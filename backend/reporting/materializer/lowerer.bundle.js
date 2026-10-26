@@ -43363,9 +43363,10 @@ Please __addLocaleData before adding additional unit data`);
   function normalizeReportViewerSettings(value) {
     if (value == null) return null;
     if (typeof value !== "object" || Array.isArray(value)) throw new Error("Report viewer settings must be an object.");
-    if (value.allowChartTableSwitch === void 0) return null;
-    if (typeof value.allowChartTableSwitch !== "boolean") throw new Error("allowChartTableSwitch must be boolean.");
-    return { allowChartTableSwitch: value.allowChartTableSwitch };
+    if (value.allowChartTableSwitch !== void 0 && typeof value.allowChartTableSwitch !== "boolean") throw new Error("allowChartTableSwitch must be boolean.");
+    if (value.appearance !== void 0 && value.appearance !== "document") throw new Error("Unsupported report viewer appearance.");
+    const settings = { ...value.allowChartTableSwitch !== void 0 ? { allowChartTableSwitch: value.allowChartTableSwitch } : {}, ...value.appearance ? { appearance: value.appearance } : {} };
+    return Object.keys(settings).length ? settings : null;
   }
 
   // src/reporting/reportDatasetRefModel.js
@@ -43526,9172 +43527,6 @@ Please __addLocaleData before adding additional unit data`);
     const difference = Number(current) - Number(previous);
     const result = calculation === "relativeChange" ? Number(previous) === 0 ? null : difference / Number(previous) : difference;
     return result === null || !Number.isFinite(result) ? null : result;
-  }
-
-  // src/utils/selector.js
-  var resolveKey = (object4, path) => {
-    try {
-      return path.split(".").reduce((acc, part) => acc && acc[part], object4);
-    } catch (e3) {
-      return void 0;
-    }
-  };
-  function assertSafeAssignmentPath(path) {
-    if (typeof path !== "string") return;
-    for (const raw of path.split(/[.:/]/)) {
-      const key = raw.startsWith("[]") ? raw.slice(2) : raw;
-      if (key === "__proto__" || key === "constructor" || key === "prototype") {
-        throw new Error(`Unsafe assignment path: ${path}`);
-      }
-    }
-  }
-  var setSelector = (holder, path, value) => {
-    assertSafeAssignmentPath(path);
-    if (!path || typeof path !== "string" || path.indexOf(".") === -1) {
-      return {
-        ...holder || {},
-        [path]: value
-      };
-    }
-    const keys2 = path.split(".");
-    const [head, ...tail] = keys2;
-    const existing = holder && typeof holder === "object" ? holder[head] : void 0;
-    return {
-      ...holder || {},
-      [head]: setSelector(existing || {}, tail.join("."), value)
-    };
-  };
-
-  // src/semantic/modelSchema.js
-  var SEMANTIC_BINDING_MODES = ["raw", "semantic"];
-  var SEMANTIC_FIELD_TYPES = [
-    "dimension",
-    "measure",
-    "parameter"
-  ];
-  var SEMANTIC_DATA_TYPES = [
-    "string",
-    "number",
-    "integer",
-    "boolean",
-    "date",
-    "datetime",
-    "time"
-  ];
-  var SEMANTIC_AGGREGATIONS = [
-    "sum",
-    "avg",
-    "min",
-    "max",
-    "count",
-    "countDistinct",
-    "ratio"
-  ];
-  var SEMANTIC_TIME_GRAINS = [
-    "hour",
-    "day",
-    "week",
-    "month",
-    "quarter",
-    "year"
-  ];
-  var SEMANTIC_GOVERNANCE_STATUSES = [
-    "draft",
-    "approved",
-    "deprecated"
-  ];
-  var SEMANTIC_CERTIFICATIONS = [
-    "none",
-    "reviewed",
-    "certified"
-  ];
-  function normalizeSemanticString(value = "") {
-    return String(value || "").trim();
-  }
-  function normalizeSemanticArray(values = []) {
-    if (Array.isArray(values)) {
-      return values.map((entry) => normalizeSemanticString(entry)).filter(Boolean);
-    }
-    const normalized = normalizeSemanticString(values);
-    return normalized ? [normalized] : [];
-  }
-
-  // src/semantic/modelRef.js
-  var MODEL_REF_PATTERN = /^model:\/\/(?<path>[A-Za-z0-9._/-]+?)(?:@(?<version>[A-Za-z0-9._-]+))?$/;
-  function parseSemanticModelRef(value = "") {
-    var _a5;
-    const input = normalizeSemanticString(value);
-    if (!input) {
-      return null;
-    }
-    const match2 = MODEL_REF_PATTERN.exec(input);
-    if (!((_a5 = match2 == null ? void 0 : match2.groups) == null ? void 0 : _a5.path)) {
-      return null;
-    }
-    const segments = match2.groups.path.split("/").map((entry) => normalizeSemanticString(entry)).filter(Boolean);
-    if (segments.length < 2) {
-      return null;
-    }
-    const model = segments[segments.length - 1];
-    const namespace = segments.slice(0, -1).join("/");
-    const version = normalizeSemanticString(match2.groups.version || "");
-    return {
-      scheme: "model",
-      namespace,
-      model,
-      version: version || "",
-      ref: formatSemanticModelRef({ namespace, model, version })
-    };
-  }
-  function formatSemanticModelRef(parts = {}) {
-    const namespace = normalizeSemanticString(parts.namespace);
-    const model = normalizeSemanticString(parts.model);
-    const version = normalizeSemanticString(parts.version);
-    if (!namespace || !model) {
-      return "";
-    }
-    return `model://${namespace}/${model}${version ? `@${version}` : ""}`;
-  }
-  function normalizeSemanticModelRef(value = "") {
-    var _a5;
-    return ((_a5 = parseSemanticModelRef(value)) == null ? void 0 : _a5.ref) || "";
-  }
-
-  // src/semantic/modelValidation.js
-  function pushError(errors, field, code, message) {
-    errors.push({ field, code, message });
-  }
-  function isPlainObject(value) {
-    return !!value && typeof value === "object" && !Array.isArray(value);
-  }
-  function normalizeGovernance(governance = {}) {
-    if (!isPlainObject(governance)) {
-      return null;
-    }
-    const status = normalizeSemanticString(governance.status).toLowerCase();
-    const certification = normalizeSemanticString(governance.certification).toLowerCase();
-    const ownerRef = normalizeSemanticString(governance.ownerRef);
-    const classification = normalizeSemanticString(governance.classification);
-    const deprecation = normalizeSemanticString(governance.deprecation);
-    const next = {};
-    if (status) next.status = status;
-    if (certification) next.certification = certification;
-    if (ownerRef) next.ownerRef = ownerRef;
-    if (classification) next.classification = classification;
-    if (deprecation) next.deprecation = deprecation;
-    return Object.keys(next).length > 0 ? next : null;
-  }
-  function normalizeSemanticFeatureType(type = "", fallbackType = "") {
-    const normalizedType2 = normalizeSemanticString(type).toLowerCase();
-    if (SEMANTIC_FIELD_TYPES.includes(normalizedType2)) {
-      return normalizedType2;
-    }
-    const normalizedFallbackType = normalizeSemanticString(fallbackType).toLowerCase();
-    if (SEMANTIC_FIELD_TYPES.includes(normalizedFallbackType)) {
-      return normalizedFallbackType;
-    }
-    return "";
-  }
-  function normalizeSemanticField(field = {}, defaults = {}) {
-    if (!isPlainObject(field)) {
-      return null;
-    }
-    const id = normalizeSemanticString(field.id || field.key);
-    if (!id) {
-      return null;
-    }
-    const key = normalizeSemanticString(field.key || id);
-    const label = normalizeSemanticString(field.label || id);
-    const dataType = normalizeSemanticString(field.dataType || defaults.dataType).toLowerCase();
-    const format2 = normalizeSemanticString(field.format);
-    const aggregation = normalizeSemanticString(field.aggregation || defaults.aggregation).toLowerCase();
-    const timeGrainSupport = normalizeSemanticArray(field.timeGrainSupport).map((entry) => entry.toLowerCase());
-    const category = normalizeSemanticString(field.category);
-    const description = normalizeSemanticString(field.description);
-    const definitionRef = normalizeSemanticString(field.definitionRef);
-    const sourceRef = normalizeSemanticString(field.sourceRef);
-    const relationshipRef = normalizeSemanticString(field.relationshipRef);
-    const governance = normalizeGovernance(field.governance);
-    const featureType = normalizeSemanticFeatureType(field.featureType, defaults.featureType);
-    return {
-      id,
-      key,
-      label,
-      ...featureType ? { featureType } : {},
-      ...description ? { description } : {},
-      ...category ? { category } : {},
-      ...dataType ? { dataType } : {},
-      ...format2 ? { format: format2 } : {},
-      ...aggregation ? { aggregation } : {},
-      ...timeGrainSupport.length > 0 ? { timeGrainSupport } : {},
-      ...definitionRef ? { definitionRef } : {},
-      ...sourceRef ? { sourceRef } : {},
-      ...relationshipRef ? { relationshipRef } : {},
-      ...governance ? { governance } : {}
-    };
-  }
-  function normalizeSemanticEntity(entity = {}) {
-    if (!isPlainObject(entity)) {
-      return null;
-    }
-    const id = normalizeSemanticString(entity.id || entity.name);
-    if (!id) {
-      return null;
-    }
-    const label = normalizeSemanticString(entity.label || id);
-    const description = normalizeSemanticString(entity.description);
-    const flatFields = (Array.isArray(entity.fields) ? entity.fields : []).map((entry) => normalizeSemanticField(entry)).filter(Boolean);
-    const dimensions = [
-      ...(Array.isArray(entity.dimensions) ? entity.dimensions : []).map((entry) => normalizeSemanticField(entry, { dataType: "string", featureType: "dimension" })).filter(Boolean),
-      ...flatFields.filter((entry) => entry.featureType === "dimension")
-    ];
-    const measures = [
-      ...(Array.isArray(entity.measures) ? entity.measures : []).map((entry) => normalizeSemanticField(entry, { dataType: "number", featureType: "measure" })).filter(Boolean),
-      ...flatFields.filter((entry) => entry.featureType === "measure")
-    ];
-    const parameters = [
-      ...(Array.isArray(entity.parameters) ? entity.parameters : []).map((entry) => normalizeSemanticField(entry, { featureType: "parameter" })).filter(Boolean),
-      ...flatFields.filter((entry) => entry.featureType === "parameter")
-    ];
-    const relationships = (Array.isArray(entity.relationships) ? entity.relationships : []).map((entry) => {
-      if (!isPlainObject(entry)) {
-        return null;
-      }
-      const id2 = normalizeSemanticString(entry.id || entry.relationshipRef);
-      const label2 = normalizeSemanticString(entry.label || id2);
-      const relationshipRef = normalizeSemanticString(entry.relationshipRef);
-      if (!id2) {
-        return null;
-      }
-      return {
-        id: id2,
-        ...label2 ? { label: label2 } : {},
-        ...relationshipRef ? { relationshipRef } : {}
-      };
-    }).filter(Boolean);
-    const governance = normalizeGovernance(entity.governance);
-    return {
-      id,
-      label,
-      ...description ? { description } : {},
-      ...dimensions.length > 0 ? { dimensions } : { dimensions: [] },
-      ...measures.length > 0 ? { measures } : { measures: [] },
-      ...parameters.length > 0 ? { parameters } : {},
-      ...relationships.length > 0 ? { relationships } : {},
-      ...governance ? { governance } : {}
-    };
-  }
-  function normalizeSemanticModel(model = {}) {
-    if (!isPlainObject(model)) {
-      return null;
-    }
-    const modelRef = normalizeSemanticModelRef(model.modelRef || model.id);
-    const version = Number(model.version || 0) || void 0;
-    const label = normalizeSemanticString(model.label || model.name);
-    const description = normalizeSemanticString(model.description);
-    const entities = (Array.isArray(model.entities) ? model.entities : []).map((entry) => normalizeSemanticEntity(entry)).filter(Boolean);
-    return {
-      ...modelRef ? { modelRef } : {},
-      ...version !== void 0 ? { version } : {},
-      ...label ? { label } : {},
-      ...description ? { description } : {},
-      entities
-    };
-  }
-  function validateSemanticModel(model = {}) {
-    const normalized = normalizeSemanticModel(model);
-    const errors = [];
-    if (!normalized) {
-      pushError(errors, "model", "invalid", "Semantic model must be an object.");
-      return { valid: false, errors, normalizedModel: null };
-    }
-    if (!normalized.modelRef) {
-      pushError(errors, "modelRef", "required", "Semantic model requires a valid modelRef.");
-    }
-    if (!Array.isArray(normalized.entities) || normalized.entities.length === 0) {
-      pushError(errors, "entities", "required", "Semantic model requires at least one entity.");
-    }
-    const entityIds = /* @__PURE__ */ new Set();
-    (normalized.entities || []).forEach((entity, entityIndex) => {
-      const rawEntity = Array.isArray(model == null ? void 0 : model.entities) ? model.entities[entityIndex] : null;
-      (Array.isArray(rawEntity == null ? void 0 : rawEntity.fields) ? rawEntity.fields : []).forEach((field, fieldIndex) => {
-        const featureType = normalizeSemanticFeatureType(field == null ? void 0 : field.featureType);
-        if (!normalizeSemanticString(field == null ? void 0 : field.featureType)) {
-          pushError(
-            errors,
-            `entities[${entityIndex}].fields[${fieldIndex}].featureType`,
-            "required",
-            "Semantic flat field entries require a featureType."
-          );
-          return;
-        }
-        if (!featureType) {
-          pushError(
-            errors,
-            `entities[${entityIndex}].fields[${fieldIndex}].featureType`,
-            "invalid",
-            `Unsupported semantic featureType '${field == null ? void 0 : field.featureType}'.`
-          );
-        }
-      });
-      if (entityIds.has(entity.id)) {
-        pushError(errors, `entities[${entityIndex}].id`, "duplicate", `Duplicate entity id '${entity.id}'.`);
-      } else {
-        entityIds.add(entity.id);
-      }
-      const fieldIds = /* @__PURE__ */ new Set();
-      const checkField = (field, fieldPath) => {
-        if (!(field == null ? void 0 : field.id)) {
-          pushError(errors, `${fieldPath}.id`, "required", "Semantic field requires an id.");
-          return;
-        }
-        if (fieldIds.has(field.id)) {
-          pushError(errors, `${fieldPath}.id`, "duplicate", `Duplicate field id '${field.id}' in entity '${entity.id}'.`);
-        } else {
-          fieldIds.add(field.id);
-        }
-        if (field.dataType && !SEMANTIC_DATA_TYPES.includes(field.dataType)) {
-          pushError(errors, `${fieldPath}.dataType`, "invalid", `Unsupported semantic dataType '${field.dataType}'.`);
-        }
-        if (field.aggregation && !SEMANTIC_AGGREGATIONS.includes(field.aggregation)) {
-          pushError(errors, `${fieldPath}.aggregation`, "invalid", `Unsupported aggregation '${field.aggregation}'.`);
-        }
-        (field.timeGrainSupport || []).forEach((grain, grainIndex) => {
-          if (!SEMANTIC_TIME_GRAINS.includes(grain)) {
-            pushError(errors, `${fieldPath}.timeGrainSupport[${grainIndex}]`, "invalid", `Unsupported time grain '${grain}'.`);
-          }
-        });
-        const governance = field.governance || {};
-        if (governance.status && !SEMANTIC_GOVERNANCE_STATUSES.includes(governance.status)) {
-          pushError(errors, `${fieldPath}.governance.status`, "invalid", `Unsupported governance status '${governance.status}'.`);
-        }
-        if (governance.certification && !SEMANTIC_CERTIFICATIONS.includes(governance.certification)) {
-          pushError(errors, `${fieldPath}.governance.certification`, "invalid", `Unsupported certification '${governance.certification}'.`);
-        }
-      };
-      (entity.dimensions || []).forEach((field, index) => checkField(field, `entities[${entityIndex}].dimensions[${index}]`));
-      (entity.measures || []).forEach((field, index) => checkField(field, `entities[${entityIndex}].measures[${index}]`));
-      (entity.parameters || []).forEach((field, index) => checkField(field, `entities[${entityIndex}].parameters[${index}]`));
-    });
-    return {
-      valid: errors.length === 0,
-      errors,
-      normalizedModel: normalized
-    };
-  }
-  function normalizeSemanticBinding(binding = {}) {
-    if (!isPlainObject(binding)) {
-      return null;
-    }
-    const mode = normalizeSemanticString(binding.mode).toLowerCase();
-    if (!mode || !SEMANTIC_BINDING_MODES.includes(mode)) {
-      return null;
-    }
-    if (mode === "raw") {
-      return { mode: "raw" };
-    }
-    const modelRef = normalizeSemanticModelRef(binding.modelRef);
-    const entity = normalizeSemanticString(binding.entity);
-    const selectedDimensions = normalizeSemanticArray(binding.selectedDimensions);
-    const selectedMeasures = normalizeSemanticArray(binding.selectedMeasures);
-    return {
-      mode: "semantic",
-      ...modelRef ? { modelRef } : {},
-      ...entity ? { entity } : {},
-      ...selectedDimensions.length > 0 ? { selectedDimensions } : { selectedDimensions: [] },
-      ...selectedMeasures.length > 0 ? { selectedMeasures } : { selectedMeasures: [] }
-    };
-  }
-  function validateSemanticBinding(binding = {}, model = null) {
-    var _a5, _b;
-    const normalized = normalizeSemanticBinding(binding);
-    const errors = [];
-    if (!normalized) {
-      pushError(errors, "binding", "invalid", "Semantic binding must declare a supported mode.");
-      return { valid: false, errors, normalizedBinding: null };
-    }
-    if (normalized.mode === "raw") {
-      return { valid: true, errors, normalizedBinding: normalized };
-    }
-    if (!normalized.modelRef) {
-      pushError(errors, "binding.modelRef", "required", "Semantic binding requires a valid modelRef.");
-    }
-    if (!normalized.entity) {
-      pushError(errors, "binding.entity", "required", "Semantic binding requires an entity.");
-    }
-    if (model) {
-      const validatedModel = validateSemanticModel(model);
-      const entity = (_b = (_a5 = validatedModel.normalizedModel) == null ? void 0 : _a5.entities) == null ? void 0 : _b.find((entry) => entry.id === normalized.entity);
-      if (!entity) {
-        pushError(errors, "binding.entity", "unknownEntity", `Unknown semantic entity '${normalized.entity}'.`);
-      } else {
-        const dimensionIds = new Set((entity.dimensions || []).map((entry) => entry.id));
-        const measureIds = new Set((entity.measures || []).map((entry) => entry.id));
-        normalized.selectedDimensions.forEach((id, index) => {
-          if (!dimensionIds.has(id)) {
-            pushError(errors, `binding.selectedDimensions[${index}]`, "unknownDimension", `Unknown semantic dimension '${id}'.`);
-          }
-        });
-        normalized.selectedMeasures.forEach((id, index) => {
-          if (!measureIds.has(id)) {
-            pushError(errors, `binding.selectedMeasures[${index}]`, "unknownMeasure", `Unknown semantic measure '${id}'.`);
-          }
-        });
-      }
-    }
-    return {
-      valid: errors.length === 0,
-      errors,
-      normalizedBinding: normalized
-    };
-  }
-
-  // src/reporting/calculationContracts.js
-  function cloneValue(value) {
-    return value == null ? value : JSON.parse(JSON.stringify(value));
-  }
-  function normalizeString2(value = "") {
-    return String(value || "").trim();
-  }
-  var REPORT_CALCULATED_FIELD_FUNCTION_SPECS = Object.freeze({
-    if: { minArgs: 3, maxArgs: 3 },
-    case: { minArgs: 3 },
-    coalesce: { minArgs: 1 },
-    isnull: { minArgs: 1, maxArgs: 1 },
-    nullif: { minArgs: 2, maxArgs: 2 },
-    abs: { minArgs: 1, maxArgs: 1 },
-    round: { minArgs: 1, maxArgs: 2 },
-    floor: { minArgs: 1, maxArgs: 1 },
-    ceil: { minArgs: 1, maxArgs: 1 },
-    min: { minArgs: 1 },
-    max: { minArgs: 1 },
-    least: { minArgs: 1 },
-    greatest: { minArgs: 1 },
-    concat: { minArgs: 1 },
-    lower: { minArgs: 1, maxArgs: 1 },
-    upper: { minArgs: 1, maxArgs: 1 }
-  });
-  var REPORT_CALCULATED_FIELD_TABLE_CALC_SPECS = Object.freeze([
-    {
-      name: "percentOfTotal",
-      label: "Percent of Total",
-      supportsPartition: true,
-      supportsDecimals: true,
-      usesFilteredScopeTotal: true,
-      nullBehavior: "nonFiniteValuesYieldZeroAndAreExcludedFromTotals",
-      defaultFormat: "percent"
-    },
-    {
-      name: "deltaFromPrevious",
-      label: "Delta From Previous",
-      supportsPartition: true,
-      requiresOrder: true,
-      nullBehavior: "nonFiniteValuesYieldZeroAndDoNotAdvancePreviousFiniteValue",
-      defaultFormat: "number"
-    },
-    {
-      name: "runningTotal",
-      label: "Running Total",
-      supportsPartition: true,
-      requiresOrder: true,
-      nullBehavior: "nonFiniteValuesDoNotAdvanceRunningTotal",
-      defaultFormat: "number"
-    },
-    {
-      name: "movingAverage",
-      label: "Moving Average",
-      supportsPartition: true,
-      requiresOrder: true,
-      requiresWindowSize: true,
-      supportsDecimals: true,
-      nullBehavior: "windowAveragesIgnoreNonFiniteValues",
-      defaultFormat: "number"
-    },
-    {
-      name: "rank",
-      label: "Rank",
-      supportsPartition: true,
-      requiresOrder: true,
-      supportsRankDirection: true,
-      supportsTieBreaker: true,
-      tieMode: "dense",
-      nullBehavior: "nonFiniteValuesYieldNullAndDoNotAdvanceRank",
-      defaultFormat: "number"
-    }
-  ]);
-  function listReportCalculatedFieldTableCalculationSpecs() {
-    return REPORT_CALCULATED_FIELD_TABLE_CALC_SPECS.map((entry) => cloneValue(entry)).sort((left, right) => normalizeString2(left.name).localeCompare(normalizeString2(right.name)));
-  }
-
-  // src/reporting/calculatedFieldModel.js
-  function normalizeString3(value = "") {
-    return String(value || "").trim();
-  }
-  function cloneValue2(value) {
-    return value == null ? value : JSON.parse(JSON.stringify(value));
-  }
-  function normalizeStringArray(values = []) {
-    return (Array.isArray(values) ? values : []).map((value) => normalizeString3(value)).filter(Boolean);
-  }
-  function normalizeOrderBy(orderBy = []) {
-    return (Array.isArray(orderBy) ? orderBy : []).map((entry) => {
-      if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
-        return null;
-      }
-      const field = normalizeString3(entry.field);
-      if (!field) {
-        return null;
-      }
-      return {
-        field,
-        direction: normalizeString3(entry.direction).toLowerCase() === "desc" ? "desc" : "asc"
-      };
-    }).filter(Boolean);
-  }
-  function normalizePartitionBy(partitionBy = []) {
-    return normalizeStringArray(partitionBy);
-  }
-  function buildExpressionError(message = "", index = 0) {
-    return new Error(`Invalid calculated field expression at ${Math.max(0, Number(index) || 0)}: ${message}`);
-  }
-  function tokenizeReportCalculatedFieldExpression(expression = "") {
-    const input = String(expression || "");
-    const tokens = [];
-    let index = 0;
-    while (index < input.length) {
-      const char = input[index];
-      if (/\s/.test(char)) {
-        index += 1;
-        continue;
-      }
-      if (char === "(" || char === ")") {
-        tokens.push({ type: "paren", value: char, index });
-        index += 1;
-        continue;
-      }
-      if (char === ",") {
-        tokens.push({ type: "comma", value: char, index });
-        index += 1;
-        continue;
-      }
-      if ((char === "!" || char === ">" || char === "<") && input[index + 1] === "=") {
-        tokens.push({ type: "operator", value: `${char}=`, index });
-        index += 2;
-        continue;
-      }
-      if (char === "=" || char === "+" || char === "-" || char === "*" || char === "/" || char === "%" || char === ">" || char === "<") {
-        tokens.push({ type: "operator", value: char, index });
-        index += 1;
-        continue;
-      }
-      if (char === "'" || char === '"') {
-        const quote = char;
-        let cursor = index + 1;
-        let value = "";
-        while (cursor < input.length) {
-          const current = input[cursor];
-          if (current === "\\") {
-            const next = input[cursor + 1];
-            if (next == null) {
-              throw buildExpressionError("unterminated escape sequence", cursor);
-            }
-            value += next;
-            cursor += 2;
-            continue;
-          }
-          if (current === quote) {
-            tokens.push({ type: "string", value, index });
-            index = cursor + 1;
-            value = null;
-            break;
-          }
-          value += current;
-          cursor += 1;
-        }
-        if (value != null) {
-          throw buildExpressionError("unterminated string literal", index);
-        }
-        continue;
-      }
-      if (/[0-9]/.test(char) || char === "." && /[0-9]/.test(input[index + 1] || "")) {
-        let cursor = index + 1;
-        while (cursor < input.length && /[0-9.]/.test(input[cursor])) {
-          cursor += 1;
-        }
-        const rawNumber = input.slice(index, cursor);
-        const numericValue = Number(rawNumber);
-        if (!Number.isFinite(numericValue)) {
-          throw buildExpressionError(`invalid number literal "${rawNumber}"`, index);
-        }
-        tokens.push({ type: "number", value: numericValue, index });
-        index = cursor;
-        continue;
-      }
-      if (/[A-Za-z_]/.test(char)) {
-        let cursor = index + 1;
-        while (cursor < input.length && /[A-Za-z0-9_.]/.test(input[cursor])) {
-          cursor += 1;
-        }
-        const rawIdentifier = input.slice(index, cursor);
-        const lowered = rawIdentifier.toLowerCase();
-        if (lowered === "and" || lowered === "or" || lowered === "not") {
-          tokens.push({ type: "operator", value: lowered, index });
-        } else if (lowered === "null") {
-          tokens.push({ type: "literal", value: null, index });
-        } else if (lowered === "true") {
-          tokens.push({ type: "literal", value: true, index });
-        } else if (lowered === "false") {
-          tokens.push({ type: "literal", value: false, index });
-        } else {
-          tokens.push({ type: "identifier", value: rawIdentifier, index });
-        }
-        index = cursor;
-        continue;
-      }
-      throw buildExpressionError(`unexpected character "${char}"`, index);
-    }
-    return tokens;
-  }
-  function parseReportCalculatedFieldExpressionTokens(tokens = []) {
-    let position = 0;
-    function current() {
-      return tokens[position] || null;
-    }
-    function consume() {
-      const token = current();
-      position += 1;
-      return token;
-    }
-    function match2(type, value = void 0) {
-      const token = current();
-      if (!token || token.type !== type) {
-        return false;
-      }
-      if (value !== void 0 && token.value !== value) {
-        return false;
-      }
-      return true;
-    }
-    function expect(type, value = void 0) {
-      var _a5, _b, _c;
-      const token = current();
-      if (!match2(type, value)) {
-        throw buildExpressionError(`expected ${value != null ? value : type}`, (_c = (_b = token == null ? void 0 : token.index) != null ? _b : (_a5 = tokens[tokens.length - 1]) == null ? void 0 : _a5.index) != null ? _c : 0);
-      }
-      return consume();
-    }
-    function parsePrimary() {
-      var _a5, _b;
-      const token = current();
-      if (!token) {
-        throw buildExpressionError("unexpected end of expression", (_b = (_a5 = tokens[tokens.length - 1]) == null ? void 0 : _a5.index) != null ? _b : 0);
-      }
-      if (token.type === "number" || token.type === "string" || token.type === "literal") {
-        consume();
-        return { type: "literal", value: token.value };
-      }
-      if (token.type === "identifier") {
-        consume();
-        if (match2("paren", "(")) {
-          consume();
-          const args = [];
-          if (!match2("paren", ")")) {
-            while (true) {
-              args.push(parseOr());
-              if (match2("comma")) {
-                consume();
-                continue;
-              }
-              break;
-            }
-          }
-          expect("paren", ")");
-          return {
-            type: "call",
-            callee: token.value,
-            args
-          };
-        }
-        return {
-          type: "identifier",
-          name: token.value
-        };
-      }
-      if (match2("paren", "(")) {
-        consume();
-        const node = parseOr();
-        expect("paren", ")");
-        return node;
-      }
-      throw buildExpressionError(`unexpected token "${token.value}"`, token.index);
-    }
-    function parseUnary() {
-      if (match2("operator", "-") || match2("operator", "not")) {
-        const token = consume();
-        return {
-          type: "unary",
-          operator: token.value,
-          argument: parseUnary()
-        };
-      }
-      return parsePrimary();
-    }
-    function parseMultiplicative() {
-      let node = parseUnary();
-      while (match2("operator", "*") || match2("operator", "/") || match2("operator", "%")) {
-        const token = consume();
-        node = {
-          type: "binary",
-          operator: token.value,
-          left: node,
-          right: parseUnary()
-        };
-      }
-      return node;
-    }
-    function parseAdditive() {
-      let node = parseMultiplicative();
-      while (match2("operator", "+") || match2("operator", "-")) {
-        const token = consume();
-        node = {
-          type: "binary",
-          operator: token.value,
-          left: node,
-          right: parseMultiplicative()
-        };
-      }
-      return node;
-    }
-    function parseComparison() {
-      let node = parseAdditive();
-      if (match2("operator", "=") || match2("operator", "!=") || match2("operator", ">") || match2("operator", ">=") || match2("operator", "<") || match2("operator", "<=")) {
-        const token = consume();
-        node = {
-          type: "binary",
-          operator: token.value,
-          left: node,
-          right: parseAdditive()
-        };
-      }
-      return node;
-    }
-    function parseAnd() {
-      let node = parseComparison();
-      while (match2("operator", "and")) {
-        consume();
-        node = {
-          type: "binary",
-          operator: "and",
-          left: node,
-          right: parseComparison()
-        };
-      }
-      return node;
-    }
-    function parseOr() {
-      let node = parseAnd();
-      while (match2("operator", "or")) {
-        consume();
-        node = {
-          type: "binary",
-          operator: "or",
-          left: node,
-          right: parseAnd()
-        };
-      }
-      return node;
-    }
-    const ast = parseOr();
-    if (position < tokens.length) {
-      throw buildExpressionError(`unexpected token "${tokens[position].value}"`, tokens[position].index);
-    }
-    return ast;
-  }
-  function collectReportCalculatedFieldExpressionDependencies(node = null, dependencies = /* @__PURE__ */ new Set()) {
-    if (!node || typeof node !== "object") {
-      return dependencies;
-    }
-    if (node.type === "identifier") {
-      dependencies.add(normalizeString3(node.name));
-      return dependencies;
-    }
-    if (node.type === "unary") {
-      return collectReportCalculatedFieldExpressionDependencies(node.argument, dependencies);
-    }
-    if (node.type === "binary") {
-      collectReportCalculatedFieldExpressionDependencies(node.left, dependencies);
-      collectReportCalculatedFieldExpressionDependencies(node.right, dependencies);
-      return dependencies;
-    }
-    if (node.type === "call") {
-      (Array.isArray(node.args) ? node.args : []).forEach((arg) => {
-        collectReportCalculatedFieldExpressionDependencies(arg, dependencies);
-      });
-    }
-    return dependencies;
-  }
-  function validateReportCalculatedFieldExpressionAst(node = null) {
-    if (!node || typeof node !== "object") {
-      return;
-    }
-    if (node.type === "literal" || node.type === "identifier") {
-      return;
-    }
-    if (node.type === "unary") {
-      validateReportCalculatedFieldExpressionAst(node.argument);
-      return;
-    }
-    if (node.type === "binary") {
-      validateReportCalculatedFieldExpressionAst(node.left);
-      validateReportCalculatedFieldExpressionAst(node.right);
-      return;
-    }
-    if (node.type === "call") {
-      const normalizedCallee = normalizeString3(node.callee).toLowerCase();
-      const spec = REPORT_CALCULATED_FIELD_FUNCTION_SPECS[normalizedCallee];
-      if (!spec) {
-        throw buildExpressionError(`unsupported function "${node.callee}"`);
-      }
-      const argCount = Array.isArray(node.args) ? node.args.length : 0;
-      if (Number.isFinite(spec.minArgs) && argCount < spec.minArgs) {
-        throw buildExpressionError(`function "${node.callee}" requires at least ${spec.minArgs} argument${spec.minArgs === 1 ? "" : "s"}`);
-      }
-      if (Number.isFinite(spec.maxArgs) && argCount > spec.maxArgs) {
-        throw buildExpressionError(`function "${node.callee}" accepts at most ${spec.maxArgs} argument${spec.maxArgs === 1 ? "" : "s"}`);
-      }
-      (Array.isArray(node.args) ? node.args : []).forEach((arg) => {
-        validateReportCalculatedFieldExpressionAst(arg);
-      });
-      return;
-    }
-    throw buildExpressionError(`unsupported expression node "${String(node.type || "unknown")}"`);
-  }
-  function parseReportCalculatedFieldExpression(expression = "") {
-    const normalizedExpression = normalizeString3(expression);
-    if (!normalizedExpression) {
-      return null;
-    }
-    const tokens = tokenizeReportCalculatedFieldExpression(normalizedExpression);
-    const ast = parseReportCalculatedFieldExpressionTokens(tokens);
-    validateReportCalculatedFieldExpressionAst(ast);
-    return {
-      expr: normalizedExpression,
-      ast,
-      dependencies: Array.from(collectReportCalculatedFieldExpressionDependencies(ast))
-    };
-  }
-  function isNullishValue(value) {
-    return value === void 0 || value === null;
-  }
-  function toFiniteNumber(value) {
-    if (isNullishValue(value) || value === "") {
-      return null;
-    }
-    const numericValue = Number(value);
-    return Number.isFinite(numericValue) ? numericValue : null;
-  }
-  function coerceBoolean(value) {
-    if (typeof value === "boolean") {
-      return value;
-    }
-    if (isNullishValue(value) || value === "") {
-      return false;
-    }
-    if (typeof value === "number") {
-      return value !== 0;
-    }
-    const trimmed = normalizeString3(value);
-    if (!trimmed) {
-      return false;
-    }
-    if (trimmed.toLowerCase() === "true") {
-      return true;
-    }
-    if (trimmed.toLowerCase() === "false") {
-      return false;
-    }
-    const numericValue = toFiniteNumber(trimmed);
-    if (numericValue != null) {
-      return numericValue !== 0;
-    }
-    return true;
-  }
-  function compareValues(left, right, operator = "=") {
-    if (isNullishValue(left) || isNullishValue(right)) {
-      return false;
-    }
-    const leftNumber = toFiniteNumber(left);
-    const rightNumber = toFiniteNumber(right);
-    if (leftNumber != null && rightNumber != null) {
-      switch (operator) {
-        case "=":
-          return leftNumber === rightNumber;
-        case "!=":
-          return leftNumber !== rightNumber;
-        case ">":
-          return leftNumber > rightNumber;
-        case ">=":
-          return leftNumber >= rightNumber;
-        case "<":
-          return leftNumber < rightNumber;
-        case "<=":
-          return leftNumber <= rightNumber;
-        default:
-          return false;
-      }
-    }
-    const leftValue = typeof left === "boolean" ? String(left) : String(left);
-    const rightValue = typeof right === "boolean" ? String(right) : String(right);
-    switch (operator) {
-      case "=":
-        return leftValue === rightValue;
-      case "!=":
-        return leftValue !== rightValue;
-      case ">":
-        return leftValue > rightValue;
-      case ">=":
-        return leftValue >= rightValue;
-      case "<":
-        return leftValue < rightValue;
-      case "<=":
-        return leftValue <= rightValue;
-      default:
-        return false;
-    }
-  }
-  function evaluateReportCalculatedFieldFunction(node = {}, row = {}) {
-    const callee = normalizeString3(node == null ? void 0 : node.callee).toLowerCase();
-    const args = Array.isArray(node == null ? void 0 : node.args) ? node.args : [];
-    switch (callee) {
-      case "if": {
-        if (args.length !== 3) {
-          return null;
-        }
-        return coerceBoolean(evaluateReportCalculatedFieldExpression(args[0], row)) ? evaluateReportCalculatedFieldExpression(args[1], row) : evaluateReportCalculatedFieldExpression(args[2], row);
-      }
-      case "case": {
-        if (args.length < 3) {
-          return null;
-        }
-        const hasElseValue = args.length % 2 === 1;
-        const pairLimit = hasElseValue ? args.length - 1 : args.length;
-        for (let index = 0; index < pairLimit; index += 2) {
-          if (coerceBoolean(evaluateReportCalculatedFieldExpression(args[index], row))) {
-            return evaluateReportCalculatedFieldExpression(args[index + 1], row);
-          }
-        }
-        return hasElseValue ? evaluateReportCalculatedFieldExpression(args[args.length - 1], row) : null;
-      }
-      case "coalesce": {
-        for (const arg of args) {
-          const value = evaluateReportCalculatedFieldExpression(arg, row);
-          if (!isNullishValue(value)) {
-            return value;
-          }
-        }
-        return null;
-      }
-      case "isnull": {
-        if (args.length !== 1) {
-          return null;
-        }
-        return isNullishValue(evaluateReportCalculatedFieldExpression(args[0], row));
-      }
-      case "nullif": {
-        if (args.length !== 2) {
-          return null;
-        }
-        const left = evaluateReportCalculatedFieldExpression(args[0], row);
-        const right = evaluateReportCalculatedFieldExpression(args[1], row);
-        return compareValues(left, right, "=") ? null : left;
-      }
-      default:
-        break;
-    }
-    const values = args.map((arg) => evaluateReportCalculatedFieldExpression(arg, row));
-    switch (callee) {
-      case "abs": {
-        const numericValue = toFiniteNumber(values[0]);
-        return numericValue == null ? null : Math.abs(numericValue);
-      }
-      case "round": {
-        const numericValue = toFiniteNumber(values[0]);
-        if (numericValue == null) {
-          return null;
-        }
-        const decimals = values.length > 1 ? toFiniteNumber(values[1]) : 0;
-        if (decimals == null) {
-          return null;
-        }
-        const factor = 10 ** Math.max(0, Math.trunc(decimals));
-        return Math.round(numericValue * factor) / factor;
-      }
-      case "floor": {
-        const numericValue = toFiniteNumber(values[0]);
-        return numericValue == null ? null : Math.floor(numericValue);
-      }
-      case "ceil": {
-        const numericValue = toFiniteNumber(values[0]);
-        return numericValue == null ? null : Math.ceil(numericValue);
-      }
-      case "min":
-      case "least": {
-        if (values.length === 0 || values.some((value) => toFiniteNumber(value) == null)) {
-          return null;
-        }
-        return Math.min(...values.map((value) => toFiniteNumber(value)));
-      }
-      case "max":
-      case "greatest": {
-        if (values.length === 0 || values.some((value) => toFiniteNumber(value) == null)) {
-          return null;
-        }
-        return Math.max(...values.map((value) => toFiniteNumber(value)));
-      }
-      case "concat": {
-        if (values.some((value) => isNullishValue(value))) {
-          return null;
-        }
-        return values.map((value) => String(value)).join("");
-      }
-      case "lower": {
-        if (isNullishValue(values[0])) {
-          return null;
-        }
-        return String(values[0]).toLowerCase();
-      }
-      case "upper": {
-        if (isNullishValue(values[0])) {
-          return null;
-        }
-        return String(values[0]).toUpperCase();
-      }
-      default:
-        return null;
-    }
-  }
-  function evaluateReportCalculatedFieldExpression(expressionOrNode = null, row = {}) {
-    var _a5;
-    const node = typeof expressionOrNode === "string" ? (_a5 = parseReportCalculatedFieldExpression(expressionOrNode)) == null ? void 0 : _a5.ast : expressionOrNode;
-    if (!node || typeof node !== "object") {
-      return null;
-    }
-    switch (node.type) {
-      case "literal":
-        return cloneValue2(node.value);
-      case "identifier": {
-        const value = resolveKey(row, node.name);
-        return value === void 0 ? null : cloneValue2(value);
-      }
-      case "unary": {
-        const value = evaluateReportCalculatedFieldExpression(node.argument, row);
-        if (node.operator === "not") {
-          return !coerceBoolean(value);
-        }
-        if (node.operator === "-") {
-          const numericValue = toFiniteNumber(value);
-          return numericValue == null ? null : -numericValue;
-        }
-        return null;
-      }
-      case "binary": {
-        if (node.operator === "and") {
-          return coerceBoolean(evaluateReportCalculatedFieldExpression(node.left, row)) && coerceBoolean(evaluateReportCalculatedFieldExpression(node.right, row));
-        }
-        if (node.operator === "or") {
-          return coerceBoolean(evaluateReportCalculatedFieldExpression(node.left, row)) || coerceBoolean(evaluateReportCalculatedFieldExpression(node.right, row));
-        }
-        const left = evaluateReportCalculatedFieldExpression(node.left, row);
-        const right = evaluateReportCalculatedFieldExpression(node.right, row);
-        if (node.operator === "+" || node.operator === "-" || node.operator === "*" || node.operator === "/" || node.operator === "%") {
-          const leftNumber = toFiniteNumber(left);
-          const rightNumber = toFiniteNumber(right);
-          if (leftNumber == null || rightNumber == null) {
-            return null;
-          }
-          if ((node.operator === "/" || node.operator === "%") && rightNumber === 0) {
-            return null;
-          }
-          switch (node.operator) {
-            case "+":
-              return leftNumber + rightNumber;
-            case "-":
-              return leftNumber - rightNumber;
-            case "*":
-              return leftNumber * rightNumber;
-            case "/":
-              return leftNumber / rightNumber;
-            case "%":
-              return leftNumber % rightNumber;
-            default:
-              return null;
-          }
-        }
-        return compareValues(left, right, node.operator);
-      }
-      case "call":
-        return evaluateReportCalculatedFieldFunction(node, row);
-      default:
-        return null;
-    }
-  }
-  function normalizeRatioCalculation(compute = {}) {
-    const numerator = normalizeString3(compute == null ? void 0 : compute.numerator);
-    const denominator = normalizeString3(compute == null ? void 0 : compute.denominator);
-    if (!numerator || !denominator) {
-      return null;
-    }
-    const next = {
-      type: "ratio",
-      numerator,
-      denominator
-    };
-    if (Number.isFinite(Number(compute == null ? void 0 : compute.scale))) {
-      next.scale = Number(compute.scale);
-    }
-    if (Number.isFinite(Number(compute == null ? void 0 : compute.decimals))) {
-      next.decimals = Number(compute.decimals);
-    }
-    return next;
-  }
-  function normalizePercentOfTotalCalculation(compute = {}) {
-    const sourceField = normalizeString3(compute == null ? void 0 : compute.sourceField);
-    if (!sourceField) {
-      return null;
-    }
-    const next = {
-      type: "percentOfTotal",
-      sourceField
-    };
-    const partitionBy = normalizePartitionBy(compute == null ? void 0 : compute.partitionBy);
-    if (partitionBy.length > 0) {
-      next.partitionBy = partitionBy;
-    }
-    if (Number.isFinite(Number(compute == null ? void 0 : compute.scale))) {
-      next.scale = Number(compute.scale);
-    }
-    if (Number.isFinite(Number(compute == null ? void 0 : compute.decimals))) {
-      next.decimals = Number(compute.decimals);
-    }
-    return next;
-  }
-  function normalizeDeltaFromPreviousCalculation(compute = {}) {
-    const sourceField = normalizeString3(compute == null ? void 0 : compute.sourceField);
-    const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
-    if (!sourceField || orderBy.length === 0) {
-      return null;
-    }
-    const next = {
-      type: "deltaFromPrevious",
-      sourceField,
-      orderBy
-    };
-    const partitionBy = normalizePartitionBy(compute == null ? void 0 : compute.partitionBy);
-    if (partitionBy.length > 0) {
-      next.partitionBy = partitionBy;
-    }
-    return next;
-  }
-  function normalizeRunningTotalCalculation(compute = {}) {
-    const sourceField = normalizeString3(compute == null ? void 0 : compute.sourceField);
-    const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
-    if (!sourceField || orderBy.length === 0) {
-      return null;
-    }
-    const next = {
-      type: "runningTotal",
-      sourceField,
-      orderBy
-    };
-    const partitionBy = normalizePartitionBy(compute == null ? void 0 : compute.partitionBy);
-    if (partitionBy.length > 0) {
-      next.partitionBy = partitionBy;
-    }
-    return next;
-  }
-  function normalizeMovingAverageCalculation(compute = {}) {
-    const sourceField = normalizeString3(compute == null ? void 0 : compute.sourceField);
-    const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
-    const windowSize = Math.max(1, Number((compute == null ? void 0 : compute.windowSize) || 0) || 0);
-    if (!sourceField || orderBy.length === 0 || !windowSize) {
-      return null;
-    }
-    const next = {
-      type: "movingAverage",
-      sourceField,
-      orderBy,
-      windowSize
-    };
-    if (Number.isFinite(Number(compute == null ? void 0 : compute.decimals))) {
-      next.decimals = Number(compute.decimals);
-    }
-    const partitionBy = normalizePartitionBy(compute == null ? void 0 : compute.partitionBy);
-    if (partitionBy.length > 0) {
-      next.partitionBy = partitionBy;
-    }
-    return next;
-  }
-  function normalizeRankCalculation(compute = {}) {
-    var _a5;
-    const sourceField = normalizeString3(compute == null ? void 0 : compute.sourceField);
-    const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
-    const tieMode = normalizeString3(compute == null ? void 0 : compute.tieMode).toLowerCase();
-    if (!sourceField || orderBy.length === 0 || ((_a5 = orderBy[0]) == null ? void 0 : _a5.field) !== sourceField) {
-      return null;
-    }
-    if (tieMode && tieMode !== "dense") {
-      return null;
-    }
-    const next = {
-      type: "rank",
-      sourceField,
-      orderBy,
-      tieMode: "dense"
-    };
-    const partitionBy = normalizePartitionBy(compute == null ? void 0 : compute.partitionBy);
-    if (partitionBy.length > 0) {
-      next.partitionBy = partitionBy;
-    }
-    return next;
-  }
-  function buildCalculatedFieldDependencies(definition = {}, inferredDependencies = []) {
-    return Array.from(/* @__PURE__ */ new Set([
-      ...normalizeStringArray(definition == null ? void 0 : definition.dependencies),
-      ...normalizeStringArray(inferredDependencies)
-    ]));
-  }
-  function normalizeReportCalculatedFieldExpressionDefinition(definition = {}) {
-    const expr = normalizeString3(definition == null ? void 0 : definition.expr);
-    if (!expr) {
-      return null;
-    }
-    const parsed = parseReportCalculatedFieldExpression(expr);
-    if (!(parsed == null ? void 0 : parsed.ast)) {
-      return null;
-    }
-    return {
-      expr,
-      dependencies: buildCalculatedFieldDependencies(definition, parsed.dependencies)
-    };
-  }
-  function normalizeReportCalculatedFieldCompute(definition = {}) {
-    var _a5;
-    const computeType = normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type).toLowerCase();
-    let compute = null;
-    if (computeType === "ratio") {
-      compute = normalizeRatioCalculation(definition.compute);
-    } else if (computeType === "percentoftotal") {
-      compute = normalizePercentOfTotalCalculation(definition.compute);
-    } else if (computeType === "deltafromprevious") {
-      compute = normalizeDeltaFromPreviousCalculation(definition.compute);
-    } else if (computeType === "runningtotal") {
-      compute = normalizeRunningTotalCalculation(definition.compute);
-    } else if (computeType === "movingaverage") {
-      compute = normalizeMovingAverageCalculation(definition.compute);
-    } else if (computeType === "rank") {
-      compute = normalizeRankCalculation(definition.compute);
-    }
-    if (!compute) {
-      return null;
-    }
-    const inferredDependencies = computeType === "percentoftotal" ? [compute.sourceField, ...normalizePartitionBy(compute.partitionBy)] : computeType === "deltafromprevious" || computeType === "runningtotal" || computeType === "movingaverage" || computeType === "rank" ? [compute.sourceField, ...compute.orderBy.map((entry) => entry.field), ...normalizePartitionBy(compute.partitionBy)] : [compute.numerator, compute.denominator];
-    return {
-      compute,
-      dependencies: buildCalculatedFieldDependencies(definition, inferredDependencies)
-    };
-  }
-  function normalizeReportCalculatedField(definition = {}, {
-    datasetRef = ""
-  } = {}) {
-    var _a5, _b, _c, _d, _e;
-    if (!definition || typeof definition !== "object" || Array.isArray(definition)) {
-      return null;
-    }
-    const id = normalizeString3((definition == null ? void 0 : definition.id) || (definition == null ? void 0 : definition.key));
-    if (!id) {
-      return null;
-    }
-    const normalizedExpression = normalizeReportCalculatedFieldExpressionDefinition(definition);
-    const normalizedCompute = normalizedExpression ? null : normalizeReportCalculatedFieldCompute(definition);
-    if (!normalizedExpression && !normalizedCompute) {
-      return null;
-    }
-    const kind = normalizedExpression ? "rowCalc" : normalizeString3((_a5 = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _a5.type).toLowerCase() === "percentoftotal" || normalizeString3((_b = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _b.type).toLowerCase() === "deltafromprevious" || normalizeString3((_c = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _c.type).toLowerCase() === "runningtotal" || normalizeString3((_d = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _d.type).toLowerCase() === "movingaverage" || normalizeString3((_e = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _e.type).toLowerCase() === "rank" ? "tableCalc" : "rowCalc";
-    if (normalizedExpression && normalizeString3(definition == null ? void 0 : definition.kind) && normalizeString3(definition.kind) !== "rowCalc") {
-      return null;
-    }
-    return {
-      id,
-      key: normalizeString3((definition == null ? void 0 : definition.key) || id),
-      kind,
-      label: normalizeString3((definition == null ? void 0 : definition.label) || id),
-      dataType: normalizeString3((definition == null ? void 0 : definition.dataType) || "number") || "number",
-      ...normalizeString3(definition == null ? void 0 : definition.format) ? { format: normalizeString3(definition.format) } : {},
-      ...normalizeString3(datasetRef || (definition == null ? void 0 : definition.datasetRef)) ? { datasetRef: normalizeString3(datasetRef || (definition == null ? void 0 : definition.datasetRef)) } : {},
-      dependencies: (normalizedExpression == null ? void 0 : normalizedExpression.dependencies) || (normalizedCompute == null ? void 0 : normalizedCompute.dependencies) || [],
-      ...normalizedExpression ? { expr: normalizedExpression.expr } : { compute: normalizedCompute.compute }
-    };
-  }
-  function normalizeReportCalculatedFields(definitions = [], options = {}) {
-    return (Array.isArray(definitions) ? definitions : []).map((definition) => normalizeReportCalculatedField(definition, options)).filter(Boolean);
-  }
-  function buildPartitionGroups(rowsToPartition = [], partitionBy = []) {
-    const normalizedPartitionBy = normalizePartitionBy(partitionBy);
-    if (normalizedPartitionBy.length === 0) {
-      return [[...rowsToPartition]];
-    }
-    const groups = /* @__PURE__ */ new Map();
-    rowsToPartition.forEach((row) => {
-      const key = JSON.stringify(normalizedPartitionBy.map((field) => resolveKey(row, field)));
-      const current = groups.get(key) || [];
-      current.push(row);
-      groups.set(key, current);
-    });
-    return Array.from(groups.values());
-  }
-  function sortRowsByOrder(rowsToSort = [], orderBy = []) {
-    return [...rowsToSort].sort((left, right) => {
-      for (const order of normalizeOrderBy(orderBy)) {
-        const leftValue = resolveKey(left, order.field);
-        const rightValue = resolveKey(right, order.field);
-        if (leftValue === rightValue) {
-          continue;
-        }
-        const comparison = String(leftValue != null ? leftValue : "").localeCompare(String(rightValue != null ? rightValue : ""), void 0, { numeric: true });
-        return order.direction === "desc" ? -comparison : comparison;
-      }
-      return 0;
-    });
-  }
-  function topologicallySortRowCalculatedFields(definitions = []) {
-    const byKey = new Map(
-      definitions.map((definition) => [normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id)), definition]).filter(([key]) => !!key)
-    );
-    const pending = new Set(byKey.keys());
-    const sorted = [];
-    let progressed = true;
-    while (pending.size > 0 && progressed) {
-      progressed = false;
-      Array.from(pending).forEach((key) => {
-        const definition = byKey.get(key);
-        const unresolved = normalizeStringArray(definition == null ? void 0 : definition.dependencies).filter((dependencyKey) => {
-          if (dependencyKey === key || !byKey.has(dependencyKey)) {
-            return false;
-          }
-          return pending.has(dependencyKey);
-        });
-        if (unresolved.length > 0) {
-          return;
-        }
-        sorted.push(definition);
-        pending.delete(key);
-        progressed = true;
-      });
-    }
-    Array.from(pending).forEach((key) => {
-      sorted.push(byKey.get(key));
-    });
-    return sorted;
-  }
-  function applyReportCalculatedFields(rows = [], calculatedFields = [], {
-    datasetRef = ""
-  } = {}) {
-    const applicableFields = normalizeReportCalculatedFields(calculatedFields).filter((definition) => {
-      const targetDatasetRef = normalizeString3(definition == null ? void 0 : definition.datasetRef);
-      if (!targetDatasetRef) {
-        return true;
-      }
-      return targetDatasetRef === normalizeString3(datasetRef);
-    });
-    if (applicableFields.length === 0) {
-      return Array.isArray(rows) ? rows : [];
-    }
-    const compiledExpressions = new Map(
-      applicableFields.filter((definition) => normalizeString3(definition == null ? void 0 : definition.expr)).map((definition) => {
-        var _a5;
-        return [normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id)), ((_a5 = parseReportCalculatedFieldExpression(definition.expr)) == null ? void 0 : _a5.ast) || null];
-      })
-    );
-    const rowCalculated = (Array.isArray(rows) ? rows : []).map((row) => {
-      const next = { ...row || {} };
-      topologicallySortRowCalculatedFields(applicableFields.filter((definition) => definition.kind === "rowCalc")).forEach((definition) => {
-        var _a5, _b, _c;
-        const outputKey = normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
-        if (!outputKey) {
-          return;
-        }
-        if (normalizeString3(definition == null ? void 0 : definition.expr)) {
-          next[outputKey] = evaluateReportCalculatedFieldExpression(compiledExpressions.get(outputKey), next);
-          return;
-        }
-        if (normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "ratio") {
-          const numerator = Number(resolveKey(next, definition.compute.numerator));
-          const denominator = Number(resolveKey(next, definition.compute.denominator));
-          const scale = Number.isFinite(Number((_b = definition == null ? void 0 : definition.compute) == null ? void 0 : _b.scale)) ? Number(definition.compute.scale) : 1;
-          const decimals = Number.isFinite(Number((_c = definition == null ? void 0 : definition.compute) == null ? void 0 : _c.decimals)) ? Number(definition.compute.decimals) : null;
-          let value = 0;
-          if (Number.isFinite(numerator) && Number.isFinite(denominator) && denominator !== 0) {
-            value = numerator / denominator * scale;
-          }
-          if (decimals != null) {
-            value = Number(value.toFixed(decimals));
-          }
-          next[outputKey] = value;
-        }
-      });
-      return next;
-    });
-    const withTableCalcs = rowCalculated.map((row) => ({ ...row }));
-    applicableFields.filter((definition) => {
-      var _a5;
-      return normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "percentOfTotal";
-    }).forEach((definition) => {
-      var _a5, _b, _c, _d;
-      const outputKey = normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
-      const sourceField = normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.sourceField);
-      if (!outputKey || !sourceField) {
-        return;
-      }
-      const scale = Number.isFinite(Number((_b = definition == null ? void 0 : definition.compute) == null ? void 0 : _b.scale)) ? Number(definition.compute.scale) : 100;
-      const decimals = Number.isFinite(Number((_c = definition == null ? void 0 : definition.compute) == null ? void 0 : _c.decimals)) ? Number(definition.compute.decimals) : null;
-      buildPartitionGroups(withTableCalcs, (_d = definition == null ? void 0 : definition.compute) == null ? void 0 : _d.partitionBy).forEach((groupRows) => {
-        const total = groupRows.reduce((sum, row) => {
-          const value = toFiniteNumber(resolveKey(row, sourceField));
-          return value != null ? sum + value : sum;
-        }, 0);
-        groupRows.forEach((row) => {
-          const sourceValue = toFiniteNumber(resolveKey(row, sourceField));
-          let value = 0;
-          if (sourceValue != null && total !== 0) {
-            value = sourceValue / total * scale;
-          }
-          if (decimals != null) {
-            value = Number(value.toFixed(decimals));
-          }
-          row[outputKey] = value;
-        });
-      });
-    });
-    applicableFields.filter((definition) => {
-      var _a5;
-      return normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "deltaFromPrevious";
-    }).forEach((definition) => {
-      var _a5, _b, _c;
-      const outputKey = normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
-      const sourceField = normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.sourceField);
-      const orderBy = normalizeOrderBy((_b = definition == null ? void 0 : definition.compute) == null ? void 0 : _b.orderBy);
-      if (!outputKey || !sourceField || orderBy.length === 0) {
-        return;
-      }
-      buildPartitionGroups(withTableCalcs, (_c = definition == null ? void 0 : definition.compute) == null ? void 0 : _c.partitionBy).forEach((groupRows) => {
-        const sortedRows = sortRowsByOrder(groupRows, orderBy);
-        let previousValue = null;
-        sortedRows.forEach((row) => {
-          const sourceValue = toFiniteNumber(resolveKey(row, sourceField));
-          let value = 0;
-          if (sourceValue != null && previousValue != null) {
-            value = sourceValue - previousValue;
-          }
-          row[outputKey] = value;
-          previousValue = sourceValue != null ? sourceValue : previousValue;
-        });
-      });
-    });
-    applicableFields.filter((definition) => {
-      var _a5;
-      return normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "runningTotal";
-    }).forEach((definition) => {
-      var _a5, _b, _c;
-      const outputKey = normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
-      const sourceField = normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.sourceField);
-      const orderBy = normalizeOrderBy((_b = definition == null ? void 0 : definition.compute) == null ? void 0 : _b.orderBy);
-      if (!outputKey || !sourceField || orderBy.length === 0) {
-        return;
-      }
-      buildPartitionGroups(withTableCalcs, (_c = definition == null ? void 0 : definition.compute) == null ? void 0 : _c.partitionBy).forEach((groupRows) => {
-        const sortedRows = sortRowsByOrder(groupRows, orderBy);
-        let runningValue = 0;
-        sortedRows.forEach((row) => {
-          const sourceValue = toFiniteNumber(resolveKey(row, sourceField));
-          if (sourceValue != null) {
-            runningValue += sourceValue;
-          }
-          row[outputKey] = runningValue;
-        });
-      });
-    });
-    applicableFields.filter((definition) => {
-      var _a5;
-      return normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "movingAverage";
-    }).forEach((definition) => {
-      var _a5, _b, _c, _d;
-      const outputKey = normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
-      const sourceField = normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.sourceField);
-      const orderBy = normalizeOrderBy((_b = definition == null ? void 0 : definition.compute) == null ? void 0 : _b.orderBy);
-      const windowSize = Math.max(1, Number(((_c = definition == null ? void 0 : definition.compute) == null ? void 0 : _c.windowSize) || 0) || 0);
-      if (!outputKey || !sourceField || orderBy.length === 0 || !windowSize) {
-        return;
-      }
-      buildPartitionGroups(withTableCalcs, (_d = definition == null ? void 0 : definition.compute) == null ? void 0 : _d.partitionBy).forEach((groupRows) => {
-        const sortedRows = sortRowsByOrder(groupRows, orderBy);
-        sortedRows.forEach((row, index) => {
-          var _a6;
-          const windowRows = sortedRows.slice(Math.max(0, index - windowSize + 1), index + 1);
-          const numericValues = windowRows.map((entry) => toFiniteNumber(resolveKey(entry, sourceField))).filter((value2) => value2 != null);
-          let value = 0;
-          if (numericValues.length > 0) {
-            value = numericValues.reduce((sum, entry) => sum + entry, 0) / numericValues.length;
-          }
-          const decimals = Number.isFinite(Number((_a6 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a6.decimals)) ? Number(definition.compute.decimals) : null;
-          if (decimals != null) {
-            value = Number(value.toFixed(decimals));
-          }
-          row[outputKey] = value;
-        });
-      });
-    });
-    applicableFields.filter((definition) => {
-      var _a5;
-      return normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "rank";
-    }).forEach((definition) => {
-      var _a5, _b, _c, _d, _e;
-      const outputKey = normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
-      const sourceField = normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.sourceField);
-      const orderBy = normalizeOrderBy((_b = definition == null ? void 0 : definition.compute) == null ? void 0 : _b.orderBy);
-      const tieMode = normalizeString3((_c = definition == null ? void 0 : definition.compute) == null ? void 0 : _c.tieMode).toLowerCase();
-      if (!outputKey || !sourceField || orderBy.length === 0 || ((_d = orderBy[0]) == null ? void 0 : _d.field) !== sourceField) {
-        return;
-      }
-      if (tieMode && tieMode !== "dense") {
-        return;
-      }
-      buildPartitionGroups(withTableCalcs, (_e = definition == null ? void 0 : definition.compute) == null ? void 0 : _e.partitionBy).forEach((groupRows) => {
-        const sortedRows = sortRowsByOrder(groupRows, orderBy);
-        let rank = 0;
-        let previousValue;
-        let hasPreviousValue = false;
-        sortedRows.forEach((row) => {
-          const sourceValue = resolveKey(row, sourceField);
-          if (sourceValue === void 0 || sourceValue === null || sourceValue === "") {
-            row[outputKey] = null;
-            return;
-          }
-          const normalizedValue = String(sourceValue);
-          if (!hasPreviousValue || normalizedValue !== previousValue) {
-            rank += 1;
-            previousValue = normalizedValue;
-            hasPreviousValue = true;
-          }
-          row[outputKey] = rank;
-        });
-      });
-    });
-    return withTableCalcs;
-  }
-  function cloneReportCalculatedFields(calculatedFields = []) {
-    return normalizeReportCalculatedFields(calculatedFields).map((definition) => cloneValue2(definition));
-  }
-
-  // src/utils/presentationText.js
-  var CONTROL_CHARACTERS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g;
-  var UNICODE_REPLACEMENT_RUN = /\uFFFD+/g;
-  function normalizePresentationText(value = "", { replacement = "?" } = {}) {
-    let text = String(value != null ? value : "").replace(CONTROL_CHARACTERS, "").replace(UNICODE_REPLACEMENT_RUN, replacement);
-    try {
-      text = text.normalize("NFC");
-    } catch (_2) {
-    }
-    return text.replace(/\s+/g, " ").trim();
-  }
-  function normalizePresentationClampConfig(value = null) {
-    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-    const lines = Number(value.lines);
-    if (lines !== 1 && lines !== 2) return null;
-    return {
-      lines,
-      maxCharacters: Math.max(4, Math.min(120, Number(value.maxCharacters) || 28))
-    };
-  }
-
-  // src/reporting/reportTableLink.js
-  function normalizeString4(value = "") {
-    return String(value != null ? value : "").trim();
-  }
-  function normalizeReportTableLink(link = null) {
-    if (!link || typeof link !== "object" || Array.isArray(link)) return null;
-    const kind = normalizeString4(link.kind).toLowerCase();
-    if (kind === "external") {
-      const urlField = normalizeString4(link.urlField);
-      return urlField ? { kind: "external", urlField } : null;
-    }
-    if (kind === "entitydetail") {
-      const handler = normalizeString4(link.handler);
-      const idField = normalizeString4(link.idField);
-      return handler && idField ? { kind: "entityDetail", handler, idField } : null;
-    }
-    return null;
-  }
-
-  // src/reporting/tableVisualSpec.js
-  function normalizeString5(value = "") {
-    return String(value || "").trim();
-  }
-  function isTruncatedPlaceholder(value = "") {
-    return normalizeString5(value) === "[MaxDepth]";
-  }
-  function cloneValue3(value) {
-    return value == null ? value : JSON.parse(JSON.stringify(value));
-  }
-  function normalizeStringArray2(values = []) {
-    return (Array.isArray(values) ? values : []).map((value) => normalizeString5(value)).filter(Boolean);
-  }
-  function normalizeRange(range = {}) {
-    if (!range || typeof range !== "object" || Array.isArray(range)) {
-      return null;
-    }
-    const mode = normalizeString5(range.mode);
-    const next = {
-      ...mode ? { mode } : {},
-      ...Number.isFinite(Number(range.min)) ? { min: Number(range.min) } : {},
-      ...Number.isFinite(Number(range.max)) ? { max: Number(range.max) } : {}
-    };
-    return Object.keys(next).length > 0 ? next : null;
-  }
-  function normalizeRules(rules = []) {
-    return (Array.isArray(rules) ? rules : []).map((rule) => {
-      if (!rule || typeof rule !== "object" || Array.isArray(rule)) {
-        return null;
-      }
-      const next = {
-        ..."value" in rule ? { value: cloneValue3(rule.value) } : {},
-        ...normalizeString5(rule.tone) ? { tone: normalizeString5(rule.tone) } : {},
-        ...normalizeString5(rule.label) ? { label: normalizeString5(rule.label) } : {},
-        ...normalizeString5(rule.color) ? { color: normalizeString5(rule.color) } : {},
-        ...normalizeString5(rule.background) ? { background: normalizeString5(rule.background) } : {}
-      };
-      return Object.keys(next).length > 0 ? next : null;
-    }).filter(Boolean);
-  }
-  function normalizeSegments(segments = []) {
-    return (Array.isArray(segments) ? segments : []).map((segment) => {
-      if (!segment || typeof segment !== "object" || Array.isArray(segment)) {
-        return null;
-      }
-      const valueField = normalizeString5(segment.valueField);
-      if (!valueField) {
-        return null;
-      }
-      const next = {
-        valueField,
-        ...normalizeString5(segment.label) ? { label: normalizeString5(segment.label) } : {},
-        ...normalizeString5(segment.color) ? { color: normalizeString5(segment.color) } : {}
-      };
-      return next;
-    }).filter(Boolean);
-  }
-  function normalizeReportTableCellVisual(cellVisual = {}) {
-    if (!cellVisual || typeof cellVisual !== "object" || Array.isArray(cellVisual)) {
-      return null;
-    }
-    const kind = normalizeString5(cellVisual.kind);
-    if (!["dataBar", "progressBar", "sparkBar", "shareBar", "tone", "badge", "delta", "rank"].includes(kind)) {
-      return null;
-    }
-    const next = {
-      kind,
-      ...normalizeString5(cellVisual.valueField) ? { valueField: normalizeString5(cellVisual.valueField) } : {},
-      ...normalizeString5(cellVisual.colorField) ? { colorField: normalizeString5(cellVisual.colorField) } : {},
-      ...normalizeRange(cellVisual.range) ? { range: normalizeRange(cellVisual.range) } : {},
-      ...normalizeStringArray2(cellVisual.palette).length > 0 ? { palette: normalizeStringArray2(cellVisual.palette) } : {},
-      ...normalizeSegments(cellVisual.segments).length > 0 ? { segments: normalizeSegments(cellVisual.segments) } : {},
-      ...normalizeString5(cellVisual.nullBehavior) ? { nullBehavior: normalizeString5(cellVisual.nullBehavior) } : {},
-      ...normalizeRules(cellVisual.rules).length > 0 ? { rules: normalizeRules(cellVisual.rules) } : {},
-      ...(cellVisual == null ? void 0 : cellVisual.positiveIsGood) === false ? { positiveIsGood: false } : {}
-    };
-    return next;
-  }
-  function normalizeReportTableBlockColumn(column = {}) {
-    if (!column || typeof column !== "object" || Array.isArray(column)) {
-      return null;
-    }
-    const key = normalizeString5(column.key);
-    if (!key || isTruncatedPlaceholder(key)) {
-      return null;
-    }
-    const cellVisual = normalizeReportTableCellVisual(column.cellVisual);
-    const link = normalizeReportTableLink(column.link);
-    const labelClamp = normalizePresentationClampConfig(column.labelClamp);
-    return {
-      key,
-      ...normalizeString5(column.sourceKey) ? { sourceKey: normalizeString5(column.sourceKey) } : {},
-      ...normalizeString5(column.displayKey) ? { displayKey: normalizeString5(column.displayKey) } : {},
-      ...(column == null ? void 0 : column.displayValueMap) && typeof column.displayValueMap === "object" && !Array.isArray(column.displayValueMap) ? { displayValueMap: cloneValue3(column.displayValueMap) } : {},
-      ...(column == null ? void 0 : column.displayIconMap) && typeof column.displayIconMap === "object" && !Array.isArray(column.displayIconMap) ? { displayIconMap: cloneValue3(column.displayIconMap) } : {},
-      ...normalizeString5(column.kind) ? { kind: normalizeString5(column.kind) } : {},
-      ...normalizeString5(column.label) ? { label: normalizeString5(column.label) } : {},
-      ...normalizeString5(column.format) || normalizeString5(column.valueFormat) ? { format: normalizeString5(column.format) || normalizeString5(column.valueFormat) } : {},
-      ...normalizeString5(column.align) ? { align: normalizeString5(column.align) } : {},
-      ...(column == null ? void 0 : column.runtimeFilterable) === true ? { runtimeFilterable: true } : {},
-      ...(column == null ? void 0 : column.rowIdentity) === true ? { rowIdentity: true } : {},
-      ...link ? { link } : {},
-      ...cellVisual ? { cellVisual } : {},
-      ...labelClamp ? { labelClamp } : {}
-    };
-  }
-  function normalizeReportDocumentTableBlock(block = {}) {
-    const id = normalizeString5((block == null ? void 0 : block.id) || "tableBlock");
-    const title = normalizeString5((block == null ? void 0 : block.title) || "Table");
-    const datasetRef = normalizeString5((block == null ? void 0 : block.datasetRef) || "primary");
-    const rawColumns = Array.isArray(block == null ? void 0 : block.columns) ? block.columns : [];
-    const rawColumnKeys = Array.isArray(block == null ? void 0 : block.columnKeys) ? block.columnKeys : [];
-    const explicitColumns = (Array.isArray(block == null ? void 0 : block.columns) ? block.columns : []).map((column) => normalizeReportTableBlockColumn(column)).filter(Boolean);
-    const columns = explicitColumns.length > 0 ? explicitColumns : normalizeStringArray2(block == null ? void 0 : block.columnKeys).filter((key) => !isTruncatedPlaceholder(key)).map((key) => ({ key }));
-    if (columns.length === 0 && (rawColumns.some((column) => isTruncatedPlaceholder(column == null ? void 0 : column.key)) || rawColumnKeys.some((key) => isTruncatedPlaceholder(key)))) {
-      return null;
-    }
-    const accentTone = normalizeString5(block == null ? void 0 : block.accentTone).toLowerCase();
-    const labelClamp = normalizePresentationClampConfig(block == null ? void 0 : block.labelClamp);
-    return {
-      id,
-      kind: "tableBlock",
-      title,
-      datasetRef,
-      columns,
-      ...["blue", "green", "amber", "rose", "slate"].includes(accentTone) ? { accentTone } : {},
-      ...(block == null ? void 0 : block.collapsible) === true ? { collapsible: true } : {},
-      ...(block == null ? void 0 : block.collapsible) === true && (block == null ? void 0 : block.defaultCollapsed) === true ? { defaultCollapsed: true } : {},
-      ...labelClamp ? { labelClamp } : {}
-    };
-  }
-
-  // src/components/dashboard/reportBuilderCalculatedFieldAuthoring.js
-  function normalizeString6(value = "") {
-    return String(value || "").trim();
-  }
-  function cloneValue4(value) {
-    return value == null ? value : JSON.parse(JSON.stringify(value));
-  }
-  function normalizeMeasureSections(measureSections = []) {
-    return (Array.isArray(measureSections) ? measureSections : []).filter((section) => section && typeof section === "object" && !Array.isArray(section)).map((section, index) => ({
-      ...cloneValue4(section),
-      id: normalizeString6(section == null ? void 0 : section.id),
-      label: normalizeString6(section == null ? void 0 : section.label),
-      order: Number.isFinite(Number(section == null ? void 0 : section.order)) ? Number(section.order) : index
-    })).filter((section) => section.id);
-  }
-  function buildLocalCalculatedFieldSectionConfig(config = {}, localCalculatedFields = []) {
-    const normalizedSections = normalizeMeasureSections(config == null ? void 0 : config.measureSections);
-    if ((localCalculatedFields || []).length === 0) {
-      return normalizedSections;
-    }
-    const existingCalculatedSection = normalizedSections.find((section) => section.id === "calculated");
-    if (existingCalculatedSection) {
-      return normalizedSections;
-    }
-    return [
-      ...normalizedSections,
-      {
-        id: "calculated",
-        label: "Calculated",
-        order: Number.MAX_SAFE_INTEGER
-      }
-    ];
-  }
-  function normalizeReportBuilderLocalCalculatedFields(calculatedFields = []) {
-    return normalizeReportCalculatedFields(calculatedFields).filter((field) => (field == null ? void 0 : field.kind) === "rowCalc" && normalizeString6(field == null ? void 0 : field.expr)).map((field) => cloneValue4(field));
-  }
-  function normalizeReportBuilderLocalTableCalculations(calculatedFields = []) {
-    return normalizeReportCalculatedFields(calculatedFields).filter((field) => (field == null ? void 0 : field.kind) === "tableCalc" && (field == null ? void 0 : field.compute)).map((field) => cloneValue4(field));
-  }
-  function mergeAuthoringFieldSets(baseFields = [], localFields = [], {
-    authoringScope = "",
-    authoringKind = "",
-    defaultSection = "calculated"
-  } = {}) {
-    const localById = new Map(
-      (Array.isArray(localFields) ? localFields : []).map((field) => [normalizeString6((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key)), field]).filter(([id, field]) => !!id && !!field)
-    );
-    const merged = [];
-    const seen = /* @__PURE__ */ new Set();
-    (Array.isArray(baseFields) ? baseFields : []).forEach((field) => {
-      const fieldId = normalizeString6((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key));
-      if (!fieldId || seen.has(fieldId)) {
-        return;
-      }
-      const localOverride = localById.get(fieldId);
-      if (localOverride) {
-        merged.push({
-          ...localOverride,
-          section: normalizeString6(localOverride == null ? void 0 : localOverride.section) || defaultSection,
-          authoringScope,
-          authoringEditable: true,
-          ...authoringKind ? { authoringKind } : {}
-        });
-      } else {
-        merged.push(field);
-      }
-      seen.add(fieldId);
-    });
-    (Array.isArray(localFields) ? localFields : []).forEach((field) => {
-      const fieldId = normalizeString6((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key));
-      if (!fieldId || seen.has(fieldId)) {
-        return;
-      }
-      merged.push({
-        ...field,
-        section: normalizeString6(field == null ? void 0 : field.section) || defaultSection,
-        authoringScope,
-        authoringEditable: true,
-        ...authoringKind ? { authoringKind } : {}
-      });
-      seen.add(fieldId);
-    });
-    return merged;
-  }
-  function buildReportBuilderCalculatedFieldConfig(config = {}, state = {}) {
-    const localCalculatedFields = normalizeReportBuilderLocalCalculatedFields(state == null ? void 0 : state.localCalculatedFields);
-    const localTableCalculations = normalizeReportBuilderLocalTableCalculations(state == null ? void 0 : state.localTableCalculations);
-    if (localCalculatedFields.length === 0 && localTableCalculations.length === 0) {
-      return config;
-    }
-    const mergedCalculatedFields = mergeAuthoringFieldSets(
-      Array.isArray(config == null ? void 0 : config.calculatedFields) ? config.calculatedFields : [],
-      localCalculatedFields,
-      {
-        authoringScope: "builderState.localCalculatedFields",
-        authoringKind: "rowCalc"
-      }
-    );
-    const mergedTableCalculations = mergeAuthoringFieldSets(
-      Array.isArray(config == null ? void 0 : config.tableCalculations) ? config.tableCalculations : [],
-      localTableCalculations,
-      {
-        authoringScope: "builderState.localTableCalculations",
-        authoringKind: "tableCalc"
-      }
-    );
-    return {
-      ...config,
-      calculatedFields: mergedCalculatedFields,
-      tableCalculations: mergedTableCalculations,
-      measureSections: buildLocalCalculatedFieldSectionConfig(config, [...localCalculatedFields, ...localTableCalculations])
-    };
-  }
-  var REPORT_BUILDER_TABLE_CALC_FUNCTIONS = listReportCalculatedFieldTableCalculationSpecs().map((entry) => ({
-    value: normalizeString6(entry == null ? void 0 : entry.name),
-    label: normalizeString6((entry == null ? void 0 : entry.label) || (entry == null ? void 0 : entry.name)),
-    supportsPartition: (entry == null ? void 0 : entry.supportsPartition) === true,
-    // Rank always orders by its source field in the current authoring UX,
-    // so it only needs a direction/tie-breaker control rather than a
-    // separate order-by field selector.
-    requiresOrder: (entry == null ? void 0 : entry.requiresOrder) === true && normalizeString6(entry == null ? void 0 : entry.name) !== "rank",
-    supportsRankDirection: (entry == null ? void 0 : entry.supportsRankDirection) === true,
-    supportsTieBreaker: (entry == null ? void 0 : entry.supportsTieBreaker) === true,
-    requiresWindowSize: (entry == null ? void 0 : entry.requiresWindowSize) === true,
-    supportsDecimals: (entry == null ? void 0 : entry.supportsDecimals) === true,
-    defaultFormat: normalizeString6(entry == null ? void 0 : entry.defaultFormat)
-  })).filter((entry) => entry.value && entry.label);
-
-  // src/reporting/reportBuilderBlockModel.js
-  function normalizeString7(value = "") {
-    return String(value || "").trim();
-  }
-  function resolveReportBuilderBlock(document = null) {
-    const blocks = Array.isArray(document == null ? void 0 : document.blocks) ? document.blocks : [];
-    return blocks.find((block) => normalizeString7(block == null ? void 0 : block.kind) === "reportBuilderBlock") || null;
-  }
-
-  // src/reporting/reportSections.js
-  var normalizeString8 = (value) => String(value || "").trim();
-  function buildRuntimeSections(blocks = [], hiddenBlockIds = /* @__PURE__ */ new Set()) {
-    var _a5, _b, _c, _d;
-    const normalizedBlocks = Array.isArray(blocks) ? blocks : [];
-    const explicitTabGroup = normalizedBlocks.find((block) => normalizeString8(block == null ? void 0 : block.kind) === "tabGroupBlock") || null;
-    const explicitSectionIds = Array.isArray((_a5 = explicitTabGroup == null ? void 0 : explicitTabGroup.content) == null ? void 0 : _a5.sectionIds) ? explicitTabGroup.content.sectionIds.map((sectionId) => normalizeString8(sectionId)).filter(Boolean) : Array.isArray(explicitTabGroup == null ? void 0 : explicitTabGroup.sectionIds) ? explicitTabGroup.sectionIds.map((sectionId) => normalizeString8(sectionId)).filter(Boolean) : [];
-    const includeUnlistedSections = (_d = (_c = (_b = explicitTabGroup == null ? void 0 : explicitTabGroup.content) == null ? void 0 : _b.includeUnlistedSections) != null ? _c : explicitTabGroup == null ? void 0 : explicitTabGroup.includeUnlistedSections) != null ? _d : true;
-    const sections = [];
-    let current = null;
-    normalizedBlocks.forEach((block, index) => {
-      var _a6, _b2, _c2;
-      const kind = normalizeString8(block == null ? void 0 : block.kind);
-      if (kind === "tabGroupBlock") {
-        return;
-      }
-      if (hiddenBlockIds.has(normalizeString8(block == null ? void 0 : block.id))) {
-        return;
-      }
-      if (kind === "sectionBlock") {
-        const ownedBlockIds = (Array.isArray((_a6 = block == null ? void 0 : block.content) == null ? void 0 : _a6.blockIds) ? block.content.blockIds : Array.isArray(block == null ? void 0 : block.blockIds) ? block.blockIds : []).map((ownedBlockId) => normalizeString8(ownedBlockId)).filter(Boolean);
-        current = {
-          id: normalizeString8((block == null ? void 0 : block.id) || `section_${index + 1}`) || `section_${index + 1}`,
-          title: normalizeString8((block == null ? void 0 : block.title) || ((_b2 = block == null ? void 0 : block.content) == null ? void 0 : _b2.title) || `Section ${sections.length + 1}`) || `Section ${sections.length + 1}`,
-          navigationLabel: normalizeString8(((_c2 = block == null ? void 0 : block.content) == null ? void 0 : _c2.navigationLabel) || (block == null ? void 0 : block.navigationLabel) || (block == null ? void 0 : block.title) || `Section ${sections.length + 1}`) || `Section ${sections.length + 1}`,
-          block,
-          items: [],
-          ownedBlockIds
-        };
-        sections.push(current);
-        return;
-      }
-      if (!current) {
-        current = {
-          id: "overview",
-          title: "Overview",
-          navigationLabel: "Overview",
-          block: null,
-          items: [],
-          ownedBlockIds: []
-        };
-        sections.push(current);
-      }
-      if (includeUnlistedSections === false && current.ownedBlockIds.length > 0 && !current.ownedBlockIds.includes(normalizeString8(block == null ? void 0 : block.id))) {
-        return;
-      }
-      current.items.push(block);
-    });
-    if (includeUnlistedSections === false) {
-      for (const section of sections) {
-        if (!section.ownedBlockIds.length) continue;
-        const owned = new Set(section.ownedBlockIds);
-        section.items = normalizedBlocks.filter((block) => owned.has(normalizeString8(block == null ? void 0 : block.id)) && !hiddenBlockIds.has(normalizeString8(block == null ? void 0 : block.id)) && normalizeString8(block == null ? void 0 : block.kind) !== "sectionBlock" && normalizeString8(block == null ? void 0 : block.kind) !== "tabGroupBlock");
-      }
-    }
-    const filteredSections = sections.filter((section) => section.block || section.items.length > 0);
-    if (explicitSectionIds.length === 0) {
-      return filteredSections;
-    }
-    const sectionById = new Map(filteredSections.map((section) => [normalizeString8(section == null ? void 0 : section.id), section]));
-    const orderedSections = explicitSectionIds.map((sectionId) => sectionById.get(sectionId) || null).filter(Boolean);
-    const trailingSections = filteredSections.filter((section) => !explicitSectionIds.includes(normalizeString8(section == null ? void 0 : section.id)));
-    return includeUnlistedSections === false ? orderedSections : [...orderedSections, ...trailingSections];
-  }
-
-  // src/reporting/reportLayoutModel.js
-  var REPORT_LAYOUT_GRID_COLUMNS = 12;
-  var REPORT_LAYOUT_SPAN_PRESETS = Object.freeze([
-    { span: 12, label: "Full" },
-    { span: 8, label: "Two-thirds" },
-    { span: 6, label: "Half" },
-    { span: 4, label: "Third" },
-    { span: 3, label: "Quarter" }
-  ]);
-  function normalizeString9(value = "") {
-    return String(value || "").trim();
-  }
-  function normalizeReportLayoutSpanValue(value = null) {
-    const numeric = Number.parseInt(String(value != null ? value : "").trim(), 10);
-    if (!Number.isFinite(numeric) || numeric < 1 || numeric > REPORT_LAYOUT_GRID_COLUMNS) {
-      return null;
-    }
-    return numeric;
-  }
-  function normalizeLegacyReportLayoutSize(value = "") {
-    const normalized = normalizeString9(value).toLowerCase();
-    if (normalized === "quarter" || normalized === "1/4") {
-      return 3;
-    }
-    if (normalized === "third" || normalized === "1/3") {
-      return 4;
-    }
-    if (normalized === "half") {
-      return 6;
-    }
-    if (normalized === "two-thirds" || normalized === "twothirds" || normalized === "2/3") {
-      return 8;
-    }
-    if (normalized === "full") {
-      return REPORT_LAYOUT_GRID_COLUMNS;
-    }
-    return null;
-  }
-  function resolveReportLayoutSpan(source = null, {
-    defaultSpan = REPORT_LAYOUT_GRID_COLUMNS
-  } = {}) {
-    if (source && typeof source === "object" && !Array.isArray(source)) {
-      const explicitSpan2 = normalizeReportLayoutSpanValue(source == null ? void 0 : source.span);
-      if (explicitSpan2) {
-        return explicitSpan2;
-      }
-      const legacySpan2 = normalizeLegacyReportLayoutSize(source == null ? void 0 : source.size);
-      if (legacySpan2) {
-        return legacySpan2;
-      }
-      return defaultSpan;
-    }
-    const legacySpan = normalizeLegacyReportLayoutSize(source);
-    if (legacySpan) {
-      return legacySpan;
-    }
-    const explicitSpan = normalizeReportLayoutSpanValue(source);
-    if (explicitSpan) {
-      return explicitSpan;
-    }
-    return defaultSpan;
-  }
-  function buildReportLayoutItem(blockId = "", source = null, {
-    omitDefaultSpan = true,
-    preserveLegacyHalf = false
-  } = {}) {
-    const normalizedBlockId = normalizeString9(blockId);
-    if (!normalizedBlockId) {
-      return null;
-    }
-    const normalizedSource = source && typeof source === "object" && !Array.isArray(source) ? source : {
-      span: normalizeReportLayoutSpanValue(source),
-      size: normalizeString9(source)
-    };
-    const explicitSpan = normalizeReportLayoutSpanValue(normalizedSource == null ? void 0 : normalizedSource.span);
-    if (explicitSpan) {
-      return omitDefaultSpan && explicitSpan === REPORT_LAYOUT_GRID_COLUMNS ? { blockId: normalizedBlockId } : { blockId: normalizedBlockId, span: explicitSpan };
-    }
-    const legacySpan = normalizeLegacyReportLayoutSize(normalizedSource == null ? void 0 : normalizedSource.size);
-    if (legacySpan === 6 && preserveLegacyHalf) {
-      return { blockId: normalizedBlockId, size: "half" };
-    }
-    if (legacySpan) {
-      return omitDefaultSpan && legacySpan === REPORT_LAYOUT_GRID_COLUMNS ? { blockId: normalizedBlockId } : { blockId: normalizedBlockId, span: legacySpan };
-    }
-    return { blockId: normalizedBlockId };
-  }
-
-  // src/reporting/reportRelativeDateRangeModel.js
-  function normalizePreset(value = "") {
-    return String(value || "").trim().toLowerCase().replaceAll("_", "");
-  }
-  function formatDateISO(date) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  }
-  function normalizeSemanticExpression(value = "") {
-    return String(value || "").trim().replace(/([a-z])([A-Z])/g, "$1 $2").replace(/(\d)([A-Za-z])/g, "$1 $2").replace(/([A-Za-z])(\d)/g, "$1 $2").replace(/\s+/g, " ");
-  }
-  function resolveReportRelativeTime(expression = "", now = /* @__PURE__ */ new Date()) {
-    const source = normalizeSemanticExpression(expression);
-    if (!source) return null;
-    const utc = /(?:\s+in\s+utc|\s+inutc)$/i.test(source);
-    const normalized = source.replace(/\s+in\s*utc$/i, "").trim().toLowerCase();
-    const result = new Date(now.getTime());
-    if (["now", "today"].includes(normalized)) return result;
-    if (normalized === "yesterday") {
-      result.setTime(result.getTime() - 24 * 60 * 60 * 1e3);
-      return result;
-    }
-    if (normalized === "tomorrow") {
-      result.setTime(result.getTime() + 24 * 60 * 60 * 1e3);
-      return result;
-    }
-    const match2 = normalized.match(/^(\d+)\s*(seconds?|secs?|minutes?|mins?|hours?|days?|weeks?)\s+(ahead|after|later|onward|ago|before|earlier|past)$/i);
-    if (!match2) return null;
-    const count = Number(match2[1]);
-    const units2 = match2[2].toLowerCase();
-    const direction = ["ago", "before", "earlier", "past"].includes(match2[3].toLowerCase()) ? -1 : 1;
-    const unitMillis = units2.startsWith("sec") ? 1e3 : units2.startsWith("min") ? 60 * 1e3 : units2.startsWith("hour") ? 60 * 60 * 1e3 : units2.startsWith("week") ? 7 * 24 * 60 * 60 * 1e3 : 24 * 60 * 60 * 1e3;
-    result.setTime(result.getTime() + direction * count * unitMillis);
-    if (utc) return new Date(result.toISOString());
-    return result;
-  }
-  function formatReportRelativeTime(expression = "", { now = /* @__PURE__ */ new Date(), format: format2 = "date" } = {}) {
-    const resolved = resolveReportRelativeTime(expression, now);
-    if (!resolved) return "";
-    return String(format2 || "date").toLowerCase() === "datetime" ? resolved.toISOString() : formatDateISO(resolved);
-  }
-  function resolveReportRelativeDateRange(preset = "", now = /* @__PURE__ */ new Date()) {
-    const normalizedPreset = normalizePreset(preset);
-    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const start = new Date(end);
-    switch (normalizedPreset) {
-      case "today":
-        break;
-      case "yesterday":
-        start.setDate(end.getDate() - 1);
-        end.setDate(end.getDate() - 1);
-        break;
-      case "last3days":
-      case "3d":
-        start.setDate(end.getDate() - 2);
-        break;
-      case "last7days":
-      case "7d":
-        start.setDate(end.getDate() - 6);
-        break;
-      case "last30days":
-      case "30d":
-        start.setDate(end.getDate() - 29);
-        break;
-      default:
-        return null;
-    }
-    return { start: formatDateISO(start), end: formatDateISO(end) };
-  }
-  function resolveReportRelativeDateRangeSpec(spec = {}, now = /* @__PURE__ */ new Date(), referenceRequest = null) {
-    if (normalizePreset(spec == null ? void 0 : spec.preset) === "previousperiod") {
-      const atPath = (path) => String(path || "").split(".").reduce((value, key) => value == null ? void 0 : value[key], referenceRequest);
-      return resolveReportPreviousPeriodRange(atPath(spec.startParamPath), atPath(spec.endParamPath));
-    }
-    const presetRange = resolveReportRelativeDateRange(spec == null ? void 0 : spec.preset, now);
-    if (presetRange) return presetRange;
-    const start = formatReportRelativeTime(spec == null ? void 0 : spec.startExpression, { now, format: spec == null ? void 0 : spec.format });
-    const end = formatReportRelativeTime(spec == null ? void 0 : spec.endExpression, { now, format: spec == null ? void 0 : spec.format });
-    return start && end ? { start, end } : null;
-  }
-  function resolveReportPreviousPeriodRange(start, end) {
-    const parse2 = (value) => {
-      if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-      const date = /* @__PURE__ */ new Date(value + "T00:00:00.000Z");
-      return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value ? date : null;
-    };
-    const from = parse2(start), to = parse2(end);
-    if (!from || !to || from > to) throw new Error("Previous period requires a valid bounded civil date range.");
-    const day = 864e5;
-    const length = (to.getTime() - from.getTime()) / day + 1;
-    const previousStart = new Date(from.getTime() - length * day);
-    const previousEnd = new Date(from.getTime() - day);
-    if (previousStart.getUTCFullYear() < 1) throw new Error("Previous period exceeds the supported civil date range.");
-    return { start: previousStart.toISOString().slice(0, 10), end: previousEnd.toISOString().slice(0, 10) };
-  }
-
-  // src/reporting/reportDateRangeValue.js
-  function resolveReportDateRangeValue(value, now = /* @__PURE__ */ new Date()) {
-    if (!value || typeof value !== "object" || Array.isArray(value)) return value;
-    const preset = resolveReportRelativeDateRange(value.preset, now);
-    if (preset) return { ...value, ...preset };
-    if (!("startExpression" in value) && !("endExpression" in value)) return value;
-    const resolved = { ...value };
-    for (const edge of ["start", "end"]) {
-      if (`${edge}Expression` in value) resolved[edge] = formatReportRelativeTime(value[`${edge}Expression`], { now });
-    }
-    return resolved;
-  }
-
-  // src/reporting/scopeStateModel.js
-  var SCOPE_PARAM_STATE_KEY = "scopeParams";
-  var LEGACY_SCOPE_PARAM_STATE_KEY = "staticFilters";
-  var EMPTY_SCOPE_PARAM_VALUES = Object.freeze({});
-  function asScopeParamValuesMap(candidate) {
-    return !!candidate && typeof candidate === "object" && !Array.isArray(candidate) ? candidate : null;
-  }
-  function resolveScopeParamId(paramDef) {
-    return String((paramDef == null ? void 0 : paramDef.id) || (paramDef == null ? void 0 : paramDef.field) || "").trim();
-  }
-  function listScopeParamValues(state) {
-    return asScopeParamValuesMap(state == null ? void 0 : state[SCOPE_PARAM_STATE_KEY]) || asScopeParamValuesMap(state == null ? void 0 : state[LEGACY_SCOPE_PARAM_STATE_KEY]) || EMPTY_SCOPE_PARAM_VALUES;
-  }
-  function getScopeParamValue(state, paramId) {
-    const id = String(paramId || "").trim();
-    return id ? resolveReportDateRangeValue(listScopeParamValues(state)[id]) : void 0;
-  }
-  function mergeScopeParamValues(state, values) {
-    const { [LEGACY_SCOPE_PARAM_STATE_KEY]: _legacyValues, ...nextState } = state || {};
-    return {
-      ...nextState,
-      [SCOPE_PARAM_STATE_KEY]: {
-        ...listScopeParamValues(state),
-        ...values || {}
-      }
-    };
-  }
-  function scopeParamStateSlice(values) {
-    return {
-      [SCOPE_PARAM_STATE_KEY]: { ...values || {} }
-    };
-  }
-
-  // src/components/dashboard/reportBuilderDynamicRows.js
-  function clone(value) {
-    if (Array.isArray(value)) {
-      return value.map((item) => clone(item));
-    }
-    if (value && typeof value === "object") {
-      const result = {};
-      Object.entries(value).forEach(([key, item]) => {
-        result[key] = clone(item);
-      });
-      return result;
-    }
-    return value;
-  }
-  function normalizeArray(values = []) {
-    const isPresent = (entry) => entry !== void 0 && entry !== null && entry !== "";
-    if (Array.isArray(values)) {
-      return values.filter(isPresent);
-    }
-    return isPresent(values) ? [values] : [];
-  }
-  function normalizeDynamicRow(row = {}, group = {}, index = 0) {
-    var _a5;
-    const filters = normalizeArray(group.filters);
-    const firstFilterId = String(((_a5 = filters[0]) == null ? void 0 : _a5.id) || "").trim();
-    const rowId = String(row.id || `row_${index + 1}`).trim();
-    return {
-      id: rowId || `row_${index + 1}`,
-      filterId: String(row.filterId || firstFilterId).trim(),
-      enabled: (row == null ? void 0 : row.enabled) !== false,
-      selections: normalizeArray(row.selections).map((entry) => clone(entry))
-    };
-  }
-  function filterDefinitionForRow(group = {}, row = {}) {
-    const filterId = String((row == null ? void 0 : row.filterId) || "").trim();
-    return normalizeArray(group == null ? void 0 : group.filters).find((entry) => String((entry == null ? void 0 : entry.id) || "").trim() === filterId) || null;
-  }
-  function normalizeSelectionForFilter(filterDef = {}, entry = null) {
-    var _a5, _b, _c, _d;
-    const isObjectEntry = entry && typeof entry === "object" && !Array.isArray(entry);
-    const valueSelector = String((filterDef == null ? void 0 : filterDef.valueSelector) || "value").trim() || "value";
-    const labelSelector = String((filterDef == null ? void 0 : filterDef.labelSelector) || "label").trim() || "label";
-    const record = isObjectEntry && (entry == null ? void 0 : entry.record) && typeof entry.record === "object" ? entry.record : isObjectEntry ? entry : {};
-    const rawValue = isObjectEntry ? (_b = (_a5 = entry == null ? void 0 : entry.value) != null ? _a5 : selectFirstDefined(entry, lookupValueFallbackSelectors(valueSelector))) != null ? _b : selectFirstDefined(record, lookupValueFallbackSelectors(valueSelector)) : entry;
-    const coerced = coerceManualSelectionValue(filterDef, rawValue);
-    if (!coerced.ok) {
-      return null;
-    }
-    const recordLabel = String((_c = selectFirstDefined(record, lookupLabelFallbackSelectors(labelSelector, valueSelector))) != null ? _c : "").trim();
-    const entryLabel = String(isObjectEntry ? (_d = entry == null ? void 0 : entry.label) != null ? _d : "" : "").trim();
-    const label = recordLabel || entryLabel || String(coerced.label || "").trim();
-    return {
-      value: coerced.value,
-      label,
-      group: isObjectEntry ? (entry == null ? void 0 : entry.group) || "" : "",
-      record: {
-        ...record,
-        [valueSelector]: coerced.value,
-        [labelSelector]: label
-      }
-    };
-  }
-  function normalizeDynamicGroupRows(rows = [], group = {}) {
-    return normalizeArray(rows).map((row, index) => {
-      const normalizedRow = normalizeDynamicRow(row, group, index);
-      const filterDef = filterDefinitionForRow(group, normalizedRow);
-      if (!filterDef) {
-        return normalizedRow;
-      }
-      const originalSelections = normalizeArray(normalizedRow.selections);
-      const normalizedSelections = originalSelections.map((entry) => normalizeSelectionForFilter(filterDef, entry)).filter(Boolean);
-      if (originalSelections.length > 0 && normalizedSelections.length === 0) {
-        return null;
-      }
-      return {
-        ...normalizedRow,
-        selections: normalizedSelections
-      };
-    }).filter(Boolean);
-  }
-  function selectFirstDefined(record = {}, selectors = []) {
-    for (const selector of selectors) {
-      const key = String(selector || "").trim();
-      if (!key) continue;
-      const value = resolveKey(record, key);
-      if (value !== void 0 && value !== null && value !== "") {
-        return value;
-      }
-    }
-    return void 0;
-  }
-  function selectorLeaf(selector = "") {
-    const normalized = String(selector || "").trim();
-    if (!normalized) return "";
-    const parts = normalized.split(".").map((entry) => entry.trim()).filter(Boolean);
-    return parts[parts.length - 1] || normalized;
-  }
-  function lookupValueFallbackSelectors(selector = "") {
-    const leaf = selectorLeaf(selector);
-    const lower2 = leaf.toLowerCase();
-    const selectors = [selector, leaf];
-    if (lower2 === "id" || lower2.endsWith("id")) {
-      selectors.push("id", "value");
-    }
-    return Array.from(new Set(selectors.filter(Boolean)));
-  }
-  function lookupLabelFallbackSelectors(selector = "", valueSelector = "") {
-    const leaf = selectorLeaf(selector);
-    const lower2 = leaf.toLowerCase();
-    const selectors = [selector, leaf];
-    if (lower2 === "label" || lower2.endsWith("label")) {
-      selectors.push("label", "name", "displayName", "displayPath");
-    } else if (lower2 === "name" || lower2.endsWith("name")) {
-      selectors.push("name", "label", "displayName", "displayPath");
-    } else {
-      selectors.push("label", "name", "displayName", "displayPath");
-    }
-    const valueLeaf = selectorLeaf(valueSelector);
-    if (valueLeaf && valueLeaf !== leaf) {
-      selectors.push(valueLeaf);
-    }
-    return Array.from(new Set(selectors.filter(Boolean)));
-  }
-  function coerceManualSelectionValue(filterDef = {}, rawValue = "") {
-    if (rawValue === void 0 || rawValue === null || rawValue === "") {
-      return { ok: false };
-    }
-    const normalized = String(rawValue != null ? rawValue : "").trim();
-    if (!normalized) {
-      return { ok: false };
-    }
-    const valueType = String((filterDef == null ? void 0 : filterDef.manualValueType) || "string").trim().toLowerCase();
-    switch (valueType) {
-      case "int":
-      case "integer":
-        if (!/^-?\d+$/.test(normalized)) {
-          return { ok: false };
-        }
-        return { ok: true, value: Number(normalized), label: normalized };
-      case "string":
-      default:
-        if (typeof rawValue === "number" && Number.isFinite(rawValue)) {
-          return { ok: true, value: rawValue, label: normalized };
-        }
-        return { ok: true, value: normalized, label: normalized };
-    }
-  }
-
-  // src/components/dashboard/reportBuilderPredicates.js
-  var DIRECTION_FILTER_FIELDS = [
-    "semanticRef",
-    "dialogId",
-    "multiple",
-    "emitArray",
-    "manualEntry",
-    "manualValueType",
-    "manualPlaceholder",
-    "placeholder",
-    "valueSelector",
-    "labelSelector",
-    "recordSelectors",
-    "groupSelector",
-    "targetingFeatureKey",
-    "lookup",
-    "requestMapping",
-    "handledByHook"
-  ];
-  function clone2(value) {
-    return value == null ? value : JSON.parse(JSON.stringify(value));
-  }
-  function isPlainObject2(value) {
-    return !!value && typeof value === "object" && !Array.isArray(value);
-  }
-  function normalizeArray2(value) {
-    if (Array.isArray(value)) {
-      return value.filter((entry) => entry !== void 0 && entry !== null && entry !== "");
-    }
-    if (value === void 0 || value === null || value === "") {
-      return [];
-    }
-    return [value];
-  }
-  function pascalCase(value = "") {
-    const normalized = String(value || "").trim();
-    if (!normalized) return "";
-    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
-  }
-  function normalizePrefillPaths(value) {
-    return normalizeArray2(value).map((entry) => String(entry || "").trim()).filter(Boolean);
-  }
-  function normalizePredicatePrefill(entry) {
-    const raw = entry == null ? void 0 : entry.prefill;
-    if (typeof raw === "string" || Array.isArray(raw)) {
-      const paths = normalizePrefillPaths(raw);
-      return paths.length > 0 ? { path: paths } : null;
-    }
-    if (!isPlainObject2(raw)) {
-      return null;
-    }
-    const prefill = {};
-    ["path", "start", "end", "include", "exclude"].forEach((key) => {
-      const paths = normalizePrefillPaths(raw[key]);
-      if (paths.length > 0) {
-        prefill[key] = paths;
-      }
-    });
-    return Object.keys(prefill).length > 0 ? prefill : null;
-  }
-  function buildPredicateDirection(entry = {}, predicate = {}, direction = "", spec = {}) {
-    var _a5, _b;
-    const overrides = isPlainObject2(spec) ? spec : {};
-    const fallbackFilterId = direction ? `${direction}${pascalCase(predicate.id)}` : predicate.id;
-    const filterId = String(overrides.filterId || fallbackFilterId).trim();
-    const paramPath = String(
-      overrides.paramPath || (direction ? entry == null ? void 0 : entry[`${direction}ParamPath`] : entry == null ? void 0 : entry.paramPath) || `filters.${filterId}`
-    ).trim();
-    const filter = {
-      id: filterId,
-      label: String(overrides.label || predicate.label || filterId).trim(),
-      paramPath
-    };
-    DIRECTION_FILTER_FIELDS.forEach((field) => {
-      const value = overrides[field] !== void 0 ? overrides[field] : entry == null ? void 0 : entry[field];
-      if (value !== void 0) {
-        filter[field] = clone2(value);
-      }
-    });
-    if (filter.multiple === void 0) {
-      filter.multiple = true;
-    }
-    if (filter.emitArray === void 0 && filter.multiple !== false) {
-      filter.emitArray = true;
-    }
-    const overridePaths = normalizePrefillPaths(overrides.prefill);
-    const prefillPaths = overridePaths.length > 0 ? overridePaths : (direction ? (_a5 = predicate.prefill) == null ? void 0 : _a5[direction] : (_b = predicate.prefill) == null ? void 0 : _b.path) || [];
-    return {
-      direction,
-      groupId: direction || predicate.bucket,
-      filter,
-      prefillPaths
-    };
-  }
-  function normalizeReportBuilderPredicates(config = {}) {
-    return normalizeArray2(config == null ? void 0 : config.predicates).map((entry) => {
-      if (!isPlainObject2(entry)) {
-        return null;
-      }
-      const id = String(entry.id || "").trim();
-      if (!id) {
-        return null;
-      }
-      const kind = String(entry.kind || "").trim().toLowerCase() === "daterange" ? "dateRange" : "value";
-      const pinned = entry.pinned === true || kind === "dateRange";
-      const predicate = {
-        id,
-        label: String(entry.label || id).trim(),
-        description: String(entry.description || "").trim(),
-        group: String(entry.group || "").trim(),
-        kind,
-        pinned,
-        required: entry.required === true,
-        multiple: entry.multiple,
-        presentation: String(entry.presentation || "").trim(),
-        semanticRef: String(entry.semanticRef || "").trim(),
-        options: Array.isArray(entry.options) ? clone2(entry.options) : void 0,
-        optionsDataSourceRef: String(entry.optionsDataSourceRef || "").trim(),
-        optionsFetchMode: String(entry.optionsFetchMode || "").trim(),
-        optionValueField: String(entry.optionValueField || "").trim(),
-        optionLabelField: String(entry.optionLabelField || "").trim(),
-        default: entry.default !== void 0 ? clone2(entry.default) : void 0,
-        paramPath: String(entry.paramPath || "").trim(),
-        startParamPath: String(entry.startParamPath || "").trim(),
-        endParamPath: String(entry.endParamPath || "").trim(),
-        bucket: String(entry.bucket || "scope").trim() || "scope",
-        prefill: normalizePredicatePrefill(entry),
-        directions: []
-      };
-      if (!pinned) {
-        const hasInclude = entry.include !== void 0 && entry.include !== false;
-        const hasExclude = entry.exclude !== void 0 && entry.exclude !== false;
-        if (hasInclude) {
-          predicate.directions.push(buildPredicateDirection(entry, predicate, "include", entry.include));
-        }
-        if (hasExclude) {
-          predicate.directions.push(buildPredicateDirection(entry, predicate, "exclude", entry.exclude));
-        }
-        if (!hasInclude && !hasExclude) {
-          predicate.directions.push(buildPredicateDirection(entry, predicate, "", {}));
-        }
-      }
-      return predicate;
-    }).filter(Boolean);
-  }
-  function normalizeReportBuilderPredicateGroups(config = {}) {
-    return normalizeArray2(config == null ? void 0 : config.predicateGroups).map((entry, index) => {
-      if (!isPlainObject2(entry)) {
-        return null;
-      }
-      const id = String(entry.id || "").trim();
-      if (!id) {
-        return null;
-      }
-      return {
-        id,
-        label: String(entry.label || id).trim(),
-        description: String(entry.description || "").trim(),
-        icon: String(entry.icon || "").trim(),
-        order: Number.isFinite(Number(entry.order)) ? Number(entry.order) : index
-      };
-    }).filter(Boolean);
-  }
-  function normalizeReportBuilderPredicateBuckets(config = {}) {
-    return normalizeArray2(config == null ? void 0 : config.predicateBuckets).map((entry, index) => {
-      if (!isPlainObject2(entry)) {
-        return null;
-      }
-      const id = String(entry.id || "").trim();
-      if (!id) {
-        return null;
-      }
-      return {
-        id,
-        label: String(entry.label || id).trim(),
-        description: String(entry.description || "").trim(),
-        order: Number.isFinite(Number(entry.order)) ? Number(entry.order) : index
-      };
-    }).filter(Boolean);
-  }
-  function listReportBuilderPinnedPredicates(config = {}) {
-    return normalizeReportBuilderPredicates(config).filter((predicate) => predicate.pinned);
-  }
-  function lowerPinnedPredicate(predicate) {
-    const filter = {
-      id: predicate.id,
-      label: predicate.label
-    };
-    if (predicate.description) {
-      filter.description = predicate.description;
-    }
-    if (predicate.semanticRef) {
-      filter.semanticRef = predicate.semanticRef;
-    }
-    if (predicate.kind === "dateRange") {
-      filter.type = "dateRange";
-      if (predicate.startParamPath) {
-        filter.startParamPath = predicate.startParamPath;
-      }
-      if (predicate.endParamPath) {
-        filter.endParamPath = predicate.endParamPath;
-      }
-    } else if (predicate.paramPath) {
-      filter.paramPath = predicate.paramPath;
-    }
-    if (predicate.required) {
-      filter.required = true;
-    }
-    if (predicate.multiple !== void 0) {
-      filter.multiple = predicate.multiple === true;
-    }
-    if (predicate.presentation) {
-      filter.presentation = predicate.presentation;
-    }
-    if (predicate.options !== void 0) {
-      filter.options = clone2(predicate.options);
-    }
-    for (const field of ["optionsDataSourceRef", "optionsFetchMode", "optionValueField", "optionLabelField"]) {
-      if (predicate[field]) filter[field] = predicate[field];
-    }
-    if (predicate.default !== void 0) {
-      filter.default = clone2(predicate.default);
-    }
-    return filter;
-  }
-  function resolveReportBuilderScopeParamFilters(config = {}) {
-    const staticFilters = normalizeArray2(config == null ? void 0 : config.staticFilters).map((entry) => clone2(entry));
-    const pinnedPredicates = listReportBuilderPinnedPredicates(config);
-    if (pinnedPredicates.length === 0) {
-      return staticFilters;
-    }
-    const indexById = /* @__PURE__ */ new Map();
-    staticFilters.forEach((entry, index) => {
-      const id = String((entry == null ? void 0 : entry.id) || (entry == null ? void 0 : entry.field) || "").trim();
-      if (id && !indexById.has(id)) {
-        indexById.set(id, index);
-      }
-    });
-    const filters = [...staticFilters];
-    pinnedPredicates.forEach((predicate) => {
-      const lowered = lowerPinnedPredicate(predicate);
-      if (indexById.has(predicate.id)) {
-        const index = indexById.get(predicate.id);
-        filters[index] = { ...lowered, ...filters[index] };
-        return;
-      }
-      indexById.set(predicate.id, filters.length);
-      filters.push(lowered);
-    });
-    return filters;
-  }
-  function groupSeed(groupId = "", bucket = null) {
-    if (bucket) {
-      return {
-        id: bucket.id,
-        label: bucket.label,
-        ...bucket.description ? { description: bucket.description } : {},
-        filters: []
-      };
-    }
-    if (groupId === "include") {
-      return { id: "include", label: "Include", filters: [] };
-    }
-    if (groupId === "exclude") {
-      return { id: "exclude", label: "Exclude", filters: [] };
-    }
-    return { id: groupId, label: pascalCase(groupId), filters: [] };
-  }
-  function buildEffectiveDynamicFilters(config = {}, predicates = []) {
-    const dynamicFilterGroups = normalizeArray2(config.dynamicFilterGroups).map((entry) => ({
-      ...clone2(entry),
-      filters: normalizeArray2(entry == null ? void 0 : entry.filters).map((filter) => clone2(filter))
-    }));
-    const groupById = new Map(dynamicFilterGroups.map((entry) => [String((entry == null ? void 0 : entry.id) || "").trim(), entry]));
-    const declaredBuckets = normalizeReportBuilderPredicateBuckets(config);
-    const bucketById = new Map(declaredBuckets.map((entry) => [entry.id, entry]));
-    const ensureGroup = (groupId) => {
-      const id = String(groupId || "").trim();
-      if (!id) return null;
-      if (!groupById.has(id)) {
-        const seeded = groupSeed(id, bucketById.get(id) || null);
-        dynamicFilterGroups.push(seeded);
-        groupById.set(id, seeded);
-      }
-      return groupById.get(id);
-    };
-    [...declaredBuckets].sort((left, right) => left.order - right.order).forEach((bucket) => ensureGroup(bucket.id));
-    const familyMembership = /* @__PURE__ */ new Map();
-    const registerFamilyMember = (predicate, direction) => {
-      if (!predicate.group || !direction.direction) {
-        return;
-      }
-      if (!familyMembership.has(predicate.group)) {
-        familyMembership.set(predicate.group, { includeFilterIds: [], excludeFilterIds: [] });
-      }
-      const membership = familyMembership.get(predicate.group);
-      const key = direction.direction === "include" ? "includeFilterIds" : "excludeFilterIds";
-      if (!membership[key].includes(direction.filter.id)) {
-        membership[key].push(direction.filter.id);
-      }
-    };
-    predicates.forEach((predicate) => {
-      if (predicate.pinned) {
-        return;
-      }
-      predicate.directions.forEach((direction) => {
-        const group = ensureGroup(direction.groupId);
-        if (!group) {
-          return;
-        }
-        const exists = group.filters.some((entry) => String((entry == null ? void 0 : entry.id) || "").trim() === direction.filter.id);
-        if (!exists) {
-          group.filters.push(clone2(direction.filter));
-        }
-        registerFamilyMember(predicate, direction);
-      });
-    });
-    const dynamicFilterFamilies = normalizeArray2(config.dynamicFilterFamilies).map((entry) => clone2(entry));
-    const familyIds = new Set(dynamicFilterFamilies.map((entry) => String((entry == null ? void 0 : entry.id) || "").trim()).filter(Boolean));
-    const declaredGroups = normalizeReportBuilderPredicateGroups(config);
-    const declaredGroupIds = new Set(declaredGroups.map((entry) => entry.id));
-    const orderedFamilyIds = [
-      ...declaredGroups.map((entry) => entry.id),
-      ...Array.from(familyMembership.keys()).filter((id) => !declaredGroupIds.has(id))
-    ];
-    orderedFamilyIds.forEach((groupId) => {
-      const membership = familyMembership.get(groupId);
-      if (!membership || familyIds.has(groupId)) {
-        return;
-      }
-      const declared = declaredGroups.find((entry) => entry.id === groupId);
-      const family = {
-        id: groupId,
-        label: (declared == null ? void 0 : declared.label) || pascalCase(groupId),
-        includeFilterIds: membership.includeFilterIds,
-        excludeFilterIds: membership.excludeFilterIds
-      };
-      if (declared == null ? void 0 : declared.description) {
-        family.description = declared.description;
-      }
-      if (declared == null ? void 0 : declared.icon) {
-        family.icon = declared.icon;
-      }
-      if (declared) {
-        family.order = declared.order;
-      }
-      dynamicFilterFamilies.push(family);
-      familyIds.add(groupId);
-    });
-    return { dynamicFilterGroups, dynamicFilterFamilies };
-  }
-  function resolveReportBuilderDynamicFilterGroups(config = {}) {
-    const predicates = normalizeReportBuilderPredicates(config);
-    if (predicates.length === 0) {
-      return normalizeArray2(config == null ? void 0 : config.dynamicFilterGroups);
-    }
-    return buildEffectiveDynamicFilters(config, predicates).dynamicFilterGroups;
-  }
-
-  // src/components/dashboard/reportBuilderStaticDatasets.js
-  function normalizeString10(value = "") {
-    return String(value || "").trim();
-  }
-  function cloneValue5(value) {
-    return value == null ? value : JSON.parse(JSON.stringify(value));
-  }
-  function humanizeLabel(value = "") {
-    const normalized = normalizeString10(value);
-    if (!normalized) {
-      return "";
-    }
-    return normalized.replace(/[_-]+/g, " ").replace(/\s+/g, " ").split(" ").filter(Boolean).map((segment) => segment.slice(0, 1).toUpperCase() + segment.slice(1)).join(" ");
-  }
-  function normalizeStaticDatasetFormat(value = "") {
-    const normalized = normalizeString10(value).toLowerCase();
-    return normalized === "json" || normalized === "forge-data" || normalized === "forge_data" ? "json" : "csv";
-  }
-  function buildStaticDatasetKindLabel(format2 = "csv") {
-    return `static ${normalizeStaticDatasetFormat(format2)}`;
-  }
-  function buildStaticDatasetDataSourceRef(id = "", format2 = "csv") {
-    const normalizedId = sanitizeId(id);
-    const normalizedFormat = normalizeStaticDatasetFormat(format2);
-    return `static_${normalizedFormat}_${normalizedId}`;
-  }
-  function buildStaticDatasetRequestKind(format2 = "csv") {
-    return normalizeStaticDatasetFormat(format2) === "json" ? "staticJson" : "staticCsv";
-  }
-  function sanitizeId(value = "") {
-    return normalizeString10(value).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
-  }
-  function inferColumnKind(rows = [], key = "") {
-    const values = (Array.isArray(rows) ? rows : []).map((row) => row && typeof row === "object" && !Array.isArray(row) ? row[key] : void 0).filter((value) => value !== null && value !== void 0 && value !== "");
-    if (values.length === 0) {
-      return "dimension";
-    }
-    const numeric = values.every((value) => typeof value === "number" && Number.isFinite(value));
-    return numeric ? "measure" : "dimension";
-  }
-  function normalizeColumns(columns = [], rows = []) {
-    const explicit = Array.isArray(columns) ? columns : [];
-    const seen = /* @__PURE__ */ new Set();
-    const normalized = explicit.map((column) => {
-      const key = normalizeString10((column == null ? void 0 : column.key) || (column == null ? void 0 : column.id) || (column == null ? void 0 : column.value));
-      if (!key || seen.has(key)) {
-        return null;
-      }
-      seen.add(key);
-      return {
-        key,
-        label: normalizeString10((column == null ? void 0 : column.label) || humanizeLabel(key)) || key,
-        kind: normalizeString10((column == null ? void 0 : column.kind) || inferColumnKind(rows, key)) || inferColumnKind(rows, key)
-      };
-    }).filter(Boolean);
-    if (normalized.length > 0) {
-      return normalized;
-    }
-    const firstRow = rows.find((row) => row && typeof row === "object" && !Array.isArray(row)) || null;
-    if (!firstRow) {
-      return [];
-    }
-    return Object.keys(firstRow).map((key) => ({
-      key,
-      label: humanizeLabel(key) || key,
-      kind: inferColumnKind(rows, key)
-    }));
-  }
-  function buildFieldOptions(columns = [], kind = "") {
-    return (Array.isArray(columns) ? columns : []).filter((column) => normalizeString10(column == null ? void 0 : column.kind) === kind).map((column) => ({
-      value: normalizeString10(column == null ? void 0 : column.key),
-      label: normalizeString10((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key))
-    })).filter((entry) => entry.value && entry.label);
-  }
-  function buildDatasetDescription(label = "", rows = [], columns = [], format2 = "csv") {
-    const rowCount = Array.isArray(rows) ? rows.length : 0;
-    const columnCount = Array.isArray(columns) ? columns.length : 0;
-    const typeLabel = normalizeStaticDatasetFormat(format2) === "json" ? "JSON" : "CSV";
-    return [typeLabel, `${rowCount} row${rowCount === 1 ? "" : "s"}`, `${columnCount} column${columnCount === 1 ? "" : "s"}`].join(" \u2022 ");
-  }
-  function normalizeDatasetRows(rows = []) {
-    return (Array.isArray(rows) ? rows : []).filter((row) => row && typeof row === "object" && !Array.isArray(row)).map((row) => cloneValue5(row));
-  }
-  function normalizeReportBuilderStaticDatasets(datasets = []) {
-    const seen = /* @__PURE__ */ new Set();
-    return (Array.isArray(datasets) ? datasets : []).map((dataset) => {
-      if (!dataset || typeof dataset !== "object" || Array.isArray(dataset)) {
-        return null;
-      }
-      const rows = normalizeDatasetRows(dataset == null ? void 0 : dataset.rows);
-      const fallbackLabel = humanizeLabel((dataset == null ? void 0 : dataset.label) || (dataset == null ? void 0 : dataset.fileName) || (dataset == null ? void 0 : dataset.id) || "");
-      const id = sanitizeId((dataset == null ? void 0 : dataset.id) || (dataset == null ? void 0 : dataset.label) || (dataset == null ? void 0 : dataset.fileName) || `static_${seen.size + 1}`);
-      if (!id || seen.has(id)) {
-        return null;
-      }
-      seen.add(id);
-      const columns = normalizeColumns(dataset == null ? void 0 : dataset.columns, rows);
-      const format2 = normalizeStaticDatasetFormat((dataset == null ? void 0 : dataset.sourceFormat) || (dataset == null ? void 0 : dataset.format) || (dataset == null ? void 0 : dataset.kindLabel));
-      const label = normalizeString10((dataset == null ? void 0 : dataset.label) || fallbackLabel || id) || id;
-      const description = normalizeString10((dataset == null ? void 0 : dataset.description) || buildDatasetDescription(label, rows, columns, format2));
-      const dataSourceRef = normalizeString10((dataset == null ? void 0 : dataset.dataSourceRef) || buildStaticDatasetDataSourceRef(id, format2)) || buildStaticDatasetDataSourceRef(id, format2);
-      return {
-        id,
-        label,
-        description,
-        dataSourceRef,
-        kindLabel: buildStaticDatasetKindLabel(format2),
-        sourceFormat: format2,
-        rows,
-        columns,
-        rowCount: rows.length,
-        columnCount: columns.length,
-        columnOptions: columns.map((column) => ({
-          key: normalizeString10(column == null ? void 0 : column.key),
-          label: normalizeString10((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
-          kind: normalizeString10((column == null ? void 0 : column.kind) || "dimension") || "dimension"
-        })),
-        valueFieldOptions: buildFieldOptions(columns, "measure"),
-        secondaryFieldOptions: buildFieldOptions(columns, "dimension"),
-        chartFieldOptions: columns.map((column) => ({
-          key: normalizeString10(column == null ? void 0 : column.key),
-          label: normalizeString10((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
-          kind: normalizeString10((column == null ? void 0 : column.kind) || "dimension") || "dimension"
-        }))
-      };
-    }).filter(Boolean);
-  }
-  function buildReportBuilderStaticDatasetDeclarations(datasets = []) {
-    return normalizeReportBuilderStaticDatasets(datasets).map((dataset) => ({
-      id: dataset.id,
-      dataSourceRef: dataset.dataSourceRef,
-      request: {
-        kind: buildStaticDatasetRequestKind(dataset == null ? void 0 : dataset.sourceFormat),
-        format: normalizeStaticDatasetFormat(dataset == null ? void 0 : dataset.sourceFormat),
-        rowCount: dataset.rowCount,
-        columnKeys: dataset.columns.map((column) => column.key)
-      }
-    }));
-  }
-
-  // src/components/dashboard/reportBuilderSemantic.js
-  function normalizeString11(value = "") {
-    return String(value || "").trim();
-  }
-  function semanticLookupKeys(field = {}) {
-    const keys2 = [
-      normalizeString11(field == null ? void 0 : field.semanticRef),
-      normalizeString11(field == null ? void 0 : field.id),
-      normalizeString11(field == null ? void 0 : field.key)
-    ].filter(Boolean);
-    return Array.from(new Set(keys2));
-  }
-  function semanticFieldId(field = {}) {
-    return normalizeString11(field == null ? void 0 : field.semanticRef);
-  }
-  function isLocalComputedMeasure(field = {}) {
-    return !!field && typeof field === "object" && !Array.isArray(field) && (!!field.compute && typeof field.compute === "object" && !Array.isArray(field.compute) || normalizeString11(field == null ? void 0 : field.expr)) && !semanticFieldId(field);
-  }
-  function semanticSelectableMeasureFields(config = {}) {
-    return [
-      ...Array.isArray(config == null ? void 0 : config.measures) ? config.measures : [],
-      ...(Array.isArray(config == null ? void 0 : config.calculatedFields) ? config.calculatedFields : []).filter((field) => !isLocalComputedMeasure(field)),
-      ...(Array.isArray(config == null ? void 0 : config.computedMeasures) ? config.computedMeasures : []).filter((field) => !isLocalComputedMeasure(field)),
-      ...(Array.isArray(config == null ? void 0 : config.tableCalculations) ? config.tableCalculations : []).filter((field) => !isLocalComputedMeasure(field))
-    ];
-  }
-  function semanticSelectableParameterFields(config = {}) {
-    return resolveReportBuilderScopeParamFilters(config).filter((field) => !!semanticFieldId(field));
-  }
-  function semanticDiagnosableParameterFields(config = {}) {
-    return resolveReportBuilderScopeParamFilters(config).filter((field) => !!field && typeof field === "object" && !Array.isArray(field)).filter((field) => Object.prototype.hasOwnProperty.call(field, "semanticRef"));
-  }
-  function buildSemanticSelectionIds(fields2 = [], selectedIds = []) {
-    const fieldIndex = new Map(
-      (Array.isArray(fields2) ? fields2 : []).map((field) => [normalizeString11((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key)), field]).filter(([, field]) => !!field)
-    );
-    return Array.from(new Set(
-      (Array.isArray(selectedIds) ? selectedIds : []).map((id) => fieldIndex.get(normalizeString11(id))).map((field) => semanticFieldId(field)).filter(Boolean)
-    ));
-  }
-  function normalizeFieldSelectionIds(selectedIds = []) {
-    return Array.from(new Set(
-      (Array.isArray(selectedIds) ? selectedIds : []).map((id) => normalizeString11(id)).filter(Boolean)
-    ));
-  }
-  function hasConfiguredSemanticParameterValue(field = {}, value = null) {
-    if ((field == null ? void 0 : field.type) === "dateRange") {
-      return !!normalizeString11(value == null ? void 0 : value.start) || !!normalizeString11(value == null ? void 0 : value.end);
-    }
-    if (Array.isArray(value)) {
-      return value.length > 0;
-    }
-    if (value && typeof value === "object") {
-      return Object.keys(value).length > 0;
-    }
-    return value !== void 0 && value !== null && normalizeString11(value) !== "";
-  }
-  function cloneValue6(value = null) {
-    return value == null ? value : JSON.parse(JSON.stringify(value));
-  }
-  function buildSemanticSelectionParameters(config = {}, state = {}) {
-    const next = {};
-    semanticSelectableParameterFields(config).forEach((field) => {
-      const rawId = resolveScopeParamId(field);
-      const semanticRef = semanticFieldId(field);
-      if (!rawId || !semanticRef) {
-        return;
-      }
-      const value = getScopeParamValue(state, rawId);
-      if (!hasConfiguredSemanticParameterValue(field, value)) {
-        return;
-      }
-      next[semanticRef] = cloneValue6(value);
-    });
-    return next;
-  }
-  function resolveSelectedSemanticParameterIds(config = {}, state = {}) {
-    return semanticDiagnosableParameterFields(config).filter((field) => {
-      const rawId = resolveScopeParamId(field);
-      if (!rawId) {
-        return false;
-      }
-      return hasConfiguredSemanticParameterValue(field, getScopeParamValue(state, rawId));
-    }).map((field) => resolveScopeParamId(field)).filter(Boolean);
-  }
-  function resolveGroupByDimensionId(config = {}, state = {}) {
-    var _a5;
-    const groupByValue = normalizeString11(state == null ? void 0 : state.groupBy);
-    if (!groupByValue) {
-      return "";
-    }
-    const option = (Array.isArray((_a5 = config == null ? void 0 : config.groupBy) == null ? void 0 : _a5.options) ? config.groupBy.options : []).find((entry) => normalizeString11(entry == null ? void 0 : entry.value) === groupByValue);
-    return normalizeString11((option == null ? void 0 : option.dimensionId) || groupByValue);
-  }
-  function resolveTableCalculationDimensionIds(config = {}, state = {}) {
-    const selectedMeasureIds = new Set(normalizeFieldSelectionIds(state == null ? void 0 : state.selectedMeasures));
-    const calculations = [
-      ...Array.isArray(config == null ? void 0 : config.calculatedFields) ? config.calculatedFields : [],
-      ...Array.isArray(config == null ? void 0 : config.computedMeasures) ? config.computedMeasures : [],
-      ...Array.isArray(config == null ? void 0 : config.tableCalculations) ? config.tableCalculations : []
-    ].filter((field) => selectedMeasureIds.has(normalizeString11((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key))));
-    const next = [];
-    calculations.forEach((field) => {
-      const compute = (field == null ? void 0 : field.compute) && typeof field.compute === "object" ? field.compute : {};
-      [
-        ...Array.isArray(compute.partitionBy) ? compute.partitionBy : [],
-        ...Array.isArray(compute.orderBy) ? compute.orderBy.map((entry) => entry == null ? void 0 : entry.field) : []
-      ].forEach((fieldKey) => {
-        const normalizedFieldKey = normalizeString11(fieldKey);
-        if (!normalizedFieldKey) {
-          return;
-        }
-        const dimension = (Array.isArray(config == null ? void 0 : config.dimensions) ? config.dimensions : []).find((entry) => semanticLookupKeys(entry).includes(normalizedFieldKey));
-        const dimensionId = normalizeString11((dimension == null ? void 0 : dimension.id) || (dimension == null ? void 0 : dimension.key));
-        if (dimensionId && !next.includes(dimensionId)) {
-          next.push(dimensionId);
-        }
-      });
-    });
-    return next;
-  }
-  function resolveLocalCalculatedFieldDependencies(config = {}, state = {}) {
-    const selectedMeasureIds = new Set(normalizeFieldSelectionIds(state == null ? void 0 : state.selectedMeasures));
-    const localCalculatedFields = normalizeReportCalculatedFields([
-      ...Array.isArray(config == null ? void 0 : config.calculatedFields) ? config.calculatedFields : [],
-      ...Array.isArray(config == null ? void 0 : config.computedMeasures) ? config.computedMeasures : [],
-      ...Array.isArray(config == null ? void 0 : config.tableCalculations) ? config.tableCalculations : []
-    ]).filter((field) => isLocalComputedMeasure(field));
-    const calculatedFieldIndex = /* @__PURE__ */ new Map();
-    localCalculatedFields.forEach((field) => {
-      [normalizeString11(field == null ? void 0 : field.id), normalizeString11(field == null ? void 0 : field.key)].filter(Boolean).forEach((alias) => {
-        if (!calculatedFieldIndex.has(alias)) {
-          calculatedFieldIndex.set(alias, field);
-        }
-      });
-    });
-    const measureIds = /* @__PURE__ */ new Set();
-    const dimensionIds = /* @__PURE__ */ new Set();
-    const visited = /* @__PURE__ */ new Set();
-    const resolveDependency = (fieldKey = "") => {
-      const normalizedFieldKey = normalizeString11(fieldKey);
-      if (!normalizedFieldKey || visited.has(normalizedFieldKey)) {
-        return;
-      }
-      visited.add(normalizedFieldKey);
-      const measure = (Array.isArray(config == null ? void 0 : config.measures) ? config.measures : []).find((entry) => semanticLookupKeys(entry).includes(normalizedFieldKey));
-      if (measure) {
-        const measureId = normalizeString11((measure == null ? void 0 : measure.id) || (measure == null ? void 0 : measure.key));
-        if (measureId) {
-          measureIds.add(measureId);
-        }
-        return;
-      }
-      const dimension = (Array.isArray(config == null ? void 0 : config.dimensions) ? config.dimensions : []).find((entry) => semanticLookupKeys(entry).includes(normalizedFieldKey));
-      if (dimension) {
-        const dimensionId = normalizeString11((dimension == null ? void 0 : dimension.id) || (dimension == null ? void 0 : dimension.key));
-        if (dimensionId) {
-          dimensionIds.add(dimensionId);
-        }
-        return;
-      }
-      const calculatedField = calculatedFieldIndex.get(normalizedFieldKey);
-      if (calculatedField) {
-        (calculatedField.dependencies || []).forEach((dependencyId) => {
-          resolveDependency(dependencyId);
-        });
-      }
-    };
-    localCalculatedFields.filter((field) => selectedMeasureIds.has(normalizeString11((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key)))).forEach((field) => {
-      (field.dependencies || []).forEach((dependencyId) => {
-        resolveDependency(dependencyId);
-      });
-    });
-    return {
-      measureIds: Array.from(measureIds),
-      dimensionIds: Array.from(dimensionIds)
-    };
-  }
-  function resolveSemanticSelectedDimensions(config = {}, state = {}) {
-    const ids = normalizeFieldSelectionIds(state == null ? void 0 : state.selectedDimensions);
-    const groupByDimensionId = resolveGroupByDimensionId(config, state);
-    if (groupByDimensionId && !ids.includes(groupByDimensionId)) {
-      ids.push(groupByDimensionId);
-    }
-    resolveTableCalculationDimensionIds(config, state).forEach((dimensionId) => {
-      if (!ids.includes(dimensionId)) {
-        ids.push(dimensionId);
-      }
-    });
-    resolveLocalCalculatedFieldDependencies(config, state).dimensionIds.forEach((dimensionId) => {
-      if (!ids.includes(dimensionId)) {
-        ids.push(dimensionId);
-      }
-    });
-    return ids;
-  }
-  function buildUnmappedSelectionIds(fields2 = [], selectedIds = [], {
-    ignoreIds = []
-  } = {}) {
-    const fieldIndex = new Map(
-      (Array.isArray(fields2) ? fields2 : []).map((field) => [normalizeString11((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key)), field]).filter(([, field]) => !!field)
-    );
-    const ignored = new Set(
-      (Array.isArray(ignoreIds) ? ignoreIds : []).map((id) => normalizeString11(id)).filter(Boolean)
-    );
-    return Array.from(new Set(
-      (Array.isArray(selectedIds) ? selectedIds : []).map((id) => normalizeString11(id)).filter(Boolean).filter((id) => !ignored.has(id)).filter((id) => !semanticFieldId(fieldIndex.get(id)))
-    ));
-  }
-  function buildRawFieldSelection(fields2 = [], semanticIds = []) {
-    const rawIndex = /* @__PURE__ */ new Map();
-    (Array.isArray(fields2) ? fields2 : []).forEach((field) => {
-      const rawId = normalizeString11((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key));
-      const semanticRef = semanticFieldId(field);
-      if (!rawId) {
-        return;
-      }
-      if (!semanticRef || rawIndex.has(semanticRef)) {
-        return;
-      }
-      rawIndex.set(semanticRef, rawId);
-    });
-    return Array.from(new Set(
-      (Array.isArray(semanticIds) ? semanticIds : []).map((id) => rawIndex.get(normalizeString11(id))).filter(Boolean)
-    ));
-  }
-  function resolveReportBuilderSemanticSelections(config = {}, binding = null) {
-    const normalizedBinding = normalizeSemanticBinding(binding);
-    if (!normalizedBinding || normalizedBinding.mode !== "semantic") {
-      return null;
-    }
-    const source = binding && typeof binding === "object" ? binding : {};
-    return {
-      hasExplicitDimensions: Object.prototype.hasOwnProperty.call(source, "selectedDimensions"),
-      hasExplicitMeasures: Object.prototype.hasOwnProperty.call(source, "selectedMeasures"),
-      selectedDimensions: buildRawFieldSelection(config.dimensions, normalizedBinding.selectedDimensions),
-      selectedMeasures: buildRawFieldSelection(semanticSelectableMeasureFields(config), normalizedBinding.selectedMeasures)
-    };
-  }
-  function buildReportBuilderSemanticSelection(config = {}, state = {}) {
-    const normalizedBinding = normalizeSemanticBinding((state == null ? void 0 : state.binding) || (config == null ? void 0 : config.binding));
-    if (!normalizedBinding || normalizedBinding.mode !== "semantic") {
-      return null;
-    }
-    const localComputedMeasureIds = (Array.isArray(config == null ? void 0 : config.computedMeasures) ? config.computedMeasures : []).concat(Array.isArray(config == null ? void 0 : config.calculatedFields) ? config.calculatedFields : []).concat(Array.isArray(config == null ? void 0 : config.tableCalculations) ? config.tableCalculations : []).filter((field) => isLocalComputedMeasure(field)).map((field) => normalizeString11((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key))).filter(Boolean);
-    const localCalculatedDependencies = resolveLocalCalculatedFieldDependencies(config, state);
-    const selectedDimensionIds = resolveSemanticSelectedDimensions(config, state);
-    const selectedDimensions = buildSemanticSelectionIds(config.dimensions, selectedDimensionIds);
-    const selectedMeasures = buildSemanticSelectionIds(semanticSelectableMeasureFields(config), [
-      ...Array.isArray(state == null ? void 0 : state.selectedMeasures) ? state.selectedMeasures : [],
-      ...localCalculatedDependencies.measureIds
-    ]);
-    const selectedParameters = buildSemanticSelectionParameters(config, state);
-    const unmappedDimensions = buildUnmappedSelectionIds(config.dimensions, selectedDimensionIds);
-    const unmappedMeasures = buildUnmappedSelectionIds(semanticSelectableMeasureFields(config), state == null ? void 0 : state.selectedMeasures, {
-      ignoreIds: localComputedMeasureIds
-    });
-    const unmappedParameters = buildUnmappedSelectionIds(
-      semanticDiagnosableParameterFields(config),
-      resolveSelectedSemanticParameterIds(config, state)
-    );
-    return {
-      modelRef: normalizedBinding.modelRef,
-      entity: normalizedBinding.entity,
-      selection: {
-        dimensions: selectedDimensions,
-        measures: selectedMeasures
-      },
-      ...unmappedDimensions.length > 0 || unmappedMeasures.length > 0 || unmappedParameters.length > 0 ? {
-        unmapped: {
-          ...unmappedDimensions.length > 0 ? { dimensions: unmappedDimensions } : {},
-          ...unmappedMeasures.length > 0 ? { measures: unmappedMeasures } : {},
-          ...unmappedParameters.length > 0 ? { parameters: unmappedParameters } : {}
-        }
-      } : {},
-      refinements: [],
-      parameters: selectedParameters
-    };
-  }
-
-  // src/reporting/scopeBindingModel.js
-  var SCOPE_PARAMS_BINDING_PREFIX = "scopeParams.";
-  var STATIC_FILTERS_BINDING_PREFIX = "staticFilters.";
-  var SUPPORTED_SCOPE_BINDING_PREFIXES = [
-    SCOPE_PARAMS_BINDING_PREFIX,
-    STATIC_FILTERS_BINDING_PREFIX
-  ];
-  function resolveScopeBindingFilterId(target = "") {
-    const normalizedTarget = String(target || "").trim();
-    const prefix = SUPPORTED_SCOPE_BINDING_PREFIXES.find((entry) => normalizedTarget.startsWith(entry));
-    return prefix ? normalizedTarget.slice(prefix.length).trim() : "";
-  }
-
-  // src/components/dashboard/reportBuilderExplorationSession.js
-  function normalizeString12(value = "") {
-    return String(value || "").trim();
-  }
-  function cloneValue7(value) {
-    return value == null ? value : JSON.parse(JSON.stringify(value));
-  }
-  function stableSerialize(value) {
-    return JSON.stringify(value == null ? null : value);
-  }
-  function normalizeTimestamp(value, fallback = 0) {
-    const numeric = Number(value);
-    return Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
-  }
-  function resolveExplorationNow(options = {}) {
-    return normalizeTimestamp(options == null ? void 0 : options.nowMs, Date.now());
-  }
-  function resolveExplorationTtl(options = {}) {
-    const numeric = Number(options == null ? void 0 : options.ttlMs);
-    if (Number.isFinite(numeric) && numeric > 0) {
-      return numeric;
-    }
-    return 1e3 * 60 * 60;
-  }
-  function snapshotExplorationState(state = {}) {
-    const snapshot = cloneValue7(state && typeof state === "object" && !Array.isArray(state) ? state : {});
-    delete snapshot.explorationSession;
-    return snapshot;
-  }
-  function normalizeReportBuilderExplorationSession(session = null, {
-    nowMs = Date.now()
-  } = {}) {
-    var _a5;
-    if (!session || typeof session !== "object" || Array.isArray(session)) {
-      return null;
-    }
-    const sessionId = normalizeString12(session == null ? void 0 : session.sessionId);
-    const sourceRef = (session == null ? void 0 : session.sourceRef) && typeof session.sourceRef === "object" && !Array.isArray(session.sourceRef) ? cloneValue7(session.sourceRef) : null;
-    const baseSnapshot = (session == null ? void 0 : session.baseSnapshot) && typeof session.baseSnapshot === "object" && !Array.isArray(session.baseSnapshot) ? cloneValue7(session.baseSnapshot) : null;
-    const history = (Array.isArray(session == null ? void 0 : session.history) ? session.history : []).filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry)).map((entry) => ({
-      snapshot: snapshotExplorationState(entry.snapshot || {}),
-      timestamp: normalizeTimestamp(entry.timestamp, normalizeTimestamp(session == null ? void 0 : session.startedAt, nowMs))
-    }));
-    const historyIndex = Math.max(0, Math.min(history.length - 1, Number((session == null ? void 0 : session.historyIndex) || 0) || 0));
-    const startedAt = normalizeTimestamp(session == null ? void 0 : session.startedAt, nowMs);
-    const updatedAt = normalizeTimestamp(session == null ? void 0 : session.updatedAt, startedAt);
-    const ttlMs = resolveExplorationTtl(session);
-    const expiresAt = normalizeTimestamp(session == null ? void 0 : session.expiresAt, startedAt + ttlMs);
-    if (!sessionId || !sourceRef || !baseSnapshot || history.length === 0) {
-      return null;
-    }
-    return {
-      sessionId,
-      sourceRef,
-      baseSnapshot,
-      history,
-      historyIndex,
-      startedAt,
-      updatedAt,
-      ttlMs,
-      expiresAt,
-      dirty: historyIndex > 0 || stableSerialize(((_a5 = history[historyIndex]) == null ? void 0 : _a5.snapshot) || {}) !== stableSerialize(baseSnapshot)
-    };
-  }
-  function normalizeReportBuilderExplorationState(state = {}, options = {}) {
-    const session = normalizeReportBuilderExplorationSession(state == null ? void 0 : state.explorationSession, options);
-    if (!session) {
-      const next = cloneValue7(state && typeof state === "object" && !Array.isArray(state) ? state : {});
-      delete next.explorationSession;
-      return next;
-    }
-    const nowMs = resolveExplorationNow(options);
-    if (session.expiresAt <= nowMs) {
-      return cloneValue7(session.baseSnapshot);
-    }
-    return {
-      ...snapshotExplorationState(state),
-      explorationSession: session
-    };
-  }
-
-  // src/reporting/drillMetadataProvider.js
-  var SUPPORTED_REFINEMENT_ACTION_KINDS = /* @__PURE__ */ new Set(["keep", "exclude", "drill", "detail"]);
-  function normalizeString13(value = "") {
-    return String(value || "").trim();
-  }
-  function cloneValue8(value) {
-    return value == null ? value : JSON.parse(JSON.stringify(value));
-  }
-  function unwrapPayload(payload = {}, key = "") {
-    if (payload && typeof payload === "object" && !Array.isArray(payload) && payload[key] && typeof payload[key] === "object") {
-      return payload[key];
-    }
-    return payload;
-  }
-  function normalizeDetailTarget(payload = {}) {
-    const detailTarget = unwrapPayload(payload, "detailTarget");
-    if (!detailTarget || typeof detailTarget !== "object" || Array.isArray(detailTarget)) {
-      return null;
-    }
-    const targetRef = normalizeString13(detailTarget.targetRef);
-    const navigationMode = normalizeString13(detailTarget.navigationMode);
-    if (!targetRef || !navigationMode) {
-      return null;
-    }
-    return {
-      targetRef,
-      navigationMode,
-      parameters: detailTarget.parameters && typeof detailTarget.parameters === "object" && !Array.isArray(detailTarget.parameters) ? cloneValue8(detailTarget.parameters) : {},
-      ...normalizeString13(detailTarget.title) ? { title: normalizeString13(detailTarget.title) } : {},
-      ...normalizeString13(detailTarget.description) ? { description: normalizeString13(detailTarget.description) } : {}
-    };
-  }
-  function normalizeRefinementActions(payload = {}) {
-    const actions = Array.isArray(payload) ? payload : Array.isArray(payload == null ? void 0 : payload.actions) ? payload.actions : [];
-    return actions.map((action) => {
-      if (!action || typeof action !== "object" || Array.isArray(action)) {
-        return null;
-      }
-      const id = normalizeString13(action.id);
-      const label = normalizeString13(action.label);
-      const kind = normalizeString13(action.kind).toLowerCase();
-      if (!id || !label || !SUPPORTED_REFINEMENT_ACTION_KINDS.has(kind)) {
-        return null;
-      }
-      return {
-        id,
-        label,
-        kind,
-        ...normalizeString13(action.targetRef) ? { targetRef: normalizeString13(action.targetRef) } : {},
-        ...normalizeString13(action.nextFieldRef) ? { nextFieldRef: normalizeString13(action.nextFieldRef) } : {}
-      };
-    }).filter(Boolean);
-  }
-
-  // src/reporting/reportBuilderDrillHierarchy.js
-  function normalizeString14(value = "") {
-    return String(value || "").trim();
-  }
-  function normalizeReportBuilderDrillLevel(level = {}, index = 0) {
-    if (!level || typeof level !== "object" || Array.isArray(level)) {
-      return null;
-    }
-    const field = normalizeString14(level.field || level.fieldRef || level.id);
-    const label = normalizeString14(level.label || field);
-    const id = normalizeString14(level.id || field || `level_${index + 1}`);
-    if (!field || !label || !id) {
-      return null;
-    }
-    return {
-      id,
-      field,
-      label
-    };
-  }
-  function normalizeReportBuilderDrillHierarchy(hierarchy = {}) {
-    var _a5;
-    if (!hierarchy || typeof hierarchy !== "object" || Array.isArray(hierarchy)) {
-      return null;
-    }
-    const levels = (Array.isArray(hierarchy.levels) ? hierarchy.levels : []).map((level, index) => normalizeReportBuilderDrillLevel(level, index)).filter(Boolean);
-    if (levels.length < 2) {
-      return null;
-    }
-    const id = normalizeString14(hierarchy.id || hierarchy.fieldRef || ((_a5 = levels[0]) == null ? void 0 : _a5.field));
-    if (!id) {
-      return null;
-    }
-    return {
-      id,
-      ...normalizeString14(hierarchy.label) ? { label: normalizeString14(hierarchy.label) } : {},
-      levels
-    };
-  }
-  function normalizeReportBuilderDrillHierarchies(hierarchies = []) {
-    return (Array.isArray(hierarchies) ? hierarchies : []).map((hierarchy) => normalizeReportBuilderDrillHierarchy(hierarchy)).filter(Boolean);
-  }
-
-  // src/reporting/reportBuilderDrillMetadata.js
-  function normalizeString15(value = "") {
-    return String(value || "").trim();
-  }
-  function resolveDrillMetadataSource(config = {}) {
-    const nested = config == null ? void 0 : config.drillMetadata;
-    return nested && typeof nested === "object" && !Array.isArray(nested) ? nested : config;
-  }
-  function normalizeDetailTargets(detailTargets = []) {
-    return (Array.isArray(detailTargets) ? detailTargets : []).map((target) => normalizeDetailTarget(target)).filter(Boolean);
-  }
-  function normalizeFieldActionEntries(fieldActions = []) {
-    return (Array.isArray(fieldActions) ? fieldActions : []).map((entry) => {
-      if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
-        return null;
-      }
-      const fieldRef = normalizeString15(entry.fieldRef || entry.field || entry.id);
-      if (!fieldRef) {
-        return null;
-      }
-      const actions = normalizeRefinementActions(entry.actions || entry.refinementActions || []);
-      return {
-        fieldRef,
-        actions
-      };
-    }).filter(Boolean);
-  }
-  function normalizeReportBuilderDrillMetadata(config = {}) {
-    const source = resolveDrillMetadataSource(config);
-    const hierarchies = normalizeReportBuilderDrillHierarchies((source == null ? void 0 : source.hierarchies) || (source == null ? void 0 : source.drillHierarchies) || []);
-    const detailTargets = normalizeDetailTargets((source == null ? void 0 : source.detailTargets) || []);
-    const fieldActions = normalizeFieldActionEntries((source == null ? void 0 : source.fieldActions) || (source == null ? void 0 : source.refinementActionsByField) || (source == null ? void 0 : source.refinementActions) || []);
-    return {
-      hierarchies,
-      detailTargets,
-      fieldActions
-    };
-  }
-  function resolveReportBuilderDrillMetadata(config = {}, overrides = null) {
-    const base = normalizeReportBuilderDrillMetadata(config);
-    if (!overrides || typeof overrides !== "object" || Array.isArray(overrides)) {
-      return base;
-    }
-    const normalizedOverrides = normalizeReportBuilderDrillMetadata({
-      drillMetadata: overrides
-    });
-    return {
-      hierarchies: Object.prototype.hasOwnProperty.call(overrides, "hierarchies") ? normalizedOverrides.hierarchies : base.hierarchies,
-      detailTargets: Object.prototype.hasOwnProperty.call(overrides, "detailTargets") ? normalizedOverrides.detailTargets : base.detailTargets,
-      fieldActions: Object.prototype.hasOwnProperty.call(overrides, "fieldActions") ? normalizedOverrides.fieldActions : base.fieldActions
-    };
-  }
-
-  // src/components/dashboard/reportBuilderChartRules.js
-  var CARTESIAN_CHART_TYPES = ["line", "bar", "area"];
-  var CATEGORY_CHART_TYPES = ["pie", "donut", "horizontal_bar", "funnel_bar"];
-  var ALL_SUPPORTED_CHART_TYPES = [...CARTESIAN_CHART_TYPES, ...CATEGORY_CHART_TYPES];
-  var SINGLE_MEASURE_CATEGORY_TYPES = /* @__PURE__ */ new Set(["pie", "donut", "funnel_bar"]);
-  function chartFamilyForType(type = "") {
-    const normalized = String(type || "").trim().toLowerCase();
-    if (CARTESIAN_CHART_TYPES.includes(normalized)) return "cartesian";
-    if (CATEGORY_CHART_TYPES.includes(normalized)) return "category";
-    return null;
-  }
-  function chartFamilyAllowsSeriesOptions(type = "") {
-    const normalized = String(type || "").trim().toLowerCase();
-    if (chartFamilyForType(normalized) === "cartesian") return true;
-    return normalized === "horizontal_bar";
-  }
-  function chartFamilyAllowsSeriesDimension(type = "") {
-    return chartFamilyForType(type) === "cartesian" || String(type || "").trim().toLowerCase() === "horizontal_bar";
-  }
-  function isValidPerSeriesType(chartType = "", perSeriesType = "") {
-    const family = chartFamilyForType(chartType);
-    const normalized = String(perSeriesType || "").trim().toLowerCase();
-    if (!normalized) return true;
-    if (family === "cartesian") {
-      return CARTESIAN_CHART_TYPES.includes(normalized);
-    }
-    return false;
-  }
-  function supportsStackIdForSeries(chartType = "", perSeriesType = "") {
-    const family = chartFamilyForType(chartType);
-    const baseType = String(chartType || "").trim().toLowerCase();
-    const effectiveType = String(perSeriesType || baseType).trim().toLowerCase();
-    if (family === "cartesian") {
-      return effectiveType === "bar" || effectiveType === "area";
-    }
-    return baseType === "horizontal_bar";
-  }
-
-  // src/components/dashboard/reportBuilderOptions.js
-  function cloneValue9(value) {
-    return value == null ? value : JSON.parse(JSON.stringify(value));
-  }
-  function normalizeString16(value = "") {
-    return String(value || "").trim();
-  }
-  function isEntityOptionName(name = "") {
-    const normalized = normalizeString16(name).replace(/[^a-zA-Z0-9]/g, "");
-    return /^(account|agency|advertiser|campaign|order|line(item)?|audience|creative|pixel)(id|ids)?$/i.test(normalized);
-  }
-  function normalizedType(value = "") {
-    const type = normalizeString16(value).toLowerCase();
-    if (["bool", "boolean"].includes(type)) return "boolean";
-    if (["int", "integer"].includes(type)) return "integer";
-    if (["number", "float", "double"].includes(type)) return "number";
-    return "string";
-  }
-  function coerceValue(value, type) {
-    if (type === "boolean") {
-      if (value === true || value === false) return value;
-      if (value === "true" || value === 1 || value === "1") return true;
-      if (value === "false" || value === 0 || value === "0") return false;
-      return void 0;
-    }
-    if (type === "integer") {
-      const numeric = Number(value);
-      return Number.isInteger(numeric) ? numeric : void 0;
-    }
-    if (type === "number") {
-      const numeric = Number(value);
-      return Number.isFinite(numeric) ? numeric : void 0;
-    }
-    if (value === void 0 || value === null) return void 0;
-    return String(value);
-  }
-  function valueKey(value) {
-    return `${typeof value}:${JSON.stringify(value)}`;
-  }
-  function normalizeValueEntry(entry, type) {
-    const rawValue = entry && typeof entry === "object" && !Array.isArray(entry) ? entry.value : entry;
-    const value = coerceValue(rawValue, type);
-    if (value === void 0) return null;
-    const label = entry && typeof entry === "object" && !Array.isArray(entry) ? normalizeString16(entry.label) : "";
-    return {
-      value,
-      label: label || String(value)
-    };
-  }
-  function normalizeReportBuilderOptionDefinitions(values = []) {
-    const seen = /* @__PURE__ */ new Set();
-    return (Array.isArray(values) ? values : []).map((entry) => {
-      if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
-      const name = normalizeString16(entry.name);
-      if (!name || seen.has(name) || isEntityOptionName(name)) return null;
-      seen.add(name);
-      const type = normalizedType(entry.type);
-      const optionValues = (Array.isArray(entry.values) ? entry.values : []).map((value) => normalizeValueEntry(value, type)).filter(Boolean);
-      const allowedKeys = new Set(optionValues.map((value) => valueKey(value.value)));
-      const coercedDefault = coerceValue(entry.default, type);
-      const defaultValue = coercedDefault !== void 0 && (allowedKeys.size === 0 || allowedKeys.has(valueKey(coercedDefault))) ? coercedDefault : void 0;
-      const presentation = entry.presentation;
-      const anchorBlockId = typeof (presentation == null ? void 0 : presentation.anchorBlockId) === "string" ? presentation.anchorBlockId.trim() : "";
-      return {
-        ...anchorBlockId && (presentation == null ? void 0 : presentation.placement) === "header" ? { presentation: { anchorBlockId, placement: "header" } } : {},
-        name,
-        label: normalizeString16(entry.label) || name,
-        type,
-        description: normalizeString16(entry.description),
-        values: optionValues,
-        ...defaultValue !== void 0 ? { default: defaultValue } : {}
-      };
-    }).filter(Boolean);
-  }
-  function resolveEffectiveReportBuilderOptions(definitions = [], selected = {}) {
-    const source = selected && typeof selected === "object" && !Array.isArray(selected) ? selected : {};
-    return normalizeReportBuilderOptionDefinitions(definitions).reduce((result, definition) => {
-      const allowed = new Set(definition.values.map((entry) => valueKey(entry.value)));
-      const selectedValue = coerceValue(source[definition.name], definition.type);
-      const selectedValid = selectedValue !== void 0 && (allowed.size === 0 || allowed.has(valueKey(selectedValue)));
-      if (selectedValid) {
-        result[definition.name] = selectedValue;
-      } else if (Object.prototype.hasOwnProperty.call(definition, "default")) {
-        result[definition.name] = cloneValue9(definition.default);
-      }
-      return result;
-    }, {});
-  }
-
-  // src/reporting/reportRefinementModel.js
-  function normalizeString17(value = "") {
-    return String(value || "").trim();
-  }
-  function cloneValue10(value) {
-    return value == null ? value : JSON.parse(JSON.stringify(value));
-  }
-  var SUPPORTED_REFINEMENT_OPS = /* @__PURE__ */ new Set(["keep", "exclude", "drill", "detail"]);
-  function resolveDefaultRefinementId({ op = "", field = "", sourceBlockId = "" } = {}) {
-    return [
-      normalizeString17(op),
-      normalizeString17(field),
-      normalizeString17(sourceBlockId)
-    ].filter(Boolean).join(":");
-  }
-  function normalizeReportRefinement(refinement = {}) {
-    if (!refinement || typeof refinement !== "object" || Array.isArray(refinement)) {
-      return null;
-    }
-    const op = normalizeString17(refinement.op).toLowerCase();
-    if (!SUPPORTED_REFINEMENT_OPS.has(op)) {
-      return null;
-    }
-    const field = normalizeString17(refinement.field);
-    if (!field) {
-      return null;
-    }
-    const sourceBlockId = normalizeString17(refinement.sourceBlockId);
-    const id = normalizeString17(refinement.id || resolveDefaultRefinementId({ op, field, sourceBlockId }));
-    if (!id) {
-      return null;
-    }
-    return {
-      id,
-      op,
-      field,
-      values: Array.isArray(refinement.values) ? refinement.values.map((value) => cloneValue10(value)) : [],
-      ...sourceBlockId ? { sourceBlockId } : {},
-      ...normalizeString17(refinement.label) ? { label: normalizeString17(refinement.label) } : {},
-      ...normalizeString17(refinement.targetRef) ? { targetRef: normalizeString17(refinement.targetRef) } : {}
-    };
-  }
-  function normalizeReportRefinements(refinements = []) {
-    const normalized = (Array.isArray(refinements) ? refinements : [refinements]).map((entry) => normalizeReportRefinement(entry)).filter(Boolean);
-    const next = [];
-    const seen = /* @__PURE__ */ new Set();
-    normalized.forEach((entry) => {
-      if (seen.has(entry.id)) {
-        return;
-      }
-      seen.add(entry.id);
-      next.push(entry);
-    });
-    return next;
-  }
-
-  // src/components/dashboard/reportRuntimeDrillState.js
-  function normalizeString18(value = "") {
-    return String(value || "").trim();
-  }
-  function normalizeReportRuntimeDrillTransition(transition = {}) {
-    if (!transition || typeof transition !== "object" || Array.isArray(transition)) {
-      return null;
-    }
-    const refinementId = normalizeString18(transition.refinementId);
-    const sourceField = normalizeString18(transition.sourceField);
-    const nextFieldRef = normalizeString18(transition.nextFieldRef);
-    if (!refinementId || !sourceField || !nextFieldRef) {
-      return null;
-    }
-    return {
-      refinementId,
-      sourceField,
-      nextFieldRef,
-      ...normalizeString18(transition.sourceBlockId) ? { sourceBlockId: normalizeString18(transition.sourceBlockId) } : {}
-    };
-  }
-
-  // src/reporting/reportRuntimeHostIntent.js
-  function normalizeString19(value = "") {
-    return String(value || "").trim();
-  }
-  function cloneValue11(value) {
-    return value == null ? value : JSON.parse(JSON.stringify(value));
-  }
-  var SUPPORTED_REPORT_RUNTIME_HOST_INTENT_KINDS = /* @__PURE__ */ new Set(["detailTarget"]);
-  function normalizeReportRuntimeHostIntent(intent = {}) {
-    if (!intent || typeof intent !== "object" || Array.isArray(intent)) {
-      return null;
-    }
-    const intentKind = normalizeString19(intent.intentKind).trim();
-    const targetRef = normalizeString19(intent.targetRef);
-    const navigationMode = normalizeString19(intent.navigationMode);
-    if (!SUPPORTED_REPORT_RUNTIME_HOST_INTENT_KINDS.has(intentKind) || !targetRef || !navigationMode) {
-      return null;
-    }
-    return {
-      intentKind,
-      targetRef,
-      navigationMode,
-      parameters: intent.parameters && typeof intent.parameters === "object" && !Array.isArray(intent.parameters) ? cloneValue11(intent.parameters) : {},
-      ...normalizeString19(intent.title) ? { title: normalizeString19(intent.title) } : {},
-      ...normalizeString19(intent.description) ? { description: normalizeString19(intent.description) } : {}
-    };
-  }
-
-  // src/components/dashboard/reportRuntimeInteractionStateModel.js
-  function cloneValue12(value) {
-    return value == null ? value : JSON.parse(JSON.stringify(value));
-  }
-  function normalizeReportRuntimeDetailDiagnostic(detailDiagnostic = null) {
-    if (!detailDiagnostic || typeof detailDiagnostic !== "object" || Array.isArray(detailDiagnostic)) {
-      return null;
-    }
-    const code = String((detailDiagnostic == null ? void 0 : detailDiagnostic.code) || "").trim();
-    const severity = String((detailDiagnostic == null ? void 0 : detailDiagnostic.severity) || "").trim().toLowerCase();
-    const message = String((detailDiagnostic == null ? void 0 : detailDiagnostic.message) || "").trim();
-    if (!code || !message) {
-      return null;
-    }
-    return {
-      code,
-      severity: severity || "warning",
-      message
-    };
-  }
-  function normalizeReportRuntimeScopedFilterState(state = null) {
-    if (!state || typeof state !== "object" || Array.isArray(state)) {
-      return {};
-    }
-    return Object.fromEntries(
-      Object.entries(state).map(([datasetRef, values]) => {
-        const normalizedDatasetRef = String(datasetRef || "").trim();
-        if (!normalizedDatasetRef || !values || typeof values !== "object" || Array.isArray(values)) {
-          return null;
-        }
-        const normalizedValues = Object.fromEntries(
-          Object.entries(values).map(([paramId, value]) => {
-            const normalizedParamId = String(paramId || "").trim();
-            return normalizedParamId ? [normalizedParamId, cloneValue12(value)] : null;
-          }).filter(Boolean)
-        );
-        return Object.keys(normalizedValues).length > 0 ? [normalizedDatasetRef, normalizedValues] : null;
-      }).filter(Boolean)
-    );
-  }
-  function normalizeReportRuntimeInteractionState(state = null, {
-    allowEmpty = true
-  } = {}) {
-    const refinements = normalizeReportRefinements(state == null ? void 0 : state.refinements);
-    const drillTransitions = (Array.isArray(state == null ? void 0 : state.drillTransitions) ? state.drillTransitions : []).map((entry) => normalizeReportRuntimeDrillTransition(entry)).filter(Boolean);
-    const datasetScopeParams = normalizeReportRuntimeScopedFilterState(state == null ? void 0 : state.datasetScopeParams);
-    const hostIntent = normalizeReportRuntimeHostIntent(state == null ? void 0 : state.hostIntent);
-    const detailDiagnostic = normalizeReportRuntimeDetailDiagnostic(state == null ? void 0 : state.detailDiagnostic);
-    if (!allowEmpty && refinements.length === 0 && drillTransitions.length === 0 && Object.keys(datasetScopeParams).length === 0 && !hostIntent && !detailDiagnostic) {
-      return null;
-    }
-    return {
-      refinements,
-      drillTransitions,
-      datasetScopeParams,
-      hostIntent: hostIntent || null,
-      detailDiagnostic: detailDiagnostic || null
-    };
-  }
-
-  // src/components/dashboard/reportBuilderRuntimePreviewInteractionPersistence.js
-  var REPORT_DOCUMENT_RUNTIME_PREVIEW_INTERACTION_KEY = "reportDocumentRuntimePreviewInteraction";
-  function resolveReportBuilderPersistedRuntimePreviewInteraction(state = {}) {
-    return normalizeReportRuntimeInteractionState(
-      state == null ? void 0 : state[REPORT_DOCUMENT_RUNTIME_PREVIEW_INTERACTION_KEY],
-      { allowEmpty: false }
-    );
-  }
-
-  // src/components/dashboard/reportBuilderUtils.js
-  function clone3(value) {
-    if (Array.isArray(value)) {
-      return value.map((item) => clone3(item));
-    }
-    if (value && typeof value === "object") {
-      const result = {};
-      Object.entries(value).forEach(([key, item]) => {
-        result[key] = clone3(item);
-      });
-      return result;
-    }
-    return value;
-  }
-  function setNestedValue(target, path, value) {
-    const parts = String(path || "").split(".").map((entry) => entry.trim()).filter(Boolean);
-    if (!parts.length) {
-      return target;
-    }
-    let current = target;
-    for (let i3 = 0; i3 < parts.length - 1; i3 += 1) {
-      const part = parts[i3];
-      if (!current[part] || typeof current[part] !== "object" || Array.isArray(current[part])) {
-        current[part] = {};
-      }
-      current = current[part];
-    }
-    current[parts[parts.length - 1]] = value;
-    return target;
-  }
-  function normalizeArray3(values = []) {
-    const isPresent = (entry) => entry !== void 0 && entry !== null && entry !== "";
-    if (Array.isArray(values)) {
-      return values.filter(isPresent);
-    }
-    return isPresent(values) ? [values] : [];
-  }
-  function normalizeFieldIdArray(values = []) {
-    return normalizeArray3(values).flatMap((entry) => typeof entry === "string" ? entry.split(/[\s,]+/) : [entry]).map((entry) => String(entry != null ? entry : "").trim()).filter(Boolean);
-  }
-  function resolveRelativeDateRangeDefault(seed = {}) {
-    return (seed == null ? void 0 : seed.startExpression) || (seed == null ? void 0 : seed.endExpression) ? resolveReportRelativeDateRangeSpec(seed) : resolveReportRelativeDateRange(seed == null ? void 0 : seed.preset);
-  }
-  function defaultSelectedIds(items = [], fallbackCount = 1) {
-    const explicit = normalizeArray3(items).filter((item) => item == null ? void 0 : item.default).map((item) => String(item.id || "").trim()).filter(Boolean);
-    if (explicit.length > 0) {
-      return explicit;
-    }
-    return normalizeArray3(items).slice(0, fallbackCount).map((item) => String((item == null ? void 0 : item.id) || "").trim()).filter(Boolean);
-  }
-  function resolveSelectedDerivedMeasureIds(state = {}) {
-    const currentMeasures = normalizeStringArray3(state == null ? void 0 : state.selectedMeasures);
-    if (currentMeasures.length === 0) {
-      return [];
-    }
-    const localCalculatedFields = normalizeReportBuilderLocalCalculatedFields(state == null ? void 0 : state.localCalculatedFields);
-    const localTableCalculations = normalizeReportBuilderLocalTableCalculations(state == null ? void 0 : state.localTableCalculations);
-    const derivedMeasureIds = new Set(
-      normalizeReportCalculatedFields([
-        ...localCalculatedFields,
-        ...localTableCalculations
-      ]).map((field) => String((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key) || "").trim()).filter(Boolean)
-    );
-    return currentMeasures.filter((id) => derivedMeasureIds.has(id));
-  }
-  function defaultStaticFilterValue(filter = {}) {
-    var _a5;
-    if (filter.type === "dateRange") {
-      const seeded = filter.default && typeof filter.default === "object" ? filter.default : {};
-      const relative = resolveRelativeDateRangeDefault(seeded);
-      if (relative) {
-        return { ...seeded, ...relative };
-      }
-      return {
-        start: seeded.start || "",
-        end: seeded.end || ""
-      };
-    }
-    const defaults = normalizeArray3(filter.options).filter((option) => option == null ? void 0 : option.default).map((option) => option.value);
-    if (filter.multiple) {
-      return defaults;
-    }
-    return (_a5 = defaults[0]) != null ? _a5 : "";
-  }
-  function isVisibleField(entry = {}) {
-    if (!entry || typeof entry !== "object") {
-      return false;
-    }
-    if (entry.hidden === true) {
-      return false;
-    }
-    if (entry.visible === false) {
-      return false;
-    }
-    if (entry.expose === false) {
-      return false;
-    }
-    return true;
-  }
-  function normalizeStringArray3(values = []) {
-    return normalizeArray3(values).map((entry) => String(entry || "").trim()).filter(Boolean);
-  }
-  function normalizeTablePresetColumns(columns = []) {
-    return normalizeArray3(columns).map((entry) => normalizeReportTableBlockColumn(typeof entry === "string" ? { key: entry } : entry)).filter(Boolean);
-  }
-  var DEFAULT_CHART_PALETTE = [
-    "#1f77b4",
-    "#ff7f0e",
-    "#2ca02c",
-    "#d62728",
-    "#9467bd",
-    "#8c564b",
-    "#e377c2",
-    "#7f7f7f",
-    "#bcbd22",
-    "#17becf"
-  ];
-  function supportedChartTypeSet(config = {}) {
-    var _a5, _b, _c;
-    const supported = normalizeStringArray3(
-      ((_b = (_a5 = config == null ? void 0 : config.result) == null ? void 0 : _a5.chartWizard) == null ? void 0 : _b.supportedTypes) || ((_c = config == null ? void 0 : config.result) == null ? void 0 : _c.supportedChartTypes) || ALL_SUPPORTED_CHART_TYPES
-    ).filter((entry) => ALL_SUPPORTED_CHART_TYPES.includes(entry));
-    return new Set(supported.length > 0 ? supported : ALL_SUPPORTED_CHART_TYPES);
-  }
-  function resolveChartCreationMode(config = {}) {
-    var _a5;
-    return String(((_a5 = config == null ? void 0 : config.result) == null ? void 0 : _a5.chartCreationMode) || "").trim().toLowerCase();
-  }
-  function isExplicitReportBuilderChartMode(config = {}) {
-    return resolveChartCreationMode(config) === "explicit";
-  }
-  function getReportBuilderSupportedChartTypes(config = {}) {
-    return Array.from(supportedChartTypeSet(config));
-  }
-  function getReportBuilderResultPanePosition(config = {}) {
-    var _a5;
-    const position = String(((_a5 = config == null ? void 0 : config.result) == null ? void 0 : _a5.resultPanePosition) || "").trim().toLowerCase();
-    return position === "left" ? "left" : "right";
-  }
-  function getVisibleReportBuilderMeasures(config = {}) {
-    return normalizeArray3(config.measures).filter((entry) => isVisibleField(entry));
-  }
-  function getComputedReportBuilderMeasures(config = {}) {
-    return [
-      ...normalizeArray3(config.calculatedFields),
-      ...normalizeArray3(config.computedMeasures)
-    ].filter((entry) => isVisibleField(entry));
-  }
-  function getTableCalculationReportBuilderMeasures(config = {}) {
-    return normalizeArray3(config.tableCalculations).filter((entry) => isVisibleField(entry));
-  }
-  function getSelectableReportBuilderMeasures(config = {}) {
-    return [
-      ...getVisibleReportBuilderMeasures(config),
-      ...getComputedReportBuilderMeasures(config),
-      ...getTableCalculationReportBuilderMeasures(config)
-    ];
-  }
-  function getVisibleReportBuilderDimensions(config = {}) {
-    return normalizeArray3(config.dimensions).filter((entry) => isVisibleField(entry));
-  }
-  function getNormalizedTableCalculationMeasures(config = {}) {
-    return normalizeReportCalculatedFields(getTableCalculationReportBuilderMeasures(config)).filter((entry) => (entry == null ? void 0 : entry.kind) === "tableCalc");
-  }
-  function getNormalizedReportBuilderCalculatedFields(config = {}) {
-    return normalizeReportCalculatedFields([
-      ...getComputedReportBuilderMeasures(config),
-      ...getTableCalculationReportBuilderMeasures(config)
-    ]);
-  }
-  function resolveReportBuilderTableCalculationDimensionRequirements(config = {}, definition = null) {
-    const compute = (definition == null ? void 0 : definition.compute) || {};
-    const sourceField = String((compute == null ? void 0 : compute.sourceField) || "").trim();
-    const fieldKeys2 = Array.from(new Set([
-      ...normalizeArray3(compute.partitionBy),
-      ...normalizeArray3(compute.orderBy).map((entry) => entry == null ? void 0 : entry.field)
-    ].map((entry) => String(entry || "").trim()).filter(Boolean)));
-    const requiredDimensions = [];
-    const requiredDimensionIds = [];
-    const requiredDimensionLabels = [];
-    const missingDimensionFields = [];
-    const seenDimensionIds = /* @__PURE__ */ new Set();
-    fieldKeys2.forEach((fieldKey) => {
-      const dimension = resolveReportBuilderDimensionByField(config, fieldKey);
-      const dimensionId = String((dimension == null ? void 0 : dimension.id) || "").trim();
-      if (dimension && dimensionId) {
-        if (!seenDimensionIds.has(dimensionId)) {
-          seenDimensionIds.add(dimensionId);
-          requiredDimensions.push(dimension);
-          requiredDimensionIds.push(dimensionId);
-          requiredDimensionLabels.push(String((dimension == null ? void 0 : dimension.label) || dimensionId).trim());
-        }
-        return;
-      }
-      if (fieldKey === sourceField || resolveReportBuilderMeasureByField(config, fieldKey)) {
-        return;
-      }
-      missingDimensionFields.push(fieldKey);
-    });
-    return {
-      requiredDimensions,
-      requiredDimensionIds,
-      requiredDimensionLabels,
-      missingDimensionFields
-    };
-  }
-  function reportBuilderDimensionValueKey(entry = {}) {
-    return String((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id) || "").trim();
-  }
-  function resolveReportBuilderDimensionDisplayKey(entry = {}) {
-    const displayKey = String((entry == null ? void 0 : entry.displayKey) || (entry == null ? void 0 : entry.displayPath) || "").trim();
-    return displayKey || reportBuilderDimensionValueKey(entry);
-  }
-  function resolveReportBuilderDimensionByField(config = {}, fieldKey = "") {
-    const target = String(fieldKey || "").trim();
-    if (!target) {
-      return null;
-    }
-    return getVisibleReportBuilderDimensions(config).find((entry) => {
-      const dimensionId = String((entry == null ? void 0 : entry.id) || "").trim();
-      const valueKey2 = reportBuilderDimensionValueKey(entry);
-      const displayKey = resolveReportBuilderDimensionDisplayKey(entry);
-      return target === dimensionId || target === valueKey2 || target === displayKey;
-    }) || null;
-  }
-  function normalizeChartSpecValue(value) {
-    const normalized = String(value || "").trim();
-    return normalized || null;
-  }
-  function normalizeChartSeriesOption(option) {
-    if (!option || typeof option !== "object" || Array.isArray(option)) {
-      return null;
-    }
-    const result = {};
-    const type = String(option.type || "").trim().toLowerCase();
-    if (type) result.type = type;
-    const axis = String(option.axis || "").trim().toLowerCase();
-    if (axis) result.axis = axis;
-    const rawStackId = option.stackId;
-    if (rawStackId !== void 0 && rawStackId !== null && rawStackId !== "") {
-      if (typeof rawStackId === "string") {
-        const trimmed = rawStackId.trim();
-        if (trimmed) result.stackId = trimmed;
-      } else {
-        result.stackId = rawStackId;
-      }
-    }
-    const dataLabels = String(option.dataLabels || "").trim().toLowerCase();
-    if (dataLabels) result.dataLabels = dataLabels;
-    const pointColorMode = String(option.pointColorMode || "").trim().toLowerCase();
-    if (pointColorMode) result.pointColorMode = pointColorMode === "bysign" ? "bySign" : pointColorMode;
-    return Object.keys(result).length > 0 ? result : null;
-  }
-  function normalizeChartSeriesOptions(input) {
-    if (!input || typeof input !== "object" || Array.isArray(input)) {
-      return null;
-    }
-    const result = {};
-    Object.entries(input).forEach(([key, option]) => {
-      const trimmed = String(key || "").trim();
-      if (!trimmed) return;
-      const normalized = normalizeChartSeriesOption(option);
-      if (normalized) result[trimmed] = normalized;
-    });
-    return Object.keys(result).length > 0 ? result : null;
-  }
-  function normalizeChartCategoryLabel(value = null) {
-    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-    const lines = Number(value.lines);
-    if (lines !== 1 && lines !== 2) return null;
-    return {
-      lines,
-      maxCharacters: Math.max(4, Math.min(120, Number(value.maxCharacters) || 28))
-    };
-  }
-  function normalizeReportBuilderChartSpec(chartSpec = {}) {
-    if (!chartSpec || typeof chartSpec !== "object" || Array.isArray(chartSpec)) {
-      return null;
-    }
-    const title = String(chartSpec.title || "").trim();
-    const eyebrow = String(chartSpec.eyebrow || "").trim();
-    const accentTone = String(chartSpec.accentTone || "").trim();
-    const highlights = normalizeStringArray3(chartSpec.highlights);
-    const type = String(chartSpec.type || "").trim().toLowerCase() || "line";
-    const xField = normalizeChartSpecValue(chartSpec.xField);
-    const yFields = normalizeStringArray3(chartSpec.yFields || chartSpec.yField).filter(Boolean);
-    const seriesField = normalizeChartSpecValue(chartSpec.seriesField);
-    const seriesOptions = normalizeChartSeriesOptions(chartSpec.seriesOptions);
-    const categoryLabel = normalizeChartCategoryLabel(chartSpec.categoryLabel);
-    const metricSelection = normalizeChartMetricSelection(chartSpec.metricSelection, yFields);
-    if (metricSelection && (seriesField || !["line", "area", "bar", "combo"].includes(type))) throw new Error("Metric selection requires a direct cartesian chart.");
-    return {
-      ...title ? { title } : {},
-      ...eyebrow ? { eyebrow } : {},
-      ...accentTone ? { accentTone } : {},
-      ...highlights.length > 0 ? { highlights } : {},
-      type,
-      xField,
-      yFields: Array.from(new Set(yFields)),
-      ...seriesField ? { seriesField } : {},
-      ...chartSpec.categoryColors && typeof chartSpec.categoryColors === "object" && !Array.isArray(chartSpec.categoryColors) ? { categoryColors: { ...chartSpec.categoryColors } } : {},
-      ...seriesOptions ? { seriesOptions } : {},
-      ...categoryLabel ? { categoryLabel } : {},
-      ...chartSpec.preserveCategoryOrder === true ? { preserveCategoryOrder: true } : {},
-      ...metricSelection ? { metricSelection } : {},
-      ...typeof chartSpec.allowTableSwitch === "boolean" ? { allowTableSwitch: chartSpec.allowTableSwitch } : {}
-    };
-  }
-  function chartFieldIndex(columns = []) {
-    const result = /* @__PURE__ */ new Map();
-    normalizeArray3(columns).forEach((column) => {
-      const aliases2 = [
-        String((column == null ? void 0 : column.key) || "").trim(),
-        ...normalizeStringArray3(column == null ? void 0 : column.aliases)
-      ].filter(Boolean);
-      aliases2.forEach((alias) => {
-        if (!result.has(alias)) {
-          result.set(alias, column);
-        }
-      });
-    });
-    return result;
-  }
-  function chartConfigUniverse(config = {}) {
-    const fields2 = [
-      ...getVisibleReportBuilderDimensions(config).flatMap((entry) => [
-        String((entry == null ? void 0 : entry.id) || "").trim(),
-        reportBuilderDimensionValueKey(entry),
-        resolveReportBuilderDimensionDisplayKey(entry)
-      ]),
-      ...getSelectableReportBuilderMeasures(config).map((entry) => (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id))
-    ];
-    return new Set(normalizeStringArray3(fields2));
-  }
-  function sanitizeChartSpecAgainstConfig(config = {}, chartSpec = null) {
-    const normalized = normalizeReportBuilderChartSpec(chartSpec);
-    if (!normalized) {
-      return null;
-    }
-    if (!supportedChartTypeSet(config).has(normalized.type)) {
-      return null;
-    }
-    const universe = chartConfigUniverse(config);
-    if (!normalized.xField || !universe.has(normalized.xField)) {
-      return null;
-    }
-    if (!Array.isArray(normalized.yFields) || normalized.yFields.length === 0) {
-      return null;
-    }
-    if (normalized.yFields.some((entry) => !universe.has(entry))) {
-      return null;
-    }
-    const family = chartFamilyForType(normalized.type);
-    if (SINGLE_MEASURE_CATEGORY_TYPES.has(normalized.type) && normalized.yFields.length > 1) {
-      return null;
-    }
-    if (normalized.seriesField) {
-      if (!universe.has(normalized.seriesField)) {
-        return null;
-      }
-      if (!chartFamilyAllowsSeriesDimension(normalized.type)) {
-        delete normalized.seriesField;
-      } else if (normalized.yFields.length > 1) {
-        delete normalized.seriesField;
-      } else if (normalized.seriesField === normalized.xField) {
-        delete normalized.seriesField;
-      }
-    }
-    if (normalized.seriesOptions) {
-      if (normalized.seriesField) {
-        delete normalized.seriesOptions;
-      } else if (!chartFamilyAllowsSeriesOptions(normalized.type)) {
-        delete normalized.seriesOptions;
-      } else {
-        const ySet = new Set(normalized.yFields);
-        const cleaned = {};
-        const stackAxis = /* @__PURE__ */ new Map();
-        Object.entries(normalized.seriesOptions).forEach(([key, option]) => {
-          if (!ySet.has(key)) return;
-          const next = {};
-          if (option.type && isValidPerSeriesType(normalized.type, option.type)) {
-            next.type = option.type;
-          }
-          if (family === "cartesian" && (option.axis === "left" || option.axis === "right")) {
-            next.axis = option.axis;
-          }
-          if (typeof option.stackId === "string" && option.stackId && supportsStackIdForSeries(normalized.type, next.type || option.type)) {
-            const axis = next.axis || "left";
-            const prior = stackAxis.get(option.stackId);
-            if (prior && prior !== axis) {
-            } else {
-              next.stackId = option.stackId;
-              if (!prior) stackAxis.set(option.stackId, axis);
-            }
-          }
-          if (["auto", "always", "none"].includes(option.dataLabels)) {
-            next.dataLabels = option.dataLabels;
-          }
-          if (["series", "bysign"].includes(option.pointColorMode)) {
-            next.pointColorMode = option.pointColorMode === "bysign" ? "bySign" : option.pointColorMode;
-          }
-          if (Object.keys(next).length > 0) cleaned[key] = next;
-        });
-        if (Object.keys(cleaned).length > 0) {
-          normalized.seriesOptions = cleaned;
-        } else {
-          delete normalized.seriesOptions;
-        }
-      }
-    }
-    return normalized;
-  }
-  function resolveReportBuilderMeasure(config = {}, id = "") {
-    const targetId = String(id || "").trim();
-    if (!targetId) {
-      return null;
-    }
-    return getSelectableReportBuilderMeasures(config).find(
-      (entry) => String((entry == null ? void 0 : entry.id) || "").trim() === targetId
-    ) || null;
-  }
-  function resolveReportBuilderMeasureByField(config = {}, fieldKey = "") {
-    const target = String(fieldKey || "").trim();
-    if (!target) {
-      return null;
-    }
-    return getSelectableReportBuilderMeasures(config).find((entry) => {
-      const measureId = String((entry == null ? void 0 : entry.id) || "").trim();
-      const valueKey2 = String((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id) || "").trim();
-      return target === measureId || target === valueKey2;
-    }) || null;
-  }
-  function resolveReportBuilderOrderFieldEntries(config = {}) {
-    var _a5;
-    return normalizeArray3(((_a5 = config == null ? void 0 : config.result) == null ? void 0 : _a5.orderFields) || (config == null ? void 0 : config.orderFields));
-  }
-  function resolveReportBuilderOrderFieldToken(entry = {}) {
-    return String((entry == null ? void 0 : entry.value) || (entry == null ? void 0 : entry.field) || "").trim();
-  }
-  function resolveReportBuilderOrderFieldEntry(config = {}, orderField = "") {
-    const target = String(orderField || "").trim();
-    if (!target) {
-      return null;
-    }
-    return resolveReportBuilderOrderFieldEntries(config).find((entry) => resolveReportBuilderOrderFieldToken(entry) === target) || null;
-  }
-  function isReportBuilderOrderFieldCompatible(config = {}, state = {}, orderField = "") {
-    const entry = resolveReportBuilderOrderFieldEntry(config, orderField);
-    if (!entry) {
-      return false;
-    }
-    const target = resolveReportBuilderOrderFieldToken(entry);
-    if (!target) {
-      return false;
-    }
-    const selectedDimensions = normalizeArray3(state == null ? void 0 : state.selectedDimensions).map((value) => String(value || "").trim()).filter(Boolean);
-    const selectedMeasures = normalizeArray3(state == null ? void 0 : state.selectedMeasures).map((value) => String(value || "").trim()).filter(Boolean);
-    const dimension = resolveReportBuilderDimensionByField(config, target);
-    if (dimension) {
-      return selectedDimensions.includes(String((dimension == null ? void 0 : dimension.id) || "").trim());
-    }
-    const measure = resolveReportBuilderMeasureByField(config, target);
-    if (measure) {
-      return selectedMeasures.includes(String((measure == null ? void 0 : measure.id) || "").trim());
-    }
-    return true;
-  }
-  function resolveReportBuilderOrderFieldForTarget(config = {}, target = "") {
-    const normalizedTarget = String(target || "").trim();
-    if (!normalizedTarget) {
-      return "";
-    }
-    const targetDimension = resolveReportBuilderDimensionByField(config, normalizedTarget);
-    const targetMeasure = resolveReportBuilderMeasureByField(config, normalizedTarget);
-    const match2 = resolveReportBuilderOrderFieldEntries(config).find((entry) => {
-      const entryTarget = resolveReportBuilderOrderFieldToken(entry);
-      if (!entryTarget) {
-        return false;
-      }
-      if (entryTarget === normalizedTarget) {
-        return true;
-      }
-      const entryDimension = resolveReportBuilderDimensionByField(config, entryTarget);
-      if (entryDimension && targetDimension) {
-        return String((entryDimension == null ? void 0 : entryDimension.id) || "").trim() === String((targetDimension == null ? void 0 : targetDimension.id) || "").trim();
-      }
-      const entryMeasure = resolveReportBuilderMeasureByField(config, entryTarget);
-      if (entryMeasure && targetMeasure) {
-        return String((entryMeasure == null ? void 0 : entryMeasure.id) || "").trim() === String((targetMeasure == null ? void 0 : targetMeasure.id) || "").trim();
-      }
-      return false;
-    });
-    return resolveReportBuilderOrderFieldToken(match2);
-  }
-  function normalizeReportBuilderOrderDirection(value = "") {
-    return String(value || "").trim().toLowerCase() === "asc" ? "asc" : "desc";
-  }
-  function normalizeReportBuilderOrderState(config = {}, state = {}, defaults = {}) {
-    const orderEntries = resolveReportBuilderOrderFieldEntries(config);
-    if (orderEntries.length === 0) {
-      return {
-        orderField: "",
-        orderDir: normalizeReportBuilderOrderDirection((state == null ? void 0 : state.orderDir) || (defaults == null ? void 0 : defaults.orderDir) || "desc")
-      };
-    }
-    const currentOrderField = String((state == null ? void 0 : state.orderField) || "").trim();
-    if (currentOrderField && isReportBuilderOrderFieldCompatible(config, state, currentOrderField)) {
-      const currentEntry = resolveReportBuilderOrderFieldEntry(config, currentOrderField);
-      return {
-        orderField: resolveReportBuilderOrderFieldToken(currentEntry),
-        orderDir: normalizeReportBuilderOrderDirection((state == null ? void 0 : state.orderDir) || (currentEntry == null ? void 0 : currentEntry.defaultDirection) || (defaults == null ? void 0 : defaults.orderDir) || "desc")
-      };
-    }
-    const fallbackTargets = [
-      String((defaults == null ? void 0 : defaults.orderField) || "").trim(),
-      ...normalizeArray3(state == null ? void 0 : state.selectedMeasures).map((value) => String(value || "").trim()),
-      ...normalizeArray3(state == null ? void 0 : state.selectedDimensions).map((value) => String(value || "").trim())
-    ];
-    for (const target of fallbackTargets) {
-      const fallbackField = resolveReportBuilderOrderFieldForTarget(config, target);
-      if (!fallbackField) {
-        continue;
-      }
-      if (!isReportBuilderOrderFieldCompatible(config, state, fallbackField)) {
-        continue;
-      }
-      const fallbackEntry = resolveReportBuilderOrderFieldEntry(config, fallbackField);
-      return {
-        orderField: fallbackField,
-        orderDir: normalizeReportBuilderOrderDirection((fallbackEntry == null ? void 0 : fallbackEntry.defaultDirection) || (defaults == null ? void 0 : defaults.orderDir) || (state == null ? void 0 : state.orderDir) || "desc")
-      };
-    }
-    return {
-      orderField: "",
-      orderDir: normalizeReportBuilderOrderDirection((state == null ? void 0 : state.orderDir) || (defaults == null ? void 0 : defaults.orderDir) || "desc")
-    };
-  }
-  function buildReportBuilderChartFields(config = {}, state = {}) {
-    return buildReportBuilderColumns(config, state).map((entry) => ({
-      key: String((entry == null ? void 0 : entry.chartKey) || (entry == null ? void 0 : entry.displayKey) || (entry == null ? void 0 : entry.key) || "").trim(),
-      aliases: Array.from(new Set(normalizeStringArray3([entry == null ? void 0 : entry.key, entry == null ? void 0 : entry.sourceKey]))),
-      label: (entry == null ? void 0 : entry.label) || (entry == null ? void 0 : entry.key) || "",
-      kind: (entry == null ? void 0 : entry.kind) || "",
-      format: entry == null ? void 0 : entry.format,
-      align: entry == null ? void 0 : entry.align
-    })).filter((entry) => entry.key && entry.kind);
-  }
-  function validateReportBuilderChartSpec(config = {}, chartSpec = null, columns = []) {
-    const normalized = normalizeReportBuilderChartSpec(chartSpec);
-    if (!normalized) {
-      return { valid: false, errors: [{ field: "chartSpec", code: "missing" }] };
-    }
-    const supportedTypes = supportedChartTypeSet(config);
-    const errors = [];
-    if (!supportedTypes.has(normalized.type)) {
-      errors.push({ field: "type", code: "unsupportedType" });
-    }
-    const fields2 = chartFieldIndex(columns);
-    const xField = normalized.xField ? fields2.get(normalized.xField) : null;
-    if (!xField) {
-      errors.push({ field: "xField", code: "missingField" });
-    } else if (xField.kind !== "dimension") {
-      errors.push({ field: "xField", code: "wrongKind" });
-    }
-    if (!Array.isArray(normalized.yFields) || normalized.yFields.length === 0) {
-      errors.push({ field: "yFields", code: "empty" });
-    } else {
-      normalized.yFields.forEach((fieldKey, index) => {
-        const field = fields2.get(fieldKey);
-        if (!field) {
-          errors.push({ field: `yFields.${index}`, code: "missingField" });
-          return;
-        }
-        if (field.kind !== "measure") {
-          errors.push({ field: `yFields.${index}`, code: "wrongKind" });
-        }
-      });
-    }
-    const family = chartFamilyForType(normalized.type);
-    if (normalized.seriesField) {
-      const seriesField = fields2.get(normalized.seriesField);
-      if (!seriesField) {
-        errors.push({ field: "seriesField", code: "missingField" });
-      } else if (seriesField.kind !== "dimension") {
-        errors.push({ field: "seriesField", code: "wrongKind" });
-      }
-      if (normalized.seriesField === normalized.xField) {
-        errors.push({ field: "seriesField", code: "duplicateField" });
-      }
-      if (!chartFamilyAllowsSeriesDimension(normalized.type)) {
-        errors.push({ field: "seriesField", code: "notAllowed" });
-      } else {
-        if (Array.isArray(normalized.yFields) && normalized.yFields.length > 1) {
-          errors.push({ field: "seriesField", code: "tooManyMeasures" });
-        }
-        if (normalized.seriesOptions) {
-          errors.push({ field: "seriesOptions", code: "notAllowed" });
-        }
-      }
-    }
-    if (family === "category") {
-      if (SINGLE_MEASURE_CATEGORY_TYPES.has(normalized.type) && Array.isArray(normalized.yFields) && normalized.yFields.length > 1) {
-        errors.push({ field: "yFields", code: "tooManyMeasures" });
-      }
-      if (normalized.seriesOptions && !chartFamilyAllowsSeriesOptions(normalized.type)) {
-        errors.push({ field: "seriesOptions", code: "notAllowed" });
-      }
-    }
-    const canValidateSeriesOptionsEntries = !!normalized.seriesOptions && typeof normalized.seriesOptions === "object" && !(normalized.seriesField && chartFamilyAllowsSeriesDimension(normalized.type)) && !!chartFamilyAllowsSeriesOptions(normalized.type);
-    if (canValidateSeriesOptionsEntries) {
-      const ySet = new Set(Array.isArray(normalized.yFields) ? normalized.yFields : []);
-      const stackAxis = /* @__PURE__ */ new Map();
-      Object.entries(normalized.seriesOptions).forEach(([key, option]) => {
-        if (!ySet.has(key)) {
-          errors.push({ field: `seriesOptions.${key}`, code: "unknownMeasure" });
-          return;
-        }
-        if (option.type && !isValidPerSeriesType(normalized.type, option.type)) {
-          errors.push({
-            field: `seriesOptions.${key}.type`,
-            code: family === "cartesian" ? "invalidType" : "notAllowed"
-          });
-        }
-        if (option.axis && family !== "cartesian") {
-          errors.push({ field: `seriesOptions.${key}.axis`, code: "notAllowed" });
-        } else if (option.axis && !["left", "right"].includes(option.axis)) {
-          errors.push({ field: `seriesOptions.${key}.axis`, code: "invalidAxis" });
-        }
-        if (option.stackId !== void 0 && typeof option.stackId !== "string") {
-          errors.push({ field: `seriesOptions.${key}.stackId`, code: "invalidStackId" });
-        } else if (typeof option.stackId === "string" && option.stackId && !supportsStackIdForSeries(normalized.type, option.type)) {
-          errors.push({ field: `seriesOptions.${key}.stackId`, code: "notAllowed" });
-        }
-        if (option.dataLabels && !["auto", "always", "none"].includes(option.dataLabels)) {
-          errors.push({ field: `seriesOptions.${key}.dataLabels`, code: "invalidDataLabels" });
-        }
-        if (option.pointColorMode && !["series", "bySign", "bysign"].includes(option.pointColorMode)) {
-          errors.push({ field: `seriesOptions.${key}.pointColorMode`, code: "invalidPointColorMode" });
-        }
-        if (typeof option.stackId === "string" && option.stackId && family === "cartesian") {
-          const stackKey = option.stackId;
-          const axis = option.axis || "left";
-          if (stackAxis.has(stackKey) && stackAxis.get(stackKey) !== axis) {
-            errors.push({ field: `seriesOptions.${key}.stackId`, code: "axisConflict" });
-          } else if (!stackAxis.has(stackKey)) {
-            stackAxis.set(stackKey, axis);
-          }
-        }
-      });
-    }
-    return {
-      valid: errors.length === 0,
-      errors
-    };
-  }
-  function resolveValidSemanticBinding(binding = null) {
-    const normalized = normalizeSemanticBinding(binding);
-    if (!normalized) {
-      return null;
-    }
-    const validation = validateSemanticBinding(normalized);
-    return validation.valid ? validation.normalizedBinding : null;
-  }
-  function normalizeReportBuilderDrillMetadataState(value = null) {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-      return null;
-    }
-    const normalized = resolveReportBuilderDrillMetadata({}, value);
-    const next = {
-      ...Object.prototype.hasOwnProperty.call(value, "hierarchies") ? { hierarchies: normalized.hierarchies } : {},
-      ...Object.prototype.hasOwnProperty.call(value, "detailTargets") ? { detailTargets: normalized.detailTargets } : {},
-      ...Object.prototype.hasOwnProperty.call(value, "fieldActions") ? { fieldActions: normalized.fieldActions } : {}
-    };
-    return Object.keys(next).length > 0 ? next : null;
-  }
-  function normalizeActiveTablePreset(preset = null) {
-    if (!preset || typeof preset !== "object" || Array.isArray(preset)) {
-      return null;
-    }
-    const id = String(preset.id || "").trim();
-    const title = String(preset.title || "").trim();
-    const eyebrow = String(preset.eyebrow || "").trim();
-    const accentTone = String(preset.accentTone || "").trim();
-    const highlights = normalizeStringArray3(preset.highlights);
-    const dimensions = normalizeStringArray3(preset.dimensions);
-    const measures = normalizeStringArray3(preset.measures);
-    const columns = normalizeTablePresetColumns(preset.columns);
-    if (!id || !title || dimensions.length === 0 && measures.length === 0) {
-      return null;
-    }
-    const groupBy = String(preset.groupBy || "").trim();
-    const primaryMeasure = String(preset.primaryMeasure || measures[0] || "").trim();
-    const orderField = String(preset.orderField || "").trim();
-    const orderDir = String(preset.orderDir || "").trim().toLowerCase() === "asc" ? "asc" : "desc";
-    const pageSize = Math.max(1, Number(preset.pageSize || 0) || 0) || null;
-    const description = String(preset.description || "").trim();
-    return {
-      id,
-      title,
-      ...description ? { description } : {},
-      ...eyebrow ? { eyebrow } : {},
-      ...accentTone ? { accentTone } : {},
-      ...highlights.length > 0 ? { highlights } : {},
-      dimensions,
-      measures,
-      ...columns.length > 0 ? { columns } : {},
-      ...primaryMeasure ? { primaryMeasure } : {},
-      ...groupBy ? { groupBy } : {},
-      ...orderField ? { orderField } : {},
-      ...pageSize ? { pageSize } : {},
-      ...typeof (preset == null ? void 0 : preset.clearChart) === "boolean" ? { clearChart: preset.clearChart } : {},
-      orderDir
-    };
-  }
-  function resolveLocalDerivedPresetMeasureIds(preset = null, state = {}) {
-    const normalizedPreset = normalizeActiveTablePreset(preset);
-    const presetMeasureIds = new Set((normalizedPreset == null ? void 0 : normalizedPreset.measures) || []);
-    return new Set(
-      resolveSelectedDerivedMeasureIds(state).filter((id) => !presetMeasureIds.has(id))
-    );
-  }
-  function resolveLocalDerivedPresetDimensionIds(config = {}, preset = null, state = {}) {
-    const normalizedPreset = normalizeActiveTablePreset(preset);
-    if (!normalizedPreset) {
-      return /* @__PURE__ */ new Set();
-    }
-    const presetDimensionIds = new Set(normalizedPreset.dimensions);
-    const selectedLocalDerivedMeasureIds = new Set(resolveSelectedDerivedMeasureIds(state));
-    const effectiveConfig = buildReportBuilderCalculatedFieldConfig(config, state);
-    const mergedLocalTableCalculations = getNormalizedTableCalculationMeasures(effectiveConfig).filter((entry) => selectedLocalDerivedMeasureIds.has(String((entry == null ? void 0 : entry.id) || "").trim()));
-    const extraDimensionIds = /* @__PURE__ */ new Set();
-    mergedLocalTableCalculations.forEach((tableCalculation) => {
-      const { requiredDimensionIds } = resolveReportBuilderTableCalculationDimensionRequirements(effectiveConfig, tableCalculation);
-      normalizeStringArray3(requiredDimensionIds).forEach((dimensionId) => {
-        if (!presetDimensionIds.has(dimensionId)) {
-          extraDimensionIds.add(dimensionId);
-        }
-      });
-    });
-    return extraDimensionIds;
-  }
-  function reconcileActiveTablePresetState(config = {}, state = {}) {
-    const next = {
-      ...state,
-      activeTablePreset: normalizeActiveTablePreset(state == null ? void 0 : state.activeTablePreset),
-      lastTablePreset: normalizeActiveTablePreset(state == null ? void 0 : state.lastTablePreset)
-    };
-    if (next.activeTablePreset && matchesActiveTablePreset(config, next, next.activeTablePreset)) {
-      next.lastTablePreset = next.activeTablePreset;
-      return next;
-    }
-    if (next.activeTablePreset && !matchesActiveTablePreset(config, next, next.activeTablePreset)) {
-      next.lastTablePreset = next.activeTablePreset;
-      next.activeTablePreset = null;
-      return next;
-    }
-    if (!next.activeTablePreset && next.lastTablePreset && matchesActiveTablePreset(config, next, next.lastTablePreset)) {
-      next.activeTablePreset = next.lastTablePreset;
-    }
-    return next;
-  }
-  function matchesActiveTablePreset(config = {}, state = {}, preset = null) {
-    const normalizedPreset = normalizeActiveTablePreset(preset);
-    if (!normalizedPreset) {
-      return false;
-    }
-    const ignoredSelectedMeasureIds = resolveLocalDerivedPresetMeasureIds(normalizedPreset, state);
-    const ignoredSelectedDimensionIds = resolveLocalDerivedPresetDimensionIds(config, normalizedPreset, state);
-    const comparableSelectedDimensions = normalizeStringArray3(state == null ? void 0 : state.selectedDimensions).filter((id) => !ignoredSelectedDimensionIds.has(id));
-    const comparableSelectedMeasures = normalizeStringArray3(state == null ? void 0 : state.selectedMeasures).filter((id) => !ignoredSelectedMeasureIds.has(id));
-    if (JSON.stringify(comparableSelectedDimensions) !== JSON.stringify(normalizedPreset.dimensions)) {
-      return false;
-    }
-    if (JSON.stringify(comparableSelectedMeasures) !== JSON.stringify(normalizedPreset.measures)) {
-      return false;
-    }
-    if (String((state == null ? void 0 : state.primaryMeasure) || "").trim() !== String(normalizedPreset.primaryMeasure || "").trim()) {
-      return false;
-    }
-    if (String((state == null ? void 0 : state.groupBy) || "").trim() !== String(normalizedPreset.groupBy || "").trim()) {
-      return false;
-    }
-    if (String(normalizedPreset.orderField || "").trim()) {
-      if (String((state == null ? void 0 : state.orderField) || "").trim() !== normalizedPreset.orderField) {
-        return false;
-      }
-      if (String((state == null ? void 0 : state.orderDir) || "").trim().toLowerCase() !== normalizedPreset.orderDir) {
-        return false;
-      }
-    }
-    if (normalizedPreset.pageSize && Number((state == null ? void 0 : state.pageSize) || 0) !== normalizedPreset.pageSize) {
-      return false;
-    }
-    return true;
-  }
-  function resolveMergedSemanticBinding(configBinding = null, persistedBinding = null) {
-    const normalizedConfig = resolveValidSemanticBinding(configBinding);
-    const normalizedPersisted = resolveValidSemanticBinding(persistedBinding);
-    if (!normalizedPersisted) {
-      return normalizedConfig;
-    }
-    if (!normalizedConfig) {
-      return normalizedPersisted;
-    }
-    if (normalizedConfig.mode !== normalizedPersisted.mode) {
-      return normalizedConfig;
-    }
-    if (normalizedConfig.mode === "semantic" && (normalizedConfig.modelRef !== normalizedPersisted.modelRef || normalizedConfig.entity !== normalizedPersisted.entity)) {
-      return normalizedConfig;
-    }
-    return normalizedPersisted;
-  }
-  function buildDefaultReportBuilderChartSpec(config = {}, state = {}, seed = {}, options = {}) {
-    var _a5, _b, _c, _d;
-    const columns = buildReportBuilderChartFields(config, state);
-    const dimensions = columns.filter((entry) => entry.kind === "dimension");
-    const measures = columns.filter((entry) => entry.kind === "measure");
-    if (dimensions.length === 0 || measures.length === 0) {
-      return null;
-    }
-    const primaryMeasure = resolveReportBuilderMeasure(config, state == null ? void 0 : state.primaryMeasure) || resolveReportBuilderMeasure(config, (_a5 = measures[0]) == null ? void 0 : _a5.key) || null;
-    const defaultYField = String((primaryMeasure == null ? void 0 : primaryMeasure.key) || (primaryMeasure == null ? void 0 : primaryMeasure.id) || ((_b = measures[0]) == null ? void 0 : _b.key) || "").trim();
-    const normalizedSeed = normalizeReportBuilderChartSpec(seed) || {};
-    const title = String(normalizedSeed.title || "").trim();
-    const type = supportedChartTypeSet(config).has(normalizedSeed.type) ? normalizedSeed.type : getReportBuilderSupportedChartTypes(config)[0];
-    const xField = normalizedSeed.xField || ((_c = dimensions[0]) == null ? void 0 : _c.key) || null;
-    const family = chartFamilyForType(type);
-    const suggestSeriesField = (options == null ? void 0 : options.suggestSeriesField) === true;
-    const seededYFields = Array.isArray(normalizedSeed.yFields) && normalizedSeed.yFields.length > 0 ? normalizedSeed.yFields : defaultYField ? [defaultYField] : [];
-    const yFields = SINGLE_MEASURE_CATEGORY_TYPES.has(type) ? seededYFields.slice(0, 1) : seededYFields;
-    const allowSeriesField = chartFamilyAllowsSeriesDimension(type) && yFields.length === 1;
-    const seriesField = allowSeriesField ? normalizedSeed.seriesField || (suggestSeriesField ? (_d = dimensions.find((entry) => entry.key !== xField)) == null ? void 0 : _d.key : null) || null : null;
-    const allowSeriesOptions = chartFamilyAllowsSeriesOptions(type) && !seriesField;
-    const seriesOptions = allowSeriesOptions ? normalizedSeed.seriesOptions : null;
-    return normalizeReportBuilderChartSpec({
-      ...normalizedSeed,
-      ...title ? { title } : {},
-      type,
-      xField,
-      yFields,
-      ...seriesField ? { seriesField } : { seriesField: null },
-      ...seriesOptions ? { seriesOptions } : { seriesOptions: null }
-    });
-  }
-  function buildReportBuilderDefaultChartSpecs(config = {}, state = {}) {
-    var _a5;
-    return normalizeArray3((_a5 = config == null ? void 0 : config.result) == null ? void 0 : _a5.defaultChartSpecs).map((entry) => {
-      const built = buildDefaultReportBuilderChartSpec(config, state, entry);
-      const eyebrow = String((entry == null ? void 0 : entry.eyebrow) || "").trim();
-      const accentTone = String((entry == null ? void 0 : entry.accentTone) || "").trim();
-      const highlights = normalizeStringArray3(entry == null ? void 0 : entry.highlights);
-      const groupDescription = String((entry == null ? void 0 : entry.groupDescription) || "").trim();
-      if (!built) {
-        return null;
-      }
-      return {
-        ...built,
-        group: String((entry == null ? void 0 : entry.group) || "").trim(),
-        ...groupDescription ? { groupDescription } : {},
-        ...eyebrow ? { eyebrow } : {},
-        ...accentTone ? { accentTone } : {},
-        ...highlights.length > 0 ? { highlights } : {},
-        selectionPolicy: String((entry == null ? void 0 : entry.selectionPolicy) || "").trim().toLowerCase() === "replace" ? "replace" : "",
-        title: String((entry == null ? void 0 : entry.title) || built.title || "").trim() || "Default chart"
-      };
-    }).filter(Boolean);
-  }
-  function buildReportBuilderDefaultState(config = {}) {
-    var _a5, _b, _c, _d, _e, _f, _g;
-    const measures = getSelectableReportBuilderMeasures(config);
-    const dimensions = getVisibleReportBuilderDimensions(config);
-    const staticFilters = resolveReportBuilderScopeParamFilters(config);
-    const dynamicFilterGroups = resolveReportBuilderDynamicFilterGroups(config);
-    const reportOptionDefinitions = normalizeReportBuilderOptionDefinitions(config == null ? void 0 : config.reportOptions);
-    const semanticSelections = resolveReportBuilderSemanticSelections(config, config == null ? void 0 : config.binding);
-    const selectedMeasures = (semanticSelections == null ? void 0 : semanticSelections.hasExplicitMeasures) ? semanticSelections.selectedMeasures : defaultSelectedIds(measures);
-    const selectedDimensions = (semanticSelections == null ? void 0 : semanticSelections.hasExplicitDimensions) ? semanticSelections.selectedDimensions : defaultSelectedIds(
-      dimensions.filter((entry) => (entry == null ? void 0 : entry.default) || (entry == null ? void 0 : entry.chartAxis) || (entry == null ? void 0 : entry.required)),
-      0
-    );
-    const dimensionFallback = (semanticSelections == null ? void 0 : semanticSelections.hasExplicitDimensions) ? selectedDimensions : selectedDimensions.length > 0 ? selectedDimensions : defaultSelectedIds(dimensions);
-    const groupByDefault = String(((_a5 = config == null ? void 0 : config.groupBy) == null ? void 0 : _a5.default) || "").trim();
-    const viewModes = normalizeArray3((_b = config == null ? void 0 : config.result) == null ? void 0 : _b.viewModes);
-    const defaultViewMode = String(
-      ((_c = config == null ? void 0 : config.result) == null ? void 0 : _c.defaultMode) || viewModes[0] || "chart"
-    ).trim() || "chart";
-    const orderFields = normalizeArray3(((_d = config == null ? void 0 : config.result) == null ? void 0 : _d.orderFields) || (config == null ? void 0 : config.orderFields));
-    const defaultOrder = orderFields.find((entry) => entry == null ? void 0 : entry.default) || orderFields[0] || null;
-    const defaultPageSize = Number(
-      ((_e = config == null ? void 0 : config.result) == null ? void 0 : _e.pageSize) || ((_f = config == null ? void 0 : config.request) == null ? void 0 : _f.limit) || 50
-    ) || 50;
-    const defaultScopeParamValues = {};
-    staticFilters.forEach((filter) => {
-      const key = resolveScopeParamId(filter);
-      if (!key) return;
-      defaultScopeParamValues[key] = defaultStaticFilterValue(filter);
-    });
-    const defaultDynamicGroups = {};
-    dynamicFilterGroups.forEach((group) => {
-      const key = String(group.id || "").trim();
-      if (!key) return;
-      defaultDynamicGroups[key] = normalizeDynamicGroupRows(group.defaultRows, group);
-    });
-    const defaultChartSpec = sanitizeChartSpecAgainstConfig(config, ((_g = config == null ? void 0 : config.result) == null ? void 0 : _g.defaultChartSpec) || null);
-    const defaultBinding = resolveValidSemanticBinding(config == null ? void 0 : config.binding);
-    const baseState = {
-      selectedMeasures,
-      primaryMeasure: String((config == null ? void 0 : config.primaryMeasure) || selectedMeasures[0] || "").trim(),
-      selectedDimensions: dimensionFallback,
-      binding: defaultBinding,
-      localCalculatedFields: normalizeReportBuilderLocalCalculatedFields(config == null ? void 0 : config.localCalculatedFields),
-      localTableCalculations: normalizeReportBuilderLocalTableCalculations(config == null ? void 0 : config.localTableCalculations),
-      viewMode: isExplicitReportBuilderChartMode(config) && !defaultChartSpec ? "table" : defaultViewMode,
-      chartSpec: defaultChartSpec,
-      groupBy: groupByDefault,
-      page: 1,
-      pageSize: defaultPageSize,
-      orderField: String((defaultOrder == null ? void 0 : defaultOrder.value) || (defaultOrder == null ? void 0 : defaultOrder.field) || "").trim(),
-      orderDir: String((defaultOrder == null ? void 0 : defaultOrder.defaultDirection) || "desc").trim().toLowerCase() || "desc",
-      ...scopeParamStateSlice(defaultScopeParamValues),
-      dynamicGroups: defaultDynamicGroups,
-      ...reportOptionDefinitions.length > 0 ? { reportOptions: resolveEffectiveReportBuilderOptions(reportOptionDefinitions, {}) } : {}
-    };
-    const normalizedOrder = normalizeReportBuilderOrderState(config, baseState, baseState);
-    return {
-      ...baseState,
-      orderField: normalizedOrder.orderField,
-      orderDir: normalizedOrder.orderDir
-    };
-  }
-  function mergeReportBuilderState(config = {}, persisted = {}) {
-    const defaults = buildReportBuilderDefaultState(config);
-    const dynamicFilterGroups = resolveReportBuilderDynamicFilterGroups(config);
-    const reportOptionDefinitions = normalizeReportBuilderOptionDefinitions(config == null ? void 0 : config.reportOptions);
-    const next = {
-      ...mergeScopeParamValues({
-        ...defaults,
-        ...clone3(persisted || {})
-      }, {
-        ...listScopeParamValues(defaults),
-        ...listScopeParamValues(persisted)
-      }),
-      dynamicGroups: {
-        ...defaults.dynamicGroups
-      }
-    };
-    dynamicFilterGroups.forEach((group) => {
-      var _a5;
-      const groupId = String(group.id || "").trim();
-      if (!groupId) return;
-      const persistedRows = normalizeArray3((_a5 = persisted == null ? void 0 : persisted.dynamicGroups) == null ? void 0 : _a5[groupId]);
-      next.dynamicGroups[groupId] = normalizeDynamicGroupRows(persistedRows, group);
-    });
-    next.localCalculatedFields = normalizeReportBuilderLocalCalculatedFields(next.localCalculatedFields);
-    if (reportOptionDefinitions.length > 0) {
-      next.reportOptions = resolveEffectiveReportBuilderOptions(reportOptionDefinitions, next.reportOptions);
-    } else {
-      delete next.reportOptions;
-    }
-    next.localTableCalculations = normalizeReportBuilderLocalTableCalculations(next.localTableCalculations);
-    next.drillMetadata = normalizeReportBuilderDrillMetadataState(next.drillMetadata);
-    const normalizedExplorationState = normalizeReportBuilderExplorationState(next);
-    Object.keys(next).forEach((key) => {
-      if (!Object.prototype.hasOwnProperty.call(normalizedExplorationState || {}, key)) {
-        delete next[key];
-      }
-    });
-    Object.assign(next, normalizedExplorationState || {});
-    const effectiveConfig = buildReportBuilderCalculatedFieldConfig(config, next);
-    next.selectedMeasures = normalizeArray3(next.selectedMeasures).map((entry) => String(entry).trim()).filter(Boolean);
-    next.selectedDimensions = normalizeArray3(next.selectedDimensions).map((entry) => String(entry).trim()).filter(Boolean);
-    next.binding = resolveMergedSemanticBinding(config == null ? void 0 : config.binding, next.binding);
-    if (!next.drillMetadata) {
-      delete next.drillMetadata;
-    }
-    next.primaryMeasure = String(next.primaryMeasure || next.selectedMeasures[0] || defaults.primaryMeasure || "").trim();
-    next.chartSpec = sanitizeChartSpecAgainstConfig(effectiveConfig, next.chartSpec);
-    next.viewMode = String(next.viewMode || defaults.viewMode || "chart").trim() || "chart";
-    next.groupBy = next.groupBy === void 0 || next.groupBy === null ? String(defaults.groupBy || "").trim() : String(next.groupBy).trim();
-    next.page = Math.max(1, Number(next.page || defaults.page || 1) || 1);
-    next.pageSize = Math.max(1, Number(next.pageSize || defaults.pageSize || 50) || 50);
-    const normalizedOrder = normalizeReportBuilderOrderState(effectiveConfig, next, defaults);
-    next.orderField = normalizedOrder.orderField;
-    next.orderDir = normalizedOrder.orderDir;
-    if (!next.selectedMeasures.includes(next.primaryMeasure)) {
-      next.primaryMeasure = next.selectedMeasures[0] || "";
-    }
-    if (isExplicitReportBuilderChartMode(effectiveConfig) && !next.chartSpec) {
-      next.viewMode = "table";
-    }
-    return reconcileActiveTablePresetState(config, next);
-  }
-  function sanitizeReportBuilderState(config = {}, state = {}) {
-    var _a5;
-    const next = clone3(state || {});
-    const dynamicGroups = Array.isArray(next.dynamicGroups) ? {} : { ...next.dynamicGroups || {} };
-    resolveReportBuilderDynamicFilterGroups(config).forEach((group) => {
-      var _a6;
-      const groupId = String((group == null ? void 0 : group.id) || "").trim();
-      if (!groupId) return;
-      dynamicGroups[groupId] = normalizeDynamicGroupRows((_a6 = next == null ? void 0 : next.dynamicGroups) == null ? void 0 : _a6[groupId], group);
-    });
-    next.dynamicGroups = dynamicGroups;
-    next.localCalculatedFields = normalizeReportBuilderLocalCalculatedFields(next.localCalculatedFields);
-    const reportOptionDefinitions = normalizeReportBuilderOptionDefinitions(config == null ? void 0 : config.reportOptions);
-    if (reportOptionDefinitions.length > 0) {
-      next.reportOptions = resolveEffectiveReportBuilderOptions(reportOptionDefinitions, next.reportOptions);
-    } else {
-      delete next.reportOptions;
-    }
-    next.localTableCalculations = normalizeReportBuilderLocalTableCalculations(next.localTableCalculations);
-    next.drillMetadata = normalizeReportBuilderDrillMetadataState(next.drillMetadata);
-    const normalizedExplorationState = normalizeReportBuilderExplorationState(next);
-    Object.keys(next).forEach((key) => {
-      if (!Object.prototype.hasOwnProperty.call(normalizedExplorationState || {}, key)) {
-        delete next[key];
-      }
-    });
-    Object.assign(next, normalizedExplorationState || {});
-    const effectiveConfig = buildReportBuilderCalculatedFieldConfig(config, next);
-    next.binding = resolveMergedSemanticBinding(config == null ? void 0 : config.binding, next.binding);
-    if (!next.drillMetadata) {
-      delete next.drillMetadata;
-    }
-    const normalizedRuntimePreviewInteraction = resolveReportBuilderPersistedRuntimePreviewInteraction(next);
-    if (normalizedRuntimePreviewInteraction) {
-      next[REPORT_DOCUMENT_RUNTIME_PREVIEW_INTERACTION_KEY] = normalizedRuntimePreviewInteraction;
-    } else {
-      delete next[REPORT_DOCUMENT_RUNTIME_PREVIEW_INTERACTION_KEY];
-    }
-    next.chartSpec = sanitizeChartSpecAgainstConfig(effectiveConfig, next.chartSpec);
-    next.primaryMeasure = String(next.primaryMeasure || ((_a5 = next.selectedMeasures) == null ? void 0 : _a5[0]) || "").trim();
-    next.selectedMeasures = normalizeArray3(next.selectedMeasures).map((entry) => String(entry || "").trim()).filter(Boolean);
-    next.selectedDimensions = normalizeArray3(next.selectedDimensions).map((entry) => String(entry || "").trim()).filter(Boolean);
-    const normalizedOrder = normalizeReportBuilderOrderState(effectiveConfig, next, buildReportBuilderDefaultState(config));
-    next.orderField = normalizedOrder.orderField;
-    next.orderDir = normalizedOrder.orderDir;
-    if (isExplicitReportBuilderChartMode(effectiveConfig) && !next.chartSpec) {
-      next.viewMode = "table";
-    }
-    return reconcileActiveTablePresetState(config, next);
-  }
-  function buildReportBuilderRequest(config = {}, state = {}) {
-    var _a5, _b;
-    const effectiveConfig = buildReportBuilderCalculatedFieldConfig(config, state);
-    const requestConfig = effectiveConfig.request || {};
-    const resultConfig = effectiveConfig.result || {};
-    const measures = normalizeArray3(effectiveConfig.measures);
-    const calculatedFields = getNormalizedReportBuilderCalculatedFields(effectiveConfig);
-    const dimensions = normalizeArray3(effectiveConfig.dimensions);
-    const staticFilters = resolveReportBuilderScopeParamFilters(effectiveConfig);
-    const dynamicFilterGroups = resolveReportBuilderDynamicFilterGroups(effectiveConfig);
-    const groupByOptions = normalizeArray3((_a5 = effectiveConfig == null ? void 0 : effectiveConfig.groupBy) == null ? void 0 : _a5.options);
-    const orderFields = normalizeArray3(resultConfig.orderFields || effectiveConfig.orderFields);
-    const resolveBaseMeasureByField = (fieldKey = "") => {
-      const target = String(fieldKey || "").trim();
-      if (!target) {
-        return null;
-      }
-      return measures.find((item) => {
-        const measureId = String((item == null ? void 0 : item.id) || "").trim();
-        const valueKey2 = String((item == null ? void 0 : item.key) || (item == null ? void 0 : item.id) || "").trim();
-        return target === measureId || target === valueKey2;
-      }) || null;
-    };
-    const calculatedFieldById = /* @__PURE__ */ new Map();
-    calculatedFields.forEach((entry) => {
-      const aliases2 = [
-        String((entry == null ? void 0 : entry.id) || "").trim(),
-        String((entry == null ? void 0 : entry.key) || "").trim()
-      ].filter(Boolean);
-      aliases2.forEach((alias) => {
-        if (!calculatedFieldById.has(alias)) {
-          calculatedFieldById.set(alias, entry);
-        }
-      });
-    });
-    let request = clone3(requestConfig.baseParameters || {});
-    const effectiveReportOptions = resolveEffectiveReportBuilderOptions(config == null ? void 0 : config.reportOptions, state == null ? void 0 : state.reportOptions);
-    if (Object.keys(effectiveReportOptions).length > 0) {
-      request.options = effectiveReportOptions;
-    }
-    const selectedDimensionIds = new Set(
-      normalizeFieldIdArray(state.selectedDimensions)
-    );
-    const resolvedDependencyIds = /* @__PURE__ */ new Set();
-    const enableFieldDependency = (fieldKey = "") => {
-      const target = String(fieldKey || "").trim();
-      if (!target || resolvedDependencyIds.has(target)) {
-        return;
-      }
-      resolvedDependencyIds.add(target);
-      const measure = resolveBaseMeasureByField(target);
-      if (measure) {
-        setNestedValue(request, measure.paramPath || `measures.${measure.id}`, true);
-        return;
-      }
-      const dimension = resolveReportBuilderDimensionByField(effectiveConfig, target);
-      const dimensionId = String((dimension == null ? void 0 : dimension.id) || "").trim();
-      if (dimension && dimensionId) {
-        selectedDimensionIds.add(dimensionId);
-        return;
-      }
-      const calculatedField = calculatedFieldById.get(target);
-      if (calculatedField) {
-        normalizeArray3(calculatedField.dependencies).forEach((dependencyId) => {
-          enableFieldDependency(dependencyId);
-        });
-      }
-    };
-    normalizeFieldIdArray(state.selectedMeasures).forEach((id) => {
-      const match2 = measures.find((item) => String((item == null ? void 0 : item.id) || "").trim() === String(id).trim());
-      if (match2) {
-        setNestedValue(request, match2.paramPath || `measures.${match2.id}`, true);
-        return;
-      }
-      const calculatedField = calculatedFieldById.get(String(id).trim());
-      if (!calculatedField) {
-        return;
-      }
-      normalizeArray3(calculatedField.dependencies).forEach((dependencyId) => {
-        enableFieldDependency(dependencyId);
-      });
-    });
-    getNormalizedTableCalculationMeasures(effectiveConfig).filter((definition) => normalizeFieldIdArray(state.selectedMeasures).includes(String((definition == null ? void 0 : definition.id) || "").trim())).forEach((definition) => {
-      const compute = definition.compute || {};
-      [
-        ...Array.isArray(compute.partitionBy) ? compute.partitionBy : [],
-        ...Array.isArray(compute.orderBy) ? compute.orderBy.map((entry) => entry == null ? void 0 : entry.field) : []
-      ].forEach((fieldKey) => {
-        const dimension = resolveReportBuilderDimensionByField(effectiveConfig, fieldKey);
-        const dimensionId = String((dimension == null ? void 0 : dimension.id) || "").trim();
-        if (dimensionId) {
-          selectedDimensionIds.add(dimensionId);
-        }
-      });
-    });
-    const groupByValue = String(state.groupBy || "").trim();
-    if (groupByValue) {
-      const groupByOption = groupByOptions.find((entry) => String((entry == null ? void 0 : entry.value) || "").trim() === groupByValue);
-      const dimensionId = String((groupByOption == null ? void 0 : groupByOption.dimensionId) || groupByValue).trim();
-      if (dimensionId) {
-        selectedDimensionIds.add(dimensionId);
-      }
-      if (groupByOption == null ? void 0 : groupByOption.paramPath) {
-        setNestedValue(request, groupByOption.paramPath, (_b = groupByOption.paramValue) != null ? _b : true);
-      }
-    }
-    Array.from(selectedDimensionIds).forEach((id) => {
-      const match2 = dimensions.find((item) => String((item == null ? void 0 : item.id) || "").trim() === id);
-      if (!match2) return;
-      setNestedValue(request, match2.paramPath || `dimensions.${match2.id}`, true);
-    });
-    staticFilters.forEach((filter) => {
-      var _a6, _b2;
-      const filterId = resolveScopeParamId(filter);
-      if (!filterId) return;
-      const value = getScopeParamValue(state, filterId);
-      if (filter.type === "dateRange") {
-        if ((value == null ? void 0 : value.start) && (filter.startParamPath || ((_a6 = filter.paramPaths) == null ? void 0 : _a6.start))) {
-          setNestedValue(request, filter.startParamPath || filter.paramPaths.start, value.start);
-        }
-        if ((value == null ? void 0 : value.end) && (filter.endParamPath || ((_b2 = filter.paramPaths) == null ? void 0 : _b2.end))) {
-          setNestedValue(request, filter.endParamPath || filter.paramPaths.end, value.end);
-        }
-        return;
-      }
-      if (value == null || value === "" || Array.isArray(value) && value.length === 0) {
-        return;
-      }
-      const paramPath = filter.paramPath || `filters.${filterId}`;
-      setNestedValue(request, paramPath, clone3(value));
-    });
-    const dynamicAggregates = {};
-    dynamicFilterGroups.forEach((group) => {
-      var _a6;
-      const groupId = String(group.id || "").trim();
-      if (!groupId) return;
-      const rows = normalizeArray3((_a6 = state == null ? void 0 : state.dynamicGroups) == null ? void 0 : _a6[groupId]);
-      rows.forEach((row) => {
-        if ((row == null ? void 0 : row.enabled) === false) {
-          return;
-        }
-        const filterDef = normalizeArray3(group.filters).find((entry) => String((entry == null ? void 0 : entry.id) || "").trim() === String(row.filterId || "").trim());
-        if (!filterDef) return;
-        if (filterDef.requestMapping === "hook" || filterDef.handledByHook === true) {
-          return;
-        }
-        const paramPath = String(filterDef.paramPath || `filters.${filterDef.id}`).trim();
-        const values = normalizeArray3(row.selections).map((entry) => entry == null ? void 0 : entry.value).filter((entry) => entry !== void 0 && entry !== null && entry !== "");
-        if (!paramPath || values.length === 0) return;
-        const emitArray = filterDef.emitArray === true || filterDef.valueMode === "array";
-        if (filterDef.multiple === false && !emitArray) {
-          dynamicAggregates[paramPath] = values[0];
-          return;
-        }
-        dynamicAggregates[paramPath] = [
-          ...normalizeArray3(dynamicAggregates[paramPath]),
-          ...values
-        ];
-      });
-    });
-    Object.entries(dynamicAggregates).forEach(([paramPath, values]) => {
-      if (Array.isArray(values)) {
-        const unique = Array.from(new Set(values.map((entry) => JSON.stringify(entry)))).map((entry) => JSON.parse(entry));
-        setNestedValue(request, paramPath, unique);
-        return;
-      }
-      setNestedValue(request, paramPath, values);
-    });
-    const semanticSelection = buildReportBuilderSemanticSelection(effectiveConfig, state);
-    if (semanticSelection) {
-      request.semanticSelection = semanticSelection;
-    }
-    const pageSize = Math.max(1, Number(state.pageSize || resultConfig.pageSize || requestConfig.limit || 50) || 50);
-    const page = Math.max(1, Number(state.page || 1) || 1);
-    request.limit = pageSize;
-    request.offset = (page - 1) * pageSize;
-    if (requestConfig.offset != null) {
-      request.offset = requestConfig.offset;
-    }
-    if (requestConfig.timeoutMs != null) {
-      request.timeoutMs = requestConfig.timeoutMs;
-    }
-    const selectedOrder = orderFields.find((entry) => {
-      const value = String((entry == null ? void 0 : entry.value) || (entry == null ? void 0 : entry.field) || "").trim();
-      return value && value === String(state.orderField || "").trim();
-    });
-    if (selectedOrder) {
-      const dir = String(state.orderDir || selectedOrder.defaultDirection || "desc").trim().toLowerCase() || "desc";
-      if (Array.isArray(selectedOrder.orderBy) && selectedOrder.orderBy.length > 0) {
-        request.orderBy = clone3(selectedOrder.orderBy).map((entry) => String(entry).replace(/\$\{dir\}/g, dir));
-      } else if (selectedOrder.orderByDesc && dir === "desc") {
-        request.orderBy = [selectedOrder.orderByDesc];
-      } else if (selectedOrder.orderByAsc && dir === "asc") {
-        request.orderBy = [selectedOrder.orderByAsc];
-      } else {
-        const field = String(selectedOrder.field || selectedOrder.value || "").trim();
-        if (field) {
-          request.orderBy = [`${field} ${dir}`];
-        }
-      }
-    } else if (requestConfig.orderBy) {
-      request.orderBy = clone3(requestConfig.orderBy);
-    }
-    return request;
-  }
-  function buildReportBuilderColumns(config = {}, state = {}) {
-    const measures = getSelectableReportBuilderMeasures(config);
-    const dimensions = normalizeArray3(config.dimensions);
-    const activeTablePreset = (state == null ? void 0 : state.activeTablePreset) && typeof state.activeTablePreset === "object" ? state.activeTablePreset : null;
-    const presetColumnIndex = new Map(
-      normalizeTablePresetColumns(activeTablePreset == null ? void 0 : activeTablePreset.columns).map((column) => [String((column == null ? void 0 : column.key) || "").trim(), column])
-    );
-    const applyPresetColumn = (column = {}) => {
-      const override = presetColumnIndex.get(String((column == null ? void 0 : column.key) || "").trim());
-      if (!override) {
-        return column;
-      }
-      return {
-        ...column,
-        ...override.label ? { label: override.label } : {},
-        ...override.format ? { format: override.format } : {},
-        ...override.align ? { align: override.align } : {},
-        ...override.cellVisual ? { cellVisual: clone3(override.cellVisual) } : {},
-        ...override.rowIdentity === true ? { rowIdentity: true } : {}
-      };
-    };
-    const selectedDimensions = normalizeArray3(state.selectedDimensions).map((id) => dimensions.find((entry) => String((entry == null ? void 0 : entry.id) || "").trim() === String(id).trim())).filter(Boolean).map((entry) => applyPresetColumn({
-      key: reportBuilderDimensionValueKey(entry),
-      sourceKey: reportBuilderDimensionValueKey(entry),
-      displayKey: resolveReportBuilderDimensionDisplayKey(entry),
-      chartKey: resolveReportBuilderDimensionDisplayKey(entry),
-      label: entry.label || entry.id,
-      kind: "dimension",
-      format: entry.format,
-      ...(entry == null ? void 0 : entry.rowIdentity) === true ? { rowIdentity: true } : {},
-      ...(entry == null ? void 0 : entry.displayValueMap) && typeof entry.displayValueMap === "object" && !Array.isArray(entry.displayValueMap) ? { displayValueMap: clone3(entry.displayValueMap) } : {},
-      ...(entry == null ? void 0 : entry.runtimeFilter) && typeof entry.runtimeFilter === "object" && !Array.isArray(entry.runtimeFilter) ? { runtimeFilterable: true } : {}
-    }));
-    const selectedMeasures = normalizeArray3(state.selectedMeasures).map((id) => measures.find((entry) => String((entry == null ? void 0 : entry.id) || "").trim() === String(id).trim())).filter(Boolean).map((entry) => applyPresetColumn({
-      key: entry.key || entry.id,
-      label: entry.label || entry.id,
-      kind: "measure",
-      format: entry.format,
-      ...(entry == null ? void 0 : entry.rowIdentity) === true ? { rowIdentity: true } : {},
-      ...(entry == null ? void 0 : entry.displayValueMap) && typeof entry.displayValueMap === "object" && !Array.isArray(entry.displayValueMap) ? { displayValueMap: clone3(entry.displayValueMap) } : {},
-      align: entry.align || "right"
-    }));
-    return [...selectedDimensions, ...selectedMeasures];
-  }
-  function buildExplicitReportBuilderChartContainer(container = {}, config = {}, state = {}, chartSpec = null) {
-    var _a5, _b;
-    const normalized = normalizeReportBuilderChartSpec(chartSpec);
-    if (!normalized) {
-      return container;
-    }
-    const measures = getSelectableReportBuilderMeasures(config);
-    const xField = resolveReportBuilderDimensionByField(config, normalized.xField);
-    const yMeasures = normalizeStringArray3(normalized.yFields).map((fieldKey) => measures.find((entry) => String((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id) || "").trim() === fieldKey)).filter(Boolean);
-    if (!xField || yMeasures.length === 0) {
-      return container;
-    }
-    const configuredPalette = (_a5 = config.result) == null ? void 0 : _a5.palette;
-    const palette = Array.isArray(configuredPalette) && configuredPalette.length > 0 ? configuredPalette : DEFAULT_CHART_PALETTE;
-    const seriesType = normalized.type || "line";
-    const family = chartFamilyForType(seriesType);
-    const xDisplayKey = resolveReportBuilderDimensionDisplayKey(xField);
-    if (seriesType === "pie" || seriesType === "donut") {
-      const yMeasure = yMeasures[0];
-      const xSourceKey2 = reportBuilderDimensionValueKey(xField) || normalized.xField || "name";
-      const hasXDisplayValueMap2 = (xField == null ? void 0 : xField.displayValueMap) && typeof xField.displayValueMap === "object" && !Array.isArray(xField.displayValueMap);
-      return {
-        ...container,
-        dataSourceRef: container.dataSourceRef,
-        collection: container.collection,
-        chart: {
-          type: seriesType,
-          series: {
-            nameKey: xDisplayKey || normalized.xField,
-            ...xSourceKey2 && (xDisplayKey && xDisplayKey !== xSourceKey2 || hasXDisplayValueMap2) ? { sourceNameKey: xSourceKey2 } : {},
-            ...hasXDisplayValueMap2 ? { displayValueMap: clone3(xField.displayValueMap) } : {},
-            valueKey: String((yMeasure == null ? void 0 : yMeasure.key) || (yMeasure == null ? void 0 : yMeasure.id) || "").trim(),
-            palette,
-            ...normalized.categoryColors ? { categoryColors: normalized.categoryColors } : {}
-          }
-        }
-      };
-    }
-    const xSourceKey = reportBuilderDimensionValueKey(xField) || normalized.xField || "name";
-    const hasXDisplayValueMap = (xField == null ? void 0 : xField.displayValueMap) && typeof xField.displayValueMap === "object" && !Array.isArray(xField.displayValueMap);
-    const baseChart = {
-      type: seriesType,
-      ...normalized.preserveCategoryOrder === true ? { preserveCategoryOrder: true } : {},
-      xAxis: {
-        dataKey: xDisplayKey || xSourceKey,
-        label: (xField == null ? void 0 : xField.label) || (xField == null ? void 0 : xField.id) || xSourceKey,
-        ...xSourceKey && (xDisplayKey && xDisplayKey !== xSourceKey || hasXDisplayValueMap) ? { sourceDataKey: xSourceKey } : {},
-        ...hasXDisplayValueMap ? { displayValueMap: clone3(xField.displayValueMap) } : {},
-        tickFormat: xField == null ? void 0 : xField.tickFormat,
-        ...["civil", "instant"].includes(String((xField == null ? void 0 : xField.valueMode) || "").trim()) ? { valueMode: String(xField.valueMode).trim() } : {},
-        ...normalized.categoryLabel ? { categoryLabel: clone3(normalized.categoryLabel) } : {}
-      },
-      yAxis: {
-        format: (_b = yMeasures[0]) == null ? void 0 : _b.format
-      }
-    };
-    if (chartFamilyAllowsSeriesDimension(seriesType) && normalized.seriesField && yMeasures.length === 1) {
-      const yMeasure = yMeasures[0];
-      const seriesDimension = resolveReportBuilderDimensionByField(config, normalized.seriesField);
-      const seriesDisplayKey = resolveReportBuilderDimensionDisplayKey(seriesDimension) || normalized.seriesField;
-      const seriesSourceKey = reportBuilderDimensionValueKey(seriesDimension) || normalized.seriesField;
-      const hasSeriesDisplayValueMap = (seriesDimension == null ? void 0 : seriesDimension.displayValueMap) && typeof seriesDimension.displayValueMap === "object" && !Array.isArray(seriesDimension.displayValueMap);
-      return {
-        ...container,
-        dataSourceRef: container.dataSourceRef,
-        collection: container.collection,
-        chart: {
-          ...baseChart,
-          ...typeof normalized.allowTableSwitch === "boolean" ? { allowTableSwitch: normalized.allowTableSwitch } : {},
-          series: {
-            nameKey: seriesDisplayKey,
-            ...seriesSourceKey && (seriesDisplayKey && seriesDisplayKey !== seriesSourceKey || hasSeriesDisplayValueMap) ? { sourceNameKey: seriesSourceKey } : {},
-            ...hasSeriesDisplayValueMap ? { displayValueMap: clone3(seriesDimension.displayValueMap) } : {},
-            valueKey: String((yMeasure == null ? void 0 : yMeasure.key) || (yMeasure == null ? void 0 : yMeasure.id) || "").trim(),
-            values: [{
-              value: String((yMeasure == null ? void 0 : yMeasure.key) || (yMeasure == null ? void 0 : yMeasure.id) || "").trim(),
-              label: (yMeasure == null ? void 0 : yMeasure.label) || (yMeasure == null ? void 0 : yMeasure.id),
-              color: (yMeasure == null ? void 0 : yMeasure.color) || palette[0],
-              format: yMeasure == null ? void 0 : yMeasure.format,
-              type: seriesType
-            }],
-            palette,
-            ...normalized.categoryColors ? { categoryColors: normalized.categoryColors } : {}
-          }
-        }
-      };
-    }
-    const seriesOptions = normalized.seriesOptions && typeof normalized.seriesOptions === "object" ? normalized.seriesOptions : {};
-    const values = yMeasures.map((measure, index) => {
-      const measureKey = String((measure == null ? void 0 : measure.key) || (measure == null ? void 0 : measure.id) || "").trim();
-      const option = seriesOptions[measureKey] || {};
-      const entry = {
-        value: measureKey,
-        label: (measure == null ? void 0 : measure.label) || (measure == null ? void 0 : measure.id),
-        color: (measure == null ? void 0 : measure.color) || palette[index % palette.length],
-        format: measure == null ? void 0 : measure.format,
-        type: option.type || seriesType
-      };
-      if (option.axis) entry.axis = option.axis;
-      if (option.stackId) entry.stackId = option.stackId;
-      if (option.dataLabels) entry.dataLabels = option.dataLabels;
-      if (option.pointColorMode) entry.pointColorMode = option.pointColorMode;
-      return entry;
-    });
-    return {
-      ...container,
-      dataSourceRef: container.dataSourceRef,
-      collection: container.collection,
-      chart: applyChartMetricSelection({
-        ...baseChart,
-        ...typeof normalized.allowTableSwitch === "boolean" ? { allowTableSwitch: normalized.allowTableSwitch } : {},
-        ...normalized.metricSelection ? { metricSelection: normalized.metricSelection } : {},
-        series: {
-          values,
-          palette,
-          ...normalized.categoryColors ? { categoryColors: normalized.categoryColors } : {}
-        }
-      })
-    };
-  }
-
-  // src/reporting/reportDatasetSourceModel.js
-  function normalizeString20(value = "") {
-    return String(value || "").trim();
-  }
-  function cloneValue13(value) {
-    return value == null ? value : JSON.parse(JSON.stringify(value));
-  }
-  function isPlainObject3(value) {
-    return !!value && typeof value === "object" && !Array.isArray(value);
-  }
-  function normalizeKnownSourceKind(value = "") {
-    const normalized = normalizeString20(value).toLowerCase();
-    if (!normalized) {
-      return "";
-    }
-    if (normalized === "mcptool") {
-      return "mcp_tool";
-    }
-    return normalized;
-  }
-  function normalizeReportDatasetSource(value = null) {
-    if (!isPlainObject3(value)) {
-      return null;
-    }
-    const next = {
-      ...cloneValue13(value)
-    };
-    [
-      "server",
-      "service",
-      "tool",
-      "toolName",
-      "profile",
-      "contractRef",
-      "uri",
-      "method",
-      "dataSourceRef"
-    ].forEach((key) => {
-      if (!Object.prototype.hasOwnProperty.call(next, key)) {
-        return;
-      }
-      const normalized = normalizeString20(next[key]);
-      if (!normalized) {
-        delete next[key];
-        return;
-      }
-      next[key] = normalized;
-    });
-    if (Object.prototype.hasOwnProperty.call(next, "kind")) {
-      const normalizedKind = normalizeKnownSourceKind(next.kind);
-      if (normalizedKind) {
-        next.kind = normalizedKind;
-      } else {
-        delete next.kind;
-      }
-    }
-    return Object.keys(next).length > 0 ? next : null;
-  }
-  function normalizeReportDatasetCapabilities(value = null) {
-    if (!isPlainObject3(value)) {
-      return null;
-    }
-    const next = {
-      ...cloneValue13(value)
-    };
-    [
-      "fieldCatalog",
-      "scopeParams",
-      "semanticBinding",
-      "backendRefetch",
-      "export",
-      "preview",
-      "liveFilters",
-      "drill",
-      "lookupHydration"
-    ].forEach((key) => {
-      if (!Object.prototype.hasOwnProperty.call(next, key)) {
-        return;
-      }
-      next[key] = next[key] === true;
-    });
-    if (isPlainObject3(next.requestModel)) {
-      [
-        "measuresPath",
-        "dimensionsPath",
-        "filtersPath",
-        "orderByPath",
-        "limitPath",
-        "offsetPath"
-      ].forEach((key) => {
-        if (!Object.prototype.hasOwnProperty.call(next.requestModel, key)) {
-          return;
-        }
-        const normalized = normalizeString20(next.requestModel[key]);
-        if (!normalized) {
-          delete next.requestModel[key];
-          return;
-        }
-        next.requestModel[key] = normalized;
-      });
-    } else if (Object.prototype.hasOwnProperty.call(next, "requestModel")) {
-      delete next.requestModel;
-    }
-    if (!isPlainObject3(next.provider) && Object.prototype.hasOwnProperty.call(next, "provider")) {
-      delete next.provider;
-    }
-    if (!isPlainObject3(next.datly) && Object.prototype.hasOwnProperty.call(next, "datly")) {
-      delete next.datly;
-    }
-    return Object.keys(next).length > 0 ? next : null;
-  }
-
-  // src/reporting/reportDatasetScopeModel.js
-  function normalizeString21(value = "") {
-    return String(value || "").trim();
-  }
-  function cloneValue14(value) {
-    return value == null ? value : JSON.parse(JSON.stringify(value));
-  }
-  function isPlainObject4(value) {
-    return !!value && typeof value === "object" && !Array.isArray(value);
-  }
-  var DATASET_SCOPE_MODES = /* @__PURE__ */ new Set(["inherit", "append", "override", "exclude"]);
-  var RELATIVE_DATE_PRESETS = /* @__PURE__ */ new Set(["today", "yesterday", "last3days", "last7days", "last30days", "3d", "7d", "30d", "previousperiod"]);
-  function normalizeDatasetScopeMode(value = "") {
-    const normalized = normalizeString21(value).toLowerCase();
-    return DATASET_SCOPE_MODES.has(normalized) ? normalized : "";
-  }
-  function normalizeStringArray4(values = []) {
-    const seen = /* @__PURE__ */ new Set();
-    return (Array.isArray(values) ? values : []).map((value) => normalizeString21(value)).filter((value) => {
-      if (!value || seen.has(value)) {
-        return false;
-      }
-      seen.add(value);
-      return true;
-    });
-  }
-  function normalizeReportDatasetScope(value = null) {
-    if (!isPlainObject4(value)) {
-      return null;
-    }
-    const next = cloneValue14(value);
-    const rawMode = normalizeString21(next == null ? void 0 : next.mode);
-    const normalizedMode = normalizeDatasetScopeMode(next == null ? void 0 : next.mode);
-    if (normalizedMode) {
-      next.mode = normalizedMode;
-    } else if (Object.prototype.hasOwnProperty.call(next, "mode") && rawMode) {
-      throw new Error(`Unknown dataset scope mode '${String(next.mode || "").trim()}'.`);
-    } else if (Object.prototype.hasOwnProperty.call(next, "mode")) {
-      delete next.mode;
-    }
-    if (Object.prototype.hasOwnProperty.call(next, "inheritContext")) {
-      next.inheritContext = next.inheritContext === true;
-    }
-    if (isPlainObject4(next == null ? void 0 : next.local)) {
-      next.local = cloneValue14(next.local);
-    } else if (Object.prototype.hasOwnProperty.call(next, "local")) {
-      delete next.local;
-    }
-    if (Object.prototype.hasOwnProperty.call(next, "exclude")) {
-      const normalizedExclude = normalizeStringArray4(next.exclude);
-      if (normalizedExclude.length > 0) {
-        next.exclude = normalizedExclude;
-      } else {
-        delete next.exclude;
-      }
-    }
-    if (Object.prototype.hasOwnProperty.call(next, "relativeDateRange")) {
-      const relativeDateRange = isPlainObject4(next.relativeDateRange) ? cloneValue14(next.relativeDateRange) : null;
-      const preset = normalizeString21(relativeDateRange == null ? void 0 : relativeDateRange.preset).toLowerCase().replaceAll("_", "");
-      const startExpression = normalizeString21(relativeDateRange == null ? void 0 : relativeDateRange.startExpression);
-      const endExpression = normalizeString21(relativeDateRange == null ? void 0 : relativeDateRange.endExpression);
-      const startParamPath = normalizeString21(relativeDateRange == null ? void 0 : relativeDateRange.startParamPath);
-      const endParamPath = normalizeString21(relativeDateRange == null ? void 0 : relativeDateRange.endParamPath);
-      if (!RELATIVE_DATE_PRESETS.has(preset) && (!startExpression || !endExpression) || !startParamPath || !endParamPath) {
-        throw new Error("Dataset relativeDateRange requires a supported preset or start/end expressions, plus startParamPath and endParamPath.");
-      }
-      if (preset === "previousperiod" && next.mode !== "override") {
-        throw new Error("Previous period requires dataset scope mode 'override'.");
-      }
-      next.relativeDateRange = {
-        ...preset ? { preset } : {},
-        ...startExpression ? { startExpression } : {},
-        ...endExpression ? { endExpression } : {},
-        ...normalizeString21(relativeDateRange == null ? void 0 : relativeDateRange.format) ? { format: normalizeString21(relativeDateRange.format) } : {},
-        startParamPath,
-        endParamPath
-      };
-    }
-    if (next.mode === "exclude" && (!Array.isArray(next.exclude) || next.exclude.length === 0)) {
-      throw new Error("Dataset scope mode 'exclude' requires at least one excluded scope param id.");
-    }
-    return Object.keys(next).length > 0 ? next : null;
-  }
-  function resolveReportDatasetScopePolicy(scope = null) {
-    const normalizedScope = normalizeReportDatasetScope(scope);
-    if (!normalizedScope) {
-      return {
-        mode: "inherit",
-        local: {},
-        exclude: [],
-        relativeDateRange: null
-      };
-    }
-    const explicitMode = normalizeDatasetScopeMode(normalizedScope == null ? void 0 : normalizedScope.mode);
-    const normalizedLocal = isPlainObject4(normalizedScope == null ? void 0 : normalizedScope.local) ? cloneValue14(normalizedScope.local) : {};
-    const normalizedExclude = normalizeStringArray4(normalizedScope == null ? void 0 : normalizedScope.exclude);
-    const relativeDateRange = isPlainObject4(normalizedScope == null ? void 0 : normalizedScope.relativeDateRange) ? cloneValue14(normalizedScope.relativeDateRange) : null;
-    if (explicitMode) {
-      return {
-        mode: explicitMode,
-        local: normalizedLocal,
-        exclude: normalizedExclude,
-        relativeDateRange
-      };
-    }
-    const legacyLocal = cloneValue14(normalizedScope);
-    delete legacyLocal.mode;
-    delete legacyLocal.local;
-    delete legacyLocal.exclude;
-    delete legacyLocal.relativeDateRange;
-    const inheritContext = legacyLocal == null ? void 0 : legacyLocal.inheritContext;
-    delete legacyLocal.inheritContext;
-    const mergedLocal = {
-      ...legacyLocal,
-      ...normalizedLocal
-    };
-    const hasLocal = Object.keys(mergedLocal).length > 0;
-    if (inheritContext === false && normalizedExclude.length > 0) {
-      throw new Error("Legacy dataset scope cannot combine inheritContext=false with exclude entries. Use explicit mode instead.");
-    }
-    if (normalizedExclude.length > 0) {
-      return {
-        mode: "exclude",
-        local: mergedLocal,
-        exclude: normalizedExclude,
-        relativeDateRange
-      };
-    }
-    if (inheritContext === false) {
-      return {
-        mode: "override",
-        local: mergedLocal,
-        exclude: [],
-        relativeDateRange
-      };
-    }
-    return {
-      mode: hasLocal ? "append" : "inherit",
-      local: mergedLocal,
-      exclude: [],
-      relativeDateRange
-    };
-  }
-
-  // src/reporting/reportBuilderPublishedDatasetModel.js
-  function normalizeString22(value = "") {
-    return String(value || "").trim();
-  }
-  function cloneValue15(value) {
-    return value == null ? value : JSON.parse(JSON.stringify(value));
-  }
-  function isPlainObject5(value) {
-    return !!value && typeof value === "object" && !Array.isArray(value);
-  }
-  function normalizeOptionalObject(value) {
-    return isPlainObject5(value) ? cloneValue15(value) : null;
-  }
-  function normalizePublishedDatasetLineage(value) {
-    if (!isPlainObject5(value)) {
-      return null;
-    }
-    const derivedFrom = normalizeString22(value.derivedFrom);
-    return derivedFrom ? { derivedFrom } : null;
-  }
-  function normalizePublishedDatasetPresentation(value) {
-    if (!isPlainObject5(value)) {
-      return null;
-    }
-    const version = Math.max(1, Number(value.version || 1) || 1);
-    const icon = normalizeString22(value.icon);
-    const tone = normalizeString22(value.tone);
-    const summary = normalizeString22(value.summary);
-    if (!icon && !tone && !summary) {
-      return null;
-    }
-    return {
-      version,
-      ...icon ? { icon } : {},
-      ...tone ? { tone } : {},
-      ...summary ? { summary } : {}
-    };
-  }
-  function buildDerivedDimensionOptions(entry = {}) {
-    const key = normalizeString22((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id));
-    if (!key) {
-      return null;
-    }
-    return {
-      key,
-      label: normalizeString22((entry == null ? void 0 : entry.label) || key) || key,
-      kind: "dimension",
-      ...normalizeString22((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) ? { sourceKey: normalizeString22((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) } : {},
-      ...normalizeString22(entry == null ? void 0 : entry.displayKey) ? { displayKey: normalizeString22(entry.displayKey) } : {},
-      ...(entry == null ? void 0 : entry.displayValueMap) && typeof entry.displayValueMap === "object" && !Array.isArray(entry.displayValueMap) ? { displayValueMap: cloneValue15(entry.displayValueMap) } : {},
-      ...normalizeString22(entry == null ? void 0 : entry.format) ? { format: normalizeString22(entry.format) } : {},
-      ...normalizeString22(entry == null ? void 0 : entry.tickFormat) ? { tickFormat: normalizeString22(entry.tickFormat) } : {},
-      ...["civil", "instant"].includes(normalizeString22(entry == null ? void 0 : entry.valueMode)) ? { valueMode: normalizeString22(entry.valueMode) } : {},
-      ...(entry == null ? void 0 : entry.default) === true ? { default: true } : {},
-      ...(entry == null ? void 0 : entry.chartAxis) === true ? { chartAxis: true } : {},
-      ...(entry == null ? void 0 : entry.runtimeFilter) && typeof entry.runtimeFilter === "object" && !Array.isArray(entry.runtimeFilter) ? { runtimeFilter: cloneValue15(entry.runtimeFilter) } : {},
-      ...normalizeString22(entry == null ? void 0 : entry.rawId) ? { rawId: normalizeString22(entry.rawId) } : {},
-      ...normalizeString22(entry == null ? void 0 : entry.description) ? { description: normalizeString22(entry.description) } : {},
-      ...normalizeString22(entry == null ? void 0 : entry.category) ? { category: normalizeString22(entry.category) } : {},
-      ...normalizeString22(entry == null ? void 0 : entry.definitionRef) ? { definitionRef: normalizeString22(entry.definitionRef) } : {},
-      ...normalizeString22(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: normalizeString22(entry.semanticRef) } : {},
-      ...(entry == null ? void 0 : entry.governance) && typeof entry.governance === "object" && !Array.isArray(entry.governance) ? { governance: cloneValue15(entry.governance) } : {}
-    };
-  }
-  function buildDerivedMeasureOptions(entry = {}) {
-    const key = normalizeString22((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id));
-    if (!key) {
-      return null;
-    }
-    return {
-      key,
-      label: normalizeString22((entry == null ? void 0 : entry.label) || key) || key,
-      kind: "measure",
-      ...normalizeString22((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) ? { sourceKey: normalizeString22((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) } : {},
-      ...normalizeString22(entry == null ? void 0 : entry.format) ? { format: normalizeString22(entry.format) } : {},
-      ...(entry == null ? void 0 : entry.default) === true ? { default: true } : {},
-      ...normalizeString22(entry == null ? void 0 : entry.rawId) ? { rawId: normalizeString22(entry.rawId) } : {},
-      ...normalizeString22(entry == null ? void 0 : entry.description) ? { description: normalizeString22(entry.description) } : {},
-      ...normalizeString22(entry == null ? void 0 : entry.category) ? { category: normalizeString22(entry.category) } : {},
-      ...normalizeString22(entry == null ? void 0 : entry.definitionRef) ? { definitionRef: normalizeString22(entry.definitionRef) } : {},
-      ...normalizeString22(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: normalizeString22(entry.semanticRef) } : {},
-      ...(entry == null ? void 0 : entry.governance) && typeof entry.governance === "object" && !Array.isArray(entry.governance) ? { governance: cloneValue15(entry.governance) } : {}
-    };
-  }
-  function deriveColumnOptions(entry = {}) {
-    const dimensions = (Array.isArray(entry == null ? void 0 : entry.dimensions) ? entry.dimensions : []).map((item) => buildDerivedDimensionOptions(item)).filter(Boolean);
-    const measures = (Array.isArray(entry == null ? void 0 : entry.measures) ? entry.measures : []).map((item) => buildDerivedMeasureOptions(item)).filter(Boolean);
-    return [...dimensions, ...measures];
-  }
-  function deriveValueFieldOptions(entry = {}) {
-    return (Array.isArray(entry == null ? void 0 : entry.measures) ? entry.measures : []).map((item) => {
-      const key = normalizeString22((item == null ? void 0 : item.key) || (item == null ? void 0 : item.id));
-      if (!key) {
-        return null;
-      }
-      return {
-        value: key,
-        label: normalizeString22((item == null ? void 0 : item.label) || key) || key,
-        ...normalizeString22(item == null ? void 0 : item.format) ? { format: normalizeString22(item.format) } : {},
-        ...(item == null ? void 0 : item.default) === true ? { default: true } : {}
-      };
-    }).filter(Boolean);
-  }
-  function deriveSecondaryFieldOptions(entry = {}) {
-    return (Array.isArray(entry == null ? void 0 : entry.dimensions) ? entry.dimensions : []).map((item) => {
-      const key = normalizeString22((item == null ? void 0 : item.key) || (item == null ? void 0 : item.id));
-      if (!key) {
-        return null;
-      }
-      return {
-        value: key,
-        label: normalizeString22((item == null ? void 0 : item.label) || key) || key,
-        ...normalizeString22(item == null ? void 0 : item.format) ? { format: normalizeString22(item.format) } : {},
-        ...(item == null ? void 0 : item.default) === true ? { default: true } : {}
-      };
-    }).filter(Boolean);
-  }
-  function deriveChartFieldOptions(entry = {}) {
-    return deriveColumnOptions(entry).map((item) => ({
-      key: normalizeString22((item == null ? void 0 : item.displayKey) || (item == null ? void 0 : item.key)),
-      aliases: [normalizeString22(item == null ? void 0 : item.key)].filter(Boolean),
-      label: normalizeString22((item == null ? void 0 : item.label) || (item == null ? void 0 : item.key)),
-      kind: normalizeString22(item == null ? void 0 : item.kind),
-      ...normalizeString22(item == null ? void 0 : item.format) ? { format: normalizeString22(item.format) } : {},
-      ...normalizeString22(item == null ? void 0 : item.tickFormat) ? { tickFormat: normalizeString22(item.tickFormat) } : {},
-      ...["civil", "instant"].includes(normalizeString22(item == null ? void 0 : item.valueMode)) ? { valueMode: normalizeString22(item.valueMode) } : {},
-      ...(item == null ? void 0 : item.default) === true ? { default: true } : {},
-      ...(item == null ? void 0 : item.chartAxis) === true ? { chartAxis: true } : {},
-      ...normalizeString22(item == null ? void 0 : item.rawId) ? { rawId: normalizeString22(item.rawId) } : {},
-      ...normalizeString22(item == null ? void 0 : item.description) ? { description: normalizeString22(item.description) } : {},
-      ...normalizeString22(item == null ? void 0 : item.category) ? { category: normalizeString22(item.category) } : {},
-      ...normalizeString22(item == null ? void 0 : item.definitionRef) ? { definitionRef: normalizeString22(item.definitionRef) } : {},
-      ...normalizeString22(item == null ? void 0 : item.semanticRef) ? { semanticRef: normalizeString22(item.semanticRef) } : {},
-      ...(item == null ? void 0 : item.governance) && typeof item.governance === "object" && !Array.isArray(item.governance) ? { governance: cloneValue15(item.governance) } : {}
-    }));
-  }
-  function buildReportBuilderPublishedDatasetRefIndex(sources = []) {
-    const normalizedSources = (Array.isArray(sources) ? sources : []).filter(isPlainObject5);
-    const index = /* @__PURE__ */ new Map();
-    normalizedSources.forEach((source) => {
-      const id = normalizeString22(source == null ? void 0 : source.id);
-      if (id && !index.has(id)) {
-        index.set(id, source);
-      }
-    });
-    const declaredIds = new Set(index.keys());
-    const sourcesByDataSourceRef = /* @__PURE__ */ new Map();
-    normalizedSources.forEach((source) => {
-      const dataSourceRef = normalizeString22(source == null ? void 0 : source.dataSourceRef);
-      if (!dataSourceRef) {
-        return;
-      }
-      sourcesByDataSourceRef.set(dataSourceRef, [
-        ...sourcesByDataSourceRef.get(dataSourceRef) || [],
-        source
-      ]);
-    });
-    sourcesByDataSourceRef.forEach((group, dataSourceRef) => {
-      if (group.length === 1 && !declaredIds.has(dataSourceRef)) {
-        index.set(dataSourceRef, group[0]);
-      }
-    });
-    return index;
-  }
-  function normalizeReportBuilderPublishedDataSources2(config = {}) {
-    const declared = [
-      ...Array.isArray(config == null ? void 0 : config.datasets) ? config.datasets : [],
-      ...Array.isArray(config == null ? void 0 : config.dataSources) ? config.dataSources : []
-    ];
-    const seen = /* @__PURE__ */ new Set();
-    return declared.map((entry) => {
-      if (!isPlainObject5(entry)) {
-        return null;
-      }
-      const dataSourceRef = normalizeString22((entry == null ? void 0 : entry.dataSourceRef) || (entry == null ? void 0 : entry.value) || (entry == null ? void 0 : entry.id));
-      const id = normalizeString22((entry == null ? void 0 : entry.id) || dataSourceRef);
-      if (!dataSourceRef || !id) {
-        return null;
-      }
-      return {
-        id,
-        dataSourceRef,
-        label: normalizeString22((entry == null ? void 0 : entry.label) || dataSourceRef),
-        description: normalizeString22(entry == null ? void 0 : entry.description),
-        kindLabel: normalizeString22((entry == null ? void 0 : entry.kindLabel) || (entry == null ? void 0 : entry.kind) || "published"),
-        ...normalizePublishedDatasetLineage(entry == null ? void 0 : entry.lineage) ? { lineage: normalizePublishedDatasetLineage(entry.lineage) } : {},
-        ...normalizePublishedDatasetPresentation(entry == null ? void 0 : entry.presentation) ? { presentation: normalizePublishedDatasetPresentation(entry.presentation) } : {},
-        scope: normalizeReportDatasetScope(entry == null ? void 0 : entry.scope),
-        source: normalizeReportDatasetSource(entry == null ? void 0 : entry.source),
-        resultContract: normalizeOptionalObject(entry == null ? void 0 : entry.resultContract),
-        capabilities: normalizeReportDatasetCapabilities(entry == null ? void 0 : entry.capabilities),
-        request: isPlainObject5(entry == null ? void 0 : entry.request) ? cloneValue15(entry.request) : null,
-        columnOptions: Array.isArray(entry == null ? void 0 : entry.columnOptions) && entry.columnOptions.length > 0 ? cloneValue15(entry.columnOptions) : deriveColumnOptions(entry),
-        valueFieldOptions: Array.isArray(entry == null ? void 0 : entry.valueFieldOptions) && entry.valueFieldOptions.length > 0 ? cloneValue15(entry.valueFieldOptions) : deriveValueFieldOptions(entry),
-        secondaryFieldOptions: Array.isArray(entry == null ? void 0 : entry.secondaryFieldOptions) && entry.secondaryFieldOptions.length > 0 ? cloneValue15(entry.secondaryFieldOptions) : deriveSecondaryFieldOptions(entry),
-        chartFieldOptions: Array.isArray(entry == null ? void 0 : entry.chartFieldOptions) && entry.chartFieldOptions.length > 0 ? cloneValue15(entry.chartFieldOptions) : deriveChartFieldOptions(entry),
-        scopeParamOptions: Array.isArray(entry == null ? void 0 : entry.scopeParamOptions) ? cloneValue15(entry.scopeParamOptions) : []
-      };
-    }).filter((entry) => {
-      if (!entry) {
-        return false;
-      }
-      const key = `${entry.id}::${entry.dataSourceRef}`;
-      if (seen.has(key)) {
-        return false;
-      }
-      seen.add(key);
-      return true;
-    }).filter(Boolean);
-  }
-
-  // src/reporting/reportBuilderScopeParamModel.js
-  function normalizeString23(value = "") {
-    return String(value || "").trim();
-  }
-  function cloneValue16(value) {
-    return value == null ? value : JSON.parse(JSON.stringify(value));
-  }
-  function resolveScopeParamValue(filter = {}, state = {}, runtimeDatasetScopeParams = null, datasetRef = "") {
-    const filterId = resolveScopeParamId(filter);
-    if (!filterId) {
-      return null;
-    }
-    const normalizedDatasetRef = normalizeString23(datasetRef);
-    const datasetScopedValues = normalizedDatasetRef && runtimeDatasetScopeParams && typeof runtimeDatasetScopeParams === "object" && !Array.isArray(runtimeDatasetScopeParams) && runtimeDatasetScopeParams[normalizedDatasetRef] && typeof runtimeDatasetScopeParams[normalizedDatasetRef] === "object" && !Array.isArray(runtimeDatasetScopeParams[normalizedDatasetRef]) ? runtimeDatasetScopeParams[normalizedDatasetRef] : null;
-    const rawValue = datasetScopedValues && Object.prototype.hasOwnProperty.call(datasetScopedValues, filterId) ? datasetScopedValues[filterId] : getScopeParamValue(state, filterId);
-    if ((filter == null ? void 0 : filter.type) === "dateRange") {
-      const start = normalizeString23(rawValue == null ? void 0 : rawValue.start);
-      const end = normalizeString23(rawValue == null ? void 0 : rawValue.end);
-      return start || end ? { start, end } : null;
-    }
-    if (Array.isArray(rawValue)) {
-      return rawValue.length > 0 ? cloneValue16(rawValue) : [];
-    }
-    return rawValue != null ? rawValue : null;
-  }
-  function collectPinnedPredicateScopeParams(config = {}, state = {}) {
-    return listReportBuilderPinnedPredicates(config).map((predicate) => {
-      const value = resolveScopeParamValue(
-        { id: predicate.id, ...predicate.kind === "dateRange" ? { type: "dateRange" } : {} },
-        state
-      );
-      return {
-        id: predicate.id,
-        kind: predicate.kind === "dateRange" ? "dateRange" : predicate.multiple === true ? "multiSelect" : "value",
-        label: normalizeString23(predicate.label || predicate.id),
-        ...predicate.description ? { description: predicate.description } : {},
-        required: predicate.required === true,
-        ...predicate.multiple === true ? { multiple: true } : {},
-        ...predicate.presentation ? { presentation: normalizeString23(predicate.presentation) } : {},
-        ...Array.isArray(predicate.options) ? { options: cloneValue16(predicate.options) } : {},
-        value
-      };
-    });
-  }
-  function collectLegacyStaticFilterScopeParams(config = {}, state = {}, excludedIds = /* @__PURE__ */ new Set()) {
-    return resolveReportBuilderScopeParamFilters(config).map((filter) => {
-      const id = normalizeString23((filter == null ? void 0 : filter.id) || (filter == null ? void 0 : filter.field));
-      if (!id || excludedIds.has(id)) {
-        return null;
-      }
-      const value = resolveScopeParamValue(filter, state);
-      const description = normalizeString23(filter == null ? void 0 : filter.description);
-      return {
-        id,
-        kind: normalizeString23((filter == null ? void 0 : filter.type) || ((filter == null ? void 0 : filter.multiple) ? "multiSelect" : "value")) || "value",
-        label: normalizeString23((filter == null ? void 0 : filter.label) || id),
-        ...description ? { description } : {},
-        required: (filter == null ? void 0 : filter.required) === true,
-        ...(filter == null ? void 0 : filter.multiple) === true ? { multiple: true } : {},
-        ...normalizeString23(filter == null ? void 0 : filter.presentation) ? { presentation: normalizeString23(filter.presentation) } : {},
-        ...Array.isArray(filter == null ? void 0 : filter.options) ? { options: cloneValue16(filter.options) } : {},
-        value
-      };
-    }).filter(Boolean);
-  }
-  function collectConfiguredDataSourceScopeParams(config = {}, state = {}, excludedIds = /* @__PURE__ */ new Set(), runtimeDatasetScopeParams = null) {
-    const seen = new Set(excludedIds instanceof Set ? [...excludedIds] : []);
-    const params = [];
-    normalizeReportBuilderPublishedDataSources2(config).forEach((source) => {
-      const datasetRef = normalizeString23((source == null ? void 0 : source.id) || (source == null ? void 0 : source.dataSourceRef) || (source == null ? void 0 : source.value));
-      if (!datasetRef) {
-        return;
-      }
-      (Array.isArray(source == null ? void 0 : source.scopeParamOptions) ? source.scopeParamOptions : []).forEach((option) => {
-        const id = normalizeString23((option == null ? void 0 : option.id) || (option == null ? void 0 : option.value));
-        if (!id || seen.has(id)) {
-          return;
-        }
-        seen.add(id);
-        const kind = normalizeString23((option == null ? void 0 : option.kind) || "value") || "value";
-        const value = resolveScopeParamValue({
-          id,
-          ...kind === "dateRange" ? { type: "dateRange" } : {},
-          ...(option == null ? void 0 : option.multiple) === true ? { multiple: true } : {}
-        }, state, runtimeDatasetScopeParams, datasetRef);
-        params.push({
-          id,
-          kind,
-          label: normalizeString23((option == null ? void 0 : option.label) || id),
-          ...normalizeString23(option == null ? void 0 : option.description) ? { description: normalizeString23(option.description) } : {},
-          required: (option == null ? void 0 : option.required) === true,
-          ...(option == null ? void 0 : option.multiple) === true ? { multiple: true } : {},
-          ...normalizeString23(option == null ? void 0 : option.presentation) ? { presentation: normalizeString23(option.presentation) } : {},
-          ...Array.isArray(option == null ? void 0 : option.options) ? { options: cloneValue16(option.options) } : {},
-          datasetRef,
-          value
-        });
-      });
-    });
-    return params;
-  }
-  function buildReportBuilderScopeParams(config = {}, state = {}, runtimeDatasetScopeParams = null) {
-    const predicateParams = collectPinnedPredicateScopeParams(config, state);
-    const predicateParamIds = new Set(predicateParams.map((param) => param.id));
-    const legacyParams = collectLegacyStaticFilterScopeParams(config, state, predicateParamIds);
-    const configuredSourceParams = collectConfiguredDataSourceScopeParams(
-      config,
-      state,
-      /* @__PURE__ */ new Set([...predicateParamIds, ...legacyParams.map((param) => param.id)]),
-      runtimeDatasetScopeParams
-    );
-    return [
-      ...predicateParams,
-      ...legacyParams,
-      ...configuredSourceParams
-    ];
-  }
-
-  // src/reporting/reportPrimaryDatasetModel.js
-  function normalizeString24(value = "") {
-    return String(value || "").trim();
-  }
-  function normalizeStringList(values = []) {
-    const seen = /* @__PURE__ */ new Set();
-    return (Array.isArray(values) ? values : []).map((value) => normalizeString24(value)).filter((value) => {
-      if (!value || seen.has(value)) {
-        return false;
-      }
-      seen.add(value);
-      return true;
-    });
-  }
-  function shouldKeepPrimaryDataset({
-    includePrimaryBlocks = true,
-    datasetBackedBlockDatasetRefs = [],
-    availableNonPrimaryDatasetRefs = []
-  } = {}) {
-    if (includePrimaryBlocks) {
-      return true;
-    }
-    const normalizedDatasetRefs = normalizeStringList(datasetBackedBlockDatasetRefs);
-    if (normalizedDatasetRefs.length === 0) {
-      return true;
-    }
-    const normalizedAvailableNonPrimaryRefs = new Set(
-      normalizeStringList(availableNonPrimaryDatasetRefs).filter((datasetRef) => datasetRef !== "primary")
-    );
-    if (normalizedDatasetRefs.some((datasetRef) => datasetRef === "primary")) {
-      return true;
-    }
-    return !normalizedDatasetRefs.some((datasetRef) => normalizedAvailableNonPrimaryRefs.has(datasetRef));
-  }
-
-  // src/reporting/reportBlockKindModel.js
-  function normalizeString25(value = "") {
-    return String(value || "").trim();
-  }
-  function isReportDatasetBackedBlockKind(kind = "") {
-    const normalizedKind = normalizeString25(kind);
-    return normalizedKind === "tableBlock" || normalizedKind === "chartBlock" || normalizedKind === "kpiBlock" || normalizedKind === "collectionBlock" || normalizedKind === "geoMapBlock" || normalizedKind === "badgesBlock" || normalizedKind === "timelineBlock" || normalizedKind === "filterBarBlock";
-  }
-
-  // src/reporting/reportContextPresetModel.js
-  function normalizeString26(value = "") {
-    return String(value || "").trim();
-  }
-  function hasMeaningfulScopeParamValue(value = null) {
-    if (Array.isArray(value)) {
-      return value.length > 0;
-    }
-    if (value && typeof value === "object") {
-      const keys2 = Object.keys(value);
-      const start = normalizeString26(value == null ? void 0 : value.start);
-      const end = normalizeString26(value == null ? void 0 : value.end);
-      if (Object.prototype.hasOwnProperty.call(value, "start") || Object.prototype.hasOwnProperty.call(value, "end")) {
-        return !!(start || end);
-      }
-      return keys2.length > 0;
-    }
-    if (typeof value === "string") {
-      return normalizeString26(value).length > 0;
-    }
-    return value != null;
-  }
-  function normalizeParamIds(values = []) {
-    const seen = /* @__PURE__ */ new Set();
-    return (Array.isArray(values) ? values : []).map((value) => normalizeString26(value)).filter((value) => {
-      if (!value || seen.has(value)) {
-        return false;
-      }
-      seen.add(value);
-      return true;
-    });
-  }
-  function normalizeReportScopeContextPreset(value = null, {
-    availableParamIds = null
-  } = {}) {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-      return null;
-    }
-    const id = normalizeString26(value == null ? void 0 : value.id);
-    if (!id) {
-      return null;
-    }
-    const restrictToAvailableParamIds = availableParamIds != null;
-    const allowedParamIds = new Set(normalizeParamIds(availableParamIds));
-    const paramIds = normalizeParamIds(value == null ? void 0 : value.paramIds).filter((paramId) => !restrictToAvailableParamIds || allowedParamIds.has(paramId));
-    if (paramIds.length === 0) {
-      return null;
-    }
-    return {
-      id,
-      paramIds
-    };
-  }
-  function resolveReportScopeContextPresetFromState(state = {}, scopeParams = []) {
-    const availableParamIds = listMeaningfulReportScopeParamIds(scopeParams);
-    return normalizeReportScopeContextPreset(state == null ? void 0 : state.contextPreset, {
-      availableParamIds
-    });
-  }
-  function listMeaningfulReportScopeParamIds(scopeParams = []) {
-    return (Array.isArray(scopeParams) ? scopeParams : []).filter((param) => hasMeaningfulScopeParamValue(param == null ? void 0 : param.value)).map((param) => normalizeString26(param == null ? void 0 : param.id)).filter(Boolean);
-  }
-
-  // src/reporting/reportSpecModel.js
-  function normalizeString27(value = "") {
-    return String(value || "").trim();
-  }
-  function resolveContainerIdentity(container = {}) {
-    return normalizeString27(
-      (container == null ? void 0 : container.id) || (container == null ? void 0 : container.stateKey) || (container == null ? void 0 : container.windowKey) || (container == null ? void 0 : container.windowId)
-    );
-  }
-  function cloneValue17(value) {
-    return value == null ? value : JSON.parse(JSON.stringify(value));
-  }
-  function isPlainObject6(value) {
-    return !!value && typeof value === "object" && !Array.isArray(value);
-  }
-  function setNestedValue2(target, path, value) {
-    const segments = normalizeString27(path).split(".").filter(Boolean);
-    if (!target || typeof target !== "object" || Array.isArray(target) || segments.length === 0) {
-      return;
-    }
-    let cursor = target;
-    for (let index = 0; index < segments.length - 1; index += 1) {
-      const segment = segments[index];
-      if (!isPlainObject6(cursor[segment])) {
-        cursor[segment] = {};
-      }
-      cursor = cursor[segment];
-    }
-    cursor[segments[segments.length - 1]] = value;
-  }
-  function getNestedValue(target, path) {
-    const segments = normalizeString27(path).split(".").filter(Boolean);
-    if (!target || typeof target !== "object" || Array.isArray(target) || segments.length === 0) {
-      return void 0;
-    }
-    let cursor = target;
-    for (const segment of segments) {
-      if (!cursor || typeof cursor !== "object" || Array.isArray(cursor)) {
-        return void 0;
-      }
-      cursor = cursor[segment];
-    }
-    return cursor;
-  }
-  function deleteNestedValue(target, path) {
-    const segments = normalizeString27(path).split(".").filter(Boolean);
-    if (!target || typeof target !== "object" || Array.isArray(target) || segments.length === 0) {
-      return;
-    }
-    let cursor = target;
-    for (let index = 0; index < segments.length - 1; index += 1) {
-      cursor = isPlainObject6(cursor == null ? void 0 : cursor[segments[index]]) ? cursor[segments[index]] : null;
-      if (!cursor) {
-        return;
-      }
-    }
-    delete cursor[segments[segments.length - 1]];
-  }
-  function mergeReportDatasetRequestValues(base = {}, patch = {}, {
-    patchWins = true
-  } = {}) {
-    const normalizedBase = isPlainObject6(base) ? cloneValue17(base) : {};
-    const normalizedPatch = isPlainObject6(patch) ? cloneValue17(patch) : {};
-    const result = {
-      ...normalizedBase
-    };
-    Object.keys(normalizedPatch).forEach((key) => {
-      const baseValue = result[key];
-      const patchValue = normalizedPatch[key];
-      if (isPlainObject6(baseValue) && isPlainObject6(patchValue)) {
-        result[key] = mergeReportDatasetRequestValues(baseValue, patchValue, {
-          patchWins
-        });
-        return;
-      }
-      result[key] = patchWins || !Object.prototype.hasOwnProperty.call(result, key) ? cloneValue17(patchValue) : cloneValue17(baseValue);
-    });
-    return result;
-  }
-  function normalizeStringArray5(values = []) {
-    return (Array.isArray(values) ? values : []).map((value) => normalizeString27(value)).filter(Boolean);
-  }
-  function buildReportSpecColumns(columns = []) {
-    return (Array.isArray(columns) ? columns : []).map((column) => ({
-      key: normalizeString27(column == null ? void 0 : column.key),
-      sourceKey: normalizeString27((column == null ? void 0 : column.sourceKey) || (column == null ? void 0 : column.key)),
-      displayKey: normalizeString27((column == null ? void 0 : column.displayKey) || (column == null ? void 0 : column.key)),
-      ...(column == null ? void 0 : column.displayValueMap) && typeof column.displayValueMap === "object" && !Array.isArray(column.displayValueMap) ? { displayValueMap: cloneValue17(column.displayValueMap) } : {},
-      ...(column == null ? void 0 : column.displayIconMap) && typeof column.displayIconMap === "object" && !Array.isArray(column.displayIconMap) ? { displayIconMap: cloneValue17(column.displayIconMap) } : {},
-      label: normalizeString27((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
-      kind: normalizeString27(column == null ? void 0 : column.kind),
-      ...normalizeString27(column == null ? void 0 : column.format) ? { format: normalizeString27(column.format) } : {},
-      ...normalizeString27(column == null ? void 0 : column.align) ? { align: normalizeString27(column.align) } : {},
-      ...(column == null ? void 0 : column.runtimeFilterable) === true ? { runtimeFilterable: true } : {},
-      ...(column == null ? void 0 : column.rowIdentity) === true ? { rowIdentity: true } : {},
-      ...normalizeReportTableCellVisual(column == null ? void 0 : column.cellVisual) ? { cellVisual: normalizeReportTableCellVisual(column.cellVisual) } : {},
-      ...normalizePresentationClampConfig(column == null ? void 0 : column.labelClamp) ? { labelClamp: normalizePresentationClampConfig(column.labelClamp) } : {}
-    })).filter((column) => column.key);
-  }
-  function resolveReportSpecTitle(container = {}, config = {}) {
-    return normalizeString27((container == null ? void 0 : container.title) || (config == null ? void 0 : config.title) || "Report");
-  }
-  function resolveReportSpecDataSourceRef(container = {}, config = {}) {
-    return normalizeString27((container == null ? void 0 : container.dataSourceRef) || (config == null ? void 0 : config.dataSourceRef));
-  }
-  function normalizeReportBuilderPublishedDataSources(config = {}) {
-    return normalizeReportBuilderPublishedDataSources2(config);
-  }
-  function normalizeReportSpecScopeParams(reportSpec = {}) {
-    var _a5;
-    const scopeParams = Array.isArray((_a5 = reportSpec == null ? void 0 : reportSpec.scope) == null ? void 0 : _a5.params) ? cloneValue17(reportSpec.scope.params) : [];
-    if (scopeParams.length === 0) {
-      return [];
-    }
-    if (scopeParams.every((entry) => normalizeString27(entry == null ? void 0 : entry.label) && normalizeString27(entry == null ? void 0 : entry.kind))) {
-      return scopeParams;
-    }
-    const reportBuilderBlock = (Array.isArray(reportSpec == null ? void 0 : reportSpec.blocks) ? reportSpec.blocks : []).find((entry) => normalizeString27(entry == null ? void 0 : entry.kind) === "reportBuilderBlock") || null;
-    const reportBuilderConfig = isPlainObject6(reportBuilderBlock == null ? void 0 : reportBuilderBlock.config) ? reportBuilderBlock.config : {};
-    const primaryDataset = (Array.isArray(reportSpec == null ? void 0 : reportSpec.datasets) ? reportSpec.datasets : []).find((dataset) => normalizeString27(dataset == null ? void 0 : dataset.id) === "primary" && !Array.isArray(dataset == null ? void 0 : dataset.rows)) || null;
-    const filterIndex = new Map(
-      [
-        ...resolveReportBuilderScopeParamFilters(reportBuilderConfig),
-        ...Array.isArray(primaryDataset == null ? void 0 : primaryDataset.scopeParamOptions) ? primaryDataset.scopeParamOptions.map((entry) => ({
-          id: normalizeString27((entry == null ? void 0 : entry.value) || (entry == null ? void 0 : entry.id)),
-          label: normalizeString27((entry == null ? void 0 : entry.label) || (entry == null ? void 0 : entry.value) || (entry == null ? void 0 : entry.id)),
-          type: normalizeString27((entry == null ? void 0 : entry.kind) || "value"),
-          ...(entry == null ? void 0 : entry.multiple) === true ? { multiple: true } : {},
-          ...normalizeString27(entry == null ? void 0 : entry.presentation) ? { presentation: normalizeString27(entry.presentation) } : {},
-          ...(entry == null ? void 0 : entry.required) === true ? { required: true } : {},
-          ...Array.isArray(entry == null ? void 0 : entry.options) ? { options: cloneValue17(entry.options) } : {},
-          ...normalizeString27(entry == null ? void 0 : entry.description) ? { description: normalizeString27(entry.description) } : {}
-        })) : []
-      ].map((filter) => [resolveScopeParamId(filter), filter]).filter(([id]) => !!id)
-    );
-    return scopeParams.map((scopeParam) => {
-      const paramId = normalizeString27(scopeParam == null ? void 0 : scopeParam.id);
-      const filter = filterIndex.get(paramId) || null;
-      if (!filter) {
-        return scopeParam;
-      }
-      return {
-        ...scopeParam,
-        ...normalizeString27((scopeParam == null ? void 0 : scopeParam.label) || (filter == null ? void 0 : filter.label) || paramId) ? { label: normalizeString27((scopeParam == null ? void 0 : scopeParam.label) || (filter == null ? void 0 : filter.label) || paramId) } : {},
-        ...normalizeString27((scopeParam == null ? void 0 : scopeParam.kind) || (filter == null ? void 0 : filter.type)) ? { kind: normalizeString27((scopeParam == null ? void 0 : scopeParam.kind) || (filter == null ? void 0 : filter.type)) } : {},
-        ...(scopeParam == null ? void 0 : scopeParam.multiple) === true || (filter == null ? void 0 : filter.multiple) === true ? { multiple: true } : {},
-        ...normalizeString27((scopeParam == null ? void 0 : scopeParam.presentation) || (filter == null ? void 0 : filter.presentation)) ? { presentation: normalizeString27((scopeParam == null ? void 0 : scopeParam.presentation) || (filter == null ? void 0 : filter.presentation)) } : {},
-        ...(scopeParam == null ? void 0 : scopeParam.required) === true || (filter == null ? void 0 : filter.required) === true ? { required: true } : {},
-        ...Array.isArray(scopeParam == null ? void 0 : scopeParam.options) ? { options: cloneValue17(scopeParam.options) } : Array.isArray(filter == null ? void 0 : filter.options) ? { options: cloneValue17(filter.options) } : {},
-        ...normalizeString27((scopeParam == null ? void 0 : scopeParam.description) || (filter == null ? void 0 : filter.description)) ? { description: normalizeString27((scopeParam == null ? void 0 : scopeParam.description) || (filter == null ? void 0 : filter.description)) } : {}
-      };
-    });
-  }
-  function buildReportBuilderPublishedDatasetConfig(baseConfig = {}, source = null, { borrowBase = false } = {}) {
-    var _a5;
-    const normalizedSource = source && typeof source === "object" && !Array.isArray(source) ? source : null;
-    if (!normalizedSource) {
-      return baseConfig;
-    }
-    const fieldOptions = (() => {
-      const entries = [];
-      const seen = /* @__PURE__ */ new Set();
-      [
-        ...Array.isArray(normalizedSource == null ? void 0 : normalizedSource.columnOptions) ? normalizedSource.columnOptions : [],
-        ...Array.isArray(normalizedSource == null ? void 0 : normalizedSource.chartFieldOptions) ? normalizedSource.chartFieldOptions : []
-      ].forEach((option) => {
-        if (!isPlainObject6(option)) {
-          return;
-        }
-        const key = normalizeString27((option == null ? void 0 : option.key) || (option == null ? void 0 : option.sourceKey));
-        const kind = normalizeString27(option == null ? void 0 : option.kind);
-        if (!key || !kind) {
-          return;
-        }
-        const identity = `${kind}:${key}`;
-        if (seen.has(identity)) {
-          return;
-        }
-        seen.add(identity);
-        entries.push(cloneValue17(option));
-      });
-      return entries;
-    })();
-    const inheritRuntimeFieldCatalog = ((_a5 = normalizedSource == null ? void 0 : normalizedSource.capabilities) == null ? void 0 : _a5.inheritRuntimeFieldCatalog) === true && fieldOptions.length === 0;
-    const dimensions = inheritRuntimeFieldCatalog ? cloneValue17((baseConfig == null ? void 0 : baseConfig.dimensions) || []) : fieldOptions.filter((column) => normalizeString27(column == null ? void 0 : column.kind) === "dimension").map((column) => ({
-      id: normalizeString27(column == null ? void 0 : column.key),
-      key: normalizeString27((column == null ? void 0 : column.sourceKey) || (column == null ? void 0 : column.key)) || normalizeString27(column == null ? void 0 : column.key),
-      label: normalizeString27((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
-      ...normalizeString27(column == null ? void 0 : column.displayKey) ? { displayKey: normalizeString27(column.displayKey) } : {},
-      ...(column == null ? void 0 : column.displayValueMap) && typeof column.displayValueMap === "object" && !Array.isArray(column.displayValueMap) ? { displayValueMap: cloneValue17(column.displayValueMap) } : {},
-      ...normalizeString27(column == null ? void 0 : column.format) ? { format: normalizeString27(column.format) } : {},
-      ...normalizeString27(column == null ? void 0 : column.tickFormat) ? { tickFormat: normalizeString27(column.tickFormat) } : {},
-      ...["civil", "instant"].includes(normalizeString27(column == null ? void 0 : column.valueMode)) ? { valueMode: normalizeString27(column.valueMode) } : {}
-    })).filter((entry) => entry.id && entry.key && entry.label);
-    const measures = inheritRuntimeFieldCatalog ? cloneValue17((baseConfig == null ? void 0 : baseConfig.measures) || []) : fieldOptions.filter((column) => normalizeString27(column == null ? void 0 : column.kind) === "measure").map((column) => ({
-      id: normalizeString27(column == null ? void 0 : column.key),
-      key: normalizeString27((column == null ? void 0 : column.sourceKey) || (column == null ? void 0 : column.key)) || normalizeString27(column == null ? void 0 : column.key),
-      label: normalizeString27((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
-      ...normalizeString27(column == null ? void 0 : column.format) ? { format: normalizeString27(column.format) } : {}
-    })).filter((entry) => entry.id && entry.key && entry.label);
-    return {
-      // The authored lowerer only reads its invocation-local builder config.
-      // Preserve the public detached result by default; its internal read-only
-      // callers can borrow the base instead of serializing the entire builder
-      // once for every published dataset and authored block.
-      ...isPlainObject6(baseConfig) ? borrowBase ? baseConfig : cloneValue17(baseConfig) : {},
-      dataSourceRef: normalizeString27((normalizedSource == null ? void 0 : normalizedSource.dataSourceRef) || (baseConfig == null ? void 0 : baseConfig.dataSourceRef)),
-      dimensions,
-      measures
-    };
-  }
-  function buildReportBuilderPublishedDatasetRequest(source = {}, state = {}, datasetScopeParamValues = null, inheritedRequestContext = null, primaryRequestContext = null) {
-    const request = isPlainObject6(source == null ? void 0 : source.request) ? cloneValue17(source.request) : null;
-    if (!request) {
-      return null;
-    }
-    const scopePolicy = resolveReportDatasetScopePolicy(source == null ? void 0 : source.scope);
-    const excludedParamIds = new Set(Array.isArray(scopePolicy == null ? void 0 : scopePolicy.exclude) ? scopePolicy.exclude : []);
-    let contextPatch = isPlainObject6(inheritedRequestContext) ? cloneValue17(inheritedRequestContext) : {};
-    (Array.isArray(source == null ? void 0 : source.scopeParamOptions) ? source.scopeParamOptions : []).forEach((option) => {
-      const paramId = normalizeString27((option == null ? void 0 : option.id) || (option == null ? void 0 : option.value));
-      if (!paramId) {
-        return;
-      }
-      const paramPath = normalizeString27(option == null ? void 0 : option.paramPath);
-      if (excludedParamIds.has(paramId)) {
-        for (const excludedPath of [paramPath, option == null ? void 0 : option.startParamPath, option == null ? void 0 : option.endParamPath].map(normalizeString27).filter(Boolean)) {
-          deleteNestedValue(contextPatch, excludedPath);
-        }
-        return;
-      }
-      const hasDatasetScopedValue = datasetScopeParamValues && Object.prototype.hasOwnProperty.call(datasetScopeParamValues, paramId);
-      let rawValue = hasDatasetScopedValue ? datasetScopeParamValues[paramId] : getScopeParamValue(state, paramId);
-      const kind = normalizeString27((option == null ? void 0 : option.kind) || "");
-      if (kind.toLowerCase() === "daterange") {
-        const startParamPath = normalizeString27(option == null ? void 0 : option.startParamPath);
-        const endParamPath = normalizeString27(option == null ? void 0 : option.endParamPath);
-        const startValue = normalizeString27(rawValue == null ? void 0 : rawValue.start) || normalizeString27(getNestedValue(primaryRequestContext, startParamPath));
-        const endValue = normalizeString27(rawValue == null ? void 0 : rawValue.end) || normalizeString27(getNestedValue(primaryRequestContext, endParamPath));
-        if (startValue && startParamPath) {
-          setNestedValue2(contextPatch, startParamPath, startValue);
-        }
-        if (endValue && endParamPath) {
-          setNestedValue2(contextPatch, endParamPath, endValue);
-        }
-        return;
-      }
-      if (rawValue == null || rawValue === "" || Array.isArray(rawValue) && rawValue.length === 0) {
-        rawValue = getNestedValue(primaryRequestContext, paramPath);
-      }
-      if (rawValue == null || rawValue === "" || Array.isArray(rawValue) && rawValue.length === 0) {
-        return;
-      }
-      if (!paramPath) {
-        return;
-      }
-      setNestedValue2(contextPatch, paramPath, cloneValue17(rawValue));
-    });
-    const localPatch = isPlainObject6(scopePolicy == null ? void 0 : scopePolicy.local) ? scopePolicy.local : {};
-    const relativeDateRangePatch = {};
-    const relativeDateRange = scopePolicy == null ? void 0 : scopePolicy.relativeDateRange;
-    const resolvedRelativeDateRange = resolveReportRelativeDateRangeSpec(relativeDateRange, /* @__PURE__ */ new Date(), primaryRequestContext);
-    if (resolvedRelativeDateRange) {
-      setNestedValue2(relativeDateRangePatch, relativeDateRange.startParamPath, resolvedRelativeDateRange.start);
-      setNestedValue2(relativeDateRangePatch, relativeDateRange.endParamPath, resolvedRelativeDateRange.end);
-    }
-    const resolvedLocalPatch = mergeReportDatasetRequestValues(localPatch, relativeDateRangePatch, { patchWins: true });
-    if (scopePolicy.mode === "append") {
-      return mergeReportDatasetRequestValues(
-        mergeReportDatasetRequestValues(request, resolvedLocalPatch, { patchWins: true }),
-        contextPatch,
-        { patchWins: true }
-      );
-    }
-    if (scopePolicy.mode === "override" || scopePolicy.mode === "exclude") {
-      return mergeReportDatasetRequestValues(
-        mergeReportDatasetRequestValues(request, contextPatch, { patchWins: true }),
-        resolvedLocalPatch,
-        { patchWins: true }
-      );
-    }
-    return mergeReportDatasetRequestValues(request, contextPatch, { patchWins: true });
-  }
-  function buildReportBuilderPublishedDatasetDeclarations(config = {}, state = {}, referencedDatasetRefs = /* @__PURE__ */ new Set(), runtimeDatasetScopeParams = null, primaryRequestContext = null) {
-    const sources = normalizeReportBuilderPublishedDataSources(config);
-    if (sources.length === 0) {
-      return [];
-    }
-    const sourceRefIndex = buildReportBuilderPublishedDatasetRefIndex(sources);
-    const resolvesByDataSourceRef = (source) => sourceRefIndex.get(source.dataSourceRef) === source;
-    return sources.filter((source) => referencedDatasetRefs.has(source.id) || referencedDatasetRefs.has(source.dataSourceRef) && resolvesByDataSourceRef(source)).map((source) => {
-      var _a5, _b, _c;
-      const matchedRef = referencedDatasetRefs.has(source.id) ? source.id : source.dataSourceRef;
-      const runtimeScopeParamsByRef = runtimeDatasetScopeParams && typeof runtimeDatasetScopeParams === "object" && !Array.isArray(runtimeDatasetScopeParams) ? runtimeDatasetScopeParams : null;
-      const scopedValues = runtimeScopeParamsByRef ? runtimeScopeParamsByRef[source.id] || (resolvesByDataSourceRef(source) ? runtimeScopeParamsByRef[source.dataSourceRef] : null) || null : null;
-      const sameDataSource = normalizeString27(source == null ? void 0 : source.dataSourceRef) && normalizeString27(source == null ? void 0 : source.dataSourceRef) === normalizeString27(primaryRequestContext == null ? void 0 : primaryRequestContext.dataSourceRef);
-      const inheritedRequestContext = {
-        ...isPlainObject6((_a5 = primaryRequestContext == null ? void 0 : primaryRequestContext.request) == null ? void 0 : _a5.options) ? { options: cloneValue17(primaryRequestContext.request.options) } : {},
-        ...sameDataSource ? {
-          ...isPlainObject6((_b = primaryRequestContext == null ? void 0 : primaryRequestContext.request) == null ? void 0 : _b.filters) ? { filters: cloneValue17(primaryRequestContext.request.filters) } : {},
-          ...Array.isArray((_c = primaryRequestContext == null ? void 0 : primaryRequestContext.request) == null ? void 0 : _c.refinements) ? { refinements: cloneValue17(primaryRequestContext.request.refinements) } : {}
-        } : {}
-      };
-      const request = buildReportBuilderPublishedDatasetRequest(
-        source,
-        state,
-        scopedValues,
-        inheritedRequestContext,
-        primaryRequestContext == null ? void 0 : primaryRequestContext.request
-      );
-      if (!request) {
-        return null;
-      }
-      return {
-        id: matchedRef,
-        dataSourceRef: source.dataSourceRef,
-        ...normalizeReportDatasetScope(source == null ? void 0 : source.scope) ? { scope: normalizeReportDatasetScope(source == null ? void 0 : source.scope) } : {},
-        ...isPlainObject6(source == null ? void 0 : source.source) ? { source: cloneValue17(source.source) } : {},
-        ...isPlainObject6(source == null ? void 0 : source.resultContract) ? { resultContract: cloneValue17(source.resultContract) } : {},
-        ...isPlainObject6(source == null ? void 0 : source.capabilities) ? { capabilities: cloneValue17(source.capabilities) } : {},
-        request
-      };
-    }).filter(Boolean);
-  }
-  function resolveReportBuilderChartSpecForReportSpec(config = {}, state = {}) {
-    const explicit = normalizeReportBuilderChartSpec(state == null ? void 0 : state.chartSpec);
-    if (explicit) {
-      return explicit;
-    }
-    if (normalizeString27(state == null ? void 0 : state.viewMode).toLowerCase() === "table") {
-      return null;
-    }
-    const defaults = buildReportBuilderDefaultChartSpecs(config, state);
-    if (defaults.length > 0) {
-      return normalizeReportBuilderChartSpec(defaults[0]);
-    }
-    return buildDefaultReportBuilderChartSpec(config, state);
-  }
-  function buildReportSpecChartBlock({
-    container = {},
-    config = {},
-    state = {},
-    chartSpec = null,
-    blockId = "primaryChart",
-    datasetRef = "primary",
-    title = "",
-    rowLimit = 0,
-    onChartValidation = null
-  } = {}) {
-    const normalizedChartSpec = normalizeReportBuilderChartSpec({
-      ...chartSpec && typeof chartSpec === "object" && !Array.isArray(chartSpec) ? chartSpec : {},
-      ...normalizeString27(title) ? { title: normalizeString27(title) } : {}
-    });
-    if (!normalizedChartSpec) {
-      onChartValidation == null ? void 0 : onChartValidation({
-        blockId: normalizeString27(blockId || "primaryChart"),
-        datasetRef: normalizeString27(datasetRef || "primary"),
-        chartSpec: null,
-        validation: { valid: false, errors: [{ field: "chartSpec", code: "missing" }] }
-      });
-      return null;
-    }
-    const chartFields = buildReportBuilderChartFields(config, state);
-    const validation = validateReportBuilderChartSpec(config, normalizedChartSpec, chartFields);
-    onChartValidation == null ? void 0 : onChartValidation({
-      blockId: normalizeString27(blockId || "primaryChart"),
-      datasetRef: normalizeString27(datasetRef || "primary"),
-      chartSpec: cloneValue17(normalizedChartSpec),
-      validation: cloneValue17(validation)
-    });
-    const dataSourceRef = resolveReportSpecDataSourceRef(container, config);
-    const chartContainer = buildExplicitReportBuilderChartContainer({
-      dataSourceRef,
-      collection: []
-    }, config, state, normalizedChartSpec);
-    const normalizedRowLimit = Math.trunc(Number(rowLimit) || 0);
-    return {
-      id: normalizeString27(blockId || "primaryChart"),
-      kind: "chartBlock",
-      datasetRef: normalizeString27(datasetRef || "primary"),
-      chartSpec: normalizedChartSpec,
-      chartModel: validation.valid ? cloneValue17((chartContainer == null ? void 0 : chartContainer.chart) || null) : null,
-      ...Number.isInteger(normalizedRowLimit) && normalizedRowLimit > 0 ? { rowLimit: normalizedRowLimit } : {}
-    };
-  }
-  function buildReportSpecCalculatedFields(config = {}, state = {}) {
-    const selectedMeasureIds = normalizeStringArray5(state == null ? void 0 : state.selectedMeasures);
-    if (selectedMeasureIds.length === 0) {
-      return [];
-    }
-    const availableDefinitions = normalizeReportCalculatedFields([
-      ...Array.isArray(config == null ? void 0 : config.calculatedFields) ? config.calculatedFields : [],
-      ...Array.isArray(config == null ? void 0 : config.computedMeasures) ? config.computedMeasures : [],
-      ...Array.isArray(config == null ? void 0 : config.tableCalculations) ? config.tableCalculations : []
-    ], {
-      datasetRef: "primary"
-    });
-    const definitionsById = new Map(
-      availableDefinitions.map((definition) => [normalizeString27((definition == null ? void 0 : definition.id) || (definition == null ? void 0 : definition.key)), definition]).filter(([id]) => !!id)
-    );
-    const visiting = /* @__PURE__ */ new Set();
-    const visited = /* @__PURE__ */ new Set();
-    const selectedDefinitions = [];
-    function visitDefinition(id) {
-      const normalizedId = normalizeString27(id);
-      if (!normalizedId || visited.has(normalizedId) || visiting.has(normalizedId)) {
-        return;
-      }
-      const definition = definitionsById.get(normalizedId);
-      if (!definition) {
-        return;
-      }
-      visiting.add(normalizedId);
-      normalizeStringArray5(definition == null ? void 0 : definition.dependencies).forEach((dependencyId) => {
-        visitDefinition(dependencyId);
-      });
-      visiting.delete(normalizedId);
-      visited.add(normalizedId);
-      selectedDefinitions.push(cloneValue17(definition));
-    }
-    selectedMeasureIds.forEach((measureId) => {
-      visitDefinition(measureId);
-    });
-    return selectedDefinitions;
-  }
-  function buildReportSpecDrillMetadata(config = {}, state = {}) {
-    var _a5, _b, _c;
-    const normalized = resolveReportBuilderDrillMetadata(config, (state == null ? void 0 : state.drillMetadata) || null);
-    if ((((_a5 = normalized == null ? void 0 : normalized.hierarchies) == null ? void 0 : _a5.length) || 0) === 0 && (((_b = normalized == null ? void 0 : normalized.detailTargets) == null ? void 0 : _b.length) || 0) === 0 && (((_c = normalized == null ? void 0 : normalized.fieldActions) == null ? void 0 : _c.length) || 0) === 0) {
-      return null;
-    }
-    return normalized;
-  }
-  function normalizeSemanticSummaryGovernance(governance = {}) {
-    if (!governance || typeof governance !== "object" || Array.isArray(governance)) {
-      return null;
-    }
-    const status = normalizeString27(governance.status).toLowerCase();
-    const certification = normalizeString27(governance.certification).toLowerCase();
-    const ownerRef = normalizeString27(governance.ownerRef);
-    const classification = normalizeString27(governance.classification);
-    const deprecation = normalizeString27(governance.deprecation);
-    const next = {};
-    if (status) {
-      next.status = status;
-    }
-    if (certification) {
-      next.certification = certification;
-    }
-    if (ownerRef) {
-      next.ownerRef = ownerRef;
-    }
-    if (classification) {
-      next.classification = classification;
-    }
-    if (deprecation) {
-      next.deprecation = deprecation;
-    }
-    return Object.keys(next).length > 0 ? next : null;
-  }
-  function normalizeSemanticSummaryField(field = {}) {
-    if (!field || typeof field !== "object" || Array.isArray(field)) {
-      return null;
-    }
-    const id = normalizeString27(field == null ? void 0 : field.id);
-    const label = normalizeString27((field == null ? void 0 : field.label) || id);
-    if (!id || !label) {
-      return null;
-    }
-    const rawId = normalizeString27(field == null ? void 0 : field.rawId);
-    const description = normalizeString27(field == null ? void 0 : field.description);
-    const format2 = normalizeString27(field == null ? void 0 : field.format);
-    const category = normalizeString27(field == null ? void 0 : field.category);
-    const definitionRef = normalizeString27(field == null ? void 0 : field.definitionRef);
-    const governance = normalizeSemanticSummaryGovernance(field == null ? void 0 : field.governance);
-    return {
-      id,
-      ...rawId ? { rawId } : {},
-      label,
-      ...description ? { description } : {},
-      ...format2 ? { format: format2 } : {},
-      ...category ? { category } : {},
-      ...definitionRef ? { definitionRef } : {},
-      ...governance ? { governance } : {}
-    };
-  }
-  function normalizeSemanticSummary(summary = {}) {
-    if (!summary || typeof summary !== "object" || Array.isArray(summary)) {
-      return null;
-    }
-    const kind = normalizeString27(summary.kind).toLowerCase();
-    if (kind !== "semantic") {
-      return null;
-    }
-    const modelRef = normalizeString27(summary.modelRef);
-    const entity = normalizeString27(summary.entity);
-    if (!modelRef || !entity) {
-      return null;
-    }
-    const selectedParameters = (Array.isArray(summary.selectedParameters) ? summary.selectedParameters : []).map((field) => normalizeSemanticSummaryField(field)).filter(Boolean);
-    return {
-      kind: "semantic",
-      modelRef,
-      ...normalizeString27(summary.modelLabel) ? { modelLabel: normalizeString27(summary.modelLabel) } : {},
-      ...normalizeString27(summary.modelDescription) ? { modelDescription: normalizeString27(summary.modelDescription) } : {},
-      entity,
-      ...normalizeString27(summary.entityLabel) ? { entityLabel: normalizeString27(summary.entityLabel) } : {},
-      ...normalizeString27(summary.entityDescription) ? { entityDescription: normalizeString27(summary.entityDescription) } : {},
-      selectedDimensions: (Array.isArray(summary.selectedDimensions) ? summary.selectedDimensions : []).map((field) => normalizeSemanticSummaryField(field)).filter(Boolean),
-      selectedMeasures: (Array.isArray(summary.selectedMeasures) ? summary.selectedMeasures : []).map((field) => normalizeSemanticSummaryField(field)).filter(Boolean),
-      ...selectedParameters.length > 0 ? { selectedParameters } : {}
-    };
-  }
-  function buildReportBuilderReportSpec({
-    container = {},
-    config = {},
-    state = {},
-    refinements = [],
-    semanticSummary = null,
-    includePrimaryBlocks = true,
-    onChartValidation = null
-  } = {}) {
-    var _a5;
-    const normalizedState = sanitizeReportBuilderState(config, state);
-    const effectiveConfig = buildReportBuilderCalculatedFieldConfig(config, normalizedState);
-    const request = buildReportBuilderRequest(config, normalizedState);
-    const normalizedRefinements = normalizeReportRefinements(refinements);
-    if (Array.isArray((_a5 = request == null ? void 0 : request.semanticSelection) == null ? void 0 : _a5.refinements)) {
-      request.semanticSelection.refinements = cloneValue17(normalizedRefinements);
-    }
-    if (normalizedRefinements.length > 0) {
-      request.refinements = cloneValue17(normalizedRefinements);
-    }
-    const tableColumns = buildReportSpecColumns(buildReportBuilderColumns(effectiveConfig, normalizedState));
-    const chartSpec = resolveReportBuilderChartSpecForReportSpec(effectiveConfig, normalizedState);
-    const calculatedFields = buildReportSpecCalculatedFields(effectiveConfig, normalizedState);
-    const drillMetadata = buildReportSpecDrillMetadata(effectiveConfig, normalizedState);
-    const normalizedSemanticSummary = normalizeSemanticSummary(semanticSummary);
-    const scopeParams = buildReportBuilderScopeParams(effectiveConfig, normalizedState);
-    const contextPreset = resolveReportScopeContextPresetFromState(normalizedState, scopeParams);
-    const referencedDatasetRefs = new Set(
-      (Array.isArray(normalizedState == null ? void 0 : normalizedState.reportDocumentBlocks) ? normalizedState.reportDocumentBlocks : []).flatMap((block) => [normalizeString27(block == null ? void 0 : block.datasetRef), normalizeString27(block == null ? void 0 : block.secondaryDatasetRef)]).filter((datasetRef) => !!datasetRef && datasetRef !== "primary")
-    );
-    const authoredDatasetBackedBlocks = (Array.isArray(normalizedState == null ? void 0 : normalizedState.reportDocumentBlocks) ? normalizedState.reportDocumentBlocks : []).filter((block) => isReportDatasetBackedBlockKind(block == null ? void 0 : block.kind));
-    const primaryDataSourceRef = resolveReportSpecDataSourceRef(container, config);
-    const publishedDatasets = buildReportBuilderPublishedDatasetDeclarations(
-      effectiveConfig,
-      normalizedState,
-      referencedDatasetRefs,
-      null,
-      {
-        dataSourceRef: primaryDataSourceRef,
-        request
-      }
-    );
-    const staticDatasets = buildReportBuilderStaticDatasetDeclarations(normalizedState == null ? void 0 : normalizedState.reportStaticDatasets);
-    const explicitDatasetRefs = authoredDatasetBackedBlocks.map((block) => normalizeString27(block == null ? void 0 : block.datasetRef)).filter(Boolean);
-    const shouldIncludePrimaryDataset = shouldKeepPrimaryDataset({
-      includePrimaryBlocks,
-      datasetBackedBlockDatasetRefs: explicitDatasetRefs.length === authoredDatasetBackedBlocks.length ? explicitDatasetRefs : [],
-      availableNonPrimaryDatasetRefs: [
-        ...publishedDatasets.map((dataset) => normalizeString27(dataset == null ? void 0 : dataset.id)),
-        ...staticDatasets.map((dataset) => normalizeString27(dataset == null ? void 0 : dataset.id))
-      ]
-    });
-    const chartBlock = chartSpec ? buildReportSpecChartBlock({
-      container,
-      config: effectiveConfig,
-      state: normalizedState,
-      chartSpec,
-      onChartValidation: includePrimaryBlocks ? onChartValidation : null
-    }) : null;
-    const blocks = includePrimaryBlocks ? [
-      {
-        id: "primaryTable",
-        kind: "tableBlock",
-        datasetRef: "primary",
-        columns: tableColumns,
-        ...(config == null ? void 0 : config.tablePresentation) && typeof config.tablePresentation === "object" ? cloneValue17(config.tablePresentation) : {}
-      },
-      ...chartBlock ? [chartBlock] : []
-    ] : [];
-    return {
-      version: 1,
-      kind: "reportSpec",
-      source: {
-        kind: "dashboard.reportBuilder",
-        containerId: resolveContainerIdentity(container),
-        stateKey: normalizeString27((container == null ? void 0 : container.stateKey) || resolveContainerIdentity(container)),
-        dataSourceRef: primaryDataSourceRef
-      },
-      title: resolveReportSpecTitle(container, config),
-      ...(normalizedState == null ? void 0 : normalizedState.binding) ? { binding: cloneValue17(normalizedState.binding) } : {},
-      ...normalizedSemanticSummary ? { semanticSummary: cloneValue17(normalizedSemanticSummary) } : {},
-      parameters: {
-        viewMode: normalizeString27((normalizedState == null ? void 0 : normalizedState.viewMode) || "table"),
-        groupBy: normalizeString27(normalizedState == null ? void 0 : normalizedState.groupBy),
-        pageSize: Math.max(1, Number((normalizedState == null ? void 0 : normalizedState.pageSize) || 0) || 0) || 50,
-        orderField: normalizeString27(normalizedState == null ? void 0 : normalizedState.orderField),
-        orderDir: normalizeString27((normalizedState == null ? void 0 : normalizedState.orderDir) || "desc")
-      },
-      layoutIntent: {
-        kind: "single",
-        resultPanePosition: getReportBuilderResultPanePosition(config),
-        blockOrder: blocks.map((block) => block.id)
-      },
-      ...drillMetadata ? { drillMetadata: cloneValue17(drillMetadata) } : {},
-      refinements: normalizedRefinements,
-      calculatedFields,
-      scope: {
-        ...contextPreset ? { contextPreset: cloneValue17(contextPreset) } : {},
-        params: scopeParams,
-        dataSourceRef: primaryDataSourceRef
-      },
-      datasets: [
-        ...shouldIncludePrimaryDataset ? [{
-          id: "primary",
-          dataSourceRef: primaryDataSourceRef,
-          ...normalizeReportDatasetScope(config == null ? void 0 : config.scope) ? { scope: normalizeReportDatasetScope(config == null ? void 0 : config.scope) } : {},
-          ...isPlainObject6(config == null ? void 0 : config.source) ? { source: cloneValue17(config.source) } : {},
-          ...isPlainObject6(config == null ? void 0 : config.resultContract) ? { resultContract: cloneValue17(config.resultContract) } : {},
-          ...isPlainObject6(config == null ? void 0 : config.capabilities) ? { capabilities: cloneValue17(config.capabilities) } : {},
-          request: cloneValue17(request)
-        }] : [],
-        ...publishedDatasets,
-        ...staticDatasets
-      ],
-      blocks
-    };
-  }
-
-  // src/reporting/refinementBarModel.js
-  function normalizeString28(value = "") {
-    return String(value || "").trim();
-  }
-  function normalizeRefinementBarText(value, defaultValue = null) {
-    if (value == null) {
-      return defaultValue;
-    }
-    return normalizeString28(value);
-  }
-  var SUPPORTED_REFINEMENT_BAR_ACTIONS = /* @__PURE__ */ new Set(["remove", "clearAll", "undo", "redo"]);
-  function normalizeRefinementBarActionKinds(actionKinds, {
-    defaultActionKinds = null
-  } = {}) {
-    const source = Array.isArray(actionKinds) ? actionKinds : defaultActionKinds;
-    if (!Array.isArray(source)) {
-      return null;
-    }
-    const next = [];
-    const seen = /* @__PURE__ */ new Set();
-    source.forEach((entry) => {
-      const normalized = normalizeString28(entry);
-      if (!SUPPORTED_REFINEMENT_BAR_ACTIONS.has(normalized) || seen.has(normalized)) {
-        return;
-      }
-      seen.add(normalized);
-      next.push(normalized);
-    });
-    return next;
-  }
-
-  // src/reporting/reportDocumentModel.js
-  function normalizeString29(value = "") {
-    return String(value || "").trim();
-  }
-  function isTruncatedPlaceholder2(value = "") {
-    return normalizeString29(value) === "[MaxDepth]";
-  }
-  function resolveContainerIdentity2(container = {}) {
-    return normalizeString29(
-      (container == null ? void 0 : container.id) || (container == null ? void 0 : container.stateKey) || (container == null ? void 0 : container.windowKey) || (container == null ? void 0 : container.windowId)
-    );
-  }
-  function normalizeFilterBarTitle(value = "") {
-    const normalized = normalizeString29(value);
-    const lowered = normalized.toLowerCase();
-    if (!normalized || lowered === "scope" || lowered === "report scope") {
-      return "Filters";
-    }
-    return normalized;
-  }
-  function cloneValue18(value) {
-    return value == null ? value : JSON.parse(JSON.stringify(value));
-  }
-  function normalizeStringArray6(values = []) {
-    return (Array.isArray(values) ? values : []).map((value) => normalizeString29(value)).filter(Boolean);
-  }
-  function normalizeReportDocumentTheme(theme = null) {
-    const source = theme && typeof theme === "object" && !Array.isArray(theme) ? theme : {};
-    const accentTone = normalizeString29((source == null ? void 0 : source.accentTone) || (source == null ? void 0 : source.accent) || "").toLowerCase();
-    const badgePalette = normalizeString29((source == null ? void 0 : source.badgePalette) || "").toLowerCase();
-    const next = {
-      ...["blue", "green", "amber", "rose", "slate"].includes(accentTone) ? { accentTone } : {},
-      ...["soft", "bold"].includes(badgePalette) ? { badgePalette } : {}
-    };
-    return Object.keys(next).length > 0 ? next : null;
-  }
-  function normalizeGeoFormat2(value = "") {
-    const normalized = normalizeString29(value);
-    if (normalized === "compactNumber") {
-      return "compact";
-    }
-    return normalized;
-  }
-  function buildLayoutItem(blockId = "", source = null) {
-    return buildReportLayoutItem(blockId, source, {
-      preserveLegacyHalf: true
-    });
-  }
-  function isPlainObject7(value) {
-    return !!value && typeof value === "object" && !Array.isArray(value);
-  }
-  function setNestedValue3(target, path, value) {
-    const segments = String(path || "").split(".").map((segment) => segment.trim()).filter(Boolean);
-    if (!target || typeof target !== "object" || Array.isArray(target) || segments.length === 0) {
-      return;
-    }
-    let cursor = target;
-    for (let index = 0; index < segments.length - 1; index += 1) {
-      const segment = segments[index];
-      if (!cursor[segment] || typeof cursor[segment] !== "object" || Array.isArray(cursor[segment])) {
-        cursor[segment] = {};
-      }
-      cursor = cursor[segment];
-    }
-    cursor[segments[segments.length - 1]] = value;
-  }
-  function buildReportBuilderFieldLookup(entries = []) {
-    const result = /* @__PURE__ */ new Map();
-    (Array.isArray(entries) ? entries : []).forEach((entry) => {
-      const normalizedEntry = entry && typeof entry === "object" && !Array.isArray(entry) ? entry : null;
-      if (!normalizedEntry) {
-        return;
-      }
-      const aliases2 = [
-        normalizeString29(normalizedEntry == null ? void 0 : normalizedEntry.id),
-        normalizeString29(normalizedEntry == null ? void 0 : normalizedEntry.key),
-        normalizeString29(normalizedEntry == null ? void 0 : normalizedEntry.chartKey),
-        normalizeString29(normalizedEntry == null ? void 0 : normalizedEntry.displayKey),
-        normalizeString29(normalizedEntry == null ? void 0 : normalizedEntry.displayPath)
-      ].filter(Boolean);
-      aliases2.forEach((alias) => {
-        if (!result.has(alias)) {
-          result.set(alias, normalizedEntry);
-        }
-      });
-    });
-    return result;
-  }
-  function resolveReportBuilderFieldId(entry = {}) {
-    return normalizeString29((entry == null ? void 0 : entry.id) || (entry == null ? void 0 : entry.key));
-  }
-  function buildReportBuilderFieldCatalog(config = {}) {
-    const lookup = /* @__PURE__ */ new Map();
-    const addEntries = (entries = [], kind = "") => {
-      buildReportBuilderFieldLookup(entries).forEach((entry, alias) => {
-        if (!lookup.has(alias)) {
-          lookup.set(alias, { kind, entry });
-        }
-      });
-    };
-    addEntries(config == null ? void 0 : config.dimensions, "dimension");
-    addEntries(config == null ? void 0 : config.measures, "measure");
-    addEntries(
-      normalizeReportCalculatedFields([
-        ...Array.isArray(config == null ? void 0 : config.calculatedFields) ? config.calculatedFields : [],
-        ...Array.isArray(config == null ? void 0 : config.computedMeasures) ? config.computedMeasures : [],
-        ...Array.isArray(config == null ? void 0 : config.tableCalculations) ? config.tableCalculations : []
-      ], {
-        datasetRef: "primary"
-      }),
-      "calculated"
-    );
-    return { lookup };
-  }
-  function resolveReportBuilderCatalogEntry(fieldCatalog = {}, fieldKey = "") {
-    const normalizedFieldKey = normalizeString29(fieldKey);
-    if (!normalizedFieldKey) {
-      return null;
-    }
-    return (fieldCatalog == null ? void 0 : fieldCatalog.lookup) instanceof Map ? fieldCatalog.lookup.get(normalizedFieldKey) || null : null;
-  }
-  function buildAuthoredChartBlockState(baseState = {}, chartSpec = {}, fieldCatalog = {}) {
-    const nextState = cloneValue18(isPlainObject7(baseState) ? baseState : {});
-    const selectedMeasures = normalizeStringArray6(nextState == null ? void 0 : nextState.selectedMeasures);
-    const selectedDimensions = normalizeStringArray6(nextState == null ? void 0 : nextState.selectedDimensions);
-    const addSelection = (fieldKey = "") => {
-      const catalogEntry = resolveReportBuilderCatalogEntry(fieldCatalog, fieldKey);
-      const fieldId = resolveReportBuilderFieldId(catalogEntry == null ? void 0 : catalogEntry.entry);
-      if (!catalogEntry || !fieldId) {
-        return;
-      }
-      if (catalogEntry.kind === "dimension") {
-        if (!selectedDimensions.includes(fieldId)) {
-          selectedDimensions.push(fieldId);
-        }
-        return;
-      }
-      if (!selectedMeasures.includes(fieldId)) {
-        selectedMeasures.push(fieldId);
-      }
-    };
-    addSelection(chartSpec == null ? void 0 : chartSpec.xField);
-    addSelection(chartSpec == null ? void 0 : chartSpec.seriesField);
-    normalizeStringArray6(chartSpec == null ? void 0 : chartSpec.yFields).forEach((fieldKey) => addSelection(fieldKey));
-    nextState.selectedMeasures = selectedMeasures;
-    nextState.selectedDimensions = selectedDimensions;
-    return nextState;
-  }
-  function buildAuthoredTableBlock(block = {}, fieldCatalog = {}) {
-    const normalizedBlock = block && typeof block === "object" && !Array.isArray(block) ? cloneValue18(block) : null;
-    if (!normalizedBlock) {
-      return null;
-    }
-    const columns = Array.isArray(normalizedBlock == null ? void 0 : normalizedBlock.columns) ? normalizedBlock.columns : [];
-    normalizedBlock.columns = columns.map((column) => {
-      var _a5, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
-      const normalizedColumn = column && typeof column === "object" && !Array.isArray(column) ? cloneValue18(column) : null;
-      if (!normalizedColumn) {
-        return column;
-      }
-      const linkField = normalizeString29(((_a5 = normalizedColumn == null ? void 0 : normalizedColumn.link) == null ? void 0 : _a5.urlField) || ((_b = normalizedColumn == null ? void 0 : normalizedColumn.link) == null ? void 0 : _b.idField));
-      const hasValidLinkField = !linkField || !!resolveReportBuilderCatalogEntry(fieldCatalog, linkField);
-      if (!hasValidLinkField) {
-        delete normalizedColumn.link;
-      }
-      const catalogEntry = resolveReportBuilderCatalogEntry(fieldCatalog, normalizedColumn == null ? void 0 : normalizedColumn.key);
-      const fieldId = resolveReportBuilderFieldId(catalogEntry == null ? void 0 : catalogEntry.entry);
-      if (!catalogEntry || !fieldId) {
-        return normalizedColumn;
-      }
-      const sourceKey = normalizeString29(((_c = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _c.key) || ((_d = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _d.id) || fieldId) || fieldId;
-      const displayKey = normalizeString29(((_e = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _e.displayKey) || ((_f = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _f.displayPath) || sourceKey) || sourceKey;
-      return {
-        ...normalizedColumn,
-        sourceKey,
-        displayKey,
-        ...(normalizedColumn == null ? void 0 : normalizedColumn.displayValueMap) || ((_g = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _g.displayValueMap) ? { displayValueMap: cloneValue18((normalizedColumn == null ? void 0 : normalizedColumn.displayValueMap) || ((_h = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _h.displayValueMap)) } : {},
-        ...(normalizedColumn == null ? void 0 : normalizedColumn.displayIconMap) || ((_i = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _i.displayIconMap) ? { displayIconMap: cloneValue18((normalizedColumn == null ? void 0 : normalizedColumn.displayIconMap) || ((_j = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _j.displayIconMap)) } : {},
-        ...normalizeString29((normalizedColumn == null ? void 0 : normalizedColumn.label) || ((_k = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _k.label) || fieldId) ? { label: normalizeString29((normalizedColumn == null ? void 0 : normalizedColumn.label) || ((_l = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _l.label) || fieldId) } : {},
-        ...normalizeString29((normalizedColumn == null ? void 0 : normalizedColumn.format) || ((_m = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _m.format)) ? { format: normalizeString29((normalizedColumn == null ? void 0 : normalizedColumn.format) || ((_n = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _n.format)) } : {},
-        ...catalogEntry.kind === "dimension" && ((_o = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _o.runtimeFilter) && typeof catalogEntry.entry.runtimeFilter === "object" && !Array.isArray(catalogEntry.entry.runtimeFilter) ? { runtimeFilterable: true } : {}
-      };
-    });
-    return normalizedBlock;
-  }
-  function buildAuthoredKpiBlock(block = {}, fieldCatalog = {}) {
-    var _a5, _b, _c, _d, _e, _f, _g, _h;
-    const normalizedBlock = buildReportDocumentKpiBlock(block);
-    if (!normalizedBlock) {
-      return normalizedBlock;
-    }
-    const valueFieldEntry = resolveReportBuilderCatalogEntry(fieldCatalog, normalizedBlock == null ? void 0 : normalizedBlock.valueField);
-    const secondaryFieldEntry = resolveReportBuilderCatalogEntry(fieldCatalog, normalizedBlock == null ? void 0 : normalizedBlock.secondaryField);
-    const nextBlock = {
-      ...normalizedBlock
-    };
-    if (!normalizeString29(nextBlock == null ? void 0 : nextBlock.valueLabel)) {
-      const valueFieldId = resolveReportBuilderFieldId(valueFieldEntry == null ? void 0 : valueFieldEntry.entry);
-      const valueLabel = normalizeString29(((_a5 = valueFieldEntry == null ? void 0 : valueFieldEntry.entry) == null ? void 0 : _a5.label) || valueFieldId);
-      if (valueLabel) {
-        nextBlock.valueLabel = valueLabel;
-      }
-    }
-    if (!normalizeString29(nextBlock == null ? void 0 : nextBlock.valueFormat) && normalizeString29((_b = valueFieldEntry == null ? void 0 : valueFieldEntry.entry) == null ? void 0 : _b.format)) {
-      nextBlock.valueFormat = normalizeString29(valueFieldEntry.entry.format);
-    }
-    if (normalizeString29(nextBlock == null ? void 0 : nextBlock.secondaryField) && (secondaryFieldEntry == null ? void 0 : secondaryFieldEntry.entry)) {
-      const secondaryFieldId = resolveReportBuilderFieldId(secondaryFieldEntry.entry);
-      const secondaryDisplayKey = normalizeString29(
-        (nextBlock == null ? void 0 : nextBlock.secondaryDisplayKey) || ((_c = secondaryFieldEntry == null ? void 0 : secondaryFieldEntry.entry) == null ? void 0 : _c.displayKey) || ((_d = secondaryFieldEntry == null ? void 0 : secondaryFieldEntry.entry) == null ? void 0 : _d.displayPath) || ((_e = secondaryFieldEntry == null ? void 0 : secondaryFieldEntry.entry) == null ? void 0 : _e.key) || secondaryFieldId
-      );
-      const secondaryDisplayValueMap = !(nextBlock == null ? void 0 : nextBlock.secondaryDisplayValueMap) && ((_f = secondaryFieldEntry == null ? void 0 : secondaryFieldEntry.entry) == null ? void 0 : _f.displayValueMap) && typeof secondaryFieldEntry.entry.displayValueMap === "object" && !Array.isArray(secondaryFieldEntry.entry.displayValueMap) ? cloneValue18(secondaryFieldEntry.entry.displayValueMap) : null;
-      if (secondaryDisplayKey && (secondaryDisplayKey !== normalizeString29(nextBlock == null ? void 0 : nextBlock.secondaryField) || secondaryDisplayValueMap)) {
-        nextBlock.secondaryDisplayKey = secondaryDisplayKey;
-      }
-      if (secondaryDisplayValueMap) {
-        nextBlock.secondaryDisplayValueMap = secondaryDisplayValueMap;
-      }
-      if (!normalizeString29(nextBlock == null ? void 0 : nextBlock.secondaryLabel)) {
-        const secondaryLabel = normalizeString29(((_g = secondaryFieldEntry == null ? void 0 : secondaryFieldEntry.entry) == null ? void 0 : _g.label) || secondaryFieldId);
-        if (secondaryLabel) {
-          nextBlock.secondaryLabel = secondaryLabel;
-        }
-      }
-      if (!normalizeString29(nextBlock == null ? void 0 : nextBlock.secondaryFormat) && normalizeString29((_h = secondaryFieldEntry == null ? void 0 : secondaryFieldEntry.entry) == null ? void 0 : _h.format)) {
-        nextBlock.secondaryFormat = normalizeString29(secondaryFieldEntry.entry.format);
-      }
-    }
-    return nextBlock;
-  }
-  function resolveAuthoredFieldDisplayDescriptor(fieldCatalog = {}, field = "") {
-    const catalogEntry = resolveReportBuilderCatalogEntry(fieldCatalog, field);
-    const fieldId = resolveReportBuilderFieldId(catalogEntry == null ? void 0 : catalogEntry.entry);
-    if (!(catalogEntry == null ? void 0 : catalogEntry.entry) || !fieldId) {
-      return null;
-    }
-    const sourceKey = normalizeString29(catalogEntry.entry.key || catalogEntry.entry.id || fieldId) || fieldId;
-    const displayKey = normalizeString29(
-      catalogEntry.entry.displayKey || catalogEntry.entry.displayPath || sourceKey
-    ) || sourceKey;
-    const displayValueMap = catalogEntry.entry.displayValueMap && typeof catalogEntry.entry.displayValueMap === "object" && !Array.isArray(catalogEntry.entry.displayValueMap) ? cloneValue18(catalogEntry.entry.displayValueMap) : null;
-    if (displayKey === sourceKey && !displayValueMap) {
-      return null;
-    }
-    return {
-      sourceKey,
-      ...displayKey !== sourceKey ? { displayKey } : {},
-      ...displayValueMap ? { displayValueMap } : {}
-    };
-  }
-  function buildAuthoredTemplateFieldDisplayMap(template = "", fieldCatalog = {}) {
-    const mappings = {};
-    const matches = String(template || "").matchAll(/\brow\.([A-Za-z_][A-Za-z0-9_.]*)/g);
-    for (const match2 of matches) {
-      const field = normalizeString29(match2 == null ? void 0 : match2[1]);
-      const descriptor = resolveAuthoredFieldDisplayDescriptor(fieldCatalog, field);
-      if (field && descriptor) {
-        mappings[field] = descriptor;
-      }
-    }
-    return Object.keys(mappings).length > 0 ? mappings : null;
-  }
-  function buildAuthoredMarkdownBlock(block = {}, fieldCatalog = {}) {
-    const normalizedBlock = buildReportDocumentMarkdownBlock(block);
-    const templateFieldDisplayMap = buildAuthoredTemplateFieldDisplayMap(normalizedBlock == null ? void 0 : normalizedBlock.markdown, fieldCatalog);
-    return {
-      ...normalizedBlock,
-      ...templateFieldDisplayMap ? { templateFieldDisplayMap } : {}
-    };
-  }
-  function buildAuthoredCollectionBlock(block = {}, fieldCatalog = {}) {
-    const normalizedBlock = buildReportDocumentCollectionBlock(block);
-    const itemTitleDisplay = resolveAuthoredFieldDisplayDescriptor(fieldCatalog, normalizedBlock == null ? void 0 : normalizedBlock.itemTitleField);
-    const secondaryDisplay = resolveAuthoredFieldDisplayDescriptor(fieldCatalog, normalizedBlock == null ? void 0 : normalizedBlock.secondaryField);
-    const templateFieldDisplayMap = buildAuthoredTemplateFieldDisplayMap(normalizedBlock == null ? void 0 : normalizedBlock.bodyTemplate, fieldCatalog);
-    return {
-      ...normalizedBlock,
-      ...(itemTitleDisplay == null ? void 0 : itemTitleDisplay.displayKey) ? { itemTitleDisplayKey: itemTitleDisplay.displayKey } : {},
-      ...(itemTitleDisplay == null ? void 0 : itemTitleDisplay.displayValueMap) ? { itemTitleDisplayValueMap: itemTitleDisplay.displayValueMap } : {},
-      ...(secondaryDisplay == null ? void 0 : secondaryDisplay.displayKey) ? { secondaryDisplayKey: secondaryDisplay.displayKey } : {},
-      ...(secondaryDisplay == null ? void 0 : secondaryDisplay.displayValueMap) ? { secondaryDisplayValueMap: secondaryDisplay.displayValueMap } : {},
-      ...templateFieldDisplayMap ? { templateFieldDisplayMap } : {}
-    };
-  }
-  function buildAuthoredBadgesBlock(block = {}, fieldCatalog = {}) {
-    const normalizedBlock = buildReportDocumentBadgesBlock(block);
-    if (!normalizedBlock) {
-      return normalizedBlock;
-    }
-    normalizedBlock.items = (Array.isArray(normalizedBlock == null ? void 0 : normalizedBlock.items) ? normalizedBlock.items : []).map((item) => {
-      var _a5, _b, _c, _d, _e, _f;
-      const normalizedItem = item && typeof item === "object" && !Array.isArray(item) ? cloneValue18(item) : null;
-      if (!normalizedItem) {
-        return item;
-      }
-      const valueFieldEntry = resolveReportBuilderCatalogEntry(fieldCatalog, normalizedItem == null ? void 0 : normalizedItem.valueField);
-      const valueFieldId = resolveReportBuilderFieldId(valueFieldEntry == null ? void 0 : valueFieldEntry.entry);
-      if (!normalizeString29(normalizedItem == null ? void 0 : normalizedItem.valueField) || !(valueFieldEntry == null ? void 0 : valueFieldEntry.entry) || !valueFieldId) {
-        return normalizedItem;
-      }
-      const displayKey = normalizeString29(
-        (normalizedItem == null ? void 0 : normalizedItem.displayKey) || ((_a5 = valueFieldEntry == null ? void 0 : valueFieldEntry.entry) == null ? void 0 : _a5.displayKey) || ((_b = valueFieldEntry == null ? void 0 : valueFieldEntry.entry) == null ? void 0 : _b.displayPath) || ((_c = valueFieldEntry == null ? void 0 : valueFieldEntry.entry) == null ? void 0 : _c.key) || valueFieldId
-      );
-      if (displayKey && displayKey !== normalizeString29(normalizedItem == null ? void 0 : normalizedItem.valueField)) {
-        normalizedItem.displayKey = displayKey;
-      }
-      if (!(normalizedItem == null ? void 0 : normalizedItem.displayValueMap) && ((_d = valueFieldEntry == null ? void 0 : valueFieldEntry.entry) == null ? void 0 : _d.displayValueMap) && typeof valueFieldEntry.entry.displayValueMap === "object" && !Array.isArray(valueFieldEntry.entry.displayValueMap)) {
-        normalizedItem.displayValueMap = cloneValue18(valueFieldEntry.entry.displayValueMap);
-      }
-      if (!normalizeString29(normalizedItem == null ? void 0 : normalizedItem.format) && normalizeString29((_e = valueFieldEntry == null ? void 0 : valueFieldEntry.entry) == null ? void 0 : _e.format)) {
-        normalizedItem.format = normalizeString29(valueFieldEntry.entry.format);
-      }
-      if (!normalizeString29(normalizedItem == null ? void 0 : normalizedItem.label)) {
-        const label = normalizeString29(((_f = valueFieldEntry == null ? void 0 : valueFieldEntry.entry) == null ? void 0 : _f.label) || valueFieldId);
-        if (label) {
-          normalizedItem.label = label;
-        }
-      }
-      return normalizedItem;
-    });
-    return normalizedBlock;
-  }
-  function buildStaticDatasetReportBuilderConfig(baseConfig = {}, dataset = null) {
-    var _a5;
-    const normalizedDataset = dataset && typeof dataset === "object" && !Array.isArray(dataset) ? dataset : null;
-    if (!normalizedDataset) {
-      return baseConfig;
-    }
-    const columnOptions = Array.isArray(normalizedDataset == null ? void 0 : normalizedDataset.columnOptions) ? normalizedDataset.columnOptions : [];
-    const inheritRuntimeFieldCatalog = ((_a5 = normalizedDataset == null ? void 0 : normalizedDataset.capabilities) == null ? void 0 : _a5.inheritRuntimeFieldCatalog) === true && columnOptions.length === 0;
-    const dimensions = inheritRuntimeFieldCatalog ? cloneValue18((baseConfig == null ? void 0 : baseConfig.dimensions) || []) : columnOptions.filter((column) => normalizeString29(column == null ? void 0 : column.kind) === "dimension").map((column) => ({
-      id: normalizeString29(column == null ? void 0 : column.key),
-      key: normalizeString29(column == null ? void 0 : column.key),
-      label: normalizeString29((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
-      ...normalizeString29(column == null ? void 0 : column.format) ? { format: normalizeString29(column.format) } : {},
-      ...(column == null ? void 0 : column.rowIdentity) === true ? { rowIdentity: true } : {}
-    })).filter((entry) => entry.id && entry.key && entry.label);
-    const measures = inheritRuntimeFieldCatalog ? cloneValue18((baseConfig == null ? void 0 : baseConfig.measures) || []) : columnOptions.filter((column) => normalizeString29(column == null ? void 0 : column.kind) === "measure").map((column) => ({
-      id: normalizeString29(column == null ? void 0 : column.key),
-      key: normalizeString29(column == null ? void 0 : column.key),
-      label: normalizeString29((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
-      ...normalizeString29(column == null ? void 0 : column.format) ? { format: normalizeString29(column.format) } : {},
-      ...(column == null ? void 0 : column.rowIdentity) === true ? { rowIdentity: true } : {}
-    })).filter((entry) => entry.id && entry.key && entry.label);
-    return {
-      ...isPlainObject7(baseConfig) ? cloneValue18(baseConfig) : {},
-      dataSourceRef: normalizeString29((normalizedDataset == null ? void 0 : normalizedDataset.dataSourceRef) || (baseConfig == null ? void 0 : baseConfig.dataSourceRef)),
-      dimensions,
-      measures
-    };
-  }
-  function augmentReportRequestForAuthoredBlocks(baseSpec = {}, blocks = [], config = {}) {
-    const datasets = Array.isArray(baseSpec == null ? void 0 : baseSpec.datasets) ? baseSpec.datasets : [];
-    if (datasets.length === 0) {
-      return baseSpec;
-    }
-    const nextSpec = cloneValue18(baseSpec);
-    const fieldCatalog = buildReportBuilderFieldCatalog(config);
-    const datasetFieldCatalogs = new Map(normalizeReportBuilderPublishedDataSources(config).map((source) => [
-      source.id,
-      buildReportBuilderFieldCatalog(buildReportBuilderPublishedDatasetConfig(config, source, { borrowBase: true }))
-    ]));
-    const calculatedFields = Array.isArray(nextSpec == null ? void 0 : nextSpec.calculatedFields) ? nextSpec.calculatedFields : [];
-    nextSpec.calculatedFields = calculatedFields;
-    const calculatedFieldIds = new Set(
-      calculatedFields.map((field) => {
-        const fieldId = resolveReportBuilderFieldId(field);
-        return fieldId ? `${normalizeString29((field == null ? void 0 : field.datasetRef) || "primary") || "primary"}:${fieldId}` : "";
-      }).filter(Boolean)
-    );
-    const visitingCalculatedFields = /* @__PURE__ */ new Set();
-    const enableField = (fieldKey = "", datasetRef = "primary", request = null) => {
-      var _a5;
-      const normalizedDatasetRef = normalizeString29(datasetRef || "primary") || "primary";
-      if (!request || typeof request !== "object" || Array.isArray(request)) {
-        return false;
-      }
-      const catalogEntry = resolveReportBuilderCatalogEntry(datasetFieldCatalogs.get(normalizedDatasetRef) || fieldCatalog, fieldKey);
-      if (!catalogEntry) {
-        return false;
-      }
-      if (catalogEntry.kind === "calculated") {
-        const calculatedField = catalogEntry.entry;
-        const calculatedFieldId = resolveReportBuilderFieldId(calculatedField);
-        if (!calculatedFieldId) {
-          return false;
-        }
-        const calculatedFieldKey = `${normalizedDatasetRef}:${calculatedFieldId}`;
-        if (!calculatedFieldIds.has(calculatedFieldKey)) {
-          nextSpec.calculatedFields.push({
-            ...cloneValue18(calculatedField),
-            datasetRef: normalizedDatasetRef
-          });
-          calculatedFieldIds.add(calculatedFieldKey);
-        }
-        if (visitingCalculatedFields.has(calculatedFieldKey)) {
-          return true;
-        }
-        visitingCalculatedFields.add(calculatedFieldKey);
-        normalizeStringArray6(calculatedField == null ? void 0 : calculatedField.dependencies).forEach((dependencyKey) => enableField(dependencyKey, normalizedDatasetRef, request));
-        visitingCalculatedFields.delete(calculatedFieldKey);
-        return true;
-      }
-      setNestedValue3(
-        request,
-        normalizeString29(
-          ((_a5 = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _a5.paramPath) || `${catalogEntry.kind === "measure" ? "measures" : "dimensions"}.${resolveReportBuilderFieldId(catalogEntry == null ? void 0 : catalogEntry.entry) || normalizeString29(fieldKey)}`
-        ),
-        true
-      );
-      return true;
-    };
-    (Array.isArray(blocks) ? blocks : []).forEach((block) => {
-      var _a5, _b, _c, _d, _e, _f, _g, _h, _i, _j;
-      const normalizedBlock = block && typeof block === "object" && !Array.isArray(block) ? block : null;
-      if (!normalizedBlock) {
-        return;
-      }
-      const normalizedDatasetRef = normalizeString29((normalizedBlock == null ? void 0 : normalizedBlock.datasetRef) || "primary") || "primary";
-      const dataset = nextSpec.datasets.find((entry) => normalizeString29(entry == null ? void 0 : entry.id) === normalizedDatasetRef) || null;
-      const request = dataset == null ? void 0 : dataset.request;
-      if (!request || typeof request !== "object" || Array.isArray(request)) {
-        return;
-      }
-      switch (normalizeString29(normalizedBlock == null ? void 0 : normalizedBlock.kind)) {
-        case "chartBlock":
-          enableField((_a5 = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _a5.xField, normalizedDatasetRef, request);
-          normalizeString29((_b = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _b.seriesField) && enableField(normalizedBlock.chartSpec.seriesField, normalizedDatasetRef, request);
-          (Array.isArray((_c = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _c.yFields) ? normalizedBlock.chartSpec.yFields : []).forEach((fieldKey) => enableField(fieldKey, normalizedDatasetRef, request));
-          break;
-        case "kpiBlock":
-          enableField(normalizedBlock == null ? void 0 : normalizedBlock.valueField, normalizedDatasetRef, request);
-          if (normalizedBlock.sparkline) {
-            const sparkline = normalizeKpiSparkline(normalizedBlock.sparkline);
-            for (const ref of [sparkline.datasetRef, sparkline.comparisonDatasetRef].filter(Boolean)) {
-              const targetDataset = nextSpec.datasets.find((entry) => normalizeString29(entry == null ? void 0 : entry.id) === ref);
-              if (!targetDataset) throw new Error(`KPI sparkline dataset '${ref}' is unavailable.`);
-              const target = targetDataset.request;
-              if (target && (!enableField(sparkline.valueField, ref, target) || !enableField(sparkline.categoryField, ref, target))) throw new Error("KPI sparkline fields must be declared by their dataset.");
-            }
-          }
-          {
-            const secondaryRef = normalizeString29(normalizedBlock == null ? void 0 : normalizedBlock.secondaryDatasetRef) || normalizedDatasetRef;
-            const secondaryRequest = (_d = nextSpec.datasets.find((entry) => normalizeString29(entry == null ? void 0 : entry.id) === secondaryRef)) == null ? void 0 : _d.request;
-            if (secondaryRequest) enableField(normalizedBlock == null ? void 0 : normalizedBlock.secondaryField, secondaryRef, secondaryRequest);
-          }
-          break;
-        case "badgesBlock":
-          (Array.isArray(normalizedBlock == null ? void 0 : normalizedBlock.items) ? normalizedBlock.items : []).forEach((item) => {
-            enableField(item == null ? void 0 : item.valueField, normalizedDatasetRef, request);
-          });
-          break;
-        case "tableBlock":
-          (Array.isArray(normalizedBlock == null ? void 0 : normalizedBlock.columns) ? normalizedBlock.columns : []).forEach((column) => {
-            var _a6, _b2, _c2;
-            enableField(column == null ? void 0 : column.key, normalizedDatasetRef, request);
-            enableField((_a6 = column == null ? void 0 : column.cellVisual) == null ? void 0 : _a6.valueField, normalizedDatasetRef, request);
-            enableField((_b2 = column == null ? void 0 : column.link) == null ? void 0 : _b2.urlField, normalizedDatasetRef, request);
-            enableField((_c2 = column == null ? void 0 : column.link) == null ? void 0 : _c2.idField, normalizedDatasetRef, request);
-          });
-          break;
-        case "geoMapBlock":
-          enableField((_e = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _e.key, normalizedDatasetRef, request);
-          enableField((_f = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _f.labelKey, normalizedDatasetRef, request);
-          enableField((_h = (_g = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _g.metric) == null ? void 0 : _h.key, normalizedDatasetRef, request);
-          enableField((_j = (_i = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _i.color) == null ? void 0 : _j.field, normalizedDatasetRef, request);
-          break;
-        default:
-          break;
-      }
-    });
-    return nextSpec;
-  }
-  function resolveDocumentId(container = {}) {
-    return resolveContainerIdentity2(container) || "reportDocument";
-  }
-  function resolveDocumentTitle(container = {}, config = {}) {
-    return normalizeString29((container == null ? void 0 : container.title) || (config == null ? void 0 : config.title) || "Report");
-  }
-  function resolveDocumentMetadataValue(value, fallback = "") {
-    const normalized = normalizeString29(value);
-    return normalized || normalizeString29(fallback);
-  }
-  function resolveDocumentDataSourceRef(container = {}, config = {}) {
-    return normalizeString29((container == null ? void 0 : container.dataSourceRef) || (config == null ? void 0 : config.dataSourceRef));
-  }
-  function resolveDocumentTemplateIdentity(state = {}) {
-    const templateId = normalizeString29(state == null ? void 0 : state.reportDocumentTemplateId);
-    const templateLabel = normalizeString29(state == null ? void 0 : state.reportDocumentTemplateLabel);
-    if (!templateId && !templateLabel) {
-      return null;
-    }
-    return {
-      ...templateId ? { templateId } : {},
-      ...templateLabel ? { templateLabel } : {}
-    };
-  }
-  function buildPrimaryDatasetFieldContract(entry = {}) {
-    const paramPath = normalizeString29(entry == null ? void 0 : entry.paramPath);
-    const rawId = normalizeString29(entry == null ? void 0 : entry.rawId);
-    const semanticRef = normalizeString29(entry == null ? void 0 : entry.semanticRef);
-    const description = normalizeString29(entry == null ? void 0 : entry.description);
-    const category = normalizeString29(entry == null ? void 0 : entry.category);
-    const definitionRef = normalizeString29(entry == null ? void 0 : entry.definitionRef);
-    return {
-      ...paramPath ? { paramPath } : {},
-      ...(entry == null ? void 0 : entry.rowIdentity) === true ? { rowIdentity: true } : {},
-      ...(entry == null ? void 0 : entry.default) === true ? { default: true } : {},
-      ...(entry == null ? void 0 : entry.chartAxis) === true ? { chartAxis: true } : {},
-      ...(entry == null ? void 0 : entry.required) === true ? { required: true } : {},
-      ...isPlainObject7(entry == null ? void 0 : entry.runtimeFilter) ? { runtimeFilter: cloneValue18(entry.runtimeFilter) } : {},
-      ...rawId ? { rawId } : {},
-      ...semanticRef ? { semanticRef } : {},
-      ...description ? { description } : {},
-      ...category ? { category } : {},
-      ...definitionRef ? { definitionRef } : {},
-      ...isPlainObject7(entry == null ? void 0 : entry.governance) ? { governance: cloneValue18(entry.governance) } : {}
-    };
-  }
-  function stripReportBuilderDocumentDatasetCatalog(config = {}) {
-    const next = cloneValue18(isPlainObject7(config) ? config : {});
-    delete next.binding;
-    delete next.dataSources;
-    delete next.datasets;
-    return next;
-  }
-  function stripReportBuilderDocumentPrimaryFieldContract(config = {}) {
-    const next = cloneValue18(isPlainObject7(config) ? config : {});
-    delete next.dimensions;
-    delete next.measures;
-    delete next.calculatedFields;
-    delete next.computedMeasures;
-    delete next.tableCalculations;
-    delete next.staticFilters;
-    return next;
-  }
-  function stripReportBuilderDocumentPresentationMetadata(config = {}, presentation = null) {
-    const next = cloneValue18(isPlainObject7(config) ? config : {});
-    if (!isPlainObject7(presentation)) {
-      return next;
-    }
-    if (Array.isArray(presentation == null ? void 0 : presentation.groupByOptions) && presentation.groupByOptions.length > 0 && isPlainObject7(next.groupBy)) {
-      delete next.groupBy.options;
-      if (Object.keys(next.groupBy).length === 0) {
-        delete next.groupBy;
-      }
-    }
-    if (Array.isArray(presentation == null ? void 0 : presentation.orderFields) && presentation.orderFields.length > 0) {
-      delete next.orderFields;
-    }
-    if (isPlainObject7(next.result)) {
-      if (Array.isArray(presentation == null ? void 0 : presentation.orderFields) && presentation.orderFields.length > 0) {
-        delete next.result.orderFields;
-      }
-      if (Array.isArray(presentation == null ? void 0 : presentation.defaultTablePresets) && presentation.defaultTablePresets.length > 0) {
-        delete next.result.defaultTablePresets;
-      }
-      if (normalizeString29(presentation == null ? void 0 : presentation.defaultMode)) {
-        delete next.result.defaultMode;
-      }
-      if ((Number((presentation == null ? void 0 : presentation.pageSize) || 0) || 0) > 0) {
-        delete next.result.pageSize;
-      }
-      if (normalizeString29(presentation == null ? void 0 : presentation.chartCreationMode)) {
-        delete next.result.chartCreationMode;
-      }
-      if (normalizeString29(presentation == null ? void 0 : presentation.resultPanePosition)) {
-        delete next.result.resultPanePosition;
-      }
-      if (Array.isArray(presentation == null ? void 0 : presentation.defaultChartSpecs) && presentation.defaultChartSpecs.length > 0) {
-        delete next.result.defaultChartSpecs;
-      }
-      if (Object.keys(next.result).length === 0) {
-        delete next.result;
-      }
-    }
-    return next;
-  }
-  function stripReportBuilderDocumentAuthoringState(state = {}) {
-    const next = cloneValue18(isPlainObject7(state) ? state : {});
-    delete next.binding;
-    delete next.reportDocumentBlocks;
-    delete next.reportDocumentLayout;
-    delete next.reportStaticDatasets;
-    return next;
-  }
-  function buildReportBuilderReportDocumentDatasets(container = {}, config = {}, state = {}) {
-    const effectiveConfig = buildReportBuilderCalculatedFieldConfig(config, state);
-    const primaryDimensions = Array.isArray(effectiveConfig == null ? void 0 : effectiveConfig.dimensions) ? cloneValue18(effectiveConfig.dimensions) : [];
-    const primaryMeasures = Array.isArray(effectiveConfig == null ? void 0 : effectiveConfig.measures) ? cloneValue18(effectiveConfig.measures) : [];
-    const primaryCalculatedFields = Array.isArray(effectiveConfig == null ? void 0 : effectiveConfig.calculatedFields) ? cloneValue18(effectiveConfig.calculatedFields) : [];
-    const primaryComputedMeasures = Array.isArray(effectiveConfig == null ? void 0 : effectiveConfig.computedMeasures) ? cloneValue18(effectiveConfig.computedMeasures) : [];
-    const primaryTableCalculations = Array.isArray(effectiveConfig == null ? void 0 : effectiveConfig.tableCalculations) ? cloneValue18(effectiveConfig.tableCalculations) : [];
-    const dataSourceRef = resolveDocumentDataSourceRef(container, config);
-    const primarySource = normalizeReportBuilderPublishedDataSources(config).find((dataset) => dataset.id === "primary" && dataset.dataSourceRef === dataSourceRef);
-    const primaryResultContract = isPlainObject7(config == null ? void 0 : config.resultContract) ? config.resultContract : primarySource == null ? void 0 : primarySource.resultContract;
-    const dimensions = (Array.isArray(effectiveConfig == null ? void 0 : effectiveConfig.dimensions) ? effectiveConfig.dimensions : []).map((entry) => {
-      const id = normalizeString29((entry == null ? void 0 : entry.id) || (entry == null ? void 0 : entry.key));
-      const key = normalizeString29((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id));
-      if (!id || !key) {
-        return null;
-      }
-      return {
-        id,
-        key,
-        label: normalizeString29((entry == null ? void 0 : entry.label) || key) || key,
-        kind: "dimension",
-        ...(entry == null ? void 0 : entry.rowIdentity) === true ? { rowIdentity: true } : {},
-        ...normalizeString29((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) ? { sourceKey: normalizeString29((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) } : {},
-        ...normalizeString29(entry == null ? void 0 : entry.displayKey) ? { displayKey: normalizeString29(entry.displayKey) } : {},
-        ...(entry == null ? void 0 : entry.displayValueMap) && typeof entry.displayValueMap === "object" && !Array.isArray(entry.displayValueMap) ? { displayValueMap: cloneValue18(entry.displayValueMap) } : {},
-        ...normalizeString29(entry == null ? void 0 : entry.format) ? { format: normalizeString29(entry.format) } : {},
-        ...normalizeString29(entry == null ? void 0 : entry.tickFormat) ? { tickFormat: normalizeString29(entry.tickFormat) } : {},
-        ...["civil", "instant"].includes(normalizeString29(entry == null ? void 0 : entry.valueMode)) ? { valueMode: normalizeString29(entry.valueMode) } : {},
-        ...normalizeString29(entry == null ? void 0 : entry.rawId) ? { rawId: normalizeString29(entry.rawId) } : {},
-        ...normalizeString29(entry == null ? void 0 : entry.description) ? { description: normalizeString29(entry.description) } : {},
-        ...normalizeString29(entry == null ? void 0 : entry.category) ? { category: normalizeString29(entry.category) } : {},
-        ...normalizeString29(entry == null ? void 0 : entry.definitionRef) ? { definitionRef: normalizeString29(entry.definitionRef) } : {},
-        ...normalizeString29(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: normalizeString29(entry.semanticRef) } : {},
-        ...(entry == null ? void 0 : entry.governance) && typeof entry.governance === "object" && !Array.isArray(entry.governance) ? { governance: cloneValue18(entry.governance) } : {},
-        ...(entry == null ? void 0 : entry.default) === true ? { default: true } : {},
-        ...(entry == null ? void 0 : entry.chartAxis) === true ? { chartAxis: true } : {},
-        ...normalizeString29(entry == null ? void 0 : entry.paramPath) ? { paramPath: normalizeString29(entry.paramPath) } : {},
-        ...(entry == null ? void 0 : entry.runtimeFilter) && typeof entry.runtimeFilter === "object" && !Array.isArray(entry.runtimeFilter) ? { runtimeFilter: cloneValue18(entry.runtimeFilter) } : {}
-      };
-    }).filter(Boolean);
-    const measures = [
-      ...(Array.isArray(effectiveConfig == null ? void 0 : effectiveConfig.measures) ? effectiveConfig.measures : []).map((entry) => {
-        const id = normalizeString29((entry == null ? void 0 : entry.id) || (entry == null ? void 0 : entry.key));
-        const key = normalizeString29((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id));
-        if (!id || !key) {
-          return null;
-        }
-        return {
-          id,
-          key,
-          label: normalizeString29((entry == null ? void 0 : entry.label) || key) || key,
-          kind: "measure",
-          ...(entry == null ? void 0 : entry.rowIdentity) === true ? { rowIdentity: true } : {},
-          ...normalizeString29(entry == null ? void 0 : entry.format) ? { format: normalizeString29(entry.format) } : {},
-          ...normalizeString29((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) ? { sourceKey: normalizeString29((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) } : {},
-          ...normalizeString29(entry == null ? void 0 : entry.rawId) ? { rawId: normalizeString29(entry.rawId) } : {},
-          ...normalizeString29(entry == null ? void 0 : entry.description) ? { description: normalizeString29(entry.description) } : {},
-          ...normalizeString29(entry == null ? void 0 : entry.category) ? { category: normalizeString29(entry.category) } : {},
-          ...normalizeString29(entry == null ? void 0 : entry.definitionRef) ? { definitionRef: normalizeString29(entry.definitionRef) } : {},
-          ...normalizeString29(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: normalizeString29(entry.semanticRef) } : {},
-          ...(entry == null ? void 0 : entry.governance) && typeof entry.governance === "object" && !Array.isArray(entry.governance) ? { governance: cloneValue18(entry.governance) } : {},
-          ...(entry == null ? void 0 : entry.default) === true ? { default: true } : {},
-          ...normalizeString29(entry == null ? void 0 : entry.paramPath) ? { paramPath: normalizeString29(entry.paramPath) } : {}
-        };
-      }),
-      ...normalizeReportCalculatedFields([
-        ...Array.isArray(effectiveConfig == null ? void 0 : effectiveConfig.calculatedFields) ? effectiveConfig.calculatedFields : [],
-        ...Array.isArray(effectiveConfig == null ? void 0 : effectiveConfig.computedMeasures) ? effectiveConfig.computedMeasures : [],
-        ...Array.isArray(effectiveConfig == null ? void 0 : effectiveConfig.tableCalculations) ? effectiveConfig.tableCalculations : []
-      ], {
-        datasetRef: "primary"
-      }).map((entry) => {
-        const id = normalizeString29((entry == null ? void 0 : entry.id) || (entry == null ? void 0 : entry.key));
-        const key = normalizeString29((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id));
-        if (!id || !key) {
-          return null;
-        }
-        return {
-          id,
-          key,
-          label: normalizeString29((entry == null ? void 0 : entry.label) || key) || key,
-          kind: "measure",
-          ...(entry == null ? void 0 : entry.rowIdentity) === true ? { rowIdentity: true } : {},
-          ...normalizeString29(entry == null ? void 0 : entry.format) ? { format: normalizeString29(entry.format) } : {}
-        };
-      })
-    ].filter(Boolean);
-    const primaryDataset = dataSourceRef ? {
-      id: "primary",
-      dataSourceRef,
-      label: normalizeString29((config == null ? void 0 : config.title) || dataSourceRef) || dataSourceRef,
-      description: "Primary report dataset",
-      kindLabel: "primary",
-      ...isPlainObject7(config == null ? void 0 : config.scope) ? { scope: cloneValue18(config.scope) } : {},
-      ...isPlainObject7(config == null ? void 0 : config.source) ? { source: cloneValue18(config.source) } : {},
-      ...isPlainObject7(primaryResultContract) ? { resultContract: cloneValue18(primaryResultContract) } : {},
-      ...isPlainObject7(config == null ? void 0 : config.capabilities) ? { capabilities: cloneValue18(config.capabilities) } : {},
-      request: cloneValue18(buildReportBuilderRequest(config, state)),
-      ...primaryDimensions.length > 0 ? { dimensions: primaryDimensions } : {},
-      ...primaryMeasures.length > 0 ? { measures: primaryMeasures } : {},
-      ...primaryCalculatedFields.length > 0 ? { calculatedFields: primaryCalculatedFields } : {},
-      ...primaryComputedMeasures.length > 0 ? { computedMeasures: primaryComputedMeasures } : {},
-      ...primaryTableCalculations.length > 0 ? { tableCalculations: primaryTableCalculations } : {},
-      columnOptions: [
-        ...dimensions.map((entry) => ({
-          key: entry.key,
-          label: entry.label,
-          kind: "dimension",
-          ...(entry == null ? void 0 : entry.rowIdentity) === true ? { rowIdentity: true } : {},
-          ...(entry == null ? void 0 : entry.sourceKey) ? { sourceKey: entry.sourceKey } : {},
-          ...(entry == null ? void 0 : entry.displayKey) ? { displayKey: entry.displayKey } : {},
-          ...(entry == null ? void 0 : entry.displayValueMap) ? { displayValueMap: cloneValue18(entry.displayValueMap) } : {},
-          ...(entry == null ? void 0 : entry.format) ? { format: entry.format } : {},
-          ...(entry == null ? void 0 : entry.tickFormat) ? { tickFormat: entry.tickFormat } : {},
-          ...(entry == null ? void 0 : entry.valueMode) ? { valueMode: entry.valueMode } : {},
-          ...(entry == null ? void 0 : entry.rawId) ? { rawId: entry.rawId } : {},
-          ...(entry == null ? void 0 : entry.description) ? { description: entry.description } : {},
-          ...(entry == null ? void 0 : entry.category) ? { category: entry.category } : {},
-          ...(entry == null ? void 0 : entry.definitionRef) ? { definitionRef: entry.definitionRef } : {},
-          ...(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: entry.semanticRef } : {},
-          ...(entry == null ? void 0 : entry.governance) ? { governance: cloneValue18(entry.governance) } : {},
-          ...(entry == null ? void 0 : entry.default) === true ? { default: true } : {},
-          ...(entry == null ? void 0 : entry.chartAxis) === true ? { chartAxis: true } : {},
-          ...(entry == null ? void 0 : entry.paramPath) ? { paramPath: entry.paramPath } : {},
-          ...(entry == null ? void 0 : entry.runtimeFilter) ? { runtimeFilter: cloneValue18(entry.runtimeFilter) } : {}
-        })),
-        ...measures.map((entry) => ({
-          key: entry.key,
-          label: entry.label,
-          kind: "measure",
-          ...(entry == null ? void 0 : entry.rowIdentity) === true ? { rowIdentity: true } : {},
-          ...(entry == null ? void 0 : entry.sourceKey) ? { sourceKey: entry.sourceKey } : {},
-          ...(entry == null ? void 0 : entry.format) ? { format: entry.format } : {},
-          ...(entry == null ? void 0 : entry.rawId) ? { rawId: entry.rawId } : {},
-          ...(entry == null ? void 0 : entry.description) ? { description: entry.description } : {},
-          ...(entry == null ? void 0 : entry.category) ? { category: entry.category } : {},
-          ...(entry == null ? void 0 : entry.definitionRef) ? { definitionRef: entry.definitionRef } : {},
-          ...(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: entry.semanticRef } : {},
-          ...(entry == null ? void 0 : entry.governance) ? { governance: cloneValue18(entry.governance) } : {},
-          ...(entry == null ? void 0 : entry.default) === true ? { default: true } : {},
-          ...(entry == null ? void 0 : entry.paramPath) ? { paramPath: entry.paramPath } : {}
-        }))
-      ],
-      valueFieldOptions: measures.map((entry) => ({
-        value: entry.key,
-        label: entry.label,
-        ...(entry == null ? void 0 : entry.format) ? { format: entry.format } : {},
-        ...(entry == null ? void 0 : entry.rawId) ? { rawId: entry.rawId } : {},
-        ...(entry == null ? void 0 : entry.description) ? { description: entry.description } : {},
-        ...(entry == null ? void 0 : entry.category) ? { category: entry.category } : {},
-        ...(entry == null ? void 0 : entry.definitionRef) ? { definitionRef: entry.definitionRef } : {},
-        ...(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: entry.semanticRef } : {},
-        ...(entry == null ? void 0 : entry.governance) ? { governance: cloneValue18(entry.governance) } : {},
-        ...(entry == null ? void 0 : entry.default) === true ? { default: true } : {}
-      })),
-      secondaryFieldOptions: dimensions.map((entry) => ({
-        value: entry.key,
-        label: entry.label,
-        ...(entry == null ? void 0 : entry.format) ? { format: entry.format } : {},
-        ...(entry == null ? void 0 : entry.rawId) ? { rawId: entry.rawId } : {},
-        ...(entry == null ? void 0 : entry.description) ? { description: entry.description } : {},
-        ...(entry == null ? void 0 : entry.category) ? { category: entry.category } : {},
-        ...(entry == null ? void 0 : entry.definitionRef) ? { definitionRef: entry.definitionRef } : {},
-        ...(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: entry.semanticRef } : {},
-        ...(entry == null ? void 0 : entry.governance) ? { governance: cloneValue18(entry.governance) } : {},
-        ...(entry == null ? void 0 : entry.default) === true ? { default: true } : {}
-      })),
-      chartFieldOptions: [
-        ...dimensions.map((entry) => ({
-          key: normalizeString29((entry == null ? void 0 : entry.displayKey) || (entry == null ? void 0 : entry.key)),
-          aliases: [entry.key],
-          label: entry.label,
-          kind: "dimension",
-          ...(entry == null ? void 0 : entry.format) ? { format: entry.format } : {},
-          ...(entry == null ? void 0 : entry.tickFormat) ? { tickFormat: entry.tickFormat } : {},
-          ...(entry == null ? void 0 : entry.valueMode) ? { valueMode: entry.valueMode } : {},
-          ...(entry == null ? void 0 : entry.rawId) ? { rawId: entry.rawId } : {},
-          ...(entry == null ? void 0 : entry.description) ? { description: entry.description } : {},
-          ...(entry == null ? void 0 : entry.category) ? { category: entry.category } : {},
-          ...(entry == null ? void 0 : entry.definitionRef) ? { definitionRef: entry.definitionRef } : {},
-          ...(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: entry.semanticRef } : {},
-          ...(entry == null ? void 0 : entry.governance) ? { governance: cloneValue18(entry.governance) } : {},
-          ...(entry == null ? void 0 : entry.default) === true ? { default: true } : {},
-          ...(entry == null ? void 0 : entry.chartAxis) === true ? { chartAxis: true } : {}
-        })),
-        ...measures.map((entry) => ({
-          key: entry.key,
-          aliases: [entry.key],
-          label: entry.label,
-          kind: "measure",
-          ...(entry == null ? void 0 : entry.format) ? { format: entry.format } : {},
-          ...(entry == null ? void 0 : entry.rawId) ? { rawId: entry.rawId } : {},
-          ...(entry == null ? void 0 : entry.description) ? { description: entry.description } : {},
-          ...(entry == null ? void 0 : entry.category) ? { category: entry.category } : {},
-          ...(entry == null ? void 0 : entry.definitionRef) ? { definitionRef: entry.definitionRef } : {},
-          ...(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: entry.semanticRef } : {},
-          ...(entry == null ? void 0 : entry.governance) ? { governance: cloneValue18(entry.governance) } : {},
-          ...(entry == null ? void 0 : entry.default) === true ? { default: true } : {},
-          align: "right"
-        }))
-      ],
-      scopeParamOptions: resolveReportBuilderScopeParamFilters(effectiveConfig).map((filter) => {
-        const value = normalizeString29((filter == null ? void 0 : filter.id) || (filter == null ? void 0 : filter.field));
-        if (!value) {
-          return null;
-        }
-        return {
-          value,
-          label: normalizeString29((filter == null ? void 0 : filter.label) || value),
-          ...normalizeString29(filter == null ? void 0 : filter.description) ? { description: normalizeString29(filter.description) } : {},
-          kind: normalizeString29((filter == null ? void 0 : filter.type) || ((filter == null ? void 0 : filter.multiple) ? "multiSelect" : "value")) || "value",
-          required: (filter == null ? void 0 : filter.required) === true,
-          ...normalizeString29(filter == null ? void 0 : filter.semanticRef) ? { semanticRef: normalizeString29(filter.semanticRef) } : {},
-          ...(filter == null ? void 0 : filter.multiple) === true ? { multiple: true } : {},
-          ...normalizeString29(filter == null ? void 0 : filter.presentation) ? { presentation: normalizeString29(filter.presentation) } : {},
-          ...Array.isArray(filter == null ? void 0 : filter.options) ? { options: cloneValue18(filter.options) } : {},
-          ...normalizeString29(filter == null ? void 0 : filter.paramPath) ? { paramPath: normalizeString29(filter.paramPath) } : {},
-          ...normalizeString29(filter == null ? void 0 : filter.startParamPath) ? { startParamPath: normalizeString29(filter.startParamPath) } : {},
-          ...normalizeString29(filter == null ? void 0 : filter.endParamPath) ? { endParamPath: normalizeString29(filter.endParamPath) } : {}
-        };
-      }).filter(Boolean)
-    } : null;
-    const staticDatasets = normalizeReportBuilderStaticDatasets(state == null ? void 0 : state.reportStaticDatasets);
-    const staticDatasetIds = new Set(
-      staticDatasets.map((dataset) => normalizeString29(dataset == null ? void 0 : dataset.id)).filter(Boolean)
-    );
-    const publishedDatasets = normalizeReportBuilderPublishedDataSources(config).map((dataset) => ({
-      id: normalizeString29(dataset == null ? void 0 : dataset.id),
-      dataSourceRef: normalizeString29(dataset == null ? void 0 : dataset.dataSourceRef),
-      label: normalizeString29(dataset == null ? void 0 : dataset.label),
-      description: normalizeString29(dataset == null ? void 0 : dataset.description),
-      kindLabel: normalizeString29(dataset == null ? void 0 : dataset.kindLabel),
-      ...normalizeReportDatasetScope(dataset == null ? void 0 : dataset.scope) ? { scope: normalizeReportDatasetScope(dataset == null ? void 0 : dataset.scope) } : {},
-      ...isPlainObject7(dataset == null ? void 0 : dataset.source) ? { source: cloneValue18(dataset.source) } : {},
-      ...isPlainObject7(dataset == null ? void 0 : dataset.resultContract) ? { resultContract: cloneValue18(dataset.resultContract) } : {},
-      ...isPlainObject7(dataset == null ? void 0 : dataset.capabilities) ? { capabilities: cloneValue18(dataset.capabilities) } : {},
-      request: (dataset == null ? void 0 : dataset.request) && typeof dataset.request === "object" && !Array.isArray(dataset.request) ? cloneValue18(dataset.request) : null,
-      columnOptions: Array.isArray(dataset == null ? void 0 : dataset.columnOptions) ? cloneValue18(dataset.columnOptions) : [],
-      valueFieldOptions: Array.isArray(dataset == null ? void 0 : dataset.valueFieldOptions) ? cloneValue18(dataset.valueFieldOptions) : [],
-      secondaryFieldOptions: Array.isArray(dataset == null ? void 0 : dataset.secondaryFieldOptions) ? cloneValue18(dataset.secondaryFieldOptions) : [],
-      chartFieldOptions: Array.isArray(dataset == null ? void 0 : dataset.chartFieldOptions) ? cloneValue18(dataset.chartFieldOptions) : [],
-      scopeParamOptions: Array.isArray(dataset == null ? void 0 : dataset.scopeParamOptions) ? cloneValue18(dataset.scopeParamOptions) : []
-    })).filter((dataset) => dataset.id && dataset.dataSourceRef && dataset.id !== "primary" && !staticDatasetIds.has(dataset.id));
-    return [...primaryDataset ? [primaryDataset] : [], ...publishedDatasets, ...staticDatasets];
-  }
-  function buildReportBuilderReportDocumentPresentation(config = {}, state = {}) {
-    var _a5;
-    const result = isPlainObject7(config == null ? void 0 : config.result) ? config.result : {};
-    const groupByOptions = Array.isArray((_a5 = config == null ? void 0 : config.groupBy) == null ? void 0 : _a5.options) ? cloneValue18(config.groupBy.options) : [];
-    const orderFields = Array.isArray(result == null ? void 0 : result.orderFields) ? cloneValue18(result.orderFields) : Array.isArray(config == null ? void 0 : config.orderFields) ? cloneValue18(config.orderFields) : [];
-    const defaultTablePresets = Array.isArray(result == null ? void 0 : result.defaultTablePresets) ? cloneValue18(result.defaultTablePresets) : [];
-    const defaultMode = normalizeString29((result == null ? void 0 : result.defaultMode) || "");
-    const pageSize = Number((result == null ? void 0 : result.pageSize) || (state == null ? void 0 : state.pageSize) || 0) || 0;
-    const chartCreationMode = normalizeString29((result == null ? void 0 : result.chartCreationMode) || "");
-    const resultPanePosition = normalizeString29((result == null ? void 0 : result.resultPanePosition) || "");
-    const defaultChartSpecs = Array.isArray(result == null ? void 0 : result.defaultChartSpecs) ? cloneValue18(result.defaultChartSpecs) : [];
-    if (groupByOptions.length === 0 && orderFields.length === 0 && defaultTablePresets.length === 0 && !defaultMode && pageSize < 1 && !chartCreationMode && !resultPanePosition && defaultChartSpecs.length === 0) {
-      return null;
-    }
-    return {
-      ...groupByOptions.length > 0 ? { groupByOptions } : {},
-      ...orderFields.length > 0 ? { orderFields } : {},
-      ...defaultTablePresets.length > 0 ? { defaultTablePresets } : {},
-      ...defaultMode ? { defaultMode } : {},
-      ...pageSize > 0 ? { pageSize } : {},
-      ...chartCreationMode ? { chartCreationMode } : {},
-      ...resultPanePosition ? { resultPanePosition } : {},
-      ...defaultChartSpecs.length > 0 ? { defaultChartSpecs } : {}
-    };
-  }
-  function resolveReportDocumentPresentation(document = null, fallbackConfig = {}, fallbackState = {}) {
-    const explicitPresentation = document && typeof document === "object" && !Array.isArray(document) && document.presentation && typeof document.presentation === "object" && !Array.isArray(document.presentation) ? cloneValue18(document.presentation) : null;
-    const fallbackPresentation = buildReportBuilderReportDocumentPresentation(fallbackConfig, fallbackState);
-    if (explicitPresentation && !fallbackPresentation) {
-      return explicitPresentation;
-    }
-    if (!explicitPresentation) {
-      return fallbackPresentation;
-    }
-    return {
-      ...cloneValue18(fallbackPresentation || {}),
-      ...cloneValue18(explicitPresentation)
-    };
-  }
-  function resolveReportDocumentBinding(document = null, fallbackConfig = null, fallbackState = null) {
-    const documentBinding = isPlainObject7(document == null ? void 0 : document.binding) ? document.binding : null;
-    if (documentBinding) {
-      return cloneValue18(documentBinding);
-    }
-    const stateBinding = isPlainObject7(fallbackState == null ? void 0 : fallbackState.binding) ? fallbackState.binding : null;
-    if (stateBinding) {
-      return cloneValue18(stateBinding);
-    }
-    const configBinding = isPlainObject7(fallbackConfig == null ? void 0 : fallbackConfig.binding) ? fallbackConfig.binding : null;
-    return configBinding ? cloneValue18(configBinding) : null;
-  }
-  function resolveReportDocumentStaticDatasets(document = null, fallbackState = null) {
-    const explicitDocumentDatasets = Array.isArray(document == null ? void 0 : document.datasets) ? document.datasets : [];
-    const explicitStaticDatasets = explicitDocumentDatasets.some((dataset) => Array.isArray(dataset == null ? void 0 : dataset.rows)) ? normalizeReportBuilderStaticDatasets(
-      explicitDocumentDatasets.filter((dataset) => Array.isArray(dataset == null ? void 0 : dataset.rows))
-    ) : [];
-    if (explicitStaticDatasets.length > 0) {
-      return explicitStaticDatasets;
-    }
-    return normalizeReportBuilderStaticDatasets(fallbackState == null ? void 0 : fallbackState.reportStaticDatasets);
-  }
-  function resolveReportDocumentPublishedDatasets(document = null, fallbackConfig = null) {
-    const explicitDocumentDatasets = Array.isArray(document == null ? void 0 : document.datasets) ? document.datasets : [];
-    const explicitPublishedDatasets = explicitDocumentDatasets.some((dataset) => !Array.isArray(dataset == null ? void 0 : dataset.rows)) ? normalizeReportBuilderPublishedDataSources({
-      datasets: explicitDocumentDatasets.filter((dataset) => !Array.isArray(dataset == null ? void 0 : dataset.rows) && normalizeString29(dataset == null ? void 0 : dataset.id) !== "primary")
-    }) : [];
-    if (explicitPublishedDatasets.length > 0) {
-      return explicitPublishedDatasets;
-    }
-    return normalizeReportBuilderPublishedDataSources(fallbackConfig);
-  }
-  function applyReportDocumentDatasetCatalogToConfig(config = {}, document = null) {
-    const publishedDatasets = resolveReportDocumentPublishedDatasets(document, config);
-    if (publishedDatasets.length === 0) {
-      return isPlainObject7(config) ? cloneValue18(config) : {};
-    }
-    return {
-      ...isPlainObject7(config) ? stripReportBuilderDocumentDatasetCatalog(config) : {},
-      datasets: cloneValue18(publishedDatasets)
-    };
-  }
-  function hasMeaningfulReportRequest(request = null) {
-    if (!isPlainObject7(request)) {
-      return false;
-    }
-    return Object.keys((request == null ? void 0 : request.measures) || {}).length > 0 || Object.keys((request == null ? void 0 : request.dimensions) || {}).length > 0 || Object.keys((request == null ? void 0 : request.filters) || {}).length > 0 || Array.isArray(request == null ? void 0 : request.orderBy) && request.orderBy.length > 0 || Array.isArray(request == null ? void 0 : request.refinements) && request.refinements.length > 0 || isPlainObject7(request == null ? void 0 : request.semanticSelection);
-  }
-  function shouldPreferDocumentPrimaryRequest(documentRequest = null, generatedRequest = null) {
-    if (!hasMeaningfulReportRequest(documentRequest)) {
-      return false;
-    }
-    if (!hasMeaningfulReportRequest(generatedRequest)) {
-      return true;
-    }
-    const documentHasFilters = Object.keys((documentRequest == null ? void 0 : documentRequest.filters) || {}).length > 0;
-    const generatedHasFilters = Object.keys((generatedRequest == null ? void 0 : generatedRequest.filters) || {}).length > 0;
-    if (documentHasFilters && !generatedHasFilters) {
-      return true;
-    }
-    const documentHasOrderBy = Array.isArray(documentRequest == null ? void 0 : documentRequest.orderBy) && documentRequest.orderBy.length > 0;
-    const generatedHasOrderBy = Array.isArray(generatedRequest == null ? void 0 : generatedRequest.orderBy) && generatedRequest.orderBy.length > 0;
-    if (documentHasOrderBy && !generatedHasOrderBy) {
-      return true;
-    }
-    const documentHasRefinements = Array.isArray(documentRequest == null ? void 0 : documentRequest.refinements) && documentRequest.refinements.length > 0;
-    const generatedHasRefinements = Array.isArray(generatedRequest == null ? void 0 : generatedRequest.refinements) && generatedRequest.refinements.length > 0;
-    if (documentHasRefinements && !generatedHasRefinements) {
-      return true;
-    }
-    const documentHasSemanticSelection = isPlainObject7(documentRequest == null ? void 0 : documentRequest.semanticSelection);
-    const generatedHasSemanticSelection = isPlainObject7(generatedRequest == null ? void 0 : generatedRequest.semanticSelection);
-    if (documentHasSemanticSelection && !generatedHasSemanticSelection) {
-      return true;
-    }
-    return false;
-  }
-  function resolveReportDocumentPrimaryDataset(document = null) {
-    return (Array.isArray(document == null ? void 0 : document.datasets) ? document.datasets : []).find((dataset) => normalizeString29(dataset == null ? void 0 : dataset.id) === "primary" && !Array.isArray(dataset == null ? void 0 : dataset.rows)) || null;
-  }
-  function buildPrimaryDatasetCatalogEntries(primaryDataset = {}, kind = "") {
-    const explicitEntries = kind === "dimension" ? primaryDataset == null ? void 0 : primaryDataset.dimensions : primaryDataset == null ? void 0 : primaryDataset.measures;
-    if (Array.isArray(explicitEntries) && explicitEntries.length > 0) {
-      return explicitEntries;
-    }
-    const columnOptions = Array.isArray(primaryDataset == null ? void 0 : primaryDataset.columnOptions) ? primaryDataset.columnOptions : [];
-    const matchingColumns = columnOptions.filter((entry) => normalizeString29(entry == null ? void 0 : entry.kind) === kind);
-    if (matchingColumns.length > 0) {
-      return matchingColumns;
-    }
-    if (kind === "dimension") {
-      return [
-        ...Array.isArray(primaryDataset == null ? void 0 : primaryDataset.secondaryFieldOptions) ? primaryDataset.secondaryFieldOptions : [],
-        ...(Array.isArray(primaryDataset == null ? void 0 : primaryDataset.chartFieldOptions) ? primaryDataset.chartFieldOptions : []).filter((entry) => normalizeString29(entry == null ? void 0 : entry.kind) === "dimension")
-      ];
-    }
-    return [
-      ...Array.isArray(primaryDataset == null ? void 0 : primaryDataset.valueFieldOptions) ? primaryDataset.valueFieldOptions : [],
-      ...(Array.isArray(primaryDataset == null ? void 0 : primaryDataset.chartFieldOptions) ? primaryDataset.chartFieldOptions : []).filter((entry) => normalizeString29(entry == null ? void 0 : entry.kind) === "measure")
-    ];
-  }
-  function mergePrimaryDatasetCatalogEntries(entries = [], persistedEntries = []) {
-    const persistedByAlias = /* @__PURE__ */ new Map();
-    (Array.isArray(persistedEntries) ? persistedEntries : []).forEach((entry) => {
-      [entry == null ? void 0 : entry.id, entry == null ? void 0 : entry.key, entry == null ? void 0 : entry.sourceKey, entry == null ? void 0 : entry.value, entry == null ? void 0 : entry.rawId].map((value) => normalizeString29(value)).filter(Boolean).forEach((alias) => persistedByAlias.set(alias, entry));
-    });
-    return (Array.isArray(entries) ? entries : []).map((entry) => {
-      const persisted = [entry == null ? void 0 : entry.id, entry == null ? void 0 : entry.key, entry == null ? void 0 : entry.sourceKey, entry == null ? void 0 : entry.value, entry == null ? void 0 : entry.rawId].map((value) => normalizeString29(value)).filter(Boolean).map((alias) => persistedByAlias.get(alias)).find(Boolean);
-      return persisted ? { ...cloneValue18(persisted), ...entry } : entry;
-    });
-  }
-  function applyPrimaryDatasetFallbackConfig(document = null, baseConfig = {}) {
-    const primaryDataset = resolveReportDocumentPrimaryDataset(document);
-    const normalizedBaseConfig = isPlainObject7(baseConfig) ? cloneValue18(baseConfig) : {};
-    if (!primaryDataset || !isPlainObject7(primaryDataset)) {
-      return normalizedBaseConfig;
-    }
-    const primaryDatasetDimensions = Array.isArray(primaryDataset == null ? void 0 : primaryDataset.dimensions) ? cloneValue18(primaryDataset.dimensions) : [];
-    const primaryDatasetMeasures = Array.isArray(primaryDataset == null ? void 0 : primaryDataset.measures) ? cloneValue18(primaryDataset.measures) : [];
-    const primaryDatasetCalculatedFields = Array.isArray(primaryDataset == null ? void 0 : primaryDataset.calculatedFields) ? cloneValue18(primaryDataset.calculatedFields) : [];
-    const primaryDatasetComputedMeasures = Array.isArray(primaryDataset == null ? void 0 : primaryDataset.computedMeasures) ? cloneValue18(primaryDataset.computedMeasures) : [];
-    const primaryDatasetTableCalculations = Array.isArray(primaryDataset == null ? void 0 : primaryDataset.tableCalculations) ? cloneValue18(primaryDataset.tableCalculations) : [];
-    const primaryDatasetDimensionCatalog = buildPrimaryDatasetCatalogEntries(primaryDataset, "dimension");
-    const primaryDatasetMeasureCatalog = buildPrimaryDatasetCatalogEntries(primaryDataset, "measure");
-    const dimensionEntries = Array.isArray(normalizedBaseConfig == null ? void 0 : normalizedBaseConfig.dimensions) && normalizedBaseConfig.dimensions.length > 0 ? mergePrimaryDatasetCatalogEntries(normalizedBaseConfig.dimensions, primaryDatasetDimensionCatalog) : primaryDatasetDimensionCatalog;
-    const dimensions = dimensionEntries.map((entry) => {
-      const key = normalizeString29((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.value) || (entry == null ? void 0 : entry.sourceKey));
-      if (!key) {
-        return null;
-      }
-      return {
-        id: key,
-        key: normalizeString29((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.value)) || key,
-        label: normalizeString29((entry == null ? void 0 : entry.label) || key) || key,
-        ...normalizeString29(entry == null ? void 0 : entry.displayKey) ? { displayKey: normalizeString29(entry.displayKey) } : {},
-        ...(entry == null ? void 0 : entry.displayValueMap) && typeof entry.displayValueMap === "object" && !Array.isArray(entry.displayValueMap) ? { displayValueMap: cloneValue18(entry.displayValueMap) } : {},
-        ...normalizeString29(entry == null ? void 0 : entry.format) ? { format: normalizeString29(entry.format) } : {},
-        ...normalizeString29(entry == null ? void 0 : entry.tickFormat) ? { tickFormat: normalizeString29(entry.tickFormat) } : {},
-        ...["civil", "instant"].includes(normalizeString29(entry == null ? void 0 : entry.valueMode)) ? { valueMode: normalizeString29(entry.valueMode) } : {},
-        ...buildPrimaryDatasetFieldContract(entry)
-      };
-    }).filter(Boolean);
-    const measureEntries = Array.isArray(normalizedBaseConfig == null ? void 0 : normalizedBaseConfig.measures) && normalizedBaseConfig.measures.length > 0 ? mergePrimaryDatasetCatalogEntries(normalizedBaseConfig.measures, primaryDatasetMeasureCatalog) : primaryDatasetMeasureCatalog;
-    const measures = measureEntries.map((entry) => {
-      const key = normalizeString29((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.value) || (entry == null ? void 0 : entry.sourceKey));
-      if (!key) {
-        return null;
-      }
-      return {
-        id: key,
-        key: normalizeString29((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.value)) || key,
-        label: normalizeString29((entry == null ? void 0 : entry.label) || key) || key,
-        ...normalizeString29(entry == null ? void 0 : entry.format) ? { format: normalizeString29(entry.format) } : {},
-        ...buildPrimaryDatasetFieldContract(entry)
-      };
-    }).filter(Boolean);
-    const staticFilters = Array.isArray(normalizedBaseConfig == null ? void 0 : normalizedBaseConfig.staticFilters) && normalizedBaseConfig.staticFilters.length > 0 ? normalizedBaseConfig.staticFilters : (Array.isArray(primaryDataset == null ? void 0 : primaryDataset.scopeParamOptions) ? primaryDataset.scopeParamOptions : []).map((entry) => {
-      const value = normalizeString29((entry == null ? void 0 : entry.value) || (entry == null ? void 0 : entry.id));
-      if (!value) {
-        return null;
-      }
-      const kind = normalizeString29((entry == null ? void 0 : entry.kind) || "value");
-      return {
-        id: value,
-        label: normalizeString29((entry == null ? void 0 : entry.label) || value) || value,
-        ...normalizeString29(entry == null ? void 0 : entry.description) ? { description: normalizeString29(entry.description) } : {},
-        type: kind,
-        required: (entry == null ? void 0 : entry.required) === true,
-        ...normalizeString29(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: normalizeString29(entry.semanticRef) } : {},
-        ...(entry == null ? void 0 : entry.multiple) === true ? { multiple: true } : {},
-        ...normalizeString29(entry == null ? void 0 : entry.presentation) ? { presentation: normalizeString29(entry.presentation) } : {},
-        ...Array.isArray(entry == null ? void 0 : entry.options) ? { options: cloneValue18(entry.options) } : {},
-        ...normalizeString29(entry == null ? void 0 : entry.paramPath) ? { paramPath: normalizeString29(entry.paramPath) } : {},
-        ...normalizeString29(entry == null ? void 0 : entry.startParamPath) ? { startParamPath: normalizeString29(entry.startParamPath) } : {},
-        ...normalizeString29(entry == null ? void 0 : entry.endParamPath) ? { endParamPath: normalizeString29(entry.endParamPath) } : {}
-      };
-    }).filter(Boolean);
-    return {
-      ...normalizedBaseConfig,
-      ...isPlainObject7(document == null ? void 0 : document.binding) && !isPlainObject7(normalizedBaseConfig == null ? void 0 : normalizedBaseConfig.binding) ? { binding: cloneValue18(document.binding) } : {},
-      ...normalizeReportDatasetScope(primaryDataset == null ? void 0 : primaryDataset.scope) && !isPlainObject7(normalizedBaseConfig == null ? void 0 : normalizedBaseConfig.scope) ? { scope: normalizeReportDatasetScope(primaryDataset.scope) } : {},
-      ...isPlainObject7(primaryDataset == null ? void 0 : primaryDataset.source) && !isPlainObject7(normalizedBaseConfig == null ? void 0 : normalizedBaseConfig.source) ? { source: cloneValue18(primaryDataset.source) } : {},
-      ...isPlainObject7(primaryDataset == null ? void 0 : primaryDataset.resultContract) && !isPlainObject7(normalizedBaseConfig == null ? void 0 : normalizedBaseConfig.resultContract) ? { resultContract: cloneValue18(primaryDataset.resultContract) } : {},
-      ...isPlainObject7(primaryDataset == null ? void 0 : primaryDataset.capabilities) && !isPlainObject7(normalizedBaseConfig == null ? void 0 : normalizedBaseConfig.capabilities) ? { capabilities: cloneValue18(primaryDataset.capabilities) } : {},
-      ...dimensions.length > 0 ? { dimensions } : {},
-      ...measures.length > 0 ? { measures } : {},
-      ...primaryDatasetCalculatedFields.length > 0 && (!Array.isArray(normalizedBaseConfig == null ? void 0 : normalizedBaseConfig.calculatedFields) || normalizedBaseConfig.calculatedFields.length === 0) ? { calculatedFields: primaryDatasetCalculatedFields } : {},
-      ...primaryDatasetComputedMeasures.length > 0 && (!Array.isArray(normalizedBaseConfig == null ? void 0 : normalizedBaseConfig.computedMeasures) || normalizedBaseConfig.computedMeasures.length === 0) ? { computedMeasures: primaryDatasetComputedMeasures } : {},
-      ...primaryDatasetTableCalculations.length > 0 && (!Array.isArray(normalizedBaseConfig == null ? void 0 : normalizedBaseConfig.tableCalculations) || normalizedBaseConfig.tableCalculations.length === 0) ? { tableCalculations: primaryDatasetTableCalculations } : {},
-      ...staticFilters.length > 0 ? { staticFilters } : {}
-    };
-  }
-  function applyReportDocumentPresentationFallbackConfig(document = null, baseConfig = {}) {
-    const presentation = resolveReportDocumentPresentation(document);
-    const normalizedBaseConfig = isPlainObject7(baseConfig) ? cloneValue18(baseConfig) : {};
-    if (!presentation) {
-      return normalizedBaseConfig;
-    }
-    const next = {
-      ...normalizedBaseConfig
-    };
-    if ((!next.groupBy || typeof next.groupBy !== "object" || Array.isArray(next.groupBy) || !Array.isArray(next.groupBy.options) || next.groupBy.options.length === 0) && Array.isArray(presentation == null ? void 0 : presentation.groupByOptions) && presentation.groupByOptions.length > 0) {
-      next.groupBy = {
-        ...isPlainObject7(next.groupBy) ? next.groupBy : {},
-        options: cloneValue18(presentation.groupByOptions)
-      };
-    }
-    const nextResult = isPlainObject7(next.result) ? cloneValue18(next.result) : {};
-    if ((!Array.isArray(nextResult == null ? void 0 : nextResult.orderFields) || nextResult.orderFields.length === 0) && Array.isArray(presentation == null ? void 0 : presentation.orderFields) && presentation.orderFields.length > 0) {
-      nextResult.orderFields = cloneValue18(presentation.orderFields);
-    }
-    if ((!Array.isArray(next.orderFields) || next.orderFields.length === 0) && Array.isArray(presentation == null ? void 0 : presentation.orderFields) && presentation.orderFields.length > 0) {
-      next.orderFields = cloneValue18(presentation.orderFields);
-    }
-    if ((!Array.isArray(nextResult == null ? void 0 : nextResult.defaultTablePresets) || nextResult.defaultTablePresets.length === 0) && Array.isArray(presentation == null ? void 0 : presentation.defaultTablePresets) && presentation.defaultTablePresets.length > 0) {
-      nextResult.defaultTablePresets = cloneValue18(presentation.defaultTablePresets);
-    }
-    if (!normalizeString29(nextResult == null ? void 0 : nextResult.defaultMode) && normalizeString29(presentation == null ? void 0 : presentation.defaultMode)) {
-      nextResult.defaultMode = normalizeString29(presentation.defaultMode);
-    }
-    if ((Number((nextResult == null ? void 0 : nextResult.pageSize) || 0) || 0) < 1 && (Number((presentation == null ? void 0 : presentation.pageSize) || 0) || 0) > 0) {
-      nextResult.pageSize = Number(presentation.pageSize || 0) || 0;
-    }
-    if (!normalizeString29(nextResult == null ? void 0 : nextResult.chartCreationMode) && normalizeString29(presentation == null ? void 0 : presentation.chartCreationMode)) {
-      nextResult.chartCreationMode = normalizeString29(presentation.chartCreationMode);
-    }
-    if (!normalizeString29(nextResult == null ? void 0 : nextResult.resultPanePosition) && normalizeString29(presentation == null ? void 0 : presentation.resultPanePosition)) {
-      nextResult.resultPanePosition = normalizeString29(presentation.resultPanePosition);
-    }
-    if ((!Array.isArray(nextResult == null ? void 0 : nextResult.defaultChartSpecs) || nextResult.defaultChartSpecs.length === 0) && Array.isArray(presentation == null ? void 0 : presentation.defaultChartSpecs) && presentation.defaultChartSpecs.length > 0) {
-      nextResult.defaultChartSpecs = cloneValue18(presentation.defaultChartSpecs);
-    }
-    if (Object.keys(nextResult).length > 0) {
-      next.result = nextResult;
-    }
-    return next;
-  }
-  function normalizeReportDocumentBuilderConfig(document = null, baseConfig = {}, fallbackState = null) {
-    const catalogConfig = applyReportDocumentDatasetCatalogToConfig(baseConfig, document);
-    const resolvedBinding = resolveReportDocumentBinding(document, catalogConfig, fallbackState);
-    const configWithBinding = resolvedBinding ? { ...catalogConfig, binding: cloneValue18(resolvedBinding) } : catalogConfig;
-    return applyReportDocumentPresentationFallbackConfig(
-      document,
-      applyPrimaryDatasetFallbackConfig(document, configWithBinding)
-    );
-  }
-  function resolveReportDocumentBuilderContext(document = null, baseConfig = null, baseState = null) {
-    const normalizedState = isPlainObject7(baseState) ? cloneValue18(baseState) : {};
-    const resolvedStaticDatasets = resolveReportDocumentStaticDatasets(document, normalizedState);
-    if (resolvedStaticDatasets.length > 0) {
-      normalizedState.reportStaticDatasets = cloneValue18(resolvedStaticDatasets);
-    }
-    const normalizedConfig = normalizeReportDocumentBuilderConfig(document, baseConfig, normalizedState);
-    const hasConfig = isPlainObject7(normalizedConfig) && Object.keys(normalizedConfig).length > 0;
-    const resolvedBinding = resolveReportDocumentBinding(document, hasConfig ? normalizedConfig : baseConfig, normalizedState);
-    if (resolvedBinding) {
-      normalizedState.binding = cloneValue18(resolvedBinding);
-    }
-    return {
-      config: hasConfig ? normalizedConfig : null,
-      state: normalizedState,
-      ...resolvedBinding ? { binding: cloneValue18(resolvedBinding) } : {},
-      ...resolvedStaticDatasets.length > 0 ? { staticDatasets: cloneValue18(resolvedStaticDatasets) } : {}
-    };
-  }
-  function resolveLoweredPrimaryDataset(document = null, generatedDataset = null, loweredContainer = {}) {
-    const documentPrimaryDataset = resolveReportDocumentPrimaryDataset(document);
-    if (!documentPrimaryDataset) {
-      return generatedDataset;
-    }
-    const generated = isPlainObject7(generatedDataset) ? cloneValue18(generatedDataset) : {
-      id: "primary"
-    };
-    const documentRequest = isPlainObject7(documentPrimaryDataset == null ? void 0 : documentPrimaryDataset.request) ? cloneValue18(documentPrimaryDataset.request) : null;
-    const generatedRequest = isPlainObject7(generated == null ? void 0 : generated.request) ? cloneValue18(generated.request) : null;
-    return {
-      ...generated,
-      id: "primary",
-      dataSourceRef: normalizeString29(
-        (documentPrimaryDataset == null ? void 0 : documentPrimaryDataset.dataSourceRef) || (generated == null ? void 0 : generated.dataSourceRef) || (loweredContainer == null ? void 0 : loweredContainer.dataSourceRef)
-      ),
-      request: shouldPreferDocumentPrimaryRequest(documentRequest, generatedRequest) ? documentRequest : generatedRequest || documentRequest || {}
-    };
-  }
-  function buildReportDocumentScopeParams(config = {}, state = {}, runtimeDatasetScopeParams = null) {
-    return buildReportBuilderScopeParams(config, state, runtimeDatasetScopeParams);
-  }
-  function buildReportBuilderBlockScopeBindings(config = {}) {
-    const predicateBindings = listReportBuilderPinnedPredicates(config).map((predicate) => ({
-      paramId: predicate.id,
-      target: `${SCOPE_PARAMS_BINDING_PREFIX}${predicate.id}`
-    }));
-    const predicateParamIds = new Set(predicateBindings.map((binding) => binding.paramId));
-    const legacyBindings = resolveReportBuilderScopeParamFilters(config).map((filter) => {
-      const paramId = normalizeString29((filter == null ? void 0 : filter.id) || (filter == null ? void 0 : filter.field));
-      if (!paramId || predicateParamIds.has(paramId)) {
-        return null;
-      }
-      return {
-        paramId,
-        target: `${STATIC_FILTERS_BINDING_PREFIX}${paramId}`
-      };
-    }).filter(Boolean);
-    const seen = new Set([...predicateBindings, ...legacyBindings].map((binding) => binding.paramId));
-    const configuredSourceBindings = normalizeReportBuilderPublishedDataSources(config).flatMap((source) => Array.isArray(source == null ? void 0 : source.scopeParamOptions) ? source.scopeParamOptions : []).map((option) => {
-      const paramId = normalizeString29((option == null ? void 0 : option.id) || (option == null ? void 0 : option.value));
-      if (!paramId || seen.has(paramId)) {
-        return null;
-      }
-      seen.add(paramId);
-      return {
-        paramId,
-        target: `${SCOPE_PARAMS_BINDING_PREFIX}${paramId}`
-      };
-    }).filter(Boolean);
-    return [...predicateBindings, ...legacyBindings, ...configuredSourceBindings];
-  }
-  function buildReportDocumentMarkdownBlock({
-    id = "markdownBlock",
-    title = "",
-    markdown = "",
-    datasetRef = ""
-  } = {}) {
-    return {
-      id: normalizeString29(id || "markdownBlock"),
-      kind: "markdownBlock",
-      title: normalizeString29(title),
-      markdown: String(markdown || ""),
-      ...normalizeString29(datasetRef) ? { datasetRef: normalizeString29(datasetRef) } : {}
-    };
-  }
-  function buildReportDocumentFilterBarBlock({
-    id = "filterBar",
-    title = "Filters",
-    paramIds = [],
-    datasetRef = "primary",
-    mode = "",
-    placement = "",
-    groupOrder = [],
-    visibleGroups = [],
-    collapsedGroups = []
-  } = {}) {
-    const normalizedParamIds = (Array.isArray(paramIds) ? paramIds : []).map((entry) => normalizeString29(entry)).filter((entry) => !!entry && !isTruncatedPlaceholder2(entry));
-    const normalizedMode = (() => {
-      const candidate = normalizeString29(mode).toLowerCase();
-      return ["baseline", "unified"].includes(candidate) ? candidate : "";
-    })();
-    const normalizedPlacement = (() => {
-      const candidate = normalizeString29(placement).toLowerCase();
-      return ["inherit", "left", "right", "top", "inline", "rail-left", "hidden"].includes(candidate) ? candidate : "";
-    })();
-    const normalizeIdList = (values = []) => (Array.isArray(values) ? values : []).map((entry) => normalizeString29(entry)).filter(Boolean);
-    if (normalizedParamIds.length === 0 && (Array.isArray(paramIds) ? paramIds : []).some((entry) => isTruncatedPlaceholder2(entry))) {
-      return null;
-    }
-    return {
-      id: normalizeString29(id || "filterBar"),
-      kind: "filterBarBlock",
-      title: normalizeFilterBarTitle(title || "Filters"),
-      datasetRef: normalizeString29(datasetRef || "primary") || "primary",
-      ...normalizedParamIds.length > 0 ? { paramIds: normalizedParamIds } : {},
-      ...normalizedMode ? { mode: normalizedMode } : {},
-      ...normalizedPlacement ? { placement: normalizedPlacement } : {},
-      ...normalizeIdList(groupOrder).length > 0 ? { groupOrder: normalizeIdList(groupOrder) } : {},
-      ...normalizeIdList(visibleGroups).length > 0 ? { visibleGroups: normalizeIdList(visibleGroups) } : {},
-      ...normalizeIdList(collapsedGroups).length > 0 ? { collapsedGroups: normalizeIdList(collapsedGroups) } : {}
-    };
-  }
-  function buildReportDocumentKpiBlock(block = {}) {
-    const valueField = normalizeString29((block == null ? void 0 : block.valueField) || "value");
-    const valueFormat = normalizeString29((block == null ? void 0 : block.valueFormat) || (block == null ? void 0 : block.format));
-    const suffix = normalizeString29(block == null ? void 0 : block.suffix);
-    const secondaryField = normalizeString29(block == null ? void 0 : block.secondaryField);
-    const presentationMode = normalizeString29(block == null ? void 0 : block.presentationMode).toLowerCase();
-    const normalizedPresentationMode = ["card", "body", "both"].includes(presentationMode) ? presentationMode : "card";
-    const rowSelector = normalizeString29(block == null ? void 0 : block.rowSelector).toLowerCase();
-    const normalizedRowSelector = ["firstrow", "maxbyvalue", "minbyvalue"].includes(rowSelector) ? rowSelector : "firstrow";
-    const bodyFormat = normalizeString29(block == null ? void 0 : block.bodyFormat).toLowerCase();
-    const normalizedBodyFormat = bodyFormat === "markdown" ? "markdown" : "markdown";
-    const bodyTemplate = String((block == null ? void 0 : block.bodyTemplate) || "");
-    return {
-      id: normalizeString29((block == null ? void 0 : block.id) || "kpiBlock"),
-      kind: "kpiBlock",
-      title: normalizeString29((block == null ? void 0 : block.title) || "KPI"),
-      datasetRef: normalizeString29((block == null ? void 0 : block.datasetRef) || "primary"),
-      valueField,
-      valueLabel: normalizeString29((block == null ? void 0 : block.valueLabel) || valueField || "Value"),
-      ...valueFormat ? { valueFormat } : {},
-      ...suffix ? { suffix } : {},
-      ...block.sparkline ? { sparkline: normalizeKpiSparkline(block.sparkline) } : {},
-      ...secondaryField ? {
-        secondaryField,
-        ...normalizeString29(block == null ? void 0 : block.secondaryDatasetRef) ? { secondaryDatasetRef: normalizeString29(block.secondaryDatasetRef) } : {},
-        ...(block == null ? void 0 : block.secondaryCalculation) ? { secondaryCalculation: normalizeKpiSecondaryCalculation(block.secondaryCalculation) } : {},
-        secondaryLabel: normalizeString29((block == null ? void 0 : block.secondaryLabel) || secondaryField),
-        ...normalizeString29(block == null ? void 0 : block.secondaryFormat) ? { secondaryFormat: normalizeString29(block.secondaryFormat) } : {},
-        ...(block == null ? void 0 : block.secondaryTrend) === true ? { secondaryTrend: true } : {},
-        ...normalizeString29(block == null ? void 0 : block.secondaryDisplayKey) ? { secondaryDisplayKey: normalizeString29(block.secondaryDisplayKey) } : {},
-        ...(block == null ? void 0 : block.secondaryDisplayValueMap) && typeof block.secondaryDisplayValueMap === "object" && !Array.isArray(block.secondaryDisplayValueMap) ? { secondaryDisplayValueMap: cloneValue18(block.secondaryDisplayValueMap) } : {}
-      } : {},
-      ...normalizeString29(block == null ? void 0 : block.description) ? { description: normalizeString29(block.description) } : {},
-      ...normalizeString29(block == null ? void 0 : block.tone) ? { tone: normalizeString29(block.tone) } : {},
-      ...normalizeString29(block == null ? void 0 : block.emptyLabel) ? { emptyLabel: normalizeString29(block.emptyLabel) } : {},
-      ...normalizedRowSelector !== "firstrow" ? { rowSelector: normalizedRowSelector } : {},
-      ...normalizedPresentationMode !== "card" ? { presentationMode: normalizedPresentationMode } : {},
-      ...normalizedPresentationMode !== "card" || bodyTemplate.trim() ? { bodyFormat: normalizedBodyFormat } : {},
-      ...bodyTemplate.trim() ? { bodyTemplate } : {}
-    };
-  }
-  function normalizeCollectionLayout(value = "") {
-    const normalized = normalizeString29(value).toLowerCase();
-    return ["grid", "list"].includes(normalized) ? normalized : "grid";
-  }
-  function normalizeCollectionColumns(value = 0) {
-    const normalized = Math.trunc(Number(value));
-    return Number.isInteger(normalized) && normalized >= 1 && normalized <= 4 ? normalized : 2;
-  }
-  function normalizeCollectionRowLimit(value = 0) {
-    const normalized = Math.trunc(Number(value));
-    return Number.isInteger(normalized) && normalized > 0 ? normalized : 6;
-  }
-  function normalizeCollectionToneRules(rules = []) {
-    return (Array.isArray(rules) ? rules : []).map((rule) => {
-      if (!rule || typeof rule !== "object" || Array.isArray(rule) || !("value" in rule)) {
-        return null;
-      }
-      return {
-        value: cloneValue18(rule.value),
-        ...normalizeString29(rule == null ? void 0 : rule.tone) ? { tone: normalizeString29(rule.tone).toLowerCase() } : {},
-        ...normalizeString29(rule == null ? void 0 : rule.label) ? { label: normalizeString29(rule.label) } : {},
-        ...normalizeString29(rule == null ? void 0 : rule.color) ? { color: normalizeString29(rule.color) } : {},
-        ...normalizeString29(rule == null ? void 0 : rule.background) ? { background: normalizeString29(rule.background) } : {}
-      };
-    }).filter(Boolean);
-  }
-  function buildReportDocumentCollectionBlock(block = {}) {
-    const itemTitleField = normalizeString29(block == null ? void 0 : block.itemTitleField);
-    const valueField = normalizeString29(block == null ? void 0 : block.valueField);
-    const secondaryField = normalizeString29(block == null ? void 0 : block.secondaryField);
-    const bodyTemplate = String((block == null ? void 0 : block.bodyTemplate) || "");
-    const toneField = normalizeString29(block == null ? void 0 : block.toneField);
-    const toneRules = normalizeCollectionToneRules(block == null ? void 0 : block.toneRules);
-    return {
-      id: normalizeString29((block == null ? void 0 : block.id) || "collectionBlock"),
-      kind: "collectionBlock",
-      title: normalizeString29((block == null ? void 0 : block.title) || "Collection") || "Collection",
-      datasetRef: normalizeString29((block == null ? void 0 : block.datasetRef) || "primary"),
-      ...itemTitleField ? { itemTitleField } : {},
-      ...normalizeString29(block == null ? void 0 : block.itemTitleLabel) ? { itemTitleLabel: normalizeString29(block.itemTitleLabel) } : {},
-      ...normalizeString29(block == null ? void 0 : block.itemTitleDisplayKey) ? { itemTitleDisplayKey: normalizeString29(block.itemTitleDisplayKey) } : {},
-      ...(block == null ? void 0 : block.itemTitleDisplayValueMap) && typeof block.itemTitleDisplayValueMap === "object" && !Array.isArray(block.itemTitleDisplayValueMap) ? { itemTitleDisplayValueMap: cloneValue18(block.itemTitleDisplayValueMap) } : {},
-      ...valueField ? {
-        valueField,
-        valueLabel: normalizeString29((block == null ? void 0 : block.valueLabel) || valueField || "Value"),
-        ...normalizeString29(block == null ? void 0 : block.valueFormat) ? { valueFormat: normalizeString29(block.valueFormat) } : {}
-      } : {},
-      ...secondaryField ? {
-        secondaryField,
-        secondaryLabel: normalizeString29((block == null ? void 0 : block.secondaryLabel) || secondaryField),
-        ...normalizeString29(block == null ? void 0 : block.secondaryFormat) ? { secondaryFormat: normalizeString29(block.secondaryFormat) } : {},
-        ...normalizeString29(block == null ? void 0 : block.secondaryDisplayKey) ? { secondaryDisplayKey: normalizeString29(block.secondaryDisplayKey) } : {},
-        ...(block == null ? void 0 : block.secondaryDisplayValueMap) && typeof block.secondaryDisplayValueMap === "object" && !Array.isArray(block.secondaryDisplayValueMap) ? { secondaryDisplayValueMap: cloneValue18(block.secondaryDisplayValueMap) } : {}
-      } : {},
-      layout: normalizeCollectionLayout(block == null ? void 0 : block.layout),
-      columns: normalizeCollectionColumns(block == null ? void 0 : block.columns),
-      rowLimit: normalizeCollectionRowLimit(block == null ? void 0 : block.rowLimit),
-      bodyFormat: "markdown",
-      ...bodyTemplate.trim() ? { bodyTemplate } : {},
-      ...(block == null ? void 0 : block.templateFieldDisplayMap) && typeof block.templateFieldDisplayMap === "object" && !Array.isArray(block.templateFieldDisplayMap) ? { templateFieldDisplayMap: cloneValue18(block.templateFieldDisplayMap) } : {},
-      ...toneField ? { toneField } : {},
-      ...toneRules.length > 0 ? { toneRules } : {},
-      ...normalizeString29(block == null ? void 0 : block.description) ? { description: normalizeString29(block.description) } : {},
-      ...normalizeString29(block == null ? void 0 : block.emptyLabel) ? { emptyLabel: normalizeString29(block.emptyLabel) } : {}
-    };
-  }
-  function buildReportDocumentSectionBlock(block = {}) {
-    const navigationLabel = normalizeString29((block == null ? void 0 : block.navigationLabel) || (block == null ? void 0 : block.title) || "Section") || "Section";
-    const blockIds = Array.from(new Set((Array.isArray(block == null ? void 0 : block.blockIds) ? block.blockIds : []).map((blockId) => normalizeString29(blockId)).filter(Boolean)));
-    return {
-      id: normalizeString29((block == null ? void 0 : block.id) || "sectionBlock"),
-      kind: "sectionBlock",
-      title: normalizeString29((block == null ? void 0 : block.title) || "Section") || "Section",
-      ...normalizeString29(block == null ? void 0 : block.datasetRef) ? { datasetRef: normalizeString29(block.datasetRef) } : {},
-      ...normalizeString29(block == null ? void 0 : block.subtitle) ? { subtitle: normalizeString29(block.subtitle) } : {},
-      ...normalizeString29(block == null ? void 0 : block.description) ? { description: normalizeString29(block.description) } : {},
-      navigationLabel,
-      ...blockIds.length > 0 ? { blockIds } : {}
-    };
-  }
-  function normalizeReportDocumentTabGroupSectionIds(sectionIds = []) {
-    const seen = /* @__PURE__ */ new Set();
-    return (Array.isArray(sectionIds) ? sectionIds : []).map((sectionId) => normalizeString29(sectionId)).filter((sectionId) => {
-      if (!sectionId || seen.has(sectionId)) {
-        return false;
-      }
-      seen.add(sectionId);
-      return true;
-    });
-  }
-  function buildReportDocumentTabGroupBlock(block = {}) {
-    const sectionIds = normalizeReportDocumentTabGroupSectionIds(block == null ? void 0 : block.sectionIds);
-    const defaultSectionId = normalizeString29(block == null ? void 0 : block.defaultSectionId);
-    return {
-      id: normalizeString29((block == null ? void 0 : block.id) || "tabGroupBlock"),
-      kind: "tabGroupBlock",
-      title: normalizeString29((block == null ? void 0 : block.title) || "Sections") || "Sections",
-      sectionIds,
-      ...typeof (block == null ? void 0 : block.includeUnlistedSections) === "boolean" ? { includeUnlistedSections: block.includeUnlistedSections } : {},
-      ...defaultSectionId && sectionIds.includes(defaultSectionId) ? { defaultSectionId } : {}
-    };
-  }
-  function normalizeReportDocumentCompositeChildBlockIds(childBlockIds = []) {
-    const seen = /* @__PURE__ */ new Set();
-    return (Array.isArray(childBlockIds) ? childBlockIds : []).map((blockId) => normalizeString29(blockId)).filter((blockId) => {
-      if (!blockId || seen.has(blockId)) {
-        return false;
-      }
-      seen.add(blockId);
-      return true;
-    });
-  }
-  function buildReportDocumentCompositeBlock(block = {}) {
-    const childBlockIds = normalizeReportDocumentCompositeChildBlockIds(block == null ? void 0 : block.childBlockIds);
-    const layout = normalizeString29(block == null ? void 0 : block.layout);
-    return {
-      id: normalizeString29((block == null ? void 0 : block.id) || "compositeBlock"),
-      kind: "compositeBlock",
-      title: normalizeString29((block == null ? void 0 : block.title) || "Grouped Panel") || "Grouped Panel",
-      ...normalizeString29(block == null ? void 0 : block.datasetRef) ? { datasetRef: normalizeString29(block.datasetRef) } : {},
-      ...normalizeString29(block == null ? void 0 : block.description) ? { description: normalizeString29(block.description) } : {},
-      ...["stack", "responsiveGrid"].includes(layout) ? { layout } : {},
-      ...(block == null ? void 0 : block.runtime) && typeof block.runtime === "object" && !Array.isArray(block.runtime) ? { runtime: cloneValue18(block.runtime) } : {},
-      childBlockIds
-    };
-  }
-  function normalizeReportDocumentStepperSteps(steps = []) {
-    return (Array.isArray(steps) ? steps : []).map((step, index) => {
-      if (!step || typeof step !== "object" || Array.isArray(step)) {
-        return null;
-      }
-      const title = normalizeString29(step == null ? void 0 : step.title);
-      const body = String((step == null ? void 0 : step.body) || "");
-      const tone = normalizeString29(step == null ? void 0 : step.tone).toLowerCase();
-      if (!title && !body.trim()) {
-        return null;
-      }
-      return {
-        id: normalizeString29((step == null ? void 0 : step.id) || `step_${index + 1}`) || `step_${index + 1}`,
-        title,
-        body,
-        ...tone ? { tone } : {}
-      };
-    }).filter(Boolean);
-  }
-  function buildReportDocumentStepperBlock(block = {}) {
-    const steps = normalizeReportDocumentStepperSteps(block == null ? void 0 : block.steps);
-    return {
-      id: normalizeString29((block == null ? void 0 : block.id) || "stepperBlock"),
-      kind: "stepperBlock",
-      title: normalizeString29((block == null ? void 0 : block.title) || "Stepper") || "Stepper",
-      ...normalizeString29(block == null ? void 0 : block.description) ? { description: normalizeString29(block.description) } : {},
-      steps
-    };
-  }
-  function buildReportDocumentInfoPanelBlock(block = {}) {
-    return {
-      id: normalizeString29((block == null ? void 0 : block.id) || "infoPanelBlock"),
-      kind: "infoPanelBlock",
-      title: normalizeString29((block == null ? void 0 : block.title) || "Info Panel") || "Info Panel",
-      ...normalizeString29(block == null ? void 0 : block.eyebrow) ? { eyebrow: normalizeString29(block.eyebrow) } : {},
-      ...normalizeString29(block == null ? void 0 : block.description) ? { description: normalizeString29(block.description) } : {},
-      ...normalizeString29(block == null ? void 0 : block.tone) ? { tone: normalizeString29(block.tone).toLowerCase() } : {},
-      bodyFormat: "markdown",
-      body: String((block == null ? void 0 : block.body) || "")
-    };
-  }
-  function normalizeReportDocumentCalloutBadges(badges = [], badgesText = "") {
-    const explicitBadges = normalizeStringArray6(badges);
-    if (explicitBadges.length > 0) {
-      return explicitBadges;
-    }
-    return String(badgesText || "").split(/[\n,]/).map((entry) => normalizeString29(entry)).filter(Boolean);
-  }
-  function buildReportDocumentCalloutBlock(block = {}) {
-    const badges = normalizeReportDocumentCalloutBadges(block == null ? void 0 : block.badges, block == null ? void 0 : block.badgesText);
-    return {
-      id: normalizeString29((block == null ? void 0 : block.id) || "calloutBlock"),
-      kind: "calloutBlock",
-      title: normalizeString29((block == null ? void 0 : block.title) || "Callout") || "Callout",
-      ...normalizeString29(block == null ? void 0 : block.icon) ? { icon: normalizeString29(block.icon) } : {},
-      ...normalizeString29(block == null ? void 0 : block.description) ? { description: normalizeString29(block.description) } : {},
-      ...normalizeString29(block == null ? void 0 : block.tone) ? { tone: normalizeString29(block.tone).toLowerCase() } : {},
-      ...badges.length > 0 ? { badges } : {},
-      bodyFormat: "markdown",
-      body: String((block == null ? void 0 : block.body) || "")
-    };
-  }
-  function normalizeReportDocumentKanbanCards(cards = []) {
-    return (Array.isArray(cards) ? cards : []).map((card, index) => {
-      if (!card || typeof card !== "object" || Array.isArray(card)) {
-        return null;
-      }
-      const title = normalizeString29(card == null ? void 0 : card.title);
-      const body = String((card == null ? void 0 : card.body) || "");
-      const badge = normalizeString29(card == null ? void 0 : card.badge);
-      const tone = normalizeString29(card == null ? void 0 : card.tone).toLowerCase();
-      if (!title && !body.trim() && !badge) {
-        return null;
-      }
-      return {
-        id: normalizeString29((card == null ? void 0 : card.id) || `card_${index + 1}`) || `card_${index + 1}`,
-        title,
-        body,
-        ...badge ? { badge } : {},
-        ...tone ? { tone } : {}
-      };
-    }).filter(Boolean);
-  }
-  function normalizeReportDocumentKanbanColumns(columns = []) {
-    return (Array.isArray(columns) ? columns : []).map((column, index) => {
-      if (!column || typeof column !== "object" || Array.isArray(column)) {
-        return null;
-      }
-      const title = normalizeString29(column == null ? void 0 : column.title);
-      const tone = normalizeString29(column == null ? void 0 : column.tone).toLowerCase();
-      const cards = normalizeReportDocumentKanbanCards(column == null ? void 0 : column.cards);
-      if (!title && cards.length === 0) {
-        return null;
-      }
-      return {
-        id: normalizeString29((column == null ? void 0 : column.id) || `column_${index + 1}`) || `column_${index + 1}`,
-        title,
-        ...tone ? { tone } : {},
-        cards
-      };
-    }).filter(Boolean);
-  }
-  function buildReportDocumentKanbanBlock(block = {}) {
-    return {
-      id: normalizeString29((block == null ? void 0 : block.id) || "kanbanBlock"),
-      kind: "kanbanBlock",
-      title: normalizeString29((block == null ? void 0 : block.title) || "Pipeline") || "Pipeline",
-      ...normalizeString29(block == null ? void 0 : block.description) ? { description: normalizeString29(block.description) } : {},
-      columns: normalizeReportDocumentKanbanColumns(block == null ? void 0 : block.columns)
-    };
-  }
-  function normalizeReportDocumentTimelineEvents(events = []) {
-    return (Array.isArray(events) ? events : []).map((event, index) => {
-      if (!event || typeof event !== "object" || Array.isArray(event)) {
-        return null;
-      }
-      const title = normalizeString29(event == null ? void 0 : event.title);
-      const body = String((event == null ? void 0 : event.body) || "");
-      const date = normalizeString29(event == null ? void 0 : event.date);
-      const badge = normalizeString29(event == null ? void 0 : event.badge);
-      const tone = normalizeString29(event == null ? void 0 : event.tone).toLowerCase();
-      if (!title && !body.trim() && !date && !badge) {
-        return null;
-      }
-      return {
-        id: normalizeString29((event == null ? void 0 : event.id) || `event_${index + 1}`) || `event_${index + 1}`,
-        ...date ? { date } : {},
-        title,
-        body,
-        ...badge ? { badge } : {},
-        ...tone ? { tone } : {}
-      };
-    }).filter(Boolean);
-  }
-  function buildReportDocumentTimelineBlock(block = {}) {
-    const datasetRef = normalizeString29(block == null ? void 0 : block.datasetRef);
-    const timeField = normalizeString29(block == null ? void 0 : block.timeField);
-    const titleField = normalizeString29(block == null ? void 0 : block.titleField);
-    const descriptionField = normalizeString29(block == null ? void 0 : block.descriptionField);
-    const badgeField = normalizeString29(block == null ? void 0 : block.badgeField);
-    const toneField = normalizeString29(block == null ? void 0 : block.toneField);
-    return {
-      id: normalizeString29((block == null ? void 0 : block.id) || "timelineBlock"),
-      kind: "timelineBlock",
-      title: normalizeString29((block == null ? void 0 : block.title) || "Timeline") || "Timeline",
-      ...normalizeString29(block == null ? void 0 : block.description) ? { description: normalizeString29(block.description) } : {},
-      ...datasetRef ? { datasetRef } : {},
-      ...timeField ? { timeField } : {},
-      ...titleField ? { titleField } : {},
-      ...descriptionField ? { descriptionField } : {},
-      ...badgeField ? { badgeField } : {},
-      ...toneField ? { toneField } : {},
-      events: normalizeReportDocumentTimelineEvents(block == null ? void 0 : block.events)
-    };
-  }
-  function humanizeReportDocumentFieldName(value = "") {
-    return normalizeString29(value).replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
-  }
-  function normalizeReportDocumentBadgeItems(items = []) {
-    return (Array.isArray(items) ? items : []).map((item, index) => {
-      if (!item || typeof item !== "object" || Array.isArray(item)) {
-        return null;
-      }
-      const rawLegacyLabelField = normalizeString29(item == null ? void 0 : item.labelField);
-      const legacyLabelField = isTruncatedPlaceholder2(rawLegacyLabelField) ? "" : rawLegacyLabelField;
-      const rawLabel = normalizeString29(
-        (item == null ? void 0 : item.label) || (legacyLabelField ? humanizeReportDocumentFieldName(legacyLabelField) : "")
-      );
-      const label = isTruncatedPlaceholder2(rawLabel) ? "" : rawLabel;
-      const rawValue = normalizeString29(item == null ? void 0 : item.value);
-      const value = isTruncatedPlaceholder2(rawValue) ? "" : rawValue;
-      const rawValueField = normalizeString29((item == null ? void 0 : item.valueField) || legacyLabelField);
-      const valueField = isTruncatedPlaceholder2(rawValueField) ? "" : rawValueField;
-      const format2 = normalizeString29(item == null ? void 0 : item.format);
-      const displayKey = normalizeString29(item == null ? void 0 : item.displayKey);
-      const labelMode = normalizeString29(item == null ? void 0 : item.labelMode).toLowerCase();
-      const rules = (Array.isArray(item == null ? void 0 : item.rules) ? item.rules : []).map((rule) => {
-        if (!rule || typeof rule !== "object" || Array.isArray(rule)) {
-          return null;
-        }
-        const next = {
-          ..."value" in rule ? { value: cloneValue18(rule.value) } : {},
-          ...normalizeString29(rule == null ? void 0 : rule.label) ? { label: normalizeString29(rule.label) } : {},
-          ...normalizeString29(rule == null ? void 0 : rule.tone) ? { tone: normalizeString29(rule.tone) } : {}
-        };
-        return Object.keys(next).length > 0 ? next : null;
-      }).filter(Boolean);
-      const tone = normalizeString29((item == null ? void 0 : item.tone) || (item == null ? void 0 : item.severity));
-      if (!label && !value && !valueField) {
-        return null;
-      }
-      return {
-        id: normalizeString29((item == null ? void 0 : item.id) || `badge_${index + 1}`) || `badge_${index + 1}`,
-        ...label ? { label } : {},
-        ...value ? { value } : {},
-        ...valueField ? { valueField } : {},
-        ...format2 ? { format: format2 } : {},
-        ...displayKey ? { displayKey } : {},
-        ...(item == null ? void 0 : item.displayValueMap) && typeof item.displayValueMap === "object" && !Array.isArray(item.displayValueMap) ? { displayValueMap: cloneValue18(item.displayValueMap) } : {},
-        ...["field", "manual"].includes(labelMode) ? { labelMode } : {},
-        ...rules.length > 0 ? { rules } : {},
-        ...tone ? { tone } : {}
-      };
-    }).filter(Boolean);
-  }
-  function buildReportDocumentBadgesBlock(block = {}) {
-    const items = normalizeReportDocumentBadgeItems(block == null ? void 0 : block.items);
-    return {
-      id: normalizeString29((block == null ? void 0 : block.id) || "badgesBlock"),
-      kind: "badgesBlock",
-      title: normalizeString29((block == null ? void 0 : block.title) || "Status Pills") || "Status Pills",
-      datasetRef: normalizeString29((block == null ? void 0 : block.datasetRef) || "primary") || "primary",
-      items
-    };
-  }
-  function buildReportDocumentChartBlock(block = {}) {
-    var _a5;
-    const normalizedTitle = normalizeString29((block == null ? void 0 : block.title) || ((_a5 = block == null ? void 0 : block.chartSpec) == null ? void 0 : _a5.title) || "Chart") || "Chart";
-    const normalizedChartSpec = normalizeReportBuilderChartSpec({
-      ...(block == null ? void 0 : block.chartSpec) && typeof block.chartSpec === "object" && !Array.isArray(block.chartSpec) ? block.chartSpec : {},
-      title: normalizedTitle
-    });
-    const rowLimit = Math.trunc(Number(block == null ? void 0 : block.rowLimit));
-    return {
-      id: normalizeString29((block == null ? void 0 : block.id) || "chartBlock"),
-      kind: "chartBlock",
-      title: normalizedTitle,
-      datasetRef: normalizeString29((block == null ? void 0 : block.datasetRef) || "primary"),
-      chartSpec: normalizedChartSpec,
-      ...Number.isInteger(rowLimit) && rowLimit > 0 ? { rowLimit } : {}
-    };
-  }
-  function buildReportDocumentGeoMapBlock(block = {}) {
-    const geo = (block == null ? void 0 : block.geo) && typeof block.geo === "object" && !Array.isArray(block.geo) ? cloneValue18(block.geo) : {};
-    if ((geo == null ? void 0 : geo.metric) && typeof geo.metric === "object" && !Array.isArray(geo.metric)) {
-      const metricFormat = normalizeGeoFormat2(geo.metric.format);
-      if (metricFormat) {
-        geo.metric.format = metricFormat;
-      } else {
-        delete geo.metric.format;
-      }
-    }
-    const geoFormat = normalizeGeoFormat2(geo.format);
-    if (geoFormat) {
-      geo.format = geoFormat;
-    } else {
-      delete geo.format;
-    }
-    return {
-      id: normalizeString29((block == null ? void 0 : block.id) || "geoMapBlock"),
-      kind: "geoMapBlock",
-      title: normalizeString29((block == null ? void 0 : block.title) || "Geo Map"),
-      datasetRef: normalizeString29((block == null ? void 0 : block.datasetRef) || "primary"),
-      geo
-    };
-  }
-  function normalizeReportBlockRuntime(runtime = null, block = {}) {
-    const source = isPlainObject7(runtime) ? runtime : {};
-    const visibleWhen = isPlainObject7(source == null ? void 0 : source.visibleWhen) ? cloneValue18(source.visibleWhen) : isPlainObject7(block == null ? void 0 : block.visibleWhen) ? cloneValue18(block.visibleWhen) : null;
-    const filterBindings = isPlainObject7(source == null ? void 0 : source.filterBindings) ? cloneValue18(source.filterBindings) : isPlainObject7(block == null ? void 0 : block.filterBindings) ? cloneValue18(block.filterBindings) : null;
-    const selectionBindings = isPlainObject7(source == null ? void 0 : source.selectionBindings) ? cloneValue18(source.selectionBindings) : isPlainObject7(block == null ? void 0 : block.selectionBindings) ? cloneValue18(block.selectionBindings) : null;
-    const actions = Array.isArray(source == null ? void 0 : source.actions) ? cloneValue18(source.actions) : Array.isArray(block == null ? void 0 : block.actions) ? cloneValue18(block.actions) : [];
-    const normalized = {
-      ...(source == null ? void 0 : source.printRowReference) === true ? { printRowReference: true } : {},
-      ...visibleWhen ? { visibleWhen } : {},
-      ...filterBindings && Object.keys(filterBindings).length > 0 ? { filterBindings } : {},
-      ...selectionBindings && Object.keys(selectionBindings).length > 0 ? { selectionBindings } : {},
-      ...actions.length > 0 ? { actions } : {}
-    };
-    return Object.keys(normalized).length > 0 ? normalized : null;
-  }
-  function withReportBlockRuntime(normalizedBlock = null, sourceBlock = {}) {
-    if (!normalizedBlock) {
-      return normalizedBlock;
-    }
-    const runtime = normalizeReportBlockRuntime(sourceBlock == null ? void 0 : sourceBlock.runtime, sourceBlock);
-    return runtime ? { ...normalizedBlock, runtime } : normalizedBlock;
-  }
-  function normalizeReportBuilderDocumentBlockContent(block = {}) {
-    if (!isPlainObject7(block)) {
-      return null;
-    }
-    const normalizedKind = normalizeString29(block == null ? void 0 : block.kind);
-    if (normalizedKind === "markdownBlock") {
-      return buildReportDocumentMarkdownBlock(block);
-    }
-    if (normalizedKind === "filterBarBlock") {
-      return buildReportDocumentFilterBarBlock(block);
-    }
-    if (normalizedKind === "refinementBarBlock") {
-      const actionKinds = (block == null ? void 0 : block.actionKinds) != null ? normalizeRefinementBarActionKinds(block == null ? void 0 : block.actionKinds) : null;
-      return {
-        id: normalizeString29((block == null ? void 0 : block.id) || "refinementTrail"),
-        kind: "refinementBarBlock",
-        ...(block == null ? void 0 : block.title) != null ? { title: normalizeRefinementBarText(block == null ? void 0 : block.title) } : {},
-        ...actionKinds != null ? { actionKinds } : {},
-        ...(block == null ? void 0 : block.emptyLabel) != null ? { emptyLabel: normalizeRefinementBarText(block == null ? void 0 : block.emptyLabel) } : {}
-      };
-    }
-    if (normalizedKind === "kpiBlock") {
-      return buildReportDocumentKpiBlock(block);
-    }
-    if (normalizedKind === "collectionBlock") {
-      return buildReportDocumentCollectionBlock(block);
-    }
-    if (normalizedKind === "sectionBlock") {
-      return buildReportDocumentSectionBlock(block);
-    }
-    if (normalizedKind === "tabGroupBlock") {
-      return buildReportDocumentTabGroupBlock(block);
-    }
-    if (normalizedKind === "compositeBlock") {
-      return buildReportDocumentCompositeBlock(block);
-    }
-    if (normalizedKind === "stepperBlock") {
-      return buildReportDocumentStepperBlock(block);
-    }
-    if (normalizedKind === "infoPanelBlock") {
-      return buildReportDocumentInfoPanelBlock(block);
-    }
-    if (normalizedKind === "calloutBlock") {
-      return buildReportDocumentCalloutBlock(block);
-    }
-    if (normalizedKind === "kanbanBlock") {
-      return buildReportDocumentKanbanBlock(block);
-    }
-    if (normalizedKind === "timelineBlock") {
-      return buildReportDocumentTimelineBlock(block);
-    }
-    if (normalizedKind === "badgesBlock") {
-      return buildReportDocumentBadgesBlock(block);
-    }
-    if (normalizedKind === "chartBlock") {
-      return buildReportDocumentChartBlock(block);
-    }
-    if (normalizedKind === "tableBlock") {
-      return normalizeReportDocumentTableBlock(block);
-    }
-    if (normalizedKind === "geoMapBlock") {
-      return buildReportDocumentGeoMapBlock(block);
-    }
-    return cloneValue18(block);
-  }
-  function normalizeReportBuilderDocumentBlock(block = {}) {
-    return withReportBlockRuntime(normalizeReportBuilderDocumentBlockContent(block), block);
-  }
-  function normalizeReportBuilderDocumentBlocks(blocks = []) {
-    return (Array.isArray(blocks) ? blocks : []).map((block) => normalizeReportBuilderDocumentBlock(block)).filter(Boolean);
-  }
-  function mergeReportBuilderDocumentBlocks(stateBlocks = [], additionalBlocks = []) {
-    const merged = [];
-    const indexById = /* @__PURE__ */ new Map();
-    [...stateBlocks, ...additionalBlocks].forEach((block) => {
-      const normalizedBlock = normalizeReportBuilderDocumentBlock(block);
-      if (!normalizedBlock) {
-        return;
-      }
-      const blockId = normalizeString29(normalizedBlock == null ? void 0 : normalizedBlock.id);
-      if (!blockId) {
-        merged.push(normalizedBlock);
-        return;
-      }
-      if (!indexById.has(blockId)) {
-        indexById.set(blockId, merged.length);
-        merged.push(normalizedBlock);
-        return;
-      }
-      merged[indexById.get(blockId)] = normalizedBlock;
-    });
-    return merged;
-  }
-  function normalizeReportBuilderDocumentLayoutItems(layout = null, blockIds = []) {
-    const items = Array.isArray(layout) ? layout : Array.isArray(layout == null ? void 0 : layout.items) ? layout.items : [];
-    const knownIds = /* @__PURE__ */ new Set([
-      "primaryBuilder",
-      ...(Array.isArray(blockIds) ? blockIds : []).map((entry) => normalizeString29(entry)).filter(Boolean)
-    ]);
-    const seen = /* @__PURE__ */ new Set();
-    const normalized = [];
-    items.forEach((item) => {
-      const normalizedItem = buildLayoutItem((item == null ? void 0 : item.blockId) || item, item);
-      const blockId = normalizeString29(normalizedItem == null ? void 0 : normalizedItem.blockId);
-      if (!blockId || seen.has(blockId) || !knownIds.has(blockId) || !normalizedItem) {
-        return;
-      }
-      seen.add(blockId);
-      normalized.push(normalizedItem);
-    });
-    const normalizedBlockIds = (Array.isArray(blockIds) ? blockIds : []).map((entry) => normalizeString29(entry)).filter(Boolean);
-    const preludeBlockIds = normalizedBlockIds.filter((blockId) => blockId !== "primaryBuilder" && ["scopeFilters", "sharedFilters", "activeRefinements", "activeDrillPath"].includes(blockId));
-    const trailingBlockIds = normalizedBlockIds.filter((blockId) => blockId !== "primaryBuilder" && !preludeBlockIds.includes(blockId));
-    [...preludeBlockIds, "primaryBuilder", ...trailingBlockIds].forEach((blockId) => {
-      if (seen.has(blockId)) {
-        return;
-      }
-      seen.add(blockId);
-      normalized.push({ blockId });
-    });
-    return normalized;
-  }
-  function buildReportBuilderReportDocument({
-    container = {},
-    config = {},
-    state = {},
-    additionalBlocks = [],
-    refinements = [],
-    semanticSummary = null,
-    runtimeDatasetScopeParams = null
-  } = {}) {
-    var _a5;
-    const documentId = resolveDocumentId(container);
-    const blockId = "primaryBuilder";
-    const scopeParams = buildReportDocumentScopeParams(config, state, runtimeDatasetScopeParams);
-    const contextPreset = resolveReportScopeContextPresetFromState(state, scopeParams);
-    const binding = resolveReportDocumentBinding(null, config, state);
-    const documentBlocks = mergeReportBuilderDocumentBlocks(
-      normalizeReportBuilderDocumentBlocks(state == null ? void 0 : state.reportDocumentBlocks),
-      additionalBlocks
-    ).map((block) => normalizeString29(block == null ? void 0 : block.kind) === "tableBlock" && (config == null ? void 0 : config.tablePresentation) && typeof config.tablePresentation === "object" ? normalizeReportDocumentTableBlock({ ...cloneValue18(config.tablePresentation), ...block }) : block).filter(Boolean);
-    const source = {
-      kind: "dashboard.reportBuilder",
-      containerId: resolveContainerIdentity2(container),
-      stateKey: normalizeString29((container == null ? void 0 : container.stateKey) || resolveContainerIdentity2(container)),
-      dataSourceRef: resolveDocumentDataSourceRef(container, config)
-    };
-    const presentation = buildReportBuilderReportDocumentPresentation(config, state);
-    return {
-      version: 1,
-      kind: "reportDocument",
-      ...normalizeReportViewerSettings(state == null ? void 0 : state.reportDocumentViewer) ? { viewer: normalizeReportViewerSettings(state.reportDocumentViewer) } : {},
-      id: documentId,
-      title: resolveDocumentMetadataValue(state == null ? void 0 : state.reportDocumentTitle, resolveDocumentTitle(container, config)),
-      subtitle: normalizeString29(state == null ? void 0 : state.reportDocumentSubtitle),
-      description: normalizeString29(state == null ? void 0 : state.reportDocumentDescription),
-      ...normalizeReportDocumentTheme({
-        accentTone: state == null ? void 0 : state.reportDocumentThemeAccent,
-        badgePalette: state == null ? void 0 : state.reportDocumentBadgePalette
-      }) ? { theme: normalizeReportDocumentTheme({
-        accentTone: state == null ? void 0 : state.reportDocumentThemeAccent,
-        badgePalette: state == null ? void 0 : state.reportDocumentBadgePalette
-      }) } : {},
-      ...resolveDocumentTemplateIdentity(state) || {},
-      ...binding ? { binding: cloneValue18(binding) } : {},
-      ...semanticSummary && typeof semanticSummary === "object" && !Array.isArray(semanticSummary) ? { semanticSummary: cloneValue18(semanticSummary) } : {},
-      refinements: normalizeReportRefinements(refinements),
-      scope: {
-        ...contextPreset ? { contextPreset: cloneValue18(contextPreset) } : {},
-        params: scopeParams,
-        dataSourceRef: resolveDocumentDataSourceRef(container, config)
-      },
-      ...presentation ? { presentation } : {},
-      datasets: buildReportBuilderReportDocumentDatasets(container, config, state),
-      layout: {
-        type: normalizeString29(((_a5 = state == null ? void 0 : state.reportDocumentLayout) == null ? void 0 : _a5.type) || "stack") || "stack",
-        items: normalizeReportBuilderDocumentLayoutItems(
-          state == null ? void 0 : state.reportDocumentLayout,
-          documentBlocks.map((block) => normalizeString29(block == null ? void 0 : block.id)).filter(Boolean)
-        )
-      },
-      blocks: [
-        ...documentBlocks.map((block) => cloneValue18(block)),
-        {
-          id: blockId,
-          kind: "reportBuilderBlock",
-          title: resolveDocumentTitle(container, config),
-          source,
-          config: stripReportBuilderDocumentPresentationMetadata(
-            stripReportBuilderDocumentPrimaryFieldContract(
-              stripReportBuilderDocumentDatasetCatalog(config)
-            ),
-            presentation
-          ),
-          state: stripReportBuilderDocumentAuthoringState(state),
-          scopeBindings: buildReportBuilderBlockScopeBindings(config)
-        }
-      ]
-    };
-  }
-  function applyReportBuilderBlockScope(document = {}, block = {}) {
-    var _a5;
-    const scopeParams = new Map(
-      (Array.isArray((_a5 = document == null ? void 0 : document.scope) == null ? void 0 : _a5.params) ? document.scope.params : []).map((param) => [normalizeString29(param == null ? void 0 : param.id), param]).filter(([id]) => !!id)
-    );
-    const boundScopeValues = {};
-    (Array.isArray(block == null ? void 0 : block.scopeBindings) ? block.scopeBindings : []).forEach((binding) => {
-      const paramId = normalizeString29(binding == null ? void 0 : binding.paramId);
-      const filterId = resolveScopeBindingFilterId(binding == null ? void 0 : binding.target);
-      if (!paramId || !filterId) {
-        return;
-      }
-      const param = scopeParams.get(paramId);
-      if (!param) {
-        return;
-      }
-      boundScopeValues[filterId] = cloneValue18(param.value);
-    });
-    return {
-      ...block,
-      state: mergeScopeParamValues(cloneValue18((block == null ? void 0 : block.state) || {}), boundScopeValues)
-    };
-  }
-  function enrichLoweredScopeParams(documentParams = [], canonicalParams = []) {
-    const canonicalById = new Map(
-      (Array.isArray(canonicalParams) ? canonicalParams : []).map((param) => [normalizeString29(param == null ? void 0 : param.id), param]).filter(([id]) => !!id)
-    );
-    const seen = /* @__PURE__ */ new Set();
-    const enriched = (Array.isArray(documentParams) ? documentParams : []).map((param) => {
-      const id = normalizeString29(param == null ? void 0 : param.id);
-      if (!id) {
-        return null;
-      }
-      seen.add(id);
-      const canonical = canonicalById.get(id);
-      return canonical ? { ...cloneValue18(canonical), ...cloneValue18(param) } : cloneValue18(param);
-    }).filter(Boolean);
-    canonicalById.forEach((param, id) => {
-      if (!seen.has(id)) {
-        enriched.push(cloneValue18(param));
-      }
-    });
-    return enriched;
-  }
-  function orderLoweredBlocksByDocumentLayout(document = {}, baseSpec = {}, allBlocks = []) {
-    var _a5, _b;
-    const blockIndex = new Map(
-      (Array.isArray(allBlocks) ? allBlocks : []).map((block) => [normalizeString29(block == null ? void 0 : block.id), block]).filter(([id]) => !!id)
-    );
-    const ordered = [];
-    const layoutItems = [];
-    const seen = /* @__PURE__ */ new Set();
-    const primaryBuilderBlockIds = (Array.isArray((_a5 = baseSpec == null ? void 0 : baseSpec.layoutIntent) == null ? void 0 : _a5.blockOrder) ? baseSpec.layoutIntent.blockOrder : []).map((blockId) => normalizeString29(blockId)).filter(Boolean);
-    const pushOrderedBlock = (blockId = "", layoutItem = null) => {
-      const normalizedBlockId = normalizeString29(blockId);
-      const block = blockIndex.get(normalizedBlockId);
-      if (!block || seen.has(normalizedBlockId)) {
-        return;
-      }
-      seen.add(normalizedBlockId);
-      ordered.push(block);
-      layoutItems.push(buildLayoutItem(normalizedBlockId, layoutItem) || { blockId: normalizedBlockId });
-    };
-    (Array.isArray((_b = document == null ? void 0 : document.layout) == null ? void 0 : _b.items) ? document.layout.items : []).forEach((item) => {
-      const blockId = normalizeString29(item == null ? void 0 : item.blockId);
-      if (!blockId) {
-        return;
-      }
-      const expandedBlockIds = blockId === "primaryBuilder" ? primaryBuilderBlockIds : [blockId];
-      expandedBlockIds.forEach((expandedBlockId) => {
-        pushOrderedBlock(expandedBlockId, item);
-      });
-    });
-    (Array.isArray(allBlocks) ? allBlocks : []).forEach((block) => {
-      const blockId = normalizeString29(block == null ? void 0 : block.id);
-      if (blockId && seen.has(blockId)) {
-        return;
-      }
-      if (blockId) {
-        pushOrderedBlock(blockId);
-        return;
-      }
-      ordered.push(block);
-    });
-    return {
-      blocks: ordered,
-      items: layoutItems
-    };
-  }
-  function buildExclusiveReportSectionOwnership(blocks = []) {
-    const source = Array.isArray(blocks) ? blocks : [];
-    const tabGroup = source.find((block) => normalizeString29(block == null ? void 0 : block.kind) === "tabGroupBlock") || null;
-    if (!tabGroup || (tabGroup == null ? void 0 : tabGroup.includeUnlistedSections) !== false) {
-      return /* @__PURE__ */ new Map();
-    }
-    const declaredSectionIds = new Set((Array.isArray(tabGroup == null ? void 0 : tabGroup.sectionIds) ? tabGroup.sectionIds : []).map((sectionId) => normalizeString29(sectionId)).filter(Boolean));
-    const ownership = new Map(Array.from(declaredSectionIds, (sectionId) => [sectionId, []]));
-    let activeSectionId = "";
-    let inferActiveSectionOwnership = false;
-    source.forEach((block) => {
-      const blockId = normalizeString29(block == null ? void 0 : block.id);
-      const kind = normalizeString29(block == null ? void 0 : block.kind);
-      if (kind === "sectionBlock") {
-        activeSectionId = declaredSectionIds.has(blockId) ? blockId : "";
-        const explicitBlockIds = (Array.isArray(block == null ? void 0 : block.blockIds) ? block.blockIds : []).map((ownedBlockId) => normalizeString29(ownedBlockId)).filter(Boolean);
-        if (activeSectionId && explicitBlockIds.length > 0) {
-          ownership.set(activeSectionId, Array.from(new Set(explicitBlockIds)));
-          inferActiveSectionOwnership = false;
-        } else {
-          inferActiveSectionOwnership = !!activeSectionId;
-        }
-        return;
-      }
-      if (!activeSectionId || !inferActiveSectionOwnership || !blockId || kind === "tabGroupBlock" || kind === "reportBuilderBlock") {
-        return;
-      }
-      ownership.get(activeSectionId).push(blockId);
-    });
-    return ownership;
-  }
-  function filterExclusiveReportRuntimeBlocks(documentBlocks = [], runtimeBlocks = [], ownership = /* @__PURE__ */ new Map()) {
-    if (!(ownership instanceof Map) || ownership.size === 0) {
-      return Array.isArray(runtimeBlocks) ? runtimeBlocks : [];
-    }
-    const allowedBlockIds = new Set(
-      (Array.isArray(documentBlocks) ? documentBlocks : []).map((block) => normalizeString29(block == null ? void 0 : block.id)).filter(Boolean)
-    );
-    ownership.forEach((blockIds, sectionId) => {
-      if (normalizeString29(sectionId)) allowedBlockIds.add(normalizeString29(sectionId));
-      (Array.isArray(blockIds) ? blockIds : []).map((blockId) => normalizeString29(blockId)).filter(Boolean).forEach((blockId) => allowedBlockIds.add(blockId));
-    });
-    return (Array.isArray(runtimeBlocks) ? runtimeBlocks : []).filter((block) => allowedBlockIds.has(normalizeString29(block == null ? void 0 : block.id)));
-  }
-  function lowerReportDocumentToReportSpec(document = {}, {
-    includePrimaryBlocks = true,
-    runtimeDatasetScopeParams = null,
-    onChartValidation = null
-  } = {}) {
-    var _a5, _b, _c, _d, _e, _f;
-    const blocks = Array.isArray(document == null ? void 0 : document.blocks) ? document.blocks : [];
-    const exclusiveSectionOwnership = buildExclusiveReportSectionOwnership(blocks);
-    const reportBuilderBlock = resolveReportBuilderBlock(document);
-    if (!reportBuilderBlock) {
-      throw new Error("ReportDocument must contain at least one reportBuilderBlock.");
-    }
-    const scopedReportBuilderBlock = applyReportBuilderBlockScope(document, reportBuilderBlock);
-    const source = (reportBuilderBlock == null ? void 0 : reportBuilderBlock.source) && typeof reportBuilderBlock.source === "object" ? reportBuilderBlock.source : {};
-    const builderContext = resolveReportDocumentBuilderContext(
-      document,
-      (scopedReportBuilderBlock == null ? void 0 : scopedReportBuilderBlock.config) || {},
-      (scopedReportBuilderBlock == null ? void 0 : scopedReportBuilderBlock.state) || {}
-    );
-    const effectiveScopedConfig = (builderContext == null ? void 0 : builderContext.config) || {};
-    const effectiveScopedState = (builderContext == null ? void 0 : builderContext.state) || {};
-    const effectiveConfig = buildReportBuilderCalculatedFieldConfig(effectiveScopedConfig, effectiveScopedState);
-    const effectiveFieldCatalog = buildReportBuilderFieldCatalog(effectiveConfig);
-    const staticDatasets = Array.isArray(builderContext == null ? void 0 : builderContext.staticDatasets) ? builderContext.staticDatasets : [];
-    const loweringState = effectiveScopedState;
-    const staticDatasetIndex = new Map(
-      staticDatasets.map((dataset) => [normalizeString29(dataset == null ? void 0 : dataset.id), dataset]).filter(([datasetId]) => !!datasetId)
-    );
-    const publishedDatasetSources = resolveReportDocumentPublishedDatasets(document, effectiveScopedConfig);
-    const publishedDatasetIndex = buildReportBuilderPublishedDatasetRefIndex(publishedDatasetSources);
-    const loweredContainer = {
-      id: normalizeString29(source.containerId || (document == null ? void 0 : document.id)),
-      stateKey: normalizeString29(source.stateKey || source.containerId || (document == null ? void 0 : document.id)),
-      title: normalizeString29((document == null ? void 0 : document.title) || (reportBuilderBlock == null ? void 0 : reportBuilderBlock.title)),
-      dataSourceRef: normalizeString29(source.dataSourceRef || ((_a5 = document == null ? void 0 : document.scope) == null ? void 0 : _a5.dataSourceRef))
-    };
-    const baseSpec = buildReportBuilderReportSpec({
-      container: loweredContainer,
-      config: effectiveScopedConfig,
-      state: loweringState,
-      refinements: normalizeReportRefinements(document == null ? void 0 : document.refinements),
-      semanticSummary: (document == null ? void 0 : document.semanticSummary) || null,
-      includePrimaryBlocks,
-      onChartValidation
-    });
-    const primaryRequestContext = {
-      dataSourceRef: normalizeString29(((_b = baseSpec == null ? void 0 : baseSpec.source) == null ? void 0 : _b.dataSourceRef) || (loweredContainer == null ? void 0 : loweredContainer.dataSourceRef)),
-      request: cloneValue18(buildReportBuilderRequest(effectiveScopedConfig, effectiveScopedState))
-    };
-    const datasetBackedBlocks = blocks.filter((block) => normalizeString29(block == null ? void 0 : block.kind) !== "reportBuilderBlock").filter((block) => isReportDatasetBackedBlockKind(block == null ? void 0 : block.kind));
-    const explicitDatasetRefs = datasetBackedBlocks.map((block) => normalizeString29(block == null ? void 0 : block.datasetRef)).filter(Boolean);
-    const shouldOmitPrimaryDataset = !shouldKeepPrimaryDataset({
-      includePrimaryBlocks,
-      datasetBackedBlockDatasetRefs: explicitDatasetRefs.length === datasetBackedBlocks.length ? explicitDatasetRefs : [],
-      availableNonPrimaryDatasetRefs: [
-        ...Array.from(staticDatasetIndex.keys()),
-        ...Array.from(publishedDatasetIndex.keys())
-      ]
-    });
-    if (shouldOmitPrimaryDataset) {
-      baseSpec.datasets = (Array.isArray(baseSpec == null ? void 0 : baseSpec.datasets) ? baseSpec.datasets : []).filter((dataset) => normalizeString29(dataset == null ? void 0 : dataset.id) !== "primary");
-    }
-    const buildDatasetSpecificRuntimeContext = (datasetRef = "") => {
-      const normalizedDatasetRef = normalizeString29(datasetRef || "primary") || "primary";
-      if (!normalizedDatasetRef || normalizedDatasetRef === "primary") {
-        return {
-          config: effectiveConfig,
-          fieldCatalog: effectiveFieldCatalog,
-          container: loweredContainer
-        };
-      }
-      const staticDataset = staticDatasetIndex.get(normalizedDatasetRef) || null;
-      if (staticDataset) {
-        const datasetConfig = buildStaticDatasetReportBuilderConfig(effectiveConfig, staticDataset);
-        return {
-          config: datasetConfig,
-          fieldCatalog: buildReportBuilderFieldCatalog(datasetConfig),
-          container: {
-            ...loweredContainer,
-            dataSourceRef: normalizeString29((staticDataset == null ? void 0 : staticDataset.dataSourceRef) || (loweredContainer == null ? void 0 : loweredContainer.dataSourceRef))
-          }
-        };
-      }
-      const publishedDataset = publishedDatasetIndex.get(normalizedDatasetRef) || null;
-      if (publishedDataset) {
-        const datasetConfig = buildReportBuilderPublishedDatasetConfig(effectiveConfig, publishedDataset, { borrowBase: true });
-        return {
-          config: datasetConfig,
-          fieldCatalog: buildReportBuilderFieldCatalog(datasetConfig),
-          container: {
-            ...loweredContainer,
-            dataSourceRef: normalizeString29((publishedDataset == null ? void 0 : publishedDataset.dataSourceRef) || (loweredContainer == null ? void 0 : loweredContainer.dataSourceRef))
-          }
-        };
-      }
-      return {
-        config: effectiveConfig,
-        fieldCatalog: effectiveFieldCatalog,
-        container: loweredContainer
-      };
-    };
-    const datasetRuntimeContexts = /* @__PURE__ */ new Map();
-    const resolveDatasetSpecificRuntimeContext = (datasetRef = "") => {
-      const key = normalizeString29(datasetRef || "primary") || "primary";
-      if (!datasetRuntimeContexts.has(key)) {
-        datasetRuntimeContexts.set(key, buildDatasetSpecificRuntimeContext(key));
-      }
-      return datasetRuntimeContexts.get(key);
-    };
-    const additionalBlocks = blocks.filter((block) => normalizeString29(block == null ? void 0 : block.kind) !== "reportBuilderBlock").map((block) => {
-      const normalizedBlock = normalizeReportBuilderDocumentBlock(block);
-      if (normalizeString29(normalizedBlock == null ? void 0 : normalizedBlock.kind) === "sectionBlock" && exclusiveSectionOwnership.has(normalizeString29(normalizedBlock == null ? void 0 : normalizedBlock.id))) {
-        return {
-          ...normalizedBlock,
-          blockIds: cloneValue18(exclusiveSectionOwnership.get(normalizeString29(normalizedBlock.id)))
-        };
-      }
-      const datasetContext = resolveDatasetSpecificRuntimeContext(normalizedBlock == null ? void 0 : normalizedBlock.datasetRef);
-      if (normalizeString29(normalizedBlock == null ? void 0 : normalizedBlock.kind) === "chartBlock") {
-        const chartState = buildAuthoredChartBlockState({
-          ...cloneValue18(effectiveScopedState),
-          selectedDimensions: [],
-          selectedMeasures: [],
-          primaryMeasure: "",
-          groupBy: ""
-        }, (normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) || {}, datasetContext.fieldCatalog);
-        return withReportBlockRuntime(buildReportSpecChartBlock({
-          container: datasetContext.container,
-          config: datasetContext.config,
-          state: chartState,
-          chartSpec: (normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) || null,
-          blockId: normalizedBlock == null ? void 0 : normalizedBlock.id,
-          datasetRef: normalizedBlock == null ? void 0 : normalizedBlock.datasetRef,
-          title: normalizedBlock == null ? void 0 : normalizedBlock.title,
-          rowLimit: normalizedBlock == null ? void 0 : normalizedBlock.rowLimit,
-          onChartValidation
-        }), normalizedBlock);
-      }
-      if (normalizeString29(normalizedBlock == null ? void 0 : normalizedBlock.kind) === "tableBlock") {
-        return withReportBlockRuntime(buildAuthoredTableBlock(normalizedBlock, datasetContext.fieldCatalog), normalizedBlock);
-      }
-      if (normalizeString29(normalizedBlock == null ? void 0 : normalizedBlock.kind) === "markdownBlock") {
-        return withReportBlockRuntime(buildAuthoredMarkdownBlock(normalizedBlock, datasetContext.fieldCatalog), normalizedBlock);
-      }
-      if (normalizeString29(normalizedBlock == null ? void 0 : normalizedBlock.kind) === "kpiBlock") {
-        return withReportBlockRuntime(buildAuthoredKpiBlock(normalizedBlock, datasetContext.fieldCatalog), normalizedBlock);
-      }
-      if (normalizeString29(normalizedBlock == null ? void 0 : normalizedBlock.kind) === "collectionBlock") {
-        return withReportBlockRuntime(buildAuthoredCollectionBlock(normalizedBlock, datasetContext.fieldCatalog), normalizedBlock);
-      }
-      if (normalizeString29(normalizedBlock == null ? void 0 : normalizedBlock.kind) === "badgesBlock") {
-        return withReportBlockRuntime(buildAuthoredBadgesBlock(normalizedBlock, datasetContext.fieldCatalog), normalizedBlock);
-      }
-      return normalizedBlock;
-    }).filter(Boolean);
-    const loweredLayout = orderLoweredBlocksByDocumentLayout(
-      document,
-      baseSpec,
-      [...Array.isArray(baseSpec == null ? void 0 : baseSpec.blocks) ? baseSpec.blocks : [], ...additionalBlocks]
-    );
-    const nextBlocks = filterExclusiveReportRuntimeBlocks(blocks, loweredLayout.blocks, exclusiveSectionOwnership);
-    const nextBlockIds = new Set(nextBlocks.map((block) => normalizeString29(block == null ? void 0 : block.id)).filter(Boolean));
-    const referencedDatasetRefs = new Set(
-      nextBlocks.flatMap(getReportBlockDatasetRefs).filter((datasetRef) => !!datasetRef && datasetRef !== "primary")
-    );
-    const additionalPublishedDatasets = buildReportBuilderPublishedDatasetDeclarations(
-      effectiveScopedConfig,
-      effectiveScopedState,
-      referencedDatasetRefs,
-      runtimeDatasetScopeParams,
-      primaryRequestContext
-    );
-    const refreshedPublishedDatasetIndex = new Map(
-      additionalPublishedDatasets.map((dataset) => [normalizeString29(dataset == null ? void 0 : dataset.id), dataset]).filter(([datasetId]) => !!datasetId)
-    );
-    const baseDatasets = Array.isArray(baseSpec == null ? void 0 : baseSpec.datasets) ? baseSpec.datasets : [];
-    const mergedDatasets = [
-      ...baseDatasets.map((dataset) => refreshedPublishedDatasetIndex.get(normalizeString29(dataset == null ? void 0 : dataset.id)) || dataset),
-      ...additionalPublishedDatasets.filter((dataset) => !baseDatasets.some((entry) => normalizeString29(entry == null ? void 0 : entry.id) === normalizeString29(dataset == null ? void 0 : dataset.id)))
-    ];
-    const resolvedPrimaryDataset = shouldOmitPrimaryDataset ? null : resolveLoweredPrimaryDataset(
-      document,
-      mergedDatasets.find((dataset) => normalizeString29(dataset == null ? void 0 : dataset.id) === "primary") || null,
-      loweredContainer
-    );
-    const nextDatasets = [
-      ...resolvedPrimaryDataset ? [resolvedPrimaryDataset] : [],
-      ...mergedDatasets.filter((dataset) => normalizeString29(dataset == null ? void 0 : dataset.id) !== "primary")
-    ];
-    const nextDatasetIds = new Set(nextDatasets.map((dataset) => normalizeString29(dataset == null ? void 0 : dataset.id)).filter(Boolean));
-    const nextCalculatedFields = (Array.isArray(baseSpec == null ? void 0 : baseSpec.calculatedFields) ? baseSpec.calculatedFields : []).filter((field) => {
-      const datasetRef = normalizeString29((field == null ? void 0 : field.datasetRef) || "primary") || "primary";
-      return nextDatasetIds.has(datasetRef);
-    });
-    const loweredScopeParams = enrichLoweredScopeParams(
-      (_c = document == null ? void 0 : document.scope) == null ? void 0 : _c.params,
-      buildReportDocumentScopeParams(effectiveScopedConfig, effectiveScopedState, runtimeDatasetScopeParams)
-    );
-    const loweredContextPreset = normalizeReportScopeContextPreset((_d = document == null ? void 0 : document.scope) == null ? void 0 : _d.contextPreset, {
-      availableParamIds: listMeaningfulReportScopeParamIds(loweredScopeParams)
-    });
-    const nextSpec = {
-      ...baseSpec,
-      ...normalizeReportViewerSettings(document == null ? void 0 : document.viewer) ? { viewer: normalizeReportViewerSettings(document.viewer) } : {},
-      ...normalizeReportDocumentTheme(document == null ? void 0 : document.theme) ? { theme: normalizeReportDocumentTheme(document.theme) } : {},
-      scope: {
-        ...loweredContextPreset ? { contextPreset: loweredContextPreset } : {},
-        params: loweredScopeParams,
-        dataSourceRef: normalizeString29(((_e = document == null ? void 0 : document.scope) == null ? void 0 : _e.dataSourceRef) || source.dataSourceRef || ((_f = baseSpec == null ? void 0 : baseSpec.source) == null ? void 0 : _f.dataSourceRef))
-      },
-      layoutIntent: {
-        ...(baseSpec == null ? void 0 : baseSpec.layoutIntent) || {},
-        blockOrder: nextBlocks.map((block) => normalizeString29(block == null ? void 0 : block.id)).filter(Boolean),
-        items: (Array.isArray(loweredLayout.items) ? loweredLayout.items : []).filter((item) => nextBlockIds.has(normalizeString29(item == null ? void 0 : item.blockId)))
-      },
-      datasets: nextDatasets,
-      calculatedFields: nextCalculatedFields,
-      blocks: nextBlocks
-    };
-    return augmentReportRequestForAuthoredBlocks(nextSpec, nextBlocks, effectiveConfig);
-  }
-
-  // src/reporting/reportChartValidation.js
-  var AuthoredReportChartValidationError = class extends Error {
-    constructor(diagnostics) {
-      super("Authored report contains invalid chart fields.");
-      this.name = "AuthoredReportChartValidationError";
-      this.authoredChartValidation = diagnostics;
-    }
-  };
-  var bounded = (value) => typeof value === "string" && value.length <= 128 ? value : "";
-  function selectedField(chartSpec, field) {
-    var _a5;
-    if (field === "xField" || field === "seriesField") return bounded(chartSpec == null ? void 0 : chartSpec[field]);
-    const index = /^yFields\.([0-9]+)$/.exec(field);
-    return index ? bounded((_a5 = chartSpec == null ? void 0 : chartSpec.yFields) == null ? void 0 : _a5[Number(index[1])]) : "";
-  }
-  function lowerValidatedReportDocument(document, options = {}) {
-    const diagnostics = [];
-    const reportSpec = lowerReportDocumentToReportSpec(document, {
-      ...options,
-      onChartValidation: ({ blockId, datasetRef, chartSpec, validation }) => {
-        if (validation == null ? void 0 : validation.valid) return;
-        for (const error of Array.isArray(validation == null ? void 0 : validation.errors) ? validation.errors : []) {
-          if (diagnostics.length >= 64) break;
-          const field = bounded(error == null ? void 0 : error.field);
-          diagnostics.push({
-            blockId: bounded(blockId),
-            datasetRef: bounded(datasetRef),
-            field,
-            fieldRef: selectedField(chartSpec, field),
-            validationCode: bounded(error == null ? void 0 : error.code)
-          });
-        }
-      }
-    });
-    if (diagnostics.length) throw new AuthoredReportChartValidationError(diagnostics);
-    return reportSpec;
-  }
-
-  // src/utils/linkTarget.js
-  function normalizeString30(value) {
-    if (typeof value !== "string") {
-      return "";
-    }
-    return value.trim();
-  }
-  function isObjectValue(value) {
-    return value != null && typeof value === "object" && !Array.isArray(value);
-  }
-  function normalizeLinkText(value, fallbackText = "") {
-    if (value == null) {
-      return fallbackText;
-    }
-    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-      const text = String(value);
-      return text || fallbackText;
-    }
-    return fallbackText;
-  }
-  function resolveTemplateText(template = "", holder = null) {
-    const source = normalizeString30(template);
-    if (!source) {
-      return "";
-    }
-    return source.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_2, selector) => {
-      const value = resolveKey(holder || {}, String(selector || "").trim());
-      return value == null ? "" : String(value);
-    }).replace(/\s{2,}/g, " ").trim();
-  }
-  function resolveContextSourceValue({ source = "value", selector = "", context = null, row = null, value = null } = {}) {
-    var _a5, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X;
-    switch (String(source || "value").trim().toLowerCase()) {
-      case "row":
-        return selector ? resolveKey(row || {}, selector) : row;
-      case "value":
-        return selector ? resolveKey(value || {}, selector) : value;
-      case "form":
-        return selector ? resolveKey(((_c = (_b = (_a5 = context == null ? void 0 : context.handlers) == null ? void 0 : _a5.dataSource) == null ? void 0 : _b.getFormData) == null ? void 0 : _c.call(_b)) || {}, selector) : ((_f = (_e = (_d = context == null ? void 0 : context.handlers) == null ? void 0 : _d.dataSource) == null ? void 0 : _e.getFormData) == null ? void 0 : _f.call(_e)) || {};
-      case "windowform":
-        return selector ? resolveKey(((_i = (_h = (_g = context == null ? void 0 : context.signals) == null ? void 0 : _g.windowForm) == null ? void 0 : _h.peek) == null ? void 0 : _i.call(_h)) || ((_k = (_j = context == null ? void 0 : context.signals) == null ? void 0 : _j.windowForm) == null ? void 0 : _k.value) || {}, selector) : ((_n = (_m = (_l = context == null ? void 0 : context.signals) == null ? void 0 : _l.windowForm) == null ? void 0 : _m.peek) == null ? void 0 : _n.call(_m)) || ((_p = (_o = context == null ? void 0 : context.signals) == null ? void 0 : _o.windowForm) == null ? void 0 : _p.value) || {};
-      case "metrics":
-        return selector ? resolveKey(((_s = (_r = (_q = context == null ? void 0 : context.signals) == null ? void 0 : _q.metrics) == null ? void 0 : _r.peek) == null ? void 0 : _s.call(_r)) || ((_u = (_t = context == null ? void 0 : context.signals) == null ? void 0 : _t.metrics) == null ? void 0 : _u.value) || {}, selector) : ((_x = (_w = (_v = context == null ? void 0 : context.signals) == null ? void 0 : _v.metrics) == null ? void 0 : _w.peek) == null ? void 0 : _x.call(_w)) || ((_z = (_y = context == null ? void 0 : context.signals) == null ? void 0 : _y.metrics) == null ? void 0 : _z.value) || {};
-      case "filter":
-        return selector ? resolveKey(((_C = (_B = (_A = context == null ? void 0 : context.handlers) == null ? void 0 : _A.dataSource) == null ? void 0 : _B.peekFilter) == null ? void 0 : _C.call(_B)) || {}, selector) : ((_F = (_E = (_D = context == null ? void 0 : context.handlers) == null ? void 0 : _D.dataSource) == null ? void 0 : _E.peekFilter) == null ? void 0 : _F.call(_E)) || {};
-      case "selection": {
-        const selection = ((_I = (_H = (_G = context == null ? void 0 : context.handlers) == null ? void 0 : _G.dataSource) == null ? void 0 : _H.getSelection) == null ? void 0 : _I.call(_H)) || ((_L = (_K = (_J = context == null ? void 0 : context.handlers) == null ? void 0 : _J.dataSource) == null ? void 0 : _K.peekSelection) == null ? void 0 : _L.call(_K)) || {};
-        const selected = (_N = (_M = selection == null ? void 0 : selection.selected) != null ? _M : selection == null ? void 0 : selection.selection) != null ? _N : selection;
-        return selector ? resolveKey(selected || {}, selector) : selected;
-      }
-      case "input":
-        return selector ? resolveKey(((_Q = (_P = (_O = context == null ? void 0 : context.signals) == null ? void 0 : _O.input) == null ? void 0 : _P.peek) == null ? void 0 : _Q.call(_P)) || ((_S = (_R = context == null ? void 0 : context.signals) == null ? void 0 : _R.input) == null ? void 0 : _S.value) || {}, selector) : ((_V = (_U = (_T = context == null ? void 0 : context.signals) == null ? void 0 : _T.input) == null ? void 0 : _U.peek) == null ? void 0 : _V.call(_U)) || ((_X = (_W = context == null ? void 0 : context.signals) == null ? void 0 : _W.input) == null ? void 0 : _X.value) || {};
-      case "const":
-        return value;
-      default:
-        return void 0;
-    }
-  }
-  function resolveParameterSpecValue(spec, runtime = {}) {
-    if (isObjectValue(spec)) {
-      const source = spec.source || (spec.selector ? "row" : Object.prototype.hasOwnProperty.call(spec, "value") ? "const" : "value");
-      const selector = normalizeString30(spec.selector || spec.path || spec.location);
-      const resolved = resolveContextSourceValue({
-        source,
-        selector,
-        context: runtime.context,
-        row: runtime.row,
-        value: Object.prototype.hasOwnProperty.call(spec, "value") ? spec.value : runtime.value
-      });
-      if (spec.wrap === "array") {
-        return Array.isArray(resolved) ? resolved : [resolved];
-      }
-      return resolved;
-    }
-    return spec;
-  }
-  function resolveWindowParameters(parameters = {}, runtime = {}) {
-    if (!isObjectValue(parameters)) {
-      return {};
-    }
-    const result = {};
-    Object.entries(parameters).forEach(([key, spec]) => {
-      if (!key) return;
-      result[key] = resolveParameterSpecValue(spec, runtime);
-    });
-    return result;
-  }
-  function resolveLinkTarget({ linkConfig = null, row = null, value = null, context = null } = {}) {
-    var _a5, _b, _c, _d, _e, _f, _g;
-    const objectValue = isObjectValue(value) ? value : null;
-    if (!isObjectValue(linkConfig)) {
-      if (!(objectValue == null ? void 0 : objectValue.href)) {
-        return null;
-      }
-      return {
-        kind: "external",
-        href: normalizeString30(objectValue.href),
-        text: normalizeLinkText((_a5 = objectValue == null ? void 0 : objectValue.label) != null ? _a5 : objectValue == null ? void 0 : objectValue.text, normalizeString30(objectValue.href)),
-        target: normalizeString30(objectValue == null ? void 0 : objectValue.target) || "_blank",
-        rel: normalizeString30(objectValue == null ? void 0 : objectValue.rel) || "noopener noreferrer",
-        title: normalizeString30(objectValue == null ? void 0 : objectValue.title)
-      };
-    }
-    const kind = normalizeString30(linkConfig.kindSelector ? resolveContextSourceValue({ source: linkConfig.kindSource || "windowForm", selector: linkConfig.kindSelector, context, row, value }) : "") || normalizeString30(linkConfig.kind || "");
-    const windowKey = normalizeString30(linkConfig.windowKey || "");
-    const dialogId = normalizeString30(linkConfig.dialogId || linkConfig.dialog || "");
-    if (kind === "association") {
-      const associations = Array.isArray(value) ? value.filter((entry) => entry != null) : [];
-      if (associations.length === 0) {
-        return null;
-      }
-      if (associations.length === 1 && windowKey) {
-        return resolveLinkTarget({
-          linkConfig: { ...linkConfig, kind: "window", dialogId: "", dialog: "" },
-          row,
-          value: associations[0],
-          context
-        });
-      }
-      if (!dialogId) {
-        return null;
-      }
-      return {
-        kind: "dialog",
-        text: normalizeLinkText(value, dialogId),
-        title: normalizeString30(linkConfig.title),
-        dialogId,
-        awaitResult: linkConfig.awaitResult === true,
-        parameters: {
-          associations,
-          associationIds: associations.map((entry) => {
-            var _a6, _b2;
-            return Number((_b2 = (_a6 = entry == null ? void 0 : entry.id) != null ? _a6 : entry == null ? void 0 : entry.adOrderId) != null ? _b2 : entry);
-          }).filter((id) => Number.isInteger(id) && id > 0)
-        }
-      };
-    }
-    if (kind === "dialog" || !kind && dialogId) {
-      if (!dialogId) {
-        return null;
-      }
-      const textSource2 = linkConfig.textSelector ? resolveContextSourceValue({
-        source: linkConfig.textSource || "row",
-        selector: linkConfig.textSelector,
-        context,
-        row,
-        value
-      }) : linkConfig.label ? resolveKey(row || {}, linkConfig.label) : (_b = linkConfig.text) != null ? _b : value;
-      return {
-        kind: "dialog",
-        text: normalizeLinkText(textSource2, dialogId),
-        title: normalizeString30(linkConfig.title),
-        dialogId,
-        awaitResult: linkConfig.awaitResult === true,
-        parameters: resolveWindowParameters(linkConfig.parameters, { row, value, context })
-      };
-    }
-    if (kind === "window" || !kind && windowKey) {
-      if (!windowKey) {
-        return null;
-      }
-      const textSource2 = linkConfig.textSelector ? resolveContextSourceValue({
-        source: linkConfig.textSource || "row",
-        selector: linkConfig.textSelector,
-        context,
-        row,
-        value
-      }) : linkConfig.label ? resolveKey(row || {}, linkConfig.label) : (_c = linkConfig.text) != null ? _c : value;
-      const text2 = normalizeLinkText(textSource2, normalizeString30(linkConfig.windowTitle) || windowKey);
-      const hasDynamicWindowTitleSource = Boolean(linkConfig.windowTitleSelector) || Boolean(linkConfig.windowTitleSource);
-      const titleSource = hasDynamicWindowTitleSource ? resolveContextSourceValue({
-        source: linkConfig.windowTitleSource || "row",
-        selector: linkConfig.windowTitleSelector || "",
-        context,
-        row,
-        value
-      }) : linkConfig.windowTitle;
-      const titleTemplate = normalizeString30(linkConfig.windowTitleTemplate);
-      const titleTemplateSource = titleTemplate ? resolveContextSourceValue({
-        source: linkConfig.windowTitleSource || "row",
-        selector: "",
-        context,
-        row,
-        value
-      }) : null;
-      const windowTitle = titleTemplate ? resolveTemplateText(titleTemplate, titleTemplateSource) : normalizeLinkText(titleSource, "");
-      return {
-        kind: "window",
-        text: text2,
-        title: normalizeString30(linkConfig.title),
-        windowKey,
-        ...normalizeString30(linkConfig.revision) ? { revision: normalizeString30(linkConfig.revision) } : {},
-        ...Array.isArray(linkConfig.identityParameters) && linkConfig.identityParameters.length > 0 ? { identityParameters: [...linkConfig.identityParameters] } : {},
-        windowTitle,
-        ...normalizeString30(linkConfig.chipName) ? { chipName: normalizeString30(linkConfig.chipName) } : {},
-        ...normalizeString30(linkConfig.chipIcon) ? { chipIcon: normalizeString30(linkConfig.chipIcon) } : {},
-        inTab: linkConfig.inTab !== false,
-        newInstance: linkConfig.newInstance === true,
-        autoIndexTitle: linkConfig.autoIndexTitle === true,
-        awaitResult: linkConfig.awaitResult === true,
-        modal: linkConfig.modal === true,
-        size: isObjectValue(linkConfig.size) ? linkConfig.size : void 0,
-        width: linkConfig.width,
-        height: linkConfig.height,
-        footer: linkConfig.footer,
-        parameters: resolveWindowParameters(linkConfig.parameters, { row, value, context })
-      };
-    }
-    let href = normalizeString30(
-      (linkConfig == null ? void 0 : linkConfig.hrefTemplate) ? resolveTemplateText(linkConfig.hrefTemplate, linkConfig.hrefTemplateSource ? resolveContextSourceValue({ source: linkConfig.hrefTemplateSource, context, row, value }) : row || {}) : (linkConfig == null ? void 0 : linkConfig.href) ? resolveKey(row || {}, linkConfig.href) : (_d = objectValue == null ? void 0 : objectValue.href) != null ? _d : ""
-    );
-    if (!href) {
-      return null;
-    }
-    const baseUrl = normalizeString30(linkConfig.baseUrlSelector ? resolveContextSourceValue({ source: linkConfig.baseUrlSource || "windowForm", selector: linkConfig.baseUrlSelector, context, row, value }) : "") || normalizeString30(linkConfig.baseUrl);
-    if (baseUrl && !/^[a-z][a-z0-9+.-]*:/i.test(href)) {
-      try {
-        const base = new URL(baseUrl);
-        if (!["http:", "https:"].includes(base.protocol)) return null;
-        href = new URL(href.replace(/^\/+/, ""), base.href.replace(/\/?$/, "/")).href;
-      } catch (e3) {
-        return null;
-      }
-    }
-    const textSource = (linkConfig == null ? void 0 : linkConfig.label) ? resolveKey(row || {}, linkConfig.label) : (_g = (_f = (_e = linkConfig == null ? void 0 : linkConfig.text) != null ? _e : objectValue == null ? void 0 : objectValue.label) != null ? _f : objectValue == null ? void 0 : objectValue.text) != null ? _g : value;
-    const text = normalizeLinkText(textSource, href);
-    const target = normalizeString30((objectValue == null ? void 0 : objectValue.target) || (linkConfig == null ? void 0 : linkConfig.target)) || "_blank";
-    const rel = normalizeString30((objectValue == null ? void 0 : objectValue.rel) || (linkConfig == null ? void 0 : linkConfig.rel)) || "noopener noreferrer";
-    const title = normalizeString30(objectValue == null ? void 0 : objectValue.title);
-    return { kind: "external", href, text, target, rel, title };
-  }
-
-  // src/utils/formatValue.js
-  var formatUtcWallClock = (date, locale2, kind) => {
-    const year = date.getUTCFullYear();
-    const day = date.getUTCDate();
-    const hour24 = date.getUTCHours();
-    const minute = date.getUTCMinutes();
-    const month = new Intl.DateTimeFormat(locale2, { month: "short", timeZone: "UTC" }).format(date);
-    if (kind === "wallClockDate") {
-      return `${month} ${day}, ${year}`;
-    }
-    const hour12 = hour24 % 12 || 12;
-    const meridiem = hour24 >= 12 ? "PM" : "AM";
-    if (kind === "wallClockHour") {
-      return `${hour12} ${meridiem}`;
-    }
-    return `${month} ${day}, ${year} ${hour12}:${String(minute).padStart(2, "0")} ${meridiem}`;
-  };
-  var formatDisplayValue = (value, format2, locale2 = "en-US", options = {}) => {
-    var _a5;
-    if (value == null) return "-";
-    if (typeof value === "string" && value.trim() === "") return "";
-    if (format2 === "raw" || format2 === "plain" || format2 === "id" || format2 === "text") {
-      return String(value);
-    }
-    if (format2 === "code" || format2 === "json") {
-      if (typeof value === "string") return value;
-      try {
-        return (_a5 = JSON.stringify(value, null, 2)) != null ? _a5 : String(value);
-      } catch (_2) {
-        return String(value);
-      }
-    }
-    if (format2 === "dimensions" && typeof value === "object" && !Array.isArray(value)) {
-      const width = Number(value == null ? void 0 : value.width);
-      const height = Number(value == null ? void 0 : value.height);
-      return Number.isFinite(width) && Number.isFinite(height) ? `${width}x${height}` : "-";
-    }
-    if (format2 === "date" || format2 === "dateTime" || format2 === "dateTime24" || format2 === "wallClockHour" || format2 === "wallClockDate") {
-      const date = new Date(value);
-      if (!Number.isNaN(date.getTime())) {
-        if (format2 === "wallClockHour" || format2 === "wallClockDate") {
-          return formatUtcWallClock(date, locale2, format2);
-        }
-        const timeZone = typeof (options == null ? void 0 : options.timeZone) === "string" && options.timeZone.trim() !== "" ? options.timeZone : void 0;
-        if (format2 === "date") {
-          return new Intl.DateTimeFormat(locale2, {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-            // A date has calendar-day semantics. Browser-local defaults
-            // must not shift a UTC-encoded SQL date to the preceding day.
-            timeZone: timeZone || "UTC"
-          }).format(date);
-        }
-        return new Intl.DateTimeFormat(locale2, {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-          hour: "numeric",
-          minute: "2-digit",
-          ...format2 === "dateTime24" ? { hourCycle: "h23" } : {},
-          ...timeZone ? { timeZone } : {}
-        }).format(date);
-      }
-      return typeof value === "string" && value.trim() !== "" ? value : "-";
-    }
-    const numeric = Number(value);
-    const isNumeric = Number.isFinite(numeric);
-    if (!isNumeric) {
-      if (typeof value === "string" && value.trim() !== "") {
-        return value;
-      }
-      return "-";
-    }
-    switch (format2) {
-      case "currency": {
-        const currency = /^[A-Z]{3}$/.test(String((options == null ? void 0 : options.currency) || "").toUpperCase()) ? String(options.currency).toUpperCase() : "USD";
-        return new Intl.NumberFormat(locale2, { style: "currency", currency, maximumFractionDigits: 0 }).format(numeric);
-      }
-      case "currency2": {
-        const currency = /^[A-Z]{3}$/.test(String((options == null ? void 0 : options.currency) || "").toUpperCase()) ? String(options.currency).toUpperCase() : "USD";
-        return new Intl.NumberFormat(locale2, {
-          style: "currency",
-          currency,
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2
-        }).format(numeric);
-      }
-      case "compact":
-      case "compactNumber":
-        return new Intl.NumberFormat(locale2, { notation: "compact", maximumFractionDigits: 1 }).format(numeric);
-      case "percent":
-        return `${numeric.toFixed(1)}%`;
-      case "percentFraction":
-        return `${(numeric * 100).toFixed(1)}%`;
-      case "percentFraction2":
-        return `${(numeric * 100).toFixed(2)}%`;
-      case "number":
-        return new Intl.NumberFormat(locale2, {
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 5,
-          useGrouping: true
-        }).format(numeric);
-      case "number2":
-        return new Intl.NumberFormat(locale2, {
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 2,
-          useGrouping: true
-        }).format(numeric);
-      case "number5":
-        return new Intl.NumberFormat(locale2, {
-          minimumFractionDigits: 5,
-          maximumFractionDigits: 5,
-          useGrouping: true
-        }).format(numeric);
-      case "durationHours":
-        return numeric % 24 === 0 ? `${numeric / 24}d` : `${numeric}h`;
-      default:
-        return new Intl.NumberFormat(locale2, { maximumFractionDigits: 2 }).format(numeric);
-    }
-  };
-
-  // src/utils/tableLink.js
-  function resolveTableLink({ row, column, value, context = null } = {}) {
-    const isMissingLinkValue = value === void 0 || value === null || typeof value === "string" && value.trim() === "" || Array.isArray(value) && value.length === 0 || typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === 0;
-    if (isMissingLinkValue) {
-      return null;
-    }
-    const resolved = resolveLinkTarget({
-      row,
-      value: (column == null ? void 0 : column.type) === "link" ? value : value,
-      linkConfig: column == null ? void 0 : column.link,
-      context
-    });
-    if (resolved && Array.isArray(value) && (column == null ? void 0 : column.format) === "relationCount") {
-      const singular = (column == null ? void 0 : column.singularLabel) || "item";
-      const plural = (column == null ? void 0 : column.pluralLabel) || `${singular}s`;
-      resolved.text = `${value.length} ${value.length === 1 ? singular : plural}`;
-    }
-    return resolved;
-  }
-
-  // src/reporting/reportRuntimeTableRows.js
-  var normalizeString31 = (value) => String(value || "").trim();
-  var cloneValue19 = (value) => value == null ? value : JSON.parse(JSON.stringify(value));
-  function buildRuntimeTableRows(block = {}, dataset = {}) {
-    var _a5;
-    const resolvedRows = Array.isArray((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.resolvedRows) ? block.content.resolvedRows : null;
-    const originalRows = Array.isArray(dataset == null ? void 0 : dataset.rows) ? dataset.rows : [];
-    if (resolvedRows === null) {
-      return originalRows;
-    }
-    return resolvedRows.map((resolvedRow, rowIndex) => {
-      const sourceIndex = Number.isInteger(resolvedRow.rowIndex) && resolvedRow.rowIndex >= 0 ? resolvedRow.rowIndex : rowIndex;
-      const cells = Array.isArray(resolvedRow == null ? void 0 : resolvedRow.cells) ? resolvedRow.cells : [];
-      return cells.reduce((acc, cell) => {
-        const sourceKey = normalizeString31((cell == null ? void 0 : cell.sourceKey) || (cell == null ? void 0 : cell.key));
-        const displayKey = normalizeString31((cell == null ? void 0 : cell.displayKey) || (cell == null ? void 0 : cell.key));
-        const next = sourceKey ? setSelector(acc, sourceKey, cloneValue19(cell == null ? void 0 : cell.value)) : acc;
-        return displayKey && displayKey !== sourceKey ? setSelector(next, displayKey, cloneValue19(cell == null ? void 0 : cell.displayValue)) : next;
-      }, cloneValue19(originalRows[sourceIndex]) || {});
-    });
-  }
-
-  // src/components/dashboard/dashboardTableSort.js
-  var dateTypes = /* @__PURE__ */ new Set(["date", "datetime", "datetime24", "timestamp"]);
-  var missing = (value) => value === null || value === void 0 || value === "";
-  var integerText = (value) => {
-    if (typeof value === "number" && !Number.isSafeInteger(value)) return null;
-    if (typeof value !== "string" && typeof value !== "number") return null;
-    const text = String(value).trim();
-    if (!/^[+-]?\d+$/.test(text)) return null;
-    const digits = text.replace(/^[+-]/, "").replace(/^0+(?=\d)/, "");
-    return { digits, negative: text[0] === "-" && digits !== "0" };
-  };
-  function compareIntegers(a4, b3) {
-    if (a4.negative !== b3.negative) return a4.negative ? -1 : 1;
-    const magnitude = a4.digits.length !== b3.digits.length ? a4.digits.length < b3.digits.length ? -1 : 1 : a4.digits === b3.digits ? 0 : a4.digits < b3.digits ? -1 : 1;
-    return a4.negative ? -magnitude : magnitude;
-  }
-  function compareDashboardTableValues(a4, b3, column = {}, direction = "asc") {
-    const date = dateTypes.has(String(column.format || "").toLowerCase()) || dateTypes.has(String(column.type || "").toLowerCase());
-    const av = date && !missing(a4) ? new Date(a4).getTime() : a4;
-    const bv = date && !missing(b3) ? new Date(b3).getTime() : b3;
-    const am = missing(a4) || date && !Number.isFinite(av);
-    const bm = missing(b3) || date && !Number.isFinite(bv);
-    if (am || bm) return am === bm ? 0 : am ? 1 : -1;
-    const ai = integerText(av), bi = integerText(bv);
-    if (ai && bi) {
-      const compared2 = compareIntegers(ai, bi);
-      return direction === "desc" ? -compared2 : compared2;
-    }
-    const an = Number(av), bn = Number(bv);
-    const numeric = Number.isFinite(an) && Number.isFinite(bn);
-    const compared = numeric ? an - bn : String(av).localeCompare(String(bv));
-    return direction === "desc" ? -compared : compared;
-  }
-
-  // src/reporting/reportTablePresentation.js
-  var object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
-  var own = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
-  var fields = (value, allowed) => Object.keys(value).every((key) => allowed.includes(key));
-  var cellValue = (cell) => own(cell || {}, "displayValue") ? cell.displayValue : cell == null ? void 0 : cell.value;
-  function applyReportTablePresentations(reportFill, presentations = null) {
-    var _a5, _b, _c, _d;
-    if (presentations == null) return reportFill;
-    if (!object(presentations) || Object.keys(presentations).length > 128) throw Error("Invalid report table presentation map.");
-    const blocks = new Map(((reportFill == null ? void 0 : reportFill.blocks) || []).map((block) => [block.id, block]));
-    const replacements = /* @__PURE__ */ new Map();
-    for (const [id, state] of Object.entries(presentations)) {
-      const block = blocks.get(id);
-      if (!block || block.kind !== "tableBlock") throw Error(`Unknown report table: ${id}.`);
-      if (!object(state) || !fields(state, ["filter", "sort"])) throw Error(`Invalid presentation for table ${id}.`);
-      const filter = (_a5 = state.filter) != null ? _a5 : "";
-      if (typeof filter !== "string" || filter.length > 4096) throw Error(`Invalid filter for table ${id}.`);
-      const columns = (_b = block.content) == null ? void 0 : _b.columns;
-      const rows = (_c = block.content) == null ? void 0 : _c.resolvedRows;
-      if (!Array.isArray(columns) || !Array.isArray(rows)) throw Error(`Report table ${id} is not materialized.`);
-      const sort = state.sort;
-      let sortColumn;
-      if (sort != null) {
-        if (!object(sort) || !fields(sort, ["key", "direction"]) || typeof sort.key !== "string" || !["asc", "desc"].includes(sort.direction)) throw Error(`Invalid sort for table ${id}.`);
-        sortColumn = columns.find((column) => column.key === sort.key);
-        if (!sortColumn) throw Error(`Unknown sort column for table ${id}.`);
-      }
-      const dataset = ((_d = reportFill.datasets) == null ? void 0 : _d.find((dataset2) => dataset2.id === (block.datasetRef || "primary"))) || {};
-      const runtimeRows = buildRuntimeTableRows(block, dataset);
-      const values = new Map(rows.map((row, index) => [row, new Map(columns.map((column) => {
-        var _a6;
-        const value = cellValue((_a6 = row.cells) == null ? void 0 : _a6.find((cell) => cell.key === column.key));
-        const link = resolveTableLink({ row: runtimeRows[index], column, value });
-        return [column.key, link ? link.text : value];
-      }))]));
-      const query = filter.trim().toLowerCase();
-      const selected = query ? rows.filter((row) => (row.cells || []).some((cell) => {
-        var _a6;
-        return columns.some((column) => column.key === cell.key) && String((_a6 = values.get(row).get(cell.key)) != null ? _a6 : "").toLowerCase().includes(query);
-      })) : rows.slice();
-      if (sortColumn) selected.sort((a4, b3) => compareDashboardTableValues(
-        values.get(a4).get(sort.key),
-        values.get(b3).get(sort.key),
-        sortColumn,
-        sort.direction
-      ));
-      replacements.set(id, { ...block, content: { ...block.content, rowCount: selected.length, resolvedRows: selected } });
-    }
-    return { ...reportFill, blocks: reportFill.blocks.map((block) => replacements.get(block.id) || block) };
   }
 
   // node_modules/@babel/runtime/helpers/esm/typeof.js
@@ -54348,11 +45183,167 @@ Please __addLocaleData before adding additional unit data`);
     return matched[1].replace(doubleQuoteRegExp, "'");
   }
 
+  // src/utils/formatValue.js
+  var formatUtcWallClock = (date, locale2, kind) => {
+    const year = date.getUTCFullYear();
+    const day = date.getUTCDate();
+    const hour24 = date.getUTCHours();
+    const minute = date.getUTCMinutes();
+    const month = new Intl.DateTimeFormat(locale2, { month: "short", timeZone: "UTC" }).format(date);
+    if (kind === "wallClockDate") {
+      return `${month} ${day}, ${year}`;
+    }
+    const hour12 = hour24 % 12 || 12;
+    const meridiem = hour24 >= 12 ? "PM" : "AM";
+    if (kind === "wallClockHour") {
+      return `${hour12} ${meridiem}`;
+    }
+    return `${month} ${day}, ${year} ${hour12}:${String(minute).padStart(2, "0")} ${meridiem}`;
+  };
+  var formatDisplayValue = (value, format2, locale2 = "en-US", options = {}) => {
+    var _a5;
+    if (value == null) return "-";
+    if (typeof value === "string" && value.trim() === "") return "";
+    if (format2 === "raw" || format2 === "plain" || format2 === "id" || format2 === "text") {
+      return String(value);
+    }
+    if (format2 === "code" || format2 === "json") {
+      if (typeof value === "string") return value;
+      try {
+        return (_a5 = JSON.stringify(value, null, 2)) != null ? _a5 : String(value);
+      } catch (_2) {
+        return String(value);
+      }
+    }
+    if (format2 === "dimensions" && typeof value === "object" && !Array.isArray(value)) {
+      const width = Number(value == null ? void 0 : value.width);
+      const height = Number(value == null ? void 0 : value.height);
+      return Number.isFinite(width) && Number.isFinite(height) ? `${width}x${height}` : "-";
+    }
+    if (format2 === "date" || format2 === "dateTime" || format2 === "dateTime24" || format2 === "wallClockHour" || format2 === "wallClockDate") {
+      const date = new Date(value);
+      if (!Number.isNaN(date.getTime())) {
+        if (format2 === "wallClockHour" || format2 === "wallClockDate") {
+          return formatUtcWallClock(date, locale2, format2);
+        }
+        const timeZone = typeof (options == null ? void 0 : options.timeZone) === "string" && options.timeZone.trim() !== "" ? options.timeZone : void 0;
+        if (format2 === "date") {
+          return new Intl.DateTimeFormat(locale2, {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            // A date has calendar-day semantics. Browser-local defaults
+            // must not shift a UTC-encoded SQL date to the preceding day.
+            timeZone: timeZone || "UTC"
+          }).format(date);
+        }
+        return new Intl.DateTimeFormat(locale2, {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+          ...format2 === "dateTime24" ? { hourCycle: "h23" } : {},
+          ...timeZone ? { timeZone } : {}
+        }).format(date);
+      }
+      return typeof value === "string" && value.trim() !== "" ? value : "-";
+    }
+    const numeric = Number(value);
+    const isNumeric = Number.isFinite(numeric);
+    if (!isNumeric) {
+      if (typeof value === "string" && value.trim() !== "") {
+        return value;
+      }
+      return "-";
+    }
+    switch (format2) {
+      case "currency": {
+        const currency = /^[A-Z]{3}$/.test(String((options == null ? void 0 : options.currency) || "").toUpperCase()) ? String(options.currency).toUpperCase() : "USD";
+        return new Intl.NumberFormat(locale2, { style: "currency", currency, maximumFractionDigits: 0 }).format(numeric);
+      }
+      case "currency2": {
+        const currency = /^[A-Z]{3}$/.test(String((options == null ? void 0 : options.currency) || "").toUpperCase()) ? String(options.currency).toUpperCase() : "USD";
+        return new Intl.NumberFormat(locale2, {
+          style: "currency",
+          currency,
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        }).format(numeric);
+      }
+      case "compact":
+      case "compactNumber":
+        return new Intl.NumberFormat(locale2, { notation: "compact", maximumFractionDigits: 1 }).format(numeric);
+      case "percent":
+        return `${numeric.toFixed(1)}%`;
+      case "percentFraction":
+        return `${(numeric * 100).toFixed(1)}%`;
+      case "percentFraction2":
+        return `${(numeric * 100).toFixed(2)}%`;
+      case "number":
+        return new Intl.NumberFormat(locale2, {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 5,
+          useGrouping: true
+        }).format(numeric);
+      case "number2":
+        return new Intl.NumberFormat(locale2, {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 2,
+          useGrouping: true
+        }).format(numeric);
+      case "number5":
+        return new Intl.NumberFormat(locale2, {
+          minimumFractionDigits: 5,
+          maximumFractionDigits: 5,
+          useGrouping: true
+        }).format(numeric);
+      case "durationHours":
+        return numeric % 24 === 0 ? `${numeric / 24}d` : `${numeric}h`;
+      default:
+        return new Intl.NumberFormat(locale2, { maximumFractionDigits: 2 }).format(numeric);
+    }
+  };
+
+  // src/utils/selector.js
+  var resolveKey = (object4, path) => {
+    try {
+      return path.split(".").reduce((acc, part) => acc && acc[part], object4);
+    } catch (e3) {
+      return void 0;
+    }
+  };
+  function assertSafeAssignmentPath(path) {
+    if (typeof path !== "string") return;
+    for (const raw of path.split(/[.:/]/)) {
+      const key = raw.startsWith("[]") ? raw.slice(2) : raw;
+      if (key === "__proto__" || key === "constructor" || key === "prototype") {
+        throw new Error(`Unsafe assignment path: ${path}`);
+      }
+    }
+  }
+  var setSelector = (holder, path, value) => {
+    assertSafeAssignmentPath(path);
+    if (!path || typeof path !== "string" || path.indexOf(".") === -1) {
+      return {
+        ...holder || {},
+        [path]: value
+      };
+    }
+    const keys2 = path.split(".");
+    const [head, ...tail] = keys2;
+    const existing = holder && typeof holder === "object" ? holder[head] : void 0;
+    return {
+      ...holder || {},
+      [head]: setSelector(existing || {}, tail.join("."), value)
+    };
+  };
+
   // src/components/chartData.js
   function normalizeChartKey(key = "") {
     return String(key || "").trim();
   }
-  function cloneValue20(value) {
+  function cloneValue(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
   }
   function applyChartRowLimit(rows = [], rowLimit = 0) {
@@ -54443,11 +45434,11 @@ Please __addLocaleData before adding additional unit data`);
     const shouldMaterializeXAxis = xAxisDisplayKey && xAxisSourceKey && (xAxisDisplayKey !== xAxisSourceKey || xAxisDisplayValueMap && typeof xAxisDisplayValueMap === "object" && !Array.isArray(xAxisDisplayValueMap));
     const shouldMaterializeSeries = seriesDisplayKey && seriesSourceKey && (seriesDisplayKey !== seriesSourceKey || seriesDisplayValueMap && typeof seriesDisplayValueMap === "object" && !Array.isArray(seriesDisplayValueMap));
     if (!shouldMaterializeXAxis && !shouldMaterializeSeries) {
-      return normalizedRows.map((row) => row && typeof row === "object" ? attachChartSelectionRowsMetadata(cloneValue20(row), row == null ? void 0 : row.__chartSelectionRows) : row);
+      return normalizedRows.map((row) => row && typeof row === "object" ? attachChartSelectionRowsMetadata(cloneValue(row), row == null ? void 0 : row.__chartSelectionRows) : row);
     }
     return normalizedRows.map((row) => {
       const selectionRows = row == null ? void 0 : row.__chartSelectionRows;
-      let nextRow = row && typeof row === "object" && !Array.isArray(row) ? attachChartSelectionRowsMetadata(cloneValue20(row), selectionRows) : row;
+      let nextRow = row && typeof row === "object" && !Array.isArray(row) ? attachChartSelectionRowsMetadata(cloneValue(row), selectionRows) : row;
       if (!nextRow || typeof nextRow !== "object" || Array.isArray(nextRow)) {
         return nextRow;
       }
@@ -54547,7 +45538,7 @@ Please __addLocaleData before adding additional unit data`);
       (left, right) => new Date(readChartDataValue(left, key)) - new Date(readChartDataValue(right, key))
     );
   }
-  function buildPieChartData(rawData = [], nameKey = "", valueKey2 = "") {
+  function buildPieChartData(rawData = [], nameKey = "", valueKey2 = "", { includeNonPositive = false } = {}) {
     const resolvedNameKey = normalizeChartKey(nameKey);
     const resolvedValueKey = normalizeChartKey(valueKey2);
     if (!resolvedNameKey || !resolvedValueKey || !Array.isArray(rawData) || rawData.length === 0) {
@@ -54567,7 +45558,7 @@ Please __addLocaleData before adding additional unit data`);
       existing.__chartSelectionRows.push(row);
       grouped.set(category, existing);
     });
-    return Array.from(grouped.values()).filter((row) => row.value > 0);
+    return Array.from(grouped.values()).filter((row) => includeNonPositive || row.value > 0);
   }
   function formatTimestamp(timestamp2, fmt = "MM/dd", valueMode = "") {
     if (timestamp2 === null || timestamp2 === void 0 || timestamp2 === "") {
@@ -54602,6 +45593,9068 @@ Please __addLocaleData before adding additional unit data`);
     const [tl, tr, br, bl] = resolveChartBarCornerRadii(value, orientation, resolveChartBarRadius(width, height));
     const right = x2 + width, bottom = y4 + height, k2 = 0.5522847498307936;
     return `M ${x2 + tl} ${y4} L ${right - tr} ${y4} C ${right - tr + k2 * tr} ${y4} ${right} ${y4 + tr - k2 * tr} ${right} ${y4 + tr} L ${right} ${bottom - br} C ${right} ${bottom - br + k2 * br} ${right - br + k2 * br} ${bottom} ${right - br} ${bottom} L ${x2 + bl} ${bottom} C ${x2 + bl - k2 * bl} ${bottom} ${x2} ${bottom - bl + k2 * bl} ${x2} ${bottom - bl} L ${x2} ${y4 + tl} C ${x2} ${y4 + tl - k2 * tl} ${x2 + tl - k2 * tl} ${y4} ${x2 + tl} ${y4} Z`;
+  }
+
+  // src/components/chartAppearance.js
+  var appearanceKeys = ["font", "fontSize", "fontFamily", "fontWeight", "lineHeight", "letterSpacing", "background", "border", "borderRadius", "strokeWidth", "strokeDasharray", "barSize"];
+  function validateChartAppearance(chart = {}) {
+    var _a5;
+    if (chart.appearance != null && chart.appearance !== "document") throw new Error(`Unknown chart appearance: ${chart.appearance}`);
+    if (chart.layout != null && chart.layout !== "small-multiples") throw new Error(`Unknown chart layout: ${chart.layout}`);
+    if (chart.layout && !["line", "area"].includes(chart.type)) throw new Error("Small multiples require line or area charts.");
+    if (chart.appearance !== "document") return;
+    for (const source of [chart, chart.style || {}, chart.cartesianGrid || {}, ...((_a5 = chart.series) == null ? void 0 : _a5.values) || [], ...Object.values(chart.seriesOptions || {})]) {
+      if (appearanceKeys.some((key) => Object.hasOwn(source, key) && source[key] !== "" && source[key] != null)) throw new Error("Document charts use the shared appearance and tokens instead of inline styling.");
+    }
+  }
+
+  // src/semantic/modelSchema.js
+  var SEMANTIC_BINDING_MODES = ["raw", "semantic"];
+  var SEMANTIC_FIELD_TYPES = [
+    "dimension",
+    "measure",
+    "parameter"
+  ];
+  var SEMANTIC_DATA_TYPES = [
+    "string",
+    "number",
+    "integer",
+    "boolean",
+    "date",
+    "datetime",
+    "time"
+  ];
+  var SEMANTIC_AGGREGATIONS = [
+    "sum",
+    "avg",
+    "min",
+    "max",
+    "count",
+    "countDistinct",
+    "ratio"
+  ];
+  var SEMANTIC_TIME_GRAINS = [
+    "hour",
+    "day",
+    "week",
+    "month",
+    "quarter",
+    "year"
+  ];
+  var SEMANTIC_GOVERNANCE_STATUSES = [
+    "draft",
+    "approved",
+    "deprecated"
+  ];
+  var SEMANTIC_CERTIFICATIONS = [
+    "none",
+    "reviewed",
+    "certified"
+  ];
+  function normalizeSemanticString(value = "") {
+    return String(value || "").trim();
+  }
+  function normalizeSemanticArray(values = []) {
+    if (Array.isArray(values)) {
+      return values.map((entry) => normalizeSemanticString(entry)).filter(Boolean);
+    }
+    const normalized = normalizeSemanticString(values);
+    return normalized ? [normalized] : [];
+  }
+
+  // src/semantic/modelRef.js
+  var MODEL_REF_PATTERN = /^model:\/\/(?<path>[A-Za-z0-9._/-]+?)(?:@(?<version>[A-Za-z0-9._-]+))?$/;
+  function parseSemanticModelRef(value = "") {
+    var _a5;
+    const input = normalizeSemanticString(value);
+    if (!input) {
+      return null;
+    }
+    const match2 = MODEL_REF_PATTERN.exec(input);
+    if (!((_a5 = match2 == null ? void 0 : match2.groups) == null ? void 0 : _a5.path)) {
+      return null;
+    }
+    const segments = match2.groups.path.split("/").map((entry) => normalizeSemanticString(entry)).filter(Boolean);
+    if (segments.length < 2) {
+      return null;
+    }
+    const model = segments[segments.length - 1];
+    const namespace = segments.slice(0, -1).join("/");
+    const version = normalizeSemanticString(match2.groups.version || "");
+    return {
+      scheme: "model",
+      namespace,
+      model,
+      version: version || "",
+      ref: formatSemanticModelRef({ namespace, model, version })
+    };
+  }
+  function formatSemanticModelRef(parts = {}) {
+    const namespace = normalizeSemanticString(parts.namespace);
+    const model = normalizeSemanticString(parts.model);
+    const version = normalizeSemanticString(parts.version);
+    if (!namespace || !model) {
+      return "";
+    }
+    return `model://${namespace}/${model}${version ? `@${version}` : ""}`;
+  }
+  function normalizeSemanticModelRef(value = "") {
+    var _a5;
+    return ((_a5 = parseSemanticModelRef(value)) == null ? void 0 : _a5.ref) || "";
+  }
+
+  // src/semantic/modelValidation.js
+  function pushError(errors, field, code, message) {
+    errors.push({ field, code, message });
+  }
+  function isPlainObject(value) {
+    return !!value && typeof value === "object" && !Array.isArray(value);
+  }
+  function normalizeGovernance(governance = {}) {
+    if (!isPlainObject(governance)) {
+      return null;
+    }
+    const status = normalizeSemanticString(governance.status).toLowerCase();
+    const certification = normalizeSemanticString(governance.certification).toLowerCase();
+    const ownerRef = normalizeSemanticString(governance.ownerRef);
+    const classification = normalizeSemanticString(governance.classification);
+    const deprecation = normalizeSemanticString(governance.deprecation);
+    const next = {};
+    if (status) next.status = status;
+    if (certification) next.certification = certification;
+    if (ownerRef) next.ownerRef = ownerRef;
+    if (classification) next.classification = classification;
+    if (deprecation) next.deprecation = deprecation;
+    return Object.keys(next).length > 0 ? next : null;
+  }
+  function normalizeSemanticFeatureType(type = "", fallbackType = "") {
+    const normalizedType2 = normalizeSemanticString(type).toLowerCase();
+    if (SEMANTIC_FIELD_TYPES.includes(normalizedType2)) {
+      return normalizedType2;
+    }
+    const normalizedFallbackType = normalizeSemanticString(fallbackType).toLowerCase();
+    if (SEMANTIC_FIELD_TYPES.includes(normalizedFallbackType)) {
+      return normalizedFallbackType;
+    }
+    return "";
+  }
+  function normalizeSemanticField(field = {}, defaults = {}) {
+    if (!isPlainObject(field)) {
+      return null;
+    }
+    const id = normalizeSemanticString(field.id || field.key);
+    if (!id) {
+      return null;
+    }
+    const key = normalizeSemanticString(field.key || id);
+    const label = normalizeSemanticString(field.label || id);
+    const dataType = normalizeSemanticString(field.dataType || defaults.dataType).toLowerCase();
+    const format2 = normalizeSemanticString(field.format);
+    const aggregation = normalizeSemanticString(field.aggregation || defaults.aggregation).toLowerCase();
+    const timeGrainSupport = normalizeSemanticArray(field.timeGrainSupport).map((entry) => entry.toLowerCase());
+    const category = normalizeSemanticString(field.category);
+    const description = normalizeSemanticString(field.description);
+    const definitionRef = normalizeSemanticString(field.definitionRef);
+    const sourceRef = normalizeSemanticString(field.sourceRef);
+    const relationshipRef = normalizeSemanticString(field.relationshipRef);
+    const governance = normalizeGovernance(field.governance);
+    const featureType = normalizeSemanticFeatureType(field.featureType, defaults.featureType);
+    return {
+      id,
+      key,
+      label,
+      ...featureType ? { featureType } : {},
+      ...description ? { description } : {},
+      ...category ? { category } : {},
+      ...dataType ? { dataType } : {},
+      ...format2 ? { format: format2 } : {},
+      ...aggregation ? { aggregation } : {},
+      ...timeGrainSupport.length > 0 ? { timeGrainSupport } : {},
+      ...definitionRef ? { definitionRef } : {},
+      ...sourceRef ? { sourceRef } : {},
+      ...relationshipRef ? { relationshipRef } : {},
+      ...governance ? { governance } : {}
+    };
+  }
+  function normalizeSemanticEntity(entity = {}) {
+    if (!isPlainObject(entity)) {
+      return null;
+    }
+    const id = normalizeSemanticString(entity.id || entity.name);
+    if (!id) {
+      return null;
+    }
+    const label = normalizeSemanticString(entity.label || id);
+    const description = normalizeSemanticString(entity.description);
+    const flatFields = (Array.isArray(entity.fields) ? entity.fields : []).map((entry) => normalizeSemanticField(entry)).filter(Boolean);
+    const dimensions = [
+      ...(Array.isArray(entity.dimensions) ? entity.dimensions : []).map((entry) => normalizeSemanticField(entry, { dataType: "string", featureType: "dimension" })).filter(Boolean),
+      ...flatFields.filter((entry) => entry.featureType === "dimension")
+    ];
+    const measures = [
+      ...(Array.isArray(entity.measures) ? entity.measures : []).map((entry) => normalizeSemanticField(entry, { dataType: "number", featureType: "measure" })).filter(Boolean),
+      ...flatFields.filter((entry) => entry.featureType === "measure")
+    ];
+    const parameters = [
+      ...(Array.isArray(entity.parameters) ? entity.parameters : []).map((entry) => normalizeSemanticField(entry, { featureType: "parameter" })).filter(Boolean),
+      ...flatFields.filter((entry) => entry.featureType === "parameter")
+    ];
+    const relationships = (Array.isArray(entity.relationships) ? entity.relationships : []).map((entry) => {
+      if (!isPlainObject(entry)) {
+        return null;
+      }
+      const id2 = normalizeSemanticString(entry.id || entry.relationshipRef);
+      const label2 = normalizeSemanticString(entry.label || id2);
+      const relationshipRef = normalizeSemanticString(entry.relationshipRef);
+      if (!id2) {
+        return null;
+      }
+      return {
+        id: id2,
+        ...label2 ? { label: label2 } : {},
+        ...relationshipRef ? { relationshipRef } : {}
+      };
+    }).filter(Boolean);
+    const governance = normalizeGovernance(entity.governance);
+    return {
+      id,
+      label,
+      ...description ? { description } : {},
+      ...dimensions.length > 0 ? { dimensions } : { dimensions: [] },
+      ...measures.length > 0 ? { measures } : { measures: [] },
+      ...parameters.length > 0 ? { parameters } : {},
+      ...relationships.length > 0 ? { relationships } : {},
+      ...governance ? { governance } : {}
+    };
+  }
+  function normalizeSemanticModel(model = {}) {
+    if (!isPlainObject(model)) {
+      return null;
+    }
+    const modelRef = normalizeSemanticModelRef(model.modelRef || model.id);
+    const version = Number(model.version || 0) || void 0;
+    const label = normalizeSemanticString(model.label || model.name);
+    const description = normalizeSemanticString(model.description);
+    const entities = (Array.isArray(model.entities) ? model.entities : []).map((entry) => normalizeSemanticEntity(entry)).filter(Boolean);
+    return {
+      ...modelRef ? { modelRef } : {},
+      ...version !== void 0 ? { version } : {},
+      ...label ? { label } : {},
+      ...description ? { description } : {},
+      entities
+    };
+  }
+  function validateSemanticModel(model = {}) {
+    const normalized = normalizeSemanticModel(model);
+    const errors = [];
+    if (!normalized) {
+      pushError(errors, "model", "invalid", "Semantic model must be an object.");
+      return { valid: false, errors, normalizedModel: null };
+    }
+    if (!normalized.modelRef) {
+      pushError(errors, "modelRef", "required", "Semantic model requires a valid modelRef.");
+    }
+    if (!Array.isArray(normalized.entities) || normalized.entities.length === 0) {
+      pushError(errors, "entities", "required", "Semantic model requires at least one entity.");
+    }
+    const entityIds = /* @__PURE__ */ new Set();
+    (normalized.entities || []).forEach((entity, entityIndex) => {
+      const rawEntity = Array.isArray(model == null ? void 0 : model.entities) ? model.entities[entityIndex] : null;
+      (Array.isArray(rawEntity == null ? void 0 : rawEntity.fields) ? rawEntity.fields : []).forEach((field, fieldIndex) => {
+        const featureType = normalizeSemanticFeatureType(field == null ? void 0 : field.featureType);
+        if (!normalizeSemanticString(field == null ? void 0 : field.featureType)) {
+          pushError(
+            errors,
+            `entities[${entityIndex}].fields[${fieldIndex}].featureType`,
+            "required",
+            "Semantic flat field entries require a featureType."
+          );
+          return;
+        }
+        if (!featureType) {
+          pushError(
+            errors,
+            `entities[${entityIndex}].fields[${fieldIndex}].featureType`,
+            "invalid",
+            `Unsupported semantic featureType '${field == null ? void 0 : field.featureType}'.`
+          );
+        }
+      });
+      if (entityIds.has(entity.id)) {
+        pushError(errors, `entities[${entityIndex}].id`, "duplicate", `Duplicate entity id '${entity.id}'.`);
+      } else {
+        entityIds.add(entity.id);
+      }
+      const fieldIds = /* @__PURE__ */ new Set();
+      const checkField = (field, fieldPath) => {
+        if (!(field == null ? void 0 : field.id)) {
+          pushError(errors, `${fieldPath}.id`, "required", "Semantic field requires an id.");
+          return;
+        }
+        if (fieldIds.has(field.id)) {
+          pushError(errors, `${fieldPath}.id`, "duplicate", `Duplicate field id '${field.id}' in entity '${entity.id}'.`);
+        } else {
+          fieldIds.add(field.id);
+        }
+        if (field.dataType && !SEMANTIC_DATA_TYPES.includes(field.dataType)) {
+          pushError(errors, `${fieldPath}.dataType`, "invalid", `Unsupported semantic dataType '${field.dataType}'.`);
+        }
+        if (field.aggregation && !SEMANTIC_AGGREGATIONS.includes(field.aggregation)) {
+          pushError(errors, `${fieldPath}.aggregation`, "invalid", `Unsupported aggregation '${field.aggregation}'.`);
+        }
+        (field.timeGrainSupport || []).forEach((grain, grainIndex) => {
+          if (!SEMANTIC_TIME_GRAINS.includes(grain)) {
+            pushError(errors, `${fieldPath}.timeGrainSupport[${grainIndex}]`, "invalid", `Unsupported time grain '${grain}'.`);
+          }
+        });
+        const governance = field.governance || {};
+        if (governance.status && !SEMANTIC_GOVERNANCE_STATUSES.includes(governance.status)) {
+          pushError(errors, `${fieldPath}.governance.status`, "invalid", `Unsupported governance status '${governance.status}'.`);
+        }
+        if (governance.certification && !SEMANTIC_CERTIFICATIONS.includes(governance.certification)) {
+          pushError(errors, `${fieldPath}.governance.certification`, "invalid", `Unsupported certification '${governance.certification}'.`);
+        }
+      };
+      (entity.dimensions || []).forEach((field, index) => checkField(field, `entities[${entityIndex}].dimensions[${index}]`));
+      (entity.measures || []).forEach((field, index) => checkField(field, `entities[${entityIndex}].measures[${index}]`));
+      (entity.parameters || []).forEach((field, index) => checkField(field, `entities[${entityIndex}].parameters[${index}]`));
+    });
+    return {
+      valid: errors.length === 0,
+      errors,
+      normalizedModel: normalized
+    };
+  }
+  function normalizeSemanticBinding(binding = {}) {
+    if (!isPlainObject(binding)) {
+      return null;
+    }
+    const mode = normalizeSemanticString(binding.mode).toLowerCase();
+    if (!mode || !SEMANTIC_BINDING_MODES.includes(mode)) {
+      return null;
+    }
+    if (mode === "raw") {
+      return { mode: "raw" };
+    }
+    const modelRef = normalizeSemanticModelRef(binding.modelRef);
+    const entity = normalizeSemanticString(binding.entity);
+    const selectedDimensions = normalizeSemanticArray(binding.selectedDimensions);
+    const selectedMeasures = normalizeSemanticArray(binding.selectedMeasures);
+    return {
+      mode: "semantic",
+      ...modelRef ? { modelRef } : {},
+      ...entity ? { entity } : {},
+      ...selectedDimensions.length > 0 ? { selectedDimensions } : { selectedDimensions: [] },
+      ...selectedMeasures.length > 0 ? { selectedMeasures } : { selectedMeasures: [] }
+    };
+  }
+  function validateSemanticBinding(binding = {}, model = null) {
+    var _a5, _b;
+    const normalized = normalizeSemanticBinding(binding);
+    const errors = [];
+    if (!normalized) {
+      pushError(errors, "binding", "invalid", "Semantic binding must declare a supported mode.");
+      return { valid: false, errors, normalizedBinding: null };
+    }
+    if (normalized.mode === "raw") {
+      return { valid: true, errors, normalizedBinding: normalized };
+    }
+    if (!normalized.modelRef) {
+      pushError(errors, "binding.modelRef", "required", "Semantic binding requires a valid modelRef.");
+    }
+    if (!normalized.entity) {
+      pushError(errors, "binding.entity", "required", "Semantic binding requires an entity.");
+    }
+    if (model) {
+      const validatedModel = validateSemanticModel(model);
+      const entity = (_b = (_a5 = validatedModel.normalizedModel) == null ? void 0 : _a5.entities) == null ? void 0 : _b.find((entry) => entry.id === normalized.entity);
+      if (!entity) {
+        pushError(errors, "binding.entity", "unknownEntity", `Unknown semantic entity '${normalized.entity}'.`);
+      } else {
+        const dimensionIds = new Set((entity.dimensions || []).map((entry) => entry.id));
+        const measureIds = new Set((entity.measures || []).map((entry) => entry.id));
+        normalized.selectedDimensions.forEach((id, index) => {
+          if (!dimensionIds.has(id)) {
+            pushError(errors, `binding.selectedDimensions[${index}]`, "unknownDimension", `Unknown semantic dimension '${id}'.`);
+          }
+        });
+        normalized.selectedMeasures.forEach((id, index) => {
+          if (!measureIds.has(id)) {
+            pushError(errors, `binding.selectedMeasures[${index}]`, "unknownMeasure", `Unknown semantic measure '${id}'.`);
+          }
+        });
+      }
+    }
+    return {
+      valid: errors.length === 0,
+      errors,
+      normalizedBinding: normalized
+    };
+  }
+
+  // src/reporting/calculationContracts.js
+  function cloneValue2(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+  }
+  function normalizeString2(value = "") {
+    return String(value || "").trim();
+  }
+  var REPORT_CALCULATED_FIELD_FUNCTION_SPECS = Object.freeze({
+    if: { minArgs: 3, maxArgs: 3 },
+    case: { minArgs: 3 },
+    coalesce: { minArgs: 1 },
+    isnull: { minArgs: 1, maxArgs: 1 },
+    nullif: { minArgs: 2, maxArgs: 2 },
+    abs: { minArgs: 1, maxArgs: 1 },
+    round: { minArgs: 1, maxArgs: 2 },
+    floor: { minArgs: 1, maxArgs: 1 },
+    ceil: { minArgs: 1, maxArgs: 1 },
+    min: { minArgs: 1 },
+    max: { minArgs: 1 },
+    least: { minArgs: 1 },
+    greatest: { minArgs: 1 },
+    concat: { minArgs: 1 },
+    lower: { minArgs: 1, maxArgs: 1 },
+    upper: { minArgs: 1, maxArgs: 1 }
+  });
+  var REPORT_CALCULATED_FIELD_TABLE_CALC_SPECS = Object.freeze([
+    {
+      name: "percentOfTotal",
+      label: "Percent of Total",
+      supportsPartition: true,
+      supportsDecimals: true,
+      usesFilteredScopeTotal: true,
+      nullBehavior: "nonFiniteValuesYieldZeroAndAreExcludedFromTotals",
+      defaultFormat: "percent"
+    },
+    {
+      name: "deltaFromPrevious",
+      label: "Delta From Previous",
+      supportsPartition: true,
+      requiresOrder: true,
+      nullBehavior: "nonFiniteValuesYieldZeroAndDoNotAdvancePreviousFiniteValue",
+      defaultFormat: "number"
+    },
+    {
+      name: "runningTotal",
+      label: "Running Total",
+      supportsPartition: true,
+      requiresOrder: true,
+      nullBehavior: "nonFiniteValuesDoNotAdvanceRunningTotal",
+      defaultFormat: "number"
+    },
+    {
+      name: "movingAverage",
+      label: "Moving Average",
+      supportsPartition: true,
+      requiresOrder: true,
+      requiresWindowSize: true,
+      supportsDecimals: true,
+      nullBehavior: "windowAveragesIgnoreNonFiniteValues",
+      defaultFormat: "number"
+    },
+    {
+      name: "rank",
+      label: "Rank",
+      supportsPartition: true,
+      requiresOrder: true,
+      supportsRankDirection: true,
+      supportsTieBreaker: true,
+      tieMode: "dense",
+      nullBehavior: "nonFiniteValuesYieldNullAndDoNotAdvanceRank",
+      defaultFormat: "number"
+    }
+  ]);
+  function listReportCalculatedFieldTableCalculationSpecs() {
+    return REPORT_CALCULATED_FIELD_TABLE_CALC_SPECS.map((entry) => cloneValue2(entry)).sort((left, right) => normalizeString2(left.name).localeCompare(normalizeString2(right.name)));
+  }
+
+  // src/reporting/calculatedFieldModel.js
+  function normalizeString3(value = "") {
+    return String(value || "").trim();
+  }
+  function cloneValue3(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+  }
+  function normalizeStringArray(values = []) {
+    return (Array.isArray(values) ? values : []).map((value) => normalizeString3(value)).filter(Boolean);
+  }
+  function normalizeOrderBy(orderBy = []) {
+    return (Array.isArray(orderBy) ? orderBy : []).map((entry) => {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+        return null;
+      }
+      const field = normalizeString3(entry.field);
+      if (!field) {
+        return null;
+      }
+      return {
+        field,
+        direction: normalizeString3(entry.direction).toLowerCase() === "desc" ? "desc" : "asc"
+      };
+    }).filter(Boolean);
+  }
+  function normalizePartitionBy(partitionBy = []) {
+    return normalizeStringArray(partitionBy);
+  }
+  function buildExpressionError(message = "", index = 0) {
+    return new Error(`Invalid calculated field expression at ${Math.max(0, Number(index) || 0)}: ${message}`);
+  }
+  function tokenizeReportCalculatedFieldExpression(expression = "") {
+    const input = String(expression || "");
+    const tokens = [];
+    let index = 0;
+    while (index < input.length) {
+      const char = input[index];
+      if (/\s/.test(char)) {
+        index += 1;
+        continue;
+      }
+      if (char === "(" || char === ")") {
+        tokens.push({ type: "paren", value: char, index });
+        index += 1;
+        continue;
+      }
+      if (char === ",") {
+        tokens.push({ type: "comma", value: char, index });
+        index += 1;
+        continue;
+      }
+      if ((char === "!" || char === ">" || char === "<") && input[index + 1] === "=") {
+        tokens.push({ type: "operator", value: `${char}=`, index });
+        index += 2;
+        continue;
+      }
+      if (char === "=" || char === "+" || char === "-" || char === "*" || char === "/" || char === "%" || char === ">" || char === "<") {
+        tokens.push({ type: "operator", value: char, index });
+        index += 1;
+        continue;
+      }
+      if (char === "'" || char === '"') {
+        const quote = char;
+        let cursor = index + 1;
+        let value = "";
+        while (cursor < input.length) {
+          const current = input[cursor];
+          if (current === "\\") {
+            const next = input[cursor + 1];
+            if (next == null) {
+              throw buildExpressionError("unterminated escape sequence", cursor);
+            }
+            value += next;
+            cursor += 2;
+            continue;
+          }
+          if (current === quote) {
+            tokens.push({ type: "string", value, index });
+            index = cursor + 1;
+            value = null;
+            break;
+          }
+          value += current;
+          cursor += 1;
+        }
+        if (value != null) {
+          throw buildExpressionError("unterminated string literal", index);
+        }
+        continue;
+      }
+      if (/[0-9]/.test(char) || char === "." && /[0-9]/.test(input[index + 1] || "")) {
+        let cursor = index + 1;
+        while (cursor < input.length && /[0-9.]/.test(input[cursor])) {
+          cursor += 1;
+        }
+        const rawNumber = input.slice(index, cursor);
+        const numericValue = Number(rawNumber);
+        if (!Number.isFinite(numericValue)) {
+          throw buildExpressionError(`invalid number literal "${rawNumber}"`, index);
+        }
+        tokens.push({ type: "number", value: numericValue, index });
+        index = cursor;
+        continue;
+      }
+      if (/[A-Za-z_]/.test(char)) {
+        let cursor = index + 1;
+        while (cursor < input.length && /[A-Za-z0-9_.]/.test(input[cursor])) {
+          cursor += 1;
+        }
+        const rawIdentifier = input.slice(index, cursor);
+        const lowered = rawIdentifier.toLowerCase();
+        if (lowered === "and" || lowered === "or" || lowered === "not") {
+          tokens.push({ type: "operator", value: lowered, index });
+        } else if (lowered === "null") {
+          tokens.push({ type: "literal", value: null, index });
+        } else if (lowered === "true") {
+          tokens.push({ type: "literal", value: true, index });
+        } else if (lowered === "false") {
+          tokens.push({ type: "literal", value: false, index });
+        } else {
+          tokens.push({ type: "identifier", value: rawIdentifier, index });
+        }
+        index = cursor;
+        continue;
+      }
+      throw buildExpressionError(`unexpected character "${char}"`, index);
+    }
+    return tokens;
+  }
+  function parseReportCalculatedFieldExpressionTokens(tokens = []) {
+    let position = 0;
+    function current() {
+      return tokens[position] || null;
+    }
+    function consume() {
+      const token = current();
+      position += 1;
+      return token;
+    }
+    function match2(type, value = void 0) {
+      const token = current();
+      if (!token || token.type !== type) {
+        return false;
+      }
+      if (value !== void 0 && token.value !== value) {
+        return false;
+      }
+      return true;
+    }
+    function expect(type, value = void 0) {
+      var _a5, _b, _c;
+      const token = current();
+      if (!match2(type, value)) {
+        throw buildExpressionError(`expected ${value != null ? value : type}`, (_c = (_b = token == null ? void 0 : token.index) != null ? _b : (_a5 = tokens[tokens.length - 1]) == null ? void 0 : _a5.index) != null ? _c : 0);
+      }
+      return consume();
+    }
+    function parsePrimary() {
+      var _a5, _b;
+      const token = current();
+      if (!token) {
+        throw buildExpressionError("unexpected end of expression", (_b = (_a5 = tokens[tokens.length - 1]) == null ? void 0 : _a5.index) != null ? _b : 0);
+      }
+      if (token.type === "number" || token.type === "string" || token.type === "literal") {
+        consume();
+        return { type: "literal", value: token.value };
+      }
+      if (token.type === "identifier") {
+        consume();
+        if (match2("paren", "(")) {
+          consume();
+          const args = [];
+          if (!match2("paren", ")")) {
+            while (true) {
+              args.push(parseOr());
+              if (match2("comma")) {
+                consume();
+                continue;
+              }
+              break;
+            }
+          }
+          expect("paren", ")");
+          return {
+            type: "call",
+            callee: token.value,
+            args
+          };
+        }
+        return {
+          type: "identifier",
+          name: token.value
+        };
+      }
+      if (match2("paren", "(")) {
+        consume();
+        const node = parseOr();
+        expect("paren", ")");
+        return node;
+      }
+      throw buildExpressionError(`unexpected token "${token.value}"`, token.index);
+    }
+    function parseUnary() {
+      if (match2("operator", "-") || match2("operator", "not")) {
+        const token = consume();
+        return {
+          type: "unary",
+          operator: token.value,
+          argument: parseUnary()
+        };
+      }
+      return parsePrimary();
+    }
+    function parseMultiplicative() {
+      let node = parseUnary();
+      while (match2("operator", "*") || match2("operator", "/") || match2("operator", "%")) {
+        const token = consume();
+        node = {
+          type: "binary",
+          operator: token.value,
+          left: node,
+          right: parseUnary()
+        };
+      }
+      return node;
+    }
+    function parseAdditive() {
+      let node = parseMultiplicative();
+      while (match2("operator", "+") || match2("operator", "-")) {
+        const token = consume();
+        node = {
+          type: "binary",
+          operator: token.value,
+          left: node,
+          right: parseMultiplicative()
+        };
+      }
+      return node;
+    }
+    function parseComparison() {
+      let node = parseAdditive();
+      if (match2("operator", "=") || match2("operator", "!=") || match2("operator", ">") || match2("operator", ">=") || match2("operator", "<") || match2("operator", "<=")) {
+        const token = consume();
+        node = {
+          type: "binary",
+          operator: token.value,
+          left: node,
+          right: parseAdditive()
+        };
+      }
+      return node;
+    }
+    function parseAnd() {
+      let node = parseComparison();
+      while (match2("operator", "and")) {
+        consume();
+        node = {
+          type: "binary",
+          operator: "and",
+          left: node,
+          right: parseComparison()
+        };
+      }
+      return node;
+    }
+    function parseOr() {
+      let node = parseAnd();
+      while (match2("operator", "or")) {
+        consume();
+        node = {
+          type: "binary",
+          operator: "or",
+          left: node,
+          right: parseAnd()
+        };
+      }
+      return node;
+    }
+    const ast = parseOr();
+    if (position < tokens.length) {
+      throw buildExpressionError(`unexpected token "${tokens[position].value}"`, tokens[position].index);
+    }
+    return ast;
+  }
+  function collectReportCalculatedFieldExpressionDependencies(node = null, dependencies = /* @__PURE__ */ new Set()) {
+    if (!node || typeof node !== "object") {
+      return dependencies;
+    }
+    if (node.type === "identifier") {
+      dependencies.add(normalizeString3(node.name));
+      return dependencies;
+    }
+    if (node.type === "unary") {
+      return collectReportCalculatedFieldExpressionDependencies(node.argument, dependencies);
+    }
+    if (node.type === "binary") {
+      collectReportCalculatedFieldExpressionDependencies(node.left, dependencies);
+      collectReportCalculatedFieldExpressionDependencies(node.right, dependencies);
+      return dependencies;
+    }
+    if (node.type === "call") {
+      (Array.isArray(node.args) ? node.args : []).forEach((arg) => {
+        collectReportCalculatedFieldExpressionDependencies(arg, dependencies);
+      });
+    }
+    return dependencies;
+  }
+  function validateReportCalculatedFieldExpressionAst(node = null) {
+    if (!node || typeof node !== "object") {
+      return;
+    }
+    if (node.type === "literal" || node.type === "identifier") {
+      return;
+    }
+    if (node.type === "unary") {
+      validateReportCalculatedFieldExpressionAst(node.argument);
+      return;
+    }
+    if (node.type === "binary") {
+      validateReportCalculatedFieldExpressionAst(node.left);
+      validateReportCalculatedFieldExpressionAst(node.right);
+      return;
+    }
+    if (node.type === "call") {
+      const normalizedCallee = normalizeString3(node.callee).toLowerCase();
+      const spec = REPORT_CALCULATED_FIELD_FUNCTION_SPECS[normalizedCallee];
+      if (!spec) {
+        throw buildExpressionError(`unsupported function "${node.callee}"`);
+      }
+      const argCount = Array.isArray(node.args) ? node.args.length : 0;
+      if (Number.isFinite(spec.minArgs) && argCount < spec.minArgs) {
+        throw buildExpressionError(`function "${node.callee}" requires at least ${spec.minArgs} argument${spec.minArgs === 1 ? "" : "s"}`);
+      }
+      if (Number.isFinite(spec.maxArgs) && argCount > spec.maxArgs) {
+        throw buildExpressionError(`function "${node.callee}" accepts at most ${spec.maxArgs} argument${spec.maxArgs === 1 ? "" : "s"}`);
+      }
+      (Array.isArray(node.args) ? node.args : []).forEach((arg) => {
+        validateReportCalculatedFieldExpressionAst(arg);
+      });
+      return;
+    }
+    throw buildExpressionError(`unsupported expression node "${String(node.type || "unknown")}"`);
+  }
+  function parseReportCalculatedFieldExpression(expression = "") {
+    const normalizedExpression = normalizeString3(expression);
+    if (!normalizedExpression) {
+      return null;
+    }
+    const tokens = tokenizeReportCalculatedFieldExpression(normalizedExpression);
+    const ast = parseReportCalculatedFieldExpressionTokens(tokens);
+    validateReportCalculatedFieldExpressionAst(ast);
+    return {
+      expr: normalizedExpression,
+      ast,
+      dependencies: Array.from(collectReportCalculatedFieldExpressionDependencies(ast))
+    };
+  }
+  function isNullishValue(value) {
+    return value === void 0 || value === null;
+  }
+  function toFiniteNumber(value) {
+    if (isNullishValue(value) || value === "") {
+      return null;
+    }
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) ? numericValue : null;
+  }
+  function coerceBoolean(value) {
+    if (typeof value === "boolean") {
+      return value;
+    }
+    if (isNullishValue(value) || value === "") {
+      return false;
+    }
+    if (typeof value === "number") {
+      return value !== 0;
+    }
+    const trimmed = normalizeString3(value);
+    if (!trimmed) {
+      return false;
+    }
+    if (trimmed.toLowerCase() === "true") {
+      return true;
+    }
+    if (trimmed.toLowerCase() === "false") {
+      return false;
+    }
+    const numericValue = toFiniteNumber(trimmed);
+    if (numericValue != null) {
+      return numericValue !== 0;
+    }
+    return true;
+  }
+  function compareValues(left, right, operator = "=") {
+    if (isNullishValue(left) || isNullishValue(right)) {
+      return false;
+    }
+    const leftNumber = toFiniteNumber(left);
+    const rightNumber = toFiniteNumber(right);
+    if (leftNumber != null && rightNumber != null) {
+      switch (operator) {
+        case "=":
+          return leftNumber === rightNumber;
+        case "!=":
+          return leftNumber !== rightNumber;
+        case ">":
+          return leftNumber > rightNumber;
+        case ">=":
+          return leftNumber >= rightNumber;
+        case "<":
+          return leftNumber < rightNumber;
+        case "<=":
+          return leftNumber <= rightNumber;
+        default:
+          return false;
+      }
+    }
+    const leftValue = typeof left === "boolean" ? String(left) : String(left);
+    const rightValue = typeof right === "boolean" ? String(right) : String(right);
+    switch (operator) {
+      case "=":
+        return leftValue === rightValue;
+      case "!=":
+        return leftValue !== rightValue;
+      case ">":
+        return leftValue > rightValue;
+      case ">=":
+        return leftValue >= rightValue;
+      case "<":
+        return leftValue < rightValue;
+      case "<=":
+        return leftValue <= rightValue;
+      default:
+        return false;
+    }
+  }
+  function evaluateReportCalculatedFieldFunction(node = {}, row = {}) {
+    const callee = normalizeString3(node == null ? void 0 : node.callee).toLowerCase();
+    const args = Array.isArray(node == null ? void 0 : node.args) ? node.args : [];
+    switch (callee) {
+      case "if": {
+        if (args.length !== 3) {
+          return null;
+        }
+        return coerceBoolean(evaluateReportCalculatedFieldExpression(args[0], row)) ? evaluateReportCalculatedFieldExpression(args[1], row) : evaluateReportCalculatedFieldExpression(args[2], row);
+      }
+      case "case": {
+        if (args.length < 3) {
+          return null;
+        }
+        const hasElseValue = args.length % 2 === 1;
+        const pairLimit = hasElseValue ? args.length - 1 : args.length;
+        for (let index = 0; index < pairLimit; index += 2) {
+          if (coerceBoolean(evaluateReportCalculatedFieldExpression(args[index], row))) {
+            return evaluateReportCalculatedFieldExpression(args[index + 1], row);
+          }
+        }
+        return hasElseValue ? evaluateReportCalculatedFieldExpression(args[args.length - 1], row) : null;
+      }
+      case "coalesce": {
+        for (const arg of args) {
+          const value = evaluateReportCalculatedFieldExpression(arg, row);
+          if (!isNullishValue(value)) {
+            return value;
+          }
+        }
+        return null;
+      }
+      case "isnull": {
+        if (args.length !== 1) {
+          return null;
+        }
+        return isNullishValue(evaluateReportCalculatedFieldExpression(args[0], row));
+      }
+      case "nullif": {
+        if (args.length !== 2) {
+          return null;
+        }
+        const left = evaluateReportCalculatedFieldExpression(args[0], row);
+        const right = evaluateReportCalculatedFieldExpression(args[1], row);
+        return compareValues(left, right, "=") ? null : left;
+      }
+      default:
+        break;
+    }
+    const values = args.map((arg) => evaluateReportCalculatedFieldExpression(arg, row));
+    switch (callee) {
+      case "abs": {
+        const numericValue = toFiniteNumber(values[0]);
+        return numericValue == null ? null : Math.abs(numericValue);
+      }
+      case "round": {
+        const numericValue = toFiniteNumber(values[0]);
+        if (numericValue == null) {
+          return null;
+        }
+        const decimals = values.length > 1 ? toFiniteNumber(values[1]) : 0;
+        if (decimals == null) {
+          return null;
+        }
+        const factor = 10 ** Math.max(0, Math.trunc(decimals));
+        return Math.round(numericValue * factor) / factor;
+      }
+      case "floor": {
+        const numericValue = toFiniteNumber(values[0]);
+        return numericValue == null ? null : Math.floor(numericValue);
+      }
+      case "ceil": {
+        const numericValue = toFiniteNumber(values[0]);
+        return numericValue == null ? null : Math.ceil(numericValue);
+      }
+      case "min":
+      case "least": {
+        if (values.length === 0 || values.some((value) => toFiniteNumber(value) == null)) {
+          return null;
+        }
+        return Math.min(...values.map((value) => toFiniteNumber(value)));
+      }
+      case "max":
+      case "greatest": {
+        if (values.length === 0 || values.some((value) => toFiniteNumber(value) == null)) {
+          return null;
+        }
+        return Math.max(...values.map((value) => toFiniteNumber(value)));
+      }
+      case "concat": {
+        if (values.some((value) => isNullishValue(value))) {
+          return null;
+        }
+        return values.map((value) => String(value)).join("");
+      }
+      case "lower": {
+        if (isNullishValue(values[0])) {
+          return null;
+        }
+        return String(values[0]).toLowerCase();
+      }
+      case "upper": {
+        if (isNullishValue(values[0])) {
+          return null;
+        }
+        return String(values[0]).toUpperCase();
+      }
+      default:
+        return null;
+    }
+  }
+  function evaluateReportCalculatedFieldExpression(expressionOrNode = null, row = {}) {
+    var _a5;
+    const node = typeof expressionOrNode === "string" ? (_a5 = parseReportCalculatedFieldExpression(expressionOrNode)) == null ? void 0 : _a5.ast : expressionOrNode;
+    if (!node || typeof node !== "object") {
+      return null;
+    }
+    switch (node.type) {
+      case "literal":
+        return cloneValue3(node.value);
+      case "identifier": {
+        const value = resolveKey(row, node.name);
+        return value === void 0 ? null : cloneValue3(value);
+      }
+      case "unary": {
+        const value = evaluateReportCalculatedFieldExpression(node.argument, row);
+        if (node.operator === "not") {
+          return !coerceBoolean(value);
+        }
+        if (node.operator === "-") {
+          const numericValue = toFiniteNumber(value);
+          return numericValue == null ? null : -numericValue;
+        }
+        return null;
+      }
+      case "binary": {
+        if (node.operator === "and") {
+          return coerceBoolean(evaluateReportCalculatedFieldExpression(node.left, row)) && coerceBoolean(evaluateReportCalculatedFieldExpression(node.right, row));
+        }
+        if (node.operator === "or") {
+          return coerceBoolean(evaluateReportCalculatedFieldExpression(node.left, row)) || coerceBoolean(evaluateReportCalculatedFieldExpression(node.right, row));
+        }
+        const left = evaluateReportCalculatedFieldExpression(node.left, row);
+        const right = evaluateReportCalculatedFieldExpression(node.right, row);
+        if (node.operator === "+" || node.operator === "-" || node.operator === "*" || node.operator === "/" || node.operator === "%") {
+          const leftNumber = toFiniteNumber(left);
+          const rightNumber = toFiniteNumber(right);
+          if (leftNumber == null || rightNumber == null) {
+            return null;
+          }
+          if ((node.operator === "/" || node.operator === "%") && rightNumber === 0) {
+            return null;
+          }
+          switch (node.operator) {
+            case "+":
+              return leftNumber + rightNumber;
+            case "-":
+              return leftNumber - rightNumber;
+            case "*":
+              return leftNumber * rightNumber;
+            case "/":
+              return leftNumber / rightNumber;
+            case "%":
+              return leftNumber % rightNumber;
+            default:
+              return null;
+          }
+        }
+        return compareValues(left, right, node.operator);
+      }
+      case "call":
+        return evaluateReportCalculatedFieldFunction(node, row);
+      default:
+        return null;
+    }
+  }
+  function normalizeRatioCalculation(compute = {}) {
+    const numerator = normalizeString3(compute == null ? void 0 : compute.numerator);
+    const denominator = normalizeString3(compute == null ? void 0 : compute.denominator);
+    if (!numerator || !denominator) {
+      return null;
+    }
+    const next = {
+      type: "ratio",
+      numerator,
+      denominator
+    };
+    if (Number.isFinite(Number(compute == null ? void 0 : compute.scale))) {
+      next.scale = Number(compute.scale);
+    }
+    if (Number.isFinite(Number(compute == null ? void 0 : compute.decimals))) {
+      next.decimals = Number(compute.decimals);
+    }
+    return next;
+  }
+  function normalizePercentOfTotalCalculation(compute = {}) {
+    const sourceField = normalizeString3(compute == null ? void 0 : compute.sourceField);
+    if (!sourceField) {
+      return null;
+    }
+    const next = {
+      type: "percentOfTotal",
+      sourceField
+    };
+    const partitionBy = normalizePartitionBy(compute == null ? void 0 : compute.partitionBy);
+    if (partitionBy.length > 0) {
+      next.partitionBy = partitionBy;
+    }
+    if (Number.isFinite(Number(compute == null ? void 0 : compute.scale))) {
+      next.scale = Number(compute.scale);
+    }
+    if (Number.isFinite(Number(compute == null ? void 0 : compute.decimals))) {
+      next.decimals = Number(compute.decimals);
+    }
+    return next;
+  }
+  function normalizeDeltaFromPreviousCalculation(compute = {}) {
+    const sourceField = normalizeString3(compute == null ? void 0 : compute.sourceField);
+    const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
+    if (!sourceField || orderBy.length === 0) {
+      return null;
+    }
+    const next = {
+      type: "deltaFromPrevious",
+      sourceField,
+      orderBy
+    };
+    const partitionBy = normalizePartitionBy(compute == null ? void 0 : compute.partitionBy);
+    if (partitionBy.length > 0) {
+      next.partitionBy = partitionBy;
+    }
+    return next;
+  }
+  function normalizeRunningTotalCalculation(compute = {}) {
+    const sourceField = normalizeString3(compute == null ? void 0 : compute.sourceField);
+    const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
+    if (!sourceField || orderBy.length === 0) {
+      return null;
+    }
+    const next = {
+      type: "runningTotal",
+      sourceField,
+      orderBy
+    };
+    const partitionBy = normalizePartitionBy(compute == null ? void 0 : compute.partitionBy);
+    if (partitionBy.length > 0) {
+      next.partitionBy = partitionBy;
+    }
+    return next;
+  }
+  function normalizeMovingAverageCalculation(compute = {}) {
+    const sourceField = normalizeString3(compute == null ? void 0 : compute.sourceField);
+    const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
+    const windowSize = Math.max(1, Number((compute == null ? void 0 : compute.windowSize) || 0) || 0);
+    if (!sourceField || orderBy.length === 0 || !windowSize) {
+      return null;
+    }
+    const next = {
+      type: "movingAverage",
+      sourceField,
+      orderBy,
+      windowSize
+    };
+    if (Number.isFinite(Number(compute == null ? void 0 : compute.decimals))) {
+      next.decimals = Number(compute.decimals);
+    }
+    const partitionBy = normalizePartitionBy(compute == null ? void 0 : compute.partitionBy);
+    if (partitionBy.length > 0) {
+      next.partitionBy = partitionBy;
+    }
+    return next;
+  }
+  function normalizeRankCalculation(compute = {}) {
+    var _a5;
+    const sourceField = normalizeString3(compute == null ? void 0 : compute.sourceField);
+    const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
+    const tieMode = normalizeString3(compute == null ? void 0 : compute.tieMode).toLowerCase();
+    if (!sourceField || orderBy.length === 0 || ((_a5 = orderBy[0]) == null ? void 0 : _a5.field) !== sourceField) {
+      return null;
+    }
+    if (tieMode && tieMode !== "dense") {
+      return null;
+    }
+    const next = {
+      type: "rank",
+      sourceField,
+      orderBy,
+      tieMode: "dense"
+    };
+    const partitionBy = normalizePartitionBy(compute == null ? void 0 : compute.partitionBy);
+    if (partitionBy.length > 0) {
+      next.partitionBy = partitionBy;
+    }
+    return next;
+  }
+  function buildCalculatedFieldDependencies(definition = {}, inferredDependencies = []) {
+    return Array.from(/* @__PURE__ */ new Set([
+      ...normalizeStringArray(definition == null ? void 0 : definition.dependencies),
+      ...normalizeStringArray(inferredDependencies)
+    ]));
+  }
+  function normalizeReportCalculatedFieldExpressionDefinition(definition = {}) {
+    const expr = normalizeString3(definition == null ? void 0 : definition.expr);
+    if (!expr) {
+      return null;
+    }
+    const parsed = parseReportCalculatedFieldExpression(expr);
+    if (!(parsed == null ? void 0 : parsed.ast)) {
+      return null;
+    }
+    return {
+      expr,
+      dependencies: buildCalculatedFieldDependencies(definition, parsed.dependencies)
+    };
+  }
+  function normalizeReportCalculatedFieldCompute(definition = {}) {
+    var _a5;
+    const computeType = normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type).toLowerCase();
+    let compute = null;
+    if (computeType === "ratio") {
+      compute = normalizeRatioCalculation(definition.compute);
+    } else if (computeType === "percentoftotal") {
+      compute = normalizePercentOfTotalCalculation(definition.compute);
+    } else if (computeType === "deltafromprevious") {
+      compute = normalizeDeltaFromPreviousCalculation(definition.compute);
+    } else if (computeType === "runningtotal") {
+      compute = normalizeRunningTotalCalculation(definition.compute);
+    } else if (computeType === "movingaverage") {
+      compute = normalizeMovingAverageCalculation(definition.compute);
+    } else if (computeType === "rank") {
+      compute = normalizeRankCalculation(definition.compute);
+    }
+    if (!compute) {
+      return null;
+    }
+    const inferredDependencies = computeType === "percentoftotal" ? [compute.sourceField, ...normalizePartitionBy(compute.partitionBy)] : computeType === "deltafromprevious" || computeType === "runningtotal" || computeType === "movingaverage" || computeType === "rank" ? [compute.sourceField, ...compute.orderBy.map((entry) => entry.field), ...normalizePartitionBy(compute.partitionBy)] : [compute.numerator, compute.denominator];
+    return {
+      compute,
+      dependencies: buildCalculatedFieldDependencies(definition, inferredDependencies)
+    };
+  }
+  function normalizeReportCalculatedField(definition = {}, {
+    datasetRef = ""
+  } = {}) {
+    var _a5, _b, _c, _d, _e;
+    if (!definition || typeof definition !== "object" || Array.isArray(definition)) {
+      return null;
+    }
+    const id = normalizeString3((definition == null ? void 0 : definition.id) || (definition == null ? void 0 : definition.key));
+    if (!id) {
+      return null;
+    }
+    const normalizedExpression = normalizeReportCalculatedFieldExpressionDefinition(definition);
+    const normalizedCompute = normalizedExpression ? null : normalizeReportCalculatedFieldCompute(definition);
+    if (!normalizedExpression && !normalizedCompute) {
+      return null;
+    }
+    const kind = normalizedExpression ? "rowCalc" : normalizeString3((_a5 = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _a5.type).toLowerCase() === "percentoftotal" || normalizeString3((_b = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _b.type).toLowerCase() === "deltafromprevious" || normalizeString3((_c = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _c.type).toLowerCase() === "runningtotal" || normalizeString3((_d = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _d.type).toLowerCase() === "movingaverage" || normalizeString3((_e = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _e.type).toLowerCase() === "rank" ? "tableCalc" : "rowCalc";
+    if (normalizedExpression && normalizeString3(definition == null ? void 0 : definition.kind) && normalizeString3(definition.kind) !== "rowCalc") {
+      return null;
+    }
+    return {
+      id,
+      key: normalizeString3((definition == null ? void 0 : definition.key) || id),
+      kind,
+      label: normalizeString3((definition == null ? void 0 : definition.label) || id),
+      dataType: normalizeString3((definition == null ? void 0 : definition.dataType) || "number") || "number",
+      ...normalizeString3(definition == null ? void 0 : definition.format) ? { format: normalizeString3(definition.format) } : {},
+      ...normalizeString3(datasetRef || (definition == null ? void 0 : definition.datasetRef)) ? { datasetRef: normalizeString3(datasetRef || (definition == null ? void 0 : definition.datasetRef)) } : {},
+      dependencies: (normalizedExpression == null ? void 0 : normalizedExpression.dependencies) || (normalizedCompute == null ? void 0 : normalizedCompute.dependencies) || [],
+      ...normalizedExpression ? { expr: normalizedExpression.expr } : { compute: normalizedCompute.compute }
+    };
+  }
+  function normalizeReportCalculatedFields(definitions = [], options = {}) {
+    return (Array.isArray(definitions) ? definitions : []).map((definition) => normalizeReportCalculatedField(definition, options)).filter(Boolean);
+  }
+  function buildPartitionGroups(rowsToPartition = [], partitionBy = []) {
+    const normalizedPartitionBy = normalizePartitionBy(partitionBy);
+    if (normalizedPartitionBy.length === 0) {
+      return [[...rowsToPartition]];
+    }
+    const groups = /* @__PURE__ */ new Map();
+    rowsToPartition.forEach((row) => {
+      const key = JSON.stringify(normalizedPartitionBy.map((field) => resolveKey(row, field)));
+      const current = groups.get(key) || [];
+      current.push(row);
+      groups.set(key, current);
+    });
+    return Array.from(groups.values());
+  }
+  function sortRowsByOrder(rowsToSort = [], orderBy = []) {
+    return [...rowsToSort].sort((left, right) => {
+      for (const order of normalizeOrderBy(orderBy)) {
+        const leftValue = resolveKey(left, order.field);
+        const rightValue = resolveKey(right, order.field);
+        if (leftValue === rightValue) {
+          continue;
+        }
+        const comparison = String(leftValue != null ? leftValue : "").localeCompare(String(rightValue != null ? rightValue : ""), void 0, { numeric: true });
+        return order.direction === "desc" ? -comparison : comparison;
+      }
+      return 0;
+    });
+  }
+  function topologicallySortRowCalculatedFields(definitions = []) {
+    const byKey = new Map(
+      definitions.map((definition) => [normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id)), definition]).filter(([key]) => !!key)
+    );
+    const pending = new Set(byKey.keys());
+    const sorted = [];
+    let progressed = true;
+    while (pending.size > 0 && progressed) {
+      progressed = false;
+      Array.from(pending).forEach((key) => {
+        const definition = byKey.get(key);
+        const unresolved = normalizeStringArray(definition == null ? void 0 : definition.dependencies).filter((dependencyKey) => {
+          if (dependencyKey === key || !byKey.has(dependencyKey)) {
+            return false;
+          }
+          return pending.has(dependencyKey);
+        });
+        if (unresolved.length > 0) {
+          return;
+        }
+        sorted.push(definition);
+        pending.delete(key);
+        progressed = true;
+      });
+    }
+    Array.from(pending).forEach((key) => {
+      sorted.push(byKey.get(key));
+    });
+    return sorted;
+  }
+  function applyReportCalculatedFields(rows = [], calculatedFields = [], {
+    datasetRef = ""
+  } = {}) {
+    const applicableFields = normalizeReportCalculatedFields(calculatedFields).filter((definition) => {
+      const targetDatasetRef = normalizeString3(definition == null ? void 0 : definition.datasetRef);
+      if (!targetDatasetRef) {
+        return true;
+      }
+      return targetDatasetRef === normalizeString3(datasetRef);
+    });
+    if (applicableFields.length === 0) {
+      return Array.isArray(rows) ? rows : [];
+    }
+    const compiledExpressions = new Map(
+      applicableFields.filter((definition) => normalizeString3(definition == null ? void 0 : definition.expr)).map((definition) => {
+        var _a5;
+        return [normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id)), ((_a5 = parseReportCalculatedFieldExpression(definition.expr)) == null ? void 0 : _a5.ast) || null];
+      })
+    );
+    const rowCalculated = (Array.isArray(rows) ? rows : []).map((row) => {
+      const next = { ...row || {} };
+      topologicallySortRowCalculatedFields(applicableFields.filter((definition) => definition.kind === "rowCalc")).forEach((definition) => {
+        var _a5, _b, _c;
+        const outputKey = normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
+        if (!outputKey) {
+          return;
+        }
+        if (normalizeString3(definition == null ? void 0 : definition.expr)) {
+          next[outputKey] = evaluateReportCalculatedFieldExpression(compiledExpressions.get(outputKey), next);
+          return;
+        }
+        if (normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "ratio") {
+          const numerator = Number(resolveKey(next, definition.compute.numerator));
+          const denominator = Number(resolveKey(next, definition.compute.denominator));
+          const scale = Number.isFinite(Number((_b = definition == null ? void 0 : definition.compute) == null ? void 0 : _b.scale)) ? Number(definition.compute.scale) : 1;
+          const decimals = Number.isFinite(Number((_c = definition == null ? void 0 : definition.compute) == null ? void 0 : _c.decimals)) ? Number(definition.compute.decimals) : null;
+          let value = 0;
+          if (Number.isFinite(numerator) && Number.isFinite(denominator) && denominator !== 0) {
+            value = numerator / denominator * scale;
+          }
+          if (decimals != null) {
+            value = Number(value.toFixed(decimals));
+          }
+          next[outputKey] = value;
+        }
+      });
+      return next;
+    });
+    const withTableCalcs = rowCalculated.map((row) => ({ ...row }));
+    applicableFields.filter((definition) => {
+      var _a5;
+      return normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "percentOfTotal";
+    }).forEach((definition) => {
+      var _a5, _b, _c, _d;
+      const outputKey = normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
+      const sourceField = normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.sourceField);
+      if (!outputKey || !sourceField) {
+        return;
+      }
+      const scale = Number.isFinite(Number((_b = definition == null ? void 0 : definition.compute) == null ? void 0 : _b.scale)) ? Number(definition.compute.scale) : 100;
+      const decimals = Number.isFinite(Number((_c = definition == null ? void 0 : definition.compute) == null ? void 0 : _c.decimals)) ? Number(definition.compute.decimals) : null;
+      buildPartitionGroups(withTableCalcs, (_d = definition == null ? void 0 : definition.compute) == null ? void 0 : _d.partitionBy).forEach((groupRows) => {
+        const total = groupRows.reduce((sum, row) => {
+          const value = toFiniteNumber(resolveKey(row, sourceField));
+          return value != null ? sum + value : sum;
+        }, 0);
+        groupRows.forEach((row) => {
+          const sourceValue = toFiniteNumber(resolveKey(row, sourceField));
+          let value = 0;
+          if (sourceValue != null && total !== 0) {
+            value = sourceValue / total * scale;
+          }
+          if (decimals != null) {
+            value = Number(value.toFixed(decimals));
+          }
+          row[outputKey] = value;
+        });
+      });
+    });
+    applicableFields.filter((definition) => {
+      var _a5;
+      return normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "deltaFromPrevious";
+    }).forEach((definition) => {
+      var _a5, _b, _c;
+      const outputKey = normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
+      const sourceField = normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.sourceField);
+      const orderBy = normalizeOrderBy((_b = definition == null ? void 0 : definition.compute) == null ? void 0 : _b.orderBy);
+      if (!outputKey || !sourceField || orderBy.length === 0) {
+        return;
+      }
+      buildPartitionGroups(withTableCalcs, (_c = definition == null ? void 0 : definition.compute) == null ? void 0 : _c.partitionBy).forEach((groupRows) => {
+        const sortedRows = sortRowsByOrder(groupRows, orderBy);
+        let previousValue = null;
+        sortedRows.forEach((row) => {
+          const sourceValue = toFiniteNumber(resolveKey(row, sourceField));
+          let value = 0;
+          if (sourceValue != null && previousValue != null) {
+            value = sourceValue - previousValue;
+          }
+          row[outputKey] = value;
+          previousValue = sourceValue != null ? sourceValue : previousValue;
+        });
+      });
+    });
+    applicableFields.filter((definition) => {
+      var _a5;
+      return normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "runningTotal";
+    }).forEach((definition) => {
+      var _a5, _b, _c;
+      const outputKey = normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
+      const sourceField = normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.sourceField);
+      const orderBy = normalizeOrderBy((_b = definition == null ? void 0 : definition.compute) == null ? void 0 : _b.orderBy);
+      if (!outputKey || !sourceField || orderBy.length === 0) {
+        return;
+      }
+      buildPartitionGroups(withTableCalcs, (_c = definition == null ? void 0 : definition.compute) == null ? void 0 : _c.partitionBy).forEach((groupRows) => {
+        const sortedRows = sortRowsByOrder(groupRows, orderBy);
+        let runningValue = 0;
+        sortedRows.forEach((row) => {
+          const sourceValue = toFiniteNumber(resolveKey(row, sourceField));
+          if (sourceValue != null) {
+            runningValue += sourceValue;
+          }
+          row[outputKey] = runningValue;
+        });
+      });
+    });
+    applicableFields.filter((definition) => {
+      var _a5;
+      return normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "movingAverage";
+    }).forEach((definition) => {
+      var _a5, _b, _c, _d;
+      const outputKey = normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
+      const sourceField = normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.sourceField);
+      const orderBy = normalizeOrderBy((_b = definition == null ? void 0 : definition.compute) == null ? void 0 : _b.orderBy);
+      const windowSize = Math.max(1, Number(((_c = definition == null ? void 0 : definition.compute) == null ? void 0 : _c.windowSize) || 0) || 0);
+      if (!outputKey || !sourceField || orderBy.length === 0 || !windowSize) {
+        return;
+      }
+      buildPartitionGroups(withTableCalcs, (_d = definition == null ? void 0 : definition.compute) == null ? void 0 : _d.partitionBy).forEach((groupRows) => {
+        const sortedRows = sortRowsByOrder(groupRows, orderBy);
+        sortedRows.forEach((row, index) => {
+          var _a6;
+          const windowRows = sortedRows.slice(Math.max(0, index - windowSize + 1), index + 1);
+          const numericValues = windowRows.map((entry) => toFiniteNumber(resolveKey(entry, sourceField))).filter((value2) => value2 != null);
+          let value = 0;
+          if (numericValues.length > 0) {
+            value = numericValues.reduce((sum, entry) => sum + entry, 0) / numericValues.length;
+          }
+          const decimals = Number.isFinite(Number((_a6 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a6.decimals)) ? Number(definition.compute.decimals) : null;
+          if (decimals != null) {
+            value = Number(value.toFixed(decimals));
+          }
+          row[outputKey] = value;
+        });
+      });
+    });
+    applicableFields.filter((definition) => {
+      var _a5;
+      return normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "rank";
+    }).forEach((definition) => {
+      var _a5, _b, _c, _d, _e;
+      const outputKey = normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
+      const sourceField = normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.sourceField);
+      const orderBy = normalizeOrderBy((_b = definition == null ? void 0 : definition.compute) == null ? void 0 : _b.orderBy);
+      const tieMode = normalizeString3((_c = definition == null ? void 0 : definition.compute) == null ? void 0 : _c.tieMode).toLowerCase();
+      if (!outputKey || !sourceField || orderBy.length === 0 || ((_d = orderBy[0]) == null ? void 0 : _d.field) !== sourceField) {
+        return;
+      }
+      if (tieMode && tieMode !== "dense") {
+        return;
+      }
+      buildPartitionGroups(withTableCalcs, (_e = definition == null ? void 0 : definition.compute) == null ? void 0 : _e.partitionBy).forEach((groupRows) => {
+        const sortedRows = sortRowsByOrder(groupRows, orderBy);
+        let rank = 0;
+        let previousValue;
+        let hasPreviousValue = false;
+        sortedRows.forEach((row) => {
+          const sourceValue = resolveKey(row, sourceField);
+          if (sourceValue === void 0 || sourceValue === null || sourceValue === "") {
+            row[outputKey] = null;
+            return;
+          }
+          const normalizedValue = String(sourceValue);
+          if (!hasPreviousValue || normalizedValue !== previousValue) {
+            rank += 1;
+            previousValue = normalizedValue;
+            hasPreviousValue = true;
+          }
+          row[outputKey] = rank;
+        });
+      });
+    });
+    return withTableCalcs;
+  }
+  function cloneReportCalculatedFields(calculatedFields = []) {
+    return normalizeReportCalculatedFields(calculatedFields).map((definition) => cloneValue3(definition));
+  }
+
+  // src/utils/presentationText.js
+  var CONTROL_CHARACTERS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g;
+  var UNICODE_REPLACEMENT_RUN = /\uFFFD+/g;
+  function normalizePresentationText(value = "", { replacement = "?" } = {}) {
+    let text = String(value != null ? value : "").replace(CONTROL_CHARACTERS, "").replace(UNICODE_REPLACEMENT_RUN, replacement);
+    try {
+      text = text.normalize("NFC");
+    } catch (_2) {
+    }
+    return text.replace(/\s+/g, " ").trim();
+  }
+  function normalizePresentationClampConfig(value = null) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const lines = Number(value.lines);
+    if (lines !== 1 && lines !== 2) return null;
+    return {
+      lines,
+      maxCharacters: Math.max(4, Math.min(120, Number(value.maxCharacters) || 28))
+    };
+  }
+
+  // src/reporting/reportTableLink.js
+  function normalizeString4(value = "") {
+    return String(value != null ? value : "").trim();
+  }
+  function normalizeReportTableLink(link = null) {
+    if (!link || typeof link !== "object" || Array.isArray(link)) return null;
+    const kind = normalizeString4(link.kind).toLowerCase();
+    if (kind === "external") {
+      const urlField = normalizeString4(link.urlField);
+      return urlField ? { kind: "external", urlField } : null;
+    }
+    if (kind === "entitydetail") {
+      const handler = normalizeString4(link.handler);
+      const idField = normalizeString4(link.idField);
+      return handler && idField ? { kind: "entityDetail", handler, idField } : null;
+    }
+    return null;
+  }
+
+  // src/reporting/tableVisualSpec.js
+  function normalizeString5(value = "") {
+    return String(value || "").trim();
+  }
+  function isTruncatedPlaceholder(value = "") {
+    return normalizeString5(value) === "[MaxDepth]";
+  }
+  function cloneValue4(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+  }
+  function normalizeStringArray2(values = []) {
+    return (Array.isArray(values) ? values : []).map((value) => normalizeString5(value)).filter(Boolean);
+  }
+  function normalizeRange(range = {}) {
+    if (!range || typeof range !== "object" || Array.isArray(range)) {
+      return null;
+    }
+    const mode = normalizeString5(range.mode);
+    const next = {
+      ...mode ? { mode } : {},
+      ...Number.isFinite(Number(range.min)) ? { min: Number(range.min) } : {},
+      ...Number.isFinite(Number(range.max)) ? { max: Number(range.max) } : {}
+    };
+    return Object.keys(next).length > 0 ? next : null;
+  }
+  function normalizeRules(rules = []) {
+    return (Array.isArray(rules) ? rules : []).map((rule) => {
+      if (!rule || typeof rule !== "object" || Array.isArray(rule)) {
+        return null;
+      }
+      const next = {
+        ..."value" in rule ? { value: cloneValue4(rule.value) } : {},
+        ...normalizeString5(rule.tone) ? { tone: normalizeString5(rule.tone) } : {},
+        ...normalizeString5(rule.label) ? { label: normalizeString5(rule.label) } : {},
+        ...normalizeString5(rule.color) ? { color: normalizeString5(rule.color) } : {},
+        ...normalizeString5(rule.background) ? { background: normalizeString5(rule.background) } : {}
+      };
+      return Object.keys(next).length > 0 ? next : null;
+    }).filter(Boolean);
+  }
+  function normalizeSegments(segments = []) {
+    return (Array.isArray(segments) ? segments : []).map((segment) => {
+      if (!segment || typeof segment !== "object" || Array.isArray(segment)) {
+        return null;
+      }
+      const valueField = normalizeString5(segment.valueField);
+      if (!valueField) {
+        return null;
+      }
+      const next = {
+        valueField,
+        ...normalizeString5(segment.label) ? { label: normalizeString5(segment.label) } : {},
+        ...normalizeString5(segment.color) ? { color: normalizeString5(segment.color) } : {}
+      };
+      return next;
+    }).filter(Boolean);
+  }
+  function normalizeReportTableCellVisual(cellVisual = {}) {
+    if (!cellVisual || typeof cellVisual !== "object" || Array.isArray(cellVisual)) {
+      return null;
+    }
+    const kind = normalizeString5(cellVisual.kind);
+    if (!["dataBar", "progressBar", "sparkBar", "shareBar", "tone", "badge", "delta", "rank"].includes(kind)) {
+      return null;
+    }
+    const next = {
+      kind,
+      ...normalizeString5(cellVisual.valueField) ? { valueField: normalizeString5(cellVisual.valueField) } : {},
+      ...normalizeString5(cellVisual.colorField) ? { colorField: normalizeString5(cellVisual.colorField) } : {},
+      ...normalizeRange(cellVisual.range) ? { range: normalizeRange(cellVisual.range) } : {},
+      ...normalizeStringArray2(cellVisual.palette).length > 0 ? { palette: normalizeStringArray2(cellVisual.palette) } : {},
+      ...normalizeSegments(cellVisual.segments).length > 0 ? { segments: normalizeSegments(cellVisual.segments) } : {},
+      ...normalizeString5(cellVisual.nullBehavior) ? { nullBehavior: normalizeString5(cellVisual.nullBehavior) } : {},
+      ...normalizeRules(cellVisual.rules).length > 0 ? { rules: normalizeRules(cellVisual.rules) } : {},
+      ...(cellVisual == null ? void 0 : cellVisual.positiveIsGood) === false ? { positiveIsGood: false } : {}
+    };
+    return next;
+  }
+  function normalizeReportTableBlockColumn(column = {}) {
+    if (!column || typeof column !== "object" || Array.isArray(column)) {
+      return null;
+    }
+    const key = normalizeString5(column.key);
+    if (!key || isTruncatedPlaceholder(key)) {
+      return null;
+    }
+    const cellVisual = normalizeReportTableCellVisual(column.cellVisual);
+    const link = normalizeReportTableLink(column.link);
+    const labelClamp = normalizePresentationClampConfig(column.labelClamp);
+    for (const property of ["width", "minWidth"]) {
+      if (column[property] !== void 0 && (!Number.isFinite(column[property]) || column[property] < 48)) {
+        throw new Error(`Table column ${property} must be a number of at least 48`);
+      }
+    }
+    return {
+      key,
+      ...normalizeString5(column.sourceKey) ? { sourceKey: normalizeString5(column.sourceKey) } : {},
+      ...normalizeString5(column.displayKey) ? { displayKey: normalizeString5(column.displayKey) } : {},
+      ...(column == null ? void 0 : column.displayValueMap) && typeof column.displayValueMap === "object" && !Array.isArray(column.displayValueMap) ? { displayValueMap: cloneValue4(column.displayValueMap) } : {},
+      ...(column == null ? void 0 : column.displayIconMap) && typeof column.displayIconMap === "object" && !Array.isArray(column.displayIconMap) ? { displayIconMap: cloneValue4(column.displayIconMap) } : {},
+      ...normalizeString5(column.kind) ? { kind: normalizeString5(column.kind) } : {},
+      ...normalizeString5(column.label) ? { label: normalizeString5(column.label) } : {},
+      ...normalizeString5(column.format) || normalizeString5(column.valueFormat) ? { format: normalizeString5(column.format) || normalizeString5(column.valueFormat) } : {},
+      ...normalizeString5(column.align) ? { align: normalizeString5(column.align) } : {},
+      ...column.width !== void 0 ? { width: column.width } : {},
+      ...column.minWidth !== void 0 ? { minWidth: column.minWidth } : {},
+      ...column.flex === true ? { flex: true } : {},
+      ...(column == null ? void 0 : column.runtimeFilterable) === true ? { runtimeFilterable: true } : {},
+      ...(column == null ? void 0 : column.rowIdentity) === true ? { rowIdentity: true } : {},
+      ...link ? { link } : {},
+      ...cellVisual ? { cellVisual } : {},
+      ...labelClamp ? { labelClamp } : {}
+    };
+  }
+  function normalizeReportTableSelection(selection) {
+    if (selection === void 0) return null;
+    if (!selection || selection.mode !== "checkbox" || typeof selection.field !== "string" || !selection.field.trim() || Object.keys(selection).some((key) => !["mode", "field", "labelFields"].includes(key))) {
+      throw new Error("Table selection requires checkbox mode and a non-empty field");
+    }
+    if (selection.labelFields !== void 0 && (!Array.isArray(selection.labelFields) || !selection.labelFields.length || selection.labelFields.some((field) => typeof field !== "string" || !field.trim()) || new Set(selection.labelFields.map((field) => field.trim())).size !== selection.labelFields.length)) {
+      throw new Error("Selection labelFields requires unique, non-empty field names");
+    }
+    return {
+      mode: "checkbox",
+      field: selection.field.trim(),
+      ...selection.labelFields ? { labelFields: selection.labelFields.map((field) => field.trim()) } : {}
+    };
+  }
+  function normalizeReportDocumentTableBlock(block = {}) {
+    const id = normalizeString5((block == null ? void 0 : block.id) || "tableBlock");
+    const title = normalizeString5((block == null ? void 0 : block.title) || "Table");
+    const datasetRef = normalizeString5((block == null ? void 0 : block.datasetRef) || "primary");
+    const rawColumns = Array.isArray(block == null ? void 0 : block.columns) ? block.columns : [];
+    const rawColumnKeys = Array.isArray(block == null ? void 0 : block.columnKeys) ? block.columnKeys : [];
+    const explicitColumns = (Array.isArray(block == null ? void 0 : block.columns) ? block.columns : []).map((column) => normalizeReportTableBlockColumn(column)).filter(Boolean);
+    const columns = explicitColumns.length > 0 ? explicitColumns : normalizeStringArray2(block == null ? void 0 : block.columnKeys).filter((key) => !isTruncatedPlaceholder(key)).map((key) => ({ key }));
+    if (columns.length === 0 && (rawColumns.some((column) => isTruncatedPlaceholder(column == null ? void 0 : column.key)) || rawColumnKeys.some((key) => isTruncatedPlaceholder(key)))) {
+      return null;
+    }
+    const accentTone = normalizeString5(block == null ? void 0 : block.accentTone).toLowerCase();
+    const labelClamp = normalizePresentationClampConfig(block == null ? void 0 : block.labelClamp);
+    const recordTitleField = normalizeString5(block == null ? void 0 : block.recordTitleField);
+    if (recordTitleField && !columns.some((column) => column.key === recordTitleField)) {
+      throw new Error("Record presentation requires an existing table column as recordTitleField");
+    }
+    return {
+      id,
+      kind: "tableBlock",
+      title,
+      ...normalizeString5(block == null ? void 0 : block.description) ? { description: normalizeString5(block.description) } : {},
+      datasetRef,
+      columns,
+      ...block.selection !== void 0 ? { selection: normalizeReportTableSelection(block.selection) } : {},
+      ...recordTitleField ? { recordTitleField } : {},
+      ...["blue", "green", "amber", "rose", "slate"].includes(accentTone) ? { accentTone } : {},
+      ...(block == null ? void 0 : block.collapsible) === true ? { collapsible: true } : {},
+      ...(block == null ? void 0 : block.collapsible) === true && (block == null ? void 0 : block.defaultCollapsed) === true ? { defaultCollapsed: true } : {},
+      ...labelClamp ? { labelClamp } : {}
+    };
+  }
+
+  // src/components/dashboard/reportBuilderCalculatedFieldAuthoring.js
+  function normalizeString6(value = "") {
+    return String(value || "").trim();
+  }
+  function cloneValue5(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+  }
+  function normalizeMeasureSections(measureSections = []) {
+    return (Array.isArray(measureSections) ? measureSections : []).filter((section) => section && typeof section === "object" && !Array.isArray(section)).map((section, index) => ({
+      ...cloneValue5(section),
+      id: normalizeString6(section == null ? void 0 : section.id),
+      label: normalizeString6(section == null ? void 0 : section.label),
+      order: Number.isFinite(Number(section == null ? void 0 : section.order)) ? Number(section.order) : index
+    })).filter((section) => section.id);
+  }
+  function buildLocalCalculatedFieldSectionConfig(config = {}, localCalculatedFields = []) {
+    const normalizedSections = normalizeMeasureSections(config == null ? void 0 : config.measureSections);
+    if ((localCalculatedFields || []).length === 0) {
+      return normalizedSections;
+    }
+    const existingCalculatedSection = normalizedSections.find((section) => section.id === "calculated");
+    if (existingCalculatedSection) {
+      return normalizedSections;
+    }
+    return [
+      ...normalizedSections,
+      {
+        id: "calculated",
+        label: "Calculated",
+        order: Number.MAX_SAFE_INTEGER
+      }
+    ];
+  }
+  function normalizeReportBuilderLocalCalculatedFields(calculatedFields = []) {
+    return normalizeReportCalculatedFields(calculatedFields).filter((field) => (field == null ? void 0 : field.kind) === "rowCalc" && normalizeString6(field == null ? void 0 : field.expr)).map((field) => cloneValue5(field));
+  }
+  function normalizeReportBuilderLocalTableCalculations(calculatedFields = []) {
+    return normalizeReportCalculatedFields(calculatedFields).filter((field) => (field == null ? void 0 : field.kind) === "tableCalc" && (field == null ? void 0 : field.compute)).map((field) => cloneValue5(field));
+  }
+  function mergeAuthoringFieldSets(baseFields = [], localFields = [], {
+    authoringScope = "",
+    authoringKind = "",
+    defaultSection = "calculated"
+  } = {}) {
+    const localById = new Map(
+      (Array.isArray(localFields) ? localFields : []).map((field) => [normalizeString6((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key)), field]).filter(([id, field]) => !!id && !!field)
+    );
+    const merged = [];
+    const seen = /* @__PURE__ */ new Set();
+    (Array.isArray(baseFields) ? baseFields : []).forEach((field) => {
+      const fieldId = normalizeString6((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key));
+      if (!fieldId || seen.has(fieldId)) {
+        return;
+      }
+      const localOverride = localById.get(fieldId);
+      if (localOverride) {
+        merged.push({
+          ...localOverride,
+          section: normalizeString6(localOverride == null ? void 0 : localOverride.section) || defaultSection,
+          authoringScope,
+          authoringEditable: true,
+          ...authoringKind ? { authoringKind } : {}
+        });
+      } else {
+        merged.push(field);
+      }
+      seen.add(fieldId);
+    });
+    (Array.isArray(localFields) ? localFields : []).forEach((field) => {
+      const fieldId = normalizeString6((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key));
+      if (!fieldId || seen.has(fieldId)) {
+        return;
+      }
+      merged.push({
+        ...field,
+        section: normalizeString6(field == null ? void 0 : field.section) || defaultSection,
+        authoringScope,
+        authoringEditable: true,
+        ...authoringKind ? { authoringKind } : {}
+      });
+      seen.add(fieldId);
+    });
+    return merged;
+  }
+  function buildReportBuilderCalculatedFieldConfig(config = {}, state = {}) {
+    const localCalculatedFields = normalizeReportBuilderLocalCalculatedFields(state == null ? void 0 : state.localCalculatedFields);
+    const localTableCalculations = normalizeReportBuilderLocalTableCalculations(state == null ? void 0 : state.localTableCalculations);
+    if (localCalculatedFields.length === 0 && localTableCalculations.length === 0) {
+      return config;
+    }
+    const mergedCalculatedFields = mergeAuthoringFieldSets(
+      Array.isArray(config == null ? void 0 : config.calculatedFields) ? config.calculatedFields : [],
+      localCalculatedFields,
+      {
+        authoringScope: "builderState.localCalculatedFields",
+        authoringKind: "rowCalc"
+      }
+    );
+    const mergedTableCalculations = mergeAuthoringFieldSets(
+      Array.isArray(config == null ? void 0 : config.tableCalculations) ? config.tableCalculations : [],
+      localTableCalculations,
+      {
+        authoringScope: "builderState.localTableCalculations",
+        authoringKind: "tableCalc"
+      }
+    );
+    return {
+      ...config,
+      calculatedFields: mergedCalculatedFields,
+      tableCalculations: mergedTableCalculations,
+      measureSections: buildLocalCalculatedFieldSectionConfig(config, [...localCalculatedFields, ...localTableCalculations])
+    };
+  }
+  var REPORT_BUILDER_TABLE_CALC_FUNCTIONS = listReportCalculatedFieldTableCalculationSpecs().map((entry) => ({
+    value: normalizeString6(entry == null ? void 0 : entry.name),
+    label: normalizeString6((entry == null ? void 0 : entry.label) || (entry == null ? void 0 : entry.name)),
+    supportsPartition: (entry == null ? void 0 : entry.supportsPartition) === true,
+    // Rank always orders by its source field in the current authoring UX,
+    // so it only needs a direction/tie-breaker control rather than a
+    // separate order-by field selector.
+    requiresOrder: (entry == null ? void 0 : entry.requiresOrder) === true && normalizeString6(entry == null ? void 0 : entry.name) !== "rank",
+    supportsRankDirection: (entry == null ? void 0 : entry.supportsRankDirection) === true,
+    supportsTieBreaker: (entry == null ? void 0 : entry.supportsTieBreaker) === true,
+    requiresWindowSize: (entry == null ? void 0 : entry.requiresWindowSize) === true,
+    supportsDecimals: (entry == null ? void 0 : entry.supportsDecimals) === true,
+    defaultFormat: normalizeString6(entry == null ? void 0 : entry.defaultFormat)
+  })).filter((entry) => entry.value && entry.label);
+
+  // src/reporting/reportBuilderBlockModel.js
+  function normalizeString7(value = "") {
+    return String(value || "").trim();
+  }
+  function resolveReportBuilderBlock(document = null) {
+    const blocks = Array.isArray(document == null ? void 0 : document.blocks) ? document.blocks : [];
+    return blocks.find((block) => normalizeString7(block == null ? void 0 : block.kind) === "reportBuilderBlock") || null;
+  }
+
+  // src/reporting/reportSections.js
+  var normalizeString8 = (value) => String(value || "").trim();
+  function buildRuntimeSections(blocks = [], hiddenBlockIds = /* @__PURE__ */ new Set()) {
+    var _a5, _b, _c, _d;
+    const normalizedBlocks = Array.isArray(blocks) ? blocks : [];
+    const explicitTabGroup = normalizedBlocks.find((block) => normalizeString8(block == null ? void 0 : block.kind) === "tabGroupBlock") || null;
+    const explicitSectionIds = Array.isArray((_a5 = explicitTabGroup == null ? void 0 : explicitTabGroup.content) == null ? void 0 : _a5.sectionIds) ? explicitTabGroup.content.sectionIds.map((sectionId) => normalizeString8(sectionId)).filter(Boolean) : Array.isArray(explicitTabGroup == null ? void 0 : explicitTabGroup.sectionIds) ? explicitTabGroup.sectionIds.map((sectionId) => normalizeString8(sectionId)).filter(Boolean) : [];
+    const includeUnlistedSections = (_d = (_c = (_b = explicitTabGroup == null ? void 0 : explicitTabGroup.content) == null ? void 0 : _b.includeUnlistedSections) != null ? _c : explicitTabGroup == null ? void 0 : explicitTabGroup.includeUnlistedSections) != null ? _d : true;
+    const sections = [];
+    let current = null;
+    normalizedBlocks.forEach((block, index) => {
+      var _a6, _b2, _c2;
+      const kind = normalizeString8(block == null ? void 0 : block.kind);
+      if (kind === "tabGroupBlock") {
+        return;
+      }
+      if (hiddenBlockIds.has(normalizeString8(block == null ? void 0 : block.id))) {
+        return;
+      }
+      if (kind === "sectionBlock") {
+        const ownedBlockIds = (Array.isArray((_a6 = block == null ? void 0 : block.content) == null ? void 0 : _a6.blockIds) ? block.content.blockIds : Array.isArray(block == null ? void 0 : block.blockIds) ? block.blockIds : []).map((ownedBlockId) => normalizeString8(ownedBlockId)).filter(Boolean);
+        current = {
+          id: normalizeString8((block == null ? void 0 : block.id) || `section_${index + 1}`) || `section_${index + 1}`,
+          title: normalizeString8((block == null ? void 0 : block.title) || ((_b2 = block == null ? void 0 : block.content) == null ? void 0 : _b2.title) || `Section ${sections.length + 1}`) || `Section ${sections.length + 1}`,
+          navigationLabel: normalizeString8(((_c2 = block == null ? void 0 : block.content) == null ? void 0 : _c2.navigationLabel) || (block == null ? void 0 : block.navigationLabel) || (block == null ? void 0 : block.title) || `Section ${sections.length + 1}`) || `Section ${sections.length + 1}`,
+          block,
+          items: [],
+          ownedBlockIds
+        };
+        sections.push(current);
+        return;
+      }
+      if (!current) {
+        current = {
+          id: "overview",
+          title: "Overview",
+          navigationLabel: "Overview",
+          block: null,
+          items: [],
+          ownedBlockIds: []
+        };
+        sections.push(current);
+      }
+      if (includeUnlistedSections === false && current.ownedBlockIds.length > 0 && !current.ownedBlockIds.includes(normalizeString8(block == null ? void 0 : block.id))) {
+        return;
+      }
+      current.items.push(block);
+    });
+    if (includeUnlistedSections === false) {
+      for (const section of sections) {
+        if (!section.ownedBlockIds.length) continue;
+        const owned = new Set(section.ownedBlockIds);
+        section.items = normalizedBlocks.filter((block) => owned.has(normalizeString8(block == null ? void 0 : block.id)) && !hiddenBlockIds.has(normalizeString8(block == null ? void 0 : block.id)) && normalizeString8(block == null ? void 0 : block.kind) !== "sectionBlock" && normalizeString8(block == null ? void 0 : block.kind) !== "tabGroupBlock");
+      }
+    }
+    const filteredSections = sections.filter((section) => section.block || section.items.length > 0);
+    if (explicitSectionIds.length === 0) {
+      return filteredSections;
+    }
+    const sectionById = new Map(filteredSections.map((section) => [normalizeString8(section == null ? void 0 : section.id), section]));
+    const orderedSections = explicitSectionIds.map((sectionId) => sectionById.get(sectionId) || null).filter(Boolean);
+    const trailingSections = filteredSections.filter((section) => !explicitSectionIds.includes(normalizeString8(section == null ? void 0 : section.id)));
+    return includeUnlistedSections === false ? orderedSections : [...orderedSections, ...trailingSections];
+  }
+
+  // src/reporting/reportLayoutModel.js
+  var REPORT_LAYOUT_GRID_COLUMNS = 12;
+  var REPORT_LAYOUT_SPAN_PRESETS = Object.freeze([
+    { span: 12, label: "Full" },
+    { span: 8, label: "Two-thirds" },
+    { span: 6, label: "Half" },
+    { span: 4, label: "Third" },
+    { span: 3, label: "Quarter" }
+  ]);
+  function normalizeString9(value = "") {
+    return String(value || "").trim();
+  }
+  function normalizeReportLayoutSpanValue(value = null) {
+    const numeric = Number.parseInt(String(value != null ? value : "").trim(), 10);
+    if (!Number.isFinite(numeric) || numeric < 1 || numeric > REPORT_LAYOUT_GRID_COLUMNS) {
+      return null;
+    }
+    return numeric;
+  }
+  function normalizeLegacyReportLayoutSize(value = "") {
+    const normalized = normalizeString9(value).toLowerCase();
+    if (normalized === "quarter" || normalized === "1/4") {
+      return 3;
+    }
+    if (normalized === "third" || normalized === "1/3") {
+      return 4;
+    }
+    if (normalized === "half") {
+      return 6;
+    }
+    if (normalized === "two-thirds" || normalized === "twothirds" || normalized === "2/3") {
+      return 8;
+    }
+    if (normalized === "full") {
+      return REPORT_LAYOUT_GRID_COLUMNS;
+    }
+    return null;
+  }
+  function resolveReportLayoutSpan(source = null, {
+    defaultSpan = REPORT_LAYOUT_GRID_COLUMNS
+  } = {}) {
+    if (source && typeof source === "object" && !Array.isArray(source)) {
+      const explicitSpan2 = normalizeReportLayoutSpanValue(source == null ? void 0 : source.span);
+      if (explicitSpan2) {
+        return explicitSpan2;
+      }
+      const legacySpan2 = normalizeLegacyReportLayoutSize(source == null ? void 0 : source.size);
+      if (legacySpan2) {
+        return legacySpan2;
+      }
+      return defaultSpan;
+    }
+    const legacySpan = normalizeLegacyReportLayoutSize(source);
+    if (legacySpan) {
+      return legacySpan;
+    }
+    const explicitSpan = normalizeReportLayoutSpanValue(source);
+    if (explicitSpan) {
+      return explicitSpan;
+    }
+    return defaultSpan;
+  }
+  function buildReportLayoutItem(blockId = "", source = null, {
+    omitDefaultSpan = true,
+    preserveLegacyHalf = false
+  } = {}) {
+    const normalizedBlockId = normalizeString9(blockId);
+    if (!normalizedBlockId) {
+      return null;
+    }
+    const normalizedSource = source && typeof source === "object" && !Array.isArray(source) ? source : {
+      span: normalizeReportLayoutSpanValue(source),
+      size: normalizeString9(source)
+    };
+    const explicitSpan = normalizeReportLayoutSpanValue(normalizedSource == null ? void 0 : normalizedSource.span);
+    if (explicitSpan) {
+      return omitDefaultSpan && explicitSpan === REPORT_LAYOUT_GRID_COLUMNS ? { blockId: normalizedBlockId } : { blockId: normalizedBlockId, span: explicitSpan };
+    }
+    const legacySpan = normalizeLegacyReportLayoutSize(normalizedSource == null ? void 0 : normalizedSource.size);
+    if (legacySpan === 6 && preserveLegacyHalf) {
+      return { blockId: normalizedBlockId, size: "half" };
+    }
+    if (legacySpan) {
+      return omitDefaultSpan && legacySpan === REPORT_LAYOUT_GRID_COLUMNS ? { blockId: normalizedBlockId } : { blockId: normalizedBlockId, span: legacySpan };
+    }
+    return { blockId: normalizedBlockId };
+  }
+
+  // src/reporting/reportRelativeDateRangeModel.js
+  function normalizePreset(value = "") {
+    return String(value || "").trim().toLowerCase().replaceAll("_", "");
+  }
+  function formatDateISO(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+  function normalizeSemanticExpression(value = "") {
+    return String(value || "").trim().replace(/([a-z])([A-Z])/g, "$1 $2").replace(/(\d)([A-Za-z])/g, "$1 $2").replace(/([A-Za-z])(\d)/g, "$1 $2").replace(/\s+/g, " ");
+  }
+  function resolveReportRelativeTime(expression = "", now = /* @__PURE__ */ new Date()) {
+    const source = normalizeSemanticExpression(expression);
+    if (!source) return null;
+    const utc = /(?:\s+in\s+utc|\s+inutc)$/i.test(source);
+    const normalized = source.replace(/\s+in\s*utc$/i, "").trim().toLowerCase();
+    const result = new Date(now.getTime());
+    if (["now", "today"].includes(normalized)) return result;
+    if (normalized === "yesterday") {
+      result.setTime(result.getTime() - 24 * 60 * 60 * 1e3);
+      return result;
+    }
+    if (normalized === "tomorrow") {
+      result.setTime(result.getTime() + 24 * 60 * 60 * 1e3);
+      return result;
+    }
+    const match2 = normalized.match(/^(\d+)\s*(seconds?|secs?|minutes?|mins?|hours?|days?|weeks?)\s+(ahead|after|later|onward|ago|before|earlier|past)$/i);
+    if (!match2) return null;
+    const count = Number(match2[1]);
+    const units2 = match2[2].toLowerCase();
+    const direction = ["ago", "before", "earlier", "past"].includes(match2[3].toLowerCase()) ? -1 : 1;
+    const unitMillis = units2.startsWith("sec") ? 1e3 : units2.startsWith("min") ? 60 * 1e3 : units2.startsWith("hour") ? 60 * 60 * 1e3 : units2.startsWith("week") ? 7 * 24 * 60 * 60 * 1e3 : 24 * 60 * 60 * 1e3;
+    result.setTime(result.getTime() + direction * count * unitMillis);
+    if (utc) return new Date(result.toISOString());
+    return result;
+  }
+  function formatReportRelativeTime(expression = "", { now = /* @__PURE__ */ new Date(), format: format2 = "date" } = {}) {
+    const resolved = resolveReportRelativeTime(expression, now);
+    if (!resolved) return "";
+    return String(format2 || "date").toLowerCase() === "datetime" ? resolved.toISOString() : formatDateISO(resolved);
+  }
+  function resolveReportRelativeDateRange(preset = "", now = /* @__PURE__ */ new Date()) {
+    const normalizedPreset = normalizePreset(preset);
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const start = new Date(end);
+    switch (normalizedPreset) {
+      case "today":
+        break;
+      case "yesterday":
+        start.setDate(end.getDate() - 1);
+        end.setDate(end.getDate() - 1);
+        break;
+      case "last3days":
+      case "3d":
+        start.setDate(end.getDate() - 2);
+        break;
+      case "last7days":
+      case "7d":
+        start.setDate(end.getDate() - 6);
+        break;
+      case "last30days":
+      case "30d":
+        start.setDate(end.getDate() - 29);
+        break;
+      default:
+        return null;
+    }
+    return { start: formatDateISO(start), end: formatDateISO(end) };
+  }
+  function resolveReportRelativeDateRangeSpec(spec = {}, now = /* @__PURE__ */ new Date(), referenceRequest = null) {
+    if (normalizePreset(spec == null ? void 0 : spec.preset) === "previousperiod") {
+      const atPath = (path) => String(path || "").split(".").reduce((value, key) => value == null ? void 0 : value[key], referenceRequest);
+      return resolveReportPreviousPeriodRange(atPath(spec.startParamPath), atPath(spec.endParamPath));
+    }
+    const presetRange = resolveReportRelativeDateRange(spec == null ? void 0 : spec.preset, now);
+    if (presetRange) return presetRange;
+    const start = formatReportRelativeTime(spec == null ? void 0 : spec.startExpression, { now, format: spec == null ? void 0 : spec.format });
+    const end = formatReportRelativeTime(spec == null ? void 0 : spec.endExpression, { now, format: spec == null ? void 0 : spec.format });
+    return start && end ? { start, end } : null;
+  }
+  function resolveReportPreviousPeriodRange(start, end) {
+    const parse2 = (value) => {
+      if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+      const date = /* @__PURE__ */ new Date(value + "T00:00:00.000Z");
+      return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value ? date : null;
+    };
+    const from = parse2(start), to = parse2(end);
+    if (!from || !to || from > to) throw new Error("Previous period requires a valid bounded civil date range.");
+    const day = 864e5;
+    const length = (to.getTime() - from.getTime()) / day + 1;
+    const previousStart = new Date(from.getTime() - length * day);
+    const previousEnd = new Date(from.getTime() - day);
+    if (previousStart.getUTCFullYear() < 1) throw new Error("Previous period exceeds the supported civil date range.");
+    return { start: previousStart.toISOString().slice(0, 10), end: previousEnd.toISOString().slice(0, 10) };
+  }
+
+  // src/reporting/reportDateRangeValue.js
+  function resolveReportDateRangeValue(value, now = /* @__PURE__ */ new Date()) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+    const preset = resolveReportRelativeDateRange(value.preset, now);
+    if (preset) return { ...value, ...preset };
+    if (!("startExpression" in value) && !("endExpression" in value)) return value;
+    const resolved = { ...value };
+    for (const edge of ["start", "end"]) {
+      if (`${edge}Expression` in value) resolved[edge] = formatReportRelativeTime(value[`${edge}Expression`], { now });
+    }
+    return resolved;
+  }
+
+  // src/reporting/scopeStateModel.js
+  var SCOPE_PARAM_STATE_KEY = "scopeParams";
+  var LEGACY_SCOPE_PARAM_STATE_KEY = "staticFilters";
+  var EMPTY_SCOPE_PARAM_VALUES = Object.freeze({});
+  function asScopeParamValuesMap(candidate) {
+    return !!candidate && typeof candidate === "object" && !Array.isArray(candidate) ? candidate : null;
+  }
+  function resolveScopeParamId(paramDef) {
+    return String((paramDef == null ? void 0 : paramDef.id) || (paramDef == null ? void 0 : paramDef.field) || "").trim();
+  }
+  function listScopeParamValues(state) {
+    return asScopeParamValuesMap(state == null ? void 0 : state[SCOPE_PARAM_STATE_KEY]) || asScopeParamValuesMap(state == null ? void 0 : state[LEGACY_SCOPE_PARAM_STATE_KEY]) || EMPTY_SCOPE_PARAM_VALUES;
+  }
+  function getScopeParamValue(state, paramId) {
+    const id = String(paramId || "").trim();
+    return id ? resolveReportDateRangeValue(listScopeParamValues(state)[id]) : void 0;
+  }
+  function mergeScopeParamValues(state, values) {
+    const { [LEGACY_SCOPE_PARAM_STATE_KEY]: _legacyValues, ...nextState } = state || {};
+    return {
+      ...nextState,
+      [SCOPE_PARAM_STATE_KEY]: {
+        ...listScopeParamValues(state),
+        ...values || {}
+      }
+    };
+  }
+  function scopeParamStateSlice(values) {
+    return {
+      [SCOPE_PARAM_STATE_KEY]: { ...values || {} }
+    };
+  }
+
+  // src/components/dashboard/reportBuilderDynamicRows.js
+  function clone(value) {
+    if (Array.isArray(value)) {
+      return value.map((item) => clone(item));
+    }
+    if (value && typeof value === "object") {
+      const result = {};
+      Object.entries(value).forEach(([key, item]) => {
+        result[key] = clone(item);
+      });
+      return result;
+    }
+    return value;
+  }
+  function normalizeArray(values = []) {
+    const isPresent = (entry) => entry !== void 0 && entry !== null && entry !== "";
+    if (Array.isArray(values)) {
+      return values.filter(isPresent);
+    }
+    return isPresent(values) ? [values] : [];
+  }
+  function normalizeDynamicRow(row = {}, group = {}, index = 0) {
+    var _a5;
+    const filters = normalizeArray(group.filters);
+    const firstFilterId = String(((_a5 = filters[0]) == null ? void 0 : _a5.id) || "").trim();
+    const rowId = String(row.id || `row_${index + 1}`).trim();
+    return {
+      id: rowId || `row_${index + 1}`,
+      filterId: String(row.filterId || firstFilterId).trim(),
+      enabled: (row == null ? void 0 : row.enabled) !== false,
+      selections: normalizeArray(row.selections).map((entry) => clone(entry))
+    };
+  }
+  function filterDefinitionForRow(group = {}, row = {}) {
+    const filterId = String((row == null ? void 0 : row.filterId) || "").trim();
+    return normalizeArray(group == null ? void 0 : group.filters).find((entry) => String((entry == null ? void 0 : entry.id) || "").trim() === filterId) || null;
+  }
+  function normalizeSelectionForFilter(filterDef = {}, entry = null) {
+    var _a5, _b, _c, _d;
+    const isObjectEntry = entry && typeof entry === "object" && !Array.isArray(entry);
+    const valueSelector = String((filterDef == null ? void 0 : filterDef.valueSelector) || "value").trim() || "value";
+    const labelSelector = String((filterDef == null ? void 0 : filterDef.labelSelector) || "label").trim() || "label";
+    const record = isObjectEntry && (entry == null ? void 0 : entry.record) && typeof entry.record === "object" ? entry.record : isObjectEntry ? entry : {};
+    const rawValue = isObjectEntry ? (_b = (_a5 = entry == null ? void 0 : entry.value) != null ? _a5 : selectFirstDefined(entry, lookupValueFallbackSelectors(valueSelector))) != null ? _b : selectFirstDefined(record, lookupValueFallbackSelectors(valueSelector)) : entry;
+    const coerced = coerceManualSelectionValue(filterDef, rawValue);
+    if (!coerced.ok) {
+      return null;
+    }
+    const recordLabel = String((_c = selectFirstDefined(record, lookupLabelFallbackSelectors(labelSelector, valueSelector))) != null ? _c : "").trim();
+    const entryLabel = String(isObjectEntry ? (_d = entry == null ? void 0 : entry.label) != null ? _d : "" : "").trim();
+    const label = recordLabel || entryLabel || String(coerced.label || "").trim();
+    return {
+      value: coerced.value,
+      label,
+      group: isObjectEntry ? (entry == null ? void 0 : entry.group) || "" : "",
+      record: {
+        ...record,
+        [valueSelector]: coerced.value,
+        [labelSelector]: label
+      }
+    };
+  }
+  function normalizeDynamicGroupRows(rows = [], group = {}) {
+    return normalizeArray(rows).map((row, index) => {
+      const normalizedRow = normalizeDynamicRow(row, group, index);
+      const filterDef = filterDefinitionForRow(group, normalizedRow);
+      if (!filterDef) {
+        return normalizedRow;
+      }
+      const originalSelections = normalizeArray(normalizedRow.selections);
+      const normalizedSelections = originalSelections.map((entry) => normalizeSelectionForFilter(filterDef, entry)).filter(Boolean);
+      if (originalSelections.length > 0 && normalizedSelections.length === 0) {
+        return null;
+      }
+      return {
+        ...normalizedRow,
+        selections: normalizedSelections
+      };
+    }).filter(Boolean);
+  }
+  function selectFirstDefined(record = {}, selectors = []) {
+    for (const selector of selectors) {
+      const key = String(selector || "").trim();
+      if (!key) continue;
+      const value = resolveKey(record, key);
+      if (value !== void 0 && value !== null && value !== "") {
+        return value;
+      }
+    }
+    return void 0;
+  }
+  function selectorLeaf(selector = "") {
+    const normalized = String(selector || "").trim();
+    if (!normalized) return "";
+    const parts = normalized.split(".").map((entry) => entry.trim()).filter(Boolean);
+    return parts[parts.length - 1] || normalized;
+  }
+  function lookupValueFallbackSelectors(selector = "") {
+    const leaf = selectorLeaf(selector);
+    const lower2 = leaf.toLowerCase();
+    const selectors = [selector, leaf];
+    if (lower2 === "id" || lower2.endsWith("id")) {
+      selectors.push("id", "value");
+    }
+    return Array.from(new Set(selectors.filter(Boolean)));
+  }
+  function lookupLabelFallbackSelectors(selector = "", valueSelector = "") {
+    const leaf = selectorLeaf(selector);
+    const lower2 = leaf.toLowerCase();
+    const selectors = [selector, leaf];
+    if (lower2 === "label" || lower2.endsWith("label")) {
+      selectors.push("label", "name", "displayName", "displayPath");
+    } else if (lower2 === "name" || lower2.endsWith("name")) {
+      selectors.push("name", "label", "displayName", "displayPath");
+    } else {
+      selectors.push("label", "name", "displayName", "displayPath");
+    }
+    const valueLeaf = selectorLeaf(valueSelector);
+    if (valueLeaf && valueLeaf !== leaf) {
+      selectors.push(valueLeaf);
+    }
+    return Array.from(new Set(selectors.filter(Boolean)));
+  }
+  function coerceManualSelectionValue(filterDef = {}, rawValue = "") {
+    if (rawValue === void 0 || rawValue === null || rawValue === "") {
+      return { ok: false };
+    }
+    const normalized = String(rawValue != null ? rawValue : "").trim();
+    if (!normalized) {
+      return { ok: false };
+    }
+    const valueType = String((filterDef == null ? void 0 : filterDef.manualValueType) || "string").trim().toLowerCase();
+    switch (valueType) {
+      case "int":
+      case "integer":
+        if (!/^-?\d+$/.test(normalized)) {
+          return { ok: false };
+        }
+        return { ok: true, value: Number(normalized), label: normalized };
+      case "string":
+      default:
+        if (typeof rawValue === "number" && Number.isFinite(rawValue)) {
+          return { ok: true, value: rawValue, label: normalized };
+        }
+        return { ok: true, value: normalized, label: normalized };
+    }
+  }
+
+  // src/components/dashboard/reportBuilderPredicates.js
+  var DIRECTION_FILTER_FIELDS = [
+    "semanticRef",
+    "dialogId",
+    "multiple",
+    "emitArray",
+    "manualEntry",
+    "manualValueType",
+    "manualPlaceholder",
+    "placeholder",
+    "valueSelector",
+    "labelSelector",
+    "recordSelectors",
+    "groupSelector",
+    "targetingFeatureKey",
+    "lookup",
+    "requestMapping",
+    "handledByHook"
+  ];
+  function clone2(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+  }
+  function isPlainObject2(value) {
+    return !!value && typeof value === "object" && !Array.isArray(value);
+  }
+  function normalizeArray2(value) {
+    if (Array.isArray(value)) {
+      return value.filter((entry) => entry !== void 0 && entry !== null && entry !== "");
+    }
+    if (value === void 0 || value === null || value === "") {
+      return [];
+    }
+    return [value];
+  }
+  function pascalCase(value = "") {
+    const normalized = String(value || "").trim();
+    if (!normalized) return "";
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  }
+  function normalizePrefillPaths(value) {
+    return normalizeArray2(value).map((entry) => String(entry || "").trim()).filter(Boolean);
+  }
+  function normalizePredicatePrefill(entry) {
+    const raw = entry == null ? void 0 : entry.prefill;
+    if (typeof raw === "string" || Array.isArray(raw)) {
+      const paths = normalizePrefillPaths(raw);
+      return paths.length > 0 ? { path: paths } : null;
+    }
+    if (!isPlainObject2(raw)) {
+      return null;
+    }
+    const prefill = {};
+    ["path", "start", "end", "include", "exclude"].forEach((key) => {
+      const paths = normalizePrefillPaths(raw[key]);
+      if (paths.length > 0) {
+        prefill[key] = paths;
+      }
+    });
+    return Object.keys(prefill).length > 0 ? prefill : null;
+  }
+  function buildPredicateDirection(entry = {}, predicate = {}, direction = "", spec = {}) {
+    var _a5, _b;
+    const overrides = isPlainObject2(spec) ? spec : {};
+    const fallbackFilterId = direction ? `${direction}${pascalCase(predicate.id)}` : predicate.id;
+    const filterId = String(overrides.filterId || fallbackFilterId).trim();
+    const paramPath = String(
+      overrides.paramPath || (direction ? entry == null ? void 0 : entry[`${direction}ParamPath`] : entry == null ? void 0 : entry.paramPath) || `filters.${filterId}`
+    ).trim();
+    const filter = {
+      id: filterId,
+      label: String(overrides.label || predicate.label || filterId).trim(),
+      paramPath
+    };
+    DIRECTION_FILTER_FIELDS.forEach((field) => {
+      const value = overrides[field] !== void 0 ? overrides[field] : entry == null ? void 0 : entry[field];
+      if (value !== void 0) {
+        filter[field] = clone2(value);
+      }
+    });
+    if (filter.multiple === void 0) {
+      filter.multiple = true;
+    }
+    if (filter.emitArray === void 0 && filter.multiple !== false) {
+      filter.emitArray = true;
+    }
+    const overridePaths = normalizePrefillPaths(overrides.prefill);
+    const prefillPaths = overridePaths.length > 0 ? overridePaths : (direction ? (_a5 = predicate.prefill) == null ? void 0 : _a5[direction] : (_b = predicate.prefill) == null ? void 0 : _b.path) || [];
+    return {
+      direction,
+      groupId: direction || predicate.bucket,
+      filter,
+      prefillPaths
+    };
+  }
+  function normalizeReportBuilderPredicates(config = {}) {
+    return normalizeArray2(config == null ? void 0 : config.predicates).map((entry) => {
+      if (!isPlainObject2(entry)) {
+        return null;
+      }
+      const id = String(entry.id || "").trim();
+      if (!id) {
+        return null;
+      }
+      const kind = String(entry.kind || "").trim().toLowerCase() === "daterange" ? "dateRange" : "value";
+      const pinned = entry.pinned === true || kind === "dateRange";
+      const predicate = {
+        id,
+        label: String(entry.label || id).trim(),
+        description: String(entry.description || "").trim(),
+        group: String(entry.group || "").trim(),
+        kind,
+        pinned,
+        required: entry.required === true,
+        multiple: entry.multiple,
+        presentation: String(entry.presentation || "").trim(),
+        semanticRef: String(entry.semanticRef || "").trim(),
+        options: Array.isArray(entry.options) ? clone2(entry.options) : void 0,
+        optionsDataSourceRef: String(entry.optionsDataSourceRef || "").trim(),
+        optionsFetchMode: String(entry.optionsFetchMode || "").trim(),
+        optionValueField: String(entry.optionValueField || "").trim(),
+        optionLabelField: String(entry.optionLabelField || "").trim(),
+        default: entry.default !== void 0 ? clone2(entry.default) : void 0,
+        paramPath: String(entry.paramPath || "").trim(),
+        startParamPath: String(entry.startParamPath || "").trim(),
+        endParamPath: String(entry.endParamPath || "").trim(),
+        bucket: String(entry.bucket || "scope").trim() || "scope",
+        prefill: normalizePredicatePrefill(entry),
+        directions: []
+      };
+      if (!pinned) {
+        const hasInclude = entry.include !== void 0 && entry.include !== false;
+        const hasExclude = entry.exclude !== void 0 && entry.exclude !== false;
+        if (hasInclude) {
+          predicate.directions.push(buildPredicateDirection(entry, predicate, "include", entry.include));
+        }
+        if (hasExclude) {
+          predicate.directions.push(buildPredicateDirection(entry, predicate, "exclude", entry.exclude));
+        }
+        if (!hasInclude && !hasExclude) {
+          predicate.directions.push(buildPredicateDirection(entry, predicate, "", {}));
+        }
+      }
+      return predicate;
+    }).filter(Boolean);
+  }
+  function normalizeReportBuilderPredicateGroups(config = {}) {
+    return normalizeArray2(config == null ? void 0 : config.predicateGroups).map((entry, index) => {
+      if (!isPlainObject2(entry)) {
+        return null;
+      }
+      const id = String(entry.id || "").trim();
+      if (!id) {
+        return null;
+      }
+      return {
+        id,
+        label: String(entry.label || id).trim(),
+        description: String(entry.description || "").trim(),
+        icon: String(entry.icon || "").trim(),
+        order: Number.isFinite(Number(entry.order)) ? Number(entry.order) : index
+      };
+    }).filter(Boolean);
+  }
+  function normalizeReportBuilderPredicateBuckets(config = {}) {
+    return normalizeArray2(config == null ? void 0 : config.predicateBuckets).map((entry, index) => {
+      if (!isPlainObject2(entry)) {
+        return null;
+      }
+      const id = String(entry.id || "").trim();
+      if (!id) {
+        return null;
+      }
+      return {
+        id,
+        label: String(entry.label || id).trim(),
+        description: String(entry.description || "").trim(),
+        order: Number.isFinite(Number(entry.order)) ? Number(entry.order) : index
+      };
+    }).filter(Boolean);
+  }
+  function listReportBuilderPinnedPredicates(config = {}) {
+    return normalizeReportBuilderPredicates(config).filter((predicate) => predicate.pinned);
+  }
+  function lowerPinnedPredicate(predicate) {
+    const filter = {
+      id: predicate.id,
+      label: predicate.label
+    };
+    if (predicate.description) {
+      filter.description = predicate.description;
+    }
+    if (predicate.semanticRef) {
+      filter.semanticRef = predicate.semanticRef;
+    }
+    if (predicate.kind === "dateRange") {
+      filter.type = "dateRange";
+      if (predicate.startParamPath) {
+        filter.startParamPath = predicate.startParamPath;
+      }
+      if (predicate.endParamPath) {
+        filter.endParamPath = predicate.endParamPath;
+      }
+    } else if (predicate.paramPath) {
+      filter.paramPath = predicate.paramPath;
+    }
+    if (predicate.required) {
+      filter.required = true;
+    }
+    if (predicate.multiple !== void 0) {
+      filter.multiple = predicate.multiple === true;
+    }
+    if (predicate.presentation) {
+      filter.presentation = predicate.presentation;
+    }
+    if (predicate.options !== void 0) {
+      filter.options = clone2(predicate.options);
+    }
+    for (const field of ["optionsDataSourceRef", "optionsFetchMode", "optionValueField", "optionLabelField"]) {
+      if (predicate[field]) filter[field] = predicate[field];
+    }
+    if (predicate.default !== void 0) {
+      filter.default = clone2(predicate.default);
+    }
+    return filter;
+  }
+  function resolveReportBuilderScopeParamFilters(config = {}) {
+    const staticFilters = normalizeArray2(config == null ? void 0 : config.staticFilters).map((entry) => clone2(entry));
+    const pinnedPredicates = listReportBuilderPinnedPredicates(config);
+    if (pinnedPredicates.length === 0) {
+      return staticFilters;
+    }
+    const indexById = /* @__PURE__ */ new Map();
+    staticFilters.forEach((entry, index) => {
+      const id = String((entry == null ? void 0 : entry.id) || (entry == null ? void 0 : entry.field) || "").trim();
+      if (id && !indexById.has(id)) {
+        indexById.set(id, index);
+      }
+    });
+    const filters = [...staticFilters];
+    pinnedPredicates.forEach((predicate) => {
+      const lowered = lowerPinnedPredicate(predicate);
+      if (indexById.has(predicate.id)) {
+        const index = indexById.get(predicate.id);
+        filters[index] = { ...lowered, ...filters[index] };
+        return;
+      }
+      indexById.set(predicate.id, filters.length);
+      filters.push(lowered);
+    });
+    return filters;
+  }
+  function groupSeed(groupId = "", bucket = null) {
+    if (bucket) {
+      return {
+        id: bucket.id,
+        label: bucket.label,
+        ...bucket.description ? { description: bucket.description } : {},
+        filters: []
+      };
+    }
+    if (groupId === "include") {
+      return { id: "include", label: "Include", filters: [] };
+    }
+    if (groupId === "exclude") {
+      return { id: "exclude", label: "Exclude", filters: [] };
+    }
+    return { id: groupId, label: pascalCase(groupId), filters: [] };
+  }
+  function buildEffectiveDynamicFilters(config = {}, predicates = []) {
+    const dynamicFilterGroups = normalizeArray2(config.dynamicFilterGroups).map((entry) => ({
+      ...clone2(entry),
+      filters: normalizeArray2(entry == null ? void 0 : entry.filters).map((filter) => clone2(filter))
+    }));
+    const groupById = new Map(dynamicFilterGroups.map((entry) => [String((entry == null ? void 0 : entry.id) || "").trim(), entry]));
+    const declaredBuckets = normalizeReportBuilderPredicateBuckets(config);
+    const bucketById = new Map(declaredBuckets.map((entry) => [entry.id, entry]));
+    const ensureGroup = (groupId) => {
+      const id = String(groupId || "").trim();
+      if (!id) return null;
+      if (!groupById.has(id)) {
+        const seeded = groupSeed(id, bucketById.get(id) || null);
+        dynamicFilterGroups.push(seeded);
+        groupById.set(id, seeded);
+      }
+      return groupById.get(id);
+    };
+    [...declaredBuckets].sort((left, right) => left.order - right.order).forEach((bucket) => ensureGroup(bucket.id));
+    const familyMembership = /* @__PURE__ */ new Map();
+    const registerFamilyMember = (predicate, direction) => {
+      if (!predicate.group || !direction.direction) {
+        return;
+      }
+      if (!familyMembership.has(predicate.group)) {
+        familyMembership.set(predicate.group, { includeFilterIds: [], excludeFilterIds: [] });
+      }
+      const membership = familyMembership.get(predicate.group);
+      const key = direction.direction === "include" ? "includeFilterIds" : "excludeFilterIds";
+      if (!membership[key].includes(direction.filter.id)) {
+        membership[key].push(direction.filter.id);
+      }
+    };
+    predicates.forEach((predicate) => {
+      if (predicate.pinned) {
+        return;
+      }
+      predicate.directions.forEach((direction) => {
+        const group = ensureGroup(direction.groupId);
+        if (!group) {
+          return;
+        }
+        const exists = group.filters.some((entry) => String((entry == null ? void 0 : entry.id) || "").trim() === direction.filter.id);
+        if (!exists) {
+          group.filters.push(clone2(direction.filter));
+        }
+        registerFamilyMember(predicate, direction);
+      });
+    });
+    const dynamicFilterFamilies = normalizeArray2(config.dynamicFilterFamilies).map((entry) => clone2(entry));
+    const familyIds = new Set(dynamicFilterFamilies.map((entry) => String((entry == null ? void 0 : entry.id) || "").trim()).filter(Boolean));
+    const declaredGroups = normalizeReportBuilderPredicateGroups(config);
+    const declaredGroupIds = new Set(declaredGroups.map((entry) => entry.id));
+    const orderedFamilyIds = [
+      ...declaredGroups.map((entry) => entry.id),
+      ...Array.from(familyMembership.keys()).filter((id) => !declaredGroupIds.has(id))
+    ];
+    orderedFamilyIds.forEach((groupId) => {
+      const membership = familyMembership.get(groupId);
+      if (!membership || familyIds.has(groupId)) {
+        return;
+      }
+      const declared = declaredGroups.find((entry) => entry.id === groupId);
+      const family = {
+        id: groupId,
+        label: (declared == null ? void 0 : declared.label) || pascalCase(groupId),
+        includeFilterIds: membership.includeFilterIds,
+        excludeFilterIds: membership.excludeFilterIds
+      };
+      if (declared == null ? void 0 : declared.description) {
+        family.description = declared.description;
+      }
+      if (declared == null ? void 0 : declared.icon) {
+        family.icon = declared.icon;
+      }
+      if (declared) {
+        family.order = declared.order;
+      }
+      dynamicFilterFamilies.push(family);
+      familyIds.add(groupId);
+    });
+    return { dynamicFilterGroups, dynamicFilterFamilies };
+  }
+  function resolveReportBuilderDynamicFilterGroups(config = {}) {
+    const predicates = normalizeReportBuilderPredicates(config);
+    if (predicates.length === 0) {
+      return normalizeArray2(config == null ? void 0 : config.dynamicFilterGroups);
+    }
+    return buildEffectiveDynamicFilters(config, predicates).dynamicFilterGroups;
+  }
+
+  // src/components/dashboard/reportBuilderStaticDatasets.js
+  function normalizeString10(value = "") {
+    return String(value || "").trim();
+  }
+  function cloneValue6(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+  }
+  function humanizeLabel(value = "") {
+    const normalized = normalizeString10(value);
+    if (!normalized) {
+      return "";
+    }
+    return normalized.replace(/[_-]+/g, " ").replace(/\s+/g, " ").split(" ").filter(Boolean).map((segment) => segment.slice(0, 1).toUpperCase() + segment.slice(1)).join(" ");
+  }
+  function normalizeStaticDatasetFormat(value = "") {
+    const normalized = normalizeString10(value).toLowerCase();
+    return normalized === "json" || normalized === "forge-data" || normalized === "forge_data" ? "json" : "csv";
+  }
+  function buildStaticDatasetKindLabel(format2 = "csv") {
+    return `static ${normalizeStaticDatasetFormat(format2)}`;
+  }
+  function buildStaticDatasetDataSourceRef(id = "", format2 = "csv") {
+    const normalizedId = sanitizeId(id);
+    const normalizedFormat = normalizeStaticDatasetFormat(format2);
+    return `static_${normalizedFormat}_${normalizedId}`;
+  }
+  function buildStaticDatasetRequestKind(format2 = "csv") {
+    return normalizeStaticDatasetFormat(format2) === "json" ? "staticJson" : "staticCsv";
+  }
+  function sanitizeId(value = "") {
+    return normalizeString10(value).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  }
+  function inferColumnKind(rows = [], key = "") {
+    const values = (Array.isArray(rows) ? rows : []).map((row) => row && typeof row === "object" && !Array.isArray(row) ? row[key] : void 0).filter((value) => value !== null && value !== void 0 && value !== "");
+    if (values.length === 0) {
+      return "dimension";
+    }
+    const numeric = values.every((value) => typeof value === "number" && Number.isFinite(value));
+    return numeric ? "measure" : "dimension";
+  }
+  function normalizeColumns(columns = [], rows = []) {
+    const explicit = Array.isArray(columns) ? columns : [];
+    const seen = /* @__PURE__ */ new Set();
+    const normalized = explicit.map((column) => {
+      const key = normalizeString10((column == null ? void 0 : column.key) || (column == null ? void 0 : column.id) || (column == null ? void 0 : column.value));
+      if (!key || seen.has(key)) {
+        return null;
+      }
+      seen.add(key);
+      return {
+        key,
+        label: normalizeString10((column == null ? void 0 : column.label) || humanizeLabel(key)) || key,
+        kind: normalizeString10((column == null ? void 0 : column.kind) || inferColumnKind(rows, key)) || inferColumnKind(rows, key),
+        ...normalizeString10(column == null ? void 0 : column.format) ? { format: normalizeString10(column.format) } : {}
+      };
+    }).filter(Boolean);
+    if (normalized.length > 0) {
+      return normalized;
+    }
+    const firstRow = rows.find((row) => row && typeof row === "object" && !Array.isArray(row)) || null;
+    if (!firstRow) {
+      return [];
+    }
+    return Object.keys(firstRow).map((key) => ({
+      key,
+      label: humanizeLabel(key) || key,
+      kind: inferColumnKind(rows, key)
+    }));
+  }
+  function buildFieldOptions(columns = [], kind = "") {
+    return (Array.isArray(columns) ? columns : []).filter((column) => normalizeString10(column == null ? void 0 : column.kind) === kind).map((column) => ({
+      value: normalizeString10(column == null ? void 0 : column.key),
+      label: normalizeString10((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key))
+    })).filter((entry) => entry.value && entry.label);
+  }
+  function buildDatasetDescription(label = "", rows = [], columns = [], format2 = "csv") {
+    const rowCount = Array.isArray(rows) ? rows.length : 0;
+    const columnCount = Array.isArray(columns) ? columns.length : 0;
+    const typeLabel = normalizeStaticDatasetFormat(format2) === "json" ? "JSON" : "CSV";
+    return [typeLabel, `${rowCount} row${rowCount === 1 ? "" : "s"}`, `${columnCount} column${columnCount === 1 ? "" : "s"}`].join(" \u2022 ");
+  }
+  function normalizeDatasetRows(rows = []) {
+    return (Array.isArray(rows) ? rows : []).filter((row) => row && typeof row === "object" && !Array.isArray(row)).map((row) => cloneValue6(row));
+  }
+  function normalizeReportBuilderStaticDatasets(datasets = []) {
+    const seen = /* @__PURE__ */ new Set();
+    return (Array.isArray(datasets) ? datasets : []).map((dataset) => {
+      if (!dataset || typeof dataset !== "object" || Array.isArray(dataset)) {
+        return null;
+      }
+      const rows = normalizeDatasetRows(dataset == null ? void 0 : dataset.rows);
+      const fallbackLabel = humanizeLabel((dataset == null ? void 0 : dataset.label) || (dataset == null ? void 0 : dataset.fileName) || (dataset == null ? void 0 : dataset.id) || "");
+      const id = sanitizeId((dataset == null ? void 0 : dataset.id) || (dataset == null ? void 0 : dataset.label) || (dataset == null ? void 0 : dataset.fileName) || `static_${seen.size + 1}`);
+      if (!id || seen.has(id)) {
+        return null;
+      }
+      seen.add(id);
+      const columns = normalizeColumns(dataset == null ? void 0 : dataset.columns, rows);
+      const format2 = normalizeStaticDatasetFormat((dataset == null ? void 0 : dataset.sourceFormat) || (dataset == null ? void 0 : dataset.format) || (dataset == null ? void 0 : dataset.kindLabel));
+      const label = normalizeString10((dataset == null ? void 0 : dataset.label) || fallbackLabel || id) || id;
+      const description = normalizeString10((dataset == null ? void 0 : dataset.description) || buildDatasetDescription(label, rows, columns, format2));
+      const dataSourceRef = normalizeString10((dataset == null ? void 0 : dataset.dataSourceRef) || buildStaticDatasetDataSourceRef(id, format2)) || buildStaticDatasetDataSourceRef(id, format2);
+      return {
+        id,
+        label,
+        description,
+        dataSourceRef,
+        kindLabel: buildStaticDatasetKindLabel(format2),
+        sourceFormat: format2,
+        rows,
+        columns,
+        rowCount: rows.length,
+        columnCount: columns.length,
+        columnOptions: columns.map((column) => ({
+          key: normalizeString10(column == null ? void 0 : column.key),
+          label: normalizeString10((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
+          kind: normalizeString10((column == null ? void 0 : column.kind) || "dimension") || "dimension",
+          ...column.format ? { format: column.format } : {}
+        })),
+        valueFieldOptions: buildFieldOptions(columns, "measure"),
+        secondaryFieldOptions: buildFieldOptions(columns, "dimension"),
+        chartFieldOptions: columns.map((column) => ({
+          key: normalizeString10(column == null ? void 0 : column.key),
+          label: normalizeString10((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
+          kind: normalizeString10((column == null ? void 0 : column.kind) || "dimension") || "dimension",
+          ...column.format ? { format: column.format } : {}
+        }))
+      };
+    }).filter(Boolean);
+  }
+  function buildReportBuilderStaticDatasetDeclarations(datasets = []) {
+    return normalizeReportBuilderStaticDatasets(datasets).map((dataset) => ({
+      id: dataset.id,
+      dataSourceRef: dataset.dataSourceRef,
+      request: {
+        kind: buildStaticDatasetRequestKind(dataset == null ? void 0 : dataset.sourceFormat),
+        format: normalizeStaticDatasetFormat(dataset == null ? void 0 : dataset.sourceFormat),
+        rowCount: dataset.rowCount,
+        columnKeys: dataset.columns.map((column) => column.key)
+      }
+    }));
+  }
+
+  // src/components/dashboard/reportBuilderSemantic.js
+  function normalizeString11(value = "") {
+    return String(value || "").trim();
+  }
+  function semanticLookupKeys(field = {}) {
+    const keys2 = [
+      normalizeString11(field == null ? void 0 : field.semanticRef),
+      normalizeString11(field == null ? void 0 : field.id),
+      normalizeString11(field == null ? void 0 : field.key)
+    ].filter(Boolean);
+    return Array.from(new Set(keys2));
+  }
+  function semanticFieldId(field = {}) {
+    return normalizeString11(field == null ? void 0 : field.semanticRef);
+  }
+  function isLocalComputedMeasure(field = {}) {
+    return !!field && typeof field === "object" && !Array.isArray(field) && (!!field.compute && typeof field.compute === "object" && !Array.isArray(field.compute) || normalizeString11(field == null ? void 0 : field.expr)) && !semanticFieldId(field);
+  }
+  function semanticSelectableMeasureFields(config = {}) {
+    return [
+      ...Array.isArray(config == null ? void 0 : config.measures) ? config.measures : [],
+      ...(Array.isArray(config == null ? void 0 : config.calculatedFields) ? config.calculatedFields : []).filter((field) => !isLocalComputedMeasure(field)),
+      ...(Array.isArray(config == null ? void 0 : config.computedMeasures) ? config.computedMeasures : []).filter((field) => !isLocalComputedMeasure(field)),
+      ...(Array.isArray(config == null ? void 0 : config.tableCalculations) ? config.tableCalculations : []).filter((field) => !isLocalComputedMeasure(field))
+    ];
+  }
+  function semanticSelectableParameterFields(config = {}) {
+    return resolveReportBuilderScopeParamFilters(config).filter((field) => !!semanticFieldId(field));
+  }
+  function semanticDiagnosableParameterFields(config = {}) {
+    return resolveReportBuilderScopeParamFilters(config).filter((field) => !!field && typeof field === "object" && !Array.isArray(field)).filter((field) => Object.prototype.hasOwnProperty.call(field, "semanticRef"));
+  }
+  function buildSemanticSelectionIds(fields2 = [], selectedIds = []) {
+    const fieldIndex = new Map(
+      (Array.isArray(fields2) ? fields2 : []).map((field) => [normalizeString11((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key)), field]).filter(([, field]) => !!field)
+    );
+    return Array.from(new Set(
+      (Array.isArray(selectedIds) ? selectedIds : []).map((id) => fieldIndex.get(normalizeString11(id))).map((field) => semanticFieldId(field)).filter(Boolean)
+    ));
+  }
+  function normalizeFieldSelectionIds(selectedIds = []) {
+    return Array.from(new Set(
+      (Array.isArray(selectedIds) ? selectedIds : []).map((id) => normalizeString11(id)).filter(Boolean)
+    ));
+  }
+  function hasConfiguredSemanticParameterValue(field = {}, value = null) {
+    if ((field == null ? void 0 : field.type) === "dateRange") {
+      return !!normalizeString11(value == null ? void 0 : value.start) || !!normalizeString11(value == null ? void 0 : value.end);
+    }
+    if (Array.isArray(value)) {
+      return value.length > 0;
+    }
+    if (value && typeof value === "object") {
+      return Object.keys(value).length > 0;
+    }
+    return value !== void 0 && value !== null && normalizeString11(value) !== "";
+  }
+  function cloneValue7(value = null) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+  }
+  function buildSemanticSelectionParameters(config = {}, state = {}) {
+    const next = {};
+    semanticSelectableParameterFields(config).forEach((field) => {
+      const rawId = resolveScopeParamId(field);
+      const semanticRef = semanticFieldId(field);
+      if (!rawId || !semanticRef) {
+        return;
+      }
+      const value = getScopeParamValue(state, rawId);
+      if (!hasConfiguredSemanticParameterValue(field, value)) {
+        return;
+      }
+      next[semanticRef] = cloneValue7(value);
+    });
+    return next;
+  }
+  function resolveSelectedSemanticParameterIds(config = {}, state = {}) {
+    return semanticDiagnosableParameterFields(config).filter((field) => {
+      const rawId = resolveScopeParamId(field);
+      if (!rawId) {
+        return false;
+      }
+      return hasConfiguredSemanticParameterValue(field, getScopeParamValue(state, rawId));
+    }).map((field) => resolveScopeParamId(field)).filter(Boolean);
+  }
+  function resolveGroupByDimensionId(config = {}, state = {}) {
+    var _a5;
+    const groupByValue = normalizeString11(state == null ? void 0 : state.groupBy);
+    if (!groupByValue) {
+      return "";
+    }
+    const option = (Array.isArray((_a5 = config == null ? void 0 : config.groupBy) == null ? void 0 : _a5.options) ? config.groupBy.options : []).find((entry) => normalizeString11(entry == null ? void 0 : entry.value) === groupByValue);
+    return normalizeString11((option == null ? void 0 : option.dimensionId) || groupByValue);
+  }
+  function resolveTableCalculationDimensionIds(config = {}, state = {}) {
+    const selectedMeasureIds = new Set(normalizeFieldSelectionIds(state == null ? void 0 : state.selectedMeasures));
+    const calculations = [
+      ...Array.isArray(config == null ? void 0 : config.calculatedFields) ? config.calculatedFields : [],
+      ...Array.isArray(config == null ? void 0 : config.computedMeasures) ? config.computedMeasures : [],
+      ...Array.isArray(config == null ? void 0 : config.tableCalculations) ? config.tableCalculations : []
+    ].filter((field) => selectedMeasureIds.has(normalizeString11((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key))));
+    const next = [];
+    calculations.forEach((field) => {
+      const compute = (field == null ? void 0 : field.compute) && typeof field.compute === "object" ? field.compute : {};
+      [
+        ...Array.isArray(compute.partitionBy) ? compute.partitionBy : [],
+        ...Array.isArray(compute.orderBy) ? compute.orderBy.map((entry) => entry == null ? void 0 : entry.field) : []
+      ].forEach((fieldKey) => {
+        const normalizedFieldKey = normalizeString11(fieldKey);
+        if (!normalizedFieldKey) {
+          return;
+        }
+        const dimension = (Array.isArray(config == null ? void 0 : config.dimensions) ? config.dimensions : []).find((entry) => semanticLookupKeys(entry).includes(normalizedFieldKey));
+        const dimensionId = normalizeString11((dimension == null ? void 0 : dimension.id) || (dimension == null ? void 0 : dimension.key));
+        if (dimensionId && !next.includes(dimensionId)) {
+          next.push(dimensionId);
+        }
+      });
+    });
+    return next;
+  }
+  function resolveLocalCalculatedFieldDependencies(config = {}, state = {}) {
+    const selectedMeasureIds = new Set(normalizeFieldSelectionIds(state == null ? void 0 : state.selectedMeasures));
+    const localCalculatedFields = normalizeReportCalculatedFields([
+      ...Array.isArray(config == null ? void 0 : config.calculatedFields) ? config.calculatedFields : [],
+      ...Array.isArray(config == null ? void 0 : config.computedMeasures) ? config.computedMeasures : [],
+      ...Array.isArray(config == null ? void 0 : config.tableCalculations) ? config.tableCalculations : []
+    ]).filter((field) => isLocalComputedMeasure(field));
+    const calculatedFieldIndex = /* @__PURE__ */ new Map();
+    localCalculatedFields.forEach((field) => {
+      [normalizeString11(field == null ? void 0 : field.id), normalizeString11(field == null ? void 0 : field.key)].filter(Boolean).forEach((alias) => {
+        if (!calculatedFieldIndex.has(alias)) {
+          calculatedFieldIndex.set(alias, field);
+        }
+      });
+    });
+    const measureIds = /* @__PURE__ */ new Set();
+    const dimensionIds = /* @__PURE__ */ new Set();
+    const visited = /* @__PURE__ */ new Set();
+    const resolveDependency = (fieldKey = "") => {
+      const normalizedFieldKey = normalizeString11(fieldKey);
+      if (!normalizedFieldKey || visited.has(normalizedFieldKey)) {
+        return;
+      }
+      visited.add(normalizedFieldKey);
+      const measure = (Array.isArray(config == null ? void 0 : config.measures) ? config.measures : []).find((entry) => semanticLookupKeys(entry).includes(normalizedFieldKey));
+      if (measure) {
+        const measureId = normalizeString11((measure == null ? void 0 : measure.id) || (measure == null ? void 0 : measure.key));
+        if (measureId) {
+          measureIds.add(measureId);
+        }
+        return;
+      }
+      const dimension = (Array.isArray(config == null ? void 0 : config.dimensions) ? config.dimensions : []).find((entry) => semanticLookupKeys(entry).includes(normalizedFieldKey));
+      if (dimension) {
+        const dimensionId = normalizeString11((dimension == null ? void 0 : dimension.id) || (dimension == null ? void 0 : dimension.key));
+        if (dimensionId) {
+          dimensionIds.add(dimensionId);
+        }
+        return;
+      }
+      const calculatedField = calculatedFieldIndex.get(normalizedFieldKey);
+      if (calculatedField) {
+        (calculatedField.dependencies || []).forEach((dependencyId) => {
+          resolveDependency(dependencyId);
+        });
+      }
+    };
+    localCalculatedFields.filter((field) => selectedMeasureIds.has(normalizeString11((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key)))).forEach((field) => {
+      (field.dependencies || []).forEach((dependencyId) => {
+        resolveDependency(dependencyId);
+      });
+    });
+    return {
+      measureIds: Array.from(measureIds),
+      dimensionIds: Array.from(dimensionIds)
+    };
+  }
+  function resolveSemanticSelectedDimensions(config = {}, state = {}) {
+    const ids = normalizeFieldSelectionIds(state == null ? void 0 : state.selectedDimensions);
+    const groupByDimensionId = resolveGroupByDimensionId(config, state);
+    if (groupByDimensionId && !ids.includes(groupByDimensionId)) {
+      ids.push(groupByDimensionId);
+    }
+    resolveTableCalculationDimensionIds(config, state).forEach((dimensionId) => {
+      if (!ids.includes(dimensionId)) {
+        ids.push(dimensionId);
+      }
+    });
+    resolveLocalCalculatedFieldDependencies(config, state).dimensionIds.forEach((dimensionId) => {
+      if (!ids.includes(dimensionId)) {
+        ids.push(dimensionId);
+      }
+    });
+    return ids;
+  }
+  function buildUnmappedSelectionIds(fields2 = [], selectedIds = [], {
+    ignoreIds = []
+  } = {}) {
+    const fieldIndex = new Map(
+      (Array.isArray(fields2) ? fields2 : []).map((field) => [normalizeString11((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key)), field]).filter(([, field]) => !!field)
+    );
+    const ignored = new Set(
+      (Array.isArray(ignoreIds) ? ignoreIds : []).map((id) => normalizeString11(id)).filter(Boolean)
+    );
+    return Array.from(new Set(
+      (Array.isArray(selectedIds) ? selectedIds : []).map((id) => normalizeString11(id)).filter(Boolean).filter((id) => !ignored.has(id)).filter((id) => !semanticFieldId(fieldIndex.get(id)))
+    ));
+  }
+  function buildRawFieldSelection(fields2 = [], semanticIds = []) {
+    const rawIndex = /* @__PURE__ */ new Map();
+    (Array.isArray(fields2) ? fields2 : []).forEach((field) => {
+      const rawId = normalizeString11((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key));
+      const semanticRef = semanticFieldId(field);
+      if (!rawId) {
+        return;
+      }
+      if (!semanticRef || rawIndex.has(semanticRef)) {
+        return;
+      }
+      rawIndex.set(semanticRef, rawId);
+    });
+    return Array.from(new Set(
+      (Array.isArray(semanticIds) ? semanticIds : []).map((id) => rawIndex.get(normalizeString11(id))).filter(Boolean)
+    ));
+  }
+  function resolveReportBuilderSemanticSelections(config = {}, binding = null) {
+    const normalizedBinding = normalizeSemanticBinding(binding);
+    if (!normalizedBinding || normalizedBinding.mode !== "semantic") {
+      return null;
+    }
+    const source = binding && typeof binding === "object" ? binding : {};
+    return {
+      hasExplicitDimensions: Object.prototype.hasOwnProperty.call(source, "selectedDimensions"),
+      hasExplicitMeasures: Object.prototype.hasOwnProperty.call(source, "selectedMeasures"),
+      selectedDimensions: buildRawFieldSelection(config.dimensions, normalizedBinding.selectedDimensions),
+      selectedMeasures: buildRawFieldSelection(semanticSelectableMeasureFields(config), normalizedBinding.selectedMeasures)
+    };
+  }
+  function buildReportBuilderSemanticSelection(config = {}, state = {}) {
+    const normalizedBinding = normalizeSemanticBinding((state == null ? void 0 : state.binding) || (config == null ? void 0 : config.binding));
+    if (!normalizedBinding || normalizedBinding.mode !== "semantic") {
+      return null;
+    }
+    const localComputedMeasureIds = (Array.isArray(config == null ? void 0 : config.computedMeasures) ? config.computedMeasures : []).concat(Array.isArray(config == null ? void 0 : config.calculatedFields) ? config.calculatedFields : []).concat(Array.isArray(config == null ? void 0 : config.tableCalculations) ? config.tableCalculations : []).filter((field) => isLocalComputedMeasure(field)).map((field) => normalizeString11((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key))).filter(Boolean);
+    const localCalculatedDependencies = resolveLocalCalculatedFieldDependencies(config, state);
+    const selectedDimensionIds = resolveSemanticSelectedDimensions(config, state);
+    const selectedDimensions = buildSemanticSelectionIds(config.dimensions, selectedDimensionIds);
+    const selectedMeasures = buildSemanticSelectionIds(semanticSelectableMeasureFields(config), [
+      ...Array.isArray(state == null ? void 0 : state.selectedMeasures) ? state.selectedMeasures : [],
+      ...localCalculatedDependencies.measureIds
+    ]);
+    const selectedParameters = buildSemanticSelectionParameters(config, state);
+    const unmappedDimensions = buildUnmappedSelectionIds(config.dimensions, selectedDimensionIds);
+    const unmappedMeasures = buildUnmappedSelectionIds(semanticSelectableMeasureFields(config), state == null ? void 0 : state.selectedMeasures, {
+      ignoreIds: localComputedMeasureIds
+    });
+    const unmappedParameters = buildUnmappedSelectionIds(
+      semanticDiagnosableParameterFields(config),
+      resolveSelectedSemanticParameterIds(config, state)
+    );
+    return {
+      modelRef: normalizedBinding.modelRef,
+      entity: normalizedBinding.entity,
+      selection: {
+        dimensions: selectedDimensions,
+        measures: selectedMeasures
+      },
+      ...unmappedDimensions.length > 0 || unmappedMeasures.length > 0 || unmappedParameters.length > 0 ? {
+        unmapped: {
+          ...unmappedDimensions.length > 0 ? { dimensions: unmappedDimensions } : {},
+          ...unmappedMeasures.length > 0 ? { measures: unmappedMeasures } : {},
+          ...unmappedParameters.length > 0 ? { parameters: unmappedParameters } : {}
+        }
+      } : {},
+      refinements: [],
+      parameters: selectedParameters
+    };
+  }
+
+  // src/reporting/scopeBindingModel.js
+  var SCOPE_PARAMS_BINDING_PREFIX = "scopeParams.";
+  var STATIC_FILTERS_BINDING_PREFIX = "staticFilters.";
+  var SUPPORTED_SCOPE_BINDING_PREFIXES = [
+    SCOPE_PARAMS_BINDING_PREFIX,
+    STATIC_FILTERS_BINDING_PREFIX
+  ];
+  function resolveScopeBindingFilterId(target = "") {
+    const normalizedTarget = String(target || "").trim();
+    const prefix = SUPPORTED_SCOPE_BINDING_PREFIXES.find((entry) => normalizedTarget.startsWith(entry));
+    return prefix ? normalizedTarget.slice(prefix.length).trim() : "";
+  }
+
+  // src/components/dashboard/reportBuilderExplorationSession.js
+  function normalizeString12(value = "") {
+    return String(value || "").trim();
+  }
+  function cloneValue8(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+  }
+  function stableSerialize(value) {
+    return JSON.stringify(value == null ? null : value);
+  }
+  function normalizeTimestamp(value, fallback = 0) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
+  }
+  function resolveExplorationNow(options = {}) {
+    return normalizeTimestamp(options == null ? void 0 : options.nowMs, Date.now());
+  }
+  function resolveExplorationTtl(options = {}) {
+    const numeric = Number(options == null ? void 0 : options.ttlMs);
+    if (Number.isFinite(numeric) && numeric > 0) {
+      return numeric;
+    }
+    return 1e3 * 60 * 60;
+  }
+  function snapshotExplorationState(state = {}) {
+    const snapshot = cloneValue8(state && typeof state === "object" && !Array.isArray(state) ? state : {});
+    delete snapshot.explorationSession;
+    return snapshot;
+  }
+  function normalizeReportBuilderExplorationSession(session = null, {
+    nowMs = Date.now()
+  } = {}) {
+    var _a5;
+    if (!session || typeof session !== "object" || Array.isArray(session)) {
+      return null;
+    }
+    const sessionId = normalizeString12(session == null ? void 0 : session.sessionId);
+    const sourceRef = (session == null ? void 0 : session.sourceRef) && typeof session.sourceRef === "object" && !Array.isArray(session.sourceRef) ? cloneValue8(session.sourceRef) : null;
+    const baseSnapshot = (session == null ? void 0 : session.baseSnapshot) && typeof session.baseSnapshot === "object" && !Array.isArray(session.baseSnapshot) ? cloneValue8(session.baseSnapshot) : null;
+    const history = (Array.isArray(session == null ? void 0 : session.history) ? session.history : []).filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry)).map((entry) => ({
+      snapshot: snapshotExplorationState(entry.snapshot || {}),
+      timestamp: normalizeTimestamp(entry.timestamp, normalizeTimestamp(session == null ? void 0 : session.startedAt, nowMs))
+    }));
+    const historyIndex = Math.max(0, Math.min(history.length - 1, Number((session == null ? void 0 : session.historyIndex) || 0) || 0));
+    const startedAt = normalizeTimestamp(session == null ? void 0 : session.startedAt, nowMs);
+    const updatedAt = normalizeTimestamp(session == null ? void 0 : session.updatedAt, startedAt);
+    const ttlMs = resolveExplorationTtl(session);
+    const expiresAt = normalizeTimestamp(session == null ? void 0 : session.expiresAt, startedAt + ttlMs);
+    if (!sessionId || !sourceRef || !baseSnapshot || history.length === 0) {
+      return null;
+    }
+    return {
+      sessionId,
+      sourceRef,
+      baseSnapshot,
+      history,
+      historyIndex,
+      startedAt,
+      updatedAt,
+      ttlMs,
+      expiresAt,
+      dirty: historyIndex > 0 || stableSerialize(((_a5 = history[historyIndex]) == null ? void 0 : _a5.snapshot) || {}) !== stableSerialize(baseSnapshot)
+    };
+  }
+  function normalizeReportBuilderExplorationState(state = {}, options = {}) {
+    const session = normalizeReportBuilderExplorationSession(state == null ? void 0 : state.explorationSession, options);
+    if (!session) {
+      const next = cloneValue8(state && typeof state === "object" && !Array.isArray(state) ? state : {});
+      delete next.explorationSession;
+      return next;
+    }
+    const nowMs = resolveExplorationNow(options);
+    if (session.expiresAt <= nowMs) {
+      return cloneValue8(session.baseSnapshot);
+    }
+    return {
+      ...snapshotExplorationState(state),
+      explorationSession: session
+    };
+  }
+
+  // src/reporting/drillMetadataProvider.js
+  var SUPPORTED_REFINEMENT_ACTION_KINDS = /* @__PURE__ */ new Set(["keep", "exclude", "drill", "detail"]);
+  function normalizeString13(value = "") {
+    return String(value || "").trim();
+  }
+  function cloneValue9(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+  }
+  function unwrapPayload(payload = {}, key = "") {
+    if (payload && typeof payload === "object" && !Array.isArray(payload) && payload[key] && typeof payload[key] === "object") {
+      return payload[key];
+    }
+    return payload;
+  }
+  function normalizeDetailTarget(payload = {}) {
+    const detailTarget = unwrapPayload(payload, "detailTarget");
+    if (!detailTarget || typeof detailTarget !== "object" || Array.isArray(detailTarget)) {
+      return null;
+    }
+    const targetRef = normalizeString13(detailTarget.targetRef);
+    const navigationMode = normalizeString13(detailTarget.navigationMode);
+    if (!targetRef || !navigationMode) {
+      return null;
+    }
+    return {
+      targetRef,
+      navigationMode,
+      parameters: detailTarget.parameters && typeof detailTarget.parameters === "object" && !Array.isArray(detailTarget.parameters) ? cloneValue9(detailTarget.parameters) : {},
+      ...normalizeString13(detailTarget.title) ? { title: normalizeString13(detailTarget.title) } : {},
+      ...normalizeString13(detailTarget.description) ? { description: normalizeString13(detailTarget.description) } : {}
+    };
+  }
+  function normalizeRefinementActions(payload = {}) {
+    const actions = Array.isArray(payload) ? payload : Array.isArray(payload == null ? void 0 : payload.actions) ? payload.actions : [];
+    return actions.map((action) => {
+      if (!action || typeof action !== "object" || Array.isArray(action)) {
+        return null;
+      }
+      const id = normalizeString13(action.id);
+      const label = normalizeString13(action.label);
+      const kind = normalizeString13(action.kind).toLowerCase();
+      if (!id || !label || !SUPPORTED_REFINEMENT_ACTION_KINDS.has(kind)) {
+        return null;
+      }
+      return {
+        id,
+        label,
+        kind,
+        ...normalizeString13(action.targetRef) ? { targetRef: normalizeString13(action.targetRef) } : {},
+        ...normalizeString13(action.nextFieldRef) ? { nextFieldRef: normalizeString13(action.nextFieldRef) } : {}
+      };
+    }).filter(Boolean);
+  }
+
+  // src/reporting/reportBuilderDrillHierarchy.js
+  function normalizeString14(value = "") {
+    return String(value || "").trim();
+  }
+  function normalizeReportBuilderDrillLevel(level = {}, index = 0) {
+    if (!level || typeof level !== "object" || Array.isArray(level)) {
+      return null;
+    }
+    const field = normalizeString14(level.field || level.fieldRef || level.id);
+    const label = normalizeString14(level.label || field);
+    const id = normalizeString14(level.id || field || `level_${index + 1}`);
+    if (!field || !label || !id) {
+      return null;
+    }
+    return {
+      id,
+      field,
+      label
+    };
+  }
+  function normalizeReportBuilderDrillHierarchy(hierarchy = {}) {
+    var _a5;
+    if (!hierarchy || typeof hierarchy !== "object" || Array.isArray(hierarchy)) {
+      return null;
+    }
+    const levels = (Array.isArray(hierarchy.levels) ? hierarchy.levels : []).map((level, index) => normalizeReportBuilderDrillLevel(level, index)).filter(Boolean);
+    if (levels.length < 2) {
+      return null;
+    }
+    const id = normalizeString14(hierarchy.id || hierarchy.fieldRef || ((_a5 = levels[0]) == null ? void 0 : _a5.field));
+    if (!id) {
+      return null;
+    }
+    return {
+      id,
+      ...normalizeString14(hierarchy.label) ? { label: normalizeString14(hierarchy.label) } : {},
+      levels
+    };
+  }
+  function normalizeReportBuilderDrillHierarchies(hierarchies = []) {
+    return (Array.isArray(hierarchies) ? hierarchies : []).map((hierarchy) => normalizeReportBuilderDrillHierarchy(hierarchy)).filter(Boolean);
+  }
+
+  // src/reporting/reportBuilderDrillMetadata.js
+  function normalizeString15(value = "") {
+    return String(value || "").trim();
+  }
+  function resolveDrillMetadataSource(config = {}) {
+    const nested = config == null ? void 0 : config.drillMetadata;
+    return nested && typeof nested === "object" && !Array.isArray(nested) ? nested : config;
+  }
+  function normalizeDetailTargets(detailTargets = []) {
+    return (Array.isArray(detailTargets) ? detailTargets : []).map((target) => normalizeDetailTarget(target)).filter(Boolean);
+  }
+  function normalizeFieldActionEntries(fieldActions = []) {
+    return (Array.isArray(fieldActions) ? fieldActions : []).map((entry) => {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+        return null;
+      }
+      const fieldRef = normalizeString15(entry.fieldRef || entry.field || entry.id);
+      if (!fieldRef) {
+        return null;
+      }
+      const actions = normalizeRefinementActions(entry.actions || entry.refinementActions || []);
+      return {
+        fieldRef,
+        actions
+      };
+    }).filter(Boolean);
+  }
+  function normalizeReportBuilderDrillMetadata(config = {}) {
+    const source = resolveDrillMetadataSource(config);
+    const hierarchies = normalizeReportBuilderDrillHierarchies((source == null ? void 0 : source.hierarchies) || (source == null ? void 0 : source.drillHierarchies) || []);
+    const detailTargets = normalizeDetailTargets((source == null ? void 0 : source.detailTargets) || []);
+    const fieldActions = normalizeFieldActionEntries((source == null ? void 0 : source.fieldActions) || (source == null ? void 0 : source.refinementActionsByField) || (source == null ? void 0 : source.refinementActions) || []);
+    return {
+      hierarchies,
+      detailTargets,
+      fieldActions
+    };
+  }
+  function resolveReportBuilderDrillMetadata(config = {}, overrides = null) {
+    const base = normalizeReportBuilderDrillMetadata(config);
+    if (!overrides || typeof overrides !== "object" || Array.isArray(overrides)) {
+      return base;
+    }
+    const normalizedOverrides = normalizeReportBuilderDrillMetadata({
+      drillMetadata: overrides
+    });
+    return {
+      hierarchies: Object.prototype.hasOwnProperty.call(overrides, "hierarchies") ? normalizedOverrides.hierarchies : base.hierarchies,
+      detailTargets: Object.prototype.hasOwnProperty.call(overrides, "detailTargets") ? normalizedOverrides.detailTargets : base.detailTargets,
+      fieldActions: Object.prototype.hasOwnProperty.call(overrides, "fieldActions") ? normalizedOverrides.fieldActions : base.fieldActions
+    };
+  }
+
+  // src/components/dashboard/reportBuilderChartRules.js
+  var CARTESIAN_CHART_TYPES = ["line", "bar", "area"];
+  var CATEGORY_CHART_TYPES = ["pie", "donut", "horizontal_bar", "funnel_bar"];
+  var ALL_SUPPORTED_CHART_TYPES = [...CARTESIAN_CHART_TYPES, ...CATEGORY_CHART_TYPES];
+  var SINGLE_MEASURE_CATEGORY_TYPES = /* @__PURE__ */ new Set(["pie", "donut", "funnel_bar"]);
+  function chartFamilyForType(type = "") {
+    const normalized = String(type || "").trim().toLowerCase();
+    if (CARTESIAN_CHART_TYPES.includes(normalized)) return "cartesian";
+    if (CATEGORY_CHART_TYPES.includes(normalized)) return "category";
+    return null;
+  }
+  function chartFamilyAllowsSeriesOptions(type = "") {
+    const normalized = String(type || "").trim().toLowerCase();
+    if (chartFamilyForType(normalized) === "cartesian") return true;
+    return normalized === "horizontal_bar";
+  }
+  function chartFamilyAllowsSeriesDimension(type = "") {
+    return chartFamilyForType(type) === "cartesian" || String(type || "").trim().toLowerCase() === "horizontal_bar";
+  }
+  function isValidPerSeriesType(chartType = "", perSeriesType = "") {
+    const family = chartFamilyForType(chartType);
+    const normalized = String(perSeriesType || "").trim().toLowerCase();
+    if (!normalized) return true;
+    if (family === "cartesian") {
+      return CARTESIAN_CHART_TYPES.includes(normalized);
+    }
+    return false;
+  }
+  function supportsStackIdForSeries(chartType = "", perSeriesType = "") {
+    const family = chartFamilyForType(chartType);
+    const baseType = String(chartType || "").trim().toLowerCase();
+    const effectiveType = String(perSeriesType || baseType).trim().toLowerCase();
+    if (family === "cartesian") {
+      return effectiveType === "bar" || effectiveType === "area";
+    }
+    return baseType === "horizontal_bar";
+  }
+
+  // src/components/dashboard/reportBuilderOptions.js
+  function cloneValue10(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+  }
+  function normalizeString16(value = "") {
+    return String(value || "").trim();
+  }
+  function isEntityOptionName(name = "") {
+    const normalized = normalizeString16(name).replace(/[^a-zA-Z0-9]/g, "");
+    return /^(account|agency|advertiser|campaign|order|line(item)?|audience|creative|pixel)(id|ids)?$/i.test(normalized);
+  }
+  function normalizedType(value = "") {
+    const type = normalizeString16(value).toLowerCase();
+    if (["bool", "boolean"].includes(type)) return "boolean";
+    if (["int", "integer"].includes(type)) return "integer";
+    if (["number", "float", "double"].includes(type)) return "number";
+    return "string";
+  }
+  function coerceValue(value, type) {
+    if (type === "boolean") {
+      if (value === true || value === false) return value;
+      if (value === "true" || value === 1 || value === "1") return true;
+      if (value === "false" || value === 0 || value === "0") return false;
+      return void 0;
+    }
+    if (type === "integer") {
+      const numeric = Number(value);
+      return Number.isInteger(numeric) ? numeric : void 0;
+    }
+    if (type === "number") {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric : void 0;
+    }
+    if (value === void 0 || value === null) return void 0;
+    return String(value);
+  }
+  function valueKey(value) {
+    return `${typeof value}:${JSON.stringify(value)}`;
+  }
+  function normalizeValueEntry(entry, type) {
+    const rawValue = entry && typeof entry === "object" && !Array.isArray(entry) ? entry.value : entry;
+    const value = coerceValue(rawValue, type);
+    if (value === void 0) return null;
+    const label = entry && typeof entry === "object" && !Array.isArray(entry) ? normalizeString16(entry.label) : "";
+    return {
+      value,
+      label: label || String(value)
+    };
+  }
+  function normalizeReportBuilderOptionDefinitions(values = []) {
+    const seen = /* @__PURE__ */ new Set();
+    return (Array.isArray(values) ? values : []).map((entry) => {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
+      const name = normalizeString16(entry.name);
+      if (!name || seen.has(name) || isEntityOptionName(name)) return null;
+      seen.add(name);
+      const type = normalizedType(entry.type);
+      const optionValues = (Array.isArray(entry.values) ? entry.values : []).map((value) => normalizeValueEntry(value, type)).filter(Boolean);
+      const allowedKeys = new Set(optionValues.map((value) => valueKey(value.value)));
+      const coercedDefault = coerceValue(entry.default, type);
+      const defaultValue = coercedDefault !== void 0 && (allowedKeys.size === 0 || allowedKeys.has(valueKey(coercedDefault))) ? coercedDefault : void 0;
+      const presentation = entry.presentation;
+      const anchorBlockId = typeof (presentation == null ? void 0 : presentation.anchorBlockId) === "string" ? presentation.anchorBlockId.trim() : "";
+      return {
+        ...anchorBlockId && (presentation == null ? void 0 : presentation.placement) === "header" ? { presentation: { anchorBlockId, placement: "header" } } : {},
+        name,
+        label: normalizeString16(entry.label) || name,
+        type,
+        description: normalizeString16(entry.description),
+        values: optionValues,
+        ...defaultValue !== void 0 ? { default: defaultValue } : {}
+      };
+    }).filter(Boolean);
+  }
+  function resolveEffectiveReportBuilderOptions(definitions = [], selected = {}) {
+    const source = selected && typeof selected === "object" && !Array.isArray(selected) ? selected : {};
+    return normalizeReportBuilderOptionDefinitions(definitions).reduce((result, definition) => {
+      const allowed = new Set(definition.values.map((entry) => valueKey(entry.value)));
+      const selectedValue = coerceValue(source[definition.name], definition.type);
+      const selectedValid = selectedValue !== void 0 && (allowed.size === 0 || allowed.has(valueKey(selectedValue)));
+      if (selectedValid) {
+        result[definition.name] = selectedValue;
+      } else if (Object.prototype.hasOwnProperty.call(definition, "default")) {
+        result[definition.name] = cloneValue10(definition.default);
+      }
+      return result;
+    }, {});
+  }
+
+  // src/reporting/reportRefinementModel.js
+  function normalizeString17(value = "") {
+    return String(value || "").trim();
+  }
+  function cloneValue11(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+  }
+  var SUPPORTED_REFINEMENT_OPS = /* @__PURE__ */ new Set(["keep", "exclude", "drill", "detail"]);
+  function resolveDefaultRefinementId({ op = "", field = "", sourceBlockId = "" } = {}) {
+    return [
+      normalizeString17(op),
+      normalizeString17(field),
+      normalizeString17(sourceBlockId)
+    ].filter(Boolean).join(":");
+  }
+  function normalizeReportRefinement(refinement = {}) {
+    if (!refinement || typeof refinement !== "object" || Array.isArray(refinement)) {
+      return null;
+    }
+    const op = normalizeString17(refinement.op).toLowerCase();
+    if (!SUPPORTED_REFINEMENT_OPS.has(op)) {
+      return null;
+    }
+    const field = normalizeString17(refinement.field);
+    if (!field) {
+      return null;
+    }
+    const sourceBlockId = normalizeString17(refinement.sourceBlockId);
+    const id = normalizeString17(refinement.id || resolveDefaultRefinementId({ op, field, sourceBlockId }));
+    if (!id) {
+      return null;
+    }
+    return {
+      id,
+      op,
+      field,
+      values: Array.isArray(refinement.values) ? refinement.values.map((value) => cloneValue11(value)) : [],
+      ...sourceBlockId ? { sourceBlockId } : {},
+      ...normalizeString17(refinement.label) ? { label: normalizeString17(refinement.label) } : {},
+      ...normalizeString17(refinement.targetRef) ? { targetRef: normalizeString17(refinement.targetRef) } : {}
+    };
+  }
+  function normalizeReportRefinements(refinements = []) {
+    const normalized = (Array.isArray(refinements) ? refinements : [refinements]).map((entry) => normalizeReportRefinement(entry)).filter(Boolean);
+    const next = [];
+    const seen = /* @__PURE__ */ new Set();
+    normalized.forEach((entry) => {
+      if (seen.has(entry.id)) {
+        return;
+      }
+      seen.add(entry.id);
+      next.push(entry);
+    });
+    return next;
+  }
+
+  // src/components/dashboard/reportRuntimeDrillState.js
+  function normalizeString18(value = "") {
+    return String(value || "").trim();
+  }
+  function normalizeReportRuntimeDrillTransition(transition = {}) {
+    if (!transition || typeof transition !== "object" || Array.isArray(transition)) {
+      return null;
+    }
+    const refinementId = normalizeString18(transition.refinementId);
+    const sourceField = normalizeString18(transition.sourceField);
+    const nextFieldRef = normalizeString18(transition.nextFieldRef);
+    if (!refinementId || !sourceField || !nextFieldRef) {
+      return null;
+    }
+    return {
+      refinementId,
+      sourceField,
+      nextFieldRef,
+      ...normalizeString18(transition.sourceBlockId) ? { sourceBlockId: normalizeString18(transition.sourceBlockId) } : {}
+    };
+  }
+
+  // src/reporting/reportRuntimeHostIntent.js
+  function normalizeString19(value = "") {
+    return String(value || "").trim();
+  }
+  function cloneValue12(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+  }
+  var SUPPORTED_REPORT_RUNTIME_HOST_INTENT_KINDS = /* @__PURE__ */ new Set(["detailTarget"]);
+  function normalizeReportRuntimeHostIntent(intent = {}) {
+    if (!intent || typeof intent !== "object" || Array.isArray(intent)) {
+      return null;
+    }
+    const intentKind = normalizeString19(intent.intentKind).trim();
+    const targetRef = normalizeString19(intent.targetRef);
+    const navigationMode = normalizeString19(intent.navigationMode);
+    if (!SUPPORTED_REPORT_RUNTIME_HOST_INTENT_KINDS.has(intentKind) || !targetRef || !navigationMode) {
+      return null;
+    }
+    return {
+      intentKind,
+      targetRef,
+      navigationMode,
+      parameters: intent.parameters && typeof intent.parameters === "object" && !Array.isArray(intent.parameters) ? cloneValue12(intent.parameters) : {},
+      ...normalizeString19(intent.title) ? { title: normalizeString19(intent.title) } : {},
+      ...normalizeString19(intent.description) ? { description: normalizeString19(intent.description) } : {}
+    };
+  }
+
+  // src/components/dashboard/reportRuntimeInteractionStateModel.js
+  function cloneValue13(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+  }
+  function normalizeReportRuntimeDetailDiagnostic(detailDiagnostic = null) {
+    if (!detailDiagnostic || typeof detailDiagnostic !== "object" || Array.isArray(detailDiagnostic)) {
+      return null;
+    }
+    const code = String((detailDiagnostic == null ? void 0 : detailDiagnostic.code) || "").trim();
+    const severity = String((detailDiagnostic == null ? void 0 : detailDiagnostic.severity) || "").trim().toLowerCase();
+    const message = String((detailDiagnostic == null ? void 0 : detailDiagnostic.message) || "").trim();
+    if (!code || !message) {
+      return null;
+    }
+    return {
+      code,
+      severity: severity || "warning",
+      message
+    };
+  }
+  function normalizeReportRuntimeScopedFilterState(state = null) {
+    if (!state || typeof state !== "object" || Array.isArray(state)) {
+      return {};
+    }
+    return Object.fromEntries(
+      Object.entries(state).map(([datasetRef, values]) => {
+        const normalizedDatasetRef = String(datasetRef || "").trim();
+        if (!normalizedDatasetRef || !values || typeof values !== "object" || Array.isArray(values)) {
+          return null;
+        }
+        const normalizedValues = Object.fromEntries(
+          Object.entries(values).map(([paramId, value]) => {
+            const normalizedParamId = String(paramId || "").trim();
+            return normalizedParamId ? [normalizedParamId, cloneValue13(value)] : null;
+          }).filter(Boolean)
+        );
+        return Object.keys(normalizedValues).length > 0 ? [normalizedDatasetRef, normalizedValues] : null;
+      }).filter(Boolean)
+    );
+  }
+  function normalizeReportRuntimeInteractionState(state = null, {
+    allowEmpty = true
+  } = {}) {
+    const refinements = normalizeReportRefinements(state == null ? void 0 : state.refinements);
+    const drillTransitions = (Array.isArray(state == null ? void 0 : state.drillTransitions) ? state.drillTransitions : []).map((entry) => normalizeReportRuntimeDrillTransition(entry)).filter(Boolean);
+    const datasetScopeParams = normalizeReportRuntimeScopedFilterState(state == null ? void 0 : state.datasetScopeParams);
+    const hostIntent = normalizeReportRuntimeHostIntent(state == null ? void 0 : state.hostIntent);
+    const detailDiagnostic = normalizeReportRuntimeDetailDiagnostic(state == null ? void 0 : state.detailDiagnostic);
+    if (!allowEmpty && refinements.length === 0 && drillTransitions.length === 0 && Object.keys(datasetScopeParams).length === 0 && !hostIntent && !detailDiagnostic) {
+      return null;
+    }
+    return {
+      refinements,
+      drillTransitions,
+      datasetScopeParams,
+      hostIntent: hostIntent || null,
+      detailDiagnostic: detailDiagnostic || null
+    };
+  }
+
+  // src/components/dashboard/reportBuilderRuntimePreviewInteractionPersistence.js
+  var REPORT_DOCUMENT_RUNTIME_PREVIEW_INTERACTION_KEY = "reportDocumentRuntimePreviewInteraction";
+  function resolveReportBuilderPersistedRuntimePreviewInteraction(state = {}) {
+    return normalizeReportRuntimeInteractionState(
+      state == null ? void 0 : state[REPORT_DOCUMENT_RUNTIME_PREVIEW_INTERACTION_KEY],
+      { allowEmpty: false }
+    );
+  }
+
+  // src/components/dashboard/reportBuilderUtils.js
+  function clone3(value) {
+    if (Array.isArray(value)) {
+      return value.map((item) => clone3(item));
+    }
+    if (value && typeof value === "object") {
+      const result = {};
+      Object.entries(value).forEach(([key, item]) => {
+        result[key] = clone3(item);
+      });
+      return result;
+    }
+    return value;
+  }
+  function setNestedValue(target, path, value) {
+    const parts = String(path || "").split(".").map((entry) => entry.trim()).filter(Boolean);
+    if (!parts.length) {
+      return target;
+    }
+    let current = target;
+    for (let i3 = 0; i3 < parts.length - 1; i3 += 1) {
+      const part = parts[i3];
+      if (!current[part] || typeof current[part] !== "object" || Array.isArray(current[part])) {
+        current[part] = {};
+      }
+      current = current[part];
+    }
+    current[parts[parts.length - 1]] = value;
+    return target;
+  }
+  function normalizeArray3(values = []) {
+    const isPresent = (entry) => entry !== void 0 && entry !== null && entry !== "";
+    if (Array.isArray(values)) {
+      return values.filter(isPresent);
+    }
+    return isPresent(values) ? [values] : [];
+  }
+  function normalizeFieldIdArray(values = []) {
+    return normalizeArray3(values).flatMap((entry) => typeof entry === "string" ? entry.split(/[\s,]+/) : [entry]).map((entry) => String(entry != null ? entry : "").trim()).filter(Boolean);
+  }
+  function resolveRelativeDateRangeDefault(seed = {}) {
+    return (seed == null ? void 0 : seed.startExpression) || (seed == null ? void 0 : seed.endExpression) ? resolveReportRelativeDateRangeSpec(seed) : resolveReportRelativeDateRange(seed == null ? void 0 : seed.preset);
+  }
+  function defaultSelectedIds(items = [], fallbackCount = 1) {
+    const explicit = normalizeArray3(items).filter((item) => item == null ? void 0 : item.default).map((item) => String(item.id || "").trim()).filter(Boolean);
+    if (explicit.length > 0) {
+      return explicit;
+    }
+    return normalizeArray3(items).slice(0, fallbackCount).map((item) => String((item == null ? void 0 : item.id) || "").trim()).filter(Boolean);
+  }
+  function resolveSelectedDerivedMeasureIds(state = {}) {
+    const currentMeasures = normalizeStringArray3(state == null ? void 0 : state.selectedMeasures);
+    if (currentMeasures.length === 0) {
+      return [];
+    }
+    const localCalculatedFields = normalizeReportBuilderLocalCalculatedFields(state == null ? void 0 : state.localCalculatedFields);
+    const localTableCalculations = normalizeReportBuilderLocalTableCalculations(state == null ? void 0 : state.localTableCalculations);
+    const derivedMeasureIds = new Set(
+      normalizeReportCalculatedFields([
+        ...localCalculatedFields,
+        ...localTableCalculations
+      ]).map((field) => String((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key) || "").trim()).filter(Boolean)
+    );
+    return currentMeasures.filter((id) => derivedMeasureIds.has(id));
+  }
+  function defaultStaticFilterValue(filter = {}) {
+    var _a5;
+    if (filter.type === "dateRange") {
+      const seeded = filter.default && typeof filter.default === "object" ? filter.default : {};
+      const relative = resolveRelativeDateRangeDefault(seeded);
+      if (relative) {
+        return { ...seeded, ...relative };
+      }
+      return {
+        start: seeded.start || "",
+        end: seeded.end || ""
+      };
+    }
+    const defaults = normalizeArray3(filter.options).filter((option) => option == null ? void 0 : option.default).map((option) => option.value);
+    if (filter.multiple) {
+      return defaults;
+    }
+    return (_a5 = defaults[0]) != null ? _a5 : "";
+  }
+  function isVisibleField(entry = {}) {
+    if (!entry || typeof entry !== "object") {
+      return false;
+    }
+    if (entry.hidden === true) {
+      return false;
+    }
+    if (entry.visible === false) {
+      return false;
+    }
+    if (entry.expose === false) {
+      return false;
+    }
+    return true;
+  }
+  function normalizeStringArray3(values = []) {
+    return normalizeArray3(values).map((entry) => String(entry || "").trim()).filter(Boolean);
+  }
+  function normalizeTablePresetColumns(columns = []) {
+    return normalizeArray3(columns).map((entry) => normalizeReportTableBlockColumn(typeof entry === "string" ? { key: entry } : entry)).filter(Boolean);
+  }
+  var DEFAULT_CHART_PALETTE = [
+    "#1f77b4",
+    "#ff7f0e",
+    "#2ca02c",
+    "#d62728",
+    "#9467bd",
+    "#8c564b",
+    "#e377c2",
+    "#7f7f7f",
+    "#bcbd22",
+    "#17becf"
+  ];
+  function supportedChartTypeSet(config = {}) {
+    var _a5, _b, _c;
+    const supported = normalizeStringArray3(
+      ((_b = (_a5 = config == null ? void 0 : config.result) == null ? void 0 : _a5.chartWizard) == null ? void 0 : _b.supportedTypes) || ((_c = config == null ? void 0 : config.result) == null ? void 0 : _c.supportedChartTypes) || ALL_SUPPORTED_CHART_TYPES
+    ).filter((entry) => ALL_SUPPORTED_CHART_TYPES.includes(entry));
+    return new Set(supported.length > 0 ? supported : ALL_SUPPORTED_CHART_TYPES);
+  }
+  function resolveChartCreationMode(config = {}) {
+    var _a5;
+    return String(((_a5 = config == null ? void 0 : config.result) == null ? void 0 : _a5.chartCreationMode) || "").trim().toLowerCase();
+  }
+  function isExplicitReportBuilderChartMode(config = {}) {
+    return resolveChartCreationMode(config) === "explicit";
+  }
+  function getReportBuilderSupportedChartTypes(config = {}) {
+    return Array.from(supportedChartTypeSet(config));
+  }
+  function getReportBuilderResultPanePosition(config = {}) {
+    var _a5;
+    const position = String(((_a5 = config == null ? void 0 : config.result) == null ? void 0 : _a5.resultPanePosition) || "").trim().toLowerCase();
+    return position === "left" ? "left" : "right";
+  }
+  function getVisibleReportBuilderMeasures(config = {}) {
+    return normalizeArray3(config.measures).filter((entry) => isVisibleField(entry));
+  }
+  function getComputedReportBuilderMeasures(config = {}) {
+    return [
+      ...normalizeArray3(config.calculatedFields),
+      ...normalizeArray3(config.computedMeasures)
+    ].filter((entry) => isVisibleField(entry));
+  }
+  function getTableCalculationReportBuilderMeasures(config = {}) {
+    return normalizeArray3(config.tableCalculations).filter((entry) => isVisibleField(entry));
+  }
+  function getSelectableReportBuilderMeasures(config = {}) {
+    return [
+      ...getVisibleReportBuilderMeasures(config),
+      ...getComputedReportBuilderMeasures(config),
+      ...getTableCalculationReportBuilderMeasures(config)
+    ];
+  }
+  function getVisibleReportBuilderDimensions(config = {}) {
+    return normalizeArray3(config.dimensions).filter((entry) => isVisibleField(entry));
+  }
+  function getNormalizedTableCalculationMeasures(config = {}) {
+    return normalizeReportCalculatedFields(getTableCalculationReportBuilderMeasures(config)).filter((entry) => (entry == null ? void 0 : entry.kind) === "tableCalc");
+  }
+  function getNormalizedReportBuilderCalculatedFields(config = {}) {
+    return normalizeReportCalculatedFields([
+      ...getComputedReportBuilderMeasures(config),
+      ...getTableCalculationReportBuilderMeasures(config)
+    ]);
+  }
+  function resolveReportBuilderTableCalculationDimensionRequirements(config = {}, definition = null) {
+    const compute = (definition == null ? void 0 : definition.compute) || {};
+    const sourceField = String((compute == null ? void 0 : compute.sourceField) || "").trim();
+    const fieldKeys2 = Array.from(new Set([
+      ...normalizeArray3(compute.partitionBy),
+      ...normalizeArray3(compute.orderBy).map((entry) => entry == null ? void 0 : entry.field)
+    ].map((entry) => String(entry || "").trim()).filter(Boolean)));
+    const requiredDimensions = [];
+    const requiredDimensionIds = [];
+    const requiredDimensionLabels = [];
+    const missingDimensionFields = [];
+    const seenDimensionIds = /* @__PURE__ */ new Set();
+    fieldKeys2.forEach((fieldKey) => {
+      const dimension = resolveReportBuilderDimensionByField(config, fieldKey);
+      const dimensionId = String((dimension == null ? void 0 : dimension.id) || "").trim();
+      if (dimension && dimensionId) {
+        if (!seenDimensionIds.has(dimensionId)) {
+          seenDimensionIds.add(dimensionId);
+          requiredDimensions.push(dimension);
+          requiredDimensionIds.push(dimensionId);
+          requiredDimensionLabels.push(String((dimension == null ? void 0 : dimension.label) || dimensionId).trim());
+        }
+        return;
+      }
+      if (fieldKey === sourceField || resolveReportBuilderMeasureByField(config, fieldKey)) {
+        return;
+      }
+      missingDimensionFields.push(fieldKey);
+    });
+    return {
+      requiredDimensions,
+      requiredDimensionIds,
+      requiredDimensionLabels,
+      missingDimensionFields
+    };
+  }
+  function reportBuilderDimensionValueKey(entry = {}) {
+    return String((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id) || "").trim();
+  }
+  function resolveReportBuilderDimensionDisplayKey(entry = {}) {
+    const displayKey = String((entry == null ? void 0 : entry.displayKey) || (entry == null ? void 0 : entry.displayPath) || "").trim();
+    return displayKey || reportBuilderDimensionValueKey(entry);
+  }
+  function resolveReportBuilderDimensionByField(config = {}, fieldKey = "") {
+    const target = String(fieldKey || "").trim();
+    if (!target) {
+      return null;
+    }
+    return getVisibleReportBuilderDimensions(config).find((entry) => {
+      const dimensionId = String((entry == null ? void 0 : entry.id) || "").trim();
+      const valueKey2 = reportBuilderDimensionValueKey(entry);
+      const displayKey = resolveReportBuilderDimensionDisplayKey(entry);
+      return target === dimensionId || target === valueKey2 || target === displayKey;
+    }) || null;
+  }
+  function normalizeChartSpecValue(value) {
+    const normalized = String(value || "").trim();
+    return normalized || null;
+  }
+  function normalizeChartSeriesOption(option) {
+    if (!option || typeof option !== "object" || Array.isArray(option)) {
+      return null;
+    }
+    const result = {};
+    const type = String(option.type || "").trim().toLowerCase();
+    if (type) result.type = type;
+    const axis = String(option.axis || "").trim().toLowerCase();
+    if (axis) result.axis = axis;
+    const rawStackId = option.stackId;
+    if (rawStackId !== void 0 && rawStackId !== null && rawStackId !== "") {
+      if (typeof rawStackId === "string") {
+        const trimmed = rawStackId.trim();
+        if (trimmed) result.stackId = trimmed;
+      } else {
+        result.stackId = rawStackId;
+      }
+    }
+    const dataLabels = String(option.dataLabels || "").trim().toLowerCase();
+    if (dataLabels) result.dataLabels = dataLabels;
+    const pointColorMode = String(option.pointColorMode || "").trim().toLowerCase();
+    if (pointColorMode) result.pointColorMode = pointColorMode === "bysign" ? "bySign" : pointColorMode;
+    return Object.keys(result).length > 0 ? result : null;
+  }
+  function normalizeChartSeriesOptions(input) {
+    if (!input || typeof input !== "object" || Array.isArray(input)) {
+      return null;
+    }
+    const result = {};
+    Object.entries(input).forEach(([key, option]) => {
+      const trimmed = String(key || "").trim();
+      if (!trimmed) return;
+      const normalized = normalizeChartSeriesOption(option);
+      if (normalized) result[trimmed] = normalized;
+    });
+    return Object.keys(result).length > 0 ? result : null;
+  }
+  function normalizeChartCategoryLabel(value = null) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const lines = Number(value.lines);
+    if (lines !== 1 && lines !== 2) return null;
+    return {
+      lines,
+      maxCharacters: Math.max(4, Math.min(120, Number(value.maxCharacters) || 28))
+    };
+  }
+  function normalizeReportBuilderChartSpec(chartSpec = {}) {
+    if (!chartSpec || typeof chartSpec !== "object" || Array.isArray(chartSpec)) {
+      return null;
+    }
+    validateChartAppearance(chartSpec);
+    const title = String(chartSpec.title || "").trim();
+    const eyebrow = String(chartSpec.eyebrow || "").trim();
+    const accentTone = String(chartSpec.accentTone || "").trim();
+    const highlights = normalizeStringArray3(chartSpec.highlights);
+    const type = String(chartSpec.type || "").trim().toLowerCase() || "line";
+    const xField = normalizeChartSpecValue(chartSpec.xField);
+    const yFields = normalizeStringArray3(chartSpec.yFields || chartSpec.yField).filter(Boolean);
+    const seriesField = normalizeChartSpecValue(chartSpec.seriesField);
+    const seriesOptions = normalizeChartSeriesOptions(chartSpec.seriesOptions);
+    const categoryLabel = normalizeChartCategoryLabel(chartSpec.categoryLabel);
+    const metricSelection = normalizeChartMetricSelection(chartSpec.metricSelection, yFields);
+    if (metricSelection && (seriesField || !["line", "area", "bar", "combo"].includes(type))) throw new Error("Metric selection requires a direct cartesian chart.");
+    return {
+      ...title ? { title } : {},
+      ...eyebrow ? { eyebrow } : {},
+      ...accentTone ? { accentTone } : {},
+      ...highlights.length > 0 ? { highlights } : {},
+      type,
+      ...chartSpec.appearance ? { appearance: chartSpec.appearance } : {},
+      ...chartSpec.layout ? { layout: chartSpec.layout } : {},
+      ...typeof chartSpec.stacked === "boolean" ? { stacked: chartSpec.stacked } : {},
+      xField,
+      yFields: Array.from(new Set(yFields)),
+      ...seriesField ? { seriesField } : {},
+      ...chartSpec.categoryColors && typeof chartSpec.categoryColors === "object" && !Array.isArray(chartSpec.categoryColors) ? { categoryColors: { ...chartSpec.categoryColors } } : {},
+      ...seriesOptions ? { seriesOptions } : {},
+      ...categoryLabel ? { categoryLabel } : {},
+      ...chartSpec.preserveCategoryOrder === true ? { preserveCategoryOrder: true } : {},
+      ...metricSelection ? { metricSelection } : {},
+      ...typeof chartSpec.allowTableSwitch === "boolean" ? { allowTableSwitch: chartSpec.allowTableSwitch } : {}
+    };
+  }
+  function chartFieldIndex(columns = []) {
+    const result = /* @__PURE__ */ new Map();
+    normalizeArray3(columns).forEach((column) => {
+      const aliases2 = [
+        String((column == null ? void 0 : column.key) || "").trim(),
+        ...normalizeStringArray3(column == null ? void 0 : column.aliases)
+      ].filter(Boolean);
+      aliases2.forEach((alias) => {
+        if (!result.has(alias)) {
+          result.set(alias, column);
+        }
+      });
+    });
+    return result;
+  }
+  function chartConfigUniverse(config = {}) {
+    const fields2 = [
+      ...getVisibleReportBuilderDimensions(config).flatMap((entry) => [
+        String((entry == null ? void 0 : entry.id) || "").trim(),
+        reportBuilderDimensionValueKey(entry),
+        resolveReportBuilderDimensionDisplayKey(entry)
+      ]),
+      ...getSelectableReportBuilderMeasures(config).map((entry) => (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id))
+    ];
+    return new Set(normalizeStringArray3(fields2));
+  }
+  function sanitizeChartSpecAgainstConfig(config = {}, chartSpec = null) {
+    const normalized = normalizeReportBuilderChartSpec(chartSpec);
+    if (!normalized) {
+      return null;
+    }
+    if (!supportedChartTypeSet(config).has(normalized.type)) {
+      return null;
+    }
+    const universe = chartConfigUniverse(config);
+    if (!normalized.xField || !universe.has(normalized.xField)) {
+      return null;
+    }
+    if (!Array.isArray(normalized.yFields) || normalized.yFields.length === 0) {
+      return null;
+    }
+    if (normalized.yFields.some((entry) => !universe.has(entry))) {
+      return null;
+    }
+    const family = chartFamilyForType(normalized.type);
+    if (SINGLE_MEASURE_CATEGORY_TYPES.has(normalized.type) && normalized.yFields.length > 1) {
+      return null;
+    }
+    if (normalized.seriesField) {
+      if (!universe.has(normalized.seriesField)) {
+        return null;
+      }
+      if (!chartFamilyAllowsSeriesDimension(normalized.type)) {
+        delete normalized.seriesField;
+      } else if (normalized.yFields.length > 1) {
+        delete normalized.seriesField;
+      } else if (normalized.seriesField === normalized.xField) {
+        delete normalized.seriesField;
+      }
+    }
+    if (normalized.seriesOptions) {
+      if (normalized.seriesField) {
+        delete normalized.seriesOptions;
+      } else if (!chartFamilyAllowsSeriesOptions(normalized.type)) {
+        delete normalized.seriesOptions;
+      } else {
+        const ySet = new Set(normalized.yFields);
+        const cleaned = {};
+        const stackAxis = /* @__PURE__ */ new Map();
+        Object.entries(normalized.seriesOptions).forEach(([key, option]) => {
+          if (!ySet.has(key)) return;
+          const next = {};
+          if (option.type && isValidPerSeriesType(normalized.type, option.type)) {
+            next.type = option.type;
+          }
+          if (family === "cartesian" && (option.axis === "left" || option.axis === "right")) {
+            next.axis = option.axis;
+          }
+          if (typeof option.stackId === "string" && option.stackId && supportsStackIdForSeries(normalized.type, next.type || option.type)) {
+            const axis = next.axis || "left";
+            const prior = stackAxis.get(option.stackId);
+            if (prior && prior !== axis) {
+            } else {
+              next.stackId = option.stackId;
+              if (!prior) stackAxis.set(option.stackId, axis);
+            }
+          }
+          if (["auto", "always", "none"].includes(option.dataLabels)) {
+            next.dataLabels = option.dataLabels;
+          }
+          if (["series", "bysign"].includes(option.pointColorMode)) {
+            next.pointColorMode = option.pointColorMode === "bysign" ? "bySign" : option.pointColorMode;
+          }
+          if (Object.keys(next).length > 0) cleaned[key] = next;
+        });
+        if (Object.keys(cleaned).length > 0) {
+          normalized.seriesOptions = cleaned;
+        } else {
+          delete normalized.seriesOptions;
+        }
+      }
+    }
+    return normalized;
+  }
+  function resolveReportBuilderMeasure(config = {}, id = "") {
+    const targetId = String(id || "").trim();
+    if (!targetId) {
+      return null;
+    }
+    return getSelectableReportBuilderMeasures(config).find(
+      (entry) => String((entry == null ? void 0 : entry.id) || "").trim() === targetId
+    ) || null;
+  }
+  function resolveReportBuilderMeasureByField(config = {}, fieldKey = "") {
+    const target = String(fieldKey || "").trim();
+    if (!target) {
+      return null;
+    }
+    return getSelectableReportBuilderMeasures(config).find((entry) => {
+      const measureId = String((entry == null ? void 0 : entry.id) || "").trim();
+      const valueKey2 = String((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id) || "").trim();
+      return target === measureId || target === valueKey2;
+    }) || null;
+  }
+  function resolveReportBuilderOrderFieldEntries(config = {}) {
+    var _a5;
+    return normalizeArray3(((_a5 = config == null ? void 0 : config.result) == null ? void 0 : _a5.orderFields) || (config == null ? void 0 : config.orderFields));
+  }
+  function resolveReportBuilderOrderFieldToken(entry = {}) {
+    return String((entry == null ? void 0 : entry.value) || (entry == null ? void 0 : entry.field) || "").trim();
+  }
+  function resolveReportBuilderOrderFieldEntry(config = {}, orderField = "") {
+    const target = String(orderField || "").trim();
+    if (!target) {
+      return null;
+    }
+    return resolveReportBuilderOrderFieldEntries(config).find((entry) => resolveReportBuilderOrderFieldToken(entry) === target) || null;
+  }
+  function isReportBuilderOrderFieldCompatible(config = {}, state = {}, orderField = "") {
+    const entry = resolveReportBuilderOrderFieldEntry(config, orderField);
+    if (!entry) {
+      return false;
+    }
+    const target = resolveReportBuilderOrderFieldToken(entry);
+    if (!target) {
+      return false;
+    }
+    const selectedDimensions = normalizeArray3(state == null ? void 0 : state.selectedDimensions).map((value) => String(value || "").trim()).filter(Boolean);
+    const selectedMeasures = normalizeArray3(state == null ? void 0 : state.selectedMeasures).map((value) => String(value || "").trim()).filter(Boolean);
+    const dimension = resolveReportBuilderDimensionByField(config, target);
+    if (dimension) {
+      return selectedDimensions.includes(String((dimension == null ? void 0 : dimension.id) || "").trim());
+    }
+    const measure = resolveReportBuilderMeasureByField(config, target);
+    if (measure) {
+      return selectedMeasures.includes(String((measure == null ? void 0 : measure.id) || "").trim());
+    }
+    return true;
+  }
+  function resolveReportBuilderOrderFieldForTarget(config = {}, target = "") {
+    const normalizedTarget = String(target || "").trim();
+    if (!normalizedTarget) {
+      return "";
+    }
+    const targetDimension = resolveReportBuilderDimensionByField(config, normalizedTarget);
+    const targetMeasure = resolveReportBuilderMeasureByField(config, normalizedTarget);
+    const match2 = resolveReportBuilderOrderFieldEntries(config).find((entry) => {
+      const entryTarget = resolveReportBuilderOrderFieldToken(entry);
+      if (!entryTarget) {
+        return false;
+      }
+      if (entryTarget === normalizedTarget) {
+        return true;
+      }
+      const entryDimension = resolveReportBuilderDimensionByField(config, entryTarget);
+      if (entryDimension && targetDimension) {
+        return String((entryDimension == null ? void 0 : entryDimension.id) || "").trim() === String((targetDimension == null ? void 0 : targetDimension.id) || "").trim();
+      }
+      const entryMeasure = resolveReportBuilderMeasureByField(config, entryTarget);
+      if (entryMeasure && targetMeasure) {
+        return String((entryMeasure == null ? void 0 : entryMeasure.id) || "").trim() === String((targetMeasure == null ? void 0 : targetMeasure.id) || "").trim();
+      }
+      return false;
+    });
+    return resolveReportBuilderOrderFieldToken(match2);
+  }
+  function normalizeReportBuilderOrderDirection(value = "") {
+    return String(value || "").trim().toLowerCase() === "asc" ? "asc" : "desc";
+  }
+  function normalizeReportBuilderOrderState(config = {}, state = {}, defaults = {}) {
+    const orderEntries = resolveReportBuilderOrderFieldEntries(config);
+    if (orderEntries.length === 0) {
+      return {
+        orderField: "",
+        orderDir: normalizeReportBuilderOrderDirection((state == null ? void 0 : state.orderDir) || (defaults == null ? void 0 : defaults.orderDir) || "desc")
+      };
+    }
+    const currentOrderField = String((state == null ? void 0 : state.orderField) || "").trim();
+    if (currentOrderField && isReportBuilderOrderFieldCompatible(config, state, currentOrderField)) {
+      const currentEntry = resolveReportBuilderOrderFieldEntry(config, currentOrderField);
+      return {
+        orderField: resolveReportBuilderOrderFieldToken(currentEntry),
+        orderDir: normalizeReportBuilderOrderDirection((state == null ? void 0 : state.orderDir) || (currentEntry == null ? void 0 : currentEntry.defaultDirection) || (defaults == null ? void 0 : defaults.orderDir) || "desc")
+      };
+    }
+    const fallbackTargets = [
+      String((defaults == null ? void 0 : defaults.orderField) || "").trim(),
+      ...normalizeArray3(state == null ? void 0 : state.selectedMeasures).map((value) => String(value || "").trim()),
+      ...normalizeArray3(state == null ? void 0 : state.selectedDimensions).map((value) => String(value || "").trim())
+    ];
+    for (const target of fallbackTargets) {
+      const fallbackField = resolveReportBuilderOrderFieldForTarget(config, target);
+      if (!fallbackField) {
+        continue;
+      }
+      if (!isReportBuilderOrderFieldCompatible(config, state, fallbackField)) {
+        continue;
+      }
+      const fallbackEntry = resolveReportBuilderOrderFieldEntry(config, fallbackField);
+      return {
+        orderField: fallbackField,
+        orderDir: normalizeReportBuilderOrderDirection((fallbackEntry == null ? void 0 : fallbackEntry.defaultDirection) || (defaults == null ? void 0 : defaults.orderDir) || (state == null ? void 0 : state.orderDir) || "desc")
+      };
+    }
+    return {
+      orderField: "",
+      orderDir: normalizeReportBuilderOrderDirection((state == null ? void 0 : state.orderDir) || (defaults == null ? void 0 : defaults.orderDir) || "desc")
+    };
+  }
+  function buildReportBuilderChartFields(config = {}, state = {}) {
+    return buildReportBuilderColumns(config, state).map((entry) => ({
+      key: String((entry == null ? void 0 : entry.chartKey) || (entry == null ? void 0 : entry.displayKey) || (entry == null ? void 0 : entry.key) || "").trim(),
+      aliases: Array.from(new Set(normalizeStringArray3([entry == null ? void 0 : entry.key, entry == null ? void 0 : entry.sourceKey]))),
+      label: (entry == null ? void 0 : entry.label) || (entry == null ? void 0 : entry.key) || "",
+      kind: (entry == null ? void 0 : entry.kind) || "",
+      format: entry == null ? void 0 : entry.format,
+      align: entry == null ? void 0 : entry.align
+    })).filter((entry) => entry.key && entry.kind);
+  }
+  function validateReportBuilderChartSpec(config = {}, chartSpec = null, columns = []) {
+    const normalized = normalizeReportBuilderChartSpec(chartSpec);
+    if (!normalized) {
+      return { valid: false, errors: [{ field: "chartSpec", code: "missing" }] };
+    }
+    const supportedTypes = supportedChartTypeSet(config);
+    const errors = [];
+    if (!supportedTypes.has(normalized.type)) {
+      errors.push({ field: "type", code: "unsupportedType" });
+    }
+    const fields2 = chartFieldIndex(columns);
+    const xField = normalized.xField ? fields2.get(normalized.xField) : null;
+    if (!xField) {
+      errors.push({ field: "xField", code: "missingField" });
+    } else if (xField.kind !== "dimension") {
+      errors.push({ field: "xField", code: "wrongKind" });
+    }
+    if (!Array.isArray(normalized.yFields) || normalized.yFields.length === 0) {
+      errors.push({ field: "yFields", code: "empty" });
+    } else {
+      normalized.yFields.forEach((fieldKey, index) => {
+        const field = fields2.get(fieldKey);
+        if (!field) {
+          errors.push({ field: `yFields.${index}`, code: "missingField" });
+          return;
+        }
+        if (field.kind !== "measure") {
+          errors.push({ field: `yFields.${index}`, code: "wrongKind" });
+        }
+      });
+    }
+    const family = chartFamilyForType(normalized.type);
+    if (normalized.seriesField) {
+      const seriesField = fields2.get(normalized.seriesField);
+      if (!seriesField) {
+        errors.push({ field: "seriesField", code: "missingField" });
+      } else if (seriesField.kind !== "dimension") {
+        errors.push({ field: "seriesField", code: "wrongKind" });
+      }
+      if (normalized.seriesField === normalized.xField) {
+        errors.push({ field: "seriesField", code: "duplicateField" });
+      }
+      if (!chartFamilyAllowsSeriesDimension(normalized.type)) {
+        errors.push({ field: "seriesField", code: "notAllowed" });
+      } else {
+        if (Array.isArray(normalized.yFields) && normalized.yFields.length > 1) {
+          errors.push({ field: "seriesField", code: "tooManyMeasures" });
+        }
+        if (normalized.seriesOptions) {
+          errors.push({ field: "seriesOptions", code: "notAllowed" });
+        }
+      }
+    }
+    if (family === "category") {
+      if (SINGLE_MEASURE_CATEGORY_TYPES.has(normalized.type) && Array.isArray(normalized.yFields) && normalized.yFields.length > 1) {
+        errors.push({ field: "yFields", code: "tooManyMeasures" });
+      }
+      if (normalized.seriesOptions && !chartFamilyAllowsSeriesOptions(normalized.type)) {
+        errors.push({ field: "seriesOptions", code: "notAllowed" });
+      }
+    }
+    const canValidateSeriesOptionsEntries = !!normalized.seriesOptions && typeof normalized.seriesOptions === "object" && !(normalized.seriesField && chartFamilyAllowsSeriesDimension(normalized.type)) && !!chartFamilyAllowsSeriesOptions(normalized.type);
+    if (canValidateSeriesOptionsEntries) {
+      const ySet = new Set(Array.isArray(normalized.yFields) ? normalized.yFields : []);
+      const stackAxis = /* @__PURE__ */ new Map();
+      Object.entries(normalized.seriesOptions).forEach(([key, option]) => {
+        if (!ySet.has(key)) {
+          errors.push({ field: `seriesOptions.${key}`, code: "unknownMeasure" });
+          return;
+        }
+        if (option.type && !isValidPerSeriesType(normalized.type, option.type)) {
+          errors.push({
+            field: `seriesOptions.${key}.type`,
+            code: family === "cartesian" ? "invalidType" : "notAllowed"
+          });
+        }
+        if (option.axis && family !== "cartesian") {
+          errors.push({ field: `seriesOptions.${key}.axis`, code: "notAllowed" });
+        } else if (option.axis && !["left", "right"].includes(option.axis)) {
+          errors.push({ field: `seriesOptions.${key}.axis`, code: "invalidAxis" });
+        }
+        if (option.stackId !== void 0 && typeof option.stackId !== "string") {
+          errors.push({ field: `seriesOptions.${key}.stackId`, code: "invalidStackId" });
+        } else if (typeof option.stackId === "string" && option.stackId && !supportsStackIdForSeries(normalized.type, option.type)) {
+          errors.push({ field: `seriesOptions.${key}.stackId`, code: "notAllowed" });
+        }
+        if (option.dataLabels && !["auto", "always", "none"].includes(option.dataLabels)) {
+          errors.push({ field: `seriesOptions.${key}.dataLabels`, code: "invalidDataLabels" });
+        }
+        if (option.pointColorMode && !["series", "bySign", "bysign"].includes(option.pointColorMode)) {
+          errors.push({ field: `seriesOptions.${key}.pointColorMode`, code: "invalidPointColorMode" });
+        }
+        if (typeof option.stackId === "string" && option.stackId && family === "cartesian") {
+          const stackKey = option.stackId;
+          const axis = option.axis || "left";
+          if (stackAxis.has(stackKey) && stackAxis.get(stackKey) !== axis) {
+            errors.push({ field: `seriesOptions.${key}.stackId`, code: "axisConflict" });
+          } else if (!stackAxis.has(stackKey)) {
+            stackAxis.set(stackKey, axis);
+          }
+        }
+      });
+    }
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  }
+  function resolveValidSemanticBinding(binding = null) {
+    const normalized = normalizeSemanticBinding(binding);
+    if (!normalized) {
+      return null;
+    }
+    const validation = validateSemanticBinding(normalized);
+    return validation.valid ? validation.normalizedBinding : null;
+  }
+  function normalizeReportBuilderDrillMetadataState(value = null) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return null;
+    }
+    const normalized = resolveReportBuilderDrillMetadata({}, value);
+    const next = {
+      ...Object.prototype.hasOwnProperty.call(value, "hierarchies") ? { hierarchies: normalized.hierarchies } : {},
+      ...Object.prototype.hasOwnProperty.call(value, "detailTargets") ? { detailTargets: normalized.detailTargets } : {},
+      ...Object.prototype.hasOwnProperty.call(value, "fieldActions") ? { fieldActions: normalized.fieldActions } : {}
+    };
+    return Object.keys(next).length > 0 ? next : null;
+  }
+  function normalizeActiveTablePreset(preset = null) {
+    if (!preset || typeof preset !== "object" || Array.isArray(preset)) {
+      return null;
+    }
+    const id = String(preset.id || "").trim();
+    const title = String(preset.title || "").trim();
+    const eyebrow = String(preset.eyebrow || "").trim();
+    const accentTone = String(preset.accentTone || "").trim();
+    const highlights = normalizeStringArray3(preset.highlights);
+    const dimensions = normalizeStringArray3(preset.dimensions);
+    const measures = normalizeStringArray3(preset.measures);
+    const columns = normalizeTablePresetColumns(preset.columns);
+    if (!id || !title || dimensions.length === 0 && measures.length === 0) {
+      return null;
+    }
+    const groupBy = String(preset.groupBy || "").trim();
+    const primaryMeasure = String(preset.primaryMeasure || measures[0] || "").trim();
+    const orderField = String(preset.orderField || "").trim();
+    const orderDir = String(preset.orderDir || "").trim().toLowerCase() === "asc" ? "asc" : "desc";
+    const pageSize = Math.max(1, Number(preset.pageSize || 0) || 0) || null;
+    const description = String(preset.description || "").trim();
+    return {
+      id,
+      title,
+      ...description ? { description } : {},
+      ...eyebrow ? { eyebrow } : {},
+      ...accentTone ? { accentTone } : {},
+      ...highlights.length > 0 ? { highlights } : {},
+      dimensions,
+      measures,
+      ...columns.length > 0 ? { columns } : {},
+      ...primaryMeasure ? { primaryMeasure } : {},
+      ...groupBy ? { groupBy } : {},
+      ...orderField ? { orderField } : {},
+      ...pageSize ? { pageSize } : {},
+      ...typeof (preset == null ? void 0 : preset.clearChart) === "boolean" ? { clearChart: preset.clearChart } : {},
+      orderDir
+    };
+  }
+  function resolveLocalDerivedPresetMeasureIds(preset = null, state = {}) {
+    const normalizedPreset = normalizeActiveTablePreset(preset);
+    const presetMeasureIds = new Set((normalizedPreset == null ? void 0 : normalizedPreset.measures) || []);
+    return new Set(
+      resolveSelectedDerivedMeasureIds(state).filter((id) => !presetMeasureIds.has(id))
+    );
+  }
+  function resolveLocalDerivedPresetDimensionIds(config = {}, preset = null, state = {}) {
+    const normalizedPreset = normalizeActiveTablePreset(preset);
+    if (!normalizedPreset) {
+      return /* @__PURE__ */ new Set();
+    }
+    const presetDimensionIds = new Set(normalizedPreset.dimensions);
+    const selectedLocalDerivedMeasureIds = new Set(resolveSelectedDerivedMeasureIds(state));
+    const effectiveConfig = buildReportBuilderCalculatedFieldConfig(config, state);
+    const mergedLocalTableCalculations = getNormalizedTableCalculationMeasures(effectiveConfig).filter((entry) => selectedLocalDerivedMeasureIds.has(String((entry == null ? void 0 : entry.id) || "").trim()));
+    const extraDimensionIds = /* @__PURE__ */ new Set();
+    mergedLocalTableCalculations.forEach((tableCalculation) => {
+      const { requiredDimensionIds } = resolveReportBuilderTableCalculationDimensionRequirements(effectiveConfig, tableCalculation);
+      normalizeStringArray3(requiredDimensionIds).forEach((dimensionId) => {
+        if (!presetDimensionIds.has(dimensionId)) {
+          extraDimensionIds.add(dimensionId);
+        }
+      });
+    });
+    return extraDimensionIds;
+  }
+  function reconcileActiveTablePresetState(config = {}, state = {}) {
+    const next = {
+      ...state,
+      activeTablePreset: normalizeActiveTablePreset(state == null ? void 0 : state.activeTablePreset),
+      lastTablePreset: normalizeActiveTablePreset(state == null ? void 0 : state.lastTablePreset)
+    };
+    if (next.activeTablePreset && matchesActiveTablePreset(config, next, next.activeTablePreset)) {
+      next.lastTablePreset = next.activeTablePreset;
+      return next;
+    }
+    if (next.activeTablePreset && !matchesActiveTablePreset(config, next, next.activeTablePreset)) {
+      next.lastTablePreset = next.activeTablePreset;
+      next.activeTablePreset = null;
+      return next;
+    }
+    if (!next.activeTablePreset && next.lastTablePreset && matchesActiveTablePreset(config, next, next.lastTablePreset)) {
+      next.activeTablePreset = next.lastTablePreset;
+    }
+    return next;
+  }
+  function matchesActiveTablePreset(config = {}, state = {}, preset = null) {
+    const normalizedPreset = normalizeActiveTablePreset(preset);
+    if (!normalizedPreset) {
+      return false;
+    }
+    const ignoredSelectedMeasureIds = resolveLocalDerivedPresetMeasureIds(normalizedPreset, state);
+    const ignoredSelectedDimensionIds = resolveLocalDerivedPresetDimensionIds(config, normalizedPreset, state);
+    const comparableSelectedDimensions = normalizeStringArray3(state == null ? void 0 : state.selectedDimensions).filter((id) => !ignoredSelectedDimensionIds.has(id));
+    const comparableSelectedMeasures = normalizeStringArray3(state == null ? void 0 : state.selectedMeasures).filter((id) => !ignoredSelectedMeasureIds.has(id));
+    if (JSON.stringify(comparableSelectedDimensions) !== JSON.stringify(normalizedPreset.dimensions)) {
+      return false;
+    }
+    if (JSON.stringify(comparableSelectedMeasures) !== JSON.stringify(normalizedPreset.measures)) {
+      return false;
+    }
+    if (String((state == null ? void 0 : state.primaryMeasure) || "").trim() !== String(normalizedPreset.primaryMeasure || "").trim()) {
+      return false;
+    }
+    if (String((state == null ? void 0 : state.groupBy) || "").trim() !== String(normalizedPreset.groupBy || "").trim()) {
+      return false;
+    }
+    if (String(normalizedPreset.orderField || "").trim()) {
+      if (String((state == null ? void 0 : state.orderField) || "").trim() !== normalizedPreset.orderField) {
+        return false;
+      }
+      if (String((state == null ? void 0 : state.orderDir) || "").trim().toLowerCase() !== normalizedPreset.orderDir) {
+        return false;
+      }
+    }
+    if (normalizedPreset.pageSize && Number((state == null ? void 0 : state.pageSize) || 0) !== normalizedPreset.pageSize) {
+      return false;
+    }
+    return true;
+  }
+  function resolveMergedSemanticBinding(configBinding = null, persistedBinding = null) {
+    const normalizedConfig = resolveValidSemanticBinding(configBinding);
+    const normalizedPersisted = resolveValidSemanticBinding(persistedBinding);
+    if (!normalizedPersisted) {
+      return normalizedConfig;
+    }
+    if (!normalizedConfig) {
+      return normalizedPersisted;
+    }
+    if (normalizedConfig.mode !== normalizedPersisted.mode) {
+      return normalizedConfig;
+    }
+    if (normalizedConfig.mode === "semantic" && (normalizedConfig.modelRef !== normalizedPersisted.modelRef || normalizedConfig.entity !== normalizedPersisted.entity)) {
+      return normalizedConfig;
+    }
+    return normalizedPersisted;
+  }
+  function buildDefaultReportBuilderChartSpec(config = {}, state = {}, seed = {}, options = {}) {
+    var _a5, _b, _c, _d;
+    const columns = buildReportBuilderChartFields(config, state);
+    const dimensions = columns.filter((entry) => entry.kind === "dimension");
+    const measures = columns.filter((entry) => entry.kind === "measure");
+    if (dimensions.length === 0 || measures.length === 0) {
+      return null;
+    }
+    const primaryMeasure = resolveReportBuilderMeasure(config, state == null ? void 0 : state.primaryMeasure) || resolveReportBuilderMeasure(config, (_a5 = measures[0]) == null ? void 0 : _a5.key) || null;
+    const defaultYField = String((primaryMeasure == null ? void 0 : primaryMeasure.key) || (primaryMeasure == null ? void 0 : primaryMeasure.id) || ((_b = measures[0]) == null ? void 0 : _b.key) || "").trim();
+    const normalizedSeed = normalizeReportBuilderChartSpec(seed) || {};
+    const title = String(normalizedSeed.title || "").trim();
+    const type = supportedChartTypeSet(config).has(normalizedSeed.type) ? normalizedSeed.type : getReportBuilderSupportedChartTypes(config)[0];
+    const xField = normalizedSeed.xField || ((_c = dimensions[0]) == null ? void 0 : _c.key) || null;
+    const family = chartFamilyForType(type);
+    const suggestSeriesField = (options == null ? void 0 : options.suggestSeriesField) === true;
+    const seededYFields = Array.isArray(normalizedSeed.yFields) && normalizedSeed.yFields.length > 0 ? normalizedSeed.yFields : defaultYField ? [defaultYField] : [];
+    const yFields = SINGLE_MEASURE_CATEGORY_TYPES.has(type) ? seededYFields.slice(0, 1) : seededYFields;
+    const allowSeriesField = chartFamilyAllowsSeriesDimension(type) && yFields.length === 1;
+    const seriesField = allowSeriesField ? normalizedSeed.seriesField || (suggestSeriesField ? (_d = dimensions.find((entry) => entry.key !== xField)) == null ? void 0 : _d.key : null) || null : null;
+    const allowSeriesOptions = chartFamilyAllowsSeriesOptions(type) && !seriesField;
+    const seriesOptions = allowSeriesOptions ? normalizedSeed.seriesOptions : null;
+    return normalizeReportBuilderChartSpec({
+      ...normalizedSeed,
+      ...title ? { title } : {},
+      type,
+      xField,
+      yFields,
+      ...seriesField ? { seriesField } : { seriesField: null },
+      ...seriesOptions ? { seriesOptions } : { seriesOptions: null }
+    });
+  }
+  function buildReportBuilderDefaultChartSpecs(config = {}, state = {}) {
+    var _a5;
+    return normalizeArray3((_a5 = config == null ? void 0 : config.result) == null ? void 0 : _a5.defaultChartSpecs).map((entry) => {
+      const built = buildDefaultReportBuilderChartSpec(config, state, entry);
+      const eyebrow = String((entry == null ? void 0 : entry.eyebrow) || "").trim();
+      const accentTone = String((entry == null ? void 0 : entry.accentTone) || "").trim();
+      const highlights = normalizeStringArray3(entry == null ? void 0 : entry.highlights);
+      const groupDescription = String((entry == null ? void 0 : entry.groupDescription) || "").trim();
+      if (!built) {
+        return null;
+      }
+      return {
+        ...built,
+        group: String((entry == null ? void 0 : entry.group) || "").trim(),
+        ...groupDescription ? { groupDescription } : {},
+        ...eyebrow ? { eyebrow } : {},
+        ...accentTone ? { accentTone } : {},
+        ...highlights.length > 0 ? { highlights } : {},
+        selectionPolicy: String((entry == null ? void 0 : entry.selectionPolicy) || "").trim().toLowerCase() === "replace" ? "replace" : "",
+        title: String((entry == null ? void 0 : entry.title) || built.title || "").trim() || "Default chart"
+      };
+    }).filter(Boolean);
+  }
+  function buildReportBuilderDefaultState(config = {}) {
+    var _a5, _b, _c, _d, _e, _f, _g;
+    const measures = getSelectableReportBuilderMeasures(config);
+    const dimensions = getVisibleReportBuilderDimensions(config);
+    const staticFilters = resolveReportBuilderScopeParamFilters(config);
+    const dynamicFilterGroups = resolveReportBuilderDynamicFilterGroups(config);
+    const reportOptionDefinitions = normalizeReportBuilderOptionDefinitions(config == null ? void 0 : config.reportOptions);
+    const semanticSelections = resolveReportBuilderSemanticSelections(config, config == null ? void 0 : config.binding);
+    const selectedMeasures = (semanticSelections == null ? void 0 : semanticSelections.hasExplicitMeasures) ? semanticSelections.selectedMeasures : defaultSelectedIds(measures);
+    const selectedDimensions = (semanticSelections == null ? void 0 : semanticSelections.hasExplicitDimensions) ? semanticSelections.selectedDimensions : defaultSelectedIds(
+      dimensions.filter((entry) => (entry == null ? void 0 : entry.default) || (entry == null ? void 0 : entry.chartAxis) || (entry == null ? void 0 : entry.required)),
+      0
+    );
+    const dimensionFallback = (semanticSelections == null ? void 0 : semanticSelections.hasExplicitDimensions) ? selectedDimensions : selectedDimensions.length > 0 ? selectedDimensions : defaultSelectedIds(dimensions);
+    const groupByDefault = String(((_a5 = config == null ? void 0 : config.groupBy) == null ? void 0 : _a5.default) || "").trim();
+    const viewModes = normalizeArray3((_b = config == null ? void 0 : config.result) == null ? void 0 : _b.viewModes);
+    const defaultViewMode = String(
+      ((_c = config == null ? void 0 : config.result) == null ? void 0 : _c.defaultMode) || viewModes[0] || "chart"
+    ).trim() || "chart";
+    const orderFields = normalizeArray3(((_d = config == null ? void 0 : config.result) == null ? void 0 : _d.orderFields) || (config == null ? void 0 : config.orderFields));
+    const defaultOrder = orderFields.find((entry) => entry == null ? void 0 : entry.default) || orderFields[0] || null;
+    const defaultPageSize = Number(
+      ((_e = config == null ? void 0 : config.result) == null ? void 0 : _e.pageSize) || ((_f = config == null ? void 0 : config.request) == null ? void 0 : _f.limit) || 50
+    ) || 50;
+    const defaultScopeParamValues = {};
+    staticFilters.forEach((filter) => {
+      const key = resolveScopeParamId(filter);
+      if (!key) return;
+      defaultScopeParamValues[key] = defaultStaticFilterValue(filter);
+    });
+    const defaultDynamicGroups = {};
+    dynamicFilterGroups.forEach((group) => {
+      const key = String(group.id || "").trim();
+      if (!key) return;
+      defaultDynamicGroups[key] = normalizeDynamicGroupRows(group.defaultRows, group);
+    });
+    const defaultChartSpec = sanitizeChartSpecAgainstConfig(config, ((_g = config == null ? void 0 : config.result) == null ? void 0 : _g.defaultChartSpec) || null);
+    const defaultBinding = resolveValidSemanticBinding(config == null ? void 0 : config.binding);
+    const baseState = {
+      selectedMeasures,
+      primaryMeasure: String((config == null ? void 0 : config.primaryMeasure) || selectedMeasures[0] || "").trim(),
+      selectedDimensions: dimensionFallback,
+      binding: defaultBinding,
+      localCalculatedFields: normalizeReportBuilderLocalCalculatedFields(config == null ? void 0 : config.localCalculatedFields),
+      localTableCalculations: normalizeReportBuilderLocalTableCalculations(config == null ? void 0 : config.localTableCalculations),
+      viewMode: isExplicitReportBuilderChartMode(config) && !defaultChartSpec ? "table" : defaultViewMode,
+      chartSpec: defaultChartSpec,
+      groupBy: groupByDefault,
+      page: 1,
+      pageSize: defaultPageSize,
+      orderField: String((defaultOrder == null ? void 0 : defaultOrder.value) || (defaultOrder == null ? void 0 : defaultOrder.field) || "").trim(),
+      orderDir: String((defaultOrder == null ? void 0 : defaultOrder.defaultDirection) || "desc").trim().toLowerCase() || "desc",
+      ...scopeParamStateSlice(defaultScopeParamValues),
+      dynamicGroups: defaultDynamicGroups,
+      ...reportOptionDefinitions.length > 0 ? { reportOptions: resolveEffectiveReportBuilderOptions(reportOptionDefinitions, {}) } : {}
+    };
+    const normalizedOrder = normalizeReportBuilderOrderState(config, baseState, baseState);
+    return {
+      ...baseState,
+      orderField: normalizedOrder.orderField,
+      orderDir: normalizedOrder.orderDir
+    };
+  }
+  function mergeReportBuilderState(config = {}, persisted = {}) {
+    const defaults = buildReportBuilderDefaultState(config);
+    const dynamicFilterGroups = resolveReportBuilderDynamicFilterGroups(config);
+    const reportOptionDefinitions = normalizeReportBuilderOptionDefinitions(config == null ? void 0 : config.reportOptions);
+    const next = {
+      ...mergeScopeParamValues({
+        ...defaults,
+        ...clone3(persisted || {})
+      }, {
+        ...listScopeParamValues(defaults),
+        ...listScopeParamValues(persisted)
+      }),
+      dynamicGroups: {
+        ...defaults.dynamicGroups
+      }
+    };
+    dynamicFilterGroups.forEach((group) => {
+      var _a5;
+      const groupId = String(group.id || "").trim();
+      if (!groupId) return;
+      const persistedRows = normalizeArray3((_a5 = persisted == null ? void 0 : persisted.dynamicGroups) == null ? void 0 : _a5[groupId]);
+      next.dynamicGroups[groupId] = normalizeDynamicGroupRows(persistedRows, group);
+    });
+    next.localCalculatedFields = normalizeReportBuilderLocalCalculatedFields(next.localCalculatedFields);
+    if (reportOptionDefinitions.length > 0) {
+      next.reportOptions = resolveEffectiveReportBuilderOptions(reportOptionDefinitions, next.reportOptions);
+    } else {
+      delete next.reportOptions;
+    }
+    next.localTableCalculations = normalizeReportBuilderLocalTableCalculations(next.localTableCalculations);
+    next.drillMetadata = normalizeReportBuilderDrillMetadataState(next.drillMetadata);
+    const normalizedExplorationState = normalizeReportBuilderExplorationState(next);
+    Object.keys(next).forEach((key) => {
+      if (!Object.prototype.hasOwnProperty.call(normalizedExplorationState || {}, key)) {
+        delete next[key];
+      }
+    });
+    Object.assign(next, normalizedExplorationState || {});
+    const effectiveConfig = buildReportBuilderCalculatedFieldConfig(config, next);
+    next.selectedMeasures = normalizeArray3(next.selectedMeasures).map((entry) => String(entry).trim()).filter(Boolean);
+    next.selectedDimensions = normalizeArray3(next.selectedDimensions).map((entry) => String(entry).trim()).filter(Boolean);
+    next.binding = resolveMergedSemanticBinding(config == null ? void 0 : config.binding, next.binding);
+    if (!next.drillMetadata) {
+      delete next.drillMetadata;
+    }
+    next.primaryMeasure = String(next.primaryMeasure || next.selectedMeasures[0] || defaults.primaryMeasure || "").trim();
+    next.chartSpec = sanitizeChartSpecAgainstConfig(effectiveConfig, next.chartSpec);
+    next.viewMode = String(next.viewMode || defaults.viewMode || "chart").trim() || "chart";
+    next.groupBy = next.groupBy === void 0 || next.groupBy === null ? String(defaults.groupBy || "").trim() : String(next.groupBy).trim();
+    next.page = Math.max(1, Number(next.page || defaults.page || 1) || 1);
+    next.pageSize = Math.max(1, Number(next.pageSize || defaults.pageSize || 50) || 50);
+    const normalizedOrder = normalizeReportBuilderOrderState(effectiveConfig, next, defaults);
+    next.orderField = normalizedOrder.orderField;
+    next.orderDir = normalizedOrder.orderDir;
+    if (!next.selectedMeasures.includes(next.primaryMeasure)) {
+      next.primaryMeasure = next.selectedMeasures[0] || "";
+    }
+    if (isExplicitReportBuilderChartMode(effectiveConfig) && !next.chartSpec) {
+      next.viewMode = "table";
+    }
+    return reconcileActiveTablePresetState(config, next);
+  }
+  function sanitizeReportBuilderState(config = {}, state = {}) {
+    var _a5;
+    const next = clone3(state || {});
+    const dynamicGroups = Array.isArray(next.dynamicGroups) ? {} : { ...next.dynamicGroups || {} };
+    resolveReportBuilderDynamicFilterGroups(config).forEach((group) => {
+      var _a6;
+      const groupId = String((group == null ? void 0 : group.id) || "").trim();
+      if (!groupId) return;
+      dynamicGroups[groupId] = normalizeDynamicGroupRows((_a6 = next == null ? void 0 : next.dynamicGroups) == null ? void 0 : _a6[groupId], group);
+    });
+    next.dynamicGroups = dynamicGroups;
+    next.localCalculatedFields = normalizeReportBuilderLocalCalculatedFields(next.localCalculatedFields);
+    const reportOptionDefinitions = normalizeReportBuilderOptionDefinitions(config == null ? void 0 : config.reportOptions);
+    if (reportOptionDefinitions.length > 0) {
+      next.reportOptions = resolveEffectiveReportBuilderOptions(reportOptionDefinitions, next.reportOptions);
+    } else {
+      delete next.reportOptions;
+    }
+    next.localTableCalculations = normalizeReportBuilderLocalTableCalculations(next.localTableCalculations);
+    next.drillMetadata = normalizeReportBuilderDrillMetadataState(next.drillMetadata);
+    const normalizedExplorationState = normalizeReportBuilderExplorationState(next);
+    Object.keys(next).forEach((key) => {
+      if (!Object.prototype.hasOwnProperty.call(normalizedExplorationState || {}, key)) {
+        delete next[key];
+      }
+    });
+    Object.assign(next, normalizedExplorationState || {});
+    const effectiveConfig = buildReportBuilderCalculatedFieldConfig(config, next);
+    next.binding = resolveMergedSemanticBinding(config == null ? void 0 : config.binding, next.binding);
+    if (!next.drillMetadata) {
+      delete next.drillMetadata;
+    }
+    const normalizedRuntimePreviewInteraction = resolveReportBuilderPersistedRuntimePreviewInteraction(next);
+    if (normalizedRuntimePreviewInteraction) {
+      next[REPORT_DOCUMENT_RUNTIME_PREVIEW_INTERACTION_KEY] = normalizedRuntimePreviewInteraction;
+    } else {
+      delete next[REPORT_DOCUMENT_RUNTIME_PREVIEW_INTERACTION_KEY];
+    }
+    next.chartSpec = sanitizeChartSpecAgainstConfig(effectiveConfig, next.chartSpec);
+    next.primaryMeasure = String(next.primaryMeasure || ((_a5 = next.selectedMeasures) == null ? void 0 : _a5[0]) || "").trim();
+    next.selectedMeasures = normalizeArray3(next.selectedMeasures).map((entry) => String(entry || "").trim()).filter(Boolean);
+    next.selectedDimensions = normalizeArray3(next.selectedDimensions).map((entry) => String(entry || "").trim()).filter(Boolean);
+    const normalizedOrder = normalizeReportBuilderOrderState(effectiveConfig, next, buildReportBuilderDefaultState(config));
+    next.orderField = normalizedOrder.orderField;
+    next.orderDir = normalizedOrder.orderDir;
+    if (isExplicitReportBuilderChartMode(effectiveConfig) && !next.chartSpec) {
+      next.viewMode = "table";
+    }
+    return reconcileActiveTablePresetState(config, next);
+  }
+  function buildReportBuilderRequest(config = {}, state = {}) {
+    var _a5, _b;
+    const effectiveConfig = buildReportBuilderCalculatedFieldConfig(config, state);
+    const requestConfig = effectiveConfig.request || {};
+    const resultConfig = effectiveConfig.result || {};
+    const measures = normalizeArray3(effectiveConfig.measures);
+    const calculatedFields = getNormalizedReportBuilderCalculatedFields(effectiveConfig);
+    const dimensions = normalizeArray3(effectiveConfig.dimensions);
+    const staticFilters = resolveReportBuilderScopeParamFilters(effectiveConfig);
+    const dynamicFilterGroups = resolveReportBuilderDynamicFilterGroups(effectiveConfig);
+    const groupByOptions = normalizeArray3((_a5 = effectiveConfig == null ? void 0 : effectiveConfig.groupBy) == null ? void 0 : _a5.options);
+    const orderFields = normalizeArray3(resultConfig.orderFields || effectiveConfig.orderFields);
+    const resolveBaseMeasureByField = (fieldKey = "") => {
+      const target = String(fieldKey || "").trim();
+      if (!target) {
+        return null;
+      }
+      return measures.find((item) => {
+        const measureId = String((item == null ? void 0 : item.id) || "").trim();
+        const valueKey2 = String((item == null ? void 0 : item.key) || (item == null ? void 0 : item.id) || "").trim();
+        return target === measureId || target === valueKey2;
+      }) || null;
+    };
+    const calculatedFieldById = /* @__PURE__ */ new Map();
+    calculatedFields.forEach((entry) => {
+      const aliases2 = [
+        String((entry == null ? void 0 : entry.id) || "").trim(),
+        String((entry == null ? void 0 : entry.key) || "").trim()
+      ].filter(Boolean);
+      aliases2.forEach((alias) => {
+        if (!calculatedFieldById.has(alias)) {
+          calculatedFieldById.set(alias, entry);
+        }
+      });
+    });
+    let request = clone3(requestConfig.baseParameters || {});
+    const effectiveReportOptions = resolveEffectiveReportBuilderOptions(config == null ? void 0 : config.reportOptions, state == null ? void 0 : state.reportOptions);
+    if (Object.keys(effectiveReportOptions).length > 0) {
+      request.options = effectiveReportOptions;
+    }
+    const selectedDimensionIds = new Set(
+      normalizeFieldIdArray(state.selectedDimensions)
+    );
+    const resolvedDependencyIds = /* @__PURE__ */ new Set();
+    const enableFieldDependency = (fieldKey = "") => {
+      const target = String(fieldKey || "").trim();
+      if (!target || resolvedDependencyIds.has(target)) {
+        return;
+      }
+      resolvedDependencyIds.add(target);
+      const measure = resolveBaseMeasureByField(target);
+      if (measure) {
+        setNestedValue(request, measure.paramPath || `measures.${measure.id}`, true);
+        return;
+      }
+      const dimension = resolveReportBuilderDimensionByField(effectiveConfig, target);
+      const dimensionId = String((dimension == null ? void 0 : dimension.id) || "").trim();
+      if (dimension && dimensionId) {
+        selectedDimensionIds.add(dimensionId);
+        return;
+      }
+      const calculatedField = calculatedFieldById.get(target);
+      if (calculatedField) {
+        normalizeArray3(calculatedField.dependencies).forEach((dependencyId) => {
+          enableFieldDependency(dependencyId);
+        });
+      }
+    };
+    normalizeFieldIdArray(state.selectedMeasures).forEach((id) => {
+      const match2 = measures.find((item) => String((item == null ? void 0 : item.id) || "").trim() === String(id).trim());
+      if (match2) {
+        setNestedValue(request, match2.paramPath || `measures.${match2.id}`, true);
+        return;
+      }
+      const calculatedField = calculatedFieldById.get(String(id).trim());
+      if (!calculatedField) {
+        return;
+      }
+      normalizeArray3(calculatedField.dependencies).forEach((dependencyId) => {
+        enableFieldDependency(dependencyId);
+      });
+    });
+    getNormalizedTableCalculationMeasures(effectiveConfig).filter((definition) => normalizeFieldIdArray(state.selectedMeasures).includes(String((definition == null ? void 0 : definition.id) || "").trim())).forEach((definition) => {
+      const compute = definition.compute || {};
+      [
+        ...Array.isArray(compute.partitionBy) ? compute.partitionBy : [],
+        ...Array.isArray(compute.orderBy) ? compute.orderBy.map((entry) => entry == null ? void 0 : entry.field) : []
+      ].forEach((fieldKey) => {
+        const dimension = resolveReportBuilderDimensionByField(effectiveConfig, fieldKey);
+        const dimensionId = String((dimension == null ? void 0 : dimension.id) || "").trim();
+        if (dimensionId) {
+          selectedDimensionIds.add(dimensionId);
+        }
+      });
+    });
+    const groupByValue = String(state.groupBy || "").trim();
+    if (groupByValue) {
+      const groupByOption = groupByOptions.find((entry) => String((entry == null ? void 0 : entry.value) || "").trim() === groupByValue);
+      const dimensionId = String((groupByOption == null ? void 0 : groupByOption.dimensionId) || groupByValue).trim();
+      if (dimensionId) {
+        selectedDimensionIds.add(dimensionId);
+      }
+      if (groupByOption == null ? void 0 : groupByOption.paramPath) {
+        setNestedValue(request, groupByOption.paramPath, (_b = groupByOption.paramValue) != null ? _b : true);
+      }
+    }
+    Array.from(selectedDimensionIds).forEach((id) => {
+      const match2 = dimensions.find((item) => String((item == null ? void 0 : item.id) || "").trim() === id);
+      if (!match2) return;
+      setNestedValue(request, match2.paramPath || `dimensions.${match2.id}`, true);
+    });
+    staticFilters.forEach((filter) => {
+      var _a6, _b2;
+      const filterId = resolveScopeParamId(filter);
+      if (!filterId) return;
+      const value = getScopeParamValue(state, filterId);
+      if (filter.type === "dateRange") {
+        if ((value == null ? void 0 : value.start) && (filter.startParamPath || ((_a6 = filter.paramPaths) == null ? void 0 : _a6.start))) {
+          setNestedValue(request, filter.startParamPath || filter.paramPaths.start, value.start);
+        }
+        if ((value == null ? void 0 : value.end) && (filter.endParamPath || ((_b2 = filter.paramPaths) == null ? void 0 : _b2.end))) {
+          setNestedValue(request, filter.endParamPath || filter.paramPaths.end, value.end);
+        }
+        return;
+      }
+      if (value == null || value === "" || Array.isArray(value) && value.length === 0) {
+        return;
+      }
+      const paramPath = filter.paramPath || `filters.${filterId}`;
+      setNestedValue(request, paramPath, clone3(value));
+    });
+    const dynamicAggregates = {};
+    dynamicFilterGroups.forEach((group) => {
+      var _a6;
+      const groupId = String(group.id || "").trim();
+      if (!groupId) return;
+      const rows = normalizeArray3((_a6 = state == null ? void 0 : state.dynamicGroups) == null ? void 0 : _a6[groupId]);
+      rows.forEach((row) => {
+        if ((row == null ? void 0 : row.enabled) === false) {
+          return;
+        }
+        const filterDef = normalizeArray3(group.filters).find((entry) => String((entry == null ? void 0 : entry.id) || "").trim() === String(row.filterId || "").trim());
+        if (!filterDef) return;
+        if (filterDef.requestMapping === "hook" || filterDef.handledByHook === true) {
+          return;
+        }
+        const paramPath = String(filterDef.paramPath || `filters.${filterDef.id}`).trim();
+        const values = normalizeArray3(row.selections).map((entry) => entry == null ? void 0 : entry.value).filter((entry) => entry !== void 0 && entry !== null && entry !== "");
+        if (!paramPath || values.length === 0) return;
+        const emitArray = filterDef.emitArray === true || filterDef.valueMode === "array";
+        if (filterDef.multiple === false && !emitArray) {
+          dynamicAggregates[paramPath] = values[0];
+          return;
+        }
+        dynamicAggregates[paramPath] = [
+          ...normalizeArray3(dynamicAggregates[paramPath]),
+          ...values
+        ];
+      });
+    });
+    Object.entries(dynamicAggregates).forEach(([paramPath, values]) => {
+      if (Array.isArray(values)) {
+        const unique = Array.from(new Set(values.map((entry) => JSON.stringify(entry)))).map((entry) => JSON.parse(entry));
+        setNestedValue(request, paramPath, unique);
+        return;
+      }
+      setNestedValue(request, paramPath, values);
+    });
+    const semanticSelection = buildReportBuilderSemanticSelection(effectiveConfig, state);
+    if (semanticSelection) {
+      request.semanticSelection = semanticSelection;
+    }
+    const pageSize = Math.max(1, Number(state.pageSize || resultConfig.pageSize || requestConfig.limit || 50) || 50);
+    const page = Math.max(1, Number(state.page || 1) || 1);
+    request.limit = pageSize;
+    request.offset = (page - 1) * pageSize;
+    if (requestConfig.offset != null) {
+      request.offset = requestConfig.offset;
+    }
+    if (requestConfig.timeoutMs != null) {
+      request.timeoutMs = requestConfig.timeoutMs;
+    }
+    const selectedOrder = orderFields.find((entry) => {
+      const value = String((entry == null ? void 0 : entry.value) || (entry == null ? void 0 : entry.field) || "").trim();
+      return value && value === String(state.orderField || "").trim();
+    });
+    if (selectedOrder) {
+      const dir = String(state.orderDir || selectedOrder.defaultDirection || "desc").trim().toLowerCase() || "desc";
+      if (Array.isArray(selectedOrder.orderBy) && selectedOrder.orderBy.length > 0) {
+        request.orderBy = clone3(selectedOrder.orderBy).map((entry) => String(entry).replace(/\$\{dir\}/g, dir));
+      } else if (selectedOrder.orderByDesc && dir === "desc") {
+        request.orderBy = [selectedOrder.orderByDesc];
+      } else if (selectedOrder.orderByAsc && dir === "asc") {
+        request.orderBy = [selectedOrder.orderByAsc];
+      } else {
+        const field = String(selectedOrder.field || selectedOrder.value || "").trim();
+        if (field) {
+          request.orderBy = [`${field} ${dir}`];
+        }
+      }
+    } else if (requestConfig.orderBy) {
+      request.orderBy = clone3(requestConfig.orderBy);
+    }
+    return request;
+  }
+  function buildReportBuilderColumns(config = {}, state = {}) {
+    const measures = getSelectableReportBuilderMeasures(config);
+    const dimensions = normalizeArray3(config.dimensions);
+    const activeTablePreset = (state == null ? void 0 : state.activeTablePreset) && typeof state.activeTablePreset === "object" ? state.activeTablePreset : null;
+    const presetColumnIndex = new Map(
+      normalizeTablePresetColumns(activeTablePreset == null ? void 0 : activeTablePreset.columns).map((column) => [String((column == null ? void 0 : column.key) || "").trim(), column])
+    );
+    const applyPresetColumn = (column = {}) => {
+      const override = presetColumnIndex.get(String((column == null ? void 0 : column.key) || "").trim());
+      if (!override) {
+        return column;
+      }
+      return {
+        ...column,
+        ...override.label ? { label: override.label } : {},
+        ...override.format ? { format: override.format } : {},
+        ...override.align ? { align: override.align } : {},
+        ...override.cellVisual ? { cellVisual: clone3(override.cellVisual) } : {},
+        ...override.rowIdentity === true ? { rowIdentity: true } : {}
+      };
+    };
+    const selectedDimensions = normalizeArray3(state.selectedDimensions).map((id) => dimensions.find((entry) => String((entry == null ? void 0 : entry.id) || "").trim() === String(id).trim())).filter(Boolean).map((entry) => applyPresetColumn({
+      key: reportBuilderDimensionValueKey(entry),
+      sourceKey: reportBuilderDimensionValueKey(entry),
+      displayKey: resolveReportBuilderDimensionDisplayKey(entry),
+      chartKey: resolveReportBuilderDimensionDisplayKey(entry),
+      label: entry.label || entry.id,
+      kind: "dimension",
+      format: entry.format,
+      ...(entry == null ? void 0 : entry.rowIdentity) === true ? { rowIdentity: true } : {},
+      ...(entry == null ? void 0 : entry.displayValueMap) && typeof entry.displayValueMap === "object" && !Array.isArray(entry.displayValueMap) ? { displayValueMap: clone3(entry.displayValueMap) } : {},
+      ...(entry == null ? void 0 : entry.runtimeFilter) && typeof entry.runtimeFilter === "object" && !Array.isArray(entry.runtimeFilter) ? { runtimeFilterable: true } : {}
+    }));
+    const selectedMeasures = normalizeArray3(state.selectedMeasures).map((id) => measures.find((entry) => String((entry == null ? void 0 : entry.id) || "").trim() === String(id).trim())).filter(Boolean).map((entry) => applyPresetColumn({
+      key: entry.key || entry.id,
+      label: entry.label || entry.id,
+      kind: "measure",
+      format: entry.format,
+      ...(entry == null ? void 0 : entry.rowIdentity) === true ? { rowIdentity: true } : {},
+      ...(entry == null ? void 0 : entry.displayValueMap) && typeof entry.displayValueMap === "object" && !Array.isArray(entry.displayValueMap) ? { displayValueMap: clone3(entry.displayValueMap) } : {},
+      align: entry.align || "right"
+    }));
+    return [...selectedDimensions, ...selectedMeasures];
+  }
+  function buildExplicitReportBuilderChartContainer(container = {}, config = {}, state = {}, chartSpec = null) {
+    var _a5, _b;
+    const normalized = normalizeReportBuilderChartSpec(chartSpec);
+    if (!normalized) {
+      return container;
+    }
+    const measures = getSelectableReportBuilderMeasures(config);
+    const xField = resolveReportBuilderDimensionByField(config, normalized.xField);
+    const yMeasures = normalizeStringArray3(normalized.yFields).map((fieldKey) => measures.find((entry) => String((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id) || "").trim() === fieldKey)).filter(Boolean);
+    if (!xField || yMeasures.length === 0) {
+      return container;
+    }
+    const configuredPalette = (_a5 = config.result) == null ? void 0 : _a5.palette;
+    const palette = Array.isArray(configuredPalette) && configuredPalette.length > 0 ? configuredPalette : DEFAULT_CHART_PALETTE;
+    const seriesType = normalized.type || "line";
+    const family = chartFamilyForType(seriesType);
+    const xDisplayKey = resolveReportBuilderDimensionDisplayKey(xField);
+    if (seriesType === "pie" || seriesType === "donut") {
+      const yMeasure = yMeasures[0];
+      const xSourceKey2 = reportBuilderDimensionValueKey(xField) || normalized.xField || "name";
+      const hasXDisplayValueMap2 = (xField == null ? void 0 : xField.displayValueMap) && typeof xField.displayValueMap === "object" && !Array.isArray(xField.displayValueMap);
+      return {
+        ...container,
+        dataSourceRef: container.dataSourceRef,
+        collection: container.collection,
+        chart: {
+          type: seriesType,
+          ...normalized.appearance ? { appearance: normalized.appearance } : {},
+          series: {
+            nameKey: xDisplayKey || normalized.xField,
+            ...xSourceKey2 && (xDisplayKey && xDisplayKey !== xSourceKey2 || hasXDisplayValueMap2) ? { sourceNameKey: xSourceKey2 } : {},
+            ...hasXDisplayValueMap2 ? { displayValueMap: clone3(xField.displayValueMap) } : {},
+            valueKey: String((yMeasure == null ? void 0 : yMeasure.key) || (yMeasure == null ? void 0 : yMeasure.id) || "").trim(),
+            palette,
+            ...normalized.categoryColors ? { categoryColors: normalized.categoryColors } : {}
+          }
+        }
+      };
+    }
+    const xSourceKey = reportBuilderDimensionValueKey(xField) || normalized.xField || "name";
+    const hasXDisplayValueMap = (xField == null ? void 0 : xField.displayValueMap) && typeof xField.displayValueMap === "object" && !Array.isArray(xField.displayValueMap);
+    const baseChart = {
+      type: seriesType,
+      ...normalized.appearance ? { appearance: normalized.appearance } : {},
+      ...normalized.layout ? { layout: normalized.layout } : {},
+      ...typeof normalized.stacked === "boolean" ? { stacked: normalized.stacked } : {},
+      ...normalized.preserveCategoryOrder === true ? { preserveCategoryOrder: true } : {},
+      xAxis: {
+        dataKey: xDisplayKey || xSourceKey,
+        label: (xField == null ? void 0 : xField.label) || (xField == null ? void 0 : xField.id) || xSourceKey,
+        ...xSourceKey && (xDisplayKey && xDisplayKey !== xSourceKey || hasXDisplayValueMap) ? { sourceDataKey: xSourceKey } : {},
+        ...hasXDisplayValueMap ? { displayValueMap: clone3(xField.displayValueMap) } : {},
+        tickFormat: xField == null ? void 0 : xField.tickFormat,
+        ...["civil", "instant"].includes(String((xField == null ? void 0 : xField.valueMode) || "").trim()) ? { valueMode: String(xField.valueMode).trim() } : {},
+        ...normalized.categoryLabel ? { categoryLabel: clone3(normalized.categoryLabel) } : {}
+      },
+      yAxis: {
+        format: (_b = yMeasures[0]) == null ? void 0 : _b.format
+      }
+    };
+    if (chartFamilyAllowsSeriesDimension(seriesType) && normalized.seriesField && yMeasures.length === 1) {
+      const yMeasure = yMeasures[0];
+      const seriesDimension = resolveReportBuilderDimensionByField(config, normalized.seriesField);
+      const seriesDisplayKey = resolveReportBuilderDimensionDisplayKey(seriesDimension) || normalized.seriesField;
+      const seriesSourceKey = reportBuilderDimensionValueKey(seriesDimension) || normalized.seriesField;
+      const hasSeriesDisplayValueMap = (seriesDimension == null ? void 0 : seriesDimension.displayValueMap) && typeof seriesDimension.displayValueMap === "object" && !Array.isArray(seriesDimension.displayValueMap);
+      return {
+        ...container,
+        dataSourceRef: container.dataSourceRef,
+        collection: container.collection,
+        chart: {
+          ...baseChart,
+          ...typeof normalized.allowTableSwitch === "boolean" ? { allowTableSwitch: normalized.allowTableSwitch } : {},
+          series: {
+            nameKey: seriesDisplayKey,
+            ...seriesSourceKey && (seriesDisplayKey && seriesDisplayKey !== seriesSourceKey || hasSeriesDisplayValueMap) ? { sourceNameKey: seriesSourceKey } : {},
+            ...hasSeriesDisplayValueMap ? { displayValueMap: clone3(seriesDimension.displayValueMap) } : {},
+            valueKey: String((yMeasure == null ? void 0 : yMeasure.key) || (yMeasure == null ? void 0 : yMeasure.id) || "").trim(),
+            values: [{
+              value: String((yMeasure == null ? void 0 : yMeasure.key) || (yMeasure == null ? void 0 : yMeasure.id) || "").trim(),
+              label: (yMeasure == null ? void 0 : yMeasure.label) || (yMeasure == null ? void 0 : yMeasure.id),
+              color: (yMeasure == null ? void 0 : yMeasure.color) || palette[0],
+              format: yMeasure == null ? void 0 : yMeasure.format,
+              type: seriesType
+            }],
+            palette,
+            ...normalized.categoryColors ? { categoryColors: normalized.categoryColors } : {}
+          }
+        }
+      };
+    }
+    const seriesOptions = normalized.seriesOptions && typeof normalized.seriesOptions === "object" ? normalized.seriesOptions : {};
+    const values = yMeasures.map((measure, index) => {
+      const measureKey = String((measure == null ? void 0 : measure.key) || (measure == null ? void 0 : measure.id) || "").trim();
+      const option = seriesOptions[measureKey] || {};
+      const entry = {
+        value: measureKey,
+        label: (measure == null ? void 0 : measure.label) || (measure == null ? void 0 : measure.id),
+        color: (measure == null ? void 0 : measure.color) || palette[index % palette.length],
+        format: measure == null ? void 0 : measure.format,
+        type: option.type || seriesType
+      };
+      if (option.axis) entry.axis = option.axis;
+      if (option.stackId) entry.stackId = option.stackId;
+      if (option.dataLabels) entry.dataLabels = option.dataLabels;
+      if (option.pointColorMode) entry.pointColorMode = option.pointColorMode;
+      return entry;
+    });
+    return {
+      ...container,
+      dataSourceRef: container.dataSourceRef,
+      collection: container.collection,
+      chart: applyChartMetricSelection({
+        ...baseChart,
+        ...typeof normalized.allowTableSwitch === "boolean" ? { allowTableSwitch: normalized.allowTableSwitch } : {},
+        ...normalized.metricSelection ? { metricSelection: normalized.metricSelection } : {},
+        series: {
+          values,
+          palette,
+          ...normalized.categoryColors ? { categoryColors: normalized.categoryColors } : {}
+        }
+      })
+    };
+  }
+
+  // src/reporting/reportDatasetSourceModel.js
+  function normalizeString20(value = "") {
+    return String(value || "").trim();
+  }
+  function cloneValue14(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+  }
+  function isPlainObject3(value) {
+    return !!value && typeof value === "object" && !Array.isArray(value);
+  }
+  function normalizeKnownSourceKind(value = "") {
+    const normalized = normalizeString20(value).toLowerCase();
+    if (!normalized) {
+      return "";
+    }
+    if (normalized === "mcptool") {
+      return "mcp_tool";
+    }
+    return normalized;
+  }
+  function normalizeReportDatasetSource(value = null) {
+    if (!isPlainObject3(value)) {
+      return null;
+    }
+    const next = {
+      ...cloneValue14(value)
+    };
+    [
+      "server",
+      "service",
+      "tool",
+      "toolName",
+      "profile",
+      "contractRef",
+      "uri",
+      "method",
+      "dataSourceRef"
+    ].forEach((key) => {
+      if (!Object.prototype.hasOwnProperty.call(next, key)) {
+        return;
+      }
+      const normalized = normalizeString20(next[key]);
+      if (!normalized) {
+        delete next[key];
+        return;
+      }
+      next[key] = normalized;
+    });
+    if (Object.prototype.hasOwnProperty.call(next, "kind")) {
+      const normalizedKind = normalizeKnownSourceKind(next.kind);
+      if (normalizedKind) {
+        next.kind = normalizedKind;
+      } else {
+        delete next.kind;
+      }
+    }
+    return Object.keys(next).length > 0 ? next : null;
+  }
+  function normalizeReportDatasetCapabilities(value = null) {
+    if (!isPlainObject3(value)) {
+      return null;
+    }
+    const next = {
+      ...cloneValue14(value)
+    };
+    [
+      "fieldCatalog",
+      "scopeParams",
+      "semanticBinding",
+      "backendRefetch",
+      "export",
+      "preview",
+      "liveFilters",
+      "drill",
+      "lookupHydration"
+    ].forEach((key) => {
+      if (!Object.prototype.hasOwnProperty.call(next, key)) {
+        return;
+      }
+      next[key] = next[key] === true;
+    });
+    if (isPlainObject3(next.requestModel)) {
+      [
+        "measuresPath",
+        "dimensionsPath",
+        "filtersPath",
+        "orderByPath",
+        "limitPath",
+        "offsetPath"
+      ].forEach((key) => {
+        if (!Object.prototype.hasOwnProperty.call(next.requestModel, key)) {
+          return;
+        }
+        const normalized = normalizeString20(next.requestModel[key]);
+        if (!normalized) {
+          delete next.requestModel[key];
+          return;
+        }
+        next.requestModel[key] = normalized;
+      });
+    } else if (Object.prototype.hasOwnProperty.call(next, "requestModel")) {
+      delete next.requestModel;
+    }
+    if (!isPlainObject3(next.provider) && Object.prototype.hasOwnProperty.call(next, "provider")) {
+      delete next.provider;
+    }
+    if (!isPlainObject3(next.datly) && Object.prototype.hasOwnProperty.call(next, "datly")) {
+      delete next.datly;
+    }
+    return Object.keys(next).length > 0 ? next : null;
+  }
+
+  // src/reporting/reportDatasetScopeModel.js
+  function normalizeString21(value = "") {
+    return String(value || "").trim();
+  }
+  function cloneValue15(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+  }
+  function isPlainObject4(value) {
+    return !!value && typeof value === "object" && !Array.isArray(value);
+  }
+  var DATASET_SCOPE_MODES = /* @__PURE__ */ new Set(["inherit", "append", "override", "exclude"]);
+  var RELATIVE_DATE_PRESETS = /* @__PURE__ */ new Set(["today", "yesterday", "last3days", "last7days", "last30days", "3d", "7d", "30d", "previousperiod"]);
+  function normalizeDatasetScopeMode(value = "") {
+    const normalized = normalizeString21(value).toLowerCase();
+    return DATASET_SCOPE_MODES.has(normalized) ? normalized : "";
+  }
+  function normalizeStringArray4(values = []) {
+    const seen = /* @__PURE__ */ new Set();
+    return (Array.isArray(values) ? values : []).map((value) => normalizeString21(value)).filter((value) => {
+      if (!value || seen.has(value)) {
+        return false;
+      }
+      seen.add(value);
+      return true;
+    });
+  }
+  function normalizeReportDatasetScope(value = null) {
+    if (!isPlainObject4(value)) {
+      return null;
+    }
+    const next = cloneValue15(value);
+    const rawMode = normalizeString21(next == null ? void 0 : next.mode);
+    const normalizedMode = normalizeDatasetScopeMode(next == null ? void 0 : next.mode);
+    if (normalizedMode) {
+      next.mode = normalizedMode;
+    } else if (Object.prototype.hasOwnProperty.call(next, "mode") && rawMode) {
+      throw new Error(`Unknown dataset scope mode '${String(next.mode || "").trim()}'.`);
+    } else if (Object.prototype.hasOwnProperty.call(next, "mode")) {
+      delete next.mode;
+    }
+    if (Object.prototype.hasOwnProperty.call(next, "inheritContext")) {
+      next.inheritContext = next.inheritContext === true;
+    }
+    if (isPlainObject4(next == null ? void 0 : next.local)) {
+      next.local = cloneValue15(next.local);
+    } else if (Object.prototype.hasOwnProperty.call(next, "local")) {
+      delete next.local;
+    }
+    if (Object.prototype.hasOwnProperty.call(next, "exclude")) {
+      const normalizedExclude = normalizeStringArray4(next.exclude);
+      if (normalizedExclude.length > 0) {
+        next.exclude = normalizedExclude;
+      } else {
+        delete next.exclude;
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(next, "relativeDateRange")) {
+      const relativeDateRange = isPlainObject4(next.relativeDateRange) ? cloneValue15(next.relativeDateRange) : null;
+      const preset = normalizeString21(relativeDateRange == null ? void 0 : relativeDateRange.preset).toLowerCase().replaceAll("_", "");
+      const startExpression = normalizeString21(relativeDateRange == null ? void 0 : relativeDateRange.startExpression);
+      const endExpression = normalizeString21(relativeDateRange == null ? void 0 : relativeDateRange.endExpression);
+      const startParamPath = normalizeString21(relativeDateRange == null ? void 0 : relativeDateRange.startParamPath);
+      const endParamPath = normalizeString21(relativeDateRange == null ? void 0 : relativeDateRange.endParamPath);
+      if (!RELATIVE_DATE_PRESETS.has(preset) && (!startExpression || !endExpression) || !startParamPath || !endParamPath) {
+        throw new Error("Dataset relativeDateRange requires a supported preset or start/end expressions, plus startParamPath and endParamPath.");
+      }
+      if (preset === "previousperiod" && next.mode !== "override") {
+        throw new Error("Previous period requires dataset scope mode 'override'.");
+      }
+      next.relativeDateRange = {
+        ...preset ? { preset } : {},
+        ...startExpression ? { startExpression } : {},
+        ...endExpression ? { endExpression } : {},
+        ...normalizeString21(relativeDateRange == null ? void 0 : relativeDateRange.format) ? { format: normalizeString21(relativeDateRange.format) } : {},
+        startParamPath,
+        endParamPath
+      };
+    }
+    if (next.mode === "exclude" && (!Array.isArray(next.exclude) || next.exclude.length === 0)) {
+      throw new Error("Dataset scope mode 'exclude' requires at least one excluded scope param id.");
+    }
+    return Object.keys(next).length > 0 ? next : null;
+  }
+  function resolveReportDatasetScopePolicy(scope = null) {
+    const normalizedScope = normalizeReportDatasetScope(scope);
+    if (!normalizedScope) {
+      return {
+        mode: "inherit",
+        local: {},
+        exclude: [],
+        relativeDateRange: null
+      };
+    }
+    const explicitMode = normalizeDatasetScopeMode(normalizedScope == null ? void 0 : normalizedScope.mode);
+    const normalizedLocal = isPlainObject4(normalizedScope == null ? void 0 : normalizedScope.local) ? cloneValue15(normalizedScope.local) : {};
+    const normalizedExclude = normalizeStringArray4(normalizedScope == null ? void 0 : normalizedScope.exclude);
+    const relativeDateRange = isPlainObject4(normalizedScope == null ? void 0 : normalizedScope.relativeDateRange) ? cloneValue15(normalizedScope.relativeDateRange) : null;
+    if (explicitMode) {
+      return {
+        mode: explicitMode,
+        local: normalizedLocal,
+        exclude: normalizedExclude,
+        relativeDateRange
+      };
+    }
+    const legacyLocal = cloneValue15(normalizedScope);
+    delete legacyLocal.mode;
+    delete legacyLocal.local;
+    delete legacyLocal.exclude;
+    delete legacyLocal.relativeDateRange;
+    const inheritContext = legacyLocal == null ? void 0 : legacyLocal.inheritContext;
+    delete legacyLocal.inheritContext;
+    const mergedLocal = {
+      ...legacyLocal,
+      ...normalizedLocal
+    };
+    const hasLocal = Object.keys(mergedLocal).length > 0;
+    if (inheritContext === false && normalizedExclude.length > 0) {
+      throw new Error("Legacy dataset scope cannot combine inheritContext=false with exclude entries. Use explicit mode instead.");
+    }
+    if (normalizedExclude.length > 0) {
+      return {
+        mode: "exclude",
+        local: mergedLocal,
+        exclude: normalizedExclude,
+        relativeDateRange
+      };
+    }
+    if (inheritContext === false) {
+      return {
+        mode: "override",
+        local: mergedLocal,
+        exclude: [],
+        relativeDateRange
+      };
+    }
+    return {
+      mode: hasLocal ? "append" : "inherit",
+      local: mergedLocal,
+      exclude: [],
+      relativeDateRange
+    };
+  }
+
+  // src/reporting/reportBuilderPublishedDatasetModel.js
+  function normalizeString22(value = "") {
+    return String(value || "").trim();
+  }
+  function cloneValue16(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+  }
+  function isPlainObject5(value) {
+    return !!value && typeof value === "object" && !Array.isArray(value);
+  }
+  function normalizeOptionalObject(value) {
+    return isPlainObject5(value) ? cloneValue16(value) : null;
+  }
+  function normalizePublishedDatasetLineage(value) {
+    if (!isPlainObject5(value)) {
+      return null;
+    }
+    const derivedFrom = normalizeString22(value.derivedFrom);
+    return derivedFrom ? { derivedFrom } : null;
+  }
+  function normalizePublishedDatasetPresentation(value) {
+    if (!isPlainObject5(value)) {
+      return null;
+    }
+    const version = Math.max(1, Number(value.version || 1) || 1);
+    const icon = normalizeString22(value.icon);
+    const tone = normalizeString22(value.tone);
+    const summary = normalizeString22(value.summary);
+    if (!icon && !tone && !summary) {
+      return null;
+    }
+    return {
+      version,
+      ...icon ? { icon } : {},
+      ...tone ? { tone } : {},
+      ...summary ? { summary } : {}
+    };
+  }
+  function buildDerivedDimensionOptions(entry = {}) {
+    const key = normalizeString22((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id));
+    if (!key) {
+      return null;
+    }
+    return {
+      key,
+      label: normalizeString22((entry == null ? void 0 : entry.label) || key) || key,
+      kind: "dimension",
+      ...normalizeString22((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) ? { sourceKey: normalizeString22((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) } : {},
+      ...normalizeString22(entry == null ? void 0 : entry.displayKey) ? { displayKey: normalizeString22(entry.displayKey) } : {},
+      ...(entry == null ? void 0 : entry.displayValueMap) && typeof entry.displayValueMap === "object" && !Array.isArray(entry.displayValueMap) ? { displayValueMap: cloneValue16(entry.displayValueMap) } : {},
+      ...normalizeString22(entry == null ? void 0 : entry.format) ? { format: normalizeString22(entry.format) } : {},
+      ...normalizeString22(entry == null ? void 0 : entry.tickFormat) ? { tickFormat: normalizeString22(entry.tickFormat) } : {},
+      ...["civil", "instant"].includes(normalizeString22(entry == null ? void 0 : entry.valueMode)) ? { valueMode: normalizeString22(entry.valueMode) } : {},
+      ...(entry == null ? void 0 : entry.default) === true ? { default: true } : {},
+      ...(entry == null ? void 0 : entry.chartAxis) === true ? { chartAxis: true } : {},
+      ...(entry == null ? void 0 : entry.runtimeFilter) && typeof entry.runtimeFilter === "object" && !Array.isArray(entry.runtimeFilter) ? { runtimeFilter: cloneValue16(entry.runtimeFilter) } : {},
+      ...normalizeString22(entry == null ? void 0 : entry.rawId) ? { rawId: normalizeString22(entry.rawId) } : {},
+      ...normalizeString22(entry == null ? void 0 : entry.description) ? { description: normalizeString22(entry.description) } : {},
+      ...normalizeString22(entry == null ? void 0 : entry.category) ? { category: normalizeString22(entry.category) } : {},
+      ...normalizeString22(entry == null ? void 0 : entry.definitionRef) ? { definitionRef: normalizeString22(entry.definitionRef) } : {},
+      ...normalizeString22(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: normalizeString22(entry.semanticRef) } : {},
+      ...(entry == null ? void 0 : entry.governance) && typeof entry.governance === "object" && !Array.isArray(entry.governance) ? { governance: cloneValue16(entry.governance) } : {}
+    };
+  }
+  function buildDerivedMeasureOptions(entry = {}) {
+    const key = normalizeString22((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id));
+    if (!key) {
+      return null;
+    }
+    return {
+      key,
+      label: normalizeString22((entry == null ? void 0 : entry.label) || key) || key,
+      kind: "measure",
+      ...normalizeString22((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) ? { sourceKey: normalizeString22((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) } : {},
+      ...normalizeString22(entry == null ? void 0 : entry.format) ? { format: normalizeString22(entry.format) } : {},
+      ...(entry == null ? void 0 : entry.default) === true ? { default: true } : {},
+      ...normalizeString22(entry == null ? void 0 : entry.rawId) ? { rawId: normalizeString22(entry.rawId) } : {},
+      ...normalizeString22(entry == null ? void 0 : entry.description) ? { description: normalizeString22(entry.description) } : {},
+      ...normalizeString22(entry == null ? void 0 : entry.category) ? { category: normalizeString22(entry.category) } : {},
+      ...normalizeString22(entry == null ? void 0 : entry.definitionRef) ? { definitionRef: normalizeString22(entry.definitionRef) } : {},
+      ...normalizeString22(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: normalizeString22(entry.semanticRef) } : {},
+      ...(entry == null ? void 0 : entry.governance) && typeof entry.governance === "object" && !Array.isArray(entry.governance) ? { governance: cloneValue16(entry.governance) } : {}
+    };
+  }
+  function deriveColumnOptions(entry = {}) {
+    const dimensions = (Array.isArray(entry == null ? void 0 : entry.dimensions) ? entry.dimensions : []).map((item) => buildDerivedDimensionOptions(item)).filter(Boolean);
+    const measures = (Array.isArray(entry == null ? void 0 : entry.measures) ? entry.measures : []).map((item) => buildDerivedMeasureOptions(item)).filter(Boolean);
+    return [...dimensions, ...measures];
+  }
+  function deriveValueFieldOptions(entry = {}) {
+    return (Array.isArray(entry == null ? void 0 : entry.measures) ? entry.measures : []).map((item) => {
+      const key = normalizeString22((item == null ? void 0 : item.key) || (item == null ? void 0 : item.id));
+      if (!key) {
+        return null;
+      }
+      return {
+        value: key,
+        label: normalizeString22((item == null ? void 0 : item.label) || key) || key,
+        ...normalizeString22(item == null ? void 0 : item.format) ? { format: normalizeString22(item.format) } : {},
+        ...(item == null ? void 0 : item.default) === true ? { default: true } : {}
+      };
+    }).filter(Boolean);
+  }
+  function deriveSecondaryFieldOptions(entry = {}) {
+    return (Array.isArray(entry == null ? void 0 : entry.dimensions) ? entry.dimensions : []).map((item) => {
+      const key = normalizeString22((item == null ? void 0 : item.key) || (item == null ? void 0 : item.id));
+      if (!key) {
+        return null;
+      }
+      return {
+        value: key,
+        label: normalizeString22((item == null ? void 0 : item.label) || key) || key,
+        ...normalizeString22(item == null ? void 0 : item.format) ? { format: normalizeString22(item.format) } : {},
+        ...(item == null ? void 0 : item.default) === true ? { default: true } : {}
+      };
+    }).filter(Boolean);
+  }
+  function deriveChartFieldOptions(entry = {}) {
+    return deriveColumnOptions(entry).map((item) => ({
+      key: normalizeString22((item == null ? void 0 : item.displayKey) || (item == null ? void 0 : item.key)),
+      aliases: [normalizeString22(item == null ? void 0 : item.key)].filter(Boolean),
+      label: normalizeString22((item == null ? void 0 : item.label) || (item == null ? void 0 : item.key)),
+      kind: normalizeString22(item == null ? void 0 : item.kind),
+      ...normalizeString22(item == null ? void 0 : item.format) ? { format: normalizeString22(item.format) } : {},
+      ...normalizeString22(item == null ? void 0 : item.tickFormat) ? { tickFormat: normalizeString22(item.tickFormat) } : {},
+      ...["civil", "instant"].includes(normalizeString22(item == null ? void 0 : item.valueMode)) ? { valueMode: normalizeString22(item.valueMode) } : {},
+      ...(item == null ? void 0 : item.default) === true ? { default: true } : {},
+      ...(item == null ? void 0 : item.chartAxis) === true ? { chartAxis: true } : {},
+      ...normalizeString22(item == null ? void 0 : item.rawId) ? { rawId: normalizeString22(item.rawId) } : {},
+      ...normalizeString22(item == null ? void 0 : item.description) ? { description: normalizeString22(item.description) } : {},
+      ...normalizeString22(item == null ? void 0 : item.category) ? { category: normalizeString22(item.category) } : {},
+      ...normalizeString22(item == null ? void 0 : item.definitionRef) ? { definitionRef: normalizeString22(item.definitionRef) } : {},
+      ...normalizeString22(item == null ? void 0 : item.semanticRef) ? { semanticRef: normalizeString22(item.semanticRef) } : {},
+      ...(item == null ? void 0 : item.governance) && typeof item.governance === "object" && !Array.isArray(item.governance) ? { governance: cloneValue16(item.governance) } : {}
+    }));
+  }
+  function buildReportBuilderPublishedDatasetRefIndex(sources = []) {
+    const normalizedSources = (Array.isArray(sources) ? sources : []).filter(isPlainObject5);
+    const index = /* @__PURE__ */ new Map();
+    normalizedSources.forEach((source) => {
+      const id = normalizeString22(source == null ? void 0 : source.id);
+      if (id && !index.has(id)) {
+        index.set(id, source);
+      }
+    });
+    const declaredIds = new Set(index.keys());
+    const sourcesByDataSourceRef = /* @__PURE__ */ new Map();
+    normalizedSources.forEach((source) => {
+      const dataSourceRef = normalizeString22(source == null ? void 0 : source.dataSourceRef);
+      if (!dataSourceRef) {
+        return;
+      }
+      sourcesByDataSourceRef.set(dataSourceRef, [
+        ...sourcesByDataSourceRef.get(dataSourceRef) || [],
+        source
+      ]);
+    });
+    sourcesByDataSourceRef.forEach((group, dataSourceRef) => {
+      if (group.length === 1 && !declaredIds.has(dataSourceRef)) {
+        index.set(dataSourceRef, group[0]);
+      }
+    });
+    return index;
+  }
+  function normalizeReportBuilderPublishedDataSources2(config = {}) {
+    const declared = [
+      ...Array.isArray(config == null ? void 0 : config.datasets) ? config.datasets : [],
+      ...Array.isArray(config == null ? void 0 : config.dataSources) ? config.dataSources : []
+    ];
+    const seen = /* @__PURE__ */ new Set();
+    return declared.map((entry) => {
+      if (!isPlainObject5(entry)) {
+        return null;
+      }
+      const dataSourceRef = normalizeString22((entry == null ? void 0 : entry.dataSourceRef) || (entry == null ? void 0 : entry.value) || (entry == null ? void 0 : entry.id));
+      const id = normalizeString22((entry == null ? void 0 : entry.id) || dataSourceRef);
+      if (!dataSourceRef || !id) {
+        return null;
+      }
+      return {
+        id,
+        dataSourceRef,
+        label: normalizeString22((entry == null ? void 0 : entry.label) || dataSourceRef),
+        description: normalizeString22(entry == null ? void 0 : entry.description),
+        kindLabel: normalizeString22((entry == null ? void 0 : entry.kindLabel) || (entry == null ? void 0 : entry.kind) || "published"),
+        ...normalizePublishedDatasetLineage(entry == null ? void 0 : entry.lineage) ? { lineage: normalizePublishedDatasetLineage(entry.lineage) } : {},
+        ...normalizePublishedDatasetPresentation(entry == null ? void 0 : entry.presentation) ? { presentation: normalizePublishedDatasetPresentation(entry.presentation) } : {},
+        scope: normalizeReportDatasetScope(entry == null ? void 0 : entry.scope),
+        source: normalizeReportDatasetSource(entry == null ? void 0 : entry.source),
+        resultContract: normalizeOptionalObject(entry == null ? void 0 : entry.resultContract),
+        capabilities: normalizeReportDatasetCapabilities(entry == null ? void 0 : entry.capabilities),
+        request: isPlainObject5(entry == null ? void 0 : entry.request) ? cloneValue16(entry.request) : null,
+        columnOptions: Array.isArray(entry == null ? void 0 : entry.columnOptions) && entry.columnOptions.length > 0 ? cloneValue16(entry.columnOptions) : deriveColumnOptions(entry),
+        valueFieldOptions: Array.isArray(entry == null ? void 0 : entry.valueFieldOptions) && entry.valueFieldOptions.length > 0 ? cloneValue16(entry.valueFieldOptions) : deriveValueFieldOptions(entry),
+        secondaryFieldOptions: Array.isArray(entry == null ? void 0 : entry.secondaryFieldOptions) && entry.secondaryFieldOptions.length > 0 ? cloneValue16(entry.secondaryFieldOptions) : deriveSecondaryFieldOptions(entry),
+        chartFieldOptions: Array.isArray(entry == null ? void 0 : entry.chartFieldOptions) && entry.chartFieldOptions.length > 0 ? cloneValue16(entry.chartFieldOptions) : deriveChartFieldOptions(entry),
+        scopeParamOptions: Array.isArray(entry == null ? void 0 : entry.scopeParamOptions) ? cloneValue16(entry.scopeParamOptions) : []
+      };
+    }).filter((entry) => {
+      if (!entry) {
+        return false;
+      }
+      const key = `${entry.id}::${entry.dataSourceRef}`;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    }).filter(Boolean);
+  }
+
+  // src/reporting/reportBuilderScopeParamModel.js
+  function normalizeString23(value = "") {
+    return String(value || "").trim();
+  }
+  function cloneValue17(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+  }
+  function resolveScopeParamValue(filter = {}, state = {}, runtimeDatasetScopeParams = null, datasetRef = "") {
+    const filterId = resolveScopeParamId(filter);
+    if (!filterId) {
+      return null;
+    }
+    const normalizedDatasetRef = normalizeString23(datasetRef);
+    const datasetScopedValues = normalizedDatasetRef && runtimeDatasetScopeParams && typeof runtimeDatasetScopeParams === "object" && !Array.isArray(runtimeDatasetScopeParams) && runtimeDatasetScopeParams[normalizedDatasetRef] && typeof runtimeDatasetScopeParams[normalizedDatasetRef] === "object" && !Array.isArray(runtimeDatasetScopeParams[normalizedDatasetRef]) ? runtimeDatasetScopeParams[normalizedDatasetRef] : null;
+    const rawValue = datasetScopedValues && Object.prototype.hasOwnProperty.call(datasetScopedValues, filterId) ? datasetScopedValues[filterId] : getScopeParamValue(state, filterId);
+    if ((filter == null ? void 0 : filter.type) === "dateRange") {
+      const start = normalizeString23(rawValue == null ? void 0 : rawValue.start);
+      const end = normalizeString23(rawValue == null ? void 0 : rawValue.end);
+      return start || end ? { start, end } : null;
+    }
+    if (Array.isArray(rawValue)) {
+      return rawValue.length > 0 ? cloneValue17(rawValue) : [];
+    }
+    return rawValue != null ? rawValue : null;
+  }
+  function collectPinnedPredicateScopeParams(config = {}, state = {}) {
+    return listReportBuilderPinnedPredicates(config).map((predicate) => {
+      const value = resolveScopeParamValue(
+        { id: predicate.id, ...predicate.kind === "dateRange" ? { type: "dateRange" } : {} },
+        state
+      );
+      return {
+        id: predicate.id,
+        kind: predicate.kind === "dateRange" ? "dateRange" : predicate.multiple === true ? "multiSelect" : "value",
+        label: normalizeString23(predicate.label || predicate.id),
+        ...predicate.description ? { description: predicate.description } : {},
+        required: predicate.required === true,
+        ...predicate.multiple === true ? { multiple: true } : {},
+        ...predicate.presentation ? { presentation: normalizeString23(predicate.presentation) } : {},
+        ...Array.isArray(predicate.options) ? { options: cloneValue17(predicate.options) } : {},
+        value
+      };
+    });
+  }
+  function collectLegacyStaticFilterScopeParams(config = {}, state = {}, excludedIds = /* @__PURE__ */ new Set()) {
+    return resolveReportBuilderScopeParamFilters(config).map((filter) => {
+      const id = normalizeString23((filter == null ? void 0 : filter.id) || (filter == null ? void 0 : filter.field));
+      if (!id || excludedIds.has(id)) {
+        return null;
+      }
+      const value = resolveScopeParamValue(filter, state);
+      const description = normalizeString23(filter == null ? void 0 : filter.description);
+      return {
+        id,
+        kind: normalizeString23((filter == null ? void 0 : filter.type) || ((filter == null ? void 0 : filter.multiple) ? "multiSelect" : "value")) || "value",
+        label: normalizeString23((filter == null ? void 0 : filter.label) || id),
+        ...description ? { description } : {},
+        required: (filter == null ? void 0 : filter.required) === true,
+        ...(filter == null ? void 0 : filter.multiple) === true ? { multiple: true } : {},
+        ...normalizeString23(filter == null ? void 0 : filter.presentation) ? { presentation: normalizeString23(filter.presentation) } : {},
+        ...Array.isArray(filter == null ? void 0 : filter.options) ? { options: cloneValue17(filter.options) } : {},
+        value
+      };
+    }).filter(Boolean);
+  }
+  function collectConfiguredDataSourceScopeParams(config = {}, state = {}, excludedIds = /* @__PURE__ */ new Set(), runtimeDatasetScopeParams = null) {
+    const seen = new Set(excludedIds instanceof Set ? [...excludedIds] : []);
+    const params = [];
+    normalizeReportBuilderPublishedDataSources2(config).forEach((source) => {
+      const datasetRef = normalizeString23((source == null ? void 0 : source.id) || (source == null ? void 0 : source.dataSourceRef) || (source == null ? void 0 : source.value));
+      if (!datasetRef) {
+        return;
+      }
+      (Array.isArray(source == null ? void 0 : source.scopeParamOptions) ? source.scopeParamOptions : []).forEach((option) => {
+        const id = normalizeString23((option == null ? void 0 : option.id) || (option == null ? void 0 : option.value));
+        if (!id || seen.has(id)) {
+          return;
+        }
+        seen.add(id);
+        const kind = normalizeString23((option == null ? void 0 : option.kind) || "value") || "value";
+        const value = resolveScopeParamValue({
+          id,
+          ...kind === "dateRange" ? { type: "dateRange" } : {},
+          ...(option == null ? void 0 : option.multiple) === true ? { multiple: true } : {}
+        }, state, runtimeDatasetScopeParams, datasetRef);
+        params.push({
+          id,
+          kind,
+          label: normalizeString23((option == null ? void 0 : option.label) || id),
+          ...normalizeString23(option == null ? void 0 : option.description) ? { description: normalizeString23(option.description) } : {},
+          required: (option == null ? void 0 : option.required) === true,
+          ...(option == null ? void 0 : option.multiple) === true ? { multiple: true } : {},
+          ...normalizeString23(option == null ? void 0 : option.presentation) ? { presentation: normalizeString23(option.presentation) } : {},
+          ...Array.isArray(option == null ? void 0 : option.options) ? { options: cloneValue17(option.options) } : {},
+          datasetRef,
+          value
+        });
+      });
+    });
+    return params;
+  }
+  function buildReportBuilderScopeParams(config = {}, state = {}, runtimeDatasetScopeParams = null) {
+    const predicateParams = collectPinnedPredicateScopeParams(config, state);
+    const predicateParamIds = new Set(predicateParams.map((param) => param.id));
+    const legacyParams = collectLegacyStaticFilterScopeParams(config, state, predicateParamIds);
+    const configuredSourceParams = collectConfiguredDataSourceScopeParams(
+      config,
+      state,
+      /* @__PURE__ */ new Set([...predicateParamIds, ...legacyParams.map((param) => param.id)]),
+      runtimeDatasetScopeParams
+    );
+    return [
+      ...predicateParams,
+      ...legacyParams,
+      ...configuredSourceParams
+    ];
+  }
+
+  // src/reporting/reportPrimaryDatasetModel.js
+  function normalizeString24(value = "") {
+    return String(value || "").trim();
+  }
+  function normalizeStringList(values = []) {
+    const seen = /* @__PURE__ */ new Set();
+    return (Array.isArray(values) ? values : []).map((value) => normalizeString24(value)).filter((value) => {
+      if (!value || seen.has(value)) {
+        return false;
+      }
+      seen.add(value);
+      return true;
+    });
+  }
+  function shouldKeepPrimaryDataset({
+    includePrimaryBlocks = true,
+    datasetBackedBlockDatasetRefs = [],
+    availableNonPrimaryDatasetRefs = []
+  } = {}) {
+    if (includePrimaryBlocks) {
+      return true;
+    }
+    const normalizedDatasetRefs = normalizeStringList(datasetBackedBlockDatasetRefs);
+    if (normalizedDatasetRefs.length === 0) {
+      return true;
+    }
+    const normalizedAvailableNonPrimaryRefs = new Set(
+      normalizeStringList(availableNonPrimaryDatasetRefs).filter((datasetRef) => datasetRef !== "primary")
+    );
+    if (normalizedDatasetRefs.some((datasetRef) => datasetRef === "primary")) {
+      return true;
+    }
+    return !normalizedDatasetRefs.some((datasetRef) => normalizedAvailableNonPrimaryRefs.has(datasetRef));
+  }
+
+  // src/reporting/reportBlockKindModel.js
+  function normalizeString25(value = "") {
+    return String(value || "").trim();
+  }
+  function isReportDatasetBackedBlockKind(kind = "") {
+    const normalizedKind = normalizeString25(kind);
+    return normalizedKind === "tableBlock" || normalizedKind === "chartBlock" || normalizedKind === "kpiBlock" || normalizedKind === "collectionBlock" || normalizedKind === "geoMapBlock" || normalizedKind === "badgesBlock" || normalizedKind === "timelineBlock" || normalizedKind === "filterBarBlock";
+  }
+
+  // src/reporting/reportContextPresetModel.js
+  function normalizeString26(value = "") {
+    return String(value || "").trim();
+  }
+  function hasMeaningfulScopeParamValue(value = null) {
+    if (Array.isArray(value)) {
+      return value.length > 0;
+    }
+    if (value && typeof value === "object") {
+      const keys2 = Object.keys(value);
+      const start = normalizeString26(value == null ? void 0 : value.start);
+      const end = normalizeString26(value == null ? void 0 : value.end);
+      if (Object.prototype.hasOwnProperty.call(value, "start") || Object.prototype.hasOwnProperty.call(value, "end")) {
+        return !!(start || end);
+      }
+      return keys2.length > 0;
+    }
+    if (typeof value === "string") {
+      return normalizeString26(value).length > 0;
+    }
+    return value != null;
+  }
+  function normalizeParamIds(values = []) {
+    const seen = /* @__PURE__ */ new Set();
+    return (Array.isArray(values) ? values : []).map((value) => normalizeString26(value)).filter((value) => {
+      if (!value || seen.has(value)) {
+        return false;
+      }
+      seen.add(value);
+      return true;
+    });
+  }
+  function normalizeReportScopeContextPreset(value = null, {
+    availableParamIds = null
+  } = {}) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return null;
+    }
+    const id = normalizeString26(value == null ? void 0 : value.id);
+    if (!id) {
+      return null;
+    }
+    const restrictToAvailableParamIds = availableParamIds != null;
+    const allowedParamIds = new Set(normalizeParamIds(availableParamIds));
+    const paramIds = normalizeParamIds(value == null ? void 0 : value.paramIds).filter((paramId) => !restrictToAvailableParamIds || allowedParamIds.has(paramId));
+    if (paramIds.length === 0) {
+      return null;
+    }
+    return {
+      id,
+      paramIds
+    };
+  }
+  function resolveReportScopeContextPresetFromState(state = {}, scopeParams = []) {
+    const availableParamIds = listMeaningfulReportScopeParamIds(scopeParams);
+    return normalizeReportScopeContextPreset(state == null ? void 0 : state.contextPreset, {
+      availableParamIds
+    });
+  }
+  function listMeaningfulReportScopeParamIds(scopeParams = []) {
+    return (Array.isArray(scopeParams) ? scopeParams : []).filter((param) => hasMeaningfulScopeParamValue(param == null ? void 0 : param.value)).map((param) => normalizeString26(param == null ? void 0 : param.id)).filter(Boolean);
+  }
+
+  // src/reporting/reportSpecModel.js
+  function normalizeString27(value = "") {
+    return String(value || "").trim();
+  }
+  function resolveContainerIdentity(container = {}) {
+    return normalizeString27(
+      (container == null ? void 0 : container.id) || (container == null ? void 0 : container.stateKey) || (container == null ? void 0 : container.windowKey) || (container == null ? void 0 : container.windowId)
+    );
+  }
+  function cloneValue18(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+  }
+  function isPlainObject6(value) {
+    return !!value && typeof value === "object" && !Array.isArray(value);
+  }
+  function setNestedValue2(target, path, value) {
+    const segments = normalizeString27(path).split(".").filter(Boolean);
+    if (!target || typeof target !== "object" || Array.isArray(target) || segments.length === 0) {
+      return;
+    }
+    let cursor = target;
+    for (let index = 0; index < segments.length - 1; index += 1) {
+      const segment = segments[index];
+      if (!isPlainObject6(cursor[segment])) {
+        cursor[segment] = {};
+      }
+      cursor = cursor[segment];
+    }
+    cursor[segments[segments.length - 1]] = value;
+  }
+  function getNestedValue(target, path) {
+    const segments = normalizeString27(path).split(".").filter(Boolean);
+    if (!target || typeof target !== "object" || Array.isArray(target) || segments.length === 0) {
+      return void 0;
+    }
+    let cursor = target;
+    for (const segment of segments) {
+      if (!cursor || typeof cursor !== "object" || Array.isArray(cursor)) {
+        return void 0;
+      }
+      cursor = cursor[segment];
+    }
+    return cursor;
+  }
+  function deleteNestedValue(target, path) {
+    const segments = normalizeString27(path).split(".").filter(Boolean);
+    if (!target || typeof target !== "object" || Array.isArray(target) || segments.length === 0) {
+      return;
+    }
+    let cursor = target;
+    for (let index = 0; index < segments.length - 1; index += 1) {
+      cursor = isPlainObject6(cursor == null ? void 0 : cursor[segments[index]]) ? cursor[segments[index]] : null;
+      if (!cursor) {
+        return;
+      }
+    }
+    delete cursor[segments[segments.length - 1]];
+  }
+  function mergeReportDatasetRequestValues(base = {}, patch = {}, {
+    patchWins = true
+  } = {}) {
+    const normalizedBase = isPlainObject6(base) ? cloneValue18(base) : {};
+    const normalizedPatch = isPlainObject6(patch) ? cloneValue18(patch) : {};
+    const result = {
+      ...normalizedBase
+    };
+    Object.keys(normalizedPatch).forEach((key) => {
+      const baseValue = result[key];
+      const patchValue = normalizedPatch[key];
+      if (isPlainObject6(baseValue) && isPlainObject6(patchValue)) {
+        result[key] = mergeReportDatasetRequestValues(baseValue, patchValue, {
+          patchWins
+        });
+        return;
+      }
+      result[key] = patchWins || !Object.prototype.hasOwnProperty.call(result, key) ? cloneValue18(patchValue) : cloneValue18(baseValue);
+    });
+    return result;
+  }
+  function normalizeStringArray5(values = []) {
+    return (Array.isArray(values) ? values : []).map((value) => normalizeString27(value)).filter(Boolean);
+  }
+  function buildReportSpecColumns(columns = []) {
+    return (Array.isArray(columns) ? columns : []).map((column) => ({
+      key: normalizeString27(column == null ? void 0 : column.key),
+      sourceKey: normalizeString27((column == null ? void 0 : column.sourceKey) || (column == null ? void 0 : column.key)),
+      displayKey: normalizeString27((column == null ? void 0 : column.displayKey) || (column == null ? void 0 : column.key)),
+      ...(column == null ? void 0 : column.displayValueMap) && typeof column.displayValueMap === "object" && !Array.isArray(column.displayValueMap) ? { displayValueMap: cloneValue18(column.displayValueMap) } : {},
+      ...(column == null ? void 0 : column.displayIconMap) && typeof column.displayIconMap === "object" && !Array.isArray(column.displayIconMap) ? { displayIconMap: cloneValue18(column.displayIconMap) } : {},
+      label: normalizeString27((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
+      kind: normalizeString27(column == null ? void 0 : column.kind),
+      ...normalizeString27(column == null ? void 0 : column.format) ? { format: normalizeString27(column.format) } : {},
+      ...normalizeString27(column == null ? void 0 : column.align) ? { align: normalizeString27(column.align) } : {},
+      ...column.width !== void 0 ? { width: column.width } : {},
+      ...column.minWidth !== void 0 ? { minWidth: column.minWidth } : {},
+      ...column.flex === true ? { flex: true } : {},
+      ...(column == null ? void 0 : column.runtimeFilterable) === true ? { runtimeFilterable: true } : {},
+      ...(column == null ? void 0 : column.rowIdentity) === true ? { rowIdentity: true } : {},
+      ...normalizeReportTableCellVisual(column == null ? void 0 : column.cellVisual) ? { cellVisual: normalizeReportTableCellVisual(column.cellVisual) } : {},
+      ...normalizePresentationClampConfig(column == null ? void 0 : column.labelClamp) ? { labelClamp: normalizePresentationClampConfig(column.labelClamp) } : {}
+    })).filter((column) => column.key);
+  }
+  function resolveReportSpecTitle(container = {}, config = {}) {
+    return normalizeString27((container == null ? void 0 : container.title) || (config == null ? void 0 : config.title) || "Report");
+  }
+  function resolveReportSpecDataSourceRef(container = {}, config = {}) {
+    return normalizeString27((container == null ? void 0 : container.dataSourceRef) || (config == null ? void 0 : config.dataSourceRef));
+  }
+  function normalizeReportBuilderPublishedDataSources(config = {}) {
+    return normalizeReportBuilderPublishedDataSources2(config);
+  }
+  function normalizeReportSpecScopeParams(reportSpec = {}) {
+    var _a5;
+    const scopeParams = Array.isArray((_a5 = reportSpec == null ? void 0 : reportSpec.scope) == null ? void 0 : _a5.params) ? cloneValue18(reportSpec.scope.params) : [];
+    if (scopeParams.length === 0) {
+      return [];
+    }
+    if (scopeParams.every((entry) => normalizeString27(entry == null ? void 0 : entry.label) && normalizeString27(entry == null ? void 0 : entry.kind))) {
+      return scopeParams;
+    }
+    const reportBuilderBlock = (Array.isArray(reportSpec == null ? void 0 : reportSpec.blocks) ? reportSpec.blocks : []).find((entry) => normalizeString27(entry == null ? void 0 : entry.kind) === "reportBuilderBlock") || null;
+    const reportBuilderConfig = isPlainObject6(reportBuilderBlock == null ? void 0 : reportBuilderBlock.config) ? reportBuilderBlock.config : {};
+    const primaryDataset = (Array.isArray(reportSpec == null ? void 0 : reportSpec.datasets) ? reportSpec.datasets : []).find((dataset) => normalizeString27(dataset == null ? void 0 : dataset.id) === "primary" && !Array.isArray(dataset == null ? void 0 : dataset.rows)) || null;
+    const filterIndex = new Map(
+      [
+        ...resolveReportBuilderScopeParamFilters(reportBuilderConfig),
+        ...Array.isArray(primaryDataset == null ? void 0 : primaryDataset.scopeParamOptions) ? primaryDataset.scopeParamOptions.map((entry) => ({
+          id: normalizeString27((entry == null ? void 0 : entry.value) || (entry == null ? void 0 : entry.id)),
+          label: normalizeString27((entry == null ? void 0 : entry.label) || (entry == null ? void 0 : entry.value) || (entry == null ? void 0 : entry.id)),
+          type: normalizeString27((entry == null ? void 0 : entry.kind) || "value"),
+          ...(entry == null ? void 0 : entry.multiple) === true ? { multiple: true } : {},
+          ...normalizeString27(entry == null ? void 0 : entry.presentation) ? { presentation: normalizeString27(entry.presentation) } : {},
+          ...(entry == null ? void 0 : entry.required) === true ? { required: true } : {},
+          ...Array.isArray(entry == null ? void 0 : entry.options) ? { options: cloneValue18(entry.options) } : {},
+          ...normalizeString27(entry == null ? void 0 : entry.description) ? { description: normalizeString27(entry.description) } : {}
+        })) : []
+      ].map((filter) => [resolveScopeParamId(filter), filter]).filter(([id]) => !!id)
+    );
+    return scopeParams.map((scopeParam) => {
+      const paramId = normalizeString27(scopeParam == null ? void 0 : scopeParam.id);
+      const filter = filterIndex.get(paramId) || null;
+      if (!filter) {
+        return scopeParam;
+      }
+      return {
+        ...scopeParam,
+        ...normalizeString27((scopeParam == null ? void 0 : scopeParam.label) || (filter == null ? void 0 : filter.label) || paramId) ? { label: normalizeString27((scopeParam == null ? void 0 : scopeParam.label) || (filter == null ? void 0 : filter.label) || paramId) } : {},
+        ...normalizeString27((scopeParam == null ? void 0 : scopeParam.kind) || (filter == null ? void 0 : filter.type)) ? { kind: normalizeString27((scopeParam == null ? void 0 : scopeParam.kind) || (filter == null ? void 0 : filter.type)) } : {},
+        ...(scopeParam == null ? void 0 : scopeParam.multiple) === true || (filter == null ? void 0 : filter.multiple) === true ? { multiple: true } : {},
+        ...normalizeString27((scopeParam == null ? void 0 : scopeParam.presentation) || (filter == null ? void 0 : filter.presentation)) ? { presentation: normalizeString27((scopeParam == null ? void 0 : scopeParam.presentation) || (filter == null ? void 0 : filter.presentation)) } : {},
+        ...(scopeParam == null ? void 0 : scopeParam.required) === true || (filter == null ? void 0 : filter.required) === true ? { required: true } : {},
+        ...Array.isArray(scopeParam == null ? void 0 : scopeParam.options) ? { options: cloneValue18(scopeParam.options) } : Array.isArray(filter == null ? void 0 : filter.options) ? { options: cloneValue18(filter.options) } : {},
+        ...normalizeString27((scopeParam == null ? void 0 : scopeParam.description) || (filter == null ? void 0 : filter.description)) ? { description: normalizeString27((scopeParam == null ? void 0 : scopeParam.description) || (filter == null ? void 0 : filter.description)) } : {}
+      };
+    });
+  }
+  function buildReportBuilderPublishedDatasetConfig(baseConfig = {}, source = null, { borrowBase = false } = {}) {
+    var _a5;
+    const normalizedSource = source && typeof source === "object" && !Array.isArray(source) ? source : null;
+    if (!normalizedSource) {
+      return baseConfig;
+    }
+    const fieldOptions = (() => {
+      const entries = [];
+      const seen = /* @__PURE__ */ new Set();
+      [
+        ...Array.isArray(normalizedSource == null ? void 0 : normalizedSource.columnOptions) ? normalizedSource.columnOptions : [],
+        ...Array.isArray(normalizedSource == null ? void 0 : normalizedSource.chartFieldOptions) ? normalizedSource.chartFieldOptions : []
+      ].forEach((option) => {
+        if (!isPlainObject6(option)) {
+          return;
+        }
+        const key = normalizeString27((option == null ? void 0 : option.key) || (option == null ? void 0 : option.sourceKey));
+        const kind = normalizeString27(option == null ? void 0 : option.kind);
+        if (!key || !kind) {
+          return;
+        }
+        const identity = `${kind}:${key}`;
+        if (seen.has(identity)) {
+          return;
+        }
+        seen.add(identity);
+        entries.push(cloneValue18(option));
+      });
+      return entries;
+    })();
+    const inheritRuntimeFieldCatalog = ((_a5 = normalizedSource == null ? void 0 : normalizedSource.capabilities) == null ? void 0 : _a5.inheritRuntimeFieldCatalog) === true && fieldOptions.length === 0;
+    const dimensions = inheritRuntimeFieldCatalog ? cloneValue18((baseConfig == null ? void 0 : baseConfig.dimensions) || []) : fieldOptions.filter((column) => normalizeString27(column == null ? void 0 : column.kind) === "dimension").map((column) => ({
+      id: normalizeString27(column == null ? void 0 : column.key),
+      key: normalizeString27((column == null ? void 0 : column.sourceKey) || (column == null ? void 0 : column.key)) || normalizeString27(column == null ? void 0 : column.key),
+      label: normalizeString27((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
+      ...normalizeString27(column == null ? void 0 : column.displayKey) ? { displayKey: normalizeString27(column.displayKey) } : {},
+      ...(column == null ? void 0 : column.displayValueMap) && typeof column.displayValueMap === "object" && !Array.isArray(column.displayValueMap) ? { displayValueMap: cloneValue18(column.displayValueMap) } : {},
+      ...normalizeString27(column == null ? void 0 : column.format) ? { format: normalizeString27(column.format) } : {},
+      ...normalizeString27(column == null ? void 0 : column.tickFormat) ? { tickFormat: normalizeString27(column.tickFormat) } : {},
+      ...["civil", "instant"].includes(normalizeString27(column == null ? void 0 : column.valueMode)) ? { valueMode: normalizeString27(column.valueMode) } : {}
+    })).filter((entry) => entry.id && entry.key && entry.label);
+    const measures = inheritRuntimeFieldCatalog ? cloneValue18((baseConfig == null ? void 0 : baseConfig.measures) || []) : fieldOptions.filter((column) => normalizeString27(column == null ? void 0 : column.kind) === "measure").map((column) => ({
+      id: normalizeString27(column == null ? void 0 : column.key),
+      key: normalizeString27((column == null ? void 0 : column.sourceKey) || (column == null ? void 0 : column.key)) || normalizeString27(column == null ? void 0 : column.key),
+      label: normalizeString27((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
+      ...normalizeString27(column == null ? void 0 : column.format) ? { format: normalizeString27(column.format) } : {}
+    })).filter((entry) => entry.id && entry.key && entry.label);
+    return {
+      // The authored lowerer only reads its invocation-local builder config.
+      // Preserve the public detached result by default; its internal read-only
+      // callers can borrow the base instead of serializing the entire builder
+      // once for every published dataset and authored block.
+      ...isPlainObject6(baseConfig) ? borrowBase ? baseConfig : cloneValue18(baseConfig) : {},
+      dataSourceRef: normalizeString27((normalizedSource == null ? void 0 : normalizedSource.dataSourceRef) || (baseConfig == null ? void 0 : baseConfig.dataSourceRef)),
+      dimensions,
+      measures
+    };
+  }
+  function buildReportBuilderPublishedDatasetRequest(source = {}, state = {}, datasetScopeParamValues = null, inheritedRequestContext = null, primaryRequestContext = null) {
+    const request = isPlainObject6(source == null ? void 0 : source.request) ? cloneValue18(source.request) : null;
+    if (!request) {
+      return null;
+    }
+    const scopePolicy = resolveReportDatasetScopePolicy(source == null ? void 0 : source.scope);
+    const excludedParamIds = new Set(Array.isArray(scopePolicy == null ? void 0 : scopePolicy.exclude) ? scopePolicy.exclude : []);
+    let contextPatch = isPlainObject6(inheritedRequestContext) ? cloneValue18(inheritedRequestContext) : {};
+    (Array.isArray(source == null ? void 0 : source.scopeParamOptions) ? source.scopeParamOptions : []).forEach((option) => {
+      const paramId = normalizeString27((option == null ? void 0 : option.id) || (option == null ? void 0 : option.value));
+      if (!paramId) {
+        return;
+      }
+      const paramPath = normalizeString27(option == null ? void 0 : option.paramPath);
+      if (excludedParamIds.has(paramId)) {
+        for (const excludedPath of [paramPath, option == null ? void 0 : option.startParamPath, option == null ? void 0 : option.endParamPath].map(normalizeString27).filter(Boolean)) {
+          deleteNestedValue(contextPatch, excludedPath);
+        }
+        return;
+      }
+      const hasDatasetScopedValue = datasetScopeParamValues && Object.prototype.hasOwnProperty.call(datasetScopeParamValues, paramId);
+      let rawValue = hasDatasetScopedValue ? datasetScopeParamValues[paramId] : getScopeParamValue(state, paramId);
+      const kind = normalizeString27((option == null ? void 0 : option.kind) || "");
+      if (kind.toLowerCase() === "daterange") {
+        const startParamPath = normalizeString27(option == null ? void 0 : option.startParamPath);
+        const endParamPath = normalizeString27(option == null ? void 0 : option.endParamPath);
+        const startValue = normalizeString27(rawValue == null ? void 0 : rawValue.start) || normalizeString27(getNestedValue(primaryRequestContext, startParamPath));
+        const endValue = normalizeString27(rawValue == null ? void 0 : rawValue.end) || normalizeString27(getNestedValue(primaryRequestContext, endParamPath));
+        if (startValue && startParamPath) {
+          setNestedValue2(contextPatch, startParamPath, startValue);
+        }
+        if (endValue && endParamPath) {
+          setNestedValue2(contextPatch, endParamPath, endValue);
+        }
+        return;
+      }
+      if (rawValue == null || rawValue === "" || Array.isArray(rawValue) && rawValue.length === 0) {
+        rawValue = getNestedValue(primaryRequestContext, paramPath);
+      }
+      if (rawValue == null || rawValue === "" || Array.isArray(rawValue) && rawValue.length === 0) {
+        return;
+      }
+      if (!paramPath) {
+        return;
+      }
+      setNestedValue2(contextPatch, paramPath, cloneValue18(rawValue));
+    });
+    const localPatch = isPlainObject6(scopePolicy == null ? void 0 : scopePolicy.local) ? scopePolicy.local : {};
+    const relativeDateRangePatch = {};
+    const relativeDateRange = scopePolicy == null ? void 0 : scopePolicy.relativeDateRange;
+    const resolvedRelativeDateRange = resolveReportRelativeDateRangeSpec(relativeDateRange, /* @__PURE__ */ new Date(), primaryRequestContext);
+    if (resolvedRelativeDateRange) {
+      setNestedValue2(relativeDateRangePatch, relativeDateRange.startParamPath, resolvedRelativeDateRange.start);
+      setNestedValue2(relativeDateRangePatch, relativeDateRange.endParamPath, resolvedRelativeDateRange.end);
+    }
+    const resolvedLocalPatch = mergeReportDatasetRequestValues(localPatch, relativeDateRangePatch, { patchWins: true });
+    if (scopePolicy.mode === "append") {
+      return mergeReportDatasetRequestValues(
+        mergeReportDatasetRequestValues(request, resolvedLocalPatch, { patchWins: true }),
+        contextPatch,
+        { patchWins: true }
+      );
+    }
+    if (scopePolicy.mode === "override" || scopePolicy.mode === "exclude") {
+      return mergeReportDatasetRequestValues(
+        mergeReportDatasetRequestValues(request, contextPatch, { patchWins: true }),
+        resolvedLocalPatch,
+        { patchWins: true }
+      );
+    }
+    return mergeReportDatasetRequestValues(request, contextPatch, { patchWins: true });
+  }
+  function buildReportBuilderPublishedDatasetDeclarations(config = {}, state = {}, referencedDatasetRefs = /* @__PURE__ */ new Set(), runtimeDatasetScopeParams = null, primaryRequestContext = null) {
+    const sources = normalizeReportBuilderPublishedDataSources(config);
+    if (sources.length === 0) {
+      return [];
+    }
+    const sourceRefIndex = buildReportBuilderPublishedDatasetRefIndex(sources);
+    const resolvesByDataSourceRef = (source) => sourceRefIndex.get(source.dataSourceRef) === source;
+    return sources.filter((source) => referencedDatasetRefs.has(source.id) || referencedDatasetRefs.has(source.dataSourceRef) && resolvesByDataSourceRef(source)).map((source) => {
+      var _a5, _b, _c;
+      const matchedRef = referencedDatasetRefs.has(source.id) ? source.id : source.dataSourceRef;
+      const runtimeScopeParamsByRef = runtimeDatasetScopeParams && typeof runtimeDatasetScopeParams === "object" && !Array.isArray(runtimeDatasetScopeParams) ? runtimeDatasetScopeParams : null;
+      const scopedValues = runtimeScopeParamsByRef ? runtimeScopeParamsByRef[source.id] || (resolvesByDataSourceRef(source) ? runtimeScopeParamsByRef[source.dataSourceRef] : null) || null : null;
+      const sameDataSource = normalizeString27(source == null ? void 0 : source.dataSourceRef) && normalizeString27(source == null ? void 0 : source.dataSourceRef) === normalizeString27(primaryRequestContext == null ? void 0 : primaryRequestContext.dataSourceRef);
+      const inheritedRequestContext = {
+        ...isPlainObject6((_a5 = primaryRequestContext == null ? void 0 : primaryRequestContext.request) == null ? void 0 : _a5.options) ? { options: cloneValue18(primaryRequestContext.request.options) } : {},
+        ...sameDataSource ? {
+          ...isPlainObject6((_b = primaryRequestContext == null ? void 0 : primaryRequestContext.request) == null ? void 0 : _b.filters) ? { filters: cloneValue18(primaryRequestContext.request.filters) } : {},
+          ...Array.isArray((_c = primaryRequestContext == null ? void 0 : primaryRequestContext.request) == null ? void 0 : _c.refinements) ? { refinements: cloneValue18(primaryRequestContext.request.refinements) } : {}
+        } : {}
+      };
+      const request = buildReportBuilderPublishedDatasetRequest(
+        source,
+        state,
+        scopedValues,
+        inheritedRequestContext,
+        primaryRequestContext == null ? void 0 : primaryRequestContext.request
+      );
+      if (!request) {
+        return null;
+      }
+      return {
+        id: matchedRef,
+        dataSourceRef: source.dataSourceRef,
+        ...normalizeReportDatasetScope(source == null ? void 0 : source.scope) ? { scope: normalizeReportDatasetScope(source == null ? void 0 : source.scope) } : {},
+        ...isPlainObject6(source == null ? void 0 : source.source) ? { source: cloneValue18(source.source) } : {},
+        ...isPlainObject6(source == null ? void 0 : source.resultContract) ? { resultContract: cloneValue18(source.resultContract) } : {},
+        ...isPlainObject6(source == null ? void 0 : source.capabilities) ? { capabilities: cloneValue18(source.capabilities) } : {},
+        request
+      };
+    }).filter(Boolean);
+  }
+  function resolveReportBuilderChartSpecForReportSpec(config = {}, state = {}) {
+    const explicit = normalizeReportBuilderChartSpec(state == null ? void 0 : state.chartSpec);
+    if (explicit) {
+      return explicit;
+    }
+    if (normalizeString27(state == null ? void 0 : state.viewMode).toLowerCase() === "table") {
+      return null;
+    }
+    const defaults = buildReportBuilderDefaultChartSpecs(config, state);
+    if (defaults.length > 0) {
+      return normalizeReportBuilderChartSpec(defaults[0]);
+    }
+    return buildDefaultReportBuilderChartSpec(config, state);
+  }
+  function buildReportSpecChartBlock({
+    container = {},
+    config = {},
+    state = {},
+    chartSpec = null,
+    blockId = "primaryChart",
+    datasetRef = "primary",
+    title = "",
+    rowLimit = 0,
+    onChartValidation = null
+  } = {}) {
+    const normalizedChartSpec = normalizeReportBuilderChartSpec({
+      ...chartSpec && typeof chartSpec === "object" && !Array.isArray(chartSpec) ? chartSpec : {},
+      ...normalizeString27(title) ? { title: normalizeString27(title) } : {}
+    });
+    if (!normalizedChartSpec) {
+      onChartValidation == null ? void 0 : onChartValidation({
+        blockId: normalizeString27(blockId || "primaryChart"),
+        datasetRef: normalizeString27(datasetRef || "primary"),
+        chartSpec: null,
+        validation: { valid: false, errors: [{ field: "chartSpec", code: "missing" }] }
+      });
+      return null;
+    }
+    const chartFields = buildReportBuilderChartFields(config, state);
+    const validation = validateReportBuilderChartSpec(config, normalizedChartSpec, chartFields);
+    onChartValidation == null ? void 0 : onChartValidation({
+      blockId: normalizeString27(blockId || "primaryChart"),
+      datasetRef: normalizeString27(datasetRef || "primary"),
+      chartSpec: cloneValue18(normalizedChartSpec),
+      validation: cloneValue18(validation)
+    });
+    const dataSourceRef = resolveReportSpecDataSourceRef(container, config);
+    const chartContainer = buildExplicitReportBuilderChartContainer({
+      dataSourceRef,
+      collection: []
+    }, config, state, normalizedChartSpec);
+    const normalizedRowLimit = Math.trunc(Number(rowLimit) || 0);
+    return {
+      id: normalizeString27(blockId || "primaryChart"),
+      kind: "chartBlock",
+      datasetRef: normalizeString27(datasetRef || "primary"),
+      chartSpec: normalizedChartSpec,
+      chartModel: validation.valid ? cloneValue18((chartContainer == null ? void 0 : chartContainer.chart) || null) : null,
+      ...Number.isInteger(normalizedRowLimit) && normalizedRowLimit > 0 ? { rowLimit: normalizedRowLimit } : {}
+    };
+  }
+  function buildReportSpecCalculatedFields(config = {}, state = {}) {
+    const selectedMeasureIds = normalizeStringArray5(state == null ? void 0 : state.selectedMeasures);
+    if (selectedMeasureIds.length === 0) {
+      return [];
+    }
+    const availableDefinitions = normalizeReportCalculatedFields([
+      ...Array.isArray(config == null ? void 0 : config.calculatedFields) ? config.calculatedFields : [],
+      ...Array.isArray(config == null ? void 0 : config.computedMeasures) ? config.computedMeasures : [],
+      ...Array.isArray(config == null ? void 0 : config.tableCalculations) ? config.tableCalculations : []
+    ], {
+      datasetRef: "primary"
+    });
+    const definitionsById = new Map(
+      availableDefinitions.map((definition) => [normalizeString27((definition == null ? void 0 : definition.id) || (definition == null ? void 0 : definition.key)), definition]).filter(([id]) => !!id)
+    );
+    const visiting = /* @__PURE__ */ new Set();
+    const visited = /* @__PURE__ */ new Set();
+    const selectedDefinitions = [];
+    function visitDefinition(id) {
+      const normalizedId = normalizeString27(id);
+      if (!normalizedId || visited.has(normalizedId) || visiting.has(normalizedId)) {
+        return;
+      }
+      const definition = definitionsById.get(normalizedId);
+      if (!definition) {
+        return;
+      }
+      visiting.add(normalizedId);
+      normalizeStringArray5(definition == null ? void 0 : definition.dependencies).forEach((dependencyId) => {
+        visitDefinition(dependencyId);
+      });
+      visiting.delete(normalizedId);
+      visited.add(normalizedId);
+      selectedDefinitions.push(cloneValue18(definition));
+    }
+    selectedMeasureIds.forEach((measureId) => {
+      visitDefinition(measureId);
+    });
+    return selectedDefinitions;
+  }
+  function buildReportSpecDrillMetadata(config = {}, state = {}) {
+    var _a5, _b, _c;
+    const normalized = resolveReportBuilderDrillMetadata(config, (state == null ? void 0 : state.drillMetadata) || null);
+    if ((((_a5 = normalized == null ? void 0 : normalized.hierarchies) == null ? void 0 : _a5.length) || 0) === 0 && (((_b = normalized == null ? void 0 : normalized.detailTargets) == null ? void 0 : _b.length) || 0) === 0 && (((_c = normalized == null ? void 0 : normalized.fieldActions) == null ? void 0 : _c.length) || 0) === 0) {
+      return null;
+    }
+    return normalized;
+  }
+  function normalizeSemanticSummaryGovernance(governance = {}) {
+    if (!governance || typeof governance !== "object" || Array.isArray(governance)) {
+      return null;
+    }
+    const status = normalizeString27(governance.status).toLowerCase();
+    const certification = normalizeString27(governance.certification).toLowerCase();
+    const ownerRef = normalizeString27(governance.ownerRef);
+    const classification = normalizeString27(governance.classification);
+    const deprecation = normalizeString27(governance.deprecation);
+    const next = {};
+    if (status) {
+      next.status = status;
+    }
+    if (certification) {
+      next.certification = certification;
+    }
+    if (ownerRef) {
+      next.ownerRef = ownerRef;
+    }
+    if (classification) {
+      next.classification = classification;
+    }
+    if (deprecation) {
+      next.deprecation = deprecation;
+    }
+    return Object.keys(next).length > 0 ? next : null;
+  }
+  function normalizeSemanticSummaryField(field = {}) {
+    if (!field || typeof field !== "object" || Array.isArray(field)) {
+      return null;
+    }
+    const id = normalizeString27(field == null ? void 0 : field.id);
+    const label = normalizeString27((field == null ? void 0 : field.label) || id);
+    if (!id || !label) {
+      return null;
+    }
+    const rawId = normalizeString27(field == null ? void 0 : field.rawId);
+    const description = normalizeString27(field == null ? void 0 : field.description);
+    const format2 = normalizeString27(field == null ? void 0 : field.format);
+    const category = normalizeString27(field == null ? void 0 : field.category);
+    const definitionRef = normalizeString27(field == null ? void 0 : field.definitionRef);
+    const governance = normalizeSemanticSummaryGovernance(field == null ? void 0 : field.governance);
+    return {
+      id,
+      ...rawId ? { rawId } : {},
+      label,
+      ...description ? { description } : {},
+      ...format2 ? { format: format2 } : {},
+      ...category ? { category } : {},
+      ...definitionRef ? { definitionRef } : {},
+      ...governance ? { governance } : {}
+    };
+  }
+  function normalizeSemanticSummary(summary = {}) {
+    if (!summary || typeof summary !== "object" || Array.isArray(summary)) {
+      return null;
+    }
+    const kind = normalizeString27(summary.kind).toLowerCase();
+    if (kind !== "semantic") {
+      return null;
+    }
+    const modelRef = normalizeString27(summary.modelRef);
+    const entity = normalizeString27(summary.entity);
+    if (!modelRef || !entity) {
+      return null;
+    }
+    const selectedParameters = (Array.isArray(summary.selectedParameters) ? summary.selectedParameters : []).map((field) => normalizeSemanticSummaryField(field)).filter(Boolean);
+    return {
+      kind: "semantic",
+      modelRef,
+      ...normalizeString27(summary.modelLabel) ? { modelLabel: normalizeString27(summary.modelLabel) } : {},
+      ...normalizeString27(summary.modelDescription) ? { modelDescription: normalizeString27(summary.modelDescription) } : {},
+      entity,
+      ...normalizeString27(summary.entityLabel) ? { entityLabel: normalizeString27(summary.entityLabel) } : {},
+      ...normalizeString27(summary.entityDescription) ? { entityDescription: normalizeString27(summary.entityDescription) } : {},
+      selectedDimensions: (Array.isArray(summary.selectedDimensions) ? summary.selectedDimensions : []).map((field) => normalizeSemanticSummaryField(field)).filter(Boolean),
+      selectedMeasures: (Array.isArray(summary.selectedMeasures) ? summary.selectedMeasures : []).map((field) => normalizeSemanticSummaryField(field)).filter(Boolean),
+      ...selectedParameters.length > 0 ? { selectedParameters } : {}
+    };
+  }
+  function buildReportBuilderReportSpec({
+    container = {},
+    config = {},
+    state = {},
+    refinements = [],
+    semanticSummary = null,
+    includePrimaryBlocks = true,
+    onChartValidation = null
+  } = {}) {
+    var _a5;
+    const normalizedState = sanitizeReportBuilderState(config, state);
+    const effectiveConfig = buildReportBuilderCalculatedFieldConfig(config, normalizedState);
+    const request = buildReportBuilderRequest(config, normalizedState);
+    const normalizedRefinements = normalizeReportRefinements(refinements);
+    if (Array.isArray((_a5 = request == null ? void 0 : request.semanticSelection) == null ? void 0 : _a5.refinements)) {
+      request.semanticSelection.refinements = cloneValue18(normalizedRefinements);
+    }
+    if (normalizedRefinements.length > 0) {
+      request.refinements = cloneValue18(normalizedRefinements);
+    }
+    const tableColumns = buildReportSpecColumns(buildReportBuilderColumns(effectiveConfig, normalizedState));
+    const chartSpec = resolveReportBuilderChartSpecForReportSpec(effectiveConfig, normalizedState);
+    const calculatedFields = buildReportSpecCalculatedFields(effectiveConfig, normalizedState);
+    const drillMetadata = buildReportSpecDrillMetadata(effectiveConfig, normalizedState);
+    const normalizedSemanticSummary = normalizeSemanticSummary(semanticSummary);
+    const scopeParams = buildReportBuilderScopeParams(effectiveConfig, normalizedState);
+    const contextPreset = resolveReportScopeContextPresetFromState(normalizedState, scopeParams);
+    const referencedDatasetRefs = new Set(
+      (Array.isArray(normalizedState == null ? void 0 : normalizedState.reportDocumentBlocks) ? normalizedState.reportDocumentBlocks : []).flatMap((block) => [normalizeString27(block == null ? void 0 : block.datasetRef), normalizeString27(block == null ? void 0 : block.secondaryDatasetRef)]).filter((datasetRef) => !!datasetRef && datasetRef !== "primary")
+    );
+    const authoredDatasetBackedBlocks = (Array.isArray(normalizedState == null ? void 0 : normalizedState.reportDocumentBlocks) ? normalizedState.reportDocumentBlocks : []).filter((block) => isReportDatasetBackedBlockKind(block == null ? void 0 : block.kind));
+    const primaryDataSourceRef = resolveReportSpecDataSourceRef(container, config);
+    const publishedDatasets = buildReportBuilderPublishedDatasetDeclarations(
+      effectiveConfig,
+      normalizedState,
+      referencedDatasetRefs,
+      null,
+      {
+        dataSourceRef: primaryDataSourceRef,
+        request
+      }
+    );
+    const staticDatasets = buildReportBuilderStaticDatasetDeclarations(normalizedState == null ? void 0 : normalizedState.reportStaticDatasets);
+    const explicitDatasetRefs = authoredDatasetBackedBlocks.map((block) => normalizeString27(block == null ? void 0 : block.datasetRef)).filter(Boolean);
+    const shouldIncludePrimaryDataset = shouldKeepPrimaryDataset({
+      includePrimaryBlocks,
+      datasetBackedBlockDatasetRefs: explicitDatasetRefs.length === authoredDatasetBackedBlocks.length ? explicitDatasetRefs : [],
+      availableNonPrimaryDatasetRefs: [
+        ...publishedDatasets.map((dataset) => normalizeString27(dataset == null ? void 0 : dataset.id)),
+        ...staticDatasets.map((dataset) => normalizeString27(dataset == null ? void 0 : dataset.id))
+      ]
+    });
+    const chartBlock = chartSpec ? buildReportSpecChartBlock({
+      container,
+      config: effectiveConfig,
+      state: normalizedState,
+      chartSpec,
+      onChartValidation: includePrimaryBlocks ? onChartValidation : null
+    }) : null;
+    const blocks = includePrimaryBlocks ? [
+      {
+        id: "primaryTable",
+        kind: "tableBlock",
+        datasetRef: "primary",
+        columns: tableColumns,
+        ...(config == null ? void 0 : config.tablePresentation) && typeof config.tablePresentation === "object" ? cloneValue18(config.tablePresentation) : {}
+      },
+      ...chartBlock ? [chartBlock] : []
+    ] : [];
+    return {
+      version: 1,
+      kind: "reportSpec",
+      source: {
+        kind: "dashboard.reportBuilder",
+        containerId: resolveContainerIdentity(container),
+        stateKey: normalizeString27((container == null ? void 0 : container.stateKey) || resolveContainerIdentity(container)),
+        dataSourceRef: primaryDataSourceRef
+      },
+      title: resolveReportSpecTitle(container, config),
+      ...(normalizedState == null ? void 0 : normalizedState.binding) ? { binding: cloneValue18(normalizedState.binding) } : {},
+      ...normalizedSemanticSummary ? { semanticSummary: cloneValue18(normalizedSemanticSummary) } : {},
+      parameters: {
+        viewMode: normalizeString27((normalizedState == null ? void 0 : normalizedState.viewMode) || "table"),
+        groupBy: normalizeString27(normalizedState == null ? void 0 : normalizedState.groupBy),
+        pageSize: Math.max(1, Number((normalizedState == null ? void 0 : normalizedState.pageSize) || 0) || 0) || 50,
+        orderField: normalizeString27(normalizedState == null ? void 0 : normalizedState.orderField),
+        orderDir: normalizeString27((normalizedState == null ? void 0 : normalizedState.orderDir) || "desc")
+      },
+      layoutIntent: {
+        kind: "single",
+        resultPanePosition: getReportBuilderResultPanePosition(config),
+        blockOrder: blocks.map((block) => block.id)
+      },
+      ...drillMetadata ? { drillMetadata: cloneValue18(drillMetadata) } : {},
+      refinements: normalizedRefinements,
+      calculatedFields,
+      scope: {
+        ...contextPreset ? { contextPreset: cloneValue18(contextPreset) } : {},
+        params: scopeParams,
+        dataSourceRef: primaryDataSourceRef
+      },
+      datasets: [
+        ...shouldIncludePrimaryDataset ? [{
+          id: "primary",
+          dataSourceRef: primaryDataSourceRef,
+          ...normalizeReportDatasetScope(config == null ? void 0 : config.scope) ? { scope: normalizeReportDatasetScope(config == null ? void 0 : config.scope) } : {},
+          ...isPlainObject6(config == null ? void 0 : config.source) ? { source: cloneValue18(config.source) } : {},
+          ...isPlainObject6(config == null ? void 0 : config.resultContract) ? { resultContract: cloneValue18(config.resultContract) } : {},
+          ...isPlainObject6(config == null ? void 0 : config.capabilities) ? { capabilities: cloneValue18(config.capabilities) } : {},
+          request: cloneValue18(request)
+        }] : [],
+        ...publishedDatasets,
+        ...staticDatasets
+      ],
+      blocks
+    };
+  }
+
+  // src/reporting/refinementBarModel.js
+  function normalizeString28(value = "") {
+    return String(value || "").trim();
+  }
+  function normalizeRefinementBarText(value, defaultValue = null) {
+    if (value == null) {
+      return defaultValue;
+    }
+    return normalizeString28(value);
+  }
+  var SUPPORTED_REFINEMENT_BAR_ACTIONS = /* @__PURE__ */ new Set(["remove", "clearAll", "undo", "redo"]);
+  function normalizeRefinementBarActionKinds(actionKinds, {
+    defaultActionKinds = null
+  } = {}) {
+    const source = Array.isArray(actionKinds) ? actionKinds : defaultActionKinds;
+    if (!Array.isArray(source)) {
+      return null;
+    }
+    const next = [];
+    const seen = /* @__PURE__ */ new Set();
+    source.forEach((entry) => {
+      const normalized = normalizeString28(entry);
+      if (!SUPPORTED_REFINEMENT_BAR_ACTIONS.has(normalized) || seen.has(normalized)) {
+        return;
+      }
+      seen.add(normalized);
+      next.push(normalized);
+    });
+    return next;
+  }
+
+  // src/reporting/reportDocumentModel.js
+  function normalizeString29(value = "") {
+    return String(value || "").trim();
+  }
+  function isTruncatedPlaceholder2(value = "") {
+    return normalizeString29(value) === "[MaxDepth]";
+  }
+  function resolveContainerIdentity2(container = {}) {
+    return normalizeString29(
+      (container == null ? void 0 : container.id) || (container == null ? void 0 : container.stateKey) || (container == null ? void 0 : container.windowKey) || (container == null ? void 0 : container.windowId)
+    );
+  }
+  function normalizeFilterBarTitle(value = "") {
+    const normalized = normalizeString29(value);
+    const lowered = normalized.toLowerCase();
+    if (!normalized || lowered === "scope" || lowered === "report scope") {
+      return "Filters";
+    }
+    return normalized;
+  }
+  function cloneValue19(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+  }
+  function normalizeStringArray6(values = []) {
+    return (Array.isArray(values) ? values : []).map((value) => normalizeString29(value)).filter(Boolean);
+  }
+  function normalizeReportDocumentTheme(theme = null) {
+    const source = theme && typeof theme === "object" && !Array.isArray(theme) ? theme : {};
+    const accentTone = normalizeString29((source == null ? void 0 : source.accentTone) || (source == null ? void 0 : source.accent) || "").toLowerCase();
+    const badgePalette = normalizeString29((source == null ? void 0 : source.badgePalette) || "").toLowerCase();
+    const next = {
+      ...["blue", "green", "amber", "rose", "slate"].includes(accentTone) ? { accentTone } : {},
+      ...["soft", "bold"].includes(badgePalette) ? { badgePalette } : {}
+    };
+    return Object.keys(next).length > 0 ? next : null;
+  }
+  function normalizeGeoFormat2(value = "") {
+    const normalized = normalizeString29(value);
+    if (normalized === "compactNumber") {
+      return "compact";
+    }
+    return normalized;
+  }
+  function buildLayoutItem(blockId = "", source = null) {
+    return buildReportLayoutItem(blockId, source, {
+      preserveLegacyHalf: true
+    });
+  }
+  function isPlainObject7(value) {
+    return !!value && typeof value === "object" && !Array.isArray(value);
+  }
+  function setNestedValue3(target, path, value) {
+    const segments = String(path || "").split(".").map((segment) => segment.trim()).filter(Boolean);
+    if (!target || typeof target !== "object" || Array.isArray(target) || segments.length === 0) {
+      return;
+    }
+    let cursor = target;
+    for (let index = 0; index < segments.length - 1; index += 1) {
+      const segment = segments[index];
+      if (!cursor[segment] || typeof cursor[segment] !== "object" || Array.isArray(cursor[segment])) {
+        cursor[segment] = {};
+      }
+      cursor = cursor[segment];
+    }
+    cursor[segments[segments.length - 1]] = value;
+  }
+  function buildReportBuilderFieldLookup(entries = []) {
+    const result = /* @__PURE__ */ new Map();
+    (Array.isArray(entries) ? entries : []).forEach((entry) => {
+      const normalizedEntry = entry && typeof entry === "object" && !Array.isArray(entry) ? entry : null;
+      if (!normalizedEntry) {
+        return;
+      }
+      const aliases2 = [
+        normalizeString29(normalizedEntry == null ? void 0 : normalizedEntry.id),
+        normalizeString29(normalizedEntry == null ? void 0 : normalizedEntry.key),
+        normalizeString29(normalizedEntry == null ? void 0 : normalizedEntry.chartKey),
+        normalizeString29(normalizedEntry == null ? void 0 : normalizedEntry.displayKey),
+        normalizeString29(normalizedEntry == null ? void 0 : normalizedEntry.displayPath)
+      ].filter(Boolean);
+      aliases2.forEach((alias) => {
+        if (!result.has(alias)) {
+          result.set(alias, normalizedEntry);
+        }
+      });
+    });
+    return result;
+  }
+  function resolveReportBuilderFieldId(entry = {}) {
+    return normalizeString29((entry == null ? void 0 : entry.id) || (entry == null ? void 0 : entry.key));
+  }
+  function buildReportBuilderFieldCatalog(config = {}) {
+    const lookup = /* @__PURE__ */ new Map();
+    const addEntries = (entries = [], kind = "") => {
+      buildReportBuilderFieldLookup(entries).forEach((entry, alias) => {
+        if (!lookup.has(alias)) {
+          lookup.set(alias, { kind, entry });
+        }
+      });
+    };
+    addEntries(config == null ? void 0 : config.dimensions, "dimension");
+    addEntries(config == null ? void 0 : config.measures, "measure");
+    addEntries(
+      normalizeReportCalculatedFields([
+        ...Array.isArray(config == null ? void 0 : config.calculatedFields) ? config.calculatedFields : [],
+        ...Array.isArray(config == null ? void 0 : config.computedMeasures) ? config.computedMeasures : [],
+        ...Array.isArray(config == null ? void 0 : config.tableCalculations) ? config.tableCalculations : []
+      ], {
+        datasetRef: "primary"
+      }),
+      "calculated"
+    );
+    return { lookup };
+  }
+  function resolveReportBuilderCatalogEntry(fieldCatalog = {}, fieldKey = "") {
+    const normalizedFieldKey = normalizeString29(fieldKey);
+    if (!normalizedFieldKey) {
+      return null;
+    }
+    return (fieldCatalog == null ? void 0 : fieldCatalog.lookup) instanceof Map ? fieldCatalog.lookup.get(normalizedFieldKey) || null : null;
+  }
+  function buildAuthoredChartBlockState(baseState = {}, chartSpec = {}, fieldCatalog = {}) {
+    const nextState = cloneValue19(isPlainObject7(baseState) ? baseState : {});
+    const selectedMeasures = normalizeStringArray6(nextState == null ? void 0 : nextState.selectedMeasures);
+    const selectedDimensions = normalizeStringArray6(nextState == null ? void 0 : nextState.selectedDimensions);
+    const addSelection = (fieldKey = "") => {
+      const catalogEntry = resolveReportBuilderCatalogEntry(fieldCatalog, fieldKey);
+      const fieldId = resolveReportBuilderFieldId(catalogEntry == null ? void 0 : catalogEntry.entry);
+      if (!catalogEntry || !fieldId) {
+        return;
+      }
+      if (catalogEntry.kind === "dimension") {
+        if (!selectedDimensions.includes(fieldId)) {
+          selectedDimensions.push(fieldId);
+        }
+        return;
+      }
+      if (!selectedMeasures.includes(fieldId)) {
+        selectedMeasures.push(fieldId);
+      }
+    };
+    addSelection(chartSpec == null ? void 0 : chartSpec.xField);
+    addSelection(chartSpec == null ? void 0 : chartSpec.seriesField);
+    normalizeStringArray6(chartSpec == null ? void 0 : chartSpec.yFields).forEach((fieldKey) => addSelection(fieldKey));
+    nextState.selectedMeasures = selectedMeasures;
+    nextState.selectedDimensions = selectedDimensions;
+    return nextState;
+  }
+  function buildAuthoredTableBlock(block = {}, fieldCatalog = {}) {
+    const normalizedBlock = block && typeof block === "object" && !Array.isArray(block) ? cloneValue19(block) : null;
+    if (!normalizedBlock) {
+      return null;
+    }
+    const columns = Array.isArray(normalizedBlock == null ? void 0 : normalizedBlock.columns) ? normalizedBlock.columns : [];
+    normalizedBlock.columns = columns.map((column) => {
+      var _a5, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
+      const normalizedColumn = column && typeof column === "object" && !Array.isArray(column) ? cloneValue19(column) : null;
+      if (!normalizedColumn) {
+        return column;
+      }
+      const linkField = normalizeString29(((_a5 = normalizedColumn == null ? void 0 : normalizedColumn.link) == null ? void 0 : _a5.urlField) || ((_b = normalizedColumn == null ? void 0 : normalizedColumn.link) == null ? void 0 : _b.idField));
+      const hasValidLinkField = !linkField || !!resolveReportBuilderCatalogEntry(fieldCatalog, linkField);
+      if (!hasValidLinkField) {
+        delete normalizedColumn.link;
+      }
+      const catalogEntry = resolveReportBuilderCatalogEntry(fieldCatalog, normalizedColumn == null ? void 0 : normalizedColumn.key);
+      const fieldId = resolveReportBuilderFieldId(catalogEntry == null ? void 0 : catalogEntry.entry);
+      if (!catalogEntry || !fieldId) {
+        return normalizedColumn;
+      }
+      const sourceKey = normalizeString29(((_c = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _c.key) || ((_d = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _d.id) || fieldId) || fieldId;
+      const displayKey = normalizeString29(((_e = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _e.displayKey) || ((_f = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _f.displayPath) || sourceKey) || sourceKey;
+      return {
+        ...normalizedColumn,
+        sourceKey,
+        displayKey,
+        ...(normalizedColumn == null ? void 0 : normalizedColumn.displayValueMap) || ((_g = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _g.displayValueMap) ? { displayValueMap: cloneValue19((normalizedColumn == null ? void 0 : normalizedColumn.displayValueMap) || ((_h = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _h.displayValueMap)) } : {},
+        ...(normalizedColumn == null ? void 0 : normalizedColumn.displayIconMap) || ((_i = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _i.displayIconMap) ? { displayIconMap: cloneValue19((normalizedColumn == null ? void 0 : normalizedColumn.displayIconMap) || ((_j = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _j.displayIconMap)) } : {},
+        ...normalizeString29((normalizedColumn == null ? void 0 : normalizedColumn.label) || ((_k = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _k.label) || fieldId) ? { label: normalizeString29((normalizedColumn == null ? void 0 : normalizedColumn.label) || ((_l = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _l.label) || fieldId) } : {},
+        ...normalizeString29((normalizedColumn == null ? void 0 : normalizedColumn.format) || ((_m = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _m.format)) ? { format: normalizeString29((normalizedColumn == null ? void 0 : normalizedColumn.format) || ((_n = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _n.format)) } : {},
+        ...catalogEntry.kind === "dimension" && ((_o = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _o.runtimeFilter) && typeof catalogEntry.entry.runtimeFilter === "object" && !Array.isArray(catalogEntry.entry.runtimeFilter) ? { runtimeFilterable: true } : {}
+      };
+    });
+    return normalizedBlock;
+  }
+  function buildAuthoredKpiBlock(block = {}, fieldCatalog = {}) {
+    var _a5, _b, _c, _d, _e, _f, _g, _h;
+    const normalizedBlock = buildReportDocumentKpiBlock(block);
+    if (!normalizedBlock) {
+      return normalizedBlock;
+    }
+    const valueFieldEntry = resolveReportBuilderCatalogEntry(fieldCatalog, normalizedBlock == null ? void 0 : normalizedBlock.valueField);
+    const secondaryFieldEntry = resolveReportBuilderCatalogEntry(fieldCatalog, normalizedBlock == null ? void 0 : normalizedBlock.secondaryField);
+    const nextBlock = {
+      ...normalizedBlock
+    };
+    if (!normalizeString29(nextBlock == null ? void 0 : nextBlock.valueLabel)) {
+      const valueFieldId = resolveReportBuilderFieldId(valueFieldEntry == null ? void 0 : valueFieldEntry.entry);
+      const valueLabel = normalizeString29(((_a5 = valueFieldEntry == null ? void 0 : valueFieldEntry.entry) == null ? void 0 : _a5.label) || valueFieldId);
+      if (valueLabel) {
+        nextBlock.valueLabel = valueLabel;
+      }
+    }
+    if (!normalizeString29(nextBlock == null ? void 0 : nextBlock.valueFormat) && normalizeString29((_b = valueFieldEntry == null ? void 0 : valueFieldEntry.entry) == null ? void 0 : _b.format)) {
+      nextBlock.valueFormat = normalizeString29(valueFieldEntry.entry.format);
+    }
+    if (normalizeString29(nextBlock == null ? void 0 : nextBlock.secondaryField) && (secondaryFieldEntry == null ? void 0 : secondaryFieldEntry.entry)) {
+      const secondaryFieldId = resolveReportBuilderFieldId(secondaryFieldEntry.entry);
+      const secondaryDisplayKey = normalizeString29(
+        (nextBlock == null ? void 0 : nextBlock.secondaryDisplayKey) || ((_c = secondaryFieldEntry == null ? void 0 : secondaryFieldEntry.entry) == null ? void 0 : _c.displayKey) || ((_d = secondaryFieldEntry == null ? void 0 : secondaryFieldEntry.entry) == null ? void 0 : _d.displayPath) || ((_e = secondaryFieldEntry == null ? void 0 : secondaryFieldEntry.entry) == null ? void 0 : _e.key) || secondaryFieldId
+      );
+      const secondaryDisplayValueMap = !(nextBlock == null ? void 0 : nextBlock.secondaryDisplayValueMap) && ((_f = secondaryFieldEntry == null ? void 0 : secondaryFieldEntry.entry) == null ? void 0 : _f.displayValueMap) && typeof secondaryFieldEntry.entry.displayValueMap === "object" && !Array.isArray(secondaryFieldEntry.entry.displayValueMap) ? cloneValue19(secondaryFieldEntry.entry.displayValueMap) : null;
+      if (secondaryDisplayKey && (secondaryDisplayKey !== normalizeString29(nextBlock == null ? void 0 : nextBlock.secondaryField) || secondaryDisplayValueMap)) {
+        nextBlock.secondaryDisplayKey = secondaryDisplayKey;
+      }
+      if (secondaryDisplayValueMap) {
+        nextBlock.secondaryDisplayValueMap = secondaryDisplayValueMap;
+      }
+      if (!normalizeString29(nextBlock == null ? void 0 : nextBlock.secondaryLabel)) {
+        const secondaryLabel = normalizeString29(((_g = secondaryFieldEntry == null ? void 0 : secondaryFieldEntry.entry) == null ? void 0 : _g.label) || secondaryFieldId);
+        if (secondaryLabel) {
+          nextBlock.secondaryLabel = secondaryLabel;
+        }
+      }
+      if (!normalizeString29(nextBlock == null ? void 0 : nextBlock.secondaryFormat) && normalizeString29((_h = secondaryFieldEntry == null ? void 0 : secondaryFieldEntry.entry) == null ? void 0 : _h.format)) {
+        nextBlock.secondaryFormat = normalizeString29(secondaryFieldEntry.entry.format);
+      }
+    }
+    return nextBlock;
+  }
+  function resolveAuthoredFieldDisplayDescriptor(fieldCatalog = {}, field = "") {
+    const catalogEntry = resolveReportBuilderCatalogEntry(fieldCatalog, field);
+    const fieldId = resolveReportBuilderFieldId(catalogEntry == null ? void 0 : catalogEntry.entry);
+    if (!(catalogEntry == null ? void 0 : catalogEntry.entry) || !fieldId) {
+      return null;
+    }
+    const sourceKey = normalizeString29(catalogEntry.entry.key || catalogEntry.entry.id || fieldId) || fieldId;
+    const displayKey = normalizeString29(
+      catalogEntry.entry.displayKey || catalogEntry.entry.displayPath || sourceKey
+    ) || sourceKey;
+    const displayValueMap = catalogEntry.entry.displayValueMap && typeof catalogEntry.entry.displayValueMap === "object" && !Array.isArray(catalogEntry.entry.displayValueMap) ? cloneValue19(catalogEntry.entry.displayValueMap) : null;
+    if (displayKey === sourceKey && !displayValueMap) {
+      return null;
+    }
+    return {
+      sourceKey,
+      ...displayKey !== sourceKey ? { displayKey } : {},
+      ...displayValueMap ? { displayValueMap } : {}
+    };
+  }
+  function buildAuthoredTemplateFieldDisplayMap(template = "", fieldCatalog = {}) {
+    const mappings = {};
+    const matches = String(template || "").matchAll(/\brow\.([A-Za-z_][A-Za-z0-9_.]*)/g);
+    for (const match2 of matches) {
+      const field = normalizeString29(match2 == null ? void 0 : match2[1]);
+      const descriptor = resolveAuthoredFieldDisplayDescriptor(fieldCatalog, field);
+      if (field && descriptor) {
+        mappings[field] = descriptor;
+      }
+    }
+    return Object.keys(mappings).length > 0 ? mappings : null;
+  }
+  function buildAuthoredMarkdownBlock(block = {}, fieldCatalog = {}) {
+    const normalizedBlock = buildReportDocumentMarkdownBlock(block);
+    const templateFieldDisplayMap = buildAuthoredTemplateFieldDisplayMap(normalizedBlock == null ? void 0 : normalizedBlock.markdown, fieldCatalog);
+    return {
+      ...normalizedBlock,
+      ...templateFieldDisplayMap ? { templateFieldDisplayMap } : {}
+    };
+  }
+  function buildAuthoredCollectionBlock(block = {}, fieldCatalog = {}) {
+    const normalizedBlock = buildReportDocumentCollectionBlock(block);
+    const itemTitleDisplay = resolveAuthoredFieldDisplayDescriptor(fieldCatalog, normalizedBlock == null ? void 0 : normalizedBlock.itemTitleField);
+    const secondaryDisplay = resolveAuthoredFieldDisplayDescriptor(fieldCatalog, normalizedBlock == null ? void 0 : normalizedBlock.secondaryField);
+    const templateFieldDisplayMap = buildAuthoredTemplateFieldDisplayMap(normalizedBlock == null ? void 0 : normalizedBlock.bodyTemplate, fieldCatalog);
+    return {
+      ...normalizedBlock,
+      ...(itemTitleDisplay == null ? void 0 : itemTitleDisplay.displayKey) ? { itemTitleDisplayKey: itemTitleDisplay.displayKey } : {},
+      ...(itemTitleDisplay == null ? void 0 : itemTitleDisplay.displayValueMap) ? { itemTitleDisplayValueMap: itemTitleDisplay.displayValueMap } : {},
+      ...(secondaryDisplay == null ? void 0 : secondaryDisplay.displayKey) ? { secondaryDisplayKey: secondaryDisplay.displayKey } : {},
+      ...(secondaryDisplay == null ? void 0 : secondaryDisplay.displayValueMap) ? { secondaryDisplayValueMap: secondaryDisplay.displayValueMap } : {},
+      ...templateFieldDisplayMap ? { templateFieldDisplayMap } : {}
+    };
+  }
+  function buildAuthoredBadgesBlock(block = {}, fieldCatalog = {}) {
+    const normalizedBlock = buildReportDocumentBadgesBlock(block);
+    if (!normalizedBlock) {
+      return normalizedBlock;
+    }
+    normalizedBlock.items = (Array.isArray(normalizedBlock == null ? void 0 : normalizedBlock.items) ? normalizedBlock.items : []).map((item) => {
+      var _a5, _b, _c, _d, _e, _f;
+      const normalizedItem = item && typeof item === "object" && !Array.isArray(item) ? cloneValue19(item) : null;
+      if (!normalizedItem) {
+        return item;
+      }
+      const valueFieldEntry = resolveReportBuilderCatalogEntry(fieldCatalog, normalizedItem == null ? void 0 : normalizedItem.valueField);
+      const valueFieldId = resolveReportBuilderFieldId(valueFieldEntry == null ? void 0 : valueFieldEntry.entry);
+      if (!normalizeString29(normalizedItem == null ? void 0 : normalizedItem.valueField) || !(valueFieldEntry == null ? void 0 : valueFieldEntry.entry) || !valueFieldId) {
+        return normalizedItem;
+      }
+      const displayKey = normalizeString29(
+        (normalizedItem == null ? void 0 : normalizedItem.displayKey) || ((_a5 = valueFieldEntry == null ? void 0 : valueFieldEntry.entry) == null ? void 0 : _a5.displayKey) || ((_b = valueFieldEntry == null ? void 0 : valueFieldEntry.entry) == null ? void 0 : _b.displayPath) || ((_c = valueFieldEntry == null ? void 0 : valueFieldEntry.entry) == null ? void 0 : _c.key) || valueFieldId
+      );
+      if (displayKey && displayKey !== normalizeString29(normalizedItem == null ? void 0 : normalizedItem.valueField)) {
+        normalizedItem.displayKey = displayKey;
+      }
+      if (!(normalizedItem == null ? void 0 : normalizedItem.displayValueMap) && ((_d = valueFieldEntry == null ? void 0 : valueFieldEntry.entry) == null ? void 0 : _d.displayValueMap) && typeof valueFieldEntry.entry.displayValueMap === "object" && !Array.isArray(valueFieldEntry.entry.displayValueMap)) {
+        normalizedItem.displayValueMap = cloneValue19(valueFieldEntry.entry.displayValueMap);
+      }
+      if (!normalizeString29(normalizedItem == null ? void 0 : normalizedItem.format) && normalizeString29((_e = valueFieldEntry == null ? void 0 : valueFieldEntry.entry) == null ? void 0 : _e.format)) {
+        normalizedItem.format = normalizeString29(valueFieldEntry.entry.format);
+      }
+      if (!normalizeString29(normalizedItem == null ? void 0 : normalizedItem.label)) {
+        const label = normalizeString29(((_f = valueFieldEntry == null ? void 0 : valueFieldEntry.entry) == null ? void 0 : _f.label) || valueFieldId);
+        if (label) {
+          normalizedItem.label = label;
+        }
+      }
+      return normalizedItem;
+    });
+    return normalizedBlock;
+  }
+  function buildStaticDatasetReportBuilderConfig(baseConfig = {}, dataset = null) {
+    var _a5;
+    const normalizedDataset = dataset && typeof dataset === "object" && !Array.isArray(dataset) ? dataset : null;
+    if (!normalizedDataset) {
+      return baseConfig;
+    }
+    const columnOptions = Array.isArray(normalizedDataset == null ? void 0 : normalizedDataset.columnOptions) ? normalizedDataset.columnOptions : [];
+    const inheritRuntimeFieldCatalog = ((_a5 = normalizedDataset == null ? void 0 : normalizedDataset.capabilities) == null ? void 0 : _a5.inheritRuntimeFieldCatalog) === true && columnOptions.length === 0;
+    const dimensions = inheritRuntimeFieldCatalog ? cloneValue19((baseConfig == null ? void 0 : baseConfig.dimensions) || []) : columnOptions.filter((column) => normalizeString29(column == null ? void 0 : column.kind) === "dimension").map((column) => ({
+      id: normalizeString29(column == null ? void 0 : column.key),
+      key: normalizeString29(column == null ? void 0 : column.key),
+      label: normalizeString29((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
+      ...normalizeString29(column == null ? void 0 : column.format) ? { format: normalizeString29(column.format) } : {},
+      ...(column == null ? void 0 : column.rowIdentity) === true ? { rowIdentity: true } : {}
+    })).filter((entry) => entry.id && entry.key && entry.label);
+    const measures = inheritRuntimeFieldCatalog ? cloneValue19((baseConfig == null ? void 0 : baseConfig.measures) || []) : columnOptions.filter((column) => normalizeString29(column == null ? void 0 : column.kind) === "measure").map((column) => ({
+      id: normalizeString29(column == null ? void 0 : column.key),
+      key: normalizeString29(column == null ? void 0 : column.key),
+      label: normalizeString29((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
+      ...normalizeString29(column == null ? void 0 : column.format) ? { format: normalizeString29(column.format) } : {},
+      ...(column == null ? void 0 : column.rowIdentity) === true ? { rowIdentity: true } : {}
+    })).filter((entry) => entry.id && entry.key && entry.label);
+    return {
+      ...isPlainObject7(baseConfig) ? cloneValue19(baseConfig) : {},
+      dataSourceRef: normalizeString29((normalizedDataset == null ? void 0 : normalizedDataset.dataSourceRef) || (baseConfig == null ? void 0 : baseConfig.dataSourceRef)),
+      dimensions,
+      measures
+    };
+  }
+  function augmentReportRequestForAuthoredBlocks(baseSpec = {}, blocks = [], config = {}) {
+    const datasets = Array.isArray(baseSpec == null ? void 0 : baseSpec.datasets) ? baseSpec.datasets : [];
+    if (datasets.length === 0) {
+      return baseSpec;
+    }
+    const nextSpec = cloneValue19(baseSpec);
+    const fieldCatalog = buildReportBuilderFieldCatalog(config);
+    const datasetFieldCatalogs = new Map(normalizeReportBuilderPublishedDataSources(config).map((source) => [
+      source.id,
+      buildReportBuilderFieldCatalog(buildReportBuilderPublishedDatasetConfig(config, source, { borrowBase: true }))
+    ]));
+    const calculatedFields = Array.isArray(nextSpec == null ? void 0 : nextSpec.calculatedFields) ? nextSpec.calculatedFields : [];
+    nextSpec.calculatedFields = calculatedFields;
+    const calculatedFieldIds = new Set(
+      calculatedFields.map((field) => {
+        const fieldId = resolveReportBuilderFieldId(field);
+        return fieldId ? `${normalizeString29((field == null ? void 0 : field.datasetRef) || "primary") || "primary"}:${fieldId}` : "";
+      }).filter(Boolean)
+    );
+    const visitingCalculatedFields = /* @__PURE__ */ new Set();
+    const enableField = (fieldKey = "", datasetRef = "primary", request = null) => {
+      var _a5;
+      const normalizedDatasetRef = normalizeString29(datasetRef || "primary") || "primary";
+      if (!request || typeof request !== "object" || Array.isArray(request)) {
+        return false;
+      }
+      if (["staticJson", "staticCsv"].includes(request.kind)) {
+        return Array.isArray(request.columnKeys) && request.columnKeys.includes(normalizeString29(fieldKey));
+      }
+      const catalogEntry = resolveReportBuilderCatalogEntry(datasetFieldCatalogs.get(normalizedDatasetRef) || fieldCatalog, fieldKey);
+      if (!catalogEntry) {
+        return false;
+      }
+      if (catalogEntry.kind === "calculated") {
+        const calculatedField = catalogEntry.entry;
+        const calculatedFieldId = resolveReportBuilderFieldId(calculatedField);
+        if (!calculatedFieldId) {
+          return false;
+        }
+        const calculatedFieldKey = `${normalizedDatasetRef}:${calculatedFieldId}`;
+        if (!calculatedFieldIds.has(calculatedFieldKey)) {
+          nextSpec.calculatedFields.push({
+            ...cloneValue19(calculatedField),
+            datasetRef: normalizedDatasetRef
+          });
+          calculatedFieldIds.add(calculatedFieldKey);
+        }
+        if (visitingCalculatedFields.has(calculatedFieldKey)) {
+          return true;
+        }
+        visitingCalculatedFields.add(calculatedFieldKey);
+        normalizeStringArray6(calculatedField == null ? void 0 : calculatedField.dependencies).forEach((dependencyKey) => enableField(dependencyKey, normalizedDatasetRef, request));
+        visitingCalculatedFields.delete(calculatedFieldKey);
+        return true;
+      }
+      setNestedValue3(
+        request,
+        normalizeString29(
+          ((_a5 = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _a5.paramPath) || `${catalogEntry.kind === "measure" ? "measures" : "dimensions"}.${resolveReportBuilderFieldId(catalogEntry == null ? void 0 : catalogEntry.entry) || normalizeString29(fieldKey)}`
+        ),
+        true
+      );
+      return true;
+    };
+    (Array.isArray(blocks) ? blocks : []).forEach((block) => {
+      var _a5, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+      const normalizedBlock = block && typeof block === "object" && !Array.isArray(block) ? block : null;
+      if (!normalizedBlock) {
+        return;
+      }
+      const normalizedDatasetRef = normalizeString29((normalizedBlock == null ? void 0 : normalizedBlock.datasetRef) || "primary") || "primary";
+      const dataset = nextSpec.datasets.find((entry) => normalizeString29(entry == null ? void 0 : entry.id) === normalizedDatasetRef) || null;
+      const request = dataset == null ? void 0 : dataset.request;
+      if (!request || typeof request !== "object" || Array.isArray(request)) {
+        return;
+      }
+      switch (normalizeString29(normalizedBlock == null ? void 0 : normalizedBlock.kind)) {
+        case "chartBlock":
+          enableField((_a5 = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _a5.xField, normalizedDatasetRef, request);
+          normalizeString29((_b = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _b.seriesField) && enableField(normalizedBlock.chartSpec.seriesField, normalizedDatasetRef, request);
+          (Array.isArray((_c = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _c.yFields) ? normalizedBlock.chartSpec.yFields : []).forEach((fieldKey) => enableField(fieldKey, normalizedDatasetRef, request));
+          break;
+        case "kpiBlock":
+          enableField(normalizedBlock == null ? void 0 : normalizedBlock.valueField, normalizedDatasetRef, request);
+          if (normalizedBlock.sparkline) {
+            const sparkline = normalizeKpiSparkline(normalizedBlock.sparkline);
+            for (const ref of [sparkline.datasetRef, sparkline.comparisonDatasetRef].filter(Boolean)) {
+              const targetDataset = nextSpec.datasets.find((entry) => normalizeString29(entry == null ? void 0 : entry.id) === ref);
+              if (!targetDataset) throw new Error(`KPI sparkline dataset '${ref}' is unavailable.`);
+              const target = targetDataset.request;
+              if (target && (!enableField(sparkline.valueField, ref, target) || !enableField(sparkline.categoryField, ref, target))) throw new Error("KPI sparkline fields must be declared by their dataset.");
+            }
+          }
+          {
+            const secondaryRef = normalizeString29(normalizedBlock == null ? void 0 : normalizedBlock.secondaryDatasetRef) || normalizedDatasetRef;
+            const secondaryRequest = (_d = nextSpec.datasets.find((entry) => normalizeString29(entry == null ? void 0 : entry.id) === secondaryRef)) == null ? void 0 : _d.request;
+            if (secondaryRequest) enableField(normalizedBlock == null ? void 0 : normalizedBlock.secondaryField, secondaryRef, secondaryRequest);
+          }
+          break;
+        case "badgesBlock":
+          (Array.isArray(normalizedBlock == null ? void 0 : normalizedBlock.items) ? normalizedBlock.items : []).forEach((item) => {
+            enableField(item == null ? void 0 : item.valueField, normalizedDatasetRef, request);
+          });
+          break;
+        case "tableBlock":
+          (Array.isArray(normalizedBlock == null ? void 0 : normalizedBlock.columns) ? normalizedBlock.columns : []).forEach((column) => {
+            var _a6, _b2, _c2;
+            enableField(column == null ? void 0 : column.key, normalizedDatasetRef, request);
+            enableField((_a6 = column == null ? void 0 : column.cellVisual) == null ? void 0 : _a6.valueField, normalizedDatasetRef, request);
+            enableField((_b2 = column == null ? void 0 : column.link) == null ? void 0 : _b2.urlField, normalizedDatasetRef, request);
+            enableField((_c2 = column == null ? void 0 : column.link) == null ? void 0 : _c2.idField, normalizedDatasetRef, request);
+          });
+          break;
+        case "geoMapBlock":
+          enableField((_e = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _e.key, normalizedDatasetRef, request);
+          enableField((_f = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _f.labelKey, normalizedDatasetRef, request);
+          enableField((_h = (_g = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _g.metric) == null ? void 0 : _h.key, normalizedDatasetRef, request);
+          enableField((_j = (_i = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _i.color) == null ? void 0 : _j.field, normalizedDatasetRef, request);
+          break;
+        default:
+          break;
+      }
+    });
+    return nextSpec;
+  }
+  function resolveDocumentId(container = {}) {
+    return resolveContainerIdentity2(container) || "reportDocument";
+  }
+  function resolveDocumentTitle(container = {}, config = {}) {
+    return normalizeString29((container == null ? void 0 : container.title) || (config == null ? void 0 : config.title) || "Report");
+  }
+  function resolveDocumentMetadataValue(value, fallback = "") {
+    const normalized = normalizeString29(value);
+    return normalized || normalizeString29(fallback);
+  }
+  function resolveDocumentDataSourceRef(container = {}, config = {}) {
+    return normalizeString29((container == null ? void 0 : container.dataSourceRef) || (config == null ? void 0 : config.dataSourceRef));
+  }
+  function resolveDocumentTemplateIdentity(state = {}) {
+    const templateId = normalizeString29(state == null ? void 0 : state.reportDocumentTemplateId);
+    const templateLabel = normalizeString29(state == null ? void 0 : state.reportDocumentTemplateLabel);
+    if (!templateId && !templateLabel) {
+      return null;
+    }
+    return {
+      ...templateId ? { templateId } : {},
+      ...templateLabel ? { templateLabel } : {}
+    };
+  }
+  function buildPrimaryDatasetFieldContract(entry = {}) {
+    const paramPath = normalizeString29(entry == null ? void 0 : entry.paramPath);
+    const rawId = normalizeString29(entry == null ? void 0 : entry.rawId);
+    const semanticRef = normalizeString29(entry == null ? void 0 : entry.semanticRef);
+    const description = normalizeString29(entry == null ? void 0 : entry.description);
+    const category = normalizeString29(entry == null ? void 0 : entry.category);
+    const definitionRef = normalizeString29(entry == null ? void 0 : entry.definitionRef);
+    return {
+      ...paramPath ? { paramPath } : {},
+      ...(entry == null ? void 0 : entry.rowIdentity) === true ? { rowIdentity: true } : {},
+      ...(entry == null ? void 0 : entry.default) === true ? { default: true } : {},
+      ...(entry == null ? void 0 : entry.chartAxis) === true ? { chartAxis: true } : {},
+      ...(entry == null ? void 0 : entry.required) === true ? { required: true } : {},
+      ...isPlainObject7(entry == null ? void 0 : entry.runtimeFilter) ? { runtimeFilter: cloneValue19(entry.runtimeFilter) } : {},
+      ...rawId ? { rawId } : {},
+      ...semanticRef ? { semanticRef } : {},
+      ...description ? { description } : {},
+      ...category ? { category } : {},
+      ...definitionRef ? { definitionRef } : {},
+      ...isPlainObject7(entry == null ? void 0 : entry.governance) ? { governance: cloneValue19(entry.governance) } : {}
+    };
+  }
+  function stripReportBuilderDocumentDatasetCatalog(config = {}) {
+    const next = cloneValue19(isPlainObject7(config) ? config : {});
+    delete next.binding;
+    delete next.dataSources;
+    delete next.datasets;
+    return next;
+  }
+  function stripReportBuilderDocumentPrimaryFieldContract(config = {}) {
+    const next = cloneValue19(isPlainObject7(config) ? config : {});
+    delete next.dimensions;
+    delete next.measures;
+    delete next.calculatedFields;
+    delete next.computedMeasures;
+    delete next.tableCalculations;
+    delete next.staticFilters;
+    return next;
+  }
+  function stripReportBuilderDocumentPresentationMetadata(config = {}, presentation = null) {
+    const next = cloneValue19(isPlainObject7(config) ? config : {});
+    if (!isPlainObject7(presentation)) {
+      return next;
+    }
+    if (Array.isArray(presentation == null ? void 0 : presentation.groupByOptions) && presentation.groupByOptions.length > 0 && isPlainObject7(next.groupBy)) {
+      delete next.groupBy.options;
+      if (Object.keys(next.groupBy).length === 0) {
+        delete next.groupBy;
+      }
+    }
+    if (Array.isArray(presentation == null ? void 0 : presentation.orderFields) && presentation.orderFields.length > 0) {
+      delete next.orderFields;
+    }
+    if (isPlainObject7(next.result)) {
+      if (Array.isArray(presentation == null ? void 0 : presentation.orderFields) && presentation.orderFields.length > 0) {
+        delete next.result.orderFields;
+      }
+      if (Array.isArray(presentation == null ? void 0 : presentation.defaultTablePresets) && presentation.defaultTablePresets.length > 0) {
+        delete next.result.defaultTablePresets;
+      }
+      if (normalizeString29(presentation == null ? void 0 : presentation.defaultMode)) {
+        delete next.result.defaultMode;
+      }
+      if ((Number((presentation == null ? void 0 : presentation.pageSize) || 0) || 0) > 0) {
+        delete next.result.pageSize;
+      }
+      if (normalizeString29(presentation == null ? void 0 : presentation.chartCreationMode)) {
+        delete next.result.chartCreationMode;
+      }
+      if (normalizeString29(presentation == null ? void 0 : presentation.resultPanePosition)) {
+        delete next.result.resultPanePosition;
+      }
+      if (Array.isArray(presentation == null ? void 0 : presentation.defaultChartSpecs) && presentation.defaultChartSpecs.length > 0) {
+        delete next.result.defaultChartSpecs;
+      }
+      if (Object.keys(next.result).length === 0) {
+        delete next.result;
+      }
+    }
+    return next;
+  }
+  function stripReportBuilderDocumentAuthoringState(state = {}) {
+    const next = cloneValue19(isPlainObject7(state) ? state : {});
+    delete next.binding;
+    delete next.reportDocumentBlocks;
+    delete next.reportDocumentLayout;
+    delete next.reportStaticDatasets;
+    return next;
+  }
+  function buildReportBuilderReportDocumentDatasets(container = {}, config = {}, state = {}) {
+    const effectiveConfig = buildReportBuilderCalculatedFieldConfig(config, state);
+    const primaryDimensions = Array.isArray(effectiveConfig == null ? void 0 : effectiveConfig.dimensions) ? cloneValue19(effectiveConfig.dimensions) : [];
+    const primaryMeasures = Array.isArray(effectiveConfig == null ? void 0 : effectiveConfig.measures) ? cloneValue19(effectiveConfig.measures) : [];
+    const primaryCalculatedFields = Array.isArray(effectiveConfig == null ? void 0 : effectiveConfig.calculatedFields) ? cloneValue19(effectiveConfig.calculatedFields) : [];
+    const primaryComputedMeasures = Array.isArray(effectiveConfig == null ? void 0 : effectiveConfig.computedMeasures) ? cloneValue19(effectiveConfig.computedMeasures) : [];
+    const primaryTableCalculations = Array.isArray(effectiveConfig == null ? void 0 : effectiveConfig.tableCalculations) ? cloneValue19(effectiveConfig.tableCalculations) : [];
+    const dataSourceRef = resolveDocumentDataSourceRef(container, config);
+    const primarySource = normalizeReportBuilderPublishedDataSources(config).find((dataset) => dataset.id === "primary" && dataset.dataSourceRef === dataSourceRef);
+    const primaryResultContract = isPlainObject7(config == null ? void 0 : config.resultContract) ? config.resultContract : primarySource == null ? void 0 : primarySource.resultContract;
+    const dimensions = (Array.isArray(effectiveConfig == null ? void 0 : effectiveConfig.dimensions) ? effectiveConfig.dimensions : []).map((entry) => {
+      const id = normalizeString29((entry == null ? void 0 : entry.id) || (entry == null ? void 0 : entry.key));
+      const key = normalizeString29((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id));
+      if (!id || !key) {
+        return null;
+      }
+      return {
+        id,
+        key,
+        label: normalizeString29((entry == null ? void 0 : entry.label) || key) || key,
+        kind: "dimension",
+        ...(entry == null ? void 0 : entry.rowIdentity) === true ? { rowIdentity: true } : {},
+        ...normalizeString29((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) ? { sourceKey: normalizeString29((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) } : {},
+        ...normalizeString29(entry == null ? void 0 : entry.displayKey) ? { displayKey: normalizeString29(entry.displayKey) } : {},
+        ...(entry == null ? void 0 : entry.displayValueMap) && typeof entry.displayValueMap === "object" && !Array.isArray(entry.displayValueMap) ? { displayValueMap: cloneValue19(entry.displayValueMap) } : {},
+        ...normalizeString29(entry == null ? void 0 : entry.format) ? { format: normalizeString29(entry.format) } : {},
+        ...normalizeString29(entry == null ? void 0 : entry.tickFormat) ? { tickFormat: normalizeString29(entry.tickFormat) } : {},
+        ...["civil", "instant"].includes(normalizeString29(entry == null ? void 0 : entry.valueMode)) ? { valueMode: normalizeString29(entry.valueMode) } : {},
+        ...normalizeString29(entry == null ? void 0 : entry.rawId) ? { rawId: normalizeString29(entry.rawId) } : {},
+        ...normalizeString29(entry == null ? void 0 : entry.description) ? { description: normalizeString29(entry.description) } : {},
+        ...normalizeString29(entry == null ? void 0 : entry.category) ? { category: normalizeString29(entry.category) } : {},
+        ...normalizeString29(entry == null ? void 0 : entry.definitionRef) ? { definitionRef: normalizeString29(entry.definitionRef) } : {},
+        ...normalizeString29(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: normalizeString29(entry.semanticRef) } : {},
+        ...(entry == null ? void 0 : entry.governance) && typeof entry.governance === "object" && !Array.isArray(entry.governance) ? { governance: cloneValue19(entry.governance) } : {},
+        ...(entry == null ? void 0 : entry.default) === true ? { default: true } : {},
+        ...(entry == null ? void 0 : entry.chartAxis) === true ? { chartAxis: true } : {},
+        ...normalizeString29(entry == null ? void 0 : entry.paramPath) ? { paramPath: normalizeString29(entry.paramPath) } : {},
+        ...(entry == null ? void 0 : entry.runtimeFilter) && typeof entry.runtimeFilter === "object" && !Array.isArray(entry.runtimeFilter) ? { runtimeFilter: cloneValue19(entry.runtimeFilter) } : {}
+      };
+    }).filter(Boolean);
+    const measures = [
+      ...(Array.isArray(effectiveConfig == null ? void 0 : effectiveConfig.measures) ? effectiveConfig.measures : []).map((entry) => {
+        const id = normalizeString29((entry == null ? void 0 : entry.id) || (entry == null ? void 0 : entry.key));
+        const key = normalizeString29((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id));
+        if (!id || !key) {
+          return null;
+        }
+        return {
+          id,
+          key,
+          label: normalizeString29((entry == null ? void 0 : entry.label) || key) || key,
+          kind: "measure",
+          ...(entry == null ? void 0 : entry.rowIdentity) === true ? { rowIdentity: true } : {},
+          ...normalizeString29(entry == null ? void 0 : entry.format) ? { format: normalizeString29(entry.format) } : {},
+          ...normalizeString29((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) ? { sourceKey: normalizeString29((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) } : {},
+          ...normalizeString29(entry == null ? void 0 : entry.rawId) ? { rawId: normalizeString29(entry.rawId) } : {},
+          ...normalizeString29(entry == null ? void 0 : entry.description) ? { description: normalizeString29(entry.description) } : {},
+          ...normalizeString29(entry == null ? void 0 : entry.category) ? { category: normalizeString29(entry.category) } : {},
+          ...normalizeString29(entry == null ? void 0 : entry.definitionRef) ? { definitionRef: normalizeString29(entry.definitionRef) } : {},
+          ...normalizeString29(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: normalizeString29(entry.semanticRef) } : {},
+          ...(entry == null ? void 0 : entry.governance) && typeof entry.governance === "object" && !Array.isArray(entry.governance) ? { governance: cloneValue19(entry.governance) } : {},
+          ...(entry == null ? void 0 : entry.default) === true ? { default: true } : {},
+          ...normalizeString29(entry == null ? void 0 : entry.paramPath) ? { paramPath: normalizeString29(entry.paramPath) } : {}
+        };
+      }),
+      ...normalizeReportCalculatedFields([
+        ...Array.isArray(effectiveConfig == null ? void 0 : effectiveConfig.calculatedFields) ? effectiveConfig.calculatedFields : [],
+        ...Array.isArray(effectiveConfig == null ? void 0 : effectiveConfig.computedMeasures) ? effectiveConfig.computedMeasures : [],
+        ...Array.isArray(effectiveConfig == null ? void 0 : effectiveConfig.tableCalculations) ? effectiveConfig.tableCalculations : []
+      ], {
+        datasetRef: "primary"
+      }).map((entry) => {
+        const id = normalizeString29((entry == null ? void 0 : entry.id) || (entry == null ? void 0 : entry.key));
+        const key = normalizeString29((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id));
+        if (!id || !key) {
+          return null;
+        }
+        return {
+          id,
+          key,
+          label: normalizeString29((entry == null ? void 0 : entry.label) || key) || key,
+          kind: "measure",
+          ...(entry == null ? void 0 : entry.rowIdentity) === true ? { rowIdentity: true } : {},
+          ...normalizeString29(entry == null ? void 0 : entry.format) ? { format: normalizeString29(entry.format) } : {}
+        };
+      })
+    ].filter(Boolean);
+    const primaryDataset = dataSourceRef ? {
+      id: "primary",
+      dataSourceRef,
+      label: normalizeString29((config == null ? void 0 : config.title) || dataSourceRef) || dataSourceRef,
+      description: "Primary report dataset",
+      kindLabel: "primary",
+      ...isPlainObject7(config == null ? void 0 : config.scope) ? { scope: cloneValue19(config.scope) } : {},
+      ...isPlainObject7(config == null ? void 0 : config.source) ? { source: cloneValue19(config.source) } : {},
+      ...isPlainObject7(primaryResultContract) ? { resultContract: cloneValue19(primaryResultContract) } : {},
+      ...isPlainObject7(config == null ? void 0 : config.capabilities) ? { capabilities: cloneValue19(config.capabilities) } : {},
+      request: cloneValue19(buildReportBuilderRequest(config, state)),
+      ...primaryDimensions.length > 0 ? { dimensions: primaryDimensions } : {},
+      ...primaryMeasures.length > 0 ? { measures: primaryMeasures } : {},
+      ...primaryCalculatedFields.length > 0 ? { calculatedFields: primaryCalculatedFields } : {},
+      ...primaryComputedMeasures.length > 0 ? { computedMeasures: primaryComputedMeasures } : {},
+      ...primaryTableCalculations.length > 0 ? { tableCalculations: primaryTableCalculations } : {},
+      columnOptions: [
+        ...dimensions.map((entry) => ({
+          key: entry.key,
+          label: entry.label,
+          kind: "dimension",
+          ...(entry == null ? void 0 : entry.rowIdentity) === true ? { rowIdentity: true } : {},
+          ...(entry == null ? void 0 : entry.sourceKey) ? { sourceKey: entry.sourceKey } : {},
+          ...(entry == null ? void 0 : entry.displayKey) ? { displayKey: entry.displayKey } : {},
+          ...(entry == null ? void 0 : entry.displayValueMap) ? { displayValueMap: cloneValue19(entry.displayValueMap) } : {},
+          ...(entry == null ? void 0 : entry.format) ? { format: entry.format } : {},
+          ...(entry == null ? void 0 : entry.tickFormat) ? { tickFormat: entry.tickFormat } : {},
+          ...(entry == null ? void 0 : entry.valueMode) ? { valueMode: entry.valueMode } : {},
+          ...(entry == null ? void 0 : entry.rawId) ? { rawId: entry.rawId } : {},
+          ...(entry == null ? void 0 : entry.description) ? { description: entry.description } : {},
+          ...(entry == null ? void 0 : entry.category) ? { category: entry.category } : {},
+          ...(entry == null ? void 0 : entry.definitionRef) ? { definitionRef: entry.definitionRef } : {},
+          ...(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: entry.semanticRef } : {},
+          ...(entry == null ? void 0 : entry.governance) ? { governance: cloneValue19(entry.governance) } : {},
+          ...(entry == null ? void 0 : entry.default) === true ? { default: true } : {},
+          ...(entry == null ? void 0 : entry.chartAxis) === true ? { chartAxis: true } : {},
+          ...(entry == null ? void 0 : entry.paramPath) ? { paramPath: entry.paramPath } : {},
+          ...(entry == null ? void 0 : entry.runtimeFilter) ? { runtimeFilter: cloneValue19(entry.runtimeFilter) } : {}
+        })),
+        ...measures.map((entry) => ({
+          key: entry.key,
+          label: entry.label,
+          kind: "measure",
+          ...(entry == null ? void 0 : entry.rowIdentity) === true ? { rowIdentity: true } : {},
+          ...(entry == null ? void 0 : entry.sourceKey) ? { sourceKey: entry.sourceKey } : {},
+          ...(entry == null ? void 0 : entry.format) ? { format: entry.format } : {},
+          ...(entry == null ? void 0 : entry.rawId) ? { rawId: entry.rawId } : {},
+          ...(entry == null ? void 0 : entry.description) ? { description: entry.description } : {},
+          ...(entry == null ? void 0 : entry.category) ? { category: entry.category } : {},
+          ...(entry == null ? void 0 : entry.definitionRef) ? { definitionRef: entry.definitionRef } : {},
+          ...(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: entry.semanticRef } : {},
+          ...(entry == null ? void 0 : entry.governance) ? { governance: cloneValue19(entry.governance) } : {},
+          ...(entry == null ? void 0 : entry.default) === true ? { default: true } : {},
+          ...(entry == null ? void 0 : entry.paramPath) ? { paramPath: entry.paramPath } : {}
+        }))
+      ],
+      valueFieldOptions: measures.map((entry) => ({
+        value: entry.key,
+        label: entry.label,
+        ...(entry == null ? void 0 : entry.format) ? { format: entry.format } : {},
+        ...(entry == null ? void 0 : entry.rawId) ? { rawId: entry.rawId } : {},
+        ...(entry == null ? void 0 : entry.description) ? { description: entry.description } : {},
+        ...(entry == null ? void 0 : entry.category) ? { category: entry.category } : {},
+        ...(entry == null ? void 0 : entry.definitionRef) ? { definitionRef: entry.definitionRef } : {},
+        ...(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: entry.semanticRef } : {},
+        ...(entry == null ? void 0 : entry.governance) ? { governance: cloneValue19(entry.governance) } : {},
+        ...(entry == null ? void 0 : entry.default) === true ? { default: true } : {}
+      })),
+      secondaryFieldOptions: dimensions.map((entry) => ({
+        value: entry.key,
+        label: entry.label,
+        ...(entry == null ? void 0 : entry.format) ? { format: entry.format } : {},
+        ...(entry == null ? void 0 : entry.rawId) ? { rawId: entry.rawId } : {},
+        ...(entry == null ? void 0 : entry.description) ? { description: entry.description } : {},
+        ...(entry == null ? void 0 : entry.category) ? { category: entry.category } : {},
+        ...(entry == null ? void 0 : entry.definitionRef) ? { definitionRef: entry.definitionRef } : {},
+        ...(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: entry.semanticRef } : {},
+        ...(entry == null ? void 0 : entry.governance) ? { governance: cloneValue19(entry.governance) } : {},
+        ...(entry == null ? void 0 : entry.default) === true ? { default: true } : {}
+      })),
+      chartFieldOptions: [
+        ...dimensions.map((entry) => ({
+          key: normalizeString29((entry == null ? void 0 : entry.displayKey) || (entry == null ? void 0 : entry.key)),
+          aliases: [entry.key],
+          label: entry.label,
+          kind: "dimension",
+          ...(entry == null ? void 0 : entry.format) ? { format: entry.format } : {},
+          ...(entry == null ? void 0 : entry.tickFormat) ? { tickFormat: entry.tickFormat } : {},
+          ...(entry == null ? void 0 : entry.valueMode) ? { valueMode: entry.valueMode } : {},
+          ...(entry == null ? void 0 : entry.rawId) ? { rawId: entry.rawId } : {},
+          ...(entry == null ? void 0 : entry.description) ? { description: entry.description } : {},
+          ...(entry == null ? void 0 : entry.category) ? { category: entry.category } : {},
+          ...(entry == null ? void 0 : entry.definitionRef) ? { definitionRef: entry.definitionRef } : {},
+          ...(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: entry.semanticRef } : {},
+          ...(entry == null ? void 0 : entry.governance) ? { governance: cloneValue19(entry.governance) } : {},
+          ...(entry == null ? void 0 : entry.default) === true ? { default: true } : {},
+          ...(entry == null ? void 0 : entry.chartAxis) === true ? { chartAxis: true } : {}
+        })),
+        ...measures.map((entry) => ({
+          key: entry.key,
+          aliases: [entry.key],
+          label: entry.label,
+          kind: "measure",
+          ...(entry == null ? void 0 : entry.format) ? { format: entry.format } : {},
+          ...(entry == null ? void 0 : entry.rawId) ? { rawId: entry.rawId } : {},
+          ...(entry == null ? void 0 : entry.description) ? { description: entry.description } : {},
+          ...(entry == null ? void 0 : entry.category) ? { category: entry.category } : {},
+          ...(entry == null ? void 0 : entry.definitionRef) ? { definitionRef: entry.definitionRef } : {},
+          ...(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: entry.semanticRef } : {},
+          ...(entry == null ? void 0 : entry.governance) ? { governance: cloneValue19(entry.governance) } : {},
+          ...(entry == null ? void 0 : entry.default) === true ? { default: true } : {},
+          align: "right"
+        }))
+      ],
+      scopeParamOptions: resolveReportBuilderScopeParamFilters(effectiveConfig).map((filter) => {
+        const value = normalizeString29((filter == null ? void 0 : filter.id) || (filter == null ? void 0 : filter.field));
+        if (!value) {
+          return null;
+        }
+        return {
+          value,
+          label: normalizeString29((filter == null ? void 0 : filter.label) || value),
+          ...normalizeString29(filter == null ? void 0 : filter.description) ? { description: normalizeString29(filter.description) } : {},
+          kind: normalizeString29((filter == null ? void 0 : filter.type) || ((filter == null ? void 0 : filter.multiple) ? "multiSelect" : "value")) || "value",
+          required: (filter == null ? void 0 : filter.required) === true,
+          ...normalizeString29(filter == null ? void 0 : filter.semanticRef) ? { semanticRef: normalizeString29(filter.semanticRef) } : {},
+          ...(filter == null ? void 0 : filter.multiple) === true ? { multiple: true } : {},
+          ...normalizeString29(filter == null ? void 0 : filter.presentation) ? { presentation: normalizeString29(filter.presentation) } : {},
+          ...Array.isArray(filter == null ? void 0 : filter.options) ? { options: cloneValue19(filter.options) } : {},
+          ...normalizeString29(filter == null ? void 0 : filter.paramPath) ? { paramPath: normalizeString29(filter.paramPath) } : {},
+          ...normalizeString29(filter == null ? void 0 : filter.startParamPath) ? { startParamPath: normalizeString29(filter.startParamPath) } : {},
+          ...normalizeString29(filter == null ? void 0 : filter.endParamPath) ? { endParamPath: normalizeString29(filter.endParamPath) } : {}
+        };
+      }).filter(Boolean)
+    } : null;
+    const staticDatasets = normalizeReportBuilderStaticDatasets(state == null ? void 0 : state.reportStaticDatasets);
+    const staticDatasetIds = new Set(
+      staticDatasets.map((dataset) => normalizeString29(dataset == null ? void 0 : dataset.id)).filter(Boolean)
+    );
+    const publishedDatasets = normalizeReportBuilderPublishedDataSources(config).map((dataset) => ({
+      id: normalizeString29(dataset == null ? void 0 : dataset.id),
+      dataSourceRef: normalizeString29(dataset == null ? void 0 : dataset.dataSourceRef),
+      label: normalizeString29(dataset == null ? void 0 : dataset.label),
+      description: normalizeString29(dataset == null ? void 0 : dataset.description),
+      kindLabel: normalizeString29(dataset == null ? void 0 : dataset.kindLabel),
+      ...normalizeReportDatasetScope(dataset == null ? void 0 : dataset.scope) ? { scope: normalizeReportDatasetScope(dataset == null ? void 0 : dataset.scope) } : {},
+      ...isPlainObject7(dataset == null ? void 0 : dataset.source) ? { source: cloneValue19(dataset.source) } : {},
+      ...isPlainObject7(dataset == null ? void 0 : dataset.resultContract) ? { resultContract: cloneValue19(dataset.resultContract) } : {},
+      ...isPlainObject7(dataset == null ? void 0 : dataset.capabilities) ? { capabilities: cloneValue19(dataset.capabilities) } : {},
+      request: (dataset == null ? void 0 : dataset.request) && typeof dataset.request === "object" && !Array.isArray(dataset.request) ? cloneValue19(dataset.request) : null,
+      columnOptions: Array.isArray(dataset == null ? void 0 : dataset.columnOptions) ? cloneValue19(dataset.columnOptions) : [],
+      valueFieldOptions: Array.isArray(dataset == null ? void 0 : dataset.valueFieldOptions) ? cloneValue19(dataset.valueFieldOptions) : [],
+      secondaryFieldOptions: Array.isArray(dataset == null ? void 0 : dataset.secondaryFieldOptions) ? cloneValue19(dataset.secondaryFieldOptions) : [],
+      chartFieldOptions: Array.isArray(dataset == null ? void 0 : dataset.chartFieldOptions) ? cloneValue19(dataset.chartFieldOptions) : [],
+      scopeParamOptions: Array.isArray(dataset == null ? void 0 : dataset.scopeParamOptions) ? cloneValue19(dataset.scopeParamOptions) : []
+    })).filter((dataset) => dataset.id && dataset.dataSourceRef && dataset.id !== "primary" && !staticDatasetIds.has(dataset.id));
+    return [...primaryDataset ? [primaryDataset] : [], ...publishedDatasets, ...staticDatasets];
+  }
+  function buildReportBuilderReportDocumentPresentation(config = {}, state = {}) {
+    var _a5;
+    const result = isPlainObject7(config == null ? void 0 : config.result) ? config.result : {};
+    const groupByOptions = Array.isArray((_a5 = config == null ? void 0 : config.groupBy) == null ? void 0 : _a5.options) ? cloneValue19(config.groupBy.options) : [];
+    const orderFields = Array.isArray(result == null ? void 0 : result.orderFields) ? cloneValue19(result.orderFields) : Array.isArray(config == null ? void 0 : config.orderFields) ? cloneValue19(config.orderFields) : [];
+    const defaultTablePresets = Array.isArray(result == null ? void 0 : result.defaultTablePresets) ? cloneValue19(result.defaultTablePresets) : [];
+    const defaultMode = normalizeString29((result == null ? void 0 : result.defaultMode) || "");
+    const pageSize = Number((result == null ? void 0 : result.pageSize) || (state == null ? void 0 : state.pageSize) || 0) || 0;
+    const chartCreationMode = normalizeString29((result == null ? void 0 : result.chartCreationMode) || "");
+    const resultPanePosition = normalizeString29((result == null ? void 0 : result.resultPanePosition) || "");
+    const defaultChartSpecs = Array.isArray(result == null ? void 0 : result.defaultChartSpecs) ? cloneValue19(result.defaultChartSpecs) : [];
+    if (groupByOptions.length === 0 && orderFields.length === 0 && defaultTablePresets.length === 0 && !defaultMode && pageSize < 1 && !chartCreationMode && !resultPanePosition && defaultChartSpecs.length === 0) {
+      return null;
+    }
+    return {
+      ...groupByOptions.length > 0 ? { groupByOptions } : {},
+      ...orderFields.length > 0 ? { orderFields } : {},
+      ...defaultTablePresets.length > 0 ? { defaultTablePresets } : {},
+      ...defaultMode ? { defaultMode } : {},
+      ...pageSize > 0 ? { pageSize } : {},
+      ...chartCreationMode ? { chartCreationMode } : {},
+      ...resultPanePosition ? { resultPanePosition } : {},
+      ...defaultChartSpecs.length > 0 ? { defaultChartSpecs } : {}
+    };
+  }
+  function resolveReportDocumentPresentation(document = null, fallbackConfig = {}, fallbackState = {}) {
+    const explicitPresentation = document && typeof document === "object" && !Array.isArray(document) && document.presentation && typeof document.presentation === "object" && !Array.isArray(document.presentation) ? cloneValue19(document.presentation) : null;
+    const fallbackPresentation = buildReportBuilderReportDocumentPresentation(fallbackConfig, fallbackState);
+    if (explicitPresentation && !fallbackPresentation) {
+      return explicitPresentation;
+    }
+    if (!explicitPresentation) {
+      return fallbackPresentation;
+    }
+    return {
+      ...cloneValue19(fallbackPresentation || {}),
+      ...cloneValue19(explicitPresentation)
+    };
+  }
+  function resolveReportDocumentBinding(document = null, fallbackConfig = null, fallbackState = null) {
+    const documentBinding = isPlainObject7(document == null ? void 0 : document.binding) ? document.binding : null;
+    if (documentBinding) {
+      return cloneValue19(documentBinding);
+    }
+    const stateBinding = isPlainObject7(fallbackState == null ? void 0 : fallbackState.binding) ? fallbackState.binding : null;
+    if (stateBinding) {
+      return cloneValue19(stateBinding);
+    }
+    const configBinding = isPlainObject7(fallbackConfig == null ? void 0 : fallbackConfig.binding) ? fallbackConfig.binding : null;
+    return configBinding ? cloneValue19(configBinding) : null;
+  }
+  function resolveReportDocumentStaticDatasets(document = null, fallbackState = null) {
+    const explicitDocumentDatasets = Array.isArray(document == null ? void 0 : document.datasets) ? document.datasets : [];
+    const explicitStaticDatasets = explicitDocumentDatasets.some((dataset) => Array.isArray(dataset == null ? void 0 : dataset.rows)) ? normalizeReportBuilderStaticDatasets(
+      explicitDocumentDatasets.filter((dataset) => Array.isArray(dataset == null ? void 0 : dataset.rows))
+    ) : [];
+    if (explicitStaticDatasets.length > 0) {
+      return explicitStaticDatasets;
+    }
+    return normalizeReportBuilderStaticDatasets(fallbackState == null ? void 0 : fallbackState.reportStaticDatasets);
+  }
+  function resolveReportDocumentPublishedDatasets(document = null, fallbackConfig = null) {
+    const explicitDocumentDatasets = Array.isArray(document == null ? void 0 : document.datasets) ? document.datasets : [];
+    const explicitPublishedDatasets = explicitDocumentDatasets.some((dataset) => !Array.isArray(dataset == null ? void 0 : dataset.rows)) ? normalizeReportBuilderPublishedDataSources({
+      datasets: explicitDocumentDatasets.filter((dataset) => !Array.isArray(dataset == null ? void 0 : dataset.rows) && normalizeString29(dataset == null ? void 0 : dataset.id) !== "primary")
+    }) : [];
+    if (explicitPublishedDatasets.length > 0) {
+      return explicitPublishedDatasets;
+    }
+    return normalizeReportBuilderPublishedDataSources(fallbackConfig);
+  }
+  function applyReportDocumentDatasetCatalogToConfig(config = {}, document = null) {
+    const publishedDatasets = resolveReportDocumentPublishedDatasets(document, config);
+    if (publishedDatasets.length === 0) {
+      return isPlainObject7(config) ? cloneValue19(config) : {};
+    }
+    return {
+      ...isPlainObject7(config) ? stripReportBuilderDocumentDatasetCatalog(config) : {},
+      datasets: cloneValue19(publishedDatasets)
+    };
+  }
+  function hasMeaningfulReportRequest(request = null) {
+    if (!isPlainObject7(request)) {
+      return false;
+    }
+    return Object.keys((request == null ? void 0 : request.measures) || {}).length > 0 || Object.keys((request == null ? void 0 : request.dimensions) || {}).length > 0 || Object.keys((request == null ? void 0 : request.filters) || {}).length > 0 || Array.isArray(request == null ? void 0 : request.orderBy) && request.orderBy.length > 0 || Array.isArray(request == null ? void 0 : request.refinements) && request.refinements.length > 0 || isPlainObject7(request == null ? void 0 : request.semanticSelection);
+  }
+  function shouldPreferDocumentPrimaryRequest(documentRequest = null, generatedRequest = null) {
+    if (!hasMeaningfulReportRequest(documentRequest)) {
+      return false;
+    }
+    if (!hasMeaningfulReportRequest(generatedRequest)) {
+      return true;
+    }
+    const documentHasFilters = Object.keys((documentRequest == null ? void 0 : documentRequest.filters) || {}).length > 0;
+    const generatedHasFilters = Object.keys((generatedRequest == null ? void 0 : generatedRequest.filters) || {}).length > 0;
+    if (documentHasFilters && !generatedHasFilters) {
+      return true;
+    }
+    const documentHasOrderBy = Array.isArray(documentRequest == null ? void 0 : documentRequest.orderBy) && documentRequest.orderBy.length > 0;
+    const generatedHasOrderBy = Array.isArray(generatedRequest == null ? void 0 : generatedRequest.orderBy) && generatedRequest.orderBy.length > 0;
+    if (documentHasOrderBy && !generatedHasOrderBy) {
+      return true;
+    }
+    const documentHasRefinements = Array.isArray(documentRequest == null ? void 0 : documentRequest.refinements) && documentRequest.refinements.length > 0;
+    const generatedHasRefinements = Array.isArray(generatedRequest == null ? void 0 : generatedRequest.refinements) && generatedRequest.refinements.length > 0;
+    if (documentHasRefinements && !generatedHasRefinements) {
+      return true;
+    }
+    const documentHasSemanticSelection = isPlainObject7(documentRequest == null ? void 0 : documentRequest.semanticSelection);
+    const generatedHasSemanticSelection = isPlainObject7(generatedRequest == null ? void 0 : generatedRequest.semanticSelection);
+    if (documentHasSemanticSelection && !generatedHasSemanticSelection) {
+      return true;
+    }
+    return false;
+  }
+  function resolveReportDocumentPrimaryDataset(document = null) {
+    return (Array.isArray(document == null ? void 0 : document.datasets) ? document.datasets : []).find((dataset) => normalizeString29(dataset == null ? void 0 : dataset.id) === "primary" && !Array.isArray(dataset == null ? void 0 : dataset.rows)) || null;
+  }
+  function buildPrimaryDatasetCatalogEntries(primaryDataset = {}, kind = "") {
+    const explicitEntries = kind === "dimension" ? primaryDataset == null ? void 0 : primaryDataset.dimensions : primaryDataset == null ? void 0 : primaryDataset.measures;
+    if (Array.isArray(explicitEntries) && explicitEntries.length > 0) {
+      return explicitEntries;
+    }
+    const columnOptions = Array.isArray(primaryDataset == null ? void 0 : primaryDataset.columnOptions) ? primaryDataset.columnOptions : [];
+    const matchingColumns = columnOptions.filter((entry) => normalizeString29(entry == null ? void 0 : entry.kind) === kind);
+    if (matchingColumns.length > 0) {
+      return matchingColumns;
+    }
+    if (kind === "dimension") {
+      return [
+        ...Array.isArray(primaryDataset == null ? void 0 : primaryDataset.secondaryFieldOptions) ? primaryDataset.secondaryFieldOptions : [],
+        ...(Array.isArray(primaryDataset == null ? void 0 : primaryDataset.chartFieldOptions) ? primaryDataset.chartFieldOptions : []).filter((entry) => normalizeString29(entry == null ? void 0 : entry.kind) === "dimension")
+      ];
+    }
+    return [
+      ...Array.isArray(primaryDataset == null ? void 0 : primaryDataset.valueFieldOptions) ? primaryDataset.valueFieldOptions : [],
+      ...(Array.isArray(primaryDataset == null ? void 0 : primaryDataset.chartFieldOptions) ? primaryDataset.chartFieldOptions : []).filter((entry) => normalizeString29(entry == null ? void 0 : entry.kind) === "measure")
+    ];
+  }
+  function mergePrimaryDatasetCatalogEntries(entries = [], persistedEntries = []) {
+    const persistedByAlias = /* @__PURE__ */ new Map();
+    (Array.isArray(persistedEntries) ? persistedEntries : []).forEach((entry) => {
+      [entry == null ? void 0 : entry.id, entry == null ? void 0 : entry.key, entry == null ? void 0 : entry.sourceKey, entry == null ? void 0 : entry.value, entry == null ? void 0 : entry.rawId].map((value) => normalizeString29(value)).filter(Boolean).forEach((alias) => persistedByAlias.set(alias, entry));
+    });
+    return (Array.isArray(entries) ? entries : []).map((entry) => {
+      const persisted = [entry == null ? void 0 : entry.id, entry == null ? void 0 : entry.key, entry == null ? void 0 : entry.sourceKey, entry == null ? void 0 : entry.value, entry == null ? void 0 : entry.rawId].map((value) => normalizeString29(value)).filter(Boolean).map((alias) => persistedByAlias.get(alias)).find(Boolean);
+      return persisted ? { ...cloneValue19(persisted), ...entry } : entry;
+    });
+  }
+  function applyPrimaryDatasetFallbackConfig(document = null, baseConfig = {}) {
+    const primaryDataset = resolveReportDocumentPrimaryDataset(document);
+    const normalizedBaseConfig = isPlainObject7(baseConfig) ? cloneValue19(baseConfig) : {};
+    if (!primaryDataset || !isPlainObject7(primaryDataset)) {
+      return normalizedBaseConfig;
+    }
+    const primaryDatasetDimensions = Array.isArray(primaryDataset == null ? void 0 : primaryDataset.dimensions) ? cloneValue19(primaryDataset.dimensions) : [];
+    const primaryDatasetMeasures = Array.isArray(primaryDataset == null ? void 0 : primaryDataset.measures) ? cloneValue19(primaryDataset.measures) : [];
+    const primaryDatasetCalculatedFields = Array.isArray(primaryDataset == null ? void 0 : primaryDataset.calculatedFields) ? cloneValue19(primaryDataset.calculatedFields) : [];
+    const primaryDatasetComputedMeasures = Array.isArray(primaryDataset == null ? void 0 : primaryDataset.computedMeasures) ? cloneValue19(primaryDataset.computedMeasures) : [];
+    const primaryDatasetTableCalculations = Array.isArray(primaryDataset == null ? void 0 : primaryDataset.tableCalculations) ? cloneValue19(primaryDataset.tableCalculations) : [];
+    const primaryDatasetDimensionCatalog = buildPrimaryDatasetCatalogEntries(primaryDataset, "dimension");
+    const primaryDatasetMeasureCatalog = buildPrimaryDatasetCatalogEntries(primaryDataset, "measure");
+    const dimensionEntries = Array.isArray(normalizedBaseConfig == null ? void 0 : normalizedBaseConfig.dimensions) && normalizedBaseConfig.dimensions.length > 0 ? mergePrimaryDatasetCatalogEntries(normalizedBaseConfig.dimensions, primaryDatasetDimensionCatalog) : primaryDatasetDimensionCatalog;
+    const dimensions = dimensionEntries.map((entry) => {
+      const key = normalizeString29((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.value) || (entry == null ? void 0 : entry.sourceKey));
+      if (!key) {
+        return null;
+      }
+      return {
+        id: key,
+        key: normalizeString29((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.value)) || key,
+        label: normalizeString29((entry == null ? void 0 : entry.label) || key) || key,
+        ...normalizeString29(entry == null ? void 0 : entry.displayKey) ? { displayKey: normalizeString29(entry.displayKey) } : {},
+        ...(entry == null ? void 0 : entry.displayValueMap) && typeof entry.displayValueMap === "object" && !Array.isArray(entry.displayValueMap) ? { displayValueMap: cloneValue19(entry.displayValueMap) } : {},
+        ...normalizeString29(entry == null ? void 0 : entry.format) ? { format: normalizeString29(entry.format) } : {},
+        ...normalizeString29(entry == null ? void 0 : entry.tickFormat) ? { tickFormat: normalizeString29(entry.tickFormat) } : {},
+        ...["civil", "instant"].includes(normalizeString29(entry == null ? void 0 : entry.valueMode)) ? { valueMode: normalizeString29(entry.valueMode) } : {},
+        ...buildPrimaryDatasetFieldContract(entry)
+      };
+    }).filter(Boolean);
+    const measureEntries = Array.isArray(normalizedBaseConfig == null ? void 0 : normalizedBaseConfig.measures) && normalizedBaseConfig.measures.length > 0 ? mergePrimaryDatasetCatalogEntries(normalizedBaseConfig.measures, primaryDatasetMeasureCatalog) : primaryDatasetMeasureCatalog;
+    const measures = measureEntries.map((entry) => {
+      const key = normalizeString29((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.value) || (entry == null ? void 0 : entry.sourceKey));
+      if (!key) {
+        return null;
+      }
+      return {
+        id: key,
+        key: normalizeString29((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.value)) || key,
+        label: normalizeString29((entry == null ? void 0 : entry.label) || key) || key,
+        ...normalizeString29(entry == null ? void 0 : entry.format) ? { format: normalizeString29(entry.format) } : {},
+        ...buildPrimaryDatasetFieldContract(entry)
+      };
+    }).filter(Boolean);
+    const staticFilters = Array.isArray(normalizedBaseConfig == null ? void 0 : normalizedBaseConfig.staticFilters) && normalizedBaseConfig.staticFilters.length > 0 ? normalizedBaseConfig.staticFilters : (Array.isArray(primaryDataset == null ? void 0 : primaryDataset.scopeParamOptions) ? primaryDataset.scopeParamOptions : []).map((entry) => {
+      const value = normalizeString29((entry == null ? void 0 : entry.value) || (entry == null ? void 0 : entry.id));
+      if (!value) {
+        return null;
+      }
+      const kind = normalizeString29((entry == null ? void 0 : entry.kind) || "value");
+      return {
+        id: value,
+        label: normalizeString29((entry == null ? void 0 : entry.label) || value) || value,
+        ...normalizeString29(entry == null ? void 0 : entry.description) ? { description: normalizeString29(entry.description) } : {},
+        type: kind,
+        required: (entry == null ? void 0 : entry.required) === true,
+        ...normalizeString29(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: normalizeString29(entry.semanticRef) } : {},
+        ...(entry == null ? void 0 : entry.multiple) === true ? { multiple: true } : {},
+        ...normalizeString29(entry == null ? void 0 : entry.presentation) ? { presentation: normalizeString29(entry.presentation) } : {},
+        ...Array.isArray(entry == null ? void 0 : entry.options) ? { options: cloneValue19(entry.options) } : {},
+        ...normalizeString29(entry == null ? void 0 : entry.paramPath) ? { paramPath: normalizeString29(entry.paramPath) } : {},
+        ...normalizeString29(entry == null ? void 0 : entry.startParamPath) ? { startParamPath: normalizeString29(entry.startParamPath) } : {},
+        ...normalizeString29(entry == null ? void 0 : entry.endParamPath) ? { endParamPath: normalizeString29(entry.endParamPath) } : {}
+      };
+    }).filter(Boolean);
+    return {
+      ...normalizedBaseConfig,
+      ...isPlainObject7(document == null ? void 0 : document.binding) && !isPlainObject7(normalizedBaseConfig == null ? void 0 : normalizedBaseConfig.binding) ? { binding: cloneValue19(document.binding) } : {},
+      ...normalizeReportDatasetScope(primaryDataset == null ? void 0 : primaryDataset.scope) && !isPlainObject7(normalizedBaseConfig == null ? void 0 : normalizedBaseConfig.scope) ? { scope: normalizeReportDatasetScope(primaryDataset.scope) } : {},
+      ...isPlainObject7(primaryDataset == null ? void 0 : primaryDataset.source) && !isPlainObject7(normalizedBaseConfig == null ? void 0 : normalizedBaseConfig.source) ? { source: cloneValue19(primaryDataset.source) } : {},
+      ...isPlainObject7(primaryDataset == null ? void 0 : primaryDataset.resultContract) && !isPlainObject7(normalizedBaseConfig == null ? void 0 : normalizedBaseConfig.resultContract) ? { resultContract: cloneValue19(primaryDataset.resultContract) } : {},
+      ...isPlainObject7(primaryDataset == null ? void 0 : primaryDataset.capabilities) && !isPlainObject7(normalizedBaseConfig == null ? void 0 : normalizedBaseConfig.capabilities) ? { capabilities: cloneValue19(primaryDataset.capabilities) } : {},
+      ...dimensions.length > 0 ? { dimensions } : {},
+      ...measures.length > 0 ? { measures } : {},
+      ...primaryDatasetCalculatedFields.length > 0 && (!Array.isArray(normalizedBaseConfig == null ? void 0 : normalizedBaseConfig.calculatedFields) || normalizedBaseConfig.calculatedFields.length === 0) ? { calculatedFields: primaryDatasetCalculatedFields } : {},
+      ...primaryDatasetComputedMeasures.length > 0 && (!Array.isArray(normalizedBaseConfig == null ? void 0 : normalizedBaseConfig.computedMeasures) || normalizedBaseConfig.computedMeasures.length === 0) ? { computedMeasures: primaryDatasetComputedMeasures } : {},
+      ...primaryDatasetTableCalculations.length > 0 && (!Array.isArray(normalizedBaseConfig == null ? void 0 : normalizedBaseConfig.tableCalculations) || normalizedBaseConfig.tableCalculations.length === 0) ? { tableCalculations: primaryDatasetTableCalculations } : {},
+      ...staticFilters.length > 0 ? { staticFilters } : {}
+    };
+  }
+  function applyReportDocumentPresentationFallbackConfig(document = null, baseConfig = {}) {
+    const presentation = resolveReportDocumentPresentation(document);
+    const normalizedBaseConfig = isPlainObject7(baseConfig) ? cloneValue19(baseConfig) : {};
+    if (!presentation) {
+      return normalizedBaseConfig;
+    }
+    const next = {
+      ...normalizedBaseConfig
+    };
+    if ((!next.groupBy || typeof next.groupBy !== "object" || Array.isArray(next.groupBy) || !Array.isArray(next.groupBy.options) || next.groupBy.options.length === 0) && Array.isArray(presentation == null ? void 0 : presentation.groupByOptions) && presentation.groupByOptions.length > 0) {
+      next.groupBy = {
+        ...isPlainObject7(next.groupBy) ? next.groupBy : {},
+        options: cloneValue19(presentation.groupByOptions)
+      };
+    }
+    const nextResult = isPlainObject7(next.result) ? cloneValue19(next.result) : {};
+    if ((!Array.isArray(nextResult == null ? void 0 : nextResult.orderFields) || nextResult.orderFields.length === 0) && Array.isArray(presentation == null ? void 0 : presentation.orderFields) && presentation.orderFields.length > 0) {
+      nextResult.orderFields = cloneValue19(presentation.orderFields);
+    }
+    if ((!Array.isArray(next.orderFields) || next.orderFields.length === 0) && Array.isArray(presentation == null ? void 0 : presentation.orderFields) && presentation.orderFields.length > 0) {
+      next.orderFields = cloneValue19(presentation.orderFields);
+    }
+    if ((!Array.isArray(nextResult == null ? void 0 : nextResult.defaultTablePresets) || nextResult.defaultTablePresets.length === 0) && Array.isArray(presentation == null ? void 0 : presentation.defaultTablePresets) && presentation.defaultTablePresets.length > 0) {
+      nextResult.defaultTablePresets = cloneValue19(presentation.defaultTablePresets);
+    }
+    if (!normalizeString29(nextResult == null ? void 0 : nextResult.defaultMode) && normalizeString29(presentation == null ? void 0 : presentation.defaultMode)) {
+      nextResult.defaultMode = normalizeString29(presentation.defaultMode);
+    }
+    if ((Number((nextResult == null ? void 0 : nextResult.pageSize) || 0) || 0) < 1 && (Number((presentation == null ? void 0 : presentation.pageSize) || 0) || 0) > 0) {
+      nextResult.pageSize = Number(presentation.pageSize || 0) || 0;
+    }
+    if (!normalizeString29(nextResult == null ? void 0 : nextResult.chartCreationMode) && normalizeString29(presentation == null ? void 0 : presentation.chartCreationMode)) {
+      nextResult.chartCreationMode = normalizeString29(presentation.chartCreationMode);
+    }
+    if (!normalizeString29(nextResult == null ? void 0 : nextResult.resultPanePosition) && normalizeString29(presentation == null ? void 0 : presentation.resultPanePosition)) {
+      nextResult.resultPanePosition = normalizeString29(presentation.resultPanePosition);
+    }
+    if ((!Array.isArray(nextResult == null ? void 0 : nextResult.defaultChartSpecs) || nextResult.defaultChartSpecs.length === 0) && Array.isArray(presentation == null ? void 0 : presentation.defaultChartSpecs) && presentation.defaultChartSpecs.length > 0) {
+      nextResult.defaultChartSpecs = cloneValue19(presentation.defaultChartSpecs);
+    }
+    if (Object.keys(nextResult).length > 0) {
+      next.result = nextResult;
+    }
+    return next;
+  }
+  function normalizeReportDocumentBuilderConfig(document = null, baseConfig = {}, fallbackState = null) {
+    const catalogConfig = applyReportDocumentDatasetCatalogToConfig(baseConfig, document);
+    const resolvedBinding = resolveReportDocumentBinding(document, catalogConfig, fallbackState);
+    const configWithBinding = resolvedBinding ? { ...catalogConfig, binding: cloneValue19(resolvedBinding) } : catalogConfig;
+    return applyReportDocumentPresentationFallbackConfig(
+      document,
+      applyPrimaryDatasetFallbackConfig(document, configWithBinding)
+    );
+  }
+  function resolveReportDocumentBuilderContext(document = null, baseConfig = null, baseState = null) {
+    const normalizedState = isPlainObject7(baseState) ? cloneValue19(baseState) : {};
+    const resolvedStaticDatasets = resolveReportDocumentStaticDatasets(document, normalizedState);
+    if (resolvedStaticDatasets.length > 0) {
+      normalizedState.reportStaticDatasets = cloneValue19(resolvedStaticDatasets);
+    }
+    const normalizedConfig = normalizeReportDocumentBuilderConfig(document, baseConfig, normalizedState);
+    const hasConfig = isPlainObject7(normalizedConfig) && Object.keys(normalizedConfig).length > 0;
+    const resolvedBinding = resolveReportDocumentBinding(document, hasConfig ? normalizedConfig : baseConfig, normalizedState);
+    if (resolvedBinding) {
+      normalizedState.binding = cloneValue19(resolvedBinding);
+    }
+    return {
+      config: hasConfig ? normalizedConfig : null,
+      state: normalizedState,
+      ...resolvedBinding ? { binding: cloneValue19(resolvedBinding) } : {},
+      ...resolvedStaticDatasets.length > 0 ? { staticDatasets: cloneValue19(resolvedStaticDatasets) } : {}
+    };
+  }
+  function resolveLoweredPrimaryDataset(document = null, generatedDataset = null, loweredContainer = {}) {
+    const documentPrimaryDataset = resolveReportDocumentPrimaryDataset(document);
+    if (!documentPrimaryDataset) {
+      return generatedDataset;
+    }
+    const generated = isPlainObject7(generatedDataset) ? cloneValue19(generatedDataset) : {
+      id: "primary"
+    };
+    const documentRequest = isPlainObject7(documentPrimaryDataset == null ? void 0 : documentPrimaryDataset.request) ? cloneValue19(documentPrimaryDataset.request) : null;
+    const generatedRequest = isPlainObject7(generated == null ? void 0 : generated.request) ? cloneValue19(generated.request) : null;
+    return {
+      ...generated,
+      id: "primary",
+      dataSourceRef: normalizeString29(
+        (documentPrimaryDataset == null ? void 0 : documentPrimaryDataset.dataSourceRef) || (generated == null ? void 0 : generated.dataSourceRef) || (loweredContainer == null ? void 0 : loweredContainer.dataSourceRef)
+      ),
+      request: shouldPreferDocumentPrimaryRequest(documentRequest, generatedRequest) ? documentRequest : generatedRequest || documentRequest || {}
+    };
+  }
+  function buildReportDocumentScopeParams(config = {}, state = {}, runtimeDatasetScopeParams = null) {
+    return buildReportBuilderScopeParams(config, state, runtimeDatasetScopeParams);
+  }
+  function buildReportBuilderBlockScopeBindings(config = {}) {
+    const predicateBindings = listReportBuilderPinnedPredicates(config).map((predicate) => ({
+      paramId: predicate.id,
+      target: `${SCOPE_PARAMS_BINDING_PREFIX}${predicate.id}`
+    }));
+    const predicateParamIds = new Set(predicateBindings.map((binding) => binding.paramId));
+    const legacyBindings = resolveReportBuilderScopeParamFilters(config).map((filter) => {
+      const paramId = normalizeString29((filter == null ? void 0 : filter.id) || (filter == null ? void 0 : filter.field));
+      if (!paramId || predicateParamIds.has(paramId)) {
+        return null;
+      }
+      return {
+        paramId,
+        target: `${STATIC_FILTERS_BINDING_PREFIX}${paramId}`
+      };
+    }).filter(Boolean);
+    const seen = new Set([...predicateBindings, ...legacyBindings].map((binding) => binding.paramId));
+    const configuredSourceBindings = normalizeReportBuilderPublishedDataSources(config).flatMap((source) => Array.isArray(source == null ? void 0 : source.scopeParamOptions) ? source.scopeParamOptions : []).map((option) => {
+      const paramId = normalizeString29((option == null ? void 0 : option.id) || (option == null ? void 0 : option.value));
+      if (!paramId || seen.has(paramId)) {
+        return null;
+      }
+      seen.add(paramId);
+      return {
+        paramId,
+        target: `${SCOPE_PARAMS_BINDING_PREFIX}${paramId}`
+      };
+    }).filter(Boolean);
+    return [...predicateBindings, ...legacyBindings, ...configuredSourceBindings];
+  }
+  function buildReportDocumentMarkdownBlock({
+    id = "markdownBlock",
+    title = "",
+    markdown = "",
+    datasetRef = ""
+  } = {}) {
+    return {
+      id: normalizeString29(id || "markdownBlock"),
+      kind: "markdownBlock",
+      title: normalizeString29(title),
+      markdown: String(markdown || ""),
+      ...normalizeString29(datasetRef) ? { datasetRef: normalizeString29(datasetRef) } : {}
+    };
+  }
+  function buildReportDocumentFilterBarBlock({
+    id = "filterBar",
+    title = "Filters",
+    paramIds = [],
+    datasetRef = "primary",
+    mode = "",
+    placement = "",
+    groupOrder = [],
+    visibleGroups = [],
+    collapsedGroups = []
+  } = {}) {
+    const normalizedParamIds = (Array.isArray(paramIds) ? paramIds : []).map((entry) => normalizeString29(entry)).filter((entry) => !!entry && !isTruncatedPlaceholder2(entry));
+    const normalizedMode = (() => {
+      const candidate = normalizeString29(mode).toLowerCase();
+      return ["baseline", "unified"].includes(candidate) ? candidate : "";
+    })();
+    const normalizedPlacement = (() => {
+      const candidate = normalizeString29(placement).toLowerCase();
+      return ["inherit", "left", "right", "top", "inline", "rail-left", "hidden"].includes(candidate) ? candidate : "";
+    })();
+    const normalizeIdList = (values = []) => (Array.isArray(values) ? values : []).map((entry) => normalizeString29(entry)).filter(Boolean);
+    if (normalizedParamIds.length === 0 && (Array.isArray(paramIds) ? paramIds : []).some((entry) => isTruncatedPlaceholder2(entry))) {
+      return null;
+    }
+    return {
+      id: normalizeString29(id || "filterBar"),
+      kind: "filterBarBlock",
+      title: normalizeFilterBarTitle(title || "Filters"),
+      datasetRef: normalizeString29(datasetRef || "primary") || "primary",
+      ...normalizedParamIds.length > 0 ? { paramIds: normalizedParamIds } : {},
+      ...normalizedMode ? { mode: normalizedMode } : {},
+      ...normalizedPlacement ? { placement: normalizedPlacement } : {},
+      ...normalizeIdList(groupOrder).length > 0 ? { groupOrder: normalizeIdList(groupOrder) } : {},
+      ...normalizeIdList(visibleGroups).length > 0 ? { visibleGroups: normalizeIdList(visibleGroups) } : {},
+      ...normalizeIdList(collapsedGroups).length > 0 ? { collapsedGroups: normalizeIdList(collapsedGroups) } : {}
+    };
+  }
+  function buildReportDocumentKpiBlock(block = {}) {
+    const valueField = normalizeString29((block == null ? void 0 : block.valueField) || "value");
+    const valueFormat = normalizeString29((block == null ? void 0 : block.valueFormat) || (block == null ? void 0 : block.format));
+    const suffix = normalizeString29(block == null ? void 0 : block.suffix);
+    const secondaryField = normalizeString29(block == null ? void 0 : block.secondaryField);
+    const presentationMode = normalizeString29(block == null ? void 0 : block.presentationMode).toLowerCase();
+    const normalizedPresentationMode = ["card", "body", "both"].includes(presentationMode) ? presentationMode : "card";
+    const rowSelector = normalizeString29(block == null ? void 0 : block.rowSelector).toLowerCase();
+    const normalizedRowSelector = ["firstrow", "maxbyvalue", "minbyvalue"].includes(rowSelector) ? rowSelector : "firstrow";
+    const bodyFormat = normalizeString29(block == null ? void 0 : block.bodyFormat).toLowerCase();
+    const normalizedBodyFormat = bodyFormat === "markdown" ? "markdown" : "markdown";
+    const bodyTemplate = String((block == null ? void 0 : block.bodyTemplate) || "");
+    return {
+      id: normalizeString29((block == null ? void 0 : block.id) || "kpiBlock"),
+      kind: "kpiBlock",
+      title: normalizeString29((block == null ? void 0 : block.title) || "KPI"),
+      datasetRef: normalizeString29((block == null ? void 0 : block.datasetRef) || "primary"),
+      valueField,
+      valueLabel: normalizeString29((block == null ? void 0 : block.valueLabel) || valueField || "Value"),
+      ...valueFormat ? { valueFormat } : {},
+      ...suffix ? { suffix } : {},
+      ...block.sparkline ? { sparkline: normalizeKpiSparkline(block.sparkline) } : {},
+      ...secondaryField ? {
+        secondaryField,
+        ...normalizeString29(block == null ? void 0 : block.secondaryDatasetRef) ? { secondaryDatasetRef: normalizeString29(block.secondaryDatasetRef) } : {},
+        ...(block == null ? void 0 : block.secondaryCalculation) ? { secondaryCalculation: normalizeKpiSecondaryCalculation(block.secondaryCalculation) } : {},
+        secondaryLabel: normalizeString29((block == null ? void 0 : block.secondaryLabel) || secondaryField),
+        ...normalizeString29(block == null ? void 0 : block.secondaryFormat) ? { secondaryFormat: normalizeString29(block.secondaryFormat) } : {},
+        ...(block == null ? void 0 : block.secondaryTrend) === true ? { secondaryTrend: true } : {},
+        ...normalizeString29(block == null ? void 0 : block.secondaryDisplayKey) ? { secondaryDisplayKey: normalizeString29(block.secondaryDisplayKey) } : {},
+        ...(block == null ? void 0 : block.secondaryDisplayValueMap) && typeof block.secondaryDisplayValueMap === "object" && !Array.isArray(block.secondaryDisplayValueMap) ? { secondaryDisplayValueMap: cloneValue19(block.secondaryDisplayValueMap) } : {}
+      } : {},
+      ...normalizeString29(block == null ? void 0 : block.description) ? { description: normalizeString29(block.description) } : {},
+      ...normalizeString29(block == null ? void 0 : block.tone) ? { tone: normalizeString29(block.tone) } : {},
+      ...normalizeString29(block == null ? void 0 : block.emptyLabel) ? { emptyLabel: normalizeString29(block.emptyLabel) } : {},
+      ...normalizedRowSelector !== "firstrow" ? { rowSelector: normalizedRowSelector } : {},
+      ...normalizedPresentationMode !== "card" ? { presentationMode: normalizedPresentationMode } : {},
+      ...normalizedPresentationMode !== "card" || bodyTemplate.trim() ? { bodyFormat: normalizedBodyFormat } : {},
+      ...bodyTemplate.trim() ? { bodyTemplate } : {}
+    };
+  }
+  function normalizeCollectionLayout(value = "") {
+    const normalized = normalizeString29(value).toLowerCase();
+    return ["grid", "list"].includes(normalized) ? normalized : "grid";
+  }
+  function normalizeCollectionColumns(value = 0) {
+    const normalized = Math.trunc(Number(value));
+    return Number.isInteger(normalized) && normalized >= 1 && normalized <= 4 ? normalized : 2;
+  }
+  function normalizeCollectionRowLimit(value = 0) {
+    const normalized = Math.trunc(Number(value));
+    return Number.isInteger(normalized) && normalized > 0 ? normalized : 6;
+  }
+  function normalizeCollectionToneRules(rules = []) {
+    return (Array.isArray(rules) ? rules : []).map((rule) => {
+      if (!rule || typeof rule !== "object" || Array.isArray(rule) || !("value" in rule)) {
+        return null;
+      }
+      return {
+        value: cloneValue19(rule.value),
+        ...normalizeString29(rule == null ? void 0 : rule.tone) ? { tone: normalizeString29(rule.tone).toLowerCase() } : {},
+        ...normalizeString29(rule == null ? void 0 : rule.label) ? { label: normalizeString29(rule.label) } : {},
+        ...normalizeString29(rule == null ? void 0 : rule.color) ? { color: normalizeString29(rule.color) } : {},
+        ...normalizeString29(rule == null ? void 0 : rule.background) ? { background: normalizeString29(rule.background) } : {}
+      };
+    }).filter(Boolean);
+  }
+  function buildReportDocumentCollectionBlock(block = {}) {
+    const itemTitleField = normalizeString29(block == null ? void 0 : block.itemTitleField);
+    const valueField = normalizeString29(block == null ? void 0 : block.valueField);
+    const secondaryField = normalizeString29(block == null ? void 0 : block.secondaryField);
+    const bodyTemplate = String((block == null ? void 0 : block.bodyTemplate) || "");
+    const toneField = normalizeString29(block == null ? void 0 : block.toneField);
+    const toneRules = normalizeCollectionToneRules(block == null ? void 0 : block.toneRules);
+    return {
+      id: normalizeString29((block == null ? void 0 : block.id) || "collectionBlock"),
+      kind: "collectionBlock",
+      title: normalizeString29((block == null ? void 0 : block.title) || "Collection") || "Collection",
+      datasetRef: normalizeString29((block == null ? void 0 : block.datasetRef) || "primary"),
+      ...itemTitleField ? { itemTitleField } : {},
+      ...normalizeString29(block == null ? void 0 : block.itemTitleLabel) ? { itemTitleLabel: normalizeString29(block.itemTitleLabel) } : {},
+      ...normalizeString29(block == null ? void 0 : block.itemTitleDisplayKey) ? { itemTitleDisplayKey: normalizeString29(block.itemTitleDisplayKey) } : {},
+      ...(block == null ? void 0 : block.itemTitleDisplayValueMap) && typeof block.itemTitleDisplayValueMap === "object" && !Array.isArray(block.itemTitleDisplayValueMap) ? { itemTitleDisplayValueMap: cloneValue19(block.itemTitleDisplayValueMap) } : {},
+      ...valueField ? {
+        valueField,
+        valueLabel: normalizeString29((block == null ? void 0 : block.valueLabel) || valueField || "Value"),
+        ...normalizeString29(block == null ? void 0 : block.valueFormat) ? { valueFormat: normalizeString29(block.valueFormat) } : {}
+      } : {},
+      ...secondaryField ? {
+        secondaryField,
+        secondaryLabel: normalizeString29((block == null ? void 0 : block.secondaryLabel) || secondaryField),
+        ...normalizeString29(block == null ? void 0 : block.secondaryFormat) ? { secondaryFormat: normalizeString29(block.secondaryFormat) } : {},
+        ...normalizeString29(block == null ? void 0 : block.secondaryDisplayKey) ? { secondaryDisplayKey: normalizeString29(block.secondaryDisplayKey) } : {},
+        ...(block == null ? void 0 : block.secondaryDisplayValueMap) && typeof block.secondaryDisplayValueMap === "object" && !Array.isArray(block.secondaryDisplayValueMap) ? { secondaryDisplayValueMap: cloneValue19(block.secondaryDisplayValueMap) } : {}
+      } : {},
+      layout: normalizeCollectionLayout(block == null ? void 0 : block.layout),
+      columns: normalizeCollectionColumns(block == null ? void 0 : block.columns),
+      rowLimit: normalizeCollectionRowLimit(block == null ? void 0 : block.rowLimit),
+      bodyFormat: "markdown",
+      ...bodyTemplate.trim() ? { bodyTemplate } : {},
+      ...(block == null ? void 0 : block.templateFieldDisplayMap) && typeof block.templateFieldDisplayMap === "object" && !Array.isArray(block.templateFieldDisplayMap) ? { templateFieldDisplayMap: cloneValue19(block.templateFieldDisplayMap) } : {},
+      ...toneField ? { toneField } : {},
+      ...toneRules.length > 0 ? { toneRules } : {},
+      ...normalizeString29(block == null ? void 0 : block.description) ? { description: normalizeString29(block.description) } : {},
+      ...normalizeString29(block == null ? void 0 : block.emptyLabel) ? { emptyLabel: normalizeString29(block.emptyLabel) } : {}
+    };
+  }
+  function buildReportDocumentSectionBlock(block = {}) {
+    const navigationLabel = normalizeString29((block == null ? void 0 : block.navigationLabel) || (block == null ? void 0 : block.title) || "Section") || "Section";
+    const blockIds = Array.from(new Set((Array.isArray(block == null ? void 0 : block.blockIds) ? block.blockIds : []).map((blockId) => normalizeString29(blockId)).filter(Boolean)));
+    return {
+      id: normalizeString29((block == null ? void 0 : block.id) || "sectionBlock"),
+      kind: "sectionBlock",
+      title: normalizeString29((block == null ? void 0 : block.title) || "Section") || "Section",
+      ...normalizeString29(block == null ? void 0 : block.datasetRef) ? { datasetRef: normalizeString29(block.datasetRef) } : {},
+      ...normalizeString29(block == null ? void 0 : block.subtitle) ? { subtitle: normalizeString29(block.subtitle) } : {},
+      ...normalizeString29(block == null ? void 0 : block.description) ? { description: normalizeString29(block.description) } : {},
+      navigationLabel,
+      ...blockIds.length > 0 ? { blockIds } : {}
+    };
+  }
+  function normalizeReportDocumentTabGroupSectionIds(sectionIds = []) {
+    const seen = /* @__PURE__ */ new Set();
+    return (Array.isArray(sectionIds) ? sectionIds : []).map((sectionId) => normalizeString29(sectionId)).filter((sectionId) => {
+      if (!sectionId || seen.has(sectionId)) {
+        return false;
+      }
+      seen.add(sectionId);
+      return true;
+    });
+  }
+  function buildReportDocumentTabGroupBlock(block = {}) {
+    const sectionIds = normalizeReportDocumentTabGroupSectionIds(block == null ? void 0 : block.sectionIds);
+    const defaultSectionId = normalizeString29(block == null ? void 0 : block.defaultSectionId);
+    return {
+      id: normalizeString29((block == null ? void 0 : block.id) || "tabGroupBlock"),
+      kind: "tabGroupBlock",
+      title: normalizeString29((block == null ? void 0 : block.title) || "Sections") || "Sections",
+      sectionIds,
+      ...typeof (block == null ? void 0 : block.includeUnlistedSections) === "boolean" ? { includeUnlistedSections: block.includeUnlistedSections } : {},
+      ...defaultSectionId && sectionIds.includes(defaultSectionId) ? { defaultSectionId } : {}
+    };
+  }
+  function normalizeReportDocumentCompositeChildBlockIds(childBlockIds = []) {
+    const seen = /* @__PURE__ */ new Set();
+    return (Array.isArray(childBlockIds) ? childBlockIds : []).map((blockId) => normalizeString29(blockId)).filter((blockId) => {
+      if (!blockId || seen.has(blockId)) {
+        return false;
+      }
+      seen.add(blockId);
+      return true;
+    });
+  }
+  function buildReportDocumentCompositeBlock(block = {}) {
+    const childBlockIds = normalizeReportDocumentCompositeChildBlockIds(block == null ? void 0 : block.childBlockIds);
+    const layout = normalizeString29(block == null ? void 0 : block.layout);
+    return {
+      id: normalizeString29((block == null ? void 0 : block.id) || "compositeBlock"),
+      kind: "compositeBlock",
+      title: normalizeString29((block == null ? void 0 : block.title) || "Grouped Panel") || "Grouped Panel",
+      ...normalizeString29(block == null ? void 0 : block.datasetRef) ? { datasetRef: normalizeString29(block.datasetRef) } : {},
+      ...normalizeString29(block == null ? void 0 : block.description) ? { description: normalizeString29(block.description) } : {},
+      ...["stack", "responsiveGrid"].includes(layout) ? { layout } : {},
+      ...(block == null ? void 0 : block.runtime) && typeof block.runtime === "object" && !Array.isArray(block.runtime) ? { runtime: cloneValue19(block.runtime) } : {},
+      childBlockIds
+    };
+  }
+  function normalizeReportDocumentStepperSteps(steps = []) {
+    return (Array.isArray(steps) ? steps : []).map((step, index) => {
+      if (!step || typeof step !== "object" || Array.isArray(step)) {
+        return null;
+      }
+      const title = normalizeString29(step == null ? void 0 : step.title);
+      const body = String((step == null ? void 0 : step.body) || "");
+      const tone = normalizeString29(step == null ? void 0 : step.tone).toLowerCase();
+      if (!title && !body.trim()) {
+        return null;
+      }
+      return {
+        id: normalizeString29((step == null ? void 0 : step.id) || `step_${index + 1}`) || `step_${index + 1}`,
+        title,
+        body,
+        ...tone ? { tone } : {}
+      };
+    }).filter(Boolean);
+  }
+  function buildReportDocumentStepperBlock(block = {}) {
+    const steps = normalizeReportDocumentStepperSteps(block == null ? void 0 : block.steps);
+    return {
+      id: normalizeString29((block == null ? void 0 : block.id) || "stepperBlock"),
+      kind: "stepperBlock",
+      title: normalizeString29((block == null ? void 0 : block.title) || "Stepper") || "Stepper",
+      ...normalizeString29(block == null ? void 0 : block.description) ? { description: normalizeString29(block.description) } : {},
+      steps
+    };
+  }
+  function buildReportDocumentInfoPanelBlock(block = {}) {
+    return {
+      id: normalizeString29((block == null ? void 0 : block.id) || "infoPanelBlock"),
+      kind: "infoPanelBlock",
+      title: normalizeString29((block == null ? void 0 : block.title) || "Info Panel") || "Info Panel",
+      ...normalizeString29(block == null ? void 0 : block.eyebrow) ? { eyebrow: normalizeString29(block.eyebrow) } : {},
+      ...normalizeString29(block == null ? void 0 : block.description) ? { description: normalizeString29(block.description) } : {},
+      ...normalizeString29(block == null ? void 0 : block.tone) ? { tone: normalizeString29(block.tone).toLowerCase() } : {},
+      bodyFormat: "markdown",
+      body: String((block == null ? void 0 : block.body) || "")
+    };
+  }
+  function normalizeReportDocumentCalloutBadges(badges = [], badgesText = "") {
+    const explicitBadges = normalizeStringArray6(badges);
+    if (explicitBadges.length > 0) {
+      return explicitBadges;
+    }
+    return String(badgesText || "").split(/[\n,]/).map((entry) => normalizeString29(entry)).filter(Boolean);
+  }
+  function buildReportDocumentCalloutBlock(block = {}) {
+    const badges = normalizeReportDocumentCalloutBadges(block == null ? void 0 : block.badges, block == null ? void 0 : block.badgesText);
+    return {
+      id: normalizeString29((block == null ? void 0 : block.id) || "calloutBlock"),
+      kind: "calloutBlock",
+      title: normalizeString29((block == null ? void 0 : block.title) || "Callout") || "Callout",
+      ...normalizeString29(block == null ? void 0 : block.icon) ? { icon: normalizeString29(block.icon) } : {},
+      ...normalizeString29(block == null ? void 0 : block.description) ? { description: normalizeString29(block.description) } : {},
+      ...normalizeString29(block == null ? void 0 : block.tone) ? { tone: normalizeString29(block.tone).toLowerCase() } : {},
+      ...badges.length > 0 ? { badges } : {},
+      bodyFormat: "markdown",
+      body: String((block == null ? void 0 : block.body) || "")
+    };
+  }
+  function normalizeReportDocumentKanbanCards(cards = []) {
+    return (Array.isArray(cards) ? cards : []).map((card, index) => {
+      if (!card || typeof card !== "object" || Array.isArray(card)) {
+        return null;
+      }
+      const title = normalizeString29(card == null ? void 0 : card.title);
+      const body = String((card == null ? void 0 : card.body) || "");
+      const badge = normalizeString29(card == null ? void 0 : card.badge);
+      const tone = normalizeString29(card == null ? void 0 : card.tone).toLowerCase();
+      if (!title && !body.trim() && !badge) {
+        return null;
+      }
+      return {
+        id: normalizeString29((card == null ? void 0 : card.id) || `card_${index + 1}`) || `card_${index + 1}`,
+        title,
+        body,
+        ...badge ? { badge } : {},
+        ...tone ? { tone } : {}
+      };
+    }).filter(Boolean);
+  }
+  function normalizeReportDocumentKanbanColumns(columns = []) {
+    return (Array.isArray(columns) ? columns : []).map((column, index) => {
+      if (!column || typeof column !== "object" || Array.isArray(column)) {
+        return null;
+      }
+      const title = normalizeString29(column == null ? void 0 : column.title);
+      const tone = normalizeString29(column == null ? void 0 : column.tone).toLowerCase();
+      const cards = normalizeReportDocumentKanbanCards(column == null ? void 0 : column.cards);
+      if (!title && cards.length === 0) {
+        return null;
+      }
+      return {
+        id: normalizeString29((column == null ? void 0 : column.id) || `column_${index + 1}`) || `column_${index + 1}`,
+        title,
+        ...tone ? { tone } : {},
+        cards
+      };
+    }).filter(Boolean);
+  }
+  function buildReportDocumentKanbanBlock(block = {}) {
+    return {
+      id: normalizeString29((block == null ? void 0 : block.id) || "kanbanBlock"),
+      kind: "kanbanBlock",
+      title: normalizeString29((block == null ? void 0 : block.title) || "Pipeline") || "Pipeline",
+      ...normalizeString29(block == null ? void 0 : block.description) ? { description: normalizeString29(block.description) } : {},
+      columns: normalizeReportDocumentKanbanColumns(block == null ? void 0 : block.columns)
+    };
+  }
+  function normalizeReportDocumentTimelineEvents(events = []) {
+    return (Array.isArray(events) ? events : []).map((event, index) => {
+      if (!event || typeof event !== "object" || Array.isArray(event)) {
+        return null;
+      }
+      const title = normalizeString29(event == null ? void 0 : event.title);
+      const body = String((event == null ? void 0 : event.body) || "");
+      const date = normalizeString29(event == null ? void 0 : event.date);
+      const badge = normalizeString29(event == null ? void 0 : event.badge);
+      const tone = normalizeString29(event == null ? void 0 : event.tone).toLowerCase();
+      if (!title && !body.trim() && !date && !badge) {
+        return null;
+      }
+      return {
+        id: normalizeString29((event == null ? void 0 : event.id) || `event_${index + 1}`) || `event_${index + 1}`,
+        ...date ? { date } : {},
+        title,
+        body,
+        ...badge ? { badge } : {},
+        ...tone ? { tone } : {}
+      };
+    }).filter(Boolean);
+  }
+  function buildReportDocumentTimelineBlock(block = {}) {
+    const datasetRef = normalizeString29(block == null ? void 0 : block.datasetRef);
+    const timeField = normalizeString29(block == null ? void 0 : block.timeField);
+    const titleField = normalizeString29(block == null ? void 0 : block.titleField);
+    const descriptionField = normalizeString29(block == null ? void 0 : block.descriptionField);
+    const badgeField = normalizeString29(block == null ? void 0 : block.badgeField);
+    const toneField = normalizeString29(block == null ? void 0 : block.toneField);
+    return {
+      id: normalizeString29((block == null ? void 0 : block.id) || "timelineBlock"),
+      kind: "timelineBlock",
+      title: normalizeString29((block == null ? void 0 : block.title) || "Timeline") || "Timeline",
+      ...normalizeString29(block == null ? void 0 : block.description) ? { description: normalizeString29(block.description) } : {},
+      ...datasetRef ? { datasetRef } : {},
+      ...timeField ? { timeField } : {},
+      ...titleField ? { titleField } : {},
+      ...descriptionField ? { descriptionField } : {},
+      ...badgeField ? { badgeField } : {},
+      ...toneField ? { toneField } : {},
+      events: normalizeReportDocumentTimelineEvents(block == null ? void 0 : block.events)
+    };
+  }
+  function humanizeReportDocumentFieldName(value = "") {
+    return normalizeString29(value).replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
+  }
+  function normalizeReportDocumentBadgeItems(items = []) {
+    return (Array.isArray(items) ? items : []).map((item, index) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        return null;
+      }
+      const rawLegacyLabelField = normalizeString29(item == null ? void 0 : item.labelField);
+      const legacyLabelField = isTruncatedPlaceholder2(rawLegacyLabelField) ? "" : rawLegacyLabelField;
+      const rawLabel = normalizeString29(
+        (item == null ? void 0 : item.label) || (legacyLabelField ? humanizeReportDocumentFieldName(legacyLabelField) : "")
+      );
+      const label = isTruncatedPlaceholder2(rawLabel) ? "" : rawLabel;
+      const rawValue = normalizeString29(item == null ? void 0 : item.value);
+      const value = isTruncatedPlaceholder2(rawValue) ? "" : rawValue;
+      const rawValueField = normalizeString29((item == null ? void 0 : item.valueField) || legacyLabelField);
+      const valueField = isTruncatedPlaceholder2(rawValueField) ? "" : rawValueField;
+      const format2 = normalizeString29(item == null ? void 0 : item.format);
+      const displayKey = normalizeString29(item == null ? void 0 : item.displayKey);
+      const labelMode = normalizeString29(item == null ? void 0 : item.labelMode).toLowerCase();
+      const rules = (Array.isArray(item == null ? void 0 : item.rules) ? item.rules : []).map((rule) => {
+        if (!rule || typeof rule !== "object" || Array.isArray(rule)) {
+          return null;
+        }
+        const next = {
+          ..."value" in rule ? { value: cloneValue19(rule.value) } : {},
+          ...normalizeString29(rule == null ? void 0 : rule.label) ? { label: normalizeString29(rule.label) } : {},
+          ...normalizeString29(rule == null ? void 0 : rule.tone) ? { tone: normalizeString29(rule.tone) } : {}
+        };
+        return Object.keys(next).length > 0 ? next : null;
+      }).filter(Boolean);
+      const tone = normalizeString29((item == null ? void 0 : item.tone) || (item == null ? void 0 : item.severity));
+      if (!label && !value && !valueField) {
+        return null;
+      }
+      return {
+        id: normalizeString29((item == null ? void 0 : item.id) || `badge_${index + 1}`) || `badge_${index + 1}`,
+        ...label ? { label } : {},
+        ...value ? { value } : {},
+        ...valueField ? { valueField } : {},
+        ...format2 ? { format: format2 } : {},
+        ...displayKey ? { displayKey } : {},
+        ...(item == null ? void 0 : item.displayValueMap) && typeof item.displayValueMap === "object" && !Array.isArray(item.displayValueMap) ? { displayValueMap: cloneValue19(item.displayValueMap) } : {},
+        ...["field", "manual"].includes(labelMode) ? { labelMode } : {},
+        ...rules.length > 0 ? { rules } : {},
+        ...tone ? { tone } : {}
+      };
+    }).filter(Boolean);
+  }
+  function buildReportDocumentBadgesBlock(block = {}) {
+    const items = normalizeReportDocumentBadgeItems(block == null ? void 0 : block.items);
+    return {
+      id: normalizeString29((block == null ? void 0 : block.id) || "badgesBlock"),
+      kind: "badgesBlock",
+      title: normalizeString29((block == null ? void 0 : block.title) || "Status Pills") || "Status Pills",
+      datasetRef: normalizeString29((block == null ? void 0 : block.datasetRef) || "primary") || "primary",
+      items
+    };
+  }
+  function buildReportDocumentChartBlock(block = {}) {
+    var _a5;
+    const normalizedTitle = normalizeString29((block == null ? void 0 : block.title) || ((_a5 = block == null ? void 0 : block.chartSpec) == null ? void 0 : _a5.title) || "Chart") || "Chart";
+    const normalizedChartSpec = normalizeReportBuilderChartSpec({
+      ...(block == null ? void 0 : block.chartSpec) && typeof block.chartSpec === "object" && !Array.isArray(block.chartSpec) ? block.chartSpec : {},
+      title: normalizedTitle
+    });
+    const rowLimit = Math.trunc(Number(block == null ? void 0 : block.rowLimit));
+    return {
+      id: normalizeString29((block == null ? void 0 : block.id) || "chartBlock"),
+      kind: "chartBlock",
+      title: normalizedTitle,
+      datasetRef: normalizeString29((block == null ? void 0 : block.datasetRef) || "primary"),
+      chartSpec: normalizedChartSpec,
+      ...Number.isInteger(rowLimit) && rowLimit > 0 ? { rowLimit } : {}
+    };
+  }
+  function buildReportDocumentGeoMapBlock(block = {}) {
+    const geo = (block == null ? void 0 : block.geo) && typeof block.geo === "object" && !Array.isArray(block.geo) ? cloneValue19(block.geo) : {};
+    if ((geo == null ? void 0 : geo.metric) && typeof geo.metric === "object" && !Array.isArray(geo.metric)) {
+      const metricFormat = normalizeGeoFormat2(geo.metric.format);
+      if (metricFormat) {
+        geo.metric.format = metricFormat;
+      } else {
+        delete geo.metric.format;
+      }
+    }
+    const geoFormat = normalizeGeoFormat2(geo.format);
+    if (geoFormat) {
+      geo.format = geoFormat;
+    } else {
+      delete geo.format;
+    }
+    return {
+      id: normalizeString29((block == null ? void 0 : block.id) || "geoMapBlock"),
+      kind: "geoMapBlock",
+      title: normalizeString29((block == null ? void 0 : block.title) || "Geo Map"),
+      datasetRef: normalizeString29((block == null ? void 0 : block.datasetRef) || "primary"),
+      geo
+    };
+  }
+  function normalizeReportBlockRuntime(runtime = null, block = {}) {
+    const source = isPlainObject7(runtime) ? runtime : {};
+    const visibleWhen = isPlainObject7(source == null ? void 0 : source.visibleWhen) ? cloneValue19(source.visibleWhen) : isPlainObject7(block == null ? void 0 : block.visibleWhen) ? cloneValue19(block.visibleWhen) : null;
+    const filterBindings = isPlainObject7(source == null ? void 0 : source.filterBindings) ? cloneValue19(source.filterBindings) : isPlainObject7(block == null ? void 0 : block.filterBindings) ? cloneValue19(block.filterBindings) : null;
+    const selectionBindings = isPlainObject7(source == null ? void 0 : source.selectionBindings) ? cloneValue19(source.selectionBindings) : isPlainObject7(block == null ? void 0 : block.selectionBindings) ? cloneValue19(block.selectionBindings) : null;
+    const actions = Array.isArray(source == null ? void 0 : source.actions) ? cloneValue19(source.actions) : Array.isArray(block == null ? void 0 : block.actions) ? cloneValue19(block.actions) : [];
+    const normalized = {
+      ...(source == null ? void 0 : source.printRowReference) === true ? { printRowReference: true } : {},
+      ...visibleWhen ? { visibleWhen } : {},
+      ...filterBindings && Object.keys(filterBindings).length > 0 ? { filterBindings } : {},
+      ...selectionBindings && Object.keys(selectionBindings).length > 0 ? { selectionBindings } : {},
+      ...actions.length > 0 ? { actions } : {}
+    };
+    return Object.keys(normalized).length > 0 ? normalized : null;
+  }
+  function withReportBlockRuntime(normalizedBlock = null, sourceBlock = {}) {
+    if (!normalizedBlock) {
+      return normalizedBlock;
+    }
+    const runtime = normalizeReportBlockRuntime(sourceBlock == null ? void 0 : sourceBlock.runtime, sourceBlock);
+    return runtime ? { ...normalizedBlock, runtime } : normalizedBlock;
+  }
+  function normalizeReportBuilderDocumentBlockContent(block = {}) {
+    if (!isPlainObject7(block)) {
+      return null;
+    }
+    const normalizedKind = normalizeString29(block == null ? void 0 : block.kind);
+    if (normalizedKind === "markdownBlock") {
+      return buildReportDocumentMarkdownBlock(block);
+    }
+    if (normalizedKind === "filterBarBlock") {
+      return buildReportDocumentFilterBarBlock(block);
+    }
+    if (normalizedKind === "refinementBarBlock") {
+      const actionKinds = (block == null ? void 0 : block.actionKinds) != null ? normalizeRefinementBarActionKinds(block == null ? void 0 : block.actionKinds) : null;
+      return {
+        id: normalizeString29((block == null ? void 0 : block.id) || "refinementTrail"),
+        kind: "refinementBarBlock",
+        ...(block == null ? void 0 : block.title) != null ? { title: normalizeRefinementBarText(block == null ? void 0 : block.title) } : {},
+        ...actionKinds != null ? { actionKinds } : {},
+        ...(block == null ? void 0 : block.emptyLabel) != null ? { emptyLabel: normalizeRefinementBarText(block == null ? void 0 : block.emptyLabel) } : {}
+      };
+    }
+    if (normalizedKind === "kpiBlock") {
+      return buildReportDocumentKpiBlock(block);
+    }
+    if (normalizedKind === "collectionBlock") {
+      return buildReportDocumentCollectionBlock(block);
+    }
+    if (normalizedKind === "sectionBlock") {
+      return buildReportDocumentSectionBlock(block);
+    }
+    if (normalizedKind === "tabGroupBlock") {
+      return buildReportDocumentTabGroupBlock(block);
+    }
+    if (normalizedKind === "compositeBlock") {
+      return buildReportDocumentCompositeBlock(block);
+    }
+    if (normalizedKind === "stepperBlock") {
+      return buildReportDocumentStepperBlock(block);
+    }
+    if (normalizedKind === "infoPanelBlock") {
+      return buildReportDocumentInfoPanelBlock(block);
+    }
+    if (normalizedKind === "calloutBlock") {
+      return buildReportDocumentCalloutBlock(block);
+    }
+    if (normalizedKind === "kanbanBlock") {
+      return buildReportDocumentKanbanBlock(block);
+    }
+    if (normalizedKind === "timelineBlock") {
+      return buildReportDocumentTimelineBlock(block);
+    }
+    if (normalizedKind === "badgesBlock") {
+      return buildReportDocumentBadgesBlock(block);
+    }
+    if (normalizedKind === "chartBlock") {
+      return buildReportDocumentChartBlock(block);
+    }
+    if (normalizedKind === "tableBlock") {
+      return normalizeReportDocumentTableBlock(block);
+    }
+    if (normalizedKind === "geoMapBlock") {
+      return buildReportDocumentGeoMapBlock(block);
+    }
+    return cloneValue19(block);
+  }
+  function normalizeReportBuilderDocumentBlock(block = {}) {
+    return withReportBlockRuntime(normalizeReportBuilderDocumentBlockContent(block), block);
+  }
+  function normalizeReportBuilderDocumentBlocks(blocks = []) {
+    return (Array.isArray(blocks) ? blocks : []).map((block) => normalizeReportBuilderDocumentBlock(block)).filter(Boolean);
+  }
+  function mergeReportBuilderDocumentBlocks(stateBlocks = [], additionalBlocks = []) {
+    const merged = [];
+    const indexById = /* @__PURE__ */ new Map();
+    [...stateBlocks, ...additionalBlocks].forEach((block) => {
+      const normalizedBlock = normalizeReportBuilderDocumentBlock(block);
+      if (!normalizedBlock) {
+        return;
+      }
+      const blockId = normalizeString29(normalizedBlock == null ? void 0 : normalizedBlock.id);
+      if (!blockId) {
+        merged.push(normalizedBlock);
+        return;
+      }
+      if (!indexById.has(blockId)) {
+        indexById.set(blockId, merged.length);
+        merged.push(normalizedBlock);
+        return;
+      }
+      merged[indexById.get(blockId)] = normalizedBlock;
+    });
+    return merged;
+  }
+  function normalizeReportBuilderDocumentLayoutItems(layout = null, blockIds = []) {
+    const items = Array.isArray(layout) ? layout : Array.isArray(layout == null ? void 0 : layout.items) ? layout.items : [];
+    const knownIds = /* @__PURE__ */ new Set([
+      "primaryBuilder",
+      ...(Array.isArray(blockIds) ? blockIds : []).map((entry) => normalizeString29(entry)).filter(Boolean)
+    ]);
+    const seen = /* @__PURE__ */ new Set();
+    const normalized = [];
+    items.forEach((item) => {
+      const normalizedItem = buildLayoutItem((item == null ? void 0 : item.blockId) || item, item);
+      const blockId = normalizeString29(normalizedItem == null ? void 0 : normalizedItem.blockId);
+      if (!blockId || seen.has(blockId) || !knownIds.has(blockId) || !normalizedItem) {
+        return;
+      }
+      seen.add(blockId);
+      normalized.push(normalizedItem);
+    });
+    const normalizedBlockIds = (Array.isArray(blockIds) ? blockIds : []).map((entry) => normalizeString29(entry)).filter(Boolean);
+    const preludeBlockIds = normalizedBlockIds.filter((blockId) => blockId !== "primaryBuilder" && ["scopeFilters", "sharedFilters", "activeRefinements", "activeDrillPath"].includes(blockId));
+    const trailingBlockIds = normalizedBlockIds.filter((blockId) => blockId !== "primaryBuilder" && !preludeBlockIds.includes(blockId));
+    [...preludeBlockIds, "primaryBuilder", ...trailingBlockIds].forEach((blockId) => {
+      if (seen.has(blockId)) {
+        return;
+      }
+      seen.add(blockId);
+      normalized.push({ blockId });
+    });
+    return normalized;
+  }
+  function buildReportBuilderReportDocument({
+    container = {},
+    config = {},
+    state = {},
+    additionalBlocks = [],
+    refinements = [],
+    semanticSummary = null,
+    runtimeDatasetScopeParams = null
+  } = {}) {
+    var _a5;
+    const documentId = resolveDocumentId(container);
+    const blockId = "primaryBuilder";
+    const scopeParams = buildReportDocumentScopeParams(config, state, runtimeDatasetScopeParams);
+    const contextPreset = resolveReportScopeContextPresetFromState(state, scopeParams);
+    const binding = resolveReportDocumentBinding(null, config, state);
+    const documentBlocks = mergeReportBuilderDocumentBlocks(
+      normalizeReportBuilderDocumentBlocks(state == null ? void 0 : state.reportDocumentBlocks),
+      additionalBlocks
+    ).map((block) => normalizeString29(block == null ? void 0 : block.kind) === "tableBlock" && (config == null ? void 0 : config.tablePresentation) && typeof config.tablePresentation === "object" ? normalizeReportDocumentTableBlock({ ...cloneValue19(config.tablePresentation), ...block }) : block).filter(Boolean);
+    const source = {
+      kind: "dashboard.reportBuilder",
+      containerId: resolveContainerIdentity2(container),
+      stateKey: normalizeString29((container == null ? void 0 : container.stateKey) || resolveContainerIdentity2(container)),
+      dataSourceRef: resolveDocumentDataSourceRef(container, config)
+    };
+    const presentation = buildReportBuilderReportDocumentPresentation(config, state);
+    return {
+      version: 1,
+      kind: "reportDocument",
+      ...normalizeReportViewerSettings(state == null ? void 0 : state.reportDocumentViewer) ? { viewer: normalizeReportViewerSettings(state.reportDocumentViewer) } : {},
+      id: documentId,
+      title: resolveDocumentMetadataValue(state == null ? void 0 : state.reportDocumentTitle, resolveDocumentTitle(container, config)),
+      subtitle: normalizeString29(state == null ? void 0 : state.reportDocumentSubtitle),
+      description: normalizeString29(state == null ? void 0 : state.reportDocumentDescription),
+      ...normalizeReportDocumentTheme({
+        accentTone: state == null ? void 0 : state.reportDocumentThemeAccent,
+        badgePalette: state == null ? void 0 : state.reportDocumentBadgePalette
+      }) ? { theme: normalizeReportDocumentTheme({
+        accentTone: state == null ? void 0 : state.reportDocumentThemeAccent,
+        badgePalette: state == null ? void 0 : state.reportDocumentBadgePalette
+      }) } : {},
+      ...resolveDocumentTemplateIdentity(state) || {},
+      ...binding ? { binding: cloneValue19(binding) } : {},
+      ...semanticSummary && typeof semanticSummary === "object" && !Array.isArray(semanticSummary) ? { semanticSummary: cloneValue19(semanticSummary) } : {},
+      refinements: normalizeReportRefinements(refinements),
+      scope: {
+        ...contextPreset ? { contextPreset: cloneValue19(contextPreset) } : {},
+        params: scopeParams,
+        dataSourceRef: resolveDocumentDataSourceRef(container, config)
+      },
+      ...presentation ? { presentation } : {},
+      datasets: buildReportBuilderReportDocumentDatasets(container, config, state),
+      layout: {
+        type: normalizeString29(((_a5 = state == null ? void 0 : state.reportDocumentLayout) == null ? void 0 : _a5.type) || "stack") || "stack",
+        items: normalizeReportBuilderDocumentLayoutItems(
+          state == null ? void 0 : state.reportDocumentLayout,
+          documentBlocks.map((block) => normalizeString29(block == null ? void 0 : block.id)).filter(Boolean)
+        )
+      },
+      blocks: [
+        ...documentBlocks.map((block) => cloneValue19(block)),
+        {
+          id: blockId,
+          kind: "reportBuilderBlock",
+          title: resolveDocumentTitle(container, config),
+          source,
+          config: stripReportBuilderDocumentPresentationMetadata(
+            stripReportBuilderDocumentPrimaryFieldContract(
+              stripReportBuilderDocumentDatasetCatalog(config)
+            ),
+            presentation
+          ),
+          state: stripReportBuilderDocumentAuthoringState(state),
+          scopeBindings: buildReportBuilderBlockScopeBindings(config)
+        }
+      ]
+    };
+  }
+  function applyReportBuilderBlockScope(document = {}, block = {}) {
+    var _a5;
+    const scopeParams = new Map(
+      (Array.isArray((_a5 = document == null ? void 0 : document.scope) == null ? void 0 : _a5.params) ? document.scope.params : []).map((param) => [normalizeString29(param == null ? void 0 : param.id), param]).filter(([id]) => !!id)
+    );
+    const boundScopeValues = {};
+    (Array.isArray(block == null ? void 0 : block.scopeBindings) ? block.scopeBindings : []).forEach((binding) => {
+      const paramId = normalizeString29(binding == null ? void 0 : binding.paramId);
+      const filterId = resolveScopeBindingFilterId(binding == null ? void 0 : binding.target);
+      if (!paramId || !filterId) {
+        return;
+      }
+      const param = scopeParams.get(paramId);
+      if (!param) {
+        return;
+      }
+      boundScopeValues[filterId] = cloneValue19(param.value);
+    });
+    return {
+      ...block,
+      state: mergeScopeParamValues(cloneValue19((block == null ? void 0 : block.state) || {}), boundScopeValues)
+    };
+  }
+  function enrichLoweredScopeParams(documentParams = [], canonicalParams = []) {
+    const canonicalById = new Map(
+      (Array.isArray(canonicalParams) ? canonicalParams : []).map((param) => [normalizeString29(param == null ? void 0 : param.id), param]).filter(([id]) => !!id)
+    );
+    const seen = /* @__PURE__ */ new Set();
+    const enriched = (Array.isArray(documentParams) ? documentParams : []).map((param) => {
+      const id = normalizeString29(param == null ? void 0 : param.id);
+      if (!id) {
+        return null;
+      }
+      seen.add(id);
+      const canonical = canonicalById.get(id);
+      return canonical ? { ...cloneValue19(canonical), ...cloneValue19(param) } : cloneValue19(param);
+    }).filter(Boolean);
+    canonicalById.forEach((param, id) => {
+      if (!seen.has(id)) {
+        enriched.push(cloneValue19(param));
+      }
+    });
+    return enriched;
+  }
+  function orderLoweredBlocksByDocumentLayout(document = {}, baseSpec = {}, allBlocks = []) {
+    var _a5, _b;
+    const blockIndex = new Map(
+      (Array.isArray(allBlocks) ? allBlocks : []).map((block) => [normalizeString29(block == null ? void 0 : block.id), block]).filter(([id]) => !!id)
+    );
+    const ordered = [];
+    const layoutItems = [];
+    const seen = /* @__PURE__ */ new Set();
+    const primaryBuilderBlockIds = (Array.isArray((_a5 = baseSpec == null ? void 0 : baseSpec.layoutIntent) == null ? void 0 : _a5.blockOrder) ? baseSpec.layoutIntent.blockOrder : []).map((blockId) => normalizeString29(blockId)).filter(Boolean);
+    const pushOrderedBlock = (blockId = "", layoutItem = null) => {
+      const normalizedBlockId = normalizeString29(blockId);
+      const block = blockIndex.get(normalizedBlockId);
+      if (!block || seen.has(normalizedBlockId)) {
+        return;
+      }
+      seen.add(normalizedBlockId);
+      ordered.push(block);
+      layoutItems.push(buildLayoutItem(normalizedBlockId, layoutItem) || { blockId: normalizedBlockId });
+    };
+    (Array.isArray((_b = document == null ? void 0 : document.layout) == null ? void 0 : _b.items) ? document.layout.items : []).forEach((item) => {
+      const blockId = normalizeString29(item == null ? void 0 : item.blockId);
+      if (!blockId) {
+        return;
+      }
+      const expandedBlockIds = blockId === "primaryBuilder" ? primaryBuilderBlockIds : [blockId];
+      expandedBlockIds.forEach((expandedBlockId) => {
+        pushOrderedBlock(expandedBlockId, item);
+      });
+    });
+    (Array.isArray(allBlocks) ? allBlocks : []).forEach((block) => {
+      const blockId = normalizeString29(block == null ? void 0 : block.id);
+      if (blockId && seen.has(blockId)) {
+        return;
+      }
+      if (blockId) {
+        pushOrderedBlock(blockId);
+        return;
+      }
+      ordered.push(block);
+    });
+    return {
+      blocks: ordered,
+      items: layoutItems
+    };
+  }
+  function buildExclusiveReportSectionOwnership(blocks = []) {
+    const source = Array.isArray(blocks) ? blocks : [];
+    const tabGroup = source.find((block) => normalizeString29(block == null ? void 0 : block.kind) === "tabGroupBlock") || null;
+    if (!tabGroup || (tabGroup == null ? void 0 : tabGroup.includeUnlistedSections) !== false) {
+      return /* @__PURE__ */ new Map();
+    }
+    const declaredSectionIds = new Set((Array.isArray(tabGroup == null ? void 0 : tabGroup.sectionIds) ? tabGroup.sectionIds : []).map((sectionId) => normalizeString29(sectionId)).filter(Boolean));
+    const ownership = new Map(Array.from(declaredSectionIds, (sectionId) => [sectionId, []]));
+    let activeSectionId = "";
+    let inferActiveSectionOwnership = false;
+    source.forEach((block) => {
+      const blockId = normalizeString29(block == null ? void 0 : block.id);
+      const kind = normalizeString29(block == null ? void 0 : block.kind);
+      if (kind === "sectionBlock") {
+        activeSectionId = declaredSectionIds.has(blockId) ? blockId : "";
+        const explicitBlockIds = (Array.isArray(block == null ? void 0 : block.blockIds) ? block.blockIds : []).map((ownedBlockId) => normalizeString29(ownedBlockId)).filter(Boolean);
+        if (activeSectionId && explicitBlockIds.length > 0) {
+          ownership.set(activeSectionId, Array.from(new Set(explicitBlockIds)));
+          inferActiveSectionOwnership = false;
+        } else {
+          inferActiveSectionOwnership = !!activeSectionId;
+        }
+        return;
+      }
+      if (!activeSectionId || !inferActiveSectionOwnership || !blockId || kind === "tabGroupBlock" || kind === "reportBuilderBlock") {
+        return;
+      }
+      ownership.get(activeSectionId).push(blockId);
+    });
+    return ownership;
+  }
+  function filterExclusiveReportRuntimeBlocks(documentBlocks = [], runtimeBlocks = [], ownership = /* @__PURE__ */ new Map()) {
+    if (!(ownership instanceof Map) || ownership.size === 0) {
+      return Array.isArray(runtimeBlocks) ? runtimeBlocks : [];
+    }
+    const allowedBlockIds = new Set(
+      (Array.isArray(documentBlocks) ? documentBlocks : []).map((block) => normalizeString29(block == null ? void 0 : block.id)).filter(Boolean)
+    );
+    ownership.forEach((blockIds, sectionId) => {
+      if (normalizeString29(sectionId)) allowedBlockIds.add(normalizeString29(sectionId));
+      (Array.isArray(blockIds) ? blockIds : []).map((blockId) => normalizeString29(blockId)).filter(Boolean).forEach((blockId) => allowedBlockIds.add(blockId));
+    });
+    return (Array.isArray(runtimeBlocks) ? runtimeBlocks : []).filter((block) => allowedBlockIds.has(normalizeString29(block == null ? void 0 : block.id)));
+  }
+  function lowerReportDocumentToReportSpec(document = {}, {
+    includePrimaryBlocks = true,
+    runtimeDatasetScopeParams = null,
+    onChartValidation = null
+  } = {}) {
+    var _a5, _b, _c, _d, _e, _f;
+    const blocks = Array.isArray(document == null ? void 0 : document.blocks) ? document.blocks : [];
+    const exclusiveSectionOwnership = buildExclusiveReportSectionOwnership(blocks);
+    const reportBuilderBlock = resolveReportBuilderBlock(document);
+    if (!reportBuilderBlock) {
+      throw new Error("ReportDocument must contain at least one reportBuilderBlock.");
+    }
+    const scopedReportBuilderBlock = applyReportBuilderBlockScope(document, reportBuilderBlock);
+    const source = (reportBuilderBlock == null ? void 0 : reportBuilderBlock.source) && typeof reportBuilderBlock.source === "object" ? reportBuilderBlock.source : {};
+    const builderContext = resolveReportDocumentBuilderContext(
+      document,
+      (scopedReportBuilderBlock == null ? void 0 : scopedReportBuilderBlock.config) || {},
+      (scopedReportBuilderBlock == null ? void 0 : scopedReportBuilderBlock.state) || {}
+    );
+    const effectiveScopedConfig = (builderContext == null ? void 0 : builderContext.config) || {};
+    const effectiveScopedState = (builderContext == null ? void 0 : builderContext.state) || {};
+    const effectiveConfig = buildReportBuilderCalculatedFieldConfig(effectiveScopedConfig, effectiveScopedState);
+    const effectiveFieldCatalog = buildReportBuilderFieldCatalog(effectiveConfig);
+    const staticDatasets = Array.isArray(builderContext == null ? void 0 : builderContext.staticDatasets) ? builderContext.staticDatasets : [];
+    const loweringState = effectiveScopedState;
+    const staticDatasetIndex = new Map(
+      staticDatasets.map((dataset) => [normalizeString29(dataset == null ? void 0 : dataset.id), dataset]).filter(([datasetId]) => !!datasetId)
+    );
+    const publishedDatasetSources = resolveReportDocumentPublishedDatasets(document, effectiveScopedConfig);
+    const publishedDatasetIndex = buildReportBuilderPublishedDatasetRefIndex(publishedDatasetSources);
+    const loweredContainer = {
+      id: normalizeString29(source.containerId || (document == null ? void 0 : document.id)),
+      stateKey: normalizeString29(source.stateKey || source.containerId || (document == null ? void 0 : document.id)),
+      title: normalizeString29((document == null ? void 0 : document.title) || (reportBuilderBlock == null ? void 0 : reportBuilderBlock.title)),
+      dataSourceRef: normalizeString29(source.dataSourceRef || ((_a5 = document == null ? void 0 : document.scope) == null ? void 0 : _a5.dataSourceRef))
+    };
+    const baseSpec = buildReportBuilderReportSpec({
+      container: loweredContainer,
+      config: effectiveScopedConfig,
+      state: loweringState,
+      refinements: normalizeReportRefinements(document == null ? void 0 : document.refinements),
+      semanticSummary: (document == null ? void 0 : document.semanticSummary) || null,
+      includePrimaryBlocks,
+      onChartValidation
+    });
+    const primaryRequestContext = {
+      dataSourceRef: normalizeString29(((_b = baseSpec == null ? void 0 : baseSpec.source) == null ? void 0 : _b.dataSourceRef) || (loweredContainer == null ? void 0 : loweredContainer.dataSourceRef)),
+      request: cloneValue19(buildReportBuilderRequest(effectiveScopedConfig, effectiveScopedState))
+    };
+    const datasetBackedBlocks = blocks.filter((block) => normalizeString29(block == null ? void 0 : block.kind) !== "reportBuilderBlock").filter((block) => isReportDatasetBackedBlockKind(block == null ? void 0 : block.kind));
+    const explicitDatasetRefs = datasetBackedBlocks.map((block) => normalizeString29(block == null ? void 0 : block.datasetRef)).filter(Boolean);
+    const shouldOmitPrimaryDataset = !shouldKeepPrimaryDataset({
+      includePrimaryBlocks,
+      datasetBackedBlockDatasetRefs: explicitDatasetRefs.length === datasetBackedBlocks.length ? explicitDatasetRefs : [],
+      availableNonPrimaryDatasetRefs: [
+        ...Array.from(staticDatasetIndex.keys()),
+        ...Array.from(publishedDatasetIndex.keys())
+      ]
+    });
+    if (shouldOmitPrimaryDataset) {
+      baseSpec.datasets = (Array.isArray(baseSpec == null ? void 0 : baseSpec.datasets) ? baseSpec.datasets : []).filter((dataset) => normalizeString29(dataset == null ? void 0 : dataset.id) !== "primary");
+    }
+    const buildDatasetSpecificRuntimeContext = (datasetRef = "") => {
+      const normalizedDatasetRef = normalizeString29(datasetRef || "primary") || "primary";
+      const staticDataset = staticDatasetIndex.get(normalizedDatasetRef) || null;
+      if (staticDataset) {
+        const datasetConfig = buildStaticDatasetReportBuilderConfig(effectiveConfig, staticDataset);
+        return {
+          config: datasetConfig,
+          fieldCatalog: buildReportBuilderFieldCatalog(datasetConfig),
+          container: {
+            ...loweredContainer,
+            dataSourceRef: normalizeString29((staticDataset == null ? void 0 : staticDataset.dataSourceRef) || (loweredContainer == null ? void 0 : loweredContainer.dataSourceRef))
+          }
+        };
+      }
+      const publishedDataset = publishedDatasetIndex.get(normalizedDatasetRef) || null;
+      if (publishedDataset) {
+        const datasetConfig = buildReportBuilderPublishedDatasetConfig(effectiveConfig, publishedDataset, { borrowBase: true });
+        return {
+          config: datasetConfig,
+          fieldCatalog: buildReportBuilderFieldCatalog(datasetConfig),
+          container: {
+            ...loweredContainer,
+            dataSourceRef: normalizeString29((publishedDataset == null ? void 0 : publishedDataset.dataSourceRef) || (loweredContainer == null ? void 0 : loweredContainer.dataSourceRef))
+          }
+        };
+      }
+      return {
+        config: effectiveConfig,
+        fieldCatalog: effectiveFieldCatalog,
+        container: loweredContainer
+      };
+    };
+    const datasetRuntimeContexts = /* @__PURE__ */ new Map();
+    const resolveDatasetSpecificRuntimeContext = (datasetRef = "") => {
+      const key = normalizeString29(datasetRef || "primary") || "primary";
+      if (!datasetRuntimeContexts.has(key)) {
+        datasetRuntimeContexts.set(key, buildDatasetSpecificRuntimeContext(key));
+      }
+      return datasetRuntimeContexts.get(key);
+    };
+    const additionalBlocks = blocks.filter((block) => normalizeString29(block == null ? void 0 : block.kind) !== "reportBuilderBlock").map((block) => {
+      const normalizedBlock = normalizeReportBuilderDocumentBlock(block);
+      if (normalizeString29(normalizedBlock == null ? void 0 : normalizedBlock.kind) === "sectionBlock" && exclusiveSectionOwnership.has(normalizeString29(normalizedBlock == null ? void 0 : normalizedBlock.id))) {
+        return {
+          ...normalizedBlock,
+          blockIds: cloneValue19(exclusiveSectionOwnership.get(normalizeString29(normalizedBlock.id)))
+        };
+      }
+      const datasetContext = resolveDatasetSpecificRuntimeContext(normalizedBlock == null ? void 0 : normalizedBlock.datasetRef);
+      if (normalizeString29(normalizedBlock == null ? void 0 : normalizedBlock.kind) === "chartBlock") {
+        const chartState = buildAuthoredChartBlockState({
+          ...cloneValue19(effectiveScopedState),
+          selectedDimensions: [],
+          selectedMeasures: [],
+          primaryMeasure: "",
+          groupBy: ""
+        }, (normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) || {}, datasetContext.fieldCatalog);
+        return withReportBlockRuntime(buildReportSpecChartBlock({
+          container: datasetContext.container,
+          config: datasetContext.config,
+          state: chartState,
+          chartSpec: (normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) || null,
+          blockId: normalizedBlock == null ? void 0 : normalizedBlock.id,
+          datasetRef: normalizedBlock == null ? void 0 : normalizedBlock.datasetRef,
+          title: normalizedBlock == null ? void 0 : normalizedBlock.title,
+          rowLimit: normalizedBlock == null ? void 0 : normalizedBlock.rowLimit,
+          onChartValidation
+        }), normalizedBlock);
+      }
+      if (normalizeString29(normalizedBlock == null ? void 0 : normalizedBlock.kind) === "tableBlock") {
+        return withReportBlockRuntime(buildAuthoredTableBlock(normalizedBlock, datasetContext.fieldCatalog), normalizedBlock);
+      }
+      if (normalizeString29(normalizedBlock == null ? void 0 : normalizedBlock.kind) === "markdownBlock") {
+        return withReportBlockRuntime(buildAuthoredMarkdownBlock(normalizedBlock, datasetContext.fieldCatalog), normalizedBlock);
+      }
+      if (normalizeString29(normalizedBlock == null ? void 0 : normalizedBlock.kind) === "kpiBlock") {
+        return withReportBlockRuntime(buildAuthoredKpiBlock(normalizedBlock, datasetContext.fieldCatalog), normalizedBlock);
+      }
+      if (normalizeString29(normalizedBlock == null ? void 0 : normalizedBlock.kind) === "collectionBlock") {
+        return withReportBlockRuntime(buildAuthoredCollectionBlock(normalizedBlock, datasetContext.fieldCatalog), normalizedBlock);
+      }
+      if (normalizeString29(normalizedBlock == null ? void 0 : normalizedBlock.kind) === "badgesBlock") {
+        return withReportBlockRuntime(buildAuthoredBadgesBlock(normalizedBlock, datasetContext.fieldCatalog), normalizedBlock);
+      }
+      return normalizedBlock;
+    }).filter(Boolean);
+    const loweredLayout = orderLoweredBlocksByDocumentLayout(
+      document,
+      baseSpec,
+      [...Array.isArray(baseSpec == null ? void 0 : baseSpec.blocks) ? baseSpec.blocks : [], ...additionalBlocks]
+    );
+    const nextBlocks = filterExclusiveReportRuntimeBlocks(blocks, loweredLayout.blocks, exclusiveSectionOwnership);
+    const nextBlockIds = new Set(nextBlocks.map((block) => normalizeString29(block == null ? void 0 : block.id)).filter(Boolean));
+    const referencedDatasetRefs = new Set(
+      nextBlocks.flatMap(getReportBlockDatasetRefs).filter((datasetRef) => !!datasetRef && datasetRef !== "primary")
+    );
+    const additionalPublishedDatasets = buildReportBuilderPublishedDatasetDeclarations(
+      effectiveScopedConfig,
+      effectiveScopedState,
+      referencedDatasetRefs,
+      runtimeDatasetScopeParams,
+      primaryRequestContext
+    );
+    const refreshedPublishedDatasetIndex = new Map(
+      additionalPublishedDatasets.map((dataset) => [normalizeString29(dataset == null ? void 0 : dataset.id), dataset]).filter(([datasetId]) => !!datasetId)
+    );
+    const baseDatasets = Array.isArray(baseSpec == null ? void 0 : baseSpec.datasets) ? baseSpec.datasets : [];
+    const mergedDatasets = [
+      ...baseDatasets.map((dataset) => refreshedPublishedDatasetIndex.get(normalizeString29(dataset == null ? void 0 : dataset.id)) || dataset),
+      ...additionalPublishedDatasets.filter((dataset) => !baseDatasets.some((entry) => normalizeString29(entry == null ? void 0 : entry.id) === normalizeString29(dataset == null ? void 0 : dataset.id)))
+    ];
+    const resolvedPrimaryDataset = shouldOmitPrimaryDataset ? null : resolveLoweredPrimaryDataset(
+      document,
+      mergedDatasets.find((dataset) => normalizeString29(dataset == null ? void 0 : dataset.id) === "primary") || null,
+      loweredContainer
+    );
+    const nextDatasets = [
+      ...resolvedPrimaryDataset ? [resolvedPrimaryDataset] : [],
+      ...mergedDatasets.filter((dataset) => normalizeString29(dataset == null ? void 0 : dataset.id) !== "primary")
+    ];
+    const nextDatasetIds = new Set(nextDatasets.map((dataset) => normalizeString29(dataset == null ? void 0 : dataset.id)).filter(Boolean));
+    const nextCalculatedFields = (Array.isArray(baseSpec == null ? void 0 : baseSpec.calculatedFields) ? baseSpec.calculatedFields : []).filter((field) => {
+      const datasetRef = normalizeString29((field == null ? void 0 : field.datasetRef) || "primary") || "primary";
+      return nextDatasetIds.has(datasetRef);
+    });
+    const loweredScopeParams = enrichLoweredScopeParams(
+      (_c = document == null ? void 0 : document.scope) == null ? void 0 : _c.params,
+      buildReportDocumentScopeParams(effectiveScopedConfig, effectiveScopedState, runtimeDatasetScopeParams)
+    );
+    const loweredContextPreset = normalizeReportScopeContextPreset((_d = document == null ? void 0 : document.scope) == null ? void 0 : _d.contextPreset, {
+      availableParamIds: listMeaningfulReportScopeParamIds(loweredScopeParams)
+    });
+    const nextSpec = {
+      ...baseSpec,
+      ...normalizeReportViewerSettings(document == null ? void 0 : document.viewer) ? { viewer: normalizeReportViewerSettings(document.viewer) } : {},
+      ...normalizeReportDocumentTheme(document == null ? void 0 : document.theme) ? { theme: normalizeReportDocumentTheme(document.theme) } : {},
+      scope: {
+        ...loweredContextPreset ? { contextPreset: loweredContextPreset } : {},
+        params: loweredScopeParams,
+        dataSourceRef: normalizeString29(((_e = document == null ? void 0 : document.scope) == null ? void 0 : _e.dataSourceRef) || source.dataSourceRef || ((_f = baseSpec == null ? void 0 : baseSpec.source) == null ? void 0 : _f.dataSourceRef))
+      },
+      layoutIntent: {
+        ...(baseSpec == null ? void 0 : baseSpec.layoutIntent) || {},
+        blockOrder: nextBlocks.map((block) => normalizeString29(block == null ? void 0 : block.id)).filter(Boolean),
+        items: (Array.isArray(loweredLayout.items) ? loweredLayout.items : []).filter((item) => nextBlockIds.has(normalizeString29(item == null ? void 0 : item.blockId)))
+      },
+      datasets: nextDatasets,
+      calculatedFields: nextCalculatedFields,
+      blocks: nextBlocks
+    };
+    return augmentReportRequestForAuthoredBlocks(nextSpec, nextBlocks, effectiveConfig);
+  }
+
+  // src/reporting/reportChartValidation.js
+  var AuthoredReportChartValidationError = class extends Error {
+    constructor(diagnostics) {
+      super("Authored report contains invalid chart fields.");
+      this.name = "AuthoredReportChartValidationError";
+      this.authoredChartValidation = diagnostics;
+    }
+  };
+  var bounded = (value) => typeof value === "string" && value.length <= 128 ? value : "";
+  function selectedField(chartSpec, field) {
+    var _a5;
+    if (field === "xField" || field === "seriesField") return bounded(chartSpec == null ? void 0 : chartSpec[field]);
+    const index = /^yFields\.([0-9]+)$/.exec(field);
+    return index ? bounded((_a5 = chartSpec == null ? void 0 : chartSpec.yFields) == null ? void 0 : _a5[Number(index[1])]) : "";
+  }
+  function lowerValidatedReportDocument(document, options = {}) {
+    const diagnostics = [];
+    const reportSpec = lowerReportDocumentToReportSpec(document, {
+      ...options,
+      onChartValidation: ({ blockId, datasetRef, chartSpec, validation }) => {
+        if (validation == null ? void 0 : validation.valid) return;
+        for (const error of Array.isArray(validation == null ? void 0 : validation.errors) ? validation.errors : []) {
+          if (diagnostics.length >= 64) break;
+          const field = bounded(error == null ? void 0 : error.field);
+          diagnostics.push({
+            blockId: bounded(blockId),
+            datasetRef: bounded(datasetRef),
+            field,
+            fieldRef: selectedField(chartSpec, field),
+            validationCode: bounded(error == null ? void 0 : error.code)
+          });
+        }
+      }
+    });
+    if (diagnostics.length) throw new AuthoredReportChartValidationError(diagnostics);
+    return reportSpec;
+  }
+
+  // src/utils/linkTarget.js
+  function normalizeString30(value) {
+    if (typeof value !== "string") {
+      return "";
+    }
+    return value.trim();
+  }
+  function isObjectValue(value) {
+    return value != null && typeof value === "object" && !Array.isArray(value);
+  }
+  function normalizeLinkText(value, fallbackText = "") {
+    if (value == null) {
+      return fallbackText;
+    }
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      const text = String(value);
+      return text || fallbackText;
+    }
+    return fallbackText;
+  }
+  function resolveTemplateText(template = "", holder = null) {
+    const source = normalizeString30(template);
+    if (!source) {
+      return "";
+    }
+    return source.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_2, selector) => {
+      const value = resolveKey(holder || {}, String(selector || "").trim());
+      return value == null ? "" : String(value);
+    }).replace(/\s{2,}/g, " ").trim();
+  }
+  function resolveContextSourceValue({ source = "value", selector = "", context = null, row = null, value = null } = {}) {
+    var _a5, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X;
+    switch (String(source || "value").trim().toLowerCase()) {
+      case "row":
+        return selector ? resolveKey(row || {}, selector) : row;
+      case "value":
+        return selector ? resolveKey(value || {}, selector) : value;
+      case "form":
+        return selector ? resolveKey(((_c = (_b = (_a5 = context == null ? void 0 : context.handlers) == null ? void 0 : _a5.dataSource) == null ? void 0 : _b.getFormData) == null ? void 0 : _c.call(_b)) || {}, selector) : ((_f = (_e = (_d = context == null ? void 0 : context.handlers) == null ? void 0 : _d.dataSource) == null ? void 0 : _e.getFormData) == null ? void 0 : _f.call(_e)) || {};
+      case "windowform":
+        return selector ? resolveKey(((_i = (_h = (_g = context == null ? void 0 : context.signals) == null ? void 0 : _g.windowForm) == null ? void 0 : _h.peek) == null ? void 0 : _i.call(_h)) || ((_k = (_j = context == null ? void 0 : context.signals) == null ? void 0 : _j.windowForm) == null ? void 0 : _k.value) || {}, selector) : ((_n = (_m = (_l = context == null ? void 0 : context.signals) == null ? void 0 : _l.windowForm) == null ? void 0 : _m.peek) == null ? void 0 : _n.call(_m)) || ((_p = (_o = context == null ? void 0 : context.signals) == null ? void 0 : _o.windowForm) == null ? void 0 : _p.value) || {};
+      case "metrics":
+        return selector ? resolveKey(((_s = (_r = (_q = context == null ? void 0 : context.signals) == null ? void 0 : _q.metrics) == null ? void 0 : _r.peek) == null ? void 0 : _s.call(_r)) || ((_u = (_t = context == null ? void 0 : context.signals) == null ? void 0 : _t.metrics) == null ? void 0 : _u.value) || {}, selector) : ((_x = (_w = (_v = context == null ? void 0 : context.signals) == null ? void 0 : _v.metrics) == null ? void 0 : _w.peek) == null ? void 0 : _x.call(_w)) || ((_z = (_y = context == null ? void 0 : context.signals) == null ? void 0 : _y.metrics) == null ? void 0 : _z.value) || {};
+      case "filter":
+        return selector ? resolveKey(((_C = (_B = (_A = context == null ? void 0 : context.handlers) == null ? void 0 : _A.dataSource) == null ? void 0 : _B.peekFilter) == null ? void 0 : _C.call(_B)) || {}, selector) : ((_F = (_E = (_D = context == null ? void 0 : context.handlers) == null ? void 0 : _D.dataSource) == null ? void 0 : _E.peekFilter) == null ? void 0 : _F.call(_E)) || {};
+      case "selection": {
+        const selection = ((_I = (_H = (_G = context == null ? void 0 : context.handlers) == null ? void 0 : _G.dataSource) == null ? void 0 : _H.getSelection) == null ? void 0 : _I.call(_H)) || ((_L = (_K = (_J = context == null ? void 0 : context.handlers) == null ? void 0 : _J.dataSource) == null ? void 0 : _K.peekSelection) == null ? void 0 : _L.call(_K)) || {};
+        const selected = (_N = (_M = selection == null ? void 0 : selection.selected) != null ? _M : selection == null ? void 0 : selection.selection) != null ? _N : selection;
+        return selector ? resolveKey(selected || {}, selector) : selected;
+      }
+      case "input":
+        return selector ? resolveKey(((_Q = (_P = (_O = context == null ? void 0 : context.signals) == null ? void 0 : _O.input) == null ? void 0 : _P.peek) == null ? void 0 : _Q.call(_P)) || ((_S = (_R = context == null ? void 0 : context.signals) == null ? void 0 : _R.input) == null ? void 0 : _S.value) || {}, selector) : ((_V = (_U = (_T = context == null ? void 0 : context.signals) == null ? void 0 : _T.input) == null ? void 0 : _U.peek) == null ? void 0 : _V.call(_U)) || ((_X = (_W = context == null ? void 0 : context.signals) == null ? void 0 : _W.input) == null ? void 0 : _X.value) || {};
+      case "const":
+        return value;
+      default:
+        return void 0;
+    }
+  }
+  function resolveParameterSpecValue(spec, runtime = {}) {
+    if (isObjectValue(spec)) {
+      const source = spec.source || (spec.selector ? "row" : Object.prototype.hasOwnProperty.call(spec, "value") ? "const" : "value");
+      const selector = normalizeString30(spec.selector || spec.path || spec.location);
+      const resolved = resolveContextSourceValue({
+        source,
+        selector,
+        context: runtime.context,
+        row: runtime.row,
+        value: Object.prototype.hasOwnProperty.call(spec, "value") ? spec.value : runtime.value
+      });
+      if (spec.wrap === "array") {
+        return Array.isArray(resolved) ? resolved : [resolved];
+      }
+      return resolved;
+    }
+    return spec;
+  }
+  function resolveWindowParameters(parameters = {}, runtime = {}) {
+    if (!isObjectValue(parameters)) {
+      return {};
+    }
+    const result = {};
+    Object.entries(parameters).forEach(([key, spec]) => {
+      if (!key) return;
+      result[key] = resolveParameterSpecValue(spec, runtime);
+    });
+    return result;
+  }
+  function resolveLinkTarget({ linkConfig = null, row = null, value = null, context = null } = {}) {
+    var _a5, _b, _c, _d, _e, _f, _g;
+    const objectValue = isObjectValue(value) ? value : null;
+    if (!isObjectValue(linkConfig)) {
+      if (!(objectValue == null ? void 0 : objectValue.href)) {
+        return null;
+      }
+      return {
+        kind: "external",
+        href: normalizeString30(objectValue.href),
+        text: normalizeLinkText((_a5 = objectValue == null ? void 0 : objectValue.label) != null ? _a5 : objectValue == null ? void 0 : objectValue.text, normalizeString30(objectValue.href)),
+        target: normalizeString30(objectValue == null ? void 0 : objectValue.target) || "_blank",
+        rel: normalizeString30(objectValue == null ? void 0 : objectValue.rel) || "noopener noreferrer",
+        title: normalizeString30(objectValue == null ? void 0 : objectValue.title)
+      };
+    }
+    const kind = normalizeString30(linkConfig.kindSelector ? resolveContextSourceValue({ source: linkConfig.kindSource || "windowForm", selector: linkConfig.kindSelector, context, row, value }) : "") || normalizeString30(linkConfig.kind || "");
+    const windowKey = normalizeString30(linkConfig.windowKey || "");
+    const dialogId = normalizeString30(linkConfig.dialogId || linkConfig.dialog || "");
+    if (kind === "association") {
+      const associations = Array.isArray(value) ? value.filter((entry) => entry != null) : [];
+      if (associations.length === 0) {
+        return null;
+      }
+      if (associations.length === 1 && windowKey) {
+        return resolveLinkTarget({
+          linkConfig: { ...linkConfig, kind: "window", dialogId: "", dialog: "" },
+          row,
+          value: associations[0],
+          context
+        });
+      }
+      if (!dialogId) {
+        return null;
+      }
+      return {
+        kind: "dialog",
+        text: normalizeLinkText(value, dialogId),
+        title: normalizeString30(linkConfig.title),
+        dialogId,
+        awaitResult: linkConfig.awaitResult === true,
+        parameters: {
+          associations,
+          associationIds: associations.map((entry) => {
+            var _a6, _b2;
+            return Number((_b2 = (_a6 = entry == null ? void 0 : entry.id) != null ? _a6 : entry == null ? void 0 : entry.adOrderId) != null ? _b2 : entry);
+          }).filter((id) => Number.isInteger(id) && id > 0)
+        }
+      };
+    }
+    if (kind === "dialog" || !kind && dialogId) {
+      if (!dialogId) {
+        return null;
+      }
+      const textSource2 = linkConfig.textSelector ? resolveContextSourceValue({
+        source: linkConfig.textSource || "row",
+        selector: linkConfig.textSelector,
+        context,
+        row,
+        value
+      }) : linkConfig.label ? resolveKey(row || {}, linkConfig.label) : (_b = linkConfig.text) != null ? _b : value;
+      return {
+        kind: "dialog",
+        text: normalizeLinkText(textSource2, dialogId),
+        title: normalizeString30(linkConfig.title),
+        dialogId,
+        awaitResult: linkConfig.awaitResult === true,
+        parameters: resolveWindowParameters(linkConfig.parameters, { row, value, context })
+      };
+    }
+    if (kind === "window" || !kind && windowKey) {
+      if (!windowKey) {
+        return null;
+      }
+      const textSource2 = linkConfig.textSelector ? resolveContextSourceValue({
+        source: linkConfig.textSource || "row",
+        selector: linkConfig.textSelector,
+        context,
+        row,
+        value
+      }) : linkConfig.label ? resolveKey(row || {}, linkConfig.label) : (_c = linkConfig.text) != null ? _c : value;
+      const text2 = normalizeLinkText(textSource2, normalizeString30(linkConfig.windowTitle) || windowKey);
+      const hasDynamicWindowTitleSource = Boolean(linkConfig.windowTitleSelector) || Boolean(linkConfig.windowTitleSource);
+      const titleSource = hasDynamicWindowTitleSource ? resolveContextSourceValue({
+        source: linkConfig.windowTitleSource || "row",
+        selector: linkConfig.windowTitleSelector || "",
+        context,
+        row,
+        value
+      }) : linkConfig.windowTitle;
+      const titleTemplate = normalizeString30(linkConfig.windowTitleTemplate);
+      const titleTemplateSource = titleTemplate ? resolveContextSourceValue({
+        source: linkConfig.windowTitleSource || "row",
+        selector: "",
+        context,
+        row,
+        value
+      }) : null;
+      const windowTitle = titleTemplate ? resolveTemplateText(titleTemplate, titleTemplateSource) : normalizeLinkText(titleSource, "");
+      return {
+        kind: "window",
+        text: text2,
+        title: normalizeString30(linkConfig.title),
+        windowKey,
+        ...normalizeString30(linkConfig.revision) ? { revision: normalizeString30(linkConfig.revision) } : {},
+        ...Array.isArray(linkConfig.identityParameters) && linkConfig.identityParameters.length > 0 ? { identityParameters: [...linkConfig.identityParameters] } : {},
+        windowTitle,
+        ...normalizeString30(linkConfig.chipName) ? { chipName: normalizeString30(linkConfig.chipName) } : {},
+        ...normalizeString30(linkConfig.chipIcon) ? { chipIcon: normalizeString30(linkConfig.chipIcon) } : {},
+        inTab: linkConfig.inTab !== false,
+        newInstance: linkConfig.newInstance === true,
+        autoIndexTitle: linkConfig.autoIndexTitle === true,
+        awaitResult: linkConfig.awaitResult === true,
+        modal: linkConfig.modal === true,
+        size: isObjectValue(linkConfig.size) ? linkConfig.size : void 0,
+        width: linkConfig.width,
+        height: linkConfig.height,
+        footer: linkConfig.footer,
+        parameters: resolveWindowParameters(linkConfig.parameters, { row, value, context })
+      };
+    }
+    let href = normalizeString30(
+      (linkConfig == null ? void 0 : linkConfig.hrefTemplate) ? resolveTemplateText(linkConfig.hrefTemplate, linkConfig.hrefTemplateSource ? resolveContextSourceValue({ source: linkConfig.hrefTemplateSource, context, row, value }) : row || {}) : (linkConfig == null ? void 0 : linkConfig.href) ? resolveKey(row || {}, linkConfig.href) : (_d = objectValue == null ? void 0 : objectValue.href) != null ? _d : ""
+    );
+    if (!href) {
+      return null;
+    }
+    const baseUrl = normalizeString30(linkConfig.baseUrlSelector ? resolveContextSourceValue({ source: linkConfig.baseUrlSource || "windowForm", selector: linkConfig.baseUrlSelector, context, row, value }) : "") || normalizeString30(linkConfig.baseUrl);
+    if (baseUrl && !/^[a-z][a-z0-9+.-]*:/i.test(href)) {
+      try {
+        const base = new URL(baseUrl);
+        if (!["http:", "https:"].includes(base.protocol)) return null;
+        href = new URL(href.replace(/^\/+/, ""), base.href.replace(/\/?$/, "/")).href;
+      } catch (e3) {
+        return null;
+      }
+    }
+    const textSource = (linkConfig == null ? void 0 : linkConfig.label) ? resolveKey(row || {}, linkConfig.label) : (_g = (_f = (_e = linkConfig == null ? void 0 : linkConfig.text) != null ? _e : objectValue == null ? void 0 : objectValue.label) != null ? _f : objectValue == null ? void 0 : objectValue.text) != null ? _g : value;
+    const text = normalizeLinkText(textSource, href);
+    const target = normalizeString30((objectValue == null ? void 0 : objectValue.target) || (linkConfig == null ? void 0 : linkConfig.target)) || "_blank";
+    const rel = normalizeString30((objectValue == null ? void 0 : objectValue.rel) || (linkConfig == null ? void 0 : linkConfig.rel)) || "noopener noreferrer";
+    const title = normalizeString30(objectValue == null ? void 0 : objectValue.title);
+    return { kind: "external", href, text, target, rel, title };
+  }
+
+  // src/utils/tableLink.js
+  function resolveTableLink({ row, column, value, context = null } = {}) {
+    const isMissingLinkValue = value === void 0 || value === null || typeof value === "string" && value.trim() === "" || Array.isArray(value) && value.length === 0 || typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === 0;
+    if (isMissingLinkValue) {
+      return null;
+    }
+    const resolved = resolveLinkTarget({
+      row,
+      value: (column == null ? void 0 : column.type) === "link" ? value : value,
+      linkConfig: column == null ? void 0 : column.link,
+      context
+    });
+    if (resolved && Array.isArray(value) && (column == null ? void 0 : column.format) === "relationCount") {
+      const singular = (column == null ? void 0 : column.singularLabel) || "item";
+      const plural = (column == null ? void 0 : column.pluralLabel) || `${singular}s`;
+      resolved.text = `${value.length} ${value.length === 1 ? singular : plural}`;
+    }
+    return resolved;
+  }
+
+  // src/reporting/reportRuntimeTableRows.js
+  var normalizeString31 = (value) => String(value || "").trim();
+  var cloneValue20 = (value) => value == null ? value : JSON.parse(JSON.stringify(value));
+  function buildRuntimeTableRows(block = {}, dataset = {}) {
+    var _a5;
+    const resolvedRows = Array.isArray((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.resolvedRows) ? block.content.resolvedRows : null;
+    const originalRows = Array.isArray(dataset == null ? void 0 : dataset.rows) ? dataset.rows : [];
+    if (resolvedRows === null) {
+      return originalRows;
+    }
+    return resolvedRows.map((resolvedRow, rowIndex) => {
+      const sourceIndex = Number.isInteger(resolvedRow.rowIndex) && resolvedRow.rowIndex >= 0 ? resolvedRow.rowIndex : rowIndex;
+      const cells = Array.isArray(resolvedRow == null ? void 0 : resolvedRow.cells) ? resolvedRow.cells : [];
+      return cells.reduce((acc, cell) => {
+        const sourceKey = normalizeString31((cell == null ? void 0 : cell.sourceKey) || (cell == null ? void 0 : cell.key));
+        const displayKey = normalizeString31((cell == null ? void 0 : cell.displayKey) || (cell == null ? void 0 : cell.key));
+        const next = sourceKey ? setSelector(acc, sourceKey, cloneValue20(cell == null ? void 0 : cell.value)) : acc;
+        return displayKey && displayKey !== sourceKey ? setSelector(next, displayKey, cloneValue20(cell == null ? void 0 : cell.displayValue)) : next;
+      }, cloneValue20(originalRows[sourceIndex]) || {});
+    });
+  }
+
+  // src/components/dashboard/dashboardTableSort.js
+  var dateTypes = /* @__PURE__ */ new Set(["date", "datetime", "datetime24", "timestamp"]);
+  var missing = (value) => value === null || value === void 0 || value === "";
+  var integerText = (value) => {
+    if (typeof value === "number" && !Number.isSafeInteger(value)) return null;
+    if (typeof value !== "string" && typeof value !== "number") return null;
+    const text = String(value).trim();
+    if (!/^[+-]?\d+$/.test(text)) return null;
+    const digits = text.replace(/^[+-]/, "").replace(/^0+(?=\d)/, "");
+    return { digits, negative: text[0] === "-" && digits !== "0" };
+  };
+  function compareIntegers(a4, b3) {
+    if (a4.negative !== b3.negative) return a4.negative ? -1 : 1;
+    const magnitude = a4.digits.length !== b3.digits.length ? a4.digits.length < b3.digits.length ? -1 : 1 : a4.digits === b3.digits ? 0 : a4.digits < b3.digits ? -1 : 1;
+    return a4.negative ? -magnitude : magnitude;
+  }
+  function compareDashboardTableValues(a4, b3, column = {}, direction = "asc") {
+    const date = dateTypes.has(String(column.format || "").toLowerCase()) || dateTypes.has(String(column.type || "").toLowerCase());
+    const av = date && !missing(a4) ? new Date(a4).getTime() : a4;
+    const bv = date && !missing(b3) ? new Date(b3).getTime() : b3;
+    const am = missing(a4) || date && !Number.isFinite(av);
+    const bm = missing(b3) || date && !Number.isFinite(bv);
+    if (am || bm) return am === bm ? 0 : am ? 1 : -1;
+    const ai = integerText(av), bi = integerText(bv);
+    if (ai && bi) {
+      const compared2 = compareIntegers(ai, bi);
+      return direction === "desc" ? -compared2 : compared2;
+    }
+    const an = Number(av), bn = Number(bv);
+    const numeric = Number.isFinite(an) && Number.isFinite(bn);
+    const compared = numeric ? an - bn : String(av).localeCompare(String(bv));
+    return direction === "desc" ? -compared : compared;
+  }
+
+  // src/reporting/reportTablePresentation.js
+  var object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+  var own = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
+  var fields = (value, allowed) => Object.keys(value).every((key) => allowed.includes(key));
+  var cellValue = (cell) => own(cell || {}, "displayValue") ? cell.displayValue : cell == null ? void 0 : cell.value;
+  function applyReportTablePresentations(reportFill, presentations = null) {
+    var _a5, _b, _c, _d;
+    if (presentations == null) return reportFill;
+    if (!object(presentations) || Object.keys(presentations).length > 128) throw Error("Invalid report table presentation map.");
+    const blocks = new Map(((reportFill == null ? void 0 : reportFill.blocks) || []).map((block) => [block.id, block]));
+    const replacements = /* @__PURE__ */ new Map();
+    for (const [id, state] of Object.entries(presentations)) {
+      const block = blocks.get(id);
+      if (!block || block.kind !== "tableBlock") throw Error(`Unknown report table: ${id}.`);
+      if (!object(state) || !fields(state, ["filter", "sort"])) throw Error(`Invalid presentation for table ${id}.`);
+      const filter = (_a5 = state.filter) != null ? _a5 : "";
+      if (typeof filter !== "string" || filter.length > 4096) throw Error(`Invalid filter for table ${id}.`);
+      const columns = (_b = block.content) == null ? void 0 : _b.columns;
+      const rows = (_c = block.content) == null ? void 0 : _c.resolvedRows;
+      if (!Array.isArray(columns) || !Array.isArray(rows)) throw Error(`Report table ${id} is not materialized.`);
+      const sort = state.sort;
+      let sortColumn;
+      if (sort != null) {
+        if (!object(sort) || !fields(sort, ["key", "direction"]) || typeof sort.key !== "string" || !["asc", "desc"].includes(sort.direction)) throw Error(`Invalid sort for table ${id}.`);
+        sortColumn = columns.find((column) => column.key === sort.key);
+        if (!sortColumn) throw Error(`Unknown sort column for table ${id}.`);
+      }
+      const dataset = ((_d = reportFill.datasets) == null ? void 0 : _d.find((dataset2) => dataset2.id === (block.datasetRef || "primary"))) || {};
+      const runtimeRows = buildRuntimeTableRows(block, dataset);
+      const values = new Map(rows.map((row, index) => [row, new Map(columns.map((column) => {
+        var _a6;
+        const value = cellValue((_a6 = row.cells) == null ? void 0 : _a6.find((cell) => cell.key === column.key));
+        const link = resolveTableLink({ row: runtimeRows[index], column, value });
+        return [column.key, link ? link.text : value];
+      }))]));
+      const query = filter.trim().toLowerCase();
+      const selected = query ? rows.filter((row) => (row.cells || []).some((cell) => {
+        var _a6;
+        return columns.some((column) => column.key === cell.key) && String((_a6 = values.get(row).get(cell.key)) != null ? _a6 : "").toLowerCase().includes(query);
+      })) : rows.slice();
+      if (sortColumn) selected.sort((a4, b3) => compareDashboardTableValues(
+        values.get(a4).get(sort.key),
+        values.get(b3).get(sort.key),
+        sortColumn,
+        sort.direction
+      ));
+      replacements.set(id, { ...block, content: { ...block.content, rowCount: selected.length, resolvedRows: selected } });
+    }
+    return { ...reportFill, blocks: reportFill.blocks.map((block) => replacements.get(block.id) || block) };
   }
 
   // src/reporting/reportFillChartPayload.js
@@ -58842,7 +58895,7 @@ ${indent}${end}`;
           content: {
             columns,
             rowCount: Number(((_c = dataset == null ? void 0 : dataset.provenance) == null ? void 0 : _c.rowCount) || 0),
-            resolvedRows: buildReportFillTableRows(columns, (dataset == null ? void 0 : dataset.rows) || [])
+            resolvedRows: buildReportFillTableRows(block.selection && !columns.some((column) => column.key === block.selection.field) ? [...columns, { key: block.selection.field, label: "Selected" }] : columns, (dataset == null ? void 0 : dataset.rows) || [])
           }
         };
       }
@@ -68340,7 +68393,10 @@ ${indent}${end}`;
     columnBand = false
   } = {}) {
     var _a5, _b, _c;
-    let columns = Array.isArray((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.columns) ? block.content.columns : [];
+    const description = normalizeString41(block == null ? void 0 : block.description);
+    if (description && !layoutNote.includes(description)) layoutNote = [description, layoutNote].filter(Boolean).join("\n");
+    const authoredColumns = Array.isArray((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.columns) ? block.content.columns : [];
+    let columns = block.selection && !authoredColumns.some((column) => column.key === block.selection.field) ? [...authoredColumns, { key: block.selection.field, label: "Selected" }] : authoredColumns;
     let rows = Array.isArray((_b = block == null ? void 0 : block.content) == null ? void 0 : _b.resolvedRows) ? block.content.resolvedRows : [];
     if (!columnBand && ((_c = block == null ? void 0 : block.runtime) == null ? void 0 : _c.printRowReference) === true && columns.length > 0 && rows.length > 0) {
       block = withReportPrintRowReference(block, columns, rows);
@@ -68357,6 +68413,7 @@ ${indent}${end}`;
           renderReportPrintTableBlock(state, {
             ...block,
             id: `${block.id}__columns_${index + 1}`,
+            selection: void 0,
             title,
             content: { ...block.content, title, columns: groupColumns }
           }, { layoutNote, columnBand: true });
@@ -69003,11 +69060,8 @@ ${indent}${end}`;
   function normalizeFormat(column = {}) {
     const explicit = normalizeString42(column == null ? void 0 : column.format);
     if (explicit) return explicit;
-    const name = normalizeString42(column == null ? void 0 : column.name).toLowerCase();
     const type = normalizeString42(column == null ? void 0 : column.type).toLowerCase();
-    if (type === "date" || name.endsWith("date")) return "date";
-    if (/spend|revenue|sales|cost|cpm|price|amount/.test(name)) return "currency";
-    if (/rate|ratio|percent|percentage|lift|ctr/.test(name)) return "percent";
+    if (type === "date") return "date";
     if (type === "integer" || type === "number") return "compactNumber";
     return "";
   }
@@ -69097,8 +69151,8 @@ ${indent}${end}`;
       }))
     };
     const allowedFilters = new Set(normalizeList(catalog == null ? void 0 : catalog.allowedFilters));
-    const predicates = [];
-    if (allowedFilters.has("from") || allowedFilters.has("to") || allowedFilters.has("dateRange")) {
+    const predicates = Array.isArray(next.predicates) ? clone5(next.predicates) : [];
+    if (!predicates.some((predicate) => (predicate == null ? void 0 : predicate.id) === "dateRange") && (allowedFilters.has("from") || allowedFilters.has("to") || allowedFilters.has("dateRange"))) {
       predicates.push({
         id: "dateRange",
         label: "Date Range",
@@ -69107,31 +69161,6 @@ ${indent}${end}`;
         endParamPath: "filters.to",
         prefill: { start: ["from", "From"], end: ["to", "To"] },
         ...normalizeString42(catalog == null ? void 0 : catalog.defaultDatePreset) ? { default: { preset: normalizeString42(catalog.defaultDatePreset) } } : {}
-      });
-    }
-    if (allowedFilters.has("campaignIds")) {
-      const parameter = (Array.isArray(catalog == null ? void 0 : catalog.parameters) ? catalog.parameters : []).find((item) => (item == null ? void 0 : item.name) === "campaignIds");
-      const choices = Array.isArray(parameter == null ? void 0 : parameter.choices) ? parameter.choices : [];
-      const seen = /* @__PURE__ */ new Set();
-      const options = choices.filter((choice) => {
-        if (!Number.isSafeInteger(choice == null ? void 0 : choice.value) || choice.value <= 0 || seen.has(choice.value)) return false;
-        seen.add(choice.value);
-        return true;
-      }).map((choice) => ({ value: choice.value, label: normalizeString42(choice.label) || `Campaign ${choice.value}` }));
-      const lazyChoicesRef = normalizeString42(next.campaignChoicesDataSourceRef);
-      predicates.push({
-        id: "campaignIds",
-        label: "Campaign",
-        pinned: true,
-        paramPath: "filters.campaignIds",
-        multiple: true,
-        emitArray: true,
-        // Choices are presentation metadata. The producer must reauthorize IDs
-        // on execution; missing/empty choices never enable free-form identifiers.
-        manualEntry: false,
-        options,
-        ...lazyChoicesRef ? { optionsDataSourceRef: lazyChoicesRef, optionsFetchMode: "onFocus", optionValueField: "value", optionLabelField: "label" } : {},
-        prefill: ["campaignIds", "campaignId"]
       });
     }
     next.predicates = predicates;

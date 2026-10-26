@@ -11,8 +11,8 @@ let root,host,windowId,serial=0;
 beforeEach(()=>{globalThis.IS_REACT_ACT_ENVIRONMENT=true;windowId='lazy-options-mounted-'+(++serial);host=document.createElement('div');document.body.append(host);root=createRoot(host);HTMLElement.prototype.scrollIntoView ||= function(){};});
 afterEach(async()=>{await act(async()=>root.unmount());host.remove();removeSignalsForKey(windowId);});
 const pick={id:'pick',type:'select',label:'Category',scope:'form',dataField:'category',optionsDataSourceRef:'choices',optionsFetchMode:'onFocus',optionValueField:'caption',optionLabelField:'caption'};
-it('mounts a report builder campaign-choice datasource without fetching it on open',()=>{
- const def=metadata();def.view.content={id:'builder',kind:'dashboard.reportBuilder',dashboard:{reportBuilder:{campaignChoicesDataSourceRef:'choices'}},dataSourceRef:'record'};
+it('mounts a report builder declared choice datasource without fetching it on open',()=>{
+ const def=metadata();def.view.content={id:'builder',kind:'dashboard.reportBuilder',dashboard:{reportBuilder:{predicates:[{id:'recordIds',optionsDataSourceRef:'choices',optionsFetchMode:'onFocus'}]}},dataSourceRef:'record'};
  expect(resolveRequiredDataSourceRefs(def,'record')).toContain('choices');
 });
 function metadata(){return {dataSource:{record:{id:'record',service:{uri:'mcp://fixture/record'},selectionMode:'single'},choices:{id:'choices',service:{uri:'mcp://fixture/choices'},selectionMode:'none'}},view:{content:{id:'root',dataSourceRef:'record',items:[pick]}}};}

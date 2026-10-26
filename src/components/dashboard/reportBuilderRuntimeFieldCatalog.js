@@ -29,11 +29,8 @@ function normalizeList(values = []) {
 function normalizeFormat(column = {}) {
   const explicit = normalizeString(column?.format);
   if (explicit) return explicit;
-  const name = normalizeString(column?.name).toLowerCase();
   const type = normalizeString(column?.type).toLowerCase();
-  if (type === "date" || name.endsWith("date")) return "date";
-  if (/spend|revenue|sales|cost|cpm|price|amount/.test(name)) return "currency";
-  if (/rate|ratio|percent|percentage|lift|ctr/.test(name)) return "percent";
+  if (type === "date") return "date";
   if (type === "integer" || type === "number") return "compactNumber";
   return "";
 }
@@ -134,8 +131,10 @@ export function applyReportBuilderRuntimeFieldCatalog(config = {}, windowForm = 
   };
 
   const allowedFilters = new Set(normalizeList(catalog?.allowedFilters));
-  const predicates = [];
-  if (allowedFilters.has("from") || allowedFilters.has("to") || allowedFilters.has("dateRange")) {
+  // Business-specific filters and formats are authored by the producer.
+  const predicates = Array.isArray(next.predicates) ? clone(next.predicates) : [];
+  if (!predicates.some(predicate => predicate?.id === "dateRange")
+    && (allowedFilters.has("from") || allowedFilters.has("to") || allowedFilters.has("dateRange"))) {
     predicates.push({
       id: "dateRange",
       label: "Date Range",
@@ -146,31 +145,6 @@ export function applyReportBuilderRuntimeFieldCatalog(config = {}, windowForm = 
       ...(normalizeString(catalog?.defaultDatePreset)
         ? { default: { preset: normalizeString(catalog.defaultDatePreset) } }
         : {}),
-    });
-  }
-  if (allowedFilters.has("campaignIds")) {
-    const parameter = (Array.isArray(catalog?.parameters) ? catalog.parameters : [])
-      .find(item => item?.name === "campaignIds");
-    const choices = Array.isArray(parameter?.choices) ? parameter.choices : [];
-    const seen = new Set();
-    const options = choices.filter(choice => {
-      if (!Number.isSafeInteger(choice?.value) || choice.value <= 0 || seen.has(choice.value)) return false;
-      seen.add(choice.value);return true;
-    }).map(choice => ({value:choice.value,label:normalizeString(choice.label) || `Campaign ${choice.value}`}));
-    const lazyChoicesRef = normalizeString(next.campaignChoicesDataSourceRef);
-    predicates.push({
-      id: "campaignIds",
-      label: "Campaign",
-      pinned: true,
-      paramPath: "filters.campaignIds",
-      multiple: true,
-      emitArray: true,
-      // Choices are presentation metadata. The producer must reauthorize IDs
-      // on execution; missing/empty choices never enable free-form identifiers.
-      manualEntry: false,
-      options,
-      ...(lazyChoicesRef ? {optionsDataSourceRef:lazyChoicesRef,optionsFetchMode:"onFocus",optionValueField:"value",optionLabelField:"label"} : {}),
-      prefill: ["campaignIds", "campaignId"],
     });
   }
   next.predicates = predicates;
