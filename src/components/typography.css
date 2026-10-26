@@ -1,0 +1,129 @@
+:root {
+    --forge-default-type-caption-size: 11px;
+    --forge-default-type-caption-weight: 400;
+    --forge-default-type-caption-line-height: 16px;
+    --forge-default-type-caption-letter-spacing: 0em;
+    --forge-default-type-small-size: 12px;
+    --forge-default-type-small-weight: 400;
+    --forge-default-type-small-line-height: 18px;
+    --forge-default-type-small-letter-spacing: 0em;
+    --forge-default-type-body-size: 14px;
+    --forge-default-type-body-weight: 400;
+    --forge-default-type-body-line-height: 20px;
+    --forge-default-type-body-letter-spacing: 0em;
+    --forge-default-type-section-size: 15px;
+    --forge-default-type-section-weight: 600;
+    --forge-default-type-section-line-height: 22px;
+    --forge-default-type-section-letter-spacing: 0em;
+    --forge-default-type-heading-size: 18px;
+    --forge-default-type-heading-weight: 700;
+    --forge-default-type-heading-line-height: 24px;
+    --forge-default-type-heading-letter-spacing: -0.01em;
+    --forge-default-type-title-size: 22px;
+    --forge-default-type-title-weight: 600;
+    --forge-default-type-title-line-height: 28px;
+    --forge-default-type-title-letter-spacing: -0.01em;
+    --forge-default-type-metric-size: 28px;
+    --forge-default-type-metric-weight: 600;
+    --forge-default-type-metric-line-height: 34px;
+    --forge-default-type-metric-letter-spacing: -0.01em;
+    --forge-default-type-display-size: 32px;
+    --forge-default-type-display-weight: 700;
+    --forge-default-type-display-line-height: 40px;
+    --forge-default-type-display-letter-spacing: -0.02em;
+    --forge-default-type-code-size: 13px;
+    --forge-default-type-code-weight: 400;
+    --forge-default-type-code-line-height: 20px;
+    --forge-default-type-code-letter-spacing: 0em;
+    --forge-default-type-label-size: 14px;
+    --forge-default-type-label-weight: 400;
+    --forge-default-type-label-line-height: 20px;
+    --forge-default-type-label-letter-spacing: 0em;
+    --forge-default-type-metadata-size: 12px;
+    --forge-default-type-metadata-weight: 400;
+    --forge-default-type-metadata-line-height: 16px;
+    --forge-default-type-metadata-letter-spacing: 0em;
+}
+
+/* Canonical neutral fallbacks. Opt-in roles do not restyle legacy consumers.
+ * Agently and Forge receive the same values from the portable theme catalog. */
+:is(.agently-application, .agently-workspace) [data-forge-type="caption"] {
+    font-family: var(--forge-type-caption-family, var(--agently-theme-type-caption-family, var(--forge-font-family, var(--agently-theme-font-family, inherit))));
+    font-size: var(--forge-type-caption-size, var(--agently-theme-type-caption-size, var(--forge-default-type-caption-size)));
+    font-weight: var(--forge-type-caption-weight, var(--agently-theme-type-caption-weight, var(--forge-default-type-caption-weight)));
+    line-height: var(--forge-type-caption-line-height, var(--agently-theme-type-caption-line-height, var(--forge-default-type-caption-line-height)));
+    letter-spacing: var(--forge-type-caption-letter-spacing, var(--agently-theme-type-caption-letter-spacing, var(--forge-default-type-caption-letter-spacing)));
+}
+:is(.agently-application, .agently-workspace) [data-forge-type="small"] {
+    font-family: var(--forge-type-small-family, var(--agently-theme-type-small-family, var(--forge-font-family, var(--agently-theme-font-family, inherit))));
+    font-size: var(--forge-type-small-size, var(--agently-theme-type-small-size, var(--forge-default-type-small-size)));
+    font-weight: var(--forge-type-small-weight, var(--agently-theme-type-small-weight, var(--forge-default-type-small-weight)));
+    line-height: var(--forge-type-small-line-height, var(--agently-theme-type-small-line-height, var(--forge-default-type-small-line-height)));
+    letter-spacing: var(--forge-type-small-letter-spacing, var(--agently-theme-type-small-letter-spacing, var(--forge-default-type-small-letter-spacing)));
+}
+:is(.agently-application, .agently-workspace) [data-forge-type="body"] {
+    font-family: var(--forge-type-body-family, var(--agently-theme-type-body-family, var(--forge-font-family, var(--agently-theme-font-family, inherit))));
+    font-size: var(--forge-type-body-size, var(--agently-theme-type-body-size, var(--forge-default-type-body-size)));
+    font-weight: var(--forge-type-body-weight, var(--agently-theme-type-body-weight, var(--forge-default-type-body-weight)));
+    line-height: var(--forge-type-body-line-height, var(--agently-theme-type-body-line-height, var(--forge-default-type-body-line-height)));
+    letter-spacing: var(--forge-type-body-letter-spacing, var(--agently-theme-type-body-letter-spacing, var(--forge-default-type-body-letter-spacing)));
+}
+:is(.agently-application, .agently-workspace) [data-forge-type="section"] {
+    font-family: var(--forge-type-section-family, var(--agently-theme-type-section-family, var(--forge-font-family, var(--agently-theme-font-family, inherit))));
+    font-size: var(--forge-type-section-size, var(--agently-theme-type-section-size, var(--forge-default-type-section-size)));
+    font-weight: var(--forge-type-section-weight, var(--agently-theme-type-section-weight, var(--forge-default-type-section-weight)));
+    line-height: var(--forge-type-section-line-height, var(--agently-theme-type-section-line-height, var(--forge-default-type-section-line-height)));
+    letter-spacing: var(--forge-type-section-letter-spacing, var(--agently-theme-type-section-letter-spacing, var(--forge-default-type-section-letter-spacing)));
+}
+:is(.agently-application, .agently-workspace) [data-forge-type="heading"] {
+    font-family: var(--forge-type-heading-family, var(--agently-theme-type-heading-family, var(--forge-font-family, var(--agently-theme-font-family, inherit))));
+    font-size: var(--forge-type-heading-size, var(--agently-theme-type-heading-size, var(--forge-default-type-heading-size)));
+    font-weight: var(--forge-type-heading-weight, var(--agently-theme-type-heading-weight, var(--forge-default-type-heading-weight)));
+    line-height: var(--forge-type-heading-line-height, var(--agently-theme-type-heading-line-height, var(--forge-default-type-heading-line-height)));
+    letter-spacing: var(--forge-type-heading-letter-spacing, var(--agently-theme-type-heading-letter-spacing, var(--forge-default-type-heading-letter-spacing)));
+}
+:is(.agently-application, .agently-workspace) [data-forge-type="title"] {
+    font-family: var(--forge-type-title-family, var(--agently-theme-type-title-family, var(--forge-font-family, var(--agently-theme-font-family, inherit))));
+    font-size: var(--forge-type-title-size, var(--agently-theme-type-title-size, var(--forge-default-type-title-size)));
+    font-weight: var(--forge-type-title-weight, var(--agently-theme-type-title-weight, var(--forge-default-type-title-weight)));
+    line-height: var(--forge-type-title-line-height, var(--agently-theme-type-title-line-height, var(--forge-default-type-title-line-height)));
+    letter-spacing: var(--forge-type-title-letter-spacing, var(--agently-theme-type-title-letter-spacing, var(--forge-default-type-title-letter-spacing)));
+}
+:is(.agently-application, .agently-workspace) [data-forge-type="metric"] {
+    font-family: var(--forge-type-metric-family, var(--agently-theme-type-metric-family, var(--forge-font-family, var(--agently-theme-font-family, inherit))));
+    font-size: var(--forge-type-metric-size, var(--agently-theme-type-metric-size, var(--forge-default-type-metric-size)));
+    font-weight: var(--forge-type-metric-weight, var(--agently-theme-type-metric-weight, var(--forge-default-type-metric-weight)));
+    line-height: var(--forge-type-metric-line-height, var(--agently-theme-type-metric-line-height, var(--forge-default-type-metric-line-height)));
+    letter-spacing: var(--forge-type-metric-letter-spacing, var(--agently-theme-type-metric-letter-spacing, var(--forge-default-type-metric-letter-spacing)));
+    font-variant-numeric: tabular-nums;
+}
+:is(.agently-application, .agently-workspace) [data-forge-type="display"] {
+    font-family: var(--forge-type-display-family, var(--agently-theme-type-display-family, var(--forge-font-family, var(--agently-theme-font-family, inherit))));
+    font-size: var(--forge-type-display-size, var(--agently-theme-type-display-size, var(--forge-default-type-display-size)));
+    font-weight: var(--forge-type-display-weight, var(--agently-theme-type-display-weight, var(--forge-default-type-display-weight)));
+    line-height: var(--forge-type-display-line-height, var(--agently-theme-type-display-line-height, var(--forge-default-type-display-line-height)));
+    letter-spacing: var(--forge-type-display-letter-spacing, var(--agently-theme-type-display-letter-spacing, var(--forge-default-type-display-letter-spacing)));
+}
+:is(.agently-application, .agently-workspace) [data-forge-type="code"] {
+    font-family: var(--forge-type-code-family, var(--agently-theme-type-code-family, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace));
+    font-size: var(--forge-type-code-size, var(--agently-theme-type-code-size, var(--forge-default-type-code-size)));
+    font-weight: var(--forge-type-code-weight, var(--agently-theme-type-code-weight, var(--forge-default-type-code-weight)));
+    line-height: var(--forge-type-code-line-height, var(--agently-theme-type-code-line-height, var(--forge-default-type-code-line-height)));
+    letter-spacing: var(--forge-type-code-letter-spacing, var(--agently-theme-type-code-letter-spacing, var(--forge-default-type-code-letter-spacing)));
+    font-variant-numeric: tabular-nums;
+}
+:is(.agently-application, .agently-workspace) [data-forge-type="label"] {
+    font-family: var(--forge-type-label-family, var(--agently-theme-type-label-family, var(--forge-font-family, var(--agently-theme-font-family, inherit))));
+    font-size: var(--forge-type-label-size, var(--agently-theme-type-label-size, var(--forge-default-type-label-size)));
+    font-weight: var(--forge-type-label-weight, var(--agently-theme-type-label-weight, var(--forge-default-type-label-weight)));
+    line-height: var(--forge-type-label-line-height, var(--agently-theme-type-label-line-height, var(--forge-default-type-label-line-height)));
+    letter-spacing: var(--forge-type-label-letter-spacing, var(--agently-theme-type-label-letter-spacing, var(--forge-default-type-label-letter-spacing)));
+}
+:is(.agently-application, .agently-workspace) :is([data-forge-part="helper-text"], [data-forge-part="validation-message"])[data-forge-type="metadata"],
+:is(.agently-application, .agently-workspace) [data-forge-type="metadata"] {
+    font-family: var(--forge-type-metadata-family, var(--agently-theme-type-metadata-family, var(--forge-font-family, var(--agently-theme-font-family, inherit))));
+    font-size: var(--forge-type-metadata-size, var(--agently-theme-type-metadata-size, var(--forge-default-type-metadata-size)));
+    font-weight: var(--forge-type-metadata-weight, var(--agently-theme-type-metadata-weight, var(--forge-default-type-metadata-weight)));
+    line-height: var(--forge-type-metadata-line-height, var(--agently-theme-type-metadata-line-height, var(--forge-default-type-metadata-line-height)));
+    letter-spacing: var(--forge-type-metadata-letter-spacing, var(--agently-theme-type-metadata-letter-spacing, var(--forge-default-type-metadata-letter-spacing)));
+}

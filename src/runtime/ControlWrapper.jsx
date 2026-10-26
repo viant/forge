@@ -30,6 +30,7 @@ export default function ControlWrapper({ item, container, context, framework = '
     const accessibility = useControlDOMIdentity({windowId:context?.identity?.windowId,formId:container?.id || context?.identity?.dataSourceRef,controlId:children?.props?.id || item?.id || generatedId});
     const controlId=accessibility.controlId;
     const helperId=item?.validationError?accessibility.errorId:accessibility.helperId;
+    const feedbackRole=(item?.properties?.typographyRole || children?.props?.['data-forge-type']) ? 'metadata' : undefined;
     const remapReferences=value=>typeof value==='string'?value.split(/\s+/).map(id=>id===item?.id?controlId:id===`${item?.id}-label`?accessibility.labelId:id===`${item?.id}-help`||id===`${item?.id}-error`?(hasHelper?helperId:id):id).join(' '):value;
     const helperText = item?.validationError || item?.helperText || item?.description;
     const controlOnly = item?.wrapper === 'control-only';
@@ -153,7 +154,7 @@ export default function ControlWrapper({ item, container, context, framework = '
         return <div className="forge-control-validation-shell" data-forge-control-id={item?.id || undefined}>
             {child}
             <div className="forge-control-validation-message" id={helperId}
-                data-forge-part="validation-message" role="alert">{item.validationError}</div>
+                data-forge-type={feedbackRole} data-forge-part="validation-message" role="alert">{item.validationError}</div>
         </div>;
     }
 
@@ -166,7 +167,7 @@ export default function ControlWrapper({ item, container, context, framework = '
                 {...accessibilityProps}
             >
                 {child}
-                {hasHelper && <div id={helperId} data-forge-part={item?.validationError ? 'validation-message' : 'helper-text'}
+                {hasHelper && <div id={helperId} data-forge-type={feedbackRole} data-forge-part={item?.validationError ? 'validation-message' : 'helper-text'}
                     role={item?.validationError ? 'alert' : undefined}>{helperText}</div>}
             </div>
         );
@@ -181,7 +182,7 @@ export default function ControlWrapper({ item, container, context, framework = '
                 data-forge-control-id={item?.id || undefined}
                 {...accessibilityProps}
             >
-                {custom(item, container, child, context, {controlId, labelId:accessibility.labelId, helperId, disabled, readOnly})}
+                {custom(item, container, child, context, {controlId, labelId:accessibility.labelId, helperId, disabled, readOnly, feedbackRole})}
             </div>
         );
     }
@@ -206,7 +207,7 @@ export default function ControlWrapper({ item, container, context, framework = '
                 </label>
             )}
             {child}
-            {hasHelper && <div id={helperId} data-forge-part={item?.validationError ? 'validation-message' : 'helper-text'}
+            {hasHelper && <div id={helperId} data-forge-type={feedbackRole} data-forge-part={item?.validationError ? 'validation-message' : 'helper-text'}
                 role={item?.validationError ? 'alert' : undefined}>{helperText}</div>}
         </div>
     );

@@ -48,3 +48,20 @@ assert.ok(component.includes("var(--forge-dashboard-table-link, #2367d1)"));
 assert.ok(component.includes("var(--forge-status-danger-foreground, #a82a2a)"));
 
 console.log('dashboard table semantic theme contract passed');
+
+const {documentTableLayout, documentTableColumns} = await import('./documentTable.js');
+const columns = [{key: 'name', flex: true, minWidth: 240}, {key: 'id', width: 88}, {key: 'amount', width: 104}, {key: 'notes', editor: false}];
+const presentation = {variant: 'document', rowDetails: {field: 'notes'}};
+const visible = documentTableColumns(columns, presentation);
+assert.deepEqual(visible.map(column => column.key), ['name', 'id', 'amount']);
+assert.deepEqual(documentTableLayout(visible, {hasRowActions: true}), {columnWidths: [null, 88, 104], actionsWidth: 56, selectionWidth: 0, minWidth: 488, horizontallyScrollable: true});
+assert.throws(() => documentTableColumns(columns, {variant: 'document', rowDetails: {field: 'name'}}), /read-only column/);
+assert.throws(() => documentTableColumns(columns, {variant: 'invented'}), /Unsupported table/);
+assert.equal(documentTableColumns(columns), columns, 'Legacy metadata remains unchanged');
+const documentStyles = fs.readFileSync(new URL('./documentTable.css', import.meta.url), 'utf8');
+for (const role of ['body', 'label', 'metadata']) for (const property of ['family', 'size', 'weight', 'line-height', 'letter-spacing']) {
+    assert.ok(documentStyles.includes(`--forge-type-${role}-${property}`), `Document table must consume all ${role} properties`);
+}
+assert.doesNotMatch(documentStyles, /(?:IBM Plex|Steward|Viant|!important|#[a-z][\w-]*\s+[.{])/i);
+assert.match(documentStyles, /100cqw/);
+console.log('document table authored order, flexible width, read-only detail and role contracts passed');
