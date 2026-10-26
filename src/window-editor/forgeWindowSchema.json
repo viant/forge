@@ -580,6 +580,99 @@
       },
       "type": "object"
     },
+    "ChoiceBrowserSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "detailEnabledField": {
+          "type": "string"
+        },
+        "detailFields": {
+          "items": {
+            "$ref": "#/$defs/RecordDetailField"
+          },
+          "type": "array"
+        },
+        "detailPathField": {
+          "type": "string"
+        },
+        "disabled": {
+          "type": "boolean"
+        },
+        "disabledField": {
+          "type": "string"
+        },
+        "disabledReasonField": {
+          "type": "string"
+        },
+        "disabledWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "emptyMessage": {
+          "type": "string"
+        },
+        "emptyMessageField": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        },
+        "identityField": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "labelField": {
+          "type": "string"
+        },
+        "loadingMessage": {
+          "type": "string"
+        },
+        "loadingWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "maxPathItems": {
+          "type": "integer"
+        },
+        "navigationDisabledField": {
+          "type": "string"
+        },
+        "onAction": {
+          "type": "string"
+        },
+        "pathField": {
+          "type": "string"
+        },
+        "readOnly": {
+          "type": "boolean"
+        },
+        "readOnlyWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "secondaryField": {
+          "type": "string"
+        },
+        "selectableField": {
+          "type": "string"
+        },
+        "selectedField": {
+          "type": "string"
+        },
+        "selectionDisabledField": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "Codec": {
       "additionalProperties": true,
       "properties": {
@@ -753,6 +846,9 @@
         "chat": {
           "$ref": "#/$defs/Chat"
         },
+        "choiceBrowser": {
+          "$ref": "#/$defs/ChoiceBrowserSpec"
+        },
         "className": {
           "type": "string"
         },
@@ -823,6 +919,9 @@
         },
         "gateRequirementsEditor": {
           "$ref": "#/$defs/GateRequirementsEditorSpec"
+        },
+        "groupedSelection": {
+          "$ref": "#/$defs/GroupedSelectionSpec"
         },
         "hiddenWhen": {
           "additionalProperties": {},
@@ -2898,6 +2997,97 @@
       },
       "type": "object"
     },
+    "GroupedSelectionSection": {
+      "additionalProperties": true,
+      "properties": {
+        "addLabel": {
+          "type": "string"
+        },
+        "groupsField": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "GroupedSelectionSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "activeGroupField": {
+          "type": "string"
+        },
+        "addGroupLabel": {
+          "type": "string"
+        },
+        "allowRemoveGroups": {
+          "type": "boolean"
+        },
+        "collapsedField": {
+          "type": "string"
+        },
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "detailFields": {
+          "items": {
+            "$ref": "#/$defs/RecordDetailField"
+          },
+          "type": "array"
+        },
+        "detailPathField": {
+          "type": "string"
+        },
+        "emptyMessage": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        },
+        "groupIdentityField": {
+          "type": "string"
+        },
+        "groupLabelField": {
+          "type": "string"
+        },
+        "itemDescriptionField": {
+          "type": "string"
+        },
+        "itemIdentityField": {
+          "type": "string"
+        },
+        "itemLabelField": {
+          "type": "string"
+        },
+        "itemsField": {
+          "type": "string"
+        },
+        "onAction": {
+          "type": "string"
+        },
+        "readOnly": {
+          "type": "boolean"
+        },
+        "readOnlyWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "sections": {
+          "items": {
+            "$ref": "#/$defs/GroupedSelectionSection"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
     "HistoryDiffSpec": {
       "additionalProperties": true,
       "properties": {
@@ -3627,6 +3817,10 @@
           "additionalProperties": {},
           "type": "object"
         },
+        "prepare": {
+          "description": "Prepare names an optional async handler that returns the final parameter map\nafter confirmation and before the writer is invoked.",
+          "type": "string"
+        },
         "reconcile": {
           "$ref": "#/$defs/ReconcileSpec"
         },
@@ -4099,6 +4293,10 @@
     "Progress": {
       "additionalProperties": true,
       "properties": {
+        "appearance": {
+          "description": "Appearance \"inline\" places the formatted value beside a compact native meter.",
+          "type": "string"
+        },
         "maxValueField": {
           "type": "string"
         }
@@ -4228,6 +4426,27 @@
           "type": "string"
         },
         "rowsPath": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "RecordDetailField": {
+      "additionalProperties": true,
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "emptyText": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        },
+        "format": {
+          "type": "string"
+        },
+        "label": {
           "type": "string"
         }
       },
@@ -5568,6 +5787,9 @@
           "type": "string"
         },
         "windowTitleSource": {
+          "type": "string"
+        },
+        "windowTitleTemplate": {
           "type": "string"
         }
       },
@@ -7014,9 +7236,10 @@
   "$ref": "#/$defs/Window",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "x-forge-provenance": {
-    "baseCommit": "aa2a747378bd14baaca367b008161b92f7b94457",
+    "baseCommit": "e2af17b0d128901164d3ea443df9a00250e0bdad",
     "generator": "scripts/window-schema/main.go",
     "sha256": {
+      "choice_browser.go": "935cbeddb231dd329374114c5f38454dc7c44c2ab70a45ea3c0f37ce7f3aee26",
       "datasource_projection.go": "87f165b7c9558d0c43fadc6b006bb0f110bd905226b5301dcb5d8a06eb2a692e",
       "dialog_resource.go": "36dbaee1db9c979ba32359f29d61af006ae9bcb32e8b35e74c6fa0a4243466e8",
       "form.go": "aa2114822f1e688942aa4b63ec51c4b4c0f728b44b6d82b8b04fbf95efa807f0",
@@ -7044,10 +7267,11 @@
       "github.com/viant/forge/backend/window/contract.model.go": "ba7b581c5a80d94fbd95b45d5b1a7d8c7971a5c207d02acc502afa9826a8070b",
       "github.com/viant/forge/backend/window/contract.presentation.go": "239b91f0d3dd60a87b46d1b33ac8e45d15beb7b94d2b0aed01e2fa14d464250a",
       "github.com/viant/forge/backend/window/contract.resource.go": "3d405993972615d81f63d4f8fdf1ed99539af092353f20e7b80005fd196fc467",
+      "grouped_selection.go": "01adc51b32a074569634319adffa8c76af8fc85fec26437db8f1179650d21d8a",
       "host_content.go": "f9f870afe88756eb3abd04b79cc717f60a696a5dc2501dec11ffba0f87dbc0fd",
       "json_metadata_clone.go": "baa9bde7e567774737f28b87c45a2bb145d9c5b2fadc81da3024578b17c6c09c",
       "local_state_owner.go": "987402ce2487f4b7714a3991c405aab0dda74a573d8690f8f6561d4ce020ab8f",
-      "model.go": "36ac3aca8e5ff03a0717c69c6167c944ff203536fef289052e41ae1f9fb3eeb4",
+      "model.go": "d31ec0bfadf6f21a48f6c04ec9dae6b55fdf0e6c8a45befb42139b725ac27c3e",
       "parameter_editor.go": "a176f3b63d74714d216daf57ba5c3c3ee8e12aaf8ccf2c0ee1b663c95a657bf6",
       "predicate_composition_editor.go": "881bcf68a5f5e16cae2f58ef7495ac14582398236cfd263cc8585e89f97cab4b",
       "presentation_primitives.go": "02a6a592152be515ce4a0632a586a1c94c926090ebfe39e5a29868d2b496b6cb",
@@ -7064,7 +7288,7 @@
       "window_reference_manifest.go": "fe66bf7b36823b396742d8e36d8aa5c559c494125e0f4ed1bba89219fbaf0635",
       "window_resource.go": "f9426cf66d40ae52bf029f4776fbc34930764a31ff850f38c76e72e8ab960a2e",
       "window_target_proof.go": "53605c132aae2b8c8d6e377daaae416f347e0ff8c48a39fb2a0f15f95ad5faeb",
-      "workflow_primitives.go": "01de185cf0d0e591cfc4a4cdee8d19ee26a360a3e87cf5f992ba20d164cb9334",
+      "workflow_primitives.go": "02d64cd4ea950884edb8d6ed19d16db06129437d336148f27bbe3309f1d6c036",
       "workspace_summary.go": "d9cf3867d3d3bfa3f65c9fdeccad91d21bd9d2602e066823bb36cbff079c86c1"
     },
     "sourceNote": "Generated from committed canonical Forge authored model and Forge-owned public contracts; SHA-256 identifies every parsed source file."
