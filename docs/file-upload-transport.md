@@ -43,3 +43,10 @@ or install a window-specific React component.
 Tests cover sequential reads, binary fidelity, bounded first read for a logical
 multi-gigabyte file, cancellation, invalid part sizes and acknowledgements. This
 does not establish full large-file or business-window E2E acceptance.
+
+`UploadCollection` also honors its container's `disabledWhen` and `readOnlyWhen`
+predicates for file selection, removal and submission. Container
+`onSelectionChange` handlers receive `{context, execution, files, operation}`,
+where `files` contains only `{name, size, type}` and `operation` is `select` or
+`remove`. This lets authored forms lock metadata as soon as a file is selected,
+without sharing browser File references or adding domain rules to the primitive.
