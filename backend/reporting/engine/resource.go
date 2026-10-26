@@ -17,9 +17,20 @@ import (
 // operation. The source must serve Forge working/stamped report definitions.
 type ResourceResolver func(context.Context, string) (*identity.ResourceResolver, error)
 
+// admittedCompileDefinition is a private, invocation-local delivery from
+// ExecuteResource's selected read. It never crosses a request or enters the
+// public CompileRequest.
+type admittedCompileDefinition struct {
+	raw json.RawMessage
+	pin identity.ResolvedResource
+	// A host-derived window envelope is invocation-local, never the source
+	// returned by a ResourceReader and never fingerprinted as the window bytes.
+	windowEnvelope json.RawMessage
+}
+
 // compileResolved consumes the shared Forge report envelope, not a second
 // client-supplied definition. It preserves the selected identity through compile.
-func (s *Service) compileResolved(ctx context.Context, request *CompileRequest) (*CompileRequest, *identity.ResolvedResource, ResourceReader, error) {
+func (s *Service) compileResolved(ctx context.Context, request *CompileRequest, admitted *admittedCompileDefinition) (*CompileRequest, *identity.ResolvedResource, ResourceReader, error) {
 	if !s.hasResourceReader() {
 		return nil, nil, nil, identity.ErrResourceDenied
 	}
@@ -33,7 +44,8 @@ func (s *Service) compileResolved(ctx context.Context, request *CompileRequest) 
 		ref.URI = request.ArtifactRef
 	}
 	uri, err := identity.ParseResourceURI(ref.URI)
-	if err != nil || uri.Kind != "report" {
+	windowBuilder := admitted != nil && len(admitted.windowEnvelope) > 0
+	if err != nil || uri.Kind != "report" && !(windowBuilder && uri.Kind == "window") {
 		return nil, nil, nil, identity.ErrResourceDenied
 	}
 	resolver, err := s.resourceReaderFor(ctx, "report.compile")
@@ -48,19 +60,33 @@ func (s *Service) compileResolved(ctx context.Context, request *CompileRequest) 
 		pin = cloneResolvedResource(request.ResolvedResource)
 	}
 	readTiming := observe.Start(ctx, "report.compile.read", observe.Labels{Kind: "report"})
-	raw, pin, err := selectResourceRead(ctx, resolver, ref, pin)
+	var raw json.RawMessage
+	if admitted != nil {
+		if pin == nil || !identity.SameResolvedResource(*pin, admitted.pin) ||
+			!identity.MetadataExpiryValid(pin.ValidUntil, s.now()) || ctx.Err() != nil ||
+			identity.ContentFingerprint(admitted.raw) != pin.ContentFingerprint {
+			err = identity.ErrResourceDenied
+		} else {
+			raw = append(json.RawMessage(nil), admitted.raw...)
+		}
+	} else {
+		raw, pin, err = selectResourceRead(ctx, resolver, ref, pin)
+	}
 	readTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
 		return nil, nil, nil, err
+	}
+	if windowBuilder {
+		raw = append(json.RawMessage(nil), admitted.windowEnvelope...)
 	}
 	var definition registry.ReportEnvelope
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&definition); err != nil {
-		return nil, nil, nil, fmt.Errorf("invalid resolved report envelope")
+		return nil, nil, nil, compileStageError(CompileStageEnvelope, fmt.Errorf("invalid resolved report envelope"))
 	}
 	if decoder.Decode(new(any)) != io.EOF || (len(definition.ReportDocument) == 0 && len(definition.ReportSpec) == 0) || !(definition.SchemaVersion == 1 && definition.Format != registry.ResourceReportFormat && len(definition.DataSourceResources) == 0 && definition.SourceFormat == "" || definition.SchemaVersion == 2 && definition.Format == registry.ResourceReportFormat && len(definition.DataSourceResources) > 0) {
-		return nil, nil, nil, fmt.Errorf("invalid resolved report definition")
+		return nil, nil, nil, compileStageError(CompileStageEnvelope, fmt.Errorf("invalid resolved report definition"))
 	}
 	bindTiming := observe.Start(ctx, "report.compile.bind", observe.Labels{Kind: "report"})
 	dependencyPins, dependencyToken, err := s.bindOperationDependencies(ctx, request.ResolvedResource, pin, definition, request.DependencyPins, request.DependencyToken)
@@ -83,27 +109,31 @@ func (s *Service) compileResolved(ctx context.Context, request *CompileRequest) 
 	switch definition.Format {
 	case "":
 		if len(definition.ReportSpec) == 0 || len(definition.BuilderDefinition) != 0 || len(definition.Dependencies) != 0 {
-			return nil, nil, nil, fmt.Errorf("invalid native report definition")
+			return nil, nil, nil, compileStageError(CompileStageEnvelope, fmt.Errorf("invalid native report definition"))
 		}
 		spec = definition.ReportSpec
 	case registry.AuthoredReportFormat:
 		for _, dependency := range definition.Dependencies {
-			if dependency.Kind == "report" && dependency.ID != pin.URI {
+			if (dependency.Kind == "report" || dependency.Kind == "window") && dependency.ID != pin.URI {
 				return nil, nil, nil, identity.ErrResourceDenied
 			}
 		}
 		requestBase, bindErr := bindAuthoredCompileParameters(raw, request.Parameters)
 		if bindErr != nil {
-			return nil, nil, nil, bindErr
+			return nil, nil, nil, compileStageError(CompileStageBind, bindErr)
 		}
 		lowerTiming := observe.Start(ctx, "report.compile.lower", observe.Labels{Kind: "report"})
-		spec, err = materializer.LowerWithRequestBase(ctx, raw, requestBase)
+		if windowBuilder {
+			spec, err = materializer.LowerWindowBuilderWithRequestBase(ctx, raw, requestBase)
+		} else {
+			spec, err = materializer.LowerWithRequestBase(ctx, raw, requestBase)
+		}
 		lowerTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, compileStageError(CompileStageLower, err)
 		}
 	default:
-		return nil, nil, nil, fmt.Errorf("unsupported resolved report format")
+		return nil, nil, nil, compileStageError(CompileStageEnvelope, fmt.Errorf("unsupported resolved report format"))
 	}
 	boundRef := identity.ResourceRef{URI: pin.URI, Revision: pin.Selector()}
 	return &CompileRequest{DependencyPins: dependencyPins, DependencyToken: dependencyToken, ResolvedResource: cloneResolvedResource(pin), Resource: &boundRef, ArtifactRef: pin.URI, SourceKind: SourceKindReportSpec, Document: append(json.RawMessage(nil), spec...)}, pin, resolver, nil

@@ -10,6 +10,12 @@ import (
 // Compile is a metadata-only phase. Its explicit host scope ends before the
 // original execution context proceeds to datasource admission or dispatch.
 func (s *Service) Compile(ctx context.Context, request *CompileRequest) (out *CompileResult, resultErr error) {
+	return s.compileWithAdmitted(ctx, request, nil)
+}
+
+// compileWithAdmitted is internal to ExecuteResource. The public Compile path
+// still reads its selected resource through the configured reader.
+func (s *Service) compileWithAdmitted(ctx context.Context, request *CompileRequest, admitted *admittedCompileDefinition) (out *CompileResult, resultErr error) {
 	if s.reportCatalog != nil && s.hasResourceReader() {
 		scopeTiming := observe.Start(ctx, "report.compile.scope", observe.Labels{Kind: "report"})
 		scoped, finish, err := s.reportCatalog.MetadataRead(ctx)
@@ -34,5 +40,5 @@ func (s *Service) Compile(ctx context.Context, request *CompileRequest) (out *Co
 		}
 		ctx = scoped
 	}
-	return s.compileUnscoped(ctx, request)
+	return s.compileUnscoped(ctx, request, admitted)
 }

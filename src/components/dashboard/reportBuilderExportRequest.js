@@ -280,6 +280,7 @@ export function buildReportBuilderExportArtifactKindLabel(artifactKind = "") {
 export function resolveReportBuilderExportHandler(builderContext = {}) {
     const candidate = builderContext?.handlers?.reportExport || null;
     const supportedMethods = [
+        "exportCurrent",
         "submitRequest",
         "getStatus",
         "getArtifact",

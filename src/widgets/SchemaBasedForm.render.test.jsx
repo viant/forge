@@ -418,7 +418,8 @@ const searchableOptions = Array.from({length: 10}, (_, index) => ({
     value: `objective-${index + 1}`,
     label: `Objective ${index + 1}`,
 }));
-const onOpening = () => {};
+let openingArguments;
+const onOpening = (...args) => { openingArguments = args; };
 const onKeyDown = () => {};
 const searchableSelect = inspectWidget(SelectInput,{
     value: 'objective-2',
@@ -438,7 +439,9 @@ const searchableSelect = inspectWidget(SelectInput,{
 assert.equal(searchableSelect.props.fill, true);
 assert.equal(searchableSelect.props.filterable, true);
 assert.equal(searchableSelect.props.popoverProps.matchTargetWidth, false);
-assert.equal(searchableSelect.props.popoverProps.onOpening, onOpening);
+const openingTarget = {};
+searchableSelect.props.popoverProps.onOpening(openingTarget, true);
+assert.deepEqual(openingArguments, [openingTarget, true]);
 assert.match(searchableSelect.props.popoverProps.popoverClassName, /forge-field-track-select-popover/);
 assert.match(searchableSelect.props.popoverProps.popoverClassName, /authored-popover/);
 assert.match(searchableSelect.props.popoverProps.portalClassName, /forge-field-track-select-portal/);

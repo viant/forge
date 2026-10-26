@@ -280,6 +280,14 @@ td .pagination-bar {
     gap: 6px;
 }
 
+.forge-toolbar-table-export.is-aligned-left {
+    margin-right: var(--forge-toolbar-export-margin, 10px);
+}
+
+.forge-toolbar-table-export.is-aligned-right {
+    margin-left: var(--forge-toolbar-export-margin, 10px);
+}
+
 .forge-toolbar-export-error {
     max-width: 260px;
     color: var(--forge-status-danger-foreground, #b42318);

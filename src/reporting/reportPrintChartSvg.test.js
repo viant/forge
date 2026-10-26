@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { buildReportPrintChartSvg } from "./reportPrintChartSvg.js";
+import { buildReportPrintChartSvg, buildReportPrintChartPages } from "./reportPrintChartSvg.js";
 
 const groupedLine = buildReportPrintChartSvg({
   chartModel: {
@@ -493,3 +493,79 @@ for(const [format,expected] of [['percentFraction',/>84\.8%</],['currency2',/>\$
 
 const tinyAudienceCost=buildReportPrintChartSvg({width:640,chartModel:{type:'horizontal_bar',series:{values:[{value:'cost',label:'Cost per published reach (USD)',type:'horizontal_bar',format:'number5'}]}},resolvedChart:{kind:'directSeries',type:'horizontal_bar',xAxisKey:'publisher',seriesKeys:['cost'],rows:[{publisher:'One',cost:.00123}]}});
 assert.match(tinyAudienceCost.svg,/>0\.00123</,'Printed cost labels must retain small authored values');
+
+
+// Preserve accepted page geometry and complete categories while fitting pages
+// without repeatedly drawing rejected prefixes. Includes signed values, missing
+// points, wrapped labels, multiple series and a smaller first-page allocation.
+const pageRows=Array.from({length:37},(_,index)=>({category:`Synthetic category ${index+1}`,amount:index%3===0?-(index+1)*123.456:(index+1)*123.456,rate:index%5===0?null:(index+1)/101}));
+const pageInput={chartModel:{type:'horizontal_bar',series:{values:[{value:'amount',label:'Amount',type:'horizontal_bar',format:'currency2',dataLabels:'auto'}]}},resolvedChart:{kind:'directSeries',type:'horizontal_bar',xAxisKey:'category',seriesKeys:['amount'],rows:pageRows},width:270,maxHeight:448,firstMaxHeight:247};
+const paginated=buildReportPrintChartPages(pageInput);
+assert.deepEqual(paginated.map(page=>page.height),[236,428,428,396]);
+assert.equal(paginated.reduce((count,page)=>count+(page.svg.match(/class="forge-chart-bar"/g)||[]).length,0),37);
+const pageText=paginated.map(page=>page.svg.replace(/<[^>]*>/g,' ').replace(/\s+/g,' '));
+for(const row of pageRows)assert.ok(pageText.some(text=>text.includes(row.category+' ')),`${row.category} remains printable`);
+const multiPages=buildReportPrintChartPages({...pageInput,width:140,chartModel:{type:'horizontal_bar',series:{values:[{value:'amount',label:'Amount',type:'horizontal_bar',format:'currency2',dataLabels:'always'},{value:'rate',label:'Rate',type:'horizontal_bar',format:'percentFraction2',dataLabels:'always'}]}},resolvedChart:{...pageInput.resolvedChart,seriesKeys:['amount','rate']}});
+assert.deepEqual(multiPages.map(page=>page.height),[226,446,446,446,446,182]);
+assert.equal(multiPages.reduce((count,page)=>count+(page.svg.match(/class="forge-chart-bar"/g)||[]).length,0),66,'Only missing numeric points omit their own bars');
+const longPageRows=pageRows.map((row,index)=>({...row,category:`Synthetic exceptionally long category ${index+1} with complete pathway -> context -> details -> printable sequence`}));
+const longPages=buildReportPrintChartPages({...pageInput,resolvedChart:{...pageInput.resolvedChart,rows:longPageRows}});
+assert.deepEqual(longPages.map(page=>page.height),paginated.map(page=>page.height));
+assert.equal(longPages.reduce((count,page)=>count+page.labelDetails.length,0),37);
+for(const [index,row] of longPageRows.entries())assert.ok(longPages.some(page=>page.labelDetails.includes(`Category ${index+1}: ${row.category}`)));
+const tinyFirst=buildReportPrintChartPages({...pageInput,firstMaxHeight:1});
+assert.deepEqual(tinyFirst.map(page=>page.height),[164,428,428,428,172]);
+for(const height of [1,-1,NaN]) {
+ const pages=buildReportPrintChartPages({...pageInput,maxHeight:height,firstMaxHeight:height});
+ assert.equal(pages.length,37,'An undersized allocation retains the one-row fallback');
+ assert.ok(pages.every(page=>page.height===164));
+}
+assert.equal(buildReportPrintChartPages({...pageInput,maxHeight:Infinity,firstMaxHeight:Infinity}).length,1);
+for(const [input,code] of [
+ [{...pageInput,chartModel:{type:'horizontal_bar',series:{values:[{value:'amount',label:'Unsupported',type:'line'}]}}},'unsupportedReportPrintChartType'],
+ [{...pageInput,resolvedChart:{...pageInput.resolvedChart,rows:pageRows.map(row=>({...row,amount:null}))}},'emptyReportPrintChart'],
+]) {
+ const pages=buildReportPrintChartPages(input);
+ assert.equal(pages.length,1);assert.equal(pages[0].height,0);assert.equal(pages[0].svg,'');assert.equal(pages[0].diagnostics[0].code,code);
+}
+
+// Counting actual Intl formatting operations catches the old quadratic SVG
+// probe loop without a timing threshold or an implementation-specific call count.
+const numberFormatProperty=Object.getOwnPropertyDescriptor(Intl.NumberFormat.prototype,'format');
+let axisFormats=0;
+Object.defineProperty(Intl.NumberFormat.prototype,'format',{...numberFormatProperty,get(){const format=numberFormatProperty.get.call(this);return value=>{axisFormats++;return format(value);};}});
+try {
+ const rows=Array.from({length:134},(_,index)=>({category:`Synthetic ${index+1}`,amount:index*123.456}));
+ const pages=buildReportPrintChartPages({...pageInput,chartModel:{type:'horizontal_bar',series:{values:[{value:'amount',label:'Amount',type:'horizontal_bar',format:'currency2',dataLabels:'none'}]}},resolvedChart:{...pageInput.resolvedChart,rows}});
+ assert.equal(pages.reduce((count,page)=>count+(page.svg.match(/class="forge-chart-bar"/g)||[]).length,0),134);
+ assert.ok(axisFormats<512,`Page fitting must not repeatedly format discarded SVG axes: ${axisFormats}`);
+} finally {Object.defineProperty(Intl.NumberFormat.prototype,'format',numberFormatProperty);}
+console.log('reportPrintChartSvg ✓ paginates complete horizontal charts without repeated SVG probes');
+
+// Compare the complete SVG/page/diagnostic payload with an independently frozen
+// renderer. This is optional for ordinary consumers and required by port proofs.
+if (process.env.FORGE_CHART_PAGINATION_BASELINE_ROOT) {
+  const {pathToFileURL} = await import('node:url');
+  const old = await import(pathToFileURL(`${process.env.FORGE_CHART_PAGINATION_BASELINE_ROOT}/src/reporting/reportPrintChartSvg.js`));
+  const annotations = {referenceLines:[{axis:'x',value:0,label:'Zero',color:'#137cbd'}],bands:[{axis:'y',from:'Synthetic category 1',to:'Synthetic category 3',label:'Window',color:'#137cbd',opacity:.18}],notes:[{x:0,y:'Synthetic category 1',label:'Note',color:'#0f9960'}]};
+  const multiple = {...pageInput, chartModel:{...pageInput.chartModel,annotations,series:{values:Array.from({length:9},(_,i)=>({value:`value${i}`,label:`Series ${i} complete legend`,type:'horizontal_bar',format:i%2?'percentFraction2':'number5',dataLabels:'always'}))}},resolvedChart:{...pageInput.resolvedChart,seriesKeys:Array.from({length:9},(_,i)=>`value${i}`),rows:pageRows.map((row,index)=>({...row,...Object.fromEntries(Array.from({length:9},(_,i)=>[`value${i}`,index%5===0?null:(index-i)/101]))}))}};
+  const grouped = {...multiple,chartModel:{...multiple.chartModel,yAxis:{format:'number5'}},resolvedChart:{...multiple.resolvedChart,kind:'groupedSeries'}};
+  const cases = [
+    pageInput, multiple, grouped,
+    {...pageInput,chartModel:{...pageInput.chartModel,type:'funnel_bar',series:{values:[{value:'amount',type:'funnel_bar',format:'currency2'}]}}},
+    {...pageInput,resolvedChart:{...pageInput.resolvedChart,rows:longPageRows}},
+    {...pageInput,resolvedChart:{...pageInput.resolvedChart,rows:[]}},
+    {...pageInput,resolvedChart:{...pageInput.resolvedChart,seriesKeys:[]}},
+    {...pageInput,resolvedChart:{...pageInput.resolvedChart,rows:pageRows.map(row=>({...row,amount:null}))}},
+    {...pageInput,chartModel:{...pageInput.chartModel,series:{values:[{value:'amount',type:'line'}]}}},
+    ...[0,-1,1,164,172,235,236,237,NaN,Infinity].map(height=>({...pageInput,maxHeight:height,firstMaxHeight:height})),
+    ...[1,139,160,319,320,700].map(width=>({...multiple,width})),
+    ...[false,true].map(negative=>({...pageInput,resolvedChart:{...pageInput.resolvedChart,rows:pageRows.map((row,i)=>({...row,amount:negative?-i:0}))}})),
+  ];
+  for (const [index,input] of cases.entries()) {
+    const snapshot=JSON.stringify(input);
+    assert.deepEqual(buildReportPrintChartPages(input),old.buildReportPrintChartPages(input),`independent old/new complete page parity, case ${index}`);
+    assert.equal(JSON.stringify(input),snapshot,'pagination preserves input rows, chart metadata and annotations');
+  }
+  console.log(`reportPrintChartSvg ✓ ${cases.length} independent old/new edge cases (complete SVGs, ticks, labels, diagnostics and heights)`);
+}

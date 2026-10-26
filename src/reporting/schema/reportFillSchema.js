@@ -469,6 +469,7 @@ export const reportFillSchema = {
         minWidth: { type: "number", minimum: 48 },
         flex: { type: "boolean" },
         runtimeFilterable: { type: "boolean" },
+        rowIdentity: { type: "boolean" },
         link: { $ref: "#/$defs/tableLink" },
         cellVisual: { $ref: "#/$defs/tableCellVisual" },
         labelClamp: { $ref: "#/$defs/presentationTextClamp" },
@@ -928,7 +929,6 @@ export const reportFillSchema = {
         appearance: {enum:["document"]},
         layout: {enum:["small-multiples"]},
         stacked: {type:"boolean"},
-        preserveCategoryOrder: {type:"boolean"},
         xField: { type: "string" },
         yFields: {
           type: "array",
@@ -1178,6 +1178,7 @@ export const reportFillSchema = {
         appearance: {enum:["document"]},
         layout: {enum:["small-multiples"]},
         stacked: {type:"boolean"},
+        preserveCategoryOrder: { type: "boolean" },
         xAxis: { $ref: "#/$defs/chartAxis" },
         yAxis: { $ref: "#/$defs/chartYAxis" },
         axes: {type:"object",additionalProperties:false,properties:{left:{$ref:"#/$defs/chartYAxis"},right:{$ref:"#/$defs/chartYAxis"}}},
@@ -1456,6 +1457,7 @@ export const reportFillSchema = {
       properties: {
         id: { type: "string" },
         kind: { const: "sectionBlock" },
+        datasetRef: { type: "string" },
         runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
         subtitle: { type: "string" },
@@ -1483,6 +1485,7 @@ export const reportFillSchema = {
       properties: {
         id: { type: "string" },
         kind: { const: "compositeBlock" },
+        datasetRef: { type: "string" },
         runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
         description: { type: "string" },

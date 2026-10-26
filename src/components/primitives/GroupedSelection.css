@@ -1,0 +1,23 @@
+.forge-grouped-selection {display:flex; flex-direction:column; gap:var(--forge-grouped-selection-gap,16px); min-width:0; width:100%;}
+.forge-grouped-selection__section {min-width:0;}
+.forge-grouped-selection__section-header,.forge-grouped-selection__group-header {display:flex; align-items:center; gap:8px; min-width:0;}
+.forge-grouped-selection__section-header {justify-content:space-between; margin-bottom:8px;}
+.forge-grouped-selection__section-header h3 {font:inherit; font-weight:600; margin:0;}
+.forge-grouped-selection__group {border:1px solid var(--forge-border-color,#d8dee6); border-radius:4px; margin-bottom:8px; background:var(--forge-surface,white); min-width:0;}
+.forge-grouped-selection__group.is-active {border-color:var(--forge-interaction-color,#215db0);}
+.forge-grouped-selection__group-header {padding:8px; border-bottom:1px solid var(--forge-border-color,#d8dee6);}
+.forge-grouped-selection__activate {flex:1; text-align:left; font:inherit; font-weight:600; color:inherit; border:0; background:transparent; cursor:pointer; min-width:0; overflow-wrap:anywhere;}
+.forge-grouped-selection__activate:focus-visible {outline:2px solid var(--forge-interaction-color,#215db0); outline-offset:2px;}
+.forge-grouped-selection__count,.forge-grouped-selection__description,.forge-grouped-selection__empty {color:var(--forge-text-muted,#5f6b7c);}
+.forge-grouped-selection__items {min-width:0;}
+.forge-grouped-selection__item {display:flex; gap:8px; flex-wrap:wrap; align-items:center; padding:10px; border-bottom:1px solid var(--forge-border-color,#d8dee6); min-width:0;}
+.forge-grouped-selection__item:last-child {border-bottom:0;}
+.forge-grouped-selection__item[draggable=true] {cursor:grab;}
+.forge-grouped-selection__item-content {display:flex; flex:1 1 180px; flex-direction:column; gap:4px; min-width:0; overflow-wrap:anywhere;}
+.forge-grouped-selection__item-label {font-weight:500;}
+.forge-grouped-selection__description {font-size:var(--forge-type-small-size,12px);}
+.forge-grouped-selection__item-actions {display:flex; align-items:center; flex-wrap:wrap; gap:4px; max-width:100%; min-width:0;}
+.forge-grouped-selection__move-label {min-width:0; max-width:100%;}
+.forge-grouped-selection select {font:inherit; color:inherit; background:var(--forge-surface,white); border:1px solid var(--forge-border-color,#d8dee6); border-radius:3px; min-height:28px; max-width:100%;}
+.forge-grouped-selection__empty {margin:0; padding:16px;}
+.forge-grouped-selection__sr-only {position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;}

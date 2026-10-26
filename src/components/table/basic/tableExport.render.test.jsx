@@ -13,7 +13,7 @@ const item = {id: 'export', type: 'tableExport', label: 'Export', properties: {f
 
 const enabled = renderToStaticMarkup(<Toolbar context={context} toolbarItems={[item]} exportRows={[{id: 1}]} exportPageRows={[{id: 1}]} exportColumns={[{id: 'id', name: 'ID'}]}/>);
 assert.match(enabled, /aria-label="Export"/);
-assert.match(enabled, /class="forge-toolbar-table-export"/);
+assert.match(enabled, /class="forge-toolbar-table-export is-aligned-right"/);
 assert.doesNotMatch(enabled, /disabled=""/);
 
 const emptyRows = renderToStaticMarkup(<Toolbar context={context} toolbarItems={[item]} exportRows={[]} exportColumns={[{id: 'id', name: 'ID'}]}/>);

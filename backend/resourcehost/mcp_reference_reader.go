@@ -208,18 +208,32 @@ func (r *MCPReferenceReader) inventory(ctx context.Context, external bool, targe
 			rows = append(rows, additional...)
 		}
 	}
-	uris := map[string]string{}
+	localNames := map[string]bool{}
 	for _, row := range rows {
-		if row.Connection.Name == r.internal.ConnectionName && r.reserved[row.Resource.Name] {
-			return nil, fmt.Errorf("%w: MCP alias collides with a reserved local connection", ErrCollision)
+		if row.Connection.Name == r.internal.ConnectionName {
+			if r.reserved[row.Resource.Name] {
+				return nil, fmt.Errorf("%w: MCP alias collides with a reserved local connection", ErrCollision)
+			}
+			localNames[row.Resource.Name] = true
+		}
+	}
+	uris := map[string]string{}
+	selected := make([]Located[json.RawMessage], 0, len(rows))
+	for _, row := range rows {
+		// Operator-owned definitions win by logical MCP name, including callers
+		// using the published canonical service URI. In-process names above remain
+		// reserved independently; this never changes ordinary resource selection.
+		if row.Connection.Name != r.internal.ConnectionName && localNames[row.Resource.Name] {
+			continue
 		}
 		origin := row.Connection.Name + "\x00" + row.Connection.ProviderIdentity + "\x00" + row.Resource.URI
 		if previous := uris[row.Resource.URI]; previous != "" && previous != origin {
 			return nil, fmt.Errorf("%w: ambiguous MCP URI", ErrCollision)
 		}
 		uris[row.Resource.URI] = origin
+		selected = append(selected, row)
 	}
-	return rows, nil
+	return selected, nil
 }
 
 // Configuration lookup is a separate metadata operation. Preserve credentials,
@@ -268,16 +282,6 @@ func (r *MCPReferenceReader) Load(ctx context.Context, name string) (*mcpcfg.MCP
 	if r.reserved[name] {
 		return nil, ErrCollision
 	}
-	var selectionStart mcpReferenceMemoKey
-	if target, err := identity.ParseResourceURI(name); err == nil && target.Kind == "mcp" && target.Namespace != r.internal.Namespace {
-		selectionStart, _, err = r.memoKey(ctx, target.String())
-		if err != nil {
-			return nil, err
-		}
-		if cached, found, err := r.memoLoad(ctx, target); found || err != nil {
-			return cached, err
-		}
-	}
 	// Explicit catalog roots always bootstrap from the internal source. They
 	// cannot depend on aggregate enumeration of their own connection options.
 	for _, ref := range r.catalogs {
@@ -290,11 +294,18 @@ func (r *MCPReferenceReader) Load(ctx context.Context, name string) (*mcpcfg.MCP
 	if err != nil {
 		return nil, err
 	}
+	localName := name
+	if target, parseErr := identity.ParseResourceURI(name); parseErr == nil && target.Kind == "mcp" {
+		localName = target.Name
+	}
 	find := func(rows []Located[json.RawMessage]) (*Located[json.RawMessage], error) {
 		var found *Located[json.RawMessage]
 		for i := range rows {
 			row := &rows[i]
 			match := row.Resource.URI == name || row.Resource.Name == name
+			if row.Connection.Name == r.internal.ConnectionName && row.Resource.Name == localName {
+				match = true
+			}
 			if !strings.Contains(name, "://") {
 				match = match || row.Resource.Name == strings.ReplaceAll(name, "/", "_")
 			}
@@ -311,7 +322,19 @@ func (r *MCPReferenceReader) Load(ctx context.Context, name string) (*mcpcfg.MCP
 	if err != nil {
 		return nil, err
 	}
+	var selectionStart mcpReferenceMemoKey
 	if selected == nil {
+		// Check local precedence before reusing a remote URI-to-owner memo. A
+		// newly supplied operator definition must also win over a warm remote.
+		if target, parseErr := identity.ParseResourceURI(name); parseErr == nil && target.Kind == "mcp" && target.Namespace != r.internal.Namespace {
+			selectionStart, _, err = r.memoKey(ctx, target.String())
+			if err != nil {
+				return nil, err
+			}
+			if cached, found, err := r.memoLoad(ctx, target); found || err != nil {
+				return cached, err
+			}
+		}
 		namespace := ""
 		if target, parseErr := identity.ParseResourceURI(name); parseErr == nil && target.Kind == "mcp" {
 			namespace = target.Namespace

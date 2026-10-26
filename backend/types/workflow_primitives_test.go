@@ -22,6 +22,7 @@ mutationCommand:
   invalidMessage: Complete required fields.
   timeoutMs: 45000
   invocationParameter: RequestId
+  prepare: Host.prepareSave
   indeterminateState: {saveOutcome: unknown}
   reconcile: {mode: merge, dataSourceRef: records, identityField: id, resultPath: data}
   refresh: [{dataSourceRef: records, bypassCache: true, clearSelection: true}]
@@ -149,6 +150,9 @@ scheduleEditor:
 	if container.MutationCommand == nil {
 		t.Fatal("mutation command missing")
 	}
+	if container.MutationCommand.Prepare != "Host.prepareSave" {
+		t.Fatal("async command preparation was truncated")
+	}
 	if container.MutationCommand.Label != "Save records" || container.MutationCommand.Intent != "primary" {
 		t.Fatalf("mutation presentation missing: %#v", container.MutationCommand)
 	}
@@ -216,6 +220,9 @@ scheduleEditor:
 	}
 	if output["editableCollection"] == nil || output["scheduleEditor"] == nil {
 		t.Fatalf("workflow primitives were not serialized: %s", encoded)
+	}
+	if output["mutationCommand"].(map[string]interface{})["prepare"] != "Host.prepareSave" {
+		t.Fatal("async preparation handler was lost during serialization")
 	}
 	editable := output["editableCollection"].(map[string]interface{})
 	if editable["selectionStatus"] != true || editable["selectionPrompt"] != "Select one row to continue." {

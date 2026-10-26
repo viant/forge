@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import './SettingsDialog.css';
+import TableViewPresets from './TableViewPresets.jsx';
 import {
     Button,
     Checkbox,
@@ -20,6 +22,8 @@ const SettingsDialog = ({
                             isOpen,
                             onClose,
                             columns,
+                            baseColumns = columns,
+                            savedViews,
                             density = 'normal',
                             onSaveColumnSettings,
                             onResetColumns,
@@ -101,12 +105,12 @@ const SettingsDialog = ({
     );
 
     const renderColumnsPanel = () => (
-        <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+        <div className="forge-table-settings__columns">
             {localColumns
                 .filter((col) => !col.nonExcludable) // Exclude non-excludable columns
                 .map((col, index) => (
-                    <div key={col.id} style={{ marginBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '10px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div key={col.id} className="forge-table-settings__column">
+                        <div className="forge-table-settings__column-heading">
                             <h5>{col.displayName || col.name}</h5>
                             <div>
                                 <Button
@@ -123,7 +127,7 @@ const SettingsDialog = ({
                                 />
                             </div>
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                        <div className="forge-table-settings__fields">
                             <FormGroup label="Width" labelFor={`width-${col.id}`}>
                                 <NumericInput
                                     id={`width-${col.id}`}
@@ -150,7 +154,7 @@ const SettingsDialog = ({
                             <FormGroup
                                 label="Tooltip"
                                 labelFor={`tooltip-${col.id}`}
-                                style={{ gridColumn: '1 / -1' }}
+                                className="forge-table-settings__full-width"
                             >
                                 <InputGroup
                                     id={`tooltip-${col.id}`}
@@ -170,11 +174,11 @@ const SettingsDialog = ({
             isOpen={isOpen}
             onClose={onClose}
             title="Table Settings"
-            style={{
-                zIndex: 100,
-            }}
+            className="forge-table-settings"
         >
             <DialogBody>
+                {savedViews && <TableViewPresets model={savedViews} columns={localColumns} baseColumns={baseColumns} density={localDensity}
+                    onApply={(nextColumns, preferences) => {setLocalColumns(nextColumns); setLocalDensity(preferences.density || density);}}/>}
                 <FormGroup label="Density" labelFor="table-preference-density"><HTMLSelect id="table-preference-density" value={localDensity} onChange={event=>setLocalDensity(event.target.value)} options={[{label:'Compact',value:'compact'},{label:'Normal',value:'normal'}]}/></FormGroup>
                 <Tabs id="settings-tabs" selectedTabId={selectedTabId} onChange={handleTabChange} animate={false}>
                     <Tab id="visibility" title="Visibility" panel={renderVisibilityPanel()} />

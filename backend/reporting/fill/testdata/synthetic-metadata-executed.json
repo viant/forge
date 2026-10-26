@@ -1,0 +1,476 @@
+{
+  "version": 1,
+  "kind": "reportFill",
+  "specVersion": 1,
+  "specHash": "fnv1a:8d52841f",
+  "source": {
+    "kind": "dashboard.reportBuilder",
+    "containerId": "sample-table",
+    "stateKey": "sample-table",
+    "dataSourceRef": "sampleRows"
+  },
+  "parameters": {
+    "viewMode": "table",
+    "groupBy": "",
+    "pageSize": 1,
+    "orderField": "",
+    "orderDir": "desc"
+  },
+  "refinements": [],
+  "calculatedFields": [],
+  "datasets": [
+    {
+      "id": "sample0",
+      "dataSourceRef": "sampleRows",
+      "scope": {
+        "mode": "inherit"
+      },
+      "capabilities": {
+        "backendRefetch": true
+      },
+      "request": {
+        "measures": {
+          "amount": true,
+          "count": true
+        },
+        "dimensions": {
+          "category": true
+        },
+        "limit": 5,
+        "offset": 0,
+        "filters": {
+          "sample": true
+        }
+      },
+      "provenance": {
+        "requestHash": "fnv1a:b1c8db4a",
+        "rowCount": 1,
+        "truncated": false,
+        "hasMore": false,
+        "diagnostics": []
+      },
+      "rows": [
+        {
+          "category": "Example 0",
+          "amount": 1,
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "sample1",
+      "dataSourceRef": "sampleRows",
+      "scope": {
+        "mode": "inherit"
+      },
+      "capabilities": {
+        "backendRefetch": true
+      },
+      "request": {
+        "measures": {
+          "amount": true,
+          "count": true
+        },
+        "dimensions": {
+          "category": true
+        },
+        "limit": 5,
+        "offset": 0,
+        "filters": {
+          "sample": true
+        }
+      },
+      "provenance": {
+        "requestHash": "fnv1a:b1c8db4a",
+        "rowCount": 1,
+        "truncated": false,
+        "hasMore": false,
+        "diagnostics": []
+      },
+      "rows": [
+        {
+          "category": "Example 1",
+          "amount": 2,
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "sample2",
+      "dataSourceRef": "sampleRows",
+      "scope": {
+        "mode": "inherit"
+      },
+      "capabilities": {
+        "backendRefetch": true
+      },
+      "request": {
+        "measures": {
+          "amount": true,
+          "count": true
+        },
+        "dimensions": {
+          "category": true
+        },
+        "limit": 5,
+        "offset": 0,
+        "filters": {
+          "sample": true
+        }
+      },
+      "provenance": {
+        "requestHash": "fnv1a:b1c8db4a",
+        "rowCount": 1,
+        "truncated": false,
+        "hasMore": false,
+        "diagnostics": []
+      },
+      "rows": [
+        {
+          "category": "Example 2",
+          "amount": 3,
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "sample3",
+      "dataSourceRef": "sampleRows",
+      "scope": {
+        "mode": "inherit"
+      },
+      "capabilities": {
+        "backendRefetch": true
+      },
+      "request": {
+        "measures": {
+          "amount": true,
+          "count": true
+        },
+        "dimensions": {
+          "category": true
+        },
+        "limit": 5,
+        "offset": 0,
+        "filters": {
+          "sample": true
+        }
+      },
+      "provenance": {
+        "requestHash": "fnv1a:b1c8db4a",
+        "rowCount": 1,
+        "truncated": false,
+        "hasMore": false,
+        "diagnostics": []
+      },
+      "rows": [
+        {
+          "category": "Example 3",
+          "amount": 4,
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "sample4",
+      "dataSourceRef": "sampleRows",
+      "scope": {
+        "mode": "inherit"
+      },
+      "capabilities": {
+        "backendRefetch": true
+      },
+      "request": {
+        "measures": {
+          "amount": true,
+          "count": true
+        },
+        "dimensions": {
+          "category": true
+        },
+        "limit": 5,
+        "offset": 0,
+        "filters": {
+          "sample": true
+        }
+      },
+      "provenance": {
+        "requestHash": "fnv1a:b1c8db4a",
+        "rowCount": 1,
+        "truncated": false,
+        "hasMore": false,
+        "diagnostics": []
+      },
+      "rows": [
+        {
+          "category": "Example 4",
+          "amount": 5,
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "sample5",
+      "dataSourceRef": "sampleRows",
+      "scope": {
+        "mode": "inherit"
+      },
+      "capabilities": {
+        "backendRefetch": true
+      },
+      "request": {
+        "measures": {
+          "amount": true,
+          "count": true
+        },
+        "dimensions": {
+          "category": true
+        },
+        "limit": 5,
+        "offset": 0,
+        "filters": {
+          "sample": true
+        }
+      },
+      "provenance": {
+        "requestHash": "fnv1a:b1c8db4a",
+        "rowCount": 1,
+        "truncated": false,
+        "hasMore": false,
+        "diagnostics": []
+      },
+      "rows": [
+        {
+          "category": "Example 5",
+          "amount": 6,
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "sample6",
+      "dataSourceRef": "sampleRows",
+      "scope": {
+        "mode": "inherit"
+      },
+      "capabilities": {
+        "backendRefetch": true
+      },
+      "request": {
+        "measures": {
+          "amount": true,
+          "count": true
+        },
+        "dimensions": {
+          "category": true
+        },
+        "limit": 5,
+        "offset": 0,
+        "filters": {
+          "sample": true
+        }
+      },
+      "provenance": {
+        "requestHash": "fnv1a:b1c8db4a",
+        "rowCount": 1,
+        "truncated": false,
+        "hasMore": false,
+        "diagnostics": []
+      },
+      "rows": [
+        {
+          "category": "Example 6",
+          "amount": 7,
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "sample7",
+      "dataSourceRef": "sampleRows",
+      "scope": {
+        "mode": "inherit"
+      },
+      "capabilities": {
+        "backendRefetch": true
+      },
+      "request": {
+        "measures": {
+          "amount": true,
+          "count": true
+        },
+        "dimensions": {
+          "category": true
+        },
+        "limit": 5,
+        "offset": 0,
+        "filters": {
+          "sample": true
+        }
+      },
+      "provenance": {
+        "requestHash": "fnv1a:b1c8db4a",
+        "rowCount": 1,
+        "truncated": false,
+        "hasMore": false,
+        "diagnostics": []
+      },
+      "rows": [
+        {
+          "category": "Example 7",
+          "amount": 8,
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "sample8",
+      "dataSourceRef": "sampleRows",
+      "scope": {
+        "mode": "inherit"
+      },
+      "capabilities": {
+        "backendRefetch": true
+      },
+      "request": {
+        "measures": {
+          "amount": true,
+          "count": true
+        },
+        "dimensions": {
+          "category": true
+        },
+        "limit": 5,
+        "offset": 0,
+        "filters": {
+          "sample": true
+        }
+      },
+      "provenance": {
+        "requestHash": "fnv1a:b1c8db4a",
+        "rowCount": 1,
+        "truncated": false,
+        "hasMore": false,
+        "diagnostics": []
+      },
+      "rows": [
+        {
+          "category": "Example 8",
+          "amount": 9,
+          "count": 1
+        }
+      ]
+    }
+  ],
+  "blocks": [
+    {
+      "id": "summary0",
+      "kind": "markdownBlock",
+      "title": "Example summary",
+      "datasetRef": "sample0",
+      "markdown": "Synthetic sample 0",
+      "content": {
+        "title": "Example summary",
+        "datasetRef": "sample0",
+        "markdown": "Synthetic sample 0"
+      }
+    },
+    {
+      "id": "summary1",
+      "kind": "markdownBlock",
+      "title": "Example summary",
+      "datasetRef": "sample1",
+      "markdown": "Synthetic sample 1",
+      "content": {
+        "title": "Example summary",
+        "datasetRef": "sample1",
+        "markdown": "Synthetic sample 1"
+      }
+    },
+    {
+      "id": "summary2",
+      "kind": "markdownBlock",
+      "title": "Example summary",
+      "datasetRef": "sample2",
+      "markdown": "Synthetic sample 2",
+      "content": {
+        "title": "Example summary",
+        "datasetRef": "sample2",
+        "markdown": "Synthetic sample 2"
+      }
+    },
+    {
+      "id": "summary3",
+      "kind": "markdownBlock",
+      "title": "Example summary",
+      "datasetRef": "sample3",
+      "markdown": "Synthetic sample 3",
+      "content": {
+        "title": "Example summary",
+        "datasetRef": "sample3",
+        "markdown": "Synthetic sample 3"
+      }
+    },
+    {
+      "id": "summary4",
+      "kind": "markdownBlock",
+      "title": "Example summary",
+      "datasetRef": "sample4",
+      "markdown": "Synthetic sample 4",
+      "content": {
+        "title": "Example summary",
+        "datasetRef": "sample4",
+        "markdown": "Synthetic sample 4"
+      }
+    },
+    {
+      "id": "summary5",
+      "kind": "markdownBlock",
+      "title": "Example summary",
+      "datasetRef": "sample5",
+      "markdown": "Synthetic sample 5",
+      "content": {
+        "title": "Example summary",
+        "datasetRef": "sample5",
+        "markdown": "Synthetic sample 5"
+      }
+    },
+    {
+      "id": "summary6",
+      "kind": "markdownBlock",
+      "title": "Example summary",
+      "datasetRef": "sample6",
+      "markdown": "Synthetic sample 6",
+      "content": {
+        "title": "Example summary",
+        "datasetRef": "sample6",
+        "markdown": "Synthetic sample 6"
+      }
+    },
+    {
+      "id": "summary7",
+      "kind": "markdownBlock",
+      "title": "Example summary",
+      "datasetRef": "sample7",
+      "markdown": "Synthetic sample 7",
+      "content": {
+        "title": "Example summary",
+        "datasetRef": "sample7",
+        "markdown": "Synthetic sample 7"
+      }
+    },
+    {
+      "id": "summary8",
+      "kind": "markdownBlock",
+      "title": "Example summary",
+      "datasetRef": "sample8",
+      "markdown": "Synthetic sample 8",
+      "content": {
+        "title": "Example summary",
+        "datasetRef": "sample8",
+        "markdown": "Synthetic sample 8"
+      }
+    }
+  ],
+  "diagnostics": []
+}

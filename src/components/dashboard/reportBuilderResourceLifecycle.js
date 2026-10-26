@@ -39,8 +39,8 @@ export function buildReportResourceRunRequest(pin, parameters = {}) {
     const choices=parameters.chartMetricSelections;
     return {resource:{uri:pin.uri,revision:pin.kind === "working" ? "working" : pin.revision},resolvedResource:clone(pin),parameters:clone(selected),...(choices && Object.keys(choices).length ? {chartMetricSelections:clone(choices)} : {})};
 }
-export function validateReportResourceRunResult(result, expected, chartMetricSelections = {}) {
-    if (!result?.resource || ["providerIdentity","uri","kind","revision","contentFingerprint","authorityBinding","validUntil"].some(field => (expected?.[field] ?? "") !== (result.resource[field] ?? "")) || !result.reportSpec || !result.reportFill || !result.reportPrint) throw new Error("The report service did not return the selected report run.");
+export function validateReportResourceRunResult(result, expected, chartMetricSelections = {}, {fillOnly = false} = {}) {
+    if (!result?.resource || ["providerIdentity","uri","kind","revision","contentFingerprint","authorityBinding","validUntil"].some(field => (expected?.[field] ?? "") !== (result.resource[field] ?? "")) || !result.reportSpec || !result.reportFill || (fillOnly !== true && !result.reportPrint)) throw new Error("The report service did not return the selected report run.");
     for (const [id,choice] of Object.entries(chartMetricSelections || {})) {
         const applied = result.reportSpec.blocks?.find(block=>block.id===id)?.chartSpec?.metricSelection;
         if (!applied || applied.primaryField!==choice.primaryField || applied.secondaryField!==choice.secondaryField) throw new Error("The report service did not retain the selected chart metrics.");

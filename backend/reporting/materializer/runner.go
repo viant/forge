@@ -33,6 +33,16 @@ func Lower(ctx context.Context, raw json.RawMessage) (json.RawMessage, error) {
 // LowerWithRequestBase validates the original fingerprinted envelope before
 // applying host-bound predicate values to an invocation-local builder copy.
 func LowerWithRequestBase(ctx context.Context, raw json.RawMessage, requestBase map[string]interface{}) (json.RawMessage, error) {
+	return lowerWithSourceKind(ctx, raw, requestBase, "report")
+}
+
+// LowerWindowBuilderWithRequestBase is restricted to a host-derived envelope.
+// The engine retains and revalidates the original window pin independently.
+func LowerWindowBuilderWithRequestBase(ctx context.Context, raw json.RawMessage, requestBase map[string]interface{}) (json.RawMessage, error) {
+	return lowerWithSourceKind(ctx, raw, requestBase, "window")
+}
+
+func lowerWithSourceKind(ctx context.Context, raw json.RawMessage, requestBase map[string]interface{}, sourceKind string) (json.RawMessage, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf("materializer context required")
 	}
@@ -51,7 +61,7 @@ func LowerWithRequestBase(ctx context.Context, raw json.RawMessage, requestBase 
 	if decoder.Decode(&envelope) != nil || decoder.Decode(new(any)) != io.EOF {
 		return nil, fmt.Errorf("invalid authored report envelope")
 	}
-	if err := validateEnvelope(envelope); err != nil {
+	if err := validateEnvelopeSourceKind(envelope, sourceKind); err != nil {
 		return nil, err
 	}
 	programOnce.Do(func() { program, programError = goja.Compile("forge-authored-lowerer", bundle, true) })
@@ -101,9 +111,19 @@ func loweringError(ctx context.Context, err error) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
+	if chartError := authoredChartValidationError(err); chartError != nil {
+		return chartError
+	}
 	return fmt.Errorf("authored report lowering failed: %w", err)
 }
 func validateEnvelope(e registry.ReportEnvelope) error {
+	return validateEnvelopeSourceKind(e, "report")
+}
+
+func validateEnvelopeSourceKind(e registry.ReportEnvelope, sourceKind string) error {
+	if sourceKind != "report" && sourceKind != "window" {
+		return identity.ErrResourceDenied
+	}
 	if e.SchemaVersion != 1 || e.Format != registry.AuthoredReportFormat || len(e.ReportSpec) != 0 || e.BuilderRef == "" || len(e.ReportDocument) == 0 || len(e.BuilderDefinition) == 0 || len(e.DataSources) == 0 {
 		return fmt.Errorf("incomplete authored report envelope")
 	}
@@ -130,20 +150,26 @@ func validateEnvelope(e registry.ReportEnvelope) error {
 		switch dep.Kind {
 		case "builder":
 			builderCount++
-			if dep.ID != e.BuilderRef || dep.ContentFingerprint != identity.ContentFingerprint(e.BuilderDefinition) {
+			if dep.ID != e.BuilderRef {
 				return fmt.Errorf("authored builder fingerprint mismatch")
+			}
+			if dep.ContentFingerprint != identity.ContentFingerprint(e.BuilderDefinition) {
+				return &AuthoredDependencyFingerprintError{kind: "builder"}
 			}
 		case "datasource":
 			descriptor := e.DataSources[dep.ID]
 			var object map[string]any
-			if len(descriptor) == 0 || json.Unmarshal(descriptor, &object) != nil || len(object) == 0 || dep.ContentFingerprint != identity.ContentFingerprint(descriptor) {
+			if len(descriptor) == 0 || json.Unmarshal(descriptor, &object) != nil || len(object) == 0 {
 				return fmt.Errorf("authored datasource fingerprint mismatch")
 			}
+			if dep.ContentFingerprint != identity.ContentFingerprint(descriptor) {
+				return &AuthoredDependencyFingerprintError{kind: "datasource"}
+			}
 			ds[dep.ID] = true
-		case "report":
+		case "report", "window":
 			reportCount++
 			uri, err := identity.ParseResourceURI(dep.ID)
-			if err != nil || uri.Kind != "report" {
+			if err != nil || dep.Kind != sourceKind || uri.Kind != sourceKind {
 				return fmt.Errorf("invalid authored report dependency identity")
 			}
 		default:
@@ -151,7 +177,7 @@ func validateEnvelope(e registry.ReportEnvelope) error {
 		}
 	}
 	if builderCount != 1 || reportCount != 1 || len(ds) != len(e.DataSources) {
-		return fmt.Errorf("incomplete authored report dependency closure")
+		return &AuthoredDependencyClosureError{}
 	}
 	return nil
 }
@@ -201,7 +227,7 @@ func runEntryWithTimeSourceTimeout(ctx context.Context, program *goja.Program, e
 		return nil, fmt.Errorf("trusted lowerer entry missing")
 	}
 	invokeTiming := observe.Start(ctx, "report.materializer.runtime.invoke", observe.Labels{Kind: "report"})
-	result, err := lower(goja.Undefined(), runtime.ToValue(string(raw)))
+	result, err := invokeMaterializerEntry(bounded, runtime, entry, lower, raw)
 	invokeTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
 		return nil, loweringError(bounded, err)
@@ -219,16 +245,16 @@ type Artifacts struct {
 }
 
 func Materialize(ctx context.Context, spec json.RawMessage, datasets map[string]json.RawMessage) (*Artifacts, error) {
-	return materialize(ctx, spec, datasets, false)
+	return materialize(ctx, spec, datasets, false, nil)
 }
 
 // MaterializeFill computes the validated report fill without constructing a
 // print model. Complete execution and export retain Materialize by default.
 func MaterializeFill(ctx context.Context, spec json.RawMessage, datasets map[string]json.RawMessage) (*Artifacts, error) {
-	return materialize(ctx, spec, datasets, true)
+	return materialize(ctx, spec, datasets, true, nil)
 }
 
-func materialize(ctx context.Context, spec json.RawMessage, datasets map[string]json.RawMessage, fillOnly bool) (*Artifacts, error) {
+func materialize(ctx context.Context, spec json.RawMessage, datasets map[string]json.RawMessage, fillOnly bool, presentations TablePresentations) (*Artifacts, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf("materializer context required")
 	}
@@ -249,9 +275,10 @@ func materialize(ctx context.Context, spec json.RawMessage, datasets map[string]
 		return nil, err
 	}
 	raw, err := json.Marshal(struct {
-		Spec     json.RawMessage            `json:"reportSpec"`
-		Datasets map[string]json.RawMessage `json:"datasets"`
-	}{spec, normalized})
+		Spec               json.RawMessage            `json:"reportSpec"`
+		Datasets           map[string]json.RawMessage `json:"datasets"`
+		TablePresentations TablePresentations         `json:"tablePresentations,omitempty"`
+	}{spec, normalized, presentations})
 	if err != nil {
 		return nil, err
 	}

@@ -184,7 +184,7 @@ assert.equal(
   !source.includes("requestTransform:")
     && source.includes("const runtimePreviewCanonicalRequest = useMemo(")
     && source.includes("applyReportBuilderRequestHook(\n                builderContext,\n                displayConfig,\n                state,\n                runtimePreviewCanonicalRequest,")
-    && source.includes("applyReportBuilderRequestHook(builderContext, displayConfig, state, canonicalRequest)"),
+    && source.includes("applyReportBuilderRequestHook(builderContext, displayConfig, state, canonicalRequest, {datasetId: dataset.id})"),
   true,
   "Durable report artifacts retain canonical requests while provider hooks run only at primary and published datasource dispatch boundaries.",
 );

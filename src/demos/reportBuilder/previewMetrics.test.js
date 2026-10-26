@@ -119,7 +119,7 @@ assert.equal(metrics.semanticValidationBehaviors.length, 1);
 assert.equal(metrics.replaceDetailTargetBehaviors([
   {
     match: {
-      targetRef: "target://steward/performance/channel-detail",
+      targetRef: "target://example/performance/channel-detail",
     },
     result: {
       detailTarget: null,
@@ -133,7 +133,7 @@ assert.equal(metrics.replaceRuntimeActionBehaviors([
       fieldRef: "eventDate",
     },
     actions: [
-      { id: "detail_date", label: "Show date details", kind: "detail", targetRef: "target://steward/performance/date-detail" },
+      { id: "detail_date", label: "Show date details", kind: "detail", targetRef: "target://example/performance/date-detail" },
     ],
   },
 ]), 1);

@@ -52,6 +52,20 @@ for (const expected of [
 ]) assert.ok(markup.includes(expected), `missing rendered mobile editable-table contract: ${expected}`);
 assert.equal((markup.match(/required=""/g) || []).length, 6, 'required fields must be marked in both desktop and mobile render trees');
 
+const emptyRows = [];
+const emptyContext = {
+    Context: () => ({
+        signals: {collection: {value: emptyRows, peek: () => emptyRows}},
+        handlers: {dataSource: {peekFullCollection: () => emptyRows, peekCollection: () => emptyRows}},
+    }),
+};
+const emptyMarkup = renderToStaticMarkup(<DashboardEditableTable container={{
+    ...container,
+    emptyText: 'No channels selected.',
+}} context={emptyContext}/>);
+assert.match(emptyMarkup, /class="forge-editable-collection__cards"><div class="forge-editable-collection__empty">No channels selected\.<\/div>/, 'mobile cards must show the same empty message as the desktop table');
+assert.equal((emptyMarkup.match(/No channels selected\./g) || []).length, 2, 'desktop and mobile empty states must both be present');
+
 const frequencyRows = [{Channel: 'CTV', 'Freq Cap': '3 per 1 hour', Reason: 'Protect reach.'}];
 const frequencyContext = {
     Context: () => ({

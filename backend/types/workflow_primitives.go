@@ -25,6 +25,9 @@ type MutationCommand struct {
 	IndeterminateState  map[string]interface{}      `json:"indeterminateState,omitempty" yaml:"indeterminateState,omitempty"`
 	Reconcile           *ReconcileSpec              `json:"reconcile,omitempty" yaml:"reconcile,omitempty"`
 	Refresh             []RefreshSpec               `json:"refresh,omitempty" yaml:"refresh,omitempty"`
+	// Prepare names an optional async handler that returns the final parameter map
+	// after confirmation and before the writer is invoked.
+	Prepare string `json:"prepare,omitempty" yaml:"prepare,omitempty"`
 }
 
 type SelectionConfirmation struct {

@@ -1,0 +1,28 @@
+import assert from 'node:assert/strict';
+import {advisoryReportExportTables, immediateReportExportDownload, MAX_IMMEDIATE_REPORT_EXPORT_BYTES} from './reportBuilderImmediateExport.js';
+
+const pdf = {kind:'immediateReportExport', format:'pdf', contentType:'application/pdf', filename:'report.pdf', data:btoa('%PDF-synthetic-contract')};
+const downloaded = immediateReportExportDownload(pdf, 'pdf');
+assert.equal(downloaded.filename, 'report.pdf');
+assert.equal(new TextDecoder().decode(downloaded.payload), '%PDF-synthetic-contract');
+assert.equal(downloaded.jobId, undefined);
+assert.equal(downloaded.artifactId, undefined);
+assert.equal(immediateReportExportDownload({jobId:'existing-job', status:'succeeded'}), null, 'existing job results keep their original path');
+assert.throws(() => immediateReportExportDownload({...pdf, jobId:'invented'}), /job identity/);
+assert.throws(() => immediateReportExportDownload({...pdf, artifactId:'invented'}), /job identity/);
+assert.throws(() => immediateReportExportDownload(pdf, 'xlsx'), /format/);
+assert.throws(() => immediateReportExportDownload({...pdf, contentType:'text/html'}), /media type/);
+assert.throws(() => immediateReportExportDownload({...pdf, filename:'report.html'}), /filename/);
+assert.throws(() => immediateReportExportDownload({...pdf, data:[]}), /complete/);
+assert.throws(() => immediateReportExportDownload({...pdf, data:btoa('not a rendered PDF')}), /signature/);
+assert.throws(() => immediateReportExportDownload({...pdf, data:'https://foreign.invalid/file'}), /base64/);
+assert.throws(() => immediateReportExportDownload({...pdf, data:[-1]}), /invalid bytes/);
+assert.throws(() => immediateReportExportDownload({...pdf, data:new Uint8Array(MAX_IMMEDIATE_REPORT_EXPORT_BYTES + 1)}), /size limit/);
+assert.equal(immediateReportExportDownload({...pdf, filename:'../../safe.pdf'}).filename, 'safe.pdf');
+const typed = new Uint8Array([80,75,3,4]);
+const xlsx = immediateReportExportDownload({kind:'immediateReportExport',format:'xlsx',contentType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',filename:'complete.xlsx',data:typed},'xlsx');
+typed[0] = 0;
+assert.equal(xlsx.payload[0],80,'download bytes are copied, not a mutable response view');
+assert.deepEqual(advisoryReportExportTables({blocks:[{id:'title',kind:'markdownBlock'}, {id:'one',kind:'tableBlock',title:'First table'}, {id:'two',kind:'tableBlock'}]}), [{id:'one',title:'First table'}, {id:'two',title:'two'}]);
+assert.throws(()=>advisoryReportExportTables({blocks:[{id:'same',kind:'tableBlock'}, {id:'same',kind:'tableBlock'}]}), /ambiguous/);
+console.log('Immediate report artifact source contracts passed; no renderer or browser acceptance claimed.');

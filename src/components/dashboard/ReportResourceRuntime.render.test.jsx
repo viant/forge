@@ -13,7 +13,9 @@ import ReportResourceRuntime from './ReportResourceRuntime.jsx';
 
 const pin = {uri:'report://workspace/example', kind:'stamped', revision:2,
     contentFingerprint:'a'.repeat(64), authorityBinding:'selected-principal'};
-const result = (resource=pin, title='Server report') => ({resource, reportSpec:{title}, reportFill:{}, reportPrint:{}});
+const result = (resource=pin, title='Server report') => ({resource, reportSpec:{title}, reportFill:{}});
+const printedResult = (resource=pin, title='Fresh print') => ({...result(resource), reportPrint:{kind:'reportPrint', title, pages:[{number:1,elements:[]}],pageGeometry:{width:612,height:792}}});
+const button = (view,label) => [...view.host.querySelectorAll('button')].find(item=>item.textContent===label);
 const deferred = () => {let resolve, reject; const promise=new Promise((yes,no)=>{resolve=yes;reject=no;}); return {promise,resolve,reject};};
 async function mount(runReport, parameters={}) {
     globalThis.IS_REACT_ACT_ENVIRONMENT=true;
@@ -29,7 +31,7 @@ it('auto-opens once under StrictMode, preserves scope and server materialization
     const view=await mount(run,{executeOnOpen:true,prefill:{advertiserIds:[42]}});
     try {
         expect(run).toHaveBeenCalledTimes(1);
-        expect(run.mock.calls[0][0]).toEqual({resource:{uri:pin.uri,revision:2},resolvedResource:pin,parameters:{advertiserIds:[42]}});
+        expect(run.mock.calls[0][0]).toEqual({resource:{uri:pin.uri,revision:2},resolvedResource:pin,parameters:{advertiserIds:[42]},fillOnly:true});
         await act(async()=>pending.resolve(result()));
         expect(view.host.querySelector('output').textContent).toBe('Server report');
         await view.render();expect(run).toHaveBeenCalledTimes(1);
@@ -86,7 +88,7 @@ it('reruns opted-in presentation choices and keeps scope parameters unchanged',a
   const button=[...view.host.querySelectorAll('button')].find(b=>b.textContent==='Choose metrics');
   await act(async()=>button.click());
   expect(run).toHaveBeenCalledTimes(2);
-  expect(run.mock.calls[1][0]).toEqual({resource:{uri:pin.uri,revision:2},resolvedResource:pin,parameters:{advertiserIds:[42]},chartMetricSelections:{trend:{primaryField:'count',secondaryField:'rate'}}});
+  expect(run.mock.calls[1][0]).toEqual({resource:{uri:pin.uri,revision:2},resolvedResource:pin,parameters:{advertiserIds:[42]},chartMetricSelections:{trend:{primaryField:'count',secondaryField:'rate'}},fillOnly:true});
   expect([...view.host.querySelectorAll('button')].find(b=>b.textContent==='Print preview').disabled).toBe(false);
  }finally{await view.close();}
 });
@@ -131,5 +133,117 @@ it('reruns metric choices after an explicitly started report without executeOnOp
   await act(async()=>[...view.host.querySelectorAll('button')].find(b=>b.textContent==='Choose metrics').click());
   expect(run).toHaveBeenCalledTimes(2);
   expect(view.host.querySelector('output').textContent).toBe('Selected metrics');
+ }finally{await view.close();}
+});
+
+
+it('renders a fill-only run, then prepares print only on an explicit action without blocking the report',async()=>{
+ const print=deferred();
+ const run=vi.fn().mockResolvedValueOnce(result()).mockReturnValueOnce(print.promise);
+ const view=await mount(run,{executeOnOpen:true,prefill:{advertiserIds:[42],from:'2026-08-01'},reportCapabilities:{run:true,export:true}});
+ try{
+  expect(run).toHaveBeenCalledTimes(1);
+  expect(run.mock.calls[0][0].fillOnly).toBe(true);
+  expect(view.host.querySelector('output').textContent).toBe('Server report');
+  expect(view.host.querySelector('aside')).toBeNull();
+  await act(async()=>button(view,'Print preview').click());
+  expect(run).toHaveBeenCalledTimes(2);
+  expect(run.mock.calls[1][0]).toEqual({resource:{uri:pin.uri,revision:2},resolvedResource:pin,parameters:{advertiserIds:[42],from:'2026-08-01'}});
+  expect(view.host.textContent).toContain('Preparing print preview.');
+  expect(view.host.querySelector('output').textContent).toBe('Server report');
+  expect(button(view,'Run report').disabled).toBe(false);
+  await act(async()=>print.resolve(printedResult()));
+  expect(view.host.querySelector('aside').textContent).toBe('Print');
+  expect(view.host.querySelector('output')).toBeNull();
+  await act(async()=>button(view,'Close print preview').click());
+  expect(view.host.querySelector('output').textContent).toBe('Server report');
+  expect(run).toHaveBeenCalledTimes(2);
+ }finally{await view.close();}
+});
+
+it('uses the completed run snapshot for lazy Print, including exact selected metrics and scope',async()=>{
+ const choice={primaryField:'count',secondaryField:'rate'};
+ const chosen={...result(),reportSpec:{title:'Chosen',blocks:[{id:'trend',chartSpec:{metricSelection:choice}}]}};
+ const print={...printedResult(),reportSpec:chosen.reportSpec};
+ const run=vi.fn().mockResolvedValueOnce(result()).mockResolvedValueOnce(chosen).mockResolvedValueOnce(print);
+ const view=await mount(run,{executeOnOpen:true,prefill:{advertiserIds:[42]},reportCapabilities:{run:true,export:true,chartMetricSelection:true}});
+ try{
+  await act(async()=>button(view,'Choose metrics').click());
+  expect(run.mock.calls[1][0].fillOnly).toBe(true);
+  await act(async()=>button(view,'Print preview').click());
+  expect(run.mock.calls[2][0]).toEqual({resource:{uri:pin.uri,revision:2},resolvedResource:pin,parameters:{advertiserIds:[42]},chartMetricSelections:{trend:choice}});
+  expect(view.host.querySelector('aside')).not.toBeNull();
+ }finally{await view.close();}
+});
+
+it.each([
+ ['missing full print',()=>Promise.resolve(result()),'did not return the selected report run'],
+ ['invalid print shape',()=>Promise.resolve({...result(),reportPrint:{kind:'reportPrint',pages:null,pageGeometry:{}}}),'canonical print layout'],
+ ['different authority',()=>Promise.resolve(printedResult({...pin,authorityBinding:'foreign'})),'did not return the selected report run'],
+ ['producer failure',()=>Promise.reject(new Error('Producer denied print')),'Producer denied print'],
+])('keeps the screen report available after %s',async(_name,prepare,message)=>{
+ const run=vi.fn().mockResolvedValueOnce(result()).mockImplementationOnce(prepare);
+ const view=await mount(run,{executeOnOpen:true,reportCapabilities:{run:true,export:true}});
+ try{
+  await act(async()=>button(view,'Print preview').click());
+  expect(view.host.textContent).toContain(message);
+  expect(view.host.textContent).not.toContain('Preparing print preview.');
+  expect(view.host.querySelector('aside')).toBeNull();
+  expect(view.host.querySelector('output').textContent).toBe('Server report');
+  expect(button(view,'Run report').disabled).toBe(false);
+ }finally{await view.close();}
+});
+
+it.each(['parameters','resource'])('discards a pending Print after %s changes',async(change)=>{
+ const print=deferred();const nextPin=change==='resource'?{...pin,revision:3,contentFingerprint:'b'.repeat(64)}:pin;
+ const run=vi.fn().mockResolvedValueOnce(result()).mockReturnValueOnce(print.promise).mockResolvedValueOnce(result(nextPin,'New selection'));
+ const view=await mount(run,{executeOnOpen:true,prefill:{advertiserIds:[1]},reportCapabilities:{run:true,export:true}});
+ try{
+  await act(async()=>button(view,'Print preview').click());
+  await view.render(change==='resource'?{reportResource:nextPin}:{prefill:{advertiserIds:[2]}});
+  expect(run).toHaveBeenCalledTimes(3);
+  expect(run.mock.calls[1][0].parameters).toEqual({advertiserIds:[1]});
+  expect(run.mock.calls[1][0].resolvedResource).toEqual(pin);
+  await act(async()=>print.resolve(printedResult()));
+  expect(view.host.querySelector('aside')).toBeNull();
+  expect(view.host.querySelector('output').textContent).toBe('New selection');
+ }finally{await view.close();}
+});
+
+it('invalidates a pending Print when an immediately completed rerun keeps the same scope',async()=>{
+ const print=deferred();const run=vi.fn().mockResolvedValueOnce(result()).mockReturnValueOnce(print.promise).mockResolvedValueOnce(result(pin,'New execution'));
+ const view=await mount(run,{executeOnOpen:true,reportCapabilities:{run:true,export:true}});
+ try{
+  await act(async()=>button(view,'Print preview').click());
+  await act(async()=>button(view,'Run report').click());
+  expect(run).toHaveBeenCalledTimes(3);
+  expect(run.mock.calls[2][0].fillOnly).toBe(true);
+  await act(async()=>print.resolve(printedResult()));
+  expect(view.host.querySelector('aside')).toBeNull();
+  expect(view.host.querySelector('output').textContent).toBe('New execution');
+ }finally{await view.close();}
+});
+
+it('ignores Print settlement after the report view closes',async()=>{
+ const print=deferred();const run=vi.fn().mockResolvedValueOnce(result()).mockReturnValueOnce(print.promise);
+ const view=await mount(run,{executeOnOpen:true,reportCapabilities:{run:true,export:true}});
+ await act(async()=>button(view,'Print preview').click());
+ await view.close();
+ await act(async()=>print.resolve(printedResult()));
+ expect(view.host.childNodes.length).toBe(0);
+});
+
+it('keeps explicit export requests full and independent of the fill-only screen run',async()=>{
+ const run=vi.fn().mockResolvedValue(result());
+ const view=await mount(run,{executeOnOpen:true,prefill:{advertiserIds:[42]},reportCapabilities:{run:true,export:true}});
+ const submitResource=vi.fn().mockResolvedValue({jobId:'export'});
+ view.handlers.reportExport={submitResource,getStatus:vi.fn().mockResolvedValue({status:'failed',error:'Expected export stop'})};
+ try{
+  for(const format of ['pdf','csv','xlsx']){
+   await act(async()=>button(view,`Export ${format.toUpperCase()}`).click());
+   expect(submitResource.mock.lastCall[0]).toEqual({resource:{uri:pin.uri,revision:2},resolvedResource:pin,parameters:{advertiserIds:[42]},format});
+  }
+  expect(run).toHaveBeenCalledTimes(1);
+  expect(view.host.querySelector('output').textContent).toBe('Server report');
  }finally{await view.close();}
 });

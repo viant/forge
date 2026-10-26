@@ -25,6 +25,7 @@ import {documentTableLayout} from "./documentTable.js";
 import { buildDashboardTableLayout } from "./dashboardTableLayout.js";
 import Typography from '../Typography.jsx';
 import ForgeIcon from '../Icon.jsx';
+import { compareDashboardTableValues } from "./dashboardTableSort.js";
 
 const DEFAULT_SUBTITLE_STYLE = {
     fontSize: 'var(--forge-dashboard-table-small-size, 12px)',
@@ -66,6 +67,7 @@ export default function DashboardTableContent({
     locale = 'en-US',
     subtitleStyle = DEFAULT_SUBTITLE_STYLE,
     onPresentationStateChange = null,
+    initialPresentationState = null,
 }) {
     const {collection, loading, error, selection} = useDataSourceState(context);
     const dashboardFilterSignal = context?.dashboardKey ? getDashboardFilterSignal(context.dashboardKey) : null;
@@ -73,7 +75,7 @@ export default function DashboardTableContent({
     const dashboardFilters = useSignalSnapshot(dashboardFilterSignal, {});
     const dashboardSelection = useSignalSnapshot(dashboardSelectionSignal, {});
     const limit = container.dashboard?.table?.limit || container.limit || Number.MAX_SAFE_INTEGER;
-    const [quickFilter, setQuickFilter] = useState("");
+    const [quickFilter, setQuickFilter] = useState(() => initialPresentationState?.filter || "");
     const quickFilterEnabled = container.dashboard?.table?.quickFilter === true || container.quickFilter === true;
     const density = container.dashboard?.table?.density || container.density || "comfortable";
     const rowActions = container.dashboard?.table?.rowActions || container.rowActions || [];
@@ -169,29 +171,25 @@ export default function DashboardTableContent({
         hasRowActions: rowActions.length > 0,
     }), [displayColumns, multiSelect, rowActions.length, documentTable]);
 
-    const [sortKey, setSortKey] = useState(null);
-    const [sortDir, setSortDir] = useState('asc');
+    const [sortKey, setSortKey] = useState(() => initialPresentationState?.sort?.key || null);
+    const [sortDir, setSortDir] = useState(() => initialPresentationState?.sort?.direction === 'desc' ? 'desc' : 'asc');
     const [page, setPage] = useState(1);
     const pagingEnabled = context?.dataSource?.paging?.enabled === true || container?.paging?.enabled === true;
     const pageSize = Math.max(1, Number(container?.paging?.size || context?.dataSource?.paging?.size || 20));
 
     const allSortedRows = useMemo(() => {
-        const rows = quickFilteredCollection.slice(0, limit);
-        if (!sortKey) return rows;
+        if (!sortKey) return quickFilteredCollection.slice(0, limit);
         const sortColumn = runtimeColumns.find((col) => col.key === sortKey);
-        return [...rows].sort((a, b) => {
+        const ordered = [...quickFilteredCollection].sort((a, b) => {
             const avRaw = resolveDashboardTableColumnValue(a, sortColumn, { preferDisplay: true });
             const bvRaw = resolveDashboardTableColumnValue(b, sortColumn, { preferDisplay: true });
             const avLink = resolveTableLink({row: a, column: sortColumn, value: avRaw});
             const bvLink = resolveTableLink({row: b, column: sortColumn, value: bvRaw});
             const av = avLink ? avLink.text : avRaw;
             const bv = bvLink ? bvLink.text : bvRaw;
-            const an = Number(av);
-            const bn = Number(bv);
-            const numeric = Number.isFinite(an) && Number.isFinite(bn);
-            const cmp = numeric ? an - bn : String(av ?? '').localeCompare(String(bv ?? ''));
-            return sortDir === 'desc' ? -cmp : cmp;
+            return compareDashboardTableValues(av, bv, sortColumn, sortDir);
         });
+        return ordered.slice(0, limit);
     }, [quickFilteredCollection, limit, runtimeColumns, sortKey, sortDir]);
     const pageCount = pagingEnabled ? Math.max(1, Math.ceil(allSortedRows.length / pageSize)) : 1;
     const currentPage = Math.min(page, pageCount);
@@ -323,10 +321,10 @@ export default function DashboardTableContent({
                                     <th
                                         key={col.key}
                                         className={col.frozen ? 'forge-table-frozen-identifier' : undefined}
-                                        onClick={() => handleSort(col.key)}
-                                        style={{textAlign: col.align || 'left', color: active ? 'var(--forge-dashboard-table-link, #2367d1)' : undefined, cursor: 'pointer', userSelect: 'none', ...(col.frozen ? {'--forge-frozen-column-width': `${col.resolvedCompactWidth}px`, '--forge-frozen-left': multiSelect ? '42px' : '0px'} : {})}}
+                                        aria-sort={active ? sortDir === 'asc' ? 'ascending' : 'descending' : 'none'}
+                                        style={{textAlign: col.align || 'left', color: active ? 'var(--forge-dashboard-table-link, #2367d1)' : undefined, ...(col.frozen ? {'--forge-frozen-column-width': `${col.resolvedCompactWidth}px`, '--forge-frozen-left': multiSelect ? '42px' : '0px'} : {})}}
                                     >
-                                        {col.label}{arrow}
+                                        <button type="button" className="forge-dashboard-table__sort-button" title={col.label || col.key} aria-label={`Sort by ${col.label || col.key}`} onClick={() => handleSort(col.key)}><span className="forge-dashboard-table__header-label">{col.label || col.key}</span><span aria-hidden="true">{arrow}</span></button>
                                     </th>
                                 );
                             })}

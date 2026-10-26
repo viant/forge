@@ -383,7 +383,7 @@ assert.deepEqual(orderHorizontalChartRows(serverRankedCosts,'cost',true),serverR
 assert.equal(orderHorizontalChartRows(serverRankedCosts,'cost')[0].publisher,'Next CPM','Legacy descending default remains compatible');
 assert.equal(serverRankedCosts[0].publisher,'Lowest CPM','Chart sorting must not mutate producer ordering');
 
-for (const [width,height,radius] of [[100,12,6],[2,12,1],[-40,12,6],[0,12,0],[NaN,12,0],[Infinity,12,0]]) {
+for (const [width,height,radius] of [[100,12,6],[300,245,6],[300,92,6],[2,12,1],[-40,12,6],[0,12,0],[NaN,12,0],[Infinity,12,0]]) {
  assert.equal(resolveChartBarRadius(width,height),radius);
 }
 
@@ -397,6 +397,10 @@ assert.match(rightTip,/L 10 32 C 10 32 10 32 10 32 L 10 20 C 10 20 10 20 10 20 Z
 const leftTip=buildChartBarPath({x:10,y:20,width:100,height:12,value:-5});
 assert.match(leftTip,/L 110 20 C 110 20 110 20 110 20 L 110 32/,'Negative origin side must stay flat at the right');
 assert.equal(buildChartBarPath({x:0,y:0,width:0,height:12,value:0}),'');
+assert.deepEqual(resolveChartBarCornerRadii(200,'vertical'),[6,6,0,0]);
+const broadBar=buildChartBarPath({x:0,y:0,width:300,height:245,value:200,orientation:'vertical'});
+assert.match(broadBar,/^M 6 0 L 294 0 C /,'Wide bars retain a flat top between small corners');
+assert.match(broadBar,/L 300 245 C 300 245 300 245 300 245 L 0 245/,'Baseline stays square');
 
 assert.equal(formatChartDisplayValue(0.00123,'number5'),'0.00123','Small cost values must retain authored precision');
 assert.equal(formatChartDisplayValue(0,'number5'),'0.00000');

@@ -120,6 +120,16 @@ type nativeSkillClient struct {
 	gateway *Gateway
 }
 
+func (c *nativeSkillClient) NegotiatedServer() (*schema.InitializeResult, error) {
+	negotiated, ok := c.Interface.(interface {
+		NegotiatedServer() (*schema.InitializeResult, error)
+	})
+	if !ok {
+		return nil, ErrUnavailable
+	}
+	return negotiated.NegotiatedServer()
+}
+
 func (c *nativeSkillClient) Discover(ctx context.Context, opts ...client.RequestOption) (*schema.DiscoverResult, error) {
 	a, e := c.gateway.actor(ctx)
 	if e != nil {

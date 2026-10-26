@@ -19,7 +19,7 @@ assert.equal(previewSemanticSelectionIdsEqual(["event_date"], ["event_date", "ch
 
 assert.deepEqual(normalizePreviewSemanticValidationBehavior({
   match: {
-    modelRef: " model://steward/performance/ad_delivery@v1 ",
+    modelRef: " model://example/performance/ad_delivery@v1 ",
     entity: " line_delivery ",
     dimensions: [" event_date ", " channel "],
     measures: [" available_impressions "],
@@ -37,7 +37,7 @@ assert.deepEqual(normalizePreviewSemanticValidationBehavior({
   },
 }), {
   match: {
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/ad_delivery@v1",
     entity: "line_delivery",
     dimensions: ["event_date", "channel"],
     measures: ["available_impressions"],
@@ -79,7 +79,7 @@ assert.equal(metrics.semanticValidationBehaviors.length, 2);
 
 assert.deepEqual(consumePreviewSemanticValidationBehavior(
   metrics,
-  "model://steward/performance/ad_delivery@v1",
+  "model://example/performance/ad_delivery@v1",
   {
     entity: "line_delivery",
     dimensions: ["event_date", "channel", "country_code"],
@@ -96,7 +96,7 @@ assert.equal(metrics.semanticValidationBehaviors.length, 1);
 
 assert.equal(consumePreviewSemanticValidationBehavior(
   metrics,
-  "model://steward/performance/ad_delivery@v1",
+  "model://example/performance/ad_delivery@v1",
   {
     entity: "line_delivery",
     dimensions: ["event_date", "channel", "country_code"],
@@ -135,7 +135,7 @@ assert.equal(metrics.semanticValidationBehaviors.length, 2);
 
 const successResult = await applyPreviewSemanticValidationBehavior(
   metrics,
-  "model://steward/performance/ad_delivery@v1",
+  "model://example/performance/ad_delivery@v1",
   {
     entity: "line_delivery",
     dimensions: ["event_date", "channel", "country_code"],
@@ -156,7 +156,7 @@ assert.equal(metrics.semanticValidationBehaviors.length, 1);
 await assert.rejects(
   applyPreviewSemanticValidationBehavior(
     metrics,
-    "model://steward/performance/ad_delivery@v1",
+    "model://example/performance/ad_delivery@v1",
     {
       entity: "line_delivery",
       dimensions: ["event_date", "channel", "age_group"],

@@ -63,7 +63,7 @@ const FilterDialog = ({
             const value = filterValues[field.id];
             if (value === '' || value === undefined) continue;
             if (Array.isArray(field.options) && !field.options.some(option => String(option.value) === String(value))) continue;
-            appliedFilter[field.id] = normalizeSubmittedFilterValue(field, value, filterMode);
+            appliedFilter[field.id] = normalizeSubmittedFilterValue(field, value, filterMode, {textInput: !Array.isArray(field.options)});
         }
         onApplyFilters({...activeSet, filter: appliedFilter});
         onClose();
@@ -123,7 +123,7 @@ const FilterDialog = ({
                                 <HTMLSelect
                                     id={`forge-filter-${tpl.id}`}
                                     fill
-                                    value={filterValues[tpl.id] || ''}
+                                    value={filterValues[tpl.id] ?? ''}
                                     onChange={(e) => handleInputChange(tpl.id, e.target.value)}
                                 >
                                     <option value="">All</option>
@@ -135,7 +135,7 @@ const FilterDialog = ({
                                 <InputGroup
                                     id={`forge-filter-${tpl.id}`}
                                     placeholder={tpl.operator}
-                                    value={filterValues[tpl.id] || ""}
+                                    value={filterValues[tpl.id] ?? ""}
                                     onChange={(e) => handleInputChange(tpl.id, e.target.value)}
                                 />
                             )}

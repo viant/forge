@@ -41,4 +41,4 @@ jobs:
       - run: npm run test:workspace-theme
       - run: npm run build
       - name: Check contributor entry points
-        run: test -f AGENTS.md && test -f CLAUDE.md && test -f .cursor/rules/design-system.mdc
+        run: test -f AGENTS.md && test -f CLAUDE.md && test -f .cursor/rules/design-system.mdc && node --test scripts/public-boundary.test.mjs

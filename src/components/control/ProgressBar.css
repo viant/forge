@@ -1,0 +1,6 @@
+.forge-progress-inline {display:flex;align-items:center;justify-content:flex-end;gap:var(--forge-progress-inline-gap,10px);min-width:0;color:var(--forge-text,#263244);font-variant-numeric:tabular-nums;}
+.forge-progress-inline__value {min-width:2ch;text-align:right;}
+.forge-progress-inline__meter {appearance:none;border:0;border-radius:2px;overflow:hidden;display:block;flex:none;width:var(--forge-progress-inline-width,36px);height:var(--forge-progress-inline-height,4px);background:var(--forge-progress-track,var(--forge-border-color,#d5deeb));}
+.forge-progress-inline__meter::-webkit-progress-bar {background:var(--forge-progress-track,var(--forge-border-color,#d5deeb));border-radius:2px;}
+.forge-progress-inline__meter::-webkit-progress-value {background:var(--forge-progress-fill,var(--forge-interaction-color,#215db0));border-radius:2px;}
+.forge-progress-inline__meter::-moz-progress-bar {background:var(--forge-progress-fill,var(--forge-interaction-color,#215db0));border-radius:2px;}

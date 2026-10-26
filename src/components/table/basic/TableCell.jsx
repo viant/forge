@@ -140,7 +140,7 @@ const TableCell = ({
     };
 
     let cellContent = null;
-    if(type === "mediaPreview" && normalizeMediaPreview(value).kind !== "imagecard") type="link";
+    if(type === "mediaPreview" && !["imagecard","frame"].includes(normalizeMediaPreview(value).kind)) type="link";
     switch (type) {
         case "mediaPreview":
             cellContent=<MediaPreviewPopover value={value} {...col.preview}/>;
@@ -169,7 +169,7 @@ const TableCell = ({
             break;
         case "progress":
             cellContent = (
-                <ProgressBar value={value} text={displayedText} {...cellProps} row={row}/>
+                <ProgressBar value={value} text={displayedText} {...cellProps} progress={cellProps.progress ?? col.progress} row={row}/>
             );
             break;
         case "checkbox":

@@ -128,6 +128,7 @@ export function normalizeReportTableBlockColumn(column = {}) {
     ...(column.minWidth !== undefined ? {minWidth:column.minWidth} : {}),
     ...(column.flex === true ? {flex:true} : {}),
     ...(column?.runtimeFilterable === true ? { runtimeFilterable: true } : {}),
+    ...(column?.rowIdentity === true ? { rowIdentity: true } : {}),
     ...(link ? { link } : {}),
     ...(cellVisual ? { cellVisual } : {}),
     ...(labelClamp ? { labelClamp } : {}),

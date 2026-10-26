@@ -37,7 +37,7 @@ const runtimeInteraction = {
   datasetScopeParams: {},
   hostIntent: {
     intentKind: "detailTarget",
-    targetRef: "target://steward/performance/market-detail",
+    targetRef: "target://example/performance/market-detail",
     navigationMode: "hostRoute",
     parameters: {
       country: "US",
@@ -73,7 +73,7 @@ assert.deepEqual(buildPreviewRuntimeInteractionSnapshot(runtimeInteraction), {
   datasetScopeParams: {},
   hostIntent: {
     intentKind: "detailTarget",
-    targetRef: "target://steward/performance/market-detail",
+    targetRef: "target://example/performance/market-detail",
     navigationMode: "hostRoute",
     parameters: {
       country: "US",
@@ -103,7 +103,7 @@ const session = {
   },
   reopenedSemanticSummary: {
     kind: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/ad_delivery@v1",
     modelLabel: "Ad Delivery",
     entity: "line_delivery",
     entityLabel: "Line Delivery",
@@ -309,7 +309,7 @@ assert.deepEqual(buildPreviewRuntimeInteractionAdvancedState({
       datasetScopeParams: {},
       hostIntent: {
         intentKind: "detailTarget",
-        targetRef: "target://steward/performance/market-detail",
+        targetRef: "target://example/performance/market-detail",
         navigationMode: "hostRoute",
         parameters: {
           country: "US",

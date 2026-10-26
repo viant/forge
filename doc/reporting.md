@@ -742,6 +742,7 @@ Authoring fields:
 - `title`
 - optional `description`
 - optional `layout`: `stack` or `responsiveGrid`
+- optional `runtime`: `desktopColumns` (1–6), `tabletColumns` (1–3), `mobileColumns` (1–3), and `minColumnWidth` for browser grid sizing
 - `childBlockIds[]`
 
 Runtime behavior:
@@ -749,7 +750,7 @@ Runtime behavior:
 - child blocks render inside the grouped panel once
 - grouped child blocks are suppressed from the top-level document flow
 - omitted `layout` preserves the legacy child-span behavior (which stacks children without authored spans); explicit `stack` forces one full-width child per row
-- `responsiveGrid` renders three columns above 960px, two columns from 641px through 960px, and one column at 640px or below
+- `responsiveGrid` defaults to three columns above 960px, two columns from 641px through 960px, and one column at 640px or below; explicit runtime column counts override those defaults, subject to `minColumnWidth`
 - print/export lowers the grouped children inside the composite panel in order
 - print/export lowers `responsiveGrid` deterministically as three equal columns; it does not depend on a browser viewport
 
@@ -855,6 +856,30 @@ Runtime behavior:
   - delta chips
   - rank chips
   - spark bars
+
+### Printed table row identity
+
+An authored table column may set `rowIdentity: true`. All marked columns lead
+every horizontal continuation band in authored order. Without a print row
+reference, mark the complete composite key needed to identify a row.
+
+For wide composite keys, a table may opt into `runtime.printRowReference: true`.
+Print adds a clearly labeled `Row (print)` ordinal, numbered 1 through N from the
+complete, already filtered and ordered table. It repeats with the marked readable
+anchors in every band and keeps its number across vertical pages. Keep all
+business-key columns in the table, but mark only the readable anchors, such as
+campaign ID and publisher label; the remaining key fields and metrics print once
+in their respective bands. The ordinal connects those bands within this printed
+table only. It is not a persisted business ID and restarts for each table.
+
+The generated column and cells exist only in print layout. Source, ReportFill,
+screen columns, CSV, XLSX, filtering, ordering, and dataset requests are unchanged.
+Unmarked tables retain their first-column anchor, including in row-reference
+mode. With the option absent, all legacy print behavior is unchanged.
+
+Bands are planned once, including when an identity set is wider than the page;
+the existing layout wraps cells without reducing the font or discarding columns.
+Table row density is unchanged.
 
 ### Table Visual Kinds
 
