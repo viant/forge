@@ -25,6 +25,8 @@ const interactiveColumns = [
 assert.deepEqual(tableExportColumns(interactiveColumns).map(column => column.id), ['category']);
 assert.equal(buildTableCsv([{category: 'Data category', action: 'Open', internal: 'omit', hidden: 'omit'}], interactiveColumns), '"Category"\n"Data category"');
 assert.equal(buildTableCsv([{category: '=unsafe()'}], interactiveColumns), '"Category"\n"\'=unsafe()"');
+assert.equal(buildTableCsv([{count: 1019}], [{id: 'count', name: 'Count', format: 'number', exportFormat: 'display'}]), '"Count"\n"1,019"');
+assert.equal(buildTableCsv([{count: 1019}], [{id: 'count', name: 'Count', format: 'number'}]), '"Count"\n"1019"');
 assert.deepEqual(tableExportFormats(['XLSX', 'invalid', 'csv', 'xlsx']), ['xlsx', 'csv']);
 assert.deepEqual(tableExportFormats(['invalid']), ['csv', 'xlsx']);
 assert.deepEqual(tableExportRows({filteredSortedRows: [3, 2, 1], pageRows: [3], scope: 'filtered'}), [3, 2, 1]);

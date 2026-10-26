@@ -10,7 +10,7 @@ import (
 func TestColumnExportPolicyRoundTrip(t *testing.T) {
 	for _, enabled := range []string{"true", "false"} {
 		var column Column
-		if err := yaml.Unmarshal([]byte("id: category\nname: Category\ntype: button\nexportable: "+enabled+"\n"), &column); err != nil {
+		if err := yaml.Unmarshal([]byte("id: category\nname: Category\ntype: button\nexportFormat: display\nexportable: "+enabled+"\n"), &column); err != nil {
 			t.Fatal(err)
 		}
 		if column.Exportable == nil || *column.Exportable != (enabled == "true") {
@@ -26,6 +26,9 @@ func TestColumnExportPolicyRoundTrip(t *testing.T) {
 		}
 		if value, exists := decoded["exportable"]; !exists || value != (enabled == "true") {
 			t.Fatalf("wire export policy missing or changed: %s", raw)
+		}
+		if decoded["exportFormat"] != "display" {
+			t.Fatalf("display export format was lost: %s", raw)
 		}
 	}
 	raw, err := json.Marshal(Column{ID: "action", Type: "button"})
