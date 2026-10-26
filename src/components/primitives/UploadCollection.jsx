@@ -5,6 +5,7 @@ import MutationCommand, {useMutationCommandState} from './MutationCommand.jsx';
 import {encodeUploadFiles} from './uploadCollectionModel.js';
 import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
 import {usePredicateSignals} from './usePredicateSignals.js';
+import {resetMutationCommandState} from './primitiveMutation.js';
 
 export default function UploadCollection({container, context}) {
   const spec = container.uploadCollection || {};
@@ -23,6 +24,7 @@ export default function UploadCollection({container, context}) {
   const blobs = preparedForSelection ? prepared.blobs : [];
   const change = (next, operation) => {
     if (busy || unavailable()) return;
+    resetMutationCommandState(context, spec.upload);
     setFiles(next);
     // File references remain local. Authored handlers receive selection metadata
     // so forms can coordinate surrounding controls without reading file bytes.
