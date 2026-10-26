@@ -16,7 +16,7 @@ const config = applyReportBuilderRuntimeFieldCatalog({
       columns: [
         { name: "advertiserDate", type: "date", role: "dimension" },
         { name: "campaignName", type: "string", role: "dimension" },
-        { name: "totalSpend", type: "number", role: "measure" },
+        { name: "totalSpend", type: "number", role: "measure", format: "currency" },
       ],
       defaultDimensions: ["advertiserDate"],
       defaultMeasures: ["totalSpend"],
@@ -34,7 +34,7 @@ assert.deepEqual(config.dimensions.map(({ id, default: selected }) => [id, !!sel
 ]);
 assert.equal(config.measures[0].format, "currency");
 assert.deepEqual(config.result.orderFields.map((entry) => entry.value), ["advertiserDate", "totalSpend"]);
-assert.deepEqual(config.predicates.map((entry) => entry.id), ["dateRange", "campaignIds"]);
+assert.deepEqual(config.predicates.map((entry) => entry.id), ["dateRange"]);
 assert.deepEqual(config.predicates[0].default, { preset: "last7Days" });
 assert.deepEqual(config.result.viewModes, ["table", "chart"]);
 assert.deepEqual(config.tablePresentation, { collapsible: true, labelClamp: { lines: 2, maxCharacters: 36 } });
@@ -82,7 +82,7 @@ assert.deepEqual(
   parameterizedConfig.measures.map(({ id, default: selected }) => [id, !!selected]),
   [["conversions", true], ["lastTouchConversions", true]],
 );
-assert.deepEqual(parameterizedConfig.predicates.map((entry) => entry.id), ["dateRange", "campaignIds"]);
+assert.deepEqual(parameterizedConfig.predicates.map((entry) => entry.id), ["dateRange"]);
 
 const runtimeState = {
   selectedDimensions: ["advertiserDate"],
@@ -139,16 +139,20 @@ assert.deepEqual(
   },
 );
 
-const campaignConfig = choices => applyReportBuilderRuntimeFieldCatalog({runtimeFieldCatalog:{enabled:true}}, {reportDefinition:{fieldCatalog:{columns:[{name:'campaignId',role:'dimension',type:'integer'}],allowedFilters:['campaignIds'],parameters:[{name:'campaignIds',choices}]}}}).predicates[0];
-assert.equal(campaignConfig(undefined).manualEntry,false);
-assert.deepEqual(campaignConfig(undefined).options,[]);
-assert.deepEqual(campaignConfig([]).options,[]);
-assert.deepEqual(campaignConfig([{value:12,label:'Synthetic display'},{value:12,label:'Duplicate'},{value:0,label:'Invalid'},{value:'15',label:'Untyped'},{value:14,label:'Synthetic video'}]).options,[{value:12,label:'Synthetic display'},{value:14,label:'Synthetic video'}]);
-
-const loweredChoices=lowerReportBuilderPredicates({predicates:[campaignConfig([{value:12,label:'Synthetic display'}])]});
-assert.deepEqual(loweredChoices.staticFilters[0].options,[{value:12,label:'Synthetic display'}]);
-assert.equal(loweredChoices.staticFilters[0].multiple,true);
-const lazyCampaign=applyReportBuilderRuntimeFieldCatalog({runtimeFieldCatalog:{enabled:true},campaignChoicesDataSourceRef:'campaign_choices'}, {reportDefinition:{fieldCatalog:{columns:[{name:'campaignId',role:'dimension',type:'integer'}],allowedFilters:['campaignIds'],parameters:[{name:'campaignIds'}]}}});
-const lazyFilter=lowerReportBuilderPredicates(lazyCampaign).staticFilters[0];
-assert.deepEqual([lazyFilter.optionsDataSourceRef,lazyFilter.optionsFetchMode,lazyFilter.optionValueField,lazyFilter.optionLabelField],['campaign_choices','onFocus','value','label']);
-assert.deepEqual(lazyFilter.options,[]);
+// Runtime catalogs do not invent business-specific predicates.
+const authored = {id:'recordIds', label:'Records', pinned:true, paramPath:'filters.recordIds', multiple:true,
+  options:[{value:'alpha',label:'First'}], optionsDataSourceRef:'record_choices', optionsFetchMode:'onFocus'};
+const authoredConfig = applyReportBuilderRuntimeFieldCatalog({runtimeFieldCatalog:{enabled:true},predicates:[authored]},
+  {fieldCatalog:{columns:[{name:'quantity',role:'measure',type:'number'}],allowedFilters:['recordIds']}});
+assert.deepEqual(authoredConfig.predicates,[authored]);
+assert.notEqual(authoredConfig.predicates[0],authored);
+const loweredChoices=lowerReportBuilderPredicates(authoredConfig).staticFilters[0];
+assert.equal(loweredChoices.optionsDataSourceRef,'record_choices');
+assert.deepEqual(loweredChoices.options,[{value:'alpha',label:'First'}]);
+const noAuthoredFilters = applyReportBuilderRuntimeFieldCatalog({runtimeFieldCatalog:{enabled:true}},
+  {fieldCatalog:{columns:[{name:'quantity',role:'measure',type:'number'}],allowedFilters:['campaignIds'],parameters:[{name:'campaignIds',choices:[{value:7,label:'Example'}]}]}});
+assert.deepEqual(noAuthoredFilters.predicates,[]);
+const explicitFormats=applyReportBuilderRuntimeFieldCatalog({runtimeFieldCatalog:{enabled:true}},
+  {fieldCatalog:{columns:[{name:'quantity',role:'measure',type:'number',format:'currency'},{name:'conversionRate',role:'measure',type:'number'}]}});
+assert.equal(explicitFormats.measures[0].format,'currency');
+assert.equal(explicitFormats.measures[1].format,'compactNumber');

@@ -13,3 +13,5 @@ Before changing UI or its theme contract, read [the canonical usage guide](doc/t
 Reuse the documented shared components and semantic roles. Extend the owning
 shared component with its usage example, states and existing checks when a
 reusable capability is missing. Record remaining legacy scope in the change.
+
+- Render declared producer metadata without application-specific tool names, business-field fallbacks, or domain-driven filtering/formatting rules. Business schemas and validation remain with data producers.
