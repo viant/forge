@@ -262,8 +262,7 @@ editors reuse this frame. Agently's real appearance settings consume it through
 the public export. Legacy table rendering is retained. Read-only table cells
 remain text rather than a disabled edit affordance. Existing render/browser
 checks verify native attributes, selection, disabled behavior, role validation,
-indicator size/inset/padding and table cancellation. This local follow-up has not
-been submitted; it still requires the user's local review.
+indicator size/inset/padding and table cancellation.
 
 
 The installed Lucide registry also exposes bell, gauge and log-out for shared

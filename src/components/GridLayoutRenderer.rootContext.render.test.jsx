@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import React from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+import GridLayoutRenderer from './GridLayoutRenderer.jsx';
+const child={identity:{dataSourceRef:'records'}};
+const root={identity:{windowId:'owned-window'},Context(ref){assert.notEqual(ref,'');if(ref==='records')return child;throw Error('Missing fixture datasource: '+ref);}};
+const render=(context,items,baseDataSourceRef,expected)=>renderToStaticMarkup(React.createElement(GridLayoutRenderer,{context,items,baseDataSourceRef,container:{id:'root',layout:{columns:1,labels:{mode:'none'}}},renderEntry:({entry,context})=>{assert.equal(context,expected);return React.createElement('span',null,entry.id);}}));
+assert.match(render(root,[{id:'unbound-child'}],undefined,root),/unbound-child/);
+assert.match(render(root,[{id:'empty-base'}],'',root),/empty-base/);
+assert.match(render(root,[{id:'inherited'}],'records',child),/inherited/);
+assert.match(render(root,[{id:'explicit',dataSourceRef:'records'}],undefined,child),/explicit/);
+assert.throws(()=>render(root,[{id:'bad',dataSourceRef:'missing'}],undefined,root),/Missing fixture datasource/);
+console.log('PASS: root grid context, inherited/explicit source scopes, and strict missing-source errors');

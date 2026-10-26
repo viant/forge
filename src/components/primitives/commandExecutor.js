@@ -74,6 +74,24 @@ export function resetCommandState(context, command = {}) {
 
 const invocationID = () => globalThis.crypto?.randomUUID?.() || `cmd-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
+async function prepareCommandParameters(context, command, parameters, extras) {
+  const prepare = context?.lookupHandler?.(command.prepare);
+  if (typeof prepare !== 'function') throw new Error(`Command preparation handler is unavailable: ${command.prepare}`);
+  const controller = new AbortController();
+  let timer;
+  try {
+    const prepared = await Promise.race([
+      Promise.resolve().then(() => prepare({context, parameters: parameterSnapshot(parameters), extras, signal: controller.signal})),
+      new Promise((_, reject) => { timer = setTimeout(() => {
+        controller.abort();
+        reject(new Error('Command preparation timed out. The writer was not invoked.'));
+      }, Math.max(1000, Number(command.timeoutMs) || 30000)); }),
+    ]);
+    if (!prepared || typeof prepared !== 'object' || Array.isArray(prepared)) throw new Error('Command preparation must return a parameter map.');
+    return parameterSnapshot(prepared);
+  } finally { clearTimeout(timer); }
+}
+
 function awaitWriter(target, invoke, timeoutMs) {
   return new Promise((resolve) => {
     let settled = false;
@@ -248,7 +266,8 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
       ? {expectedForm: parameterSnapshot(context.signals.form.peek?.() ?? context.signals.form.value)} : null;
     const baseParameters = mutationCommandTargetParameters(resolved, targetRef);
     const preparedParameters = command.payload ? prepareResourcePayload(context, command.payload, extras) : extras;
-    const preparedSnapshot = mergeCommandParameters(baseParameters, preparedParameters);
+    let preparedSnapshot = mergeCommandParameters(baseParameters, preparedParameters);
+    const preparationExtras = command.prepare ? parameterSnapshot(extras) : null;
     const confirmation = resolveCommandConfirmation(command, extras);
     if (confirmation) {
       if (typeof lifecycle.confirm !== 'function') {
@@ -261,6 +280,11 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
         publish(context, key, {phase: 'idle', guarded: false, pending: false, retryAllowed: true, error: null, message: '', writerStatus: 'not_invoked', syncStatus: 'not_started'});
         return {accepted: false, status: 'cancelled'};
       }
+    }
+    if (command.prepare) {
+      if (!authorizationIsCurrent()) return superseded(false);
+      publish(context, key, {phase: 'preparing', guarded: true, pending: false, retryAllowed: false, message: 'Preparing…', writerStatus: 'not_invoked'});
+      preparedSnapshot = await prepareCommandParameters(context, command, preparedSnapshot, preparationExtras);
     }
     if (!authorizationIsCurrent()) return superseded(false);
     target = context?.Context?.(targetRef);

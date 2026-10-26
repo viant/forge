@@ -17,7 +17,7 @@ func TestBundledKpiSparklineRetainsAuthorizedDatasetAndPrint(t *testing.T) {
 	require.NoError(t, err)
 	var envelope registry.ReportEnvelope
 	require.NoError(t, json.Unmarshal(raw, &envelope))
-	envelope.BuilderDefinition = json.RawMessage(`{"kind":"forge.reporting.builder","id":"stewardPerformance","reportBuilder":{"dataSourceRef":"steward-orders","measures":[{"id":"spend","key":"spend","paramPath":"measures.spend","default":true}],"dataSources":[{"id":"daily","dataSourceRef":"steward-orders","dimensions":[{"id":"day","key":"day","paramPath":"dimensions.day"}],"measures":[{"id":"spend","key":"spend","paramPath":"measures.spend"}],"request":{"dimensions":{},"measures":{},"filters":{"from":"2026-10-01","to":"2026-10-04"}}}]}}`)
+	envelope.BuilderDefinition = json.RawMessage(`{"kind":"forge.reporting.builder","id":"sampleBuilder","reportBuilder":{"dataSourceRef":"sampleRows","measures":[{"id":"spend","key":"spend","paramPath":"measures.spend","default":true}],"dataSources":[{"id":"daily","dataSourceRef":"sampleRows","dimensions":[{"id":"day","key":"day","paramPath":"dimensions.day"}],"measures":[{"id":"spend","key":"spend","paramPath":"measures.spend"}],"request":{"dimensions":{},"measures":{},"filters":{"from":"2026-10-01","to":"2026-10-04"}}}]}}`)
 	envelope.ReportDocument = json.RawMessage(`{"version":1,"kind":"reportDocument","title":"Daily trend","blocks":[{"id":"current","kind":"kpiBlock","datasetRef":"primary","valueField":"spend","sparkline":{"datasetRef":"daily","categoryField":"day","valueField":"spend","periodStartPath":"filters.from","periodEndPath":"filters.to"}}]}`)
 	envelope.State = json.RawMessage(`{"selectedMeasures":["spend"]}`)
 	for id, descriptor := range envelope.DataSources {
@@ -25,7 +25,7 @@ func TestBundledKpiSparklineRetainsAuthorizedDatasetAndPrint(t *testing.T) {
 		require.NoError(t, json.Compact(&compact, descriptor))
 		envelope.DataSources[id] = json.RawMessage(compact.Bytes())
 	}
-	envelope.Dependencies = []registry.ReportDependency{{Kind: "builder", ID: envelope.BuilderRef, ContentFingerprint: identity.ContentFingerprint(envelope.BuilderDefinition)}, {Kind: "datasource", ID: "steward-orders", ContentFingerprint: identity.ContentFingerprint(envelope.DataSources["steward-orders"])}, {Kind: "report", ID: "report://example/trend", ContentFingerprint: identity.ContentFingerprint(envelope.ReportDocument)}}
+	envelope.Dependencies = []registry.ReportDependency{{Kind: "builder", ID: envelope.BuilderRef, ContentFingerprint: identity.ContentFingerprint(envelope.BuilderDefinition)}, {Kind: "datasource", ID: "sampleRows", ContentFingerprint: identity.ContentFingerprint(envelope.DataSources["sampleRows"])}, {Kind: "report", ID: "report://example/trend", ContentFingerprint: identity.ContentFingerprint(envelope.ReportDocument)}}
 	raw, err = json.Marshal(envelope)
 	require.NoError(t, err)
 	spec, err := Lower(context.Background(), raw)

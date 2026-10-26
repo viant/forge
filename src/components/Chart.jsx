@@ -627,14 +627,11 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     const isPieChart = responsiveChartType === "pie" || responsiveChartType === "donut";
     const isHorizontalBar = isHorizontalBarType(responsiveChartType);
     const prepared = useMemo(() => {
-        const chartRows = applyChartRowLimit(
-            materializeChartDisplayRows(chart, effectiveCollection || []),
-            chart?.rowLimit,
-        );
+        const chartRows = materializeChartDisplayRows(chart, effectiveCollection || []);
         if (isPieChart) {
             const nameKey = series.nameKey || "name";
             const valueKey = series.valueKey || selectedValueKey || "value";
-            const rows = buildPieChartData(chartRows, nameKey, valueKey, {includeNonPositive:documentAppearance});
+            const rows = applyChartRowLimit(buildPieChartData(chartRows, nameKey, valueKey, {includeNonPositive:documentAppearance}), chart?.rowLimit);
             return {
                 chartData: rows,
                 availableDataKeys: rows.map((row) => row.name),
@@ -643,7 +640,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         }
 
         if (directSeriesChart) {
-            const sorted = aggregateDirectSeriesData(chartRows, xAxis?.dataKey, seriesDefinitions);
+            const sorted = applyChartRowLimit(aggregateDirectSeriesData(chartRows, xAxis?.dataKey, seriesDefinitions), chart?.rowLimit);
             return {
                 chartData: sorted,
                 availableDataKeys: seriesDefinitions.map((entry) => entry.value),
@@ -654,7 +651,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         const {data, keys} = transformData(chartRows, chart, selectedValueKey);
         const selectedValue = (series.values || []).find((val) => val.value === selectedValueKey);
         return {
-            chartData: data,
+            chartData: applyChartRowLimit(data, chart?.rowLimit),
             availableDataKeys: keys,
                 yAxisLabel: selectedValue?.name || selectedValue?.label || leftAxis.label || "",
         };
@@ -732,9 +729,17 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         }
     }, [embedded, documentAppearance, viewSwitchEnabled, viewMode]);
 
+    // Category charts expose aggregated name/value rows, not one column per legend key.
+    const tableXAxis = useMemo(() => isPieChart ? {dataKey: 'name', label: 'Category'} : xAxis, [isPieChart, xAxis]);
+    const tableSeriesDefinitions = useMemo(() => {
+        if (!isPieChart) return seriesDefinitions;
+        const metric = seriesDefinitions.find(entry => entry.value === (series.valueKey || selectedValueKey)) || {};
+        return [{...metric, value: 'value', label: metric.label || metric.name || 'Value'}];
+    }, [isPieChart, seriesDefinitions, series.valueKey, selectedValueKey]);
+
     const allTableColumns = useMemo(
-        () => documentAppearance && isPieChart ? ["name", "value"] : [xAxis?.dataKey, ...stableAvailableDataKeys].filter(Boolean),
-        [xAxis?.dataKey, stableAvailableDataKeys,documentAppearance,isPieChart],
+        () => isPieChart ? ['name', 'value'] : [xAxis?.dataKey, ...stableAvailableDataKeys].filter(Boolean),
+        [isPieChart, xAxis?.dataKey, stableAvailableDataKeys],
     );
     const [visibleColumns, setVisibleColumns] = useState(allTableColumns);
 
@@ -974,7 +979,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         if(!isChartNumericValue(value)) return null;
         const label=`${entry.name || entry.label || entry.value}, ${formatChartXAxisValue(readChartDataValue(props.payload,xAxis.dataKey),resolvedTickFormat,resolvedTickValueMode)}: ${formatValueByFormat(value,entry.format || leftAxis.format)}`;
         const color=resolveCategoryColor(chart.series?.categoryColors,readChartDataValue(props.payload,xAxis.dataKey),resolveConditionalSeriesColor(entry,value,entry.color));
-        return <ChartPoint {...props} firstIndex={normalizedChartData.findIndex(row=>isChartNumericValue(readChartDataValue(row,entry.value)))} label={label} color={color} style={documentStyle} onSelect={interactiveDatumSelection ? ()=>emitSeriesDatumSelection(entry.value,props.payload) : undefined}/>;
+        return <ChartPoint {...props} seriesKey={String(entry.value)} category={String(readChartDataValue(props.payload,xAxis.dataKey) ?? "")} firstIndex={normalizedChartData.findIndex(row=>isChartNumericValue(readChartDataValue(row,entry.value)))} label={label} color={color} style={documentStyle} onSelect={interactiveDatumSelection ? ()=>emitSeriesDatumSelection(entry.value,props.payload) : undefined}/>;
     };
 
     const resolvedChartAnnotations = React.useMemo(() => (
@@ -982,6 +987,31 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     ), [chart, embedded]);
 
     const configuredBarSize = documentAppearance ? (isHorizontalBar ? documentStyle.barSize : documentStyle.columnSize) : typeof chart?.barSize === "number" && Number.isFinite(chart.barSize) && chart.barSize > 0 ? chart.barSize : undefined;
+    const chartPointIdentity = (seriesKey, row) => ({
+        "data-series-id": String(seriesKey),
+        "data-category": String(row?.[xAxis?.dataKey] ?? ""),
+    });
+    const renderSeriesPoint = (entry, visible) => (props = {}) => {
+        const row = props.payload ?? normalizedChartData[props.index];
+        const value = row?.[entry.value] ?? (Array.isArray(props.value) ? props.value.at(-1) : props.value);
+        if (!Number.isFinite(Number(value)) || value === null || value === "") return null;
+        const category = String(row?.[xAxis?.dataKey] ?? "");
+        return <circle
+            key={props.index}
+            cx={props.cx}
+            cy={props.cy}
+            r={visible ? (embedded || interactiveDatumSelection ? 4 : 3) : 6}
+            {...chartPointIdentity(entry.value, row)}
+            role="img"
+            aria-label={`${entry.label || entry.value} at ${category}: ${value}`}
+            strokeWidth={visible ? 1 : 0}
+            stroke={visible ? "var(--forge-chart-surface, #ffffff)" : "none"}
+            fill={visible
+                ? resolveCategoryColor(chart?.series?.categoryColors, row?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color))
+                : "transparent"}
+            {...(!visible ? {pointerEvents: "all"} : {})}
+        />;
+    };
 
     const cartesianSeriesElements = renderableSeriesDefinitions.map((entry, seriesIndex) => {
         const defaultLineDash = renderableSeriesDefinitions.length > 1 && (entry.type === "line" || entry.type === "area")
@@ -1008,11 +1038,11 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         if (entry.type === "bar") {
             return (
                 <Bar key={entry.value} {...commonProps} radius={entry.stackId || chart.stacked ? 0 : resolveChartBarCornerRadii(1, 'vertical')} barSize={documentAppearance ? undefined : configuredBarSize} maxBarSize={documentAppearance ? configuredBarSize : undefined} stackId={entry.stackId || (chart.stacked ? 'total' : undefined)} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
-                    {entry.pointColorMode === "bySign"
-                        ? normalizedChartData.map((row, index) => (
-                            <Cell key={`${entry.value}-cell-${index}`} fill={resolveCategoryColor(chart?.series?.categoryColors, row?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color))} />
-                        ))
-                        : null}
+                    {normalizedChartData.map((row, index) => (
+                        <Cell key={`${entry.value}-cell-${index}`}
+                              {...chartPointIdentity(entry.value, row)}
+                              {...(entry.pointColorMode === "bySign" ? {fill: resolveCategoryColor(chart?.series?.categoryColors, row?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color))} : {})} />
+                    ))}
                     {showSeriesDataLabels ? (
                         <LabelList dataKey={entry.value} position="top" formatter={dataLabelFormatter} fill="var(--forge-chart-text-muted, #5f6b7c)" fontSize={chartTypography.captionSize} fontFamily={chartTypography.captionFamily} fontWeight={chartTypography.captionWeight} letterSpacing={chartTypography.captionLetterSpacing} />
                     ) : null}
@@ -1020,18 +1050,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             );
         }
         if (entry.type === "area") {
-            const dotRenderer = documentAppearance ? props=>documentPoint(props,entry) : embedded || interactiveDatumSelection || entry.pointColorMode === "bySign"
-                ? ((props = {}) => (
-                    <circle
-                        cx={props.cx}
-                        cy={props.cy}
-                        r={embedded || interactiveDatumSelection ? 4 : 3}
-                        strokeWidth={1}
-                        stroke="var(--forge-chart-surface, #ffffff)"
-                        fill={resolveCategoryColor(chart?.series?.categoryColors, props?.payload?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, props?.payload?.[entry.value], entry.color))}
-                    />
-                ))
-                : false;
+            const dotRenderer = documentAppearance ? props=>documentPoint(props,entry) : renderSeriesPoint(entry, embedded || interactiveDatumSelection || entry.pointColorMode === "bySign");
             return (
                 <Area key={entry.value} {...commonProps} type={documentAppearance ? 'linear' : 'monotone'} connectNulls={!documentAppearance} dot={dotRenderer} activeDot={documentAppearance ? {r:documentStyle.pointRadius + 1,strokeWidth:documentStyle.pointStrokeWidth} : embedded || interactiveDatumSelection ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
                     {showSeriesDataLabels ? (
@@ -1040,18 +1059,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 </Area>
             );
         }
-        const lineDotRenderer = documentAppearance ? props=>documentPoint(props,entry) : embedded || interactiveDatumSelection || entry.pointColorMode === "bySign"
-            ? ((props = {}) => (
-                <circle
-                    cx={props.cx}
-                    cy={props.cy}
-                    r={embedded || interactiveDatumSelection ? 4 : 3}
-                    strokeWidth={1}
-                    stroke="var(--forge-chart-surface, #ffffff)"
-                    fill={resolveCategoryColor(chart?.series?.categoryColors, props?.payload?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, props?.payload?.[entry.value], entry.color))}
-                />
-            ))
-            : false;
+        const lineDotRenderer = documentAppearance ? props=>documentPoint(props,entry) : renderSeriesPoint(entry, embedded || interactiveDatumSelection || entry.pointColorMode === "bySign");
         return (
             <Line key={entry.value} {...commonProps} type={documentAppearance ? 'linear' : 'monotone'} connectNulls={!documentAppearance} strokeLinecap="round" strokeLinejoin="round" dot={lineDotRenderer} activeDot={documentAppearance ? {r:documentStyle.pointRadius + 1,strokeWidth:documentStyle.pointStrokeWidth} : embedded || interactiveDatumSelection ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
                 {showSeriesDataLabels ? (
@@ -1207,6 +1215,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                         {normalizedChartData.map((row, index) => (
                             <Cell
                                 key={`cell-${index}`}
+                                {...chartPointIdentity(primarySeries.value, row)}
                                 fill={resolveCategoryColor(chart?.series?.categoryColors, row?.[xAxis?.dataKey], primarySeries.pointColorMode === "bySign"
                                     ? resolveConditionalSeriesColor(primarySeries, row?.[primarySeries.value], activePalette[index % activePalette.length])
                                     : activePalette[index % activePalette.length])}
@@ -1226,11 +1235,11 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                             stackId={responsiveChartType === "funnel_bar" ? undefined : entry.stackId}
                             {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}
                         >
-                            {entry.pointColorMode === "bySign"
-                                ? normalizedChartData.map((row, index) => (
-                                    <Cell key={`${entry.value}-cell-${index}`} fill={resolveCategoryColor(chart?.series?.categoryColors, row?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color))} />
-                                ))
-                                : null}
+                            {normalizedChartData.map((row, index) => (
+                                <Cell key={`${entry.value}-cell-${index}`}
+                                      {...chartPointIdentity(entry.value, row)}
+                                      {...(entry.pointColorMode === "bySign" ? {fill: resolveCategoryColor(chart?.series?.categoryColors, row?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color))} : {})} />
+                            ))}
                             {shouldRenderSeriesDataLabels(entry, responsiveChartType, normalizedChartData.length, embedded) ? (
                                 <LabelList dataKey={entry.value} content={(props) => <HorizontalBarValueLabel {...props} formatter={buildDataLabelFormatter(entry.format || leftAxis.format)} />} />
                             ) : null}
@@ -1293,7 +1302,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     const computedWidthByCol = React.useMemo(() => {
         const out = {};
         allTableColumns.forEach((key) => {
-            const meta = chartTableColumnMeta(key, xAxis, seriesDefinitions);
+            const meta = chartTableColumnMeta(key, tableXAxis, tableSeriesDefinitions);
             const headerLen = String(meta.label || key || "").length;
             let maxLen = headerLen;
             chartData.forEach((row) => {
@@ -1305,7 +1314,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             out[key] = w;
         });
         return out;
-    }, [allTableColumns, chartData, resolvedTickFormat, resolvedTickValueMode, seriesDefinitions, xAxis]);
+    }, [allTableColumns, chartData, resolvedTickFormat, resolvedTickValueMode, tableSeriesDefinitions, tableXAxis]);
 
     const tableColumnWidths = visibleColumns.map((key) => {
         const persisted = Number(columnWidths[key]);
@@ -1322,7 +1331,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
 
     const downloadCsv = () => {
         const cols = visibleColumns.length ? visibleColumns : allTableColumns;
-        const lines = [cols.map((key) => escapeCsvCell(chartTableColumnMeta(key, xAxis, seriesDefinitions).label)).join(",")];
+        const lines = [cols.map((key) => escapeCsvCell(chartTableColumnMeta(key, tableXAxis, tableSeriesDefinitions).label)).join(",")];
         chartData.forEach((row) => {
             lines.push(cols.map((c) => escapeCsvCell(readChartDataValue(row, c))).join(","));
         });
@@ -1338,7 +1347,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         URL.revokeObjectURL(url);
     };
 
-    const tableColumnMeta = visibleColumns.map((columnKey) => chartTableColumnMeta(columnKey, xAxis, seriesDefinitions));
+    const tableColumnMeta = visibleColumns.map((columnKey) => chartTableColumnMeta(columnKey, tableXAxis, tableSeriesDefinitions));
 
     const chartExportId = container?.id && String(container?.kind || '').startsWith('dashboard.')
         ? container.id
@@ -1789,7 +1798,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             <Dialog isOpen={!embedded && showColumnDialog} onClose={() => setShowColumnDialog(false)} title="Column customization">
                 <div style={{padding: 12, display: "flex", flexDirection: "column", gap: 10}}>
                     {allTableColumns.map((key) => {
-                        const meta = chartTableColumnMeta(key, xAxis, seriesDefinitions);
+                        const meta = chartTableColumnMeta(key, tableXAxis, tableSeriesDefinitions);
                         return (
                         <div key={key} style={{display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12}}>
                             <label className="bp4-control bp4-checkbox" style={{marginBottom: 0}}>

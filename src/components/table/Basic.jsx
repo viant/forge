@@ -4,6 +4,7 @@ import {isRowSelectionDisabled} from './rowSelection.js';
 import {useSetting} from '../../core/context/Setting.jsx';
 import {applyTableColumnPreferences,sanitizeTablePreferences} from '../../core/preferences/tablePreferences.js';
 import {useTablePreferences} from './useTablePreferences.js';
+import {useTableViews} from './useTableViews.js';
 import {tablePrimaryToolbarItems} from './tableToolbarLayout.js';
 import { getViewSignal } from '../../core/store/signals.js';
 import React, { useState, useEffect, useRef, useMemo } from "react";
@@ -164,6 +165,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
     const [popupContent, setPopupContent] = useState("");
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const savedViews = useTableViews({adapter: services.tableViews, config: container.table?.savedViews, active: isSettingsOpen});
     const [horizontalOverflow, setHorizontalOverflow] = useState({left: false, right: false, cueTop: null});
     const { collection: collectionData, loading, error } = useDataSourceState(context);
     const collection = collectionData; // keep old variable name for compatibility
@@ -753,6 +755,8 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
                 isOpen={isSettingsOpen}
                 onClose={handleCloseSettings}
                 columns={configuredColumns}
+                baseColumns={initConfiguredColumns(resolvedColumns)}
+                savedViews={container.table?.savedViews ? savedViews : undefined}
                 density={effectiveDensity === 'compact' ? 'compact' : 'normal'}
                 onSaveColumnSettings={handleSaveColumnSettings}
                 onResetColumns={handleResetSettings}  // Pass the reset handler

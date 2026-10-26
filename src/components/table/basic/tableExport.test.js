@@ -15,6 +15,18 @@ const rows = [{name: 'Alpha, "A"', spend: 12.5, hidden: 'secret', approved: true
 
 assert.deepEqual(tableExportColumns(columns).map((column) => column.id), ['name', 'spend', 'approved']);
 assert.equal(buildTableCsv(rows, columns), '"Name","Spend","Approved"\n"Alpha, ""A""","12.5","true"');
+const interactiveColumns = [
+    {id: 'category', name: 'Category', type: 'button', exportable: true},
+    {id: 'action', name: 'Open', type: 'button'},
+    {id: 'internal', name: 'Internal', exportable: false},
+    {id: 'hidden', name: 'Hidden', visible: false, exportable: true},
+    {id: '__select__', multiSelect: true, exportable: true},
+];
+assert.deepEqual(tableExportColumns(interactiveColumns).map(column => column.id), ['category']);
+assert.equal(buildTableCsv([{category: 'Data category', action: 'Open', internal: 'omit', hidden: 'omit'}], interactiveColumns), '"Category"\n"Data category"');
+assert.equal(buildTableCsv([{category: '=unsafe()'}], interactiveColumns), '"Category"\n"\'=unsafe()"');
+assert.equal(buildTableCsv([{count: 1019}], [{id: 'count', name: 'Count', format: 'number', exportFormat: 'display'}]), '"Count"\n"1,019"');
+assert.equal(buildTableCsv([{count: 1019}], [{id: 'count', name: 'Count', format: 'number'}]), '"Count"\n"1019"');
 assert.deepEqual(tableExportFormats(['XLSX', 'invalid', 'csv', 'xlsx']), ['xlsx', 'csv']);
 assert.deepEqual(tableExportFormats(['invalid']), ['csv', 'xlsx']);
 assert.deepEqual(tableExportRows({filteredSortedRows: [3, 2, 1], pageRows: [3], scope: 'filtered'}), [3, 2, 1]);

@@ -1896,10 +1896,43 @@ function resolveReportPrintTableCellText(column = {}, cell = {}) {
   ));
 }
 
+// Layout measures and renders each cell repeatedly. This resolver lives only
+// for one print build, so neither cell text nor values survive another request.
+function createReportPrintTableCellTextResolver() {
+  const byCell = new WeakMap();
+  const byFormat = new Map();
+  return (column = {}, cell = {}) => {
+    const format = normalizeString(column?.format);
+    const value = cell?.displayValue !== undefined && cell?.displayValue !== null && cell?.displayValue !== ""
+      ? cell.displayValue
+      : cell?.value;
+    // Primitive values can share their final text within this print. Preserve
+    // negative zero, which Map otherwise equates with zero but Intl distinguishes.
+    if ((value === null || typeof value !== "object") && typeof value !== "function") {
+      let values = byFormat.get(format);
+      if (!values) {
+        values = new Map();
+        byFormat.set(format, values);
+      }
+      const key = Object.is(value, -0) ? negativeZeroPrintValue : value;
+      if (!values.has(key)) values.set(key, resolveReportPrintTableCellText(column, cell));
+      return values.get(key);
+    }
+    let formats = byCell.get(cell);
+    if (!formats) {
+      formats = new Map();
+      byCell.set(cell, formats);
+    }
+    if (!formats.has(format)) formats.set(format, resolveReportPrintTableCellText(column, cell));
+    return formats.get(format);
+  };
+}
+const negativeZeroPrintValue = Symbol("negative zero");
+
 // Size compact evidence from its displayed content rather than a fixed column count.
 // Cap long labels so descriptive columns can wrap without forcing every row into
 // another horizontal pane. Dates and numeric identifiers keep their full width.
-function minimumReportPrintColumnWidths(state = {}, block = {}, columns = []) {
+function minimumReportPrintColumnWidths(state = {}, block = {}, columns = [], resolveText = resolveReportPrintTableCellText) {
   const rows = Array.isArray(block?.content?.resolvedRows) ? block.content.resolvedRows : [];
   const padding = REPORT_PRINT_THEME.tableCellPaddingX * 2;
   const cap = Math.min(128, state.contentWidth / 2);
@@ -1909,13 +1942,13 @@ function minimumReportPrintColumnWidths(state = {}, block = {}, columns = []) {
     let characters = Math.max(6, ...labelWords.map((word) => Math.min(12, word.length)));
     rows.slice(0, 50).forEach((row) => {
       const cell = (row?.cells || []).find((entry) => normalizeString(entry?.key) === key);
-      characters = Math.max(characters, resolveReportPrintTableCellText(column, cell).length);
+      characters = Math.max(characters, resolveText(column, cell).length);
     });
     return Math.min(cap, Math.max(44, characters * 9 * 0.56 + padding));
   });
 }
 
-function buildReportPrintTableColumnLayout(state = {}, block = {}, columns = []) {
+function buildReportPrintTableColumnLayout(state = {}, block = {}, columns = [], resolveText = resolveReportPrintTableCellText) {
   const rows = Array.isArray(block?.content?.resolvedRows) ? block.content.resolvedRows : [];
   const weights = columns.map((column) => {
     const key = normalizeString(column?.key);
@@ -1928,12 +1961,12 @@ function buildReportPrintTableColumnLayout(state = {}, block = {}, columns = [])
       : normalizeString(column?.label || key).length;
     rows.slice(0, 50).forEach((row) => {
       const cell = (Array.isArray(row?.cells) ? row.cells : []).find((entry) => normalizeString(entry?.key) === key);
-      longest = Math.max(longest, resolveReportPrintTableCellText(column, cell).length);
+      longest = Math.max(longest, resolveText(column, cell).length);
     });
     return Math.max(7, Math.min(numeric ? 18 : 30, longest));
   });
   const totalWeight = Math.max(1, weights.reduce((sum, weight) => sum + weight, 0));
-  const minimumWidths = minimumReportPrintColumnWidths(state, block, columns);
+  const minimumWidths = minimumReportPrintColumnWidths(state, block, columns, resolveText);
   const minimumTotal = minimumWidths.reduce((sum, width) => sum + width, 0);
   const scale = Math.min(1, state.contentWidth / Math.max(1, minimumTotal));
   const flexibleWidth = Math.max(0, state.contentWidth - minimumTotal);
@@ -1956,12 +1989,12 @@ function buildReportPrintTableColumnLayout(state = {}, block = {}, columns = [])
   return { widths, offsets, headerHeight };
 }
 
-function resolveReportPrintTableRowHeight(columns = [], row = {}, widths = []) {
+function resolveReportPrintTableRowHeight(columns = [], row = {}, widths = [], resolveText = resolveReportPrintTableCellText) {
   const cells = new Map((Array.isArray(row?.cells) ? row.cells : []).map((cell) => [normalizeString(cell?.key), cell]));
   return Math.max(
     REPORT_PRINT_THEME.tableRowHeight,
     ...columns.map((column, index) => {
-      const text = resolveReportPrintTableCellText(column, cells.get(normalizeString(column?.key)));
+      const text = resolveText(column, cells.get(normalizeString(column?.key)));
       const lines = wrapReportPrintText(
         text,
         Math.max(1, (widths[index] || 1) - (REPORT_PRINT_THEME.tableCellPaddingX * 2)),
@@ -2009,7 +2042,7 @@ function renderReportPrintTableHeader(state = {}, block = {}, columns = [], rowY
   });
 }
 
-function renderReportPrintTableRow(state = {}, block = {}, columns = [], row = {}, rowPosition = 0, rowSequence = 0, columnLayout = {}, rowHeight = REPORT_PRINT_THEME.tableRowHeight, dataBarRanges = new Map()) {
+function renderReportPrintTableRow(state = {}, block = {}, columns = [], row = {}, rowPosition = 0, rowSequence = 0, columnLayout = {}, rowHeight = REPORT_PRINT_THEME.tableRowHeight, dataBarRanges = new Map(), resolveText = resolveReportPrintTableCellText) {
   const widths = Array.isArray(columnLayout?.widths) ? columnLayout.widths : [];
   const offsets = Array.isArray(columnLayout?.offsets) ? columnLayout.offsets : [];
   const rowKey = `row_${normalizePositiveInteger(row?.rowIndex + 1) || rowSequence}`;
@@ -2208,7 +2241,7 @@ function renderReportPrintTableRow(state = {}, block = {}, columns = [], row = {
       },
       rowKey,
       columnKey,
-      text: resolveReportPrintTableCellText(column, cell),
+      text: resolveText(column, cell),
       ...(normalizeString(column?.format) ? { format: normalizeString(column.format) } : {}),
       align: resolveReportPrintTableColumnAlign(column, cell),
       fontSize: 9,
@@ -2217,41 +2250,96 @@ function renderReportPrintTableRow(state = {}, block = {}, columns = [], row = {
   });
 }
 
+// This reference belongs only to this printed table. Resolve it from the final
+// fill order once, before horizontal bands are planned; never change the fill.
+function withReportPrintRowReference(block, columns, rows) {
+  const keys = new Set();
+  const reserve = (entry) => [entry?.key, entry?.sourceKey, entry?.displayKey]
+    .map((value) => normalizeString(value)).filter(Boolean).forEach((key) => keys.add(key));
+  columns.forEach(reserve);
+  rows.forEach((row) => (row?.cells || []).forEach(reserve));
+  const prefix = "__forge_print_row_reference";
+  let key = prefix;
+  let suffix = 1;
+  while (keys.has(key)) key = `${prefix}_${suffix++}`;
+  const hasIdentity = columns.some((column) => column?.rowIdentity === true);
+  const sourceColumns = hasIdentity ? columns : columns.map((column, index) => (
+    index === 0 ? { ...column, rowIdentity: true } : column
+  ));
+  return {
+    ...block,
+    content: {
+      ...block.content,
+      columns: [{ key, label: "Row (print)", format: "id", align: "right", rowIdentity: true }, ...sourceColumns],
+      resolvedRows: rows.map((row, index) => ({
+        ...row,
+        rowIndex: index,
+        cells: [{ key, sourceKey: key, displayKey: key, value: index + 1, displayValue: index + 1 }, ...(row?.cells || [])],
+      })),
+    },
+  };
+}
+
+// Plan each payload column exactly once. Explicit identity columns lead every
+// band; unmarked legacy tables retain their original first-column anchor.
+// A band always admits one payload column, even when its anchors exceed the
+// width budget. The existing width allocator wraps those cells at the same font.
+function partitionReportPrintTableColumns(columns, minimumWidths, contentWidth) {
+  let identityIndexes = columns.flatMap((column, index) => column?.rowIdentity === true ? [index] : []);
+  if (identityIndexes.length === 0) identityIndexes = [0];
+  const identities = new Set(identityIndexes);
+  const payloadIndexes = columns.map((_, index) => index).filter((index) => !identities.has(index));
+  if (payloadIndexes.length === 0) return [columns];
+  const anchorWidth = identityIndexes.reduce((sum, index) => sum + minimumWidths[index], 0);
+  const groups = [];
+  let payload = [];
+  let width = anchorWidth;
+  const appendGroup = () => groups.push([...identityIndexes, ...payload].map((index) => columns[index]));
+  for (const index of payloadIndexes) {
+    if (payload.length > 0 && width + minimumWidths[index] > contentWidth) {
+      appendGroup();
+      payload = [];
+      width = anchorWidth;
+    }
+    payload.push(index);
+    width += minimumWidths[index];
+  }
+  appendGroup();
+  return groups;
+}
+
 function renderReportPrintTableBlock(state = {}, block = {}, {
   layoutNote = "",
+  columnBand = false,
 } = {}) {
   const description = normalizeString(block?.description);
   if (description && !layoutNote.includes(description)) layoutNote = [description, layoutNote].filter(Boolean).join("\n");
   const authoredColumns = Array.isArray(block?.content?.columns) ? block.content.columns : [];
-  const columns = block.selection && !authoredColumns.some(column => column.key === block.selection.field)
+  let columns = block.selection && !authoredColumns.some(column => column.key === block.selection.field)
     ? [...authoredColumns,{key:block.selection.field,label:'Selected'}] : authoredColumns;
   let rows = Array.isArray(block?.content?.resolvedRows) ? block.content.resolvedRows : [];
-  const minimumWidths = minimumReportPrintColumnWidths(state, block, columns);
-  if (rows.length > 0 && columns.length > 2 && minimumWidths.reduce((sum, width) => sum + width, 0) > state.contentWidth) {
-    const groups = [];
-    let group = [columns[0]];
-    let width = minimumWidths[0];
-    for (let index = 1; index < columns.length; index += 1) {
-      if (group.length > 1 && width + minimumWidths[index] > state.contentWidth) {
-        groups.push(group);
-        group = [columns[0]];
-        width = minimumWidths[0];
-      }
-      group.push(columns[index]);
-      width += minimumWidths[index];
+  if (!columnBand && block?.runtime?.printRowReference === true && columns.length > 0 && rows.length > 0) {
+    block = withReportPrintRowReference(block, columns, rows);
+    columns = block.content.columns;
+    rows = block.content.resolvedRows;
+  }
+  const resolveText = state.resolveTableCellText;
+  const minimumWidths = minimumReportPrintColumnWidths(state, block, columns, resolveText);
+  if (!columnBand && rows.length > 0 && columns.length > 2 && minimumWidths.reduce((sum, width) => sum + width, 0) > state.contentWidth) {
+    const groups = partitionReportPrintTableColumns(columns, minimumWidths, state.contentWidth);
+    if (groups.length > 1) {
+      groups.forEach((groupColumns, index) => {
+        const title = `${resolveReportPrintBlockTitle(block)} (${index + 1}/${groups.length})`;
+        renderReportPrintTableBlock(state, {
+          ...block,
+          id: `${block.id}__columns_${index + 1}`,
+          selection: undefined,
+          title,
+          content: { ...block.content, title, columns: groupColumns },
+        }, { layoutNote, columnBand: true });
+      });
+      return;
     }
-    groups.push(group);
-    groups.forEach((groupColumns, index) => {
-      const title = `${resolveReportPrintBlockTitle(block)} (${index + 1}/${groups.length})`;
-      renderReportPrintTableBlock(state, {
-        ...block,
-        id: `${block.id}__columns_${index + 1}`,
-        selection: undefined,
-        title,
-        content: { ...block.content, title, columns: groupColumns },
-      }, { layoutNote });
-    });
-    return;
   }
   const pathwayDetails = [];
   rows = rows.map((row, rowIndex) => ({
@@ -2259,7 +2347,7 @@ function renderReportPrintTableBlock(state = {}, block = {}, {
     cells: (row.cells || []).map((cell) => {
       const column = columns.find((entry) => entry.key === cell.key);
       if (!column) return cell;
-      const text = resolveReportPrintTableCellText(column, cell);
+      const text = resolveText(column, cell);
       if (!text.includes(" -> ") || text.length <= 110) return cell;
       const key = `Pathway ${rowIndex + 1}`;
       pathwayDetails.push(`${key}: ${text}`);
@@ -2286,22 +2374,22 @@ function renderReportPrintTableBlock(state = {}, block = {}, {
     finishReportPrintBlock(state);
     return;
   }
-  const columnLayout = buildReportPrintTableColumnLayout(state, block, columns);
+  const columnLayout = buildReportPrintTableColumnLayout(state, block, columns, resolveText);
   const dataBarRanges = buildReportPrintDataBarRanges(block);
-  const firstRowHeight = resolveReportPrintTableRowHeight(columns, rows[0], columnLayout.widths);
+  const firstRowHeight = resolveReportPrintTableRowHeight(columns, rows[0], columnLayout.widths, resolveText);
   const headingHeight = reportPrintTitleHeight(state, block, layoutNote);
   ensureReportPrintSpace(state, headingHeight + columnLayout.headerHeight + firstRowHeight);
   renderReportPrintSectionTitle(state, block, { layoutNote });
   let rowIndex = 0;
   while (rowIndex < rows.length) {
-    const nextRowHeight = resolveReportPrintTableRowHeight(columns, rows[rowIndex], columnLayout.widths);
+    const nextRowHeight = resolveReportPrintTableRowHeight(columns, rows[rowIndex], columnLayout.widths, resolveText);
     ensureReportPrintSpace(state, columnLayout.headerHeight + nextRowHeight);
     const headerY = state.cursorY;
     renderReportPrintTableHeader(state, block, columns, headerY, columnLayout);
     state.cursorY += columnLayout.headerHeight;
     while (rowIndex < rows.length) {
       ensureReportPrintPage(state);
-      const rowHeight = resolveReportPrintTableRowHeight(columns, rows[rowIndex], columnLayout.widths);
+      const rowHeight = resolveReportPrintTableRowHeight(columns, rows[rowIndex], columnLayout.widths, resolveText);
       if (state.cursorY + rowHeight > state.contentBottom && state.cursorY > state.contentTop) {
         startNextReportPrintPage(state);
         renderReportPrintSectionTitle(state, { ...block, title: `${resolveReportPrintBlockTitle(block)} (continued)`, content: { ...block.content, title: `${resolveReportPrintBlockTitle(block)} (continued)` } }, { continuation: true });
@@ -2317,6 +2405,7 @@ function renderReportPrintTableBlock(state = {}, block = {}, {
         columnLayout,
         rowHeight,
         dataBarRanges,
+        resolveText,
       );
       state.cursorY += rowHeight;
       rowIndex += 1;
@@ -2350,6 +2439,7 @@ function renderReportPrintChartBlock(state = {}, block = {}, {
   const chartPages = buildReportPrintChartPages({
     chartModel: block?.content?.chartModel || block?.chartModel || {},
     resolvedChart: block?.content?.resolvedChart || null,
+    rowLimit: block?.content?.rowLimit ?? block?.rowLimit ?? 0,
     width: state.contentWidth,
     maxHeight: state.contentBottom - state.contentTop - titleHeight,
     firstMaxHeight: state.contentBottom - state.cursorY - titleHeight >= 180
@@ -2590,6 +2680,7 @@ export function buildReportPrintFromReportFill({
   if (!state) {
     return null;
   }
+  state.resolveTableCellText = createReportPrintTableCellTextResolver();
   const orderedBlocks = buildOrderedReportFillBlocks(reportSpec, reportFill, state.visibleBlockIds);
   let pendingRow = [];
   let pendingSpan = 0;

@@ -362,6 +362,32 @@
     z-index: 1;
 }
 
+.forge-dashboard-table__sort-button {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-weight: inherit;
+    letter-spacing: inherit;
+    text-align: inherit;
+    cursor: pointer;
+}
+
+.forge-dashboard-table__sort-button:focus-visible {
+    outline: 2px solid var(--forge-dashboard-table-link, #2367d1);
+    outline-offset: 3px;
+}
+
+.forge-dashboard-table__header-label {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
 .forge-dashboard-table__actions-head {
     letter-spacing: 0.04em;
 }

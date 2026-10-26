@@ -1,11 +1,15 @@
 import React, {useEffect, useState} from 'react';
 import {normalizeMediaPreview} from './mediaPreview.js';
+import FramePreview from './FramePreview.jsx';
 import './mediaPreview.css';
 
-export default function MediaPreview({value, style, className = ''}) {
+export default function MediaPreview({value, style, className = '', onClose}) {
     const preview = normalizeMediaPreview(value);
     const [failed, setFailed] = useState(false);
     useEffect(() => setFailed(false), [preview.kind, preview.url, preview.identity]);
+
+    if (preview.kind === 'frame') return <FramePreview key={JSON.stringify(preview)}
+        preview={preview} className={className} onClose={onClose}/>;
 
     if (preview.kind === 'imagecard') {
         const content=<>{preview.url && !failed ? <img src={preview.url} alt={preview.alt} onError={()=>setFailed(true)} className="forge-media-preview__card-image"/> : null}<div className="forge-media-preview__card-caption">{preview.caption}</div></>;

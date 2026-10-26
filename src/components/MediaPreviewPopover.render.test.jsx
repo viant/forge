@@ -20,6 +20,9 @@ it('uses the same card popover in desktop and responsive rows, retaining non-car
  try{
   await act(async()=>root.render(<table><tbody><tr><TableCell context={context} cell={{value,displayedText:'Preview'}} cellSelection={{row:{id:1},col}}/></tr></tbody></table>));expect(host.querySelector('.forge-media-preview-trigger')).not.toBeNull();
   await act(async()=>root.render(<ResponsiveCardRows rows={[{id:1,content:value}]} columns={[col]} context={context}/>));expect(host.querySelector('.forge-media-preview-trigger')).not.toBeNull();
+  const frame={kind:'frame',url:'https://example.test/document',identity:'frame'};
+  await act(async()=>root.render(<table><tbody><tr><TableCell context={context} cell={{value:frame,displayedText:'Preview'}} cellSelection={{row:{id:2},col}}/></tr></tbody></table>));expect(host.querySelector('.forge-media-preview-trigger')).not.toBeNull();
+  await act(async()=>root.render(<ResponsiveCardRows rows={[{id:2,content:frame}]} columns={[col]} context={context}/>));expect(host.querySelector('.forge-media-preview-trigger')).not.toBeNull();
   await act(async()=>root.render(<table><tbody><tr><TableCell context={context} cell={{value:'http://example.test/banner.png',displayedText:'Preview'}} cellSelection={{row:{id:4},col}}/></tr></tbody></table>));await act(async()=>host.querySelector('button').click());expect(opened.windowKey).toBe('record');expect(opened.parameters.RecordId).toEqual([4]);
  }finally{await act(async()=>root.unmount());host.remove();}
 });
@@ -31,5 +34,31 @@ it('retains ordinary image error recovery, audio/video controls and executable-U
   await act(async()=>root.render(<MediaPreview value={{kind:'image',url:'https://example.test/new.png'}}/>));expect(host.querySelector('img').src).toContain('new.png');
   for(const kind of['audio','video']){await act(async()=>root.render(<MediaPreview value={{kind,url:'https://example.test/media'}}/>));expect(host.querySelector(kind).controls).toBe(true);}
   await act(async()=>root.render(<MediaPreview value={{kind:'image',url:'javascript:alert(1)'}}/>));expect(host.querySelector('img')).toBeNull();expect(host.querySelector('a')).toBeNull();
+ }finally{await act(async()=>root.unmount());host.remove();}
+});
+
+it('renders frame source choices, resets record identity, and dismisses from the toolbar',async()=>{
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ const value={kind:'frame',identity:'42',url:'https://example.test/render?id=42',title:'Document preview',width:350,height:280,sources:[{label:'HTTPS',url:'https://example.test/render?id=42'},{label:'HTTP',url:'http://example.test/render?id=42'},{label:'SOURCE',url:'view-source:http://example.test/render?id=42'}]};
+ try{
+  await act(async()=>root.render(<MediaPreviewPopover value={value}/>));
+  await act(async()=>{host.querySelector('button').click();await settle();});
+  let dialog=document.querySelector('[role=dialog]');
+  expect(dialog.querySelector('iframe').getAttribute('src')).toBe(value.url);
+  expect(dialog.querySelector('iframe').title).toBe('Document preview');
+  expect(dialog.querySelector('iframe').getAttribute('width')).toBe('350');
+  const select=dialog.querySelector('select');
+  await act(async()=>{select.value=value.sources[2].url;select.dispatchEvent(new Event('change',{bubbles:true}));});
+  expect(dialog.querySelector('iframe').getAttribute('src')).toBe(value.sources[2].url);
+  expect(dialog.querySelector('a').getAttribute('href')).toBe(value.sources[2].url);
+  expect(dialog.querySelector('[style]')).toBeNull();
+  await act(async()=>dialog.querySelector('button').click());await act(settle);
+  expect(document.querySelector('[role=dialog]')).toBeNull();
+  await act(async()=>root.render(<MediaPreview value={value}/>));
+  await act(async()=>{host.querySelector('select').value=value.sources[1].url;host.querySelector('select').dispatchEvent(new Event('change',{bubbles:true}));});
+  await act(async()=>root.render(<MediaPreview value={{...value,identity:'43',url:'https://example.test/render?id=43'}}/>));
+  expect(host.querySelector('iframe').getAttribute('src')).toBe('https://example.test/render?id=43');
+  await act(async()=>root.render(<MediaPreview value={{kind:'frame',url:'javascript:alert(1)'}}/>));
+  expect(host.querySelector('iframe')).toBeNull();expect(host.querySelector('a')).toBeNull();
  }finally{await act(async()=>root.unmount());host.remove();}
 });

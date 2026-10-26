@@ -15,7 +15,8 @@ export default function ReportResourceRuntime({container, context}) {
     const canSelectMetrics = parameters.reportCapabilities?.chartMetricSelection === true;
     const scoped = container?.dataSourceRef && context?.Context ? context.Context(container.dataSourceRef) : context;
     const services = scoped?.handlers || context?.handlers || {};
-    const [result, setResult] = useState(null);
+    const [runResult, setRunResult] = useState(null);
+    const result = runResult?.result || null;
     const [error, setError] = useState("");
     const [progress, setProgress] = useState("");
     const generation = useRef(0);
@@ -35,7 +36,7 @@ export default function ReportResourceRuntime({container, context}) {
     const run = useCallback(async () => {
         const current = ++generation.current;
         if (!canSelectMetrics) setMetricState(null);
-        setResult(null); setError(""); setProgress("Running the selected report revision.");
+        setRunResult(null); setError(""); setProgress("Running the selected report revision.");
         try {
             if (!canRun || typeof runReport !== "function") throw new Error("Report execution is unavailable.");
             // StrictMode may replay the opening effect. Share only a pending request
@@ -43,33 +44,43 @@ export default function ReportResourceRuntime({container, context}) {
             // settles must execute again.
             let pending = pendingRun.current;
             if (!pending || pending.identity !== identity || pending.runReport !== runReport) {
-                const request = buildReportResourceRunRequest(pin, runParameters);
-                pending = {identity, runReport};
+                const request = {...buildReportResourceRunRequest(pin, runParameters), fillOnly:true};
+                pending = {identity, runReport, request};
                 pending.promise = Promise.resolve().then(() => runReport(request))
-                    .then(value => validateReportResourceRunResult(value, pin, request.chartMetricSelections))
+                    .then(value => validateReportResourceRunResult(value, request.resolvedResource, request.chartMetricSelections, {fillOnly:true}))
                     .finally(() => {
                         if (pendingRun.current === pending) pendingRun.current = null;
                     });
                 pendingRun.current = pending;
             }
             const value = await pending.promise;
-            if (current === generation.current) setResult(value);
+            if (current === generation.current) setRunResult({result:value, request:pending.request, version:current});
         } catch (failure) {if (current === generation.current) setError(failure?.message || "The report could not be run.");}
         finally {if (current === generation.current) setProgress("");}
     }, [identity, canRun, runReport, canSelectMetrics]);
     useEffect(() => {
         ++generation.current;
-        setResult(null); setError(""); setProgress("");
+        setRunResult(null); setError(""); setProgress("");
         if (executeOnOpen || canSelectMetrics && Object.keys(metricSelections).length > 0) void run();
         // The host contract has no abort signal. Invalidate UI ownership so a
         // late result cannot replace a newer selection or update a closed view.
         return () => {++generation.current;};
     }, [identity, executeOnOpen, run]);
     const unexportedMetricSelection = !canSelectMetrics && Object.keys(metricSelections).length > 0;
-    const output = useReportOutput({scopeKey:identity,disabled:!canExport||!result||!!progress||unexportedMetricSelection,
+    // A manual rerun can keep the same parameters. Its output still belongs to
+    // a new execution, so a pending print/export from the older run must expire.
+    const outputScopeKey = JSON.stringify([identity, runResult?.version]);
+    const output = useReportOutput({scopeKey:outputScopeKey,disabled:!canExport||!result||!!progress||unexportedMetricSelection,
         onExport:({format,tableBlockId,isCurrent})=>exportSelectedReport({pin,parameters:runParameters,format,tableBlockId,services:services.reportExport,isCurrent}),
-        onPrint:()=>result.reportPrint});
-    const controls = reportResourceControls({canRun, canExport, result, progress:progress||output.busy});
+        onPrint:async()=>{
+            // Full print materialization is an explicit, fresh authorized run.
+            // Reuse the completed screen run's captured pin, scope and metrics.
+            const captured = runResult.request;
+            const request = buildReportResourceRunRequest(captured.resolvedResource, {runOverride:captured.parameters, chartMetricSelections:captured.chartMetricSelections});
+            const printed = validateReportResourceRunResult(await runReport(request), captured.resolvedResource, request.chartMetricSelections);
+            return printed.reportPrint;
+        }});
+    const controls = reportResourceControls({canRun, canExport, result, progress});
     const tables=parameters.reportCapabilities?.tableBlockSelection===true?result?.reportSpec?.blocks?.filter(block=>block.kind==='tableBlock'):undefined;
     return <section style={{padding:16}}>
         <h2>{result?.reportSpec?.title || parameters.reportTitle || "Selected report"}</h2>

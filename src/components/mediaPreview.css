@@ -45,3 +45,63 @@
     border-radius: 0;
 }
 .forge-media-preview-popover .bp6-popover-content { border-radius: 0; }
+.forge-frame-preview { max-width: 100%; }
+.forge-frame-preview__body {
+    display: flex;
+    justify-content: center;
+    padding: var(--forge-frame-preview-body-padding, 12px);
+    box-sizing: border-box;
+}
+.forge-frame-preview__frame {
+    display: block;
+    border: 0;
+    max-width: min(100%, 80vw);
+    max-height: calc(80vh - var(--forge-frame-preview-toolbar-height, 120px));
+}
+.forge-frame-preview__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: var(--forge-frame-preview-control-gap, 8px);
+    padding: var(--forge-frame-preview-toolbar-padding, 0 12px);
+    min-height: var(--forge-frame-preview-toolbar-min-height, 48px);
+    box-sizing: border-box;
+    border-top: 1px solid var(--forge-frame-preview-control-border, var(--forge-control-border, #c6cdd1));
+    background: var(--forge-frame-preview-toolbar-bg, #fff);
+}
+.forge-frame-preview__button,
+.forge-frame-preview__source {
+    font: inherit;
+    line-height: 1.5;
+    border: 1px solid var(--forge-frame-preview-control-border, var(--forge-control-border, #c6cdd1));
+    border-radius: var(--forge-control-radius, 4px);
+    background: var(--forge-frame-preview-control-bg, var(--forge-control-bg, #fff));
+    color: var(--forge-frame-preview-secondary-text, var(--forge-control-text, #182430));
+    min-height: var(--forge-frame-preview-control-height, 30px);
+    box-sizing: border-box;
+}
+.forge-frame-preview__button {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    padding: var(--forge-frame-preview-button-padding, 5px 16px);
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+}
+.forge-frame-preview__source {
+    padding: var(--forge-frame-preview-source-padding, 4px 8px);
+    min-width: var(--forge-frame-preview-source-min-width, 80px);
+}
+.forge-frame-preview__button--primary {
+    min-width: var(--forge-frame-preview-primary-min-width, 88px);
+    color: var(--forge-frame-preview-primary-text, #fff);
+    background: var(--forge-frame-preview-primary-bg, var(--forge-link-color, #137cbd));
+    border-color: var(--forge-frame-preview-primary-bg, var(--forge-link-color, #137cbd));
+}
+.forge-frame-preview__button:focus-visible,
+.forge-frame-preview__source:focus-visible {
+    outline: 2px solid var(--forge-focus-color, #2563eb);
+    outline-offset: 2px;
+}

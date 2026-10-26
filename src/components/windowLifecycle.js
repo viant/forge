@@ -18,6 +18,7 @@ export function runWindowLifecycleHandlers({
   log = null,
   windowId = '',
   windowKey = '',
+  preserveWindowFormFields = null,
 } = {}) {
   const windowOnArr = collectWindowLifecycleEntries(metadata);
   const evts = windowOnArr.filter((entry) => entry?.event === eventName);
@@ -25,7 +26,14 @@ export function runWindowLifecycleHandlers({
     try {
       const { handler: handlerId, args = [], parameters = [] } = ev;
       if (handlerId === 'dataSource.setWindowFormData') {
-        const resolvedParameters = resolveParameters(parameters, {
+        // Preserve values supplied by the caller, restored form, or preset
+        // normalization. Other authored constants and dynamic bindings keep
+        // their existing onInit behavior.
+        const effectiveParameters = eventName === 'onInit' && preserveWindowFormFields
+          ? parameters.filter(parameter => parameter?.in !== 'const' || !preserveWindowFormFields.has(parameter?.name))
+          : parameters;
+        if (parameters.length > 0 && effectiveParameters.length === 0) return;
+        const resolvedParameters = resolveParameters(effectiveParameters, {
           identity: { dataSourceRef: defaultDataSourceRef },
           signals: { windowForm: windowFormSignal },
           dataSources: metadata?.dataSource || {},
@@ -43,7 +51,7 @@ export function runWindowLifecycleHandlers({
             windowId,
             windowKey,
             handlerId,
-            parameters,
+            parameters: effectiveParameters,
             resolvedParameters,
             before: windowFormSignal?.peek?.() || {},
           });

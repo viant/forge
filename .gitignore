@@ -16,3 +16,6 @@ thtest_local.go
 dist-window-editor/
 public/window-editor/canonical.wasm
 public/window-editor/wasm_exec.js
+
+# Compiled Go test executables.
+*.test

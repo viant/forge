@@ -1162,7 +1162,7 @@ func normalizeColumns(value any) []map[string]any {
 	allowed := map[string]bool{
 		"key": true, "sourceKey": true, "displayKey": true, "label": true,
 		"kind": true, "format": true, "align": true, "cellVisual": true,
-		"runtimeFilterable": true,
+		"runtimeFilterable": true, "rowIdentity": true,
 	}
 	for _, item := range raw {
 		if column, ok := item.(map[string]any); ok {

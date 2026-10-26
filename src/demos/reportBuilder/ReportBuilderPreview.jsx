@@ -75,7 +75,7 @@ import { mergeReportBuilderReopenedConfig } from '../../components/dashboard/rep
 import { applyPreviewExportBehavior } from './previewExportBehaviors.js';
 
 const DEMO_SEMANTIC_MODEL = {
-  modelRef: 'model://steward/performance/ad_delivery@v1',
+  modelRef: 'model://example/performance/ad_delivery@v1',
   version: 1,
   label: 'Ad Delivery',
   description: 'Governed reporting model for the report builder preview.',
@@ -92,7 +92,7 @@ const DEMO_SEMANTIC_MODEL = {
           format: 'date',
           governance: {
             status: 'approved',
-            ownerRef: 'team://steward/performance',
+            ownerRef: 'team://example/performance',
           },
         },
         {
@@ -103,7 +103,7 @@ const DEMO_SEMANTIC_MODEL = {
           governance: {
             status: 'approved',
             certification: 'reviewed',
-            ownerRef: 'team://steward/performance',
+            ownerRef: 'team://example/performance',
           },
         },
         {
@@ -113,7 +113,7 @@ const DEMO_SEMANTIC_MODEL = {
           dataType: 'string',
           governance: {
             status: 'draft',
-            ownerRef: 'team://steward/performance',
+            ownerRef: 'team://example/performance',
           },
         },
         {
@@ -123,7 +123,7 @@ const DEMO_SEMANTIC_MODEL = {
           dataType: 'string',
           governance: {
             status: 'deprecated',
-            ownerRef: 'team://steward/performance',
+            ownerRef: 'team://example/performance',
           },
         },
         {
@@ -134,7 +134,7 @@ const DEMO_SEMANTIC_MODEL = {
           governance: {
             status: 'approved',
             certification: 'reviewed',
-            ownerRef: 'team://steward/performance',
+            ownerRef: 'team://example/performance',
           },
         },
         {
@@ -144,7 +144,7 @@ const DEMO_SEMANTIC_MODEL = {
           dataType: 'string',
           governance: {
             status: 'approved',
-            ownerRef: 'team://steward/performance',
+            ownerRef: 'team://example/performance',
           },
         },
         {
@@ -154,7 +154,7 @@ const DEMO_SEMANTIC_MODEL = {
           dataType: 'string',
           governance: {
             status: 'approved',
-            ownerRef: 'team://steward/performance',
+            ownerRef: 'team://example/performance',
           },
         },
         {
@@ -164,7 +164,7 @@ const DEMO_SEMANTIC_MODEL = {
           dataType: 'string',
           governance: {
             status: 'approved',
-            ownerRef: 'team://steward/performance',
+            ownerRef: 'team://example/performance',
           },
         },
       ],
@@ -179,7 +179,7 @@ const DEMO_SEMANTIC_MODEL = {
           governance: {
             status: 'approved',
             certification: 'certified',
-            ownerRef: 'team://steward/performance',
+            ownerRef: 'team://example/performance',
           },
         },
         {
@@ -192,7 +192,7 @@ const DEMO_SEMANTIC_MODEL = {
           governance: {
             status: 'approved',
             certification: 'reviewed',
-            ownerRef: 'team://steward/performance',
+            ownerRef: 'team://example/performance',
           },
         },
       ],
@@ -837,26 +837,26 @@ const container = {
           {
             fieldRef: 'eventDate',
             actions: [
-              { id: 'detail_date', label: 'Show date details', kind: 'detail', targetRef: 'target://steward/performance/date-detail' },
+              { id: 'detail_date', label: 'Show date details', kind: 'detail', targetRef: 'target://example/performance/date-detail' },
             ],
           },
           {
             fieldRef: 'channelV2',
             actions: [
               { id: 'drill_market', label: 'Drill to Market', kind: 'drill', nextFieldRef: 'country' },
-              { id: 'detail_channel', label: 'Show channel details', kind: 'detail', targetRef: 'target://steward/performance/channel-detail' },
+              { id: 'detail_channel', label: 'Show channel details', kind: 'detail', targetRef: 'target://example/performance/channel-detail' },
             ],
           },
           {
             fieldRef: 'country',
             actions: [
-              { id: 'detail_market', label: 'Show market details', kind: 'detail', targetRef: 'target://steward/performance/market-detail' },
+              { id: 'detail_market', label: 'Show market details', kind: 'detail', targetRef: 'target://example/performance/market-detail' },
             ],
           },
         ],
         detailTargets: [
           {
-            targetRef: 'target://steward/performance/channel-detail',
+            targetRef: 'target://example/performance/channel-detail',
             navigationMode: 'hostRoute',
             parameters: {
               channel: '$value',
@@ -864,14 +864,14 @@ const container = {
             },
           },
           {
-            targetRef: 'target://steward/performance/date-detail',
+            targetRef: 'target://example/performance/date-detail',
             navigationMode: 'hostRoute',
             parameters: {
               eventDate: '$value',
             },
           },
           {
-            targetRef: 'target://steward/performance/market-detail',
+            targetRef: 'target://example/performance/market-detail',
             navigationMode: 'hostRoute',
             parameters: {
               country: '$value',

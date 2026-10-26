@@ -126,6 +126,35 @@ func TestReportExecutionSelectsOnlyDeclaredDatasets(t *testing.T) {
 	}
 }
 
+func TestReportExecutionSelectsOneCompiledTableBeforeProducerFetch(t *testing.T) {
+	var allowed atomic.Bool
+	allowed.Store(true)
+	var calls atomic.Int32
+	service, request := parallelReportFixture(t, 4, &allowed, func(context.Context) error {
+		calls.Add(1)
+		return nil
+	})
+	selected := "supplyTable"
+	request.TableBlockID = &selected
+	result, err := service.ExecuteResource(context.Background(), request)
+	if err != nil || result == nil || len(result.Datasets) != 1 || result.Datasets["forecast_last_7_days"] == nil || calls.Load() != 1 || len(result.ReportFill) == 0 {
+		t.Fatalf("selected table fetched unrelated datasets: result=%v err=%v calls=%d", result != nil, err, calls.Load())
+	}
+	for _, id := range []string{"missing", "summaryAvails", ""} {
+		before := calls.Load()
+		request.TableBlockID = &id
+		if result, err := service.ExecuteResource(context.Background(), request); !errors.Is(err, identity.ErrResourceDenied) || result != nil || calls.Load() != before {
+			t.Fatalf("unknown, non-table or ambiguous table reached producer: id=%q err=%v calls=%d", id, err, calls.Load())
+		}
+	}
+	request.TableBlockID = &selected
+	request.DatasetIDs = []string{"forecast_last_7_days"}
+	before := calls.Load()
+	if result, err := service.ExecuteResource(context.Background(), request); !errors.Is(err, identity.ErrResourceDenied) || result != nil || calls.Load() != before {
+		t.Fatalf("table selector combined with caller dataset override: err=%v calls=%d", err, calls.Load())
+	}
+}
+
 func TestParallelResourceDatasetFailureCancelsSibling(t *testing.T) {
 	var allowed atomic.Bool
 	allowed.Store(true)

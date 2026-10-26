@@ -473,6 +473,7 @@ export function buildStaticDatasetReportBuilderConfig(baseConfig = {}, dataset =
       key: normalizeString(column?.key),
       label: normalizeString(column?.label || column?.key),
       ...(normalizeString(column?.format) ? { format: normalizeString(column.format) } : {}),
+      ...(column?.rowIdentity === true ? { rowIdentity: true } : {}),
     }))
     .filter((entry) => entry.id && entry.key && entry.label);
   const measures = inheritRuntimeFieldCatalog ? cloneValue(baseConfig?.measures || []) : columnOptions
@@ -482,6 +483,7 @@ export function buildStaticDatasetReportBuilderConfig(baseConfig = {}, dataset =
       key: normalizeString(column?.key),
       label: normalizeString(column?.label || column?.key),
       ...(normalizeString(column?.format) ? { format: normalizeString(column.format) } : {}),
+      ...(column?.rowIdentity === true ? { rowIdentity: true } : {}),
     }))
     .filter((entry) => entry.id && entry.key && entry.label);
   return {
@@ -682,6 +684,7 @@ function buildPrimaryDatasetFieldContract(entry = {}) {
   const definitionRef = normalizeString(entry?.definitionRef);
   return {
     ...(paramPath ? { paramPath } : {}),
+    ...(entry?.rowIdentity === true ? { rowIdentity: true } : {}),
     ...(entry?.default === true ? { default: true } : {}),
     ...(entry?.chartAxis === true ? { chartAxis: true } : {}),
     ...(entry?.required === true ? { required: true } : {}),
@@ -779,6 +782,13 @@ function buildReportBuilderReportDocumentDatasets(container = {}, config = {}, s
   const primaryComputedMeasures = Array.isArray(effectiveConfig?.computedMeasures) ? cloneValue(effectiveConfig.computedMeasures) : [];
   const primaryTableCalculations = Array.isArray(effectiveConfig?.tableCalculations) ? cloneValue(effectiveConfig.tableCalculations) : [];
   const dataSourceRef = resolveDocumentDataSourceRef(container, config);
+  // The primary logical dataset may declare its transport result shape with
+  // the other published datasets. Match both identities: another dataset on
+  // the same endpoint is not the primary result contract.
+  const primarySource = normalizeReportBuilderPublishedDataSources(config)
+    .find(dataset => dataset.id === "primary" && dataset.dataSourceRef === dataSourceRef);
+  const primaryResultContract = isPlainObject(config?.resultContract)
+    ? config.resultContract : primarySource?.resultContract;
   const dimensions = (Array.isArray(effectiveConfig?.dimensions) ? effectiveConfig.dimensions : [])
     .map((entry) => {
       const id = normalizeString(entry?.id || entry?.key);
@@ -791,12 +801,15 @@ function buildReportBuilderReportDocumentDatasets(container = {}, config = {}, s
         key,
         label: normalizeString(entry?.label || key) || key,
         kind: "dimension",
+        ...(entry?.rowIdentity === true ? { rowIdentity: true } : {}),
         ...(normalizeString(entry?.sourceKey || entry?.key || entry?.id) ? { sourceKey: normalizeString(entry?.sourceKey || entry?.key || entry?.id) } : {}),
         ...(normalizeString(entry?.displayKey) ? { displayKey: normalizeString(entry.displayKey) } : {}),
         ...(entry?.displayValueMap && typeof entry.displayValueMap === "object" && !Array.isArray(entry.displayValueMap)
           ? { displayValueMap: cloneValue(entry.displayValueMap) }
           : {}),
         ...(normalizeString(entry?.format) ? { format: normalizeString(entry.format) } : {}),
+        ...(normalizeString(entry?.tickFormat) ? { tickFormat: normalizeString(entry.tickFormat) } : {}),
+        ...(["civil", "instant"].includes(normalizeString(entry?.valueMode)) ? { valueMode: normalizeString(entry.valueMode) } : {}),
         ...(normalizeString(entry?.rawId) ? { rawId: normalizeString(entry.rawId) } : {}),
         ...(normalizeString(entry?.description) ? { description: normalizeString(entry.description) } : {}),
         ...(normalizeString(entry?.category) ? { category: normalizeString(entry.category) } : {}),
@@ -826,6 +839,7 @@ function buildReportBuilderReportDocumentDatasets(container = {}, config = {}, s
         key,
         label: normalizeString(entry?.label || key) || key,
         kind: "measure",
+        ...(entry?.rowIdentity === true ? { rowIdentity: true } : {}),
         ...(normalizeString(entry?.format) ? { format: normalizeString(entry.format) } : {}),
         ...(normalizeString(entry?.sourceKey || entry?.key || entry?.id) ? { sourceKey: normalizeString(entry?.sourceKey || entry?.key || entry?.id) } : {}),
         ...(normalizeString(entry?.rawId) ? { rawId: normalizeString(entry.rawId) } : {}),
@@ -857,6 +871,7 @@ function buildReportBuilderReportDocumentDatasets(container = {}, config = {}, s
         key,
         label: normalizeString(entry?.label || key) || key,
         kind: "measure",
+        ...(entry?.rowIdentity === true ? { rowIdentity: true } : {}),
         ...(normalizeString(entry?.format) ? { format: normalizeString(entry.format) } : {}),
       };
     }),
@@ -870,7 +885,7 @@ function buildReportBuilderReportDocumentDatasets(container = {}, config = {}, s
       kindLabel: "primary",
       ...(isPlainObject(config?.scope) ? { scope: cloneValue(config.scope) } : {}),
       ...(isPlainObject(config?.source) ? { source: cloneValue(config.source) } : {}),
-      ...(isPlainObject(config?.resultContract) ? { resultContract: cloneValue(config.resultContract) } : {}),
+      ...(isPlainObject(primaryResultContract) ? { resultContract: cloneValue(primaryResultContract) } : {}),
       ...(isPlainObject(config?.capabilities) ? { capabilities: cloneValue(config.capabilities) } : {}),
       request: cloneValue(buildReportBuilderRequest(config, state)),
       ...(primaryDimensions.length > 0 ? { dimensions: primaryDimensions } : {}),
@@ -883,10 +898,13 @@ function buildReportBuilderReportDocumentDatasets(container = {}, config = {}, s
           key: entry.key,
           label: entry.label,
           kind: "dimension",
+          ...(entry?.rowIdentity === true ? { rowIdentity: true } : {}),
           ...(entry?.sourceKey ? { sourceKey: entry.sourceKey } : {}),
           ...(entry?.displayKey ? { displayKey: entry.displayKey } : {}),
           ...(entry?.displayValueMap ? { displayValueMap: cloneValue(entry.displayValueMap) } : {}),
           ...(entry?.format ? { format: entry.format } : {}),
+          ...(entry?.tickFormat ? { tickFormat: entry.tickFormat } : {}),
+          ...(entry?.valueMode ? { valueMode: entry.valueMode } : {}),
           ...(entry?.rawId ? { rawId: entry.rawId } : {}),
           ...(entry?.description ? { description: entry.description } : {}),
           ...(entry?.category ? { category: entry.category } : {}),
@@ -902,6 +920,7 @@ function buildReportBuilderReportDocumentDatasets(container = {}, config = {}, s
           key: entry.key,
           label: entry.label,
           kind: "measure",
+          ...(entry?.rowIdentity === true ? { rowIdentity: true } : {}),
           ...(entry?.sourceKey ? { sourceKey: entry.sourceKey } : {}),
           ...(entry?.format ? { format: entry.format } : {}),
           ...(entry?.rawId ? { rawId: entry.rawId } : {}),
@@ -945,6 +964,8 @@ function buildReportBuilderReportDocumentDatasets(container = {}, config = {}, s
           label: entry.label,
           kind: "dimension",
           ...(entry?.format ? { format: entry.format } : {}),
+          ...(entry?.tickFormat ? { tickFormat: entry.tickFormat } : {}),
+          ...(entry?.valueMode ? { valueMode: entry.valueMode } : {}),
           ...(entry?.rawId ? { rawId: entry.rawId } : {}),
           ...(entry?.description ? { description: entry.description } : {}),
           ...(entry?.category ? { category: entry.category } : {}),
@@ -1244,6 +1265,8 @@ export function applyPrimaryDatasetFallbackConfig(document = null, baseConfig = 
           ? { displayValueMap: cloneValue(entry.displayValueMap) }
           : {}),
         ...(normalizeString(entry?.format) ? { format: normalizeString(entry.format) } : {}),
+        ...(normalizeString(entry?.tickFormat) ? { tickFormat: normalizeString(entry.tickFormat) } : {}),
+        ...(["civil", "instant"].includes(normalizeString(entry?.valueMode)) ? { valueMode: normalizeString(entry.valueMode) } : {}),
         ...buildPrimaryDatasetFieldContract(entry),
       };
     }).filter(Boolean);
@@ -1688,6 +1711,7 @@ export function buildReportDocumentSectionBlock(block = {}) {
     id: normalizeString(block?.id || "sectionBlock"),
     kind: "sectionBlock",
     title: normalizeString(block?.title || "Section") || "Section",
+    ...(normalizeString(block?.datasetRef) ? { datasetRef: normalizeString(block.datasetRef) } : {}),
     ...(normalizeString(block?.subtitle) ? { subtitle: normalizeString(block.subtitle) } : {}),
     ...(normalizeString(block?.description) ? { description: normalizeString(block.description) } : {}),
     navigationLabel,
@@ -1741,6 +1765,7 @@ export function buildReportDocumentCompositeBlock(block = {}) {
     id: normalizeString(block?.id || "compositeBlock"),
     kind: "compositeBlock",
     title: normalizeString(block?.title || "Grouped Panel") || "Grouped Panel",
+    ...(normalizeString(block?.datasetRef) ? { datasetRef: normalizeString(block.datasetRef) } : {}),
     ...(normalizeString(block?.description) ? { description: normalizeString(block.description) } : {}),
     ...(["stack", "responsiveGrid"].includes(layout) ? { layout } : {}),
     ...(block?.runtime && typeof block.runtime === "object" && !Array.isArray(block.runtime) ? { runtime: cloneValue(block.runtime) } : {}),
@@ -2016,7 +2041,10 @@ export function buildReportDocumentChartBlock(block = {}) {
 }
 
 export function buildReportDocumentTableBlock(block = {}) {
-  return normalizeReportDocumentTableBlock(block);
+  const normalized = normalizeReportDocumentTableBlock(block);
+  return block?.runtime?.printRowReference === true
+    ? withReportBlockRuntime(normalized, block)
+    : normalized;
 }
 
 export function buildReportDocumentGeoMapBlock(block = {}) {
@@ -2061,6 +2089,7 @@ export function normalizeReportBlockRuntime(runtime = null, block = {}) {
     ? cloneValue(source.actions)
     : (Array.isArray(block?.actions) ? cloneValue(block.actions) : []);
   const normalized = {
+    ...(source?.printRowReference === true ? { printRowReference: true } : {}),
     ...(visibleWhen ? { visibleWhen } : {}),
     ...(filterBindings && Object.keys(filterBindings).length > 0 ? { filterBindings } : {}),
     ...(selectionBindings && Object.keys(selectionBindings).length > 0 ? { selectionBindings } : {}),
@@ -2461,6 +2490,7 @@ export function filterExclusiveReportRuntimeBlocks(documentBlocks = [], runtimeB
 export function lowerReportDocumentToReportSpec(document = {}, {
   includePrimaryBlocks = true,
   runtimeDatasetScopeParams = null,
+  onChartValidation = null,
 } = {}) {
   const blocks = Array.isArray(document?.blocks) ? document.blocks : [];
   const exclusiveSectionOwnership = buildExclusiveReportSectionOwnership(blocks);
@@ -2501,6 +2531,7 @@ export function lowerReportDocumentToReportSpec(document = {}, {
     refinements: normalizeReportRefinements(document?.refinements),
     semanticSummary: document?.semanticSummary || null,
     includePrimaryBlocks,
+    onChartValidation,
   });
   const primaryRequestContext = {
     dataSourceRef: normalizeString(baseSpec?.source?.dataSourceRef || loweredContainer?.dataSourceRef),
@@ -2595,6 +2626,7 @@ export function lowerReportDocumentToReportSpec(document = {}, {
           datasetRef: normalizedBlock?.datasetRef,
           title: normalizedBlock?.title,
           rowLimit: normalizedBlock?.rowLimit,
+          onChartValidation,
         }), normalizedBlock);
       }
       if (normalizeString(normalizedBlock?.kind) === "tableBlock") {

@@ -1,4 +1,5 @@
 import {resolveReportRuntimeChartRowLimit} from '../chartAppearance.js';
+import {buildRuntimeTableRows} from "../../reporting/reportRuntimeTableRows.js";
 import ReportDatasetPager from "./ReportDatasetPager.jsx";
 import {normalizeReportViewerSettings, resolveReportChartTableSwitch} from "../../reporting/reportViewerSettings.js";
 import {DocumentPresentationContext} from '../documentPresentation.js';
@@ -185,26 +186,6 @@ export function shouldApplyTableDefaultCollapsed(previousDefaultCollapsed, nextD
   return collapsible === true && nextDefaultCollapsed === true && previousDefaultCollapsed !== true;
 }
 
-function buildRuntimeTableRows(block = {}, dataset = {}) {
-  const resolvedRows = Array.isArray(block?.content?.resolvedRows) ? block.content.resolvedRows : [];
-  const originalRows = Array.isArray(dataset?.rows) ? dataset.rows : [];
-  if (resolvedRows.length === 0) {
-    return originalRows;
-  }
-  return resolvedRows.map((resolvedRow, rowIndex) => {
-    const cells = Array.isArray(resolvedRow?.cells) ? resolvedRow.cells : [];
-    return cells.reduce((acc, cell) => {
-      const sourceKey = normalizeString(cell?.sourceKey || cell?.key);
-      const displayKey = normalizeString(cell?.displayKey || cell?.key);
-      const next = sourceKey
-        ? setSelector(acc, sourceKey, cloneValue(cell?.value))
-        : acc;
-      return displayKey && displayKey !== sourceKey
-        ? setSelector(next, displayKey, cloneValue(cell?.displayValue))
-        : next;
-    }, cloneValue(originalRows[rowIndex]) || {});
-  });
-}
 
 function RuntimePanel({ title = "", subtitle = "", children, className = "", style = {}, headerAction = null }) {
   const documentPresentation = React.useContext(DocumentPresentationContext);
@@ -279,10 +260,10 @@ export function resolveReportRuntimeCompositeColumns(block = {}, viewportWidth =
   }
   const normalizedWidth = Number(viewportWidth) || 0;
   const runtime = block?.content?.runtime || block?.runtime || {};
-  const requestedColumns = (name, fallback) => {
+  const requestedColumns = (name, fallback, maximum = 3) => {
     const requested = Number(runtime?.[name]);
     return Number.isFinite(requested)
-      ? Math.max(1, Math.min(3, Math.floor(requested)))
+      ? Math.max(1, Math.min(maximum, Math.floor(requested)))
       : fallback;
   };
   const constrainForMinimumWidth = (columns) => {
@@ -298,7 +279,7 @@ export function resolveReportRuntimeCompositeColumns(block = {}, viewportWidth =
   if (normalizedWidth > 0 && normalizedWidth <= 960) {
     return constrainForMinimumWidth(requestedColumns("tabletColumns", 2));
   }
-  return constrainForMinimumWidth(requestedColumns("desktopColumns", 3));
+  return constrainForMinimumWidth(requestedColumns("desktopColumns", 3, 6));
 }
 
 function formatKpiValue(value, format = "", locale = "en-US") {
@@ -2254,7 +2235,7 @@ function resolveRuntimeCompositeConfig(blocks = []) {
   return { composites, ...resolveReportRuntimeCompositeOwnership(blocks) };
 }
 
-function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, block = {}, diagnostics = [], dataset = {}, reportSpec = {}, providerActionsByField = new Map(), runtimeHandlers = null, locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false, onRuntimeSelection = null, publicMode = false }) {
+function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, onDatasetExpand = null, block = {}, diagnostics = [], dataset = {}, reportSpec = {}, providerActionsByField = new Map(), runtimeHandlers = null, locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false, onRuntimeSelection = null, publicMode = false, displayMode, onDisplayModeChange = null, initialPresentationState = null, onTablePresentationChange = null }) {
   const documentPresentation = React.useContext(DocumentPresentationContext);
   const authoredBlock = (Array.isArray(reportSpec?.blocks) ? reportSpec.blocks : [])
     .find((candidate) => normalizeString(candidate?.id) === normalizeString(block?.id)) || {};
@@ -2272,19 +2253,29 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, bl
   const collapsible = block?.content?.collapsible === true || block?.collapsible === true;
   const authoredDefaultCollapsed = block?.content?.defaultCollapsed ?? block?.defaultCollapsed;
   const defaultCollapsed = collapsible && authoredDefaultCollapsed !== false;
-  const [collapsed, setCollapsed] = useState(() => collapsible && defaultCollapsed);
-  const [paginating, setPaginating] = useState(false);
+  const [localCollapsed, setLocalCollapsed] = useState(() => collapsible && defaultCollapsed);
+  const [localPaginating, setLocalPaginating] = useState(false);
+  const controlled = displayMode !== undefined;
+  const collapsed = controlled ? displayMode === "preview" || (displayMode === "default" && defaultCollapsed) : localCollapsed;
+  const paginating = controlled ? displayMode === "paginate" : localPaginating;
+  const chooseDisplayMode = (mode) => {
+    if (controlled) onDisplayModeChange?.(block.id, mode);
+    else {
+      setLocalCollapsed(mode === "preview");
+      setLocalPaginating(mode === "paginate");
+    }
+  };
   const previousDefaultCollapsedRef = useRef(defaultCollapsed);
   useEffect(() => {
     if (shouldApplyTableDefaultCollapsed(previousDefaultCollapsedRef.current, defaultCollapsed, collapsible)) {
-      setCollapsed(true);
+      setLocalCollapsed(true);
     }
     previousDefaultCollapsedRef.current = defaultCollapsed;
   }, [collapsible, defaultCollapsed]);
   const [tablePresentation, setTablePresentation] = useState(() => ({
     rowCount: Number(block?.content?.rowCount ?? dataset?.provenance?.rowCount ?? 0) || 0,
-    filter: "",
-    sort: null,
+    filter: initialPresentationState?.filter || "",
+    sort: initialPresentationState?.sort || null,
   }));
   const handleTablePresentationChange = useCallback((next = {}) => {
     setTablePresentation((current) => {
@@ -2301,6 +2292,12 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, bl
       return { rowCount: nextRowCount, filter: nextFilter, sort: nextSort };
     });
   }, []);
+  useEffect(() => {
+    onTablePresentationChange?.(block.id, {
+      filter: tablePresentation.filter,
+      sort: tablePresentation.sort ? {key: tablePresentation.sort.key, direction: tablePresentation.sort.direction} : null,
+    });
+  }, [block.id, tablePresentation.filter, tablePresentation.sort, onTablePresentationChange]);
   if (invalidDiagnostic) {
     return (
       <RuntimePanel
@@ -2374,7 +2371,11 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, bl
           aria-label={`${collapsed || localPaging ? "Expand" : "Collapse"} ${normalizeString(block?.title || "Table")}`}
           aria-expanded={!collapsed && !localPaging}
           aria-controls={`${normalizeString(block?.id || "tableBlock")}__table_content`}
-          onClick={() => { setPaginating(false); setCollapsed(collapsed || localPaging ? false : true); }}
+          onClick={() => {
+            const expanding = collapsed || localPaging;
+            if (expanding && !locallyComplete && !page.loading && dataset?.id) onDatasetExpand?.({ datasetId: dataset.id });
+            chooseDisplayMode(expanding ? "expanded" : "preview");
+          }}
           style={{ border: "1px solid var(--forge-report-control-border, #d4dee8)", background: "var(--forge-report-control-surface, #fff)", borderRadius: 8, padding: "5px 9px", cursor: "pointer", color: "var(--forge-report-text-secondary, #30404d)", display: "inline-flex", alignItems: "center", gap: 6, fontSize: "var(--forge-report-type-small-size, 12px)", lineHeight: "var(--forge-report-type-small-line-height, normal)" }}
         >
           <Icon icon={collapsed || localPaging ? "chevron-down" : "chevron-up"} size={14} aria-hidden="true" />
@@ -2383,7 +2384,7 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, bl
         {canPaginate ? <button type="button" className="forge-report-runtime-table-toggle"
           aria-label={`Paginate ${normalizeString(block?.title || "Table")}`}
           aria-pressed={localPaging}
-          onClick={() => { setPaginating(!localPaging); setCollapsed(localPaging); }}
+          onClick={() => chooseDisplayMode(localPaging ? "preview" : "paginate")}
           style={{ border: "1px solid var(--forge-report-control-border, #d4dee8)", background: "var(--forge-report-control-surface, #fff)", borderRadius: 8, padding: "5px 9px", cursor: "pointer", color: "var(--forge-report-text-secondary, #30404d)", fontSize: "var(--forge-report-type-small-size, 12px)" }}
         >Paginate</button> : null}
       </span>) : null}
@@ -2444,6 +2445,7 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, bl
           rows: runtimeTableRows,
         }, locale, { publicMode })}
         locale={locale}
+        initialPresentationState={initialPresentationState}
         onPresentationStateChange={handleTablePresentationChange}
       />}
       </div>
@@ -3065,6 +3067,11 @@ export default function ReportRuntime({
   onChartMetricSelectionChange = null,
   datasetPages = {},
   onDatasetPageChange = null,
+  onDatasetExpand = null,
+  tableDisplayModes = null,
+  onTableDisplayModeChange = null,
+  tablePresentations = null,
+  onTablePresentationChange = null,
   showContextSummary = true,
   suppressFilterBarBlocks = false,
   suppressFilterBarBlockDatasetRefs = [],
@@ -3410,6 +3417,11 @@ export default function ReportRuntime({
           dataset={dataset}
           page={datasetPages[dataset?.id] || {}}
           onDatasetPageChange={onDatasetPageChange}
+          onDatasetExpand={onDatasetExpand}
+          displayMode={tableDisplayModes ? (tableDisplayModes[block.id] || "default") : undefined}
+          onDisplayModeChange={onTableDisplayModeChange}
+          initialPresentationState={tablePresentations?.[block.id]}
+          onTablePresentationChange={onTablePresentationChange}
           reportSpec={reportSpec}
           providerActionsByField={providerActionsByField}
           runtimeHandlers={runtimeHandlers}
@@ -3422,6 +3434,7 @@ export default function ReportRuntime({
       );
     }
     if (kind === "chartBlock") {
+      const sourceDataset = datasetIndex.get(resolveRuntimeBlockDatasetRef(block, { availableDatasetRefs }).datasetRef) || null;
       const dataset = resolveRuntimeDataset(block);
       const diagnostics = resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset, publicDiagnosticsMode);
       const invalidDiagnostic = diagnostics
@@ -3443,6 +3456,18 @@ export default function ReportRuntime({
       const selectedDatum = selectedChartSelectionsByBlock[normalizeString(block?.id)] || null;
       const chartSpec = block?.content?.chartSpec || block?.chartSpec || {};
       const chartModel = block?.content?.chartModel || block?.chartModel || null;
+      const chartLoading = sectionLoading || datasetPages[dataset?.id]?.loading === true;
+      // A compiler may legitimately omit a model for a completed empty result.
+      // Do not turn missing, partial, failed or contradictory data into "No data".
+      const emptyChart = Array.isArray(sourceDataset?.rows) && Array.isArray(dataset?.rows) && dataset.rows.length === 0
+        && !(Number(sourceDataset?.provenance?.rowCount || 0) > 0)
+        && !(Number(block?.content?.rowCount || 0) > 0)
+        && !(Array.isArray(block?.content?.resolvedChart?.rows) && block.content.resolvedChart.rows.length > 0)
+        && !(Array.isArray(block?.content?.resolvedRows) && block.content.resolvedRows.length > 0)
+        && dataset?.provenance?.hasMore !== true && dataset?.provenance?.truncated !== true
+        && diagnostics.length === 0
+        && !runtimeDiagnostics.some((diagnostic) => !normalizeString(diagnostic?.blockId))
+        && !chartLoading && !sectionError;
       const chartInteractionSupport = resolveReportRuntimeChartInteractionSupport(chartSpec);
       const authoredSelectionActions = resolveReportRuntimeSelectionActions(block);
       const chartInteractionState = buildReportRuntimeChartInteractionState({
@@ -3512,12 +3537,19 @@ export default function ReportRuntime({
               }) : null}
               onLegendItemSelect={!reportPresentation && chartInteractionSupport.legendEnabled ? ((selection) => setSelectedChartSelection(block.id, selection)) : null}
             />
+          ) : chartLoading ? (
+            <div role="status" aria-busy="true">Loading chart…</div>
+          ) : emptyChart ? (
+            <div className="forge-report-runtime-chart-empty" role="status"
+              style={{ fontSize: "var(--forge-report-type-small-size, 12px)", color: "var(--forge-report-text-muted, #5f6b7c)", lineHeight: "var(--forge-report-type-small-line-height, 1.5)" }}>
+              No data for the selected scope.
+            </div>
           ) : (
             <div style={{ fontSize: "var(--forge-report-type-small-size, 12px)", color: "var(--forge-report-text-muted, #5f6b7c)", lineHeight: "var(--forge-report-type-small-line-height, 1.5)" }}>
               Chart actions are unavailable because this authored chart does not compile to a runtime chart model.
             </div>
           )}
-          {!reportPresentation && effectiveChartInteractionSupport.reason !== "readOnlyRuntime" ? (
+          {!emptyChart && !chartLoading && !reportPresentation && effectiveChartInteractionSupport.reason !== "readOnlyRuntime" ? (
             <ChartSelectionPanel
               viewModel={chartSelectionViewModel}
               onAction={(actionId) => executeReportRuntimeAction(chartExecutionsById.get(normalizeString(actionId)), runtimeHandlers)}

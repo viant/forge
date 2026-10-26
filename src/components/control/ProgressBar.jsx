@@ -1,7 +1,8 @@
 import React from 'react';
 import { Colors } from "@blueprintjs/core";
+import "./ProgressBar.css";
 
-const ProgressBar = ({ value = 0, text, maxValue = 100, progress = {}, row = {} }) => {
+const ProgressBar = ({ value = 0, text, maxValue = 100, progress = {}, row = {}, label = "Progress" }) => {
     const numericValue = Number(value) || 0;
     let numericMax = Number(maxValue) || 100;
     if (progress.maxValueField) {
@@ -9,6 +10,17 @@ const ProgressBar = ({ value = 0, text, maxValue = 100, progress = {}, row = {} 
         if (Number.isFinite(rowMax) && rowMax > 0) {
             numericMax = rowMax;
         }
+    }
+    if (progress.appearance === 'inline') {
+        const finiteMax = Number.isFinite(numericMax) && numericMax > 0 ? numericMax : 100;
+        const finiteValue = Number.isFinite(numericValue) ? numericValue : 0;
+        const displayedValue = text == null || text === '' ? String(value ?? '—') : String(text);
+        return <span className="forge-progress-inline">
+            <span className="forge-progress-inline__value">{displayedValue}</span>
+            <progress className="forge-progress-inline__meter" max={finiteMax}
+                value={Math.max(0, Math.min(finiteMax, finiteValue))}
+                aria-label={label} aria-valuetext={displayedValue}/>
+        </span>;
     }
     const widthValue = Math.max(0, Math.min(1, numericMax > 0 ? numericValue / numericMax : 0));
     const remainder = 100 - (100 * widthValue);

@@ -1,0 +1,41 @@
+import assert from 'node:assert/strict';
+import {buildReportFillChartPayload} from './reportFillChartPayload.js';
+import {buildReportPrintChartPages, buildReportPrintChartSvg} from './reportPrintChartSvg.js';
+import {buildReportSpecHash} from './reportFillModel.js';
+import {buildReportPrintFromReportFill} from './reportPrintModel.js';
+const raw=[{label:'Alpha',value:5},{label:'Alpha',value:7},{label:'Beta',value:9},{label:'Gamma',value:4}];
+const model={type:'horizontal_bar',xAxis:{dataKey:'label'},series:{values:[{value:'value',label:'Value',type:'horizontal_bar',dataLabels:'always'}]}};
+const resolved=buildReportFillChartPayload(model,raw);
+assert.equal(resolved.rows[0].value,12);
+const before=JSON.stringify({raw,resolved});
+const svg=buildReportPrintChartPages({chartModel:model,resolvedChart:resolved,rowLimit:1}).map(p=>p.svg).join('');
+assert.match(svg,/Alpha/);assert.match(svg,/>12<\/text>/);assert.doesNotMatch(svg,/Beta|Gamma/);
+const unlimited=buildReportPrintChartPages({chartModel:model,resolvedChart:resolved}).map(p=>p.svg).join('');
+assert.match(unlimited,/Beta/);assert.match(unlimited,/Gamma/);
+assert.equal(JSON.stringify({raw,resolved}),before);
+for(const type of ['bar','line','area','pie','donut']){
+ const chart={...model,type,series:type==='pie'||type==='donut'?{nameKey:'label',valueKey:'value'}:{values:[{value:'value',label:'Value',type}]}};
+ const payload=buildReportFillChartPayload(chart,raw);
+ assert.equal(payload.rows[0].value,12);
+ const output=buildReportPrintChartSvg({chartModel:chart,resolvedChart:payload,rowLimit:1}).svg;
+ assert.match(output,/Alpha/);assert.doesNotMatch(output,/Beta|Gamma/);
+}
+const groupedModel={type:'horizontal_bar',xAxis:{dataKey:'label'},series:{nameKey:'channel',valueKey:'value'}};
+const groupedRaw=[{label:'Alpha',channel:'Display',value:5},{label:'Alpha',channel:'Video',value:7},{label:'Beta',channel:'Display',value:9}];
+const grouped=buildReportFillChartPayload(groupedModel,groupedRaw);
+const groupedSvg=buildReportPrintChartPages({chartModel:groupedModel,resolvedChart:grouped,rowLimit:1}).map(p=>p.svg).join('');
+assert.match(groupedSvg,/Alpha/);assert.match(groupedSvg,/Display/);assert.match(groupedSvg,/Video/);assert.doesNotMatch(groupedSvg,/Beta/);
+assert.equal(grouped.rows.length,2);
+const source={kind:'reportBuilder',containerId:'limit',stateKey:'limit',dataSourceRef:'primary'};
+const blocks=[{id:'chart',kind:'chartBlock',title:'Top category',rowLimit:1,content:{chartModel:model,resolvedChart:resolved}},
+ {id:'table',kind:'tableBlock',title:'Complete evidence',content:{columns:[{key:'label',label:'Label'},{key:'value',label:'Value'}],resolvedRows:raw.map((r,rowIndex)=>({rowIndex,cells:[{key:'label',value:r.label},{key:'value',value:r.value}]}))}}];
+const spec={version:1,kind:'reportSpec',title:'Limit',source,blocks,layoutIntent:{blockOrder:['chart','table']}};
+const fill={version:1,kind:'reportFill',specVersion:1,specHash:buildReportSpecHash(spec),source,blocks,datasets:[]};
+const original=JSON.stringify({spec,fill});
+const printed=buildReportPrintFromReportFill({reportSpec:spec,reportFill:fill});
+const elements=printed.pages.flatMap(p=>p.elements);
+assert.doesNotMatch(elements.filter(e=>e.id.startsWith('chart__svg')).map(e=>e.svg).join(''),/Beta|Gamma/);
+assert.match(elements.filter(e=>e.id.startsWith('table')).map(e=>e.text||'').join(' '),/Beta/);
+assert.match(elements.filter(e=>e.id.startsWith('table')).map(e=>e.text||'').join(' '),/Gamma/);
+assert.equal(JSON.stringify({spec,fill}),original);
+console.log('PASS explicit mark limits after aggregation; unlimited default; all evidence retained; input immutability');

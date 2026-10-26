@@ -381,6 +381,8 @@ type Labels struct {
 }
 
 type Progress struct {
+	// Appearance "inline" places the formatted value beside a compact native meter.
+	Appearance    string `json:"appearance,omitempty" yaml:"appearance,omitempty"`
 	MaxValueField string `json:"maxValueField" yaml:"maxValueField"`
 }
 
@@ -598,6 +600,8 @@ type Container struct {
 	ParameterEditor            *ParameterEditorSpec              `json:"parameterEditor,omitempty" yaml:"parameterEditor,omitempty"`
 	RuleEditor                 *RuleEditorSpec                   `json:"ruleEditor,omitempty" yaml:"ruleEditor,omitempty"`
 	TreeEditor                 *TreeEditorSpec                   `json:"treeEditor,omitempty" yaml:"treeEditor,omitempty"`
+	GroupedSelection           *GroupedSelectionSpec             `json:"groupedSelection,omitempty" yaml:"groupedSelection,omitempty"`
+	ChoiceBrowser              *ChoiceBrowserSpec                `json:"choiceBrowser,omitempty" yaml:"choiceBrowser,omitempty"`
 	Wizard                     *WizardSpec                       `json:"wizard,omitempty" yaml:"wizard,omitempty"`
 	UploadCollection           *UploadCollectionSpec             `json:"uploadCollection,omitempty" yaml:"uploadCollection,omitempty"`
 	DerivedDataSource          *DerivedDataSourceSpec            `json:"derivedDataSource,omitempty" yaml:"derivedDataSource,omitempty"`
@@ -1386,6 +1390,7 @@ type Card struct {
 }
 
 type Table struct {
+	SavedViews *TableSavedViews `json:"savedViews,omitempty" yaml:"savedViews,omitempty"`
 	// QueryDisabledWhen disables built-in search, paging and sorting controls.
 	QueryDisabledWhen    map[string]interface{}            `json:"queryDisabledWhen,omitempty" yaml:"queryDisabledWhen,omitempty"`
 	FillRemainingWidth   bool                              `json:"fillRemainingWidth,omitempty" yaml:"fillRemainingWidth,omitempty"`
@@ -1412,6 +1417,11 @@ type Table struct {
 type TableSort struct {
 	ColumnID  string `json:"columnId" yaml:"columnId"`
 	Direction string `json:"direction,omitempty" yaml:"direction,omitempty"`
+}
+
+// TableSavedViews selects the host's actor-scoped named preference collection.
+type TableSavedViews struct {
+	Key string `json:"key" yaml:"key"`
 }
 
 type TableFormattingRule struct {
@@ -1448,6 +1458,7 @@ type TableLink struct {
 	WindowTitle         string                 `json:"windowTitle,omitempty" yaml:"windowTitle,omitempty"`
 	ChipName            string                 `json:"chipName,omitempty" yaml:"chipName,omitempty"`
 	ChipIcon            string                 `json:"chipIcon,omitempty" yaml:"chipIcon,omitempty"`
+	WindowTitleTemplate string                 `json:"windowTitleTemplate,omitempty" yaml:"windowTitleTemplate,omitempty"`
 	WindowTitleSelector string                 `json:"windowTitleSelector,omitempty" yaml:"windowTitleSelector,omitempty"`
 	WindowTitleSource   string                 `json:"windowTitleSource,omitempty" yaml:"windowTitleSource,omitempty"`
 	InTab               *bool                  `json:"inTab,omitempty" yaml:"inTab,omitempty"`
@@ -1480,14 +1491,23 @@ type Toolbar struct {
 // MediaPreviewValue is a reusable media value; imageCard adds escaped text and
 // an optional external destination around an image. Runtime validates URLs.
 type MediaPreviewValue struct {
-	Kind        string `json:"kind" yaml:"kind"`
-	URL         string `json:"url,omitempty" yaml:"url,omitempty"`
-	Alt         string `json:"alt,omitempty" yaml:"alt,omitempty"`
-	Title       string `json:"title,omitempty" yaml:"title,omitempty"`
-	Description string `json:"description,omitempty" yaml:"description,omitempty"`
-	Caption     string `json:"caption,omitempty" yaml:"caption,omitempty"`
-	Href        string `json:"href,omitempty" yaml:"href,omitempty"`
-	Identity    string `json:"identity,omitempty" yaml:"identity,omitempty"`
+	Kind        string               `json:"kind" yaml:"kind"`
+	URL         string               `json:"url,omitempty" yaml:"url,omitempty"`
+	Alt         string               `json:"alt,omitempty" yaml:"alt,omitempty"`
+	Title       string               `json:"title,omitempty" yaml:"title,omitempty"`
+	Description string               `json:"description,omitempty" yaml:"description,omitempty"`
+	Caption     string               `json:"caption,omitempty" yaml:"caption,omitempty"`
+	Href        string               `json:"href,omitempty" yaml:"href,omitempty"`
+	Identity    string               `json:"identity,omitempty" yaml:"identity,omitempty"`
+	Sources     []MediaPreviewSource `json:"sources,omitempty" yaml:"sources,omitempty"`
+	Width       int                  `json:"width,omitempty" yaml:"width,omitempty"`
+	Height      int                  `json:"height,omitempty" yaml:"height,omitempty"`
+}
+
+// MediaPreviewSource is an authored URL choice for a generic frame preview.
+type MediaPreviewSource struct {
+	Label string `json:"label" yaml:"label"`
+	URL   string `json:"url" yaml:"url"`
 }
 
 // MediaPreviewOptions configures the shared table/card preview trigger.
@@ -1499,22 +1519,26 @@ type MediaPreviewOptions struct {
 }
 
 type Column struct {
-	ID                    string                 `json:"id" yaml:"id"`
-	Name                  string                 `json:"name" yaml:"name"`
-	Width                 int                    `json:"width,omitempty" yaml:"width,omitempty"`
-	Sticky                string                 `json:"sticky,omitempty" yaml:"sticky,omitempty"`
-	Align                 string                 `json:"align,omitempty" yaml:"align,omitempty"`
-	Format                string                 `json:"format,omitempty" yaml:"format,omitempty"`
-	TimeZone              string                 `json:"timeZone,omitempty" yaml:"timeZone,omitempty"`
-	TimeZoneSelector      string                 `json:"timeZoneSelector,omitempty" yaml:"timeZoneSelector,omitempty"`
-	TimeZoneBinding       *Binding               `json:"timeZoneBinding,omitempty" yaml:"timeZoneBinding,omitempty"`
-	ValueMap              map[string]interface{} `json:"valueMap,omitempty" yaml:"valueMap,omitempty"`
-	NumericFormat         string                 `json:"numericFormat,omitempty" yaml:"numericFormat,omitempty"`
-	EmptyText             string                 `json:"emptyText,omitempty" yaml:"emptyText,omitempty"`
-	SingularLabel         string                 `json:"singularLabel,omitempty" yaml:"singularLabel,omitempty"`
-	PluralLabel           string                 `json:"pluralLabel,omitempty" yaml:"pluralLabel,omitempty"`
-	Visible               *bool                  `json:"visible,omitempty" yaml:"visible,omitempty"`
-	Sortable              bool                   `json:"sortable,omitempty" yaml:"sortable,omitempty"`
+	ID               string                 `json:"id" yaml:"id"`
+	Name             string                 `json:"name" yaml:"name"`
+	Width            int                    `json:"width,omitempty" yaml:"width,omitempty"`
+	Sticky           string                 `json:"sticky,omitempty" yaml:"sticky,omitempty"`
+	Align            string                 `json:"align,omitempty" yaml:"align,omitempty"`
+	Format           string                 `json:"format,omitempty" yaml:"format,omitempty"`
+	TimeZone         string                 `json:"timeZone,omitempty" yaml:"timeZone,omitempty"`
+	TimeZoneSelector string                 `json:"timeZoneSelector,omitempty" yaml:"timeZoneSelector,omitempty"`
+	TimeZoneBinding  *Binding               `json:"timeZoneBinding,omitempty" yaml:"timeZoneBinding,omitempty"`
+	ValueMap         map[string]interface{} `json:"valueMap,omitempty" yaml:"valueMap,omitempty"`
+	NumericFormat    string                 `json:"numericFormat,omitempty" yaml:"numericFormat,omitempty"`
+	EmptyText        string                 `json:"emptyText,omitempty" yaml:"emptyText,omitempty"`
+	SingularLabel    string                 `json:"singularLabel,omitempty" yaml:"singularLabel,omitempty"`
+	PluralLabel      string                 `json:"pluralLabel,omitempty" yaml:"pluralLabel,omitempty"`
+	Visible          *bool                  `json:"visible,omitempty" yaml:"visible,omitempty"`
+	Sortable         bool                   `json:"sortable,omitempty" yaml:"sortable,omitempty"`
+	// Exportable overrides the default exclusion of action/button columns.
+	// Hidden and selection columns remain excluded regardless of this setting.
+	Exportable            *bool                  `json:"exportable,omitempty" yaml:"exportable,omitempty"`
+	ExportFormat          string                 `json:"exportFormat,omitempty" yaml:"exportFormat,omitempty"`
 	Icon                  string                 `json:"icon,omitempty" yaml:"icon,omitempty"`
 	IconFromValue         bool                   `json:"iconFromValue,omitempty" yaml:"iconFromValue,omitempty"`
 	PressedWhenValue      interface{}            `json:"pressedWhenValue,omitempty" yaml:"pressedWhenValue,omitempty"`
@@ -1785,6 +1809,22 @@ type SortMapping struct {
 	Template  string            `json:"template" yaml:"template"`
 	Fields    map[string]string `json:"fields" yaml:"fields"`
 	ThenBy    []string          `json:"thenBy,omitempty" yaml:"thenBy,omitempty"`
+}
+
+// CriteriaMapping opts a datasource into a producer's string Criteria selector.
+// Inputs remain logical request/cache values; only MCP transport is translated.
+type CriteriaMapping struct {
+	Parameter string          `json:"parameter" yaml:"parameter"`
+	Fields    []CriteriaField `json:"fields" yaml:"fields"`
+	// Simple opts into legacy producers that cannot represent embedded quotes.
+	LiteralGrammar string `json:"literalGrammar,omitempty" yaml:"literalGrammar,omitempty"`
+}
+
+type CriteriaField struct {
+	Input    string `json:"input" yaml:"input"`
+	Field    string `json:"field" yaml:"field"`
+	Operator string `json:"operator" yaml:"operator"`
+	Type     string `json:"type" yaml:"type"`
 }
 
 type SelectionMode string

@@ -1,0 +1,52 @@
+{
+  "table.json": {
+    "reportSpec": "0eb0aae9a7010321257c4b21fe09eec30860b3ed64425d185352a3a31a18ab6b",
+    "reportFill": "b671ec2b54e0b8766883daf893eba56f4db724750d4ed69eac721ae88cf4f6c7",
+    "reportPrint": "9949d7c05cde3f35ec1b5eac1112da503eea101e4d43cd1e1a53a4a5362cdb71"
+  },
+  "line.json": {
+    "reportSpec": "92fdac4f2082cc8681290926c6aaccc3cf922ee066a1a9a91f61ec22dd11d58c",
+    "reportFill": "21237202fef914aeed0e178c4a2bb716c3700a2dc975b19cfbeef25225a29c6f",
+    "reportPrint": "a80fae590a592f86153e3db369d764df82a28ae7599e38aaf60b1bae54ca4862"
+  },
+  "bar.json": {
+    "reportSpec": "70f94f0c1452397a79d87eb421e0acd7cee86e266c5c65884241fc305e84fb12",
+    "reportFill": "5defaf60b1906254d61d907b9747dfcba822f31e20b1e882186f7857800a5015",
+    "reportPrint": "95beb62159b1338aa0e66f627fd8caa66b3a89333210b52eb733483a452e8d7d"
+  },
+  "kpi.json": {
+    "reportSpec": "e00559f560af5e293cb230c3204f9a034daf3fa35a1e2fa56e2721ab779a56c1",
+    "reportFill": "31900461f96363c72ee6f2269ba570d9b46173a267749ecd19576eeedf9135b2",
+    "reportPrint": "709f9b42f07eba8bc7df61379a6cd1bef4aa1cbceb4bb029353077d291bebb01"
+  },
+  "currency.json": {
+    "reportSpec": "5b1e31b5f37cd0c6b8867afe6565d1d76065ca9bf012e247c6b7a327645731ac",
+    "reportFill": "1a618145d4d5065e65c47a2b3148beef0396eb15a8dfb038d3c8e57a9fad062f",
+    "reportPrint": "361b21dddb748a8f93d7b21e72a44bbe0ba767ed66a1d61662898f5ec1b18b5f"
+  },
+  "filtered.json": {
+    "reportSpec": "12a772cd1b94b1cac402da7ecc052970d9842e028565c18ac265f63919f45fd0",
+    "reportFill": "8971f4bb685ec7d5697953c0a92f4f279b62624dd965ed5ebb0cc2f58d8a34d3",
+    "reportPrint": "cb030083186d7ca37c29b27a5fc18720a7cb65cd7baf01ca89c1f8a8071e6572"
+  },
+  "empty.json": {
+    "reportSpec": "6aa7707ed9edd3d948652c71e27e720d107e7a5e64d98b8c5731f0c17bbcf2dc",
+    "reportFill": "058b7148244d88c06d5cbb34230bd9af4ca4971c926d5351b6adbbf03080418c",
+    "reportPrint": "e4d6636f7d355230431af720f4c6b7a9bd702d3f70caec857721694dc039abbf"
+  },
+  "multi_series.json": {
+    "reportSpec": "25c0f0134e6c082f69e9392454af7880ab6b24cdac7c189a9c078fd168e5b9de",
+    "reportFill": "45d8d7f067b55a8f02b7e154206d46b09a00ed8659b0322903bc54a1cf44e54d",
+    "reportPrint": "1a5b33538e603d1aefa20f66cc3aac3c72d0852bcbf61c19e6e5cf365f2a358b"
+  },
+  "large_values.json": {
+    "reportSpec": "402fdcae62ec0a1e245a1e86575553cfa40f92db56ca99b65b999af01e78d25c",
+    "reportFill": "b111953fa09ebe52c9c03051c3e0d16ab6a78b602ff4043d56e87c803c5897f5",
+    "reportPrint": "dfd8f27be70727aa4ca258807c145e07c35b9b4491b6198b20c8ae0119aa1d63"
+  },
+  "null_values.json": {
+    "reportSpec": "45d90fe28c241b8872f1f75982ed4663129b0dd548bda36c4809ba310949f63b",
+    "reportFill": "4d2603cd75cb921e3bbbf167b993aa87931f0c479636f2408772a4f14ca298de",
+    "reportPrint": "a69a85ed5979e3c260e0360015a6f93e64687eef1c4b1950a89f10c918716f16"
+  }
+}

@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
   "format": "forge.authoredReport",
-  "builderRef": "stewardPerformance",
+  "builderRef": "sampleBuilder",
   "reportDocument": {
     "version": 1,
     "kind": "reportDocument",
     "id": "delivery-performance",
     "title": "Delivery Performance",
-    "subtitle": "Trusted migrated report",
+    "subtitle": "Synthetic report fixture",
     "blocks": [
       {
         "id": "intro",
@@ -18,10 +18,10 @@
   },
   "builderDefinition": {
     "kind": "forge.reporting.builder",
-    "id": "stewardPerformance",
+    "id": "sampleBuilder",
     "reportBuilder": {
       "title": "Delivery Performance",
-      "dataSourceRef": "steward-orders",
+      "dataSourceRef": "sampleRows",
       "dimensions": [
         { "id": "eventDate", "key": "eventDate", "label": "Event date", "paramPath": "dimensions.eventDate", "default": true, "chartAxis": true }
       ],
@@ -53,8 +53,8 @@
     }
   },
   "dataSources": {
-    "steward-orders": {
-      "dataSourceRef": "steward-orders",
+    "sampleRows": {
+      "dataSourceRef": "sampleRows",
       "kind": "published",
       "source": { "kind": "datly", "uri": "orders" },
       "request": { "measures": { "spend": true } },
@@ -67,7 +67,7 @@
     }
   },
   "dependencies": [
-    { "kind": "builder", "id": "stewardPerformance", "contentFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
-    { "kind": "datasource", "id": "steward-orders", "contentFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }
+    { "kind": "builder", "id": "sampleBuilder", "contentFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+    { "kind": "datasource", "id": "sampleRows", "contentFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }
   ]
 }

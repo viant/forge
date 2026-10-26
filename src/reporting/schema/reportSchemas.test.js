@@ -122,6 +122,25 @@ assert.deepEqual(validateReportPrint(buildReportPrintFromReportFill({reportSpec:
 const invalidDocumentChart=JSON.parse(JSON.stringify(documentChartSpec));
 invalidDocumentChart.blocks.find(block=>block.kind==='chartBlock').chartSpec.appearance='rainbow';
 assert.equal(validateReportSpec(invalidDocumentChart).valid,false,'Unknown chart recipes must fail before rendering');
+// Runtime chart models retain the authored ranking order through compilation
+// and filling; strict schemas must accept the same optional boolean.
+const orderedReportSpec = buildReportBuilderReportSpec({
+  container: { id: "rankedBuilder", stateKey: "rankedBuilder", dataSourceRef: "rankedRows" },
+  config,
+  state: { ...state, chartSpec: { ...state.chartSpec, preserveCategoryOrder: true } },
+});
+assert.equal(orderedReportSpec.blocks.find(block => block.kind === "chartBlock").chartModel.preserveCategoryOrder, true);
+assert.deepEqual(validateReportSpec(orderedReportSpec), { valid: true, errors: [] });
+const orderedReportFill = buildReportFillFromReportSpec(orderedReportSpec, {
+  primary: { rows: [{ eventDate: "2026-05-01", channelId: "CTV", totalSpend: 100, impressions: 5 }] },
+});
+assert.equal(orderedReportFill.blocks.find(block => block.kind === "chartBlock").content.chartModel.preserveCategoryOrder, true);
+assert.deepEqual(validateReportFill(orderedReportFill), { valid: true, errors: [] });
+for (const [artifact, validate] of [[orderedReportSpec, validateReportSpec], [orderedReportFill, validateReportFill]]) {
+  const invalid = JSON.parse(JSON.stringify(artifact));
+  invalid.blocks.find(block => block.kind === "chartBlock").chartModel.preserveCategoryOrder = "true";
+  assert.equal(validate(invalid).valid, false);
+}
 
 const badgesReportSpec = {
   ...reportSpec,

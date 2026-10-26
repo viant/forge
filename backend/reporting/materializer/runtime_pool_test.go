@@ -29,7 +29,7 @@ func TestPrepareTrustedRuntimeWarmsOnlyCodeOwnedBundle(t *testing.T) {
 	if len(trustedRuntimePool) == 0 {
 		t.Fatal("trusted empty runtime was not prepared")
 	}
-	envelope, err := os.ReadFile("testdata/steward/forecast_inventory_brief.json")
+	envelope, err := os.ReadFile("testdata/synthetic/table.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,12 +78,12 @@ func BenchmarkTrustedRuntimeRetainedHeap(b *testing.B) {
 }
 
 func BenchmarkTrustedRuntimeHeapAfterMaterializedRows(b *testing.B) {
-	path := "testdata/steward/forecast_inventory_brief.json"
+	path := "testdata/synthetic/table.json"
 	envelope, err := os.ReadFile(path)
 	if err != nil {
 		b.Fatal(err)
 	}
-	dataset, err := os.ReadFile(filepath.Join("testdata/steward_materialization", filepath.Base(path)))
+	dataset, err := os.ReadFile(filepath.Join("testdata/synthetic_materialization", filepath.Base(path)))
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -114,7 +114,7 @@ func BenchmarkTrustedRuntimeHeapAfterMaterializedRows(b *testing.B) {
 }
 
 func TestTrustedRuntimePoolDoesNotLeakAlternateRowMarkers(t *testing.T) {
-	path := "testdata/steward/forecast_inventory_brief.json"
+	path := "testdata/synthetic/table.json"
 	envelope, original := pooledFixture(t, path)
 	spec, err := Lower(context.Background(), envelope)
 	if err != nil {
@@ -167,7 +167,7 @@ func pooledFixture(t *testing.T, path string) (json.RawMessage, map[string]json.
 	if err != nil {
 		t.Fatal(err)
 	}
-	dataset, err := os.ReadFile(filepath.Join("testdata/steward_materialization", filepath.Base(path)))
+	dataset, err := os.ReadFile(filepath.Join("testdata/synthetic_materialization", filepath.Base(path)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +179,7 @@ func pooledFixture(t *testing.T, path string) (json.RawMessage, map[string]json.
 }
 
 func TestTrustedRuntimePoolKeepsReportOutputsIsolatedAcrossConcurrentCalls(t *testing.T) {
-	paths, err := filepath.Glob("testdata/steward/*.json")
+	paths, err := filepath.Glob("testdata/synthetic/*.json")
 	if err != nil || len(paths) < 2 {
 		t.Fatal("missing distinct report fixtures", err)
 	}
@@ -259,7 +259,7 @@ func TestTrustedRuntimePoolKeepsReportOutputsIsolatedAcrossConcurrentCalls(t *te
 }
 
 func TestTrustedRuntimePoolDiscardsInterruptedRuntime(t *testing.T) {
-	paths, err := filepath.Glob("testdata/steward/*.json")
+	paths, err := filepath.Glob("testdata/synthetic/*.json")
 	if err != nil || len(paths) == 0 {
 		t.Fatal("missing report fixture", err)
 	}

@@ -147,6 +147,7 @@ function buildReportSpecColumns(columns = []) {
     ...(column.minWidth !== undefined ? {minWidth:column.minWidth} : {}),
     ...(column.flex === true ? {flex:true} : {}),
     ...(column?.runtimeFilterable === true ? { runtimeFilterable: true } : {}),
+    ...(column?.rowIdentity === true ? { rowIdentity: true } : {}),
     ...(normalizeReportTableCellVisual(column?.cellVisual) ? { cellVisual: normalizeReportTableCellVisual(column.cellVisual) } : {}),
     ...(normalizePresentationClampConfig(column?.labelClamp) ? { labelClamp: normalizePresentationClampConfig(column.labelClamp) } : {}),
   })).filter((column) => column.key);
@@ -463,16 +464,29 @@ export function buildReportSpecChartBlock({
   datasetRef = "primary",
   title = "",
   rowLimit = 0,
+  onChartValidation = null,
 } = {}) {
   const normalizedChartSpec = normalizeReportBuilderChartSpec({
     ...(chartSpec && typeof chartSpec === "object" && !Array.isArray(chartSpec) ? chartSpec : {}),
     ...(normalizeString(title) ? { title: normalizeString(title) } : {}),
   });
   if (!normalizedChartSpec) {
+    onChartValidation?.({
+      blockId: normalizeString(blockId || "primaryChart"),
+      datasetRef: normalizeString(datasetRef || "primary"),
+      chartSpec: null,
+      validation: { valid: false, errors: [{ field: "chartSpec", code: "missing" }] },
+    });
     return null;
   }
   const chartFields = buildReportBuilderChartFields(config, state);
   const validation = validateReportBuilderChartSpec(config, normalizedChartSpec, chartFields);
+  onChartValidation?.({
+    blockId: normalizeString(blockId || "primaryChart"),
+    datasetRef: normalizeString(datasetRef || "primary"),
+    chartSpec: cloneValue(normalizedChartSpec),
+    validation: cloneValue(validation),
+  });
   const dataSourceRef = resolveReportSpecDataSourceRef(container, config);
   const chartContainer = buildExplicitReportBuilderChartContainer({
     dataSourceRef,
@@ -640,6 +654,7 @@ export function buildReportBuilderReportSpec({
   refinements = [],
   semanticSummary = null,
   includePrimaryBlocks = true,
+  onChartValidation = null,
 } = {}) {
   const normalizedState = sanitizeReportBuilderState(config, state);
   const effectiveConfig = buildReportBuilderCalculatedFieldConfig(config, normalizedState);
@@ -694,6 +709,7 @@ export function buildReportBuilderReportSpec({
       config: effectiveConfig,
       state: normalizedState,
       chartSpec,
+      onChartValidation: includePrimaryBlocks ? onChartValidation : null,
     })
     : null;
   const blocks = includePrimaryBlocks

@@ -2,7 +2,7 @@ import {resolveCategoryColor} from '../components/chartTheme.js';
 import { compactReportPrintSequence, wrapReportPrintLabel } from "./reportPrintLabels.js";
 import { formatExportNumericValue } from "./reportExportValueFormatter.js";
 import { normalizeChartAnnotations, resolveChartAnnotationStrokeDasharray } from "./reportChartAnnotations.js";
-import { formatChartXAxisValue, readChartDataValue, isChartNumericValue, buildChartBarPath } from "../components/chartData.js";
+import { formatChartXAxisValue, readChartDataValue, isChartNumericValue, buildChartBarPath, applyChartRowLimit } from "../components/chartData.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -1008,6 +1008,18 @@ function renderCartesianChartSvg({
   };
 }
 
+// Horizontal bar height depends on category/series counts and the legend,
+// never on values or label text. Share those metrics with pagination so fitting
+// a page does not construct and discard a full SVG for every rejected row count.
+function horizontalBarChartMetrics(rowCount, seriesCount) {
+  const topPad = 16;
+  const bottomPad = 34;
+  const groupGap = 8;
+  const rowHeight = Math.max(24, seriesCount * 18);
+  const plotHeight = Math.max(80, (rowCount * rowHeight) + (Math.max(0, rowCount - 1) * groupGap));
+  return {topPad, bottomPad, groupGap, rowHeight, plotHeight, height:topPad + plotHeight + bottomPad + 12};
+}
+
 function renderHorizontalBarChartSvg({
   chartModel = {},
   resolvedChart = {},
@@ -1069,17 +1081,13 @@ function renderHorizontalBarChartSvg({
   ), 0);
   const leftPad = Math.min(Math.floor(width * 0.38), Math.max(116, 20 + (longestCategoryLine * 6)));
   const rightPad = 66;
-  const topPad = 16;
-  const bottomPad = 34;
+  const {topPad, bottomPad, groupGap, rowHeight, plotHeight, height:baseHeight} = horizontalBarChartMetrics(rows.length, seriesDescriptors.length);
   const plotWidth = Math.max(40, width - leftPad - rightPad);
   const valueRange = bounds.maxValue - bounds.minValue || 1;
   const baselineX = leftPad + (((0 - bounds.minValue) / valueRange) * plotWidth);
-  const groupGap = 8;
-  const rowHeight = Math.max(24, seriesDescriptors.length * 18);
   const perSeriesHeight = Math.max(10, Math.floor((rowHeight - (Math.max(0, seriesDescriptors.length - 1) * 4)) / Math.max(seriesDescriptors.length, 1)));
-  const plotHeight = Math.max(80, (rows.length * rowHeight) + (Math.max(0, rows.length - 1) * groupGap));
   const legend = buildLegendSvg(seriesDescriptors, width, topPad + plotHeight + bottomPad + 4);
-  const height = topPad + plotHeight + bottomPad + legend.height + 12;
+  const height = baseHeight + legend.height;
   const annotations = renderHorizontalBarAnnotationsSvg({
     chartModel,
     rows,
@@ -1172,7 +1180,11 @@ export function buildReportPrintChartSvg({
   chartModel = {},
   resolvedChart = {},
   width = 680,
+  rowLimit = 0,
 } = {}) {
+  // Resolved rows already contain complete category aggregations. Limit marks,
+  // never source rows, so duplicate categories retain their complete values.
+  resolvedChart = { ...resolvedChart, rows: applyChartRowLimit(resolvedChart?.rows, rowLimit) };
   const kind = normalizeString(resolvedChart?.kind);
   if (kind === "category") {
     return renderCategoryChartSvg({ chartModel, resolvedChart, width });
@@ -1196,7 +1208,8 @@ export function buildReportPrintChartSvg({
   };
 }
 
-export function buildReportPrintChartPages({ chartModel = {}, resolvedChart = {}, width = 680, maxHeight = 620, firstMaxHeight = maxHeight } = {}) {
+export function buildReportPrintChartPages({ chartModel = {}, resolvedChart = {}, width = 680, maxHeight = 620, firstMaxHeight = maxHeight, rowLimit = 0 } = {}) {
+  resolvedChart = { ...resolvedChart, rows: applyChartRowLimit(resolvedChart?.rows, rowLimit) };
   const type = normalizeString(chartModel?.type || resolvedChart?.type).toLowerCase();
   if (!["horizontal_bar", "funnel_bar"].includes(type) || !["directSeries", "groupedSeries"].includes(resolvedChart?.kind)) {
     return [buildReportPrintChartSvg({ chartModel, resolvedChart, width })];
@@ -1205,17 +1218,24 @@ export function buildReportPrintChartPages({ chartModel = {}, resolvedChart = {}
   if (!rows.length) return [buildReportPrintChartSvg({ chartModel, resolvedChart, width })];
   const descriptors = resolveCartesianSeriesDescriptors(chartModel, resolvedChart);
   const valueBounds = computeCartesianValueBounds(rows, descriptors);
+  const hasLayout = valueBounds && descriptors.length > 0
+    && descriptors.every((series) => resolveChartSupportedSeriesType(series.type) === "horizontal_bar");
+  const legendHeight = hasLayout ? buildLegendSvg(descriptors, width, 0).height : 0;
   const pages = [];
   let offset = 0;
   while (offset < rows.length) {
-    let count = rows.length - offset;
-    let page;
-    do {
-      page = renderHorizontalBarChartSvg({ chartModel, resolvedChart: { ...resolvedChart, rows: rows.slice(offset, offset + count) }, width, valueBounds, categoryOffset: offset });
-      if (page.height <= (offset === 0 ? firstMaxHeight : maxHeight) || count === 1) break;
-      count -= 1;
-    } while (count > 0);
-    pages.push(page);
+    const availableHeight = offset === 0 ? firstMaxHeight : maxHeight;
+    let count = 1;
+    let upper = rows.length - offset;
+    // Height is monotonic. Find the same largest fitting prefix as the former
+    // decrement scan, retaining its one-row fallback when no row can fit.
+    while (count < upper) {
+      const middle = Math.ceil((count + upper) / 2);
+      const height = hasLayout ? horizontalBarChartMetrics(middle, descriptors.length).height + legendHeight : 0;
+      if (height <= availableHeight) count = middle;
+      else upper = middle - 1;
+    }
+    pages.push(renderHorizontalBarChartSvg({ chartModel, resolvedChart: { ...resolvedChart, rows: rows.slice(offset, offset + count) }, width, valueBounds, categoryOffset: offset }));
     offset += count;
   }
   return pages;

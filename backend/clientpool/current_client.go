@@ -41,6 +41,7 @@ func (m *Manager) IsCurrentClient(ctx context.Context, conversation, name string
 // release it. Callers should invoke this off the request path because closing
 // an idle transport can perform network I/O. It never replays a tool call.
 func (m *Manager) EvictCurrentClient(ctx context.Context, conversation, name string, client mcpclient.Interface) bool {
+	defer m.dispatchClientEvictions()
 	if m == nil || ctx == nil || ctx.Err() != nil {
 		return false
 	}
@@ -63,7 +64,7 @@ func (m *Manager) EvictCurrentClient(ctx context.Context, conversation, name str
 		m.mu.Unlock()
 		return false
 	}
-	toClose = m.evictEntryLocked(key, held.serverName, current)
+	toClose = m.evictEntryLocked(key, held.serverName, current, ClientTransportEvicted)
 	if m.epoch == nil {
 		m.epoch = map[string]uint64{}
 	}

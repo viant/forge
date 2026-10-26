@@ -8,9 +8,8 @@ import {DashboardBlock} from './DashboardBlocks.jsx';
 import {applyParameterCodec, resolveParameters} from '../../hooks/parameters.js';
 
 // Core owns provider-window assembly. Exercise its canonical wire fixture
-// here so Forge proves rendering without regaining the MCP delivery boundary.
-const coreRoot = process.env.AGENTLY_CORE_ROOT || fileURLToPath(new URL('../../../../agently-core_primitive-mcp-boundaries/', import.meta.url));
-const window = JSON.parse(fs.readFileSync(path.join(coreRoot, 'protocol/window/testdata/native-report-window.json'), 'utf8'));
+// here using an independently authored synthetic wire contract.
+const window = JSON.parse(fs.readFileSync(fileURLToPath(new URL('./testdata/synthetic-native-report-window.json', import.meta.url)), 'utf8'));
 const block = window.view.content.containers.find(container => container.kind === 'dashboard.reportRuntime');
 assert.ok(block, 'native report must create a visible Forge runtime container');
 const sourceRef = block.dashboard.reportRuntime.datasetBindings.primary.dataSourceRef;

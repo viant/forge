@@ -176,6 +176,7 @@ type TableColumn struct {
 	CellVisual        any               `json:"cellVisual,omitempty"`
 	Link              map[string]any    `json:"link,omitempty"`
 	RuntimeFilterable bool              `json:"runtimeFilterable,omitempty"`
+	RowIdentity       bool              `json:"rowIdentity,omitempty"`
 	LabelClamp        *TextClamp        `json:"labelClamp,omitempty"`
 }
 

@@ -15,7 +15,7 @@ assert.deepEqual(normalizePreviewRuntimeActionBehavior({
   },
   actions: [
     { id: "keep_date", label: "Keep only", kind: "keep" },
-    { id: "detail_date", label: "Show date details", kind: "detail", targetRef: "target://steward/performance/date-detail" },
+    { id: "detail_date", label: "Show date details", kind: "detail", targetRef: "target://example/performance/date-detail" },
   ],
 }), {
   match: {
@@ -24,7 +24,7 @@ assert.deepEqual(normalizePreviewRuntimeActionBehavior({
   },
   actions: [
     { id: "keep_date", label: "Keep only", kind: "keep" },
-    { id: "detail_date", label: "Show date details", kind: "detail", targetRef: "target://steward/performance/date-detail" },
+    { id: "detail_date", label: "Show date details", kind: "detail", targetRef: "target://example/performance/date-detail" },
   ],
 });
 
@@ -37,7 +37,7 @@ assert.equal(replacePreviewRuntimeActionBehaviors(metrics, [
     },
     actions: [
       { id: "keep_date", label: "Keep only", kind: "keep" },
-      { id: "detail_date", label: "Show date details", kind: "detail", targetRef: "target://steward/performance/date-detail" },
+      { id: "detail_date", label: "Show date details", kind: "detail", targetRef: "target://example/performance/date-detail" },
     ],
   },
 ]), 1);
@@ -47,7 +47,7 @@ assert.deepEqual(
   ]),
   [
     { id: "keep_date", label: "Keep only", kind: "keep" },
-    { id: "detail_date", label: "Show date details", kind: "detail", targetRef: "target://steward/performance/date-detail" },
+    { id: "detail_date", label: "Show date details", kind: "detail", targetRef: "target://example/performance/date-detail" },
   ],
 );
 assert.deepEqual(

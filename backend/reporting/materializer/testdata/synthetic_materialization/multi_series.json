@@ -1,0 +1,16 @@
+{
+  "primary": {
+    "rows": [
+      {
+        "category": "Example A",
+        "amount": 17,
+        "count": 2
+      },
+      {
+        "category": "Example B",
+        "amount": 27,
+        "count": 3
+      }
+    ]
+  }
+}

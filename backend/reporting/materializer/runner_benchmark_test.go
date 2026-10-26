@@ -33,7 +33,7 @@ func BenchmarkInitializedLowering(b *testing.B) {
 		}
 		defer func() { goja.StopProfile(); file.Close() }()
 	}
-	raw, err := os.ReadFile("testdata/steward/performance_delivery_command_center.json")
+	raw, err := os.ReadFile("testdata/synthetic/multi_series.json")
 	if err != nil {
 		b.Fatal(err)
 	}

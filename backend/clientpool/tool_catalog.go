@@ -48,7 +48,18 @@ func (p *toolCatalogPage) reusable(now time.Time) bool {
 }
 
 type toolCatalogReadSnapshotKey struct{}
-type toolCatalogReadSnapshot struct{ pages sync.Map }
+type toolCatalogReadSnapshot struct {
+	pages        sync.Map
+	noRetryPages sync.Map
+}
+
+// NoRetry pages are held only by the explicit read snapshot. They never enter
+// the manager's retained catalog, including when the producer advertises TTL.
+type noRetryToolCatalogPage struct {
+	ready chan struct{}
+	bytes []byte
+	err   error
+}
 
 // WithToolCatalogReadSnapshot reuses one authenticated tools/list generation
 // while assembling a single tool surface. Explicit ttlMs=0 still prevents
@@ -60,6 +71,16 @@ func WithToolCatalogReadSnapshot(ctx context.Context) context.Context {
 	}
 	if existing, _ := ctx.Value(toolCatalogReadSnapshotKey{}).(*toolCatalogReadSnapshot); existing != nil {
 		return ctx
+	}
+	return WithNewToolCatalogReadSnapshot(ctx)
+}
+
+// WithNewToolCatalogReadSnapshot begins a distinct read even when an outer
+// metadata operation already has a snapshot. A new approved datasource fetch
+// must not inherit another fetch's zero-TTL metadata.
+func WithNewToolCatalogReadSnapshot(ctx context.Context) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
 	}
 	return context.WithValue(ctx, toolCatalogReadSnapshotKey{}, &toolCatalogReadSnapshot{})
 }
@@ -87,6 +108,9 @@ func (m *Manager) invalidateToolCatalogLocked(server string) {
 
 func (c *managedClient) listTools(ctx context.Context, client mcpclient.Interface, cursor *string, options ...mcpclient.RequestOption) (*mcpschema.ListToolsResult, error) {
 	m := c.mgr
+	if snapshot, _ := ctx.Value(toolCatalogReadSnapshotKey{}).(*toolCatalogReadSnapshot); snapshot != nil && mcpclient.NewRequestOptions(options).NoRetry {
+		return c.listToolsNoRetrySnapshot(ctx, client, cursor, snapshot, options...)
+	}
 	ctx, raw, scope, witness, delegatedToken, cacheable, err := c.toolCatalogScope(ctx, options...)
 	if err != nil {
 		return nil, err
@@ -242,6 +266,106 @@ func (c *managedClient) listTools(ctx context.Context, client mcpclient.Interfac
 	}
 }
 
+// listToolsNoRetrySnapshot coalesces only one explicit operation's identical
+// metadata reads. Its source call still carries WithNoRetry, so a lost session
+// or 401 is never replayed. Ordinary NoRetry calls keep their force-fresh path.
+func (c *managedClient) listToolsNoRetrySnapshot(ctx context.Context, client mcpclient.Interface, cursor *string, snapshot *toolCatalogReadSnapshot, options ...mcpclient.RequestOption) (*mcpschema.ListToolsResult, error) {
+	ctx, raw, scope, witness, delegatedToken, cacheable, err := c.toolCatalogScopeWithNoRetrySnapshot(ctx, options...)
+	if err != nil {
+		return nil, err
+	}
+	if !cacheable || scope == "public" {
+		return c.fetchToolCatalog(ctx, client, cursor, observe.CacheBypass, options...)
+	}
+	pageCursor := "first"
+	if cursor != nil {
+		pageCursor = "cursor:" + *cursor
+	}
+	m := c.mgr
+	m.mu.Lock()
+	generation := m.toolCatalogGeneration[c.serverName]
+	m.mu.Unlock()
+	key := fmt.Sprintf("noretry:%s:%s:%x:%d:%s", c.serverName, scope, sha256.Sum256(raw), generation, pageCursor)
+	pending := &noRetryToolCatalogPage{ready: make(chan struct{})}
+	snapshotTiming := observe.Start(ctx, "mcp.tools.list.read_snapshot", observe.Labels{Provider: c.serverName})
+	actual, loaded := snapshot.noRetryPages.LoadOrStore(key, pending)
+	page := actual.(*noRetryToolCatalogPage)
+	if !loaded {
+		snapshotTiming.End(observe.OK, observe.CacheMiss)
+	} else {
+		select {
+		case <-page.ready:
+			snapshotTiming.End(observe.OK, observe.CacheHit)
+		default:
+			snapshotTiming.End(observe.OK, observe.CacheMiss)
+		}
+	}
+	if !loaded {
+		result, fetchErr := c.fetchToolCatalog(ctx, client, cursor, observe.CacheMiss, options...)
+		var encoded []byte
+		if fetchErr == nil && result != nil {
+			encoded, fetchErr = json.Marshal(result)
+		}
+		if fetchErr == nil && result == nil {
+			fetchErr = fmt.Errorf("MCP tool catalog source returned no result")
+		}
+		_, freshRaw, freshScope, _, _, freshCacheable, scopeErr := c.toolCatalogScopeWithNoRetrySnapshot(ctx, options...)
+		if fetchErr == nil && (scopeErr != nil || !freshCacheable || freshScope != scope || !bytes.Equal(freshRaw, raw)) {
+			fetchErr = fmt.Errorf("MCP tool catalog authority changed during no-retry source read")
+		}
+		if witness != nil {
+			witness.mu.Lock()
+			observed := witness.observed && witness.token == delegatedToken
+			witness.mu.Unlock()
+			if fetchErr == nil && !observed {
+				fetchErr = fmt.Errorf("MCP tool catalog credential was not observed")
+			}
+		}
+		m.mu.Lock()
+		freshGeneration := m.toolCatalogGeneration[c.serverName]
+		m.mu.Unlock()
+		if fetchErr == nil && freshGeneration != generation {
+			fetchErr = fmt.Errorf("MCP tool catalog changed during no-retry source read")
+		}
+		if fetchErr == nil && ctx.Err() != nil {
+			fetchErr = ctx.Err()
+		}
+		page.bytes, page.err = encoded, fetchErr
+		if page.err != nil {
+			snapshot.noRetryPages.CompareAndDelete(key, page)
+		}
+		close(page.ready)
+	}
+	select {
+	case <-page.ready:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	currentCtx, currentRaw, currentScope, _, _, currentCacheable, scopeErr := c.toolCatalogScopeWithNoRetrySnapshot(ctx, options...)
+	if scopeErr != nil {
+		return nil, scopeErr
+	}
+	if !currentCacheable || currentScope != scope || !bytes.Equal(currentRaw, raw) {
+		return nil, fmt.Errorf("MCP tool catalog authority changed during no-retry read")
+	}
+	if err := currentCtx.Err(); err != nil {
+		return nil, err
+	}
+	m.mu.Lock()
+	currentGeneration := m.toolCatalogGeneration[c.serverName]
+	m.mu.Unlock()
+	if currentGeneration != generation {
+		return nil, fmt.Errorf("MCP tool catalog changed during no-retry read")
+	}
+	if page.err != nil {
+		return nil, page.err
+	}
+	return decodeToolCatalogPage(page.bytes)
+}
+
 // IsToolsListPublic reports whether configured catalog metadata can be shared
 // without invoking an authorization context. Unknown/custom transports remain
 // principal-scoped even when their workspace principal is anonymous.
@@ -274,6 +398,14 @@ func (m *Manager) IsToolsListPublic(ctx context.Context, server string) bool {
 // toolCatalogScope is shared by population and read-only snapshot lookup, so
 // consumers cannot invent a second credential or visibility policy.
 func (c *managedClient) toolCatalogScope(ctx context.Context, options ...mcpclient.RequestOption) (context.Context, []byte, string, *catalogAuthUse, string, bool, error) {
+	return c.toolCatalogScopeWithSnapshotMode(ctx, false, options...)
+}
+
+func (c *managedClient) toolCatalogScopeWithNoRetrySnapshot(ctx context.Context, options ...mcpclient.RequestOption) (context.Context, []byte, string, *catalogAuthUse, string, bool, error) {
+	return c.toolCatalogScopeWithSnapshotMode(ctx, true, options...)
+}
+
+func (c *managedClient) toolCatalogScopeWithSnapshotMode(ctx context.Context, allowNoRetrySnapshot bool, options ...mcpclient.RequestOption) (context.Context, []byte, string, *catalogAuthUse, string, bool, error) {
 	m := c.mgr
 	cfg, err := m.Options(ctx, c.serverName)
 	if err != nil {
@@ -294,7 +426,7 @@ func (c *managedClient) toolCatalogScope(ctx context.Context, options ...mcpclie
 	}
 	request := mcpclient.NewRequestOptions(options)
 	// Request IDs and replay controls retain their normal transport semantics.
-	if request.RequestId != nil || request.NoRetry || request.JsonrpcVersion != "" {
+	if request.RequestId != nil || request.NoRetry && !allowNoRetrySnapshot || request.JsonrpcVersion != "" {
 		return ctx, nil, "", nil, "", false, nil
 	}
 	token, _ := ctx.Value(authtransport.ContextAuthTokenKey).(string)

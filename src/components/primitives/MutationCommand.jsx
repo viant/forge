@@ -37,7 +37,7 @@ export default function MutationCommand({command, context, extras = {}, disabled
     ? (!valid ? command?.invalidMessage || command?.tooltip : command?.tooltip)
     : '';
   const busy = state.guarded === true || ['validating', 'confirming', 'pending'].includes(state.phase);
-  const statusMessage = state.message || ({validating: 'Validating…', confirming: 'Awaiting confirmation…', pending: 'Saving…', indeterminate: 'Outcome unknown; refresh authoritative data before retrying.'}[state.phase]) || (state.guarded ? 'Working…' : '');
+  const statusMessage = state.message || ({validating: 'Validating…', confirming: 'Awaiting confirmation…', preparing: 'Preparing…', pending: 'Saving…', indeterminate: 'Outcome unknown; refresh authoritative data before retrying.'}[state.phase]) || (state.guarded ? 'Working…' : '');
   const invoke = () => {
     mutationLog.debug('activate', {commandId: command?.commandId, dataSourceRef: command?.dataSourceRef, blocked, busy, phase: state.phase, guarded: getMutationCommandState(context, command).guarded});
     if (blocked || busy) return;

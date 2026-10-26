@@ -18,7 +18,7 @@ import (
 )
 
 // Compile runs the configured canonical compiler.
-func (s *Service) compileUnscoped(ctx context.Context, request *CompileRequest) (*CompileResult, error) {
+func (s *Service) compileUnscoped(ctx context.Context, request *CompileRequest, admitted *admittedCompileDefinition) (*CompileResult, error) {
 	if request == nil {
 		return nil, fmt.Errorf("reporting compile: request is required")
 	}
@@ -30,7 +30,7 @@ func (s *Service) compileUnscoped(ctx context.Context, request *CompileRequest) 
 	if request.Resource != nil || request.ResolvedResource != nil {
 		var err error
 		resolvedTiming := observe.Start(ctx, "report.compile.resolve", observe.Labels{Kind: "report"})
-		request, pin, resolver, err = s.compileResolved(ctx, request)
+		request, pin, resolver, err = s.compileResolved(ctx, request, admitted)
 		resolvedTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 		if err != nil {
 			return nil, err
@@ -43,7 +43,7 @@ func (s *Service) compileUnscoped(ctx context.Context, request *CompileRequest) 
 	result, err := s.compiler.Compile(ctx, cloneCompileRequest(request))
 	compilerTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
-		return nil, err
+		return nil, compileStageError(CompileStageCompiler, err)
 	}
 	if result == nil {
 		return nil, fmt.Errorf("reporting compile: compiler returned nil result")
@@ -56,6 +56,11 @@ func (s *Service) compileUnscoped(ctx context.Context, request *CompileRequest) 
 			return nil, err
 		}
 		pin = fresh
+		if admitted != nil && len(admitted.windowEnvelope) > 0 {
+			// ReadResolved above revalidated the original window. The derived
+			// envelope has no independent persisted identity to read or refresh.
+			raw = admitted.windowEnvelope
+		}
 		var envelope registry.ReportEnvelope
 		if json.Unmarshal(raw, &envelope) != nil {
 			recheckTiming.End(observe.Error, observe.CacheUnknown)
