@@ -22,7 +22,9 @@ func Lines(text string, width, fontSize float64) []string {
 	}
 	var result []string
 	for _, paragraph := range strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n") {
-		paragraph = strings.TrimSpace(paragraph)
+		// The JS print model measures words with one separating space. Keep that
+		// budget even when the source uses tabs or repeated whitespace.
+		paragraph = strings.Join(strings.Fields(paragraph), " ")
 		if paragraph == "" {
 			result = append(result, "")
 			continue
@@ -33,7 +35,9 @@ func Lines(text string, width, fontSize float64) []string {
 			if current != "" {
 				candidate = current + token
 			}
-			if current == "" || len([]rune(candidate)) <= maxChars {
+			// breakTokens retains a separator for the next token. Its trailing
+			// whitespace is not painted and must not consume this line's budget.
+			if current == "" || len([]rune(strings.TrimSpace(candidate))) <= maxChars {
 				current = candidate
 				continue
 			}
