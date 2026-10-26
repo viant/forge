@@ -504,9 +504,9 @@ const ContainerContent = ({context, container, isActive, suppressTitle = false, 
         );
     }
 
-    const controlContext = effectiveContext?.signals
-        ? effectiveContext
-        : resolveChildContext(effectiveContext, dataSourceRef);
+    // Window contexts also have signals, but do not own datasource form
+    // handlers. Bind authored events to the same datasource as the controls.
+    const controlContext = resolveChildContext(effectiveContext, dataSourceRef);
     const handlers = useControlEvents(controlContext, visualItems || [], state)
 
     const visibleWhen = getDashboardVisibleWhen(container);
