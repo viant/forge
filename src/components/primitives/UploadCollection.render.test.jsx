@@ -4,6 +4,7 @@ import {afterEach, beforeEach, expect, it, vi} from 'vitest';
 import UploadCollection from './UploadCollection.jsx';
 
 const boundary = vi.hoisted(() => ({renders: [], selected: ''}));
+vi.mock('./primitiveMutation.js', () => ({resetMutationCommandState: () => boundary.resets++}));
 vi.mock('./MutationCommand.jsx', () => ({
     useMutationCommandState: () => boundary.mutation,
     default: ({disabled, extras, onSettled}) => {
@@ -16,7 +17,7 @@ let host, root;
 beforeEach(() => {
     globalThis.IS_REACT_ACT_ENVIRONMENT = true;
     host = document.createElement('div'); document.body.append(host); root = createRoot(host);
-    boundary.renders = []; boundary.selected = ''; boundary.mutation = {pending:false}; boundary.settled = null;
+    boundary.renders = []; boundary.selected = ''; boundary.mutation = {pending:false}; boundary.settled = null; boundary.resets = 0;
 });
 afterEach(async () => {await act(async () => root.unmount()); host.remove();});
 const spec = {accept: ['.csv'], maxBytes: 100, multiple: false, upload: {dataSourceRef: 'upload'}};
@@ -119,6 +120,7 @@ it('cancelled replacement retains the current file and never reads proposed byte
     expect(host.querySelector('.forge-upload-collection__files').textContent).toContain(first.name);
     expect(host.querySelector('button[aria-label="Upload selected files"]').disabled).toBe(true);
     await dialogButton('Cancel');
+    expect(boundary.resets).toBe(1);
     expect(next.arrayBuffer).not.toHaveBeenCalled();expect(boundary.renders.at(-1).filename).toBe(first.name);
     expect(host.querySelector('button[aria-label="Upload selected files"]').disabled).toBe(false);
 });
@@ -128,6 +130,7 @@ it('confirmation replaces the selection before encoding the proposed file', asyn
     const first=file('first.csv',1),next=file('next.csv',2);await select(first);await select(next);
     expect(changed).toHaveBeenCalledTimes(1);expect(next.arrayBuffer).not.toHaveBeenCalled();
     await dialogButton('Replace');
+    expect(boundary.resets).toBe(2);
     expect(changed).toHaveBeenCalledTimes(2);expect(changed.mock.calls[1][0].files[0].name).toBe(next.name);
     expect(next.arrayBuffer).toHaveBeenCalledTimes(1);expect(boundary.renders.at(-1).filename).toBe(next.name);
 });
