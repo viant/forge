@@ -35,7 +35,7 @@ export default function ReportResourceEditor({container,context,forceReadOnly=fa
         const result=validateReportResourceRunResult(await store.runReport(buildReportResourceRunRequest(saved.resource,container?.parameters)),saved.resource);
         return {status:"result",...result};
     },[saved,store,container?.parameters]);
-    if(error)return <Callout intent="danger" title="Report unavailable">{error}</Callout>;
+    if(error)return <Callout intent="danger" title="Report unavailable">This report could not be opened. Please try again.</Callout>;
     if(!saved || !document)return <Callout icon={<Spinner size={18}/>} title="Loading report"/>;
     const editable=!forceReadOnly && saved.resource?.kind==="working" && container?.parameters?.reportCapabilities?.edit===true;
     const executable=container?.parameters?.reportCapabilities?.run===true;
