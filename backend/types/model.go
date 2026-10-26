@@ -1366,6 +1366,7 @@ type Card struct {
 }
 
 type Table struct {
+	SavedViews *TableSavedViews `json:"savedViews,omitempty" yaml:"savedViews,omitempty"`
 	// QueryDisabledWhen disables built-in search, paging and sorting controls.
 	QueryDisabledWhen    map[string]interface{}            `json:"queryDisabledWhen,omitempty" yaml:"queryDisabledWhen,omitempty"`
 	FillRemainingWidth   bool                              `json:"fillRemainingWidth,omitempty" yaml:"fillRemainingWidth,omitempty"`
@@ -1392,6 +1393,11 @@ type Table struct {
 type TableSort struct {
 	ColumnID  string `json:"columnId" yaml:"columnId"`
 	Direction string `json:"direction,omitempty" yaml:"direction,omitempty"`
+}
+
+// TableSavedViews selects the host's actor-scoped named preference collection.
+type TableSavedViews struct {
+	Key string `json:"key" yaml:"key"`
 }
 
 type TableFormattingRule struct {
