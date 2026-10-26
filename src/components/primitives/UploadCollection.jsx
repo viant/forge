@@ -8,20 +8,24 @@ export default function UploadCollection({container, context}) {
   const spec = container.uploadCollection || {};
   const mutationState = useMutationCommandState(context, spec.upload);
   const [files, setFiles] = React.useState([]);
-  const [blobs, setBlobs] = React.useState([]);
+  const [prepared, setPrepared] = React.useState(null);
   const [encodingError, setEncodingError] = React.useState('');
   const [encoding, setEncoding] = React.useState(false);
   const validation = validateUploadCollection(files, spec);
+  const preparedForSelection = prepared?.files === files && prepared?.transport === spec.transport && prepared?.blobField === spec.blobField;
+  const blobs = preparedForSelection ? prepared.blobs : [];
   const select = (event) => setFiles(Array.from(event.currentTarget.files || []));
   const remove = (index) => setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index));
   React.useEffect(() => {
     let active = true;
     setEncodingError('');
-    if (!files.length) { setBlobs([]); setEncoding(false); return () => { active = false; }; }
+    if (!files.length || !validation.valid) { setPrepared(null); setEncoding(false); return () => { active = false; }; }
     setEncoding(true);
-    encodeUploadFiles(files, {...spec, multiple: true}).then((payload) => { if (active) setBlobs(payload[spec.blobField || 'files']); }, (error) => { if (active) { setBlobs([]); setEncodingError(error.message); } }).finally(() => { if (active) setEncoding(false); });
+    encodeUploadFiles(files, {...spec, multiple: true}).then((payload) => {
+      if (active) setPrepared({files, transport: spec.transport, blobField: spec.blobField, blobs: payload[spec.blobField || 'files']});
+    }, (error) => { if (active) { setPrepared(null); setEncodingError(error.message); } }).finally(() => { if (active) setEncoding(false); });
     return () => { active = false; };
-  }, [files]);
+  }, [files, validation.valid, spec.transport, spec.blobField]);
   const uploadExtras = {
     transport: 'mcpBlob',
     [spec.blobField || 'files']: spec.multiple === false ? blobs[0] : blobs,
