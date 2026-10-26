@@ -40,7 +40,7 @@ assert.match(css, /\.forge-field-track-select-menu/);
 assert.match(css, /\.forge-field-track-select-option/);
 assert.match(css, /max-height:\s*var\(--forge-field-select-menu-max-height\)/);
 assert.match(css, /aria-selected="true"/);
-assert.match(css, /\[data-forge-widget="dateRange"\] > input/);
+assert.match(css, /\[data-forge-widget="dateRange"\]:not\(\.forge-document-date-range\) > input/);
 assert.match(css, /@container \(max-width:\s*600px\)/);
 assert.match(css, /@container \(max-width:\s*420px\)/);
 assert.match(css, /@media \(max-width:\s*600px\)/);

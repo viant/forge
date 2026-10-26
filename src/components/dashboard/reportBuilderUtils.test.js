@@ -3280,3 +3280,10 @@ for(const type of ['pie','donut','funnel_bar'])assert.ok(validateReportBuilderCh
 const orderedHorizontal=buildExplicitReportBuilderChartContainer({dataSourceRef:'report_source',collection:[]},expandedSupportedConfig,splitHorizontalState,{...splitHorizontalSpec,preserveCategoryOrder:true});
 assert.equal(orderedHorizontal.chart.preserveCategoryOrder,true);
 assert.equal(normalizeReportBuilderChartSpec({...splitHorizontalSpec,preserveCategoryOrder:true}).preserveCategoryOrder,true);
+
+const orderedDocumentSpec={...splitHorizontalSpec,type:'line',preserveCategoryOrder:true,appearance:'document',layout:'small-multiples',stacked:false};
+const orderedDocument=buildExplicitReportBuilderChartContainer({dataSourceRef:'report_source',collection:[]},expandedSupportedConfig,splitHorizontalState,orderedDocumentSpec);
+assert.equal(orderedDocument.chart.preserveCategoryOrder,true);
+assert.equal(orderedDocument.chart.appearance,'document');
+assert.equal(orderedDocument.chart.layout,'small-multiples');
+assert.equal(orderedDocument.chart.stacked,false);

@@ -285,6 +285,26 @@ function rebuildInlineRuntime(compiled, datasetPayloads) {
   };
 }
 
+// Apply only explicit boolean review choices; retain all evidence and source contracts.
+export function applyInlineReportTableSelections(compiled, selections = {}) {
+  if (Object.keys(selections).length === 0) return compiled;
+  const payloads = cloneValue(compiled.datasetPayloads || {});
+  const writes = new Map();
+  for (const [blockId, values] of Object.entries(selections)) {
+    const block = compiled.reportSpec.blocks.find(candidate => candidate.id === blockId);
+    if (block?.kind !== 'tableBlock' || block.selection?.mode !== 'checkbox') throw new Error('Table does not support review selection');
+    const payload = payloads[block.datasetRef];
+    if (!Array.isArray(values) || values.length !== payload?.rows?.length || values.some(value => typeof value !== 'boolean')) {
+      throw new Error('Review selection must contain one boolean per source row');
+    }
+    const key = `${block.datasetRef}:${block.selection.field}`;
+    if (writes.has(key) && JSON.stringify(writes.get(key)) !== JSON.stringify(values)) throw new Error('Conflicting review selections');
+    writes.set(key, values);
+    payload.rows = payload.rows.map((row,index) => ({...row,[block.selection.field]:values[index]}));
+  }
+  return rebuildInlineRuntime(compiled, payloads);
+}
+
 // Rebuild all derived runtime/export content from the same edited scope.
 export function applyInlineReportFilterValues(compiled, values = {}) {
   const reportDocument = cloneValue(compiled.reportDocument);

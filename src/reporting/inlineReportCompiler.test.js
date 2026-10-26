@@ -4,6 +4,7 @@ import {
   compileInlineReport,
   compileInlineReportDefinition,
   materializeInlineReport,
+  applyInlineReportTableSelections,
   normalizeInlineReportAssemblyDataSources,
 } from "./inlineReportCompiler.js";
 
@@ -243,3 +244,62 @@ assert.throws(() => compileInlineReportDefinition({
 }), /incomplete and cannot be opened/i);
 
 console.log("inlineReportCompiler ✓ compiles dashboard and canonical inline reports with static and live datasets");
+
+const formattedStatic=compileInlineReport({reportId:'formatted_static',grammar:'report-document-v1',source:{viewer:{appearance:'document'},blocks:[
+ {id:'cost',kind:'chartBlock',datasetRef:'records',chartSpec:{appearance:'document',type:'horizontal_bar',xField:'group',yFields:['amount']}},
+ {id:'share',kind:'chartBlock',datasetRef:'records',chartSpec:{appearance:'document',type:'line',xField:'group',yFields:['share']}},
+]},dataSources:{records:{columns:[{key:'group',kind:'dimension',label:'Group'},{key:'amount',kind:'measure',label:'Amount',format:'currency'},{key:'share',kind:'measure',label:'Share',format:'percentFraction'}],rows:[{group:'A',amount:22000.75,share:.45}]}}});
+assert.equal(formattedStatic.reportSpec.blocks.find(block=>block.id==='cost').chartModel.yAxis.format,'currency');
+assert.equal(formattedStatic.reportSpec.blocks.find(block=>block.id==='share').chartModel.yAxis.format,'percentFraction');
+assert.equal(formattedStatic.reportFill.datasets.find(dataset=>dataset.id==='records').rows[0].share,.45,'Formatting must not change underlying values');
+
+const recordSource={viewer:{appearance:'document'},blocks:[{id:'review',kind:'tableBlock',title:'Candidate review',description:'Bounded coverage: all returned rows displayed',datasetRef:'candidates',recordTitleField:'name',columns:[{key:'name',label:'Name',flex:true,minWidth:240},{key:'selected',label:'Selected',width:96,align:'right',displayValueMap:{false:'Not selected',true:'Selected'}}]}]};
+const recordReport=compileInlineReport({reportId:'record_review',grammar:'report-document-v1',source:recordSource,dataSources:{candidates:{rows:[{name:'First record',selected:false}]}}});
+assert.equal(recordReport.reportSpec.blocks[0].recordTitleField,'name');
+assert.equal(recordReport.reportFill.blocks[0].recordTitleField,'name');
+assert.equal(recordReport.reportSpec.blocks[0].columns[0].minWidth,240);
+assert.equal(recordReport.reportFill.blocks[0].columns[1].width,96);
+assert.equal(recordReport.reportFill.blocks[0].content.resolvedRows[0].cells[1].displayValue,'Not selected');
+assert.equal(recordReport.reportFill.datasets[0].rows[0].selected,false);
+const {validateReportSpec:validateRecordSpec,validateReportFill:validateRecordFill}=await import('./schema/reportSchemas.js');
+assert.equal(validateRecordSpec(recordReport.reportSpec).valid,true);
+assert.equal(validateRecordFill(recordReport.reportFill).valid,true);
+assert.throws(()=>compileInlineReport({reportId:'invalid_records',grammar:'report-document-v1',source:{...recordSource,blocks:[{...recordSource.blocks[0],recordTitleField:'missing'}]},dataSources:{candidates:{rows:[]}}}),/existing table column/);
+
+const sparklineSource={viewer:{appearance:'document'},blocks:[{id:'metric',kind:'kpiBlock',title:'Count',datasetRef:'points',valueField:'count',valueLabel:'Count',sparkline:{datasetRef:'points',valueField:'count',categoryField:'day'}}]};
+const sparklineReport=compileInlineReport({reportId:'static_sparkline',grammar:'report-document-v1',source:sparklineSource,dataSources:{points:{rows:[{day:'2026-01-01',count:12},{day:'2026-01-02',count:15}]}}});
+assert.deepEqual(sparklineReport.reportFill.blocks[0].content.sparkline.values,[12,15]);
+assert.deepEqual(sparklineReport.reportSpec.datasets[0].request,{kind:'staticJson',format:'json',rowCount:2,columnKeys:['day','count']},'Materialized snapshots must not gain backend query fields');
+assert.throws(()=>compileInlineReport({reportId:'invalid_sparkline',grammar:'report-document-v1',source:{...sparklineSource,blocks:[{...sparklineSource.blocks[0],sparkline:{...sparklineSource.blocks[0].sparkline,valueField:'missing'}}]},dataSources:{points:{rows:[{day:'2026-01-01',count:12}]}}}),/fields must be declared/);
+
+assert.equal(recordReport.reportSpec.blocks[0].description,'Bounded coverage: all returned rows displayed');
+assert.equal(recordReport.reportFill.blocks[0].description,'Bounded coverage: all returned rows displayed');
+assert.ok(JSON.stringify(recordReport.reportPrint).includes('Bounded coverage: all returned rows displayed'));
+
+// Review choices remain local; matching site IDs must not merge distinct paths.
+const reviewReport = compileInlineReport({reportId:'review-choices',grammar:'report-document-v1',
+  source:{viewer:{appearance:'document'},blocks:[{id:'choices',kind:'tableBlock',datasetRef:'paths',selection:{mode:'checkbox',field:'selected'},columns:[{key:'site',label:'Site'},{key:'path',label:'Path'}]}]},
+  dataSources:{paths:{rows:[{site:101,path:'direct',selected:true,cost:7},{site:101,path:'reseller',selected:true,cost:12}]}}});
+const reviewed = applyInlineReportTableSelections(reviewReport,{choices:[true,false]});
+assert.deepEqual(reviewed.datasetPayloads.paths.rows,[{site:101,path:'direct',selected:true,cost:7},{site:101,path:'reseller',selected:false,cost:12}]);
+assert.equal(reviewReport.datasetPayloads.paths.rows[1].selected,true);
+assert.match(JSON.stringify(reviewed.reportPrint),/Selected/);
+assert.match(JSON.stringify(reviewed.reportPrint),/false/);
+assert.throws(()=>applyInlineReportTableSelections(reviewReport,{choices:[true]}),/one boolean per source row/);
+assert.throws(()=>applyInlineReportTableSelections(reviewReport,{choices:[true,'false']}),/one boolean per source row/);
+assert.throws(()=>applyInlineReportTableSelections(reviewReport,{missing:[true,false]}),/does not support review selection/);
+const legacyReview = compileInlineReport({grammar:'dashboard-v1',source:{blocks:[{id:'old',kind:'dashboard.table',dataSourceRef:'paths',selection:{mode:'checkbox',field:'selected'},columns:[{key:'site',label:'Site'}]}]},dataSources:{paths:{rows:[{site:101,selected:true}]}}});
+assert.ok(legacyReview.reportSpec.blocks.some(block=>block.selection?.field==='selected'),'Dashboard compatibility retains checkbox selection');
+
+const {mergeReportTableSelections} = await import('./tableVisualSpec.js');
+const allChoices = [{site:101,path:'direct',selected:true},{site:101,path:'reseller',selected:true},{site:102,path:'direct',selected:false}];
+assert.deepEqual(mergeReportTableSelections(allChoices,[allChoices[1]],[{...allChoices[1],selected:false}],'selected'),[true,false,false],'Filtered review cannot deselect hidden rows or merge same-site paths');
+
+// The reserved primary ref must retain its explicit static field catalog too.
+for (const rows of [[{group:'First',count:12}],[]]) {
+  const primaryChart = compileInlineReport({grammar:'report-document-v1',source:{viewer:{appearance:'document'},blocks:[
+    {id:'primary-chart',kind:'chartBlock',title:'Primary chart',datasetRef:'primary',chartSpec:{type:'bar',xField:'group',yFields:['count']}},
+  ]},dataSources:{primary:{rows,columns:[{key:'group',kind:'dimension',label:'Group'},{key:'count',kind:'measure',label:'Count'}]}}});
+  assert.ok(primaryChart.reportSpec.blocks.find(block=>block.id==='primary-chart').chartModel,'Primary static charts retain the real fields, including empty rows');
+  assert.deepEqual(primaryChart.datasetPayloads.primary.rows,rows);
+}

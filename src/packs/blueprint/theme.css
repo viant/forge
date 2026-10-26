@@ -140,6 +140,7 @@
     --forge-interaction-color: var(--forge-button-text);
     --forge-interaction-hover-color: var(--forge-button-text);
     --forge-interaction-active-color: var(--forge-button-text);
+    --forge-tab-active-color: var(--forge-focus-color);
     --forge-selected-background: color-mix(in srgb, var(--forge-control-bg) 85%, var(--forge-focus-color));
     --forge-status-info-background: #ebf1f5;
     --forge-status-info-foreground: #30404d;
@@ -254,6 +255,15 @@
     font-family: var(--forge-font-family, system-ui, sans-serif);
     font-size: var(--forge-font-size, 14px);
 }
+/* Blueprint's global :focus outline must not become a mouse selection state. */
+:where(.agently-application, .agently-workspace) :where(button, [role="button"], [role="tab"], a[href]):focus:not(:focus-visible) {
+    outline: none;
+}
+:where(.agently-application, .agently-workspace) :where(button, [role="button"], [role="tab"], a[href]):focus-visible {
+    outline: var(--forge-focus-width, 2px) solid var(--forge-focus-color, currentColor);
+    outline-offset: var(--forge-focus-offset, 2px);
+}
+
 .agently-workspace[data-forge-theme] [data-forge-part="input"] {
     background-color: var(--forge-control-bg);
     color: var(--forge-control-text);
@@ -357,16 +367,16 @@
 .agently-workspace[data-forge-theme] [data-forge-part="container-section"][data-forge-section-appearance="quiet"] > .bp6-section-header {
     background: var(--forge-section-quiet-header-surface, var(--forge-section-header-surface));
 }
-.agently-workspace[data-forge-theme] [data-forge-part="container-section"] > .bp6-section-header .bp6-heading {
+.agently-workspace[data-forge-theme] [data-forge-part="container-section"] > .bp6-section-header .bp6-heading:not([data-forge-type]) {
     color: inherit;
     font-size: var(--forge-section-header-font-size);
     line-height: var(--forge-section-header-line-height);
 }
-.agently-workspace[data-forge-theme] [data-forge-part="container-section"][data-forge-section-appearance="primary"] > .bp6-section-header .bp6-heading {
+.agently-workspace[data-forge-theme] [data-forge-part="container-section"][data-forge-section-appearance="primary"] > .bp6-section-header .bp6-heading:not([data-forge-type]) {
     font-size: var(--forge-section-primary-header-font-size, var(--forge-section-header-font-size));
     line-height: var(--forge-section-primary-header-line-height, var(--forge-section-header-line-height));
 }
-.agently-workspace[data-forge-theme] [data-forge-part="container-section"][data-forge-section-appearance="quiet"] > .bp6-section-header .bp6-heading {
+.agently-workspace[data-forge-theme] [data-forge-part="container-section"][data-forge-section-appearance="quiet"] > .bp6-section-header .bp6-heading:not([data-forge-type]) {
     font-size: var(--forge-section-quiet-header-font-size, var(--forge-section-header-font-size));
     line-height: var(--forge-section-quiet-header-line-height, var(--forge-section-header-line-height));
 }

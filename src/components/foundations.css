@@ -6,7 +6,7 @@
     --forge-default-modal-shadow: 0 24px 60px -18px color-mix(in srgb, var(--forge-text, currentColor) 36%, transparent);
 }
 /* The same public primitives can consume the host's application boundary. */
-.agently-application[data-agently-theme] .forge-button[data-forge-variant]:not(.agently-workspace *) {
+.agently-application[data-agently-theme] :is(.forge-button[data-forge-variant], .forge-select-control):not(.agently-workspace *) {
     --forge-text: var(--agently-theme-text);
     --forge-text-inverse: var(--agently-theme-text-inverse);
     --forge-surface: var(--agently-theme-surface);
@@ -23,6 +23,8 @@
     --forge-disabled-text: var(--agently-theme-disabled-foreground);
     --forge-control-height: var(--agently-theme-control-height);
     --forge-control-text: var(--agently-theme-control-foreground);
+    --forge-control-border: var(--agently-theme-control-border);
+    --forge-control-bg: var(--agently-theme-control-background);
     --forge-control-radius: var(--agently-theme-control-radius);
     --forge-control-padding-inline: var(--agently-theme-control-padding-inline);
     --forge-focus-color: var(--agently-theme-focus);

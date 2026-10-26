@@ -1,0 +1,7 @@
+.forge-chart-specimen { padding:var(--forge-spacing-6,24px); color:var(--forge-text); background:var(--forge-surface); min-width:0; }
+.forge-chart-specimen > :is(h2,p) { margin:0 0 var(--forge-spacing-3,12px); }
+.forge-chart-specimen > label { display:inline-flex; align-items:center; gap:var(--forge-spacing-3,12px); margin-bottom:var(--forge-spacing-6,24px); }
+.forge-chart-specimen-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr)); gap:var(--forge-spacing-6,24px); }
+.forge-chart-specimen-grid > section { min-width:0; padding-top:var(--forge-spacing-4,16px); border-top:var(--forge-border-width,1px) solid var(--forge-border); }
+.forge-chart-specimen-grid h3 { margin:0 0 var(--forge-spacing-3,12px); }
+.forge-chart-specimen > [role=status] { margin-top:var(--forge-spacing-6,24px); overflow-wrap:anywhere; }

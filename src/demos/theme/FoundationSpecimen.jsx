@@ -1,7 +1,11 @@
 import React, {useState} from 'react';
+import DocumentSpecimen from './DocumentSpecimen.jsx';
+import ReportDocumentSpecimen from './ReportDocumentSpecimen.jsx';
 import {signal} from '@preact/signals-react';
-import {Callout, Card, Dialog, Popover, Tag} from '@blueprintjs/core';
+import {Button as BlueprintButton, Callout, Card, Dialog, Popover, Tag} from '@blueprintjs/core';
 import Button from '../../components/Button.jsx';
+import SectionTabRail from '../../components/SectionTabRail.jsx';
+import SelectControl from '../../components/SelectControl.jsx';
 import Icon from '../../components/Icon.jsx';
 import Typography, {typographyProps} from '../../components/Typography.jsx';
 import AccessibleSection from '../../components/AccessibleSection.jsx';
@@ -16,7 +20,7 @@ const texts = [['text', 'Primary text'], ['text-secondary', 'Secondary text'], [
 const statuses = {info: 'Information', success: 'Saved', warning: 'Needs review', danger: 'Needs attention'};
 const columns = [{key: 'name', label: 'Record', flex: true}, {key: 'count', label: 'Count', format: 'number', align: 'right'}, {key: 'status', label: 'Status'}];
 const table = {id: 'foundationTable', columns, quickFilter: true, tablePresentation: {variant: 'document'}};
-const tableContext = {signals: {collection: signal([{name: 'First example', count: 12345, status: 'Active'}, {name: 'Second example with a longer name', count: 86, status: 'Warning'}]), control: signal({}), selection: signal({})}};
+const tableContext = {signals: {collection: signal([{name: 'First example', count: 12345, status: 'Active', frequency: '3 per 1 day'}, {name: 'Second example with a longer name', count: 86, status: 'Warning', frequency: '5 per 1 week'}]), control: signal({}), selection: signal({})}};
 
 tableContext.Context = () => tableContext;
 tableContext.handlers = {dataSource:{peekFullCollection:()=>tableContext.signals.collection.value,replaceCollection:({rows})=>{tableContext.signals.collection.value=rows;}}};
@@ -24,6 +28,7 @@ const editableTable = {...table, dataSourceRef:'examples', allowAdd:false, colum
     {key:'name',label:'Record',width:220,editor:{type:'text'}},
     {key:'count',label:'Count',width:112,align:'right',editor:{type:'number'}},
     {key:'status',label:'Status',width:144,editor:{type:'select',options:['Active','Warning']}},
+    {key:'frequency',label:'Frequency',width:260,editor:{type:'frequency'}},
     {key:'notes',label:'Notes',flex:true,minWidth:240,editor:false},
 ]};
 
@@ -32,18 +37,21 @@ export default function FoundationSpecimen({iconExamples = ['menu', 'search', 'p
     const [saved, setSaved] = useState(0);
     const [dialog, setDialog] = useState(false);
     const [tableState, setTableState] = useState('populated');
+    const [section, setSection] = useState('overview');
     const input = (id, label, widget, extra = {}) => <WidgetRenderer key={id} state={state}
         item={{id, label, widget, scope: 'local', properties: {typographyRole: 'body'}, ...extra}}/>;
     const changeTable = value => {
         setTableState(value);
         tableContext.signals.control.value = value === 'loading' ? {loading: true} : value === 'error' ? {error: {message: 'Example data could not load. Try again.'}} : {};
-        tableContext.signals.collection.value = value === 'empty' ? [] : [{name: 'First example', count: 12345, status: 'Active'}, {name: 'Second example with a longer name', count: 86, status: 'Warning'}];
+        tableContext.signals.collection.value = value === 'empty' ? [] : [{name: 'First example', count: 12345, status: 'Active', frequency: '3 per 1 day'}, {name: 'Second example with a longer name', count: 86, status: 'Warning', frequency: '5 per 1 week'}];
     };
     return <div className="forge-foundation-specimen">
+        <DocumentSpecimen/>
+        <ReportDocumentSpecimen/>
         <header>
             <Typography as="h1" typeRole="display">Workspace design system</Typography>
             <Typography as="p" typeRole="body">The shared components, foundations and states available to workspace authors. Appearance follows the selected workspace theme.</Typography>
-            <nav aria-label="Foundation sections">{['Colors', 'Spacing and surfaces', 'Actions and icons', 'Form controls', 'Feedback', 'Overlays', 'Data display'].map(label => <a key={label} href={`#foundation-${label.split(' ')[0].toLowerCase()}`} {...typographyProps('body')}>{label}</a>)}</nav>
+            <nav aria-label="Foundation sections">{['Colors', 'Spacing and surfaces', 'Actions and icons', 'Form controls', 'Feedback', 'Overlays', 'Data display', 'Charts'].map(label => <a key={label} href={`#foundation-${label.split(' ')[0].toLowerCase()}`} {...typographyProps('body')}>{label}</a>)}</nav>
         </header>
         <section id="foundation-colors" aria-label="Semantic colors">
             <Typography as="h2" typeRole="section">Colors</Typography>
@@ -67,8 +75,10 @@ export default function FoundationSpecimen({iconExamples = ['menu', 'search', 'p
                 <Button variant="danger">Remove example</Button><Button variant="secondary" size="compact">Compact action</Button>
                 <Button variant="primary" disabled>Unavailable action</Button><Button variant="primary" loading>Saving example</Button>
                 <Button variant="ghost" icon="lucide:panel-right" hideLabel aria-label="Show example panel" onClick={() => setDialog(true)}/>
+                <BlueprintButton minimal icon="refresh" aria-label="Reset example count" onClick={() => setSaved(0)}/>
             </div>
             <Typography as="p" typeRole="metadata" role="status">Example saved {saved} {saved === 1 ? 'time' : 'times'}.</Typography>
+            <SectionTabRail ariaLabel="Example sections" items={['overview', 'records', 'schedule', 'sources', 'settings', 'history'].map(id => ({id, label:id.charAt(0).toUpperCase()+id.slice(1)}))} selectedId={section} onChange={setSection}/>
             <div className="forge-foundation-row" aria-label="Shared icon set">{iconExamples.map(({name, label}) => <span className="forge-foundation-icon-example" key={name}><Icon name={name}/><Typography typeRole="metadata">{label}</Typography></span>)}</div>
         </section>
         <section id="foundation-form" aria-label="Form controls">
@@ -104,7 +114,7 @@ export default function FoundationSpecimen({iconExamples = ['menu', 'search', 'p
         </section>
         <section id="foundation-data" aria-label="Data display">
             <Typography as="h2" typeRole="section">Data display and states</Typography>
-            <label {...typographyProps('label')}>Table state <select aria-label="Example table state" value={tableState} onChange={event => changeTable(event.target.value)}>{['populated', 'editing', 'empty', 'loading', 'error'].map(value => <option key={value}>{value}</option>)}</select></label>
+            <label {...typographyProps('label')}>Table state <SelectControl {...typographyProps('body')} aria-label="Example table state" value={tableState} onChange={event => changeTable(event.target.value)}>{['populated', 'editing', 'empty', 'loading', 'error'].map(value => <option key={value}>{value}</option>)}</SelectControl></label>
             {tableState==='editing' ? <DashboardEditableTable embedded container={editableTable} context={tableContext}/> : <DashboardTableContent container={table} context={tableContext}/>}
             <Typography as="p" typeRole="metadata">Actual document table with local sample data. Legacy table variants remain available for existing consumers.</Typography>
         </section>

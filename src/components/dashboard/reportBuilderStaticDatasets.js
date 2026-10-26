@@ -86,6 +86,7 @@ function normalizeColumns(columns = [], rows = []) {
         key,
         label: normalizeString(column?.label || humanizeLabel(key)) || key,
         kind: normalizeString(column?.kind || inferColumnKind(rows, key)) || inferColumnKind(rows, key),
+        ...(normalizeString(column?.format) ? {format:normalizeString(column.format)} : {}),
       };
     })
     .filter(Boolean);
@@ -249,6 +250,7 @@ export function normalizeReportBuilderStaticDatasets(datasets = []) {
           key: normalizeString(column?.key),
           label: normalizeString(column?.label || column?.key),
           kind: normalizeString(column?.kind || "dimension") || "dimension",
+          ...(column.format ? {format:column.format} : {}),
         })),
         valueFieldOptions: buildFieldOptions(columns, "measure"),
         secondaryFieldOptions: buildFieldOptions(columns, "dimension"),
@@ -256,6 +258,7 @@ export function normalizeReportBuilderStaticDatasets(datasets = []) {
           key: normalizeString(column?.key),
           label: normalizeString(column?.label || column?.key),
           kind: normalizeString(column?.kind || "dimension") || "dimension",
+          ...(column.format ? {format:column.format} : {}),
         })),
       };
     })
