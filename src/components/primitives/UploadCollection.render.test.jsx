@@ -85,3 +85,23 @@ it('rejects file references when no preparation command can consume them', async
     expect(host.textContent).toContain('requires a command preparation handler');
     expect(host.querySelector('button[aria-label="Upload selected files"]').disabled).toBe(true);
 });
+
+it('notifies authored selection and removal handlers with metadata only', async () => {
+    const changed = vi.fn();
+    const context = {lookupHandler: name => name === 'Files.changed' ? changed : undefined};
+    await act(async () => root.render(<UploadCollection context={context} container={{on:[{event:'onSelectionChange',handler:'Files.changed'}],uploadCollection:spec}}/>));
+    const selected=file('first.csv',1);await select(selected);
+    expect(changed.mock.calls[0][0]).toMatchObject({operation:'select',files:[{name:'first.csv',size:1,type:'text/csv'}]});
+    expect(changed.mock.calls[0][0].files[0].arrayBuffer).toBeUndefined();
+    await act(async () => host.querySelector('.bp6-tag-remove').click());
+    expect(changed.mock.calls.at(-1)[0]).toMatchObject({operation:'remove',files:[]});
+});
+it.each(['disabledWhen','readOnlyWhen'])('honors container %s for selection, removal and submission', async predicate => {
+    const context={handlers:{dataSource:{peekFormData:()=>({blocked:true})}}};
+    const container={[predicate]:{source:'form',field:'blocked',equals:true},uploadCollection:spec};
+    await act(async () => root.render(<UploadCollection context={context} container={container}/>));
+    expect(host.querySelector('input[type=file]').disabled).toBe(true);
+    const selected=file('blocked.csv',1);await select(selected);
+    expect(selected.arrayBuffer).not.toHaveBeenCalled();
+    expect(host.querySelector('button[aria-label="Upload selected files"]').disabled).toBe(true);
+});
