@@ -1,0 +1,13 @@
+.forge-choice-browser {min-width:0; min-height:0; overflow:auto; color:var(--forge-text,#263244);}
+.forge-choice-browser ul {list-style:none; margin:0; padding:0;}
+.forge-choice-browser__item {padding:10px 12px; border-bottom:1px solid var(--forge-border-color,#d5deeb); min-width:0;}
+.forge-choice-browser__item.is-selected {background:var(--forge-selected-background,#eaf2ff);}
+.forge-choice-browser__row {display:flex; align-items:center; gap:8px; min-width:0;}
+.forge-choice-browser__label {flex:1; min-width:0; overflow-wrap:anywhere; border:0; background:transparent; color:inherit; padding:0; text-align:left; font:inherit; cursor:pointer;}
+.forge-choice-browser__label:disabled {color:var(--forge-text-muted,#59677b); cursor:default;}
+.forge-choice-browser__label:focus-visible,.forge-choice-browser__path button:focus-visible {outline:2px solid var(--forge-interaction-color,#215db0); outline-offset:2px;}
+.forge-choice-browser__path {font-size:var(--forge-type-small-size,12px); color:var(--forge-text-muted,#59677b); padding-top:4px; overflow-wrap:anywhere;}
+.forge-choice-browser__path button {border:0; background:transparent; color:var(--forge-interaction-color,#215db0); font:inherit; padding:0; cursor:pointer;}
+.forge-choice-browser__path button:disabled {color:inherit; cursor:default;}
+.forge-choice-browser__secondary,.forge-choice-browser__chevron {color:var(--forge-text-muted,#59677b); flex-shrink:0;}
+.forge-choice-browser__empty {padding:20px 12px; color:var(--forge-text-muted,#59677b);}

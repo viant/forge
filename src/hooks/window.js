@@ -220,6 +220,19 @@ export function useDialogHandlers(windowId, dialogId) {
 const pendingDialogResolvers  = new Map();
 const pendingWindowResolvers  = new Map();
 
+// Frame closes and authorization/session cleanup remove windows directly,
+// without passing through commitWindow. Settle their awaiters as cancellations
+// so callers can release suspended work and do not retain abandoned contexts.
+activeWindows.subscribe(windows => {
+    const live = new Set((windows || []).map(window => window.windowId));
+    for (const [id, entry] of pendingWindowResolvers) {
+        if (live.has(id)) continue;
+        pendingWindowResolvers.delete(id);
+        cancelDialogsOwnedByWindow(id);
+        entry.resolve?.({status:'canceled', canceled:true, reason:'window_closed'});
+    }
+});
+
 function cloneNavigationValue(value) {
     if (value == null) return value;
     try {
