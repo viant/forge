@@ -50,3 +50,32 @@ predicates for file selection, removal and submission. Container
 where `files` contains only `{name, size, type}` and `operation` is `select` or
 `remove`. This lets authored forms lock metadata as soon as a file is selected,
 without sharing browser File references or adding domain rules to the primitive.
+
+## Confirming replacement and retaining the selection
+
+`uploadCollection.replaceConfirmation` optionally prompts before accepting a new
+selection when files are already selected. Cancel keeps the current selection
+and payload and never reads the proposed file. Replace accepts the new selection
+and then runs the existing type/count/size checks and preparation. An empty
+chooser result leaves the current selection intact. The native chooser resets
+after each proposal so the same path can be chosen again after cancellation.
+
+`retainOnSuccess: true` keeps selected files after the writer succeeds. The
+default remains false. Applications can use the command's existing `validateWhen`
+to prevent resubmitting an acknowledged selection while still allowing a new
+file proposal. Container availability blocks selection, removal and submission;
+command guards and an open replacement confirmation block conflicting actions.
+A guard/availability/command-identity change abandons a pending replacement.
+
+```yaml
+uploadCollection:
+  multiple: false
+  retainOnSuccess: true
+  replaceConfirmation: Replace the selected file?
+  upload:
+    dataSourceRef: upload
+    validateWhen: {source: form, field: uploaded, equals: false}
+```
+
+Confirmation and retention remain local file-selection behavior. Applications
+own publication receipts, resource identity and retry/update protocols.
