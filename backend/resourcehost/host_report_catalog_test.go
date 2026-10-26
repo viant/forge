@@ -58,7 +58,7 @@ func reportGatewayFixture(t *testing.T) (*ReportGatewayCatalog, *localFixtureSou
 			return identity.ErrResourceDenied
 		}
 		return nil
-	}, Bindings: []LocalResourceBinding{{Changes: source, URI: "report://steward/sales", Title: "Approved", FormatVersion: 1, Resolver: func(_ context.Context, a identity.VerifiedActor, _ string) (*identity.ResourceResolver, error) {
+	}, Bindings: []LocalResourceBinding{{Changes: source, URI: "report://example/sales", Title: "Approved", FormatVersion: 1, Resolver: func(_ context.Context, a identity.VerifiedActor, _ string) (*identity.ResourceResolver, error) {
 		return &identity.ResourceResolver{ProviderIdentity: "internal", Source: source, Policy: boundedReportFixturePolicy{actor: a, until: until}}, nil
 	}}}, Validators: map[string]LocalResourceValidator{"report": ValidateReportEnvelope}})
 	require.NoError(t, err)

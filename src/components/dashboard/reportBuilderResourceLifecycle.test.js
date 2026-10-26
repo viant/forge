@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import {buildReportBuilderResourceSaveRequest,buildReportResourceRunRequest,validateReportResourceRunResult,resourceEditorDocument,resourceEditorDefinition} from "./reportBuilderResourceLifecycle.js";
-const pin={uri:"report://steward/performance",kind:"working",contentFingerprint:"a".repeat(64),authorityBinding:"alice-account"};
+const pin={uri:"report://example/performance",kind:"working",contentFingerprint:"a".repeat(64),authorityBinding:"alice-account"};
 const request={reportDocument:{title:"New title"},reportSpec:{title:"New title"},reportId:"old-local-id",artifactRef:"old-local-alias",title:"New title"};
 const current={resource:pin,rowEtag:8,draftRevision:3,resourceDefinition:{schemaVersion:1,format:"forge.authoredReport",reportDocument:{title:"Old"},builderDefinition:{id:"trusted"},dependencies:[{id:"source",contentFingerprint:"b".repeat(64)}]}};
 const update=buildReportBuilderResourceSaveRequest(request,{current,idempotencyKey:"update-one"});

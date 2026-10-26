@@ -1431,8 +1431,8 @@ formattingRules:
     operator: between
     values: [0, 7]
     target: cell
-    className: steward-value-warning
+    className: example-value-warning
 ```
 
 For whole-row highlighting, use `target: row` and a workspace row class such as
-`steward-row-warning`. Keep thresholds in metadata and colors in semantic CSS tokens.
+`example-row-warning`. Keep thresholds in metadata and colors in semantic CSS tokens.

@@ -51,10 +51,10 @@ it('shows the diagnostic published opener only after a host callback is register
   trace.setOpenPublishedWindow(open);
   expect(controls.hidden).toBe(false);
   document.querySelector('#test-timing-provider').value='unknown-provider';
-  document.querySelector('#test-timing-uri').value='window://dspui/orderList';
+  document.querySelector('#test-timing-uri').value='window://sampleui/orderList';
   document.querySelector('#test-timing-open').click();
   await new Promise(resolve=>setTimeout(resolve,0));
-  expect(open).toHaveBeenCalledWith({providerIdentity:'unknown-provider',uri:'window://dspui/orderList',title:'Order List'});
+  expect(open).toHaveBeenCalledWith({providerIdentity:'unknown-provider',uri:'window://sampleui/orderList',title:'Order List'});
   expect(clock.clearResourceTimings).toHaveBeenCalledOnce();
   expect(fetch).not.toHaveBeenCalled(); // Only the host's normal workspace route can issue the GET.
   trace.setOpenPublishedWindow(null);

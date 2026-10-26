@@ -164,7 +164,7 @@ func TestNativeSnapshotTracksFirstOutsideDependencyAndIgnoresUnrelatedRootEntrie
 	extensionWrite(t, root, "imports/body.json", `{"schemaVersion":1,"reportDocument":{"title":"First"},"reportSpec":{"title":"First"}}`)
 	file := filepath.Join(root, "imports/body.json")
 	changeDuringLoad := true
-	definition := NativeSnapshotDefinition{URI: "report://steward/imported", Title: "Imported", FormatVersion: 1, File: "imports/body.json", Load: func(ctx context.Context, reader *ExtensionReader, name string) (json.RawMessage, error) {
+	definition := NativeSnapshotDefinition{URI: "report://example/imported", Title: "Imported", FormatVersion: 1, File: "imports/body.json", Load: func(ctx context.Context, reader *ExtensionReader, name string) (json.RawMessage, error) {
 		raw, err := reader.ReadFile(ctx, name)
 		if err != nil {
 			return nil, err
@@ -208,7 +208,7 @@ func TestNativeSnapshotCompilationDropsCallerValues(t *testing.T) {
 	const file = "extension/forge/reporting/definition.json"
 	extensionWrite(t, root, file, `{"schemaVersion":1,"reportDocument":{"title":"Static"},"reportSpec":{"title":"Static"}}`)
 	type actorKey struct{}
-	definition := NativeSnapshotDefinition{URI: "report://steward/static", Title: "Static", FormatVersion: 1, File: file, Load: func(ctx context.Context, reader *ExtensionReader, name string) (json.RawMessage, error) {
+	definition := NativeSnapshotDefinition{URI: "report://example/static", Title: "Static", FormatVersion: 1, File: file, Load: func(ctx context.Context, reader *ExtensionReader, name string) (json.RawMessage, error) {
 		require.Nil(t, ctx.Value(actorKey{}))
 		return reader.ReadFile(ctx, name)
 	}}

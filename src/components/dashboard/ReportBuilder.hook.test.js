@@ -185,19 +185,19 @@ const strippedContext = {
     metadata: { namespace: "Performance Metrics" },
     lookupHandler(name) {
         strippedHandlerCalls.push(name);
-        if (name === "stewardReportBuilder.buildRequest") {
+        if (name === "exampleReportBuilder.buildRequest") {
             return strippedHandler;
         }
         throw new Error(`missing ${name}`);
     },
 };
 assert.equal(
-    resolveReportBuilderHookHandler(strippedContext, "Performance Metrics.stewardReportBuilder.buildRequest"),
+    resolveReportBuilderHookHandler(strippedContext, "Performance Metrics.exampleReportBuilder.buildRequest"),
     strippedHandler,
 );
 assert.deepEqual(strippedHandlerCalls, [
-    "Performance Metrics.stewardReportBuilder.buildRequest",
-    "stewardReportBuilder.buildRequest",
+    "Performance Metrics.exampleReportBuilder.buildRequest",
+    "exampleReportBuilder.buildRequest",
 ]);
 
 const suffixFallbackCalls = [];
@@ -206,19 +206,19 @@ const suffixFallbackContext = {
     metadata: {},
     lookupHandler(name) {
         suffixFallbackCalls.push(name);
-        if (name === "stewardReportBuilder.buildRequest") {
+        if (name === "exampleReportBuilder.buildRequest") {
             return suffixFallbackHandler;
         }
         throw new Error(`missing ${name}`);
     },
 };
 assert.equal(
-    resolveReportBuilderHookHandler(suffixFallbackContext, "Performance Metrics.stewardReportBuilder.buildRequest"),
+    resolveReportBuilderHookHandler(suffixFallbackContext, "Performance Metrics.exampleReportBuilder.buildRequest"),
     suffixFallbackHandler,
 );
 assert.deepEqual(suffixFallbackCalls, [
-    "Performance Metrics.stewardReportBuilder.buildRequest",
-    "stewardReportBuilder.buildRequest",
+    "Performance Metrics.exampleReportBuilder.buildRequest",
+    "exampleReportBuilder.buildRequest",
 ]);
 
 const stateHookContext = {

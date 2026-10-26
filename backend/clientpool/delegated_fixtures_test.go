@@ -18,7 +18,7 @@ func delegatedConfig(disableSwitch bool) *mcpcfg.MCPClient {
 			Auth: &mcp.ClientAuth{
 				Mode:        authcfg.ModeOAuth,
 				ProviderRef: "adelphic-dev6",
-				ClientRef:   "steward-web",
+				ClientRef:   "example-web",
 				Resource:    "https://mcp6.example.com/mcp",
 				Scopes:      []string{"plan:create"},
 			},

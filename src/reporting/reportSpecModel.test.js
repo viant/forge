@@ -291,7 +291,7 @@ const datasetCatalogConfig = {
       },
       source: {
         kind: "mcp",
-        server: "steward",
+        server: "example",
         tool: "reach.summary",
       },
       resultContract: {
@@ -335,7 +335,7 @@ assert.deepEqual(normalizeReportBuilderPublishedDataSources(datasetCatalogConfig
       },
       source: {
         kind: "mcp",
-        server: "steward",
+        server: "example",
         tool: "reach.summary",
       },
       resultContract: {
@@ -506,7 +506,7 @@ assert.deepEqual(
   datasetCatalogSpec.datasets.find((dataset) => dataset.id === "reach_summary")?.source,
   {
     kind: "mcp",
-    server: "steward",
+    server: "example",
     tool: "reach.summary",
   },
 );

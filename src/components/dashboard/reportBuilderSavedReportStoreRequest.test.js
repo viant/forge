@@ -85,7 +85,7 @@ assert.deepEqual(buildReportBuilderSaveReportRequest(savedReportPayload, {
     savedReportPayloadRecord,
     metadata: {
         conversationId: "conv-123",
-        workspaceId: "steward",
+        workspaceId: "example",
     },
 }), {
     artifactRef: "reportBuilder.savedReportPayload://rbreport_forecasting_q3",
@@ -140,7 +140,7 @@ assert.deepEqual(buildReportBuilderSaveReportRequest(savedReportPayload, {
             },
         },
         conversationId: "conv-123",
-        workspaceId: "steward",
+        workspaceId: "example",
     },
 });
 

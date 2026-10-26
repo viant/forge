@@ -57,7 +57,7 @@ func (c *mcpOnlyDefinitionClient) ListTools(context.Context, *string, ...mcpclie
 }
 func (c *mcpOnlyDefinitionClient) CallTool(_ context.Context, params *schema.CallToolRequestParams, _ ...mcpclient.RequestOption) (*schema.CallToolResult, error) {
 	require.Equal(c.t, "namespaces/list", params.Name)
-	return &schema.CallToolResult{StructuredContent: map[string]any{"namespaces": []any{map[string]any{"uri": "ns://dspui", "name": "DSPUI"}}}}, nil
+	return &schema.CallToolResult{StructuredContent: map[string]any{"namespaces": []any{map[string]any{"uri": "ns://sampleui", "name": "SAMPLEUI"}}}}, nil
 }
 func (c *mcpOnlyDefinitionClient) ListResourcesWithParams(_ context.Context, params *schema.ListResourcesRequestParams, _ ...mcpclient.RequestOption) (*schema.ListResourcesResult, error) {
 	c.filters++
@@ -66,16 +66,16 @@ func (c *mcpOnlyDefinitionClient) ListResourcesWithParams(_ context.Context, par
 	var meta map[string]any
 	require.NoError(c.t, json.Unmarshal(raw, &meta))
 	filter := meta[resourceFilterExtension].(map[string]any)
-	require.Equal(c.t, "ns://dspui", filter["namespace"])
+	require.Equal(c.t, "ns://sampleui", filter["namespace"])
 	if filter["kind"] != "mcp" {
 		if !c.allowGeneric {
 			c.t.Fatal("MCP definition lookup walked unrelated resource kinds")
 		}
 	}
 	require.EqualValues(c.t, 100, filter["limit"])
-	resources := []schema.Resource{{Uri: "mcp://dspui/platform", Name: "mcp://dspui/platform"}, {Uri: "mcp://dspui/steward", Name: "mcp://dspui/steward"}}
+	resources := []schema.Resource{{Uri: "mcp://sampleui/platform", Name: "mcp://sampleui/platform"}, {Uri: "mcp://sampleui/example", Name: "mcp://sampleui/example"}}
 	if filter["kind"] != "mcp" {
-		resources = append(resources, schema.Resource{Uri: "window://dspui/other", Name: "window://dspui/other"})
+		resources = append(resources, schema.Resource{Uri: "window://sampleui/other", Name: "window://sampleui/other"})
 	}
 	return &schema.ListResourcesResult{Resources: resources}, nil
 }
@@ -84,7 +84,7 @@ func (c *mcpOnlyDefinitionClient) ReadResource(_ context.Context, params *schema
 	if c.denied {
 		return nil, errors.New("owning producer denied")
 	}
-	require.Equal(c.t, "mcp://dspui/platform", params.Uri)
+	require.Equal(c.t, "mcp://sampleui/platform", params.Uri)
 	text := `{"name":"platform","transport":{"type":"streamable","url":"https://example.invalid/mcp"}}`
 	item := schema.ReadResourceResultContentsElem{Uri: params.Uri, Text: text}
 	if c.reportedOwner != "" {
@@ -97,7 +97,7 @@ func TestMCPReferenceReaderFiltersOnlyDefinitionsAndRetainsExactReadGuard(t *tes
 	client := &mcpOnlyDefinitionClient{t: t}
 	mgr, err := manager.New(nil)
 	require.NoError(t, err)
-	require.NoError(t, mgr.RegisterLocal(context.Background(), "owned", &cfg.MCPClient{ClientOptions: &mcp.ClientOptions{}, PrimitiveProviderIdentity: "producer", PrimitiveNamespaces: []string{"ns://dspui"}, ResourceCacheScopes: map[string]string{"*": cfg.ResourceCachePublic}}, func(context.Context) (mcpclient.Interface, error) { return client, nil }))
+	require.NoError(t, mgr.RegisterLocal(context.Background(), "owned", &cfg.MCPClient{ClientOptions: &mcp.ClientOptions{}, PrimitiveProviderIdentity: "producer", PrimitiveNamespaces: []string{"ns://sampleui"}, ResourceCacheScopes: map[string]string{"*": cfg.ResourceCachePublic}}, func(context.Context) (mcpclient.Interface, error) { return client, nil }))
 	defer mgr.CloseConversation("")
 	actor, verify := PublicReadActors()
 	g := NewGateway(mgr, actor, verify, "consumer")
@@ -149,14 +149,14 @@ func TestMCPReferenceReaderFullLoadUsesKindScopedIndexWithoutChangingGenericInve
 	require.NoError(t, err)
 	localURI, err := identity.ParseResourceURI("mcp://workspace/owned")
 	require.NoError(t, err)
-	localRaw := json.RawMessage(`{"name":"owned","transport":{"type":"streamable","url":"https://example.invalid/mcp"},"primitiveProviderIdentity":"producer","primitiveNamespaces":["ns://dspui"],"resourceCacheScopes":{"*":"user"}}`)
+	localRaw := json.RawMessage(`{"name":"owned","transport":{"type":"streamable","url":"https://example.invalid/mcp"},"primitiveProviderIdentity":"producer","primitiveNamespaces":["ns://sampleui"],"resourceCacheScopes":{"*":"user"}}`)
 	localSource := &indexedWindowSource{uri: localURI, raw: localRaw}
 	unrelatedURI, err := identity.ParseResourceURI("mcp://workspace/datastudio")
 	require.NoError(t, err)
 	unrelatedSource := &indexedWindowSource{uri: unrelatedURI, raw: json.RawMessage(`{"name":"datastudio","transport":{"type":"streamable","url":"https://unrelated.invalid/mcp"},"primitiveProviderIdentity":"datastudio-owner","primitiveNamespaces":["ns://datastudio"],"resourceCacheScopes":{"*":"user"}}`)}
 	overlapURI, err := identity.ParseResourceURI("mcp://workspace/overlap")
 	require.NoError(t, err)
-	overlapSource := &indexedWindowSource{uri: overlapURI, raw: json.RawMessage(`{"name":"overlap","transport":{"type":"streamable","url":"https://overlap.invalid/mcp"},"primitiveProviderIdentity":"second-producer","primitiveNamespaces":["ns://dspui"],"resourceCacheScopes":{"*":"user"}}`)}
+	overlapSource := &indexedWindowSource{uri: overlapURI, raw: json.RawMessage(`{"name":"overlap","transport":{"type":"streamable","url":"https://overlap.invalid/mcp"},"primitiveProviderIdentity":"second-producer","primitiveNamespaces":["ns://sampleui"],"resourceCacheScopes":{"*":"user"}}`)}
 	localActor, localVerify := PublicReadActors()
 	binding := func(uri identity.ResourceURI, source *indexedWindowSource) LocalResourceBinding {
 		return LocalResourceBinding{URI: uri.String(), FormatVersion: 1, Resolver: func(_ context.Context, _ identity.VerifiedActor, _ string) (*identity.ResourceResolver, error) {
@@ -211,16 +211,16 @@ func TestMCPReferenceReaderFullLoadUsesKindScopedIndexWithoutChangingGenericInve
 	require.True(t, bound)
 	alice := authctx.WithUserInfo(context.Background(), &authctx.UserInfo{Subject: "alice"})
 	bob := authctx.WithUserInfo(context.Background(), &authctx.UserInfo{Subject: "bob"})
-	definition, err := reader.Load(alice, "mcp://dspui/platform")
+	definition, err := reader.Load(alice, "mcp://sampleui/platform")
 	require.NoError(t, err)
-	require.Equal(t, "mcp://dspui/platform", definition.ResolvedIdentity.ResourceURI)
+	require.Equal(t, "mcp://sampleui/platform", definition.ResolvedIdentity.ResourceURI)
 	require.Equal(t, "producer", definition.ResolvedIdentity.ProviderIdentity)
 	require.Equal(t, 1, remote.reads)
 	require.Positive(t, remote.filters)
-	require.Zero(t, unrelatedCalls, "an exact DSPUI URI must skip the Data Studio namespace root")
+	require.Zero(t, unrelatedCalls, "an exact SAMPLEUI URI must skip the Data Studio namespace root")
 	firstFilters := remote.filters
 	for i := 0; i < 100; i++ {
-		cached, err := reader.Load(alice, "mcp://dspui/platform")
+		cached, err := reader.Load(alice, "mcp://sampleui/platform")
 		require.NoError(t, err)
 		require.Equal(t, definition.ResolvedIdentity, cached.ResolvedIdentity)
 	}
@@ -229,29 +229,29 @@ func TestMCPReferenceReaderFullLoadUsesKindScopedIndexWithoutChangingGenericInve
 	require.Equal(t, 1, remote.initializes, "warm definition loads must reuse negotiated capabilities")
 	require.Zero(t, remote.discovers)
 	require.NotNil(t, remote.handler)
-	remote.handler.OnNotification(context.Background(), &jsonrpc.Notification{Method: "notifications/resources/updated", Params: json.RawMessage(`{"uri":"mcp://dspui/platform"}`)})
+	remote.handler.OnNotification(context.Background(), &jsonrpc.Notification{Method: "notifications/resources/updated", Params: json.RawMessage(`{"uri":"mcp://sampleui/platform"}`)})
 	beforeUpdate := remote.filters
-	_, err = reader.Load(alice, "mcp://dspui/platform")
+	_, err = reader.Load(alice, "mcp://sampleui/platform")
 	require.NoError(t, err)
 	require.Greater(t, remote.filters, beforeUpdate, "source content update must invalidate the selection memo")
 	beforeReconnect := remote.filters
 	_, err = mgr.Reconnect(alice, "", "owned")
 	require.NoError(t, err)
-	_, err = reader.Load(alice, "mcp://dspui/platform")
+	_, err = reader.Load(alice, "mcp://sampleui/platform")
 	require.NoError(t, err)
 	require.Greater(t, remote.filters, beforeReconnect, "connection replacement must relist the owning provider")
 	rotated := authctx.WithIDToken(alice, "fixture-rotated-credential")
-	_, err = reader.Load(rotated, "mcp://dspui/platform")
+	_, err = reader.Load(rotated, "mcp://sampleui/platform")
 	require.NoError(t, err)
 	require.Greater(t, remote.filters, firstFilters, "credential change must relist the source")
 	beforeRevision := remote.filters
 	identityRevision = "v2"
-	_, err = reader.Load(alice, "mcp://dspui/platform")
+	_, err = reader.Load(alice, "mcp://sampleui/platform")
 	require.NoError(t, err)
 	require.Greater(t, remote.filters, beforeRevision, "verified identity revision must relist the source")
 	// Bob's visible catalog is different and cannot reuse Alice's selection.
 	remote.denied = true
-	_, err = reader.Load(bob, "mcp://dspui/platform")
+	_, err = reader.Load(bob, "mcp://sampleui/platform")
 	require.Error(t, err)
 	require.Zero(t, unrelatedCalls)
 	remote.denied = false
@@ -259,13 +259,13 @@ func TestMCPReferenceReaderFullLoadUsesKindScopedIndexWithoutChangingGenericInve
 	// unrelated resource remains visible once the producer allows that query.
 	remote.allowGeneric = true
 	provider.names = []string{"owned"}
-	rows, err := g.List(alice, "window", "dspui")
+	rows, err := g.List(alice, "window", "sampleui")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
-	require.Equal(t, "window://dspui/other", rows[0].Resource.URI)
+	require.Equal(t, "window://sampleui/other", rows[0].Resource.URI)
 	readerWithOverlap, err := NewMCPReferenceReader(g, MCPDefinitionSource{ConnectionName: "configuration", ProviderIdentity: "configuration", Namespace: "workspace"}, []identity.ResourceRef{{URI: "mcp://workspace/owned"}, {URI: "mcp://workspace/overlap"}})
 	require.NoError(t, err)
-	_, err = readerWithOverlap.Load(alice, "mcp://dspui/platform")
+	_, err = readerWithOverlap.Load(alice, "mcp://sampleui/platform")
 	require.ErrorIs(t, err, ErrCollision, "same canonical URI from two eligible owners must remain ambiguous")
 	// Configuration readers may use a fixed public actor. Distinct caller
 	// credentials must coexist under that actor rather than evicting each
@@ -275,12 +275,12 @@ func TestMCPReferenceReaderFullLoadUsesKindScopedIndexWithoutChangingGenericInve
 	require.NoError(t, err)
 	credentialA := authctx.WithIDToken(alice, "fixture-credential-a")
 	credentialB := authctx.WithIDToken(alice, "fixture-credential-b")
-	_, err = publicReader.Load(credentialA, "mcp://dspui/platform")
+	_, err = publicReader.Load(credentialA, "mcp://sampleui/platform")
 	require.NoError(t, err)
-	_, err = publicReader.Load(credentialB, "mcp://dspui/platform")
+	_, err = publicReader.Load(credentialB, "mcp://sampleui/platform")
 	require.NoError(t, err)
 	filtersAfterBoth := remote.filters
-	_, err = publicReader.Load(credentialA, "mcp://dspui/platform")
+	_, err = publicReader.Load(credentialA, "mcp://sampleui/platform")
 	require.NoError(t, err)
 	require.Equal(t, filtersAfterBoth, remote.filters, "returning to an authorized credential must reuse its own selection")
 	require.Len(t, publicReader.memo, 2)

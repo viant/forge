@@ -245,12 +245,12 @@ class ActionHookRuntimeTest {
         val state = runtime.openWindow("advertiser")
         withTimeout(1_000) { runtime.metadataSignal(state.windowId).flow.filterNotNull().first() }
 
-        runtime.updatePreviewPrincipal(state.windowId, setOf("ADMIN", "VIEWER"), setOf("EXPOSE_CAPI"))
+        runtime.updatePreviewPrincipal(state.windowId, setOf("ADMIN", "VIEWER"), setOf("EXPOSE_CONTACT"))
 
         val updated = runtime.metadataSignal(state.windowId).peek()!!.authorizationSnapshot
         val principal = updated["principal"]!!.jsonObject
         assertEquals(listOf("ADMIN", "VIEWER"), principal["roles"]!!.let { it as JsonArray }.map { it.jsonPrimitive.content })
-        assertEquals(listOf("EXPOSE_CAPI"), principal["features"]!!.let { it as JsonArray }.map { it.jsonPrimitive.content })
+        assertEquals(listOf("EXPOSE_CONTACT"), principal["features"]!!.let { it as JsonArray }.map { it.jsonPrimitive.content })
         assertEquals(false, updated["resource"]!!.jsonObject["capabilities"]!!.jsonObject["write"]!!.jsonPrimitive.content.toBoolean())
     }
 

@@ -39,7 +39,7 @@ describe('applyWindowPermissionMetadata', () => {
   it('recognizes only a bound canonical cohort GET as an already-admitted delivery', () => {
     const hash='a'.repeat(64),etag=`"${hash}.cohort-v2"`;
     const responseInfo={artifactHash:hash,etag};
-    const window={providerIdentity:'studio',resourceRef:{uri:'window://dspui/orderList'}};
+    const window={providerIdentity:'studio',resourceRef:{uri:'window://sampleui/orderList'}};
     const metadata={view:{content:{id:'root'}},authorization:{scope:'window'}};
     expect(isAdmittedPublishedWindowResponse(responseInfo,window,metadata)).toBe(true);
     expect(isAdmittedPublishedWindowResponse({artifactHash:hash,etag:'"legacy"'},window,metadata)).toBe(false);

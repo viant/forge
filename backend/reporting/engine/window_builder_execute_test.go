@@ -55,7 +55,7 @@ func TestWindowBuilderRetainsOriginalSourceAndExecutionFences(t *testing.T) {
 			t.Fatal("fetch lost the original window identity")
 		}
 		during()
-		return &dsproto.FetchResult{Rows: []map[string]interface{}{{"channelV2": "CTV", "eventDate": "2026-10-07", "avails": 10, "hhUniqs": 5}}}, nil
+		return &dsproto.FetchResult{Rows: []map[string]interface{}{{"category": "Sample", "day": "2026-10-07", "amount": 10, "count": 5}}}, nil
 	})
 	request := &ExecuteResourceRequest{Resource: &identity.ResourceRef{URI: uri.String()}}
 	if _, err = service.ExecuteResource(context.Background(), request); err == nil || derivations != 0 || calls != 0 {

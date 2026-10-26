@@ -24,16 +24,16 @@ reportBuilder:
 	extensionWrite(t, root, "extension/forge/reporting/profiles/profile.json", `{"kind":"forge.reporting.presentationProfileCatalog","schemaVersion":1,"familyId":"metrics","views":[{"reportId":"overview","visualProfile":"overview","revision":"1","tabs":[{"id":"main","title":"Main","blockIds":["intro"]}],"blocks":[{"id":"intro","kind":"markdownBlock"}]}]}`)
 	extensionWrite(t, root, "extension/forge/reporting/report.yaml", `kind: forge.reporting.report
 id: delivery
-namespace: steward
+namespace: example
 name: delivery
-resourceUri: report://steward/delivery
+resourceUri: report://example/delivery
 builderRef: metrics
 label: Delivery
 documentPatch: {title: Delivery, blocks: [{id: intro, kind: markdownBlock, markdown: Hello}]}
 statePatch: {selectedMeasures: [spend]}
 `)
 	options := reportcatalog.ReportResourceOptions{Options: registry.Options{WorkspaceRoot: root}, BuilderWindows: map[string]string{"metrics": "campaign/detail"}}
-	return root, NativeSnapshotDefinition{URI: "report://steward/delivery", Title: "Delivery", FormatVersion: 1, File: "extension/forge/reporting/report.yaml", Load: NativeReportLoader("report://steward/delivery", options, nil)}
+	return root, NativeSnapshotDefinition{URI: "report://example/delivery", Title: "Delivery", FormatVersion: 1, File: "extension/forge/reporting/report.yaml", Load: NativeReportLoader("report://example/delivery", options, nil)}
 }
 func TestNativeReportSnapshotConfinesProfilesAndDatasourceImports(t *testing.T) {
 	root, definition := snapshotReportFixture(t)

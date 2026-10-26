@@ -119,7 +119,7 @@ const lazyMetadata = {
     import() {
       return {
         'Performance Metrics': {
-          stewardReportBuilder: {
+          exampleReportBuilder: {
             buildRequest() {
               return 'ok';
             },
@@ -139,7 +139,7 @@ const lazyMetadata = {
 };
 
 const lazyContext = Context('W_ctx_lazy', lazyMetadata, 'lookup', {});
-const lazyHandler = lazyContext.lookupHandler('Performance Metrics.stewardReportBuilder.buildRequest');
+const lazyHandler = lazyContext.lookupHandler('Performance Metrics.exampleReportBuilder.buildRequest');
 assert.equal(typeof lazyHandler, 'function');
 assert.equal(lazyHandler(), 'ok');
 

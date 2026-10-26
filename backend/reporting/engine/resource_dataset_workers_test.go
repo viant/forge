@@ -20,7 +20,7 @@ func parallelReportFixture(t *testing.T, concurrency int, allowed *atomic.Bool, 
 	if err != nil {
 		t.Fatal(err)
 	}
-	uri, _ := identity.ParseResourceURI("report://steward/forecast_supply_command_center")
+	uri, _ := identity.ParseResourceURI("report://example/summary")
 	resolver := &identity.ResourceResolver{Source: &identity.LocalResource{URI: uri, Load: func(context.Context) (json.RawMessage, error) { return append(json.RawMessage(nil), raw...), nil }}, Policy: reportPolicyFunc(func(_ context.Context, _ identity.ResourceRef, c []identity.ResourceCandidate) (identity.ResourceDecision, error) {
 		if !allowed.Load() {
 			return identity.ResourceDecision{}, identity.ErrResourceDenied
@@ -36,7 +36,7 @@ func parallelReportFixture(t *testing.T, concurrency int, allowed *atomic.Bool, 
 		if err := execute(ctx); err != nil {
 			return "", err
 		}
-		return `{"data":[{"channelV2":"CTV","eventDate":"2026-10-07","avails":10,"hhUniqs":5}]}`, nil
+		return `{"data":[{"category":"Sample","day":"2026-10-07","amount":10,"count":5}]}`, nil
 	}), service.AuthorizeResourceDataset))
 	return service, &ExecuteResourceRequest{Resource: &identity.ResourceRef{URI: uri.String()}}
 }
@@ -134,13 +134,13 @@ func TestReportExecutionSelectsOneCompiledTableBeforeProducerFetch(t *testing.T)
 		calls.Add(1)
 		return nil
 	})
-	selected := "supplyTable"
+	selected := "detailTable"
 	request.TableBlockID = &selected
 	result, err := service.ExecuteResource(context.Background(), request)
-	if err != nil || result == nil || len(result.Datasets) != 1 || result.Datasets["forecast_last_7_days"] == nil || calls.Load() != 1 || len(result.ReportFill) == 0 {
+	if err != nil || result == nil || len(result.Datasets) != 1 || result.Datasets["daily"] == nil || calls.Load() != 1 || len(result.ReportFill) == 0 {
 		t.Fatalf("selected table fetched unrelated datasets: result=%v err=%v calls=%d", result != nil, err, calls.Load())
 	}
-	for _, id := range []string{"missing", "summaryAvails", ""} {
+	for _, id := range []string{"missing", "summaryMetric", ""} {
 		before := calls.Load()
 		request.TableBlockID = &id
 		if result, err := service.ExecuteResource(context.Background(), request); !errors.Is(err, identity.ErrResourceDenied) || result != nil || calls.Load() != before {
@@ -148,7 +148,7 @@ func TestReportExecutionSelectsOneCompiledTableBeforeProducerFetch(t *testing.T)
 		}
 	}
 	request.TableBlockID = &selected
-	request.DatasetIDs = []string{"forecast_last_7_days"}
+	request.DatasetIDs = []string{"daily"}
 	before := calls.Load()
 	if result, err := service.ExecuteResource(context.Background(), request); !errors.Is(err, identity.ErrResourceDenied) || result != nil || calls.Load() != before {
 		t.Fatalf("table selector combined with caller dataset override: err=%v calls=%d", err, calls.Load())

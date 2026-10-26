@@ -540,7 +540,7 @@ assert.deepEqual(
             reportDocumentReopenSession: {
                 reportId: "performanceInventoryBrief",
                 documentVersion: 8,
-                reopenedSemanticFingerprint: '{"modelRef":"model://steward/performance/line_delivery@v1"}',
+                reopenedSemanticFingerprint: '{"modelRef":"model://example/performance/line_delivery@v1"}',
             },
         },
         {
@@ -559,7 +559,7 @@ assert.deepEqual(
             reportDocumentReopenSession: {
                 reportId: "performanceInventoryBrief",
                 documentVersion: 8,
-                reopenedSemanticFingerprint: '{"modelRef":"model://steward/performance/line_delivery@v1"}',
+                reopenedSemanticFingerprint: '{"modelRef":"model://example/performance/line_delivery@v1"}',
             },
         },
     ),
@@ -579,7 +579,7 @@ assert.deepEqual(
         reportDocumentReopenSession: {
             reportId: "performanceInventoryBrief",
             documentVersion: 8,
-            reopenedSemanticFingerprint: '{"modelRef":"model://steward/performance/line_delivery@v1"}',
+            reopenedSemanticFingerprint: '{"modelRef":"model://example/performance/line_delivery@v1"}',
         },
     },
 );
@@ -596,7 +596,7 @@ assert.equal(
             reportDocumentReopenSession: {
                 reportId: "performanceInventoryBrief",
                 documentVersion: 8,
-                reopenedSemanticFingerprint: '{"modelRef":"model://steward/performance/line_delivery@v1"}',
+                reopenedSemanticFingerprint: '{"modelRef":"model://example/performance/line_delivery@v1"}',
             },
         },
         {
@@ -615,7 +615,7 @@ assert.equal(
             reportDocumentReopenSession: {
                 reportId: "performanceInventoryBrief",
                 documentVersion: 8,
-                reopenedSemanticFingerprint: '{"modelRef":"model://steward/performance/line_delivery@v1"}',
+                reopenedSemanticFingerprint: '{"modelRef":"model://example/performance/line_delivery@v1"}',
             },
         },
     ),

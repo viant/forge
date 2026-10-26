@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-const menuFixture = `{"schemaVersion":1,"applications":[{"id":"steward","title":"Workspace","icon":"applications","menus":[{"id":"advertisers","title":"Advertisers","icon":"office","action":{"type":"window","windowKey":"advertiserList","parameters":{"active":true}}},{"id":"campaigns","title":"Campaigns","icon":"timeline-events","action":{"type":"window","windowKey":"campaignList"}},{"id":"group","title":"Hidden","menus":[{"id":"secret","action":{"type":"window","windowKey":"secretWindow"}}]}]}]}`
+const menuFixture = `{"schemaVersion":1,"applications":[{"id":"example","title":"Workspace","icon":"applications","menus":[{"id":"advertisers","title":"Advertisers","icon":"office","action":{"type":"window","windowKey":"advertiserList","parameters":{"active":true}}},{"id":"campaigns","title":"Campaigns","icon":"timeline-events","action":{"type":"window","windowKey":"campaignList"}},{"id":"group","title":"Hidden","menus":[{"id":"secret","action":{"type":"window","windowKey":"secretWindow"}}]}]}]}`
 
 func menuFixtureProvider(t *testing.T) (*LocalProvider, *localFixtureSource, *identity.VerifiedActor, *bool) {
 	p, source, actor, revoked := localFixture(t)

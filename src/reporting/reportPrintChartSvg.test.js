@@ -406,10 +406,10 @@ assert.deepEqual(unsupported.diagnostics, [
 console.log("reportPrintChartSvg ✓ lowers grouped, direct, and category chart payloads into deterministic SVG output");
 
 const spoColors = {
-  Direct: "var(--steward-spo-direct, #1f77b4)",
-  "Preferred - Primary": "var(--steward-spo-primary, #1a873d)",
-  "Preferred - Secondary": "var(--steward-spo-secondary, #b65b05)",
-  unknown: "var(--steward-spo-unknown, #d62728)",
+  Direct: "var(--example-spo-direct, #1f77b4)",
+  "Preferred - Primary": "var(--example-spo-primary, #1a873d)",
+  "Preferred - Secondary": "var(--example-spo-secondary, #b65b05)",
+  unknown: "var(--example-spo-unknown, #d62728)",
 };
 for (const names of [
   ["Direct", "Preferred - Primary", "Preferred - Secondary", "unknown"],

@@ -16,9 +16,9 @@ func TestReportParametersUseTrustedAliasesAndPreserveLocalScope(t *testing.T) {
 	var e registry.ReportEnvelope
 	_ = json.Unmarshal(raw, &e)
 	var ds dsproto.DataSource
-	_ = json.Unmarshal(e.DataSources["forecasting_cube_report"], &ds)
+	_ = json.Unmarshal(e.DataSources["records"], &ds)
 	params := map[string]interface{}{"from": "2026-10-01", "to": "2026-10-02"}
-	base := map[string]interface{}{"filters": map[string]interface{}{"from": "2026-10-07", "to": "2026-10-07"}, "dimensions": map[string]interface{}{"channelV2": true}, "limit": float64(25)}
+	base := map[string]interface{}{"filters": map[string]interface{}{"from": "2026-10-07", "to": "2026-10-07"}, "dimensions": map[string]interface{}{"category": true}, "limit": float64(25)}
 	args, err := reportDatasetArguments(base, params, &ds, e.BuilderDefinition, nil)
 	if err != nil {
 		t.Fatal(err)

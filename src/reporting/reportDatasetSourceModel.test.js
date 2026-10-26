@@ -13,18 +13,18 @@ assert.equal(normalizeReportDatasetCapabilities(null), null);
 assert.deepEqual(
   normalizeReportDatasetSource({
     kind: " MCPTOOL ",
-    server: " steward ",
-    tool: " steward:MetricsAdCube ",
+    server: " example ",
+    tool: " example:MetricsAdCube ",
     profile: " datly.unified_cube ",
-    contractRef: " steward://metrics/performance_cube ",
+    contractRef: " example://metrics/performance_cube ",
     ignoredArray: [],
   }),
   {
     kind: "mcp_tool",
-    server: "steward",
-    tool: "steward:MetricsAdCube",
+    server: "example",
+    tool: "example:MetricsAdCube",
     profile: "datly.unified_cube",
-    contractRef: "steward://metrics/performance_cube",
+    contractRef: "example://metrics/performance_cube",
     ignoredArray: [],
   },
 );

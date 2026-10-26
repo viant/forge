@@ -117,7 +117,7 @@ func TestLoadWindow_LoadsRootSiblingActionCodeForFolderizedWindow(t *testing.T) 
 	root := t.TempDir()
 	base := filepath.Join(root, "window", "metricReportBuilder")
 	mustWriteHandlerMetaFile(t, filepath.Join(base, "shared", "main.yaml"), "namespace: Performance Metrics\nview:\n  content: {}\n")
-	mustWriteHandlerMetaFile(t, filepath.Join(root, "window", "metricReportBuilder.js"), "(() => ({ stewardReportBuilder: { buildRequest: () => ({}) } }))()")
+	mustWriteHandlerMetaFile(t, filepath.Join(root, "window", "metricReportBuilder.js"), "(() => ({ exampleReportBuilder: { buildRequest: () => ({}) } }))()")
 
 	baseURL := "file://" + filepath.ToSlash(filepath.Join(root, "window"))
 	loader := meta.New(afs.New(), baseURL)

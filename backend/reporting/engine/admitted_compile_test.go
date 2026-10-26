@@ -36,7 +36,7 @@ func TestExecuteResourceReusesOnlyInvocationAdmittedDefinition(t *testing.T) {
 		t.Fatal(err)
 	}
 	content := append(json.RawMessage(nil), original...)
-	uri, _ := identity.ParseResourceURI("report://steward/forecast_supply_command_center")
+	uri, _ := identity.ParseResourceURI("report://example/summary")
 	allowed := true
 	expiry := time.Now().Add(time.Minute)
 	resolver := &identity.ResourceResolver{Source: &identity.LocalResource{URI: uri, Load: func(context.Context) (json.RawMessage, error) {
@@ -59,7 +59,7 @@ func TestExecuteResourceReusesOnlyInvocationAdmittedDefinition(t *testing.T) {
 	fetched := func() {}
 	service.SetResourceDatasetExecutor(func(context.Context, identity.ResolvedResource, *dsproto.DataSource, map[string]interface{}) (*dsproto.FetchResult, error) {
 		fetched()
-		return &dsproto.FetchResult{Rows: []map[string]interface{}{{"channelV2": "CTV", "eventDate": "2026-10-07", "avails": 10, "hhUniqs": 5}}}, nil
+		return &dsproto.FetchResult{Rows: []map[string]interface{}{{"category": "Sample", "day": "2026-10-07", "amount": 10, "count": 5}}}, nil
 	})
 	ctxA := context.WithValue(context.Background(), reportActorKey{}, "actor-a")
 	ctxB := context.WithValue(context.Background(), reportActorKey{}, "actor-b")

@@ -21,7 +21,7 @@ func TestCapabilityMappingUsesVerifiedPinAndNeverWorkingFallback(t *testing.T) {
 	if _, _, _, err := mapper(context.Background(), "campaign", 42, "read", false); err == nil {
 		t.Fatal("missing pin fell back to current resource")
 	}
-	pin := identity.ResolvedResource{URI: "window://steward/campaign", ResourceCandidate: identity.ResourceCandidate{Kind: identity.StampedCandidate, Revision: "1", ContentFingerprint: strings.Repeat("a", 64)}, AuthorityBinding: "verified-account", ValidUntil: time.Now().Add(time.Minute)}
+	pin := identity.ResolvedResource{URI: "window://example/campaign", ResourceCandidate: identity.ResourceCandidate{Kind: identity.StampedCandidate, Revision: "1", ContentFingerprint: strings.Repeat("a", 64)}, AuthorityBinding: "verified-account", ValidUntil: time.Now().Add(time.Minute)}
 	resource, _, selected, err := mapper(requestctx.WithResolvedResource(context.Background(), pin), "campaign", 42, "read", false)
 	if err != nil || resource.ID != pin.URI || resource.Version != "1" || resource.Kind != "window" || resource.Tenant != "trusted-tenant" || selected.ID != "42" {
 		t.Fatal("opened historical resource identity lost", resource, selected, err)

@@ -17,7 +17,7 @@ func TestPreparedReportExecutesWithoutMetadataReads(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	uri, _ := identity.ParseResourceURI("report://steward/forecast_supply_command_center")
+	uri, _ := identity.ParseResourceURI("report://example/summary")
 	reads := 0
 	expiry := time.Now().Add(time.Minute)
 	prepared := false
@@ -40,7 +40,7 @@ func TestPreparedReportExecutesWithoutMetadataReads(t *testing.T) {
 		return resolver, nil
 	}})
 	service.SetResourceDatasetExecutor(func(context.Context, identity.ResolvedResource, *dsproto.DataSource, map[string]interface{}) (*dsproto.FetchResult, error) {
-		return &dsproto.FetchResult{Rows: []map[string]interface{}{{"channelV2": "CTV", "eventDate": "2026-10-07", "avails": 10, "hhUniqs": 5}}}, nil
+		return &dsproto.FetchResult{Rows: []map[string]interface{}{{"category": "Sample", "day": "2026-10-07", "amount": 10, "count": 5}}}, nil
 	})
 	plan, err := service.PrepareReport(context.Background(), &CompileRequest{Resource: &identity.ResourceRef{URI: uri.String()}})
 	if err != nil {
@@ -59,7 +59,7 @@ func TestPreparedReportExecutesWithoutMetadataReads(t *testing.T) {
 				t.Errorf("prepared execution: %v", err)
 				return
 			}
-			result.Datasets["primary"].Rows[0]["channelV2"] = "mutated result"
+			result.Datasets["primary"].Rows[0]["category"] = "mutated result"
 		}()
 	}
 	wg.Wait()

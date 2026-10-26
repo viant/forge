@@ -5802,7 +5802,7 @@ final class ForgeIOSTests: XCTestCase {
     func testWindowMetadataSynthesizesPublishedReportBuilderViewReference() throws {
         let payload = """
         {
-          "namespace": "Steward",
+          "namespace": "Example",
           "view": {
             "contentId": "reportBuilder",
             "controls": [],
