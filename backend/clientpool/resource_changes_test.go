@@ -55,6 +55,32 @@ func TestResourceNotificationsScopeSnapshotsWithoutToolOrConnectionChanges(t *te
 	require.EqualValues(t, 1, m.ToolCatalogGeneration("one"))
 }
 
+func TestCanonicalNotificationsInvalidateAliasesWithinReceiverScope(t *testing.T) {
+	m, err := New(nil)
+	require.NoError(t, err)
+	alice := authctx.WithCanonicalUserID(context.Background(), "alice")
+	bob := authctx.WithCanonicalUserID(context.Background(), "bob")
+	canonical := "mcp://example/service"
+	m.pool = map[string]map[string]*entry{
+		"alice": {canonical: {resourceReceiver: m.resourceReceiver(alice), aliases: map[string]bool{canonical: true, "direct": true}}},
+		"bob":   {canonical: {resourceReceiver: m.resourceReceiver(bob), aliases: map[string]bool{canonical: true, "other-direct": true}}},
+	}
+	var notified []string
+	stop := m.OnResourceCatalogChange(func(name string) { notified = append(notified, name) })
+	defer stop()
+	m.notifyResourceCatalogChange(canonical, m.resourceReceiver(alice), false)
+	require.ElementsMatch(t, []string{canonical, "direct"}, notified)
+	require.Equal(t, [2]uint64{0, 1}, m.ResourceCatalogGeneration(alice, "direct"))
+	require.Equal(t, [2]uint64{}, m.ResourceCatalogGeneration(bob, "direct"))
+	require.Equal(t, [2]uint64{}, m.ResourceCatalogGeneration(alice, "other-direct"))
+	m.notifyResourceUpdated(canonical, m.resourceReceiver(alice), false, "window://example/list")
+	require.Equal(t, [2]uint64{0, 1}, m.ResourceContentGeneration(alice, "direct"))
+	require.Equal(t, [2]uint64{}, m.ResourceContentGeneration(bob, "other-direct"))
+	m.notifyCatalogChange(canonical)
+	require.EqualValues(t, 1, m.ToolCatalogGeneration(canonical))
+	require.EqualValues(t, 1, m.ToolCatalogGeneration("direct"))
+}
+
 func TestURIResourceNotificationUsesEntryInvalidationWhileListChangeIsCoarse(t *testing.T) {
 	mgr, err := New(nil)
 	require.NoError(t, err)

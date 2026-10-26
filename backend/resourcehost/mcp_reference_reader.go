@@ -139,8 +139,42 @@ func (r *MCPReferenceReader) internalDefinition(ctx context.Context, ref identit
 		return nil, err
 	}
 	uri, _ := identity.ParseResourceURI(ref.URI)
-	result.Definition.ResolvedIdentity = &mcpcfg.ResolvedServiceIdentity{ServiceName: uri.Name, ResourceURI: ref.URI, ProviderIdentity: result.ResolvedResource.ProviderIdentity}
+	name, err := configuredConnectionName(result.Definition, uri.Name)
+	if err != nil {
+		return nil, err
+	}
+	result.Definition.ResolvedIdentity = &mcpcfg.ResolvedServiceIdentity{ServiceName: name, ResourceURI: ref.URI, ProviderIdentity: result.ResolvedResource.ProviderIdentity}
 	return r.effectiveOptions(ctx, r.internalRoot(), r.internal.Namespace, result.Definition)
+}
+
+// A canonical MCP name is an explicit operator binding, not endpoint inference.
+// Ordinary client names retain their existing local alias behavior.
+func configuredConnectionName(config *mcpcfg.MCPClient, fallback string) (string, error) {
+	if config == nil || config.ClientOptions == nil || !strings.HasPrefix(strings.TrimSpace(config.Name), "mcp://") {
+		return fallback, nil
+	}
+	uri, err := identity.ParseResourceURI(strings.TrimSpace(config.Name))
+	if err != nil || uri.Kind != "mcp" {
+		return "", fmt.Errorf("invalid canonical MCP connection name")
+	}
+	return uri.String(), nil
+}
+
+func (r *MCPReferenceReader) catalogConnectionNames(ctx context.Context) (map[string]string, error) {
+	names, owners := map[string]string{}, map[string]string{}
+	for _, ref := range r.catalogs {
+		uri, _ := identity.ParseResourceURI(ref.URI)
+		config, err := r.internalDefinition(ctx, ref)
+		if err != nil {
+			return nil, err
+		}
+		name := config.ResolvedIdentity.ServiceName
+		if previous := owners[name]; previous != "" && previous != uri.Name {
+			return nil, fmt.Errorf("%w: multiple configured connections claim one canonical MCP name", ErrCollision)
+		}
+		names[uri.Name], owners[name] = name, uri.Name
+	}
+	return names, nil
 }
 func (r *MCPReferenceReader) effectiveOptions(ctx context.Context, source Connection, namespace string, config *mcpcfg.MCPClient) (*mcpcfg.MCPClient, error) {
 	options, err := r.gateway.Manager.Options(ctx, source.Name)
@@ -209,6 +243,18 @@ func (r *MCPReferenceReader) inventory(ctx context.Context, external bool, targe
 		}
 	}
 	localNames := map[string]bool{}
+	canonicalNames := map[string]bool{}
+	if external {
+		configured, err := r.catalogConnectionNames(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for alias, name := range configured {
+			if alias != name {
+				canonicalNames[name] = true
+			}
+		}
+	}
 	for _, row := range rows {
 		if row.Connection.Name == r.internal.ConnectionName {
 			if r.reserved[row.Resource.Name] {
@@ -223,7 +269,7 @@ func (r *MCPReferenceReader) inventory(ctx context.Context, external bool, targe
 		// Operator-owned definitions win by logical MCP name, including callers
 		// using the published canonical service URI. In-process names above remain
 		// reserved independently; this never changes ordinary resource selection.
-		if row.Connection.Name != r.internal.ConnectionName && localNames[row.Resource.Name] {
+		if row.Connection.Name != r.internal.ConnectionName && (localNames[row.Resource.Name] || canonicalNames[row.Resource.URI]) {
 			continue
 		}
 		origin := row.Connection.Name + "\x00" + row.Connection.ProviderIdentity + "\x00" + row.Resource.URI
@@ -247,17 +293,27 @@ func (r *MCPReferenceReader) metadataContext(ctx context.Context) context.Contex
 }
 func (r *MCPReferenceReader) List(ctx context.Context) ([]string, error) {
 	ctx = r.metadataContext(ctx)
+	canonical, err := r.catalogConnectionNames(ctx)
+	if err != nil {
+		return nil, err
+	}
 	rows, err := r.inventory(ctx, true)
 	if err != nil {
 		return nil, err
 	}
 	names := make([]string, 0, len(rows))
+	seen := map[string]bool{}
 	for _, row := range rows {
 		name := row.Resource.Name
 		if row.Connection.Name != r.internal.ConnectionName {
 			name = row.Resource.URI
+		} else if resolved := canonical[name]; resolved != "" {
+			name = resolved
 		}
-		names = append(names, name)
+		if !seen[name] {
+			names = append(names, name)
+			seen[name] = true
+		}
 	}
 	sort.Strings(names)
 	return names, nil
@@ -266,13 +322,16 @@ func (r *MCPReferenceReader) List(ctx context.Context) ([]string, error) {
 // CatalogNames preserves configured discovery roots without promoting every
 // datasource's published MCP backend into a second resource provider.
 func (r *MCPReferenceReader) CatalogNames(ctx context.Context) ([]string, error) {
-	rows, err := r.inventory(r.metadataContext(ctx), false)
-	if err != nil {
-		return nil, err
-	}
-	names := make([]string, 0, len(rows))
-	for _, row := range rows {
-		names = append(names, row.Resource.Name)
+	// Catalog roots are explicit routing declarations. Internal MCP definitions
+	// also contain ordinary tool connections, whose availability cannot gate
+	// unrelated resource discovery. The manager adds registered local providers.
+	names := make([]string, 0, len(r.catalogs))
+	for _, ref := range r.catalogs {
+		uri, err := identity.ParseResourceURI(ref.URI)
+		if err != nil {
+			return nil, err
+		}
+		names = append(names, uri.Name)
 	}
 	sort.Strings(names)
 	return names, nil
@@ -288,6 +347,20 @@ func (r *MCPReferenceReader) Load(ctx context.Context, name string) (*mcpcfg.MCP
 		uri, _ := identity.ParseResourceURI(ref.URI)
 		if name == uri.Name || name == ref.URI {
 			return r.internalDefinition(ctx, ref)
+		}
+	}
+	// Canonical direct connections resolve locally before any management catalog
+	// access. The configured authentication and cache scopes remain authoritative.
+	if strings.HasPrefix(name, "mcp://") {
+		canonical, err := r.catalogConnectionNames(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, ref := range r.catalogs {
+			uri, _ := identity.ParseResourceURI(ref.URI)
+			if canonical[uri.Name] == name {
+				return r.internalDefinition(ctx, ref)
+			}
 		}
 	}
 	internal, err := r.inventory(ctx, false)
