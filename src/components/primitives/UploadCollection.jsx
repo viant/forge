@@ -1,5 +1,5 @@
 import React from 'react';
-import {Button, Callout, FileInput, Tag} from '@blueprintjs/core';
+import {Alert, Callout, FileInput, Tag} from '@blueprintjs/core';
 import {validateUploadCollection} from './workflowModels.js';
 import MutationCommand, {useMutationCommandState} from './MutationCommand.jsx';
 import {encodeUploadFiles} from './uploadCollectionModel.js';
@@ -15,11 +15,14 @@ export default function UploadCollection({container, context}) {
   const [prepared, setPrepared] = React.useState(null);
   const [encodingError, setEncodingError] = React.useState('');
   const [encoding, setEncoding] = React.useState(false);
+  const [replacement, setReplacement] = React.useState(null);
+  const busy = mutationState.pending || mutationState.guarded || ['validating', 'confirming', 'preparing', 'pending'].includes(mutationState.phase);
+  const blocked = unavailable();
   const validation = validateUploadCollection(files, spec);
   const preparedForSelection = prepared?.files === files && prepared?.transport === spec.transport && prepared?.blobField === spec.blobField && prepared?.prepare === spec.upload?.prepare;
   const blobs = preparedForSelection ? prepared.blobs : [];
   const change = (next, operation) => {
-    if (mutationState.pending || unavailable()) return;
+    if (busy || unavailable()) return;
     setFiles(next);
     // File references remain local. Authored handlers receive selection metadata
     // so forms can coordinate surrounding controls without reading file bytes.
@@ -29,8 +32,26 @@ export default function UploadCollection({container, context}) {
       context?.lookupHandler?.(execution.handler)?.({context, execution, files: selection, operation});
     }
   };
-  const select = event => change(Array.from(event.currentTarget.files || []), 'select');
-  const remove = index => change(files.filter((_, fileIndex) => fileIndex !== index), 'remove');
+  const select = event => {
+    const next = Array.from(event.currentTarget.files || []);
+    // Reset the native chooser even on cancellation of a later confirmation,
+    // so selecting the same path again still emits a browser change event.
+    event.currentTarget.value = '';
+    if (!next.length || busy || unavailable() || replacement) return;
+    if (files.length && spec.replaceConfirmation) {
+      setReplacement({next, previous: files, commandId: spec.upload?.commandId, dataSourceRef: spec.upload?.dataSourceRef});
+      return;
+    }
+    change(next, 'select');
+  };
+  const remove = index => {if (!replacement) change(files.filter((_, fileIndex) => fileIndex !== index), 'remove');};
+  const confirmReplacement = () => {
+    const pending = replacement;
+    setReplacement(null);
+    if (!pending || pending.previous !== files || pending.commandId !== spec.upload?.commandId || pending.dataSourceRef !== spec.upload?.dataSourceRef) return;
+    change(pending.next, 'select');
+  };
+  React.useEffect(() => {setReplacement(null);}, [blocked, busy, spec.upload?.commandId, spec.upload?.dataSourceRef]);
   React.useEffect(() => {
     let active = true;
     setEncodingError('');
@@ -48,10 +69,11 @@ export default function UploadCollection({container, context}) {
   };
   return (
     <div className="forge-upload-collection" data-forge-primitive="uploadCollection">
-      <FileInput fill disabled={mutationState.pending || unavailable()} multiple={spec.multiple !== false} inputProps={{accept: (spec.accept || []).join(',')}} text={files.length ? `${files.length} file${files.length === 1 ? '' : 's'} selected` : spec.emptyMessage || 'Choose files…'} onInputChange={select}/>
-      {files.length ? <div className="forge-upload-collection__files">{files.map((file, index) => <Tag key={`${file.name}:${file.size}:${index}`} onRemove={mutationState.pending || unavailable() ? undefined : () => remove(index)}>{file.name}</Tag>)}</div> : null}
+      <FileInput fill disabled={busy || blocked || !!replacement} multiple={spec.multiple !== false} inputProps={{accept: (spec.accept || []).join(',')}} text={files.length ? `${files.length} file${files.length === 1 ? '' : 's'} selected` : spec.emptyMessage || 'Choose files…'} onInputChange={select}/>
+      {files.length ? <div className="forge-upload-collection__files">{files.map((file, index) => <Tag key={`${file.name}:${file.size}:${index}`} onRemove={busy || blocked || replacement ? undefined : () => remove(index)}>{file.name}</Tag>)}</div> : null}
       {!validation.valid || encodingError ? <Callout intent="danger">{[...validation.errors, encodingError].filter(Boolean).join(' ')}</Callout> : null}
-      <MutationCommand command={{...spec.upload, label: encoding ? 'Preparing…' : 'Upload', intent: 'primary'}} context={context} extras={uploadExtras} disabled={unavailable() || !files.length || !validation.valid || encoding || !!encodingError || blobs.length !== files.length} onSettled={({status}) => { if (status === 'succeeded') setFiles([]); }}/>
+      <MutationCommand command={{...spec.upload, label: encoding ? 'Preparing…' : 'Upload', intent: 'primary'}} context={context} extras={uploadExtras} disabled={blocked || !!replacement || !files.length || !validation.valid || encoding || !!encodingError || blobs.length !== files.length} onSettled={({status}) => { if (status === 'succeeded' && !spec.retainOnSuccess) setFiles([]); }}/>
+      <Alert isOpen={!!replacement} confirmButtonText="Replace" cancelButtonText="Cancel" onConfirm={confirmReplacement} onCancel={() => setReplacement(null)}>{spec.replaceConfirmation}</Alert>
     </div>
   );
 }

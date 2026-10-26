@@ -81,6 +81,8 @@ uploadCollection:
   transport: mcpBlob
   blobField: File
   metadataField: Data
+  replaceConfirmation: Replace the selected files?
+  retainOnSuccess: true
   upload: {dataSourceRef: upload_patch}
 derivedDataSource:
   version: v1
@@ -182,6 +184,9 @@ scheduleEditor:
 	}
 	if container.UploadCollection == nil || container.UploadCollection.Transport != "mcpBlob" || container.UploadCollection.Multiple == nil || !*container.UploadCollection.Multiple {
 		t.Fatalf("upload contract missing: %#v", container.UploadCollection)
+	}
+	if container.UploadCollection.ReplaceConfirmation != "Replace the selected files?" || !container.UploadCollection.RetainOnSuccess {
+		t.Fatal("upload replacement/retention contract missing")
 	}
 	if container.DerivedDataSource == nil || len(container.DerivedDataSource.Pipeline) != 2 || container.PermissionBoundary == nil {
 		t.Fatal("derived datasource or permission boundary missing")
