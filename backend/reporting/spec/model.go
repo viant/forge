@@ -343,7 +343,7 @@ type rawTableBlock struct {
 	RecordTitleField string          `json:"recordTitleField,omitempty"`
 	AccentTone       string          `json:"accentTone,omitempty"`
 	Collapsible      bool            `json:"collapsible,omitempty"`
-	DefaultCollapsed bool            `json:"defaultCollapsed,omitempty"`
+	DefaultCollapsed *bool           `json:"defaultCollapsed,omitempty"`
 	LabelClamp       *TextClamp      `json:"labelClamp,omitempty"`
 	DatasetRef       string          `json:"datasetRef"`
 	Columns          []TableColumn   `json:"columns"`
@@ -1009,7 +1009,7 @@ func decodeBlock(payload json.RawMessage, index int) (result Block, resultErr er
 			RecordTitleField: block.RecordTitleField,
 			AccentTone:       block.AccentTone,
 			Collapsible:      block.Collapsible,
-			DefaultCollapsed: block.DefaultCollapsed,
+			DefaultCollapsed: tableDefaultCollapsed(block.Collapsible, block.DefaultCollapsed),
 			LabelClamp:       block.LabelClamp,
 			DatasetRef:       block.DatasetRef,
 			Columns:          block.Columns,

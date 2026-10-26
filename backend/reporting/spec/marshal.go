@@ -37,6 +37,14 @@ func (b Block) MarshalJSON() ([]byte, error) {
 	if err := json.Unmarshal(payload, &fields); err != nil {
 		return nil, err
 	}
+	if b.Kind == "tableBlock" {
+		// False is meaningful: omitting it makes renderers apply the table's
+		// default collapsed state again.
+		fields["defaultCollapsed"] = json.RawMessage("false")
+		if b.DefaultCollapsed {
+			fields["defaultCollapsed"] = json.RawMessage("true")
+		}
+	}
 	var columns any
 	switch b.Kind {
 	case "tableBlock":
