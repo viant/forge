@@ -1508,6 +1508,7 @@ type Column struct {
 	// Exportable overrides the default exclusion of action/button columns.
 	// Hidden and selection columns remain excluded regardless of this setting.
 	Exportable            *bool                  `json:"exportable,omitempty" yaml:"exportable,omitempty"`
+	ExportFormat          string                 `json:"exportFormat,omitempty" yaml:"exportFormat,omitempty"`
 	Icon                  string                 `json:"icon,omitempty" yaml:"icon,omitempty"`
 	IconFromValue         bool                   `json:"iconFromValue,omitempty" yaml:"iconFromValue,omitempty"`
 	PressedWhenValue      interface{}            `json:"pressedWhenValue,omitempty" yaml:"pressedWhenValue,omitempty"`

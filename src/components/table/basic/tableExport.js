@@ -74,8 +74,10 @@ function estimatedExportBytes(value) {
 
 export function tableExportValue(row = {}, column = {}) {
     const raw = resolveKey(row, column.id);
-    if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
-    if (typeof raw === 'boolean') return raw;
+    if (column.exportFormat !== 'display') {
+        if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+        if (typeof raw === 'boolean') return raw;
+    }
     return resolveTableCellText({row, column, value: raw, timeZone: column.boundTimeZone});
 }
 
