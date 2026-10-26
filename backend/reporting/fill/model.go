@@ -541,7 +541,7 @@ type rawTableBlock struct {
 	Title            string        `json:"title,omitempty"`
 	AccentTone       string        `json:"accentTone,omitempty"`
 	Collapsible      bool          `json:"collapsible,omitempty"`
-	DefaultCollapsed bool          `json:"defaultCollapsed,omitempty"`
+	DefaultCollapsed *bool         `json:"defaultCollapsed,omitempty"`
 	LabelClamp       *TextClamp    `json:"labelClamp,omitempty"`
 	DatasetRef       string        `json:"datasetRef"`
 	Columns          []TableColumn `json:"columns"`
@@ -855,7 +855,7 @@ func decodeJSON(data []byte, datasourceRequests bool) (*ReportFill, error) {
 				Title:            tableBlock.Title,
 				AccentTone:       tableBlock.AccentTone,
 				Collapsible:      tableBlock.Collapsible,
-				DefaultCollapsed: tableBlock.DefaultCollapsed,
+				DefaultCollapsed: tableDefaultCollapsed(tableBlock.Collapsible, tableBlock.DefaultCollapsed),
 				LabelClamp:       tableBlock.LabelClamp,
 				DatasetRef:       tableBlock.DatasetRef,
 				Columns:          tableBlock.Columns,
