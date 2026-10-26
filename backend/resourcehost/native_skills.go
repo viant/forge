@@ -6,13 +6,16 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	manager "github.com/viant/forge/backend/clientpool"
 	primitive "github.com/viant/forge/backend/provider/contract"
+	identity "github.com/viant/forge/backend/resource"
 	"github.com/viant/mcp-protocol/schema"
 	client "github.com/viant/mcp/client"
 	cfg "github.com/viant/mcp/client/config"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -42,14 +45,14 @@ func (s *NativeSkillSource) Options(ctx context.Context, name string) (*cfg.MCPC
 func (s *NativeSkillSource) Get(ctx context.Context, conversation, name string) (client.Interface, error) {
 	a, err := s.Gateway.actor(ctx)
 	if err != nil {
-		return nil, err
+		return nil, &requiredSkillDiscoveryFailure{err}
 	}
 	c, err := s.Gateway.Manager.Get(ctx, conversation, name)
 	if err != nil {
 		return nil, err
 	}
 	if err = s.Gateway.final(ctx, a); err != nil {
-		return nil, err
+		return nil, &requiredSkillDiscoveryFailure{err}
 	}
 	return &nativeSkillClient{Interface: c, gateway: s.Gateway}, nil
 }
@@ -74,6 +77,27 @@ func (s *NativeSkillSource) CatalogScope(ctx context.Context, conversation strin
 	}
 	parts := []string{base}
 	for _, name := range names {
+		options, err := s.Gateway.Manager.Options(ctx, name)
+		if err != nil {
+			return "", false, err
+		}
+		automatic := options != nil && options.SkillDiscovery == nil && options.ResolvedIdentity != nil && strings.HasPrefix(options.ResolvedIdentity.ResourceURI, "mcp://")
+		if automatic {
+			// Separate provider contact from the credential/configuration scope
+			// checks below. A contact failure is optional; a scope failure is not.
+			_, contactErr := s.Gateway.Manager.Get(s.WithAuthTokenContext(ctx, name), conversation, name)
+			if contactErr != nil {
+				if ctx.Err() != nil {
+					return "", false, ctx.Err()
+				}
+				if optionalSkillProviderContact(contactErr) {
+					cacheable = false
+					parts = append(parts, name, "unavailable")
+					continue
+				}
+				return "", false, contactErr
+			}
+		}
 		scope, reusable, scopeErr := s.Gateway.Manager.CatalogScope(ctx, conversation, []string{name})
 		if aggregateLinkRequired(scopeErr) {
 			// Optional metadata discovery cannot require linking. Do not cache
@@ -87,6 +111,12 @@ func (s *NativeSkillSource) CatalogScope(ctx context.Context, conversation strin
 		}
 		cacheable = cacheable && reusable
 		parts = append(parts, name, scope)
+	}
+	if err = ctx.Err(); err != nil {
+		return "", false, err
+	}
+	if err = s.Gateway.final(ctx, a); err != nil {
+		return "", false, err
 	}
 	raw, err := json.Marshal(parts)
 	if err != nil {
@@ -151,7 +181,7 @@ func (c *nativeSkillClient) Discover(ctx context.Context, opts ...client.Request
 func (c *nativeSkillClient) ListSkills(ctx context.Context, cursor *string, opts ...client.RequestOption) (*schema.ListSkillsResult, error) {
 	a, e := c.gateway.actor(ctx)
 	if e != nil {
-		return nil, e
+		return nil, &requiredSkillDiscoveryFailure{e}
 	}
 	s, ok := c.Interface.(manager.SkillsClient)
 	if !ok {
@@ -159,7 +189,9 @@ func (c *nativeSkillClient) ListSkills(ctx context.Context, cursor *string, opts
 	}
 	out, e := s.ListSkills(ctx, cursor, opts...)
 	if e == nil {
-		e = c.gateway.final(ctx, a)
+		if e = c.gateway.final(ctx, a); e != nil {
+			return nil, &requiredSkillDiscoveryFailure{e}
+		}
 	}
 	if e != nil {
 		return nil, e
@@ -251,4 +283,36 @@ func (s *NativeSkillSource) ReadSkillResource(ctx context.Context, server, uri s
 		return nil, err
 	}
 	return cli.ReadResource(ctx, &schema.ReadResourceRequestParams{Uri: uri})
+}
+
+// Actor and publication fence failures must never be treated as an optional
+// provider outage by a federating skill consumer.
+type requiredSkillDiscoveryFailure struct{ error }
+
+func (e *requiredSkillDiscoveryFailure) Unwrap() error                     { return e.error }
+func (*requiredSkillDiscoveryFailure) RequiredSkillDiscoveryFailure() bool { return true }
+
+func optionalSkillProviderContact(err error) bool {
+	if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, identity.ErrResourceDenied) || errors.Is(err, identity.ErrResourceStale) || errors.Is(err, identity.ErrResource) || errors.Is(err, identity.ErrInvalid) {
+		return false
+	}
+	if required, ok := err.(interface{ RequiredSkillDiscoveryFailure() bool }); ok && required.RequiredSkillDiscoveryFailure() {
+		return false
+	}
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		children := joined.Unwrap()
+		if len(children) == 0 {
+			return false
+		}
+		for _, child := range children {
+			if !optionalSkillProviderContact(child) {
+				return false
+			}
+		}
+		return true
+	}
+	if child := errors.Unwrap(err); child != nil {
+		return optionalSkillProviderContact(child)
+	}
+	return true
 }
