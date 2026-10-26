@@ -55,3 +55,23 @@ assert.ok(tabStyles.includes('border-bottom-color: var(--forge-tab-active-color,
 assert.ok(tabStyles.includes('box-shadow: none'));
 
 console.log('report runtime semantic theme contract passed');
+const documentStyles=fs.readFileSync(new URL('./reportDocument.css',import.meta.url),'utf8');
+assert.match(runtime,/normalizeReportViewerSettings\(reportSpec\?\.viewer \?\? reportDocument\?\.viewer\)\?\.appearance === 'document'/);
+assert.match(runtime,/tablePresentation:\{variant:'document',recordTitleField:authoredBlock.recordTitleField\}/);
+for(const role of ['title','section','body','metadata','metric'])assert.ok(runtime.includes(`typeRole="${role}"`)||runtime.includes(`'${role}'`),`Document report must apply ${role}`);
+assert.doesNotMatch(documentStyles,/!important|#[0-9a-f]{3,8}\b|font-size:\s*\d|font-weight:\s*\d|line-height:\s*\d|letter-spacing:\s*[\d.-]/i);
+
+for(const functionName of ['TimelineBlock','GeoMapBlock','BlockDiagnosticsCallout','BlockErrorCallout']) {
+    const functionBody=runtime.split(`function ${functionName}(`)[1]?.split('\nfunction ')[0] || '';
+    const documentBranch=functionBody.split('if (documentPresentation)')[1]?.split('\n  return (')[0] || '';
+    assert.ok(documentBranch,`${functionName} needs its real document branch`);
+    assert.doesNotMatch(documentBranch,/fontSize:|fontFamily:|fontWeight:|lineHeight:|letterSpacing:/,`${functionName}: use complete typography roles`);
+}
+
+const reviewTable = fs.readFileSync(new URL('./ReviewTable.jsx', import.meta.url),'utf8');
+const reviewStyles = fs.readFileSync(new URL('./reviewTable.css', import.meta.url),'utf8');
+assert.match(reviewTable,/<DashboardTableContent/);
+assert.match(reviewTable,/<Typography typeRole="metadata"/);
+assert.match(reviewTable,/<Button variant="secondary"/);
+assert.doesNotMatch(reviewTable,/style=|#[0-9a-f]{3,8}\b|fontSize:|fontFamily:/i,'Review composition cannot bypass shared roles');
+assert.doesNotMatch(reviewStyles,/#[0-9a-f]{3,8}\b|font-size:|font-family:|(?:padding|gap):\s*\d/i,'Review CSS uses shared spacing and typography');

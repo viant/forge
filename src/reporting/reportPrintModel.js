@@ -2312,7 +2312,11 @@ function renderReportPrintTableBlock(state = {}, block = {}, {
   layoutNote = "",
   columnBand = false,
 } = {}) {
-  let columns = Array.isArray(block?.content?.columns) ? block.content.columns : [];
+  const description = normalizeString(block?.description);
+  if (description && !layoutNote.includes(description)) layoutNote = [description, layoutNote].filter(Boolean).join("\n");
+  const authoredColumns = Array.isArray(block?.content?.columns) ? block.content.columns : [];
+  let columns = block.selection && !authoredColumns.some(column => column.key === block.selection.field)
+    ? [...authoredColumns,{key:block.selection.field,label:'Selected'}] : authoredColumns;
   let rows = Array.isArray(block?.content?.resolvedRows) ? block.content.resolvedRows : [];
   if (!columnBand && block?.runtime?.printRowReference === true && columns.length > 0 && rows.length > 0) {
     block = withReportPrintRowReference(block, columns, rows);
@@ -2329,6 +2333,7 @@ function renderReportPrintTableBlock(state = {}, block = {}, {
         renderReportPrintTableBlock(state, {
           ...block,
           id: `${block.id}__columns_${index + 1}`,
+          selection: undefined,
           title,
           content: { ...block.content, title, columns: groupColumns },
         }, { layoutNote, columnBand: true });

@@ -1,3 +1,4 @@
+import SharedIcon from '../../components/Icon.jsx';
 import {useRegisteredControlActions} from '../../runtime/useRegisteredControlActions.js';
 import {isLiveControlVisible,validateWidgetControlValue} from '../../core/ui/controlActions.js';
 import Typography, {typographyProps} from '../../components/Typography.jsx';
@@ -810,7 +811,7 @@ export function registerPack() {
                             if (['Enter', ' ', 'ArrowDown'].includes(event.key)) requestOptions('open');
                             onKeyDown?.(event);
                         }}
-                        rightIcon="caret-down"
+                        rightIcon={isFieldTrack ? <SharedIcon name="lucide:chevron-down"/> : "caret-down"}
                         disabled={unavailable}
                     />
                 </Select>
@@ -1207,6 +1208,7 @@ export function registerPack() {
             disabled,
             item,
             id,
+            appearance,
             'aria-label': ariaLabel,
             'aria-labelledby': ariaLabelledBy,
             'aria-describedby': ariaDescribedBy,
@@ -1222,6 +1224,17 @@ export function registerPack() {
             const end = String(range.end || '');
             const invalid = !!start && !!end && start > end;
             const exposedInvalid = invalid || (fieldTrackControl ? ariaInvalid : false) || undefined;
+            if (appearance === 'document') return <div className="forge-document-date-range" role="group"
+                id={id ? `${id}-group` : undefined} aria-label={ariaLabel || item?.label || 'Date range'} aria-describedby={ariaDescribedBy}
+                aria-invalid={exposedInvalid} aria-disabled={(readOnly || disabled) || undefined} data-forge-control-id={forgeControlId} data-forge-widget={forgeWidget} data-forge-part="group" data-forge-field-track-control={fieldTrackControl}>
+                {[['start','Start date',start],['end','End date',end]].map(([edge,label,date]) => <label key={edge}>
+                    <Typography as="span" typeRole="metadata">{label}</Typography>
+                    <input id={id ? edge === 'start' ? id : `${id}-end` : undefined} type="date" aria-label={label} {...typographyProps('body')} data-forge-part="input"
+                        aria-describedby={ariaDescribedBy} aria-required={ariaRequired} aria-invalid={exposedInvalid}
+                        value={date} min={edge === 'end' ? start || undefined : undefined} max={edge === 'start' ? end || undefined : undefined}
+                        readOnly={readOnly} disabled={disabled} onChange={event => onChange?.({...range,[edge]:event.target.value})}/>
+                </label>)}
+            </div>;
             const inputStyle = {
                 minWidth: 0,
                 width: '100%',
@@ -1406,6 +1419,8 @@ export function registerPack() {
 
     /* -------------------- Label ------------------------------------- */
     registerWidget('label', ({ value, format, locale, timeZone, item, ...rest }) => {
+        const LabelComponent = rest.as ? Typography : Label;
+        const labelProps = rest.as ? {...rest, typeRole: rest['data-forge-type'] || 'body'} : rest;
         const hasBoundValue = value !== null && value !== undefined && !(typeof value === 'string' && value.trim() === '');
         const shouldRenderEmptyState = !!item?.dataField && !hasBoundValue;
         const inferredIdFormat = format === undefined && (
@@ -1416,14 +1431,14 @@ export function registerPack() {
             : format;
         if (shouldRenderEmptyState) {
             return (
-                <Label {...rest}>
+                <LabelComponent {...labelProps}>
                     <span style={{ color: '#8a9ba8', fontStyle: 'italic' }}>{resolveEmptyDisplayText(item)}</span>
-                </Label>
+                </LabelComponent>
             );
         }
         const mappedValue = mapDisplayValue(value, item?.valueMap);
         return (
-            <Label {...rest}>{formatDisplayValue(mappedValue, inferredIdFormat, locale, {timeZone})}</Label>
+            <LabelComponent {...labelProps}>{formatDisplayValue(mappedValue, inferredIdFormat, locale, {timeZone})}</LabelComponent>
         );
     }, { framework: 'blueprint' });
 

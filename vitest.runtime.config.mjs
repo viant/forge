@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     include: [
+      'src/components/chat/DocumentChat.render.test.jsx',
       'src/components/primitives/UploadCollection.render.test.jsx',
       'src/components/table/TableViewPresets.render.test.jsx',
       'src/components/control/ProgressBar.render.test.jsx',

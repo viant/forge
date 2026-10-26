@@ -6,6 +6,17 @@ import '../packs/blueprint/index.jsx';
 import LookupSelectionInput from '../components/lookup/LookupSelectionInput.jsx';
 import {getWidget} from '../runtime/widgetRegistry.jsx';
 import SchemaBasedForm from './SchemaBasedForm.jsx';
+import {Context} from '../core/context/Context.jsx';
+import {MissingDataSourceReferenceError} from '../core/context/dataSourceReference.js';
+
+const localReviewContext=Context('local-review', {dataSource: []});
+assert.throws(()=>localReviewContext.Context(),MissingDataSourceReferenceError);
+assert.throws(()=>localReviewContext.Context('missing'),MissingDataSourceReferenceError);
+const localReviewHtml=renderToStaticMarkup(<SchemaBasedForm
+    id="local-review" context={localReviewContext}
+    fields={[{name:'scope',label:'Scope',widget:'text'}]} data={{scope:'Retained local scope'}}
+    layout={{kind:'grid',appearance:'field-tracks',columns:1,labels:{mode:'top'}}} showSubmit={false}/>);
+assert.match(localReviewHtml,/Retained local scope/);
 
 // Inspect component output under a real React hook dispatcher; widgets may
 // use focus/loading hooks even when this contract checks their presentation.
@@ -407,7 +418,8 @@ const searchableOptions = Array.from({length: 10}, (_, index) => ({
     value: `objective-${index + 1}`,
     label: `Objective ${index + 1}`,
 }));
-const onOpening = () => {};
+let openingArguments;
+const onOpening = (...args) => { openingArguments = args; };
 const onKeyDown = () => {};
 const searchableSelect = inspectWidget(SelectInput,{
     value: 'objective-2',
@@ -427,7 +439,9 @@ const searchableSelect = inspectWidget(SelectInput,{
 assert.equal(searchableSelect.props.fill, true);
 assert.equal(searchableSelect.props.filterable, true);
 assert.equal(searchableSelect.props.popoverProps.matchTargetWidth, false);
-assert.equal(searchableSelect.props.popoverProps.onOpening, onOpening);
+const openingTarget = {};
+searchableSelect.props.popoverProps.onOpening(openingTarget, true);
+assert.deepEqual(openingArguments, [openingTarget, true]);
 assert.match(searchableSelect.props.popoverProps.popoverClassName, /forge-field-track-select-popover/);
 assert.match(searchableSelect.props.popoverProps.popoverClassName, /authored-popover/);
 assert.match(searchableSelect.props.popoverProps.portalClassName, /forge-field-track-select-portal/);
@@ -507,3 +521,5 @@ assert.equal((refinedChoiceHtml.match(/type="text"/g) || []).length, 0);
 assert.ok(!refinedChoiceHtml.includes('checked='));
 assert.match(refinedChoiceHtml, /<legend>Segments \(required\)<\/legend>/);
 console.log('SchemaBasedForm refined array enum render contract passed');
+
+assert.match(fieldTracksHtml, /lucide-chevron-down/);

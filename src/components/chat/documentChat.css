@@ -1,0 +1,114 @@
+/* Shared document-chat geometry. Workspace theme tokens own color and typography. */
+.forge-document-chat {
+    --chat-surface: var(--forge-surface, var(--agently-theme-surface));
+    --chat-subtle: var(--forge-surface-subtle, var(--agently-theme-surface-subtle));
+    --chat-text: var(--forge-text, var(--agently-theme-text));
+    --chat-muted: var(--forge-text-muted, var(--agently-theme-text-muted));
+    --chat-divider: var(--forge-border-color, var(--agently-theme-border));
+    --chat-selected: var(--forge-selected-background, var(--agently-theme-selected-background));
+    --chat-border: var(--forge-border-strong, var(--agently-theme-border-strong));
+    --chat-focus: var(--forge-text-muted, var(--agently-theme-text-muted));
+    --chat-radius: var(--forge-chat-composer-radius, var(--forge-radius-surface, var(--agently-theme-radius-surface, 16px)));
+    font-family: var(--forge-type-body-family);
+    font-size: var(--forge-type-body-size);
+    font-weight: var(--forge-type-body-weight);
+    line-height: var(--forge-type-body-line-height);
+    letter-spacing: var(--forge-type-body-letter-spacing);
+    padding: var(--forge-spacing-5, 24px) var(--forge-spacing-4, 16px);
+    gap: var(--forge-spacing-4, 16px);
+    color: var(--chat-text);
+    background: var(--chat-surface);
+}
+.forge-document-chat.is-starting { gap: 0; overflow: auto; padding: 76px 36px 50px; background: var(--forge-canvas, var(--agently-theme-canvas)); }
+.forge-document-chat.is-starting > * { width: min(100%, 748px); margin-inline: auto; flex: none; }
+.forge-document-chat.is-starting .forge-chat-welcome { order: 0; margin-block: 0 25px; }
+.forge-document-chat.is-starting > .forge-document-composer { order: 1; margin-block: 0; }
+.forge-document-chat.is-starting > .chat-feed-stage { order: 2; flex: none; overflow: visible; display: flex; flex-direction: column; min-width: 0; }
+.forge-document-chat > .chat-feed-stage > :is(.app-chat-feed, .chat-feed) { width: min(100%, 748px); margin-inline: auto; }
+.forge-document-chat .forge-document-composer { background: transparent; padding-top: 0; }
+.forge-document-composer { width: min(100%, 748px); margin: auto auto 0; flex: none; }
+.forge-document-composer-shell { display: flex; flex-direction: column; gap: var(--forge-spacing-2, 8px); padding: 12px 12px 10px 16px; border: var(--forge-border-width, 1px) solid var(--chat-border); border-radius: var(--chat-radius); background: var(--chat-surface); }
+.forge-document-composer.is-keyboard-focus .forge-document-composer-shell:has(.forge-document-textarea:focus-visible) { outline: var(--forge-focus-width, 2px) solid var(--chat-focus); outline-offset: var(--forge-focus-offset, 2px); }
+.forge-document-input { min-width: 0; }
+.forge-document-input .forge-document-textarea { display: block; box-sizing: border-box; width: 100%; min-height: 36px; max-height: 200px; padding: 6px 0; resize: none; overflow-y: auto; border: 0; border-radius: 0; box-shadow: none; background: transparent; color: var(--chat-text); caret-color: var(--chat-text); }
+.forge-document-input .forge-document-textarea:focus { outline: 0; box-shadow: none; }
+.forge-document-textarea::placeholder { color: var(--chat-muted); opacity: 1; }
+.forge-document-toolbar { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.forge-document-toolbar .forge-icon { width: 18px; height: 18px; }
+.forge-document-submit { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+.forge-document-chat .forge-document-submit > .forge-button[data-forge-variant] { min-width: 44px; min-height: 44px; padding: 0; }
+.forge-document-chat .forge-document-submit > .forge-document-send[data-forge-variant] { min-width: 36px; min-height: 36px; border-radius: var(--forge-radius-pill, 999px); }
+.forge-composer-disclosure { position: relative; flex: none; }
+.forge-composer-disclosure > summary { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 44px; min-height: 44px; padding-inline: 10px; list-style: none; cursor: pointer; border-radius: var(--forge-control-radius, 6px); }
+.forge-composer-disclosure > summary::-webkit-details-marker { display: none; }
+.forge-composer-disclosure > summary:hover, .forge-composer-disclosure[open] > summary { background: var(--chat-subtle); }
+.forge-composer-disclosure > summary[aria-disabled='true'] { color: var(--chat-muted); cursor: default; }
+.forge-composer-options { position: absolute; bottom: calc(100% + 8px); left: 0; z-index: 30; display: flex; flex-direction: column; gap: var(--forge-spacing-3, 12px); width: min(280px, calc(100vw - 80px)); max-height: min(480px, 60dvh); overflow: auto; padding: var(--forge-spacing-3, 12px); border: var(--forge-border-width, 1px) solid var(--chat-border); border-radius: var(--forge-control-radius, 6px); background: var(--chat-surface); color: var(--chat-text); }
+.forge-composer-options > .forge-button { justify-content: flex-start; }
+.forge-composer-setting { display: flex; flex-direction: column; gap: var(--forge-spacing-1, 4px); }
+.forge-composer-setting select { width: 100%; }
+.forge-composer-auto-tools { display: flex; align-items: center; gap: var(--forge-spacing-2, 8px); }
+.forge-composer-attachments { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--forge-spacing-2, 8px); }
+.forge-composer-attachments li { display: flex; align-items: center; max-width: 100%; gap: var(--forge-spacing-1, 4px); padding-left: var(--forge-spacing-2, 8px); border-radius: var(--forge-control-radius, 6px); background: var(--chat-subtle); }
+.forge-composer-attachments li > span { overflow-wrap: anywhere; }
+.forge-task-browser { margin-top: 30px; }
+.forge-task-heading { margin-bottom: 8px; min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: var(--forge-spacing-3, 12px); flex-wrap: wrap; }
+.forge-task-heading h2 { margin: 0; }
+.forge-task-filters { display: flex; flex-wrap: wrap; gap: var(--forge-spacing-1, 4px); margin-block: 0 12px; }
+.forge-task-filters > .forge-button { min-height: 44px; padding: 8px 10px; border: 0; color: var(--forge-text-secondary); gap: 3px; }
+.forge-task-filters > .forge-button:hover { background: var(--chat-subtle); }
+.forge-task-heading .forge-task-browse { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0; border: 0; text-decoration: none; }
+.forge-task-heading .forge-task-browse:hover { background: transparent; border-color: transparent; text-decoration: underline; }
+.forge-task-browse .forge-icon { width: 14px; height: 14px; }
+.forge-task-filters [aria-pressed='true'] { background: var(--chat-selected); border-color: transparent; color: var(--forge-interaction-color); }
+.forge-task-note { color: var(--chat-muted); margin: 0 0 12px; }
+.forge-task-list { border-top: var(--forge-border-width, 1px) solid var(--chat-divider); }
+.forge-task-row { font: inherit; display: flex; justify-content: space-between; align-items: center; gap: 18px; width: 100%; padding: 17px 2px; border: 0; border-bottom: var(--forge-border-width, 1px) solid var(--chat-divider); background: transparent; color: var(--chat-text); text-align: left; cursor: pointer; }
+.forge-task-row:hover strong { color: var(--forge-interaction-color); }
+.forge-task-row > span { flex: 1; min-width: 0; display: block; }
+.forge-task-row > span > * { display: block; }
+.forge-task-row [data-forge-type='small'] { margin-top: 3px; }
+.forge-task-row [data-forge-type='caption'] { margin-top: 5px; }
+.forge-task-row > .forge-icon { width: 16px; height: 18px; color: var(--chat-muted); }
+.forge-task-row :is([data-forge-type='small'], [data-forge-type='caption']) { color: var(--chat-muted); }
+.forge-task-search { display: flex; box-sizing: border-box; min-height: 44px; align-items: center; gap: var(--forge-spacing-2, 8px); margin-block: var(--forge-spacing-4, 16px); padding: var(--forge-spacing-2, 8px); border: var(--forge-border-width, 1px) solid var(--chat-border); border-radius: var(--forge-control-radius, 6px); }
+.forge-task-search input { width: 100%; min-width: 0; border: 0; background: transparent; color: inherit; }
+.forge-document-chat :is(button, summary, input):focus:not(:focus-visible) { outline: 0; }
+.forge-document-chat :is(button, summary, input):focus-visible { outline: var(--forge-focus-width, 2px) solid var(--chat-focus); outline-offset: var(--forge-focus-offset, 2px); }
+@media (max-width: 760px) {
+    .forge-document-chat, .forge-document-chat.is-starting { padding: var(--forge-spacing-4, 16px); }
+    .forge-document-chat.is-starting { padding: 48px 24px 36px; }
+    .forge-document-chat .forge-document-input .forge-document-textarea[data-forge-type] { --forge-chat-touch-size: 16px; font-size: var(--forge-chat-touch-size); min-height: 44px; padding-block: 10px; }
+    .forge-document-chat .forge-task-search input[data-forge-type] { --forge-chat-touch-size: 16px; font-size: var(--forge-chat-touch-size); }
+    .forge-task-heading > .forge-button { min-height: 44px; }
+    .forge-document-composer-shell { padding: 10px 10px 8px 16px; }
+    .forge-composer-options { left: -40px; }
+}
+@media (max-width: 760px), (pointer: coarse) { .forge-document-chat .forge-document-submit > .forge-document-send[data-forge-variant] { min-width: 44px; min-height: 44px; } }
+
+.forge-composer-instructions { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.forge-chat-task-back { align-self: flex-start; order: -1; }
+
+.forge-document-chat.is-task-library { padding-top: 32px; }
+.forge-document-chat.is-task-library > :is(.forge-chat-welcome, .forge-document-composer) { display: none; }
+.forge-document-chat.is-task-library .forge-chat-home-recent { display: none; }
+.forge-task-browser.is-library { margin-top: 0; }
+.forge-task-browser.is-library > h1 { margin: 0 0 12px; }
+.forge-task-intro { margin: 0 0 22px; color: var(--chat-muted); }
+.forge-task-back.forge-button { display: inline-flex; align-items: center; min-height: 44px; margin-bottom: 16px; padding: 0; border: 0; text-decoration: none; gap: 6px; }
+.forge-task-back .forge-icon { width: 14px; height: 18px; }
+.forge-task-group { margin-top: 28px; }
+.forge-task-group > h2 { margin: 0 0 10px; }
+
+.forge-task-category-count { margin-inline-start: 3px; }
+.forge-task-heading .forge-task-browse { border-radius: 0; }
+
+/* Conversation geometry follows the same document frame around any output. */
+.forge-document-chat:not(.is-starting) { padding: 0; gap: 0; }
+.forge-document-chat:not(.is-starting) > .chat-feed-stage { box-sizing: border-box; padding: 32px 24px 24px; }
+.forge-document-chat:not(.is-starting) > .chat-feed-stage > :is(.app-chat-feed, .chat-feed) { width: min(100%, 680px); }
+.forge-document-chat:not(.is-starting) > .forge-document-composer { box-sizing: border-box; width: min(100%, 728px); padding: 8px 16px 16px; }
+@media (max-width: 760px) {
+    .forge-document-chat:not(.is-starting) > .chat-feed-stage { padding: 24px 20px; }
+    .forge-document-chat:not(.is-starting) > .forge-document-composer { padding: 8px 12px 12px; }
+}
