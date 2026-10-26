@@ -378,6 +378,8 @@ type Labels struct {
 }
 
 type Progress struct {
+	// Appearance "inline" places the formatted value beside a compact native meter.
+	Appearance    string `json:"appearance,omitempty" yaml:"appearance,omitempty"`
 	MaxValueField string `json:"maxValueField" yaml:"maxValueField"`
 }
 
