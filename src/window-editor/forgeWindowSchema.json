@@ -264,6 +264,9 @@
     "Chart": {
       "additionalProperties": true,
       "properties": {
+        "appearance": {
+          "type": "string"
+        },
         "axes": {
           "$ref": "#/$defs/ChartAxes"
         },
@@ -303,6 +306,9 @@
         "hideControlsWhenEmpty": {
           "type": "boolean"
         },
+        "layout": {
+          "type": "string"
+        },
         "margin": {
           "additionalProperties": {
             "type": "number"
@@ -328,6 +334,9 @@
           "type": "boolean"
         },
         "showLegend": {
+          "type": "boolean"
+        },
+        "stacked": {
           "type": "boolean"
         },
         "type": {
@@ -481,7 +490,6 @@
     "Chat": {
       "additionalProperties": true,
       "properties": {
-        "appearance": {"type": "string", "enum": ["document"], "description": "Optional shared document chat presentation."},
         "abortVisible": {
           "$ref": "#/$defs/SelectorCondition",
           "description": "AbortVisible allows declarative, data-bound control of the abort button\nvisibility. When provided, the UI shows the abort button if the value\nresolved at `selector` matches `when` (or is truthy if `when` is omitted).\nExample:\n  abortVisible: { selector: \"job.status\", when: [\"queued\", \"running\"] }"
@@ -492,6 +500,10 @@
         },
         "allowModelSelection": {
           "type": "boolean"
+        },
+        "appearance": {
+          "description": "Appearance selects the shared document chat recipe; omitted retains legacy rendering.",
+          "type": "string"
         },
         "commandCenter": {
           "description": "CommandCenter enables the \"composer-as-command-center\" UI layout.",
@@ -842,6 +854,9 @@
         "allowRemove": {
           "type": "boolean"
         },
+        "appearance": {
+          "type": "string"
+        },
         "assignmentPicker": {
           "$ref": "#/$defs/AssignmentPicker"
         },
@@ -1082,6 +1097,9 @@
         },
         "table": {
           "$ref": "#/$defs/Table"
+        },
+        "tablePresentation": {
+          "$ref": "#/$defs/TablePresentation"
         },
         "tabs": {
           "$ref": "#/$defs/Tabs"
@@ -1455,10 +1473,16 @@
     "DashboardEditableTableColumn": {
       "additionalProperties": true,
       "properties": {
+        "align": {
+          "type": "string"
+        },
         "cardLabel": {
           "type": "string"
         },
         "editor": {},
+        "flex": {
+          "type": "boolean"
+        },
         "format": {
           "type": "string"
         },
@@ -1471,6 +1495,9 @@
         "label": {
           "type": "string"
         },
+        "minWidth": {
+          "type": "integer"
+        },
         "required": {
           "type": "boolean"
         },
@@ -1480,6 +1507,9 @@
         "visibleWhen": {
           "additionalProperties": {},
           "type": "object"
+        },
+        "width": {
+          "type": "integer"
         }
       },
       "type": "object"
@@ -1997,6 +2027,9 @@
         "align": {
           "type": "string"
         },
+        "flex": {
+          "type": "boolean"
+        },
         "format": {
           "type": "string"
         },
@@ -2009,6 +2042,9 @@
         "link": {
           "$ref": "#/$defs/TableLink"
         },
+        "minWidth": {
+          "type": "integer"
+        },
         "timeZone": {
           "type": "string"
         },
@@ -2017,6 +2053,9 @@
         },
         "type": {
           "type": "string"
+        },
+        "width": {
+          "type": "integer"
         }
       },
       "type": "object"
@@ -5806,6 +5845,33 @@
       },
       "type": "object"
     },
+    "TablePresentation": {
+      "additionalProperties": true,
+      "properties": {
+        "removeIcon": {
+          "type": "string"
+        },
+        "rowDetails": {
+          "$ref": "#/$defs/TableRowDetails"
+        },
+        "variant": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "TableRowDetails": {
+      "additionalProperties": true,
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "TableSavedViews": {
       "additionalProperties": true,
       "properties": {
@@ -6210,6 +6276,12 @@
           "type": "string"
         },
         "multiple": {
+          "type": "boolean"
+        },
+        "replaceConfirmation": {
+          "type": "string"
+        },
+        "retainOnSuccess": {
           "type": "boolean"
         },
         "transport": {
@@ -7256,7 +7328,7 @@
   "$ref": "#/$defs/Window",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "x-forge-provenance": {
-    "baseCommit": "23fb09c20af73b076f34547bc052dd0f6aa953d7",
+    "baseCommit": "8471bed34df86e6d3f020df7d277a55ec7e88c27",
     "generator": "scripts/window-schema/main.go",
     "sha256": {
       "choice_browser.go": "935cbeddb231dd329374114c5f38454dc7c44c2ab70a45ea3c0f37ce7f3aee26",
@@ -7291,7 +7363,7 @@
       "host_content.go": "f9f870afe88756eb3abd04b79cc717f60a696a5dc2501dec11ffba0f87dbc0fd",
       "json_metadata_clone.go": "baa9bde7e567774737f28b87c45a2bb145d9c5b2fadc81da3024578b17c6c09c",
       "local_state_owner.go": "987402ce2487f4b7714a3991c405aab0dda74a573d8690f8f6561d4ce020ab8f",
-      "model.go": "432034d47bc9374c38a6bcb1ff7313e0a797b94673c102b94f7c2a6119937187",
+      "model.go": "5a88adbe464a2511d173c7bb5d1cde900020279b1aac14b26ae8b661d45e2635",
       "parameter_editor.go": "a176f3b63d74714d216daf57ba5c3c3ee8e12aaf8ccf2c0ee1b663c95a657bf6",
       "predicate_composition_editor.go": "881bcf68a5f5e16cae2f58ef7495ac14582398236cfd263cc8585e89f97cab4b",
       "presentation_primitives.go": "02a6a592152be515ce4a0632a586a1c94c926090ebfe39e5a29868d2b496b6cb",
@@ -7308,7 +7380,7 @@
       "window_reference_manifest.go": "fe66bf7b36823b396742d8e36d8aa5c559c494125e0f4ed1bba89219fbaf0635",
       "window_resource.go": "f9426cf66d40ae52bf029f4776fbc34930764a31ff850f38c76e72e8ab960a2e",
       "window_target_proof.go": "53605c132aae2b8c8d6e377daaae416f347e0ff8c48a39fb2a0f15f95ad5faeb",
-      "workflow_primitives.go": "02d64cd4ea950884edb8d6ed19d16db06129437d336148f27bbe3309f1d6c036",
+      "workflow_primitives.go": "930a4ad96dc4b108c3436dc175014ca766bf2921e4a40ec3bfca7d622ecd3ff1",
       "workspace_summary.go": "d9cf3867d3d3bfa3f65c9fdeccad91d21bd9d2602e066823bb36cbff079c86c1"
     },
     "sourceNote": "Generated from committed canonical Forge authored model and Forge-owned public contracts; SHA-256 identifies every parsed source file."
