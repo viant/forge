@@ -101,6 +101,38 @@ func (m *Manager) OnResourceUpdated(listener func(string, string)) func() {
 	return func() { m.mu.Lock(); delete(m.resourceUpdatedListeners, id); m.mu.Unlock() }
 }
 
+// notificationNamesLocked reuses aliases owned by existing scoped clients.
+// No configuration reads or network calls occur on the notification path.
+func (m *Manager) notificationNamesLocked(server string, receiver [32]byte) map[string]bool {
+	names := map[string]bool{server: true}
+	for _, pool := range m.pool {
+		for canonical, client := range pool {
+			if client == nil || (receiver != ([32]byte{}) && client.resourceReceiver != receiver) {
+				continue
+			}
+			if canonical != server && !client.aliases[server] {
+				continue
+			}
+			names[canonical] = true
+			for alias := range client.aliases {
+				names[alias] = true
+			}
+		}
+	}
+	return names
+}
+func catalogUsesNames(sources map[string]bool, names map[string]bool) bool {
+	if sources == nil {
+		return true
+	}
+	for name := range names {
+		if sources[name] {
+			return true
+		}
+	}
+	return false
+}
+
 // notifyResourceUpdated evicts only the named definition and its revision
 // aliases. A pending load is fenced so it cannot republish after the event.
 func (m *Manager) notifyResourceUpdated(server string, receiver [32]byte, public bool, uri string) {
@@ -115,10 +147,13 @@ func (m *Manager) notifyResourceUpdated(server string, receiver [32]byte, public
 	if m.resourceContentGeneration == nil {
 		m.resourceContentGeneration = map[resourceCatalogScope]uint64{}
 	}
-	m.resourceContentGeneration[resourceCatalogScope{server: server, receiver: receiver}]++
+	names := m.notificationNamesLocked(server, receiver)
+	for name := range names {
+		m.resourceContentGeneration[resourceCatalogScope{server: name, receiver: receiver}]++
+	}
 	prefix := uri + "\x00"
 	for _, held := range m.visibleCatalogs {
-		if held.sources != nil && !held.sources[server] || receiver != ([32]byte{}) && held.receiver != receiver && held.receiver != ([32]byte{}) {
+		if !catalogUsesNames(held.sources, names) || receiver != ([32]byte{}) && held.receiver != receiver && held.receiver != ([32]byte{}) {
 			continue
 		}
 		kept := held.entries[:0]
@@ -136,8 +171,10 @@ func (m *Manager) notifyResourceUpdated(server string, receiver [32]byte, public
 		listeners = append(listeners, listener)
 	}
 	m.mu.Unlock()
-	for _, listener := range listeners {
-		listener(server, uri)
+	for name := range names {
+		for _, listener := range listeners {
+			listener(name, uri)
+		}
 	}
 }
 func (m *Manager) notifyResourceCatalogChange(server string, receiver [32]byte, public bool) {
@@ -148,10 +185,13 @@ func (m *Manager) notifyResourceCatalogChange(server string, receiver [32]byte, 
 	if m.resourceCatalogGeneration == nil {
 		m.resourceCatalogGeneration = map[resourceCatalogScope]uint64{}
 	}
-	m.resourceCatalogGeneration[resourceCatalogScope{server: server, receiver: receiver}]++
+	names := m.notificationNamesLocked(server, receiver)
+	for name := range names {
+		m.resourceCatalogGeneration[resourceCatalogScope{server: name, receiver: receiver}]++
+	}
 	for key, held := range m.visibleCatalogs {
 		// Missing dependency metadata is conservative, never evidence of isolation.
-		affected := held.sources == nil || held.sources[server]
+		affected := catalogUsesNames(held.sources, names)
 		if affected && (receiver == ([32]byte{}) || held.receiver == receiver || held.receiver == ([32]byte{})) {
 			delete(m.visibleCatalogs, key)
 		}
@@ -161,8 +201,10 @@ func (m *Manager) notifyResourceCatalogChange(server string, receiver [32]byte, 
 		listeners = append(listeners, listener)
 	}
 	m.mu.Unlock()
-	for _, listener := range listeners {
-		listener(server)
+	for name := range names {
+		for _, listener := range listeners {
+			listener(name)
+		}
 	}
 }
 

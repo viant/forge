@@ -135,13 +135,18 @@ func (h *changeHandler) Elicit(ctx context.Context, r *jsonrpc.TypedRequest[*sch
 
 func (m *Manager) notifyCatalogChange(server string) {
 	m.mu.Lock()
-	m.invalidateToolCatalogLocked(server)
+	names := m.notificationNamesLocked(server, [32]byte{})
+	for name := range names {
+		m.invalidateToolCatalogLocked(name)
+	}
 	listeners := make([]func(string), 0, len(m.changeListeners))
 	for _, listener := range m.changeListeners {
 		listeners = append(listeners, listener)
 	}
 	m.mu.Unlock()
-	for _, listener := range listeners {
-		listener(server)
+	for name := range names {
+		for _, listener := range listeners {
+			listener(name)
+		}
 	}
 }

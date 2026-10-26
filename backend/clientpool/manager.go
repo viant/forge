@@ -182,6 +182,7 @@ type Manager struct {
 
 type entry struct {
 	capacityHeld      bool
+	resourceReceiver  [32]byte
 	aliases           map[string]bool
 	configFingerprint [32]byte
 	client            mcpclient.Interface
@@ -512,6 +513,7 @@ func (m *Manager) Get(ctx context.Context, convID, serverName string) (result mc
 		return nil, err
 	}
 	key := m.poolKey(ctx, convID)
+	receiver := m.resourceReceiver(ctx)
 	m.mu.Lock()
 	// Intentionally avoid `defer m.mu.Unlock()` here.
 	// This lock must be released before client creation/network setup
@@ -684,7 +686,7 @@ func (m *Manager) Get(ctx context.Context, convID, serverName string) (result mc
 		close(call.ready)
 		return managed, nil
 	}
-	e := &entry{capacityHeld: reservedCapacity, client: client, usedAt: time.Now(), epoch: call.epoch, configFingerprint: fingerprint, aliases: map[string]bool{requestedName: true, serverName: true}}
+	e := &entry{capacityHeld: reservedCapacity, resourceReceiver: receiver, client: client, usedAt: time.Now(), epoch: call.epoch, configFingerprint: fingerprint, aliases: map[string]bool{requestedName: true, serverName: true}}
 	e.managed = &managedClient{mgr: m, key: key, serverName: serverName, entry: e}
 	m.pool[key][serverName] = e
 	capacityTransferred = true
