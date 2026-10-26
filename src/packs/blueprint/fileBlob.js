@@ -13,7 +13,7 @@ const encodeBytes = (bytes) => {
     throw new Error('Base64 encoding is unavailable in this runtime.');
 };
 
-export async function fileToMCPBlob(file) {
+export async function fileToBlob(file) {
     if (!file) return null;
     if (typeof file.arrayBuffer !== 'function') {
         throw new TypeError('Selected file does not expose arrayBuffer().');
@@ -30,3 +30,7 @@ export async function fileToMCPBlob(file) {
         mimeType,
     };
 }
+
+// Compatibility name for existing consumers; this only encodes bytes and
+// performs no connector, protocol or network operation.
+export const fileToMCPBlob = fileToBlob;
