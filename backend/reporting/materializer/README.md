@@ -24,13 +24,13 @@ paths resolve to pure package entrypoints, without React rendering. No runtime
 imports or external scripts remain in the embedded bundle.
 
 Run `go test ./backend/reporting/materializer ./backend/reporting/engine` from
-the repository root. The ten existing Steward fixtures compare ReportSpec,
+the repository root. The ten independently authored synthetic fixtures compare ReportSpec,
 ReportFill, and print output against retained goldens. A separate synthetic
 comparison fixture proves previous-period authored lowering in the bundled Goja
 runtime. Rebuilding twice must produce the same bundle SHA-256. The generated
 bundle is committed build input; metadata input cannot replace it.
 
-`GOWORK=off go test -race ./...` verifies all ten migrated Steward envelopes, changed builder/descriptor rejection, duplicate fields and bounded VM interruption. Core adds its own real compiler, pin and authority regression tests. Goja is pinned to the verified published module version in go.mod. Consumers must pin a published Forge revision containing the regenerated bundle; runtime builds do not require a local replacement.
+`GOWORK=off go test -race ./...` verifies all ten synthetic envelopes, changed builder/descriptor rejection, duplicate fields and bounded VM interruption. Core adds its own real compiler, pin and authority regression tests. Goja is pinned to the verified published module version in go.mod. Consumers must pin a published Forge revision containing the regenerated bundle; runtime builds do not require a local replacement.
 
 `Materialize(ctx, spec, executedDatasets)` consumes server-executed dataset
 payloads and calls the official fill and print functions. The consuming Core
@@ -44,18 +44,15 @@ metadata script execution.
 Canonical print tables allocate widths from bounded samples of formatted cell text.
 Compact tables stay in one horizontal pane when their columns fit; genuinely wide
 tables still split and repeat the first identifying column. This changes print
-geometry only. The ten fixture ReportSpec and ReportFill hashes remain unchanged;
-print hashes were regenerated with the official Node bundle after checking those
-artifacts against the preceding bundle. Compact/wide table tests cover complete
+geometry only. Strict synthetic ReportSpec, ReportFill and print hashes are produced by the
+official Node bundle and verified independently by Goja. Compact/wide table tests cover complete
 cell retention and page bounds, and the 600-row Goja regression enforces a single
 horizontal pane without changing the materializer time budget.
 
-Retained goldens also include dataset result contracts, civil date-axis metadata,
-and the canonical chart SVG corner geometry. Regenerate with
-`node scripts/generate-steward-materialization-fixtures.mjs --write` from the
-repository root after auditing semantic changes against the previous bundle.
-The generator executes the official bundle in Node at the fixture time; its small
-Go hashing utility only applies standard JSON canonicalization to those Node
-artifacts and does not import the materializer. Running without `--write` detects
-stale hashes. Go tests independently execute the bundle in Goja and compare all
-ten complete results to these retained hashes.
+Synthetic goldens cover table/chart lowering, dataset metadata, empty/null data,
+and distinct report output isolation. Regenerate all inputs and expected hashes
+with `node scripts/generate-synthetic-report-fixtures.mjs` from the repository
+root (`--check` verifies without writing). The script creates deterministic example records from constants, executes
+the official Node bundle, and hashes its canonical JSON output. Go tests execute
+the bundle independently in Goja and compare the complete results. Fixtures must
+never be copied from private applications or live customer executions.

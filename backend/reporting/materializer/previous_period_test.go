@@ -21,7 +21,7 @@ func TestBundledAuthoredPreviousPeriod(t *testing.T) {
 		t.Fatal(err)
 	}
 	// This is a synthetic definition using the ordinary fingerprinted envelope.
-	envelope.BuilderDefinition = json.RawMessage(`{"kind":"forge.reporting.builder","id":"stewardPerformance","reportBuilder":{"dataSourceRef":"steward-orders","measures":[{"key":"spend","id":"spend","label":"Spend","paramPath":"measures.spend","default":true}],"staticFilters":[{"id":"dateRange","type":"dateRange","startParamPath":"filters.from","endParamPath":"filters.to","default":{"start":"2026-09-21","end":"2026-10-20"}}],"dataSources":[{"id":"prior","dataSourceRef":"steward-orders","request":{"filters":{},"measures":{"spend":true}},"scope":{"mode":"override","relativeDateRange":{"preset":"previousPeriod","startParamPath":"filters.from","endParamPath":"filters.to"}}}]}}`)
+	envelope.BuilderDefinition = json.RawMessage(`{"kind":"forge.reporting.builder","id":"sampleBuilder","reportBuilder":{"dataSourceRef":"sampleRows","measures":[{"key":"spend","id":"spend","label":"Spend","paramPath":"measures.spend","default":true}],"staticFilters":[{"id":"dateRange","type":"dateRange","startParamPath":"filters.from","endParamPath":"filters.to","default":{"start":"2026-09-21","end":"2026-10-20"}}],"dataSources":[{"id":"prior","dataSourceRef":"sampleRows","request":{"filters":{},"measures":{"spend":true}},"scope":{"mode":"override","relativeDateRange":{"preset":"previousPeriod","startParamPath":"filters.from","endParamPath":"filters.to"}}}]}}`)
 	envelope.ReportDocument = json.RawMessage(`{"version":1,"kind":"reportDocument","title":"Comparison","blocks":[{"id":"current","kind":"kpiBlock","datasetRef":"primary","valueField":"spend","secondaryDatasetRef":"prior","secondaryField":"spend","secondaryCalculation":"relativeChange","secondaryLabel":"Change vs prior period","secondaryFormat":"percentFraction","secondaryTrend":true}]}`)
 	envelope.State = json.RawMessage(`{"selectedMeasures":["spend"],"scopeParams":{"dateRange":{"start":"2026-09-21","end":"2026-10-20"}}}`)
 	for id, descriptor := range envelope.DataSources {
@@ -33,7 +33,7 @@ func TestBundledAuthoredPreviousPeriod(t *testing.T) {
 	}
 	envelope.Dependencies = []registry.ReportDependency{
 		{Kind: "builder", ID: envelope.BuilderRef, ContentFingerprint: identity.ContentFingerprint(envelope.BuilderDefinition)},
-		{Kind: "datasource", ID: "steward-orders", ContentFingerprint: identity.ContentFingerprint(envelope.DataSources["steward-orders"])},
+		{Kind: "datasource", ID: "sampleRows", ContentFingerprint: identity.ContentFingerprint(envelope.DataSources["sampleRows"])},
 		{Kind: "report", ID: "report://example/comparison", ContentFingerprint: identity.ContentFingerprint(envelope.ReportDocument)},
 	}
 	raw, err = json.Marshal(envelope)

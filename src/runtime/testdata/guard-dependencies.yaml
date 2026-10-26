@@ -1,0 +1,59 @@
+# Independently authored synthetic controls; no external application source.
+items:
+  - id: featureEnabled
+    widget: checkbox
+    dataField: settings.enabled
+    disabledWhen:
+      any:
+        - source: authorization
+          field: resource.capabilities.write
+          notEquals: true
+  - id: featureLimit
+    widget: input
+    dataField: settings.limit
+    disabledWhen:
+      any:
+        - source: authorization
+          field: resource.capabilities.write
+          notEquals: true
+        - source: form
+          field: settings.enabled
+          notEquals: true
+  - id: featureDuration
+    widget: input
+    dataField: settings.interval.value
+    disabledWhen:
+      any:
+        - source: authorization
+          field: resource.capabilities.write
+          notEquals: true
+        - source: form
+          field: settings.enabled
+          notEquals: true
+  - id: featureUnit
+    widget: input
+    dataField: settings.interval.unit
+    disabledWhen:
+      any:
+        - source: authorization
+          field: resource.capabilities.write
+          notEquals: true
+        - source: form
+          field: settings.enabled
+          notEquals: true
+  - id: contactName
+    widget: input
+    dataField: contactName
+    disabledWhen:
+      any:
+        - source: authorization
+          field: resource.capabilities.write
+          notEquals: true
+  - id: referenceCode
+    widget: input
+    dataField: reference
+    disabledWhen:
+      any:
+        - source: authorization
+          field: resource.capabilities.write
+          notEquals: true

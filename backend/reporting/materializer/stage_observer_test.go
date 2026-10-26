@@ -82,7 +82,7 @@ func assertStageArtifactIdentity(t *testing.T, expected, actual *Artifacts) {
 }
 func stageFixture(t *testing.T) (json.RawMessage, map[string]json.RawMessage) {
 	t.Helper()
-	envelope, datasets := pooledFixture(t, "testdata/steward/forecast_inventory_brief.json")
+	envelope, datasets := pooledFixture(t, "testdata/synthetic/table.json")
 	spec, err := Lower(context.Background(), envelope)
 	if err != nil {
 		t.Fatal(err)

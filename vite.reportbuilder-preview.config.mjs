@@ -1,16 +1,18 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import {fileURLToPath} from 'node:url';
+const root = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
-  root: '/Users/awitas/go/src/github.com/viant/forge',
+  root: root,
   base: './',
   plugins: [react()],
   build: {
-    outDir: '/Users/awitas/go/src/github.com/viant/forge/output/report-builder-preview-static',
+    outDir: fileURLToPath(new URL('./output/report-builder-preview-static', import.meta.url)),
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        reportBuilderPreview: '/Users/awitas/go/src/github.com/viant/forge/report-builder-preview.html',
+        reportBuilderPreview: fileURLToPath(new URL('./report-builder-preview.html', import.meta.url)),
       },
     },
   },
