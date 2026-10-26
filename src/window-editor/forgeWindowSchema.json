@@ -717,6 +717,9 @@
         "enforceColumnSize": {
           "type": "boolean"
         },
+        "exportFormat": {
+          "type": "string"
+        },
         "exportable": {
           "description": "Exportable overrides the default exclusion of action/button columns.\nHidden and selection columns remain excluded regardless of this setting.",
           "type": "boolean"
@@ -7240,7 +7243,7 @@
   "$ref": "#/$defs/Window",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "x-forge-provenance": {
-    "baseCommit": "2c2719126269498a2fdd2f8a544aa3dd5d4e4aef",
+    "baseCommit": "c633b7bbe2679d574c6e9f30898c8ba2574a9f86",
     "generator": "scripts/window-schema/main.go",
     "sha256": {
       "choice_browser.go": "935cbeddb231dd329374114c5f38454dc7c44c2ab70a45ea3c0f37ce7f3aee26",
@@ -7275,7 +7278,7 @@
       "host_content.go": "f9f870afe88756eb3abd04b79cc717f60a696a5dc2501dec11ffba0f87dbc0fd",
       "json_metadata_clone.go": "baa9bde7e567774737f28b87c45a2bb145d9c5b2fadc81da3024578b17c6c09c",
       "local_state_owner.go": "987402ce2487f4b7714a3991c405aab0dda74a573d8690f8f6561d4ce020ab8f",
-      "model.go": "802261c6b916da4a8504ac73229152750a7614f8e0d74530fd8858be4b51c4ef",
+      "model.go": "5941938a8e5bea80b0bea76a41617905a9dbf517baff408822b1cc1c8a96301f",
       "parameter_editor.go": "a176f3b63d74714d216daf57ba5c3c3ee8e12aaf8ccf2c0ee1b663c95a657bf6",
       "predicate_composition_editor.go": "881bcf68a5f5e16cae2f58ef7495ac14582398236cfd263cc8585e89f97cab4b",
       "presentation_primitives.go": "02a6a592152be515ce4a0632a586a1c94c926090ebfe39e5a29868d2b496b6cb",
