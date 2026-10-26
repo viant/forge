@@ -1,0 +1,92 @@
+{
+  "dataSource": {
+    "records": {
+      "service": {
+        "uri": "mcp://example/source"
+      }
+    },
+    "sampleResult": {
+      "service": {
+        "uri": "mcp://example/source"
+      },
+      "parameters": [
+        {
+          "name": "request",
+          "in": "const",
+          "location": {
+            "limit": 50,
+            "offset": 0
+          }
+        }
+      ]
+    }
+  },
+  "view": {
+    "content": {
+      "containers": [
+        {
+          "id": "overview",
+          "kind": "dashboard.reportRuntime",
+          "dashboard": {
+            "reportRuntime": {
+              "reportSpec": {
+                "version": 1,
+                "kind": "reportSpec",
+                "title": "Overview",
+                "source": {
+                  "kind": "report",
+                  "containerId": "overview",
+                  "stateKey": "overview",
+                  "dataSourceRef": "records"
+                },
+                "parameters": {
+                  "viewMode": "table",
+                  "groupBy": "",
+                  "pageSize": 50,
+                  "orderField": "",
+                  "orderDir": "asc"
+                },
+                "layoutIntent": {
+                  "kind": "stack",
+                  "resultPanePosition": "bottom",
+                  "blockOrder": [
+                    "table"
+                  ]
+                },
+                "refinements": [],
+                "calculatedFields": [],
+                "datasets": [
+                  {
+                    "id": "primary",
+                    "dataSourceRef": "records",
+                    "request": {}
+                  }
+                ],
+                "blocks": [
+                  {
+                    "id": "table",
+                    "kind": "tableBlock",
+                    "datasetRef": "primary",
+                    "title": "Overview",
+                    "columns": [
+                      {
+                        "key": "count",
+                        "label": "Count",
+                        "kind": "measure"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "datasetBindings": {
+                "primary": {
+                  "dataSourceRef": "sampleResult"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

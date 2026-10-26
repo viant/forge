@@ -104,7 +104,10 @@ function measureCategoryTickText(value, style = {}) {
     const fontSize = Math.max(8, Number(style?.fontSize || 12));
     const fontWeight = style?.fontWeight || 400;
     context.font = `${fontWeight} ${fontSize}px ${style?.fontFamily || "system-ui, sans-serif"}`;
-    return context.measureText(String(value || "")).width;
+    const text = String(value || "");
+    const spacing = Number.parseFloat(style.letterSpacing) || 0;
+    const pixels = String(style.letterSpacing).endsWith('em') ? spacing * fontSize : spacing;
+    return context.measureText(text).width + Math.max(0, [...text].length - 1) * pixels;
 }
 
 function ClampedCategoryTick({ x = 0, y = 0, payload = {}, config = null, valueFormatter = null, orientation = "x", style = {}, availableWidth = 0 }) {
@@ -115,7 +118,7 @@ function ClampedCategoryTick({ x = 0, y = 0, payload = {}, config = null, valueF
         ? buildMeasuredChartCategoryTickLabel(formattedValue, config, availableWidth, (text) => measureCategoryTickText(text, style))
         : buildChartCategoryTickLabel(formattedValue, config);
     if (!label) return null;
-    const lineHeight = Math.max(11, Number(style?.fontSize || 12) + 2);
+    const lineHeight = Number.parseFloat(style?.lineHeight) || Math.max(11, Number(style?.fontSize || 12) + 2);
     return (
         <g transform={`translate(${x},${y})`}>
             <title>{label.fullText}</title>
@@ -522,7 +525,26 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         series,
     } = chart;
     const palette = useMemo(() => resolveThemeAwareChartPalette(series?.palette || []), [series?.palette]);
-    const chartTypography = resolveChartTypography(chartRef.current);
+    const [chartTypography, setChartTypography] = useState(() => resolveChartTypography(null));
+    useEffect(() => {
+        let frame;
+        const update = () => {
+            cancelAnimationFrame(frame);
+            frame = requestAnimationFrame(() => {
+                const next = resolveChartTypography(chartRef.current);
+                setChartTypography(previous => JSON.stringify(previous) === JSON.stringify(next) ? previous : next);
+            });
+        };
+        const observer = new MutationObserver(update);
+        observer.observe(document.documentElement, {attributes: true});
+        observer.observe(document.head, {childList: true, subtree: true, characterData: true});
+        for (let node = chartRef.current; node && node !== document.documentElement; node = node.parentElement) {
+            observer.observe(node, {attributes: true, attributeFilter: ['style', 'class', 'data-forge-theme', 'data-forge-color-mode']});
+        }
+        document.fonts?.addEventListener('loadingdone', update);
+        update();
+        return () => { cancelAnimationFrame(frame); observer.disconnect(); document.fonts?.removeEventListener('loadingdone', update); };
+    }, []);
     const directSeriesChart = isDirectSeriesChart(chart);
     const seriesDefinitions = useMemo(() => getSeriesDefinitions(chart), [chart]);
     const leftAxis = useMemo(() => ({...yAxis, ...(axes.left || {})}), [yAxis, axes]);
@@ -750,22 +772,22 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         ? seriesDefinitions.length
         : availableDataKeys.length;
     const legendProps = embedded
-        ? {verticalAlign: "top", align: "center", wrapperStyle: {fontSize: chartTypography.captionSize, lineHeight: `${chartTypography.captionLineHeight}px`, paddingBottom: "6px", color: "var(--forge-chart-text-muted, #5f6b7c)", fontFamily: chartTypography.family}}
+        ? {verticalAlign: "top", align: "center", wrapperStyle: {fontSize: chartTypography.captionSize, lineHeight: `${chartTypography.captionLineHeight}px`, paddingBottom: "6px", color: "var(--forge-chart-text-muted, #5f6b7c)", fontFamily: chartTypography.captionFamily, fontWeight: chartTypography.captionWeight, letterSpacing: chartTypography.captionLetterSpacing}}
         : (isHorizontalBar && horizontalLegendSeriesCount > 1
-            ? {verticalAlign: "top", align: "center", wrapperStyle: {fontSize: chartTypography.smallSize, lineHeight: `${chartTypography.smallLineHeight}px`, paddingBottom: "8px", color: "var(--forge-chart-text-muted, #5f6b7c)", fontFamily: chartTypography.family}}
+            ? {verticalAlign: "top", align: "center", wrapperStyle: {fontSize: chartTypography.smallSize, lineHeight: `${chartTypography.smallLineHeight}px`, paddingBottom: "8px", color: "var(--forge-chart-text-muted, #5f6b7c)", fontFamily: chartTypography.smallFamily, fontWeight: chartTypography.smallWeight, letterSpacing: chartTypography.smallLetterSpacing}}
             : {});
     const axisTickStyle = embedded
-        ? {fontSize: chartTypography.captionSize, fill: "var(--forge-chart-text-muted, #5f6b7c)", fontFamily: chartTypography.family}
-        : {fontSize: chartTypography.smallSize, fill: "var(--forge-chart-text-muted, #667085)", fontFamily: chartTypography.family};
+        ? {fontSize: chartTypography.captionSize, lineHeight: `${chartTypography.captionLineHeight}px`, fill: "var(--forge-chart-text-muted, #5f6b7c)", fontFamily: chartTypography.captionFamily, fontWeight: chartTypography.captionWeight, letterSpacing: chartTypography.captionLetterSpacing}
+        : {fontSize: chartTypography.smallSize, lineHeight: `${chartTypography.smallLineHeight}px`, fill: "var(--forge-chart-text-muted, #667085)", fontFamily: chartTypography.smallFamily, fontWeight: chartTypography.smallWeight, letterSpacing: chartTypography.smallLetterSpacing};
     const axisLabelStyle = embedded
         ? undefined
-        : {fontSize: chartTypography.smallSize, fill: "var(--forge-chart-text-muted, #667085)", fontWeight: 500, fontFamily: chartTypography.family};
+        : {fontSize: chartTypography.smallSize, lineHeight: `${chartTypography.smallLineHeight}px`, fill: "var(--forge-chart-text-muted, #667085)", fontFamily: chartTypography.smallFamily, fontWeight: chartTypography.smallWeight, letterSpacing: chartTypography.smallLetterSpacing};
     const renderXAxisCategoryTick = categoryLabelConfig
         ? ((props) => <ClampedCategoryTick {...props} config={categoryLabelConfig} valueFormatter={(value) => formatChartXAxisValue(value, resolvedTickFormat, resolvedTickValueMode)} style={axisTickStyle} />)
         : axisTickStyle;
     const renderYAxisCategoryTick = categoryLabelConfig
         ? ((props) => <ClampedCategoryTick {...props} config={categoryLabelConfig} orientation="y" style={axisTickStyle} availableWidth={Math.max(0, horizontalBarLayout.categoryWidth - 10)} />)
-        : (embedded ? {fontSize: chartTypography.captionSize, fill: "var(--forge-chart-text-muted, #5f6b7c)", fontFamily: chartTypography.family} : undefined);
+        : (embedded ? {fontSize: chartTypography.captionSize, lineHeight: `${chartTypography.captionLineHeight}px`, fill: "var(--forge-chart-text-muted, #5f6b7c)", fontFamily: chartTypography.captionFamily, fontWeight: chartTypography.captionWeight, letterSpacing: chartTypography.captionLetterSpacing} : undefined);
     const gridStroke = "var(--forge-chart-grid, rgba(152,162,179,0.22))";
     const showEmbeddedSeriesSelector = embedded && !isPieChart && availableDataKeys.length > 1;
     const showChartLegend = chart?.showLegend !== false && !showEmbeddedSeriesSelector && (embedded || !controlsVisible);
@@ -878,8 +900,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                                 cursor: "pointer",
                                 fontSize: chartTypography.captionSize,
                                 lineHeight: `${chartTypography.captionLineHeight}px`,
-                                fontFamily: chartTypography.family,
-                                fontWeight: 600,
+                                fontFamily: chartTypography.captionFamily, fontWeight: chartTypography.captionWeight, letterSpacing: chartTypography.captionLetterSpacing,
                             }}
                         >
                             <span
@@ -977,7 +998,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                               {...(entry.pointColorMode === "bySign" ? {fill: resolveCategoryColor(chart?.series?.categoryColors, row?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color))} : {})} />
                     ))}
                     {showSeriesDataLabels ? (
-                        <LabelList dataKey={entry.value} position="top" formatter={dataLabelFormatter} fill="var(--forge-chart-text-muted, #5f6b7c)" fontSize={chartTypography.captionSize} fontFamily={chartTypography.family} />
+                        <LabelList dataKey={entry.value} position="top" formatter={dataLabelFormatter} fill="var(--forge-chart-text-muted, #5f6b7c)" fontSize={chartTypography.captionSize} fontFamily={chartTypography.captionFamily} fontWeight={chartTypography.captionWeight} letterSpacing={chartTypography.captionLetterSpacing} />
                     ) : null}
                 </Bar>
             );
@@ -987,7 +1008,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             return (
                 <Area key={entry.value} {...commonProps} type="monotone" connectNulls={true} dot={dotRenderer} activeDot={embedded || interactiveDatumSelection ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
                     {showSeriesDataLabels ? (
-                        <LabelList dataKey={entry.value} position="top" formatter={dataLabelFormatter} fill="var(--forge-chart-text-muted, #5f6b7c)" fontSize={chartTypography.captionSize} fontFamily={chartTypography.family} />
+                        <LabelList dataKey={entry.value} position="top" formatter={dataLabelFormatter} fill="var(--forge-chart-text-muted, #5f6b7c)" fontSize={chartTypography.captionSize} fontFamily={chartTypography.captionFamily} fontWeight={chartTypography.captionWeight} letterSpacing={chartTypography.captionLetterSpacing} />
                     ) : null}
                 </Area>
             );
@@ -996,7 +1017,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         return (
             <Line key={entry.value} {...commonProps} type="monotone" connectNulls={true} strokeLinecap="round" strokeLinejoin="round" dot={lineDotRenderer} activeDot={embedded || interactiveDatumSelection ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
                 {showSeriesDataLabels ? (
-                    <LabelList dataKey={entry.value} position="top" formatter={dataLabelFormatter} fill="var(--forge-chart-text-muted, #5f6b7c)" fontSize={chartTypography.captionSize} fontFamily={chartTypography.family} />
+                    <LabelList dataKey={entry.value} position="top" formatter={dataLabelFormatter} fill="var(--forge-chart-text-muted, #5f6b7c)" fontSize={chartTypography.captionSize} fontFamily={chartTypography.captionFamily} fontWeight={chartTypography.captionWeight} letterSpacing={chartTypography.captionLetterSpacing} />
                 ) : null}
             </Line>
         );
@@ -1064,7 +1085,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                     const formatType = item?.payload?.__seriesFormats?.[item?.dataKey] || item?.payload?.__seriesAxes?.[item?.dataKey];
                     return [tooltipFormatterForFormat(formatType)(value), name];
                 }}
-                contentStyle={embedded ? {fontSize: chartTypography.captionSize, lineHeight: `${chartTypography.captionLineHeight}px`, fontFamily: chartTypography.family, color: "var(--forge-chart-text, #30404d)", background: "var(--forge-chart-surface, #ffffff)", borderRadius: "8px", border: "1px solid var(--forge-chart-border, #d8e1e8)"} : undefined}
+                contentStyle={embedded ? {fontSize: chartTypography.captionSize, lineHeight: `${chartTypography.captionLineHeight}px`, fontFamily: chartTypography.captionFamily, fontWeight: chartTypography.captionWeight, letterSpacing: chartTypography.captionLetterSpacing, color: "var(--forge-chart-text, #30404d)", background: "var(--forge-chart-surface, #ffffff)", borderRadius: "8px", border: "1px solid var(--forge-chart-border, #d8e1e8)"} : undefined}
             />
             {showChartLegend ? <Legend {...legendProps} {...(interactiveLegendContent ? { content: interactiveLegendContent } : {})}/> : null}
             {cartesianSeriesElements}
@@ -1127,7 +1148,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 />
                 <Tooltip
                     formatter={(value) => tooltipFormatterForFormat(primarySeries.format || leftAxis.format)(value)}
-                    contentStyle={embedded ? {fontSize: chartTypography.captionSize, lineHeight: `${chartTypography.captionLineHeight}px`, fontFamily: chartTypography.family, color: "var(--forge-chart-text, #30404d)", background: "var(--forge-chart-surface, #ffffff)", borderRadius: "8px", border: "1px solid var(--forge-chart-border, #d8e1e8)"} : undefined}
+                    contentStyle={embedded ? {fontSize: chartTypography.captionSize, lineHeight: `${chartTypography.captionLineHeight}px`, fontFamily: chartTypography.captionFamily, fontWeight: chartTypography.captionWeight, letterSpacing: chartTypography.captionLetterSpacing, color: "var(--forge-chart-text, #30404d)", background: "var(--forge-chart-surface, #ffffff)", borderRadius: "8px", border: "1px solid var(--forge-chart-border, #d8e1e8)"} : undefined}
                 />
                 {chart?.showLegend !== false && selectedSeriesDefinitions.length > 1 ? <Legend {...legendProps} {...(interactiveLegendContent ? { content: interactiveLegendContent } : {})} /> : null}
                 {selectedSeriesDefinitions.length === 1 ? (
@@ -1218,12 +1239,12 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             </Pie>
             <Tooltip
                 formatter={(value) => formatLargeNumber(value)}
-                contentStyle={embedded ? {fontSize: chartTypography.captionSize, lineHeight: `${chartTypography.captionLineHeight}px`, fontFamily: chartTypography.family, color: "var(--forge-chart-text, #30404d)", background: "var(--forge-chart-surface, #ffffff)", borderRadius: "8px", border: "1px solid var(--forge-chart-border, #d8e1e8)"} : undefined}
+                contentStyle={embedded ? {fontSize: chartTypography.captionSize, lineHeight: `${chartTypography.captionLineHeight}px`, fontFamily: chartTypography.captionFamily, fontWeight: chartTypography.captionWeight, letterSpacing: chartTypography.captionLetterSpacing, color: "var(--forge-chart-text, #30404d)", background: "var(--forge-chart-surface, #ffffff)", borderRadius: "8px", border: "1px solid var(--forge-chart-border, #d8e1e8)"} : undefined}
             />
             {showChartLegend ? (
                 <Legend
-                    {...(embedded ? {wrapperStyle: {fontSize: chartTypography.captionSize, lineHeight: `${chartTypography.captionLineHeight}px`, fontFamily: chartTypography.family}, iconSize: 10} : {})}
-                    {...(compactPie ? {verticalAlign: "bottom", align: "center", wrapperStyle: {fontSize: chartTypography.captionSize, lineHeight: `${chartTypography.captionLineHeight}px`, paddingTop: "8px", fontFamily: chartTypography.family}, iconSize: 9} : {})}
+                    {...(embedded ? {wrapperStyle: {fontSize: chartTypography.captionSize, lineHeight: `${chartTypography.captionLineHeight}px`, fontFamily: chartTypography.captionFamily, fontWeight: chartTypography.captionWeight, letterSpacing: chartTypography.captionLetterSpacing}, iconSize: 10} : {})}
+                    {...(compactPie ? {verticalAlign: "bottom", align: "center", wrapperStyle: {fontSize: chartTypography.captionSize, lineHeight: `${chartTypography.captionLineHeight}px`, paddingTop: "8px", fontFamily: chartTypography.captionFamily, fontWeight: chartTypography.captionWeight, letterSpacing: chartTypography.captionLetterSpacing}, iconSize: 9} : {})}
                     {...(interactiveLegendContent ? { content: interactiveLegendContent } : {})}
                 />
             ) : null}
@@ -1349,7 +1370,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                             userSelect: "none",
                             fontSize: chartTypography.smallSize,
                             lineHeight: `${chartTypography.smallLineHeight}px`,
-                            fontFamily: chartTypography.family,
+                            fontFamily: chartTypography.smallFamily, fontWeight: chartTypography.smallWeight, letterSpacing: chartTypography.smallLetterSpacing,
                         }}
                     >
                         <input
@@ -1464,7 +1485,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                                     gap: 6,
                                     fontSize: chartTypography.captionSize,
                                     lineHeight: `${chartTypography.captionLineHeight}px`,
-                                    fontFamily: chartTypography.family,
+                                    fontFamily: chartTypography.captionFamily, fontWeight: chartTypography.captionWeight, letterSpacing: chartTypography.captionLetterSpacing,
                                     color: checked ? "var(--forge-chart-text, #41566d)" : "var(--forge-chart-text-muted, #7d8da1)",
                                     cursor: "pointer",
                                     userSelect: "none",
@@ -1560,8 +1581,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                                     color: "var(--forge-chart-text-muted, #7d8da1)",
                                     fontSize: chartTypography.smallSize,
                                     lineHeight: `${chartTypography.smallLineHeight}px`,
-                                    fontFamily: chartTypography.family,
-                                    fontWeight: 600,
+                                    fontFamily: chartTypography.smallFamily, fontWeight: chartTypography.smallWeight, letterSpacing: chartTypography.smallLetterSpacing,
                                     pointerEvents: "none",
                                 }}
                             >
@@ -1582,7 +1602,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                                 color: "var(--forge-chart-text-muted, #5f6b7c)",
                                 fontSize: chartTypography.smallSize,
                                 lineHeight: `${chartTypography.smallLineHeight}px`,
-                                fontFamily: chartTypography.family,
+                                fontFamily: chartTypography.smallFamily, fontWeight: chartTypography.smallWeight, letterSpacing: chartTypography.smallLetterSpacing,
                             }}
                         >
                             <strong style={{ color: "var(--forge-chart-text, #30404d)" }}>All values are zero for the selected period.</strong>
@@ -1600,7 +1620,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                                 color: "var(--forge-chart-text-muted, #7d8da1)",
                                 fontSize: chartTypography.smallSize,
                                 lineHeight: `${chartTypography.smallLineHeight}px`,
-                                fontFamily: chartTypography.family,
+                                fontFamily: chartTypography.smallFamily, fontWeight: chartTypography.smallWeight, letterSpacing: chartTypography.smallLetterSpacing,
                             }}
                         >
                             {emptyChartMessage}
@@ -1617,7 +1637,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                                 color: "var(--forge-chart-text-muted, #7d8da1)",
                                 fontSize: chartTypography.smallSize,
                                 lineHeight: `${chartTypography.smallLineHeight}px`,
-                                fontFamily: chartTypography.family,
+                                fontFamily: chartTypography.smallFamily, fontWeight: chartTypography.smallWeight, letterSpacing: chartTypography.smallLetterSpacing,
                             }}
                         >
                             Select at least one series to render the chart.
@@ -1682,7 +1702,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                         color: "var(--forge-chart-text-muted, #5f6b7c)",
                         fontSize: chartTypography.captionSize,
                         lineHeight: `${chartTypography.captionLineHeight}px`,
-                        fontFamily: chartTypography.family,
+                        fontFamily: chartTypography.captionFamily, fontWeight: chartTypography.captionWeight, letterSpacing: chartTypography.captionLetterSpacing,
                         backdropFilter: "blur(4px)",
                         pointerEvents: "none",
                     }}

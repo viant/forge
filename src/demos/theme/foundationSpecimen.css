@@ -1,0 +1,19 @@
+/* Specimen composition only. Component appearance stays in the shared pack. */
+.forge-foundation-specimen { display: grid; gap: var(--forge-spacing-6, 24px); padding: var(--forge-spacing-6, 24px); max-width: 1100px; min-width: 0; color: var(--forge-text); background: var(--forge-surface); }
+.forge-foundation-specimen :is(header, section) { display: grid; gap: var(--forge-spacing-3, 12px); min-width: 0; scroll-margin-block-start: var(--forge-spacing-6, 24px); }
+.forge-foundation-specimen :is(h1, h2, h3, p) { margin: 0; }
+.forge-foundation-specimen p { max-width: 75ch; }
+.forge-foundation-specimen nav, .forge-foundation-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--forge-spacing-3, 12px); }
+.forge-foundation-specimen nav a { color: var(--forge-interaction-color); text-underline-offset: .2em; }
+.forge-foundation-swatches { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--forge-spacing-3, 12px); }
+.forge-foundation-swatch { display: block; height: 56px; border: var(--forge-border-width, 1px) solid var(--forge-border-color); border-radius: var(--forge-radius-surface, 12px); margin-block-end: var(--forge-spacing-1, 4px); }
+.forge-foundation-data-color { width: 44px; height: 12px; border-radius: var(--forge-control-radius, 4px); }
+.forge-foundation-space { display: grid; gap: var(--forge-spacing-1, 4px); }
+.forge-foundation-space__sample { display: block; height: 16px; background: var(--forge-interaction-color); }
+.forge-foundation-card { padding: var(--forge-spacing-4, 16px); border: var(--forge-border-width, 1px) solid var(--forge-border-color); border-radius: var(--forge-radius-surface, 12px); box-shadow: none; }
+.forge-foundation-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--forge-spacing-4, 16px); }
+.forge-foundation-fields input, .forge-foundation-fields textarea { max-width: 100%; }
+.forge-foundation-specimen :is(a, select):focus-visible { outline: var(--forge-focus-width, 2px) solid var(--forge-focus-color); outline-offset: var(--forge-focus-offset, 2px); }
+@media (max-width: 600px) { .forge-foundation-fields { grid-template-columns: minmax(0, 1fr); } .forge-foundation-swatches { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.forge-foundation-icon-example { display: inline-flex; align-items: center; gap: var(--forge-spacing-2, 8px); }

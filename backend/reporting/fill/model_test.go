@@ -1257,7 +1257,7 @@ func loadReportFillFromPerformanceFixtureBytes(t *testing.T, variant string) []b
 }
 
 func TestOfficialAuthoredFillPreservesPublishedDatasetMetadata(t *testing.T) {
-	raw, err := os.ReadFile("testdata/steward-forecast-executed.json")
+	raw, err := os.ReadFile("testdata/synthetic-metadata-executed.json")
 	require.NoError(t, err)
 	report, err := DecodeJSON(raw)
 	require.NoError(t, err)

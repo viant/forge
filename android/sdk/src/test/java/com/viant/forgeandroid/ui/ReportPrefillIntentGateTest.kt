@@ -9,11 +9,11 @@ import org.junit.Test
 class ReportPrefillIntentGateTest {
     @Test fun declaredHookCannotEraseFirstDateAndCoercedOrderIntent() {
         val json = Json { ignoreUnknownKeys = true }
-        val fixture = json.parseToJsonElement(javaClass.getResource("/steward-request-only.json")!!.readText()).jsonObject
+        val fixture = json.parseToJsonElement(javaClass.getResource("/synthetic-request-only.json")!!.readText()).jsonObject
         val config = lowerReportBuilderPredicates(json.decodeFromJsonElement<DashboardReportBuilderVariantDef>(buildJsonObject { put("reportBuilder", fixture.getValue("config")) }).reportBuilder!!)
-        val form = mapOf("prefill" to mapOf("from" to "2026-09-27", "to" to "2026-10-04", "orderIds" to listOf("2659534")))
+        val form = mapOf("prefill" to mapOf("from" to "2026-01-01", "to" to "2026-01-02", "entityIds" to listOf("7")))
         val bindings = reportBuilderInitialIntentBindings(config, form)
-        assertEquals(JsonArray(listOf(JsonPrimitive(2659534))), bindings.first { it.path == "filters.orderIds" }.value)
+        assertEquals(JsonArray(listOf(JsonPrimitive(7))), bindings.first { it.path == "filters.entityIds" }.value)
         val identity = ReportPreparationIdentity("W", "builder", "form", "state")
         val erased = PreparedReportRequest(identity, "ready", "cube", requiredBindings = bindings)
         assertEquals("unbound-intent", preparedReportPrimaryGate(identity, erased).reason)
