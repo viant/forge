@@ -19,3 +19,14 @@
     gap: var(--forge-table-settings-field-gap, 10px);
 }
 .forge-table-settings__full-width { grid-column: 1 / -1; }
+.forge-table-settings__presets {
+    margin-bottom: var(--forge-table-settings-section-gap, 20px);
+    padding-bottom: var(--forge-table-settings-field-gap, 10px);
+    border-bottom: 1px solid var(--forge-border-color, #d5deeb);
+}
+.forge-table-settings__preset-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--forge-table-settings-field-gap, 10px);
+    margin-bottom: var(--forge-table-settings-field-gap, 10px);
+}
