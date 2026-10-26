@@ -50,7 +50,7 @@ it('does not execute an ordinary open, and does not execute without capability',
         expect(run).not.toHaveBeenCalled();
         await view.render({executeOnOpen:true,reportCapabilities:{run:false}});
         expect(run).not.toHaveBeenCalled();
-        expect(view.host.textContent).toContain('Report execution is unavailable');
+        expect(view.host.textContent).toContain('This report could not be run. Please try again.');
     } finally {await view.close();}
 });
 it('rejects authority mismatch and surfaces producer denial without materializing data',async()=>{
@@ -58,10 +58,11 @@ it('rejects authority mismatch and surfaces producer denial without materializin
     const view=await mount(run,{executeOnOpen:true});
     try {
         expect(view.host.querySelector('output')).toBeNull();
-        expect(view.host.textContent).toContain('did not return the selected report run');
-        run.mockRejectedValueOnce(new Error('Report denied'));
+        expect(view.host.textContent).toContain('This report could not be run. Please try again.');
+        run.mockRejectedValueOnce(new Error('automatic MCP protocol attempts failed: private transport details'));
         await act(async()=>view.host.querySelector('button').click());
-        expect(view.host.textContent).toContain('Report denied');
+        expect(view.host.textContent).toContain('This report could not be run. Please try again.');
+        expect(view.host.textContent).not.toContain('automatic MCP protocol');
         expect(view.handlers.reportRuns.begin).not.toHaveBeenCalled();
         expect(view.handlers.dataSource.fetchCollection).not.toHaveBeenCalled();
     } finally {await view.close();}
