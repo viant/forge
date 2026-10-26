@@ -7,7 +7,7 @@ const boundary = vi.hoisted(() => ({renders: [], selected: ''}));
 vi.mock('./MutationCommand.jsx', () => ({
     useMutationCommandState: () => ({pending: false}),
     default: ({disabled, extras}) => {
-        boundary.renders.push({selected: boundary.selected, disabled, filename: (Array.isArray(extras.files) ? extras.files[0] : extras.files)?.name});
+        boundary.renders.push({selected: boundary.selected, disabled, filename: (Array.isArray(extras.files) ? extras.files[0] : extras.files)?.name, transport: extras.transport});
         return <button aria-label="Upload selected files" disabled={disabled}>Upload</button>;
     },
 }));
@@ -66,4 +66,22 @@ it('never enables a replacement upload with the previous selection payload', asy
     await act(async () => finish(new Uint8Array([2]).buffer));
     expect(host.querySelector('button[aria-label="Upload selected files"]').disabled).toBe(false);
     expect(boundary.renders.at(-1).filename).toBe('replacement.csv');
+});
+
+it('passes file references to a preparation command without reading whole-file bytes', async () => {
+    await render({transport: 'files', upload: {dataSourceRef: 'upload', prepare: 'Upload.transfer'}});
+    const selected = file('references.csv', 10);
+    await select(selected);
+    expect(selected.arrayBuffer).not.toHaveBeenCalled();
+    expect(host.querySelector('button[aria-label="Upload selected files"]').disabled).toBe(false);
+    expect(boundary.renders.at(-1)).toMatchObject({filename: 'references.csv', transport: 'files'});
+});
+
+it('rejects file references when no preparation command can consume them', async () => {
+    await render({transport: 'files'});
+    const selected = file('references.csv', 10);
+    await select(selected);
+    expect(selected.arrayBuffer).not.toHaveBeenCalled();
+    expect(host.textContent).toContain('requires a command preparation handler');
+    expect(host.querySelector('button[aria-label="Upload selected files"]').disabled).toBe(true);
 });

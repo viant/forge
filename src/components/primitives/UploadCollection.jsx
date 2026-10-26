@@ -12,7 +12,7 @@ export default function UploadCollection({container, context}) {
   const [encodingError, setEncodingError] = React.useState('');
   const [encoding, setEncoding] = React.useState(false);
   const validation = validateUploadCollection(files, spec);
-  const preparedForSelection = prepared?.files === files && prepared?.transport === spec.transport && prepared?.blobField === spec.blobField;
+  const preparedForSelection = prepared?.files === files && prepared?.transport === spec.transport && prepared?.blobField === spec.blobField && prepared?.prepare === spec.upload?.prepare;
   const blobs = preparedForSelection ? prepared.blobs : [];
   const select = (event) => setFiles(Array.from(event.currentTarget.files || []));
   const remove = (index) => setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index));
@@ -22,12 +22,12 @@ export default function UploadCollection({container, context}) {
     if (!files.length || !validation.valid) { setPrepared(null); setEncoding(false); return () => { active = false; }; }
     setEncoding(true);
     encodeUploadFiles(files, {...spec, multiple: true}).then((payload) => {
-      if (active) setPrepared({files, transport: spec.transport, blobField: spec.blobField, blobs: payload[spec.blobField || 'files']});
+      if (active) setPrepared({files, transport: spec.transport, blobField: spec.blobField, prepare: spec.upload?.prepare, blobs: payload[spec.blobField || 'files']});
     }, (error) => { if (active) { setPrepared(null); setEncodingError(error.message); } }).finally(() => { if (active) setEncoding(false); });
     return () => { active = false; };
-  }, [files, validation.valid, spec.transport, spec.blobField]);
+  }, [files, validation.valid, spec.transport, spec.blobField, spec.upload?.prepare]);
   const uploadExtras = {
-    transport: 'mcpBlob',
+    transport: spec.transport || 'mcpBlob',
     [spec.blobField || 'files']: spec.multiple === false ? blobs[0] : blobs,
     ...(spec.metadataField ? {[spec.metadataField]: context?.handlers?.dataSource?.getFormData?.() || context?.signals?.form?.value || {}} : {}),
   };

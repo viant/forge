@@ -248,6 +248,15 @@ func validateContainerResourceModels(window *Window, container *Container, valid
 		commands = append(commands, container.Wizard.Submit)
 	}
 	if container.UploadCollection != nil {
+		switch container.UploadCollection.Transport {
+		case "", "mcpBlob":
+		case "files":
+			if container.UploadCollection.Upload == nil || strings.TrimSpace(container.UploadCollection.Upload.Prepare) == "" {
+				return fmt.Errorf("file upload transport requires a command preparation handler")
+			}
+		default:
+			return fmt.Errorf("unsupported upload transport %q", container.UploadCollection.Transport)
+		}
 		commands = append(commands, container.UploadCollection.Upload)
 	}
 	if container.ScheduleEditor != nil {
