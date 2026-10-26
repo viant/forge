@@ -55,7 +55,7 @@ const config = {
   },
   binding: {
     mode: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/ad_delivery@v1",
     entity: "line_delivery",
     selectedDimensions: ["event_date", "channel"],
     selectedMeasures: ["available_impressions"],
@@ -92,7 +92,7 @@ const rows = [
 
 const semanticSummary = {
   kind: "semantic",
-  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelRef: "model://example/performance/ad_delivery@v1",
   modelLabel: "Ad Delivery",
   entity: "line_delivery",
   entityLabel: "Line Delivery",
@@ -269,7 +269,7 @@ const drilledAuthored = buildPreviewAuthoredReport({
   ],
   hostIntent: {
     intentKind: "detailTarget",
-    targetRef: "target://steward/performance/channel-detail",
+    targetRef: "target://example/performance/channel-detail",
     navigationMode: "hostRoute",
     parameters: {
       channel: "Display",
@@ -319,7 +319,7 @@ assert.deepEqual(drilledAuthored.reportFill.diagnostics, [
 ]);
 assert.deepEqual(drilledAuthored.runtimeBlock.dashboard.reportRuntime.hostIntent, {
   intentKind: "detailTarget",
-  targetRef: "target://steward/performance/channel-detail",
+  targetRef: "target://example/performance/channel-detail",
   navigationMode: "hostRoute",
   parameters: {
     channel: "Display",

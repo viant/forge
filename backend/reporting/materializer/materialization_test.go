@@ -16,14 +16,14 @@ import (
 	"github.com/viant/forge/backend/reporting/registry"
 )
 
-type stewardMaterializationGolden struct {
+type syntheticMaterializationGolden struct {
 	ReportSpec  string `json:"reportSpec"`
 	ReportFill  string `json:"reportFill"`
 	ReportPrint string `json:"reportPrint"`
 }
 
 func TestMaterializerTimingSeparatesBundleBootstrapFromInvocation(t *testing.T) {
-	paths, err := filepath.Glob("testdata/steward/*.json")
+	paths, err := filepath.Glob("testdata/synthetic/*.json")
 	if err != nil || len(paths) == 0 {
 		t.Fatal("missing authored fixture", err)
 	}
@@ -31,7 +31,7 @@ func TestMaterializerTimingSeparatesBundleBootstrapFromInvocation(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	dataset, err := os.ReadFile(filepath.Join("testdata/steward_materialization", filepath.Base(paths[0])))
+	dataset, err := os.ReadFile(filepath.Join("testdata/synthetic_materialization", filepath.Base(paths[0])))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,16 +62,16 @@ func TestMaterializerTimingSeparatesBundleBootstrapFromInvocation(t *testing.T) 
 	}
 }
 
-func TestStewardGojaMaterializationMatchesOfficialNodeOutput(t *testing.T) {
-	paths, err := filepath.Glob("testdata/steward/*.json")
+func TestSyntheticGojaMaterializationMatchesOfficialNodeOutput(t *testing.T) {
+	paths, err := filepath.Glob("testdata/synthetic/*.json")
 	if err != nil || len(paths) != 10 {
-		t.Fatalf("expected ten actual Steward envelopes: %v count=%d", err, len(paths))
+		t.Fatalf("expected ten synthetic envelopes: %v count=%d", err, len(paths))
 	}
-	manifestBytes, err := os.ReadFile("testdata/steward_materialization/expected.json")
+	manifestBytes, err := os.ReadFile("testdata/synthetic_materialization/expected.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	var manifest map[string]stewardMaterializationGolden
+	var manifest map[string]syntheticMaterializationGolden
 	if err := json.Unmarshal(manifestBytes, &manifest); err != nil || len(manifest) != len(paths) {
 		t.Fatalf("invalid materialization golden manifest: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestStewardGojaMaterializationMatchesOfficialNodeOutput(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			datasetPath := filepath.Join("testdata/steward_materialization", filepath.Base(path))
+			datasetPath := filepath.Join("testdata/synthetic_materialization", filepath.Base(path))
 			datasetBytes, err := os.ReadFile(datasetPath)
 			if err != nil {
 				t.Fatal(err)
@@ -116,7 +116,7 @@ func TestStewardGojaMaterializationMatchesOfficialNodeOutput(t *testing.T) {
 	}
 }
 
-var materializerFixtureTime = time.Date(2026, time.October, 7, 12, 0, 0, 0, time.UTC)
+var materializerFixtureTime = time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 func lowerAtFixtureTime(t *testing.T, raw json.RawMessage) (json.RawMessage, error) {
 	t.Helper()

@@ -77,7 +77,7 @@ const container = {
 };
 
 const semanticModel = {
-  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelRef: "model://example/performance/ad_delivery@v1",
   version: 1,
   label: "Ad Delivery",
   entities: [
@@ -117,7 +117,7 @@ const reportBuilderConfig = {
   title: "Report Builder Demo",
   binding: {
     mode: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/ad_delivery@v1",
     entity: "line_delivery",
     selectedDimensions: ["event_date", "channel", "country_code"],
     selectedMeasures: ["available_impressions"],
@@ -251,19 +251,19 @@ const reportBuilderConfig = {
         fieldRef: "channelV2",
         actions: [
           { id: "drill_market", label: "Drill to Market", kind: "drill", nextFieldRef: "country" },
-          { id: "detail_channel", label: "Show channel details", kind: "detail", targetRef: "target://steward/performance/channel-detail" },
+          { id: "detail_channel", label: "Show channel details", kind: "detail", targetRef: "target://example/performance/channel-detail" },
         ],
       },
       {
         fieldRef: "country",
         actions: [
-          { id: "detail_market", label: "Show market details", kind: "detail", targetRef: "target://steward/performance/market-detail" },
+          { id: "detail_market", label: "Show market details", kind: "detail", targetRef: "target://example/performance/market-detail" },
         ],
       },
     ],
     detailTargets: [
       {
-        targetRef: "target://steward/performance/channel-detail",
+        targetRef: "target://example/performance/channel-detail",
         navigationMode: "hostRoute",
         parameters: {
           channel: "$value",
@@ -271,7 +271,7 @@ const reportBuilderConfig = {
         },
       },
       {
-        targetRef: "target://steward/performance/market-detail",
+        targetRef: "target://example/performance/market-detail",
         navigationMode: "hostRoute",
         parameters: {
           country: "$value",
@@ -1864,7 +1864,7 @@ assert.deepEqual(hydratedInventory.state.selectedMeasures, ["avails"]);
 assert.deepEqual(hydratedInventory.state.selectedDimensions, ["channelV2"]);
 assert.equal(hydratedInventory.state.reportDocumentTemplateId, "forecast_inventory_brief");
 assert.equal(hydratedInventory.state.reportDocumentTemplateLabel, "Forecast Inventory Brief");
-assert.equal(hydratedInventory.state.binding.modelRef, "model://steward/performance/ad_delivery@v1");
+assert.equal(hydratedInventory.state.binding.modelRef, "model://example/performance/ad_delivery@v1");
 assert.deepEqual(
   findHierarchy({ drillMetadata: hydratedInventory.config.drillMetadata }, "forecast_inventory")?.levels?.map((level) => level.field),
   ["channelV2", "publisher", "siteType"],
@@ -1980,12 +1980,12 @@ const reopenedInventoryDetail = await buildReopenedRuntimeDetailScenario({
     avails: 82800,
     hhUniqs: 34800,
   },
-  targetRef: "target://steward/performance/channel-detail",
+  targetRef: "target://example/performance/channel-detail",
 });
 
-assert.equal(reopenedInventoryDetail.execution.detailRequest.action.targetRef, "target://steward/performance/channel-detail");
+assert.equal(reopenedInventoryDetail.execution.detailRequest.action.targetRef, "target://example/performance/channel-detail");
 assert.deepEqual(reopenedInventoryDetail.resolvedDetailTarget, {
-  targetRef: "target://steward/performance/channel-detail",
+  targetRef: "target://example/performance/channel-detail",
   navigationMode: "hostRoute",
   parameters: {
     channel: "Display",
@@ -2001,7 +2001,7 @@ assert.deepEqual(reopenedInventoryDetail.hostIntent, {
   intentKind: "detailTarget",
   title: "Resolved detail target",
   description: "Ready for host routing from the authored runtime preview.",
-  targetRef: "target://steward/performance/channel-detail",
+  targetRef: "target://example/performance/channel-detail",
   navigationMode: "hostRoute",
   parameters: {
     channel: "Display",
@@ -2031,12 +2031,12 @@ const reopenedLocationDetail = await buildReopenedRuntimeDetailScenario({
     },
     selectionRows: RAW_ROWS.filter((row) => row.country === "US"),
   },
-  targetRef: "target://steward/performance/market-detail",
+  targetRef: "target://example/performance/market-detail",
 });
 
-assert.equal(reopenedLocationDetail.execution.detailRequest.action.targetRef, "target://steward/performance/market-detail");
+assert.equal(reopenedLocationDetail.execution.detailRequest.action.targetRef, "target://example/performance/market-detail");
 assert.deepEqual(reopenedLocationDetail.resolvedDetailTarget, {
-  targetRef: "target://steward/performance/market-detail",
+  targetRef: "target://example/performance/market-detail",
   navigationMode: "hostRoute",
   parameters: {
     country: "US",
@@ -2047,7 +2047,7 @@ assert.deepEqual(reopenedLocationDetail.hostIntent, {
   intentKind: "detailTarget",
   title: "Resolved detail target",
   description: "Ready for host routing from the authored runtime preview.",
-  targetRef: "target://steward/performance/market-detail",
+  targetRef: "target://example/performance/market-detail",
   navigationMode: "hostRoute",
   parameters: {
     country: "US",
@@ -2117,11 +2117,11 @@ const reopenedAuthoredChannelChartDetail = await buildReopenedRuntimeDetailScena
     },
     selectionRows: RAW_ROWS.filter((row) => row.channelV2 === "Display"),
   },
-  targetRef: "target://steward/performance/channel-detail",
+  targetRef: "target://example/performance/channel-detail",
 });
-assert.equal(reopenedAuthoredChannelChartDetail.execution.detailRequest.action.targetRef, "target://steward/performance/channel-detail");
+assert.equal(reopenedAuthoredChannelChartDetail.execution.detailRequest.action.targetRef, "target://example/performance/channel-detail");
 assert.deepEqual(reopenedAuthoredChannelChartDetail.resolvedDetailTarget, {
-  targetRef: "target://steward/performance/channel-detail",
+  targetRef: "target://example/performance/channel-detail",
   navigationMode: "hostRoute",
   parameters: {
     channel: "Display",
@@ -2138,7 +2138,7 @@ assert.deepEqual(reopenedAuthoredChannelChartDetail.hostIntent, {
   intentKind: "detailTarget",
   title: "Resolved detail target",
   description: "Ready for host routing from the authored runtime preview.",
-  targetRef: "target://steward/performance/channel-detail",
+  targetRef: "target://example/performance/channel-detail",
   navigationMode: "hostRoute",
   parameters: {
     channel: "Display",
@@ -2268,7 +2268,7 @@ assert.deepEqual(mixedInventoryState.hostIntent, {
   intentKind: "detailTarget",
   title: "Resolved detail target",
   description: "Ready for host routing from the authored runtime preview.",
-  targetRef: "target://steward/performance/channel-detail",
+  targetRef: "target://example/performance/channel-detail",
   navigationMode: "hostRoute",
   parameters: {
     channel: "Display",
@@ -2380,7 +2380,7 @@ const mixedLocationDetailInteraction = buildReportRuntimeChartInteractionState({
   canClearSelection: true,
 });
 
-const mixedLocationDetailExecution = mixedLocationDetailInteraction.executions.find((entry) => entry?.kind === "detail" && entry?.detailRequest?.action?.targetRef === "target://steward/performance/market-detail") || null;
+const mixedLocationDetailExecution = mixedLocationDetailInteraction.executions.find((entry) => entry?.kind === "detail" && entry?.detailRequest?.action?.targetRef === "target://example/performance/market-detail") || null;
 assert.ok(mixedLocationDetailExecution, "A reopened mixed-flow chart detail action is required.");
 const mixedLocationDetailResult = executeReportRuntimeAction(mixedLocationDetailExecution, mixedLocationHandlers);
 assert.equal(mixedLocationDetailResult.executed, true);
@@ -2389,7 +2389,7 @@ assert.deepEqual(mixedLocationState.hostIntent, {
   intentKind: "detailTarget",
   title: "Resolved detail target",
   description: "Ready for host routing from the authored runtime preview.",
-  targetRef: "target://steward/performance/market-detail",
+  targetRef: "target://example/performance/market-detail",
   navigationMode: "hostRoute",
   parameters: {
     country: "US",

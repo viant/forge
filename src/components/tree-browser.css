@@ -149,11 +149,11 @@
         0 0 0 1px rgba(255, 255, 255, 0.7) inset;
 }
 
-.steward-targeting-tree-portal > :is(.bp6-overlay, .bp5-overlay, .bp4-overlay) {
+:is(.bp6-overlay, .bp5-overlay, .bp4-overlay):has(.forge-lookup-dialog) {
     z-index: 30;
 }
 
-:is(.bp6-overlay, .bp5-overlay, .bp4-overlay):has(.steward-targeting-tree-dialog) {
+:is(.bp6-overlay, .bp5-overlay, .bp4-overlay):has(.forge-lookup-dialog) {
     z-index: 30;
 }
 

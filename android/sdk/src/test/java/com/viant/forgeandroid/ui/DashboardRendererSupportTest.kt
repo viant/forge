@@ -287,10 +287,10 @@ class DashboardRendererSupportTest {
 
     @Test
     fun mobileTabSelectionFallsBackByStableDefaultInsteadOfClampedIndex() {
-        val before = listOf("pixels", "advanced", "capi")
-        val after = listOf("pixels", "advanced")
+        val before = listOf("overview", "advanced", "contacts")
+        val after = listOf("overview", "advanced")
 
-        assertEquals(2, resolvedMobilePageIndex(before, "capi", fallbackIndex = 0))
-        assertEquals(0, resolvedMobilePageIndex(after, "capi", fallbackIndex = 0))
+        assertEquals(2, resolvedMobilePageIndex(before, "contacts", fallbackIndex = 0))
+        assertEquals(0, resolvedMobilePageIndex(after, "contacts", fallbackIndex = 0))
     }
 }

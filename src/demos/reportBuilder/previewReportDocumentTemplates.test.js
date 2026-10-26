@@ -21,7 +21,7 @@ const config = {
   title: "Forecasting Preview",
   binding: {
     mode: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/ad_delivery@v1",
     entity: "line_delivery",
     selectedDimensions: ["channel", "country_code"],
     selectedMeasures: ["available_impressions", "household_uniques"],

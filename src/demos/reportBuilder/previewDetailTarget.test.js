@@ -40,7 +40,7 @@ assert.deepEqual(resolvePreviewDetailParameterValue("$row.campaign", {
 });
 
 assert.deepEqual(resolvePreviewDetailTarget({
-  targetRef: "target://steward/performance/channel-detail",
+  targetRef: "target://example/performance/channel-detail",
   navigationMode: "hostRoute",
   parameters: {
     channel: "$value",
@@ -54,7 +54,7 @@ assert.deepEqual(resolvePreviewDetailTarget({
     { scopeFilter: "national", campaign: "Family Reach" },
   ],
 }), {
-  targetRef: "target://steward/performance/channel-detail",
+  targetRef: "target://example/performance/channel-detail",
   navigationMode: "hostRoute",
   parameters: {
     channel: "Display",
