@@ -34,6 +34,10 @@ applications own those protocol decisions. Progress advances only after a valid
 acknowledgement. A rejected or cancelled transfer stops before reading another
 part. Empty files transfer zero parts and still require backend validation.
 
+Native retained window actions receive the same helper as
+`utilities.files.transferChunks`; an application need not embed another encoder
+or install a window-specific React component.
+
 Tests cover sequential reads, binary fidelity, bounded first read for a logical
 multi-gigabyte file, cancellation, invalid part sizes and acknowledgements. This
 does not establish full large-file or business-window E2E acceptance.

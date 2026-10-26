@@ -1,9 +1,11 @@
 import {toUTC, fromUTC, getZoneOffset, timeAt} from "../utils/datetime.js";
 import {format, parse, parseISO} from "date-fns";
 import {parseDocument} from "yaml";
+import {transferFileChunks} from '../packs/blueprint/fileChunks.js';
 
 
 const utilities = {
+    files: {transferChunks: transferFileChunks},
     yaml: {
         parse(source) {
             const document = parseDocument(source, {uniqueKeys: true});
