@@ -1489,22 +1489,25 @@ type MediaPreviewOptions struct {
 }
 
 type Column struct {
-	ID                    string                 `json:"id" yaml:"id"`
-	Name                  string                 `json:"name" yaml:"name"`
-	Width                 int                    `json:"width,omitempty" yaml:"width,omitempty"`
-	Sticky                string                 `json:"sticky,omitempty" yaml:"sticky,omitempty"`
-	Align                 string                 `json:"align,omitempty" yaml:"align,omitempty"`
-	Format                string                 `json:"format,omitempty" yaml:"format,omitempty"`
-	TimeZone              string                 `json:"timeZone,omitempty" yaml:"timeZone,omitempty"`
-	TimeZoneSelector      string                 `json:"timeZoneSelector,omitempty" yaml:"timeZoneSelector,omitempty"`
-	TimeZoneBinding       *Binding               `json:"timeZoneBinding,omitempty" yaml:"timeZoneBinding,omitempty"`
-	ValueMap              map[string]interface{} `json:"valueMap,omitempty" yaml:"valueMap,omitempty"`
-	NumericFormat         string                 `json:"numericFormat,omitempty" yaml:"numericFormat,omitempty"`
-	EmptyText             string                 `json:"emptyText,omitempty" yaml:"emptyText,omitempty"`
-	SingularLabel         string                 `json:"singularLabel,omitempty" yaml:"singularLabel,omitempty"`
-	PluralLabel           string                 `json:"pluralLabel,omitempty" yaml:"pluralLabel,omitempty"`
-	Visible               *bool                  `json:"visible,omitempty" yaml:"visible,omitempty"`
-	Sortable              bool                   `json:"sortable,omitempty" yaml:"sortable,omitempty"`
+	ID               string                 `json:"id" yaml:"id"`
+	Name             string                 `json:"name" yaml:"name"`
+	Width            int                    `json:"width,omitempty" yaml:"width,omitempty"`
+	Sticky           string                 `json:"sticky,omitempty" yaml:"sticky,omitempty"`
+	Align            string                 `json:"align,omitempty" yaml:"align,omitempty"`
+	Format           string                 `json:"format,omitempty" yaml:"format,omitempty"`
+	TimeZone         string                 `json:"timeZone,omitempty" yaml:"timeZone,omitempty"`
+	TimeZoneSelector string                 `json:"timeZoneSelector,omitempty" yaml:"timeZoneSelector,omitempty"`
+	TimeZoneBinding  *Binding               `json:"timeZoneBinding,omitempty" yaml:"timeZoneBinding,omitempty"`
+	ValueMap         map[string]interface{} `json:"valueMap,omitempty" yaml:"valueMap,omitempty"`
+	NumericFormat    string                 `json:"numericFormat,omitempty" yaml:"numericFormat,omitempty"`
+	EmptyText        string                 `json:"emptyText,omitempty" yaml:"emptyText,omitempty"`
+	SingularLabel    string                 `json:"singularLabel,omitempty" yaml:"singularLabel,omitempty"`
+	PluralLabel      string                 `json:"pluralLabel,omitempty" yaml:"pluralLabel,omitempty"`
+	Visible          *bool                  `json:"visible,omitempty" yaml:"visible,omitempty"`
+	Sortable         bool                   `json:"sortable,omitempty" yaml:"sortable,omitempty"`
+	// Exportable overrides the default exclusion of action/button columns.
+	// Hidden and selection columns remain excluded regardless of this setting.
+	Exportable            *bool                  `json:"exportable,omitempty" yaml:"exportable,omitempty"`
 	Icon                  string                 `json:"icon,omitempty" yaml:"icon,omitempty"`
 	IconFromValue         bool                   `json:"iconFromValue,omitempty" yaml:"iconFromValue,omitempty"`
 	PressedWhenValue      interface{}            `json:"pressedWhenValue,omitempty" yaml:"pressedWhenValue,omitempty"`

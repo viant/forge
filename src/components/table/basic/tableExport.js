@@ -26,7 +26,8 @@ export function tableExportColumns(columns = []) {
         && column.visible !== false
         && column.multiSelect !== true
         && String(column.id || '') !== '__select__'
-        && String(column.type || '').toLowerCase() !== 'button'
+        && column.exportable !== false
+        && (String(column.type || '').toLowerCase() !== 'button' || column.exportable === true)
     ));
 }
 

@@ -169,7 +169,7 @@ const TableCell = ({
             break;
         case "progress":
             cellContent = (
-                <ProgressBar value={value} text={displayedText} {...cellProps} row={row}/>
+                <ProgressBar value={value} text={displayedText} {...cellProps} progress={cellProps.progress ?? col.progress} row={row}/>
             );
             break;
         case "checkbox":
