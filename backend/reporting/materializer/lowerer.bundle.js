@@ -49621,17 +49621,30 @@ Please __addLocaleData before adding additional unit data`);
     blockId = "primaryChart",
     datasetRef = "primary",
     title = "",
-    rowLimit = 0
+    rowLimit = 0,
+    onChartValidation = null
   } = {}) {
     const normalizedChartSpec = normalizeReportBuilderChartSpec({
       ...chartSpec && typeof chartSpec === "object" && !Array.isArray(chartSpec) ? chartSpec : {},
       ...normalizeString27(title) ? { title: normalizeString27(title) } : {}
     });
     if (!normalizedChartSpec) {
+      onChartValidation == null ? void 0 : onChartValidation({
+        blockId: normalizeString27(blockId || "primaryChart"),
+        datasetRef: normalizeString27(datasetRef || "primary"),
+        chartSpec: null,
+        validation: { valid: false, errors: [{ field: "chartSpec", code: "missing" }] }
+      });
       return null;
     }
     const chartFields = buildReportBuilderChartFields(config, state);
     const validation = validateReportBuilderChartSpec(config, normalizedChartSpec, chartFields);
+    onChartValidation == null ? void 0 : onChartValidation({
+      blockId: normalizeString27(blockId || "primaryChart"),
+      datasetRef: normalizeString27(datasetRef || "primary"),
+      chartSpec: cloneValue17(normalizedChartSpec),
+      validation: cloneValue17(validation)
+    });
     const dataSourceRef = resolveReportSpecDataSourceRef(container, config);
     const chartContainer = buildExplicitReportBuilderChartContainer({
       dataSourceRef,
@@ -49781,7 +49794,8 @@ Please __addLocaleData before adding additional unit data`);
     state = {},
     refinements = [],
     semanticSummary = null,
-    includePrimaryBlocks = true
+    includePrimaryBlocks = true,
+    onChartValidation = null
   } = {}) {
     var _a5;
     const normalizedState = sanitizeReportBuilderState(config, state);
@@ -49830,7 +49844,8 @@ Please __addLocaleData before adding additional unit data`);
       container,
       config: effectiveConfig,
       state: normalizedState,
-      chartSpec
+      chartSpec,
+      onChartValidation: includePrimaryBlocks ? onChartValidation : null
     }) : null;
     const blocks = includePrimaryBlocks ? [
       {
@@ -51940,7 +51955,8 @@ Please __addLocaleData before adding additional unit data`);
   }
   function lowerReportDocumentToReportSpec(document = {}, {
     includePrimaryBlocks = true,
-    runtimeDatasetScopeParams = null
+    runtimeDatasetScopeParams = null,
+    onChartValidation = null
   } = {}) {
     var _a5, _b, _c, _d, _e, _f;
     const blocks = Array.isArray(document == null ? void 0 : document.blocks) ? document.blocks : [];
@@ -51979,7 +51995,8 @@ Please __addLocaleData before adding additional unit data`);
       state: loweringState,
       refinements: normalizeReportRefinements(document == null ? void 0 : document.refinements),
       semanticSummary: (document == null ? void 0 : document.semanticSummary) || null,
-      includePrimaryBlocks
+      includePrimaryBlocks,
+      onChartValidation
     });
     const primaryRequestContext = {
       dataSourceRef: normalizeString29(((_b = baseSpec == null ? void 0 : baseSpec.source) == null ? void 0 : _b.dataSourceRef) || (loweredContainer == null ? void 0 : loweredContainer.dataSourceRef)),
@@ -52070,7 +52087,8 @@ Please __addLocaleData before adding additional unit data`);
           blockId: normalizedBlock == null ? void 0 : normalizedBlock.id,
           datasetRef: normalizedBlock == null ? void 0 : normalizedBlock.datasetRef,
           title: normalizedBlock == null ? void 0 : normalizedBlock.title,
-          rowLimit: normalizedBlock == null ? void 0 : normalizedBlock.rowLimit
+          rowLimit: normalizedBlock == null ? void 0 : normalizedBlock.rowLimit,
+          onChartValidation
         }), normalizedBlock);
       }
       if (normalizeString29(normalizedBlock == null ? void 0 : normalizedBlock.kind) === "tableBlock") {
@@ -52155,6 +52173,44 @@ Please __addLocaleData before adding additional unit data`);
       blocks: nextBlocks
     };
     return augmentReportRequestForAuthoredBlocks(nextSpec, nextBlocks, effectiveConfig);
+  }
+
+  // src/reporting/reportChartValidation.js
+  var AuthoredReportChartValidationError = class extends Error {
+    constructor(diagnostics) {
+      super("Authored report contains invalid chart fields.");
+      this.name = "AuthoredReportChartValidationError";
+      this.authoredChartValidation = diagnostics;
+    }
+  };
+  var bounded = (value) => typeof value === "string" && value.length <= 128 ? value : "";
+  function selectedField(chartSpec, field) {
+    var _a5;
+    if (field === "xField" || field === "seriesField") return bounded(chartSpec == null ? void 0 : chartSpec[field]);
+    const index = /^yFields\.([0-9]+)$/.exec(field);
+    return index ? bounded((_a5 = chartSpec == null ? void 0 : chartSpec.yFields) == null ? void 0 : _a5[Number(index[1])]) : "";
+  }
+  function lowerValidatedReportDocument(document, options = {}) {
+    const diagnostics = [];
+    const reportSpec = lowerReportDocumentToReportSpec(document, {
+      ...options,
+      onChartValidation: ({ blockId, datasetRef, chartSpec, validation }) => {
+        if (validation == null ? void 0 : validation.valid) return;
+        for (const error of Array.isArray(validation == null ? void 0 : validation.errors) ? validation.errors : []) {
+          if (diagnostics.length >= 64) break;
+          const field = bounded(error == null ? void 0 : error.field);
+          diagnostics.push({
+            blockId: bounded(blockId),
+            datasetRef: bounded(datasetRef),
+            field,
+            fieldRef: selectedField(chartSpec, field),
+            validationCode: bounded(error == null ? void 0 : error.code)
+          });
+        }
+      }
+    });
+    if (diagnostics.length) throw new AuthoredReportChartValidationError(diagnostics);
+    return reportSpec;
   }
 
   // src/utils/linkTarget.js
@@ -69348,12 +69404,12 @@ ${indent}${end}`;
     if (typeof envelopeJSON !== "string") throw new Error("Authored report input must be JSON text.");
     const envelope = JSON.parse(envelopeJSON);
     const document = authoredReportDocument(envelope);
-    return JSON.stringify(lowerReportDocumentToReportSpec(document));
+    return JSON.stringify(lowerValidatedReportDocument(document));
   }
   function lowerWithRequestBase(inputJSON) {
     const input = JSON.parse(inputJSON);
     const document = authoredReportDocument(input.envelope, input.requestBaseParameters);
-    return JSON.stringify(lowerReportDocumentToReportSpec(document));
+    return JSON.stringify(lowerValidatedReportDocument(document));
   }
   function materialize(inputJSON, stage) {
     stage == null ? void 0 : stage("parse");
