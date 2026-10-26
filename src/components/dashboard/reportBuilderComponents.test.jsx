@@ -308,7 +308,7 @@ assert.deepEqual(
       ],
       source: {
         kind: "mcp",
-        server: "steward",
+        server: "example",
         toolName: "demo:reach_summary",
       },
       resultContract: {
@@ -345,7 +345,7 @@ assert.deepEqual(
       scopeParamOptions: [],
       source: {
         kind: "mcp",
-        server: "steward",
+        server: "example",
         toolName: "demo:reach_summary",
       },
       resultContract: {

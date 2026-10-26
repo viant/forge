@@ -3,7 +3,7 @@ package window
 import "testing"
 
 func TestSemanticReportModelURIIsNotForgeResourceModelDependency(t *testing.T) {
-	const semantic = "model://steward/performance/line_delivery@v1"
+	const semantic = "model://example/performance/line_delivery@v1"
 	refs := collectAssetReferences(map[string]any{
 		"reportBuilder": map[string]any{
 			"binding":       map[string]any{"modelRef": semantic, "entity": "line_delivery"},

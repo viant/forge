@@ -28,7 +28,7 @@ link:
 
 func TestConfigurableLinkFields(t *testing.T) {
 	var link TableLink
-	if err := yaml.Unmarshal([]byte("kind: external\nkindSelector: CreativeLinkMode\nkindSource: windowForm\nbaseUrl: https://dsp.viantinc.com\nbaseUrlSelector: DspBaseUrl\nbaseUrlSource: windowForm\n"), &link); err != nil {
+	if err := yaml.Unmarshal([]byte("kind: external\nkindSelector: CreativeLinkMode\nkindSource: windowForm\nbaseUrl: https://example.invalid\nbaseUrlSelector: DspBaseUrl\nbaseUrlSource: windowForm\n"), &link); err != nil {
 		t.Fatal(err)
 	}
 	data, err := json.Marshal(link)
@@ -39,7 +39,7 @@ func TestConfigurableLinkFields(t *testing.T) {
 	if err = json.Unmarshal(data, &result); err != nil {
 		t.Fatal(err)
 	}
-	if result.Kind != "external" || result.KindSelector != "CreativeLinkMode" || result.KindSource != "windowForm" || result.BaseURL != "https://dsp.viantinc.com" || result.BaseURLSelector != "DspBaseUrl" || result.BaseURLSource != "windowForm" {
+	if result.Kind != "external" || result.KindSelector != "CreativeLinkMode" || result.KindSource != "windowForm" || result.BaseURL != "https://example.invalid" || result.BaseURLSelector != "DspBaseUrl" || result.BaseURLSource != "windowForm" {
 		t.Fatalf("lost configurable link fields: %s", data)
 	}
 }

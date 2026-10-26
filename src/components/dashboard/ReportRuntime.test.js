@@ -2359,7 +2359,7 @@ const datasetBackedBlockErrorHtml = renderToStaticMarkup(
             diagnostics: [
               {
                 severity: "error",
-                message: "The reporting service at http://steward.viantinc.com:5000/mcp did not respond in time. Try again after the service is available.",
+                message: "The reporting service at http://source1.example.invalid/mcp did not respond in time. Try again after the service is available.",
               },
             ],
           },
@@ -2423,7 +2423,7 @@ const datasetBackedBlockErrorHtml = renderToStaticMarkup(
     },
   }),
 );
-assert.ok(datasetBackedBlockErrorHtml.includes("The reporting service at http://steward.viantinc.com:5000/mcp did not respond in time. Try again after the service is available."));
+assert.ok(datasetBackedBlockErrorHtml.includes("The reporting service at http://source1.example.invalid/mcp did not respond in time. Try again after the service is available."));
 assert.ok(!datasetBackedBlockErrorHtml.includes("No data."));
 assert.ok(!datasetBackedBlockErrorHtml.includes("No KPI value available."));
 assert.ok(!datasetBackedBlockErrorHtml.includes("No data for the selected period."));

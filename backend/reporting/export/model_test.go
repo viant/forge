@@ -41,7 +41,7 @@ func TestDecodeJSON_PreservesOptionalMetadata(t *testing.T) {
 	)
 	fixture["metadata"] = map[string]any{
 		"conversationId": "conv-123",
-		"workspaceId":    "steward",
+		"workspaceId":    "example",
 		"renderHints": map[string]any{
 			"theme": "print",
 		},
@@ -53,7 +53,7 @@ func TestDecodeJSON_PreservesOptionalMetadata(t *testing.T) {
 
 	request, err := DecodeJSON(data)
 	require.NoError(t, err)
-	require.JSONEq(t, `{"conversationId":"conv-123","workspaceId":"steward","renderHints":{"theme":"print"}}`, string(request.Metadata))
+	require.JSONEq(t, `{"conversationId":"conv-123","workspaceId":"example","renderHints":{"theme":"print"}}`, string(request.Metadata))
 }
 
 func TestDecodeJSON_AudienceFixturePreservesOptionalReportPrintContract(t *testing.T) {

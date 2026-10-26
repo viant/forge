@@ -45,4 +45,5 @@ test('outgoing commit messages stay generic; existing public history is not rewr
 // This also guards the contents of generated output fixtures, not just names.
 test('report fixtures reproduce solely from independently authored constants',()=>{
   execFileSync(process.execPath,['scripts/generate-synthetic-report-fixtures.mjs','--check'],{stdio:['ignore','pipe','pipe']});
+  execFileSync(process.execPath,['scripts/generate-synthetic-engine-fixture.mjs','--check'],{stdio:['ignore','pipe','pipe']});
 });

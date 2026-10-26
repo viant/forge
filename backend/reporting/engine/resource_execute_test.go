@@ -52,7 +52,7 @@ func TestAuthoredResourceExecutesRealDatasourcePipeline(t *testing.T) {
 	}
 	original, _ = json.Marshal(envelope)
 	content := append([]byte(nil), original...)
-	uri, _ := identity.ParseResourceURI("report://steward/forecast_supply_command_center")
+	uri, _ := identity.ParseResourceURI("report://example/summary")
 	binding := "verified-account"
 	allowed := true
 	expiry := time.Now().Add(time.Minute)
@@ -75,7 +75,7 @@ func TestAuthoredResourceExecutesRealDatasourcePipeline(t *testing.T) {
 			t.Fatal("missing exact pin")
 		}
 		during()
-		return `{"data":[{"channelV2":"CTV","eventDate":"2026-10-07","avails":10,"hhUniqs":5}]}`, nil
+		return `{"data":[{"category":"Sample","day":"2026-10-07","amount":10,"count":5}]}`, nil
 	}), service.AuthorizeResourceDataset))
 	var events []observe.Event
 	ctx := observe.WithObserver(authsvc.InjectUser(context.Background(), "fixture-user"), observe.ObserverFunc(func(event observe.Event) {

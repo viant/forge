@@ -29,16 +29,16 @@ assert.deepEqual(
 
 assert.deepEqual(
   resolveTableLink({
-    row: {advertiserId: 85141, firstPartyDataSource: 'Mock Commerce API'},
+    row: {contactId: 7, sourceName: 'Mock Commerce API'},
     column: {
-      id: 'firstPartyDataSource',
+      id: 'sourceName',
       type: 'link',
       link: {
         kind: 'dialog',
-        dialogId: 'advertiserCapiOnboardedData',
+        dialogId: 'contactDetails',
         parameters: {
-          AdvertiserId: {source: 'row', selector: 'advertiserId'},
-          FirstPartyDataSource: {source: 'row', selector: 'firstPartyDataSource'},
+          ContactId: {source: 'row', selector: 'contactId'},
+          SourceName: {source: 'row', selector: 'sourceName'},
         },
       },
     },
@@ -48,9 +48,9 @@ assert.deepEqual(
     kind: 'dialog',
     text: 'Mock Commerce API',
     title: '',
-    dialogId: 'advertiserCapiOnboardedData',
+    dialogId: 'contactDetails',
     awaitResult: false,
-    parameters: {AdvertiserId: 85141, FirstPartyDataSource: 'Mock Commerce API'},
+    parameters: {ContactId: 7, SourceName: 'Mock Commerce API'},
   },
 );
 
@@ -309,11 +309,11 @@ assert.equal(
 );
 
 
-const configuredColumn = {id:'name',type:'link',link:{kind:'external',kindSelector:'CreativeLinkMode',baseUrl:'https://dsp.viantinc.com',baseUrlSelector:'DspBaseUrl',hrefTemplate:'/campaigns/creative-details/{{id}}',windowKey:'creative',parameters:{CreativeId:{source:'row',selector:'id',wrap:'array'}}}};
+const configuredColumn = {id:'name',type:'link',link:{kind:'external',kindSelector:'LinkMode',baseUrl:'https://source1.example.invalid',baseUrlSelector:'SourceBaseUrl',hrefTemplate:'/items/details/{{id}}',windowKey:'item',parameters:{ItemId:{source:'row',selector:'id',wrap:'array'}}}};
 const configuredContext = values => ({signals:{windowForm:{peek:()=>values}}});
-assert.equal(resolveTableLink({row:{id:7},column:configuredColumn,value:'Creative',context:configuredContext({DspBaseUrl:'https://other.example.test'})}).href,'https://other.example.test/campaigns/creative-details/7');
-assert.equal(resolveTableLink({row:{id:7},column:configuredColumn,value:'Creative',context:configuredContext({CreativeLinkMode:'window'})}).kind,'window');
-assert.equal(resolveTableLink({row:{id:7},column:configuredColumn,value:'Creative'}).href,'https://dsp.viantinc.com/campaigns/creative-details/7');
+assert.equal(resolveTableLink({row:{id:7},column:configuredColumn,value:'Item',context:configuredContext({SourceBaseUrl:'https://other.example.test'})}).href,'https://other.example.test/items/details/7');
+assert.equal(resolveTableLink({row:{id:7},column:configuredColumn,value:'Item',context:configuredContext({LinkMode:'window'})}).kind,'window');
+assert.equal(resolveTableLink({row:{id:7},column:configuredColumn,value:'Item'}).href,'https://source1.example.invalid/items/details/7');
 console.log('table links carry runtime configuration context with external default');
 
 const zonedInstant='2026-01-01T00:00:00Z';

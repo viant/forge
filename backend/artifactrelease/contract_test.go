@@ -336,10 +336,10 @@ func TestMergeActivationPreservesUnrelatedAndOverlappingCohorts(t *testing.T) {
 }
 
 func TestMergeProjectedActivationUsesAudienceTenantWithoutChangingChannelIdentity(t *testing.T) {
-	key := Key{Tenant: "studio", Account: "2222", Workspace: "workspace", Namespace: "dspui", Name: "standard"}
-	other := Key{Tenant: "studio", Account: "2222", Workspace: "workspace", Namespace: "dspui", Name: "preview"}
+	key := Key{Tenant: "studio", Account: "2222", Workspace: "workspace", Namespace: "sampleui", Name: "standard"}
+	other := Key{Tenant: "studio", Account: "2222", Workspace: "workspace", Namespace: "sampleui", Name: "preview"}
 	audience := "https://idp.example.test/"
-	root := artifactcohort.RootRef{URI: "skill://dspui/guide", Kind: "skill", Version: 1, Hash: strings.Repeat("a", 64)}
+	root := artifactcohort.RootRef{URI: "skill://sampleui/guide", Kind: "skill", Version: 1, Hash: strings.Repeat("a", 64)}
 	old := authz.Resource{Tenant: audience, Kind: "cohort", ID: ReleaseCohortPrefix(key) + "old", Version: "logical"}
 	held := authz.Resource{Tenant: audience, Kind: "cohort", ID: ReleaseCohortPrefix(other) + "held", Version: "logical"}
 	next := authz.Resource{Tenant: audience, Kind: "cohort", ID: ReleaseCohortPrefix(key) + "new", Version: "logical"}

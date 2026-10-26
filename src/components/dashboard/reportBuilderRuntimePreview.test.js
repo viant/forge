@@ -1635,7 +1635,7 @@ assert.deepEqual(semanticRequestErrorPreview.reportFill.diagnostics, [
   },
 ]);
 
-const transportTimeoutError = new Error('GET error: 500 Internal Server Error: code: -32603, message: code: -32603, message: failed to send request: Post "http://steward.viantinc.com:5000/mcp": dial tcp 10.55.130.249:5000: i/o timeout, data: [123]');
+const transportTimeoutError = new Error('GET error: 500 Internal Server Error: code: -32603, message: code: -32603, message: failed to send request: Post "http://source1.example.invalid/mcp": dial tcp 10.55.130.249:5000: i/o timeout, data: [123]');
 const transportTimeoutPreview = buildReportBuilderRuntimePreview({
   model,
   rows: [],
@@ -1646,7 +1646,7 @@ assert.deepEqual(transportTimeoutPreview.reportFill.diagnostics, [
   {
     code: "runtimePreviewError",
     severity: "error",
-    message: "The reporting service at http://steward.viantinc.com:5000/mcp did not respond in time. Try again after the service is available.",
+    message: "The reporting service at http://source1.example.invalid/mcp did not respond in time. Try again after the service is available.",
   },
 ]);
 

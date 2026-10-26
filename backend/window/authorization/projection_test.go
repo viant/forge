@@ -106,7 +106,7 @@ func TestContextualMCPPresentationPreservesAuthoredHintsWithoutReadAdmission(t *
 	window := &types.Window{}
 	require.NoError(t, json.Unmarshal([]byte(`{"authorization":{"scope":"resource","resource":{"type":"advertiser","id":{"source":"resource","selector":"AdvertiserId.0"}},"requestedCapabilities":["read","write"]},"dataSource":{"owner":{"service":{"endpoint":"owner","uri":"/data"}}},"view":{"content":{"id":"frame","containers":[{"id":"write","visibleWhen":{"source":"authorization","field":"resource.capabilities.write","equals":true}},{"id":"read","visibleWhen":{"source":"authorization","field":"resource.capabilities.read","equals":true}}]}}}`), window))
 	executor := &contextualPresentationExecutor{}
-	runtime := NewRuntime(&MCPResolver{Executor: executor, ToolName: "steward:ResourceAuthorization"})
+	runtime := NewRuntime(&MCPResolver{Executor: executor, ToolName: "example:ResourceAuthorization"})
 	input := &BoundView{Window: window, ResourceData: map[string]any{"AdvertiserId": []any{42}}, WindowForm: map[string]any{"opaque": "unchanged"}}
 	result, err := runtime.Project(context.Background(), window, input)
 	require.NoError(t, err)

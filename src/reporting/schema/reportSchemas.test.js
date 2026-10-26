@@ -279,7 +279,7 @@ assert.deepEqual(validateReportSpec({
         },
         source: {
           kind: "mcp",
-          server: "steward",
+          server: "example",
           tool: "performance.summary",
         },
         resultContract: {

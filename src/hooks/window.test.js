@@ -276,7 +276,7 @@ console.log('openTarget ✓ replaces the current hosted workspace region for dri
 {
   const previous = activeWindows.peek();
   activeWindows.value = [{windowId:'catalog',windowKey:'reports',windowTitle:'Reports',parentKey:'chat/new',presentation:'hosted',region:'chat.top',conversationId:'',inTab:true,parameters:{}}];
-  const reportResource = {uri:'report://steward/forecast',kind:'working',contentFingerprint:'approved',authorityBinding:'caller'};
+  const reportResource = {uri:'report://example/forecast',kind:'working',contentFingerprint:'approved',authorityBinding:'caller'};
   useWindowHandlers('catalog').openTarget({target:{kind:'window',windowKey:'forecastingCubeBuilder',windowTitle:'Forecast',presentation:'hosted',region:'chat.top',replaceHostedRegion:true,parameters:{reportResource,executeOnOpen:false}},context:{}});
   const opened = activeWindows.peek().find(window=>window.windowKey==='forecastingCubeBuilder');
   assert.equal(opened?.parentKey,'chat/new','report builder must remain renderable under the root host, not nest under the replaced catalog');

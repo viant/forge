@@ -1369,9 +1369,9 @@ const explicitDatasetDocument = buildReportBuilderReportDocument({
         },
         source: {
           kind: "mcp",
-          server: "steward",
+          server: "example",
           tool: "reach.summary",
-          contractRef: "steward://reach/summary",
+          contractRef: "example://reach/summary",
         },
         resultContract: {
           shape: "rowSet",
@@ -1473,9 +1473,9 @@ assert.deepEqual(
     },
     source: {
       kind: "mcp",
-      server: "steward",
+      server: "example",
       tool: "reach.summary",
-      contractRef: "steward://reach/summary",
+      contractRef: "example://reach/summary",
     },
     resultContract: {
       shape: "rowSet",
@@ -1521,9 +1521,9 @@ assert.deepEqual(
       },
       source: {
         kind: "mcp",
-        server: "steward",
+        server: "example",
         tool: "reach.summary",
-        contractRef: "steward://reach/summary",
+        contractRef: "example://reach/summary",
       },
       resultContract: {
         shape: "rowSet",
@@ -2799,7 +2799,7 @@ const contractRichConfig = {
   },
   source: {
     kind: "mcp",
-    server: "steward",
+    server: "example",
     tool: "performance.summary",
   },
   resultContract: {
@@ -2948,7 +2948,7 @@ assert.deepEqual(contractRestoredConfig.scope, {
 });
 assert.deepEqual(contractRestoredConfig.source, {
   kind: "mcp",
-  server: "steward",
+  server: "example",
   tool: "performance.summary",
 });
 assert.deepEqual(contractRestoredConfig.resultContract, {

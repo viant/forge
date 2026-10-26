@@ -44,7 +44,7 @@ func TestPreparedWindowBuilderUsesHeldSourceWithoutCatalog(t *testing.T) {
 		if current.URI != pin.URI {
 			t.Fatal("lost source window")
 		}
-		return &dsproto.FetchResult{Rows: []map[string]interface{}{{"channelV2": "CTV", "eventDate": "2026-10-07", "avails": 10, "hhUniqs": 5}}}, nil
+		return &dsproto.FetchResult{Rows: []map[string]interface{}{{"category": "Sample", "day": "2026-10-07", "amount": 10, "count": 5}}}, nil
 	})
 	derive := func(_ context.Context, current identity.ResolvedResource, source json.RawMessage) (registry.ReportEnvelope, error) {
 		if current.URI != pin.URI || string(source) != original {

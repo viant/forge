@@ -78,8 +78,8 @@ it('uses the published cohort GET admission without a second permission GET',asy
     status:200,headers:{'Content-Type':'application/json','X-Artifact-Hash':hash,ETag:`"${hash}.cohort-v2"`},
   }));
   try{
-    await mount({applyPermission},{windowId,windowKey:'window://dspui/orderList',
-      providerIdentity:'aistudio-local',resourceRef:{uri:'window://dspui/orderList'}});
+    await mount({applyPermission},{windowId,windowKey:'window://sampleui/orderList',
+      providerIdentity:'aistudio-local',resourceRef:{uri:'window://sampleui/orderList'}});
     await flush();
     expect(element.querySelector('[data-authorized-renderer]')).not.toBeNull();
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
@@ -99,9 +99,9 @@ it('readmits a mounted published window through one refresh GET without legacy p
       status:200,headers:{'Content-Type':'application/json','X-Artifact-Hash':hash,ETag:etag},
     }));
   try{
-    activeWindows.value=[{windowId,windowKey:'window://dspui/orderList'}];
+    activeWindows.value=[{windowId,windowKey:'window://sampleui/orderList'}];
     await mount({applyPermission,windowModelCacheScope:()=> 'verified-owner',workspaceRefresh:{loadMetadata:({load})=>load()}},
-      {windowId,windowKey:'window://dspui/orderList',providerIdentity:'aistudio-local',resourceRef:{uri:'window://dspui/orderList'}});
+      {windowId,windowKey:'window://sampleui/orderList',providerIdentity:'aistudio-local',resourceRef:{uri:'window://sampleui/orderList'}});
     await flush();
     await act(async()=>{await runUICommand({method:'ui.workspace.refresh',params:{windowId,reloadMetadata:true}});});
     expect(globalThis.fetch).toHaveBeenCalledTimes(2); // Initial admission and one fresh readmission.
@@ -118,8 +118,8 @@ it('retains the separate permission preflight for legacy metadata',async()=>{
     status:200,headers:{'Content-Type':'application/json'},
   }));
   try{
-    await mount({applyPermission},{windowId,windowKey:'window://dspui/orderList',
-      providerIdentity:'aistudio-local',resourceRef:{uri:'window://dspui/orderList'}});
+    await mount({applyPermission},{windowId,windowKey:'window://sampleui/orderList',
+      providerIdentity:'aistudio-local',resourceRef:{uri:'window://sampleui/orderList'}});
     await flush();
     expect(applyPermission).toHaveBeenCalledTimes(1);
   }finally{globalThis.fetch=originalFetch;}

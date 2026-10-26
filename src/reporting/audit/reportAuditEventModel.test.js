@@ -17,7 +17,7 @@ assert.deepEqual(buildReportAuditEvent({
   actorRef: "user://awitas",
   occurredAt: "2026-06-12T00:00:00Z",
   metadata: {
-    workspace: "steward",
+    workspace: "example",
     source: "reportComposer",
   },
 }), {
@@ -27,7 +27,7 @@ assert.deepEqual(buildReportAuditEvent({
   actorRef: "user://awitas",
   occurredAt: "2026-06-12T00:00:00Z",
   metadata: {
-    workspace: "steward",
+    workspace: "example",
     source: "reportComposer",
   },
 });
@@ -96,7 +96,7 @@ assert.deepEqual(buildShareableLifecycleAuditEvent({
   actorRef: "user://awitas",
   occurredAt: "2026-06-12T00:00:00Z",
   metadata: {
-    workspace: "steward",
+    workspace: "example",
   },
 }), {
   eventType: "report.publish",
@@ -108,7 +108,7 @@ assert.deepEqual(buildShareableLifecycleAuditEvent({
     from: "draft",
     to: "published",
     reason: "quarterly release",
-    workspace: "steward",
+    workspace: "example",
   },
 });
 
@@ -171,7 +171,7 @@ assert.deepEqual(buildReportExportAuditEvent(savedViewExportRequest, {
   actorRef: "user://awitas",
   occurredAt: "2026-06-12T00:00:00Z",
   metadata: {
-    workspace: "steward",
+    workspace: "example",
   },
 }), {
   eventType: "report.export",
@@ -183,7 +183,7 @@ assert.deepEqual(buildReportExportAuditEvent(savedViewExportRequest, {
     from: "savedView",
     artifactKind: "reportBuilder.savedView",
     format: "pdf",
-    workspace: "steward",
+    workspace: "example",
   },
 });
 

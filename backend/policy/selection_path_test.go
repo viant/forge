@@ -11,7 +11,7 @@ import (
 )
 
 func TestExplicitBackendSelectionPathsMatchRealMutationPayloads(t *testing.T) {
-	resource := authz.Resource{Kind: "window", ID: "window://steward/campaign", Version: "1", Tenant: "tenant"}
+	resource := authz.Resource{Kind: "window", ID: "window://example/campaign", Version: "1", Tenant: "tenant"}
 	for _, tc := range []struct {
 		path  string
 		input map[string]any

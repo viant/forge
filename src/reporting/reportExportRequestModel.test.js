@@ -100,7 +100,7 @@ const draftExportRequest = buildDraftReportExportRequest({
   format: "pdf",
   metadata: {
     conversationId: "conv-123",
-    workspaceId: "steward",
+    workspaceId: "example",
     renderHints: {
       theme: "print",
     },
@@ -116,7 +116,7 @@ assert.equal(draftExportRequest.source.reportId, "performanceReport");
 assert.equal(draftExportRequest.source.title, "Performance Report");
 assert.deepEqual(draftExportRequest.metadata, {
   conversationId: "conv-123",
-  workspaceId: "steward",
+  workspaceId: "example",
   renderHints: {
     theme: "print",
   },

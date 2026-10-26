@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {resolveScopedWindowKey} from './windowResourceKey.js';
 
-assert.equal(resolveScopedWindowKey('advertiser', 'window://dspui/advertiserList'), 'window://dspui/advertiser');
+assert.equal(resolveScopedWindowKey('advertiser', 'window://sampleui/advertiserList'), 'window://sampleui/advertiser');
 assert.equal(resolveScopedWindowKey('nested/detail', 'window://example/parent'), 'window://example/nested/detail');
 assert.equal(resolveScopedWindowKey('window://other/detail', 'window://example/parent'), 'window://other/detail');
 assert.equal(resolveScopedWindowKey('provider:legacy:detail', 'window://example/parent'), 'provider:legacy:detail');

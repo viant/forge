@@ -65,6 +65,6 @@ const documentStyles = fs.readFileSync(new URL('./documentTable.css', import.met
 for (const role of ['body', 'label', 'metadata']) for (const property of ['family', 'size', 'weight', 'line-height', 'letter-spacing']) {
     assert.ok(documentStyles.includes(`--forge-type-${role}-${property}`), `Document table must consume all ${role} properties`);
 }
-assert.doesNotMatch(documentStyles, /(?:IBM Plex|Steward|Viant|!important|#[a-z][\w-]*\s+[.{])/i);
+assert.doesNotMatch(documentStyles, /(?:IBM Plex|Example|Viant|!important|#[a-z][\w-]*\s+[.{])/i);
 assert.match(documentStyles, /100cqw/);
 console.log('document table authored order, flexible width, read-only detail and role contracts passed');
