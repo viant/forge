@@ -4,6 +4,8 @@ import {useSignals} from '@preact/signals-react/runtime';
 import {Icon} from '@blueprintjs/core';
 import {useDataSourceState} from "../../hooks/useDataSourceState.js";
 import Chart from "../Chart.jsx";
+import SelectControl from "../SelectControl.jsx";
+import Typography from "../Typography.jsx";
 import WorldCountryMap from "./WorldCountryMap.jsx";
 import {WORLD_COUNTRY_PATHS} from "./worldCountryModel.js";
 import {resolveKey} from "../../utils/selector.js";
@@ -125,6 +127,7 @@ function Panel({container, children, actions = null}) {
 }
 
 export function DashboardSummary({container, context}) {
+    useSignals();
     const metricsData = useMetrics(context);
     const locale = getDashboardLocale(context);
     const summaryConfig = container.dashboard?.summary || {};
@@ -139,7 +142,10 @@ export function DashboardSummary({container, context}) {
     const metricCards = Array.isArray(summaryEntries)
         ? summaryEntries.map((metric) => {
             const selector = metric.selector || metric.field || metric.key || metric.valueField;
-            const rowValue = selector && summaryRow ? resolveKey(summaryRow, selector) : undefined;
+            const metricContext = metric.dataSourceRef ? context?.Context?.(metric.dataSourceRef) : null;
+            const metricRows = metricContext?.signals?.collection?.value || metricContext?.handlers?.dataSource?.peekFullCollection?.();
+            const metricRow = Array.isArray(metricRows) ? metricRows[0] : summaryRow;
+            const rowValue = selector && metricRow ? resolveKey(metricRow, selector) : undefined;
             const value = rowValue !== undefined ? rowValue : (selector ? resolveKey(metricsData, selector) : metric.value);
             const secondarySelector = metric.secondarySelector || metric.secondaryField || metric.secondaryKey || metric.secondaryValueField;
             const secondaryRowValue = secondarySelector && summaryRow ? resolveKey(summaryRow, secondarySelector) : undefined;
@@ -165,6 +171,14 @@ export function DashboardSummary({container, context}) {
             }))
             : [];
 
+    if (['document-summary', 'document-scope'].includes(container.appearance)) return (
+        <dl className={`forge-document-records${container.appearance === 'document-scope' ? ' forge-document-records--scope' : ''}`}>
+            {metricCards.map(metric => <div key={metric.key}>
+                <Typography as="dt" typeRole="metadata">{metric.label}</Typography>
+                <Typography as="dd" typeRole={container.appearance === 'document-scope' ? 'label' : 'section'}>{formatDashboardValue(metric.value, metric.format, locale)}</Typography>
+            </div>)}
+        </dl>
+    );
     return (
         <Panel container={container}>
             <div className="forge-dashboard-metric-grid">
@@ -1407,7 +1421,7 @@ export function DashboardEditableTable({container, context, embedded = false}) {
     const documentTable = tablePresentation?.variant === 'document';
     if (tablePresentation?.variant && !documentTable) throw new Error(`Unsupported table variant: ${tablePresentation.variant}`);
     const editSessions = useRef(new WeakMap());
-    const wrapSelect = select => documentTable ? <span className="forge-document-select">{select}<SharedIcon name="lucide:chevron-down"/></span> : select;
+    const Select = documentTable ? SelectControl : 'select';
 
     const tableColumns = useMemo(() => documentTable ? documentTableColumns(visibleRuntimeColumns, tablePresentation)
         : withFrozenIdentifierColumn(visibleRuntimeColumns), [visibleRuntimeColumns, tablePresentation, documentTable]);
@@ -1468,16 +1482,18 @@ export function DashboardEditableTable({container, context, embedded = false}) {
     };
     const frequencyControl = (rowIndex, column, value) => {
         const parts = frequencyParts(value);
+        const disabled = !!(column.editor?.disabledWhen && evaluatePlainVisibleWhen(column.editor.disabledWhen, context, currentRows()[rowIndex]));
         return <div className="forge-frequency-editor">
-            <input aria-label={`${column.label || column.key} count row ${rowIndex + 1}`} type="number" min="1" value={parts.count} placeholder="—" onChange={(event) => setFrequencyPart(rowIndex, column, 'count', event.target.value)}/>
+            <input aria-label={`${column.label || column.key} count row ${rowIndex + 1}`} type="number" min="1" disabled={disabled} value={parts.count} placeholder="—" onChange={(event) => setFrequencyPart(rowIndex, column, 'count', event.target.value)}/>
             <span>per</span>
-            <input aria-label={`${column.label || column.key} interval row ${rowIndex + 1}`} type="number" min="1" value={parts.interval} onChange={(event) => setFrequencyPart(rowIndex, column, 'interval', event.target.value)}/>
-            <select aria-label={`${column.label || column.key} unit row ${rowIndex + 1}`} value={parts.unit} onChange={(event) => setFrequencyPart(rowIndex, column, 'unit', event.target.value)}>
+            <input aria-label={`${column.label || column.key} interval row ${rowIndex + 1}`} type="number" min="1" disabled={disabled} value={parts.interval} onChange={(event) => setFrequencyPart(rowIndex, column, 'interval', event.target.value)}/>
+            <Select {...(documentTable ? {wrapperClassName: 'forge-document-select'} : {})} aria-label={`${column.label || column.key} unit row ${rowIndex + 1}`} disabled={disabled} value={parts.unit} onChange={(event) => setFrequencyPart(rowIndex, column, 'unit', event.target.value)}>
                 {(column?.editor?.units || ['hour', 'day', 'week']).map((unit) => <option key={unit} value={unit}>{unit}</option>)}
-            </select>
+            </Select>
         </div>;
     };
     const editableCellStyle = (row, column) => {
+        if (documentTable) return undefined;
         const visual = resolveTableCellVisualState(row, column);
         if (!visual || !['dataBar', 'progressBar', 'sparkBar'].includes(visual.kind)) return undefined;
         const pct = Math.round(Math.max(0, Math.min(1, Number(visual.percent || 0))) * 100);
@@ -1539,7 +1555,7 @@ export function DashboardEditableTable({container, context, embedded = false}) {
                         if (event.key==='Escape') {
                             if (editSessions.current.has(field)) updateCell(Number(cell.dataset.rowIndex), cell.dataset.columnKey, editSessions.current.get(field));
                             event.preventDefault(); field.blur();
-                        } else if (event.key==='Enter' && field.tagName!=='SELECT' && (field.tagName!=='TEXTAREA' || cell.hasAttribute('data-column-flex') || event.ctrlKey || event.metaKey)) {
+                        } else if (event.key==='Enter' && field.tagName!=='SELECT' && (field.tagName!=='TEXTAREA' || field.dataset.commitOnEnter === 'true' || event.ctrlKey || event.metaKey)) {
                             event.preventDefault(); field.blur();
                         }
                     } : undefined} className={`forge-editable-collection__table ${documentTable ? 'forge-document-table' : 'forge-editable-collection__table--frozen-identifier'}`} data-forge-table-variant={documentTable ? 'document' : undefined} style={documentLayout ? {minWidth: documentLayout.minWidth} : undefined}>
@@ -1556,16 +1572,17 @@ export function DashboardEditableTable({container, context, embedded = false}) {
                                             <td key={column.key} data-row-index={rowIndex} data-column-key={column.key} data-read-only={!editor || undefined} data-column-flex={column.flex || undefined} data-column-align={column.align} className={[column.frozen ? 'forge-table-frozen-identifier' : '', column.required === true ? 'is-required' : ''].filter(Boolean).join(' ') || undefined} style={column.frozen ? {'--forge-frozen-column-width': `${column.resolvedCompactWidth}px`} : undefined}>
                                                 {!editor ? <span>{formatDashboardValue(value, column.format, getDashboardLocale(context))}</span>
                                                     : editor.type === 'frequency' ? frequencyControl(rowIndex, column, value)
-                                                    : editor.type === 'select' ? wrapSelect(
-                                                        <select aria-label={`${column.label || column.key} row ${rowIndex + 1}`} value={value} disabled={editorDisabled}
+                                                    : editor.type === 'select' ? (
+                                                        <Select {...(documentTable ? {wrapperClassName: 'forge-document-select'} : {})} aria-label={`${column.label || column.key} row ${rowIndex + 1}`} value={value} disabled={editorDisabled}
                                                             onChange={(event) => updateCell(rowIndex, column.key, event.target.value)}>
                                                             {(editor.options || []).map((option) => {
                                                                 const normalized = option && typeof option === 'object' ? option : {label: option, value: option};
                                                                 return <option key={normalized.value} value={normalized.value}>{normalized.label}</option>;
                                                             })}
-                                                        </select>
+                                                        </Select>
                                                     ) : editor.type === 'multiline' || /rationale|reason|description/i.test(`${column.key} ${column.label || ''}`) ? (
                                                         <textarea aria-label={`${column.label || column.key} row ${rowIndex + 1}`} disabled={editorDisabled}
+                                                            data-commit-on-enter={editor.commitOnEnter === true ? 'true' : undefined}
                                                             rows={1}
                                                             ref={(node) => {
                                                                 if (!node) return;
@@ -1702,6 +1719,8 @@ export function DashboardLookupChips({container, context}) {
     const dataSource = dataSourceContext?.handlers?.dataSource;
     const lookupService = context?.handlers?.lookup;
     const config = container?.lookup || {};
+    const documentLookup = container?.tablePresentation?.variant === 'document';
+    const ProviderSelect = documentLookup ? SelectControl : 'select';
     const providers = Array.isArray(config.providers) ? config.providers : [];
     const [providerId, setProviderId] = useState(String(config.defaultProvider || providers[0]?.id || ''));
     const [query, setQuery] = useState('');
@@ -1902,9 +1921,9 @@ export function DashboardLookupChips({container, context}) {
                 {providers.length > 1 ? (
                     <label className="forge-dashboard-lookup-chips__provider">
                         <span>{config.providerLabel || 'Provider'}</span>
-                        <select value={providerId} onChange={(event) => { setProviderId(event.target.value); setResults([]); }}>
+                        <ProviderSelect value={providerId} onChange={(event) => { setProviderId(event.target.value); setResults([]); }}>
                             {providers.map((provider) => <option key={provider.id} value={provider.id}>{provider.label || provider.id}</option>)}
-                        </select>
+                        </ProviderSelect>
                     </label>
                 ) : null}
                 <LookupSelectionInput

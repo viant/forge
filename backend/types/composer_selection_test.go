@@ -25,3 +25,24 @@ func TestComposerSelectionExplicitFalse(t *testing.T) {
 		}
 	}
 }
+
+func TestDocumentChatAppearanceSurvivesSerialization(t *testing.T) {
+	var chat Chat
+	if err := yaml.Unmarshal([]byte("appearance: document\ncommandCenter: true\nshowUpload: true\n"), &chat); err != nil {
+		t.Fatal(err)
+	}
+	if chat.Appearance != "document" || !chat.CommandCenter || !chat.ShowUpload {
+		t.Fatalf("lost chat appearance or behavior: %#v", chat)
+	}
+	data, err := json.Marshal(chat)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var restored Chat
+	if err := json.Unmarshal(data, &restored); err != nil {
+		t.Fatal(err)
+	}
+	if restored.Appearance != "document" {
+		t.Fatalf("lost appearance after delivery: %s", data)
+	}
+}

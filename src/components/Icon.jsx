@@ -1,8 +1,8 @@
 import React from 'react';
 import {Icon as BlueprintIcon} from '@blueprintjs/core';
-import {ArrowLeft, ArrowRight, ArrowUp, Building, Camera, Check, Clock3, FileText, Flag, House, LayoutGrid, Maximize, Mic, Minimize, SlidersHorizontal, ChevronDown, ChevronRight, CircleAlert, FileDown, History,
+import {ArrowLeft, ArrowRight, ArrowUp, Bell, Gauge, LogOut, Building, Camera, Check, CloudUpload, Clock3, FileText, Flag, House, LayoutGrid, Maximize, Mic, Minimize, SlidersHorizontal, ChevronDown, ChevronRight, CircleAlert, CircleHelp, CirclePause, LoaderCircle, Link, RotateCcw, FileDown, History,
     Maximize2, Menu, MessageSquare, Minimize2, Paperclip, PanelRight, PanelRightClose,
-    PanelRightOpen, Plus, RefreshCw, Search, Settings, Square, User, X} from 'lucide-react';
+    PanelRightOpen, Plus, RefreshCw, Search, Settings, Square, Trash2, User, X, ZoomIn, ZoomOut} from 'lucide-react';
 import './foundations.css';
 
 const icons = {
@@ -14,8 +14,10 @@ const icons = {
     history: History, 'maximize-2': Maximize2, menu: Menu, 'message-square': MessageSquare,
     'minimize-2': Minimize2, paperclip: Paperclip, 'panel-right': PanelRight,
     'panel-right-close': PanelRightClose, 'panel-right-open': PanelRightOpen,
-    plus: Plus, 'refresh-cw': RefreshCw, search: Search, settings: Settings,
-    square: Square, user: User, x: X,
+    'cloud-upload': CloudUpload, plus: Plus, 'refresh-cw': RefreshCw, search: Search, settings: Settings,
+    square: Square, 'trash-2': Trash2, user: User, x: X, bell: Bell, gauge: Gauge, 'log-out': LogOut,
+    'zoom-in': ZoomIn, 'zoom-out': ZoomOut,
+    'circle-help': CircleHelp, 'circle-pause': CirclePause, 'loader-circle': LoaderCircle, link: Link, 'rotate-ccw': RotateCcw,
 };
 export const iconNames = Object.freeze(Object.keys(icons).map(name => `lucide:${name}`));
 

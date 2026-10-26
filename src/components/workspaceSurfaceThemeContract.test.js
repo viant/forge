@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const themeCSS = fs.readFileSync(new URL('../packs/blueprint/theme.css', import.meta.url), 'utf8');
+assert.match(themeCSS, /:where\(\.agently-application, \.agently-workspace\) :where\(button, \[role="button"\], \[role="tab"\], a\[href\]\):focus:not\(:focus-visible\)\s*{\s*outline: none;/);
+assert.match(themeCSS, /:where\(\.agently-application, \.agently-workspace\) :where\(button, \[role="button"\], \[role="tab"\], a\[href\]\):focus-visible\s*{[^}]*outline: var\(--forge-focus-width, 2px\) solid var\(--forge-focus-color, currentColor\)/s);
 
 for (const token of [
     '--forge-container-surface',
@@ -28,8 +30,8 @@ assert.match(themeCSS, /:is\(\[data-forge-part="container-card"\], \[data-forge-
 assert.match(themeCSS, /\[data-forge-part="container-section"\]\s*>\s*\.bp6-section-header\s*{[^}]*background:\s*var\(--forge-section-header-surface\)/s);
 assert.match(themeCSS, /\[data-forge-part="container-section"\]\[data-forge-section-appearance="primary"\]\s*>\s*\.bp6-section-header\s*{[^}]*background:\s*var\(--forge-section-primary-header-surface, var\(--forge-section-header-surface\)\)/s);
 assert.match(themeCSS, /\[data-forge-part="container-section"\]\[data-forge-section-appearance="quiet"\]\s*>\s*\.bp6-section-header\s*{[^}]*background:\s*var\(--forge-section-quiet-header-surface, var\(--forge-section-header-surface\)\)/s);
-assert.match(themeCSS, /\.bp6-section-header \.bp6-heading\s*{[^}]*font-size:\s*var\(--forge-section-header-font-size\)/s);
-assert.match(themeCSS, /data-forge-section-appearance="primary"[^}]*> \.bp6-section-header \.bp6-heading\s*{[^}]*font-size:\s*var\(--forge-section-primary-header-font-size, var\(--forge-section-header-font-size\)\)/s);
-assert.match(themeCSS, /data-forge-section-appearance="quiet"[^}]*> \.bp6-section-header \.bp6-heading\s*{[^}]*font-size:\s*var\(--forge-section-quiet-header-font-size, var\(--forge-section-header-font-size\)\)/s);
+assert.match(themeCSS, /\.bp6-section-header \.bp6-heading:not\(\[data-forge-type\]\)\s*{[^}]*font-size:\s*var\(--forge-section-header-font-size\)/s);
+assert.match(themeCSS, /data-forge-section-appearance="primary"[^}]*> \.bp6-section-header \.bp6-heading:not\(\[data-forge-type\]\)\s*{[^}]*font-size:\s*var\(--forge-section-primary-header-font-size, var\(--forge-section-header-font-size\)\)/s);
+assert.match(themeCSS, /data-forge-section-appearance="quiet"[^}]*> \.bp6-section-header \.bp6-heading:not\(\[data-forge-type\]\)\s*{[^}]*font-size:\s*var\(--forge-section-quiet-header-font-size, var\(--forge-section-header-font-size\)\)/s);
 
 console.log('Forge workspace surface theme contract passed');

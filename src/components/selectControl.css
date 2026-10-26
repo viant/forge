@@ -1,0 +1,36 @@
+.forge-select-control {
+    --forge-select-reserved-space: var(--forge-select-indicator-space, 32px);
+    display: inline-flex;
+    position: relative;
+    min-width: 0;
+    vertical-align: middle;
+}
+.forge-select-control > select {
+    appearance: none;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    padding-inline-end: var(--forge-select-reserved-space);
+}
+:where(.forge-select-control) > select {
+    min-height: var(--forge-control-height, 36px);
+    padding: var(--forge-spacing-1, 4px) var(--forge-control-padding-inline, 12px);
+    border: var(--forge-border-width, 1px) solid var(--forge-control-border, #c8ced8);
+    border-radius: var(--forge-control-radius, 4px);
+    color: var(--forge-control-text, inherit);
+    background: var(--forge-control-bg, var(--forge-surface, #ffffff));
+}
+:where(.forge-select-control > select:not([data-forge-type])) { font: inherit; }
+.forge-select-control > select:focus-visible { outline:var(--forge-focus-width,2px) solid var(--forge-focus-color,currentColor); outline-offset:var(--forge-focus-offset,2px); }
+.forge-select-control > select:disabled { color:var(--forge-disabled-text,#6b7280); background:var(--forge-disabled-bg,#f3f4f6); cursor:not-allowed; }
+.forge-select-control > .forge-icon {
+    position: absolute;
+    pointer-events: none;
+    inset-inline-end: var(--forge-select-indicator-inset, 10px);
+    top: 50%;
+    width: var(--forge-select-indicator-size, 16px);
+    height: var(--forge-select-indicator-size, 16px);
+    transform: translateY(-50%);
+}
+.forge-select-control > select:disabled + .forge-icon { opacity: .5; }
+@media(pointer:coarse) { .forge-select-control > select { min-height:44px; } }

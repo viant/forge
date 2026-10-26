@@ -481,7 +481,7 @@ const Toolbar = ({
         const testID = toolbarItemTestID(item);
         const spanStyle = align === 'center'
             ? { margin: "0 10px" }
-            : (align === 'right' ? { marginLeft: "10px" } : { marginRight: "10px" });
+            : (align === 'right' ? { marginLeft: "var(--forge-toolbar-item-gap, 10px)" } : { marginRight: "var(--forge-toolbar-item-gap, 10px)" });
 
         const ActionComponent = item.variant ? ForgeButton : Button;
         const button = (

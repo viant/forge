@@ -103,6 +103,11 @@ export function normalizeReportTableBlockColumn(column = {}) {
   const cellVisual = normalizeReportTableCellVisual(column.cellVisual);
   const link = normalizeReportTableLink(column.link);
   const labelClamp = normalizePresentationClampConfig(column.labelClamp);
+  for (const property of ['width','minWidth']) {
+    if (column[property] !== undefined && (!Number.isFinite(column[property]) || column[property] < 48)) {
+      throw new Error(`Table column ${property} must be a number of at least 48`);
+    }
+  }
   return {
     key,
     ...(normalizeString(column.sourceKey) ? { sourceKey: normalizeString(column.sourceKey) } : {}),
@@ -119,12 +124,30 @@ export function normalizeReportTableBlockColumn(column = {}) {
       ? { format: normalizeString(column.format) || normalizeString(column.valueFormat) }
       : {}),
     ...(normalizeString(column.align) ? { align: normalizeString(column.align) } : {}),
+    ...(column.width !== undefined ? {width:column.width} : {}),
+    ...(column.minWidth !== undefined ? {minWidth:column.minWidth} : {}),
+    ...(column.flex === true ? {flex:true} : {}),
     ...(column?.runtimeFilterable === true ? { runtimeFilterable: true } : {}),
     ...(column?.rowIdentity === true ? { rowIdentity: true } : {}),
     ...(link ? { link } : {}),
     ...(cellVisual ? { cellVisual } : {}),
     ...(labelClamp ? { labelClamp } : {}),
   };
+}
+
+export function normalizeReportTableSelection(selection) {
+  if (selection === undefined) return null;
+  if (!selection || selection.mode !== 'checkbox' || typeof selection.field !== 'string'
+      || !selection.field.trim() || Object.keys(selection).some(key => !['mode','field','labelFields'].includes(key))) {
+    throw new Error('Table selection requires checkbox mode and a non-empty field');
+  }
+  if (selection.labelFields !== undefined && (!Array.isArray(selection.labelFields) || !selection.labelFields.length
+      || selection.labelFields.some(field => typeof field !== 'string' || !field.trim())
+      || new Set(selection.labelFields.map(field => field.trim())).size !== selection.labelFields.length)) {
+    throw new Error('Selection labelFields requires unique, non-empty field names');
+  }
+  return {mode:'checkbox', field:selection.field.trim(),
+    ...(selection.labelFields ? {labelFields:selection.labelFields.map(field => field.trim())} : {})};
 }
 
 export function normalizeReportDocumentTableBlock(block = {}) {
@@ -152,15 +175,33 @@ export function normalizeReportDocumentTableBlock(block = {}) {
   }
   const accentTone = normalizeString(block?.accentTone).toLowerCase();
   const labelClamp = normalizePresentationClampConfig(block?.labelClamp);
+  const recordTitleField = normalizeString(block?.recordTitleField);
+  if (recordTitleField && !columns.some(column => column.key === recordTitleField)) {
+    throw new Error('Record presentation requires an existing table column as recordTitleField');
+  }
   return {
     id,
     kind: "tableBlock",
     title,
+    ...(normalizeString(block?.description) ? {description: normalizeString(block.description)} : {}),
     datasetRef,
     columns,
+    ...(block.selection !== undefined ? {selection:normalizeReportTableSelection(block.selection)} : {}),
+    ...(recordTitleField ? {recordTitleField} : {}),
     ...(["blue", "green", "amber", "rose", "slate"].includes(accentTone) ? { accentTone } : {}),
     ...(block?.collapsible === true ? { collapsible: true } : {}),
     ...(block?.collapsible === true && block?.defaultCollapsed === true ? { defaultCollapsed: true } : {}),
     ...(labelClamp ? { labelClamp } : {}),
   };
+}
+
+// Map visible rows by identity, retaining hidden rows and duplicate business IDs.
+export function mergeReportTableSelections(sourceRows, visibleRows, choices, field) {
+  const next = sourceRows.map(row => Boolean(row[field]));
+  visibleRows.forEach((row,index) => {
+    const sourceIndex = sourceRows.indexOf(row);
+    if (sourceIndex < 0) throw new Error('Review row does not belong to the source dataset');
+    next[sourceIndex] = Boolean(choices[index]?.[field]);
+  });
+  return next;
 }

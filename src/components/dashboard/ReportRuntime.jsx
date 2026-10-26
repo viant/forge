@@ -1,6 +1,13 @@
+import {resolveReportRuntimeChartRowLimit} from '../chartAppearance.js';
 import {buildRuntimeTableRows} from "../../reporting/reportRuntimeTableRows.js";
 import ReportDatasetPager from "./ReportDatasetPager.jsx";
-import {resolveReportChartTableSwitch} from "../../reporting/reportViewerSettings.js";
+import {normalizeReportViewerSettings, resolveReportChartTableSwitch} from "../../reporting/reportViewerSettings.js";
+import {DocumentPresentationContext} from '../documentPresentation.js';
+import Typography from '../Typography.jsx';
+import Button from '../Button.jsx';
+import ForgeIcon from '../Icon.jsx';
+import '../documentPresentation.css';
+import './reportDocument.css';
 import KpiSparkline from './KpiSparkline.jsx';
 import { buildRuntimeSections } from "./reportSections.js";
 export { buildRuntimeSections } from "./reportSections.js";
@@ -18,6 +25,8 @@ import {
 } from "../../reporting/reportLayoutModel.js";
 import { setSelector } from "../../utils/selector.js";
 import DashboardTableContent from "./DashboardTableContent.jsx";
+import ReviewTable from "./ReviewTable.jsx";
+import {mergeReportTableSelections} from "../../reporting/tableVisualSpec.js";
 import {
   formatReportRuntimeRefinement,
   resolveReportRuntimeCompactBindingSummaryChips,
@@ -171,13 +180,7 @@ function createRuntimeContext(dataset = {}, locale = "en-US", { publicMode = fal
   };
 }
 
-export function resolveReportRuntimeChartRowLimit(block = {}) {
-  const explicitRowLimit = Math.trunc(Number(block?.content?.rowLimit ?? block?.rowLimit ?? 0));
-  const chartType = normalizeString(block?.content?.chartSpec?.type || block?.chartSpec?.type).toLowerCase();
-  return Number.isInteger(explicitRowLimit) && explicitRowLimit > 0
-    ? explicitRowLimit
-    : (chartType === "horizontal_bar" || chartType === "funnel_bar" ? 10 : 0);
-}
+export {resolveReportRuntimeChartRowLimit} from '../chartAppearance.js';
 
 export function shouldApplyTableDefaultCollapsed(previousDefaultCollapsed, nextDefaultCollapsed, collapsible) {
   return collapsible === true && nextDefaultCollapsed === true && previousDefaultCollapsed !== true;
@@ -185,6 +188,7 @@ export function shouldApplyTableDefaultCollapsed(previousDefaultCollapsed, nextD
 
 
 function RuntimePanel({ title = "", subtitle = "", children, className = "", style = {}, headerAction = null }) {
+  const documentPresentation = React.useContext(DocumentPresentationContext);
   const presentation = useWorkspacePresentation();
   title = distinctWorkspaceTitle(title, presentation?.sectionLabel);
   return (
@@ -195,8 +199,8 @@ function RuntimePanel({ title = "", subtitle = "", children, className = "", sty
       {title || subtitle || headerAction ? (
         <header className="forge-report-runtime-panel__header">
           <span className="forge-report-runtime-panel__heading">
-            {title ? <h3 className="forge-report-runtime-panel__title">{title}</h3> : null}
-            {subtitle ? <p className="forge-report-runtime-panel__subtitle">{subtitle}</p> : null}
+            {title ? (documentPresentation ? <Typography as="h2" typeRole="section" className="forge-report-document-panel-title">{title}</Typography> : <h3 className="forge-report-runtime-panel__title">{title}</h3>) : null}
+            {subtitle ? (documentPresentation ? <Typography as="p" typeRole="metadata" className="forge-report-document-panel-subtitle">{subtitle}</Typography> : <p className="forge-report-runtime-panel__subtitle">{subtitle}</p>) : null}
           </span>
           {headerAction}
         </header>
@@ -1094,11 +1098,17 @@ export function sanitizeReportRuntimeDiagnostics(diagnostics = [], publicMode = 
 }
 
 function BlockDiagnosticsCallout({ diagnostics = [], onRetryProviderActions = null, providerActionsLoading = false }) {
+  const documentPresentation = React.useContext(DocumentPresentationContext);
   const warningDiagnostics = buildReportRuntimeDiagnosticsViewModel(diagnostics).diagnostics
     .filter((diagnostic) => normalizeString(diagnostic?.severity || "info").toLowerCase() !== "error");
   if (warningDiagnostics.length === 0) {
     return null;
   }
+  if (documentPresentation) return <div className="forge-report-document-diagnostics">{warningDiagnostics.map((diagnostic,index) => <div key={`${diagnostic.code}:${diagnostic.path}:${index}`} className="forge-report-document-diagnostic" data-forge-status="warning">
+    <Typography as="p" typeRole="body">{normalizeString(diagnostic.message || "Runtime warning.")}</Typography>
+    {normalizeString(diagnostic.suggestedFix) ? <Typography as="p" typeRole="small">{normalizeString(diagnostic.suggestedFix)}</Typography> : null}
+    {diagnostic.code === "actionProviderFailed" && typeof onRetryProviderActions === "function" ? <Button variant="secondary" size="compact" onClick={onRetryProviderActions} disabled={providerActionsLoading}>{providerActionsLoading ? "Retrying action provider" : "Retry action provider"}</Button> : null}
+  </div>)}</div>;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
       {warningDiagnostics.map((diagnostic, index) => (
@@ -1151,9 +1161,14 @@ function BlockDiagnosticsCallout({ diagnostics = [], onRetryProviderActions = nu
 }
 
 function BlockErrorCallout({ diagnostic = null }) {
+  const documentPresentation = React.useContext(DocumentPresentationContext);
   if (!diagnostic) {
     return null;
   }
+  if (documentPresentation) return <div className="forge-report-document-diagnostic" data-forge-status="danger" role="alert">
+    <Typography as="p" typeRole="body">{diagnostic.message}</Typography>
+    {normalizeString(diagnostic.suggestedFix) ? <Typography as="p" typeRole="small">{normalizeString(diagnostic.suggestedFix)}</Typography> : null}
+  </div>;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ fontSize: "var(--forge-report-type-small-size, 12px)", color: "var(--forge-report-status-danger-foreground, #a82a2a)", lineHeight: "var(--forge-report-type-small-line-height, 1.5)" }}>
@@ -1331,7 +1346,7 @@ function HostIntentPanel({ hostIntent = null, runtimeHandlers = null }) {
   );
 }
 
-function renderRuntimeMarkdownInline(value = "") {
+function renderRuntimeMarkdownInline(value = "", documentPresentation = false) {
   const segments = String(value || "").split(/(\*\*[^*]+?\*\*|`[^`]+?`|\*[^*]+?\*)/g).filter((segment) => segment !== "");
   return segments.map((segment, index) => {
     if (segment.startsWith("**") && segment.endsWith("**")) {
@@ -1341,6 +1356,7 @@ function renderRuntimeMarkdownInline(value = "") {
       return <em key={index}>{segment.slice(1, -1)}</em>;
     }
     if (segment.startsWith("`") && segment.endsWith("`")) {
+      if (documentPresentation) return <Typography key={index} as="code" typeRole="code" className="forge-report-document-code">{segment.slice(1,-1)}</Typography>;
       return (
         <code key={index} style={{ fontSize: "0.92em", background: "var(--forge-report-surface-subtle, #eef3f8)", borderRadius: 4, padding: "1px 4px" }}>
           {segment.slice(1, -1)}
@@ -1352,6 +1368,7 @@ function renderRuntimeMarkdownInline(value = "") {
 }
 
 function RuntimeMarkdownBody({ markdown = "" }) {
+  const documentPresentation = React.useContext(DocumentPresentationContext);
   const lines = String(markdown || "").replace(/\r\n/g, "\n").split("\n");
   let codeEnd = -1;
   const renderedLines = lines
@@ -1364,6 +1381,7 @@ function RuntimeMarkdownBody({ markdown = "" }) {
         let end = index + 1;
         while (end < lines.length && !close.test(lines[end])) end++;
         codeEnd = end;
+        if (documentPresentation) return <Typography key={index} as="pre" typeRole="code" className="forge-report-document-code-block"><code>{lines.slice(index+1,end).join('\n')}</code></Typography>;
         // React escapes the literal payload. Code must not pass through inline
         // Markdown processing or lose selector spacing, line breaks or symbols.
         return (
@@ -1375,6 +1393,10 @@ function RuntimeMarkdownBody({ markdown = "" }) {
       const trimmed = normalizeString(line);
       if (!trimmed) {
         return null;
+      }
+      if (documentPresentation) {
+        const heading = trimmed.match(/^#{1,2}\s+(.*)/);
+        return <Typography key={index} as={heading ? 'h3' : 'p'} typeRole={heading ? 'section' : 'body'} className="forge-report-document-copy">{renderRuntimeMarkdownInline(heading ? heading[1] : trimmed,true)}</Typography>;
       }
       if (trimmed.startsWith("## ")) {
         return <h4 key={index} style={{ margin: 0, fontSize: "var(--forge-report-type-section-size, 16px)", lineHeight: "var(--forge-report-type-section-line-height, normal)", color: "var(--forge-report-text, #182026)" }}>{renderRuntimeMarkdownInline(trimmed.slice(3))}</h4>;
@@ -1411,7 +1433,7 @@ function RuntimeMarkdownBody({ markdown = "" }) {
     })
     .filter(Boolean);
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+    <div className={documentPresentation ? 'forge-report-document-prose' : undefined} style={documentPresentation ? undefined : { display: "flex", flexDirection: "column", gap: 8 }}>
       {renderedLines}
     </div>
   );
@@ -1436,6 +1458,7 @@ function MarkdownBlock({ block = {} }) {
 }
 
 function BadgesBlock({ block = {}, locale = "en-US", theme = {} }) {
+  const documentPresentation = React.useContext(DocumentPresentationContext);
   const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content)
     ? block.content
     : {};
@@ -1463,6 +1486,14 @@ function BadgesBlock({ block = {}, locale = "en-US", theme = {} }) {
       };
     })
     .filter((item) => item.label || item.displayValue);
+  if (documentPresentation) return <RuntimePanel title={normalizeString(block?.title || content?.title)}>
+    <div className="forge-report-document-badges">
+      {items.length ? items.map((item, index) => <Typography key={item.id || index} as="span" typeRole="small"
+        className="forge-report-document-badge" data-forge-status={item.tone}>
+        {item.displayValue ? `${item.label}: ${item.displayValue}` : item.label}
+      </Typography>) : <Typography as="p" typeRole="body">No pills configured.</Typography>}
+    </div>
+  </RuntimePanel>;
   return (
     <RuntimePanel title={normalizeString(block?.title || content?.title || "Status Pills")}>
       {items.length === 0 ? (
@@ -1502,6 +1533,7 @@ function BadgesBlock({ block = {}, locale = "en-US", theme = {} }) {
 }
 
 function KpiBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false, theme = {} }) {
+  const documentPresentation = React.useContext(DocumentPresentationContext);
   const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content)
     ? block.content
     : {};
@@ -1538,6 +1570,28 @@ function KpiBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProvi
   const invalidDiagnostic = (Array.isArray(diagnostics) ? diagnostics : [])
     .find((diagnostic) => normalizeString(diagnostic?.severity || "info").toLowerCase() === "error")
     || null;
+  if (documentPresentation) return <section className="forge-report-document-metric" data-report-runtime-kpi-tone={normalizeString(content?.tone) || 'neutral'}>
+    <BlockDiagnosticsCallout diagnostics={diagnostics} onRetryProviderActions={onRetryProviderActions} providerActionsLoading={providerActionsLoading}/>
+    {invalidDiagnostic ? <BlockErrorCallout diagnostic={invalidDiagnostic}/> : !rowCount || !hasPrimaryValue ?
+      <Typography as="p" typeRole="body">{normalizeString(content?.emptyLabel || 'No KPI value available.')}</Typography> : <>
+      {showCard ? <>
+        <dl>
+          <Typography as="dt" typeRole="metadata">{blockTitle === 'KPI' ? valueLabel : blockTitle}</Typography>
+          <Typography as="dd" typeRole="metric">{formattedPrimaryValue}</Typography>
+        </dl>
+        {showValueLabel && blockTitle !== 'KPI' ? <Typography as="p" typeRole="metadata">{valueLabel}</Typography> : null}
+        {hasSecondaryValue ? <Typography as="p" typeRole="small" className="forge-report-document-comparison"
+          data-report-runtime-kpi-trend-row={secondaryTrendStyle.kind}>
+          <span>{normalizeString(content?.secondaryLabel || content?.secondaryField)}</span>
+          <span data-report-runtime-kpi-trend={secondaryTrendStyle.kind}>{signedSecondaryValue}</span>
+        </Typography> : null}
+      </> : null}
+      {showBody ? <RuntimeMarkdownBody markdown={bodyMarkdown}/> : null}
+      {!showCard && !showBody ? <RuntimeMarkdownBody markdown={`${valueLabel}: ${formattedPrimaryValue}`}/> : null}
+      {showCard && content.sparkline ? <KpiSparkline content={content.sparkline} label={`${blockTitle} trend over the selected period`}/> : null}
+    </>}
+    {content.description ? <Typography as="p" typeRole="metadata">{content.description}</Typography> : null}
+  </section>;
   return (
     <RuntimePanel
       className="forge-report-runtime-kpi-panel"
@@ -1619,6 +1673,7 @@ function KpiBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProvi
 }
 
 function CollectionBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false, theme = {} }) {
+  const documentPresentation = React.useContext(DocumentPresentationContext);
   const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content)
     ? block.content
     : {};
@@ -1639,6 +1694,20 @@ function CollectionBlock({ block = {}, diagnostics = [], locale = "en-US", onRet
     .filter((item) => item && typeof item === "object" && !Array.isArray(item));
   const gridColumns = Math.max(1, Math.min(4, Math.trunc(Number(content?.columns || 2)) || 2));
   const layout = normalizeString(content?.layout).toLowerCase() === "list" ? "list" : "grid";
+  if (documentPresentation) return <RuntimePanel title={normalizeString(block?.title || content?.title)} subtitle={normalizeString(content?.description)}>
+    <BlockDiagnosticsCallout diagnostics={effectiveDiagnostics} onRetryProviderActions={onRetryProviderActions} providerActionsLoading={providerActionsLoading}/>
+    {invalidDiagnostic ? <BlockErrorCallout diagnostic={invalidDiagnostic}/> : !items.length ?
+      <Typography as="p" typeRole="body">{normalizeString(content?.emptyLabel || 'No collection items available.')}</Typography> :
+      <div className="forge-report-document-collection" data-layout={layout} style={{'--forge-report-collection-columns':layout === 'list' ? 1 : gridColumns}}>
+        {items.map((item,index) => <section key={item.id || index}>
+          <Typography as="h3" typeRole="label">{normalizeString(item.title || `Item ${index+1}`)}</Typography>
+          {item.toneLabel ? <Typography as="p" typeRole="small" className="forge-report-document-badge" data-forge-status={item.tone}>{item.toneLabel}</Typography> : null}
+          {item.valueLabel ? <dl><Typography as="dt" typeRole="metadata">{item.valueLabel}</Typography><Typography as="dd" typeRole="metric">{formatKpiValue(item.value,normalizeString(item.valueFormat || item.format),locale)}</Typography></dl> : null}
+          {item.secondaryLabel ? <Typography as="p" typeRole="body">{item.secondaryLabel}: {formatKpiValue(item.secondaryValue,normalizeString(item.secondaryFormat),locale)}</Typography> : null}
+          {String(item.bodyMarkdown || '').trim() ? <RuntimeMarkdownBody markdown={item.bodyMarkdown}/> : null}
+        </section>)}
+      </div>}
+  </RuntimePanel>;
   return (
     <RuntimePanel
       className="forge-report-runtime-collection-panel"
@@ -1746,11 +1815,21 @@ function hasSectionHeaderDetail(block = {}, headerAction = null, navigationLabel
 }
 
 function StepperBlock({ block = {} }) {
+  const documentPresentation = React.useContext(DocumentPresentationContext);
   const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content)
     ? block.content
     : {};
   const steps = (Array.isArray(content?.steps) ? content.steps : [])
     .filter((step) => step && typeof step === "object" && !Array.isArray(step));
+  if (documentPresentation) return <RuntimePanel className="forge-report-runtime-stepper-panel"
+    title={normalizeString(block.title || content.title || "Process")} subtitle={normalizeString(content.description)}>
+    {steps.length ? <Typography as="ol" typeRole="body" className="forge-report-document-steps">
+      {steps.map((step,index) => <li key={normalizeString(step.id || `step_${index + 1}`)}>
+        {step.title ? <Typography as="h3" typeRole="label">{normalizeString(step.title)}</Typography> : null}
+        {String(step.body || '').trim() ? <RuntimeMarkdownBody markdown={String(step.body)}/> : null}
+      </li>)}
+    </Typography> : <Typography as="p" typeRole="body">No process steps configured.</Typography>}
+  </RuntimePanel>;
   return (
     <RuntimePanel
       className="forge-report-runtime-stepper-panel"
@@ -1825,11 +1904,30 @@ function resolveInfoPanelToneStyles(tone = "", theme = {}) {
   return { border: accent.border, background: accent.background, eyebrow: accent.text };
 }
 
+function DocumentNotice({block}) {
+  const content = block.content || {};
+  const tone = normalizeString(content.tone || block.tone || 'neutral');
+  const badges = Array.isArray(content.badges || block.badges) ? content.badges || block.badges : [];
+  const icon = normalizeString(content.icon || block.icon);
+  return <section className="forge-report-document-assessment" data-forge-status={tone}>
+    <div className="forge-report-document-assessment-heading">
+      {icon ? <ForgeIcon name={icon}/> : null}
+      <Typography as="h2" typeRole="heading">{normalizeString(block.title || content.title)}</Typography>
+    </div>
+    {content.eyebrow || block.eyebrow ? <Typography as="p" typeRole="metadata">{content.eyebrow || block.eyebrow}</Typography> : null}
+    {content.description || block.description ? <Typography as="p" typeRole="body">{content.description || block.description}</Typography> : null}
+    {badges.length ? <div className="forge-report-document-badges">{badges.map((badge,index)=><Typography key={index} as="span" typeRole="small" className="forge-report-document-badge" data-forge-status={tone}>{badge}</Typography>)}</div> : null}
+    {content.body || block.body ? <RuntimeMarkdownBody markdown={content.body || block.body}/> : null}
+  </section>;
+}
+
 function InfoPanelBlock({ block = {}, theme = {} }) {
+  const documentPresentation = React.useContext(DocumentPresentationContext);
   const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content)
     ? block.content
     : {};
   const tone = resolveInfoPanelToneStyles(content?.tone || block?.tone, theme);
+  if (documentPresentation) return <DocumentNotice block={block}/>;
   return (
     <section
       style={{
@@ -1879,6 +1977,7 @@ function resolveCalloutToneStyles(tone = "", theme = {}) {
 }
 
 function CalloutBlock({ block = {}, theme = {} }) {
+  const documentPresentation = React.useContext(DocumentPresentationContext);
   const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content)
     ? block.content
     : {};
@@ -1887,6 +1986,7 @@ function CalloutBlock({ block = {}, theme = {} }) {
     .map((badge) => normalizeString(badge))
     .filter(Boolean);
   const icon = normalizeString(content?.icon || block?.icon);
+  if (documentPresentation) return <DocumentNotice block={block}/>;
   return (
     <section
       style={{
@@ -1944,11 +2044,25 @@ function CalloutBlock({ block = {}, theme = {} }) {
 }
 
 function KanbanBlock({ block = {} }) {
+  const documentPresentation = React.useContext(DocumentPresentationContext);
   const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content)
     ? block.content
     : {};
   const columns = (Array.isArray(content?.columns) ? content.columns : [])
     .filter((column) => column && typeof column === "object" && !Array.isArray(column));
+  if (documentPresentation) return <RuntimePanel className="forge-report-runtime-kanban-panel"
+    title={normalizeString(block.title || content.title || "Pipeline")} subtitle={normalizeString(content.description)}>
+    {columns.length ? <div className="forge-report-document-board">
+      {columns.map((column,index) => <section key={normalizeString(column.id || `column_${index + 1}`)}>
+        <Typography as="h3" typeRole="label">{normalizeString(column.title || `Column ${index + 1}`)}</Typography>
+        {(Array.isArray(column.cards) ? column.cards : []).map((card,cardIndex) => <article key={normalizeString(card.id || `card_${cardIndex + 1}`)}>
+          {card.title ? <Typography as="h4" typeRole="label">{normalizeString(card.title)}</Typography> : null}
+          {card.badge ? <Typography typeRole="small" className="forge-report-document-stage-label">{normalizeString(card.badge)}</Typography> : null}
+          {String(card.body || '').trim() ? <RuntimeMarkdownBody markdown={String(card.body)}/> : null}
+        </article>)}
+      </section>)}
+    </div> : <Typography as="p" typeRole="body">No pipeline columns configured.</Typography>}
+  </RuntimePanel>;
   return (
     <RuntimePanel
       className="forge-report-runtime-kanban-panel"
@@ -2018,11 +2132,25 @@ function KanbanBlock({ block = {} }) {
 }
 
 function TimelineBlock({ block = {} }) {
+  const documentPresentation = React.useContext(DocumentPresentationContext);
   const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content)
     ? block.content
     : {};
   const events = (Array.isArray(content?.events) ? content.events : [])
     .filter((event) => event && typeof event === "object" && !Array.isArray(event));
+  if (documentPresentation) {
+    return <RuntimePanel className="forge-report-runtime-timeline-panel" title={normalizeString(block?.title || content?.title || "Timeline")} subtitle={normalizeString(content?.description)}>
+      {events.length === 0 ? <Typography as="p" typeRole="body" className="forge-report-document-copy">No timeline events configured.</Typography> :
+        <ol className="forge-report-document-timeline">{events.map((event, index) => <li key={normalizeString(event?.id || `event_${index + 1}`)}>
+          <Typography as="span" typeRole="metadata">{normalizeString(event?.date || event?.badge || `Event ${index + 1}`)}</Typography>
+          <div>
+            {normalizeString(event?.badge) && event.badge !== event.date ? <Typography as="span" typeRole="small" className="forge-report-document-badge">{normalizeString(event.badge)}</Typography> : null}
+            {normalizeString(event?.title) ? <Typography as="h3" typeRole="label">{normalizeString(event.title)}</Typography> : null}
+            {String(event?.body || "").trim() ? <RuntimeMarkdownBody markdown={String(event.body)} /> : null}
+          </div>
+        </li>)}</ol>}
+    </RuntimePanel>;
+  }
   return (
     <RuntimePanel
       className="forge-report-runtime-timeline-panel"
@@ -2107,7 +2235,8 @@ function resolveRuntimeCompositeConfig(blocks = []) {
   return { composites, ...resolveReportRuntimeCompositeOwnership(blocks) };
 }
 
-function TableBlock({ page = {}, onDatasetPageChange = null, onDatasetExpand = null, block = {}, diagnostics = [], dataset = {}, reportSpec = {}, providerActionsByField = new Map(), runtimeHandlers = null, locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false, onRuntimeSelection = null, publicMode = false, displayMode, onDisplayModeChange = null, initialPresentationState = null, onTablePresentationChange = null }) {
+function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, onDatasetExpand = null, block = {}, diagnostics = [], dataset = {}, reportSpec = {}, providerActionsByField = new Map(), runtimeHandlers = null, locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false, onRuntimeSelection = null, publicMode = false, displayMode, onDisplayModeChange = null, initialPresentationState = null, onTablePresentationChange = null }) {
+  const documentPresentation = React.useContext(DocumentPresentationContext);
   const authoredBlock = (Array.isArray(reportSpec?.blocks) ? reportSpec.blocks : [])
     .find((candidate) => normalizeString(candidate?.id) === normalizeString(block?.id)) || {};
   const tableAccentTone = normalizeString(block?.content?.accentTone || block?.accentTone).toLowerCase();
@@ -2174,6 +2303,7 @@ function TableBlock({ page = {}, onDatasetPageChange = null, onDatasetExpand = n
       <RuntimePanel
         className="forge-report-runtime-table-panel"
         title={normalizeString(block?.title || "Table")}
+      subtitle={normalizeString(block?.description || authoredBlock?.description)}
         style={tablePanelStyle}
       >
         <BlockDiagnosticsCallout diagnostics={diagnostics} onRetryProviderActions={onRetryProviderActions} providerActionsLoading={providerActionsLoading} />
@@ -2232,6 +2362,7 @@ function TableBlock({ page = {}, onDatasetPageChange = null, onDatasetExpand = n
     <RuntimePanel
       className="forge-report-runtime-table-panel"
       title={normalizeString(block?.title || "Table")}
+      subtitle={normalizeString(block?.description || authoredBlock?.description)}
       style={tablePanelStyle}
       headerAction={collapsible ? (<span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
         <button
@@ -2276,12 +2407,20 @@ function TableBlock({ page = {}, onDatasetPageChange = null, onDatasetExpand = n
       <div
         id={`${normalizeString(block?.id || "tableBlock")}__table_content`}
       >
-      <DashboardTableContent
+      {authoredBlock.selection?.mode === 'checkbox' ? <ReviewTable
+        id={block.id} rows={runtimeTableRows} columns={columns} selectionField={authoredBlock.selection.field}
+        selectionLabelFields={authoredBlock.selection.labelFields}
+        onRowsChange={runtimeHandlers?.onTableReviewChange ? rows => runtimeHandlers.onTableReviewChange({
+          blockId:block.id, selection:mergeReportTableSelections(sourceRows, dataset.rows, rows, authoredBlock.selection.field),
+        }) : undefined} locale={locale} onPresentationStateChange={handleTablePresentationChange}
+        container={{dashboard:{table:{rowActions,quickFilter:true}}}}/>
+        : <DashboardTableContent
         container={{
           id: block.id,
           kind: "dashboard.table",
           title: normalizeString(block?.title || "Table"),
           dataSourceRef: normalizeString(dataset?.dataSourceRef || block?.datasetRef),
+          ...(documentPresentation ? {tablePresentation:{variant:'document',recordTitleField:authoredBlock.recordTitleField}} : {}),
           dashboard: {
             table: {
               columns,
@@ -2308,7 +2447,7 @@ function TableBlock({ page = {}, onDatasetPageChange = null, onDatasetExpand = n
         locale={locale}
         initialPresentationState={initialPresentationState}
         onPresentationStateChange={handleTablePresentationChange}
-      />
+      />}
       </div>
       )}
       <ReportDatasetPager dataset={dataset} page={page} onPageChange={onDatasetPageChange}/>
@@ -2652,6 +2791,7 @@ function shouldRenderRefinementBarBlock(block = {}, runtimeHandlers = null) {
 }
 
 function GeoMapBlock({ block = {}, diagnostics = [], onRetryProviderActions = null, providerActionsLoading = false }) {
+  const documentPresentation = React.useContext(DocumentPresentationContext);
   const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content)
     ? block.content
     : {};
@@ -2691,6 +2831,54 @@ function GeoMapBlock({ block = {}, diagnostics = [], onRetryProviderActions = nu
     .find((diagnostic) => normalizeString(diagnostic?.severity || "info").toLowerCase() === "error")
     || null;
 
+  if (documentPresentation) {
+    const currentRegion = regionsByKey.get(normalizeGeoKey(selectedRegion?.key)) || resolvedGeo?.activeRegion || ranking[0] || null;
+    const metricLabel = normalizeString(resolvedGeo?.metricLabel || geo?.metric?.label || "Value");
+    const maxValue = Math.max(...ranking.map(region => Number(region?.rawValue) || 0), 0);
+    return <RuntimePanel className="forge-report-runtime-geo-panel" title={normalizeString(block?.title || "Geographic distribution")} subtitle={metricLabel}>
+      <BlockDiagnosticsCallout diagnostics={diagnostics} onRetryProviderActions={onRetryProviderActions} providerActionsLoading={providerActionsLoading} />
+      {invalidDiagnostic ? <BlockErrorCallout diagnostic={invalidDiagnostic} /> : !supportedShape || !hasData ?
+        <Typography as="p" typeRole="body" className="forge-report-document-copy">{supportedShape ? "No geo data." : `Unsupported geo shape: ${shape || "unknown"}.`}</Typography> :
+        <div className="forge-report-document-geo">
+          <div className="forge-report-document-geo-main">
+            <Typography as="p" typeRole="metadata" className="forge-report-document-geo-summary">{Number(resolvedGeo?.summary?.regionCount || 0)} regions · {normalizeString(resolvedGeo?.summary?.totalValue ?? "-")} total</Typography>
+            {shape === "world" ? <WorldCountryMap regions={regions} title={normalizeString(block?.title || "Country map")} onSelect={setSelectedRegion}/> :
+              <div className="forge-report-document-map-scroll" role="region" aria-label="Scrollable state map" tabIndex={0}>
+                <div className="forge-report-document-state-map" role="group" aria-label={normalizeString(block?.title || "State map")}>
+                  {tileRegions.map(entry => {
+                    const region = entry.region;
+                    const label = `${normalizeString(region?.label || entry.label || entry.key)} (${entry.key}): ${normalizeString(region?.displayValue ?? "No data")}`;
+                    const tileStyle = {gridColumn: entry.col, gridRow: entry.row, ...(region ? {background: region.color, color: resolveGeoTextColor(region.color)} : {})};
+                    return region ? <Typography as="button" type="button" typeRole="caption" key={entry.key} className="forge-report-document-map-tile" style={tileStyle} aria-label={label} aria-pressed={normalizeGeoKey(currentRegion?.key) === entry.key} onClick={() => setSelectedRegion(region)}>{entry.key}</Typography> :
+                      <Typography as="span" typeRole="caption" key={entry.key} className="forge-report-document-map-tile" style={tileStyle} title={label}>{entry.key}</Typography>;
+                  })}
+                </div>
+              </div>}
+            {legend ? <div className="forge-report-document-map-legend" aria-label="Map legend">
+              {Array.isArray(legend.rules) && legend.rules.length ? legend.rules.map(rule => <Typography as="span" typeRole="caption" key={`${rule.label || rule.color}`}><i aria-hidden="true" style={{background: rule.color}}/>{normalizeString(rule.label || rule.color)}</Typography>) : <>
+                <Typography as="span" typeRole="caption">{normalizeString(legend.min ?? "-")}</Typography>
+                {palette.map(color => <i key={color} aria-hidden="true" style={{background: color}}/>)}
+                <Typography as="span" typeRole="caption">{normalizeString(legend.max ?? "-")}</Typography>
+              </>}
+            </div> : null}
+          </div>
+          <aside className="forge-report-document-geo-detail">
+            <div className="forge-report-document-map-selection" role="status" aria-live="polite">
+              <Typography as="span" typeRole="metadata">Selected area</Typography>
+              <Typography as="h3" typeRole="section">{currentRegion ? `${normalizeString(currentRegion.label || currentRegion.key)} (${normalizeString(currentRegion.key)})` : "-"}</Typography>
+              <Typography as="p" typeRole="body">{metricLabel}: {normalizeString(currentRegion?.displayValue ?? "-")}</Typography>
+              {normalizeString(currentRegion?.statusLabel) ? <Typography as="span" typeRole="small" style={{color: currentRegion.statusColor}}>{normalizeString(currentRegion.statusLabel)}</Typography> : null}
+            </div>
+            <Typography as="h3" typeRole="label">Top regions</Typography>
+            <ol className="forge-report-document-map-ranking">{ranking.slice(0, 5).map(region => <li key={region.key}>
+              <Typography as="span" typeRole="label">{normalizeString(region.key)}</Typography>
+              <span className="forge-report-document-map-bar" aria-hidden="true"><i style={{width: `${maxValue > 0 ? Math.max(0, Math.min(100, Number(region.rawValue || 0) / maxValue * 100)) : 0}%`, background: region.color}}/></span>
+              <Typography as="span" typeRole="small">{normalizeString(region.displayValue ?? "-")}</Typography>
+            </li>)}</ol>
+          </aside>
+        </div>}
+    </RuntimePanel>;
+  }
   return (
     <RuntimePanel
       className="forge-report-runtime-geo-panel"
@@ -2890,12 +3078,14 @@ export default function ReportRuntime({
   showDeveloperDiagnostics = false,
   conditionValues = {},
   defaultContextSummaryOpen = false,
+  reportActions = null,
 }) {
   const workspacePresentation = useWorkspacePresentation();
   const reportPresentation = normalizeString(presentationMode).toLowerCase() === "report";
+  const documentPresentation = normalizeReportViewerSettings(reportSpec?.viewer ?? reportDocument?.viewer)?.appearance === 'document';
   const publicDiagnosticsMode = reportPresentation && !showDeveloperDiagnostics;
   const [selectedChartSelectionsByBlock, setSelectedChartSelectionsByBlock] = useState({});
-  const [filterPanelOpen, setFilterPanelOpen] = useState(true);
+  const [filterPanelOpen, setFilterPanelOpen] = useState(() => !documentPresentation);
   const [contextSummaryOpen, setContextSummaryOpen] = useState(() => defaultContextSummaryOpen === true);
   const [runtimeSelection, setRuntimeSelection] = useState({});
   const [runtimeViewportWidth, setRuntimeViewportWidth] = useState(() => (
@@ -3220,6 +3410,7 @@ export default function ReportRuntime({
       const dataset = resolveRuntimeDataset(block);
       return (
         <TableBlock
+          sourceRows={datasetIndex.get(dataset.id)?.rows || []}
           key={block.id}
           block={block}
           diagnostics={resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset, publicDiagnosticsMode)}
@@ -3330,6 +3521,7 @@ export default function ReportRuntime({
                 dataSourceRef: normalizeString(dataset?.dataSourceRef || block?.datasetRef),
                 chart: {
                   ...chartModel,
+                  ...(documentPresentation ? {appearance:'document'} : {}),
                   rowLimit: resolveReportRuntimeChartRowLimit(block),
                 },
               }}
@@ -3379,21 +3571,24 @@ export default function ReportRuntime({
       const compositeLayout = resolveReportRuntimeCompositeLayout(block);
       const compositeColumns = resolveReportRuntimeCompositeColumns(block, runtimeViewportWidth);
       const hasAuthoredCompositeLayout = !!normalizeString(block?.content?.layout || block?.layout);
+      const documentMetricGrid = documentPresentation && !hasAuthoredCompositeLayout && childBlocks.length > 0
+        && childBlocks.every(child => child.kind === "kpiBlock");
       return (
         <RuntimePanel
           key={block.id}
           headerAction={headerActions?.get(normalizeString(block.id))}
-          title={normalizeString(block?.title || block?.content?.title || "Grouped Panel")}
+          title={documentPresentation && childBlocks.every(child => child.kind === "kpiBlock") ? "" : normalizeString(block?.title || block?.content?.title || "Grouped Panel")}
           subtitle={normalizeString(block?.content?.description || block?.description)}
         >
           {childBlocks.length > 0 ? (
-            hasAuthoredCompositeLayout ? <div
-              data-report-runtime-composite-layout={compositeLayout}
-              data-report-runtime-composite-columns={compositeColumns}
-              style={{
+            hasAuthoredCompositeLayout || documentMetricGrid ? <div
+              className={documentMetricGrid ? "forge-report-document-metrics" : undefined}
+              data-report-runtime-composite-layout={documentMetricGrid ? "documentMetrics" : compositeLayout}
+              data-report-runtime-composite-columns={documentMetricGrid ? undefined : compositeColumns}
+              style={documentMetricGrid ? undefined : {
                 display: "grid",
                 gridTemplateColumns: `repeat(${compositeColumns}, minmax(0, 1fr))`,
-                gap: 16,
+                gap: "var(--forge-spacing-4, 16px)",
               }}
             >
               {childBlocks.map((childBlock) => {
@@ -3461,7 +3656,7 @@ export default function ReportRuntime({
           gridTemplateColumns: runtimeGridColumns <= 1
             ? "minmax(0, 1fr)"
             : `repeat(${REPORT_LAYOUT_GRID_COLUMNS}, minmax(0, 1fr))`,
-          gap: 16,
+          gap: documentPresentation ? "var(--forge-document-section-gap, 28px) var(--forge-spacing-6, 24px)" : 16,
         }}
         data-report-runtime-layout-columns={runtimeGridColumns}
       >
@@ -3484,8 +3679,25 @@ export default function ReportRuntime({
     );
   };
 
+  const renderTopFilters = () => (topFilterBarBlocks.length > 0 && (!reportPresentation || filterPanelOpen) ? (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: topFilterBarBlocks.length > 1 ? "repeat(auto-fit, minmax(320px, 1fr))" : "minmax(0, 1fr)",
+            gap: 16,
+          }}
+        >
+          {topFilterBarBlocks.map((block) => renderFilterBarBlock(block))}
+        </div>
+      ) : null);
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <DocumentPresentationContext.Provider value={documentPresentation}>
+    <div data-forge-report-appearance={documentPresentation ? 'document' : undefined} style={documentPresentation ? undefined : { display: "flex", flexDirection: "column", gap: 16 }}>
+      {documentPresentation ? <header className="forge-report-document-header">
+        <div><Typography as="h1" typeRole="title">{title || reportDocument?.title || reportSpec?.title}</Typography>{subtitle || reportDocument?.subtitle ? <Typography as="p" typeRole="body">{subtitle || reportDocument.subtitle}</Typography> : null}</div>
+        <div className="forge-report-document-actions">{reportActions}{topFilterBarBlocks.length ? <Button variant="ghost" icon="lucide:sliders-horizontal" hideLabel aria-label="Toggle report filters" aria-pressed={filterPanelOpen} onClick={() => setFilterPanelOpen(open => !open)}/> : null}{filterToolbarModel.activeCount > 0 && typeof runtimeHandlers?.clearScopeParams === 'function' ? <Button variant="link" aria-label="Clear all report filters" onClick={() => runtimeHandlers.clearScopeParams(filterToolbarModel.filters)}>Clear all</Button> : null}</div>
+      </header> : null}
       {showContextSummary && !reportPresentation ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <button
@@ -3532,7 +3744,7 @@ export default function ReportRuntime({
         </div>
       ) : null}
       {!showContextSummary && !reportPresentation ? <CompactBindingChips bindingSummary={bindingSummary} /> : null}
-      {reportPresentation && filterToolbarModel.visible ? (
+      {reportPresentation && !documentPresentation && filterToolbarModel.visible ? (
         <div className="forge-report-runtime-filter-toolbar" style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8 }}>
           <button
             type="button"
@@ -3552,22 +3764,12 @@ export default function ReportRuntime({
           ) : null}
         </div>
       ) : null}
-      {topFilterBarBlocks.length > 0 && (!reportPresentation || filterPanelOpen) ? (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: topFilterBarBlocks.length > 1 ? "repeat(auto-fit, minmax(320px, 1fr))" : "minmax(0, 1fr)",
-            gap: 16,
-          }}
-        >
-          {topFilterBarBlocks.map((block) => renderFilterBarBlock(block))}
-        </div>
-      ) : null}
+      {!documentPresentation ? renderTopFilters() : null}
       <HostIntentPanel hostIntent={hostIntent} runtimeHandlers={runtimeHandlers} />
       <DiagnosticsPanel diagnostics={visibleRuntimeDiagnostics} developerMode={!reportPresentation || showDeveloperDiagnostics} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />
       {sectionPresentation !== 'stack' && (runtimeSections.length > 1 || (runtimeTabGroup?.includeUnlistedSections === false && runtimeSections.length > 0)) ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {distinctWorkspaceTitle(runtimeTabGroup?.title, workspacePresentation?.label) ? (
+          {!documentPresentation && distinctWorkspaceTitle(runtimeTabGroup?.title, workspacePresentation?.label) ? (
             <div className="forge-report-runtime-section-label" style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--forge-report-text-muted, #486579)" }}>
               {runtimeTabGroup.title}
             </div>
@@ -3578,6 +3780,7 @@ export default function ReportRuntime({
             onChange={changeSection}
             ariaLabel="Report sections"
           />
+          {documentPresentation ? renderTopFilters() : null}
           {runtimeSections.map((section) => {
             if (normalizeString(section?.id) !== resolvedActiveSectionId) {
               return null;
@@ -3597,7 +3800,7 @@ export default function ReportRuntime({
                         : "Loading section…"}</div>
                     </section>
                   ) : <>
-                    {section.block && hasSectionHeaderDetail(section.block, sectionHeaderAction, section.navigationLabel)
+                    {section.block && (!documentPresentation || sectionHeaderAction) && hasSectionHeaderDetail(section.block, sectionHeaderAction, section.navigationLabel)
                       ? renderBlock(section.block)
                       : null}
                     {renderLayoutBlockGrid(section.items, `runtime:${section.id}`)}
@@ -3611,5 +3814,6 @@ export default function ReportRuntime({
         renderLayoutBlockGrid(visibleRuntimeBlocks, "runtime")
       )}
     </div>
+    </DocumentPresentationContext.Provider>
   );
 }
