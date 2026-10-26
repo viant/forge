@@ -135,6 +135,8 @@ type Manager struct {
 	localMu sync.RWMutex
 	local   map[string]localRegistration
 
+	clientEvictionListeners   map[uint64]func(ClientEviction)
+	pendingClientEvictions    []ClientEviction
 	changeListeners           map[uint64]func(string)
 	changeListenerID          uint64
 	resourceChangeListeners   map[uint64]func(string)
@@ -465,6 +467,7 @@ func (m *Manager) mergeInventoryNames(ctx context.Context, names []string) ([]st
 // When a UserIDExtractor is configured, the pool key includes the user ID to
 // prevent shared conversations from leaking MCP auth/tokens across users.
 func (m *Manager) Get(ctx context.Context, convID, serverName string) (result mcpclient.Interface, resultErr error) {
+	defer m.dispatchClientEvictions()
 	span := observe.Start(ctx, "mcp.pool.acquire", observe.Labels{Provider: serverName})
 	defer func() { span.End(observe.OutcomeFor(resultErr), observe.CacheUnknown) }()
 	requestedName := serverName
@@ -974,9 +977,16 @@ func (m *Manager) endUse(e *entry) {
 	closeClientBestEffort(toClose)
 }
 
-func (m *Manager) evictEntryLocked(key, serverName string, e *entry) mcpclient.Interface {
+func (m *Manager) evictEntryLocked(key, serverName string, e *entry, reasons ...ClientEvictionReason) mcpclient.Interface {
 	if e == nil {
 		return nil
+	}
+	if !e.evicted && len(m.clientEvictionListeners) > 0 {
+		reason := ClientRetired
+		if len(reasons) > 0 {
+			reason = reasons[0]
+		}
+		m.pendingClientEvictions = append(m.pendingClientEvictions, ClientEviction{Server: serverName, Client: e.managed, Reason: reason})
 	}
 	m.invalidateToolCatalogLocked(serverName)
 	e.evicted = true
@@ -1138,6 +1148,7 @@ func (m *Manager) Touch(convID, serverName string) {
 // CloseConversation drops all clients for a conversation (across all users).
 // Note: underlying transports may keep connections if the library doesn't expose Close.
 func (m *Manager) CloseConversation(convID string) {
+	defer m.dispatchClientEvictions()
 	var toClose []mcpclient.Interface
 	m.mu.Lock()
 	if m.epoch == nil {
@@ -1170,6 +1181,7 @@ func (m *Manager) CloseConversation(convID string) {
 // reusing a client authenticated with the old one. It never touches other
 // users' entries, sessions or auth context.
 func (m *Manager) EvictUserServer(userID, serverName string) {
+	defer m.dispatchClientEvictions()
 	userID = strings.TrimSpace(userID)
 	serverName = strings.TrimSpace(serverName)
 	if m == nil || userID == "" || serverName == "" {
@@ -1202,6 +1214,7 @@ func (m *Manager) EvictUserServer(userID, serverName string) {
 
 // Reap closes idle clients beyond TTL by dropping references.
 func (m *Manager) Reap() {
+	defer m.dispatchClientEvictions()
 	cutoff := time.Now().Add(-m.ttl)
 	var toClose []mcpclient.Interface
 	m.mu.Lock()
@@ -1212,7 +1225,7 @@ func (m *Manager) Reap() {
 				continue
 			}
 			if e.active == 0 && e.usedAt.Before(cutoff) {
-				if client := m.evictEntryLocked(convID, server, e); client != nil {
+				if client := m.evictEntryLocked(convID, server, e, ClientIdleEvicted); client != nil {
 					toClose = append(toClose, client)
 				}
 			}
@@ -1230,6 +1243,7 @@ func (m *Manager) Reap() {
 // Reconnect drops the cached client for (convID, serverName) and creates a new one.
 // It returns the fresh client or an error if recreation fails.
 func (m *Manager) Reconnect(ctx context.Context, convID, serverName string) (mcpclient.Interface, error) {
+	defer m.dispatchClientEvictions()
 	if m == nil {
 		return nil, errors.New("mcp manager: nil manager")
 	}

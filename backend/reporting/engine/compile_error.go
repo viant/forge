@@ -32,5 +32,8 @@ func compileStageError(stage string, err error) error {
 	if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, identity.ErrResourceDenied) {
 		return err
 	}
+	if stage == CompileStageLower {
+		err = chartValidationCompileError(err)
+	}
 	return &CompileStageError{Stage: stage, Cause: err}
 }
