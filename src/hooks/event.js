@@ -277,27 +277,35 @@ export const useControlEvents = (context, items = [], state) => {
 
             const scope = item.scope || 'form';
             let changeHandler = ""
+            let changeImplementation;
             switch (scope) {
                 case 'filter':
                     changeHandler = 'dataSource.setFilterValue';
                     break;
                 case 'windowForm':
-                    changeHandler = 'dataSource.setWindowFormField';
+                    changeHandler = 'windowForm.setField';
+                    changeImplementation = ({item, value}) => {
+                        const signal = context?.signals?.windowForm;
+                        if (!signal) return false;
+                        const field = item.dataField || item.bindingPath || item.id;
+                        signal.value = setSelector(signal.peek?.() || signal.value || {}, field, value);
+                        return true;
+                    };
                     break;
                 default:
                     changeHandler = 'dataSource.setFormField';
                     break;
             }
             if (handlers.onChange && item.type !== 'file') {
-                const execution = {id: changeHandler};
+                const execution = {id: changeHandler, handler: changeImplementation};
                 handlers.onChange.isDefined() ? handlers.onChange.prepend(execution) : handlers.onChange.push(execution);
             }
             if (handlers.onValueChange) {
-                const execution = {id: changeHandler};
+                const execution = {id: changeHandler, handler: changeImplementation};
                 handlers.onValueChange.isDefined() ? handlers.onValueChange.prepend(execution) : handlers.onValueChange.push(execution);
             }
             if (handlers.onItemSelect) {
-                const execution = {id: changeHandler};
+                const execution = {id: changeHandler, handler: changeImplementation};
                 handlers.onItemSelect.isDefined() ? handlers.onItemSelect.prepend(execution) : handlers.onItemSelect.push(execution);
             }
         }

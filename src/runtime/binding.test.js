@@ -92,3 +92,12 @@ const collectionAdapter = resolveStateAdapter('collection')(
 assert.equal(collectionAdapter.get(), 12);
 
 console.log('binding adapters ✓ signal-backed getters use reactive values');
+
+{
+ const windowForm={value:{filters:{other:7}},peek(){return this.value;}};
+ const adapter=resolveStateAdapter('windowForm')({signals:{windowForm}},{dataField:'filters.channels'});
+ adapter.set(['display']);
+ assert.deepEqual(windowForm.value,{filters:{other:7,channels:['display']}});
+ assert.deepEqual(adapter.get(),['display']);
+ assert.equal(Object.hasOwn(windowForm.value,'filters.channels'),false);
+}

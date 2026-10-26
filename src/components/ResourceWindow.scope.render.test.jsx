@@ -5,7 +5,7 @@ import {useSetting} from '../core/context/Setting.jsx';
 let activeHost;
 vi.mock('./WindowContent.jsx',()=>({default:()=>{activeHost=useSetting().services.hostWindow;return <div>Metadata window</div>;}}));
 import {ResourceWindow} from './ResourceWindow.jsx';
-const resource={schemaVersion:3,targets:[{variant:'default'}],variants:{default:{window:{windowKey:'fixture',dataSource:{}},dataSources:{}}}};
+const resource={schemaVersion:3,format:'window.references',targets:[{variant:'default'}],variants:{default:{window:{windowKey:'fixture',dataSource:{}},dataSources:{}}}};
 it('keeps independent child scopes and dialogs protected until every scope is released',async()=>{
  globalThis.IS_REACT_ACT_ENVIRONMENT=true;const target=document.createElement('div');document.body.append(target);const root=createRoot(target),dirty=vi.fn();
  const services={hostWindow:{loadResource:async()=>resource}};
