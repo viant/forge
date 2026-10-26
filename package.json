@@ -55,6 +55,7 @@
     "./reporting/section-datasets": "./src/reporting/reportSectionDatasets.js"
   },
   "scripts": {
+    "test:table-preferences": "node --no-warnings src/core/preferences/tablePreferences.test.js && node --no-warnings src/core/preferences/tableViews.test.js",
     "test:widget-pairing": "node --no-warnings src/components/primitives/nativeWidgetContract.test.js",
     "test:grid-layout-alignment": "node --no-warnings src/components/gridLayoutAlignment.test.js && node --no-warnings src/components/gridLayoutAppearance.test.js && node --no-warnings src/components/containerChrome.test.js && node --no-warnings ./node_modules/vite-node/vite-node.mjs src/components/GridLayoutRenderer.render.test.jsx",
     "test:schema-form-layout": "node --no-warnings src/widgets/schemaFormLayout.test.js && node --no-warnings src/widgets/schemaFormCss.contract.test.mjs && node --no-warnings ./node_modules/vite-node/vite-node.mjs src/widgets/SchemaBasedForm.render.test.jsx",
