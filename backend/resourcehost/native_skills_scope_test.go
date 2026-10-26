@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	identity "github.com/viant/forge/backend/resource"
 	mcpclient "github.com/viant/mcp/client"
 	authcfg "github.com/viant/mcp/client/auth/config"
+	cfg "github.com/viant/mcp/client/config"
 )
 
 func TestNativeSkillScopeHonorsParticipantsAndSkipsOnlyOptionalLink(t *testing.T) {
@@ -70,4 +72,81 @@ func TestNativeSkillScopeHonorsParticipantsAndSkipsOnlyOptionalLink(t *testing.T
 			require.NotEqual(t, partial, current, "newly linked participants must change the scope")
 		})
 	}
+}
+
+func TestAutomaticNativeSkillScopeIsolatesContactFailure(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		failure  error
+		optional bool
+	}{
+		{"offline", errors.New("synthetic offline provider"), true},
+		{"protocol negotiation", fmt.Errorf("automatic protocol attempts failed: latest discovery: %w; legacy initialize: %w", errors.New("synthetic discovery 400"), errors.New("synthetic initialize 400")), true},
+		{"wrapped protocol negotiation", fmt.Errorf("manager get: %w", fmt.Errorf("protocol attempts: %w; %w", errors.New("synthetic discovery 400"), errors.New("synthetic initialize 400"))), true},
+		{"protocol denial", fmt.Errorf("protocol attempts: %w; %w", errors.New("synthetic discovery 400"), identity.ErrResourceDenied), false},
+		{"protocol cancellation", fmt.Errorf("protocol attempts: %w; %w", errors.New("synthetic discovery 400"), context.Canceled), false},
+		{"denied", identity.ErrResourceDenied, false},
+		{"joined", errors.Join(errors.New("offline"), identity.ErrResourceDenied), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			recovered := false
+			options := fixtureOptions{"available": {ResolvedIdentity: &cfg.ResolvedServiceIdentity{ResourceURI: "mcp://example/available"}}, "optional": {ResolvedIdentity: &cfg.ResolvedServiceIdentity{ResourceURI: "mcp://example/optional"}}}
+			mgr, err := manager.New(options, manager.WithClientFactory(func(_ context.Context, _, name string) (mcpclient.Interface, error) {
+				if name == "optional" && !recovered {
+					return nil, tc.failure
+				}
+				return provider(name + "-owner"), nil
+			}))
+			require.NoError(t, err)
+			defer mgr.CloseConversation("skill-catalog")
+			actor := identity.VerifiedActor{Issuer: "fixture", Subject: "alice", TenantID: "team", AccountID: "account", IdentityRevision: "one", ValidUntil: time.Now().Add(time.Minute)}
+			g := NewGateway(mgr, func(context.Context) (identity.VerifiedActor, error) { return actor, nil }, func(context.Context, identity.VerifiedActor) error { return nil }, "aggregate")
+			defer g.Close()
+			source := &NativeSkillSource{Gateway: g}
+			partial, cacheable, err := source.CatalogScope(context.Background(), "skill-catalog", []string{"optional", "available"})
+			if !tc.optional {
+				require.ErrorIs(t, err, tc.failure)
+				return
+			}
+			require.NoError(t, err)
+			require.False(t, cacheable)
+			_, err = source.Get(context.Background(), "skill-catalog", "optional")
+			require.ErrorIs(t, err, tc.failure)
+			recovered = true
+			complete, cacheable, err := source.CatalogScope(context.Background(), "skill-catalog", []string{"optional", "available"})
+			require.NoError(t, err)
+			require.True(t, cacheable)
+			require.NotEqual(t, partial, complete)
+		})
+	}
+}
+
+func TestAutomaticNativeSkillScopePreservesCancellationAndActorFailure(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	options := fixtureOptions{"optional": {ResolvedIdentity: &cfg.ResolvedServiceIdentity{ResourceURI: "mcp://example/optional"}}}
+	mgr, err := manager.New(options, manager.WithClientFactory(func(context.Context, string, string) (mcpclient.Interface, error) {
+		cancel()
+		return nil, errors.New("offline")
+	}))
+	require.NoError(t, err)
+	actor := identity.VerifiedActor{Issuer: "fixture", Subject: "alice", TenantID: "team", AccountID: "account", IdentityRevision: "one", ValidUntil: time.Now().Add(time.Minute)}
+	denied := errors.New("synthetic actor verification failed")
+	verifyFailure := false
+	g := NewGateway(mgr, func(context.Context) (identity.VerifiedActor, error) { return actor, nil }, func(context.Context, identity.VerifiedActor) error {
+		if verifyFailure {
+			return denied
+		}
+		return nil
+	}, "aggregate")
+	defer g.Close()
+	source := &NativeSkillSource{Gateway: g}
+	_, _, err = source.CatalogScope(ctx, "skill-catalog", []string{"optional"})
+	require.ErrorIs(t, err, context.Canceled)
+	verifyFailure = true
+	_, err = source.Get(context.Background(), "skill-catalog", "optional")
+	require.ErrorIs(t, err, denied)
+	var required interface{ RequiredSkillDiscoveryFailure() bool }
+	require.ErrorAs(t, err, &required)
+	require.True(t, required.RequiredSkillDiscoveryFailure())
 }
