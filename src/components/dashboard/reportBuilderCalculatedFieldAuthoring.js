@@ -2,6 +2,7 @@ import {
     normalizeReportCalculatedField,
     normalizeReportCalculatedFields,
     parseReportCalculatedFieldExpression,
+    validateReportCalculatedFieldDependencies,
 } from "../../reporting/calculatedFieldModel.js";
 import {
     listReportCalculatedFieldTableCalculationSpecs,
@@ -250,6 +251,9 @@ export const REPORT_BUILDER_TABLE_CALC_FUNCTIONS = listReportCalculatedFieldTabl
         supportsRankDirection: entry?.supportsRankDirection === true,
         supportsTieBreaker: entry?.supportsTieBreaker === true,
         requiresWindowSize: entry?.requiresWindowSize === true,
+        supportsOffset: entry?.supportsOffset === true,
+        requiresExplicitFrame: entry?.requiresExplicitFrame === true,
+        boundedFrameRequiresOrder: entry?.boundedFrameRequiresOrder === true,
         supportsDecimals: entry?.supportsDecimals === true,
         defaultFormat: normalizeString(entry?.defaultFormat),
     }))
@@ -299,6 +303,15 @@ export function buildReportBuilderTableCalculationDraft(seed = null) {
                 : "",
             windowSize: compute?.windowSize != null ? String(compute.windowSize) : "",
             decimals: compute?.decimals != null ? String(compute.decimals) : "",
+            ...(["lag", "windowMax"].includes(functionId) ? {
+                additionalOrderBy: cloneValue((compute.orderBy || []).slice(1)),
+                offset: compute.offset == null ? "1" : String(compute.offset),
+                frameType: compute.frame?.type || "",
+                framePreceding: compute.frame?.preceding == null ? "" : String(compute.frame.preceding),
+                frameFollowing: compute.frame?.following == null ? "" : String(compute.frame.following),
+                datasetRef: normalized.datasetRef || "",
+                originalKey: normalized.key,
+            } : {}),
         };
     }
     return {
@@ -322,7 +335,7 @@ export function buildReportBuilderCalculatedFieldReferenceOptions(config = {}, {
 } = {}) {
     const ignored = new Set(normalizeStringArray([editingId]));
     const entries = Array.from(buildCalculatedFieldReferenceCatalog(config).values())
-        .filter((entry) => entry?.id && !ignored.has(entry.id) && !entry.isTableCalculated)
+        .filter((entry) => entry?.id && !ignored.has(entry.id))
         .reduce((acc, entry) => {
             if (acc.some((candidate) => candidate.id === entry.id)) {
                 return acc;
@@ -352,7 +365,7 @@ export function buildReportBuilderTableCalculationFieldOptions(config = {}, {
 } = {}) {
     const ignored = new Set(normalizeStringArray([editingId]));
     const referenceEntries = Array.from(buildCalculatedFieldReferenceCatalog(config).values())
-        .filter((entry) => entry?.id && !ignored.has(entry.id) && !entry.isTableCalculated)
+        .filter((entry) => entry?.id && !ignored.has(entry.id))
         .reduce((acc, entry) => {
             if (acc.some((candidate) => candidate.id === entry.id)) {
                 return acc;
@@ -424,7 +437,7 @@ export function validateReportBuilderCalculatedFieldDraft(draft = {}, config = {
     const selfAliases = new Set(normalizeStringArray([normalizedDraft.id, editingId]));
     if (parsedExpression?.dependencies) {
         const unknownDependencies = [];
-        const unsupportedDependencies = [];
+
         const selfDependencies = [];
         normalizeStringArray(parsedExpression.dependencies).forEach((dependencyId) => {
             if (selfAliases.has(dependencyId)) {
@@ -436,18 +449,12 @@ export function validateReportBuilderCalculatedFieldDraft(draft = {}, config = {
                 unknownDependencies.push(dependencyId);
                 return;
             }
-            if (entry.isTableCalculated) {
-                unsupportedDependencies.push(dependencyId);
-            }
         });
         if (selfDependencies.length > 0) {
             pushError("expr", "selfReference", "Calculated fields cannot reference themselves.");
         }
         if (unknownDependencies.length > 0) {
             pushError("expr", "unknownDependency", `Unknown fields in expression: ${unknownDependencies.join(", ")}.`);
-        }
-        if (unsupportedDependencies.length > 0) {
-            pushError("expr", "tableCalcDependency", `Row calculations cannot depend on table calculations: ${unsupportedDependencies.join(", ")}.`);
         }
     }
 
@@ -480,11 +487,14 @@ export function validateReportBuilderCalculatedFieldDraft(draft = {}, config = {
             field: null,
         };
     }
-    return {
-        valid: true,
-        errors: [],
-        field,
-    };
+    try {
+        validateReportCalculatedFieldDependencies([
+            ...(config.calculatedFields || []), ...(config.computedMeasures || []), ...(config.tableCalculations || []),
+        ].filter((entry) => (entry.id || entry.key) !== (editingId || field.id)).concat(field));
+    } catch (error) {
+        return {valid: false, errors: [formatCalculatedFieldValidationError({field: field.kind === "rowCalc" ? "expr" : "sourceField", code: "dependencyCycle", message: error.message})], field: null};
+    }
+    return {valid: true, errors: [], field};
 }
 
 function normalizeTableCalculationDraftInput(draft = {}) {
@@ -501,6 +511,11 @@ function normalizeTableCalculationDraftInput(draft = {}) {
         tieBreakerField: normalizeString(draft?.tieBreakerField),
         windowSize: normalizeString(draft?.windowSize),
         decimals: normalizeString(draft?.decimals),
+        additionalOrderBy: Array.isArray(draft.additionalOrderBy) ? cloneValue(draft.additionalOrderBy) : [],
+        offset: draft.offset == null ? "1" : String(draft.offset),
+        frameType: normalizeString(draft.frameType),
+        framePreceding: draft.framePreceding == null ? "" : String(draft.framePreceding),
+        frameFollowing: draft.frameFollowing == null ? "" : String(draft.frameFollowing),
     };
 }
 
@@ -540,7 +555,7 @@ export function validateReportBuilderTableCalculationDraft(draft = {}, config = 
         pushError("sourceField", "unknownSourceField", `Unknown source field '${normalizedDraft.sourceField}'.`);
     }
 
-    if (functionMeta?.requiresOrder && !normalizedDraft.orderByField) {
+    if ((functionMeta?.requiresOrder || (functionMeta?.boundedFrameRequiresOrder && normalizedDraft.frameType === "rows")) && !normalizedDraft.orderByField) {
         pushError("orderByField", "required", "Order-by field is required.");
     } else if (normalizedDraft.orderByField && !orderFieldIds.has(normalizedDraft.orderByField)) {
         pushError("orderByField", "unknownOrderField", `Unknown order-by field '${normalizedDraft.orderByField}'.`);
@@ -557,6 +572,28 @@ export function validateReportBuilderTableCalculationDraft(draft = {}, config = 
     const invalidPartitionBy = normalizedDraft.partitionBy.filter((entry) => !partitionDimensionIds.has(entry));
     if (invalidPartitionBy.length > 0) {
         pushError("partitionBy", "unknownPartitionField", `Unknown partition fields: ${invalidPartitionBy.join(", ")}.`);
+    }
+
+    if (["lag", "windowMax"].includes(normalizedDraft.functionId)) {
+        if (normalizedDraft.additionalOrderBy.length && !normalizedDraft.orderByField) pushError("orderByField", "required", "Select a primary order field before additional order fields.");
+        normalizedDraft.additionalOrderBy.forEach((entry) => {
+            if (!orderFieldIds.has(entry.field) || !["asc", "desc"].includes(entry.direction)) {
+                pushError("additionalOrderBy", "invalid", "Each additional order requires a known field and ascending or descending direction.");
+            }
+        });
+    }
+    if (functionMeta?.supportsOffset && (!/^\d+$/.test(normalizedDraft.offset) || Number(normalizedDraft.offset) < 1 || Number(normalizedDraft.offset) > 10000)) {
+        pushError("offset", "invalid", "Lag offset must be an integer from 1 to 10000.");
+    }
+    if (functionMeta?.requiresExplicitFrame) {
+        if (!["full", "rows"].includes(normalizedDraft.frameType)) pushError("frameType", "required", "Select an explicit full or bounded rows frame.");
+        if (normalizedDraft.frameType === "rows") {
+            ["framePreceding", "frameFollowing"].forEach((key) => {
+                if (!/^\d+$/.test(normalizedDraft[key]) || Number(normalizedDraft[key]) > 10000) pushError(key, "invalid", "Frame bounds must be integers from 0 to 10000.");
+            });
+        } else if (normalizedDraft.frameType === "full" && (normalizedDraft.framePreceding || normalizedDraft.frameFollowing)) {
+            pushError("frameType", "invalid", "A full frame cannot have row bounds.");
+        }
     }
 
     if (functionMeta?.requiresWindowSize) {
@@ -587,6 +624,17 @@ export function validateReportBuilderTableCalculationDraft(draft = {}, config = 
 
     const compute = (() => {
         switch (functionMeta.value) {
+            case "lag":
+            case "windowMax":
+                return {
+                    type: functionMeta.value,
+                    sourceField: normalizedDraft.sourceField,
+                    ...(normalizedDraft.partitionBy.length ? {partitionBy: normalizedDraft.partitionBy} : {}),
+                    ...(normalizedDraft.orderByField ? {orderBy: [{field: normalizedDraft.orderByField, direction: normalizedDraft.orderDir}, ...normalizedDraft.additionalOrderBy]} : {}),
+                    ...(functionMeta.value === "lag" ? {offset: Number(normalizedDraft.offset)} : {
+                        frame: normalizedDraft.frameType === "full" ? {type: "full"} : {type: "rows", preceding: Number(normalizedDraft.framePreceding), following: Number(normalizedDraft.frameFollowing)},
+                    }),
+                };
             case "percentOfTotal":
                 return {
                     type: "percentOfTotal",
@@ -638,7 +686,8 @@ export function validateReportBuilderTableCalculationDraft(draft = {}, config = 
     const field = compute
         ? normalizeReportCalculatedField({
             id: normalizedDraft.id,
-            key: normalizedDraft.id,
+            key: draft.originalKey || normalizedDraft.id,
+            ...(draft.datasetRef ? {datasetRef: draft.datasetRef} : {}),
             label: normalizedDraft.label,
             dataType: "number",
             ...(format ? { format } : {}),
@@ -658,11 +707,14 @@ export function validateReportBuilderTableCalculationDraft(draft = {}, config = 
             field: null,
         };
     }
-    return {
-        valid: true,
-        errors: [],
-        field,
-    };
+    try {
+        validateReportCalculatedFieldDependencies([
+            ...(config.calculatedFields || []), ...(config.computedMeasures || []), ...(config.tableCalculations || []),
+        ].filter((entry) => (entry.id || entry.key) !== (editingId || field.id)).concat(field));
+    } catch (error) {
+        return {valid: false, errors: [formatCalculatedFieldValidationError({field: field.kind === "rowCalc" ? "expr" : "sourceField", code: "dependencyCycle", message: error.message})], field: null};
+    }
+    return {valid: true, errors: [], field};
 }
 
 export function upsertReportBuilderLocalCalculatedFieldState(state = {}, draft = {}, config = {}, {

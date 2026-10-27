@@ -46036,6 +46036,24 @@ Please __addLocaleData before adding additional unit data`);
       defaultFormat: "number"
     },
     {
+      name: "lag",
+      label: "Lag",
+      supportsPartition: true,
+      requiresOrder: true,
+      supportsOffset: true,
+      nullBehavior: "missingOrNullPriorRowYieldsNullWithoutSkippingRows",
+      defaultFormat: "number"
+    },
+    {
+      name: "windowMax",
+      label: "Window Maximum",
+      supportsPartition: true,
+      requiresExplicitFrame: true,
+      boundedFrameRequiresOrder: true,
+      nullBehavior: "ignoresNonFiniteValuesAndReturnsNullForAnEmptyNumericWindow",
+      defaultFormat: "number"
+    },
+    {
       name: "runningTotal",
       label: "Running Total",
       supportsPartition: true,
@@ -46738,6 +46756,29 @@ Please __addLocaleData before adding additional unit data`);
     }
     return next;
   }
+  function normalizeLagCalculation(compute = {}) {
+    const sourceField = normalizeString3(compute == null ? void 0 : compute.sourceField);
+    const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
+    const offset = (compute == null ? void 0 : compute.offset) == null ? 1 : Number(compute.offset);
+    if (!sourceField || !orderBy.length || !Number.isSafeInteger(offset) || offset < 1 || offset > 1e4) return null;
+    const partitionBy = normalizePartitionBy(compute == null ? void 0 : compute.partitionBy);
+    return { type: "lag", sourceField, orderBy, offset, ...partitionBy.length ? { partitionBy } : {} };
+  }
+  function normalizeWindowMaxCalculation(compute = {}) {
+    var _a5;
+    const sourceField = normalizeString3(compute == null ? void 0 : compute.sourceField);
+    const partitionBy = normalizePartitionBy(compute == null ? void 0 : compute.partitionBy);
+    const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
+    const type = normalizeString3((_a5 = compute == null ? void 0 : compute.frame) == null ? void 0 : _a5.type);
+    if (!sourceField || !["full", "rows"].includes(type)) return null;
+    let frame = { type };
+    if (type === "rows") {
+      const preceding = Number(compute.frame.preceding), following = Number(compute.frame.following);
+      if (!orderBy.length || !Number.isSafeInteger(preceding) || !Number.isSafeInteger(following) || preceding < 0 || following < 0 || preceding > 1e4 || following > 1e4) return null;
+      frame = { type, preceding, following };
+    } else if (compute.frame.preceding != null || compute.frame.following != null) return null;
+    return { type: "windowMax", sourceField, frame, ...partitionBy.length ? { partitionBy } : {}, ...orderBy.length ? { orderBy } : {} };
+  }
   function normalizeRunningTotalCalculation(compute = {}) {
     const sourceField = normalizeString3(compute == null ? void 0 : compute.sourceField);
     const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
@@ -46830,6 +46871,10 @@ Please __addLocaleData before adding additional unit data`);
       compute = normalizePercentOfTotalCalculation(definition.compute);
     } else if (computeType === "deltafromprevious") {
       compute = normalizeDeltaFromPreviousCalculation(definition.compute);
+    } else if (computeType === "lag") {
+      compute = normalizeLagCalculation(definition.compute);
+    } else if (computeType === "windowmax") {
+      compute = normalizeWindowMaxCalculation(definition.compute);
     } else if (computeType === "runningtotal") {
       compute = normalizeRunningTotalCalculation(definition.compute);
     } else if (computeType === "movingaverage") {
@@ -46840,7 +46885,7 @@ Please __addLocaleData before adding additional unit data`);
     if (!compute) {
       return null;
     }
-    const inferredDependencies = computeType === "percentoftotal" ? [compute.sourceField, ...normalizePartitionBy(compute.partitionBy)] : computeType === "deltafromprevious" || computeType === "runningtotal" || computeType === "movingaverage" || computeType === "rank" ? [compute.sourceField, ...compute.orderBy.map((entry) => entry.field), ...normalizePartitionBy(compute.partitionBy)] : [compute.numerator, compute.denominator];
+    const inferredDependencies = computeType === "percentoftotal" ? [compute.sourceField, ...normalizePartitionBy(compute.partitionBy)] : computeType === "deltafromprevious" || computeType === "runningtotal" || computeType === "movingaverage" || computeType === "rank" || computeType === "lag" || computeType === "windowmax" ? [compute.sourceField, ...(compute.orderBy || []).map((entry) => entry.field), ...normalizePartitionBy(compute.partitionBy)] : [compute.numerator, compute.denominator];
     return {
       compute,
       dependencies: buildCalculatedFieldDependencies(definition, inferredDependencies)
@@ -46849,7 +46894,7 @@ Please __addLocaleData before adding additional unit data`);
   function normalizeReportCalculatedField(definition = {}, {
     datasetRef = ""
   } = {}) {
-    var _a5, _b, _c, _d, _e;
+    var _a5, _b, _c, _d, _e, _f, _g;
     if (!definition || typeof definition !== "object" || Array.isArray(definition)) {
       return null;
     }
@@ -46862,7 +46907,7 @@ Please __addLocaleData before adding additional unit data`);
     if (!normalizedExpression && !normalizedCompute) {
       return null;
     }
-    const kind = normalizedExpression ? "rowCalc" : normalizeString3((_a5 = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _a5.type).toLowerCase() === "percentoftotal" || normalizeString3((_b = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _b.type).toLowerCase() === "deltafromprevious" || normalizeString3((_c = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _c.type).toLowerCase() === "runningtotal" || normalizeString3((_d = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _d.type).toLowerCase() === "movingaverage" || normalizeString3((_e = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _e.type).toLowerCase() === "rank" ? "tableCalc" : "rowCalc";
+    const kind = normalizedExpression ? "rowCalc" : normalizeString3((_a5 = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _a5.type).toLowerCase() === "percentoftotal" || normalizeString3((_b = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _b.type).toLowerCase() === "deltafromprevious" || normalizeString3((_c = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _c.type).toLowerCase() === "runningtotal" || normalizeString3((_d = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _d.type).toLowerCase() === "movingaverage" || normalizeString3((_e = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _e.type).toLowerCase() === "rank" || normalizeString3((_f = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _f.type).toLowerCase() === "lag" || normalizeString3((_g = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _g.type).toLowerCase() === "windowmax" ? "tableCalc" : "rowCalc";
     if (normalizedExpression && normalizeString3(definition == null ? void 0 : definition.kind) && normalizeString3(definition.kind) !== "rowCalc") {
       return null;
     }
@@ -46903,16 +46948,17 @@ Please __addLocaleData before adding additional unit data`);
         if (leftValue === rightValue) {
           continue;
         }
-        const comparison = String(leftValue != null ? leftValue : "").localeCompare(String(rightValue != null ? rightValue : ""), void 0, { numeric: true });
+        const comparison = typeof leftValue === "number" && typeof rightValue === "number" && Number.isFinite(leftValue) && Number.isFinite(rightValue) ? leftValue < rightValue ? -1 : 1 : String(leftValue != null ? leftValue : "").localeCompare(String(rightValue != null ? rightValue : ""), void 0, { numeric: true });
         return order.direction === "desc" ? -comparison : comparison;
       }
       return 0;
     });
   }
-  function topologicallySortRowCalculatedFields(definitions = []) {
+  function topologicallySortCalculatedFields(definitions = []) {
     const byKey = new Map(
       definitions.map((definition) => [normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id)), definition]).filter(([key]) => !!key)
     );
+    const aliases2 = new Map([...byKey].map(([key, definition]) => [normalizeString3(definition.id), key]));
     const pending = new Set(byKey.keys());
     const sorted = [];
     let progressed = true;
@@ -46920,7 +46966,7 @@ Please __addLocaleData before adding additional unit data`);
       progressed = false;
       Array.from(pending).forEach((key) => {
         const definition = byKey.get(key);
-        const unresolved = normalizeStringArray(definition == null ? void 0 : definition.dependencies).filter((dependencyKey) => {
+        const unresolved = normalizeStringArray(definition == null ? void 0 : definition.dependencies).map((dependency) => byKey.has(dependency) ? dependency : aliases2.get(dependency) || dependency).filter((dependencyKey) => {
           if (dependencyKey === key || !byKey.has(dependencyKey)) {
             return false;
           }
@@ -46934,10 +46980,14 @@ Please __addLocaleData before adding additional unit data`);
         progressed = true;
       });
     }
-    Array.from(pending).forEach((key) => {
-      sorted.push(byKey.get(key));
-    });
+    if (pending.size) throw new Error("Calculated field dependencies contain a cycle: " + [...pending].map((key) => {
+      var _a5;
+      return ((_a5 = byKey.get(key)) == null ? void 0 : _a5.id) || key;
+    }).join(", "));
     return sorted;
+  }
+  function validateReportCalculatedFieldDependencies(definitions = []) {
+    topologicallySortCalculatedFields(normalizeReportCalculatedFields(definitions));
   }
   function applyReportCalculatedFields(rows = [], calculatedFields = [], {
     datasetRef = ""
@@ -46952,29 +47002,36 @@ Please __addLocaleData before adding additional unit data`);
     if (applicableFields.length === 0) {
       return Array.isArray(rows) ? rows : [];
     }
+    const ordered = topologicallySortCalculatedFields(applicableFields);
+    const result = (Array.isArray(rows) ? rows : []).map((row) => ({ ...row || {} }));
+    for (const definition of ordered) applyReportCalculatedField(result, definition);
+    return result;
+  }
+  function applyReportCalculatedField(rows, definition) {
+    var _a5, _b;
+    const applicableFields = [definition];
     const compiledExpressions = new Map(
-      applicableFields.filter((definition) => normalizeString3(definition == null ? void 0 : definition.expr)).map((definition) => {
-        var _a5;
-        return [normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id)), ((_a5 = parseReportCalculatedFieldExpression(definition.expr)) == null ? void 0 : _a5.ast) || null];
+      applicableFields.filter((definition2) => normalizeString3(definition2 == null ? void 0 : definition2.expr)).map((definition2) => {
+        var _a6;
+        return [normalizeString3((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id)), ((_a6 = parseReportCalculatedFieldExpression(definition2.expr)) == null ? void 0 : _a6.ast) || null];
       })
     );
-    const rowCalculated = (Array.isArray(rows) ? rows : []).map((row) => {
-      const next = { ...row || {} };
-      topologicallySortRowCalculatedFields(applicableFields.filter((definition) => definition.kind === "rowCalc")).forEach((definition) => {
-        var _a5, _b, _c;
-        const outputKey = normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
+    rows.forEach((next) => {
+      applicableFields.filter((definition2) => definition2.kind === "rowCalc").forEach((definition2) => {
+        var _a6, _b2, _c;
+        const outputKey = normalizeString3((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
         if (!outputKey) {
           return;
         }
-        if (normalizeString3(definition == null ? void 0 : definition.expr)) {
+        if (normalizeString3(definition2 == null ? void 0 : definition2.expr)) {
           next[outputKey] = evaluateReportCalculatedFieldExpression(compiledExpressions.get(outputKey), next);
           return;
         }
-        if (normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "ratio") {
-          const numerator = Number(resolveKey(next, definition.compute.numerator));
-          const denominator = Number(resolveKey(next, definition.compute.denominator));
-          const scale = Number.isFinite(Number((_b = definition == null ? void 0 : definition.compute) == null ? void 0 : _b.scale)) ? Number(definition.compute.scale) : 1;
-          const decimals = Number.isFinite(Number((_c = definition == null ? void 0 : definition.compute) == null ? void 0 : _c.decimals)) ? Number(definition.compute.decimals) : null;
+        if (normalizeString3((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "ratio") {
+          const numerator = Number(resolveKey(next, definition2.compute.numerator));
+          const denominator = Number(resolveKey(next, definition2.compute.denominator));
+          const scale = Number.isFinite(Number((_b2 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _b2.scale)) ? Number(definition2.compute.scale) : 1;
+          const decimals = Number.isFinite(Number((_c = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _c.decimals)) ? Number(definition2.compute.decimals) : null;
           let value = 0;
           if (Number.isFinite(numerator) && Number.isFinite(denominator) && denominator !== 0) {
             value = numerator / denominator * scale;
@@ -46985,22 +47042,21 @@ Please __addLocaleData before adding additional unit data`);
           next[outputKey] = value;
         }
       });
-      return next;
     });
-    const withTableCalcs = rowCalculated.map((row) => ({ ...row }));
-    applicableFields.filter((definition) => {
-      var _a5;
-      return normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "percentOfTotal";
-    }).forEach((definition) => {
-      var _a5, _b, _c, _d;
-      const outputKey = normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
-      const sourceField = normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.sourceField);
+    const withTableCalcs = rows;
+    applicableFields.filter((definition2) => {
+      var _a6;
+      return normalizeString3((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "percentOfTotal";
+    }).forEach((definition2) => {
+      var _a6, _b2, _c, _d;
+      const outputKey = normalizeString3((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
+      const sourceField = normalizeString3((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.sourceField);
       if (!outputKey || !sourceField) {
         return;
       }
-      const scale = Number.isFinite(Number((_b = definition == null ? void 0 : definition.compute) == null ? void 0 : _b.scale)) ? Number(definition.compute.scale) : 100;
-      const decimals = Number.isFinite(Number((_c = definition == null ? void 0 : definition.compute) == null ? void 0 : _c.decimals)) ? Number(definition.compute.decimals) : null;
-      buildPartitionGroups(withTableCalcs, (_d = definition == null ? void 0 : definition.compute) == null ? void 0 : _d.partitionBy).forEach((groupRows) => {
+      const scale = Number.isFinite(Number((_b2 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _b2.scale)) ? Number(definition2.compute.scale) : 100;
+      const decimals = Number.isFinite(Number((_c = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _c.decimals)) ? Number(definition2.compute.decimals) : null;
+      buildPartitionGroups(withTableCalcs, (_d = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _d.partitionBy).forEach((groupRows) => {
         const total = groupRows.reduce((sum, row) => {
           const value = toFiniteNumber(resolveKey(row, sourceField));
           return value != null ? sum + value : sum;
@@ -47018,18 +47074,18 @@ Please __addLocaleData before adding additional unit data`);
         });
       });
     });
-    applicableFields.filter((definition) => {
-      var _a5;
-      return normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "deltaFromPrevious";
-    }).forEach((definition) => {
-      var _a5, _b, _c;
-      const outputKey = normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
-      const sourceField = normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.sourceField);
-      const orderBy = normalizeOrderBy((_b = definition == null ? void 0 : definition.compute) == null ? void 0 : _b.orderBy);
+    applicableFields.filter((definition2) => {
+      var _a6;
+      return normalizeString3((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "deltaFromPrevious";
+    }).forEach((definition2) => {
+      var _a6, _b2, _c;
+      const outputKey = normalizeString3((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
+      const sourceField = normalizeString3((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.sourceField);
+      const orderBy = normalizeOrderBy((_b2 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _b2.orderBy);
       if (!outputKey || !sourceField || orderBy.length === 0) {
         return;
       }
-      buildPartitionGroups(withTableCalcs, (_c = definition == null ? void 0 : definition.compute) == null ? void 0 : _c.partitionBy).forEach((groupRows) => {
+      buildPartitionGroups(withTableCalcs, (_c = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _c.partitionBy).forEach((groupRows) => {
         const sortedRows = sortRowsByOrder(groupRows, orderBy);
         let previousValue = null;
         sortedRows.forEach((row) => {
@@ -47043,18 +47099,18 @@ Please __addLocaleData before adding additional unit data`);
         });
       });
     });
-    applicableFields.filter((definition) => {
-      var _a5;
-      return normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "runningTotal";
-    }).forEach((definition) => {
-      var _a5, _b, _c;
-      const outputKey = normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
-      const sourceField = normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.sourceField);
-      const orderBy = normalizeOrderBy((_b = definition == null ? void 0 : definition.compute) == null ? void 0 : _b.orderBy);
+    applicableFields.filter((definition2) => {
+      var _a6;
+      return normalizeString3((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "runningTotal";
+    }).forEach((definition2) => {
+      var _a6, _b2, _c;
+      const outputKey = normalizeString3((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
+      const sourceField = normalizeString3((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.sourceField);
+      const orderBy = normalizeOrderBy((_b2 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _b2.orderBy);
       if (!outputKey || !sourceField || orderBy.length === 0) {
         return;
       }
-      buildPartitionGroups(withTableCalcs, (_c = definition == null ? void 0 : definition.compute) == null ? void 0 : _c.partitionBy).forEach((groupRows) => {
+      buildPartitionGroups(withTableCalcs, (_c = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _c.partitionBy).forEach((groupRows) => {
         const sortedRows = sortRowsByOrder(groupRows, orderBy);
         let runningValue = 0;
         sortedRows.forEach((row) => {
@@ -47066,29 +47122,29 @@ Please __addLocaleData before adding additional unit data`);
         });
       });
     });
-    applicableFields.filter((definition) => {
-      var _a5;
-      return normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "movingAverage";
-    }).forEach((definition) => {
-      var _a5, _b, _c, _d;
-      const outputKey = normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
-      const sourceField = normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.sourceField);
-      const orderBy = normalizeOrderBy((_b = definition == null ? void 0 : definition.compute) == null ? void 0 : _b.orderBy);
-      const windowSize = Math.max(1, Number(((_c = definition == null ? void 0 : definition.compute) == null ? void 0 : _c.windowSize) || 0) || 0);
+    applicableFields.filter((definition2) => {
+      var _a6;
+      return normalizeString3((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "movingAverage";
+    }).forEach((definition2) => {
+      var _a6, _b2, _c, _d;
+      const outputKey = normalizeString3((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
+      const sourceField = normalizeString3((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.sourceField);
+      const orderBy = normalizeOrderBy((_b2 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _b2.orderBy);
+      const windowSize = Math.max(1, Number(((_c = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _c.windowSize) || 0) || 0);
       if (!outputKey || !sourceField || orderBy.length === 0 || !windowSize) {
         return;
       }
-      buildPartitionGroups(withTableCalcs, (_d = definition == null ? void 0 : definition.compute) == null ? void 0 : _d.partitionBy).forEach((groupRows) => {
+      buildPartitionGroups(withTableCalcs, (_d = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _d.partitionBy).forEach((groupRows) => {
         const sortedRows = sortRowsByOrder(groupRows, orderBy);
         sortedRows.forEach((row, index) => {
-          var _a6;
+          var _a7;
           const windowRows = sortedRows.slice(Math.max(0, index - windowSize + 1), index + 1);
           const numericValues = windowRows.map((entry) => toFiniteNumber(resolveKey(entry, sourceField))).filter((value2) => value2 != null);
           let value = 0;
           if (numericValues.length > 0) {
             value = numericValues.reduce((sum, entry) => sum + entry, 0) / numericValues.length;
           }
-          const decimals = Number.isFinite(Number((_a6 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a6.decimals)) ? Number(definition.compute.decimals) : null;
+          const decimals = Number.isFinite(Number((_a7 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a7.decimals)) ? Number(definition2.compute.decimals) : null;
           if (decimals != null) {
             value = Number(value.toFixed(decimals));
           }
@@ -47096,22 +47152,22 @@ Please __addLocaleData before adding additional unit data`);
         });
       });
     });
-    applicableFields.filter((definition) => {
-      var _a5;
-      return normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "rank";
-    }).forEach((definition) => {
-      var _a5, _b, _c, _d, _e;
-      const outputKey = normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
-      const sourceField = normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.sourceField);
-      const orderBy = normalizeOrderBy((_b = definition == null ? void 0 : definition.compute) == null ? void 0 : _b.orderBy);
-      const tieMode = normalizeString3((_c = definition == null ? void 0 : definition.compute) == null ? void 0 : _c.tieMode).toLowerCase();
+    applicableFields.filter((definition2) => {
+      var _a6;
+      return normalizeString3((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "rank";
+    }).forEach((definition2) => {
+      var _a6, _b2, _c, _d, _e;
+      const outputKey = normalizeString3((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
+      const sourceField = normalizeString3((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.sourceField);
+      const orderBy = normalizeOrderBy((_b2 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _b2.orderBy);
+      const tieMode = normalizeString3((_c = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _c.tieMode).toLowerCase();
       if (!outputKey || !sourceField || orderBy.length === 0 || ((_d = orderBy[0]) == null ? void 0 : _d.field) !== sourceField) {
         return;
       }
       if (tieMode && tieMode !== "dense") {
         return;
       }
-      buildPartitionGroups(withTableCalcs, (_e = definition == null ? void 0 : definition.compute) == null ? void 0 : _e.partitionBy).forEach((groupRows) => {
+      buildPartitionGroups(withTableCalcs, (_e = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _e.partitionBy).forEach((groupRows) => {
         const sortedRows = sortRowsByOrder(groupRows, orderBy);
         let rank = 0;
         let previousValue;
@@ -47132,6 +47188,29 @@ Please __addLocaleData before adding additional unit data`);
         });
       });
     });
+    if (((_a5 = definition.compute) == null ? void 0 : _a5.type) === "lag") {
+      const { sourceField, orderBy, partitionBy, offset } = definition.compute;
+      buildPartitionGroups(withTableCalcs, partitionBy).forEach((groupRows) => {
+        const sorted = sortRowsByOrder(groupRows, orderBy);
+        const values = sorted.map((row) => resolveKey(row, sourceField));
+        sorted.forEach((row, index) => {
+          const previous = index >= offset ? values[index - offset] : null;
+          row[definition.key] = previous == null ? null : cloneValue3(previous);
+        });
+      });
+    }
+    if (((_b = definition.compute) == null ? void 0 : _b.type) === "windowMax") {
+      const { sourceField, orderBy, partitionBy, frame } = definition.compute;
+      buildPartitionGroups(withTableCalcs, partitionBy).forEach((groupRows) => {
+        const sorted = frame.type === "rows" ? sortRowsByOrder(groupRows, orderBy) : groupRows;
+        const values = sorted.map((row) => toFiniteNumber(resolveKey(row, sourceField)));
+        sorted.forEach((row, index) => {
+          const selected = frame.type === "full" ? values : values.slice(Math.max(0, index - frame.preceding), index + frame.following + 1);
+          const finite = selected.filter((value) => value != null);
+          row[definition.key] = finite.length ? Math.max(...finite) : null;
+        });
+      });
+    }
     return withTableCalcs;
   }
   function cloneReportCalculatedFields(calculatedFields = []) {
@@ -47463,6 +47542,9 @@ Please __addLocaleData before adding additional unit data`);
     supportsRankDirection: (entry == null ? void 0 : entry.supportsRankDirection) === true,
     supportsTieBreaker: (entry == null ? void 0 : entry.supportsTieBreaker) === true,
     requiresWindowSize: (entry == null ? void 0 : entry.requiresWindowSize) === true,
+    supportsOffset: (entry == null ? void 0 : entry.supportsOffset) === true,
+    requiresExplicitFrame: (entry == null ? void 0 : entry.requiresExplicitFrame) === true,
+    boundedFrameRequiresOrder: (entry == null ? void 0 : entry.boundedFrameRequiresOrder) === true,
     supportsDecimals: (entry == null ? void 0 : entry.supportsDecimals) === true,
     defaultFormat: normalizeString6(entry == null ? void 0 : entry.defaultFormat)
   })).filter((entry) => entry.value && entry.label);
@@ -51751,9 +51833,6 @@ Please __addLocaleData before adding additional unit data`);
   }
   function buildReportSpecCalculatedFields(config = {}, state = {}) {
     const selectedMeasureIds = normalizeStringArray5(state == null ? void 0 : state.selectedMeasures);
-    if (selectedMeasureIds.length === 0) {
-      return [];
-    }
     const availableDefinitions = normalizeReportCalculatedFields([
       ...Array.isArray(config == null ? void 0 : config.calculatedFields) ? config.calculatedFields : [],
       ...Array.isArray(config == null ? void 0 : config.computedMeasures) ? config.computedMeasures : [],
@@ -51761,24 +51840,23 @@ Please __addLocaleData before adding additional unit data`);
     ], {
       datasetRef: "primary"
     });
+    validateReportCalculatedFieldDependencies(availableDefinitions);
+    if (selectedMeasureIds.length === 0) return [];
     const definitionsById = new Map(
-      availableDefinitions.map((definition) => [normalizeString27((definition == null ? void 0 : definition.id) || (definition == null ? void 0 : definition.key)), definition]).filter(([id]) => !!id)
+      availableDefinitions.flatMap((definition) => [[normalizeString27((definition == null ? void 0 : definition.id) || (definition == null ? void 0 : definition.key)), definition], [normalizeString27((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id)), definition]]).filter(([id]) => !!id)
     );
     const visiting = /* @__PURE__ */ new Set();
     const visited = /* @__PURE__ */ new Set();
     const selectedDefinitions = [];
     function visitDefinition(id) {
-      const normalizedId = normalizeString27(id);
-      if (!normalizedId || visited.has(normalizedId) || visiting.has(normalizedId)) {
-        return;
-      }
-      const definition = definitionsById.get(normalizedId);
-      if (!definition) {
-        return;
-      }
+      const definition = definitionsById.get(normalizeString27(id));
+      if (!definition) return;
+      const normalizedId = normalizeString27(definition.id || definition.key);
+      if (!normalizedId || visited.has(normalizedId)) return;
+      if (visiting.has(normalizedId)) throw new Error("Calculated field dependencies contain a cycle: " + [...visiting, normalizedId].join(", "));
       visiting.add(normalizedId);
       normalizeStringArray5(definition == null ? void 0 : definition.dependencies).forEach((dependencyId) => {
-        visitDefinition(dependencyId);
+        if (dependencyId !== normalizedId && dependencyId !== definition.key) visitDefinition(dependencyId);
       });
       visiting.delete(normalizedId);
       visited.add(normalizedId);

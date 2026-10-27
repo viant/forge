@@ -9,6 +9,15 @@
       "defaultFormat": "number"
     },
     {
+      "name": "lag",
+      "label": "Lag",
+      "supportsPartition": true,
+      "requiresOrder": true,
+      "supportsOffset": true,
+      "nullBehavior": "missingOrNullPriorRowYieldsNullWithoutSkippingRows",
+      "defaultFormat": "number"
+    },
+    {
       "name": "movingAverage",
       "label": "Moving Average",
       "supportsPartition": true,
@@ -44,6 +53,15 @@
       "supportsPartition": true,
       "requiresOrder": true,
       "nullBehavior": "nonFiniteValuesDoNotAdvanceRunningTotal",
+      "defaultFormat": "number"
+    },
+    {
+      "name": "windowMax",
+      "label": "Window Maximum",
+      "supportsPartition": true,
+      "requiresExplicitFrame": true,
+      "boundedFrameRequiresOrder": true,
+      "nullBehavior": "ignoresNonFiniteValuesAndReturnsNullForAnEmptyNumericWindow",
       "defaultFormat": "number"
     }
   ],
@@ -222,6 +240,300 @@
         { "eventDate": "2026-05-02", "spend": 100, "rankSpend": 1 },
         { "eventDate": "2026-05-03", "spend": 50, "rankSpend": 2 },
         { "eventDate": "2026-05-04", "spend": null, "rankSpend": null }
+      ]
+    },
+    {
+      "id": "mixed_dependency_order",
+      "definitions": [
+        {
+          "id": "score",
+          "expr": "if(isnull(previous), value / peak, 1 + (normalized - previous) / abs(previous))"
+        },
+        {
+          "id": "previous",
+          "compute": {
+            "type": "lag",
+            "sourceField": "normalized",
+            "orderBy": [
+              {
+                "field": "value",
+                "direction": "desc"
+              }
+            ]
+          }
+        },
+        {
+          "id": "peak",
+          "compute": {
+            "type": "windowMax",
+            "sourceField": "capacity",
+            "frame": {
+              "type": "full"
+            }
+          }
+        },
+        {
+          "id": "normalized",
+          "expr": "coalesce(value, 0)"
+        }
+      ],
+      "rows": [
+        {
+          "label": "a",
+          "value": 8,
+          "capacity": 100
+        },
+        {
+          "label": "b",
+          "value": 32,
+          "capacity": 200
+        },
+        {
+          "label": "c",
+          "value": 16,
+          "capacity": 180
+        }
+      ],
+      "expectedRows": [
+        {
+          "label": "a",
+          "value": 8,
+          "capacity": 100,
+          "normalized": 8,
+          "previous": 16,
+          "peak": 200,
+          "score": 0.5
+        },
+        {
+          "label": "b",
+          "value": 32,
+          "capacity": 200,
+          "normalized": 32,
+          "previous": null,
+          "peak": 200,
+          "score": 0.16
+        },
+        {
+          "label": "c",
+          "value": 16,
+          "capacity": 180,
+          "normalized": 16,
+          "previous": 32,
+          "peak": 200,
+          "score": 0.5
+        }
+      ]
+    },
+    {
+      "id": "lag_preserves_null_and_zero_positions",
+      "definitions": [
+        {
+          "id": "previous",
+          "compute": {
+            "type": "lag",
+            "sourceField": "value",
+            "orderBy": [
+              {
+                "field": "index",
+                "direction": "asc"
+              }
+            ]
+          }
+        }
+      ],
+      "rows": [
+        {
+          "index": 1,
+          "value": 2
+        },
+        {
+          "index": 2,
+          "value": null
+        },
+        {
+          "index": 3,
+          "value": 0
+        },
+        {
+          "index": 4,
+          "value": -1
+        }
+      ],
+      "expectedRows": [
+        {
+          "index": 1,
+          "value": 2,
+          "previous": null
+        },
+        {
+          "index": 2,
+          "value": null,
+          "previous": 2
+        },
+        {
+          "index": 3,
+          "value": 0,
+          "previous": null
+        },
+        {
+          "index": 4,
+          "value": -1,
+          "previous": 0
+        }
+      ]
+    },
+    {
+      "id": "window_max_partition_and_bounded_frame",
+      "definitions": [
+        {
+          "id": "peak",
+          "compute": {
+            "type": "windowMax",
+            "sourceField": "value",
+            "partitionBy": [
+              "group"
+            ],
+            "frame": {
+              "type": "full"
+            }
+          }
+        },
+        {
+          "id": "nearby",
+          "compute": {
+            "type": "windowMax",
+            "sourceField": "value",
+            "partitionBy": [
+              "group"
+            ],
+            "orderBy": [
+              {
+                "field": "index",
+                "direction": "asc"
+              }
+            ],
+            "frame": {
+              "type": "rows",
+              "preceding": 1,
+              "following": 0
+            }
+          }
+        }
+      ],
+      "rows": [
+        {
+          "group": "a",
+          "index": 1,
+          "value": 5
+        },
+        {
+          "group": "a",
+          "index": 2,
+          "value": null
+        },
+        {
+          "group": "a",
+          "index": 3,
+          "value": -2
+        },
+        {
+          "group": "b",
+          "index": 1,
+          "value": null
+        }
+      ],
+      "expectedRows": [
+        {
+          "group": "a",
+          "index": 1,
+          "value": 5,
+          "peak": 5,
+          "nearby": 5
+        },
+        {
+          "group": "a",
+          "index": 2,
+          "value": null,
+          "peak": 5,
+          "nearby": 5
+        },
+        {
+          "group": "a",
+          "index": 3,
+          "value": -2,
+          "peak": 5,
+          "nearby": -2
+        },
+        {
+          "group": "b",
+          "index": 1,
+          "value": null,
+          "peak": null,
+          "nearby": null
+        }
+      ]
+    },
+    {
+      "id": "lag_explicit_tie_break_and_partition",
+      "definitions": [
+        {
+          "id": "previous",
+          "dataType": "string",
+          "compute": {
+            "type": "lag",
+            "sourceField": "label",
+            "partitionBy": [
+              "group"
+            ],
+            "orderBy": [
+              {
+                "field": "score",
+                "direction": "desc"
+              },
+              {
+                "field": "label",
+                "direction": "asc"
+              }
+            ]
+          }
+        }
+      ],
+      "rows": [
+        {
+          "group": "a",
+          "label": "b",
+          "score": 5
+        },
+        {
+          "group": "a",
+          "label": "a",
+          "score": 5
+        },
+        {
+          "group": "b",
+          "label": "c",
+          "score": 1
+        }
+      ],
+      "expectedRows": [
+        {
+          "group": "a",
+          "label": "b",
+          "score": 5,
+          "previous": "a"
+        },
+        {
+          "group": "a",
+          "label": "a",
+          "score": 5,
+          "previous": null
+        },
+        {
+          "group": "b",
+          "label": "c",
+          "score": 1,
+          "previous": null
+        }
       ]
     }
   ]

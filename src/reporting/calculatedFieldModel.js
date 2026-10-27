@@ -721,6 +721,30 @@ function normalizeDeltaFromPreviousCalculation(compute = {}) {
   return next;
 }
 
+function normalizeLagCalculation(compute = {}) {
+  const sourceField = normalizeString(compute?.sourceField);
+  const orderBy = normalizeOrderBy(compute?.orderBy);
+  const offset = compute?.offset == null ? 1 : Number(compute.offset);
+  if (!sourceField || !orderBy.length || !Number.isSafeInteger(offset) || offset < 1 || offset > 10000) return null;
+  const partitionBy = normalizePartitionBy(compute?.partitionBy);
+  return {type: "lag", sourceField, orderBy, offset, ...(partitionBy.length ? {partitionBy} : {})};
+}
+
+function normalizeWindowMaxCalculation(compute = {}) {
+  const sourceField = normalizeString(compute?.sourceField);
+  const partitionBy = normalizePartitionBy(compute?.partitionBy);
+  const orderBy = normalizeOrderBy(compute?.orderBy);
+  const type = normalizeString(compute?.frame?.type);
+  if (!sourceField || !["full", "rows"].includes(type)) return null;
+  let frame = {type};
+  if (type === "rows") {
+    const preceding = Number(compute.frame.preceding), following = Number(compute.frame.following);
+    if (!orderBy.length || !Number.isSafeInteger(preceding) || !Number.isSafeInteger(following) || preceding < 0 || following < 0 || preceding > 10000 || following > 10000) return null;
+    frame = {type, preceding, following};
+  } else if (compute.frame.preceding != null || compute.frame.following != null) return null;
+  return {type: "windowMax", sourceField, frame, ...(partitionBy.length ? {partitionBy} : {}), ...(orderBy.length ? {orderBy} : {})};
+}
+
 function normalizeRunningTotalCalculation(compute = {}) {
   const sourceField = normalizeString(compute?.sourceField);
   const orderBy = normalizeOrderBy(compute?.orderBy);
@@ -816,6 +840,10 @@ function normalizeReportCalculatedFieldCompute(definition = {}) {
     compute = normalizePercentOfTotalCalculation(definition.compute);
   } else if (computeType === "deltafromprevious") {
     compute = normalizeDeltaFromPreviousCalculation(definition.compute);
+  } else if (computeType === "lag") {
+    compute = normalizeLagCalculation(definition.compute);
+  } else if (computeType === "windowmax") {
+    compute = normalizeWindowMaxCalculation(definition.compute);
   } else if (computeType === "runningtotal") {
     compute = normalizeRunningTotalCalculation(definition.compute);
   } else if (computeType === "movingaverage") {
@@ -828,8 +856,8 @@ function normalizeReportCalculatedFieldCompute(definition = {}) {
   }
   const inferredDependencies = computeType === "percentoftotal"
     ? [compute.sourceField, ...normalizePartitionBy(compute.partitionBy)]
-    : ((computeType === "deltafromprevious" || computeType === "runningtotal" || computeType === "movingaverage" || computeType === "rank")
-      ? [compute.sourceField, ...compute.orderBy.map((entry) => entry.field), ...normalizePartitionBy(compute.partitionBy)]
+    : ((computeType === "deltafromprevious" || computeType === "runningtotal" || computeType === "movingaverage" || computeType === "rank" || computeType === "lag" || computeType === "windowmax")
+      ? [compute.sourceField, ...(compute.orderBy || []).map((entry) => entry.field), ...normalizePartitionBy(compute.partitionBy)]
       : [compute.numerator, compute.denominator]);
   return {
     compute,
@@ -859,6 +887,8 @@ export function normalizeReportCalculatedField(definition = {}, {
       || normalizeString(normalizedCompute?.compute?.type).toLowerCase() === "runningtotal"
       || normalizeString(normalizedCompute?.compute?.type).toLowerCase() === "movingaverage"
       || normalizeString(normalizedCompute?.compute?.type).toLowerCase() === "rank"
+      || normalizeString(normalizedCompute?.compute?.type).toLowerCase() === "lag"
+      || normalizeString(normalizedCompute?.compute?.type).toLowerCase() === "windowmax"
       ? "tableCalc"
       : "rowCalc");
   if (normalizedExpression && normalizeString(definition?.kind) && normalizeString(definition.kind) !== "rowCalc") {
@@ -906,19 +936,24 @@ function sortRowsByOrder(rowsToSort = [], orderBy = []) {
       if (leftValue === rightValue) {
         continue;
       }
-      const comparison = String(leftValue ?? "").localeCompare(String(rightValue ?? ""), undefined, { numeric: true });
+      // Embedded engines may ignore localeCompare's numeric option. Typed
+      // numeric data must keep the same order in browser and trusted lowering.
+      const comparison = typeof leftValue === "number" && typeof rightValue === "number" && Number.isFinite(leftValue) && Number.isFinite(rightValue)
+        ? (leftValue < rightValue ? -1 : 1)
+        : String(leftValue ?? "").localeCompare(String(rightValue ?? ""), undefined, { numeric: true });
       return order.direction === "desc" ? -comparison : comparison;
     }
     return 0;
   });
 }
 
-function topologicallySortRowCalculatedFields(definitions = []) {
+function topologicallySortCalculatedFields(definitions = []) {
   const byKey = new Map(
     definitions
       .map((definition) => [normalizeString(definition?.key || definition?.id), definition])
       .filter(([key]) => !!key),
   );
+  const aliases = new Map([...byKey].map(([key, definition]) => [normalizeString(definition.id), key]));
   const pending = new Set(byKey.keys());
   const sorted = [];
   let progressed = true;
@@ -926,7 +961,7 @@ function topologicallySortRowCalculatedFields(definitions = []) {
     progressed = false;
     Array.from(pending).forEach((key) => {
       const definition = byKey.get(key);
-      const unresolved = normalizeStringArray(definition?.dependencies).filter((dependencyKey) => {
+      const unresolved = normalizeStringArray(definition?.dependencies).map(dependency => byKey.has(dependency) ? dependency : aliases.get(dependency) || dependency).filter((dependencyKey) => {
         if (dependencyKey === key || !byKey.has(dependencyKey)) {
           return false;
         }
@@ -940,10 +975,12 @@ function topologicallySortRowCalculatedFields(definitions = []) {
       progressed = true;
     });
   }
-  Array.from(pending).forEach((key) => {
-    sorted.push(byKey.get(key));
-  });
+  if (pending.size) throw new Error("Calculated field dependencies contain a cycle: " + [...pending].map(key => byKey.get(key)?.id || key).join(", "));
   return sorted;
+}
+
+export function validateReportCalculatedFieldDependencies(definitions = []) {
+  topologicallySortCalculatedFields(normalizeReportCalculatedFields(definitions));
 }
 
 export function applyReportCalculatedFields(rows = [], calculatedFields = [], {
@@ -960,15 +997,22 @@ export function applyReportCalculatedFields(rows = [], calculatedFields = [], {
     return Array.isArray(rows) ? rows : [];
   }
 
+  const ordered = topologicallySortCalculatedFields(applicableFields);
+  const result = (Array.isArray(rows) ? rows : []).map(row => ({...(row || {})}));
+  for (const definition of ordered) applyReportCalculatedField(result, definition);
+  return result;
+}
+
+function applyReportCalculatedField(rows, definition) {
+  const applicableFields = [definition];
   const compiledExpressions = new Map(
     applicableFields
       .filter((definition) => normalizeString(definition?.expr))
       .map((definition) => [normalizeString(definition?.key || definition?.id), parseReportCalculatedFieldExpression(definition.expr)?.ast || null]),
   );
 
-  const rowCalculated = (Array.isArray(rows) ? rows : []).map((row) => {
-    const next = { ...(row || {}) };
-    topologicallySortRowCalculatedFields(applicableFields.filter((definition) => definition.kind === "rowCalc")).forEach((definition) => {
+  rows.forEach((next) => {
+    applicableFields.filter((definition) => definition.kind === "rowCalc").forEach((definition) => {
       const outputKey = normalizeString(definition?.key || definition?.id);
       if (!outputKey) {
         return;
@@ -992,10 +1036,9 @@ export function applyReportCalculatedFields(rows = [], calculatedFields = [], {
         next[outputKey] = value;
       }
     });
-    return next;
   });
 
-  const withTableCalcs = rowCalculated.map((row) => ({ ...row }));
+  const withTableCalcs = rows;
   applicableFields
     .filter((definition) => normalizeString(definition?.compute?.type) === "percentOfTotal")
     .forEach((definition) => {
@@ -1131,6 +1174,30 @@ export function applyReportCalculatedFields(rows = [], calculatedFields = [], {
         });
       });
     });
+  if (definition.compute?.type === "lag") {
+    const {sourceField, orderBy, partitionBy, offset} = definition.compute;
+    buildPartitionGroups(withTableCalcs, partitionBy).forEach(groupRows => {
+      const sorted = sortRowsByOrder(groupRows, orderBy);
+      // Snapshot before assigning: an output can deliberately shadow its input.
+      const values = sorted.map(row => resolveKey(row, sourceField));
+      sorted.forEach((row, index) => {
+        const previous = index >= offset ? values[index - offset] : null;
+        row[definition.key] = previous == null ? null : cloneValue(previous);
+      });
+    });
+  }
+  if (definition.compute?.type === "windowMax") {
+    const {sourceField, orderBy, partitionBy, frame} = definition.compute;
+    buildPartitionGroups(withTableCalcs, partitionBy).forEach(groupRows => {
+      const sorted = frame.type === "rows" ? sortRowsByOrder(groupRows, orderBy) : groupRows;
+      const values = sorted.map(row => toFiniteNumber(resolveKey(row, sourceField)));
+      sorted.forEach((row, index) => {
+        const selected = frame.type === "full" ? values : values.slice(Math.max(0, index - frame.preceding), index + frame.following + 1);
+        const finite = selected.filter(value => value != null);
+        row[definition.key] = finite.length ? Math.max(...finite) : null;
+      });
+    });
+  }
   return withTableCalcs;
 }
 
