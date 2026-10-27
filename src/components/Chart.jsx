@@ -18,6 +18,7 @@ import {
     AreaChart,
     Area,
     ComposedChart,
+    Curve,
     PieChart,
     Pie,
     Cell,
@@ -101,6 +102,16 @@ import SharedButton from './Button.jsx';
 import {validateChartAppearance, resolveDocumentChartStyle, sharedChartDomain} from './chartAppearance.js';
 
 let categoryTickMeasureCanvas = null;
+
+function visiblePiePercentage({value, percent}) {
+    return Number(value) > 0 && Number.isFinite(percent) && Math.round(percent * 100) > 0;
+}
+
+function PiePercentageLeader(props) {
+    return visiblePiePercentage(props)
+        ? <Curve {...props} type="linear" className="recharts-pie-label-line" />
+        : null;
+}
 
 function measureCategoryTickText(value, style = {}) {
     if (typeof document === "undefined") return String(value || "").length * 6.5;
@@ -1278,8 +1289,8 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 innerRadius={pieInnerRadius}
                 outerRadius={compactPie ? "52%" : "78%"}
                 paddingAngle={pieFilteredData.length > 1 ? 2 : 0}
-                label={embedded || compactPie || documentAppearance ? false : ({name, percent}) => `${name} ${(percent * 100).toFixed(0)}%`}
-                labelLine={!embedded && !compactPie && !documentAppearance}
+                label={embedded || compactPie || documentAppearance ? false : props => visiblePiePercentage(props) ? `${props.name} ${(props.percent * 100).toFixed(0)}%` : null}
+                labelLine={!embedded && !compactPie && !documentAppearance ? PiePercentageLeader : false}
             >
                 {pieFilteredData.map((entry, index) => (
                     <Cell key={buildPieSliceCellKey(entry, index)} fill={resolveCategoryColor(chart?.series?.categoryColors, entry.name, piePalette[index % piePalette.length])} />
