@@ -11,7 +11,7 @@ import (
 
 var ErrReportParameterBinding = errors.New("report parameter is not declared by the approved source")
 
-// ReportParameterBindingError describes an undeclared invocation input only.
+// ReportParameterBindingError describes an invalid invocation input.
 // Reserved inputs, authorization failures and selection widening retain their
 // original errors. Values and private parameter destination paths are omitted.
 type ReportParameterBindingError struct{ diagnostic Diagnostic }
@@ -23,6 +23,55 @@ func (e *ReportParameterBindingError) ReportParameterBindingDiagnostic() Diagnos
 }
 
 var bindingDiagnosticID = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_.-]{0,127}$`)
+
+func validateRequiredReportParameters(args map[string]interface{}, declarations map[string]reportParameterDeclaration, scope *reportExecutionDatasetScope) error {
+	names := make([]string, 0, len(declarations))
+	for name, declaration := range declarations {
+		if declaration.Required {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		declaration := declarations[name]
+		excluded := false
+		if scope != nil {
+			for _, id := range scope.Exclude {
+				excluded = excluded || id == declaration.ID
+			}
+		}
+		if excluded {
+			continue
+		}
+		var value interface{} = args
+		for _, part := range strings.Split(declaration.Path, ".") {
+			object, ok := value.(map[string]interface{})
+			if !ok {
+				value = nil
+				break
+			}
+			value = object[part]
+		}
+		missing := value == nil
+		if text, ok := value.(string); ok {
+			missing = strings.TrimSpace(text) == ""
+		}
+		if !missing {
+			continue
+		}
+		label, path := "<invalid identifier>", "parameters"
+		if !reservedReportParameter(name) && bindingDiagnosticID.MatchString(name) {
+			label = strconv.Quote(name)
+			path += "[" + label + "]"
+		}
+		return &ReportParameterBindingError{diagnostic: Diagnostic{
+			Code: "missing_report_parameter", Severity: "error", Path: path,
+			Message:      fmt.Sprintf("Required report input %s is missing.", label),
+			SuggestedFix: "Enter the required report input before running the report. Date ranges require both a start and an end date.",
+		}}
+	}
+	return nil
+}
 
 func reservedReportParameter(key string) bool {
 	return strings.HasPrefix(key, "_") || key == "backend" || key == "source" || key == "service" || key == "method" || key == "filters" || key == "options"

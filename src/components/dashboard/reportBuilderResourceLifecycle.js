@@ -1,6 +1,14 @@
 const text = value => String(value || "").trim();
 const clone = value => value == null ? value : JSON.parse(JSON.stringify(value));
 
+export function reportResourceFailureMessage(failure) {
+    const envelopes = [failure, failure?.data, failure?.details, failure?.response?.data];
+    if (envelopes.some(value => Array.isArray(value?.diagnostics) && value.diagnostics.some(diagnostic => diagnostic?.code === "missing_report_parameter"))) {
+        return "Enter all required report inputs before running the report. Date ranges need both a start and an end date.";
+    }
+    return "This report could not be run. Please try again.";
+}
+
 export function hostedReportResource(container) {
     const parameters = hostedReportParameters(container);
     return parameters.reportResource || parameters.resolvedResource || null;

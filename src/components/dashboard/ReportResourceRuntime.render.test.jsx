@@ -17,6 +17,16 @@ const result = (resource=pin, title='Server report') => ({resource, reportSpec:{
 const printedResult = (resource=pin, title='Fresh print') => ({...result(resource), reportPrint:{kind:'reportPrint', title, pages:[{number:1,elements:[]}],pageGeometry:{width:612,height:792}}});
 const button = (view,label) => [...view.host.querySelectorAll('button')].find(item=>item.textContent===label);
 const deferred = () => {let resolve, reject; const promise=new Promise((yes,no)=>{resolve=yes;reject=no;}); return {promise,resolve,reject};};
+it('explains missing required inputs without exposing upstream details',async()=>{
+    const failure=Object.assign(new Error('private-token https://internal/source'),{data:{diagnostics:[{code:'missing_report_parameter',message:'private-token'}]}});
+    const view=await mount(vi.fn().mockRejectedValue(failure),{executeOnOpen:true});
+    try {
+        expect(view.host.textContent).toContain('Enter all required report inputs');
+        expect(view.host.textContent).toContain('both a start and an end date');
+        expect(view.host.textContent).not.toContain('private-token');
+        expect(view.host.textContent).not.toContain('internal/source');
+    } finally {await view.close();}
+});
 async function mount(runReport, parameters={}) {
     globalThis.IS_REACT_ACT_ENVIRONMENT=true;
     const host=document.createElement('div'), root=createRoot(host);
