@@ -25,6 +25,8 @@ const SUPPORTED_MULTI_SERIES_CARTESIAN_TYPES = new Set([
 export function resolveReportRuntimeChartInteractionSupport(chartSpec = {}) {
   const type = normalizeString(chartSpec?.type).toLowerCase();
   const seriesField = normalizeString(chartSpec?.seriesField);
+  if (type === "category-range" && chartSpec.categoryRange) return {enabled:true,reason:"",message:"",legendEnabled:false};
+  if (type === "heatmap" && chartSpec.heatmap) return {enabled:true,reason:"",message:"",legendEnabled:false};
   if (!type) {
     return {
       enabled: false,

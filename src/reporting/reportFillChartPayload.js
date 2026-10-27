@@ -1,3 +1,5 @@
+import {buildCategoryRange,categoryRangeFields} from '../components/categoryRange.js';
+import {buildHeatmap} from '../components/categoricalHeatmap.js';
 import {
   aggregateDirectSeriesData,
   buildPieChartData,
@@ -26,6 +28,14 @@ function cloneChartRows(rows = []) {
 
 export function buildReportFillChartPayload(chart = {}, rows = []) {
   const type = normalizeString(chart?.type).toLowerCase();
+  if(type === "category-range") {
+    const model=buildCategoryRange(chart.categoryRange,rows);
+    return {kind:"category-range",type,seriesKeys:categoryRangeFields(model.config),rows:cloneChartRows(rows)};
+  }
+  if(type === "heatmap") {
+    buildHeatmap(chart.heatmap,rows);
+    return {kind:"heatmap",type,seriesKeys:[chart.heatmap.valueField],rows:cloneChartRows(rows)};
+  }
   const chartRows = materializeChartDisplayRows(chart, rows);
   if (!type || chartRows.length === 0) {
     return null;

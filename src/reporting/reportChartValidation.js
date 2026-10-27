@@ -12,6 +12,7 @@ export class AuthoredReportChartValidationError extends Error {
 
 const bounded = value => typeof value === 'string' && value.length <= 128 ? value : '';
 function selectedField(chartSpec, field) {
+  if (field.startsWith('heatmap.')) return bounded(chartSpec?.heatmap?.[field.slice(8)]);
   if (field === 'xField' || field === 'seriesField') return bounded(chartSpec?.[field]);
   const index = /^yFields\.([0-9]+)$/.exec(field);
   return index ? bounded(chartSpec?.yFields?.[Number(index[1])]) : '';

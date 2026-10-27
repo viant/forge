@@ -1,3 +1,7 @@
+import {geoGeometrySchema, resolvedGeoGeometrySchema, geoConfigWithGeometry} from './geoGeometrySchema.js';
+import {chartConfigRequirements} from './chartConfigRequirements.js';
+import {categoryRangeSchema} from '../../components/categoryRange.js';
+import {heatmapSchema} from '../../components/categoricalHeatmap.js';
 import {kpiSparklineSchema} from '../reportKpiSparklineModel.js';
 export const reportSpecSchema = {
   $id: "report://schema/report-spec/v1",
@@ -714,12 +718,14 @@ export const reportSpecSchema = {
         color: { type: "string" },
       },
     },
-    geoConfig: {
+    geoConfig: geoConfigWithGeometry({
       type: "object",
       additionalProperties: false,
       required: ["key", "metric"],
       properties: {
-        shape: { enum: ["us-states", "us-state-tiles", "world"] },
+        shape: { enum: ["us-states", "us-state-tiles", "world", "geojson"] },
+        projection: {const: "planar"},
+        geometry: geoGeometrySchema,
         key: { type: "string" },
         codeKey: { type: "string" },
         regionKey: { type: "string" },
@@ -741,7 +747,7 @@ export const reportSpecSchema = {
         emptyColor: { type: "string" },
         color: { $ref: "#/$defs/geoColorConfig" },
       },
-    },
+    }),
     chartBlock: {
       type: "object",
       additionalProperties: false,
@@ -771,6 +777,7 @@ export const reportSpecSchema = {
       },
     },
     chartSpec: {
+      allOf: chartConfigRequirements,
       type: "object",
       additionalProperties: false,
       required: ["type", "xField", "yFields"],
@@ -783,6 +790,8 @@ export const reportSpecSchema = {
           items: { type: "string" },
         },
         type: { type: "string" },
+        heatmap: heatmapSchema,
+        categoryRange: categoryRangeSchema,
         appearance: {enum:["document"]},
         layout: {enum:["small-multiples"]},
         stacked: {type:"boolean"},
@@ -1029,11 +1038,14 @@ export const reportSpecSchema = {
       },
     },
     chartModel: {
+      allOf: chartConfigRequirements,
       type: "object",
       additionalProperties: false,
       required: ["type", "series"],
       properties: {
         type: { type: "string" },
+        heatmap: heatmapSchema,
+        categoryRange: categoryRangeSchema,
         appearance: {enum:["document"]},
         layout: {enum:["small-multiples"]},
         stacked: {type:"boolean"},

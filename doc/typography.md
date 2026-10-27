@@ -1,5 +1,11 @@
 # Shared design-system foundation
 
+Declared planar region maps use the shared `GeoGeometryMap` component with
+semantic typography and Button region selectors. See [the geometry contract and
+synthetic runnable example](geo-geometry.md) for Polygon/MultiPolygon shapes,
+keyboard selection, missing-value states, and matching canonical print paths.
+This opt-in map does not change the legacy world or US tile appearance.
+
 The renderer supplies generic behavior, semantic hooks and neutral fallback
 recipes. Workspaces supply palettes, font assets, reviewed values, business
 content and variant selection. Customer styling never belongs in shared code.
@@ -576,3 +582,22 @@ reports use the same placement. Changing placement must preserve filter values.
 
 These controls do not change producer authorization or query semantics. Legacy
 ReportBuilder drawer and sheet presentations remain outside this host migration.
+
+### Categorical matrix charts
+
+`chartSpec.type: heatmap` selects the shared categorical matrix primitive. Its
+explicit row/column domains and numeric scale are producer-authored; browser and
+canonical print share the matrix, colors and labels. The owning ChartSpecimen
+includes independently invented occupancy and signed-temperature examples.
+Cells consume the small role, retain complete accessible descriptions and keyboard
+focus, and scroll locally at narrow widths. See [the heatmap contract and limits](categorical-heatmap.md).
+
+### Category-local range charts
+
+`chartSpec.type: category-range` opts into declared scalar bars, intervals and
+comparator markers per category. The shared ChartSpecimen includes independently
+invented room temperatures and signed offsets in both orientations. All marks
+share one numeric extent; null endpoints remain unavailable. Labels and exact
+values use the small role, wrap and scroll locally, with complete accessible
+names and keyboard selection. Browser and canonical print use the same geometry.
+See [the range contract and migration limits](category-range.md).
