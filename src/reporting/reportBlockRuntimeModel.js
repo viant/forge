@@ -13,11 +13,17 @@ function cloneValue(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
 }
 
-export function normalizeReportRuntimeCondition(condition = null) {
+export function normalizeReportRuntimeCondition(condition = null, depth = 0) {
   if (!condition || typeof condition !== "object" || Array.isArray(condition)) {
     return null;
   }
+  if (depth > 16) return { all: [] };
   const normalized = cloneValue(condition);
+  if (Object.prototype.hasOwnProperty.call(normalized, "all")) {
+    normalized.all = Array.isArray(normalized.all) && normalized.all.length <= 32
+      ? normalized.all.map(child => normalizeReportRuntimeCondition(child, depth + 1) || { all: [] })
+      : [];
+  }
   const selector = normalizeString(normalized?.selector || normalized?.field || normalized?.key);
   if (selector.startsWith("dashboard.selection.")) {
     normalized.source = "selection";

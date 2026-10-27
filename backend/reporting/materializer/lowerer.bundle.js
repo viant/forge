@@ -57483,9 +57483,14 @@ ${indent}${end}`;
       }
     }
   };
-  var evaluateDashboardConditionSnapshot = (condition, snapshot) => {
+  var evaluateConditionNode = (condition, snapshot, depth, budget) => {
+    if (depth > 16 || --budget.remaining < 0) return false;
     if (!condition) {
       return true;
+    }
+    if (Object.prototype.hasOwnProperty.call(condition, "all")) {
+      if (!Array.isArray(condition.all) || condition.all.length === 0 || condition.all.length > 32) return false;
+      if (!condition.all.every((child) => child && typeof child === "object" && !Array.isArray(child) && evaluateConditionNode(child, snapshot, depth + 1, budget))) return false;
     }
     const value = pickConditionValue(condition, snapshot);
     if (condition.equals !== void 0 && value !== condition.equals) return false;
@@ -57503,6 +57508,7 @@ ${indent}${end}`;
     }
     return true;
   };
+  var evaluateDashboardConditionSnapshot = (condition, snapshot) => evaluateConditionNode(condition, snapshot, 0, { remaining: 128 });
   var evaluateDashboardCondition = (condition, scope) => {
     return evaluateDashboardConditionSnapshot(condition, createDashboardConditionSnapshot(scope));
   };
@@ -59129,11 +59135,15 @@ ${indent}${end}`;
   function cloneValue25(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
   }
-  function normalizeReportRuntimeCondition(condition = null) {
+  function normalizeReportRuntimeCondition(condition = null, depth = 0) {
     if (!condition || typeof condition !== "object" || Array.isArray(condition)) {
       return null;
     }
+    if (depth > 16) return { all: [] };
     const normalized = cloneValue25(condition);
+    if (Object.prototype.hasOwnProperty.call(normalized, "all")) {
+      normalized.all = Array.isArray(normalized.all) && normalized.all.length <= 32 ? normalized.all.map((child) => normalizeReportRuntimeCondition(child, depth + 1) || { all: [] }) : [];
+    }
     const selector = normalizeString36((normalized == null ? void 0 : normalized.selector) || (normalized == null ? void 0 : normalized.field) || (normalized == null ? void 0 : normalized.key));
     if (selector.startsWith("dashboard.selection.")) {
       normalized.source = "selection";

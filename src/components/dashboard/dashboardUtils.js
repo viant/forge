@@ -270,9 +270,15 @@ const pickConditionValue = (condition, snapshot) => {
     }
 };
 
-export const evaluateDashboardConditionSnapshot = (condition, snapshot) => {
+const evaluateConditionNode = (condition, snapshot, depth, budget) => {
+    if (depth > 16 || --budget.remaining < 0) return false;
     if (!condition) {
         return true;
+    }
+    if (Object.prototype.hasOwnProperty.call(condition, 'all')) {
+        if (!Array.isArray(condition.all) || condition.all.length === 0 || condition.all.length > 32) return false;
+        if (!condition.all.every(child => child && typeof child === 'object' && !Array.isArray(child)
+            && evaluateConditionNode(child, snapshot, depth + 1, budget))) return false;
     }
 
     const value = pickConditionValue(condition, snapshot);
@@ -293,6 +299,9 @@ export const evaluateDashboardConditionSnapshot = (condition, snapshot) => {
 
     return true;
 };
+
+export const evaluateDashboardConditionSnapshot = (condition, snapshot) =>
+    evaluateConditionNode(condition, snapshot, 0, {remaining: 128});
 
 export const evaluateDashboardCondition = (condition, scope) => {
     return evaluateDashboardConditionSnapshot(condition, createDashboardConditionSnapshot(scope));
