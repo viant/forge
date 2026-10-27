@@ -18,14 +18,14 @@ test('action freshness is cache expiry only, with a60second freshness budget and
  assert.equal(calls,1);
  assert.equal(expired.validUntil,new Date(now-1).toISOString(),'old pin is never extended locally');
 });
-test('changed identity, unchanged near-expiry grants and failed metadata reads never silently select a new definition',async()=>{
+test('changed identity, expired grants and failed metadata reads never silently select a new definition',async()=>{
  for(const field of ['providerIdentity','uri','kind','revision','contentFingerprint','authorityBinding']){
   let calls=0;
   await assert.rejects(freshReportActionPin(expired,async()=>{calls++;return {resource:{...pin,[field]:'different'}};},{now:()=>now}),/changed while it was open/);
   assert.equal(calls,1);
  }
  let calls=0;
- await assert.rejects(freshReportActionPin(expired,async()=>{calls++;return {resource:expired};},{now:()=>now}),/still expiring/);
+ await assert.rejects(freshReportActionPin(expired,async()=>{calls++;return {resource:expired};},{now:()=>now}),/expired or invalid/);
  assert.equal(calls,1);
  await assert.rejects(freshReportActionPin(expired,async()=>{throw new Error('upstream details');},{now:()=>now}),error=>error instanceof ReportMetadataRefreshError&&!error.message.includes('upstream details'));
 });
@@ -35,4 +35,26 @@ test('metadata settling after action cancellation cannot dispatch or substitute 
  const fresh=freshReportActionPin(expired,()=>pending,{now:()=>now,isCurrent:()=>current});
  current=false;resolve({resource:pin});
  assert.equal(await fresh,null);
+});
+
+test('one trusted refresh accepts short unexpired grants without applying the cache budget again',async()=>{
+ for(const remaining of [3_000,30_000,59_000]){
+  const short={...pin,validUntil:new Date(now+remaining).toISOString()};let calls=0;
+  assert.equal(reportActionNeedsMetadataRefresh(short,now),true);
+  const selected=await freshReportActionPin(expired,async()=>{calls++;return {resource:short};},{now:()=>now});
+  assert.deepEqual(selected,short);assert.equal(calls,1);
+  assert.equal(selected.validUntil,short.validUntil,'the browser cannot extend the new server deadline');
+ }
+ for(const validUntil of [undefined,'0001-01-01T00:00:00Z']){
+  let calls=0;
+  const selected=await freshReportActionPin(expired,async()=>{calls++;return {resource:{...pin,validUntil}};},{now:()=>now});
+  assert.equal(selected.validUntil,validUntil);assert.equal(calls,1);
+ }
+});
+test('expired and malformed fresh deadlines stop after one metadata read',async()=>{
+ for(const validUntil of [new Date(now-1).toISOString(),new Date(now).toISOString(),'invalid','2030','',now+30_000]){
+  let calls=0;
+  await assert.rejects(freshReportActionPin(expired,async()=>{calls++;return {resource:{...pin,validUntil}};},{now:()=>now}),/expired or invalid/);
+  assert.equal(calls,1);
+ }
 });

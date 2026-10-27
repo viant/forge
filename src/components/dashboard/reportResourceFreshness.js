@@ -31,6 +31,12 @@ export async function freshReportActionPin(pin, getReport, {isCurrent=()=>true, 
     if (!isCurrent()) return null;
     const fresh = saved?.resource;
     if (!sameReportActionIdentity(pin,fresh)) throw new ReportMetadataRefreshError('This report changed while it was open. Refresh or reopen it before continuing.');
-    if (reportActionNeedsMetadataRefresh(fresh,now())) throw new ReportMetadataRefreshError('Report details are still expiring. Refresh or reopen this report before continuing.');
+    // The budget only triggers a cache refresh. Once the server has selected
+    // metadata, its remaining unexpired deadline governs this new action.
+    const until = fresh.validUntil;
+    const notificationBound = until == null || typeof until === 'string' && /^0001-01-01T00:00:00(?:\.0+)?Z$/.test(until);
+    const timestamp = typeof until === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(until);
+    const expires = timestamp ? Date.parse(until) : NaN;
+    if (!notificationBound && (!Number.isFinite(expires) || expires <= now())) throw new ReportMetadataRefreshError('Report details are expired or invalid. Refresh or reopen this report before continuing.');
     return clone(fresh);
 }
