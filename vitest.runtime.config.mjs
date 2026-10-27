@@ -28,6 +28,7 @@ export default defineConfig({
       'src/components/dashboard/ReportPrintPreview.render.test.jsx',
       'src/components/dashboard/reportBuilderConcurrentRead.render.test.jsx',
       'src/components/WindowContentMount.render.test.jsx',
+      'src/components/WindowContent.reconnect.render.test.jsx',
       'src/components/WorkspaceRuntimeSurface.render.test.jsx',
       'src/components/WorkspaceRefresh.render.test.jsx',
       'src/components/WindowContent.nestedTabFetch.render.test.jsx',
