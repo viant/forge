@@ -165,7 +165,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
     const [popupContent, setPopupContent] = useState("");
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    const savedViews = useTableViews({adapter: services.tableViews, config: container.table?.savedViews, active: isSettingsOpen});
+    const savedViews = useTableViews({adapter: services.tableViews, context, config: container.table?.savedViews, active: isSettingsOpen});
     const [horizontalOverflow, setHorizontalOverflow] = useState({left: false, right: false, cueTop: null});
     const { collection: collectionData, loading, error } = useDataSourceState(context);
     const collection = collectionData; // keep old variable name for compatibility

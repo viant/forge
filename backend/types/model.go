@@ -1421,7 +1421,15 @@ type TableSort struct {
 
 // TableSavedViews selects the host's actor-scoped named preference collection.
 type TableSavedViews struct {
-	Key string `json:"key" yaml:"key"`
+	Key     string            `json:"key" yaml:"key"`
+	Actions *TableViewActions `json:"actions,omitempty" yaml:"actions,omitempty"`
+}
+
+// TableViewActions resolves application-authored functions through the window context.
+type TableViewActions struct {
+	List   string `json:"list,omitempty" yaml:"list,omitempty"`
+	Save   string `json:"save,omitempty" yaml:"save,omitempty"`
+	Remove string `json:"remove,omitempty" yaml:"remove,omitempty"`
 }
 
 type TableFormattingRule struct {
