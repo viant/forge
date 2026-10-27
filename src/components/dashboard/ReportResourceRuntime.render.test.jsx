@@ -505,3 +505,28 @@ it('never refreshes or replays an already dispatched run when its cached metadat
         expect(getReport).not.toHaveBeenCalled();expect(run).toHaveBeenCalledTimes(1);
     } finally {await view.close();vi.useRealTimers();}
 });
+
+it.each([30_000,59_000])('dispatches once after accepting a new server grant with %ims remaining',async(remaining)=>{
+    vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(clockStart);
+    const initial=timedPin(clockStart-1),short=timedPin(clockStart+remaining);
+    const getReport=vi.fn().mockResolvedValue({resource:short});
+    const run=vi.fn(request=>Promise.resolve(result(request.resolvedResource)));
+    const view=await mount(run,{reportResource:initial,executeOnOpen:true},{getReport});
+    try {
+        expect(getReport).toHaveBeenCalledTimes(1);expect(run).toHaveBeenCalledTimes(1);
+        expect(run.mock.calls[0][0].resolvedResource).toEqual(short);
+        expect(view.host.querySelector('output')?.textContent).toBe('Server report');
+        await view.render();expect(getReport).toHaveBeenCalledTimes(1);expect(run).toHaveBeenCalledTimes(1);
+    } finally {await view.close();vi.useRealTimers();}
+});
+it.each(['expired','malformed'])('rejects an %s fresh response before dispatch without retrying metadata',async(condition)=>{
+    vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(clockStart);
+    const initial=timedPin(clockStart-1),invalid={...initial,validUntil:condition==='expired'?initial.validUntil:'invalid'};
+    const getReport=vi.fn().mockResolvedValue({resource:invalid}),run=vi.fn();
+    const view=await mount(run,{reportResource:initial,executeOnOpen:true},{getReport});
+    try {
+        expect(getReport).toHaveBeenCalledTimes(1);expect(run).not.toHaveBeenCalled();
+        expect(view.host.textContent).toContain('Report details are expired or invalid.');
+        await view.render();expect(getReport).toHaveBeenCalledTimes(1);expect(run).not.toHaveBeenCalled();
+    } finally {await view.close();vi.useRealTimers();}
+});

@@ -39,9 +39,11 @@ lease caps.
 
 The browser compares provider, URI, lifecycle, revision, content fingerprint and
 authority binding before starting exactly one action with the new pin. Changed
-metadata asks the user to refresh or reopen the report. A response still within
-the freshness budget also asks for a refresh; it causes no second metadata read
-or tool replay. The UI displays “Refreshing report details” while waiting.
+metadata asks the user to refresh or reopen the report. The sixty-second budget
+only triggers the initial cache refresh. A same-identity refreshed server grant
+is accepted while its deadline remains unexpired, including grants with thirty
+to fifty-nine seconds remaining. Expired or malformed fresh responses ask for a
+refresh; they cause no second metadata read or tool replay. The UI displays “Refreshing report details” while waiting.
 Parameters, selected table and chart choices belong to the captured action and
 remain intact. Print validates its response against the new action pin.
 
