@@ -1,8 +1,11 @@
+import {buildChartTooltipEntries,chartTooltipPieFields} from '../components/chartTooltip.js';
+import {resolveDonutCenter} from '../components/donutCenter.js';
 import {buildCategoryRange,categoryRangeFields} from '../components/categoryRange.js';
 import {buildHeatmap} from '../components/categoricalHeatmap.js';
 import {
   aggregateDirectSeriesData,
   buildPieChartData,
+  chartCategoryRowOptions,
   materializeChartDisplayRows,
   normalizeChartKey,
   transformData,
@@ -26,7 +29,7 @@ function cloneChartRows(rows = []) {
   return (Array.isArray(rows) ? rows : []).map((row) => cloneValue(row));
 }
 
-export function buildReportFillChartPayload(chart = {}, rows = []) {
+function buildBaseReportFillChartPayload(chart = {}, rows = []) {
   const type = normalizeString(chart?.type).toLowerCase();
   if(type === "category-range") {
     const model=buildCategoryRange(chart.categoryRange,rows);
@@ -36,19 +39,21 @@ export function buildReportFillChartPayload(chart = {}, rows = []) {
     buildHeatmap(chart.heatmap,rows);
     return {kind:"heatmap",type,seriesKeys:[chart.heatmap.valueField],rows:cloneChartRows(rows)};
   }
+  const center=resolveDonutCenter(chart.center,rows,type);
   const chartRows = materializeChartDisplayRows(chart, rows);
-  if (!type || chartRows.length === 0) {
+  if (!type || (chartRows.length === 0&&!center)) {
     return null;
   }
   if (type === "pie" || type === "donut") {
-    const nameKey = normalizeString(chart?.series?.nameKey || "name");
-    const valueKey = normalizeString(chart?.series?.valueKey || "value");
+    const nameKey = normalizeString(chart.tooltip ? chartTooltipPieFields(chart).nameKey : chart?.series?.nameKey || "name");
+    const valueKey = normalizeString(chart.tooltip ? chartTooltipPieFields(chart).valueKey : chart?.series?.valueKey || "value");
     if (!nameKey || !valueKey) {
       return null;
     }
-    const resolvedRows = buildPieChartData(chartRows, nameKey, valueKey);
+    const resolvedRows = buildPieChartData(chartRows, nameKey, valueKey, chartCategoryRowOptions(chart));
     return {
       kind: "category",
+      ...(center?{center}:{}),
       type,
       nameKey,
       valueKey,
@@ -90,4 +95,15 @@ export function buildReportFillChartPayload(chart = {}, rows = []) {
     rows: cloneChartRows(data),
     seriesKeys: Array.isArray(keys) ? keys.map((entry) => String(entry)) : [],
   };
+}
+
+export function buildReportFillChartPayload(chart = {}, rows = []) {
+  // An authored chart may not compile yet; retain the legacy absent-model result.
+  if (chart == null) return null;
+  const result = buildBaseReportFillChartPayload(chart, rows);
+  if(chart.tooltip) {
+    const tooltipEntries=buildChartTooltipEntries(chart,rows);
+    if(result)return {...result,tooltipEntries};
+  }
+  return result;
 }

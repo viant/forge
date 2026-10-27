@@ -3,6 +3,7 @@ package xlsx
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/viant/forge/backend/reporting/tablemeta"
 	"math"
 	"strconv"
 	"strings"
@@ -72,7 +73,7 @@ func Render(report *reportfill.ReportFill) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err := workbook.SetCellStr(sheetName, cellName, strings.TrimSpace(column.Label)); err != nil {
+		if err := workbook.SetCellStr(sheetName, cellName, tablemeta.Header(strings.TrimSpace(column.Label), column.Key, block.Content.ColumnGroups)); err != nil {
 			return nil, err
 		}
 		if err := workbook.SetCellStyle(sheetName, cellName, cellName, headerStyle); err != nil {

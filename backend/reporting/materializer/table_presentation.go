@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/viant/forge/backend/reporting/tablemeta"
 )
 
 var ErrTablePresentation = errors.New("invalid report table presentation")
@@ -14,8 +15,9 @@ var ErrTablePresentation = errors.New("invalid report table presentation")
 type TablePresentations map[string]TablePresentation
 
 type TablePresentation struct {
-	Filter string     `json:"filter,omitempty"`
-	Sort   *TableSort `json:"sort,omitempty"`
+	ExpandedKeys []string   `json:"expandedKeys,omitempty"`
+	Filter       string     `json:"filter,omitempty"`
+	Sort         *TableSort `json:"sort,omitempty"`
 }
 
 type TableSort struct {
@@ -41,9 +43,11 @@ func ValidateTablePresentations(spec json.RawMessage, presentations TablePresent
 	}
 	var document struct {
 		Blocks []struct {
-			ID      string `json:"id"`
-			Kind    string `json:"kind"`
-			Columns []struct {
+			ID        string               `json:"id"`
+			Hierarchy *tablemeta.Hierarchy `json:"hierarchy,omitempty"`
+			Pivot     *tablemeta.Pivot     `json:"pivot,omitempty"`
+			Kind      string               `json:"kind"`
+			Columns   []struct {
 				Key string `json:"key"`
 			} `json:"columns"`
 		} `json:"blocks"`
@@ -59,6 +63,17 @@ func ValidateTablePresentations(spec json.RawMessage, presentations TablePresent
 		columns := make(map[string]bool)
 		for _, column := range block.Columns {
 			columns[column.Key] = true
+		}
+		if block.Pivot != nil {
+			columns = make(map[string]bool)
+			for _, field := range block.Pivot.RowFields {
+				columns[field] = true
+			}
+			for c := range block.Pivot.ColumnCategories {
+				for m := range block.Pivot.Values {
+					columns[fmt.Sprintf("__forge_pivot_%d_%d", c, m)] = true
+				}
+			}
 		}
 		tables[block.ID] = columns
 	}

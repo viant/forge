@@ -109,7 +109,7 @@ func validateSVGAttribute(attr xml.Attr) error {
 		valid = value == "butt" || value == "round" || value == "square"
 	case "stroke-linejoin":
 		valid = value == "miter" || value == "round" || value == "bevel"
-	case "id":
+	case "id", "class":
 		valid = svgIdentifier.MatchString(value)
 	case "style":
 		valid = validateSVGStyle(value)

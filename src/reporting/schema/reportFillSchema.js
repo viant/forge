@@ -1,3 +1,6 @@
+import {hierarchySchema,pivotSchema,columnGroupsSchema} from '../reportTableAnalytics.js';
+import {chartTooltipSchema,chartTooltipEntrySchema} from '../../components/chartTooltip.js';
+import {donutCenterSchema,resolvedDonutCenterSchema} from '../../components/donutCenter.js';
 import {geoGeometrySchema, resolvedGeoGeometrySchema, geoConfigWithGeometry} from './geoGeometrySchema.js';
 import {chartConfigRequirements} from './chartConfigRequirements.js';
 import {categoryRangeSchema} from '../../components/categoryRange.js';
@@ -701,7 +704,7 @@ export const reportFillSchema = {
     },
     resolvedChart: {
       anyOf: [
-        ...["heatmap","category-range"].map(kind=>({type:"object",additionalProperties:false,required:["kind","type","seriesKeys","rows"],properties:{kind:{const:kind},type:{const:kind},seriesKeys:{type:"array",items:{type:"string"}},rows:{type:"array",items:{$ref:"#/$defs/jsonObject"}}}})),
+        ...["heatmap","category-range"].map(kind=>({type:"object",additionalProperties:false,required:["kind","type","seriesKeys","rows"],properties:{tooltipEntries:{type:"array",items:chartTooltipEntrySchema},kind:{const:kind},type:{const:kind},seriesKeys:{type:"array",items:{type:"string"}},rows:{type:"array",items:{$ref:"#/$defs/jsonObject"}}}})),
         { type: "null" },
         {
           type: "object",
@@ -709,6 +712,8 @@ export const reportFillSchema = {
           required: ["kind", "type", "nameKey", "valueKey", "rows", "seriesKeys"],
           properties: {
             kind: { const: "category" },
+            tooltipEntries: {type:"array",items:chartTooltipEntrySchema},
+            center: resolvedDonutCenterSchema,
             type: { type: "string" },
             nameKey: { type: "string" },
             valueKey: { type: "string" },
@@ -725,6 +730,7 @@ export const reportFillSchema = {
           required: ["kind", "type", "xAxisKey", "seriesKeys", "rows"],
           properties: {
             kind: { const: "directSeries" },
+            tooltipEntries: {type:"array",items:chartTooltipEntrySchema},
             type: { type: "string" },
             nameKey: { type: "string" },
             valueKey: { type: "string" },
@@ -742,6 +748,7 @@ export const reportFillSchema = {
           required: ["kind", "type", "xAxisKey", "nameKey", "valueKey", "rows", "seriesKeys"],
           properties: {
             kind: { const: "groupedSeries" },
+            tooltipEntries: {type:"array",items:chartTooltipEntrySchema},
             type: { type: "string" },
             xAxisKey: { type: "string" },
             nameKey: { type: "string" },
@@ -854,10 +861,12 @@ export const reportFillSchema = {
       ],
     },
     tableBlock: {
+      allOf:[{if:{type:'object',required:['hierarchy']},then:{properties:{pivot:{type:'null'},recordTitleField:{type:'null'}}}},{if:{type:'object',required:['pivot']},then:{properties:{hierarchy:{type:'null'},selection:{type:'null'},columnGroups:{type:'null'},recordTitleField:{type:'null'}}}}],
       type: "object",
       additionalProperties: false,
       required: ["id", "kind", "datasetRef", "columns", "content"],
       properties: {
+        hierarchy:hierarchySchema, pivot:pivotSchema, columnGroups:columnGroupsSchema,
         id: { type: "string" },
         kind: { const: "tableBlock" },
         runtime: { $ref: "#/$defs/jsonObject" },
@@ -882,6 +891,7 @@ export const reportFillSchema = {
           additionalProperties: false,
           required: ["columns", "rowCount", "resolvedRows"],
           properties: {
+            columnGroups:columnGroupsSchema,
             columns: {
               type: "array",
               items: { $ref: "#/$defs/tableColumn" },
@@ -927,6 +937,7 @@ export const reportFillSchema = {
       additionalProperties: false,
       required: ["type", "xField", "yFields"],
       properties: {
+        tooltip: chartTooltipSchema,
         title: { type: "string" },
         eyebrow: { type: "string" },
         accentTone: { type: "string" },
@@ -937,6 +948,7 @@ export const reportFillSchema = {
         type: { type: "string" },
         heatmap: heatmapSchema,
         categoryRange: categoryRangeSchema,
+        center: donutCenterSchema,
         appearance: {enum:["document"]},
         layout: {enum:["small-multiples"]},
         stacked: {type:"boolean"},
@@ -1186,9 +1198,11 @@ export const reportFillSchema = {
       additionalProperties: false,
       required: ["type", "series"],
       properties: {
+        tooltip: chartTooltipSchema,
         type: { type: "string" },
         heatmap: heatmapSchema,
         categoryRange: categoryRangeSchema,
+        center: donutCenterSchema,
         appearance: {enum:["document"]},
         layout: {enum:["small-multiples"]},
         stacked: {type:"boolean"},

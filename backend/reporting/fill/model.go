@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/viant/forge/backend/reporting/tablemeta"
 	"io"
 	"reflect"
 	"sort"
@@ -110,6 +111,10 @@ type Provenance struct {
 }
 
 type Block struct {
+	Hierarchy    *tablemeta.Hierarchy    `json:"hierarchy,omitempty"`
+	Pivot        *tablemeta.Pivot        `json:"pivot,omitempty"`
+	ColumnGroups []tablemeta.ColumnGroup `json:"columnGroups,omitempty"`
+
 	ID                       string                `json:"id"`
 	Kind                     string                `json:"kind"`
 	Title                    string                `json:"title,omitempty"`
@@ -205,9 +210,10 @@ type TableColumn struct {
 }
 
 type TableContent struct {
-	Columns      []TableColumn      `json:"columns"`
-	RowCount     int                `json:"rowCount"`
-	ResolvedRows []ResolvedTableRow `json:"resolvedRows"`
+	ColumnGroups []tablemeta.ColumnGroup `json:"columnGroups,omitempty"`
+	Columns      []TableColumn           `json:"columns"`
+	RowCount     int                     `json:"rowCount"`
+	ResolvedRows []ResolvedTableRow      `json:"resolvedRows"`
 }
 
 type ResolvedTableRow struct {
@@ -252,13 +258,39 @@ type ChartContent struct {
 }
 
 type ResolvedChart struct {
-	Kind       string           `json:"kind"`
-	Type       string           `json:"type"`
-	NameKey    string           `json:"nameKey,omitempty"`
-	ValueKey   string           `json:"valueKey,omitempty"`
-	XAxisKey   string           `json:"xAxisKey,omitempty"`
-	SeriesKeys []string         `json:"seriesKeys"`
-	Rows       []map[string]any `json:"rows"`
+	TooltipEntries []ChartTooltipEntry `json:"tooltipEntries,omitempty"`
+	Center         *DonutCenter        `json:"center,omitempty"`
+	Kind           string              `json:"kind"`
+	Type           string              `json:"type"`
+	NameKey        string              `json:"nameKey,omitempty"`
+	ValueKey       string              `json:"valueKey,omitempty"`
+	XAxisKey       string              `json:"xAxisKey,omitempty"`
+	SeriesKeys     []string            `json:"seriesKeys"`
+	Rows           []map[string]any    `json:"rows"`
+}
+
+type ChartTooltipEntry struct {
+	ID          string              `json:"id"`
+	Category    string              `json:"category"`
+	SeriesKey   string              `json:"seriesKey"`
+	SeriesLabel string              `json:"seriesLabel"`
+	RowCount    int                 `json:"rowCount"`
+	Fields      []ChartTooltipField `json:"fields"`
+}
+
+type ChartTooltipField struct {
+	Field        string `json:"field"`
+	Label        string `json:"label"`
+	DisplayValue string `json:"displayValue"`
+	Aggregate    string `json:"aggregate"`
+	State        string `json:"state"`
+}
+
+type DonutCenter struct {
+	Label          string   `json:"label"`
+	Value          *float64 `json:"value"`
+	FormattedValue string   `json:"formattedValue"`
+	Scope          string   `json:"scope"`
 }
 
 type GeoContent struct {
@@ -548,6 +580,10 @@ type rawBlockHeader struct {
 }
 
 type rawTableBlock struct {
+	Hierarchy    *tablemeta.Hierarchy    `json:"hierarchy,omitempty"`
+	Pivot        *tablemeta.Pivot        `json:"pivot,omitempty"`
+	ColumnGroups []tablemeta.ColumnGroup `json:"columnGroups,omitempty"`
+
 	ID               string        `json:"id"`
 	Kind             string        `json:"kind"`
 	Title            string        `json:"title,omitempty"`
@@ -862,7 +898,8 @@ func decodeJSON(data []byte, datasourceRequests bool) (*ReportFill, error) {
 				return nil, fmt.Errorf("decode reportFill.blocks[%d] tableBlock: %w", index, err)
 			}
 			fill.Blocks = append(fill.Blocks, Block{
-				ID:               tableBlock.ID,
+				ID:        tableBlock.ID,
+				Hierarchy: tableBlock.Hierarchy, Pivot: tableBlock.Pivot, ColumnGroups: tableBlock.ColumnGroups,
 				Kind:             tableBlock.Kind,
 				Title:            tableBlock.Title,
 				AccentTone:       tableBlock.AccentTone,
@@ -1302,6 +1339,15 @@ func (r *ReportFill) Validate() error {
 			return fmt.Errorf("reportFill.blocks[%d].kind is required", index)
 		}
 		if strings.TrimSpace(block.Kind) == "tableBlock" {
+			{
+				keys := make([]string, len(block.Columns))
+				for i, column := range block.Columns {
+					keys[i] = column.Key
+				}
+				if err := tablemeta.Validate(block.Hierarchy, block.Pivot, block.ColumnGroups, keys); err != nil {
+					return err
+				}
+			}
 			if strings.TrimSpace(block.DatasetRef) == "" {
 				return fmt.Errorf("reportFill.blocks[%d].datasetRef is required for tableBlock", index)
 			}
@@ -1321,6 +1367,15 @@ func (r *ReportFill) Validate() error {
 			}
 			if block.Content == nil {
 				return fmt.Errorf("reportFill.blocks[%d].content is required for tableBlock", index)
+			}
+			{
+				keys := make([]string, len(block.Content.Columns))
+				for i, column := range block.Content.Columns {
+					keys[i] = column.Key
+				}
+				if err := tablemeta.Validate(nil, nil, block.Content.ColumnGroups, keys); err != nil {
+					return err
+				}
 			}
 			if len(block.Content.Columns) == 0 {
 				return fmt.Errorf("reportFill.blocks[%d].content.columns must not be empty for tableBlock", index)
@@ -1419,7 +1474,7 @@ func (r *ReportFill) Validate() error {
 			if block.ChartContent.ResolvedChart.SeriesKeys == nil {
 				return fmt.Errorf("reportFill.blocks[%d].content.resolvedChart.seriesKeys is required for chartBlock", index)
 			}
-			if len(block.ChartContent.ResolvedChart.SeriesKeys) == 0 {
+			if len(block.ChartContent.ResolvedChart.SeriesKeys) == 0 && !(block.ChartContent.ResolvedChart.Type == "donut" && block.ChartContent.ResolvedChart.Center != nil && len(block.ChartContent.ResolvedChart.Rows) == 0) {
 				return fmt.Errorf("reportFill.blocks[%d].content.resolvedChart.seriesKeys must not be empty for chartBlock", index)
 			}
 			for seriesIndex, seriesKey := range block.ChartContent.ResolvedChart.SeriesKeys {
@@ -1429,6 +1484,14 @@ func (r *ReportFill) Validate() error {
 			}
 			if block.ChartContent.ResolvedChart.Rows == nil {
 				return fmt.Errorf("reportFill.blocks[%d].content.resolvedChart.rows is required for chartBlock", index)
+			}
+			if center := block.ChartContent.ResolvedChart.Center; center != nil {
+				if block.ChartContent.ResolvedChart.Type != "donut" || center.Scope != "dataset" || strings.TrimSpace(center.Label) == "" {
+					return fmt.Errorf("reportFill donut center requires donut type, label and dataset scope")
+				}
+			}
+			if err := validateChartTooltipEntries(block.ChartContent.ResolvedChart.TooltipEntries); err != nil {
+				return err
 			}
 			switch strings.TrimSpace(block.ChartContent.ResolvedChart.Kind) {
 			case "category-range":

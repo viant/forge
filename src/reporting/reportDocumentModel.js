@@ -1,3 +1,5 @@
+import {chartTooltipFields} from '../components/chartTooltip.js';
+import {tableAnalyticsFields} from './reportTableAnalytics.js';
 import {buildGeoGeometry} from './geoGeometry.js';
 import {categoryRangeFields} from '../components/categoryRange.js';
 import {normalizeReportViewerSettings} from './reportViewerSettings.js';
@@ -231,9 +233,11 @@ function buildAuthoredChartBlockState(baseState = {}, chartSpec = {}, fieldCatal
     }
   };
   if(chartSpec?.categoryRange) {addSelection(chartSpec.categoryRange.categoryField);categoryRangeFields(chartSpec.categoryRange).forEach(addSelection);}
+  chartTooltipFields(chartSpec?.tooltip).forEach(addSelection);
   addSelection(chartSpec?.heatmap?.rowField);
   addSelection(chartSpec?.heatmap?.columnField);
   addSelection(chartSpec?.heatmap?.valueField);
+  addSelection(chartSpec?.center?.value?.field);
   addSelection(chartSpec?.xField);
   addSelection(chartSpec?.seriesField);
   normalizeStringArray(chartSpec?.yFields).forEach((fieldKey) => addSelection(fieldKey));
@@ -249,6 +253,7 @@ function buildAuthoredTableBlock(block = {}, fieldCatalog = {}) {
   if (!normalizedBlock) {
     return null;
   }
+  for(const field of tableAnalyticsFields(normalizedBlock))if(!resolveReportBuilderCatalogEntry(fieldCatalog,field))throw new Error(`Analytical table field ${field} must be declared by its dataset catalog.`);
   const columns = Array.isArray(normalizedBlock?.columns) ? normalizedBlock.columns : [];
   normalizedBlock.columns = columns.map((column) => {
     const normalizedColumn = column && typeof column === "object" && !Array.isArray(column)
@@ -598,7 +603,9 @@ function augmentReportRequestForAuthoredBlocks(baseSpec = {}, blocks = [], confi
     }
     switch (normalizeString(normalizedBlock?.kind)) {
       case "chartBlock":
+        for(const field of chartTooltipFields(normalizedBlock?.chartSpec?.tooltip)) enableField(field,normalizedDatasetRef,request);
         if(normalizedBlock?.chartSpec?.categoryRange) for(const field of [normalizedBlock.chartSpec.categoryRange.categoryField,...categoryRangeFields(normalizedBlock.chartSpec.categoryRange)]) enableField(field,normalizedDatasetRef,request);
+        enableField(normalizedBlock?.chartSpec?.center?.value?.field,normalizedDatasetRef,request);
         for (const key of ["rowField","columnField","valueField"]) enableField(normalizedBlock?.chartSpec?.heatmap?.[key], normalizedDatasetRef, request);
         enableField(normalizedBlock?.chartSpec?.xField, normalizedDatasetRef, request);
         normalizeString(normalizedBlock?.chartSpec?.seriesField)
@@ -629,6 +636,7 @@ function augmentReportRequestForAuthoredBlocks(baseSpec = {}, blocks = [], confi
         });
         break;
       case "tableBlock":
+        tableAnalyticsFields(normalizedBlock).forEach(field=>enableField(field,normalizedDatasetRef,request));
         (Array.isArray(normalizedBlock?.columns) ? normalizedBlock.columns : []).forEach((column) => {
           enableField(column?.key, normalizedDatasetRef, request);
           enableField(column?.cellVisual?.valueField, normalizedDatasetRef, request);

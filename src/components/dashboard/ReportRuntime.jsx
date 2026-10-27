@@ -1,6 +1,7 @@
+import {mergeHierarchySelections} from '../../reporting/reportTableAnalytics.js';
 import GeoGeometryMap from './GeoGeometryMap.jsx';
 import {resolveReportRuntimeChartRowLimit} from '../chartAppearance.js';
-import {buildRuntimeTableRows} from "../../reporting/reportRuntimeTableRows.js";
+import {buildRuntimeTableRows,buildAnalyticalRuntimeTableRows} from "../../reporting/reportRuntimeTableRows.js";
 import ReportDatasetPager from "./ReportDatasetPager.jsx";
 import {normalizeReportViewerSettings, resolveReportChartTableSwitch} from "../../reporting/reportViewerSettings.js";
 import {DocumentPresentationContext} from '../documentPresentation.js';
@@ -2277,6 +2278,7 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, on
     rowCount: Number(block?.content?.rowCount ?? dataset?.provenance?.rowCount ?? 0) || 0,
     filter: initialPresentationState?.filter || "",
     sort: initialPresentationState?.sort || null,
+    expandedKeys:initialPresentationState?.expandedKeys || authoredBlock.hierarchy?.defaultExpandedKeys || [],
   }));
   const handleTablePresentationChange = useCallback((next = {}) => {
     setTablePresentation((current) => {
@@ -2285,20 +2287,25 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, on
       const nextSort = next?.sort || null;
       if (
         current.rowCount === nextRowCount
+        && current.rootCount === next.rootCount
+        && current.visibleRootCount === next.visibleRootCount
+        && current.visibleRowCount === next.visibleRowCount
         && current.filter === nextFilter
+        && JSON.stringify(current.expandedKeys) === JSON.stringify(next.expandedKeys || [])
         && JSON.stringify(current.sort) === JSON.stringify(nextSort)
       ) {
         return current;
       }
-      return { rowCount: nextRowCount, filter: nextFilter, sort: nextSort };
+      return { rowCount: nextRowCount, filter: nextFilter, sort: nextSort,expandedKeys:next.expandedKeys || [],rootCount:next.rootCount,visibleRootCount:next.visibleRootCount,visibleRowCount:next.visibleRowCount };
     });
   }, []);
   useEffect(() => {
     onTablePresentationChange?.(block.id, {
       filter: tablePresentation.filter,
+      ...(authoredBlock.hierarchy?{expandedKeys:tablePresentation.expandedKeys}:{}),
       sort: tablePresentation.sort ? {key: tablePresentation.sort.key, direction: tablePresentation.sort.direction} : null,
     });
-  }, [block.id, tablePresentation.filter, tablePresentation.sort, onTablePresentationChange]);
+  }, [block.id, tablePresentation.filter, tablePresentation.sort, tablePresentation.expandedKeys, onTablePresentationChange]);
   if (invalidDiagnostic) {
     return (
       <RuntimePanel
@@ -2318,14 +2325,15 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, on
     fields: refinementFields,
     providerActionsByField,
   });
-  const runtimeTableRows = buildRuntimeTableRows(block, dataset);
-  const collapsedPreviewLimit = Math.min(5, runtimeTableRows.length);
+  const runtimeTableRows = authoredBlock.hierarchy || authoredBlock.pivot ? buildAnalyticalRuntimeTableRows({...block,hierarchy:authoredBlock.hierarchy,pivot:authoredBlock.pivot},sourceRows,dataset.rows || []) : buildRuntimeTableRows(block, dataset);
+  const hierarchyRootCount=authoredBlock.hierarchy ? runtimeTableRows.filter(row=>row[authoredBlock.hierarchy.parentField]===null).length : 0;
+  const collapsedPreviewLimit = Math.min(5, authoredBlock.hierarchy?hierarchyRootCount:runtimeTableRows.length);
   // Display paging is only for a complete result already held by this report.
   // Partial results keep their host-owned ReportDatasetPager below the table.
   const locallyComplete = dataset?.provenance?.hasMore === false
     && dataset?.provenance?.truncated !== true
     && !(Number(page?.offset) > 0);
-  const canPaginate = collapsible && locallyComplete && runtimeTableRows.length > 25;
+  const canPaginate = collapsible && locallyComplete && (authoredBlock.hierarchy?hierarchyRootCount:runtimeTableRows.length) > 25;
   const localPaging = canPaginate && paginating;
   const rowActions = tableInteractionState.actions
     .filter((action) => supportsReportRuntimeExecution(action, runtimeHandlers))
@@ -2393,7 +2401,9 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, on
       <BlockDiagnosticsCallout diagnostics={diagnostics} onRetryProviderActions={onRetryProviderActions} providerActionsLoading={providerActionsLoading} />
       {collapsible && collapsed && !localPaging ? (
         <div className="forge-report-runtime-table-collapsed-summary" aria-live="polite" style={{ display: "flex", flexWrap: "wrap", gap: 8, fontSize: "var(--forge-report-type-small-size, 12px)", lineHeight: "var(--forge-report-type-small-line-height, normal)", color: "var(--forge-report-text-muted, #5f6b7c)" }}>
-          <span>{locallyComplete
+          <span>{authoredBlock.hierarchy
+            ? `Showing ${tablePresentation.visibleRootCount ?? collapsedPreviewLimit} of ${tablePresentation.rootCount ?? hierarchyRootCount} root groups (${tablePresentation.visibleRowCount ?? 0} visible rows)`
+            : locallyComplete
             ? `Showing ${collapsedPreviewLimit} of ${runtimeTableRows.length} ${runtimeTableRows.length === 1 ? "row" : "rows"}`
             : `Showing ${collapsedPreviewLimit} of ${runtimeTableRows.length} rows on this page${dataset?.provenance?.hasMore === true ? "; more available" : ""}`}</span>
           {tablePresentation.sort ? <span>Sorted by {tablePresentation.sort.label} ({tablePresentation.sort.direction})</span> : null}
@@ -2410,11 +2420,12 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, on
       >
       {authoredBlock.selection?.mode === 'checkbox' ? <ReviewTable
         id={block.id} rows={runtimeTableRows} columns={columns} selectionField={authoredBlock.selection.field}
+        initialPresentationState={initialPresentationState}
         selectionLabelFields={authoredBlock.selection.labelFields}
         onRowsChange={runtimeHandlers?.onTableReviewChange ? rows => runtimeHandlers.onTableReviewChange({
-          blockId:block.id, selection:mergeReportTableSelections(sourceRows, dataset.rows, rows, authoredBlock.selection.field),
+          blockId:block.id, selection:authoredBlock.hierarchy?mergeHierarchySelections(sourceRows,rows,authoredBlock.hierarchy,authoredBlock.selection.field):mergeReportTableSelections(sourceRows, dataset.rows, rows, authoredBlock.selection.field),
         }) : undefined} locale={locale} onPresentationStateChange={handleTablePresentationChange}
-        container={{dashboard:{table:{rowActions,quickFilter:true}}}}/>
+        container={{dashboard:{table:{rowActions,quickFilter:true,hierarchy:authoredBlock.hierarchy,analyticsMaterialized:true,hierarchyRootLimit:collapsed&&!localPaging?5:undefined,forceHierarchyExpansion:dataset.rows.length<sourceRows.length,columnGroups:block.content?.columnGroups || authoredBlock.columnGroups}}}}/>
         : <DashboardTableContent
         container={{
           id: block.id,
@@ -2425,6 +2436,13 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, on
           dashboard: {
             table: {
               columns,
+              quickFilter:!!(authoredBlock.hierarchy || authoredBlock.pivot),
+              hierarchy:authoredBlock.hierarchy,
+              analyticsMaterialized:true,
+              pivot:authoredBlock.pivot,
+              hierarchyRootLimit:collapsed&&!localPaging?5:undefined,
+              forceHierarchyExpansion:dataset.rows.length<sourceRows.length,
+              columnGroups:block.content?.columnGroups || authoredBlock.columnGroups,
               density: "compact",
               limit: collapsed
                 ? Math.max(1, collapsedPreviewLimit)

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/viant/forge/backend/reporting/tablemeta"
 	"io"
 	"strings"
 )
@@ -231,6 +232,10 @@ type BadgeItem struct {
 }
 
 type Block struct {
+	Hierarchy    *tablemeta.Hierarchy    `json:"hierarchy,omitempty"`
+	Pivot        *tablemeta.Pivot        `json:"pivot,omitempty"`
+	ColumnGroups []tablemeta.ColumnGroup `json:"columnGroups,omitempty"`
+
 	ID                       string           `json:"id"`
 	Kind                     string           `json:"kind"`
 	Title                    string           `json:"title,omitempty"`
@@ -335,6 +340,10 @@ type TableSelection struct {
 }
 
 type rawTableBlock struct {
+	Hierarchy    *tablemeta.Hierarchy    `json:"hierarchy,omitempty"`
+	Pivot        *tablemeta.Pivot        `json:"pivot,omitempty"`
+	ColumnGroups []tablemeta.ColumnGroup `json:"columnGroups,omitempty"`
+
 	Selection        *TableSelection `json:"selection,omitempty"`
 	ID               string          `json:"id"`
 	Kind             string          `json:"kind"`
@@ -701,6 +710,22 @@ func (r *ReportSpec) Validate() error {
 		}
 		switch kind {
 		case "tableBlock":
+			{
+				keys := make([]string, len(block.Columns))
+				for i, column := range block.Columns {
+					keys[i] = column.Key
+				}
+				if (block.Hierarchy != nil || block.Pivot != nil) && block.RecordTitleField != "" {
+					return fmt.Errorf("analytical tables cannot use recordTitleField")
+				}
+				if block.Pivot != nil && block.Selection != nil {
+					return fmt.Errorf("pivot rows cannot select source-row checkboxes")
+				}
+				if err := tablemeta.Validate(block.Hierarchy, block.Pivot, block.ColumnGroups, keys); err != nil {
+					return err
+				}
+			}
+
 			if strings.TrimSpace(block.DatasetRef) == "" {
 				return fmt.Errorf("reportSpec.blocks[%d].datasetRef is required for tableBlock", index)
 			}
@@ -1001,7 +1026,8 @@ func decodeBlock(payload json.RawMessage, index int) (result Block, resultErr er
 			return Block{}, err
 		}
 		return Block{
-			ID:               block.ID,
+			ID:        block.ID,
+			Hierarchy: block.Hierarchy, Pivot: block.Pivot, ColumnGroups: block.ColumnGroups,
 			Kind:             block.Kind,
 			Title:            block.Title,
 			Description:      block.Description,
