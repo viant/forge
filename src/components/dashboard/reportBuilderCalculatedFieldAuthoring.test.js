@@ -629,3 +629,12 @@ assert.equal(cycle.errors[0].code, "dependencyCycle");
 assert.match(cycle.errors[0].message, /newValue/);
 assert.match(cycle.errors[0].message, /prior/);
 console.log("ordered window authoring tests passed");
+
+const sourceWithoutFormat = {id: "priorLabel", key: "priorLabel", kind: "tableCalc", label: "Prior Label", dataType: "string", compute: {type: "lag", sourceField: "value", offset: 1, orderBy: [{field: "sequence", direction: "asc"}]}, dependencies: ["value", "sequence"]};
+const reopenedWithoutFormat = validateReportBuilderTableCalculationDraft(buildReportBuilderTableCalculationDraft(sourceWithoutFormat), windowConfig);
+assert.equal(reopenedWithoutFormat.valid, true);
+assert.equal(reopenedWithoutFormat.field.dataType, "string");
+assert.equal(Object.hasOwn(reopenedWithoutFormat.field, "format"), false);
+
+assert.equal(validateReportBuilderTableCalculationDraft({...lagDraft, offset: "1.0"}, windowConfig).valid, true);
+assert.equal(validateReportBuilderTableCalculationDraft({...maxDraft, frameFollowing: "-1"}, windowConfig).errors[0].field, "frameFollowing");

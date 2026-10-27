@@ -311,6 +311,8 @@ export function buildReportBuilderTableCalculationDraft(seed = null) {
                 frameFollowing: compute.frame?.following == null ? "" : String(compute.frame.following),
                 datasetRef: normalized.datasetRef || "",
                 originalKey: normalized.key,
+                sourceDataType: normalized.dataType,
+                sourceAuthored: true,
             } : {}),
         };
     }
@@ -437,7 +439,6 @@ export function validateReportBuilderCalculatedFieldDraft(draft = {}, config = {
     const selfAliases = new Set(normalizeStringArray([normalizedDraft.id, editingId]));
     if (parsedExpression?.dependencies) {
         const unknownDependencies = [];
-
         const selfDependencies = [];
         normalizeStringArray(parsedExpression.dependencies).forEach((dependencyId) => {
             if (selfAliases.has(dependencyId)) {
@@ -495,6 +496,11 @@ export function validateReportBuilderCalculatedFieldDraft(draft = {}, config = {
         return {valid: false, errors: [formatCalculatedFieldValidationError({field: field.kind === "rowCalc" ? "expr" : "sourceField", code: "dependencyCycle", message: error.message})], field: null};
     }
     return {valid: true, errors: [], field};
+}
+
+function isBoundedIntegerInput(value, minimum, maximum) {
+    const number = Number(value);
+    return String(value).trim() !== "" && Number.isSafeInteger(number) && number >= minimum && number <= maximum;
 }
 
 function normalizeTableCalculationDraftInput(draft = {}) {
@@ -582,14 +588,14 @@ export function validateReportBuilderTableCalculationDraft(draft = {}, config = 
             }
         });
     }
-    if (functionMeta?.supportsOffset && (!/^\d+$/.test(normalizedDraft.offset) || Number(normalizedDraft.offset) < 1 || Number(normalizedDraft.offset) > 10000)) {
+    if (functionMeta?.supportsOffset && !isBoundedIntegerInput(normalizedDraft.offset, 1, 10000)) {
         pushError("offset", "invalid", "Lag offset must be an integer from 1 to 10000.");
     }
     if (functionMeta?.requiresExplicitFrame) {
         if (!["full", "rows"].includes(normalizedDraft.frameType)) pushError("frameType", "required", "Select an explicit full or bounded rows frame.");
         if (normalizedDraft.frameType === "rows") {
             ["framePreceding", "frameFollowing"].forEach((key) => {
-                if (!/^\d+$/.test(normalizedDraft[key]) || Number(normalizedDraft[key]) > 10000) pushError(key, "invalid", "Frame bounds must be integers from 0 to 10000.");
+                if (!isBoundedIntegerInput(normalizedDraft[key], 0, 10000)) pushError(key, "invalid", "Frame bounds must be integers from 0 to 10000.");
             });
         } else if (normalizedDraft.frameType === "full" && (normalizedDraft.framePreceding || normalizedDraft.frameFollowing)) {
             pushError("frameType", "invalid", "A full frame cannot have row bounds.");
@@ -682,14 +688,14 @@ export function validateReportBuilderTableCalculationDraft(draft = {}, config = 
         }
     })();
 
-    const format = normalizedDraft.format || functionMeta.defaultFormat || "";
+    const format = normalizedDraft.format || (draft.sourceAuthored ? "" : functionMeta.defaultFormat) || "";
     const field = compute
         ? normalizeReportCalculatedField({
             id: normalizedDraft.id,
             key: draft.originalKey || normalizedDraft.id,
             ...(draft.datasetRef ? {datasetRef: draft.datasetRef} : {}),
             label: normalizedDraft.label,
-            dataType: "number",
+            dataType: draft.sourceDataType || "number",
             ...(format ? { format } : {}),
             compute,
         })
