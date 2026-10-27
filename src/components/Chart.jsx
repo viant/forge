@@ -1,3 +1,5 @@
+import CategoryRange from './CategoryRange.jsx';
+import CategoricalHeatmap from './CategoricalHeatmap.jsx';
 import {applyChartMetricSelection} from "./chartMetricSelection.js";
 import {resolveCategoryColor} from './chartTheme.js';
 import {normalizeChartExtent, resolveChartMargins} from './chartExtent.js';
@@ -546,7 +548,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         cartesianGrid = {strokeDasharray: "3 3"},
         width,
         height,
-        series,
+        series = {},
     } = chart;
     const palette = useMemo(() => resolveThemeAwareChartPalette(series?.palette || [], {forceRole:documentAppearance}), [series?.palette,documentAppearance]);
     const [chartTypography, setChartTypography] = useState(() => ({...resolveChartTypography(null), documentStyle: resolveDocumentChartStyle(null)}));
@@ -638,6 +640,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     const isPieChart = responsiveChartType === "pie" || responsiveChartType === "donut";
     const isHorizontalBar = isHorizontalBarType(responsiveChartType);
     const prepared = useMemo(() => {
+        if(type === "category-range" || type === "heatmap") return {chartData:effectiveCollection || [],availableDataKeys:[],yAxisLabel:""};
         const chartRows = materializeChartDisplayRows(chart, effectiveCollection || []);
         if (isPieChart) {
             const nameKey = series.nameKey || "name";
@@ -749,8 +752,8 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     }, [isPieChart, seriesDefinitions, series.valueKey, selectedValueKey]);
 
     const allTableColumns = useMemo(
-        () => isPieChart ? ['name', 'value'] : [xAxis?.dataKey, ...stableAvailableDataKeys].filter(Boolean),
-        [isPieChart, xAxis?.dataKey, stableAvailableDataKeys],
+        () => type === 'category-range' ? Array.from(new Set([chart.categoryRange?.categoryField,...chartData.flatMap(row=>Object.keys(row))].filter(Boolean))) : type === 'heatmap' ? Array.from(new Set([chart.heatmap?.rowField,chart.heatmap?.columnField,chart.heatmap?.valueField,...chartData.flatMap(row=>Object.keys(row))].filter(Boolean))) : isPieChart ? ['name', 'value'] : [xAxis?.dataKey, ...stableAvailableDataKeys].filter(Boolean),
+        [type, chart.categoryRange, chart.heatmap, chartData, isPieChart, xAxis?.dataKey, stableAvailableDataKeys],
     );
     const [visibleColumns, setVisibleColumns] = useState(allTableColumns);
 
@@ -1489,8 +1492,8 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     })();
     const chartViewportStyle = {
         width: "100%",
-        height: smallMultiples || (documentAppearance && isHorizontalBar && renderableSeriesDefinitions.length === 1) ? 'auto' : effectiveViewportHeight,
-        minHeight: smallMultiples || (documentAppearance && isHorizontalBar && renderableSeriesDefinitions.length === 1) ? undefined : resolvedMinHeight || undefined,
+        height: type === "category-range" || type === "heatmap" || smallMultiples || (documentAppearance && isHorizontalBar && renderableSeriesDefinitions.length === 1) ? 'auto' : effectiveViewportHeight,
+        minHeight: type === "category-range" || type === "heatmap" || smallMultiples || (documentAppearance && isHorizontalBar && renderableSeriesDefinitions.length === 1) ? undefined : resolvedMinHeight || undefined,
         minWidth: 0,
         flex: "0 0 auto",
         margin: isHorizontalBar ? "0 auto" : undefined,
@@ -1595,7 +1598,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                             onChange={handleValueKeyChange}
                             selectedValue={selectedValueKey}
                         >
-                            {series.values.map((option, index) => (
+                            {(series.values || []).map((option, index) => (
                                 <Radio key={option.value + index} label={option.label} value={option.value}/>
                             ))}
                         </RadioGroup>
@@ -1661,6 +1664,10 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                                 Loading chart…
                             </div>
                         </div>
+                    ) : type === "category-range" ? (
+                        <CategoryRange config={chart.categoryRange} rows={chartData} width={chartSize.width || 680} onSelect={interactiveDatumSelection?onDatumSelect:undefined}/>
+                    ) : type === "heatmap" ? (
+                        <CategoricalHeatmap title={container.title || chart.title || "Categorical heatmap"} config={chart.heatmap} rows={chartData} width={chartSize.width || 680} onSelect={interactiveDatumSelection?onDatumSelect:undefined}/>
                     ) : showZeroDataMessage ? (
                         <div
                             style={{

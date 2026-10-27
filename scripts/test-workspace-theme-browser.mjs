@@ -254,8 +254,9 @@ try {
         }
         assert.equal(await exampleName.inputValue(),'Retained document edit');
         assert.equal(await proof.locator('input[data-forge-control-id="specimenInput"]').inputValue(), 'Retained while roles change');
-        assert.deepEqual(await proof.evaluate(() => [...document.querySelectorAll('body *')].filter(node => {const rect = node.getBoundingClientRect(); return rect.width && rect.right > innerWidth + 1 && getComputedStyle(node).position !== 'fixed' && !node.closest('.forge-dashboard-table-wrap, .forge-section-tab-rail');}).map(node => `${node.tagName}.${node.className}`).slice(0, 12)), [], 'Foundation content must stay within the page');
+        assert.deepEqual(await proof.evaluate(() => [...document.querySelectorAll('body *')].filter(node => {const rect = node.getBoundingClientRect(); return rect.width && rect.right > innerWidth + 1 && getComputedStyle(node).position !== 'fixed' && !node.closest('.forge-dashboard-table-wrap, .forge-section-tab-rail, .forge-categorical-heatmap, .forge-category-range');}).map(node => `${node.tagName}.${node.className}`).slice(0, 12)), [], 'Foundation content must stay within the page');
         assert.equal(await proof.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+        if(process.env.FORGE_FOCUS_EVIDENCE) await proof.locator('[data-chart-example="category-range"]').screenshot({path:path.join(process.env.FORGE_FOCUS_EVIDENCE,`category-range-${viewport.width}.png`)});
         assert.deepEqual(failures, []);
         await proof.close();
     }

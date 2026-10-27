@@ -1,3 +1,5 @@
+import {normalizeCategoryRange,categoryRangeFields} from '../categoryRange.js';
+import {normalizeHeatmap} from '../categoricalHeatmap.js';
 import {normalizeChartMetricSelection, applyChartMetricSelection} from "../chartMetricSelection.js";
 import {validateChartAppearance} from '../chartAppearance.js';
 import { resolveKey } from "../../utils/selector.js";
@@ -485,8 +487,12 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
     const accentTone = String(chartSpec.accentTone || "").trim();
     const highlights = normalizeStringArray(chartSpec.highlights);
     const type = String(chartSpec.type || "").trim().toLowerCase() || "line";
-    const xField = normalizeChartSpecValue(chartSpec.xField);
-    const yFields = normalizeStringArray(chartSpec.yFields || chartSpec.yField).filter(Boolean);
+    if(type === "category-range" && ["seriesField","seriesOptions","metricSelection","layout","stacked"].some(key=>chartSpec[key]!=null)) throw new Error("Category range uses its own declared series and orientation.");
+    const categoryRange = type === "category-range" ? normalizeCategoryRange(chartSpec.categoryRange) : null;
+    if(type === "heatmap" && ["seriesField","seriesOptions","metricSelection","layout","stacked"].some(key=>chartSpec[key]!=null)) throw new Error("Heatmap uses its own declared fields, color scale and category order; seriesField, seriesOptions, metricSelection, layout and stacked are unsupported.");
+    const heatmap = type === "heatmap" ? normalizeHeatmap(chartSpec.heatmap) : null;
+    const xField = categoryRange?.categoryField || heatmap?.rowField || normalizeChartSpecValue(chartSpec.xField);
+    const yFields = categoryRange ? categoryRangeFields(categoryRange) : heatmap ? [heatmap.valueField] : normalizeStringArray(chartSpec.yFields || chartSpec.yField).filter(Boolean);
     const seriesField = normalizeChartSpecValue(chartSpec.seriesField);
     const seriesOptions = normalizeChartSeriesOptions(chartSpec.seriesOptions);
     const categoryLabel = normalizeChartCategoryLabel(chartSpec.categoryLabel);
@@ -498,6 +504,8 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
         ...(accentTone ? { accentTone } : {}),
         ...(highlights.length > 0 ? { highlights } : {}),
         type,
+        ...(heatmap ? {heatmap} : {}),
+        ...(categoryRange ? {categoryRange} : {}),
         ...(chartSpec.appearance ? {appearance:chartSpec.appearance} : {}),
         ...(chartSpec.layout ? {layout:chartSpec.layout} : {}),
         ...(typeof chartSpec.stacked === 'boolean' ? {stacked:chartSpec.stacked} : {}),
@@ -560,6 +568,8 @@ function sanitizeChartSpecAgainstConfig(config = {}, chartSpec = null) {
         return null;
     }
 
+    if (normalized.type === "heatmap") return universe.has(normalized.heatmap.columnField) ? normalized : null;
+    if (normalized.type === "category-range") return normalized;
     const family = chartFamilyForType(normalized.type);
 
     if (SINGLE_MEASURE_CATEGORY_TYPES.has(normalized.type) && normalized.yFields.length > 1) {
@@ -818,6 +828,12 @@ export function validateReportBuilderChartSpec(config = {}, chartSpec = null, co
         });
     }
 
+    if (normalized.type === "heatmap") {
+        const column = fields.get(normalized.heatmap.columnField);
+        if (!column || column.kind !== "dimension") errors.push({field:"heatmap.columnField",code:!column?"missingField":"wrongKind"});
+        return {valid:errors.length===0,errors};
+    }
+    if (normalized.type === "category-range") return {valid:errors.length===0,errors};
     const family = chartFamilyForType(normalized.type);
 
     if (normalized.seriesField) {
@@ -1357,7 +1373,7 @@ export function resolveReportBuilderChartDependencies(config = {}, chartSpec = n
     }
     const dimensions = [];
     const seen = new Set();
-    [normalized.xField, normalized.seriesField].forEach((fieldKey) => {
+    [normalized.xField, normalized.seriesField, normalized.heatmap?.columnField].forEach((fieldKey) => {
         const dimension = resolveReportBuilderDimensionByField(config, fieldKey);
         const dimensionId = String(dimension?.id || "").trim();
         if (!dimension || !dimensionId || seen.has(dimensionId)) {
@@ -2301,6 +2317,8 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
     if (!normalized) {
         return container;
     }
+    if (normalized.type === "category-range") return {...container,chart:{type:"category-range",categoryRange:normalized.categoryRange,...(normalized.appearance?{appearance:normalized.appearance}:{}),...(typeof normalized.allowTableSwitch === "boolean"?{allowTableSwitch:normalized.allowTableSwitch}:{}),xAxis:{dataKey:normalized.xField},series:{valueKey:normalized.yFields[0],values:normalized.yFields.map(value=>({value,label:value,type:"bar"}))}}};
+    if (normalized.type === "heatmap") return {...container, chart:{type:"heatmap",heatmap:normalized.heatmap,...(normalized.appearance?{appearance:normalized.appearance}:{}),...(typeof normalized.allowTableSwitch === "boolean"?{allowTableSwitch:normalized.allowTableSwitch}:{}),series:{valueKey:normalized.heatmap.valueField,values:[{value:normalized.heatmap.valueField,label:normalized.heatmap.valueField,type:"heatmap"}]}}};
     const measures = getSelectableReportBuilderMeasures(config);
     const xField = resolveReportBuilderDimensionByField(config, normalized.xField);
     const yMeasures = normalizeStringArray(normalized.yFields)

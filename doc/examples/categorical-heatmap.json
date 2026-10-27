@@ -1,0 +1,19 @@
+{
+  "provenance": "All values and labels are invented, independent synthetic examples; no customer or production source.",
+  "title": "Workspace occupancy by weekday and time slot",
+  "chartSpec": {"type":"heatmap","heatmap":{"rowField":"weekday","columnField":"slot","valueField":"occupiedSeats","rowCategories":["Monday","Tuesday","Wednesday"],"columnCategories":["Morning","Afternoon","Evening"],"colorScale":{"type":"sequential","domain":[0,12],"colors":["#eff3ff","#08519c"]},"cellLabels":true,"legend":true}},
+  "rows": [
+    {"weekday":"Monday","slot":"Morning","occupiedSeats":8},
+    {"weekday":"Monday","slot":"Afternoon","occupiedSeats":12},
+    {"weekday":"Monday","slot":"Evening","occupiedSeats":0},
+    {"weekday":"Tuesday","slot":"Morning","occupiedSeats":5},
+    {"weekday":"Tuesday","slot":"Afternoon","occupiedSeats":null},
+    {"weekday":"Tuesday","slot":"Evening","occupiedSeats":9},
+    {"weekday":"Wednesday","slot":"Morning","occupiedSeats":0},
+    {"weekday":"Wednesday","slot":"Afternoon","occupiedSeats":7}
+  ],
+  "temperatureDeviation": {
+    "chartSpec":{"type":"heatmap","heatmap":{"rowField":"zone","columnField":"period","valueField":"deviation","rowCategories":["North","South"],"columnCategories":["Early","Late"],"colorScale":{"type":"diverging","domain":[-5,0,5],"colors":["#2166ac","#f7f7f7","#b2182b"]}}},
+    "rows":[{"zone":"North","period":"Early","deviation":-5},{"zone":"North","period":"Late","deviation":0},{"zone":"South","period":"Early","deviation":2.5},{"zone":"South","period":"Late","deviation":5}]
+  }
+}

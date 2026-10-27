@@ -87,7 +87,13 @@ export function pickPaletteColor(value, minValue, maxValue, palette = DEFAULT_GE
     if (maxValue <= minValue) {
         return colors[colors.length - 1];
     }
-    const ratio = Math.max(0, Math.min(1, (numeric - minValue) / (maxValue - minValue)));
+    const span = maxValue - minValue;
+    // Finite signed endpoints can have an infinite difference. Normalize all
+    // operands first in that case so the ratio still maps endpoints to 0 and 1.
+    const scale = Number.isFinite(span) ? 1 : Math.max(Math.abs(minValue), Math.abs(maxValue));
+    const ratio = Math.max(0, Math.min(1, scale === 1
+        ? (numeric - minValue) / span
+        : (numeric / scale - minValue / scale) / (maxValue / scale - minValue / scale)));
     const index = Math.min(colors.length - 1, Math.floor(ratio * colors.length));
     return colors[index];
 }

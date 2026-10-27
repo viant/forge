@@ -1,3 +1,5 @@
+import {buildCategoryRange,categoryRangeSvg,categoryRangePrintPages} from '../components/categoryRange.js';
+import {buildHeatmap,heatmapSvg,heatmapPrintPages} from '../components/categoricalHeatmap.js';
 import {resolveCategoryColor} from '../components/chartTheme.js';
 import { compactReportPrintSequence, wrapReportPrintLabel } from "./reportPrintLabels.js";
 import { formatExportNumericValue } from "./reportExportValueFormatter.js";
@@ -1182,6 +1184,8 @@ export function buildReportPrintChartSvg({
   width = 680,
   rowLimit = 0,
 } = {}) {
+  if(resolvedChart?.kind === "category-range") return categoryRangeSvg(buildCategoryRange(chartModel.categoryRange,resolvedChart.rows),width);
+  if(resolvedChart?.kind === "heatmap") return heatmapSvg(buildHeatmap(chartModel.heatmap,resolvedChart.rows),width);
   // Resolved rows already contain complete category aggregations. Limit marks,
   // never source rows, so duplicate categories retain their complete values.
   resolvedChart = { ...resolvedChart, rows: applyChartRowLimit(resolvedChart?.rows, rowLimit) };
@@ -1209,6 +1213,8 @@ export function buildReportPrintChartSvg({
 }
 
 export function buildReportPrintChartPages({ chartModel = {}, resolvedChart = {}, width = 680, maxHeight = 620, firstMaxHeight = maxHeight, rowLimit = 0 } = {}) {
+  if(resolvedChart?.kind === "category-range") return categoryRangePrintPages(buildCategoryRange(chartModel.categoryRange,resolvedChart.rows),{width,maxHeight,firstMaxHeight});
+  if(resolvedChart?.kind === "heatmap") return heatmapPrintPages(buildHeatmap(chartModel.heatmap,resolvedChart.rows),{width,maxHeight,firstMaxHeight});
   resolvedChart = { ...resolvedChart, rows: applyChartRowLimit(resolvedChart?.rows, rowLimit) };
   const type = normalizeString(chartModel?.type || resolvedChart?.type).toLowerCase();
   if (!["horizontal_bar", "funnel_bar"].includes(type) || !["directSeries", "groupedSeries"].includes(resolvedChart?.kind)) {

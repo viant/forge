@@ -269,18 +269,30 @@ type GeoContent struct {
 
 type ResolvedGeo struct {
 	labelFieldPresent bool
-	Shape             string              `json:"shape"`
-	KeyField          string              `json:"keyField"`
-	LabelField        string              `json:"labelField"`
-	MetricKey         string              `json:"metricKey"`
-	MetricLabel       string              `json:"metricLabel"`
-	Format            string              `json:"format"`
-	Aggregate         string              `json:"aggregate"`
-	Regions           []ResolvedGeoRegion `json:"regions"`
-	Ranking           []ResolvedGeoRegion `json:"ranking"`
-	ActiveRegion      *ResolvedGeoRegion  `json:"activeRegion"`
-	Summary           *ResolvedGeoSummary `json:"summary"`
-	Legend            *ResolvedGeoLegend  `json:"legend"`
+	Geometry          *ResolvedGeoGeometry `json:"geometry,omitempty"`
+	Shape             string               `json:"shape"`
+	KeyField          string               `json:"keyField"`
+	LabelField        string               `json:"labelField"`
+	MetricKey         string               `json:"metricKey"`
+	MetricLabel       string               `json:"metricLabel"`
+	Format            string               `json:"format"`
+	Aggregate         string               `json:"aggregate"`
+	Regions           []ResolvedGeoRegion  `json:"regions"`
+	Ranking           []ResolvedGeoRegion  `json:"ranking"`
+	ActiveRegion      *ResolvedGeoRegion   `json:"activeRegion"`
+	Summary           *ResolvedGeoSummary  `json:"summary"`
+	Legend            *ResolvedGeoLegend   `json:"legend"`
+}
+
+type ResolvedGeoGeometry struct {
+	ViewBox  []float64            `json:"viewBox"`
+	Features []ResolvedGeoFeature `json:"features"`
+}
+
+type ResolvedGeoFeature struct {
+	Key   string `json:"key"`
+	Label string `json:"label"`
+	Path  string `json:"path"`
 }
 
 type ResolvedGeoRegion struct {
@@ -1419,6 +1431,14 @@ func (r *ReportFill) Validate() error {
 				return fmt.Errorf("reportFill.blocks[%d].content.resolvedChart.rows is required for chartBlock", index)
 			}
 			switch strings.TrimSpace(block.ChartContent.ResolvedChart.Kind) {
+			case "category-range":
+				if block.ChartContent.ResolvedChart.Type != "category-range" {
+					return fmt.Errorf("reportFill category-range payload requires matching type")
+				}
+			case "heatmap":
+				if block.ChartContent.ResolvedChart.Type != "heatmap" {
+					return fmt.Errorf("reportFill heatmap payload requires heatmap type")
+				}
 			case "directSeries":
 				if strings.TrimSpace(block.ChartContent.ResolvedChart.XAxisKey) == "" {
 					return fmt.Errorf("reportFill.blocks[%d].content.resolvedChart.xAxisKey is required for directSeries", index)
@@ -1735,6 +1755,9 @@ func (r *ReportFill) Validate() error {
 			}
 			if block.GeoContent.ResolvedGeo == nil {
 				return fmt.Errorf("reportFill.blocks[%d].content.resolvedGeo is required for geoMapBlock", index)
+			}
+			if err := validateGeoGeometry(block.GeoContent.ResolvedGeo); err != nil {
+				return err
 			}
 			if strings.TrimSpace(block.GeoContent.ResolvedGeo.Shape) == "" {
 				return fmt.Errorf("reportFill.blocks[%d].content.resolvedGeo.shape is required for geoMapBlock", index)

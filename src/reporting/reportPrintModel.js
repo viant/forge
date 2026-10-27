@@ -2426,7 +2426,7 @@ function renderReportPrintChartBlock(state = {}, block = {}, {
   const provenance = dataset?.provenance;
   // An admitted, complete empty dataset is ordinary no-data. Missing datasets,
   // incomplete pages and producer diagnostics must retain their failure path.
-  if (declared && block?.content?.rowCount === 0 && provenance?.hasMore === false
+  if (block?.content?.resolvedChart?.kind !== "heatmap" && declared && block?.content?.rowCount === 0 && provenance?.hasMore === false
     && provenance?.truncated === false && Array.isArray(provenance?.diagnostics)
     && provenance.diagnostics.length === 0) {
     ensureReportPrintSpace(state, reportPrintTitleHeight(state, block, layoutNote) + REPORT_PRINT_THEME.bodyLineHeight);
@@ -2447,6 +2447,7 @@ function renderReportPrintChartBlock(state = {}, block = {}, {
       : state.contentBottom - state.contentTop - titleHeight - (state.sectionHeadingHeight || 0),
   });
   for (const [pageIndex, svgResult] of chartPages.entries()) {
+    if(svgResult?.startNewPage && state.cursorY > state.contentTop) startNextReportPrintPage(state);
     const pageBlock = pageIndex === 0 ? block : { ...block, title: `${resolveReportPrintBlockTitle(block)} (continued)`, content: { ...block.content, title: `${resolveReportPrintBlockTitle(block)} (continued)` } };
     const chartHeight = svgResult?.svg ? Math.max(120, Number(svgResult.height) || 0) : REPORT_PRINT_THEME.bodyLineHeight;
     ensureReportPrintSpace(state, titleHeight + chartHeight);
@@ -2543,6 +2544,9 @@ function renderReportPrintGeoBlock(state = {}, block = {}, {
       elementId: svgElement?.id,
     });
   });
+  if (svgResult.labelDetails?.length) {
+    renderReportPrintTextLines(state, {idPrefix: `${block.id}__labels`, lines: svgResult.labelDetails, fontSize: 9, lineHeight: 12});
+  }
   finishReportPrintBlock(state);
 }
 

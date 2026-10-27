@@ -1,3 +1,4 @@
+import GeoGeometryMap from './GeoGeometryMap.jsx';
 import {resolveReportRuntimeChartRowLimit} from '../chartAppearance.js';
 import {buildRuntimeTableRows} from "../../reporting/reportRuntimeTableRows.js";
 import ReportDatasetPager from "./ReportDatasetPager.jsx";
@@ -2831,6 +2832,12 @@ function GeoMapBlock({ block = {}, diagnostics = [], onRetryProviderActions = nu
     .find((diagnostic) => normalizeString(diagnostic?.severity || "info").toLowerCase() === "error")
     || null;
 
+  if (shape === 'geojson' && resolvedGeo.geometry) {
+    return <RuntimePanel className="forge-report-runtime-geo-panel" title={normalizeString(block.title || 'Region map')}>
+      <BlockDiagnosticsCallout diagnostics={diagnostics} onRetryProviderActions={onRetryProviderActions} providerActionsLoading={providerActionsLoading} />
+      {invalidDiagnostic ? <BlockErrorCallout diagnostic={invalidDiagnostic}/> : <GeoGeometryMap resolvedGeo={resolvedGeo} title={block.title} onSelect={setSelectedRegion}/>}
+    </RuntimePanel>;
+  }
   if (documentPresentation) {
     const currentRegion = regionsByKey.get(normalizeGeoKey(selectedRegion?.key)) || resolvedGeo?.activeRegion || ranking[0] || null;
     const metricLabel = normalizeString(resolvedGeo?.metricLabel || geo?.metric?.label || "Value");

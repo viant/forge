@@ -8,6 +8,7 @@ import {
   resolveGeoColor,
 } from "../components/dashboard/geoMapUtils.js";
 import { resolveKey } from "../utils/selector.js";
+import {buildReportFillGeoGeometry} from './reportFillGeoGeometry.js';
 
 function cloneValue(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -39,6 +40,7 @@ function buildLegend(config = {}, range = {}, locale = "en-US") {
 }
 
 export function buildReportFillGeoPayload(block = {}, rows = [], { locale = "en-US" } = {}) {
+  if (block.geo?.shape === 'geojson') return buildReportFillGeoGeometry(block, Array.isArray(rows) ? rows : [], locale);
   const config = buildGeoConfig({ geo: block?.geo || {} });
   const geoRows = aggregateGeoRows(Array.isArray(rows) ? rows : [], config);
   const values = Array.from(geoRows.values())

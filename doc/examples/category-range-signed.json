@@ -1,0 +1,16 @@
+{
+  "provenance":"Independently invented signed-offset values for generic chart regression testing. These are not measured observations or recommendations.",
+  "title":"Observed deviation versus category range",
+  "chartSpec":{"type":"category-range","categoryRange":{"categoryField":"category","orientation":"vertical","series":[
+    {"kind":"bar","field":"observedDeviation","label":"Observed deviation","color":"#426b85"},
+    {"kind":"range","startField":"lowerOffset","endField":"upperOffset","label":"Comparison interval","color":"#8a7644"},
+    {"kind":"marker","field":"referenceOffset","label":"Reference offset","color":"#72577c"}
+  ]}},
+  "rows":[
+    {"category":"Negative deviation with a deliberately long complete category label","observedDeviation":-3,"lowerOffset":-5,"upperOffset":2,"referenceOffset":-1},
+    {"category":"Zero deviation; reversed interval","observedDeviation":0,"lowerOffset":3,"upperOffset":-2,"referenceOffset":0},
+    {"category":"Positive deviation; zero length interval","observedDeviation":4,"lowerOffset":2,"upperOffset":2,"referenceOffset":5},
+    {"category":"Null endpoint","observedDeviation":null,"lowerOffset":null,"upperOffset":8,"referenceOffset":null},
+    {"category":"Missing endpoint","observedDeviation":1,"lowerOffset":-7,"referenceOffset":2}
+  ]
+}
