@@ -190,7 +190,7 @@ export function normalizeReportDocumentTableBlock(block = {}) {
     ...(recordTitleField ? {recordTitleField} : {}),
     ...(["blue", "green", "amber", "rose", "slate"].includes(accentTone) ? { accentTone } : {}),
     ...(block?.collapsible === true ? { collapsible: true } : {}),
-    ...(block?.collapsible === true && block?.defaultCollapsed === true ? { defaultCollapsed: true } : {}),
+    ...(block?.collapsible === true && typeof block?.defaultCollapsed === "boolean" ? { defaultCollapsed: block.defaultCollapsed } : {}),
     ...(labelClamp ? { labelClamp } : {}),
   };
 }
