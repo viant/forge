@@ -36,10 +36,12 @@ assert.deepEqual(
   listReportCalculatedFieldTableCalculationSpecs().map((entry) => entry.name),
   [
     "deltaFromPrevious",
+    "lag",
     "movingAverage",
     "percentOfTotal",
     "rank",
     "runningTotal",
+    "windowMax",
   ],
 );
 

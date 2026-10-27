@@ -2077,3 +2077,18 @@ assert.deepEqual(comparisonContext.request.filters.campaignIds, [7]);
 assert.equal(comparisonContext.request.filters.from, "2026-09-21");
 assert.throws(() => buildReportBuilderPublishedDatasetDeclarations(comparisonSources, {}, new Set(["prior"]), null,
   {dataSourceRef: "delivery", request: {filters: {from: "2026-09-21"}}}), /Previous period/);
+
+
+const cycleConfig = {dataSourceRef:"rows", measures:[{id:"a",key:"a",label:"A"}], calculatedFields:[
+ {id:"a",expr:"b + 1"}, {id:"b",compute:{type:"lag",sourceField:"a",orderBy:[{field:"index",direction:"asc"}]}},
+]};
+for (const selectedMeasures of [[],["a"]]) assert.throws(()=>buildReportBuilderReportSpec({
+ container:{id:"cycle",dataSourceRef:"rows"},config:cycleConfig,state:{viewMode:"table",selectedMeasures},
+}),/cycle: a, b/);
+console.log("reportSpecModel rejects row/table dependency cycles during authoring ✓");
+
+const aliasSpec = buildReportBuilderReportSpec({container:{id:"aliases",dataSourceRef:"rows"},config:{
+ dataSourceRef:"rows",measures:[{id:"value",key:"value",label:"Value"}],calculatedFields:[
+  {id:"baseDefinition",key:"base",expr:"value * 2"},{id:"derivedDefinition",key:"derived",expr:"base + 1"},
+ ]},state:{viewMode:"table",selectedMeasures:["derivedDefinition"]}});
+assert.deepEqual(aliasSpec.calculatedFields.map(field=>field.id),["baseDefinition","derivedDefinition"]);

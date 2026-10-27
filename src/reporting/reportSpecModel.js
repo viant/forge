@@ -20,7 +20,7 @@ import {
 import { buildReportBuilderScopeParams } from "./reportBuilderScopeParamModel.js";
 import { getScopeParamValue, resolveScopeParamId } from "./scopeStateModel.js";
 import { normalizeReportRefinements } from "./reportRefinementModel.js";
-import { normalizeReportCalculatedFields } from "./calculatedFieldModel.js";
+import { normalizeReportCalculatedFields, validateReportCalculatedFieldDependencies } from "./calculatedFieldModel.js";
 import { resolveReportBuilderDrillMetadata } from "./reportBuilderDrillMetadata.js";
 import { normalizeReportTableCellVisual } from "./tableVisualSpec.js";
 import { normalizePresentationClampConfig } from "../utils/presentationText.js";
@@ -505,9 +505,6 @@ export function buildReportSpecChartBlock({
 
 function buildReportSpecCalculatedFields(config = {}, state = {}) {
   const selectedMeasureIds = normalizeStringArray(state?.selectedMeasures);
-  if (selectedMeasureIds.length === 0) {
-    return [];
-  }
   const availableDefinitions = normalizeReportCalculatedFields([
     ...(Array.isArray(config?.calculatedFields) ? config.calculatedFields : []),
     ...(Array.isArray(config?.computedMeasures) ? config.computedMeasures : []),
@@ -515,9 +512,11 @@ function buildReportSpecCalculatedFields(config = {}, state = {}) {
   ], {
     datasetRef: "primary",
   });
+  validateReportCalculatedFieldDependencies(availableDefinitions);
+  if (selectedMeasureIds.length === 0) return [];
   const definitionsById = new Map(
     availableDefinitions
-      .map((definition) => [normalizeString(definition?.id || definition?.key), definition])
+      .flatMap((definition) => [[normalizeString(definition?.id || definition?.key), definition], [normalizeString(definition?.key || definition?.id), definition]])
       .filter(([id]) => !!id),
   );
   const visiting = new Set();
@@ -525,17 +524,14 @@ function buildReportSpecCalculatedFields(config = {}, state = {}) {
   const selectedDefinitions = [];
 
   function visitDefinition(id) {
-    const normalizedId = normalizeString(id);
-    if (!normalizedId || visited.has(normalizedId) || visiting.has(normalizedId)) {
-      return;
-    }
-    const definition = definitionsById.get(normalizedId);
-    if (!definition) {
-      return;
-    }
+    const definition = definitionsById.get(normalizeString(id));
+    if (!definition) return;
+    const normalizedId = normalizeString(definition.id || definition.key);
+    if (!normalizedId || visited.has(normalizedId)) return;
+    if (visiting.has(normalizedId)) throw new Error("Calculated field dependencies contain a cycle: " + [...visiting, normalizedId].join(", "));
     visiting.add(normalizedId);
     normalizeStringArray(definition?.dependencies).forEach((dependencyId) => {
-      visitDefinition(dependencyId);
+      if (dependencyId !== normalizedId && dependencyId !== definition.key) visitDefinition(dependencyId);
     });
     visiting.delete(normalizedId);
     visited.add(normalizedId);

@@ -148,3 +148,37 @@ assert.deepEqual(
 );
 
 console.log("calculatedFieldModel ✓ normalizes and evaluates local row expressions and legacy calculations");
+
+
+assert.throws(() => applyReportCalculatedFields([{value: 2}], [
+  {id: "a", expr: "b + 1"},
+  {id: "b", compute: {type: "lag", sourceField: "a", orderBy: [{field: "value", direction: "asc"}]}},
+]), /dependencies contain a cycle/);
+const input = [{index: 1, value: 2}, {index: 2, value: 3}];
+assert.deepEqual(applyReportCalculatedFields(input, [
+  {id: "prior", compute: {type: "lag", sourceField: "value", orderBy: [{field: "index", direction: "asc"}]}},
+  {id: "value", expr: "value * 2"},
+]), [{index: 1, value: 4, prior: null}, {index: 2, value: 6, prior: 4}]);
+assert.deepEqual(input, [{index: 1, value: 2}, {index: 2, value: 3}]);
+for (const compute of [
+  {type: "lag", sourceField: "value", orderBy: []},
+  {type: "lag", sourceField: "value", orderBy: [{field:"index"}], offset: 0},
+  {type: "lag", sourceField: "value", orderBy: [{field:"index"}], offset: 1.5},
+  {type: "windowMax", sourceField: "value"},
+  {type: "windowMax", sourceField: "value", frame: {type: "rows", preceding: 1, following: 0}},
+  {type: "windowMax", sourceField: "value", frame: {type: "full", preceding: 1}},
+]) assert.equal(normalizeReportCalculatedField({id: "invalid", compute}), null);
+console.log("calculatedFieldModel mixed row/table dependencies, lag and explicit window frames ✓");
+
+const signed = applyReportCalculatedFields([
+  {index: 1, value: -4}, {index: 2, value: 2}, {index: 3, value: 0}, {index: 4, value: 5},
+], [
+  {id: "result", expr: "if(isnull(previous), value / 20, 1 + (value - previous) / abs(previous))"},
+  {id: "previous", compute: {type: "lag", sourceField: "value", orderBy: [{field:"index",direction:"asc"}]}},
+]);
+assert.deepEqual(signed.map(row => row.result), [-0.2, 2.5, 0, null], "Preserve the authored subtraction/absolute-denominator expression, including zero and signs");
+
+const numericOrder = applyReportCalculatedFields([{value:-10},{value:-2},{value:3}], [
+ {id:"prior",compute:{type:"lag",sourceField:"value",orderBy:[{field:"value",direction:"desc"}]}},
+]);
+assert.deepEqual(numericOrder.map(row=>row.prior),[-2,3,null]);

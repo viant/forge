@@ -90,6 +90,9 @@ assert.deepEqual(
         supportsRankDirection: entry.supportsRankDirection === true,
         supportsTieBreaker: entry.supportsTieBreaker === true,
         requiresWindowSize: entry.requiresWindowSize === true,
+        supportsOffset: entry.supportsOffset === true,
+        requiresExplicitFrame: entry.requiresExplicitFrame === true,
+        boundedFrameRequiresOrder: entry.boundedFrameRequiresOrder === true,
         supportsDecimals: entry.supportsDecimals === true,
         defaultFormat: entry.defaultFormat || "",
     })),
@@ -171,6 +174,7 @@ assert.deepEqual(
         "measure:ctr",
         "measure:impressions",
         "measure:projectedLift",
+        "measure:reachShare",
         "measure:totalSpend",
     ],
 );
@@ -181,6 +185,7 @@ assert.deepEqual(
             { id: "ctr", label: "CTR", kind: "measure", isRowCalculated: true, isTableCalculated: false },
             { id: "impressions", label: "Impressions", kind: "measure", isRowCalculated: false, isTableCalculated: false },
             { id: "projectedLift", label: "Projected Lift", kind: "measure", isRowCalculated: true, isTableCalculated: false },
+            { id: "reachShare", label: "Reach Share", kind: "measure", isRowCalculated: false, isTableCalculated: true },
             { id: "totalSpend", label: "Spend", kind: "measure", isRowCalculated: false, isTableCalculated: false },
         ],
         orderFields: [
@@ -189,6 +194,7 @@ assert.deepEqual(
             { id: "ctr", label: "CTR", kind: "measure", isRowCalculated: true, isTableCalculated: false },
             { id: "impressions", label: "Impressions", kind: "measure", isRowCalculated: false, isTableCalculated: false },
             { id: "projectedLift", label: "Projected Lift", kind: "measure", isRowCalculated: true, isTableCalculated: false },
+            { id: "reachShare", label: "Reach Share", kind: "measure", isRowCalculated: false, isTableCalculated: true },
             { id: "totalSpend", label: "Spend", kind: "measure", isRowCalculated: false, isTableCalculated: false },
         ],
         partitionDimensions: [
@@ -353,25 +359,9 @@ assert.deepEqual(
     },
 );
 
-assert.deepEqual(
-    validateReportBuilderCalculatedFieldDraft({
-        id: "badDependency",
-        label: "Bad Dependency",
-        dataType: "number",
-        expr: "reachShare + 1",
-    }, mergedConfig),
-    {
-        valid: false,
-        errors: [
-            {
-                field: "expr",
-                code: "tableCalcDependency",
-                message: "Row calculations cannot depend on table calculations: reachShare.",
-            },
-        ],
-        field: null,
-    },
-);
+assert.equal(validateReportBuilderCalculatedFieldDraft({
+    id: "nextValue", label: "Next Value", dataType: "number", expr: "reachShare + 1",
+}, mergedConfig).valid, true);
 
 const createdState = upsertReportBuilderLocalCalculatedFieldState({
     selectedMeasures: ["totalSpend"],
@@ -607,3 +597,35 @@ assert.deepEqual(removedTableCalculationState.chartSpec, {
 });
 
 console.log("reportBuilderCalculatedFieldAuthoring ✓ merges, validates, saves, and removes local calculated fields");
+
+// Generic ordered window authoring: preserve all orders, aliases, scope and frame.
+const windowConfig = {dimensions: [{id: "group"}, {id: "sequence"}, {id: "stable"}], measures: [{id: "value"}]};
+for (const compute of [
+    {type: "lag", sourceField: "value", offset: 10000, partitionBy: ["group"], orderBy: [{field: "sequence", direction: "desc"}, {field: "stable", direction: "desc"}, {field: "group", direction: "asc"}]},
+    {type: "windowMax", sourceField: "value", partitionBy: ["group"], frame: {type: "full"}},
+    {type: "windowMax", sourceField: "value", frame: {type: "rows", preceding: 0, following: 10000}, orderBy: [{field: "sequence", direction: "asc"}, {field: "stable", direction: "desc"}]},
+]) {
+    const seed = {id: "derived", key: "result", label: "Derived", datasetRef: "details", format: "number", compute};
+    const draft = buildReportBuilderTableCalculationDraft(seed);
+    const result = validateReportBuilderTableCalculationDraft(draft, windowConfig);
+    assert.equal(result.valid, true, JSON.stringify(result.errors));
+    assert.deepEqual(result.field.compute, compute);
+    assert.equal(result.field.key, "result");
+    assert.equal(result.field.datasetRef, "details");
+}
+const lagDraft = {id: "previous", label: "Previous", functionId: "lag", sourceField: "value", orderByField: "sequence", offset: "1"};
+for (const offset of ["", "0", "-1", "1.5", "10001", "NaN"]) {
+    assert.equal(validateReportBuilderTableCalculationDraft({...lagDraft, offset}, windowConfig).valid, false, offset);
+}
+assert.equal(validateReportBuilderTableCalculationDraft({...lagDraft, additionalOrderBy: [{field: "missing", direction: "asc"}]}, windowConfig).valid, false);
+const maxDraft = {...lagDraft, functionId: "windowMax", frameType: "rows", framePreceding: "0", frameFollowing: "1"};
+for (const patch of [{frameType: ""}, {orderByField: ""}, {framePreceding: ""}, {frameFollowing: "10001"}, {frameFollowing: "-1"}, {frameType: "full"}]) {
+    assert.equal(validateReportBuilderTableCalculationDraft({...maxDraft, ...patch}, windowConfig).valid, false, JSON.stringify(patch));
+}
+const cyclicConfig = {...windowConfig, tableCalculations: [{id: "prior", compute: {type: "lag", sourceField: "newValue", orderBy: [{field: "sequence", direction: "asc"}]}}]};
+const cycle = validateReportBuilderCalculatedFieldDraft({id: "newValue", label: "New Value", expr: "prior + 1", dataType: "number"}, cyclicConfig);
+assert.equal(cycle.valid, false);
+assert.equal(cycle.errors[0].code, "dependencyCycle");
+assert.match(cycle.errors[0].message, /newValue/);
+assert.match(cycle.errors[0].message, /prior/);
+console.log("ordered window authoring tests passed");

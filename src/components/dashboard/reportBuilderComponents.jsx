@@ -1796,6 +1796,9 @@ export function ReportBuilderTableCalculationDialog({
     };
     const functionId = String(draft?.functionId || "").trim();
     const functionMeta = REPORT_BUILDER_TABLE_CALC_FUNCTIONS.find((entry) => entry.value === functionId) || null;
+    const showsOrder = functionMeta?.requiresOrder || functionMeta?.boundedFrameRequiresOrder;
+    const additionalOrderBy = Array.isArray(draft?.additionalOrderBy) ? draft.additionalOrderBy : [];
+    const updateAdditionalOrder = (index, patch) => setDraftPatch({additionalOrderBy: additionalOrderBy.map((entry, i) => i === index ? {...entry, ...patch} : entry)});
     const partitionBy = Array.isArray(draft?.partitionBy)
         ? draft.partitionBy.map((entry) => String(entry || "").trim()).filter(Boolean)
         : [];
@@ -1848,7 +1851,7 @@ export function ReportBuilderTableCalculationDialog({
                             name="tableCalcFunction"
                             className={errorByField.has("functionId") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
                             value={functionId}
-                            onChange={(event) => setDraftPatch({ functionId: event.target.value })}
+                            onChange={(event) => setDraftPatch({ functionId: event.target.value, windowSize: "", decimals: "", additionalOrderBy: [], offset: "1", frameType: "", framePreceding: "", frameFollowing: "" })}
                         >
                             <option value="">Select…</option>
                             {REPORT_BUILDER_TABLE_CALC_FUNCTIONS.map((option) => (
@@ -1883,7 +1886,7 @@ export function ReportBuilderTableCalculationDialog({
                             ))}
                         </select>
                     </label>
-                    {functionMeta?.requiresOrder ? (
+                    {showsOrder ? (
                         <label className="forge-report-builder__chart-field">
                             <span>Order By</span>
                             <select
@@ -1899,7 +1902,7 @@ export function ReportBuilderTableCalculationDialog({
                             </select>
                         </label>
                     ) : null}
-                    {functionMeta?.requiresOrder || functionMeta?.supportsRankDirection ? (
+                    {showsOrder || functionMeta?.supportsRankDirection ? (
                         <label className="forge-report-builder__chart-field">
                             <span>{functionId === "rank" ? "Rank Direction" : "Order Direction"}</span>
                             <select
@@ -1928,6 +1931,51 @@ export function ReportBuilderTableCalculationDialog({
                                 ))}
                             </select>
                         </label>
+                    ) : null}
+                    {["lag", "windowMax"].includes(functionId) ? (
+                        <div className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                            {additionalOrderBy.map((entry, index) => (
+                                <div key={index} className="forge-report-builder__chart-dialog-grid">
+                                    <label className="forge-report-builder__chart-field">
+                                        <span>Additional Order {index + 1}</span>
+                                        <select name={`tableCalcAdditionalOrder${index}`} className="forge-report-builder-select" value={entry.field} onChange={(event) => updateAdditionalOrder(index, {field: event.target.value})}>
+                                            <option value="">Select…</option>
+                                            {(fieldOptions?.orderFields || []).map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+                                        </select>
+                                    </label>
+                                    <label className="forge-report-builder__chart-field">
+                                        <span>Additional Direction {index + 1}</span>
+                                        <select name={`tableCalcAdditionalDirection${index}`} className="forge-report-builder-select" value={entry.direction} onChange={(event) => updateAdditionalOrder(index, {direction: event.target.value})}>
+                                            <option value="asc">Ascending</option><option value="desc">Descending</option>
+                                        </select>
+                                    </label>
+                                    <Button outlined onClick={() => setDraftPatch({additionalOrderBy: additionalOrderBy.filter((_, i) => i !== index)})}>Remove Order {index + 1}</Button>
+                                </div>
+                            ))}
+                            <Button outlined onClick={() => setDraftPatch({additionalOrderBy: [...additionalOrderBy, {field: "", direction: "asc"}]})}>Add Order Field</Button>
+                        </div>
+                    ) : null}
+                    {functionMeta?.supportsOffset ? (
+                        <label className="forge-report-builder__chart-field">
+                            <span>Lag Offset</span>
+                            <input name="tableCalcOffset" type="number" min="1" max="10000" step="1" className={errorByField.has("offset") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"} value={draft?.offset ?? "1"} onChange={(event) => setDraftPatch({offset: event.target.value})} />
+                        </label>
+                    ) : null}
+                    {functionMeta?.requiresExplicitFrame ? (
+                        <>
+                            <label className="forge-report-builder__chart-field">
+                                <span>Window Frame</span>
+                                <select name="tableCalcFrameType" className={errorByField.has("frameType") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"} value={draft?.frameType || ""} onChange={(event) => setDraftPatch({frameType: event.target.value, framePreceding: "", frameFollowing: ""})}>
+                                    <option value="">Select…</option><option value="full">Full Partition</option><option value="rows">Bounded Rows</option>
+                                </select>
+                            </label>
+                            {draft?.frameType === "rows" ? ["Preceding", "Following"].map((bound) => (
+                                <label key={bound} className="forge-report-builder__chart-field">
+                                    <span>{bound} Rows</span>
+                                    <input name={`tableCalcFrame${bound}`} type="number" min="0" max="10000" step="1" className={errorByField.has(`frame${bound}`) ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"} value={draft?.[`frame${bound}`] ?? ""} onChange={(event) => setDraftPatch({[`frame${bound}`]: event.target.value})} />
+                                </label>
+                            )) : null}
+                        </>
                     ) : null}
                     {functionMeta?.requiresWindowSize ? (
                         <label className="forge-report-builder__chart-field">
@@ -1985,7 +2033,7 @@ export function ReportBuilderTableCalculationDialog({
                     </div>
                 </div>
                 <div className="forge-report-builder__calculated-field-hint">
-                    <strong>Supported:</strong> percent of total, running total, rank, delta from previous, and moving average over the current result grid only.
+                    <strong>Supported:</strong> percent of total, running total, rank, delta from previous, moving average, lag, and window maximum over the current result grid only. Without partition fields, the window covers the entire supplied result dataset.
                 </div>
                 {errors.length > 0 ? (
                     <div className="forge-report-builder__chart-errors">
