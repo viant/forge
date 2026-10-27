@@ -2,6 +2,7 @@ package xlsx
 
 import (
 	"fmt"
+	"github.com/viant/forge/backend/reporting/tablemeta"
 	"sort"
 	"strings"
 	"unicode"
@@ -285,7 +286,11 @@ func (w *dashboardWriter) group(group dashboardGroup, datasets []reportfill.Data
 				}
 				rows = append(rows, values)
 			}
-			if err := w.table(sheet, row, block.Content.Columns, rows); err != nil {
+			columns := append([]reportfill.TableColumn{}, block.Content.Columns...)
+			for i := range columns {
+				columns[i].Label = tablemeta.Header(columns[i].Label, columns[i].Key, block.Content.ColumnGroups)
+			}
+			if err := w.table(sheet, row, columns, rows); err != nil {
 				return err
 			}
 			row += len(rows) + 3

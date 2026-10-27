@@ -10921,10 +10921,10 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     ), [currentTablePresentationState,currentWindowExportParameterIdentity,currentTableBlockIds]);
     const onCurrentTablePresentationChange = React.useCallback((blockId,value) => {
         if (!currentTableBlockIds.has(blockId)) return;
-        const presentation={filter:value?.filter ?? "",sort:value?.sort ? {key:value.sort.key,direction:value.sort.direction} : null};
+        const presentation={filter:value?.filter ?? "",sort:value?.sort ? {key:value.sort.key,direction:value.sort.direction} : null,...(Array.isArray(value?.expandedKeys)?{expandedKeys:value.expandedKeys}: {})};
         setCurrentTablePresentationState(previous => {
             const values=previous.scope===currentWindowExportParameterIdentity ? previous.values : {};
-            if (!Object.hasOwn(values,blockId) && presentation.filter==="" && presentation.sort===null) return previous;
+            if (!Object.hasOwn(values,blockId) && presentation.filter==="" && presentation.sort===null && presentation.expandedKeys===undefined) return previous;
             if (JSON.stringify(values[blockId])===JSON.stringify(presentation)) return previous;
             return {scope:currentWindowExportParameterIdentity,values:{...values,[blockId]:presentation}};
         });

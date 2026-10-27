@@ -3,7 +3,7 @@ import {comparisonBarLayout, sharedChartDomain} from './chartAppearance.js';
 import {readChartDataValue} from './chartData.js';
 import {resolveCategoryColor} from './chartTheme.js';
 
-export default function ComparisonBars({rows, series, categoryKey, colors, formatter, colorForValue, onSelect}) {
+export default function ComparisonBars({rows, series, categoryKey, colors, formatter, colorForValue, onSelect,onInspect}) {
     const domain = sharedChartDomain(rows, [series]);
     return <ul className="forge-chart-comparisons">
         {rows.map((row, index) => {
@@ -18,7 +18,7 @@ export default function ComparisonBars({rows, series, categoryKey, colors, forma
                 <span className="forge-chart-comparison-value">{bar ? formatter(value) : 'Unavailable'}</span>
             </>;
             return <li key={`${label}-${index}`}>
-                {onSelect ? <button type="button" onClick={() => onSelect(row)}>{content}</button> : <div>{content}</div>}
+                {onSelect||onInspect ? <button type="button" onMouseEnter={()=>onInspect?.(row)} onFocus={()=>onInspect?.(row)} onClick={() => {onInspect?.(row);onSelect?.(row);}}>{content}</button> : <div>{content}</div>}
             </li>;
         })}
     </ul>;

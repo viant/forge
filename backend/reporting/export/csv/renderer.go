@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"github.com/viant/forge/backend/reporting/tablemeta"
 	"strconv"
 	"strings"
 
@@ -43,7 +44,7 @@ func Render(report *reportfill.ReportFill) ([]byte, error) {
 	writer := csv.NewWriter(buffer)
 	header := make([]string, 0, len(columns))
 	for _, column := range columns {
-		header = append(header, strings.TrimSpace(column.Label))
+		header = append(header, tablemeta.Header(strings.TrimSpace(column.Label), column.Key, block.Content.ColumnGroups))
 	}
 	if err := writer.Write(header); err != nil {
 		return nil, err

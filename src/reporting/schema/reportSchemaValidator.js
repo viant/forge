@@ -165,6 +165,9 @@ function validateNode(schema = {}, value, path = "$", rootSchema = schema) {
   }
 
   if (effectiveType === "array" && Array.isArray(value)) {
+    if (Number.isInteger(normalizedSchema.maxItems) && value.length > normalizedSchema.maxItems) {
+      errors.push({path,code:"maxItems",message:`Expected at most ${normalizedSchema.maxItems} item(s).`});
+    }
     if (Number.isFinite(Number(normalizedSchema.minItems)) && value.length < Number(normalizedSchema.minItems)) {
       errors.push({
         path,

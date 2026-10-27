@@ -1,3 +1,4 @@
+import {donutCenterSvg,donutCenterDescription} from '../components/donutCenter.js';
 import {buildCategoryRange,categoryRangeSvg,categoryRangePrintPages} from '../components/categoryRange.js';
 import {buildHeatmap,heatmapSvg,heatmapPrintPages} from '../components/categoricalHeatmap.js';
 import {resolveCategoryColor} from '../components/chartTheme.js';
@@ -699,8 +700,18 @@ function renderCategoryChartSvg({
   resolvedChart = {},
   width = 680,
 } = {}) {
+  const center=chartModel.type==="donut"?resolvedChart.center:null;
+  if(chartModel.appearance==='document') {
+    const values=(resolvedChart.rows||[]).map(row=>row.value).filter(value=>typeof value==='number'&&Number.isFinite(value));
+    const negative=values.some(value=>value<0);
+    const allZero=values.length>0&&values.every(value=>value===0);
+    if(negative || (allZero&&!center)) {
+      const message=negative?'Pie and donut charts require non-negative values. Use a bar chart to compare negative values.':'All values are zero for the selected period.';
+      return {svg:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} 48" width="${width}" height="48"><text x="0" y="20" font-size="12" fill="#344054">${negative?'Invalid negative category values.':'All category values are zero.'}</text></svg>`,height:48,labelDetails:[message],diagnostics:negative?[buildChartDiagnostic('invalidReportPrintCategoryValue',message)]:[]};
+    }
+  }
   const slices = resolveCategorySlices(resolvedChart);
-  if (slices.length === 0) {
+  if (slices.length === 0&&!center) {
     return {
       svg: "",
       height: 0,
@@ -710,7 +721,7 @@ function renderCategoryChartSvg({
     };
   }
   const total = slices.reduce((sum, slice) => sum + slice.value, 0);
-  if (total <= 0) {
+  if (total <= 0&&!center) {
     return {
       svg: "",
       height: 0,
@@ -725,7 +736,7 @@ function renderCategoryChartSvg({
   const cx = size / 2;
   const cy = size / 2;
   const r = size * 0.36;
-  const innerRadius = chartType === "donut" ? r * 0.56 : 0;
+  const innerRadius = chartType === "donut" ? r * (center?0.7:0.56) : 0;
   let startAngle = -Math.PI / 2;
   const paths = slices.map((slice, index) => {
     const fraction = slice.value / total;
@@ -772,17 +783,20 @@ function renderCategoryChartSvg({
       <text x="${legendX + 18}" y="${y + 11}" font-size="11" fill="#344054">${escapeXml(slice.name)} — ${escapeXml(pct)}%</text>
     `;
   }).join("\n");
+  const centerGraphic=center?donutCenterSvg(center,cx,cy,innerRadius):null;
   const donutHole = innerRadius > 0
     ? `<circle cx="${cx}" cy="${cy}" r="${innerRadius}" fill="#ffffff" />`
     : "";
   const height = Math.max(size, (slices.length * 20) + 24);
   return {
     svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
-      ${paths}
+      ${total>0?paths:`<circle cx="${cx}" cy="${cy}" r="${r}" fill="#d8e1e8"/>`}
       ${donutHole}
+      ${centerGraphic?.svg||""}
       ${legend}
     </svg>`,
     height,
+    ...(center?{labelDetails:[...(centerGraphic?.needsDetails?[donutCenterDescription(center)]:[]),...(slices.length===0?["No slice data."]:[])]}:{}),
     diagnostics: [],
   };
 }

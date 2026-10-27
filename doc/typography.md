@@ -583,6 +583,14 @@ reports use the same placement. Changing placement must preserve filter values.
 These controls do not change producer authorization or query semantics. Legacy
 ReportBuilder drawer and sheet presentations remain outside this host migration.
 
+### Authored tooltip details
+
+Authored `chartSpec.tooltip` fields use the shared `ChartTooltip` body for pointer
+inspection and the native detail selector for keyboard/touch access. Labels and
+values consume label/body/metadata roles, wrap safely, and retain explicit
+null/missing/grouped states. See [the tooltip contract and synthetic example](chart-tooltips.md)
+for admitted field dependencies and the default paginated print detail policy.
+
 ### Categorical matrix charts
 
 `chartSpec.type: heatmap` selects the shared categorical matrix primitive. Its
@@ -601,3 +609,21 @@ share one numeric extent; null endpoints remain unavailable. Labels and exact
 values use the small role, wrap and scroll locally, with complete accessible
 names and keyboard selection. Browser and canonical print use the same geometry.
 See [the range contract and migration limits](category-range.md).
+
+### Donut-center content
+
+Optional donut `center` binds an explicit dataset measure with declared `scalar`
+or `sum` semantics. The center consumes existing small/caption chart roles and
+wraps within the hole; complete visible details follow the chart if the text does
+not fit. Zero/unavailable states and canonical PDF use the same resolved value
+and formatting. The shared specimen includes synthetic library and occupancy
+examples. See [the contract, scope and limits](donut-center.md).
+
+### Analytical table structure
+
+`tableBlock.hierarchy` extends DashboardTableContent with keyed inline disclosure;
+`tableBlock.pivot` materializes an explicitly declared categorical matrix into the
+same table. Native grouped headers and shared buttons retain semantic typography,
+focus, selection and local scrolling. The laboratory example is entirely invented.
+See [table analytics](table-analytics.md) for totals, filter/sort/page semantics,
+complete evidence exports and migration limits.

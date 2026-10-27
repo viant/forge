@@ -1,0 +1,11 @@
+import '../packs/blueprint/theme.css';
+import React from 'react';
+import {createRoot} from 'react-dom/client';
+import ReportRuntime from '../components/dashboard/ReportRuntime.jsx';
+import Typography from '../components/Typography.jsx';
+import {ForgeThemeProvider,ForgeThemeBoundary} from '../components/ThemeBoundary.jsx';
+import {buildReportFillFromReportSpec} from '../reporting/reportFillModel.js';
+import fixture from '../../doc/examples/laboratory-table-analytics.json';
+const spec={version:1,kind:'reportSpec',title:'Laboratory inventory and inspections',viewer:{appearance:'document'},source:{kind:'report',containerId:'laboratory',stateKey:'laboratory',dataSourceRef:'invented'},parameters:{viewMode:'table',groupBy:'',pageSize:25,orderField:'',orderDir:'asc'},layoutIntent:{kind:'stack',resultPanePosition:'bottom',blockOrder:['inventory','inspections']},refinements:[],calculatedFields:[],datasets:['inventory','inspections'].map(id=>({id,dataSourceRef:'invented',request:{}})),blocks:[fixture.hierarchy,fixture.pivot]};
+const fill=buildReportFillFromReportSpec(spec,{inventory:{rows:fixture.inventoryRows},inspections:{rows:fixture.inspectionRows}});
+createRoot(document.getElementById('root')).render(<ForgeThemeProvider><ForgeThemeBoundary windowKey="table-analytics" presentation="document"><main><Typography as="p" typeRole="body">{fixture.provenance}</Typography><ReportRuntime reportSpec={spec} reportFill={fill}/></main></ForgeThemeBoundary></ForgeThemeProvider>);

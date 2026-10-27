@@ -1,3 +1,5 @@
+import {chartTooltipPrintLines} from '../components/chartTooltip.js';
+import {qualifiedTableColumnLabel} from './reportTableAnalytics.js';
 import {resolveChartBarRadius} from '../components/chartData.js';
 import {buildRuntimeSections} from './reportSections.js';
 import {buildKpiSparklineSvg} from './reportKpiSparklineModel.js';
@@ -2317,6 +2319,8 @@ function renderReportPrintTableBlock(state = {}, block = {}, {
   const authoredColumns = Array.isArray(block?.content?.columns) ? block.content.columns : [];
   let columns = block.selection && !authoredColumns.some(column => column.key === block.selection.field)
     ? [...authoredColumns,{key:block.selection.field,label:'Selected'}] : authoredColumns;
+  columns=columns.map(column=>({...column,label:qualifiedTableColumnLabel(column,block.content?.columnGroups || block.columnGroups || [])}));
+  block={...block,columnGroups:undefined,content:{...block.content,columnGroups:undefined}};
   let rows = Array.isArray(block?.content?.resolvedRows) ? block.content.resolvedRows : [];
   if (!columnBand && block?.runtime?.printRowReference === true && columns.length > 0 && rows.length > 0) {
     block = withReportPrintRowReference(block, columns, rows);
@@ -2426,7 +2430,7 @@ function renderReportPrintChartBlock(state = {}, block = {}, {
   const provenance = dataset?.provenance;
   // An admitted, complete empty dataset is ordinary no-data. Missing datasets,
   // incomplete pages and producer diagnostics must retain their failure path.
-  if (block?.content?.resolvedChart?.kind !== "heatmap" && declared && block?.content?.rowCount === 0 && provenance?.hasMore === false
+  if (!block?.content?.resolvedChart?.center && block?.content?.resolvedChart?.kind !== "heatmap" && declared && block?.content?.rowCount === 0 && provenance?.hasMore === false
     && provenance?.truncated === false && Array.isArray(provenance?.diagnostics)
     && provenance.diagnostics.length === 0) {
     ensureReportPrintSpace(state, reportPrintTitleHeight(state, block, layoutNote) + REPORT_PRINT_THEME.bodyLineHeight);
@@ -2493,6 +2497,11 @@ function renderReportPrintChartBlock(state = {}, block = {}, {
     if (svgResult.labelDetails?.length) {
       renderReportPrintTextLines(state, { idPrefix: `${block.id}__labels_${pageIndex}`, lines: svgResult.labelDetails, fontSize: 9, lineHeight: 12 });
     }
+    finishReportPrintBlock(state);
+  }
+  const tooltipLines=chartTooltipPrintLines(block?.content?.chartModel?.tooltip,block?.content?.resolvedChart?.tooltipEntries);
+  if(tooltipLines.length) {
+    renderReportPrintTextLines(state,{idPrefix:`${block.id}__tooltip_details`,lines:tooltipLines,fontSize:9,lineHeight:12});
     finishReportPrintBlock(state);
   }
 }
