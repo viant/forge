@@ -331,6 +331,18 @@ func (g *Gateway) discoverMode(ctx context.Context, a identity.VerifiedActor, na
 		}
 		options, c = binding.options, binding.client
 	}
+	if refreshMetadataNamespace(ctx, name) {
+		// One NEW metadata action refreshes each contributing owner's namespace
+		// once. Original operations keep their captured contracts and deadlines.
+		force = true
+		defer func() {
+			if retErr == nil {
+				if sequence := sequenceFromContext(ctx); sequence != nil {
+					retErr = sequence.record(name, binding.key, resolved)
+				}
+			}
+		}()
+	}
 	restrictions := append([]string(nil), options.PrimitiveNamespaces...)
 	sort.Strings(restrictions)
 	restrictionKey, _ := json.Marshal(restrictions)
@@ -974,6 +986,9 @@ func get[T any](ctx context.Context, g *Gateway, connection Connection, ref iden
 		}
 	}
 	if c.connection != connection || !supports(c, uri.Namespace, uri.Kind, "get") {
+		return nil, identity.ErrResourceDenied
+	}
+	if pin != nil && freshMetadataSelection(ctx) {
 		return nil, identity.ErrResourceDenied
 	}
 	if pin != nil {

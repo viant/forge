@@ -4,6 +4,7 @@ import ReportPrintPreview from "./ReportPrintPreview.jsx";
 import ReportRuntime from "./ReportRuntime.jsx";
 import ReportOutputActions from "./ReportOutputActions.jsx";
 import {useReportOutput} from "./useReportOutput.js";
+import {freshReportActionPin, sameReportActionIdentity, ReportMetadataRefreshError} from "./reportResourceFreshness.js";
 import {buildReportResourceRunRequest, hostedReportResource, hostedReportParameters, validateReportResourceRunResult, reportResourceFailureMessage} from "./reportBuilderResourceLifecycle.js";
 import {exportSelectedReport, reportResourceControls} from "./reportResourceExport.js";
 
@@ -62,40 +63,64 @@ export default function ReportResourceRuntime({container, context}) {
         setMetricState(previous => ({identity:sourceIdentity,selections:{...(previous?.identity===sourceIdentity ? previous.selections : {}),[blockId]:selection}}));
     };
     const pendingRun = useRef(null);
+    const metadataCache = useRef(null);
+    const [metadataRefreshing, setMetadataRefreshing] = useState(false);
+    const metadataIdentity = JSON.stringify(pin);
+    const getReport = services.reportStore?.getReport;
+    const actionPin = useCallback(async (selectedPin, options) => {
+        const cached = metadataCache.current;
+        const candidate = cached?.identity === metadataIdentity && sameReportActionIdentity(cached.pin,selectedPin) ? cached.pin : selectedPin;
+        const fresh = await freshReportActionPin(candidate,getReport,options);
+        if (fresh && options.isCurrent()) metadataCache.current={identity:metadataIdentity,pin:fresh};
+        return fresh;
+    },[metadataIdentity,getReport]);
+    const outputActionPin = async (selectedPin,isCurrent) => {
+        try {return await actionPin(selectedPin,{isCurrent,onRefresh:()=>{if(isCurrent())setMetadataRefreshing(true);}});}
+        finally {if(isCurrent())setMetadataRefreshing(false);}
+    };
     const runReport = services.reportStore?.runReport;
     const executeOnOpen = parameters.executeOnOpen === true;
     const run = useCallback(async () => {
         const current = ++generation.current;
         if (!canSelectMetrics) setMetricState(null);
-        setRunResult(null); setSectionSnapshot(null); setError(""); setProgress("Running the selected report revision.");
+        setRunResult(null); setSectionSnapshot(null); setMetadataRefreshing(false); setError(""); setProgress("Running the selected report revision.");
         try {
             if (!canRun || typeof runReport !== "function") throw new Error("Report execution is unavailable.");
             // StrictMode may replay the opening effect. Share only a pending request
             // for this exact authority/parameter identity; manual reruns after it
             // settles must execute again.
             let pending = pendingRun.current;
-            if (!pending || pending.identity !== identity || pending.runReport !== runReport) {
+            if (!pending || pending.identity !== identity || pending.runReport !== runReport || pending.getReport !== getReport) {
                 const request = {...buildReportResourceRunRequest(pin, runParameters), fillOnly:true, ...(selectedSection.current ? {prioritySectionId:selectedSection.current} : {})};
-                pending = {identity, runReport, request, progress:"", listener:null, snapshot:null, updateListener:null, done:false};
-                pending.promise = Promise.resolve().then(() => runReport(request, {onProgress:value => {
-                    if (pending.done) return;
-                    const message = reportExecutionProgressMessage(value);
-                    if (!message) return;
-                    pending.progress = message;
-                    pending.listener?.(message);
-                }, onUpdate:value => {
-                    if (pending.done) return;
-                    if (pending.snapshot) throw new Error("Unexpected repeated report section snapshot.");
-                    pending.snapshot = validateReportSectionSnapshot(value, request.resolvedResource, request.chartMetricSelections);
-                    pending.updateListener?.(pending.snapshot);
-                }}))
-                    .then(value => validateReportResourceRunResult(value, request.resolvedResource, request.chartMetricSelections, {fillOnly:true}))
+                pending = {identity, runReport, getReport, request, progress:"", listener:null, snapshot:null, updateListener:null, done:false};
+                pending.promise = Promise.resolve().then(async () => {
+                    const refreshed = await actionPin(request.resolvedResource,{isCurrent:()=>pending.isCurrent?.()===true,onRefresh:()=>{
+                        pending.progress="Refreshing report details.";pending.listener?.(pending.progress);
+                    }});
+                    if (!refreshed) return null;
+                    pending.request={...request,...buildReportResourceRunRequest(refreshed,{runOverride:request.parameters,chartMetricSelections:request.chartMetricSelections})};
+                    pending.progress="Running the selected report revision.";pending.listener?.(pending.progress);
+                    return runReport(pending.request, {onProgress:value => {
+                        if (pending.done) return;
+                        const message = reportExecutionProgressMessage(value);
+                        if (!message) return;
+                        pending.progress = message;
+                        pending.listener?.(message);
+                    }, onUpdate:value => {
+                        if (pending.done) return;
+                        if (pending.snapshot) throw new Error("Unexpected repeated report section snapshot.");
+                        pending.snapshot = validateReportSectionSnapshot(value, pending.request.resolvedResource, pending.request.chartMetricSelections);
+                        pending.updateListener?.(pending.snapshot);
+                    }});
+                })
+                    .then(value => value == null && !pending.isCurrent?.() ? null : validateReportResourceRunResult(value, pending.request.resolvedResource, pending.request.chartMetricSelections, {fillOnly:true}))
                     .finally(() => {
                         pending.done = true; pending.listener = null; pending.updateListener = null;
                         if (pendingRun.current === pending) pendingRun.current = null;
                     });
                 pendingRun.current = pending;
             }
+            pending.isCurrent=()=>current === generation.current;
             pending.listener = message => {if (current === generation.current) setProgress(message);};
             pending.updateListener = value => {
                 if (current !== generation.current) return;
@@ -106,12 +131,12 @@ export default function ReportResourceRuntime({container, context}) {
             if (pending.snapshot) pending.updateListener(pending.snapshot);
             const value = await pending.promise;
             if (current === generation.current) {setSectionSnapshot(null);setRunResult({result:value, request:pending.request, version:current});}
-        } catch (failure) {if (current === generation.current) {setSectionSnapshot(null);setError(reportResourceFailureMessage(failure));}}
+        } catch (failure) {if (current === generation.current) {setSectionSnapshot(null);setError(failure instanceof ReportMetadataRefreshError ? failure.message : reportResourceFailureMessage(failure));}}
         finally {if (current === generation.current) setProgress("");}
-    }, [identity, canRun, runReport, canSelectMetrics]);
+    }, [identity, canRun, runReport, canSelectMetrics, actionPin, getReport]);
     useEffect(() => {
         ++generation.current;
-        setRunResult(null); setSectionSnapshot(null); setError(""); setProgress("");
+        setRunResult(null); setSectionSnapshot(null); setMetadataRefreshing(false); setError(""); setProgress("");
         if (executeOnOpen || canSelectMetrics && Object.keys(metricSelections).length > 0) void run();
         // The host contract has no abort signal. Invalidate UI ownership so a
         // late result cannot replace a newer selection or update a closed view.
@@ -122,13 +147,19 @@ export default function ReportResourceRuntime({container, context}) {
     // a new execution, so a pending print/export from the older run must expire.
     const outputScopeKey = JSON.stringify([identity, runResult?.version]);
     const output = useReportOutput({scopeKey:outputScopeKey,disabled:!canExport||!runResult||!!progress||unexportedMetricSelection,
-        onExport:({format,tableBlockId,isCurrent})=>exportSelectedReport({pin,parameters:runParameters,format,tableBlockId,services:services.reportExport,isCurrent}),
-        onPrint:async()=>{
+        onExport:async({format,tableBlockId,isCurrent})=>{
+            const refreshed=await outputActionPin(runResult.request.resolvedResource,isCurrent);
+            if(!refreshed||!isCurrent())return null;
+            return exportSelectedReport({pin:refreshed,parameters:runParameters,format,tableBlockId,services:services.reportExport,isCurrent});
+        },
+        onPrint:async({isCurrent})=>{
             // Full print materialization is an explicit, fresh authorized run.
             // Reuse the completed screen run's captured pin, scope and metrics.
             const captured = runResult.request;
-            const request = buildReportResourceRunRequest(captured.resolvedResource, {runOverride:captured.parameters, chartMetricSelections:captured.chartMetricSelections});
-            const printed = validateReportResourceRunResult(await runReport(request), captured.resolvedResource, request.chartMetricSelections);
+            const refreshed=await outputActionPin(captured.resolvedResource,isCurrent);
+            if(!refreshed||!isCurrent())return null;
+            const request = buildReportResourceRunRequest(refreshed, {runOverride:captured.parameters, chartMetricSelections:captured.chartMetricSelections});
+            const printed = validateReportResourceRunResult(await runReport(request), refreshed, request.chartMetricSelections);
             return printed.reportPrint;
         }});
     const controls = reportResourceControls({canRun, canExport, result, progress});
@@ -142,6 +173,7 @@ export default function ReportResourceRuntime({container, context}) {
         <ReportOutputActions scopeKey={identity} output={output} disabled={!canExport||!runResult||!!progress||unexportedMetricSelection} tableBlocks={tables} reportSpec={result?.reportSpec} workbookExport={parameters.reportCapabilities?.workbookExport===true}/>
         {unexportedMetricSelection && <Callout>Chart selections cannot be exported from this preview. Run the report again to restore its saved chart choices.</Callout>}
         {progress && <Callout role="status" aria-live="polite" data-forge-status="info" icon={<Spinner size={18}/>} title="Report progress">{progress}</Callout>}
+        {metadataRefreshing && <Callout role="status" aria-live="polite" data-forge-status="info" icon={<Spinner size={18}/>}>Refreshing report details.</Callout>}
         {error && <Callout intent="danger" title="Report unavailable">{error}</Callout>}
         {result && !output.printModel && <ReportRuntime reportSpec={result.reportSpec} reportFill={result.reportFill} presentationMode="report" onChartMetricSelectionChange={changeMetrics}
             selectedSectionId={selectedSectionId} onSectionChange={changeSection}

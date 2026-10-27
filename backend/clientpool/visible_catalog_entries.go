@@ -27,6 +27,17 @@ type visibleCatalogEntry struct {
 }
 
 func (m *Manager) VisibleCatalogEntryInPartition(ctx context.Context, key string, partition VisibleCatalogPartition, entryKey string, load func(context.Context) (json.RawMessage, time.Time, error), aliases ...func(json.RawMessage) []string) (json.RawMessage, error) {
+	return m.visibleCatalogEntryInPartition(ctx, key, partition, entryKey, false, load, aliases...)
+}
+
+// RefreshVisibleCatalogEntryInPartition replaces one metadata entry using the
+// same owner/generation/publication fences. Existing callers retain detached
+// bytes and their original deadlines; a refresh never renews a held grant.
+func (m *Manager) RefreshVisibleCatalogEntryInPartition(ctx context.Context, key string, partition VisibleCatalogPartition, entryKey string, load func(context.Context) (json.RawMessage, time.Time, error), aliases ...func(json.RawMessage) []string) (json.RawMessage, error) {
+	return m.visibleCatalogEntryInPartition(ctx, key, partition, entryKey, true, load, aliases...)
+}
+
+func (m *Manager) visibleCatalogEntryInPartition(ctx context.Context, key string, partition VisibleCatalogPartition, entryKey string, refresh bool, load func(context.Context) (json.RawMessage, time.Time, error), aliases ...func(json.RawMessage) []string) (json.RawMessage, error) {
 	if ctx == nil || key == "" || entryKey == "" || load == nil || partition.manager != m {
 		return nil, primitive.ErrCatalogCursor
 	}
@@ -80,6 +91,8 @@ func (m *Manager) VisibleCatalogEntryInPartition(ctx context.Context, key string
 		slot.lastUsed = time.Now()
 		index := sort.Search(len(slot.entries), func(i int) bool { return slot.entries[i].key >= entryKey })
 		var entry *visibleCatalogEntry
+		var replacedValue json.RawMessage
+		var replacedAliases []string
 		if index < len(slot.entries) && slot.entries[index].key == entryKey {
 			entry = slot.entries[index]
 			if entry.ready != nil {
@@ -93,13 +106,21 @@ func (m *Manager) VisibleCatalogEntryInPartition(ctx context.Context, key string
 					return nil, ctx.Err()
 				}
 			}
-			if entry.until.IsZero() || entry.until.After(time.Now()) {
+			if !refresh && (entry.until.IsZero() || entry.until.After(time.Now())) {
 				out := bytes.Clone(entry.value)
 				m.mu.Unlock()
 				lookup.End(observe.OK, observe.CacheHit)
 				return out, nil
 			}
-			entryExpired = true
+			if refresh {
+				replacedValue = bytes.Clone(entry.value)
+				for _, candidate := range slot.entries {
+					if candidate.key != entryKey && candidate.ready == nil && bytes.Equal(candidate.value, replacedValue) {
+						replacedAliases = append(replacedAliases, candidate.key)
+					}
+				}
+			}
+			entryExpired = !entry.until.IsZero() && !entry.until.After(time.Now())
 			slot.entries = append(slot.entries[:index], slot.entries[index+1:]...)
 		}
 		if entry == nil {
@@ -129,9 +150,9 @@ func (m *Manager) VisibleCatalogEntryInPartition(ctx context.Context, key string
 		if err == nil {
 			err = ctx.Err()
 		}
-		var aliasKeys []string
+		aliasKeys := append([]string(nil), replacedAliases...)
 		if err == nil && len(aliases) > 0 && aliases[0] != nil {
-			aliasKeys = aliases[0](value)
+			aliasKeys = append(aliasKeys, aliases[0](value)...)
 		}
 		m.mu.Lock()
 		current := m.visibleCatalogs[key]
@@ -168,6 +189,10 @@ func (m *Manager) VisibleCatalogEntryInPartition(ctx context.Context, key string
 				}
 				position := sort.Search(len(slot.entries), func(i int) bool { return slot.entries[i].key >= alias })
 				if position < len(slot.entries) && slot.entries[position].key == alias {
+					prior := slot.entries[position]
+					if refresh && prior.ready == nil && bytes.Equal(prior.value, replacedValue) {
+						slot.entries[position] = &visibleCatalogEntry{key: alias, value: entry.value, until: entry.until, representations: entry.representations}
+					}
 					continue
 				}
 				shared := &visibleCatalogEntry{key: alias, value: entry.value, until: entry.until, representations: entry.representations}

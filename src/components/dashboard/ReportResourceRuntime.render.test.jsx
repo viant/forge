@@ -30,10 +30,10 @@ it('explains missing required inputs without exposing upstream details',async()=
         expect(view.host.textContent).not.toContain('internal/source');
     } finally {await view.close();}
 });
-async function mount(runReport, parameters={}) {
+async function mount(runReport, parameters={}, storeServices={}) {
     globalThis.IS_REACT_ACT_ENVIRONMENT=true;
     const host=document.createElement('div'), root=createRoot(host);
-    const handlers={reportStore:{runReport}, reportRuns:{capabilities:{browserSnapshots:false},begin:vi.fn(),complete:vi.fn()},dataSource:{fetchCollection:vi.fn()}};
+    const handlers={reportStore:{runReport,...storeServices}, reportRuns:{capabilities:{browserSnapshots:false},begin:vi.fn(),complete:vi.fn()},dataSource:{fetchCollection:vi.fn()}};
     const render = async (changes={}) => {parameters={...parameters,...changes};await act(async()=>root.render(
         <StrictMode><ReportResourceRuntime container={{parameters:{reportResource:pin,reportCapabilities:{run:true},...parameters}}} context={{handlers}}/></StrictMode>));};
     await render();
@@ -379,4 +379,129 @@ it('rejects malformed navigation label and ID types before rendering a snapshot'
         expect(view.host.querySelector('output')).toBeNull();
         await act(async()=>pending.resolve(result()));
     } finally {await view.close();}
+});
+
+const clockStart=Date.parse('2026-01-01T00:00:00Z');
+const timedPin=(until=clockStart+300_000)=>({...pin,providerIdentity:'sample-owner',validUntil:new Date(until).toISOString()});
+
+it('refreshes near-expiry metadata once across StrictMode before starting a new run, and retains the fresh action pin',async()=>{
+    vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(clockStart);
+    const initial=timedPin(clockStart+3_000),renewed=timedPin(),metadata=deferred();
+    const getReport=vi.fn(()=>metadata.promise),run=vi.fn(request=>Promise.resolve(result(request.resolvedResource)));
+    const view=await mount(run,{reportResource:initial,executeOnOpen:true,prefill:{sampleIds:[7]}},{getReport});
+    try {
+        expect(getReport).toHaveBeenCalledTimes(1);expect(run).not.toHaveBeenCalled();
+        expect(getReport.mock.calls[0][0]).toEqual({resource:{uri:initial.uri,revision:initial.revision},resolvedResource:initial,refreshMetadata:true});
+        expect(view.host.textContent).toContain('Refreshing report details.');
+        await act(async()=>metadata.resolve({resource:renewed}));
+        expect(run).toHaveBeenCalledTimes(1);
+        expect(run.mock.calls[0][0].resolvedResource).toEqual(renewed);
+        expect(run.mock.calls[0][0].parameters).toEqual({sampleIds:[7]});
+        expect(view.host.querySelector('output')).not.toBeNull();
+        await act(async()=>button(view,'Run report').click());
+        expect(run).toHaveBeenCalledTimes(2);expect(getReport).toHaveBeenCalledTimes(1);
+    } finally {await view.close();vi.useRealTimers();}
+});
+it('keeps fresh metadata cached and refreshes expired metadata before an explicit rerun without replaying a failed dispatch',async()=>{
+    vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(clockStart);
+    const initial=timedPin(),renewed=timedPin(clockStart+700_000);
+    const getReport=vi.fn().mockResolvedValue({resource:renewed});
+    const run=vi.fn().mockResolvedValueOnce(result(initial)).mockRejectedValueOnce(new Error('sample dispatch failure'));
+    const view=await mount(run,{reportResource:initial,executeOnOpen:true},{getReport});
+    try {
+        expect(getReport).not.toHaveBeenCalled();
+        vi.setSystemTime(clockStart+301_000);
+        await act(async()=>button(view,'Run report').click());
+        expect(getReport).toHaveBeenCalledTimes(1);expect(run).toHaveBeenCalledTimes(2);
+        expect(run.mock.calls[1][0].resolvedResource).toEqual(renewed);
+        await view.render();
+        expect(getReport).toHaveBeenCalledTimes(1);expect(run).toHaveBeenCalledTimes(2);
+        expect(view.host.textContent).toContain('This report could not be run.');
+    } finally {await view.close();vi.useRealTimers();}
+});
+it('refreshes expired Print against its new pin and preserves captured parameters while metadata refresh is visible',async()=>{
+    vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(clockStart);
+    const initial=timedPin(),renewed=timedPin(clockStart+700_000),metadata=deferred();
+    const getReport=vi.fn(()=>metadata.promise);
+    const run=vi.fn(request=>Promise.resolve(request.fillOnly?result(request.resolvedResource):printedResult(request.resolvedResource)));
+    const view=await mount(run,{reportResource:initial,executeOnOpen:true,prefill:{sampleIds:[7]},reportCapabilities:{run:true,export:true}},{getReport});
+    try {
+        expect(getReport).not.toHaveBeenCalled();
+        vi.setSystemTime(clockStart+301_000);
+        await act(async()=>button(view,'Print preview').click());
+        expect(view.host.textContent).toContain('Refreshing report details.');
+        expect(run).toHaveBeenCalledTimes(1);expect(getReport).toHaveBeenCalledTimes(1);
+        await act(async()=>metadata.resolve({resource:renewed}));
+        expect(run).toHaveBeenCalledTimes(2);
+        expect(run.mock.calls[1][0]).toEqual({resource:{uri:initial.uri,revision:initial.revision},resolvedResource:renewed,parameters:{sampleIds:[7]}});
+        expect(view.host.querySelector('aside')).not.toBeNull();
+        expect(view.host.textContent).not.toContain('Refreshing report details.');
+    } finally {await view.close();vi.useRealTimers();}
+});
+it('refreshes expired Export once and retains the selected table, format and parameters',async()=>{
+    vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(clockStart);
+    const initial=timedPin(),renewed=timedPin(clockStart+700_000),metadata=deferred();
+    const getReport=vi.fn(()=>metadata.promise);
+    const run=vi.fn().mockResolvedValue({...result(initial),reportSpec:{title:'Sample',blocks:[{id:'sampleTable',kind:'tableBlock',title:'Sample table'}]}});
+    const view=await mount(run,{reportResource:initial,executeOnOpen:true,prefill:{sampleIds:[7]},reportCapabilities:{run:true,export:true,tableBlockSelection:true}},{getReport});
+    const submitResource=vi.fn().mockResolvedValue({jobId:'sample-job'});
+    view.handlers.reportExport={submitResource,getStatus:vi.fn().mockResolvedValue({status:'failed',error:'Sample export stop'})};
+    try {
+        vi.setSystemTime(clockStart+301_000);
+        await act(async()=>button(view,'Export CSV').click());
+        expect(getReport).toHaveBeenCalledTimes(1);expect(submitResource).not.toHaveBeenCalled();
+        expect(view.host.textContent).toContain('Refreshing report details.');
+        await act(async()=>metadata.resolve({resource:renewed}));
+        expect(submitResource).toHaveBeenCalledExactlyOnceWith({resource:{uri:initial.uri,revision:initial.revision},resolvedResource:renewed,parameters:{sampleIds:[7]},format:'csv',tableBlockId:'sampleTable'});
+        expect(run).toHaveBeenCalledTimes(1);expect(getReport).toHaveBeenCalledTimes(1);
+    } finally {await view.close();vi.useRealTimers();}
+});
+it('explains definition or authority changes before dispatch and never retries metadata refresh',async()=>{
+    vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(clockStart);
+    const initial=timedPin(clockStart-1),changed={...timedPin(),authorityBinding:'different-binding'};
+    const getReport=vi.fn().mockResolvedValue({resource:changed}),run=vi.fn();
+    const view=await mount(run,{reportResource:initial,executeOnOpen:true},{getReport});
+    try {
+        expect(getReport).toHaveBeenCalledTimes(1);expect(run).not.toHaveBeenCalled();
+        expect(view.host.textContent).toContain('This report changed while it was open. Refresh or reopen it');
+        await view.render();expect(getReport).toHaveBeenCalledTimes(1);
+    } finally {await view.close();vi.useRealTimers();}
+});
+it('does not dispatch after a metadata refresh settles for a closed report',async()=>{
+    vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(clockStart);
+    const metadata=deferred(),getReport=vi.fn(()=>metadata.promise),run=vi.fn();
+    const view=await mount(run,{reportResource:timedPin(clockStart-1),executeOnOpen:true},{getReport});
+    await view.close();await act(async()=>metadata.resolve({resource:timedPin()}));
+    expect(run).not.toHaveBeenCalled();expect(getReport).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+});
+
+it('uses fresh action metadata for Run, Print and Export without any metadata reads',async()=>{
+    vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(clockStart);
+    const initial=timedPin(),getReport=vi.fn();
+    const run=vi.fn(request=>Promise.resolve(request.fillOnly?result(request.resolvedResource):printedResult(request.resolvedResource)));
+    const view=await mount(run,{reportResource:initial,executeOnOpen:true,reportCapabilities:{run:true,export:true}},{getReport});
+    view.handlers.reportExport={submitResource:vi.fn().mockResolvedValue({jobId:'sample'}),getStatus:vi.fn().mockResolvedValue({status:'failed',error:'Sample stop'})};
+    try {
+        await act(async()=>button(view,'Run report').click());
+        await act(async()=>button(view,'Print preview').click());
+        await act(async()=>button(view,'Close print preview').click());
+        await act(async()=>button(view,'Export PDF').click());
+        expect(getReport).not.toHaveBeenCalled();expect(run).toHaveBeenCalledTimes(3);
+        expect(view.handlers.reportExport.submitResource).toHaveBeenCalledTimes(1);
+    } finally {await view.close();vi.useRealTimers();}
+});
+it('never refreshes or replays an already dispatched run when its cached metadata ages during execution',async()=>{
+    vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(clockStart);
+    const initial=timedPin(),pending=deferred(),getReport=vi.fn(),run=vi.fn(()=>pending.promise);
+    const view=await mount(run,{reportResource:initial,executeOnOpen:true},{getReport});
+    try {
+        expect(run).toHaveBeenCalledTimes(1);
+        vi.setSystemTime(clockStart+301_000);
+        await act(async()=>run.mock.calls[0][1].onProgress({kind:'reportExecution',phase:'completed',total:2,completed:1,datasetLabel:'Sample'}));
+        expect(getReport).not.toHaveBeenCalled();expect(run).toHaveBeenCalledTimes(1);
+        expect(run.mock.calls[0][0].resolvedResource.validUntil).toBe(initial.validUntil);
+        await act(async()=>pending.reject(new Error('sample original execution failed')));
+        expect(getReport).not.toHaveBeenCalled();expect(run).toHaveBeenCalledTimes(1);
+    } finally {await view.close();vi.useRealTimers();}
 });
