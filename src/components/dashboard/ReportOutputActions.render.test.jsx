@@ -25,6 +25,10 @@ it('downloads the chosen complete table through the shared file path',async()=>{
  const run=vi.fn(async({format})=>artifact(format)),v=await mount({onExport:run});
  try{await act(async()=>v.button('Export CSV').click());expect(run).toHaveBeenCalledTimes(1);expect(run.mock.calls[0][0]).toMatchObject({format:'csv',tableBlockId:'evidence'});expect(v.click).toHaveBeenCalledOnce();}finally{await v.close()}
 });
+it('exports a complete workbook without requiring a CSV table selection',async()=>{
+ const run=vi.fn(async({format})=>artifact(format)),v=await mount({onExport:run,workbookExport:true,tableBlocks:[{id:'one'},{id:'two'}]});
+ try{expect(v.button('Export CSV').disabled).toBe(true);expect(v.button('Export XLSX').disabled).toBe(false);await act(async()=>v.button('Export XLSX').click());expect(run.mock.calls[0][0]).toMatchObject({format:'xlsx'});expect(run.mock.calls[0][0].tableBlockId).toBeUndefined();}finally{await v.close()}
+});
 it('aborts an obsolete scope and never downloads its late result',async()=>{
  const pending=deferred(),run=vi.fn(()=>pending.promise),v=await mount({onExport:run});
  try{await act(async()=>v.button('Export PDF').click());const request=run.mock.calls[0][0];await v.render({scopeKey:'different-advertiser'});expect(request.signal.aborted).toBe(true);expect(request.isCurrent()).toBe(false);await act(async()=>pending.resolve(artifact('pdf')));expect(v.click).not.toHaveBeenCalled();expect(v.host.textContent).not.toContain('Preparing PDF');}finally{await v.close()}

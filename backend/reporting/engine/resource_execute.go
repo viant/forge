@@ -295,6 +295,7 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 		} `json:"blocks"`
 		Datasets []struct {
 			ID             string                       `json:"id"`
+			Label          string                       `json:"label"`
 			DataSourceRef  string                       `json:"dataSourceRef"`
 			Request        map[string]interface{}       `json:"request"`
 			Rows           json.RawMessage              `json:"rows"`
@@ -349,8 +350,10 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 		descriptor     *dsproto.DataSource
 		args           map[string]interface{}
 		resultContract json.RawMessage
+		progress       datasetProgress
 	}
 	plans := make([]plannedDataset, 0, len(spec.Datasets))
+	progressTabs := reportProgressTabs(executionSpec)
 	seen := map[string]bool{}
 	var selected map[string]bool
 	if selectedIDs != nil {
@@ -418,7 +421,7 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 			effectiveDatasets[index]["resultContract"] = map[string]interface{}{"shape": "rows", "rowPath": "rows", "hasMorePath": "dataInfo.hasMore"}
 		}
 		if selected == nil || selected[dataset.ID] {
-			plans = append(plans, plannedDataset{dataset.ID, descriptor, args, dataset.ResultContract})
+			plans = append(plans, plannedDataset{dataset.ID, descriptor, args, dataset.ResultContract, datasetProgress{id: dataset.ID, label: reportProgressLabel(dataset.Label, descriptor.Title, dataset.ID), source: descriptor.ID, tabs: progressTabs[dataset.ID]}})
 		}
 	}
 	for id := range request.DatasetPageOffsets {
@@ -449,6 +452,7 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 	}
 	planTiming.End(observe.OK, observe.CacheUnknown)
 	planPending = false
+	progress := newExecutionProgress(ctx, len(plans))
 	fetched := make([]*dsproto.FetchResult, len(plans))
 	fetchedPayloads := make([]json.RawMessage, len(plans))
 	fetchTiming := observe.Start(ctx, "report.resource.fetch", observe.Labels{Kind: "report"})
@@ -463,6 +467,7 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 		if err := checkPage(); err != nil {
 			return err
 		}
+		progress.emit("started", plan.progress)
 		fetch := func(exact *dsproto.DataSource, pageArgs map[string]interface{}) (*dsproto.FetchResult, error) {
 			admittedContext := context.WithValue(datasetCtx, admittedReportDefinitionKey{}, admittedReportDefinition{service: s, pin: *pin, definition: envelope})
 			result, err := s.resourceDatasetExecutor(requestctx.WithResourceDependencies(requestctx.WithResolvedResource(admittedContext, *pin), *pin, compiled.DependencyPins), *pin, exact, pageArgs)
@@ -492,12 +497,14 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 			return err
 		}
 		fetched[index], fetchedPayloads[index] = result, payload
+		progress.emit("completed", plan.progress)
 		return nil
 	})
 	fetchTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
 		return nil, err
 	}
+	progress.emit("materializing", datasetProgress{})
 	// Publish no partial result: collect only after all admitted fetches finish.
 	results := map[string]*dsproto.FetchResult{}
 	payloads := map[string]json.RawMessage{}
