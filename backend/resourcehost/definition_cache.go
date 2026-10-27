@@ -86,7 +86,11 @@ func (g *Gateway) cachedDefinitionGet(ctx context.Context, actor identity.Verifi
 	entry += targetSuffix
 	attempt := observe.Start(ctx, "gateway.definition.cache.attempt", observe.Labels{})
 	attempt.End(observe.OK, observe.CacheUnknown)
-	value, err := g.Manager.VisibleCatalogEntryInPartition(ctx, key, partition, entry, func(ctx context.Context) (json.RawMessage, time.Time, error) {
+	readEntry := g.Manager.VisibleCatalogEntryInPartition
+	if refreshMetadataDefinition(ctx, key, entry) {
+		readEntry = g.Manager.RefreshVisibleCatalogEntryInPartition
+	}
+	value, err := readEntry(ctx, key, partition, entry, func(ctx context.Context) (json.RawMessage, time.Time, error) {
 		result, err := load(ctx)
 		if err != nil {
 			return nil, time.Time{}, err
