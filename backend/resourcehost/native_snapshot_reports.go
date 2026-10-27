@@ -71,7 +71,9 @@ func NativeReportLoader(uri string, options reportcatalog.ReportResourceOptions,
 			if key == "" {
 				return nil, identity.ErrResourceDenied
 			}
-			return workspacewindow.LoadWorkspaceDatasourceDescriptorsWithOptionsAt(ctx, reader.root.Name(), key, workspacewindow.WorkspaceWindowEnricher(enrich), workspacewindow.LoaderOptions{SharedDefault: true, FS: filesystem, AssetDirectories: filesystem.assetDirectories, Check: filesystem.check})
+			// Saved reports require a complete declared lookup closure. A
+			// warning-tolerant window load would silently omit referenced sources.
+			return workspacewindow.LoadWorkspaceDatasourceDescriptorsWithOptionsAt(ctx, reader.root.Name(), key, workspacewindow.WorkspaceWindowEnricher(enrich), workspacewindow.LoaderOptions{RequireCompleteResources: true, SharedDefault: true, FS: filesystem, AssetDirectories: filesystem.assetDirectories, Check: filesystem.check})
 		}
 		source, err := reportcatalog.NewReportResourceSource(current)
 		if err != nil {
