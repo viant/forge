@@ -3062,6 +3062,7 @@ export default function ReportRuntime({
   selectedSectionId = "",
   onSectionChange = null,
   sectionLoading = false,
+  sectionNavigation = null,
   sectionError = "",
   onSectionRetry = null,
   onChartMetricSelectionChange = null,
@@ -3614,12 +3615,18 @@ export default function ReportRuntime({
     return <UnsupportedBlock key={block?.id || kind} block={block} />;
   };
 
-  const runtimeSections = buildRuntimeSections(allRuntimeBlocks, runtimeCompositeConfig.childBlockIdSet)
+  const materializedSections = buildRuntimeSections(allRuntimeBlocks, runtimeCompositeConfig.childBlockIdSet)
     .filter((section) => !section.block || isReportRuntimeBlockVisible(section.block, {
       metrics: resolveRuntimeDataset(section.block)?.rows?.[0] || {},
       filters: runtimeFilterValues,
       selection: runtimeSelection,
     }));
+  // A streamed projection contains only ready blocks. Pending navigation is
+  // declared separately; it must never be evaluated against invented empty rows.
+  const runtimeSections = Array.isArray(sectionNavigation)
+    ? sectionNavigation.map(item => materializedSections.find(section => section.id === item.id)
+      || {id:item.id, navigationLabel:item.label || item.id, title:item.label || item.id, block:null, items:[]})
+    : materializedSections;
   const runtimeTabGroup = useMemo(
     () => resolveRuntimeTabGroupConfig(allRuntimeBlocks),
     [allRuntimeBlocks],

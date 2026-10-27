@@ -7,7 +7,10 @@ vi.mock('@blueprintjs/core', () => ({
     Spinner: () => <span/>,
     HTMLSelect: props => <select {...props}/>,
 }));
-vi.mock('./ReportRuntime.jsx', () => ({default: ({reportSpec,onChartMetricSelectionChange}) => <><output>{reportSpec.title}</output>{onChartMetricSelectionChange&&<button onClick={()=>onChartMetricSelectionChange({blockId:'trend',selection:{primaryField:'count',secondaryField:'rate'}})}>Choose metrics</button>}</>}));
+vi.mock('./ReportRuntime.jsx', () => ({default: ({reportSpec,onChartMetricSelectionChange,sectionNavigation,selectedSectionId,onSectionChange,sectionLoading}) => <>
+    {sectionNavigation?.map(section=><button key={section.id} onClick={()=>onSectionChange(section.id)}>{section.label}</button>)}
+    {sectionLoading ? <p>Loading section…</p> : <output data-selected-section={selectedSectionId}>{reportSpec.title}</output>}
+    {onChartMetricSelectionChange&&<button onClick={()=>onChartMetricSelectionChange({blockId:'trend',selection:{primaryField:'count',secondaryField:'rate'}})}>Choose metrics</button>}</>}));
 vi.mock('./ReportPrintPreview.jsx', () => ({default: () => <aside>Print</aside>}));
 import ReportResourceRuntime from './ReportResourceRuntime.jsx';
 
@@ -298,4 +301,82 @@ it('shows real datasource progress on the shared StrictMode execution and discar
     await closed.close();
     await act(async()=>{notify({kind:'reportExecution',phase:'started',total:1,completed:0,datasetLabel:'Late'});late.resolve(result());});
     expect(closed.host.childNodes.length).toBe(0);
+});
+
+const sectionSnapshot = () => ({kind:'reportSectionReady',resource:pin,sectionId:'overview',sections:[{id:'overview',label:'Overview'},{id:'detail',label:'Detail'}],reportSpec:{title:'Initial section',datasets:[{id:'sample'}],blocks:[{id:'overview',kind:'sectionBlock',blockIds:['sampleTable']},{id:'sampleTable',kind:'tableBlock',datasetRef:'sample'}]},reportFill:{datasets:[{id:'sample',rows:[{amount:10}]}],blocks:[]}});
+
+it('shows one ready section while pending tab clicks stay within the same StrictMode request',async()=>{
+    const pending=deferred(),run=vi.fn(()=>pending.promise);
+    const view=await mount(run,{executeOnOpen:true,reportCapabilities:{run:true,export:true}});
+    try {
+        expect(run).toHaveBeenCalledTimes(1);
+        await act(async()=>run.mock.calls[0][1].onUpdate(sectionSnapshot()));
+        expect(view.host.querySelector('output')?.textContent).toBe('Initial section');
+        expect(button(view,'Print preview')?.disabled).toBe(true);
+        await act(async()=>button(view,'Detail').click());
+        expect(view.host.textContent).toContain('Loading section…');
+        expect(view.host.querySelector('output')).toBeNull();
+        expect(run).toHaveBeenCalledTimes(1);
+        await act(async()=>button(view,'Overview').click());
+        expect(view.host.querySelector('output')?.textContent).toBe('Initial section');
+        await act(async()=>button(view,'Detail').click());
+        await act(async()=>pending.resolve(result(pin,'Complete report')));
+        expect(view.host.querySelector('output')?.textContent).toBe('Complete report');
+        expect(view.host.querySelector('output')?.getAttribute('data-selected-section')).toBe('detail');
+        expect(view.host.textContent).not.toContain('Loading section…');
+        expect(run).toHaveBeenCalledTimes(1);
+        run.mockResolvedValueOnce(result());
+        await act(async()=>button(view,'Run report').click());
+        expect(run.mock.calls[1][0].prioritySectionId).toBe('detail');
+    } finally {await view.close();}
+});
+it('removes provisional sections on terminal failure and ignores snapshots from a stale parameter scope',async()=>{
+    const first=deferred(),second=deferred(),run=vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const view=await mount(run,{executeOnOpen:true});
+    try {
+        const update=run.mock.calls[0][1].onUpdate;
+        await act(async()=>update(sectionSnapshot()));
+        expect(view.host.querySelector('output')).not.toBeNull();
+        await view.render({prefill:{sampleIds:[2]}});
+        expect(view.host.querySelector('output')).toBeNull();
+        await act(async()=>run.mock.calls[1][1].onUpdate(sectionSnapshot()));
+        await act(async()=>second.reject(Object.assign(new Error('sample denial'),{status:403})));
+        expect(view.host.querySelector('output')).toBeNull();
+        expect(view.host.textContent).toContain('Report unavailable');
+        await act(async()=>first.resolve(result(pin,'Stale completion')));
+        expect(view.host.querySelector('output')).toBeNull();
+        expect(()=>update(sectionSnapshot())).not.toThrow();
+    } finally {await view.close();}
+});
+it('rejects section snapshots that substitute authority or contain missing datasets',async()=>{
+    const pending=deferred(),run=vi.fn(()=>pending.promise),view=await mount(run,{executeOnOpen:true});
+    try {
+        const snapshot=sectionSnapshot();snapshot.resource={...pin,authorityBinding:'different-principal'};
+        expect(()=>run.mock.calls[0][1].onUpdate(snapshot)).toThrow();
+        expect(view.host.querySelector('output')).toBeNull();
+        await act(async()=>pending.resolve(result()));
+    } finally {await view.close();}
+    const next=deferred(),nextRun=vi.fn(()=>next.promise),missing=await mount(nextRun,{executeOnOpen:true});
+    try {
+        const snapshot=sectionSnapshot();snapshot.reportFill.datasets=[];
+        expect(()=>nextRun.mock.calls[0][1].onUpdate(snapshot)).toThrow('Invalid report section snapshot');
+        expect(missing.host.querySelector('output')).toBeNull();
+        await act(async()=>next.resolve(result()));
+    } finally {await missing.close();}
+});
+
+it('rejects malformed navigation label and ID types before rendering a snapshot',async()=>{
+    const pending=deferred(),run=vi.fn(()=>pending.promise),view=await mount(run,{executeOnOpen:true});
+    try {
+        for(const label of [undefined,null,7,{text:'Invalid label'}]) {
+            const snapshot=sectionSnapshot();snapshot.sections[1].label=label;
+            expect(()=>run.mock.calls[0][1].onUpdate(snapshot)).toThrow('Invalid report section snapshot');
+        }
+        for(const id of [null,7,{}]) {
+            const snapshot=sectionSnapshot();snapshot.sections[1].id=id;
+            expect(()=>run.mock.calls[0][1].onUpdate(snapshot)).toThrow('Invalid report section snapshot');
+        }
+        expect(view.host.querySelector('output')).toBeNull();
+        await act(async()=>pending.resolve(result()));
+    } finally {await view.close();}
 });

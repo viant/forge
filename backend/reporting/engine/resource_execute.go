@@ -32,6 +32,9 @@ type ExecuteResourceRequest struct {
 	// FillOnly projects interactive preview output; it does not change dataset
 	// planning, authority, or business-source dispatch. Default output is full.
 	FillOnly bool `json:"fillOnly,omitempty"`
+	// PrioritySectionID is an advisory presentation hint, never a datasource
+	// selector. Only the admitted server definition determines section closure.
+	PrioritySectionID string `json:"prioritySectionId,omitempty"`
 	// DatasetFetchMode defaults to complete for backward compatibility. Page
 	// returns one producer page and preserves its completeness metadata; complete
 	// follows only the continuation contract declared by the approved datasource.
@@ -456,7 +459,7 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 	fetched := make([]*dsproto.FetchResult, len(plans))
 	fetchedPayloads := make([]json.RawMessage, len(plans))
 	fetchTiming := observe.Start(ctx, "report.resource.fetch", observe.Labels{Kind: "report"})
-	err = runReportDatasetPlans(ctx, len(plans), s.resourceDatasetConcurrency, func(datasetCtx context.Context, index int) error {
+	fetchPlan := func(datasetCtx context.Context, index int) error {
 		plan := plans[index]
 		checkPage := func() error {
 			if err := datasetCtx.Err(); err != nil {
@@ -499,7 +502,57 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 		fetched[index], fetchedPayloads[index] = result, payload
 		progress.emit("completed", plan.progress)
 		return nil
-	})
+	}
+	var section *materializer.SectionPlan
+	if request.FillOnly && selectedIDs == nil && request.DatasetFetchMode != DatasetFetchPage && prepared == nil && requestctx.HasToolUpdates(ctx) {
+		section = materializer.PlanInitialSection(effectiveSpec, request.PrioritySectionID)
+	}
+	indices := make([]int, len(plans))
+	for index := range plans {
+		indices[index] = index
+	}
+	runIndices := func(indices []int) error {
+		return runReportDatasetPlans(ctx, len(indices), s.resourceDatasetConcurrency, func(datasetCtx context.Context, index int) error { return fetchPlan(datasetCtx, indices[index]) })
+	}
+	if section == nil {
+		err = runIndices(indices)
+	} else {
+		first := map[string]bool{}
+		for _, id := range section.DatasetIDs {
+			first[id] = true
+		}
+		var initial, remaining []int
+		for index, plan := range plans {
+			if first[plan.id] {
+				initial = append(initial, index)
+			} else {
+				remaining = append(remaining, index)
+			}
+		}
+		err = runIndices(initial)
+		if err == nil {
+			payloads := map[string]json.RawMessage{}
+			for _, index := range initial {
+				payloads[plans[index].id] = fetchedPayloads[index]
+			}
+			var initialArtifacts *materializer.Artifacts
+			initialArtifacts, err = materializer.MaterializeSection(ctx, section, payloads, request.TablePresentations)
+			if err == nil {
+				err = finalCheck()
+			}
+			// Drain the first wave before reusing existing POST release checks.
+			// No producer work overlaps a publication transition.
+			if err == nil {
+				err = requestctx.CheckResourceReadPublication(ctx)
+			}
+			if err == nil {
+				err = requestctx.EmitToolUpdate(ctx, SectionReadySnapshot{Kind: "reportSectionReady", Resource: cloneResolvedResource(pin), SectionID: section.SectionID, Sections: section.Sections, ReportSpec: cloneJSON(section.Spec), ReportFill: initialArtifacts.ReportFill})
+			}
+		}
+		if err == nil {
+			err = runIndices(remaining)
+		}
+	}
 	fetchTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
 		return nil, err
