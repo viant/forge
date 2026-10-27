@@ -1,7 +1,11 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {createTableViewActionAdapter} from '../../core/preferences/tableViewActions.js';
 import {createTableViewSession} from '../../core/preferences/tableViews.js';
 
-export function useTableViews({adapter, config, active}) {
+export function useTableViews({adapter: hostAdapter, context, config, active}) {
+    const actions = config?.actions;
+    const adapter = useMemo(() => actions == null ? hostAdapter : createTableViewActionAdapter(context, actions),
+        [hostAdapter, context, actions != null, actions?.list, actions?.save, actions?.remove]);
     const [state, setState] = useState({views: [], loading: false, error: null});
     const session = useRef(null);
     const key = config?.key;
@@ -19,8 +23,8 @@ export function useTableViews({adapter, config, active}) {
     }, [adapter, key, !!config, active]);
     return {
         ...(state.adapter === adapter && state.key === key ? state : {views: [], loading: !!active, error: null}),
-        canSave: typeof adapter?.save === 'function' && !!key,
-        canRemove: typeof adapter?.remove === 'function' && !!key,
+        canSave: typeof adapter?.list === 'function' && typeof adapter?.save === 'function' && !!key,
+        canRemove: typeof adapter?.list === 'function' && typeof adapter?.remove === 'function' && !!key,
         save: useCallback(value => session.current?.save(value), []),
         remove: useCallback(id => session.current?.remove(id), []),
         reload: useCallback(() => session.current?.load(), []),

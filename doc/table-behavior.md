@@ -161,3 +161,33 @@ the label (or the column's `emptyText` when no label exists). The renderer
 retries when a later value supplies a different image URL. Provider-specific
 logo selection and fallback assets belong in the resource's portable data
 preparation, rather than in Forge.
+
+## Saved view actions
+
+Native definitions can bind the existing saved-view controls to authored actions:
+
+```yaml
+table:
+  savedViews:
+    key: shared-record-grid
+    actions:
+      list: views.list
+      save: views.save
+      remove: views.remove
+```
+
+The normal window context resolves each handler when invoked. `list` receives
+`{context, key}` and returns an array of `{id, name, preferences}`. `save` receives
+`{context, key, input}`; creation omits `input.id`, while updating includes it.
+`remove` receives `{context, key, id}`. Preferences use the validated version-1
+contract above. List/readback follows mutations through the serialized view
+session. Missing mutation bindings disable their controls. Missing list/context
+or handler failures remain visible; authored bindings do not silently fall back
+to a host provider.
+
+Without `actions`, existing `services.tableViews` adapters remain supported.
+Applications own wire-format and column-ID conversion. Transport and trusted
+actor scope remain in the host's normal data boundary; these controls contain no
+producer tool names or authorization policy. Hosts must replace context/adapter
+identity when the actor changes so disposed sessions cannot publish stale data.
+Saved presets do not by themselves configure active table-preference persistence.

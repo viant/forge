@@ -12,8 +12,8 @@ beforeEach(() => {
 afterEach(async () => {await act(async () => root.unmount()); host.remove();});
 const baseColumns = [{id: 'a', name: 'Attribute', visible: true}, {id: 'b', name: 'Reach', visible: true}];
 const preferences = {version: 1, columns: [{id: 'b', visible: false}, {id: 'a', visible: true}], density: 'compact'};
-function Harness({adapter, viewKey = 'grid', active = true}) {
-    const model = useTableViews({adapter, config: {key: viewKey}, active});
+function Harness({adapter, context, actions, viewKey = 'grid', active = true}) {
+    const model = useTableViews({adapter, context, config: {key: viewKey, actions}, active});
     const [columns, setColumns] = useState(baseColumns);
     return <><TableViewPresets model={model} columns={columns} baseColumns={baseColumns} density="normal"
         onApply={setColumns}/><output>{JSON.stringify(columns)}</output></>;
@@ -78,4 +78,19 @@ it('shows missing-provider and producer errors with a retry action', async () =>
     expect(host.querySelector('[role="alert"]').textContent).toContain('Producer unavailable');
     await act(async () => button('Retry saved views').click());
     expect(host.querySelector('[role="alert"]')).toBeNull();
+});
+
+it('uses authored context actions without a transport-specific host adapter', async () => {
+    const list = vi.fn(async () => []), save = vi.fn(async () => {});
+    const context = {lookupHandler: name => ({'views.list': list, 'views.save': save})[name]};
+    await act(async () => root.render(<Harness context={context} actions={{list: 'views.list', save: 'views.save'}}/>));
+    expect(list).toHaveBeenCalledWith({context, key: 'grid'});
+    await change(host.querySelector('input'), 'Authored view');
+    await act(async () => button('Add selection as preset').click());
+    expect(save).toHaveBeenCalledWith({context, key: 'grid', input: expect.objectContaining({name: 'Authored view'})});
+    expect(save.mock.calls[0][0].input).not.toHaveProperty('id');
+    expect(button('Delete view').disabled).toBe(true);
+    await act(async () => root.render(<Harness context={context} actions={{save: 'views.save'}}/>));
+    expect(host.querySelector('[role="alert"]').textContent).toContain('provider is unavailable');
+    expect(button('Add selection as preset').disabled).toBe(true);
 });
