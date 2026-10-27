@@ -732,6 +732,11 @@ export function startUIBridgeHTTP(options = {}) {
       await publishSnapshot({}, scope);
       requireCurrent(scope);
       settleBridgeReadyState(true);
+      // Retained metadata may have failed against the previous process/session.
+      // Consumers compare session identities before retrying a rejected read.
+      if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+        window.dispatchEvent(new CustomEvent('forge:retry-window-metadata', {detail: {reason: 'transport-ready'}}));
+      }
       snapshotTimer = setInterval(publishSnapshot, snapshotIntervalMs);
       snapshotStatusTimer = setInterval(checkSnapshotStatus, snapshotStatusIntervalMs);
       detachListeners = bindImmediateSnapshotListeners();
