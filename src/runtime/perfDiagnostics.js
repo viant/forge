@@ -1,3 +1,5 @@
+import {observeReportTabTimings} from './reportTabTiming.js';
+
 // Opt-in browser timing for Forge hosts. Hosts provide only route/visible-panel
 // classification; the collector never retains inputs, URL queries or row data.
 export function installForgePerfDiagnostics({env=globalThis,panelId='forge-timing-diagnostics',
@@ -111,6 +113,15 @@ export function installForgePerfDiagnostics({env=globalThis,panelId='forge-timin
       openToContentDOMMs:content && open ? +(content.start-open.start).toFixed(1) : null,
       openToContentFrameMs:contentFrame && open ? +(contentFrame.start-open.start).toFixed(1) : null,
       dataEndToRowsDOMMs:rows && data.length===1 && latestDataEnd!==null && rows.start>=latestDataEnd?+(rows.start-latestDataEnd).toFixed(1):null,
+      reportTabFrameMeasure:'two requestAnimationFrame callbacks after the selected section DOM commit; proxy, not GPU paint',
+      reportTabSwitches:scoped.filter(event=>event.kind==='report-tab-click').map(click=>{
+        const dom=scoped.find(event=>event.kind==='report-tab-dom' && event.operation===click.operation);
+        const frame=scoped.find(event=>event.kind==='report-tab-frame' && event.operation===click.operation);
+        const error=scoped.some(event=>event.kind==='report-tab-error' && event.operation===click.operation);
+        return {operation:click.operation,outcome:error?'error':dom?'ready':'pending',
+          clickToContentDOMMs:dom?+(dom.start-click.start).toFixed(1):null,
+          clickToContentFrameMs:frame?+(frame.start-click.start).toFixed(1):null};
+      }),
       phaseScopes:phases,events:scoped,resources:relevantResources(),extra:extraSnapshot({events:scoped,open,performance})};
   };
   const render = () => { if (output) output.textContent = JSON.stringify(snapshot(),null,2); };
@@ -218,10 +229,14 @@ export function installForgePerfDiagnostics({env=globalThis,panelId='forge-timin
   };
   document.addEventListener('click', event => {
     if (!armed || panel?.contains(event.target)) return;
+    // Report section timing has its own numeric scope. Keep the window opener
+    // armed and avoid retaining section captions as a workspace-open label.
+    if(event.target?.closest?.('[role="tab"][data-section-id]')?.closest?.('[data-forge-report-active-section]')) return;
     const label = clickLabel(event);
     if (!label) return;
     beginOpen(label);
   },true);
+  observeReportTabTimings({document,window,now,add});
 
   const mount = () => {
     panel = document.createElement('details');

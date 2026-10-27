@@ -3707,7 +3707,7 @@ export default function ReportRuntime({
 
   return (
     <DocumentPresentationContext.Provider value={documentPresentation}>
-    <div data-forge-report-appearance={documentPresentation ? 'document' : undefined} style={documentPresentation ? undefined : { display: "flex", flexDirection: "column", gap: 16 }}>
+    <div data-forge-report-active-section={resolvedActiveSectionId} data-forge-report-section-state={sectionError?'error':sectionLoading?'loading':'ready'} data-forge-report-appearance={documentPresentation ? 'document' : undefined} style={documentPresentation ? undefined : { display: "flex", flexDirection: "column", gap: 16 }}>
       {documentPresentation ? <header className="forge-report-document-header">
         <div><Typography as="h1" typeRole="title">{title || reportDocument?.title || reportSpec?.title}</Typography>{subtitle || reportDocument?.subtitle ? <Typography as="p" typeRole="body">{subtitle || reportDocument.subtitle}</Typography> : null}</div>
         <div className="forge-report-document-actions">{reportActions}{topFilterBarBlocks.length ? <Button variant="ghost" icon="lucide:sliders-horizontal" hideLabel aria-label="Toggle report filters" aria-pressed={filterPanelOpen} onClick={() => setFilterPanelOpen(open => !open)}/> : null}{filterToolbarModel.activeCount > 0 && typeof runtimeHandlers?.clearScopeParams === 'function' ? <Button variant="link" aria-label="Clear all report filters" onClick={() => runtimeHandlers.clearScopeParams(filterToolbarModel.filters)}>Clear all</Button> : null}</div>
