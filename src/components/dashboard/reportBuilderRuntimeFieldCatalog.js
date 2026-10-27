@@ -39,9 +39,10 @@ function normalizeTablePresentation(value = null) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const labelClamp = normalizePresentationClampConfig(value?.labelClamp || value?.LabelClamp);
   const collapsible = value?.collapsible === true || value?.Collapsible === true;
+  const defaultCollapsed = typeof value?.defaultCollapsed === "boolean" ? value.defaultCollapsed : value?.DefaultCollapsed;
   return {
     ...(collapsible ? { collapsible: true } : {}),
-    ...(collapsible && (value?.defaultCollapsed === true || value?.DefaultCollapsed === true) ? { defaultCollapsed: true } : {}),
+    ...(collapsible && typeof defaultCollapsed === "boolean" ? { defaultCollapsed } : {}),
     ...(labelClamp ? { labelClamp } : {}),
   };
 }

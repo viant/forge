@@ -120,11 +120,15 @@ func TestCompleteResourceLegacyAndExplicitNumericContracts(t *testing.T) {
 		}
 	}
 	descriptor.Paging.DataInfoSelectors.HasMore = ""
+	calls = 0
 	if out, err = fetchCompleteResourceDataset(context.Background(), descriptor, nil, func() error { return nil }, func(*dsproto.DataSource, map[string]interface{}) (*dsproto.FetchResult, error) {
-		t.Fatal("unknown completeness dispatched")
-		return nil, nil
+		calls++
+		return &dsproto.FetchResult{Rows: []map[string]interface{}{{"id": 1}}}, nil
 	}); out != nil || err == nil {
-		t.Fatal("unconfigured complete report admitted")
+		t.Fatal("unknown normalized completeness admitted")
+	}
+	if calls != 1 {
+		t.Fatal("continued without boolean completeness")
 	}
 }
 
