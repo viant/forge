@@ -139,7 +139,7 @@ export default function ReportResourceRuntime({container, context}) {
             {parameters.showRunControl !== false && <Button icon="play" onClick={run} disabled={controls.runDisabled}>Run report</Button>}
 
         </div>
-        <ReportOutputActions scopeKey={identity} output={output} disabled={!canExport||!runResult||!!progress||unexportedMetricSelection} tableBlocks={tables} workbookExport={parameters.reportCapabilities?.workbookExport===true}/>
+        <ReportOutputActions scopeKey={identity} output={output} disabled={!canExport||!runResult||!!progress||unexportedMetricSelection} tableBlocks={tables} reportSpec={result?.reportSpec} workbookExport={parameters.reportCapabilities?.workbookExport===true}/>
         {unexportedMetricSelection && <Callout>Chart selections cannot be exported from this preview. Run the report again to restore its saved chart choices.</Callout>}
         {progress && <Callout role="status" aria-live="polite" data-forge-status="info" icon={<Spinner size={18}/>} title="Report progress">{progress}</Callout>}
         {error && <Callout intent="danger" title="Report unavailable">{error}</Callout>}
