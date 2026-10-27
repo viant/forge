@@ -48162,6 +48162,21 @@ Please __addLocaleData before adding additional unit data`);
     }
     return resolved;
   }
+  function updateReportDateRangeValue(previous = {}, edge, input = "", now = /* @__PURE__ */ new Date()) {
+    if (edge === "preset") return { preset: input };
+    if (!["start", "end"].includes(edge)) return previous;
+    const value = String(input || "").trim();
+    const next = { ...previous };
+    delete next.preset;
+    if (!value || /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      next[edge] = value;
+      delete next[`${edge}Expression`];
+    } else {
+      next[`${edge}Expression`] = value;
+      next[edge] = formatReportRelativeTime(value, { now });
+    }
+    return next;
+  }
 
   // src/reporting/scopeStateModel.js
   var SCOPE_PARAM_STATE_KEY = "scopeParams";
@@ -69909,11 +69924,12 @@ ${indent}${end}`;
       if (!safe(predicate == null ? void 0 : predicate.id)) continue;
       if (predicate.kind === "dateRange") {
         const start = read2(predicate.startParamPath), end = read2(predicate.endParamPath);
-        if (start !== void 0 || end !== void 0) params[predicate.id] = {
-          ...isObject(params[predicate.id]) ? params[predicate.id] : {},
-          ...start !== void 0 ? { start: clone6(start) } : {},
-          ...end !== void 0 ? { end: clone6(end) } : {}
-        };
+        if (start !== void 0 || end !== void 0) {
+          let range = isObject(params[predicate.id]) ? clone6(params[predicate.id]) : {};
+          if (start !== void 0) range = updateReportDateRangeValue(range, "start", start);
+          if (end !== void 0) range = updateReportDateRangeValue(range, "end", end);
+          params[predicate.id] = range;
+        }
       } else {
         const value = read2(predicate.paramPath);
         if (value !== void 0) params[predicate.id] = clone6(value);

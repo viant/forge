@@ -15,6 +15,7 @@ import {buildReportBuilderReportDocument} from "../../../../src/reporting/report
 import {lowerValidatedReportDocument} from "../../../../src/reporting/reportChartValidation.js";
 import {buildReportFillFromReportSpec} from "../../../../src/reporting/reportFillModel.js";
 import {buildReportPrintFromReportFill} from "../../../../src/reporting/reportPrintModel.js";
+import {updateReportDateRangeValue} from "../../../../src/reporting/reportDateRangeValue.js";
 import {normalizeReportBuilderPredicates} from "../../../../src/components/dashboard/reportBuilderPredicates.js";
 import {prepareWindowBuilderExport} from "../../../../src/reporting/windowBuilderExportState.js";
 import {mapReportRequestEnvelope, reportRequestWindowIdentity} from "../../../../src/reporting/reportRequestEnvelope.js";
@@ -50,11 +51,12 @@ import {mapReportRequestEnvelope, reportRequestWindowIdentity} from "../../../..
       if (!safe(predicate?.id)) continue;
       if (predicate.kind === "dateRange") {
         const start = read(predicate.startParamPath), end = read(predicate.endParamPath);
-        if (start !== undefined || end !== undefined) params[predicate.id] = {
-          ...(isObject(params[predicate.id]) ? params[predicate.id] : {}),
-          ...(start !== undefined ? {start: clone(start)} : {}),
-          ...(end !== undefined ? {end: clone(end)} : {}),
-        };
+        if (start !== undefined || end !== undefined) {
+          let range = isObject(params[predicate.id]) ? clone(params[predicate.id]) : {};
+          if (start !== undefined) range = updateReportDateRangeValue(range, "start", start);
+          if (end !== undefined) range = updateReportDateRangeValue(range, "end", end);
+          params[predicate.id] = range;
+        }
       } else {
         const value = read(predicate.paramPath);
         if (value !== undefined) params[predicate.id] = clone(value);
