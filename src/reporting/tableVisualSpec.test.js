@@ -404,6 +404,16 @@ assert.deepEqual(normalizeReportDocumentTableBlock({
 
 console.log("tableVisualSpec ✓ normalizes authored table visual contracts");
 
+for (const defaultCollapsed of [false, true, undefined]) {
+  const block = normalizeReportDocumentTableBlock({
+    id: "rows", datasetRef: "primary", collapsible: true,
+    ...(defaultCollapsed === undefined ? {} : { defaultCollapsed }),
+    columns: [{ key: "value" }],
+  });
+  assert.equal(block.defaultCollapsed, defaultCollapsed);
+  assert.equal(Object.hasOwn(block, "defaultCollapsed"), defaultCollapsed !== undefined);
+}
+
 // Reader compatibility retains persisted source and applies the existing units.
 {
   const original = { key: "ctr", valueFormat: "percentFraction" };

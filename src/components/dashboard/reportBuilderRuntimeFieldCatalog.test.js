@@ -41,6 +41,23 @@ assert.deepEqual(config.tablePresentation, { collapsible: true, labelClamp: { li
 
 console.log("reportBuilderRuntimeFieldCatalog ✓ derives authorized report controls from a runtime definition");
 
+for (const [presentation, expected] of [
+  [{collapsible: true, defaultCollapsed: false}, false],
+  [{Collapsible: true, DefaultCollapsed: false}, false],
+  [{collapsible: true, defaultCollapsed: true}, true],
+  [{collapsible: true}, undefined],
+  [{collapsible: true, defaultCollapsed: false, DefaultCollapsed: true}, false],
+]) {
+  const normalized = applyReportBuilderRuntimeFieldCatalog({runtimeFieldCatalog: {enabled: true}}, {
+    reportDefinition: {fieldCatalog: {
+      columns: [{name: "category", type: "string", role: "dimension"}, {name: "value", type: "number", role: "measure"}],
+      tablePresentation: presentation,
+    }},
+  }).tablePresentation;
+  assert.equal(normalized.defaultCollapsed, expected);
+  assert.equal(Object.hasOwn(normalized, "defaultCollapsed"), expected !== undefined);
+}
+
 const flatConfig = applyReportBuilderRuntimeFieldCatalog({
   runtimeFieldCatalog: { enabled: true },
 }, {

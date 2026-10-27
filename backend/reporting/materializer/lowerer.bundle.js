@@ -47334,7 +47334,7 @@ Please __addLocaleData before adding additional unit data`);
       ...recordTitleField ? { recordTitleField } : {},
       ...["blue", "green", "amber", "rose", "slate"].includes(accentTone) ? { accentTone } : {},
       ...(block == null ? void 0 : block.collapsible) === true ? { collapsible: true } : {},
-      ...(block == null ? void 0 : block.collapsible) === true && (block == null ? void 0 : block.defaultCollapsed) === true ? { defaultCollapsed: true } : {},
+      ...(block == null ? void 0 : block.collapsible) === true && typeof (block == null ? void 0 : block.defaultCollapsed) === "boolean" ? { defaultCollapsed: block.defaultCollapsed } : {},
       ...labelClamp ? { labelClamp } : {}
     };
   }
@@ -69069,9 +69069,10 @@ ${indent}${end}`;
     if (!value || typeof value !== "object" || Array.isArray(value)) return null;
     const labelClamp = normalizePresentationClampConfig((value == null ? void 0 : value.labelClamp) || (value == null ? void 0 : value.LabelClamp));
     const collapsible = (value == null ? void 0 : value.collapsible) === true || (value == null ? void 0 : value.Collapsible) === true;
+    const defaultCollapsed = typeof (value == null ? void 0 : value.defaultCollapsed) === "boolean" ? value.defaultCollapsed : value == null ? void 0 : value.DefaultCollapsed;
     return {
       ...collapsible ? { collapsible: true } : {},
-      ...collapsible && ((value == null ? void 0 : value.defaultCollapsed) === true || (value == null ? void 0 : value.DefaultCollapsed) === true) ? { defaultCollapsed: true } : {},
+      ...collapsible && typeof defaultCollapsed === "boolean" ? { defaultCollapsed } : {},
       ...labelClamp ? { labelClamp } : {}
     };
   }
