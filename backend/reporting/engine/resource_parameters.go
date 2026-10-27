@@ -10,6 +10,7 @@ type reportParameterDeclaration struct {
 	Path     string
 	ID       string
 	Multiple bool
+	Required bool
 }
 
 // Aliases and destination paths are declared by the approved builder, rather
@@ -25,6 +26,7 @@ func reportParameterDeclarations(raw json.RawMessage) (map[string]reportParamete
 				Prefill   interface{} `json:"prefill"`
 				Multiple  bool        `json:"multiple"`
 				EmitArray bool        `json:"emitArray"`
+				Required  bool        `json:"required"`
 			} `json:"predicates"`
 		} `json:"reportBuilder"`
 	}
@@ -83,6 +85,7 @@ func reportParameterDeclarations(raw json.RawMessage) (map[string]reportParamete
 		for alias, d := range result {
 			if d.ID == "" && (d.Path == p.Path || d.Path == p.Start || d.Path == p.End) {
 				d.ID = p.ID
+				d.Required = p.Required
 				result[alias] = d
 			}
 		}

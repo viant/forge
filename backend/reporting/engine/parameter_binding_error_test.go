@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+
+	"github.com/viant/forge/backend/reporting/registry"
 	"strings"
 	"testing"
 	"time"
@@ -23,6 +26,35 @@ func bindingFixtureDescriptor(t *testing.T) *dsproto.DataSource {
 }
 
 const bindingFixtureBuilder = `{"reportBuilder":{"predicates":[{"id":"advertiserId","paramPath":"filters.advertiserId"},{"id":"studyNames","paramPath":"filters.studyNames","multiple":true,"prefill":"studies"}]}}`
+
+func TestRequiredReportDateRangeRejectsMissingEndpoints(t *testing.T) {
+	builder := json.RawMessage(`{"reportBuilder":{"predicates":[{"id":"window","required":true,"startParamPath":"filters.start","endParamPath":"filters.end","prefill":{"start":"from","end":"to"}}]}}`)
+	for _, parameters := range []map[string]interface{}{nil, {"from": "2026-10-20"}, {"to": "2026-10-26"}, {"from": " ", "to": "2026-10-26"}} {
+		_, err := reportDatasetArguments(nil, parameters, bindingFixtureDescriptor(t), builder, nil)
+		var typed *ReportParameterBindingError
+		if !errors.As(err, &typed) || typed.ReportParameterBindingDiagnostic().Code != "missing_report_parameter" {
+			t.Fatalf("missing date not classified before dispatch: %v", err)
+		}
+		if strings.Contains(typed.ReportParameterBindingDiagnostic().Message, "filters") {
+			t.Fatal("private destination exposed")
+		}
+	}
+	base := map[string]interface{}{"filters": map[string]interface{}{"start": "2026-10-20", "end": "2026-10-26"}}
+	if _, err := reportDatasetArguments(base, nil, bindingFixtureDescriptor(t), builder, nil); err != nil {
+		t.Fatalf("authored dates lost: %v", err)
+	}
+	if _, err := reportDatasetArguments(nil, map[string]interface{}{"from": "2026-10-20", "to": "2026-10-26"}, bindingFixtureDescriptor(t), builder, nil); err != nil {
+		t.Fatalf("valid invocation dates lost: %v", err)
+	}
+	if _, err := reportDatasetArguments(nil, nil, bindingFixtureDescriptor(t), builder, &reportExecutionDatasetScope{Exclude: []string{"window"}}); err != nil {
+		t.Fatalf("explicit exclusion was overridden: %v", err)
+	}
+	for _, value := range []interface{}{0, false} {
+		if err := validateRequiredReportParameters(map[string]interface{}{"value": value}, map[string]reportParameterDeclaration{"value": {Path: "value", Required: true}}, nil); err != nil {
+			t.Fatalf("valid zero/false rejected: %v", err)
+		}
+	}
+}
 
 func TestReportParameterBindingUsesEffectiveDeclarations(t *testing.T) {
 	base := map[string]interface{}{"offset": 0, "filters": map[string]interface{}{"advertiserId": 7}}
@@ -133,5 +165,53 @@ func TestReportParameterBindingActualExecutionRejectsBeforeFetch(t *testing.T) {
 	_, err = service.ExecuteResource(context.Background(), request)
 	if !errors.Is(err, identity.ErrResourceDenied) || errors.Is(err, ErrReportParameterBinding) || calls != 0 {
 		t.Fatalf("lease failure changed: %v calls=%d", err, calls)
+	}
+}
+
+func TestRequiredReportInputActualExecutionStopsBeforeFetch(t *testing.T) {
+	raw, err := os.ReadFile("../materializer/testdata/authored-envelope.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var envelope registry.ReportEnvelope
+	if err = json.Unmarshal(raw, &envelope); err != nil {
+		t.Fatal(err)
+	}
+	var builder map[string]interface{}
+	if err = json.Unmarshal(envelope.BuilderDefinition, &builder); err != nil {
+		t.Fatal(err)
+	}
+	builder["reportBuilder"].(map[string]interface{})["predicates"] = []interface{}{map[string]interface{}{"id": "from", "paramPath": "filters.from", "required": true}}
+	envelope.BuilderDefinition, _ = json.Marshal(builder)
+	envelope.DataSources = map[string]json.RawMessage{"sampleRows": json.RawMessage(`{"id":"sampleRows","backend":{"kind":"inline","rows":[]}}`)}
+	envelope.Dependencies = []registry.ReportDependency{{Kind: "builder", ID: envelope.BuilderRef, ContentFingerprint: identity.ContentFingerprint(envelope.BuilderDefinition)}, {Kind: "datasource", ID: "sampleRows", ContentFingerprint: identity.ContentFingerprint(envelope.DataSources["sampleRows"])}, {Kind: "report", ID: "report://example/demo", ContentFingerprint: identity.ContentFingerprint(envelope.ReportDocument)}}
+	raw, err = json.Marshal(envelope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	uri, _ := identity.ParseResourceURI("report://example/demo")
+	allowed := true
+	resolver := &identity.ResourceResolver{Source: &identity.LocalResource{URI: uri, Load: func(context.Context) (json.RawMessage, error) { return raw, nil }}, Policy: reportPolicyFunc(func(_ context.Context, _ identity.ResourceRef, c []identity.ResourceCandidate) (identity.ResourceDecision, error) {
+		if !allowed {
+			return identity.ResourceDecision{}, identity.ErrResourceDenied
+		}
+		return identity.ResourceDecision{Candidate: c[0], AuthorityBinding: "synthetic-account", ValidUntil: time.Now().Add(time.Minute)}, nil
+	})}
+	service := New(Options{Compiler: NewReportSpecCompiler(time.Now), ResourceResolver: func(context.Context, string) (*identity.ResourceResolver, error) { return resolver, nil }})
+	calls := 0
+	service.SetResourceDatasetExecutor(func(context.Context, identity.ResolvedResource, *dsproto.DataSource, map[string]interface{}) (*dsproto.FetchResult, error) {
+		calls++
+		return nil, errors.New("unexpected execution")
+	})
+	request := &ExecuteResourceRequest{Resource: &identity.ResourceRef{URI: uri.String()}}
+	_, err = service.ExecuteResource(context.Background(), request)
+	var missing *ReportParameterBindingError
+	if !errors.As(err, &missing) || missing.ReportParameterBindingDiagnostic().Code != "missing_report_parameter" || calls != 0 {
+		t.Fatalf("missing input did not stop before dispatch: %v calls=%d", err, calls)
+	}
+	allowed = false
+	_, err = service.ExecuteResource(context.Background(), request)
+	if !errors.Is(err, identity.ErrResourceDenied) || errors.Is(err, ErrReportParameterBinding) || calls != 0 {
+		t.Fatalf("authorization must precede parameter details: %v calls=%d", err, calls)
 	}
 }

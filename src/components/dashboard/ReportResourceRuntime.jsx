@@ -4,7 +4,7 @@ import ReportPrintPreview from "./ReportPrintPreview.jsx";
 import ReportRuntime from "./ReportRuntime.jsx";
 import ReportOutputActions from "./ReportOutputActions.jsx";
 import {useReportOutput} from "./useReportOutput.js";
-import {buildReportResourceRunRequest, hostedReportResource, hostedReportParameters, validateReportResourceRunResult} from "./reportBuilderResourceLifecycle.js";
+import {buildReportResourceRunRequest, hostedReportResource, hostedReportParameters, validateReportResourceRunResult, reportResourceFailureMessage} from "./reportBuilderResourceLifecycle.js";
 import {exportSelectedReport, reportResourceControls} from "./reportResourceExport.js";
 
 export default function ReportResourceRuntime({container, context}) {
@@ -55,7 +55,7 @@ export default function ReportResourceRuntime({container, context}) {
             }
             const value = await pending.promise;
             if (current === generation.current) setRunResult({result:value, request:pending.request, version:current});
-        } catch (failure) {if (current === generation.current) setError(failure?.message || "The report could not be run.");}
+        } catch (failure) {if (current === generation.current) setError(reportResourceFailureMessage(failure));}
         finally {if (current === generation.current) setProgress("");}
     }, [identity, canRun, runReport, canSelectMetrics]);
     useEffect(() => {
@@ -91,7 +91,7 @@ export default function ReportResourceRuntime({container, context}) {
         <ReportOutputActions scopeKey={identity} output={output} disabled={!canExport||!result||!!progress||unexportedMetricSelection} tableBlocks={tables}/>
         {unexportedMetricSelection && <Callout>Chart selections cannot be exported from this preview. Run the report again to restore its saved chart choices.</Callout>}
         {progress && <Callout icon={<Spinner size={18}/>} title="Report progress">{progress}</Callout>}
-        {error && <Callout intent="danger" title="Report unavailable">This report could not be run. Please try again.</Callout>}
+        {error && <Callout intent="danger" title="Report unavailable">{error}</Callout>}
         {result && !output.printModel && <ReportRuntime reportSpec={result.reportSpec} reportFill={result.reportFill} presentationMode="report" onChartMetricSelectionChange={changeMetrics}/>}
         {output.printModel && <ReportPrintPreview reportPrint={output.printModel}/>}
     </section>;

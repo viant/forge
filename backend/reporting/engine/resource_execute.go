@@ -612,6 +612,9 @@ func reportDatasetArguments(base, parameters map[string]interface{}, descriptor 
 		}
 		args[key] = value
 	}
+	if err := validateRequiredReportParameters(args, declarations, scope); err != nil {
+		return nil, err
+	}
 	return args, nil
 }
 
