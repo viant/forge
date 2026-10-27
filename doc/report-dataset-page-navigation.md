@@ -15,6 +15,14 @@ AIStudio integration uses published Forge `3ebcb11`.
   operations, per-scope positions, cancellation, stale-response suppression and
   offset reset when filters or authority change. Complete exports omit offsets.
 
+Offset/page descriptors may omit `paging.dataInfoSelectors.hasMore` when the
+datasource service generates normalized `dataInfo.hasMore` from the returned
+page size. Report page/complete execution consumes that actual boolean. Missing
+or non-boolean completeness still fails; the report engine never infers it from
+rows. Cursor descriptors continue to require explicit producer continuation paths
+and tokens. Resource revalidation, row/byte/page bounds and progress checks apply
+to every continuation.
+
 The private AIStudio browser adapter is guarded by
 `session.reportCapabilities.datasetPaging=true`. Older backends must not advertise
 this capability. The isolated adapter forwards PreviewTestRequest offsets through

@@ -23,6 +23,9 @@ This document covers:
 - persistence, execution, export, and UI events
 - cross-surface verification expectations
 
+See [compound runtime visibility](report-runtime-visibility.md) for composing
+independent block conditions consistently across screen and print output.
+
 ## Inline preview cancellation
 
 The builder passes an AbortSignal to primary-row connector requests as well as

@@ -19,10 +19,11 @@ const maxResourceDatasetBytes = 8 << 20
 const maxResourceDatasetPages = 1000
 
 func normalizeReportPageResult(result *dsproto.FetchResult, descriptor *dsproto.DataSource, contract json.RawMessage) (*dsproto.FetchResult, error) {
-	if result == nil || descriptor.Paging.DataInfoSelectors == nil || descriptor.Paging.DataInfoSelectors.HasMore == "" {
+	selector := reportHasMoreSelector(descriptor)
+	if result == nil || selector == "" {
 		return nil, fmt.Errorf("report page requires explicit completeness metadata")
 	}
-	more, ok := reportPagingValue(result.DataInfo, descriptor.Paging.DataInfoSelectors.HasMore).(bool)
+	more, ok := reportPagingValue(result.DataInfo, selector).(bool)
 	if !ok {
 		return nil, fmt.Errorf("report page requires boolean hasMore")
 	}
@@ -50,6 +51,23 @@ func normalizeReportPageResult(result *dsproto.FetchResult, descriptor *dsproto.
 	return &copy, nil
 }
 
+// Offset/page datasources can synthesize normalized completeness metadata from
+// the returned page size. Cursor sources still require explicit producer paths.
+// Every report page must supply an actual boolean; this never infers completion.
+func reportHasMoreSelector(descriptor *dsproto.DataSource) string {
+	if descriptor == nil || descriptor.Paging == nil {
+		return ""
+	}
+	if selectors := descriptor.Paging.DataInfoSelectors; selectors != nil && selectors.HasMore != "" {
+		return selectors.HasMore
+	}
+	switch strings.ToLower(strings.TrimSpace(descriptor.Paging.Mode)) {
+	case "offset", "page":
+		return "hasMore"
+	}
+	return ""
+}
+
 // Explicit paging opts into complete aggregation. Legacy mode remains one call.
 // check retains the original selected resource and narrowed lease around every
 // page; no partial aggregate is returned on a failed guard or continuation.
@@ -68,7 +86,8 @@ func fetchCompleteResourceDataset(ctx context.Context, descriptor *dsproto.DataS
 		return nil, fmt.Errorf("unsupported report datasource paging mode %q", mode)
 	}
 	config := descriptor.Paging
-	if config.Parameters == nil || config.Parameters.Page == "" || config.DataInfoSelectors == nil || config.DataInfoSelectors.HasMore == "" || mode == "cursor" && config.DataInfoSelectors.NextCursor == "" {
+	selector := reportHasMoreSelector(descriptor)
+	if config.Parameters == nil || config.Parameters.Page == "" || selector == "" || mode == "cursor" && (config.DataInfoSelectors == nil || config.DataInfoSelectors.NextCursor == "") {
 		return nil, fmt.Errorf("complete report paging requires authored position parameter and continuation selectors")
 	}
 	position := config.Parameters.Page
@@ -148,7 +167,7 @@ func fetchCompleteResourceDataset(ctx context.Context, descriptor *dsproto.DataS
 		if err = check(); err != nil {
 			return nil, err
 		}
-		more, ok := reportPagingValue(result.DataInfo, config.DataInfoSelectors.HasMore).(bool)
+		more, ok := reportPagingValue(result.DataInfo, selector).(bool)
 		if !ok {
 			return nil, fmt.Errorf("report datasource has unknown completeness: explicit boolean hasMore required")
 		}
