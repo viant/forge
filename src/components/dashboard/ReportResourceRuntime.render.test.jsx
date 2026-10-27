@@ -258,3 +258,18 @@ it('keeps explicit export requests full and independent of the fill-only screen 
   expect(view.host.querySelector('output').textContent).toBe('Server report');
  }finally{await view.close();}
 });
+
+it('runs once per explicit host apply trigger while keeping the duplicate run control hidden',async()=>{
+ const run=vi.fn().mockResolvedValue(result());
+ const view=await mount(run,{executeOnOpen:false,showRunControl:false,runTrigger:0});
+ try{
+  expect(run).not.toHaveBeenCalled();
+  expect(view.host.textContent).not.toContain('Run report');
+  await view.render({executeOnOpen:true,showRunControl:false,runTrigger:1});
+  expect(run).toHaveBeenCalledTimes(1);
+  await view.render({executeOnOpen:true,showRunControl:false,runTrigger:1});
+  expect(run).toHaveBeenCalledTimes(1);
+  await view.render({executeOnOpen:true,showRunControl:false,runTrigger:2});
+  expect(run).toHaveBeenCalledTimes(2);
+ }finally{await view.close();}
+});

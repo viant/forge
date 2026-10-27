@@ -20,7 +20,7 @@ export default function ReportResourceRuntime({container, context}) {
     const [error, setError] = useState("");
     const [progress, setProgress] = useState("");
     const generation = useRef(0);
-    const sourceIdentity = JSON.stringify([pin, parameters.runOverride, parameters.prefill]);
+    const sourceIdentity = JSON.stringify([pin, parameters.runOverride, parameters.prefill, parameters.runTrigger]);
     const [metricState, setMetricState] = useState(null);
     const metricSelections = metricState?.identity === sourceIdentity ? metricState.selections : {};
     const identity = JSON.stringify([sourceIdentity,canSelectMetrics ? metricSelections : {}]);
@@ -85,7 +85,7 @@ export default function ReportResourceRuntime({container, context}) {
     return <section style={{padding:16}}>
         <h2>{result?.reportSpec?.title || parameters.reportTitle || "Selected report"}</h2>
         <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>
-            <Button icon="play" onClick={run} disabled={controls.runDisabled}>Run report</Button>
+            {parameters.showRunControl !== false && <Button icon="play" onClick={run} disabled={controls.runDisabled}>Run report</Button>}
 
         </div>
         <ReportOutputActions scopeKey={identity} output={output} disabled={!canExport||!result||!!progress||unexportedMetricSelection} tableBlocks={tables}/>

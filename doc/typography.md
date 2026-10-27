@@ -555,3 +555,24 @@ and authored document Tool Feeds select their respective boundary. Legacy window
 remain unmarked. Use the existing optional contract rather than duplicating role
 values in a component. Shared field-track select and lookup triggers use the same
 Lucide chevron as SelectControl; legacy triggers keep their existing icon.
+
+## Shared report filters
+
+`ReportFilterBar` uses shared controls with lazy lookup loading, Apply/Reset,
+required inputs, loading and retry states. Place it before report content inside
+`forge-report-filter-layout`. Its `placement` accepts `top` (default), `left`,
+or `right`; legacy `rail-left` and `rail-right` aliases are accepted. Both side
+rails stack above the report below 760px. Hosts read the authored
+`builderDefinition.reportBuilder.filterPresentation` so preview and hosted
+reports use the same placement. Changing placement must preserve filter values.
+
+```jsx
+<div className="forge-report-filter-layout">
+  <ReportFilterBar placement="right" controls={controls} values={values}
+    onChange={setValue} onApply={apply} onReset={reset} loadChoices={loadChoices}/>
+  <ReportContent/>
+</div>
+```
+
+These controls do not change producer authorization or query semantics. Legacy
+ReportBuilder drawer and sheet presentations remain outside this host migration.
