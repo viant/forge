@@ -7,6 +7,18 @@ import {useReportOutput} from "./useReportOutput.js";
 import {buildReportResourceRunRequest, hostedReportResource, hostedReportParameters, validateReportResourceRunResult, reportResourceFailureMessage} from "./reportBuilderResourceLifecycle.js";
 import {exportSelectedReport, reportResourceControls} from "./reportResourceExport.js";
 
+export function reportExecutionProgressMessage(value) {
+    if (value?.kind !== "reportExecution" || !Number.isInteger(value.total) || value.total < 1
+        || !Number.isInteger(value.completed) || value.completed < 0 || value.completed > value.total) return "";
+    if (value.phase === "materializing") return `Preparing report output. ${value.completed} of ${value.total} datasets loaded.`;
+    if (value.phase === "planned") return `Loading report datasets. 0 of ${value.total} loaded.`;
+    if (!["started", "completed"].includes(value.phase)) return "";
+    const label = String(value.datasetLabel || value.datasetId || value.dataSourceId || "").trim();
+    if (!label) return "";
+    const tabs = Array.isArray(value.tabs) ? value.tabs.map(tab => String(tab?.label || tab?.id || "").trim()).filter(Boolean) : [];
+    return `${value.phase === "completed" ? "Loaded" : "Loading"} ${label}${tabs.length ? ` (${tabs.join(", ")})` : ""}. ${value.completed} of ${value.total} loaded.`;
+}
+
 export default function ReportResourceRuntime({container, context}) {
     const pin = hostedReportResource(container);
     const parameters = hostedReportParameters(container);
@@ -45,14 +57,23 @@ export default function ReportResourceRuntime({container, context}) {
             let pending = pendingRun.current;
             if (!pending || pending.identity !== identity || pending.runReport !== runReport) {
                 const request = {...buildReportResourceRunRequest(pin, runParameters), fillOnly:true};
-                pending = {identity, runReport, request};
-                pending.promise = Promise.resolve().then(() => runReport(request))
+                pending = {identity, runReport, request, progress:"", listener:null, done:false};
+                pending.promise = Promise.resolve().then(() => runReport(request, {onProgress:value => {
+                    if (pending.done) return;
+                    const message = reportExecutionProgressMessage(value);
+                    if (!message) return;
+                    pending.progress = message;
+                    pending.listener?.(message);
+                }}))
                     .then(value => validateReportResourceRunResult(value, request.resolvedResource, request.chartMetricSelections, {fillOnly:true}))
                     .finally(() => {
+                        pending.done = true; pending.listener = null;
                         if (pendingRun.current === pending) pendingRun.current = null;
                     });
                 pendingRun.current = pending;
             }
+            pending.listener = message => {if (current === generation.current) setProgress(message);};
+            if (pending.progress) pending.listener(pending.progress);
             const value = await pending.promise;
             if (current === generation.current) setRunResult({result:value, request:pending.request, version:current});
         } catch (failure) {if (current === generation.current) setError(reportResourceFailureMessage(failure));}
@@ -88,9 +109,9 @@ export default function ReportResourceRuntime({container, context}) {
             {parameters.showRunControl !== false && <Button icon="play" onClick={run} disabled={controls.runDisabled}>Run report</Button>}
 
         </div>
-        <ReportOutputActions scopeKey={identity} output={output} disabled={!canExport||!result||!!progress||unexportedMetricSelection} tableBlocks={tables}/>
+        <ReportOutputActions scopeKey={identity} output={output} disabled={!canExport||!result||!!progress||unexportedMetricSelection} tableBlocks={tables} workbookExport={parameters.reportCapabilities?.workbookExport===true}/>
         {unexportedMetricSelection && <Callout>Chart selections cannot be exported from this preview. Run the report again to restore its saved chart choices.</Callout>}
-        {progress && <Callout icon={<Spinner size={18}/>} title="Report progress">{progress}</Callout>}
+        {progress && <Callout role="status" aria-live="polite" data-forge-status="info" icon={<Spinner size={18}/>} title="Report progress">{progress}</Callout>}
         {error && <Callout intent="danger" title="Report unavailable">{error}</Callout>}
         {result && !output.printModel && <ReportRuntime reportSpec={result.reportSpec} reportFill={result.reportFill} presentationMode="report" onChartMetricSelectionChange={changeMetrics}/>}
         {output.printModel && <ReportPrintPreview reportPrint={output.printModel}/>}

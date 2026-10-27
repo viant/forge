@@ -273,3 +273,29 @@ it('runs once per explicit host apply trigger while keeping the duplicate run co
   expect(run).toHaveBeenCalledTimes(2);
  }finally{await view.close();}
 });
+
+it('shows real datasource progress on the shared StrictMode execution and discards stale callbacks',async()=>{
+    const first=deferred(), second=deferred();
+    const run=vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const view=await mount(run,{executeOnOpen:true});
+    try {
+        expect(run).toHaveBeenCalledTimes(1);
+        const notify=run.mock.calls[0][1].onProgress;
+        await act(async()=>notify({kind:'reportExecution',phase:'started',total:3,completed:0,datasetId:'sample',datasetLabel:'Sample dataset',tabs:[{id:'overview',label:'Overview'}]}));
+        expect(view.host.textContent).toContain('Loading Sample dataset (Overview). 0 of 3 loaded.');
+        await act(async()=>notify({kind:'reportExecution',phase:'completed',total:3,completed:1,datasetLabel:'Sample dataset'}));
+        expect(view.host.textContent).toContain('Loaded Sample dataset. 1 of 3 loaded.');
+        await view.render({prefill:{sampleIds:[2]}});
+        await act(async()=>notify({kind:'reportExecution',phase:'completed',total:3,completed:2,datasetLabel:'Stale dataset'}));
+        expect(view.host.textContent).not.toContain('Stale dataset');
+        await act(async()=>second.resolve(result()));
+        expect(view.host.querySelector('output').textContent).toBe('Server report');
+        await act(async()=>first.resolve(result(pin,'Stale report')));
+        expect(view.host.querySelector('output').textContent).toBe('Server report');
+    } finally {await view.close();}
+    const late=deferred(), closedRun=vi.fn(()=>late.promise), closed=await mount(closedRun,{executeOnOpen:true});
+    const notify=closedRun.mock.calls[0][1].onProgress;
+    await closed.close();
+    await act(async()=>{notify({kind:'reportExecution',phase:'started',total:1,completed:0,datasetLabel:'Late'});late.resolve(result());});
+    expect(closed.host.childNodes.length).toBe(0);
+});
