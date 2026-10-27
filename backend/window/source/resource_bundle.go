@@ -11,11 +11,14 @@ import (
 	"path/filepath"
 	"strings"
 
+	metaURL "github.com/viant/afs/url"
 	dsproto "github.com/viant/forge/backend/datasource/contract"
 	identity "github.com/viant/forge/backend/resource"
 	meta "github.com/viant/forge/backend/service/meta"
 	"github.com/viant/forge/backend/types"
 	wsmeta "github.com/viant/forge/backend/window/source/internal/meta"
+	view "github.com/viant/forge/backend/window/view"
+	"gopkg.in/yaml.v3"
 )
 
 // These profiles cover the existing web/mobile client contracts. Additional
@@ -145,6 +148,7 @@ func (s *WorkspaceResourceSource) loadBundleProfilesWithBase(ctx context.Context
 	}
 	descriptors := map[string]json.RawMessage{}
 	envelope := types.WindowResourceEnvelope{SchemaVersion: 2, Format: types.WindowBundleFormat, Variants: map[string]types.WindowResourceVariant{}}
+	viewMetadataLoaded := false
 	seen, materialized := map[string]bool{}, map[string]string{}
 	for _, profile := range profiles {
 		profile, err = profile.Normalize()
@@ -203,6 +207,13 @@ func (s *WorkspaceResourceSource) loadBundleProfilesWithBase(ctx context.Context
 			}
 			if window == nil {
 				return nil, identity.ErrResourceDenied
+			}
+			if !viewMetadataLoaded && base == nil {
+				viewMetadataLoaded = true
+				envelope.ViewMetadata, err = s.authoredViewMetadata(ctx, s.windows[uri.String()], target, options)
+				if err != nil {
+					return nil, err
+				}
 			}
 			window.Resource = nil
 			window.ResourceTarget = nil
@@ -271,6 +282,45 @@ func (s *WorkspaceResourceSource) loadBundleProfilesWithBase(ctx context.Context
 		return nil, err
 	}
 	return json.Marshal(envelope)
+}
+
+// Keep the authored routing descriptor on publications just as native window
+// snapshots do. The existing reader supplies the admitted resource URI; these
+// descriptive fields never select a provider or grant access.
+func (s *WorkspaceResourceSource) authoredViewMetadata(ctx context.Context, key string, target *meta.TargetContext, options LoaderOptions) (json.RawMessage, error) {
+	root := "file://" + filepath.ToSlash(filepath.Join(s.root, "extension", "forge", "windows"))
+	loader := meta.New(options.filesystem(), root)
+	var err error
+	target, err = workspaceWindowSourceTarget(ctx, loader, root, key, target, options.SharedDefault)
+	if err != nil {
+		return nil, err
+	}
+	var node yaml.Node
+	if base, err := loader.ResolveWindowBase(ctx, metaURL.Join(root, key, "main"), target); err == nil {
+		if err := loader.LoadWithURLAndTarget(ctx, base+".yaml", &node, target); err != nil {
+			return nil, err
+		}
+	} else {
+		loader := wsmeta.New(options.filesystem(), s.root)
+		if err := loader.Load(ctx, filepath.Join("extension", "forge", "windows", key+".yaml"), &node); err != nil {
+			return nil, err
+		}
+	}
+	var header struct {
+		ID        string `yaml:"id"`
+		WindowKey string `yaml:"windowKey"`
+	}
+	if err := node.Decode(&header); err != nil {
+		return nil, err
+	}
+	if header.ID == "" || header.WindowKey == "" {
+		return nil, nil
+	}
+	var spec view.Spec
+	if err := node.Decode(&spec); err != nil {
+		return nil, err
+	}
+	return json.Marshal(spec)
 }
 
 // cloneComposedWindowDeclaration detaches authored interface values without
