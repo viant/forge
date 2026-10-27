@@ -98,3 +98,19 @@ describe('missing chart model states', () => {
     expect(html).not.toContain(noData);
   });
 });
+
+it('shows declared pending navigation without rendering missing datasets as completed empty content',()=>{
+  const input=fixture();
+  input.reportSpec.blocks=[
+    {id:'tabs',kind:'tabGroupBlock',sectionIds:['overview'],defaultSectionId:'overview',includeUnlistedSections:false},
+    {id:'overview',kind:'sectionBlock',title:'Overview',blockIds:['eventsChart']},
+    ...input.reportSpec.blocks,
+  ];
+  input.sectionNavigation=[{id:'overview',label:'Overview'},{id:'detail',label:'Detail'}];
+  input.selectedSectionId='detail';input.sectionLoading=true;
+  const html=render(input);
+  expect(html).toContain('Overview');expect(html).toContain('Detail');
+  expect(html).toContain('Loading section');expect(html).toContain('aria-busy="true"');
+  expect(html).not.toContain(noData);expect(html).not.toContain('No data.');
+  expect(html).not.toContain('Conversions by event');
+});

@@ -19,6 +19,21 @@ export function reportExecutionProgressMessage(value) {
     return `${value.phase === "completed" ? "Loaded" : "Loading"} ${label}${tabs.length ? ` (${tabs.join(", ")})` : ""}. ${value.completed} of ${value.total} loaded.`;
 }
 
+export function validateReportSectionSnapshot(value, expected, choices = {}) {
+    if (value?.kind !== "reportSectionReady" || typeof value.sectionId !== "string" || !value.sectionId.trim() || !Array.isArray(value.sections) || value.sections.length < 2
+        || value.sections.some(item => typeof item?.id !== "string" || !item.id.trim() || typeof item.label !== "string")
+        || new Set(value.sections.map(item => item.id)).size !== value.sections.length
+        || !value.sections.some(item => item.id === value.sectionId)
+        || !value.reportSpec?.blocks?.some(block => block.id === value.sectionId && block.kind === "sectionBlock")
+        || !Array.isArray(value.reportSpec?.datasets) || !Array.isArray(value.reportFill?.datasets)
+        || value.reportSpec.datasets.some(dataset => !value.reportFill.datasets.some(fill => fill.id === dataset.id))) {
+        throw new Error("Invalid report section snapshot.");
+    }
+    const selected = Object.fromEntries(Object.entries(choices || {}).filter(([id]) => value.reportSpec.blocks.some(block => block.id === id)));
+    validateReportResourceRunResult(value, expected, selected, {fillOnly:true});
+    return value;
+}
+
 export default function ReportResourceRuntime({container, context}) {
     const pin = hostedReportResource(container);
     const parameters = hostedReportParameters(container);
@@ -28,7 +43,11 @@ export default function ReportResourceRuntime({container, context}) {
     const scoped = container?.dataSourceRef && context?.Context ? context.Context(container.dataSourceRef) : context;
     const services = scoped?.handlers || context?.handlers || {};
     const [runResult, setRunResult] = useState(null);
-    const result = runResult?.result || null;
+    const [sectionSnapshot, setSectionSnapshot] = useState(null);
+    const result = runResult?.result || sectionSnapshot || null;
+    const [selectedSectionId, setSelectedSectionId] = useState("");
+    const selectedSection = useRef("");
+    const changeSection = id => {selectedSection.current=id;setSelectedSectionId(id);};
     const [error, setError] = useState("");
     const [progress, setProgress] = useState("");
     const generation = useRef(0);
@@ -48,7 +67,7 @@ export default function ReportResourceRuntime({container, context}) {
     const run = useCallback(async () => {
         const current = ++generation.current;
         if (!canSelectMetrics) setMetricState(null);
-        setRunResult(null); setError(""); setProgress("Running the selected report revision.");
+        setRunResult(null); setSectionSnapshot(null); setError(""); setProgress("Running the selected report revision.");
         try {
             if (!canRun || typeof runReport !== "function") throw new Error("Report execution is unavailable.");
             // StrictMode may replay the opening effect. Share only a pending request
@@ -56,32 +75,43 @@ export default function ReportResourceRuntime({container, context}) {
             // settles must execute again.
             let pending = pendingRun.current;
             if (!pending || pending.identity !== identity || pending.runReport !== runReport) {
-                const request = {...buildReportResourceRunRequest(pin, runParameters), fillOnly:true};
-                pending = {identity, runReport, request, progress:"", listener:null, done:false};
+                const request = {...buildReportResourceRunRequest(pin, runParameters), fillOnly:true, ...(selectedSection.current ? {prioritySectionId:selectedSection.current} : {})};
+                pending = {identity, runReport, request, progress:"", listener:null, snapshot:null, updateListener:null, done:false};
                 pending.promise = Promise.resolve().then(() => runReport(request, {onProgress:value => {
                     if (pending.done) return;
                     const message = reportExecutionProgressMessage(value);
                     if (!message) return;
                     pending.progress = message;
                     pending.listener?.(message);
+                }, onUpdate:value => {
+                    if (pending.done) return;
+                    if (pending.snapshot) throw new Error("Unexpected repeated report section snapshot.");
+                    pending.snapshot = validateReportSectionSnapshot(value, request.resolvedResource, request.chartMetricSelections);
+                    pending.updateListener?.(pending.snapshot);
                 }}))
                     .then(value => validateReportResourceRunResult(value, request.resolvedResource, request.chartMetricSelections, {fillOnly:true}))
                     .finally(() => {
-                        pending.done = true; pending.listener = null;
+                        pending.done = true; pending.listener = null; pending.updateListener = null;
                         if (pendingRun.current === pending) pendingRun.current = null;
                     });
                 pendingRun.current = pending;
             }
             pending.listener = message => {if (current === generation.current) setProgress(message);};
+            pending.updateListener = value => {
+                if (current !== generation.current) return;
+                if (!value.sections.some(section => section.id === selectedSection.current)) changeSection(value.sectionId);
+                setSectionSnapshot(value);
+            };
             if (pending.progress) pending.listener(pending.progress);
+            if (pending.snapshot) pending.updateListener(pending.snapshot);
             const value = await pending.promise;
-            if (current === generation.current) setRunResult({result:value, request:pending.request, version:current});
-        } catch (failure) {if (current === generation.current) setError(reportResourceFailureMessage(failure));}
+            if (current === generation.current) {setSectionSnapshot(null);setRunResult({result:value, request:pending.request, version:current});}
+        } catch (failure) {if (current === generation.current) {setSectionSnapshot(null);setError(reportResourceFailureMessage(failure));}}
         finally {if (current === generation.current) setProgress("");}
     }, [identity, canRun, runReport, canSelectMetrics]);
     useEffect(() => {
         ++generation.current;
-        setRunResult(null); setError(""); setProgress("");
+        setRunResult(null); setSectionSnapshot(null); setError(""); setProgress("");
         if (executeOnOpen || canSelectMetrics && Object.keys(metricSelections).length > 0) void run();
         // The host contract has no abort signal. Invalidate UI ownership so a
         // late result cannot replace a newer selection or update a closed view.
@@ -91,7 +121,7 @@ export default function ReportResourceRuntime({container, context}) {
     // A manual rerun can keep the same parameters. Its output still belongs to
     // a new execution, so a pending print/export from the older run must expire.
     const outputScopeKey = JSON.stringify([identity, runResult?.version]);
-    const output = useReportOutput({scopeKey:outputScopeKey,disabled:!canExport||!result||!!progress||unexportedMetricSelection,
+    const output = useReportOutput({scopeKey:outputScopeKey,disabled:!canExport||!runResult||!!progress||unexportedMetricSelection,
         onExport:({format,tableBlockId,isCurrent})=>exportSelectedReport({pin,parameters:runParameters,format,tableBlockId,services:services.reportExport,isCurrent}),
         onPrint:async()=>{
             // Full print materialization is an explicit, fresh authorized run.
@@ -109,11 +139,14 @@ export default function ReportResourceRuntime({container, context}) {
             {parameters.showRunControl !== false && <Button icon="play" onClick={run} disabled={controls.runDisabled}>Run report</Button>}
 
         </div>
-        <ReportOutputActions scopeKey={identity} output={output} disabled={!canExport||!result||!!progress||unexportedMetricSelection} tableBlocks={tables} workbookExport={parameters.reportCapabilities?.workbookExport===true}/>
+        <ReportOutputActions scopeKey={identity} output={output} disabled={!canExport||!runResult||!!progress||unexportedMetricSelection} tableBlocks={tables} workbookExport={parameters.reportCapabilities?.workbookExport===true}/>
         {unexportedMetricSelection && <Callout>Chart selections cannot be exported from this preview. Run the report again to restore its saved chart choices.</Callout>}
         {progress && <Callout role="status" aria-live="polite" data-forge-status="info" icon={<Spinner size={18}/>} title="Report progress">{progress}</Callout>}
         {error && <Callout intent="danger" title="Report unavailable">{error}</Callout>}
-        {result && !output.printModel && <ReportRuntime reportSpec={result.reportSpec} reportFill={result.reportFill} presentationMode="report" onChartMetricSelectionChange={changeMetrics}/>}
+        {result && !output.printModel && <ReportRuntime reportSpec={result.reportSpec} reportFill={result.reportFill} presentationMode="report" onChartMetricSelectionChange={changeMetrics}
+            selectedSectionId={selectedSectionId} onSectionChange={changeSection}
+            sectionNavigation={sectionSnapshot?.sections || null}
+            sectionLoading={!!sectionSnapshot && selectedSectionId !== sectionSnapshot.sectionId}/>}
         {output.printModel && <ReportPrintPreview reportPrint={output.printModel}/>}
     </section>;
 }
