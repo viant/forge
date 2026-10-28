@@ -60609,7 +60609,7 @@ ${indent}${end}`;
     runtimeSelection = {},
     tablePresentations = null
   } = {}) {
-    var _a5, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
+    var _a5, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
     const normalizedReportSpec = cloneValue24(reportSpec || {});
     const specHash = buildReportSpecHash(normalizedReportSpec);
     const normalizedScopeParams = normalizeReportSpecScopeParams(normalizedReportSpec);
@@ -60627,14 +60627,17 @@ ${indent}${end}`;
         if (!payload2 || payload2.hasMore !== false || payload2.truncated === true || ((_c = payload2.provenance) == null ? void 0 : _c.hasMore) === true || ((_d = payload2.provenance) == null ? void 0 : _d.truncated) === true || Number((_e = source == null ? void 0 : source.request) == null ? void 0 : _e.offset) > 0) throw new Error("KPI value color requires explicitly complete dataset input.");
       }
       if (((_f = block.runtime) == null ? void 0 : _f.requireCompleteDataset) === true) {
-        const payload2 = datasetPayloads == null ? void 0 : datasetPayloads[block.datasetRef];
-        const source = (_g = normalizedReportSpec.datasets) == null ? void 0 : _g.find((dataset) => dataset.id === block.datasetRef);
-        if (!payload2 || payload2.hasMore !== false || payload2.truncated === true || ((_h = payload2.provenance) == null ? void 0 : _h.hasMore) === true || ((_i = payload2.provenance) == null ? void 0 : _i.truncated) === true || Number((_j = source == null ? void 0 : source.request) == null ? void 0 : _j.offset) > 0) throw new Error("Block requires explicitly complete dataset input.");
+        const refs = new Set([block.datasetRef, (_g = block.sparkline) == null ? void 0 : _g.datasetRef, (_h = block.sparkline) == null ? void 0 : _h.comparisonDatasetRef].filter(Boolean));
+        for (const ref2 of refs) {
+          const payload2 = datasetPayloads == null ? void 0 : datasetPayloads[ref2];
+          const source = (_i = normalizedReportSpec.datasets) == null ? void 0 : _i.find((dataset) => dataset.id === ref2);
+          if (!payload2 || payload2.hasMore !== false || payload2.truncated === true || ((_j = payload2.provenance) == null ? void 0 : _j.hasMore) === true || ((_k = payload2.provenance) == null ? void 0 : _k.truncated) === true || Number((_l = source == null ? void 0 : source.request) == null ? void 0 : _l.offset) > 0) throw new Error(`Block '${block.id}' requires explicitly complete dataset input for '${ref2}'.`);
+        }
       }
-      const ref = (_l = (_k = block == null ? void 0 : block.chartSpec) == null ? void 0 : _k.center) == null ? void 0 : _l.datasetRef;
+      const ref = (_n = (_m = block == null ? void 0 : block.chartSpec) == null ? void 0 : _m.center) == null ? void 0 : _n.datasetRef;
       if (!ref) continue;
       const payload = datasetPayloads == null ? void 0 : datasetPayloads[ref];
-      if (!payload || payload.hasMore !== false || payload.truncated === true || ((_m = payload.provenance) == null ? void 0 : _m.hasMore) === true || ((_n = payload.provenance) == null ? void 0 : _n.truncated) === true) throw new Error("Donut center requires explicitly complete scalar input.");
+      if (!payload || payload.hasMore !== false || payload.truncated === true || ((_o = payload.provenance) == null ? void 0 : _o.hasMore) === true || ((_p = payload.provenance) == null ? void 0 : _p.truncated) === true) throw new Error("Donut center requires explicitly complete scalar input.");
     }
     const datasets = (Array.isArray(normalizedReportSpec == null ? void 0 : normalizedReportSpec.datasets) ? normalizedReportSpec.datasets : []).map((dataset) => buildReportFillDataset(dataset, (datasetPayloads == null ? void 0 : datasetPayloads[normalizeString36(dataset == null ? void 0 : dataset.id)]) || {}, calculatedFields));
     const datasetsById = new Map(datasets.map((dataset) => [dataset.id, dataset]));

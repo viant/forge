@@ -41,3 +41,16 @@ const coloredPayload={primary:{rows:[{amount:1}]},daily:{rows:[{day:'1',amount:1
 assert.throws(()=>buildReportFillFromReportSpec(coloredSpec,coloredPayload),/explicitly complete/);
 assert.throws(()=>buildReportFillFromReportSpec(coloredSpec,{...coloredPayload,daily:{...coloredPayload.daily,provenance:{hasMore:false}}}),/explicitly complete/);
 assert.doesNotThrow(()=>buildReportFillFromReportSpec(coloredSpec,{...coloredPayload,daily:{...coloredPayload.daily,hasMore:false}}));
+
+const completeTrendSpec=structuredClone(spec);completeTrendSpec.blocks.find(b=>b.id==='total').runtime={requireCompleteDataset:true};
+const completeTrendPayload=Object.fromEntries(Object.entries(coloredPayload).map(([id,payload])=>[id,{...payload,hasMore:false}]));
+assert.doesNotThrow(()=>buildReportFillFromReportSpec(completeTrendSpec,completeTrendPayload));
+for(const ref of ['daily','priorDaily']) {
+ for(const bad of [{hasMore:true},{hasMore:undefined},{hasMore:false,truncated:true},{hasMore:false,provenance:{hasMore:true}}]) {
+  assert.throws(()=>buildReportFillFromReportSpec(completeTrendSpec,{...completeTrendPayload,[ref]:{...completeTrendPayload[ref],...bad}}),new RegExp("complete dataset input for '"+ref+"'"));
+ }
+ const paged=structuredClone(completeTrendSpec);paged.datasets.find(d=>d.id===ref).request.offset=1;
+ assert.throws(()=>buildReportFillFromReportSpec(paged,completeTrendPayload),/complete dataset input/);
+}
+// Legacy uncolored sparklines without an explicit completeness contract remain compatible.
+assert.doesNotThrow(()=>buildReportFillFromReportSpec(spec,coloredPayload));

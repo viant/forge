@@ -1287,9 +1287,12 @@ export function buildReportFillFromReportSpec(reportSpec = {}, datasetPayloads =
       if(!payload||payload.hasMore!==false||payload.truncated===true||payload.provenance?.hasMore===true||payload.provenance?.truncated===true||Number(source?.request?.offset)>0)throw new Error('KPI value color requires explicitly complete dataset input.');
     }
     if(block.runtime?.requireCompleteDataset===true){
-      const payload=datasetPayloads?.[block.datasetRef];
-      const source=normalizedReportSpec.datasets?.find(dataset=>dataset.id===block.datasetRef);
-      if(!payload||payload.hasMore!==false||payload.truncated===true||payload.provenance?.hasMore===true||payload.provenance?.truncated===true||Number(source?.request?.offset)>0)throw new Error('Block requires explicitly complete dataset input.');
+      const refs = new Set([block.datasetRef, block.sparkline?.datasetRef, block.sparkline?.comparisonDatasetRef].filter(Boolean));
+      for (const ref of refs) {
+        const payload=datasetPayloads?.[ref];
+        const source=normalizedReportSpec.datasets?.find(dataset=>dataset.id===ref);
+        if(!payload||payload.hasMore!==false||payload.truncated===true||payload.provenance?.hasMore===true||payload.provenance?.truncated===true||Number(source?.request?.offset)>0)throw new Error(`Block '${block.id}' requires explicitly complete dataset input for '${ref}'.`);
+      }
     }
     const ref=block?.chartSpec?.center?.datasetRef;
     if(!ref)continue;
