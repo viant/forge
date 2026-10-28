@@ -187,6 +187,8 @@ export const reportFillSchema = {
       required: ["type", "sourceField"],
       properties: {
         type: { const: "percentOfTotal" },
+        nullPolicy: {enum:["zero","null"]},
+        requireComplete: {type:"boolean"},
         sourceField: { type: "string" },
         partitionBy: {
           type: "array",
@@ -952,7 +954,6 @@ export const reportFillSchema = {
         categoryRange: categoryRangeSchema,
         paletteMode:{enum:["declared"]},
         palette:{type:"array",minItems:1,maxItems:64,items:{type:"string",pattern:"^#[0-9a-fA-F]{6}$"}},
-        paletteMode:{enum:["declared"]},
         center: donutCenterSchema,
         sliceLabel: pieSliceLabelSchema,
         appearance: {enum:["document"]},
@@ -1208,6 +1209,7 @@ export const reportFillSchema = {
         type: { type: "string" },
         heatmap: heatmapSchema,
         categoryRange: categoryRangeSchema,
+        paletteMode: {enum:["declared"]},
         center: donutCenterSchema,
         sliceLabel: pieSliceLabelSchema,
         appearance: {enum:["document"]},

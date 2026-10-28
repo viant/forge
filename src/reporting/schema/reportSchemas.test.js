@@ -1927,3 +1927,13 @@ mappedChart.chartModel.series.categoryColors={Direct:'var(--example-direct)'};
 assert.equal(validateReportSpec(mappedColorSpec).valid,true,'Compiled category colors must remain exportable');
 mappedChart.chartModel.series.categoryColors.Direct=42;
 assert.equal(validateReportSpec(mappedColorSpec).valid,false,'Category colors retain string validation');
+
+// Resolved chart and filled calculation contracts retain authored semantics.
+const declaredFixture=JSON.parse(readFileSync(new URL('../../../doc/examples/donut-emphasis-conversion-preview.json',import.meta.url),'utf8'));
+declaredFixture.reportSpec.layoutIntent.resultPanePosition="bottom";
+assert.equal(validateReportSpec(declaredFixture.reportSpec).valid,true);
+declaredFixture.reportSpec.calculatedFields=[{id:'fraction',key:'fraction',label:'Fraction',kind:'tableCalc',dataType:'number',datasetRef:'primary',dependencies:['items'],compute:{type:'percentOfTotal',sourceField:'items',partitionBy:[],scale:1,nullPolicy:'null',requireComplete:true}}];
+const declaredFill=buildReportFillFromReportSpec(declaredFixture.reportSpec,declaredFixture.datasets);
+assert.equal(validateReportFill(declaredFill).valid,true,JSON.stringify(validateReportFill(declaredFill)));
+assert.deepEqual(declaredFill.datasets.find(d=>d.id==='primary').rows.map(r=>r.fraction),[.48,.32,.2]);
+const invalidDeclared=JSON.parse(JSON.stringify(declaredFill));invalidDeclared.blocks[0].chartModel.paletteMode='guess';assert.equal(validateReportFill(invalidDeclared).valid,false);
