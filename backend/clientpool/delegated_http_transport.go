@@ -67,6 +67,6 @@ func (m *Manager) configureDelegatedHTTPTransport(ctx context.Context, server st
 	if err != nil {
 		return err
 	}
-	options.SetAuthTransport(rt, &http.Client{Transport: rt, Timeout: policy.Timeout, CheckRedirect: policy.CheckRedirect, Jar: options.CookieJar})
+	options.SetAuthTransport(rt, &http.Client{Transport: observingRoundTripper{base: rt, serverName: server}, Timeout: policy.Timeout, CheckRedirect: policy.CheckRedirect, Jar: options.CookieJar})
 	return nil
 }
