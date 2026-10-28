@@ -65,10 +65,10 @@ func TestRenderDashboardPreservesAuthoredTabsAndFullTypedData(t *testing.T) {
 	report.Datasets[0].Provenance.RowCount = 80
 	report.Datasets[0].Rows[79]["channel"] = "@last-row"
 	workbook, _ := openDashboard(t, report)
-	require.Equal(t, []string{"Dashboard", "Results-Details", "Results-Details (2)"}, workbook.GetSheetList())
+	require.Equal(t, []string{"Dashboard", "Results-Details", "Results-Details (2)", "Data primary"}, workbook.GetSheetList())
 	require.Equal(t, "Results/Details", mustCellValue(t, workbook, "Dashboard", "A3"))
 	require.Equal(t, "Results:Details", mustCellValue(t, workbook, "Dashboard", "A5"))
-	for _, sheet := range workbook.GetSheetList()[1:] {
+	for _, sheet := range workbook.GetSheetList()[1:3] {
 		require.Equal(t, "=1+2", mustCellValue(t, workbook, sheet, "A5"))
 		formula, err := workbook.GetCellFormula(sheet, "A5")
 		require.NoError(t, err)
@@ -79,16 +79,19 @@ func TestRenderDashboardPreservesAuthoredTabsAndFullTypedData(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, value, actual)
 		require.Equal(t, "$0.11", mustCellValue(t, workbook, sheet, "B5"))
-		require.Equal(t, "Dataset primary", mustCellValue(t, workbook, sheet, "A8"))
-		require.Equal(t, "@last-row", mustCellValue(t, workbook, sheet, "A89"))
-		require.Equal(t, "9007199254740993", mustCellValue(t, workbook, sheet, "C10"))
-		kind, err := workbook.GetCellType(sheet, "C10")
+	}
+	{
+		sheet := "Data primary"
+		require.Equal(t, "Dataset primary", mustCellValue(t, workbook, sheet, "A1"))
+		require.Equal(t, "@last-row", mustCellValue(t, workbook, sheet, "A84"))
+		require.Equal(t, "9007199254740993", mustCellValue(t, workbook, sheet, "C5"))
+		kind, err := workbook.GetCellType(sheet, "C5")
 		require.NoError(t, err)
 		require.Equal(t, excelize.CellTypeSharedString, kind)
-		kind, err = workbook.GetCellType(sheet, "B10")
+		kind, err = workbook.GetCellType(sheet, "B5")
 		require.NoError(t, err)
 		require.Equal(t, excelize.CellTypeBool, kind)
-		require.Empty(t, mustCellValue(t, workbook, sheet, "D10"))
+		require.Empty(t, mustCellValue(t, workbook, sheet, "D5"))
 	}
 	// Renderer leaves the interactive fill and its formatted strings untouched.
 	require.Equal(t, "$0.11", table.Content.ResolvedRows[0].Cells[1].DisplayValue)
@@ -120,19 +123,20 @@ func TestRenderDashboardNativeChartRelationships(t *testing.T) {
 		t.Run(tc.kind+"/"+tc.chartType, func(t *testing.T) {
 			report := chartFixture(t, tc.kind, tc.chartType, tc.rows)
 			workbook, data := openDashboard(t, report)
-			// Chart data follows the two-row details table: title row 9, header row 10.
-			require.Equal(t, "12.125", rawCell(t, workbook, "Results-Details (2)", "B11"))
-			require.Equal(t, "3.5", rawCell(t, workbook, "Results-Details (2)", func() string {
+			// Chart data is isolated from the authored visual and complete raw data.
+			require.Equal(t, "12.125", rawCell(t, workbook, "Chart Trend", "B5"))
+			require.Equal(t, "3.5", rawCell(t, workbook, "Chart Trend", func() string {
 				if tc.kind == "category" {
-					return "B12"
+					return "B6"
 				}
-				return "C11"
+				return "C5"
 			}()))
 			entries := workbookZIP(t, data)
 			require.Contains(t, entries["xl/charts/chart1.xml"], tc.tag)
-			require.Contains(t, entries["xl/charts/chart1.xml"], "&#39;Results-Details (2)&#39;!$B$11:$B$12")
-			require.Contains(t, entries["xl/worksheets/sheet1.xml"], "drawing")
-			require.Contains(t, entries["xl/worksheets/_rels/sheet1.xml.rels"], "drawing1.xml")
+			require.Contains(t, entries["xl/charts/chart1.xml"], "&#39;Chart Trend&#39;!$B$5:$B$6")
+			require.Contains(t, entries["xl/charts/chart1.xml"], `<plotVisOnly val="1">`)
+			require.Contains(t, entries["xl/worksheets/sheet3.xml"], "drawing")
+			require.Contains(t, entries["xl/worksheets/_rels/sheet3.xml.rels"], "drawing1.xml")
 			require.Contains(t, entries["xl/drawings/_rels/drawing1.xml.rels"], "chart1.xml")
 		})
 	}
@@ -180,7 +184,7 @@ func TestDashboardSheetNamesAndNestedComposites(t *testing.T) {
 	report.Blocks[1].SectionContent.BlockIDs = []string{"group"}
 	workbook, _ := openDashboard(t, report)
 	sheets := workbook.GetSheetList()
-	require.Len(t, sheets, 3)
+	require.Len(t, sheets, 4)
 	require.LessOrEqual(t, len(utf16.Encode([]rune(sheets[2]))), 31)
 	require.Equal(t, "Details", mustCellValue(t, workbook, sheets[2], "A3"))
 	writer := dashboardWriter{names: map[string]bool{"dashboard": true}}

@@ -291,9 +291,22 @@ export function buildReportPrintSvgElement(element = {}) {
   if (!next || !svg) {
     return null;
   }
+  const source = element.chartSource;
+  let chartSource;
+  if (source != null) {
+    if (!isPlainObject(source) || !normalizeString(source.blockId)
+      || !Number.isInteger(source.rowOffset) || source.rowOffset < 0
+      || !Number.isInteger(source.rowCount) || source.rowCount < 1
+      || (source.minValue != null && !Number.isFinite(source.minValue))
+      || (source.maxValue != null && !Number.isFinite(source.maxValue))
+      || (source.minValue != null && source.maxValue != null && source.minValue >= source.maxValue)) return null;
+    chartSource = {blockId: normalizeString(source.blockId), rowOffset: source.rowOffset, rowCount: source.rowCount,
+      ...(source.minValue != null ? {minValue: source.minValue} : {}), ...(source.maxValue != null ? {maxValue: source.maxValue} : {})};
+  }
   return {
     ...next,
     svg,
+    ...(chartSource ? {chartSource} : {}),
   };
 }
 
@@ -2485,6 +2498,11 @@ function renderReportPrintChartBlock(state = {}, block = {}, {
         height: chartHeight,
       },
       svg: svgResult.svg,
+      ...(Number.isInteger(svgResult.sourceRowCount) && svgResult.sourceRowCount > 0
+        && (chartPages.length > 1 || svgResult.sourceRowCount < (block?.content?.resolvedChart?.rows?.length || 0))
+        ? {chartSource: {blockId: block.id, rowOffset: svgResult.sourceRowOffset || 0, rowCount: svgResult.sourceRowCount,
+          ...(svgResult.sourceValueBounds ? {minValue: svgResult.sourceValueBounds.minValue, maxValue: svgResult.sourceValueBounds.maxValue} : {})}}
+        : {}),
     }));
     state.cursorY += chartHeight;
     (Array.isArray(svgResult?.diagnostics) ? svgResult.diagnostics : []).forEach((diagnostic) => {

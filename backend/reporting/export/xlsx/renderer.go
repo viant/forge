@@ -7,6 +7,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"unicode/utf16"
 
 	reportfill "github.com/viant/forge/backend/reporting/fill"
 	"github.com/xuri/excelize/v2"
@@ -73,7 +74,7 @@ func Render(report *reportfill.ReportFill) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err := workbook.SetCellStr(sheetName, cellName, tablemeta.Header(strings.TrimSpace(column.Label), column.Key, block.Content.ColumnGroups)); err != nil {
+		if err := setXLSXText(workbook, sheetName, cellName, tablemeta.Header(strings.TrimSpace(column.Label), column.Key, block.Content.ColumnGroups)); err != nil {
 			return nil, err
 		}
 		if err := workbook.SetCellStyle(sheetName, cellName, cellName, headerStyle); err != nil {
@@ -138,20 +139,20 @@ func setXLSXCell(workbook *excelize.File, sheet, name string, cell reportfill.Re
 	case nil:
 		return false, workbook.SetCellValue(sheet, name, nil)
 	case string:
-		return false, workbook.SetCellStr(sheet, name, actual)
+		return false, setXLSXText(workbook, sheet, name, actual)
 	case bool:
 		return false, workbook.SetCellBool(sheet, name, actual)
 	case json.Number:
 		text := actual.String()
 		if !strings.ContainsAny(text, ".eE") && len(strings.TrimLeft(text, "-+")) > 15 {
-			return false, workbook.SetCellStr(sheet, name, text)
+			return false, setXLSXText(workbook, sheet, name, text)
 		}
 		number, err := actual.Float64()
 		if err != nil || math.IsNaN(number) || math.IsInf(number, 0) {
 			return false, fmt.Errorf("xlsx export requires a finite numeric value")
 		}
 		if math.Abs(number) >= 1e15 && math.Trunc(number) == number {
-			return false, workbook.SetCellStr(sheet, name, text)
+			return false, setXLSXText(workbook, sheet, name, text)
 		}
 		return true, workbook.SetCellFloat(sheet, name, number, -1, 64)
 	case float64:
@@ -159,7 +160,7 @@ func setXLSXCell(workbook *excelize.File, sheet, name string, cell reportfill.Re
 			return false, fmt.Errorf("xlsx export requires a finite numeric value")
 		}
 		if math.Abs(actual) >= 1e15 && math.Trunc(actual) == actual {
-			return false, workbook.SetCellStr(sheet, name, strconv.FormatFloat(actual, 'f', -1, 64))
+			return false, setXLSXText(workbook, sheet, name, strconv.FormatFloat(actual, 'f', -1, 64))
 		}
 		return true, workbook.SetCellValue(sheet, name, actual)
 	case float32:
@@ -170,7 +171,7 @@ func setXLSXCell(workbook *excelize.File, sheet, name string, cell reportfill.Re
 	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
 		text := fmt.Sprint(actual)
 		if len(strings.TrimLeft(text, "-+")) > 15 {
-			return false, workbook.SetCellStr(sheet, name, text)
+			return false, setXLSXText(workbook, sheet, name, text)
 		}
 		return true, workbook.SetCellValue(sheet, name, actual)
 	default:
@@ -178,8 +179,15 @@ func setXLSXCell(workbook *excelize.File, sheet, name string, cell reportfill.Re
 		if err != nil {
 			return false, err
 		}
-		return false, workbook.SetCellStr(sheet, name, string(data))
+		return false, setXLSXText(workbook, sheet, name, string(data))
 	}
+}
+
+func setXLSXText(workbook *excelize.File, sheet, cell, value string) error {
+	if len(utf16.Encode([]rune(value))) > 32767 {
+		return fmt.Errorf("xlsx cell %s!%s exceeds Excel text length limit", sheet, cell)
+	}
+	return workbook.SetCellStr(sheet, cell, value)
 }
 
 func xlsxNumberFormat(format string) string {

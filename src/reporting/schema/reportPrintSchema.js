@@ -199,6 +199,16 @@ export const reportPrintSchema = {
         box: { $ref: "#/$defs/box" },
         zIndex: { type: "integer", minimum: 0 },
         svg: { type: "string" },
+        chartSource: {
+          type: "object", additionalProperties: false,
+          required: ["blockId", "rowOffset", "rowCount"],
+          properties: {
+            blockId: {type: "string", minLength: 1},
+            rowOffset: {type: "integer", minimum: 0},
+            rowCount: {type: "integer", minimum: 1},
+            minValue: {type: "number"}, maxValue: {type: "number"},
+          },
+        },
       },
     },
     tableCellTextElement: {

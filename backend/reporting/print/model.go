@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strings"
 )
 
@@ -49,36 +50,48 @@ type Page struct {
 }
 
 type Element struct {
-	ID              string  `json:"id"`
-	Kind            string  `json:"kind"`
-	Box             Box     `json:"box"`
-	ZIndex          *int    `json:"zIndex,omitempty"`
-	Text            string  `json:"text,omitempty"`
-	FontFamily      string  `json:"fontFamily,omitempty"`
-	FontSize        float64 `json:"fontSize,omitempty"`
-	FontWeight      string  `json:"fontWeight,omitempty"`
-	Color           string  `json:"color,omitempty"`
-	Align           string  `json:"align,omitempty"`
-	VerticalAlign   string  `json:"verticalAlign,omitempty"`
-	Wrap            bool    `json:"wrap,omitempty"`
-	StrokeColor     string  `json:"strokeColor,omitempty"`
-	StrokeWidth     float64 `json:"strokeWidth,omitempty"`
-	StrokeStyle     string  `json:"strokeStyle,omitempty"`
-	FillColor       string  `json:"fillColor,omitempty"`
-	Radius          float64 `json:"radius,omitempty"`
-	Image           *Image  `json:"image,omitempty"`
-	SVG             string  `json:"svg,omitempty"`
-	RowKey          string  `json:"rowKey,omitempty"`
-	ColumnKey       string  `json:"columnKey,omitempty"`
-	Format          string  `json:"format,omitempty"`
-	Value           float64 `json:"value,omitempty"`
-	Min             float64 `json:"min,omitempty"`
-	Max             float64 `json:"max,omitempty"`
-	BackgroundColor string  `json:"backgroundColor,omitempty"`
-	BorderColor     string  `json:"borderColor,omitempty"`
-	Tone            string  `json:"tone,omitempty"`
-	Label           string  `json:"label,omitempty"`
-	TextColor       string  `json:"textColor,omitempty"`
+	ID              string       `json:"id"`
+	Kind            string       `json:"kind"`
+	Box             Box          `json:"box"`
+	ZIndex          *int         `json:"zIndex,omitempty"`
+	Text            string       `json:"text,omitempty"`
+	FontFamily      string       `json:"fontFamily,omitempty"`
+	FontSize        float64      `json:"fontSize,omitempty"`
+	FontWeight      string       `json:"fontWeight,omitempty"`
+	Color           string       `json:"color,omitempty"`
+	Align           string       `json:"align,omitempty"`
+	VerticalAlign   string       `json:"verticalAlign,omitempty"`
+	Wrap            bool         `json:"wrap,omitempty"`
+	StrokeColor     string       `json:"strokeColor,omitempty"`
+	StrokeWidth     float64      `json:"strokeWidth,omitempty"`
+	StrokeStyle     string       `json:"strokeStyle,omitempty"`
+	FillColor       string       `json:"fillColor,omitempty"`
+	Radius          float64      `json:"radius,omitempty"`
+	Image           *Image       `json:"image,omitempty"`
+	SVG             string       `json:"svg,omitempty"`
+	ChartSource     *ChartSource `json:"chartSource,omitempty"`
+	RowKey          string       `json:"rowKey,omitempty"`
+	ColumnKey       string       `json:"columnKey,omitempty"`
+	Format          string       `json:"format,omitempty"`
+	Value           float64      `json:"value,omitempty"`
+	Min             float64      `json:"min,omitempty"`
+	Max             float64      `json:"max,omitempty"`
+	BackgroundColor string       `json:"backgroundColor,omitempty"`
+	BorderColor     string       `json:"borderColor,omitempty"`
+	Tone            string       `json:"tone,omitempty"`
+	Label           string       `json:"label,omitempty"`
+	TextColor       string       `json:"textColor,omitempty"`
+}
+
+// ChartSource identifies the exact slice represented by a paginated or limited
+// print chart. Spreadsheet exporters can keep it native without guessing from
+// shortened labels or reverse-engineering SVG geometry.
+type ChartSource struct {
+	BlockID   string   `json:"blockId"`
+	RowOffset int      `json:"rowOffset"`
+	RowCount  int      `json:"rowCount"`
+	MinValue  *float64 `json:"minValue,omitempty"`
+	MaxValue  *float64 `json:"maxValue,omitempty"`
 }
 
 type Image struct {
@@ -210,6 +223,9 @@ func validateElements(elements []Element, location string) error {
 		if element.ZIndex != nil && *element.ZIndex < 0 {
 			return fmt.Errorf("%s[%d].zIndex must be >= 0", location, index)
 		}
+		if element.ChartSource != nil && kind != "svg" {
+			return fmt.Errorf("%s[%d].chartSource is only supported for svg elements", location, index)
+		}
 		if element.Box.Width < 0 || element.Box.Height < 0 || element.Box.X < 0 || element.Box.Y < 0 {
 			return fmt.Errorf("%s[%d].box values must be >= 0", location, index)
 		}
@@ -244,6 +260,19 @@ func validateElements(elements []Element, location string) error {
 		case "svg":
 			if strings.TrimSpace(element.SVG) == "" {
 				return fmt.Errorf("%s[%d].svg is required for svg elements", location, index)
+			}
+			if source := element.ChartSource; source != nil {
+				if strings.TrimSpace(source.BlockID) == "" || source.RowOffset < 0 || source.RowCount < 1 {
+					return fmt.Errorf("%s[%d].chartSource requires a block and valid row slice", location, index)
+				}
+				for _, bound := range []*float64{source.MinValue, source.MaxValue} {
+					if bound != nil && (math.IsNaN(*bound) || math.IsInf(*bound, 0)) {
+						return fmt.Errorf("%s[%d].chartSource requires finite bounds", location, index)
+					}
+				}
+				if source.MinValue != nil && source.MaxValue != nil && *source.MinValue >= *source.MaxValue {
+					return fmt.Errorf("%s[%d].chartSource requires increasing bounds", location, index)
+				}
 			}
 		case "image":
 			if element.Image == nil || strings.TrimSpace(element.Image.MimeType) == "" || strings.TrimSpace(element.Image.Payload) == "" {

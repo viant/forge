@@ -61613,7 +61613,7 @@ ${indent}${end}`;
     resolvedChart = { ...resolvedChart, rows: applyChartRowLimit(resolvedChart == null ? void 0 : resolvedChart.rows, rowLimit) };
     const type = normalizeString39((chartModel == null ? void 0 : chartModel.type) || (resolvedChart == null ? void 0 : resolvedChart.type)).toLowerCase();
     if (!["horizontal_bar", "funnel_bar"].includes(type) || !["directSeries", "groupedSeries"].includes(resolvedChart == null ? void 0 : resolvedChart.kind)) {
-      return [buildReportPrintChartSvg({ chartModel, resolvedChart, width })];
+      return [{ ...buildReportPrintChartSvg({ chartModel, resolvedChart, width }), sourceRowOffset: 0, sourceRowCount: resolvedChart.rows.length }];
     }
     const rows = resolveCartesianRows(resolvedChart);
     if (!rows.length) return [buildReportPrintChartSvg({ chartModel, resolvedChart, width })];
@@ -61633,7 +61633,7 @@ ${indent}${end}`;
         if (height <= availableHeight) count = middle;
         else upper = middle - 1;
       }
-      pages.push(renderHorizontalBarChartSvg({ chartModel, resolvedChart: { ...resolvedChart, rows: rows.slice(offset, offset + count) }, width, valueBounds, categoryOffset: offset }));
+      pages.push({ ...renderHorizontalBarChartSvg({ chartModel, resolvedChart: { ...resolvedChart, rows: rows.slice(offset, offset + count) }, width, valueBounds, categoryOffset: offset }), sourceRowOffset: offset, sourceRowCount: count, sourceValueBounds: valueBounds });
       offset += count;
     }
     return pages;
@@ -67596,9 +67596,22 @@ ${indent}${end}`;
     if (!next || !svg) {
       return null;
     }
+    const source = element.chartSource;
+    let chartSource;
+    if (source != null) {
+      if (!isPlainObject9(source) || !normalizeString41(source.blockId) || !Number.isInteger(source.rowOffset) || source.rowOffset < 0 || !Number.isInteger(source.rowCount) || source.rowCount < 1 || source.minValue != null && !Number.isFinite(source.minValue) || source.maxValue != null && !Number.isFinite(source.maxValue) || source.minValue != null && source.maxValue != null && source.minValue >= source.maxValue) return null;
+      chartSource = {
+        blockId: normalizeString41(source.blockId),
+        rowOffset: source.rowOffset,
+        rowCount: source.rowCount,
+        ...source.minValue != null ? { minValue: source.minValue } : {},
+        ...source.maxValue != null ? { maxValue: source.maxValue } : {}
+      };
+    }
     return {
       ...next,
-      svg
+      svg,
+      ...chartSource ? { chartSource } : {}
     };
   }
   function buildReportPrintTableCellElementBase(element = {}, expectedKind = "") {
@@ -69556,7 +69569,7 @@ ${indent}${end}`;
   function renderReportPrintChartBlock(state = {}, block = {}, {
     layoutNote = ""
   } = {}) {
-    var _a5, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r;
+    var _a5, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u;
     const datasetRef = normalizeString41(block == null ? void 0 : block.datasetRef);
     const declared = (Array.isArray((_a5 = state.reportSpec) == null ? void 0 : _a5.datasets) ? state.reportSpec.datasets : []).some((dataset2) => (dataset2 == null ? void 0 : dataset2.id) === datasetRef);
     const dataset = (Array.isArray((_b = state.reportFill) == null ? void 0 : _b.datasets) ? state.reportFill.datasets : []).find((dataset2) => (dataset2 == null ? void 0 : dataset2.id) === datasetRef);
@@ -69610,7 +69623,13 @@ ${indent}${end}`;
           width: state.contentWidth,
           height: chartHeight
         },
-        svg: svgResult.svg
+        svg: svgResult.svg,
+        ...Number.isInteger(svgResult.sourceRowCount) && svgResult.sourceRowCount > 0 && (chartPages.length > 1 || svgResult.sourceRowCount < (((_p = (_o = (_n = block == null ? void 0 : block.content) == null ? void 0 : _n.resolvedChart) == null ? void 0 : _o.rows) == null ? void 0 : _p.length) || 0)) ? { chartSource: {
+          blockId: block.id,
+          rowOffset: svgResult.sourceRowOffset || 0,
+          rowCount: svgResult.sourceRowCount,
+          ...svgResult.sourceValueBounds ? { minValue: svgResult.sourceValueBounds.minValue, maxValue: svgResult.sourceValueBounds.maxValue } : {}
+        } } : {}
       }));
       state.cursorY += chartHeight;
       (Array.isArray(svgResult == null ? void 0 : svgResult.diagnostics) ? svgResult.diagnostics : []).forEach((diagnostic) => {
@@ -69621,12 +69640,12 @@ ${indent}${end}`;
           elementId: svgElement == null ? void 0 : svgElement.id
         });
       });
-      if ((_n = svgResult.labelDetails) == null ? void 0 : _n.length) {
+      if ((_q = svgResult.labelDetails) == null ? void 0 : _q.length) {
         renderReportPrintTextLines(state, { idPrefix: `${block.id}__labels_${pageIndex}`, lines: svgResult.labelDetails, fontSize: 9, lineHeight: 12 });
       }
       finishReportPrintBlock(state);
     }
-    const tooltipLines = chartTooltipPrintLines((_p = (_o = block == null ? void 0 : block.content) == null ? void 0 : _o.chartModel) == null ? void 0 : _p.tooltip, (_r = (_q = block == null ? void 0 : block.content) == null ? void 0 : _q.resolvedChart) == null ? void 0 : _r.tooltipEntries);
+    const tooltipLines = chartTooltipPrintLines((_s = (_r = block == null ? void 0 : block.content) == null ? void 0 : _r.chartModel) == null ? void 0 : _s.tooltip, (_u = (_t = block == null ? void 0 : block.content) == null ? void 0 : _t.resolvedChart) == null ? void 0 : _u.tooltipEntries);
     if (tooltipLines.length) {
       renderReportPrintTextLines(state, { idPrefix: `${block.id}__tooltip_details`, lines: tooltipLines, fontSize: 9, lineHeight: 12 });
       finishReportPrintBlock(state);

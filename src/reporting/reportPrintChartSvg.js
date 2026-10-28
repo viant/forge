@@ -1232,7 +1232,7 @@ export function buildReportPrintChartPages({ chartModel = {}, resolvedChart = {}
   resolvedChart = { ...resolvedChart, rows: applyChartRowLimit(resolvedChart?.rows, rowLimit) };
   const type = normalizeString(chartModel?.type || resolvedChart?.type).toLowerCase();
   if (!["horizontal_bar", "funnel_bar"].includes(type) || !["directSeries", "groupedSeries"].includes(resolvedChart?.kind)) {
-    return [buildReportPrintChartSvg({ chartModel, resolvedChart, width })];
+    return [{...buildReportPrintChartSvg({ chartModel, resolvedChart, width }), sourceRowOffset: 0, sourceRowCount: resolvedChart.rows.length}];
   }
   const rows = resolveCartesianRows(resolvedChart);
   if (!rows.length) return [buildReportPrintChartSvg({ chartModel, resolvedChart, width })];
@@ -1255,7 +1255,7 @@ export function buildReportPrintChartPages({ chartModel = {}, resolvedChart = {}
       if (height <= availableHeight) count = middle;
       else upper = middle - 1;
     }
-    pages.push(renderHorizontalBarChartSvg({ chartModel, resolvedChart: { ...resolvedChart, rows: rows.slice(offset, offset + count) }, width, valueBounds, categoryOffset: offset }));
+    pages.push({...renderHorizontalBarChartSvg({ chartModel, resolvedChart: { ...resolvedChart, rows: rows.slice(offset, offset + count) }, width, valueBounds, categoryOffset: offset }), sourceRowOffset:offset, sourceRowCount:count, sourceValueBounds:valueBounds});
     offset += count;
   }
   return pages;

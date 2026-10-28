@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/viant/forge/backend/reporting/tablemeta"
 	"io"
+	"math"
 	"reflect"
 	"sort"
 	"strings"
@@ -171,6 +172,7 @@ type Block struct {
 	ChartContent             *ChartContent         `json:"-"`
 	GeoContent               *GeoContent           `json:"-"`
 	KPIContent               *KPIContent           `json:"-"`
+	Sparkline                *KPISparklineSpec     `json:"sparkline,omitempty"`
 	CollectionContent        *CollectionContent    `json:"-"`
 	SectionContent           *SectionContent       `json:"-"`
 	CompositeContent         *CompositeContent     `json:"-"`
@@ -357,28 +359,38 @@ type ResolvedGeoLegendRule struct {
 }
 
 type KPIContent struct {
-	Title                    string         `json:"title"`
-	Description              string         `json:"description,omitempty"`
-	ValueField               string         `json:"valueField"`
-	ValueLabel               string         `json:"valueLabel"`
-	ValueFormat              string         `json:"valueFormat,omitempty"`
-	Suffix                   string         `json:"suffix,omitempty"`
-	Tone                     string         `json:"tone,omitempty"`
-	Value                    any            `json:"value"`
-	RowCount                 *int           `json:"rowCount"`
-	SecondaryField           string         `json:"secondaryField,omitempty"`
-	SecondaryLabel           string         `json:"secondaryLabel,omitempty"`
-	SecondaryFormat          string         `json:"secondaryFormat,omitempty"`
-	SecondaryTrend           bool           `json:"secondaryTrend,omitempty"`
-	SecondaryDisplayKey      string         `json:"secondaryDisplayKey,omitempty"`
-	SecondaryDisplayValueMap map[string]any `json:"secondaryDisplayValueMap,omitempty"`
-	SecondaryValue           any            `json:"secondaryValue,omitempty"`
-	EmptyLabel               string         `json:"emptyLabel,omitempty"`
-	RowSelector              string         `json:"rowSelector,omitempty"`
-	PresentationMode         string         `json:"presentationMode,omitempty"`
-	BodyFormat               string         `json:"bodyFormat,omitempty"`
-	BodyTemplate             string         `json:"bodyTemplate,omitempty"`
-	BodyMarkdown             string         `json:"bodyMarkdown,omitempty"`
+	Sparkline                *KPISparklineContent `json:"sparkline,omitempty"`
+	Title                    string               `json:"title"`
+	Description              string               `json:"description,omitempty"`
+	ValueField               string               `json:"valueField"`
+	ValueLabel               string               `json:"valueLabel"`
+	ValueFormat              string               `json:"valueFormat,omitempty"`
+	Suffix                   string               `json:"suffix,omitempty"`
+	Tone                     string               `json:"tone,omitempty"`
+	Value                    any                  `json:"value"`
+	RowCount                 *int                 `json:"rowCount"`
+	SecondaryField           string               `json:"secondaryField,omitempty"`
+	SecondaryLabel           string               `json:"secondaryLabel,omitempty"`
+	SecondaryFormat          string               `json:"secondaryFormat,omitempty"`
+	SecondaryTrend           bool                 `json:"secondaryTrend,omitempty"`
+	SecondaryDisplayKey      string               `json:"secondaryDisplayKey,omitempty"`
+	SecondaryDisplayValueMap map[string]any       `json:"secondaryDisplayValueMap,omitempty"`
+	SecondaryValue           any                  `json:"secondaryValue,omitempty"`
+	EmptyLabel               string               `json:"emptyLabel,omitempty"`
+	RowSelector              string               `json:"rowSelector,omitempty"`
+	PresentationMode         string               `json:"presentationMode,omitempty"`
+	BodyFormat               string               `json:"bodyFormat,omitempty"`
+	BodyTemplate             string               `json:"bodyTemplate,omitempty"`
+	BodyMarkdown             string               `json:"bodyMarkdown,omitempty"`
+}
+
+// KPISparklineSpec and KPISparklineContent mirror the canonical public Forge
+// sparkline contracts. Missing observations remain nil, never implicit zeros.
+type KPISparklineSpec = reportspec.KPISparklineSpec
+type KPISparklineContent struct {
+	Values           []*float64 `json:"values"`
+	Labels           []string   `json:"labels"`
+	ComparisonValues []*float64 `json:"comparisonValues,omitempty"`
 }
 
 type BadgeItem struct {
@@ -608,28 +620,29 @@ type rawChartBlock struct {
 }
 
 type rawKPIBlock struct {
-	ID                       string         `json:"id"`
-	Kind                     string         `json:"kind"`
-	Title                    string         `json:"title"`
-	DatasetRef               string         `json:"datasetRef"`
-	ValueField               string         `json:"valueField"`
-	ValueLabel               string         `json:"valueLabel"`
-	ValueFormat              string         `json:"valueFormat,omitempty"`
-	Suffix                   string         `json:"suffix,omitempty"`
-	SecondaryField           string         `json:"secondaryField,omitempty"`
-	SecondaryLabel           string         `json:"secondaryLabel,omitempty"`
-	SecondaryFormat          string         `json:"secondaryFormat,omitempty"`
-	SecondaryTrend           bool           `json:"secondaryTrend,omitempty"`
-	SecondaryDisplayKey      string         `json:"secondaryDisplayKey,omitempty"`
-	SecondaryDisplayValueMap map[string]any `json:"secondaryDisplayValueMap,omitempty"`
-	Description              string         `json:"description,omitempty"`
-	Tone                     string         `json:"tone,omitempty"`
-	EmptyLabel               string         `json:"emptyLabel,omitempty"`
-	RowSelector              string         `json:"rowSelector,omitempty"`
-	PresentationMode         string         `json:"presentationMode,omitempty"`
-	BodyFormat               string         `json:"bodyFormat,omitempty"`
-	BodyTemplate             string         `json:"bodyTemplate,omitempty"`
-	Content                  KPIContent     `json:"content"`
+	Sparkline                *KPISparklineSpec `json:"sparkline,omitempty"`
+	ID                       string            `json:"id"`
+	Kind                     string            `json:"kind"`
+	Title                    string            `json:"title"`
+	DatasetRef               string            `json:"datasetRef"`
+	ValueField               string            `json:"valueField"`
+	ValueLabel               string            `json:"valueLabel"`
+	ValueFormat              string            `json:"valueFormat,omitempty"`
+	Suffix                   string            `json:"suffix,omitempty"`
+	SecondaryField           string            `json:"secondaryField,omitempty"`
+	SecondaryLabel           string            `json:"secondaryLabel,omitempty"`
+	SecondaryFormat          string            `json:"secondaryFormat,omitempty"`
+	SecondaryTrend           bool              `json:"secondaryTrend,omitempty"`
+	SecondaryDisplayKey      string            `json:"secondaryDisplayKey,omitempty"`
+	SecondaryDisplayValueMap map[string]any    `json:"secondaryDisplayValueMap,omitempty"`
+	Description              string            `json:"description,omitempty"`
+	Tone                     string            `json:"tone,omitempty"`
+	EmptyLabel               string            `json:"emptyLabel,omitempty"`
+	RowSelector              string            `json:"rowSelector,omitempty"`
+	PresentationMode         string            `json:"presentationMode,omitempty"`
+	BodyFormat               string            `json:"bodyFormat,omitempty"`
+	BodyTemplate             string            `json:"bodyTemplate,omitempty"`
+	Content                  KPIContent        `json:"content"`
 }
 
 type rawBadgesBlock struct {
@@ -957,6 +970,7 @@ func decodeJSON(data []byte, datasourceRequests bool) (*ReportFill, error) {
 				BodyFormat:               kpiBlock.BodyFormat,
 				BodyTemplate:             kpiBlock.BodyTemplate,
 				KPIContent:               &kpiBlock.Content,
+				Sparkline:                kpiBlock.Sparkline,
 			})
 		case "badgesBlock":
 			badgesBlock := rawBadgesBlock{}
@@ -1584,6 +1598,18 @@ func (r *ReportFill) Validate() error {
 			}
 			if block.KPIContent.RowCount == nil {
 				return fmt.Errorf("reportFill.blocks[%d].content.rowCount is required for kpiBlock", index)
+			}
+			if sparkline := block.KPIContent.Sparkline; sparkline != nil {
+				if sparkline.Values == nil || sparkline.Labels == nil || len(sparkline.Values) != len(sparkline.Labels) {
+					return fmt.Errorf("reportFill.blocks[%d].content.sparkline requires aligned values and labels", index)
+				}
+				for _, series := range [][]*float64{sparkline.Values, sparkline.ComparisonValues} {
+					for _, value := range series {
+						if value != nil && (math.IsNaN(*value) || math.IsInf(*value, 0)) {
+							return fmt.Errorf("reportFill.blocks[%d].content.sparkline requires finite values", index)
+						}
+					}
+				}
 			}
 		}
 		if strings.TrimSpace(block.Kind) == "collectionBlock" {
