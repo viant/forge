@@ -3,12 +3,14 @@ package resource
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
 	"sync"
 
 	identity "github.com/viant/forge/backend/resource"
+	"github.com/viant/jsonrpc"
 	mcpcfg "github.com/viant/mcp/client/config"
 )
 
@@ -19,13 +21,66 @@ type MCPDefinitionSource struct{ ConnectionName, ProviderIdentity, Namespace str
 // gateway. It retains only bounded, scoped URI-to-owner selections; no catalog
 // bytes, credentials or resolved client configurations are stored here.
 type MCPReferenceReader struct {
-	gateway              *Gateway
-	internal             MCPDefinitionSource
-	catalogs             []identity.ResourceRef
-	reserved             map[string]bool
-	memoMu               sync.RWMutex
+	// OnFailure reports fixed operation labels and configured resource identities
+	// without passing upstream error text, payloads, or credentials to the host.
+	OnFailure func(context.Context, MCPReferenceFailure)
+	gateway   *Gateway
+	internal  MCPDefinitionSource
+	catalogs  []identity.ResourceRef
+	reserved  map[string]bool
+	memoMu    sync.RWMutex
 	localGenerationNonce uint64
-	memo                 map[mcpReferenceMemoKey]mcpReferenceMemoEntry
+	memo      map[mcpReferenceMemoKey]mcpReferenceMemoEntry
+}
+
+type MCPReferenceFailure struct {
+	Operation         string
+	Connection        string
+	Resource          string
+	Category          string
+	RPCCode           int
+	RPCStatus         int
+	OperationID       string
+	Stage             string
+	Origin            string
+	Reason            string
+	CredentialType    string
+	CredentialPresent string
+	HTTPStatus        int
+	RemoteRequestID   string
+}
+
+func (r *MCPReferenceReader) reportFailure(ctx context.Context, operation, connection, resource string, err error) {
+	if r == nil || r.OnFailure == nil || err == nil {
+		return
+	}
+	failure := MCPReferenceFailure{Operation: operation, Connection: connection, Resource: resource, Category: "other", Stage: "unknown", Origin: "unknown", Reason: "unknown", CredentialType: "unknown", CredentialPresent: "unknown"}
+	switch {
+	case errors.Is(err, context.DeadlineExceeded), ctx != nil && errors.Is(ctx.Err(), context.DeadlineExceeded):
+		failure.Category = "timeout"
+	case ctx != nil && ctx.Err() != nil, errors.Is(err, context.Canceled):
+		failure.Category = "canceled"
+	case errors.Is(err, identity.ErrResourceDenied):
+		failure.Category = "denied"
+	case errors.Is(err, identity.ErrResourceStale):
+		failure.Category = "stale"
+	}
+	var rpc *jsonrpc.Error
+	if errors.As(err, &rpc) {
+		failure.RPCCode = rpc.Code
+		var data struct {
+			Status int `json:"status"`
+		}
+		if json.Unmarshal(rpc.Data, &data) == nil {
+			failure.RPCStatus = data.Status
+		}
+		if failure.RPCStatus == 403 && failure.Category != "canceled" {
+			failure.Category = "denied"
+		}
+	}
+	mcpReferenceDiagnosticFromContext(ctx).enrichFailure(&failure, err)
+	defer func() { _ = recover() }()
+	r.OnFailure(ctx, failure)
 }
 
 func NewMCPReferenceReader(g *Gateway, internal MCPDefinitionSource, catalogs []identity.ResourceRef) (*MCPReferenceReader, error) {
@@ -100,16 +155,24 @@ func (r *MCPReferenceReader) DefinitionContentGeneration(ctx context.Context) st
 	return strings.Join(parts, "|") + r.publishedDefinitionGeneration(ctx)
 }
 func (r *MCPReferenceReader) rows(ctx context.Context, root Connection, namespace string) ([]Located[json.RawMessage], error) {
+	ctx, diagnostic := withMCPReferenceDiagnostic(ctx)
 	if root.Name != r.internal.ConnectionName {
 		if selected, supported, err := r.filteredMCPRows(ctx, root); supported || err != nil {
+			if err != nil {
+				markMCPReferenceFailure(ctx, "unknown", "filtered_list_failed", err)
+				r.reportFailure(ctx, "list", root.Name, "", err)
+			}
 			return selected, err
 		}
 	}
 	var rows []Located[json.RawMessage]
 	query := CatalogQuery{Namespace: namespace, Limit: 1000}
 	for {
+		diagnostic.begin("connection_binding")
 		page, err := ListPageFrom[json.RawMessage](ctx, r.gateway, []Connection{root}, "mcp", query)
 		if err != nil {
+			markMCPReferenceFailure(ctx, "unknown", "catalog_list_failed", err)
+			r.reportFailure(ctx, "list", root.Name, "", err)
 			return nil, err
 		}
 		rows = append(rows, page.Items...)
@@ -137,6 +200,7 @@ func (r *MCPReferenceReader) externalRoots(ctx context.Context) ([]Connection, e
 func (r *MCPReferenceReader) internalDefinition(ctx context.Context, ref identity.ResourceRef) (*mcpcfg.MCPClient, error) {
 	result, err := GetFrom[*mcpcfg.MCPClient](ctx, r.gateway, r.internalRoot(), ref, func(raw json.RawMessage) (*mcpcfg.MCPClient, error) { return DecodeMCPDefinition(1, raw) })
 	if err != nil {
+		r.reportFailure(ctx, "get_definition", r.internal.ConnectionName, ref.URI, err)
 		return nil, err
 	}
 	uri, _ := identity.ParseResourceURI(ref.URI)
@@ -145,7 +209,11 @@ func (r *MCPReferenceReader) internalDefinition(ctx context.Context, ref identit
 		return nil, err
 	}
 	result.Definition.ResolvedIdentity = &mcpcfg.ResolvedServiceIdentity{ServiceName: name, ResourceURI: ref.URI, ProviderIdentity: result.ResolvedResource.ProviderIdentity}
-	return r.effectiveOptions(ctx, r.internalRoot(), r.internal.Namespace, result.Definition)
+	options, err := r.effectiveOptions(ctx, r.internalRoot(), r.internal.Namespace, result.Definition)
+	if err != nil {
+		r.reportFailure(ctx, "effective_options", r.internal.ConnectionName, ref.URI, err)
+	}
+	return options, err
 }
 
 // A canonical MCP name is an explicit operator binding, not endpoint inference.
@@ -234,6 +302,7 @@ func (r *MCPReferenceReader) inventory(ctx context.Context, external bool, targe
 				} else {
 					options, optionsErr := r.gateway.Manager.Options(ctx, root.Name)
 					if optionsErr != nil {
+						r.reportFailure(ctx, "external_options", root.Name, "", optionsErr)
 						return nil, optionsErr
 					}
 					if options == nil {
@@ -452,6 +521,7 @@ func (r *MCPReferenceReader) Load(ctx context.Context, name string) (*mcpcfg.MCP
 		result, err = GetFrom[*mcpcfg.MCPClient](ctx, r.gateway, selected.Connection, identity.ResourceRef{URI: selected.Resource.URI}, func(raw json.RawMessage) (*mcpcfg.MCPClient, error) { return DecodeMCPDefinition(1, raw) })
 	}
 	if err != nil {
+		r.reportFailure(ctx, "get_definition", selected.Connection.Name, selected.Resource.URI, err)
 		return nil, err
 	}
 	serviceName := selected.Resource.Name
@@ -460,6 +530,9 @@ func (r *MCPReferenceReader) Load(ctx context.Context, name string) (*mcpcfg.MCP
 	}
 	result.Definition.ResolvedIdentity = &mcpcfg.ResolvedServiceIdentity{ServiceName: serviceName, ResourceURI: selected.Resource.URI, ProviderIdentity: selected.Connection.ProviderIdentity}
 	options, err := r.effectiveOptions(ctx, selected.Connection, selected.Resource.Namespace, result.Definition)
+	if err != nil {
+		r.reportFailure(ctx, "effective_options", selected.Connection.Name, selected.Resource.URI, err)
+	}
 	if err == nil && selected.Connection.Name != r.internal.ConnectionName && name == selected.Resource.URI && result.ResolvedResource != nil {
 		r.memoSave(ctx, selected, result.ResolvedResource.ValidUntil, selectionStart)
 	}

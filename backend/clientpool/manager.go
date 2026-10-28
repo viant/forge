@@ -874,7 +874,7 @@ func (m *Manager) newClientWithOptions(ctx context.Context, convID, serverName s
 	// no user token.
 	hasExplicitAuth := opts.ClientOptions.Auth != nil
 	if rt != nil && hasExplicitAuth && useTransportAuth {
-		opts.ClientOptions.SetAuthTransport(rt, &http.Client{Transport: rt, Jar: effectiveJar})
+		opts.ClientOptions.SetAuthTransport(rt, &http.Client{Transport: observingRoundTripper{base: rt, serverName: serverName}, Jar: effectiveJar})
 	}
 	var clientRT *authtransport.RoundTripper
 	if useTransportAuth {

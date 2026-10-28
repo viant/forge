@@ -22,7 +22,10 @@ type mcpReferenceProof struct {
 }
 
 func (r *MCPReferenceReader) filteredMCPRows(ctx context.Context, root Connection) (result []Located[json.RawMessage], supported bool, resultErr error) {
+	diagnostic := mcpReferenceDiagnosticFromContext(ctx)
+	diagnostic.begin("actor")
 	if r == nil || r.gateway == nil || root.Name == "" || root.ProviderIdentity == "" {
+		markMCPReferenceFailure(ctx, "connection_binding", "invalid_root", identity.ErrResource)
 		return nil, false, identity.ErrResource
 	}
 	g := r.gateway
@@ -49,13 +52,17 @@ func (r *MCPReferenceReader) filteredMCPRows(ctx context.Context, root Connectio
 	}
 	actor, err := g.actor(ctx)
 	if err != nil {
+		markMCPReferenceFailure(ctx, "actor", "actor_failed", err)
 		return nil, false, err
 	}
+	diagnostic.begin("connection_binding")
 	binding, err := g.resolveReadBinding(ctx, actor, root.Name)
 	if err != nil {
+		markMCPReferenceFailure(ctx, "connection_binding", "connection_binding_failed", err)
 		return nil, false, err
 	}
 	if binding.options.PrimitiveProviderIdentity != root.ProviderIdentity {
+		markMCPReferenceFailure(ctx, "connection_binding", "provider_identity_mismatch", ErrCollision)
 		return nil, false, ErrCollision
 	}
 	if len(binding.options.PrimitiveNamespaces) != 1 {
@@ -64,6 +71,7 @@ func (r *MCPReferenceReader) filteredMCPRows(ctx context.Context, root Connectio
 	collection := binding.options.PrimitiveNamespaces[0]
 	namespace, err := namespaces.ParseURI(collection)
 	if err != nil || namespace == "" {
+		markMCPReferenceFailure(ctx, "connection_binding", "invalid_namespace", identity.ErrResource)
 		return nil, false, identity.ErrResource
 	}
 	if !resourceFiltersSupported(ctx, binding.client) || !standardResourceReadSupported(ctx, binding.client) {
@@ -81,16 +89,21 @@ func (r *MCPReferenceReader) filteredMCPRows(ctx context.Context, root Connectio
 	for page := 0; page < 100; page++ {
 		params := &schema.ListResourcesRequestParams{Cursor: cursor}
 		params.Meta.AdditionalProperties = map[string]any{resourceFilterExtension: map[string]any{"namespace": collection, "kind": "mcp", "limit": 100}}
+		diagnostic.begin("outbound_request")
 		listed, e := filtered.ListResourcesWithParams(ctx, params)
 		if e != nil {
+			markMCPReferenceFailure(ctx, "outbound_request", "resource_list_failed", e)
 			return nil, true, e
 		}
+		diagnostic.begin("postcheck")
 		if listed == nil || listed.ResultType != "" && listed.ResultType != schema.ResultTypeComplete || listed.TtlMs < 0 || len(listed.Resources) > 100 {
+			markMCPReferenceFailure(ctx, "postcheck", "invalid_list_response", identity.ErrResource)
 			return nil, true, identity.ErrResource
 		}
 		for _, entry := range listed.Resources {
 			uri, parseErr := identity.ParseResourceURI(entry.Uri)
 			if parseErr != nil || uri.Kind != "mcp" || uri.Namespace != namespace || entry.Name == "" || seen[entry.Uri] {
+				markMCPReferenceFailure(ctx, "postcheck", "invalid_list_entry", identity.ErrResource)
 				return nil, true, identity.ErrResource
 			}
 			seen[entry.Uri] = true
@@ -102,21 +115,27 @@ func (r *MCPReferenceReader) filteredMCPRows(ctx context.Context, root Connectio
 		}
 		if listed.NextCursor == nil {
 			if err = g.checkReadBinding(ctx, actor, binding); err != nil {
+				markMCPReferenceFailure(ctx, "postcheck", "binding_changed", err)
 				return nil, true, err
 			}
 			if err = g.final(ctx, actor); err != nil {
+				markMCPReferenceFailure(ctx, "postcheck", "actor_recheck_failed", err)
 				return nil, true, err
 			}
 			if g.generation(root.Name) != generation {
+				markMCPReferenceFailure(ctx, "postcheck", "generation_changed", identity.ErrResourceStale)
 				return nil, true, identity.ErrResourceStale
 			}
 			return result, true, nil
 		}
 		if *listed.NextCursor == "" || seenCursor[*listed.NextCursor] {
+			markMCPReferenceFailure(ctx, "postcheck", "invalid_cursor", identity.ErrResource)
 			return nil, true, identity.ErrResource
 		}
 		seenCursor[*listed.NextCursor] = true
 		cursor = listed.NextCursor
 	}
-	return nil, true, fmt.Errorf("%w: MCP definition inventory page bound", identity.ErrResource)
+	err = fmt.Errorf("%w: MCP definition inventory page bound", identity.ErrResource)
+	markMCPReferenceFailure(ctx, "postcheck", "page_limit_exceeded", err)
+	return nil, true, err
 }

@@ -60,12 +60,15 @@ func (m *Manager) WithAuthTokenContext(ctx context.Context, serverName string) c
 	if ctx == nil || m == nil {
 		return ctx
 	}
+	selectionContext := ctx
 	// In-process providers consume the original verified caller context. An
 	// OAuth refresh here would silently replace that captured authority.
 	if m.IsLocalClient(serverName) {
+		reportAuthSelection(selectionContext, AuthSelection{ServerName: serverName, Type: "local_context", Present: "not_applicable"})
 		return ctx
 	}
 	if m.IsDelegatedAuth(ctx, serverName) {
+		reportAuthSelection(selectionContext, AuthSelection{ServerName: serverName, Type: "delegated", Present: "unknown"})
 		return ctx
 	}
 	debugMCPAuthEnsure(serverName, ctx, "before_ensure", m.UseIDToken(ctx, serverName))
@@ -77,9 +80,15 @@ func (m *Manager) WithAuthTokenContext(ctx context.Context, serverName string) c
 	}
 	useID := useIDToken
 	tok := authctx.MCPAuthToken(ctx, useID)
+	selectionType := "access_token"
+	if useID {
+		selectionType = "id_token"
+	}
 	if strings.TrimSpace(tok) == "" {
+		reportAuthSelection(selectionContext, AuthSelection{ServerName: serverName, Type: selectionType, Present: "false"})
 		return ctx
 	}
+	reportAuthSelection(selectionContext, AuthSelection{ServerName: serverName, Type: selectionType, Present: "true"})
 	return context.WithValue(ctx, authtransport.ContextAuthTokenKey, tok)
 }
 
