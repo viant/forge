@@ -1,0 +1,11 @@
+{
+ "provenance":"Independently invented public examples. Counts and occupancy are illustrative, not observed data or recommendations.",
+ "title":"Library collection",
+ "chartSpec":{"type":"donut","xField":"category","yFields":["items"],"center":{"label":"Catalogued items","value":{"field":"items","operation":"sum"},"format":"number"}},
+ "rows":[{"category":"Fiction","items":240,"occupancyRate":72.5},{"category":"Reference","items":160,"occupancyRate":72.5},{"category":"Science","items":100,"occupancyRate":72.5}],
+ "occupancy":{"label":"Occupancy rate","value":{"field":"occupancyRate","operation":"scalar"},"format":"percent"},
+ "zeroRows":[{"category":"Fiction","items":0,"occupancyRate":0},{"category":"Reference","items":0,"occupancyRate":0}],
+ "nullRows":[{"category":"Fiction","items":240,"occupancyRate":null},{"category":"Reference","items":160,"occupancyRate":null}],
+ "noDataRows":[],
+ "longLabel":"Catalogued items across the complete synthetic collection, including reference material and science volumes"
+}

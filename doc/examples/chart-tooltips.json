@@ -1,0 +1,65 @@
+{
+  "provenance": "Independently invented equipment-check rows; no real equipment, production data or external assets.",
+  "chartSpec": {
+    "type": "bar",
+    "appearance": "document",
+    "xField": "day",
+    "yFields": [
+      "passed"
+    ],
+    "tooltip": {
+      "fields": [
+        {
+          "field": "day",
+          "label": "Date",
+          "format": "date"
+        },
+        {
+          "field": "passed",
+          "label": "Passed checks",
+          "format": "number",
+          "aggregate": "sum"
+        },
+        {
+          "field": "failed",
+          "label": "Failed checks",
+          "format": "number",
+          "aggregate": "sum"
+        },
+        {
+          "field": "medianMinutes",
+          "label": "Median duration",
+          "format": "number2",
+          "unit": "min"
+        },
+        {
+          "field": "note",
+          "label": "Operator note",
+          "format": "text"
+        }
+      ]
+    }
+  },
+  "rows": [
+    {
+      "day": "2026-01-05",
+      "passed": 18,
+      "failed": 2,
+      "medianMinutes": 3.25,
+      "note": "Routine checks — synthetic café equipment."
+    },
+    {
+      "day": "2026-01-06",
+      "passed": 0,
+      "failed": 0,
+      "medianMinutes": null,
+      "note": "<img src=x onerror=\"alert(1)\"> is literal example text, not markup."
+    },
+    {
+      "day": "2026-01-07",
+      "passed": 21,
+      "failed": 1,
+      "medianMinutes": 4.5
+    }
+  ]
+}

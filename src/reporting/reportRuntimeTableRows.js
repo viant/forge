@@ -1,3 +1,4 @@
+import {buildTableHierarchy,hierarchyRows,materializeAnalyticalTable} from './reportTableAnalytics.js';
 import {setSelector} from "../utils/selector.js";
 const normalizeString = value => String(value || "").trim();
 const cloneValue = value => value == null ? value : JSON.parse(JSON.stringify(value));
@@ -20,6 +21,22 @@ export function buildRuntimeTableRows(block = {}, dataset = {}) {
       return displayKey && displayKey !== sourceKey
         ? setSelector(next, displayKey, cloneValue(cell?.displayValue))
         : next;
-    }, cloneValue(originalRows[sourceIndex]) || {});
+    }, block.pivot ? {} : cloneValue(originalRows[sourceIndex]) || {});
   });
+}
+
+// Runtime filters still operate on admitted source records. Resolve hierarchy
+// identity against the full source, and aggregate pivot values only afterward.
+export function buildAnalyticalRuntimeTableRows(block,sourceRows,filteredRows){
+ const canonical=buildRuntimeTableRows(block,{rows:sourceRows});
+ if(block.hierarchy){
+  const model=buildTableHierarchy(canonical,{...block.hierarchy,totals:{mode:'producer'}});
+  return hierarchyRows(model,{matchedKeys:new Set(filteredRows.map(row=>row[block.hierarchy.keyField]))}).nodes.map(node=>node.row);
+ }
+ if(block.pivot){
+  const identity=row=>JSON.stringify(block.pivot.rowFields.map(field=>row[field]));
+  const refreshed=new Map(materializeAnalyticalTable(block,filteredRows).rows.map(row=>[identity(row),row]));
+  return canonical.map(row=>refreshed.get(identity(row))).filter(Boolean);
+ }
+ return canonical;
 }

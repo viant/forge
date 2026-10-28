@@ -1,3 +1,4 @@
+import {normalizeTableAnalytics} from './reportTableAnalytics.js';
 import { normalizeReportTableLink } from "./reportTableLink.js";
 import { normalizePresentationClampConfig } from "../utils/presentationText.js";
 
@@ -182,6 +183,7 @@ export function normalizeReportDocumentTableBlock(block = {}) {
   return {
     id,
     kind: "tableBlock",
+    ...normalizeTableAnalytics({...block,columns}),
     title,
     ...(normalizeString(block?.description) ? {description: normalizeString(block.description)} : {}),
     datasetRef,

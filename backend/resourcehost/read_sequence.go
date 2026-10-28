@@ -34,7 +34,10 @@ type namespaceRead struct {
 	cap capabilities
 }
 type resourceReadSequence struct {
-	mu                           sync.Mutex
+	mu sync.Mutex
+	// Serialize phase transitions, not producer calls. A concurrent dispatch
+	// joins the open dispatch phase after its PRE transition has completed.
+	transition                   sync.Mutex
 	gateway                      *Gateway
 	base                         context.Context
 	facts                        ReadFactsScope
@@ -372,6 +375,8 @@ func (s *resourceReadSequence) endPhase(ctx context.Context) (err error) {
 }
 
 func (s *resourceReadSequence) BeforeDispatch(ctx context.Context) error {
+	s.transition.Lock()
+	defer s.transition.Unlock()
 	s.mu.Lock()
 	if s.closed || s.failed != nil || s.ending {
 		s.mu.Unlock()
@@ -401,6 +406,8 @@ func (s *resourceReadSequence) BeforeDispatch(ctx context.Context) error {
 }
 
 func (s *resourceReadSequence) AfterDispatch(ctx context.Context) error {
+	s.transition.Lock()
+	defer s.transition.Unlock()
 	s.mu.Lock()
 	if s.closed || s.failed != nil || s.dispatchDepth == 0 || s.active {
 		s.mu.Unlock()
@@ -422,6 +429,8 @@ func (s *resourceReadSequence) AfterDispatch(ctx context.Context) error {
 }
 
 func (s *resourceReadSequence) BeforeRelease(ctx context.Context) error {
+	s.transition.Lock()
+	defer s.transition.Unlock()
 	s.mu.Lock()
 	if s.closed || s.failed != nil || s.ending || s.dispatchDepth != 0 || !s.active {
 		s.mu.Unlock()
@@ -450,6 +459,8 @@ func (s *resourceReadSequence) BeforeRelease(ctx context.Context) error {
 }
 
 func (s *resourceReadSequence) finish(ctx context.Context) error {
+	s.transition.Lock()
+	defer s.transition.Unlock()
 	s.mu.Lock()
 	if s.closed || s.ending {
 		s.failed = identity.ErrResourceDenied

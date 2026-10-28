@@ -15,6 +15,25 @@ import (
 	wsmeta "github.com/viant/forge/backend/window/source/internal/meta"
 )
 
+// Both window content and its view descriptor must use the same authored branch.
+func workspaceWindowSourceTarget(ctx context.Context, loader *metaSvc.Service, root, key string, target *metaSvc.TargetContext, sharedDefault bool) (*metaSvc.TargetContext, error) {
+	if target != nil || !sharedDefault {
+		return target, nil
+	}
+	direct, err := loader.Exists(ctx, metaURL.Join(root, key, "main.yaml"))
+	if err != nil {
+		return nil, err
+	}
+	singleton, err := loader.Exists(ctx, metaURL.Join(root, key+".yaml"))
+	if err != nil {
+		return nil, err
+	}
+	if !direct && !singleton {
+		return &metaSvc.TargetContext{}, nil
+	}
+	return target, nil
+}
+
 // LoadWorkspaceWindowAt loads a Forge window from the explicitly supplied host root.
 func LoadWorkspaceWindowAt(ctx context.Context, workspaceRoot, windowKey string, target *metaSvc.TargetContext) (*forgeTypes.Window, error) {
 	return loadWorkspaceWindowAt(ctx, workspaceRoot, windowKey, target, nil)
@@ -54,18 +73,10 @@ func loadWorkspaceWindowWithOptionsAt(ctx context.Context, workspaceRoot, window
 	}
 	workspaceWindowRoot := "file://" + filepath.ToSlash(filepath.Join(workspaceRoot, "extension/forge/windows"))
 	loader := metaSvc.New(options.filesystem(), workspaceWindowRoot)
-	if target == nil && options.SharedDefault {
-		direct, err := loader.Exists(ctx, metaURL.Join(workspaceWindowRoot, windowKey, "main.yaml"))
-		if err != nil {
-			return nil, err
-		}
-		singleton, err := loader.Exists(ctx, metaURL.Join(workspaceWindowRoot, windowKey+".yaml"))
-		if err != nil {
-			return nil, err
-		}
-		if !direct && !singleton {
-			target = &metaSvc.TargetContext{}
-		}
+	var err error
+	target, err = workspaceWindowSourceTarget(ctx, loader, workspaceWindowRoot, windowKey, target, options.SharedDefault)
+	if err != nil {
+		return nil, err
 	}
 	if resolvedBase, err := loader.ResolveWindowBase(ctx, metaURL.Join(workspaceWindowRoot, windowKey, "main"), target); err == nil {
 		window, err := forgeHandlers.LoadWindowStructure(ctx, loader, workspaceWindowRoot, windowKey, "", target)

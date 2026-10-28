@@ -120,6 +120,22 @@ export function buildReportPrintGeoSvg({
     };
   }
 
+  if (geo.shape === 'geojson' && geo.geometry) {
+    const byKey = new Map(geo.regions.map(region => [region.key, region]));
+    const mapHeight = 500;
+    const paths = geo.geometry.features.map(feature => {
+      const region = byKey.get(feature.key);
+      return `<path d="${escapeXml(feature.path)}" fill="${escapeXml(region.color)}" fill-rule="evenodd" stroke="#bccbd6" stroke-width="1"/>`;
+    }).join('');
+    const colors = geo.legend?.rules?.map(rule => rule.color) || geo.legend?.palette || [];
+    const swatches = colors.map((color, i) => `<rect x="${16 + i * 928 / colors.length}" y="516" width="${928 / colors.length}" height="12" fill="${escapeXml(color)}"/>`).join('');
+    const legendDetails = !geo.legend ? [] : geo.legend.rules
+      ? geo.legend.rules.map(rule => `Map legend: ${rule.label} (${rule.color})`)
+      : [`Map legend: ${geo.legend.min} to ${geo.legend.max}`];
+    const labelDetails = [...legendDetails, ...geo.regions.map(region => `${region.label}: ${region.displayValue}`)];
+    const height = (colors.length ? 548 : 500) * width / 960;
+    return {svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 ${colors.length ? 548 : 500}" width="${width}" height="${height}">${paths}${swatches}</svg>`, height, labelDetails, diagnostics: []};
+  }
   if (geo.shape === 'world') {
     const regions = Array.isArray(geo.regions) ? geo.regions : [];
     if (!regions.length) return {svg:'',height:0,diagnostics:[buildGeoDiagnostic('emptyReportPrintGeo','Geo block has no regions to lower into ReportPrint.')]};

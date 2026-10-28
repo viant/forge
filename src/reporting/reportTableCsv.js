@@ -1,3 +1,4 @@
+import {qualifiedTableColumnLabel} from './reportTableAnalytics.js';
 // Use the same authored column order and resolved display values as the native
 // ReportFill CSV renderer. Browser pagination is not part of this contract.
 const text = value => String(value ?? '').trim();
@@ -39,7 +40,7 @@ export function renderReportTableCsv(table) {
   if (!Array.isArray(columns) || !columns.length || !Array.isArray(rows)) throw new Error('A loaded report table is required.');
   const keys = columns.map(column => text(column.key));
   if (keys.some(key => !key) || new Set(keys).size !== keys.length) throw new Error('The table has ambiguous columns.');
-  const lines = [columns.map(column => escape(text(column.label))).join(',')];
+  const lines = [columns.map(column => escape(qualifiedTableColumnLabel(column,table.content.columnGroups || table.columnGroups || []))).join(',')];
   for (const row of rows) {
     const cells = new Map();
     for (const cell of row.cells || []) {

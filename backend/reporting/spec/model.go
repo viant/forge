@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/viant/forge/backend/reporting/tablemeta"
 	"io"
 	"strings"
 )
@@ -90,6 +91,7 @@ type LayoutIntent struct {
 type LayoutIntentItem struct {
 	BlockID string `json:"blockId"`
 	Size    string `json:"size,omitempty"`
+	Span    *int   `json:"span,omitempty"`
 }
 
 type Scope struct {
@@ -231,6 +233,11 @@ type BadgeItem struct {
 }
 
 type Block struct {
+	Sparkline    *KPISparklineSpec       `json:"sparkline,omitempty"`
+	Hierarchy    *tablemeta.Hierarchy    `json:"hierarchy,omitempty"`
+	Pivot        *tablemeta.Pivot        `json:"pivot,omitempty"`
+	ColumnGroups []tablemeta.ColumnGroup `json:"columnGroups,omitempty"`
+
 	ID                       string           `json:"id"`
 	Kind                     string           `json:"kind"`
 	Title                    string           `json:"title,omitempty"`
@@ -335,6 +342,10 @@ type TableSelection struct {
 }
 
 type rawTableBlock struct {
+	Hierarchy    *tablemeta.Hierarchy    `json:"hierarchy,omitempty"`
+	Pivot        *tablemeta.Pivot        `json:"pivot,omitempty"`
+	ColumnGroups []tablemeta.ColumnGroup `json:"columnGroups,omitempty"`
+
 	Selection        *TableSelection `json:"selection,omitempty"`
 	ID               string          `json:"id"`
 	Kind             string          `json:"kind"`
@@ -360,27 +371,28 @@ type rawChartBlock struct {
 }
 
 type rawKPIBlock struct {
-	ID                       string         `json:"id"`
-	Kind                     string         `json:"kind"`
-	Title                    string         `json:"title"`
-	DatasetRef               string         `json:"datasetRef"`
-	ValueField               string         `json:"valueField"`
-	ValueLabel               string         `json:"valueLabel"`
-	ValueFormat              string         `json:"valueFormat,omitempty"`
-	Suffix                   string         `json:"suffix,omitempty"`
-	SecondaryField           string         `json:"secondaryField,omitempty"`
-	SecondaryLabel           string         `json:"secondaryLabel,omitempty"`
-	SecondaryFormat          string         `json:"secondaryFormat,omitempty"`
-	SecondaryTrend           bool           `json:"secondaryTrend,omitempty"`
-	SecondaryDisplayKey      string         `json:"secondaryDisplayKey,omitempty"`
-	SecondaryDisplayValueMap map[string]any `json:"secondaryDisplayValueMap,omitempty"`
-	Description              string         `json:"description,omitempty"`
-	Tone                     string         `json:"tone,omitempty"`
-	EmptyLabel               string         `json:"emptyLabel,omitempty"`
-	RowSelector              string         `json:"rowSelector,omitempty"`
-	PresentationMode         string         `json:"presentationMode,omitempty"`
-	BodyFormat               string         `json:"bodyFormat,omitempty"`
-	BodyTemplate             string         `json:"bodyTemplate,omitempty"`
+	Sparkline                *KPISparklineSpec `json:"sparkline,omitempty"`
+	ID                       string            `json:"id"`
+	Kind                     string            `json:"kind"`
+	Title                    string            `json:"title"`
+	DatasetRef               string            `json:"datasetRef"`
+	ValueField               string            `json:"valueField"`
+	ValueLabel               string            `json:"valueLabel"`
+	ValueFormat              string            `json:"valueFormat,omitempty"`
+	Suffix                   string            `json:"suffix,omitempty"`
+	SecondaryField           string            `json:"secondaryField,omitempty"`
+	SecondaryLabel           string            `json:"secondaryLabel,omitempty"`
+	SecondaryFormat          string            `json:"secondaryFormat,omitempty"`
+	SecondaryTrend           bool              `json:"secondaryTrend,omitempty"`
+	SecondaryDisplayKey      string            `json:"secondaryDisplayKey,omitempty"`
+	SecondaryDisplayValueMap map[string]any    `json:"secondaryDisplayValueMap,omitempty"`
+	Description              string            `json:"description,omitempty"`
+	Tone                     string            `json:"tone,omitempty"`
+	EmptyLabel               string            `json:"emptyLabel,omitempty"`
+	RowSelector              string            `json:"rowSelector,omitempty"`
+	PresentationMode         string            `json:"presentationMode,omitempty"`
+	BodyFormat               string            `json:"bodyFormat,omitempty"`
+	BodyTemplate             string            `json:"bodyTemplate,omitempty"`
 }
 
 type rawBadgesBlock struct {
@@ -613,6 +625,11 @@ func (r *ReportSpec) Validate() error {
 	if len(r.LayoutIntent.BlockOrder) == 0 {
 		return fmt.Errorf("reportSpec.layoutIntent.blockOrder must not be empty")
 	}
+	for _, item := range r.LayoutIntent.Items {
+		if item.Span != nil && (*item.Span < 1 || *item.Span > 12) {
+			return fmt.Errorf("reportSpec.layoutIntent.items span must be between 1 and 12")
+		}
+	}
 	if r.Refinements == nil {
 		return fmt.Errorf("reportSpec.refinements is required")
 	}
@@ -701,6 +718,22 @@ func (r *ReportSpec) Validate() error {
 		}
 		switch kind {
 		case "tableBlock":
+			{
+				keys := make([]string, len(block.Columns))
+				for i, column := range block.Columns {
+					keys[i] = column.Key
+				}
+				if (block.Hierarchy != nil || block.Pivot != nil) && block.RecordTitleField != "" {
+					return fmt.Errorf("analytical tables cannot use recordTitleField")
+				}
+				if block.Pivot != nil && block.Selection != nil {
+					return fmt.Errorf("pivot rows cannot select source-row checkboxes")
+				}
+				if err := tablemeta.Validate(block.Hierarchy, block.Pivot, block.ColumnGroups, keys); err != nil {
+					return err
+				}
+			}
+
 			if strings.TrimSpace(block.DatasetRef) == "" {
 				return fmt.Errorf("reportSpec.blocks[%d].datasetRef is required for tableBlock", index)
 			}
@@ -763,6 +796,11 @@ func (r *ReportSpec) Validate() error {
 				return fmt.Errorf("reportSpec.blocks[%d].chartModel is required for chartBlock", index)
 			}
 		case "kpiBlock":
+			if spark := block.Sparkline; spark != nil {
+				if strings.TrimSpace(spark.DatasetRef) == "" || strings.TrimSpace(spark.ValueField) == "" || strings.TrimSpace(spark.CategoryField) == "" || (strings.TrimSpace(spark.PeriodStartPath) == "") != (strings.TrimSpace(spark.PeriodEndPath) == "") {
+					return fmt.Errorf("reportSpec.blocks[%d].sparkline requires dataset, fields and paired period paths", index)
+				}
+			}
 			if strings.TrimSpace(block.Title) == "" {
 				return fmt.Errorf("reportSpec.blocks[%d].title is required for kpiBlock", index)
 			}
@@ -1001,7 +1039,8 @@ func decodeBlock(payload json.RawMessage, index int) (result Block, resultErr er
 			return Block{}, err
 		}
 		return Block{
-			ID:               block.ID,
+			ID:        block.ID,
+			Hierarchy: block.Hierarchy, Pivot: block.Pivot, ColumnGroups: block.ColumnGroups,
 			Kind:             block.Kind,
 			Title:            block.Title,
 			Description:      block.Description,
@@ -1034,6 +1073,7 @@ func decodeBlock(payload json.RawMessage, index int) (result Block, resultErr er
 			return Block{}, err
 		}
 		return Block{
+			Sparkline:                block.Sparkline,
 			ID:                       block.ID,
 			Kind:                     block.Kind,
 			Title:                    block.Title,
@@ -1312,7 +1352,7 @@ func rejectTrailingJSON(decoder *json.Decoder, label string) error {
 
 func isAllowedReportValueFormat(value string) bool {
 	switch strings.TrimSpace(value) {
-	case "", "currency", "number", "number5", "percent", "percentFraction", "compact", "compactNumber":
+	case "", "currency", "currency2", "number", "number5", "percent", "percentFraction", "percentFraction2", "compact", "compactNumber":
 		return true
 	default:
 		return false

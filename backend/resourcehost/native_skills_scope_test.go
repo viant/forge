@@ -30,7 +30,7 @@ func TestNativeSkillScopeHonorsParticipantsAndSkipsOnlyOptionalLink(t *testing.T
 		t.Run(tc.name, func(t *testing.T) {
 			optionalCalls, availableCalls := 0, 0
 			linked := false
-			options := fixtureOptions{"available": {}, "optional": {}}
+			options := fixtureOptions{"available": {}, "optional": {SkillDiscovery: &cfg.SkillDiscovery{Enabled: true}}}
 			mgr, err := manager.New(options, manager.WithClientFactory(func(_ context.Context, _, name string) (mcpclient.Interface, error) {
 				if name == "optional" {
 					optionalCalls++
@@ -75,6 +75,11 @@ func TestNativeSkillScopeHonorsParticipantsAndSkipsOnlyOptionalLink(t *testing.T
 }
 
 func TestAutomaticNativeSkillScopeIsolatesContactFailure(t *testing.T) {
+	t.Run("published", func(t *testing.T) { testNativeSkillScopeContactFailure(t, true) })
+	t.Run("configured", func(t *testing.T) { testNativeSkillScopeContactFailure(t, false) })
+}
+
+func testNativeSkillScopeContactFailure(t *testing.T, published bool) {
 	for _, tc := range []struct {
 		name     string
 		failure  error
@@ -91,6 +96,9 @@ func TestAutomaticNativeSkillScopeIsolatesContactFailure(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			recovered := false
 			options := fixtureOptions{"available": {ResolvedIdentity: &cfg.ResolvedServiceIdentity{ResourceURI: "mcp://example/available"}}, "optional": {ResolvedIdentity: &cfg.ResolvedServiceIdentity{ResourceURI: "mcp://example/optional"}}}
+			if !published {
+				options = fixtureOptions{"available": {}, "optional": {}}
+			}
 			mgr, err := manager.New(options, manager.WithClientFactory(func(_ context.Context, _, name string) (mcpclient.Interface, error) {
 				if name == "optional" && !recovered {
 					return nil, tc.failure

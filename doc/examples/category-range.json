@@ -1,0 +1,21 @@
+{
+  "provenance": "Independently invented illustrative values for a public framework example. These are not standards, recommendations or measured observations.",
+  "title": "Room temperature versus target range",
+  "chartSpec": {"type":"category-range","categoryRange":{"categoryField":"room","orientation":"horizontal","series":[
+    {"kind":"bar","field":"measuredCelsius","label":"Measured","color":"#426b85","format":{"suffix":" °C"}},
+    {"kind":"range","startField":"targetMin","endField":"targetMax","label":"Target range","color":"#8a7644","format":{"suffix":" °C"}},
+    {"kind":"marker","field":"targetCelsius","label":"Target","color":"#72577c","format":{"suffix":" °C"}}
+  ]}},
+  "rows":[
+    {"room":"Room A","measuredCelsius":21,"targetMin":20,"targetMax":23,"targetCelsius":22},
+    {"room":"Room B","measuredCelsius":25,"targetMin":21,"targetMax":24,"targetCelsius":23},
+    {"room":"Room C","measuredCelsius":18,"targetMin":19,"targetMax":22,"targetCelsius":20}
+  ],
+  "signedRows":[
+    {"room":"Negative deviation with a deliberately long complete category label","measuredCelsius":-3,"targetMin":-5,"targetMax":2,"targetCelsius":-1},
+    {"room":"Zero deviation; reversed endpoints","measuredCelsius":0,"targetMin":3,"targetMax":-2,"targetCelsius":0},
+    {"room":"Positive deviation; zero length range","measuredCelsius":4,"targetMin":2,"targetMax":2,"targetCelsius":5},
+    {"room":"Null endpoint","measuredCelsius":null,"targetMin":null,"targetMax":8,"targetCelsius":null},
+    {"room":"Missing endpoint","measuredCelsius":1,"targetMin":-7,"targetCelsius":2}
+  ]
+}

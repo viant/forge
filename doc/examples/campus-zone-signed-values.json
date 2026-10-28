@@ -1,0 +1,13 @@
+{
+  "provenance": "Invented signed values for the same independently authored campus geometry; observed range, not centered divergence.",
+  "rows": [
+    {
+      "zoneId": "North",
+      "utilization": -50
+    },
+    {
+      "zoneId": "East",
+      "utilization": 50
+    }
+  ]
+}

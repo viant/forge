@@ -117,7 +117,7 @@ export default function SectionTabRail({items = [], selectedId = '', onChange, o
                     }} />;
                 return (
                     <button key={item.id} ref={(node) => { tabRefs.current[index] = node; }} id={`${baseId}-tab-${index}`}
-                        type="button" role="tab" disabled={item.disabled === true} aria-selected={selected} aria-controls={item.panelId || panelId || undefined}
+                        type="button" role="tab" data-section-id={item.id} disabled={item.disabled === true} aria-selected={selected} aria-controls={item.panelId || panelId || undefined}
                         tabIndex={selected || (selectedId === '' && index === selectedIndex) ? 0 : -1}
                         className={`forge-section-tab${selected ? ' is-selected' : ''}`}
                         title={onRename && item.editable !== false ? 'Double-click or press F2 to rename. Drag or Alt+Arrow to reorder.' : undefined}

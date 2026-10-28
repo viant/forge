@@ -1408,7 +1408,7 @@ export function ReportBuilderChartDialog({
                             value={draftType}
                             onChange={(event) => applyPatch({ type: event.target.value })}
                         >
-                            {supportedTypes.map((entry) => (
+                            {supportedTypes.filter(entry => chartFamilyForType(entry) || entry === draftType).map((entry) => (
                                 <option key={entry} value={entry}>{chartTypeLabel(entry)}</option>
                             ))}
                         </select>

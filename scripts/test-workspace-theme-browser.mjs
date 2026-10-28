@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import {verifyChartFoundation} from '../src/demos/theme/chartFoundation.browser.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const server = await createServer({root, server: {host: '127.0.0.1', port: 0, fs: {allow: [path.dirname(root)]}}});
+const server = await createServer({root, server: {hmr:process.env.FORGE_CHARTS_ONLY?false:undefined, host: '127.0.0.1', port: 0, fs: {allow: [path.dirname(root)]}}});
 let browser;
 try {
     await server.listen();
@@ -30,6 +30,10 @@ try {
         await proof.goto(`http://127.0.0.1:${address.port}/theme-preview.html`);
         await proof.locator('[data-forge-type="metric"]').first().waitFor();
         console.log(JSON.stringify({viewport,charts:await verifyChartFoundation(proof)}));
+        if(process.env.FORGE_CHARTS_ONLY) {
+            if(process.env.FORGE_FOCUS_EVIDENCE) for(const id of ['donut-center','donut-center-long']) await proof.locator(`[data-chart-example="${id}"]`).screenshot({path:path.join(process.env.FORGE_FOCUS_EVIDENCE,`${id}-${viewport.width}.png`)});
+            assert.deepEqual(failures,[]);await proof.close();continue;
+        }
         const foundation = proof.locator('.forge-foundation-specimen');
         const analyticalDocument = foundation.getByRole('region',{name:'Analytical document specimen',exact:true});
         const switchSetting=analyticalDocument.getByRole('combobox',{name:'Chart data switching',exact:true});
@@ -254,11 +258,13 @@ try {
         }
         assert.equal(await exampleName.inputValue(),'Retained document edit');
         assert.equal(await proof.locator('input[data-forge-control-id="specimenInput"]').inputValue(), 'Retained while roles change');
-        assert.deepEqual(await proof.evaluate(() => [...document.querySelectorAll('body *')].filter(node => {const rect = node.getBoundingClientRect(); return rect.width && rect.right > innerWidth + 1 && getComputedStyle(node).position !== 'fixed' && !node.closest('.forge-dashboard-table-wrap, .forge-section-tab-rail');}).map(node => `${node.tagName}.${node.className}`).slice(0, 12)), [], 'Foundation content must stay within the page');
+        assert.deepEqual(await proof.evaluate(() => [...document.querySelectorAll('body *')].filter(node => {const rect = node.getBoundingClientRect(); return rect.width && rect.right > innerWidth + 1 && getComputedStyle(node).position !== 'fixed' && !node.closest('.forge-dashboard-table-wrap, .forge-section-tab-rail, .forge-categorical-heatmap, .forge-category-range');}).map(node => `${node.tagName}.${node.className}`).slice(0, 12)), [], 'Foundation content must stay within the page');
         assert.equal(await proof.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+        if(process.env.FORGE_FOCUS_EVIDENCE) await proof.locator('[data-chart-example="category-range"]').screenshot({path:path.join(process.env.FORGE_FOCUS_EVIDENCE,`category-range-${viewport.width}.png`)});
         assert.deepEqual(failures, []);
         await proof.close();
     }
+    if(!process.env.FORGE_CHARTS_ONLY) {
     console.log('complete role browser proof passed: actual widgets, chart labels, role perturbation, portals, desktop and phone');
     const page = await browser.newPage();
     const errors = [];
@@ -300,6 +306,7 @@ try {
     assert.equal(await page.locator('[data-forge-theme-portal]').count(), 0);
     assert.deepEqual(errors, []);
     console.log('workspace theme browser proof passed: runtime binding, mode change, portals, wrapper bypass, focus, cleanup');
+    } else console.log('chart foundation browser proof passed: desktop and phone');
 } finally {
     await browser?.close();
     await server.close();

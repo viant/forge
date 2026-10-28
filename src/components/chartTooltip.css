@@ -1,0 +1,8 @@
+.forge-chart-tooltip { min-width: 0; overflow-wrap: anywhere; white-space: normal; color: var(--forge-chart-text, #30404d); }
+.forge-chart-tooltip h3,.forge-chart-tooltip p { margin-block: var(--forge-spacing-1, 4px); }
+.forge-chart-tooltip dl { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,2fr); gap: var(--forge-spacing-2, 8px); margin-block: var(--forge-spacing-2, 8px); }
+.forge-chart-tooltip dd { margin: 0; }
+.forge-chart-tooltip-popup { box-sizing: border-box; width: min(320px, 75vw); max-height: min(200px, 50vh); overflow: auto; padding: var(--forge-spacing-3, 12px); background: var(--forge-chart-surface, #fff); border: 1px solid var(--forge-chart-border, #d8e1e8); border-radius: var(--forge-radius-surface, 8px); }
+.forge-chart-tooltip-inspector { min-width: 0; margin-block: var(--forge-spacing-3, 12px); padding: var(--forge-spacing-3, 12px); border: 1px solid var(--forge-chart-border, #d8e1e8); border-radius: var(--forge-radius-surface, 8px); }
+.forge-chart-tooltip-inspector label { display: grid; gap: var(--forge-spacing-2, 8px); }
+.forge-chart-tooltip-inspector select { width: 100%; min-width: 0; }

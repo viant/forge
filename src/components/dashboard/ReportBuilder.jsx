@@ -748,6 +748,8 @@ import {
 import { normalizeReportRuntimeInteractionState } from "./reportRuntimeInteractionStateModel.js";
 import {
     registerReportWindowActions,
+    reportWindowRunReceipt,
+    reportWindowMaterialization,
 } from "../../core/ui/reportActions.js";
 import { useReportRuntimeInteractionState } from "./useReportRuntimeInteractionState.js";
 import { useAuthoredRuntimePreviewSurface } from "./useAuthoredRuntimePreviewSurface.js";
@@ -2145,6 +2147,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     const settleRunPromiseRef = useRef(null);
     const runInvocationGenerationRef = useRef(0);
     const pendingReportWorkspaceRunRef = useRef(null);
+    const [pendingReportRunSequence, setPendingReportRunSequence] = useState(0);
     const recordedStoredRunKeyRef = useRef("");
     const completedRunEventKeyRef = useRef("");
     const reportRunConversationReconciliationRef = useRef(null);
@@ -8726,6 +8729,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                 materializationFingerprint,
             });
             pendingReportWorkspaceRunRef.current = pendingRun;
+            setPendingReportRunSequence(value => value + 1);
             return pendingRun.promise;
         };
         const prepareRunSurface = () => {
@@ -8737,7 +8741,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             }
             setFiltersDrawerOpen(false);
         };
-        if (designWorkspaceMode) {
+        if (frozenRestore || designWorkspaceMode) {
             const designPendingAction = resolvePendingReportRunExecutionAction(existingPendingRun, { origin, commandIdentity });
             if (designPendingAction === "reject") throw new Error("Report request identity conflict.");
             if (designPendingAction === "reuse") {
@@ -8748,7 +8752,10 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             }
             prepareRunSurface();
             const pendingRunPromise = deferRunUntilCurrentMaterialization();
-            setWorkspaceMode("report");
+            // Exit restoration before waiting for a live snapshot. Begin is
+            // downstream of that gate; retain the existing replay guards above.
+            if (frozenRestore) onDiscardFrozen?.();
+            if (designWorkspaceMode) setWorkspaceMode("report");
             return pendingRunPromise;
         }
         const invocationSnapshot = captureRunDispatchSnapshot(currentState, { origin, commandIdentity });
@@ -8773,51 +8780,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             );
         }
         return executeCapturedReportRun(invocationSnapshot, origin);
-    }, [captureRunDispatchSnapshot, designWorkspaceMode, executeCapturedReportRun, isRunDispatchMaterializationCurrent, state, useFilterDrawer, useFilterRail]);
-
-    useEffect(() => {
-        const pendingRun = pendingReportWorkspaceRunRef.current;
-        if (designWorkspaceMode || !pendingRun || pendingRun.started) {
-            return;
-        }
-        const invocationSnapshot = captureRunDispatchSnapshot(
-            currentBuilderStateRef.current || state,
-            { origin: pendingRun.origin, commandIdentity: pendingRun.commandIdentity },
-        );
-        if (pendingRun.requestFingerprint
-            && pendingRun.requestFingerprint !== invocationSnapshot.requestFingerprint) {
-            settlePendingReportRunExecution(pendingReportWorkspaceRunRef, pendingRun, {
-                ok: false,
-                superseded: true,
-                error: "Report run was superseded before materialization capture.",
-            });
-            return;
-        }
-        if (pendingRun.materializationFingerprint
-            && pendingRun.materializationFingerprint !== invocationSnapshot.materializationFingerprint) {
-            settlePendingReportRunExecution(pendingReportWorkspaceRunRef, pendingRun, {
-                ok: false,
-                superseded: true,
-                error: "Report run was superseded before materialization capture.",
-            });
-            return;
-        }
-        if (!isRunDispatchMaterializationCurrent(invocationSnapshot)) {
-            return;
-        }
-        pendingRun.started = true;
-        void executeCapturedReportRun(invocationSnapshot, pendingRun.origin).then(
-            (result) => {
-                settlePendingReportRunExecution(pendingReportWorkspaceRunRef, pendingRun, result);
-            },
-            (runError) => {
-                settlePendingReportRunExecution(pendingReportWorkspaceRunRef, pendingRun, {
-                    ok: false,
-                    error: `Could not run the report. ${renderReportBuilderError(runError)}`,
-                });
-            },
-        );
-    }, [captureRunDispatchSnapshot, designWorkspaceMode, executeCapturedReportRun, isRunDispatchMaterializationCurrent, state]);
+    }, [captureRunDispatchSnapshot, designWorkspaceMode, executeCapturedReportRun, frozenRestore, onDiscardFrozen, isRunDispatchMaterializationCurrent, state, useFilterDrawer, useFilterRail]);
 
     const settleReportRunLifecycle = React.useCallback((settlementEvent = null) => {
         const activeRun = activeRunEventRef.current;
@@ -10604,6 +10567,50 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         materialization: currentReportMaterialization,
         materializedExportRequest: draftExportRequest,
     };
+    useEffect(() => {
+        const pendingRun = pendingReportWorkspaceRunRef.current;
+        if (designWorkspaceMode || frozenRestore || !pendingRun || pendingRun.started) {
+            return;
+        }
+        const invocationSnapshot = captureRunDispatchSnapshot(
+            currentBuilderStateRef.current || state,
+            { origin: pendingRun.origin, commandIdentity: pendingRun.commandIdentity },
+        );
+        if (pendingRun.requestFingerprint
+            && pendingRun.requestFingerprint !== invocationSnapshot.requestFingerprint) {
+            settlePendingReportRunExecution(pendingReportWorkspaceRunRef, pendingRun, {
+                ok: false,
+                superseded: true,
+                error: "Report run was superseded before materialization capture.",
+            });
+            return;
+        }
+        if (pendingRun.materializationFingerprint
+            && pendingRun.materializationFingerprint !== invocationSnapshot.materializationFingerprint) {
+            settlePendingReportRunExecution(pendingReportWorkspaceRunRef, pendingRun, {
+                ok: false,
+                superseded: true,
+                error: "Report run was superseded before materialization capture.",
+            });
+            return;
+        }
+        if (!isRunDispatchMaterializationCurrent(invocationSnapshot)) {
+            return;
+        }
+        pendingRun.started = true;
+        void executeCapturedReportRun(invocationSnapshot, pendingRun.origin).then(
+            (result) => {
+                settlePendingReportRunExecution(pendingReportWorkspaceRunRef, pendingRun, result);
+            },
+            (runError) => {
+                settlePendingReportRunExecution(pendingReportWorkspaceRunRef, pendingRun, {
+                    ok: false,
+                    error: `Could not run the report. ${renderReportBuilderError(runError)}`,
+                });
+            },
+        );
+    }, [captureRunDispatchSnapshot, designWorkspaceMode, executeCapturedReportRun, frozenRestore, isRunDispatchMaterializationCurrent, state, pendingReportRunSequence, currentReportMaterializationFingerprint, currentTerminalMaterializationFresh, draftExportRequest]);
+
     const activeRunForSettlement = activeRunEventRef.current;
     const activeSettlementRunId = activeRunForSettlement?.invocation?.runId || "";
     const activeSettlementRequestFingerprint = activeRunForSettlement?.invocation?.requestFingerprint
@@ -10914,10 +10921,10 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     ), [currentTablePresentationState,currentWindowExportParameterIdentity,currentTableBlockIds]);
     const onCurrentTablePresentationChange = React.useCallback((blockId,value) => {
         if (!currentTableBlockIds.has(blockId)) return;
-        const presentation={filter:value?.filter ?? "",sort:value?.sort ? {key:value.sort.key,direction:value.sort.direction} : null};
+        const presentation={filter:value?.filter ?? "",sort:value?.sort ? {key:value.sort.key,direction:value.sort.direction} : null,...(Array.isArray(value?.expandedKeys)?{expandedKeys:value.expandedKeys}: {})};
         setCurrentTablePresentationState(previous => {
             const values=previous.scope===currentWindowExportParameterIdentity ? previous.values : {};
-            if (!Object.hasOwn(values,blockId) && presentation.filter==="" && presentation.sort===null) return previous;
+            if (!Object.hasOwn(values,blockId) && presentation.filter==="" && presentation.sort===null && presentation.expandedKeys===undefined) return previous;
             if (JSON.stringify(values[blockId])===JSON.stringify(presentation)) return previous;
             return {scope:currentWindowExportParameterIdentity,values:{...values,[blockId]:presentation}};
         });
@@ -14505,7 +14512,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                 canRun: !!canRunReport,
                 canSave: !!canSaveCurrentReportFile && typeof reportStoreHandler?.saveReport === "function",
                 hasCompletedRun: !!hasCompletedCurrentRun || currentReportDatasetMaterialization?.status === "completed",
-                materialization: cloneReportBuilderValue(currentReportDatasetMaterialization),
+                materialization: cloneReportBuilderValue(reportWindowMaterialization(activeRunEventRef.current, currentReportDatasetMaterialization)),
             }),
             run: async (input = {}) => {
                 if (!canRunReport) {
@@ -14516,12 +14523,10 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                 if (!begun?.ok) {
                     return begun;
                 }
+                const receipt = reportWindowRunReceipt(begun);
+                if (!receipt.ok) return receipt;
                 return {
-                    ok: true,
-                    ...(begun.durable ? {
-                        reportRunId: normalizeString(begun.runId),
-                        durable: true,
-                    } : {}),
+                    ...receipt,
                     ...(commandIdentity ? { materializationId: commandIdentity.requestId } : {}),
                     windowId,
                     reportId: normalizeString(activeReportEventId),
