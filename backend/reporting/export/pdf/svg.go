@@ -57,7 +57,7 @@ func hasUnsupportedSVGStyle(attrs []xml.Attr) bool {
 
 func isSupportedSVGGroupAttr(name string) bool {
 	switch strings.TrimSpace(name) {
-	case "fill", "stroke", "stroke-width", "stroke-dasharray", "fill-opacity", "stroke-opacity", "opacity", "font-size", "font-weight", "text-anchor", "transform", svgTranslateXAttr, svgTranslateYAttr:
+	case "fill", "stroke", "stroke-width", "stroke-dasharray", "fill-opacity", "stroke-opacity", "opacity", "font-size", "font-weight", "font-style", "text-anchor", "transform", svgTranslateXAttr, svgTranslateYAttr:
 		return true
 	default:
 		return false
@@ -117,7 +117,7 @@ func resolveSupportedSVGGroupAttrs(attrs []xml.Attr) ([]xml.Attr, bool) {
 
 func isSupportedSVGStyleAttr(name string) bool {
 	switch strings.TrimSpace(name) {
-	case "fill", "stroke", "stroke-width", "stroke-dasharray", "fill-opacity", "stroke-opacity", "opacity", "font-size", "font-weight", "text-anchor", "transform":
+	case "fill", "stroke", "stroke-width", "stroke-dasharray", "fill-opacity", "stroke-opacity", "opacity", "font-size", "font-weight", "font-style", "text-anchor", "transform":
 		return true
 	default:
 		return false
@@ -1077,7 +1077,7 @@ func parseSVGText(decoder *xml.Decoder, start xml.StartElement) (svgText, error)
 		y:          parseSVGLength(attrMap["y"]) + ty,
 		fontSize:   positiveOrDefault(parseSVGLength(attrMap["font-size"]), 10),
 		fill:       fill,
-		fontWeight: attrMap["font-weight"],
+		fontWeight: strings.TrimSpace(attrMap["font-weight"] + " " + attrMap["font-style"]),
 		anchor:     strings.TrimSpace(attrMap["text-anchor"]),
 		opacity:    resolveSVGTextOrStrokeOpacity(attrMap, "fill", fill),
 	}

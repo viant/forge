@@ -45842,8 +45842,9 @@ Please __addLocaleData before adding additional unit data`);
       validateNumericDisplayFormat(format2);
     }
   };
+  var emphasisSchema = { enum: ["bold", "italic", "bold italic"] };
   var valueSchema = { type: "object", additionalProperties: false, required: ["field", "operation"], properties: { field: { type: "string", minLength: 1 }, operation: { enum: ["scalar", "sum"] } } };
-  var donutCenterSchema = { type: "object", additionalProperties: false, required: ["label"], oneOf: [{ required: ["value", "format"], not: { required: ["alternatives"] } }, { required: ["alternatives"], not: { anyOf: [{ required: ["value"] }, { required: ["format"] }] } }], properties: { label: { type: "string", minLength: 1 }, labelInput: requestLabelInputSchema, datasetRef: { type: "string", minLength: 1 }, format: formatSchema, value: valueSchema, alternatives: { type: "array", minItems: 1, items: { ...valueSchema, required: ["field", "operation", "format"], properties: { ...valueSchema.properties, label: { type: "string", minLength: 1 }, format: formatSchema } } } } };
+  var donutCenterSchema = { type: "object", additionalProperties: false, required: ["label"], oneOf: [{ required: ["value", "format"], not: { required: ["alternatives"] } }, { required: ["alternatives"], not: { anyOf: [{ required: ["value"] }, { required: ["format"] }] } }], properties: { valueRole: { enum: ["small", "body"] }, valueEmphasis: emphasisSchema, labelEmphasis: emphasisSchema, label: { type: "string", minLength: 1 }, labelInput: requestLabelInputSchema, datasetRef: { type: "string", minLength: 1 }, format: formatSchema, value: valueSchema, alternatives: { type: "array", minItems: 1, items: { ...valueSchema, required: ["field", "operation", "format"], properties: { ...valueSchema.properties, label: { type: "string", minLength: 1 }, format: formatSchema } } } } };
   function donutCenterFields(center) {
     var _a5;
     return ((_a5 = center == null ? void 0 : center.alternatives) == null ? void 0 : _a5.map((item) => item.field)) || ((center == null ? void 0 : center.value) ? [center.value.field] : []);
@@ -45851,13 +45852,15 @@ Please __addLocaleData before adding additional unit data`);
   function normalizeDonutCenter(input, type = "donut") {
     if (input === void 0) return void 0;
     if (type !== "donut") throw new Error("Center content is supported only on donut charts.");
-    if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some((k2) => !["label", "value", "format", "datasetRef", "alternatives", "labelInput"].includes(k2))) throw new Error("Donut center requires label and explicit value bindings.");
+    if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some((k2) => !["label", "value", "format", "datasetRef", "alternatives", "labelInput", "valueEmphasis", "labelEmphasis", "valueRole"].includes(k2))) throw new Error("Donut center requires label and explicit value bindings.");
     if (typeof input.label !== "string" || !input.label.trim()) throw new Error("Donut center label is required.");
     if (input.datasetRef !== void 0 && (typeof input.datasetRef !== "string" || !input.datasetRef.trim())) throw new Error("Donut center datasetRef must name a dataset.");
     if (input.labelInput !== void 0) {
       if (!input.datasetRef) throw new Error("Donut center label input requires an independent dataset.");
       normalizeRequestLabelInput(input.labelInput);
     }
+    if (input.valueRole !== void 0 && !["small", "body"].includes(input.valueRole)) throw new Error("Unsupported donut center value role.");
+    for (const key2 of ["valueEmphasis", "labelEmphasis"]) if (input[key2] !== void 0 && !emphasisSchema.enum.includes(input[key2])) throw new Error("Unsupported donut center emphasis.");
     const check = (value, alternative = false) => {
       if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some((k2) => !["field", "operation", ...alternative ? ["format", "label"] : []].includes(k2)) || typeof value.field !== "string" || !value.field.trim() || !["scalar", "sum"].includes(value.operation)) throw new Error("Donut center value requires an explicit field and scalar or sum operation.");
       if (alternative) {
@@ -45875,7 +45878,7 @@ Please __addLocaleData before adding additional unit data`);
       checkFormat(input.format);
       binding = { value: check(input.value), format: input.format };
     }
-    return { label: input.label, ...binding, ...input.labelInput ? { labelInput: JSON.parse(JSON.stringify(input.labelInput)) } : {}, ...input.datasetRef ? { datasetRef: input.datasetRef } : {} };
+    return { label: input.label, ...binding, ...Object.fromEntries(["valueEmphasis", "labelEmphasis", "valueRole"].filter((key2) => input[key2] !== void 0).map((key2) => [key2, input[key2]])), ...input.labelInput ? { labelInput: JSON.parse(JSON.stringify(input.labelInput)) } : {}, ...input.datasetRef ? { datasetRef: input.datasetRef } : {} };
   }
   function resolveDonutCenter(input, rows = [], type = "donut", centerRows, centerInputs) {
     var _a5, _b, _c;
@@ -45910,7 +45913,7 @@ Please __addLocaleData before adding additional unit data`);
     let label = ((_a5 = active[0]) == null ? void 0 : _a5.label) || config.label;
     if (config.labelInput) label = resolveRequestLabelInput(config.labelInput, centerInputs);
     const value = (_c = (_b = active[0]) == null ? void 0 : _b.value) != null ? _c : null;
-    return { label, value, formattedValue: value === null ? "Unavailable" : typeof active[0].format === "object" ? formatRangeValue(value, { format: active[0].format }) : formatExportNumericValue(value, active[0].format), scope: "dataset" };
+    return { label, value, ...Object.fromEntries(["valueEmphasis", "labelEmphasis", "valueRole"].filter((key2) => config[key2] !== void 0).map((key2) => [key2, config[key2]])), formattedValue: value === null ? "Unavailable" : typeof active[0].format === "object" ? formatRangeValue(value, { format: active[0].format }) : formatExportNumericValue(value, active[0].format), scope: "dataset" };
   }
   function validateDonutCenterDataset(dataset) {
     var _a5, _b, _c;
@@ -45919,28 +45922,37 @@ Please __addLocaleData before adding additional unit data`);
     return dataset.rows;
   }
   var donutCenterDescription = (center) => `${center.label}: ${center.formattedValue}. Dataset value; slice selection does not change it.`;
-  function layoutDonutCenter(center, radius, { valueSize = 14, labelSize = 12, lineHeight = 16, measure = (text3, size) => [...text3].reduce((sum2, char) => sum2 + size * (/[WM@%]|[^\x00-\x7F]/u.test(char) ? 1 : 0.65), 0) } = {}) {
+  function layoutDonutCenter(center, radius, { valueSize = 14, labelSize = 12, lineHeight = 16, measure = (text3, size, role, emphasis) => [...text3].reduce((sum2, char) => sum2 + size * (/[WM@%]|[^\x00-\x7F]/u.test(char) ? 1 : 0.65), 0) * ((emphasis == null ? void 0 : emphasis.includes("bold")) ? 1.1 : 1) } = {}) {
     const width = Math.max(0, Math.SQRT2 * radius - 12), height = width;
     const words = center.label.trim().split(/\s+/u), lines2 = [];
-    const wordsFit = words.every((word) => measure(word, labelSize, "label") <= width);
+    const wordsFit = words.every((word) => measure(word, labelSize, "label", center.labelEmphasis) <= width);
     let current = "";
     if (wordsFit) for (const word of words) {
       const candidate = current ? `${current} ${word}` : word;
-      if (current && measure(candidate, labelSize, "label") > width) {
+      if (current && measure(candidate, labelSize, "label", center.labelEmphasis) > width) {
         lines2.push(current);
         current = word;
       } else current = candidate;
     }
     if (current) lines2.push(current);
-    const valueFits = measure(center.formattedValue, valueSize, "value") <= width;
+    const valueFits = measure(center.formattedValue, valueSize, "value", center.valueEmphasis) <= width;
     const fits = wordsFit && valueFits && valueSize + 6 + lines2.length * lineHeight <= height;
     return { value: valueFits ? center.formattedValue : "\u2026", labelLines: fits ? lines2 : [], needsDetails: !fits, valueSize, labelSize, lineHeight, height: fits ? valueSize + 6 + lines2.length * lineHeight : valueSize };
   }
   var escape2 = (value) => String(value).replace(/[&<>"']/g, (c3) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c3]);
+  function donutCenterPrintDescription(center) {
+    if (!center.valueEmphasis && !center.labelEmphasis) return donutCenterDescription(center);
+    const text3 = donutCenterDescription(center);
+    return { text: text3, textRuns: [{ text: center.label, fontWeight: center.labelEmphasis || "normal" }, { text: ": ", fontWeight: "normal" }, { text: center.formattedValue, fontWeight: center.valueEmphasis || "normal" }, { text: ". Dataset value; slice selection does not change it.", fontWeight: "normal" }] };
+  }
   function donutCenterSvg(center, cx, cy, radius) {
     const layout = layoutDonutCenter(center, radius);
     const y4 = cy - layout.height / 2 + layout.valueSize * 0.8;
-    return { svg: `<text x="${cx}" y="${y4}" text-anchor="middle" font-size="${layout.valueSize}" fill="#344054">${escape2(layout.value)}</text>` + layout.labelLines.map((line, i3) => `<text x="${cx}" y="${y4 + layout.valueSize + 4 + i3 * layout.lineHeight}" text-anchor="middle" font-size="${layout.labelSize}" fill="#344054">${escape2(line)}</text>`).join(""), needsDetails: layout.needsDetails };
+    const emphasis = (part) => {
+      var _a5, _b;
+      return `${((_a5 = center[part + "Emphasis"]) == null ? void 0 : _a5.includes("bold")) ? ' font-weight="bold"' : ""}${((_b = center[part + "Emphasis"]) == null ? void 0 : _b.includes("italic")) ? ' font-style="italic"' : ""}`;
+    };
+    return { svg: `<text x="${cx}" y="${y4}" text-anchor="middle" font-size="${layout.valueSize}"${emphasis("value")} fill="#344054">${escape2(layout.value)}</text>` + layout.labelLines.map((line, i3) => `<text x="${cx}" y="${y4 + layout.valueSize + 4 + i3 * layout.lineHeight}" text-anchor="middle" font-size="${layout.labelSize}"${emphasis("label")} fill="#344054">${escape2(line)}</text>`).join(""), needsDetails: layout.needsDetails };
   }
 
   // src/components/categoricalHeatmap.js
@@ -55566,6 +55578,38 @@ Please __addLocaleData before adding additional unit data`);
     return reportSpec;
   }
 
+  // src/reporting/reportRowVisibility.js
+  function normalizeReportRowVisibility(input) {
+    if (input === void 0) return null;
+    if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some((key2) => key2 !== "exclude") || !Array.isArray(input.exclude) || !input.exclude.length || input.exclude.length > 32) throw new Error("Row visibility requires 1\u201332 explicit exclusions.");
+    const fields2 = /* @__PURE__ */ new Set();
+    for (const item of input.exclude) {
+      if (!item || typeof item !== "object" || Array.isArray(item) || Object.keys(item).some((key2) => !["field", "values"].includes(key2)) || typeof item.field !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(item.field) || ["__proto__", "constructor", "prototype"].includes(item.field) || fields2.has(item.field) || !Array.isArray(item.values) || !item.values.length || item.values.length > 128) throw new Error("Row visibility exclusions require distinct admitted fields and explicit values.");
+      fields2.add(item.field);
+      if (item.values.some((value) => value !== null && !["string", "boolean", "number"].includes(typeof value) || typeof value === "number" && (!Number.isFinite(value) || Math.abs(value) > Number.MAX_SAFE_INTEGER))) throw new Error("Row visibility values must be safe typed scalars or null.");
+    }
+    return JSON.parse(JSON.stringify(input));
+  }
+  function applyReportRowVisibility(rows, input) {
+    const config = normalizeReportRowVisibility(input);
+    if (!config) return rows;
+    return rows.filter((row) => {
+      for (const { field, values } of config.exclude) {
+        if (!Object.hasOwn(row || {}, field)) throw new Error(`Row visibility field '${field}' is missing.`);
+        if (values.some((value) => value === row[field])) return false;
+      }
+      return true;
+    });
+  }
+  function validateReportRowVisibilityBlock(block) {
+    var _a5, _b, _c, _d, _e, _f, _g;
+    if (((_a5 = block == null ? void 0 : block.runtime) == null ? void 0 : _a5.rowVisibility) === void 0) return;
+    normalizeReportRowVisibility(block.runtime.rowVisibility);
+    const type = ((_b = block.chartSpec) == null ? void 0 : _b.type) || ((_c = block.chartModel) == null ? void 0 : _c.type) || ((_e = (_d = block.content) == null ? void 0 : _d.chartSpec) == null ? void 0 : _e.type) || ((_g = (_f = block.content) == null ? void 0 : _f.chartModel) == null ? void 0 : _g.type);
+    if (["pie", "donut"].includes(type)) throw new Error("Pie/donut hidden-angle geometry requires explicit translation.");
+    if (!["chartBlock", "collectionBlock", "tableBlock"].includes(block.kind) || block.pivot || block.hierarchy) throw new Error("Row visibility requires a chart, collection or flat producer table.");
+  }
+
   // src/utils/linkTarget.js
   function normalizeString31(value) {
     if (typeof value !== "string") {
@@ -60253,7 +60297,7 @@ ${indent}${end}`;
     const availableDatasetRefs = Array.from(datasetsById.keys());
     const datasetsByAlias = buildReportFillDatasetAliasMap(datasetsById);
     return (Array.isArray(reportSpec == null ? void 0 : reportSpec.blocks) ? reportSpec.blocks : []).map((block) => {
-      var _a6, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+      var _a6, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
       const normalizedBlock = cloneValue24(block);
       delete normalizedBlock.templateFieldDisplayMap;
       delete normalizedBlock.markerColors;
@@ -60270,12 +60314,13 @@ ${indent}${end}`;
       const sourceDataset = datasetsById.get(datasetResolution.datasetRef) || null;
       const runtimeFilterBindings = ((_a6 = block == null ? void 0 : block.runtime) == null ? void 0 : _a6.filterBindings) && typeof block.runtime.filterBindings === "object" && !Array.isArray(block.runtime.filterBindings) ? block.runtime.filterBindings : {};
       const runtimeSelectionBindings = ((_b = block == null ? void 0 : block.runtime) == null ? void 0 : _b.selectionBindings) && typeof block.runtime.selectionBindings === "object" && !Array.isArray(block.runtime.selectionBindings) ? block.runtime.selectionBindings : {};
-      const runtimeRows = sourceDataset ? applyDashboardSelectionToCollection(
+      validateReportRowVisibilityBlock(block);
+      const runtimeRows = sourceDataset ? applyReportRowVisibility(applyDashboardSelectionToCollection(
         applyDashboardFiltersToCollection((sourceDataset == null ? void 0 : sourceDataset.rows) || [], runtimeFilterBindings, runtimeFilterValues),
         runtimeSelectionBindings,
         runtimeSelection
-      ) : [];
-      const dataset = sourceDataset && (Object.keys(runtimeFilterBindings).length > 0 || Object.keys(runtimeSelectionBindings).length > 0) ? {
+      ), (_c = block.runtime) == null ? void 0 : _c.rowVisibility) : [];
+      const dataset = sourceDataset && (Object.keys(runtimeFilterBindings).length > 0 || Object.keys(runtimeSelectionBindings).length > 0 || ((_d = block.runtime) == null ? void 0 : _d.rowVisibility)) ? {
         ...sourceDataset,
         rows: runtimeRows,
         provenance: {
@@ -60284,7 +60329,7 @@ ${indent}${end}`;
         }
       } : sourceDataset;
       if (normalizeString36(block == null ? void 0 : block.kind) === "tableBlock") {
-        if ((block.hierarchy || block.pivot) && (((_c = sourceDataset == null ? void 0 : sourceDataset.provenance) == null ? void 0 : _c.hasMore) || ((_d = sourceDataset == null ? void 0 : sourceDataset.provenance) == null ? void 0 : _d.truncated) || Number((_e = sourceDataset == null ? void 0 : sourceDataset.request) == null ? void 0 : _e.offset) > 0)) throw new Error("Hierarchy and pivot tables require a complete admitted dataset; partial pages cannot be aggregated.");
+        if ((block.hierarchy || block.pivot) && (((_e = sourceDataset == null ? void 0 : sourceDataset.provenance) == null ? void 0 : _e.hasMore) || ((_f = sourceDataset == null ? void 0 : sourceDataset.provenance) == null ? void 0 : _f.truncated) || Number((_g = sourceDataset == null ? void 0 : sourceDataset.request) == null ? void 0 : _g.offset) > 0)) throw new Error("Hierarchy and pivot tables require a complete admitted dataset; partial pages cannot be aggregated.");
         const analytic = materializeAnalyticalTable(block, block.hierarchy ? (sourceDataset == null ? void 0 : sourceDataset.rows) || [] : (dataset == null ? void 0 : dataset.rows) || []);
         let tableRows = analytic.rows, sourceIndexes = analytic.sourceIndexes;
         if (block.hierarchy && dataset !== sourceDataset) {
@@ -60312,8 +60357,8 @@ ${indent}${end}`;
           content: {
             chartSpec,
             chartModel,
-            rowCount: Number(((_f = dataset == null ? void 0 : dataset.provenance) == null ? void 0 : _f.rowCount) || 0),
-            resolvedChart: buildReportFillChartPayload(chartModel, (dataset == null ? void 0 : dataset.rows) || [], ((_g = chartModel == null ? void 0 : chartModel.center) == null ? void 0 : _g.datasetRef) ? validateDonutCenterDataset(datasetsById.get(chartModel.center.datasetRef)) : void 0, ((_h = chartModel == null ? void 0 : chartModel.center) == null ? void 0 : _h.datasetRef) ? (_j = (_i = datasetsById.get(chartModel.center.datasetRef)) == null ? void 0 : _i.request) == null ? void 0 : _j.filters : (_k = dataset == null ? void 0 : dataset.request) == null ? void 0 : _k.filters, (_l = dataset == null ? void 0 : dataset.request) == null ? void 0 : _l.filters)
+            rowCount: Number(((_h = dataset == null ? void 0 : dataset.provenance) == null ? void 0 : _h.rowCount) || 0),
+            resolvedChart: buildReportFillChartPayload(chartModel, (dataset == null ? void 0 : dataset.rows) || [], ((_i = chartModel == null ? void 0 : chartModel.center) == null ? void 0 : _i.datasetRef) ? validateDonutCenterDataset(datasetsById.get(chartModel.center.datasetRef)) : void 0, ((_j = chartModel == null ? void 0 : chartModel.center) == null ? void 0 : _j.datasetRef) ? (_l = (_k = datasetsById.get(chartModel.center.datasetRef)) == null ? void 0 : _k.request) == null ? void 0 : _l.filters : (_m = dataset == null ? void 0 : dataset.request) == null ? void 0 : _m.filters, (_n = dataset == null ? void 0 : dataset.request) == null ? void 0 : _n.filters)
           }
         };
       }
@@ -60322,7 +60367,7 @@ ${indent}${end}`;
           ...normalizedBlock,
           content: {
             geo: cloneValue24((block == null ? void 0 : block.geo) || {}),
-            rowCount: Number(((_m = dataset == null ? void 0 : dataset.provenance) == null ? void 0 : _m.rowCount) || 0),
+            rowCount: Number(((_o = dataset == null ? void 0 : dataset.provenance) == null ? void 0 : _o.rowCount) || 0),
             resolvedGeo: buildReportFillGeoPayload(block, (dataset == null ? void 0 : dataset.rows) || [])
           }
         };
@@ -60654,7 +60699,8 @@ ${indent}${end}`;
   } = {}) {
     const runtime = (block == null ? void 0 : block.runtime) && typeof block.runtime === "object" && !Array.isArray(block.runtime) ? block.runtime : {};
     const filtered = applyDashboardFiltersToCollection(rows, runtime == null ? void 0 : runtime.filterBindings, filters);
-    return applyDashboardSelectionToCollection(filtered, runtime == null ? void 0 : runtime.selectionBindings, selection);
+    validateReportRowVisibilityBlock(block);
+    return applyReportRowVisibility(applyDashboardSelectionToCollection(filtered, runtime == null ? void 0 : runtime.selectionBindings, selection), runtime.rowVisibility);
   }
   function isReportRuntimeBlockVisible(block = {}, {
     metrics = {},
@@ -61570,7 +61616,7 @@ ${indent}${end}`;
       ${legend}
     </svg>`,
       height,
-      ...center ? { labelDetails: [...(centerGraphic == null ? void 0 : centerGraphic.needsDetails) ? [donutCenterDescription(center)] : [], ...slices.length === 0 ? ["No slice data."] : []] } : {},
+      ...center ? { labelDetails: [...(centerGraphic == null ? void 0 : centerGraphic.needsDetails) ? [donutCenterPrintDescription(center)] : [], ...slices.length === 0 ? ["No slice data."] : []] } : {},
       diagnostics: []
     };
   }
@@ -68291,39 +68337,41 @@ ${indent}${end}`;
       (Array.isArray((_a5 = reportSpec == null ? void 0 : reportSpec.layoutIntent) == null ? void 0 : _a5.items) ? reportSpec.layoutIntent.items : []).map((item) => [normalizeString41(item == null ? void 0 : item.blockId), resolveReportLayoutSpan(item)]).filter(([blockId]) => !!blockId)
     );
   }
-  function buildReportPrintMarkdownLines(markdown, width, fontSize = REPORT_PRINT_THEME.bodyFontSize) {
+  function wrapReportPrintTextRuns(runs, width, fontSize = REPORT_PRINT_THEME.bodyFontSize) {
     var _a5;
+    const characters = [];
+    for (const run of runs) for (const character of run.text.split("")) {
+      if (/\s/.test(character)) {
+        if (characters.length && characters[characters.length - 1].text !== " ") characters.push({ text: " ", fontWeight: run.fontWeight || "normal" });
+      } else characters.push({ text: character, fontWeight: run.fontWeight || "normal" });
+    }
+    while (((_a5 = characters[characters.length - 1]) == null ? void 0 : _a5.text) === " ") characters.pop();
+    const plain = characters.map((entry) => entry.text).join("");
+    if (!plain) return [{ text: "" }];
+    let cursor = 0;
+    const output = [];
+    for (const wrapped of wrapReportPrintText(plain, width, fontSize)) {
+      const start = plain.indexOf(wrapped, cursor);
+      const selected = characters.slice(start, start + wrapped.length);
+      cursor = start + wrapped.length;
+      const textRuns = [];
+      for (const character of selected) {
+        const prior = textRuns[textRuns.length - 1];
+        if ((prior == null ? void 0 : prior.fontWeight) === character.fontWeight) prior.text += character.text;
+        else textRuns.push({ ...character });
+      }
+      const styled = textRuns.some((run) => run.fontWeight !== "normal");
+      output.push({ text: wrapped, ...styled ? textRuns.length === 1 ? { fontWeight: textRuns[0].fontWeight } : { textRuns } : {} });
+    }
+    return output;
+  }
+  function buildReportPrintMarkdownLines(markdown, width, fontSize = REPORT_PRINT_THEME.bodyFontSize) {
     const output = [];
     for (const rawLine of String(markdown).replace(/\r\n/g, "\n").trim().split("\n")) {
       const protectedLine = protectReportMarkdownEscapes(rawLine);
       const line = protectedLine.text.replace(/!?(?:\[([^\]]+)\])\([^\)]+\)/g, "$1").replace(/^\s{0,3}#{1,6}\s*/, "").replace(/^\s*[-*+]\s+/, "").replace(/^\s*\d+\.\s+/, "");
       const runs = parseReportMarkdownInline(line).map((run) => ({ ...run, text: normalizeReportPrintText(protectedLine.restore(run.text)) }));
-      const characters = [];
-      for (const run of runs) for (const character of run.text.split("")) {
-        if (/\s/.test(character)) {
-          if (characters.length && characters[characters.length - 1].text !== " ") characters.push({ text: " ", fontWeight: run.fontWeight || "normal" });
-        } else characters.push({ text: character, fontWeight: run.fontWeight || "normal" });
-      }
-      while (((_a5 = characters[characters.length - 1]) == null ? void 0 : _a5.text) === " ") characters.pop();
-      const plain = characters.map((entry) => entry.text).join("");
-      if (!plain) {
-        output.push({ text: "" });
-        continue;
-      }
-      let cursor = 0;
-      for (const wrapped of wrapReportPrintText(plain, width, fontSize)) {
-        const start = plain.indexOf(wrapped, cursor);
-        const selected = characters.slice(start, start + wrapped.length);
-        cursor = start + wrapped.length;
-        const textRuns = [];
-        for (const character of selected) {
-          const prior = textRuns[textRuns.length - 1];
-          if ((prior == null ? void 0 : prior.fontWeight) === character.fontWeight) prior.text += character.text;
-          else textRuns.push({ ...character });
-        }
-        const styled = textRuns.some((run) => run.fontWeight !== "normal");
-        output.push({ text: wrapped, ...styled ? textRuns.length === 1 ? { fontWeight: textRuns[0].fontWeight } : { textRuns } : {} });
-      }
+      output.push(...wrapReportPrintTextRuns(runs, width, fontSize));
     }
     return output;
   }
@@ -70073,7 +70121,7 @@ ${indent}${end}`;
         });
       });
       if ((_u = svgResult.labelDetails) == null ? void 0 : _u.length) {
-        renderReportPrintTextLines(state, { idPrefix: `${block.id}__labels_${pageIndex}`, lines: svgResult.labelDetails, fontSize: 9, lineHeight: 12 });
+        renderReportPrintTextLines(state, { idPrefix: `${block.id}__labels_${pageIndex}`, lines: svgResult.labelDetails.flatMap((line) => typeof line === "string" ? line : wrapReportPrintTextRuns(line.textRuns || [{ text: line.text, fontWeight: line.fontWeight }], state.contentWidth, 9)), fontSize: 9, lineHeight: 12 });
       }
       finishReportPrintBlock(state);
     }

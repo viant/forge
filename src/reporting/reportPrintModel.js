@@ -663,27 +663,31 @@ function buildLayoutSpanByBlockId(reportSpec = {}) {
 
 // Preserve emphasis while reusing the canonical line-break budget. Runs share
 // one line box; PDF positions them with real font advances, never guessed x boxes.
+export function wrapReportPrintTextRuns(runs,width,fontSize=REPORT_PRINT_THEME.bodyFontSize){
+  const characters=[];
+  for(const run of runs)for(const character of run.text.split('')){
+    if(/\s/.test(character)){if(characters.length&&characters[characters.length-1].text!==' ')characters.push({text:' ',fontWeight:run.fontWeight||'normal'});}
+    else characters.push({text:character,fontWeight:run.fontWeight||'normal'});
+  }
+  while(characters[characters.length-1]?.text===' ')characters.pop();
+  const plain=characters.map(entry=>entry.text).join('');
+  if(!plain)return [{text:''}];
+  let cursor=0;const output=[];
+  for(const wrapped of wrapReportPrintText(plain,width,fontSize)){
+    const start=plain.indexOf(wrapped,cursor);const selected=characters.slice(start,start+wrapped.length);cursor=start+wrapped.length;
+    const textRuns=[];for(const character of selected){const prior=textRuns[textRuns.length-1];if(prior?.fontWeight===character.fontWeight)prior.text+=character.text;else textRuns.push({...character});}
+    const styled=textRuns.some(run=>run.fontWeight!=='normal');
+    output.push({text:wrapped,...(styled ? (textRuns.length===1?{fontWeight:textRuns[0].fontWeight}:{textRuns}) : {})});
+  }
+  return output;
+}
 export function buildReportPrintMarkdownLines(markdown,width,fontSize=REPORT_PRINT_THEME.bodyFontSize){
   const output=[];
   for(const rawLine of String(markdown).replace(/\r\n/g,'\n').trim().split('\n')){
     const protectedLine=protectReportMarkdownEscapes(rawLine);
     const line=protectedLine.text.replace(/!?(?:\[([^\]]+)\])\([^\)]+\)/g,'$1').replace(/^\s{0,3}#{1,6}\s*/, '').replace(/^\s*[-*+]\s+/, '').replace(/^\s*\d+\.\s+/, '');
     const runs=parseReportMarkdownInline(line).map(run=>({...run,text:normalizeReportPrintText(protectedLine.restore(run.text))}));
-    const characters=[];
-    for(const run of runs)for(const character of run.text.split('')){
-      if(/\s/.test(character)){if(characters.length&&characters[characters.length-1].text!==' ')characters.push({text:' ',fontWeight:run.fontWeight||'normal'});}
-      else characters.push({text:character,fontWeight:run.fontWeight||'normal'});
-    }
-    while(characters[characters.length-1]?.text===' ')characters.pop();
-    const plain=characters.map(entry=>entry.text).join('');
-    if(!plain){output.push({text:''});continue;}
-    let cursor=0;
-    for(const wrapped of wrapReportPrintText(plain,width,fontSize)){
-      const start=plain.indexOf(wrapped,cursor);const selected=characters.slice(start,start+wrapped.length);cursor=start+wrapped.length;
-      const textRuns=[];for(const character of selected){const prior=textRuns[textRuns.length-1];if(prior?.fontWeight===character.fontWeight)prior.text+=character.text;else textRuns.push({...character});}
-      const styled=textRuns.some(run=>run.fontWeight!=='normal');
-      output.push({text:wrapped,...(styled ? (textRuns.length===1?{fontWeight:textRuns[0].fontWeight}:{textRuns}) : {})});
-    }
+    output.push(...wrapReportPrintTextRuns(runs,width,fontSize));
   }
   return output;
 }
@@ -2584,7 +2588,7 @@ function renderReportPrintChartBlock(state = {}, block = {}, {
       });
     });
     if (svgResult.labelDetails?.length) {
-      renderReportPrintTextLines(state, { idPrefix: `${block.id}__labels_${pageIndex}`, lines: svgResult.labelDetails, fontSize: 9, lineHeight: 12 });
+      renderReportPrintTextLines(state, { idPrefix: `${block.id}__labels_${pageIndex}`, lines: svgResult.labelDetails.flatMap(line=>typeof line==='string'?line:wrapReportPrintTextRuns(line.textRuns||[{text:line.text,fontWeight:line.fontWeight}],state.contentWidth,9)), fontSize: 9, lineHeight: 12 });
     }
     finishReportPrintBlock(state);
   }

@@ -54,6 +54,11 @@ export function resolveChartTypography(element) {
     const tokenFamily = String(style?.getPropertyValue?.('--forge-font-family') || '').trim();
     return {
         family: tokenFamily || inheritedFamily || 'system-ui, sans-serif',
+        bodyFamily: String(style?.getPropertyValue?.('--forge-type-body-family') || '').trim() || tokenFamily || inheritedFamily || 'system-ui, sans-serif',
+        bodyWeight: cssPixels(style, '--forge-type-body-weight', 400),
+        bodyLetterSpacing: String(style?.getPropertyValue?.('--forge-type-body-letter-spacing') || '').trim() || '0em',
+        bodySize: cssPixels(style, '--forge-type-body-size', 14),
+        bodyLineHeight: cssPixels(style, '--forge-type-body-line-height', 20),
         captionFamily: String(style?.getPropertyValue?.('--forge-type-caption-family') || '').trim() || tokenFamily || inheritedFamily || 'system-ui, sans-serif',
         captionWeight: cssPixels(style, '--forge-type-caption-weight', 400),
         captionLetterSpacing: String(style?.getPropertyValue?.('--forge-type-caption-letter-spacing') || '').trim() || '0em',

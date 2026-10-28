@@ -129,7 +129,7 @@ function measureCategoryTickText(value, style = {}) {
     if (!context) return String(value || "").length * 6.5;
     const fontSize = Math.max(8, Number(style?.fontSize || 12));
     const fontWeight = style?.fontWeight || 400;
-    context.font = `${fontWeight} ${fontSize}px ${style?.fontFamily || "system-ui, sans-serif"}`;
+    context.font = `${style.fontStyle?style.fontStyle+" ":""}${fontWeight} ${fontSize}px ${style?.fontFamily || "system-ui, sans-serif"}`;
     const text = String(value || "");
     const spacing = Number.parseFloat(style.letterSpacing) || 0;
     const pixels = String(style.letterSpacing).endsWith('em') ? spacing * fontSize : spacing;
@@ -1317,7 +1317,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 label={chart.sliceLabel ? props => props.payload?.sliceLabel==null?null:<text x={props.x} y={props.y} textAnchor={props.textAnchor} fill="var(--forge-chart-text, #30404d)" fontSize={chartTypography.smallSize} fontFamily={chartTypography.smallFamily} fontWeight={chartTypography.smallWeight} letterSpacing={chartTypography.smallLetterSpacing}>{props.payload.sliceLabel}</text> : embedded || compactPie || documentAppearance ? false : props => visiblePiePercentage(props) ? `${props.name} ${(props.percent * 100).toFixed(0)}%` : null}
                 labelLine={!embedded && !compactPie && !documentAppearance ? PiePercentageLeader : false}
             >
-                {centerState.resolved && <Label position="center" content={<DonutCenterLabel center={centerState.resolved} typography={chartTypography} measure={(text,size,role)=>measureCategoryTickText(text,{fontSize:size,fontFamily:role==='value'?chartTypography.smallFamily:chartTypography.captionFamily,fontWeight:role==='value'?chartTypography.smallWeight:chartTypography.captionWeight,letterSpacing:role==='value'?chartTypography.smallLetterSpacing:chartTypography.captionLetterSpacing})} onLayout={setCenterNeedsDetails}/>}/>}
+                {centerState.resolved && <Label position="center" content={<DonutCenterLabel center={centerState.resolved} typography={chartTypography} measure={(text,size,role,emphasis)=>measureCategoryTickText(text,{fontSize:size,fontFamily:role==='value'?chartTypography[(centerState.resolved.valueRole==='body'?'body':'small')+'Family']:chartTypography.captionFamily,fontWeight:emphasis?.includes('bold')?'bold':role==='value'?chartTypography[(centerState.resolved.valueRole==='body'?'body':'small')+'Weight']:chartTypography.captionWeight,fontStyle:emphasis?.includes('italic')?'italic':undefined,letterSpacing:role==='value'?chartTypography[(centerState.resolved.valueRole==='body'?'body':'small')+'LetterSpacing']:chartTypography.captionLetterSpacing})} onLayout={setCenterNeedsDetails}/>}/>}
                 {pieFilteredData.map((entry, index) => (
                     <Cell key={buildPieSliceCellKey(entry, index)} fill={resolveChartCategoryColor(chart, entry.name, piePalette[index % piePalette.length])} />
                 ))}

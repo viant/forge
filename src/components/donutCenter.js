@@ -5,17 +5,20 @@ import {readChartDataValue} from './chartData.js';
 export const donutCenterFormats=['number','number2','currency','currency2','compact','percent','percentfraction','percentfraction2','plain'];
 const formatSchema={anyOf:[{enum:donutCenterFormats},numericDisplayFormatSchema]};
 const checkFormat=format=>{if(typeof format==='string'){if(!donutCenterFormats.includes(format))throw new Error('Unsupported donut center format.');}else{if(!format)throw new Error('Donut center format is required.');validateNumericDisplayFormat(format);}};
+const emphasisSchema={enum:['bold','italic','bold italic']};
 const valueSchema={type:'object',additionalProperties:false,required:['field','operation'],properties:{field:{type:'string',minLength:1},operation:{enum:['scalar','sum']}}};
-export const donutCenterSchema={type:'object',additionalProperties:false,required:['label'],oneOf:[{required:['value','format'],not:{required:['alternatives']}},{required:['alternatives'],not:{anyOf:[{required:['value']},{required:['format']}]}}],properties:{label:{type:'string',minLength:1},labelInput:requestLabelInputSchema,datasetRef:{type:'string',minLength:1},format:formatSchema,value:valueSchema,alternatives:{type:'array',minItems:1,items:{...valueSchema,required:['field','operation','format'],properties:{...valueSchema.properties,label:{type:'string',minLength:1},format:formatSchema}}}}};
-export const resolvedDonutCenterSchema={type:'object',additionalProperties:false,required:['label','value','formattedValue','scope'],properties:{label:{type:'string'},value:{type:['number','null']},formattedValue:{type:'string'},scope:{const:'dataset'}}};
+export const donutCenterSchema={type:'object',additionalProperties:false,required:['label'],oneOf:[{required:['value','format'],not:{required:['alternatives']}},{required:['alternatives'],not:{anyOf:[{required:['value']},{required:['format']}]}}],properties:{valueRole:{enum:['small','body']},valueEmphasis:emphasisSchema,labelEmphasis:emphasisSchema,label:{type:'string',minLength:1},labelInput:requestLabelInputSchema,datasetRef:{type:'string',minLength:1},format:formatSchema,value:valueSchema,alternatives:{type:'array',minItems:1,items:{...valueSchema,required:['field','operation','format'],properties:{...valueSchema.properties,label:{type:'string',minLength:1},format:formatSchema}}}}};
+export const resolvedDonutCenterSchema={type:'object',additionalProperties:false,required:['label','value','formattedValue','scope'],properties:{valueRole:{enum:['small','body']},valueEmphasis:emphasisSchema,labelEmphasis:emphasisSchema,label:{type:'string'},value:{type:['number','null']},formattedValue:{type:'string'},scope:{const:'dataset'}}};
 export function donutCenterFields(center) {return center?.alternatives?.map(item=>item.field)||(center?.value?[center.value.field]:[]);}
 export function normalizeDonutCenter(input,type='donut') {
  if(input===undefined)return undefined;
  if(type!=='donut')throw new Error('Center content is supported only on donut charts.');
- if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!['label','value','format','datasetRef','alternatives','labelInput'].includes(k)))throw new Error('Donut center requires label and explicit value bindings.');
+ if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!['label','value','format','datasetRef','alternatives','labelInput','valueEmphasis','labelEmphasis','valueRole'].includes(k)))throw new Error('Donut center requires label and explicit value bindings.');
  if(typeof input.label!=='string'||!input.label.trim())throw new Error('Donut center label is required.');
  if(input.datasetRef!==undefined&&(typeof input.datasetRef!=='string'||!input.datasetRef.trim()))throw new Error('Donut center datasetRef must name a dataset.');
  if(input.labelInput!==undefined){if(!input.datasetRef)throw new Error('Donut center label input requires an independent dataset.');normalizeRequestLabelInput(input.labelInput);}
+ if(input.valueRole!==undefined&&!['small','body'].includes(input.valueRole))throw new Error('Unsupported donut center value role.');
+ for(const key of ['valueEmphasis','labelEmphasis'])if(input[key]!==undefined&&!emphasisSchema.enum.includes(input[key]))throw new Error('Unsupported donut center emphasis.');
  const check=(value,alternative=false)=>{
   if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(k=>!['field','operation',...(alternative?['format','label']:[])].includes(k))||typeof value.field!=='string'||!value.field.trim()||!['scalar','sum'].includes(value.operation))throw new Error('Donut center value requires an explicit field and scalar or sum operation.');
   if(alternative){checkFormat(value.format);if(value.label!==undefined&&(typeof value.label!=='string'||!value.label.trim()))throw new Error('Donut center alternative label is invalid.');}
@@ -30,7 +33,7 @@ export function normalizeDonutCenter(input,type='donut') {
   checkFormat(input.format);
   binding={value:check(input.value),format:input.format};
  }
- return {label:input.label,...binding,...(input.labelInput?{labelInput:JSON.parse(JSON.stringify(input.labelInput))}:{}),...(input.datasetRef?{datasetRef:input.datasetRef}:{})};
+ return {label:input.label,...binding,...Object.fromEntries(['valueEmphasis','labelEmphasis','valueRole'].filter(key=>input[key]!==undefined).map(key=>[key,input[key]])),...(input.labelInput?{labelInput:JSON.parse(JSON.stringify(input.labelInput))}:{}),...(input.datasetRef?{datasetRef:input.datasetRef}:{})};
 }
 export function resolveDonutCenter(input,rows=[],type='donut',centerRows,centerInputs) {
  const config=normalizeDonutCenter(input,type);if(!config)return null;
@@ -52,7 +55,7 @@ export function resolveDonutCenter(input,rows=[],type='donut',centerRows,centerI
  let label=active[0]?.label||config.label;
  if(config.labelInput)label=resolveRequestLabelInput(config.labelInput,centerInputs);
  const value=active[0]?.value??null;
- return {label,value,formattedValue:value===null?'Unavailable':(typeof active[0].format==='object'?formatRangeValue(value,{format:active[0].format}):formatExportNumericValue(value,active[0].format)),scope:'dataset'};
+ return {label,value,...Object.fromEntries(['valueEmphasis','labelEmphasis','valueRole'].filter(key=>config[key]!==undefined).map(key=>[key,config[key]])),formattedValue:value===null?'Unavailable':(typeof active[0].format==='object'?formatRangeValue(value,{format:active[0].format}):formatExportNumericValue(value,active[0].format)),scope:'dataset'};
 }
 export function validateDonutCenterDataset(dataset) {
  if(!dataset||!Array.isArray(dataset.rows))throw new Error('Donut center dataset is unavailable.');
@@ -60,25 +63,32 @@ export function validateDonutCenterDataset(dataset) {
  return dataset.rows;
 }
 export const donutCenterDescription=center=>`${center.label}: ${center.formattedValue}. Dataset value; slice selection does not change it.`;
-export function layoutDonutCenter(center,radius,{valueSize=14,labelSize=12,lineHeight=16,measure=(text,size)=>[...text].reduce((sum,char)=>sum+size*(/[WM@%]|[^\x00-\x7F]/u.test(char)?1:.65),0)}={}) {
+export function layoutDonutCenter(center,radius,{valueSize=14,labelSize=12,lineHeight=16,measure=(text,size,role,emphasis)=>[...text].reduce((sum,char)=>sum+size*(/[WM@%]|[^\x00-\x7F]/u.test(char)?1:.65),0)*(emphasis?.includes('bold')?1.1:1)}={}) {
  const width=Math.max(0,Math.SQRT2*radius-12),height=width;
  // The generic print/category helpers hard-split or truncate oversized words.
  // Center labels instead move intact to the visible details when a word cannot fit.
  const words=center.label.trim().split(/\s+/u),lines=[];
- const wordsFit=words.every(word=>measure(word,labelSize,'label')<=width);
+ const wordsFit=words.every(word=>measure(word,labelSize,'label',center.labelEmphasis)<=width);
  let current='';
  if(wordsFit)for(const word of words){
   const candidate=current?`${current} ${word}`:word;
-  if(current&&measure(candidate,labelSize,'label')>width){lines.push(current);current=word;}else current=candidate;
+  if(current&&measure(candidate,labelSize,'label',center.labelEmphasis)>width){lines.push(current);current=word;}else current=candidate;
  }
  if(current)lines.push(current);
- const valueFits=measure(center.formattedValue,valueSize,'value')<=width;
+ const valueFits=measure(center.formattedValue,valueSize,'value',center.valueEmphasis)<=width;
  const fits=wordsFit&&valueFits&&valueSize+6+lines.length*lineHeight<=height;
  return {value: valueFits?center.formattedValue:'…',labelLines:fits?lines:[],needsDetails:!fits,valueSize,labelSize,lineHeight,height:fits?valueSize+6+lines.length*lineHeight:valueSize};
 }
 const escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+export function donutCenterEmphasisStyle(emphasis){return {...(emphasis?.includes('bold')?{fontWeight:'bold'}:{}),...(emphasis?.includes('italic')?{fontStyle:'italic'}:{})};}
+export function donutCenterPrintDescription(center){
+ if(!center.valueEmphasis&&!center.labelEmphasis)return donutCenterDescription(center);
+ const text=donutCenterDescription(center);
+ return {text,textRuns:[{text:center.label,fontWeight:center.labelEmphasis||'normal'},{text:': ',fontWeight:'normal'},{text:center.formattedValue,fontWeight:center.valueEmphasis||'normal'},{text:'. Dataset value; slice selection does not change it.',fontWeight:'normal'}]};
+}
 export function donutCenterSvg(center,cx,cy,radius) {
  const layout=layoutDonutCenter(center,radius);
  const y=cy-layout.height/2+layout.valueSize*.8;
- return {svg:`<text x="${cx}" y="${y}" text-anchor="middle" font-size="${layout.valueSize}" fill="#344054">${escape(layout.value)}</text>`+layout.labelLines.map((line,i)=>`<text x="${cx}" y="${y+layout.valueSize+4+i*layout.lineHeight}" text-anchor="middle" font-size="${layout.labelSize}" fill="#344054">${escape(line)}</text>`).join(''),needsDetails:layout.needsDetails};
+ const emphasis=part=>`${center[part+'Emphasis']?.includes('bold')?' font-weight="bold"':''}${center[part+'Emphasis']?.includes('italic')?' font-style="italic"':''}`;
+ return {svg:`<text x="${cx}" y="${y}" text-anchor="middle" font-size="${layout.valueSize}"${emphasis('value')} fill="#344054">${escape(layout.value)}</text>`+layout.labelLines.map((line,i)=>`<text x="${cx}" y="${y+layout.valueSize+4+i*layout.lineHeight}" text-anchor="middle" font-size="${layout.labelSize}"${emphasis('label')} fill="#344054">${escape(line)}</text>`).join(''),needsDetails:layout.needsDetails};
 }

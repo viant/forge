@@ -83,3 +83,12 @@ it('uses independent scalar rows and same-request labels across null, empty and 
   expect([...host.querySelectorAll('.recharts-pie-sector path')].map(path=>path.getAttribute('fill'))).toEqual(['#72577c','#426b85']);
  }finally{await act(async()=>root.unmount());host.remove();vi.restoreAllMocks();globalThis.ResizeObserver=originalResizeObserver;}
 });
+it('uses the complete explicit body role and independent numeric/label emphasis',async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ const center=resolveDonutCenter({...fixture.occupancy,valueRole:'body',valueEmphasis:'bold italic',labelEmphasis:'italic'},fixture.rows);
+ const measure=vi.fn(()=>10);
+ try{await act(async()=>root.render(<svg><DonutCenterLabel center={center} viewBox={{cx:100,cy:100,innerRadius:90}} typography={{smallSize:12,bodySize:14,bodyFamily:'Body Fixture',bodyWeight:400,bodyLineHeight:20,bodyLetterSpacing:'0.02em',captionSize:11,captionFamily:'Caption Fixture',captionWeight:400}} measure={measure}/></svg>));
+ const [value,label]=host.querySelectorAll('text');expect(Number.parseFloat(value.style.fontSize)).toBe(14);expect(value.style.fontFamily).toContain('Body Fixture');expect(Number.parseFloat(value.style.lineHeight)).toBe(20);expect(value.style.letterSpacing).toBe('0.02em');expect(value.style.fontWeight).toBe('bold');expect(value.style.fontStyle).toBe('italic');expect(label.style.fontWeight).toBe('400');expect(label.style.fontStyle).toBe('italic');
+ expect(measure).toHaveBeenCalledWith(center.formattedValue,14,'value','bold italic');
+ }finally{await act(async()=>root.unmount());host.remove();}
+});

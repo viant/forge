@@ -135,3 +135,15 @@ const fixedPrint=buildReportPrintChartSvg({chartModel:fixedChart,resolvedChart:f
 assert.ok(fixedPrint.svg.indexOf('fill="#72577c"')<fixedPrint.svg.indexOf('fill="#426b85"'));
 assert.ok(!fixedPrint.svg.includes('fill="#8a7644"'));
 assert.ok(fixedPrint.svg.includes('20.0%')&&fixedPrint.svg.includes('48.0%'));
+const emphatic={...fixture.occupancy,valueRole:'body',valueEmphasis:'bold italic',labelEmphasis:'italic'};
+const emphaticResult=resolveDonutCenter(emphatic,fixture.rows);
+assert.equal(emphaticResult.valueRole,'body');assert.equal(emphaticResult.valueEmphasis,'bold italic');
+assert.throws(()=>normalizeDonutCenter({...emphatic,valueRole:'display'}),/role/);
+assert.throws(()=>normalizeDonutCenter({...emphatic,valueEmphasis:'font-size:30'}),/emphasis/);
+const emphaticChart={...chart,center:emphatic};const emphaticPayload=buildReportFillChartPayload(emphaticChart,fixture.rows);
+const emphaticSvg=buildReportPrintChartSvg({chartModel:emphaticChart,resolvedChart:emphaticPayload,width:680});
+assert.ok(emphaticSvg.svg.includes('font-weight="bold"')&&emphaticSvg.svg.includes('font-style="italic"'));
+const emphaticSpec=structuredClone(spec);emphaticSpec.blocks.find(b=>b.id==='collection').chartSpec.center=emphatic;emphaticSpec.blocks.find(b=>b.id==='collection').chartModel.center=emphatic;
+const emphaticFill=buildReportFillFromReportSpec(emphaticSpec,{primary:{rows:fixture.rows}});
+assert.equal(validateReportFill(emphaticFill).valid,true,JSON.stringify(validateReportFill(emphaticFill)));
+assert.equal(validateReportPrint(buildReportPrintFromReportFill({reportSpec:emphaticSpec,reportFill:emphaticFill})).valid,true);

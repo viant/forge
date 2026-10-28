@@ -1,3 +1,4 @@
+import {validateReportRowVisibilityBlock} from '../reportRowVisibility.js';
 import {donutCenterFields,normalizeDonutCenter} from '../../components/donutCenter.js';
 import { validateReportSchema } from "./reportSchemaValidator.js";
 import { reportExportRequestSchema } from "./reportExportRequestSchema.js";
@@ -287,10 +288,12 @@ function validateIndependentDonutCenters(value) {
 export function validateReportSpec(value = null) {
   const topLevel = validateReportSchema(reportSpecSchema, value);
   const calculatedFieldErrors = validateReportSpecCalculatedFields(value);
+  const visibilityErrors=[];for(const [index,block] of (value?.blocks||[]).entries()){try{validateReportRowVisibilityBlock(block)}catch(error){visibilityErrors.push({path:`$.blocks[${index}].runtime.rowVisibility`,code:'invalid',message:error.message})}}
   const compositeReferenceErrors = validateCompositeBlockReferences(value);
   const errors = [
     ...filterRedundantCalculatedFieldSchemaErrors(topLevel.errors, calculatedFieldErrors),
     ...calculatedFieldErrors,
+    ...visibilityErrors,
     ...validateIndependentDonutCenters(value),
     ...compositeReferenceErrors,
     ...validateTabGroupSectionReferences(value),
