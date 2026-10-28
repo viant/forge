@@ -1,24 +1,26 @@
+import {sparklineDetailsSchema,sparklinePointDetailSchema,normalizeSparklineDetails,materializeSparklineDetails} from './kpiSparklineDetails.js';
 import {isNumericValue} from '../utils/isNumericValue.js';
 import {valueColorSchema,normalizeValueColor,resolveValueColor,valueColorAt} from '../components/valueColorScale.js';
 
 export const kpiSparklineSchema = {
  type:'object',additionalProperties:false,required:['datasetRef','valueField','categoryField'],
- properties:{datasetRef:{type:'string',minLength:1},valueField:{type:'string',minLength:1},categoryField:{type:'string',minLength:1},comparisonDatasetRef:{type:'string',minLength:1},periodStartPath:{type:'string',minLength:1},periodEndPath:{type:'string',minLength:1},valueColor:valueColorSchema},
+ properties:{details:sparklineDetailsSchema,datasetRef:{type:'string',minLength:1},valueField:{type:'string',minLength:1},categoryField:{type:'string',minLength:1},comparisonDatasetRef:{type:'string',minLength:1},periodStartPath:{type:'string',minLength:1},periodEndPath:{type:'string',minLength:1},valueColor:valueColorSchema},
 };
 export const kpiSparklineContentSchema = {
  type:'object',additionalProperties:false,required:['values','labels'],
- properties:{values:{type:'array',items:{type:['number','null']}},labels:{type:'array',items:{type:'string'}},comparisonValues:{type:'array',items:{type:['number','null']}},valueColor:{type:'object',additionalProperties:false,required:['field','colors','domain','opacity'],properties:{field:{type:'string',minLength:1},colors:{type:'array',minItems:2,maxItems:64,items:{type:'string',pattern:'^#[0-9a-fA-F]{6}$'}},domain:{anyOf:[{type:'null'},{type:'array',minItems:2,maxItems:3,items:{type:'number'}}]},opacity:{type:'number',minimum:0,maximum:1}}}},
+ properties:{details:{type:'object',additionalProperties:false,required:['print','points'],properties:{print:{enum:['details','omit']},points:{type:'array',items:sparklinePointDetailSchema}}},values:{type:'array',items:{type:['number','null']}},labels:{type:'array',items:{type:'string'}},comparisonValues:{type:'array',items:{type:['number','null']}},valueColor:{type:'object',additionalProperties:false,required:['field','colors','domain','opacity'],properties:{field:{type:'string',minLength:1},colors:{type:'array',minItems:2,maxItems:64,items:{type:'string',pattern:'^#[0-9a-fA-F]{6}$'}},domain:{anyOf:[{type:'null'},{type:'array',minItems:2,maxItems:3,items:{type:'number'}}]},opacity:{type:'number',minimum:0,maximum:1}}}},
 };
 export function normalizeKpiSparkline(value){
  if(value==null)return null;
  if(typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(key=>!Object.hasOwn(kpiSparklineSchema.properties,key)))throw Error('Invalid KPI sparkline declaration.');
  const result={};
  for(const key of Object.keys(kpiSparklineSchema.properties)){
-  if(key==='valueColor')continue;
+  if(key==='valueColor'||key==='details')continue;
   if(['comparisonDatasetRef','periodStartPath','periodEndPath'].includes(key)&&value[key]===undefined)continue;
   if(typeof value[key]!=='string'||!value[key].trim())throw Error('KPI sparkline requires '+key+'.');
   result[key]=value[key].trim();
  }
+ if(value.details!==undefined)result.details=normalizeSparklineDetails(value.details);
  if(value.valueColor!==undefined){result.valueColor=normalizeValueColor(value.valueColor);if(result.valueColor.field!==result.valueField)throw Error('KPI value color must use the plotted measure.');}
  if(Boolean(result.periodStartPath)!==Boolean(result.periodEndPath))throw Error('KPI sparkline requires both period paths.');
  return result;
@@ -46,7 +48,8 @@ export function materializeKpiSparkline(declaration,resolveDataset){
  if(config.valueColor){const dataset=resolveDataset(config.datasetRef);if((dataset.provenance?.hasMore??dataset.hasMore)!==false||dataset.provenance?.truncated||dataset.truncated||Number(dataset.request?.offset)>0)throw Error('KPI value color requires a complete dataset.');valueColor=resolveValueColor(config.valueColor,current.values.map(value=>({[config.valueField]:value})));}
  const comparison=config.comparisonDatasetRef?read(config.comparisonDatasetRef):null;
  if(config.periodStartPath&&comparison&&comparison.values.length!==current.values.length)throw Error('KPI sparkline comparison periods must have equal length.');
- return {...current,...(comparison?{comparisonValues:comparison.values}:{}),...(valueColor?{valueColor}:{})};
+ const details=materializeSparklineDetails(config.details,current,comparison);
+ return {...current,...(details?{details}:{}),...(comparison?{comparisonValues:comparison.values}:{}),...(valueColor?{valueColor}:{})};
 }
 
 // Current and comparison series share bounds and align by position in their

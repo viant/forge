@@ -742,3 +742,8 @@ format contract. Optional `markerColors` maps exact item-title categories to
 six-digit hex swatches. The existing collection renderer places a small decorative
 square beside its semantic label; the text remains readable without color.
 Resolved marker colors and formatted text follow the same canonical print path.
+
+KPI sparklines can opt into explicit point detail metadata and print policy.
+The shared sparkline supplies keyboard, hover and tap access with caption-role
+status text and a shared Dismiss action. See [sparkline point details](kpi-sparkline-details.md)
+for the neutral reading-trend fixture and compatibility limits.

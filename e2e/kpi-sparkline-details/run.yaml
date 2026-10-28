@@ -1,0 +1,37 @@
+# Neutral shared primitive proof; attach only to the owned test browser.
+pipeline:
+  open:
+    action: webdriver:open
+    sessionID: sparkline-details
+    debuggerAddress: $debuggerAddress
+    directCDP: true
+    browser: chrome
+  keyboard:
+    action: webdriver:run
+    sessionID: sparkline-details
+    autoStart: false
+    commands:
+      - get($previewURL/kpi-sparkline-details-preview.html)
+      - expect("h1").toHaveText("Temperature readings", 20000)
+      - expect("svg g[tabindex='0']").toHaveCount("2")
+      - page.locator("svg g[aria-label^='Selected trend']").press("Home")
+      - expect("[role='status']").toContainText("2026-01-01")
+      - expect("[role='status']").toContainText("0 °C")
+      - page.locator("svg g[aria-label^='Selected trend']").press("ArrowRight")
+      - expect("[role='status']").toContainText("2026-01-02")
+      - page.locator("svg g[aria-label^='Selected trend']").press("ArrowRight")
+      - expect("[role='status']").toContainText("2026-01-04")
+      - page.locator("svg g[aria-label^='Selected trend']").press("Escape")
+      - expect("[role='status']").toHaveCount("0")
+      - page.locator("svg g[aria-label^='Comparison trend']").press("Home")
+      - expect("[role='status']").toContainText("2025-12-01")
+      - page.locator("svg g[aria-label^='Comparison trend']").press("End")
+      - expect("[role='status']").toContainText("2025-12-04")
+      - page.locator("button[aria-label='Dismiss trend details']").click()
+      - expect("[role='status']").toHaveCount("0")
+      - page.locator("svg g[aria-label^='Comparison trend']").press("Home")
+      - page.locator("svg g[aria-label^='Comparison trend']").press("Tab")
+      - expect("button[aria-label='Dismiss trend details']:focus").toHaveCount("1")
+      - expect("[role='status']").toContainText("2025-12-01")
+      - page.locator("button[aria-label='Dismiss trend details']").press("Enter")
+      - expect("[role='status']").toHaveCount("0")

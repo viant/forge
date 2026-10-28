@@ -393,10 +393,21 @@ type KPIContent struct {
 // sparkline contracts. Missing observations remain nil, never implicit zeros.
 type KPISparklineSpec = reportspec.KPISparklineSpec
 type KPISparklineContent struct {
+	Details          *KPISparklineDetailContent     `json:"details,omitempty"`
 	ValueColor       *reportspec.ResolvedValueColor `json:"valueColor,omitempty"`
 	Values           []*float64                     `json:"values"`
 	Labels           []string                       `json:"labels"`
 	ComparisonValues []*float64                     `json:"comparisonValues,omitempty"`
+}
+
+type KPISparklinePointDetail struct {
+	Series int    `json:"series"`
+	Index  int    `json:"index"`
+	Text   string `json:"text"`
+}
+type KPISparklineDetailContent struct {
+	Print  string                    `json:"print"`
+	Points []KPISparklinePointDetail `json:"points"`
 }
 
 type BadgeItem struct {
@@ -1615,6 +1626,36 @@ func (r *ReportFill) Validate() error {
 				return fmt.Errorf("reportFill.blocks[%d].content.rowCount is required for kpiBlock", index)
 			}
 			if sparkline := block.KPIContent.Sparkline; sparkline != nil {
+				if details := sparkline.Details; details != nil {
+					if (details.Print != "details" && details.Print != "omit") || details.Points == nil {
+						return fmt.Errorf("invalid sparkline detail content")
+					}
+					seen := map[string]bool{}
+					for _, point := range details.Points {
+						values := sparkline.Values
+						if point.Series == 1 {
+							values = sparkline.ComparisonValues
+						}
+						key := fmt.Sprintf("%d:%d", point.Series, point.Index)
+						if point.Series < 0 || point.Series > 1 || point.Index < 0 || point.Index >= len(values) || values[point.Index] == nil || strings.TrimSpace(point.Text) == "" || seen[key] {
+							return fmt.Errorf("invalid sparkline point detail")
+						}
+						seen[key] = true
+					}
+					expected := 0
+					for _, values := range [][]*float64{sparkline.Values, sparkline.ComparisonValues} {
+						for _, value := range values {
+							if value != nil {
+								expected++
+							}
+						}
+					}
+					if len(details.Points) != expected {
+						return fmt.Errorf("sparkline details must cover every numeric observation")
+					}
+
+				}
+
 				if err := sparkline.ValueColor.Validate(); err != nil {
 					return fmt.Errorf("reportFill.blocks[%d].sparkline: %w", index, err)
 				}

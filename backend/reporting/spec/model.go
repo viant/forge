@@ -819,6 +819,9 @@ func (r *ReportSpec) Validate() error {
 			}
 		case "kpiBlock":
 			if spark := block.Sparkline; spark != nil {
+				if err := spark.Details.Validate(); err != nil {
+					return err
+				}
 				if err := spark.ValueColor.Validate(); err != nil {
 					return fmt.Errorf("reportSpec.blocks[%d].sparkline: %w", index, err)
 				}
