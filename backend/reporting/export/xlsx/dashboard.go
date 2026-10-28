@@ -2,8 +2,7 @@ package xlsx
 
 import (
 	"fmt"
-	"github.com/viant/forge/backend/reporting/tablemeta"
-	"sort"
+	"math"
 	"strings"
 	"unicode"
 	"unicode/utf16"
@@ -19,63 +18,38 @@ import (
 // block's row limit cannot discard source data. Render retains the legacy
 // single-table export contract.
 func RenderDashboard(report *reportfill.ReportFill) ([]byte, error) {
+	if err := validateDashboardReport(report); err != nil {
+		return nil, err
+	}
+	return renderDashboardWorkbook(report)
+}
+
+func validateDashboardReport(report *reportfill.ReportFill) error {
 	if report == nil {
-		return nil, fmt.Errorf("reportFill is required")
+		return fmt.Errorf("reportFill is required")
 	}
 	if err := report.Validate(); err != nil {
-		return nil, err
+		return err
 	}
 	for _, diagnostic := range report.Diagnostics {
 		if blocksDashboardExport(diagnostic) {
-			return nil, fmt.Errorf("xlsx dashboard report diagnostic %q: %s", diagnostic.Code, diagnostic.Message)
+			return fmt.Errorf("xlsx dashboard report diagnostic %q: %s", diagnostic.Code, diagnostic.Message)
 		}
 	}
 	for _, dataset := range report.Datasets {
 		for _, diagnostic := range dataset.Provenance.Diagnostics {
 			if blocksDashboardExport(diagnostic) {
-				return nil, fmt.Errorf("xlsx dashboard dataset %q diagnostic %q: %s", dataset.ID, diagnostic.Code, diagnostic.Message)
+				return fmt.Errorf("xlsx dashboard dataset %q diagnostic %q: %s", dataset.ID, diagnostic.Code, diagnostic.Message)
 			}
 		}
-		if dataset.Provenance.HasMore || dataset.Provenance.Truncated {
-			return nil, fmt.Errorf("xlsx dashboard requires complete dataset %q", dataset.ID)
+		if dataset.Provenance.HasMore || dataset.Provenance.Truncated || (dataset.Request.Offset != nil && *dataset.Request.Offset > 0) {
+			return fmt.Errorf("xlsx dashboard requires complete dataset %q", dataset.ID)
 		}
 	}
 	if err := validateDashboardReferences(report); err != nil {
-		return nil, err
+		return err
 	}
-	workbook := excelize.NewFile()
-	defer workbook.Close()
-	if err := workbook.SetSheetName("Sheet1", "Dashboard"); err != nil {
-		return nil, err
-	}
-	writer := dashboardWriter{file: workbook, names: map[string]bool{"dashboard": true}, datasets: map[string]bool{}}
-	var err error
-	writer.headerStyle, err = workbook.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true}})
-	if err != nil {
-		return nil, err
-	}
-	if err := writer.text("Dashboard", 1, 1, "Dashboard"); err != nil {
-		return nil, err
-	}
-	writer.dashboardRow = 3
-	for _, group := range dashboardGroups(report.Blocks) {
-		if err := writer.group(group, report.Datasets); err != nil {
-			return nil, err
-		}
-	}
-	// Retain datasets with no visible block (including dependency/auxiliary data).
-	for _, dataset := range report.Datasets {
-		if !writer.datasets[dataset.ID] {
-			if err := writer.group(dashboardGroup{title: "Data " + dataset.ID, datasetIDs: []string{dataset.ID}}, report.Datasets); err != nil {
-				return nil, err
-			}
-		}
-	}
-	buffer, err := workbook.WriteToBuffer()
-	if err != nil {
-		return nil, err
-	}
-	return buffer.Bytes(), nil
+	return nil
 }
 
 func blocksDashboardExport(diagnostic reportfill.Diagnostic) bool {
@@ -104,6 +78,13 @@ func validateDashboardReferences(report *reportfill.ReportFill) error {
 		}
 		if block.DatasetRef != "" && !datasets[block.DatasetRef] {
 			return fmt.Errorf("xlsx dashboard block %q references unknown dataset %q", block.ID, block.DatasetRef)
+		}
+		if block.Sparkline != nil {
+			for _, ref := range []string{block.Sparkline.DatasetRef, block.Sparkline.ComparisonDatasetRef} {
+				if ref != "" && !datasets[ref] {
+					return fmt.Errorf("xlsx dashboard block %q references unknown sparkline dataset %q", block.ID, ref)
+				}
+			}
 		}
 		children[block.ID] = append([]string{}, block.ChildBlockIDs...)
 		if block.SectionContent != nil {
@@ -144,9 +125,10 @@ func validateDashboardReferences(report *reportfill.ReportFill) error {
 }
 
 type dashboardGroup struct {
-	title      string
-	blocks     []reportfill.Block
-	datasetIDs []string
+	title     string
+	blocks    []reportfill.Block
+	ids       []string
+	sharedIDs []string
 }
 
 // Section membership comes from authored IDs, never application field names.
@@ -187,7 +169,16 @@ func dashboardGroups(blocks []reportfill.Block) []dashboardGroup {
 		if !ok || section.SectionContent == nil {
 			continue
 		}
-		group := dashboardGroup{title: firstText(labels[id], section.SectionContent.Title, section.Title, id)}
+		group := dashboardGroup{title: firstText(labels[id], section.SectionContent.Title, section.Title, id), ids: []string{id}}
+		for _, container := range blocks {
+			if container.TabGroupContent != nil {
+				for _, sectionID := range container.TabGroupContent.SectionIDs {
+					if sectionID == id {
+						group.sharedIDs = append(group.sharedIDs, container.ID)
+					}
+				}
+			}
+		}
 		visited := map[string]bool{}
 		var walk func(string)
 		walk = func(id string) {
@@ -195,6 +186,7 @@ func dashboardGroups(blocks []reportfill.Block) []dashboardGroup {
 				return
 			}
 			visited[id] = true
+			group.ids = append(group.ids, id)
 			block, ok := byID[id]
 			if !ok {
 				return
@@ -225,6 +217,7 @@ func dashboardGroups(blocks []reportfill.Block) []dashboardGroup {
 	for _, block := range blocks {
 		if !assigned[block.ID] && block.SectionContent == nil && block.TabGroupContent == nil && block.CompositeContent == nil {
 			remaining.blocks = append(remaining.blocks, block)
+			remaining.ids = append(remaining.ids, block.ID)
 		}
 	}
 	if len(remaining.blocks) > 0 || len(groups) == 0 {
@@ -236,133 +229,8 @@ func dashboardGroups(blocks []reportfill.Block) []dashboardGroup {
 type dashboardWriter struct {
 	file         *excelize.File
 	names        map[string]bool
-	datasets     map[string]bool
 	headerStyle  int
-	dashboardRow int
-}
-
-func (w *dashboardWriter) group(group dashboardGroup, datasets []reportfill.Dataset) error {
-	sheet := w.sheetName(group.title)
-	if _, err := w.file.NewSheet(sheet); err != nil {
-		return err
-	}
-	if err := w.text(sheet, 1, 1, group.title); err != nil {
-		return err
-	}
-	if err := w.text("Dashboard", 1, w.dashboardRow, group.title); err != nil {
-		return err
-	}
-	w.dashboardRow += 2
-	row := 3
-	needed := map[string]bool{}
-	for _, id := range group.datasetIDs {
-		needed[id] = true
-	}
-	for _, block := range group.blocks {
-		if block.DatasetRef != "" {
-			needed[block.DatasetRef] = true
-		}
-		title := firstText(block.Title, block.ID)
-		switch {
-		case block.Content != nil:
-			if err := w.text(sheet, 1, row, title); err != nil {
-				return err
-			}
-			row++
-			rows := make([][]any, 0, len(block.Content.ResolvedRows))
-			for _, resolved := range block.Content.ResolvedRows {
-				cells := map[string]reportfill.ResolvedTableCell{}
-				for _, cell := range resolved.Cells {
-					cells[cell.Key] = cell
-				}
-				values := make([]any, len(block.Content.Columns))
-				for i, column := range block.Content.Columns {
-					cell, ok := cells[column.Key]
-					if !ok {
-						return fmt.Errorf("xlsx export missing cell for column %q at row %d", column.Key, resolved.RowIndex)
-					}
-					// Raw values retain numeric types even when the display string is formatted.
-					values[i] = cell.Value
-				}
-				rows = append(rows, values)
-			}
-			columns := append([]reportfill.TableColumn{}, block.Content.Columns...)
-			for i := range columns {
-				columns[i].Label = tablemeta.Header(columns[i].Label, columns[i].Key, block.Content.ColumnGroups)
-			}
-			if err := w.table(sheet, row, columns, rows); err != nil {
-				return err
-			}
-			row += len(rows) + 3
-		case block.ChartContent != nil && block.ChartContent.ResolvedChart != nil:
-			chart := block.ChartContent.ResolvedChart
-			columns, rows, err := chartTable(chart)
-			if err != nil {
-				return err
-			}
-			if err := w.text(sheet, 1, row, title); err != nil {
-				return err
-			}
-			row++
-			if err := w.table(sheet, row, columns, rows); err != nil {
-				return err
-			}
-			if err := w.chart(sheet, row, title, chart, len(columns)-1, len(rows)); err != nil {
-				return err
-			}
-			row += len(rows) + 3
-		case block.KPIContent != nil:
-			content := block.KPIContent
-			columns := []reportfill.TableColumn{{Key: "value", Label: firstText(content.ValueLabel, content.Title), Format: content.ValueFormat}}
-			if err := w.text(sheet, 1, row, title); err != nil {
-				return err
-			}
-			row++
-			if err := w.table(sheet, row, columns, [][]any{{content.Value}}); err != nil {
-				return err
-			}
-			if err := w.text("Dashboard", 1, w.dashboardRow, title); err != nil {
-				return err
-			}
-			if _, err := setXLSXCell(w.file, "Dashboard", fmt.Sprintf("B%d", w.dashboardRow), reportfill.ResolvedTableCell{Value: content.Value}); err != nil {
-				return err
-			}
-			w.dashboardRow += 2
-			row += 4
-		case block.MarkdownContent != nil:
-			if err := w.text(sheet, 1, row, block.MarkdownContent.Markdown); err != nil {
-				return err
-			}
-			row += 2
-		}
-	}
-	for _, dataset := range datasets {
-		if !needed[dataset.ID] {
-			continue
-		}
-		fields := map[string]bool{}
-		for _, data := range dataset.Rows {
-			for field := range data {
-				fields[field] = true
-			}
-		}
-		keys := make([]string, 0, len(fields))
-		for field := range fields {
-			keys = append(keys, field)
-		}
-		sort.Strings(keys)
-		columns, rows := mapTable(keys, dataset.Rows)
-		if err := w.text(sheet, 1, row, "Dataset "+dataset.ID); err != nil {
-			return err
-		}
-		row++
-		if err := w.table(sheet, row, columns, rows); err != nil {
-			return err
-		}
-		row += len(rows) + 3
-		w.datasets[dataset.ID] = true
-	}
-	return w.file.SetColWidth(sheet, "A", "H", 20)
+	columnWidths map[string]map[int]float64
 }
 
 func mapTable(keys []string, records []map[string]any) ([]reportfill.TableColumn, [][]any) {
@@ -385,7 +253,7 @@ func (w *dashboardWriter) text(sheet string, column, row int, value string) erro
 	if err != nil {
 		return err
 	}
-	return w.file.SetCellStr(sheet, cell, value)
+	return setXLSXText(w.file, sheet, cell, value)
 }
 
 func (w *dashboardWriter) table(sheet string, row int, columns []reportfill.TableColumn, rows [][]any) error {
@@ -393,18 +261,28 @@ func (w *dashboardWriter) table(sheet string, row int, columns []reportfill.Tabl
 		return fmt.Errorf("xlsx dashboard exceeds Excel worksheet limits on %q", sheet)
 	}
 	styles := map[string]int{}
+	headerLines := 1
+	if w.columnWidths == nil {
+		w.columnWidths = map[string]map[int]float64{}
+	}
+	if w.columnWidths[sheet] == nil {
+		w.columnWidths[sheet] = map[int]float64{}
+	}
 	for j, column := range columns {
+		headerLines = max(headerLines, (len([]rune(firstText(column.Label, column.Key)))+17)/18)
 		name, err := excelize.CoordinatesToCellName(j+1, row)
 		if err != nil {
 			return err
 		}
-		if err = w.file.SetCellStr(sheet, name, firstText(column.Label, column.Key)); err != nil {
+		if err = setXLSXText(w.file, sheet, name, firstText(column.Label, column.Key)); err != nil {
 			return err
 		}
 		if err = w.file.SetCellStyle(sheet, name, name, w.headerStyle); err != nil {
 			return err
 		}
 		for i, values := range rows {
+			width := math.Min(42, math.Max(18, float64(len([]rune(fmt.Sprint(values[j]))))+2))
+			w.columnWidths[sheet][j+1] = math.Max(w.columnWidths[sheet][j+1], width)
 			name, err = excelize.CoordinatesToCellName(j+1, row+i+1)
 			if err != nil {
 				return err
@@ -413,7 +291,7 @@ func (w *dashboardWriter) table(sheet string, row int, columns []reportfill.Tabl
 			if err != nil {
 				return err
 			}
-			if format := xlsxNumberFormat(column.Format); numeric && format != "" {
+			if format := dashboardNumberFormat(column.Format); numeric && format != "" {
 				style, ok := styles[format]
 				if !ok {
 					style, err = w.file.NewStyle(&excelize.Style{CustomNumFmt: &format})
@@ -428,7 +306,7 @@ func (w *dashboardWriter) table(sheet string, row int, columns []reportfill.Tabl
 			}
 		}
 	}
-	return nil
+	return w.file.SetRowHeight(sheet, row, math.Min(409, math.Max(24, float64(headerLines)*14+8)))
 }
 
 // Resolved category rows use canonical name/value keys in JS fills, while the
@@ -485,38 +363,6 @@ func chartTable(chart *reportfill.ResolvedChart) ([]reportfill.TableColumn, [][]
 	}
 	columns, rows := mapTable(keys, chart.Rows)
 	return columns, rows, nil
-}
-
-func (w *dashboardWriter) chart(sheet string, headerRow int, title string, resolved *reportfill.ResolvedChart, seriesCount, rowCount int) error {
-	types := map[string]excelize.ChartType{"line": excelize.Line, "bar": excelize.Col, "column": excelize.Col, "area": excelize.Area, "pie": excelize.Pie, "donut": excelize.Doughnut, "doughnut": excelize.Doughnut, "scatter": excelize.Scatter, "horizontal_bar": excelize.Bar, "stacked_bar": excelize.ColStacked, "stacked_area": excelize.AreaStacked}
-	kind, ok := types[strings.ToLower(resolved.Type)]
-	if !ok || len(resolved.Rows) == 0 {
-		return nil
-	}
-	if seriesCount == 0 {
-		return nil
-	}
-	quoted := "'" + strings.ReplaceAll(sheet, "'", "''") + "'!"
-	chart := &excelize.Chart{Type: kind, Dimension: excelize.ChartDimension{Width: 720, Height: 360}, Legend: excelize.ChartLegend{Position: "bottom"}}
-	for i := 0; i < seriesCount; i++ {
-		column, _ := excelize.ColumnNumberToName(i + 2)
-		chart.Series = append(chart.Series, excelize.ChartSeries{Name: fmt.Sprintf("%s$%s$%d", quoted, column, headerRow), Categories: fmt.Sprintf("%s$A$%d:$A$%d", quoted, headerRow+1, headerRow+rowCount), Values: fmt.Sprintf("%s$%s$%d:$%s$%d", quoted, column, headerRow+1, column, headerRow+rowCount)})
-		if kind == excelize.Pie || kind == excelize.Doughnut {
-			break
-		}
-	}
-	// Titles live in worksheet cells so the renderer remains compatible with
-	// both Excelize 2.10 and 2.11, whose chart-title option types differ.
-	if err := w.text("Dashboard", 1, w.dashboardRow, title); err != nil {
-		return err
-	}
-	w.dashboardRow++
-	anchor := fmt.Sprintf("A%d", w.dashboardRow)
-	if err := w.file.AddChart("Dashboard", anchor, chart); err != nil {
-		return err
-	}
-	w.dashboardRow += 20
-	return nil
 }
 
 func firstText(values ...string) string {
