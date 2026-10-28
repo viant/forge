@@ -16,7 +16,7 @@ try {
     const catalog = JSON.parse(fs.readFileSync(path.join(root, '../agently-core/protocol/ui/theme/testdata/baseline.json')));
     const tokens = catalog.themes[0].modes.light;
     for (const viewport of [{width:1440,height:900}, {width:390,height:844}]) {
-        const proof = await browser.newPage({viewport});
+        const proof = await browser.newPage({viewport, ...(viewport.width < 500 ? {hasTouch:true,isMobile:true} : {})});
         const failures = [];
         proof.on('pageerror', error => failures.push(error.message));
         await proof.addInitScript(() => {
@@ -164,6 +164,14 @@ try {
         assert.match(await foundation.getByRole('status').first().textContent(), /saved 1 time/);
         assert.equal(await foundation.getByRole('button', {name: 'Saving example', exact: true}).getAttribute('aria-busy'), 'true');
         assert.equal(await foundation.getByRole('button', {name: 'Unavailable action', exact: true}).isDisabled(), true);
+        const compact = foundation.getByRole('button', {name:'Compact action',exact:true});
+        assert.equal(await compact.evaluate(node => getComputedStyle(node).minHeight), viewport.width < 500 ? '44px' : '28px');
+        if (viewport.width < 500) {
+            for (const action of [compact, foundation.getByRole('button', {name:'Show example panel',exact:true})]) {
+                const target = await action.boundingBox();
+                assert.ok(target.width >= 44 && target.height >= 44, 'Compact and icon-only buttons retain coarse-pointer targets');
+            }
+        }
         await foundation.getByRole('switch', {name: 'Automatic refresh', exact: true}).press('Space');
         assert.equal(await foundation.getByRole('switch').getAttribute('aria-checked'), 'true');
         await foundation.getByRole('button', {name: 'Weekly', exact: true}).click();

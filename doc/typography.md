@@ -52,6 +52,8 @@ directly. Both reuse Button. New variants reject inline appearance overrides;
 use tokens or extend the shared component. Legacy button style props remain
 compatible. Optional --forge-button-hover-bg and --forge-button-active-bg hooks
 let a workspace select reviewed states; neutral defaults derive from its palette.
+Compact and icon-only variants retain a minimum 44px target on coarse pointers;
+the compact desktop height remains 28px. FoundationSpecimen includes both forms.
 
 Icon accepts `name` and optional `label`. Informative standalone icons have a
 label; button icons are decorative because their action supplies its name.
