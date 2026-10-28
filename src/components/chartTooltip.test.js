@@ -71,3 +71,13 @@ assert.deepEqual(spec.blocks.find(b=>b.id==='details').chartModel.tooltip,normal
 const columns=[{key:'day',kind:'dimension'},...['passed','failed','medianMinutes'].map(key=>({key,kind:'measure'}))];
 const validation=validateReportBuilderChartSpec(config,fixture.chartSpec,columns);assert.ok(validation.errors.some(error=>error.field==='tooltip.fields.4.field'));
 console.log('chart tooltip model, grouped provenance, schemas and lowering checks passed');
+const selector={path:'metric',labels:[{value:1,label:'Capacity <plain text>'},{value:2,label:'Count'}]};
+const labelledChart={...chart,tooltip:{fields:[{field:'passed',label:'Value',format:'number'}],lines:[[{text:'Selected '},{input:selector},{text:': '},{field:'passed'}]]}};
+assert.equal(buildChartTooltipEntries(labelledChart,fixture.rows,{metric:1})[0].lines[0],'Selected Capacity <plain text>: 18');
+assert.equal(buildChartTooltipEntries(labelledChart,[],{metric:2})[0].lines[0],'Selected Count: Missing field');
+assert.throws(()=>buildChartTooltipEntries(labelledChart,[],{metric:'2'}),/declared label/);
+assert.throws(()=>buildChartTooltipEntries(labelledChart,[],{}),/missing/);
+const emptyLabelFill=buildReportFillChartPayload(labelledChart,[],undefined,undefined,{metric:2});
+assert.equal(emptyLabelFill.tooltipEntries[0].rowCount,0);
+assert.equal(validateReportSchema({...reportFillSchema.$defs.resolvedChart,$defs:reportFillSchema.$defs},emptyLabelFill).valid,true);
+assert.ok(chartTooltipPrintLines(labelledChart.tooltip,emptyLabelFill.tooltipEntries).includes('Selected Count: Missing field'));

@@ -28,17 +28,18 @@ export function chartSeriesColor(role, fallback) {
     return `var(--forge-chart-series-${normalizedRole}, ${fallback})`;
 }
 
-export function resolveThemeAwareChartColor(value, index = 0, {forceRole = false} = {}) {
+export function resolveThemeAwareChartColor(value, index = 0, {forceRole = false, declared = false} = {}) {
     const color = String(value || '').trim();
+    if(declared){if(!/^#[0-9a-f]{6}$/i.test(color))throw new Error('Declared chart colors must be six-digit hex colors.');return color;}
     if (!color || color.startsWith('var(')) return color;
     const mappedRole = LEGACY_CHART_ROLE_BY_COLOR.get(normalizedColor(color));
     if (!mappedRole && !forceRole) return color;
     return chartSeriesColor(mappedRole || (index % 6) + 1, color);
 }
 
-export function resolveThemeAwareChartPalette(values = [], {forceRole = false} = {}) {
+export function resolveThemeAwareChartPalette(values = [], {forceRole = false, declared = false} = {}) {
     return (Array.isArray(values) ? values : [])
-        .map((value, index) => resolveThemeAwareChartColor(value, index, {forceRole}))
+        .map((value, index) => resolveThemeAwareChartColor(value, index, {forceRole,declared}))
         .filter(Boolean);
 }
 
@@ -71,4 +72,13 @@ export function resolveCategoryColor(colors, category, fallback) {
     const key = String(category ?? '').trim().toLowerCase();
     const entry = Object.entries(colors || {}).find(([name]) => name.trim().toLowerCase() === key);
     return typeof entry?.[1] === 'string' && entry[1].trim() ? entry[1].trim() : fallback;
+}
+
+export function resolveChartCategoryColor(chart,category,fallback) {
+ if(chart?.paletteMode!=='declared')return resolveCategoryColor(chart?.series?.categoryColors,category,fallback);
+ const key=String(category??'');
+ const colors=chart.series?.categoryColors||{};
+ if(Object.hasOwn(colors,key))return resolveThemeAwareChartColor(colors[key],0,{declared:true});
+ if(['pie','donut'].includes(chart.type))throw new Error('Declared category palettes require a color for every category.');
+ return fallback;
 }

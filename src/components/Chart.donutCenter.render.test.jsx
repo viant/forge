@@ -66,3 +66,20 @@ it('renders whole label words at normal size and complete visible fallback for t
   }
  }finally{await act(async()=>root.unmount());host.remove();}
 });
+it('uses independent scalar rows and same-request labels across null, empty and changed choices',async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ const originalResizeObserver=globalThis.ResizeObserver;globalThis.ResizeObserver=class{observe(){}disconnect(){}};
+ vi.spyOn(HTMLElement.prototype,'clientWidth','get').mockReturnValue(800);vi.spyOn(HTMLElement.prototype,'clientHeight','get').mockReturnValue(400);
+ vi.spyOn(HTMLCanvasElement.prototype,'getContext').mockReturnValue({measureText:text=>({width:text.length*6})});
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ const render=async(centerRows,metric,sliceRows=fixture.independent.sliceRows)=>act(async()=>root.render(<Chart container={{id:'independent',centerRows,centerInputs:{metric},chart:{type:'donut',appearance:'document',animation:false,center:fixture.independent.center,sliceLabel:fixture.independent.sliceLabel,paletteMode:'declared',series:{nameKey:'category',valueKey:'items',palette:fixture.independent.palette,categoryColors:fixture.independent.categoryColors}}}} context={{signals:{collection:{value:sliceRows},control:{value:{}},metrics:{value:{}},windowForm:{value:{}}}}}/>));
+ try{
+  await render([{rate:.725,count:null}],1);expect(host.querySelector('[data-forge-donut-center]').getAttribute('aria-label')).toContain('Occupancy rate: 72.50%');expect(host.textContent).toContain('48.0%');
+  expect([...host.querySelectorAll('.recharts-pie-sector path')].map(path=>path.getAttribute('fill'))).toEqual(fixture.independent.palette);
+  await render([{rate:null,count:null}],2);expect(host.querySelector('[data-forge-donut-center]').getAttribute('aria-label')).toContain('Book count: Unavailable');
+  await render([],1);expect(host.querySelector('[data-forge-donut-center]').getAttribute('aria-label')).toContain('Occupancy rate: Unavailable');
+  await render([{rate:null,count:0}],2);expect(host.querySelector('[data-forge-donut-center]').getAttribute('aria-label')).toContain('Book count: 0');
+  await render([{rate:.725,count:null}],1,[fixture.independent.sliceRows[2],fixture.independent.sliceRows[0]]);
+  expect([...host.querySelectorAll('.recharts-pie-sector path')].map(path=>path.getAttribute('fill'))).toEqual(['#72577c','#426b85']);
+ }finally{await act(async()=>root.unmount());host.remove();vi.restoreAllMocks();globalThis.ResizeObserver=originalResizeObserver;}
+});

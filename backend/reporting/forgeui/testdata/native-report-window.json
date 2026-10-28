@@ -58,7 +58,8 @@
             "reportRuntime": {
               "datasetBindings": {
                 "primary": {
-                  "dataSourceRef": "portable-report-dataset-primary"
+                  "dataSourceRef": "portable-report-dataset-primary",
+                  "queryPath": "request"
                 }
               },
               "reportSpec": {
@@ -71,6 +72,7 @@
                       }
                     ],
                     "datasetRef": "primary",
+                    "defaultCollapsed": false,
                     "id": "results",
                     "kind": "tableBlock"
                   }

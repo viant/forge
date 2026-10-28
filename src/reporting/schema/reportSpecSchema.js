@@ -1,3 +1,6 @@
+import {numericDisplayFormatSchema} from '../../components/categoryRange.js';
+import {templateRequestInputsSchema} from '../reportTemplateRequestInputs.js';
+import {pieSliceLabelSchema} from '../../components/pieSliceLabel.js';
 import {hierarchySchema,pivotSchema,columnGroupsSchema} from '../reportTableAnalytics.js';
 import {chartTooltipSchema,chartTooltipEntrySchema} from '../../components/chartTooltip.js';
 import {donutCenterSchema,resolvedDonutCenterSchema} from '../../components/donutCenter.js';
@@ -216,6 +219,10 @@ export const reportSpecSchema = {
         label: { type: "string" },
         description: { type: "string" },
         datasetRef: { type: "string" },
+        filterBindings: { type: 'array', minItems: 1, items: {
+          type: 'object', additionalProperties: false, required: ['datasetRef', 'path'],
+          properties: {datasetRef: {type: 'string', minLength: 1}, path: {type: 'string', minLength: 1}, valuePath: {type: 'string', minLength: 1}},
+        }},
         required: { type: "boolean" },
         multiple: { type: "boolean" },
         presentation: { type: "string" },
@@ -346,6 +353,8 @@ export const reportSpecSchema = {
       required: ["type", "sourceField"],
       properties: {
         type: { const: "percentOfTotal" },
+        nullPolicy: {enum: ["zero", "null"]},
+        requireComplete: {type: "boolean"},
         sourceField: { type: "string" },
         partitionBy: {
           type: "array",
@@ -796,7 +805,11 @@ export const reportSpecSchema = {
         type: { type: "string" },
         heatmap: heatmapSchema,
         categoryRange: categoryRangeSchema,
+        paletteMode:{enum:["declared"]},
+        palette:{type:"array",minItems:1,maxItems:64,items:{type:"string",pattern:"^#[0-9a-fA-F]{6}$"}},
+        paletteMode:{enum:["declared"]},
         center: donutCenterSchema,
+        sliceLabel: pieSliceLabelSchema,
         appearance: {enum:["document"]},
         layout: {enum:["small-multiples"]},
         stacked: {type:"boolean"},
@@ -1053,6 +1066,7 @@ export const reportSpecSchema = {
         heatmap: heatmapSchema,
         categoryRange: categoryRangeSchema,
         center: donutCenterSchema,
+        sliceLabel: pieSliceLabelSchema,
         appearance: {enum:["document"]},
         layout: {enum:["small-multiples"]},
         stacked: {type:"boolean"},
@@ -1225,6 +1239,7 @@ export const reportSpecSchema = {
         description: { type: "string" },
         datasetRef: { type: "string" },
         itemTitleField: { type: "string", minLength: 1 },
+        markerColors:{type:"object",additionalProperties:{type:"string",pattern:"^#[0-9a-fA-F]{6}$"}},
         itemTitleLabel: { type: "string" },
         valueField: { type: "string" },
         valueLabel: { type: "string" },
@@ -1255,6 +1270,7 @@ export const reportSpecSchema = {
             required: ["sourceKey"],
             properties: {
               sourceKey: { type: "string" },
+              numericFormat: numericDisplayFormatSchema,
               displayKey: { type: "string" },
               displayValueMap: {
                 type: "object",
@@ -1298,10 +1314,13 @@ export const reportSpecSchema = {
         layout: { enum: ["stack", "responsiveGrid"] },
         childBlockIds: {
           type: "array",
-          minItems: 1,
           items: { type: "string" },
         },
       },
+      anyOf: [
+        {properties: {childBlockIds: {type:"array",minItems: 1}}},
+        {type:"object",required: ["runtime"], properties: {runtime: {required: ["spacerHeight", "chrome"], properties: {spacerHeight: {type: "number", minimum: 0, maximum: 10000}, chrome: {const: "none"}}}, childBlockIds: {type:"array",maxItems: 0}}},
+      ],
     },
     tabGroupBlock: {
       type: "object",
@@ -1518,6 +1537,7 @@ export const reportSpecSchema = {
         title: { type: "string" },
         datasetRef: { type: "string" },
         markdown: { type: "string" },
+        templateRequestInputs: templateRequestInputsSchema,
         templateFieldDisplayMap: {
           type: "object",
           additionalProperties: {
@@ -1526,6 +1546,7 @@ export const reportSpecSchema = {
             required: ["sourceKey"],
             properties: {
               sourceKey: { type: "string" },
+              numericFormat: numericDisplayFormatSchema,
               displayKey: { type: "string" },
               displayValueMap: {
                 type: "object",

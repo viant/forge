@@ -108,16 +108,25 @@ type ScopeParamOption struct {
 }
 
 type ScopeParam struct {
-	ID           string             `json:"id"`
-	Kind         string             `json:"kind"`
-	Label        string             `json:"label"`
-	Description  string             `json:"description,omitempty"`
-	DatasetRef   string             `json:"datasetRef,omitempty"`
-	Required     bool               `json:"required"`
-	Multiple     bool               `json:"multiple,omitempty"`
-	Presentation string             `json:"presentation,omitempty"`
-	Options      []ScopeParamOption `json:"options,omitempty"`
-	Value        any                `json:"value"`
+	ID             string                    `json:"id"`
+	Kind           string                    `json:"kind"`
+	Label          string                    `json:"label"`
+	Description    string                    `json:"description,omitempty"`
+	DatasetRef     string                    `json:"datasetRef,omitempty"`
+	FilterBindings []ScopeParamFilterBinding `json:"filterBindings,omitempty"`
+	Required       bool                      `json:"required"`
+	Multiple       bool                      `json:"multiple,omitempty"`
+	Presentation   string                    `json:"presentation,omitempty"`
+	Options        []ScopeParamOption        `json:"options,omitempty"`
+	Value          any                       `json:"value"`
+}
+
+// ScopeParamFilterBinding names an admitted producer input relative to request.filters.
+// A shared control can target several datasets without changing their fixed inputs.
+type ScopeParamFilterBinding struct {
+	DatasetRef string `json:"datasetRef"`
+	Path       string `json:"path"`
+	ValuePath  string `json:"valuePath,omitempty"`
 }
 
 type Dataset struct {
@@ -233,75 +242,78 @@ type BadgeItem struct {
 }
 
 type Block struct {
-	Sparkline    *KPISparklineSpec       `json:"sparkline,omitempty"`
-	Hierarchy    *tablemeta.Hierarchy    `json:"hierarchy,omitempty"`
-	Pivot        *tablemeta.Pivot        `json:"pivot,omitempty"`
-	ColumnGroups []tablemeta.ColumnGroup `json:"columnGroups,omitempty"`
+	MarkerColors            map[string]string         `json:"markerColors,omitempty"`
+	TemplateFieldDisplayMap map[string]map[string]any `json:"templateFieldDisplayMap,omitempty"`
+	Sparkline               *KPISparklineSpec         `json:"sparkline,omitempty"`
+	Hierarchy               *tablemeta.Hierarchy      `json:"hierarchy,omitempty"`
+	Pivot                   *tablemeta.Pivot          `json:"pivot,omitempty"`
+	ColumnGroups            []tablemeta.ColumnGroup   `json:"columnGroups,omitempty"`
 
-	ID                       string           `json:"id"`
-	Kind                     string           `json:"kind"`
-	Title                    string           `json:"title,omitempty"`
-	Selection                *TableSelection  `json:"selection,omitempty"`
-	RecordTitleField         string           `json:"recordTitleField,omitempty"`
-	AccentTone               string           `json:"accentTone,omitempty"`
-	Collapsible              bool             `json:"collapsible,omitempty"`
-	DefaultCollapsed         bool             `json:"defaultCollapsed,omitempty"`
-	LabelClamp               *TextClamp       `json:"labelClamp,omitempty"`
-	DatasetRef               string           `json:"datasetRef,omitempty"`
-	Columns                  []TableColumn    `json:"columns,omitempty"`
-	ChartSpec                map[string]any   `json:"chartSpec,omitempty"`
-	ChartModel               map[string]any   `json:"chartModel,omitempty"`
-	ValueField               string           `json:"valueField,omitempty"`
-	ValueLabel               string           `json:"valueLabel,omitempty"`
-	ValueFormat              string           `json:"valueFormat,omitempty"`
-	Suffix                   string           `json:"suffix,omitempty"`
-	SecondaryField           string           `json:"secondaryField,omitempty"`
-	SecondaryLabel           string           `json:"secondaryLabel,omitempty"`
-	SecondaryFormat          string           `json:"secondaryFormat,omitempty"`
-	SecondaryTrend           bool             `json:"secondaryTrend,omitempty"`
-	SecondaryDisplayKey      string           `json:"secondaryDisplayKey,omitempty"`
-	SecondaryDisplayValueMap map[string]any   `json:"secondaryDisplayValueMap,omitempty"`
-	Description              string           `json:"description,omitempty"`
-	EmptyLabel               string           `json:"emptyLabel,omitempty"`
-	RowSelector              string           `json:"rowSelector,omitempty"`
-	PresentationMode         string           `json:"presentationMode,omitempty"`
-	ParamIDs                 []string         `json:"paramIds,omitempty"`
-	Mode                     string           `json:"mode,omitempty"`
-	Placement                string           `json:"placement,omitempty"`
-	GroupOrder               []string         `json:"groupOrder,omitempty"`
-	VisibleGroups            []string         `json:"visibleGroups,omitempty"`
-	CollapsedGroups          []string         `json:"collapsedGroups,omitempty"`
-	ActionKinds              []string         `json:"actionKinds,omitempty"`
-	Markdown                 string           `json:"markdown,omitempty"`
-	Geo                      map[string]any   `json:"geo,omitempty"`
-	Subtitle                 string           `json:"subtitle,omitempty"`
-	NavigationLabel          string           `json:"navigationLabel,omitempty"`
-	ChildBlockIDs            []string         `json:"childBlockIds,omitempty"`
-	SectionIDs               []string         `json:"sectionIds,omitempty"`
-	DefaultSectionID         string           `json:"defaultSectionId,omitempty"`
-	IncludeUnlistedSections  *bool            `json:"includeUnlistedSections,omitempty"`
-	Steps                    []StepperStep    `json:"steps,omitempty"`
-	Eyebrow                  string           `json:"eyebrow,omitempty"`
-	Icon                     string           `json:"icon,omitempty"`
-	Tone                     string           `json:"tone,omitempty"`
-	Badges                   []string         `json:"badges,omitempty"`
-	BodyFormat               string           `json:"bodyFormat,omitempty"`
-	Body                     string           `json:"body,omitempty"`
-	ColumnsLayout            []KanbanColumn   `json:"-"`
-	Events                   []TimelineEvent  `json:"events,omitempty"`
-	TimeField                string           `json:"timeField,omitempty"`
-	TitleField               string           `json:"titleField,omitempty"`
-	DescriptionField         string           `json:"descriptionField,omitempty"`
-	Items                    []BadgeItem      `json:"items,omitempty"`
-	CollectionCols           int              `json:"-"`
-	ItemTitleField           string           `json:"itemTitleField,omitempty"`
-	ItemTitleLabel           string           `json:"itemTitleLabel,omitempty"`
-	ToneField                string           `json:"toneField,omitempty"`
-	ToneRules                []map[string]any `json:"toneRules,omitempty"`
-	Layout                   string           `json:"layout,omitempty"`
-	RowLimit                 *int             `json:"rowLimit,omitempty"`
-	BodyTemplate             string           `json:"bodyTemplate,omitempty"`
-	Runtime                  map[string]any   `json:"runtime,omitempty"`
+	ID                       string                          `json:"id"`
+	Kind                     string                          `json:"kind"`
+	Title                    string                          `json:"title,omitempty"`
+	Selection                *TableSelection                 `json:"selection,omitempty"`
+	RecordTitleField         string                          `json:"recordTitleField,omitempty"`
+	AccentTone               string                          `json:"accentTone,omitempty"`
+	Collapsible              bool                            `json:"collapsible,omitempty"`
+	DefaultCollapsed         bool                            `json:"defaultCollapsed,omitempty"`
+	LabelClamp               *TextClamp                      `json:"labelClamp,omitempty"`
+	DatasetRef               string                          `json:"datasetRef,omitempty"`
+	Columns                  []TableColumn                   `json:"columns,omitempty"`
+	ChartSpec                map[string]any                  `json:"chartSpec,omitempty"`
+	ChartModel               map[string]any                  `json:"chartModel,omitempty"`
+	ValueField               string                          `json:"valueField,omitempty"`
+	ValueLabel               string                          `json:"valueLabel,omitempty"`
+	ValueFormat              string                          `json:"valueFormat,omitempty"`
+	Suffix                   string                          `json:"suffix,omitempty"`
+	SecondaryField           string                          `json:"secondaryField,omitempty"`
+	SecondaryLabel           string                          `json:"secondaryLabel,omitempty"`
+	SecondaryFormat          string                          `json:"secondaryFormat,omitempty"`
+	SecondaryTrend           bool                            `json:"secondaryTrend,omitempty"`
+	SecondaryDisplayKey      string                          `json:"secondaryDisplayKey,omitempty"`
+	SecondaryDisplayValueMap map[string]any                  `json:"secondaryDisplayValueMap,omitempty"`
+	Description              string                          `json:"description,omitempty"`
+	EmptyLabel               string                          `json:"emptyLabel,omitempty"`
+	RowSelector              string                          `json:"rowSelector,omitempty"`
+	PresentationMode         string                          `json:"presentationMode,omitempty"`
+	ParamIDs                 []string                        `json:"paramIds,omitempty"`
+	Mode                     string                          `json:"mode,omitempty"`
+	Placement                string                          `json:"placement,omitempty"`
+	GroupOrder               []string                        `json:"groupOrder,omitempty"`
+	VisibleGroups            []string                        `json:"visibleGroups,omitempty"`
+	CollapsedGroups          []string                        `json:"collapsedGroups,omitempty"`
+	ActionKinds              []string                        `json:"actionKinds,omitempty"`
+	Markdown                 string                          `json:"markdown,omitempty"`
+	TemplateRequestInputs    map[string]TemplateRequestInput `json:"templateRequestInputs,omitempty"`
+	Geo                      map[string]any                  `json:"geo,omitempty"`
+	Subtitle                 string                          `json:"subtitle,omitempty"`
+	NavigationLabel          string                          `json:"navigationLabel,omitempty"`
+	ChildBlockIDs            []string                        `json:"childBlockIds,omitempty"`
+	SectionIDs               []string                        `json:"sectionIds,omitempty"`
+	DefaultSectionID         string                          `json:"defaultSectionId,omitempty"`
+	IncludeUnlistedSections  *bool                           `json:"includeUnlistedSections,omitempty"`
+	Steps                    []StepperStep                   `json:"steps,omitempty"`
+	Eyebrow                  string                          `json:"eyebrow,omitempty"`
+	Icon                     string                          `json:"icon,omitempty"`
+	Tone                     string                          `json:"tone,omitempty"`
+	Badges                   []string                        `json:"badges,omitempty"`
+	BodyFormat               string                          `json:"bodyFormat,omitempty"`
+	Body                     string                          `json:"body,omitempty"`
+	ColumnsLayout            []KanbanColumn                  `json:"-"`
+	Events                   []TimelineEvent                 `json:"events,omitempty"`
+	TimeField                string                          `json:"timeField,omitempty"`
+	TitleField               string                          `json:"titleField,omitempty"`
+	DescriptionField         string                          `json:"descriptionField,omitempty"`
+	Items                    []BadgeItem                     `json:"items,omitempty"`
+	CollectionCols           int                             `json:"-"`
+	ItemTitleField           string                          `json:"itemTitleField,omitempty"`
+	ItemTitleLabel           string                          `json:"itemTitleLabel,omitempty"`
+	ToneField                string                          `json:"toneField,omitempty"`
+	ToneRules                []map[string]any                `json:"toneRules,omitempty"`
+	Layout                   string                          `json:"layout,omitempty"`
+	RowLimit                 *int                            `json:"rowLimit,omitempty"`
+	BodyTemplate             string                          `json:"bodyTemplate,omitempty"`
+	Runtime                  map[string]any                  `json:"runtime,omitempty"`
 }
 
 type TextClamp struct {
@@ -425,10 +437,13 @@ type rawRefinementBarBlock struct {
 }
 
 type rawMarkdownBlock struct {
-	ID       string `json:"id"`
-	Kind     string `json:"kind"`
-	Title    string `json:"title"`
-	Markdown string `json:"markdown"`
+	TemplateFieldDisplayMap map[string]map[string]any       `json:"templateFieldDisplayMap,omitempty"`
+	DatasetRef              string                          `json:"datasetRef,omitempty"`
+	TemplateRequestInputs   map[string]TemplateRequestInput `json:"templateRequestInputs,omitempty"`
+	ID                      string                          `json:"id"`
+	Kind                    string                          `json:"kind"`
+	Title                   string                          `json:"title"`
+	Markdown                string                          `json:"markdown"`
 }
 
 type rawGeoMapBlock struct {
@@ -519,27 +534,29 @@ type rawTimelineBlock struct {
 }
 
 type rawCollectionBlock struct {
-	ID              string           `json:"id"`
-	Kind            string           `json:"kind"`
-	Title           string           `json:"title"`
-	Description     string           `json:"description,omitempty"`
-	DatasetRef      string           `json:"datasetRef"`
-	ItemTitleField  string           `json:"itemTitleField"`
-	ItemTitleLabel  string           `json:"itemTitleLabel,omitempty"`
-	ToneField       string           `json:"toneField,omitempty"`
-	ToneRules       []map[string]any `json:"toneRules,omitempty"`
-	ValueField      string           `json:"valueField,omitempty"`
-	ValueLabel      string           `json:"valueLabel,omitempty"`
-	ValueFormat     string           `json:"valueFormat,omitempty"`
-	SecondaryField  string           `json:"secondaryField,omitempty"`
-	SecondaryLabel  string           `json:"secondaryLabel,omitempty"`
-	SecondaryFormat string           `json:"secondaryFormat,omitempty"`
-	Layout          string           `json:"layout"`
-	Columns         int              `json:"columns"`
-	RowLimit        int              `json:"rowLimit"`
-	BodyFormat      string           `json:"bodyFormat,omitempty"`
-	BodyTemplate    string           `json:"bodyTemplate,omitempty"`
-	EmptyLabel      string           `json:"emptyLabel,omitempty"`
+	MarkerColors            map[string]string         `json:"markerColors,omitempty"`
+	TemplateFieldDisplayMap map[string]map[string]any `json:"templateFieldDisplayMap,omitempty"`
+	ID                      string                    `json:"id"`
+	Kind                    string                    `json:"kind"`
+	Title                   string                    `json:"title"`
+	Description             string                    `json:"description,omitempty"`
+	DatasetRef              string                    `json:"datasetRef"`
+	ItemTitleField          string                    `json:"itemTitleField"`
+	ItemTitleLabel          string                    `json:"itemTitleLabel,omitempty"`
+	ToneField               string                    `json:"toneField,omitempty"`
+	ToneRules               []map[string]any          `json:"toneRules,omitempty"`
+	ValueField              string                    `json:"valueField,omitempty"`
+	ValueLabel              string                    `json:"valueLabel,omitempty"`
+	ValueFormat             string                    `json:"valueFormat,omitempty"`
+	SecondaryField          string                    `json:"secondaryField,omitempty"`
+	SecondaryLabel          string                    `json:"secondaryLabel,omitempty"`
+	SecondaryFormat         string                    `json:"secondaryFormat,omitempty"`
+	Layout                  string                    `json:"layout"`
+	Columns                 int                       `json:"columns"`
+	RowLimit                int                       `json:"rowLimit"`
+	BodyFormat              string                    `json:"bodyFormat,omitempty"`
+	BodyTemplate            string                    `json:"bodyTemplate,omitempty"`
+	EmptyLabel              string                    `json:"emptyLabel,omitempty"`
 }
 
 func DecodeJSON(data []byte) (*ReportSpec, error) {
@@ -886,10 +903,13 @@ func (r *ReportSpec) Validate() error {
 				return fmt.Errorf("reportSpec.blocks[%d].navigationLabel is required for sectionBlock", index)
 			}
 		case "compositeBlock":
+			if err := validateCompositeLayout(block); err != nil {
+				return fmt.Errorf("reportSpec.blocks[%d]: %w", index, err)
+			}
 			if strings.TrimSpace(block.Title) == "" {
 				return fmt.Errorf("reportSpec.blocks[%d].title is required for compositeBlock", index)
 			}
-			if len(block.ChildBlockIDs) == 0 {
+			if len(block.ChildBlockIDs) == 0 && block.Runtime["spacerHeight"] == nil {
 				return fmt.Errorf("reportSpec.blocks[%d].childBlockIds must not be empty for compositeBlock", index)
 			}
 			if block.Layout != "" && block.Layout != "stack" && block.Layout != "responsiveGrid" {
@@ -961,6 +981,12 @@ func (r *ReportSpec) Validate() error {
 			}
 		case "refinementBarBlock":
 		case "markdownBlock":
+			if err := validateTemplateRequestInputs(block); err != nil {
+				return fmt.Errorf("reportSpec.blocks[%d]: %w", index, err)
+			}
+			if err := validateExternalLinks(block); err != nil {
+				return fmt.Errorf("reportSpec.blocks[%d]: %w", index, err)
+			}
 			if strings.TrimSpace(block.Title) == "" {
 				return fmt.Errorf("reportSpec.blocks[%d].title is required for markdownBlock", index)
 			}
@@ -1014,7 +1040,7 @@ func (r *ReportSpec) Validate() error {
 			return fmt.Errorf("reportSpec.scope.dataSourceRef is required")
 		}
 	}
-	return nil
+	return validateScopeControlBindings(r)
 }
 
 func decodeBlock(payload json.RawMessage, index int) (result Block, resultErr error) {
@@ -1114,27 +1140,29 @@ func decodeBlock(payload json.RawMessage, index int) (result Block, resultErr er
 			return Block{}, err
 		}
 		return Block{
-			ID:              block.ID,
-			Kind:            block.Kind,
-			Title:           block.Title,
-			Description:     block.Description,
-			DatasetRef:      block.DatasetRef,
-			ItemTitleField:  block.ItemTitleField,
-			ItemTitleLabel:  block.ItemTitleLabel,
-			ToneField:       block.ToneField,
-			ToneRules:       block.ToneRules,
-			ValueField:      block.ValueField,
-			ValueLabel:      block.ValueLabel,
-			ValueFormat:     block.ValueFormat,
-			SecondaryField:  block.SecondaryField,
-			SecondaryLabel:  block.SecondaryLabel,
-			SecondaryFormat: block.SecondaryFormat,
-			Layout:          block.Layout,
-			CollectionCols:  block.Columns,
-			RowLimit:        &block.RowLimit,
-			BodyFormat:      block.BodyFormat,
-			BodyTemplate:    block.BodyTemplate,
-			EmptyLabel:      block.EmptyLabel,
+			TemplateFieldDisplayMap: block.TemplateFieldDisplayMap,
+			MarkerColors:            block.MarkerColors,
+			ID:                      block.ID,
+			Kind:                    block.Kind,
+			Title:                   block.Title,
+			Description:             block.Description,
+			DatasetRef:              block.DatasetRef,
+			ItemTitleField:          block.ItemTitleField,
+			ItemTitleLabel:          block.ItemTitleLabel,
+			ToneField:               block.ToneField,
+			ToneRules:               block.ToneRules,
+			ValueField:              block.ValueField,
+			ValueLabel:              block.ValueLabel,
+			ValueFormat:             block.ValueFormat,
+			SecondaryField:          block.SecondaryField,
+			SecondaryLabel:          block.SecondaryLabel,
+			SecondaryFormat:         block.SecondaryFormat,
+			Layout:                  block.Layout,
+			CollectionCols:          block.Columns,
+			RowLimit:                &block.RowLimit,
+			BodyFormat:              block.BodyFormat,
+			BodyTemplate:            block.BodyTemplate,
+			EmptyLabel:              block.EmptyLabel,
 		}, nil
 	case "sectionBlock":
 		block := rawSectionBlock{}
@@ -1281,10 +1309,13 @@ func decodeBlock(payload json.RawMessage, index int) (result Block, resultErr er
 			return Block{}, err
 		}
 		return Block{
-			ID:       block.ID,
-			Kind:     block.Kind,
-			Title:    block.Title,
-			Markdown: block.Markdown,
+			TemplateFieldDisplayMap: block.TemplateFieldDisplayMap,
+			ID:                      block.ID,
+			Kind:                    block.Kind,
+			Title:                   block.Title,
+			Markdown:                block.Markdown,
+			DatasetRef:              block.DatasetRef,
+			TemplateRequestInputs:   block.TemplateRequestInputs,
 		}, nil
 	case "geoMapBlock":
 		block := rawGeoMapBlock{}

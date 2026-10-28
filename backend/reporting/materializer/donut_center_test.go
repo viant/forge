@@ -124,3 +124,83 @@ func TestDonutCenterMaterialization(t *testing.T) {
 		})
 	}
 }
+
+func TestIndependentDonutReviewArtifact(t *testing.T) {
+	raw, err := os.ReadFile("../../../doc/examples/donut-center.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixture struct {
+		Independent struct {
+			Center, SliceLabel map[string]any
+			Palette            []string
+			CategoryColors     map[string]string
+			Rows, SliceRows    []map[string]any
+			Inputs             map[string]any
+		}
+	}
+	if err = json.Unmarshal(raw, &fixture); err != nil {
+		t.Fatal(err)
+	}
+	raw, err = os.ReadFile("testdata/presentation-report.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var spec map[string]any
+	if err = json.Unmarshal(raw, &spec); err != nil {
+		t.Fatal(err)
+	}
+	spec["title"] = "Independent selected metric (invented)"
+	spec["viewer"] = map[string]any{"appearance": "document"}
+	request := func(dimensions, measures map[string]bool, limit int) map[string]any {
+		return map[string]any{"dimensions": dimensions, "measures": measures, "limit": limit, "offset": 0, "filters": fixture.Independent.Inputs}
+	}
+	primary := spec["datasets"].([]any)[0].(map[string]any)
+	primary["request"] = request(map[string]bool{"category": true}, map[string]bool{"items": true, "share": true}, 100)
+	summary := map[string]any{"id": "summary", "dataSourceRef": primary["dataSourceRef"], "request": request(map[string]bool{}, map[string]bool{"rate": true, "count": true}, 2)}
+	spec["datasets"] = []any{primary, summary}
+	chartSpec := map[string]any{"type": "donut", "xField": "category", "yFields": []string{"items"}, "center": fixture.Independent.Center, "sliceLabel": fixture.Independent.SliceLabel, "paletteMode": "declared", "palette": fixture.Independent.Palette, "categoryColors": fixture.Independent.CategoryColors}
+	chart := map[string]any{"type": "donut", "center": fixture.Independent.Center, "sliceLabel": fixture.Independent.SliceLabel, "paletteMode": "declared", "series": map[string]any{"nameKey": "category", "valueKey": "items", "palette": fixture.Independent.Palette, "categoryColors": fixture.Independent.CategoryColors}}
+	spec["blocks"] = []any{map[string]any{"id": "collection", "kind": "chartBlock", "title": "Independent selected metric (invented)", "datasetRef": "primary", "chartSpec": chartSpec, "chartModel": chart}}
+	spec["layoutIntent"] = map[string]any{"kind": "single", "blockOrder": []string{"collection"}}
+	raw, err = json.Marshal(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	datasets := map[string]json.RawMessage{}
+	for id, rows := range map[string][]map[string]any{"primary": fixture.Independent.SliceRows, "summary": fixture.Independent.Rows} {
+		datasets[id], err = json.Marshal(map[string]any{"rows": rows, "hasMore": false})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	artifacts, err := Materialize(context.Background(), raw, datasets)
+	if err != nil {
+		t.Fatal(err)
+	}
+	report, err := reportprint.DecodeJSON(artifacts.ReportPrint)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rendered, err := reportpdf.Render(report, reportpdf.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rendered.Diagnostics) > 0 {
+		t.Fatalf("PDF diagnostics: %+v", rendered.Diagnostics)
+	}
+	if dir := os.Getenv("DONUT_REVIEW_ARTIFACT_DIR"); dir != "" {
+		if err = os.MkdirAll(dir, 0700); err != nil {
+			t.Fatal(err)
+		}
+		preview, err := json.Marshal(map[string]any{"reportSpec": spec, "datasets": datasets})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for name, data := range map[string][]byte{"reportSpec.json": raw, "reportFill.json": artifacts.ReportFill, "reportPrint.json": artifacts.ReportPrint, "donut.pdf": rendered.Bytes, "donut-conversion-preview.json": preview} {
+			if err = os.WriteFile(dir+"/"+name, data, 0600); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+}

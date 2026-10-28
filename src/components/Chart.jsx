@@ -1,3 +1,4 @@
+import {resolvePieSliceLabel} from './pieSliceLabel.js';
 import {resolveDonutCenter} from './donutCenter.js';
 import {DonutCenterLabel,DonutCenterDetails,EmptyDonutCenter} from './DonutCenter.jsx';
 import {buildChartTooltipEntries,chartTooltipEntryId,chartTooltipPieFields} from './chartTooltip.js';
@@ -5,7 +6,7 @@ import {ChartHoverTooltip,ChartTooltipInspector} from './ChartTooltip.jsx';
 import CategoryRange from './CategoryRange.jsx';
 import CategoricalHeatmap from './CategoricalHeatmap.jsx';
 import {applyChartMetricSelection} from "./chartMetricSelection.js";
-import {resolveCategoryColor} from './chartTheme.js';
+import {resolveCategoryColor,resolveChartCategoryColor} from './chartTheme.js';
 import {normalizeChartExtent, resolveChartMargins} from './chartExtent.js';
 import React, {useState, useEffect, useMemo} from "react";
 import {useSignals} from '@preact/signals-react/runtime';
@@ -273,7 +274,7 @@ function defaultCategoricalPalette() {
 }
 
 function getSeriesDefinitions(chart = {}) {
-    const palette = resolveThemeAwareChartPalette(chart?.series?.palette || [], {forceRole:chart.appearance === 'document'});
+    const palette = resolveThemeAwareChartPalette(chart?.series?.palette || [], {forceRole:chart.appearance === 'document',declared:chart.paletteMode==='declared'});
     return (chart?.series?.values || []).map((entry, index) => ({
         ...entry,
         value: entry?.value,
@@ -281,7 +282,7 @@ function getSeriesDefinitions(chart = {}) {
         name: entry?.name || entry?.label || entry?.value || `Series ${index + 1}`,
         type: entry?.type || chart?.type || "line",
         axis: entry?.axis || "left",
-        color: resolveThemeAwareChartColor(entry?.color, index, {forceRole:chart.appearance === 'document'})
+        color: resolveThemeAwareChartColor(entry?.color, index, {forceRole:chart.appearance === 'document',declared:chart.paletteMode==='declared'})
             || palette[index % Math.max(palette.length, 1)]
             || chartSeriesColor(index + 1, "#137cbd"),
         dataLabels: entry?.dataLabels,
@@ -556,7 +557,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         height,
         series = {},
     } = chart;
-    const palette = useMemo(() => resolveThemeAwareChartPalette(series?.palette || [], {forceRole:documentAppearance}), [series?.palette,documentAppearance]);
+    const palette = useMemo(() => resolveThemeAwareChartPalette(series?.palette || [], {forceRole:documentAppearance,declared:chart.paletteMode==='declared'}), [series?.palette,documentAppearance,chart.paletteMode]);
     const [chartTypography, setChartTypography] = useState(() => ({...resolveChartTypography(null), documentStyle: resolveDocumentChartStyle(null)}));
     useEffect(() => {
         let frame;
@@ -622,7 +623,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     const chartMetrics = chartContext?.signals?.metrics?.value || {};
     const collectionOverride = Array.isArray(container?.collection) ? container.collection : null;
     const effectiveCollection = collectionOverride || collection;
-    const centerState=useMemo(()=>{try{return {resolved:resolveDonutCenter(chart.center,effectiveCollection||[],type)};}catch(error){return {error:error.message};}},[chart.center,effectiveCollection,type]);
+    const centerState=useMemo(()=>{try{return {resolved:resolveDonutCenter(chart.center,effectiveCollection||[],type,container.centerRows,container.centerInputs)};}catch(error){return {error:error.message};}},[chart.center,effectiveCollection,type,container.centerRows,container.centerInputs]);
     const [centerNeedsDetails,setCenterNeedsDetails]=useState(false);
     const effectiveLoading = resolveChartLoadingState({
         loading,
@@ -691,9 +692,9 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
 
     const chartData = visibleState.chartData;
     const tooltipResult = useMemo(() => {
-        try {return {entries:tooltipEntriesOverride || buildChartTooltipEntries(chart,effectiveCollection || []),error:null};}
+        try {return {entries:tooltipEntriesOverride || buildChartTooltipEntries(chart,effectiveCollection || [],container.requestFilters),error:null};}
         catch(error){return {entries:[],error:error.message || 'Chart details could not be built.'};}
-    }, [chart,effectiveCollection,tooltipEntriesOverride]);
+    }, [chart,effectiveCollection,tooltipEntriesOverride,container.requestFilters]);
     const tooltipEntries=tooltipResult.entries;
     const [tooltipActiveId,setTooltipActiveId] = useState(null);
     const availableDataKeys = visibleState.availableDataKeys;
@@ -843,7 +844,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         return {
             value: dataKey,
             label: seriesDef?.label || seriesDef?.name || dataKey,
-            color: resolveCategoryColor(chart?.series?.categoryColors, dataKey, seriesDef?.color || palette[index % Math.max(palette.length, 1)] || chartSeriesColor(index + 1, "#137cbd")),
+            color: resolveChartCategoryColor(chart, dataKey, seriesDef?.color || palette[index % Math.max(palette.length, 1)] || chartSeriesColor(index + 1, "#137cbd")),
         };
     }), [availableDataKeys, palette, seriesDefinitions, chart]);
 
@@ -859,7 +860,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             type,
             stackId: chart.stacked ? "total" : undefined,
             axis: "left",
-            color: resolveCategoryColor(chart?.series?.categoryColors, dataKey, palette[index % Math.max(palette.length, 1)] || chartSeriesColor(index + 1, "#137cbd")),
+            color: resolveChartCategoryColor(chart, dataKey, palette[index % Math.max(palette.length, 1)] || chartSeriesColor(index + 1, "#137cbd")),
         }));
     const renderableSeriesDefinitions = selectedSeriesDefinitions.filter((entry) => (
         chartData.some((row) => {
@@ -1007,7 +1008,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         const value=readChartDataValue(props.payload,entry.value);
         if(!isChartNumericValue(value)) return null;
         const label=`${entry.name || entry.label || entry.value}, ${formatChartXAxisValue(readChartDataValue(props.payload,xAxis.dataKey),resolvedTickFormat,resolvedTickValueMode)}: ${formatValueByFormat(value,entry.format || leftAxis.format)}`;
-        const color=resolveCategoryColor(chart.series?.categoryColors,readChartDataValue(props.payload,xAxis.dataKey),resolveConditionalSeriesColor(entry,value,entry.color));
+        const color=resolveChartCategoryColor(chart,readChartDataValue(props.payload,xAxis.dataKey),resolveConditionalSeriesColor(entry,value,entry.color));
         return <ChartPoint {...props} seriesKey={String(entry.value)} category={String(readChartDataValue(props.payload,xAxis.dataKey) ?? "")} firstIndex={normalizedChartData.findIndex(row=>isChartNumericValue(readChartDataValue(row,entry.value)))} label={label} color={color} style={documentStyle} onInspect={chart.tooltip?()=>inspectTooltip(readChartDataValue(props.payload,xAxis.dataKey),entry.value):undefined} onSelect={interactiveDatumSelection ? ()=>emitSeriesDatumSelection(entry.value,props.payload) : undefined}/>;
     };
 
@@ -1038,13 +1039,14 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             strokeWidth={visible ? 1 : 0}
             stroke={visible ? "var(--forge-chart-surface, #ffffff)" : "none"}
             fill={visible
-                ? resolveCategoryColor(chart?.series?.categoryColors, row?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color))
+                ? resolveChartCategoryColor(chart, row?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color))
                 : "transparent"}
             {...(!visible ? {pointerEvents: "all"} : {})}
         />;
     };
 
     const cartesianSeriesElements = renderableSeriesDefinitions.map((entry, seriesIndex) => {
+        const singlePointSeries = normalizedChartData.filter(row => isChartNumericValue(readChartDataValue(row, entry.value))).length === 1;
         const defaultLineDash = renderableSeriesDefinitions.length > 1 && (entry.type === "line" || entry.type === "area")
             ? [undefined, "8 4", "3 3", "10 3 2 3"][seriesIndex % 4]
             : undefined;
@@ -1072,7 +1074,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                     {normalizedChartData.map((row, index) => (
                         <Cell key={`${entry.value}-cell-${index}`}
                               {...chartPointIdentity(entry.value, row)}
-                              {...(entry.pointColorMode === "bySign" ? {fill: resolveCategoryColor(chart?.series?.categoryColors, row?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color))} : {})} />
+                              {...(entry.pointColorMode === "bySign" ? {fill: resolveChartCategoryColor(chart, row?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color))} : {})} />
                     ))}
                     {showSeriesDataLabels ? (
                         <LabelList dataKey={entry.value} position="top" formatter={dataLabelFormatter} fill="var(--forge-chart-text-muted, #5f6b7c)" fontSize={chartTypography.captionSize} fontFamily={chartTypography.captionFamily} fontWeight={chartTypography.captionWeight} letterSpacing={chartTypography.captionLetterSpacing} />
@@ -1081,7 +1083,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             );
         }
         if (entry.type === "area") {
-            const dotRenderer = documentAppearance ? props=>documentPoint(props,entry) : renderSeriesPoint(entry, embedded || interactiveDatumSelection || entry.pointColorMode === "bySign");
+            const dotRenderer = documentAppearance ? props=>documentPoint(props,entry) : renderSeriesPoint(entry, singlePointSeries || embedded || interactiveDatumSelection || entry.pointColorMode === "bySign");
             return (
                 <Area key={entry.value} {...commonProps} type={documentAppearance ? 'linear' : 'monotone'} connectNulls={!documentAppearance} dot={dotRenderer} activeDot={documentAppearance ? {r:documentStyle.pointRadius + 1,strokeWidth:documentStyle.pointStrokeWidth} : embedded || interactiveDatumSelection ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
                     {showSeriesDataLabels ? (
@@ -1090,7 +1092,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 </Area>
             );
         }
-        const lineDotRenderer = documentAppearance ? props=>documentPoint(props,entry) : renderSeriesPoint(entry, embedded || interactiveDatumSelection || entry.pointColorMode === "bySign");
+        const lineDotRenderer = documentAppearance ? props=>documentPoint(props,entry) : renderSeriesPoint(entry, singlePointSeries || embedded || interactiveDatumSelection || entry.pointColorMode === "bySign");
         return (
             <Line key={entry.value} {...commonProps} type={documentAppearance ? 'linear' : 'monotone'} connectNulls={!documentAppearance} strokeLinecap="round" strokeLinejoin="round" dot={lineDotRenderer} activeDot={documentAppearance ? {r:documentStyle.pointRadius + 1,strokeWidth:documentStyle.pointStrokeWidth} : embedded || interactiveDatumSelection ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
                 {showSeriesDataLabels ? (
@@ -1249,7 +1251,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                             <Cell
                                 key={`cell-${index}`}
                                 {...chartPointIdentity(primarySeries.value, row)}
-                                fill={resolveCategoryColor(chart?.series?.categoryColors, row?.[xAxis?.dataKey], primarySeries.pointColorMode === "bySign"
+                                fill={resolveChartCategoryColor(chart, row?.[xAxis?.dataKey], primarySeries.pointColorMode === "bySign"
                                     ? resolveConditionalSeriesColor(primarySeries, row?.[primarySeries.value], activePalette[index % activePalette.length])
                                     : activePalette[index % activePalette.length])}
                             />
@@ -1271,7 +1273,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                             {normalizedChartData.map((row, index) => (
                                 <Cell key={`${entry.value}-cell-${index}`}
                                       {...chartPointIdentity(entry.value, row)}
-                                      {...(entry.pointColorMode === "bySign" ? {fill: resolveCategoryColor(chart?.series?.categoryColors, row?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color))} : {})} />
+                                      {...(entry.pointColorMode === "bySign" ? {fill: resolveChartCategoryColor(chart, row?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color))} : {})} />
                             ))}
                             {shouldRenderSeriesDataLabels(entry, responsiveChartType, normalizedChartData.length, embedded) ? (
                                 <LabelList dataKey={entry.value} content={(props) => <HorizontalBarValueLabel {...props} formatter={buildDataLabelFormatter(entry.format || leftAxis.format)} />} />
@@ -1290,8 +1292,9 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         </AreaChart>
     );
 
+    if(isPieChart&&chart.paletteMode==='declared'&&chartData.some(row=>!Object.hasOwn(chart.series?.categoryColors||{},String(row.name))))throw new Error('Declared category palettes require a color for every category.');
     const pieFilteredData = isPieChart
-        ? chartData.filter((row) => selectedDataKeys.includes(row.name))
+        ? chartData.filter((row) => selectedDataKeys.includes(row.name)).map(row=>chart.sliceLabel?{...row,sliceLabel:resolvePieSliceLabel(chart.sliceLabel,row.__chartSelectionRows||[])}:row)
         : [];
     const piePalette = palette.length > 0
         ? palette
@@ -1311,12 +1314,12 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 innerRadius={pieInnerRadius}
                 outerRadius={compactPie ? "52%" : "78%"}
                 paddingAngle={pieFilteredData.length > 1 ? 2 : 0}
-                label={embedded || compactPie || documentAppearance ? false : props => visiblePiePercentage(props) ? `${props.name} ${(props.percent * 100).toFixed(0)}%` : null}
+                label={chart.sliceLabel ? props => props.payload?.sliceLabel==null?null:<text x={props.x} y={props.y} textAnchor={props.textAnchor} fill="var(--forge-chart-text, #30404d)" fontSize={chartTypography.smallSize} fontFamily={chartTypography.smallFamily} fontWeight={chartTypography.smallWeight} letterSpacing={chartTypography.smallLetterSpacing}>{props.payload.sliceLabel}</text> : embedded || compactPie || documentAppearance ? false : props => visiblePiePercentage(props) ? `${props.name} ${(props.percent * 100).toFixed(0)}%` : null}
                 labelLine={!embedded && !compactPie && !documentAppearance ? PiePercentageLeader : false}
             >
                 {centerState.resolved && <Label position="center" content={<DonutCenterLabel center={centerState.resolved} typography={chartTypography} measure={(text,size,role)=>measureCategoryTickText(text,{fontSize:size,fontFamily:role==='value'?chartTypography.smallFamily:chartTypography.captionFamily,fontWeight:role==='value'?chartTypography.smallWeight:chartTypography.captionWeight,letterSpacing:role==='value'?chartTypography.smallLetterSpacing:chartTypography.captionLetterSpacing})} onLayout={setCenterNeedsDetails}/>}/>}
                 {pieFilteredData.map((entry, index) => (
-                    <Cell key={buildPieSliceCellKey(entry, index)} fill={resolveCategoryColor(chart?.series?.categoryColors, entry.name, piePalette[index % piePalette.length])} />
+                    <Cell key={buildPieSliceCellKey(entry, index)} fill={resolveChartCategoryColor(chart, entry.name, piePalette[index % piePalette.length])} />
                 ))}
             </Pie>
             <Tooltip

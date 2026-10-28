@@ -55,6 +55,7 @@
     "./reporting/section-datasets": "./src/reporting/reportSectionDatasets.js"
   },
   "scripts": {
+    "test:report-scope-controls": "node --no-warnings src/components/dashboard/reportRuntimeScopeControls.test.mjs && node --no-warnings src/components/dashboard/reportRuntimeBindings.test.mjs && vite-node src/components/dashboard/portableNativeReport.render.test.mjs && vitest run --config vitest.runtime.config.mjs src/components/dashboard/ReportRuntime.scopeControls.render.test.jsx",
     "test:table-preferences": "node --no-warnings src/core/preferences/tablePreferences.test.js && node --no-warnings src/core/preferences/tableViews.test.js",
     "test:widget-pairing": "node --no-warnings src/components/primitives/nativeWidgetContract.test.js",
     "test:grid-layout-alignment": "node --no-warnings src/components/gridLayoutAlignment.test.js && node --no-warnings src/components/gridLayoutAppearance.test.js && node --no-warnings src/components/containerChrome.test.js && node --no-warnings ./node_modules/vite-node/vite-node.mjs src/components/GridLayoutRenderer.render.test.jsx",
@@ -96,7 +97,7 @@
     "test:donut-center": "node --no-warnings src/components/donutCenter.test.js && vitest run --config vitest.runtime.config.mjs src/components/Chart.donutCenter.render.test.jsx",
     "test:category-range": "node --no-warnings src/components/categoryRange.test.js && vitest run --config vitest.runtime.config.mjs src/components/Chart.categoryRange.render.test.jsx",
     "test:heatmap": "node --no-warnings src/components/categoricalHeatmap.test.js && vitest run --config vitest.runtime.config.mjs src/components/Chart.heatmap.render.test.jsx",
-    "test:table-analytics": "node --no-warnings src/reporting/reportTableAnalytics.test.js && vitest run --config vitest.runtime.config.mjs src/components/dashboard/TableAnalytics.render.test.jsx",
+    "test:table-analytics": "node --no-warnings src/reporting/reportTableAnalytics.test.js && vitest run --config vitest.runtime.config.mjs src/components/dashboard/TableAnalytics.render.test.jsx src/components/dashboard/ReportRuntime.legend.render.test.jsx",
     "test:geo-geometry": "node --no-warnings src/reporting/geoGeometry.test.js && vitest run --config vitest.runtime.config.mjs src/components/dashboard/GeoGeometryMap.render.test.jsx",
     "test:chart-tooltip-browser": "node scripts/test-chart-tooltip-browser.mjs",
     "test:chart-tooltip": "node --no-warnings src/components/chartTooltip.test.js && vitest run --config vitest.runtime.config.mjs src/components/Chart.tooltip.render.test.jsx",

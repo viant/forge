@@ -94,7 +94,7 @@ describe('missing chart model states', () => {
     if (state === 'truncated result') dataset.provenance.truncated = true;
     if (state === 'section error') input.sectionError = 'Section could not refresh.';
     const html = render(input);
-    expect(html).toContain(compileWarning);
+    expect(html).toContain(state === 'section error' ? input.sectionError : compileWarning);
     expect(html).not.toContain(noData);
   });
 });

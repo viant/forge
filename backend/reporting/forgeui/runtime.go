@@ -103,7 +103,7 @@ func AttachReportRuntime(window *types.Window, report *reportspec.ReportSpec, re
 		}
 		source.Parameters = append(parameters, types.Parameter{Name: path, Default: string(request), Codec: &types.Codec{Name: "json"}})
 		window.DataSource[ref] = source
-		bindings[dataset.ID] = map[string]any{"dataSourceRef": ref}
+		bindings[dataset.ID] = map[string]any{"dataSourceRef": ref, "queryPath": path}
 		needed[ref] = true
 	}
 	// Source-only containers trigger all dataset loads, including multi-source

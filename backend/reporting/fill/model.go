@@ -2,6 +2,7 @@ package reportfill
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/viant/forge/backend/reporting/tablemeta"
@@ -272,6 +273,7 @@ type ResolvedChart struct {
 }
 
 type ChartTooltipEntry struct {
+	Lines       []string            `json:"lines,omitempty"`
 	ID          string              `json:"id"`
 	Category    string              `json:"category"`
 	SeriesKey   string              `json:"seriesKey"`
@@ -414,6 +416,7 @@ type BadgesContent struct {
 }
 
 type CollectionItemContent struct {
+	MarkerColor     string `json:"markerColor,omitempty"`
 	Index           *int   `json:"index,omitempty"`
 	Title           any    `json:"title"`
 	ItemTitleField  string `json:"itemTitleField,omitempty"`
@@ -1488,7 +1491,7 @@ func (r *ReportFill) Validate() error {
 			if block.ChartContent.ResolvedChart.SeriesKeys == nil {
 				return fmt.Errorf("reportFill.blocks[%d].content.resolvedChart.seriesKeys is required for chartBlock", index)
 			}
-			if len(block.ChartContent.ResolvedChart.SeriesKeys) == 0 && !(block.ChartContent.ResolvedChart.Type == "donut" && block.ChartContent.ResolvedChart.Center != nil && len(block.ChartContent.ResolvedChart.Rows) == 0) {
+			if len(block.ChartContent.ResolvedChart.SeriesKeys) == 0 && !(len(block.ChartContent.ResolvedChart.Rows) == 0 && ((block.ChartContent.ResolvedChart.Type == "donut" && block.ChartContent.ResolvedChart.Center != nil) || len(block.ChartContent.ResolvedChart.TooltipEntries) > 0)) {
 				return fmt.Errorf("reportFill.blocks[%d].content.resolvedChart.seriesKeys must not be empty for chartBlock", index)
 			}
 			for seriesIndex, seriesKey := range block.ChartContent.ResolvedChart.SeriesKeys {
@@ -1639,6 +1642,16 @@ func (r *ReportFill) Validate() error {
 			}
 			if !isAllowedReportBodyFormat(block.BodyFormat) {
 				return fmt.Errorf("reportFill.blocks[%d].bodyFormat %q is not supported for collectionBlock", index, block.BodyFormat)
+			}
+			for _, item := range block.CollectionContent.Items {
+				if item.MarkerColor != "" {
+					if len(item.MarkerColor) != 7 || item.MarkerColor[0] != '#' {
+						return fmt.Errorf("collection marker color must be six-digit hex")
+					}
+					if _, err := hex.DecodeString(item.MarkerColor[1:]); err != nil {
+						return fmt.Errorf("collection marker color must be six-digit hex")
+					}
+				}
 			}
 			if block.CollectionContent.Columns < 1 {
 				return fmt.Errorf("reportFill.blocks[%d].content.columns must be >= 1 for collectionBlock", index)
