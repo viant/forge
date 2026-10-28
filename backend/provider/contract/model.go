@@ -28,11 +28,13 @@ type NamespaceListRequest struct {
 	Limit  int    `json:"limit,omitempty"`
 }
 type NamespaceGetRequest struct {
-	Namespace string `json:"namespace"`
+	Namespace string                `json:"namespace"`
+	Sync      *NamespaceSyncRequest `json:"sync,omitempty"`
 }
 type NamespaceMetadata struct {
-	Description string   `json:"description,omitempty"`
-	UseCases    []string `json:"useCases,omitempty"`
+	Synchronization *NamespaceSyncCapability `json:"synchronization,omitempty"`
+	Description     string                   `json:"description,omitempty"`
+	UseCases        []string                 `json:"useCases,omitempty"`
 }
 
 type Namespace struct {
@@ -52,6 +54,7 @@ type KindSupport struct {
 	Methods map[string]string `json:"methods,omitempty"`
 }
 type NamespaceCapabilities struct {
+	Sync *NamespaceSyncResult `json:"sync,omitempty"`
 	NamespaceMetadata
 	ProviderIdentity string        `json:"providerIdentity"`
 	Namespace        string        `json:"namespace"`
