@@ -603,11 +603,11 @@ func DecodeJSON(data []byte) (*ReportSpec, error) {
 }
 
 func (r *ReportSpec) Validate() error {
-	if r.Viewer != nil && r.Viewer.Appearance != "" && r.Viewer.Appearance != "document" {
-		return fmt.Errorf("reportSpec.viewer.appearance must be document")
-	}
 	if r == nil {
 		return fmt.Errorf("reportSpec is required")
+	}
+	if r.Viewer != nil && r.Viewer.Appearance != "" && r.Viewer.Appearance != "document" {
+		return fmt.Errorf("reportSpec.viewer.appearance must be document")
 	}
 	if r.Version < 1 {
 		return fmt.Errorf("reportSpec.version must be >= 1")

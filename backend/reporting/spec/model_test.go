@@ -629,3 +629,8 @@ func TestStrictReportSpecViewerRoundTrip(t *testing.T) {
 	_, err = DecodeJSON(data)
 	require.ErrorContains(t, err, "unknown field")
 }
+
+func TestNilReportSpecValidation(t *testing.T) {
+	var spec *ReportSpec
+	require.ErrorContains(t, spec.Validate(), "reportSpec is required")
+}

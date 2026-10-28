@@ -733,8 +733,9 @@ function renderCategoryChartSvg({
   }
   const palette = resolveChartPalette(chartModel);
   const chartType = normalizeString(chartModel?.type || resolvedChart?.type).toLowerCase();
-  const size = Math.max(180, Math.min(240, Math.floor(width * 0.42)));
-  const cx = size / 2;
+  const size = Math.min(width, Math.max(180, Math.min(240, Math.floor(width * 0.42))));
+  const belowLegend = width - size - 38 < 160;
+  const cx = belowLegend ? width / 2 : size / 2;
   const cy = size / 2;
   const r = size * 0.36;
   const innerRadius = chartType === "donut" ? r * (center?0.7:0.56) : 0;
@@ -773,23 +774,27 @@ function renderCategoryChartSvg({
     startAngle = endAngle;
     return outerPath;
   }).join("\n");
-  const legendX = size + 20;
-  const legendY = 18;
+  const legendX = belowLegend ? 12 : size + 20;
+  const legendY = belowLegend ? size + 12 : 18;
+  // Conservative glyph-width budget keeps arbitrary producer labels inside the
+  // available SVG column. Keep every line rather than clipping or eliding text.
+  const labelCharacters = Math.max(1, Math.floor((width - legendX - 26) / 11));
+  let legendBottom = legendY;
   const legend = slices.map((slice, index) => {
     const fill = printColor(resolveChartCategoryColor(chartModel, slice.name, palette[index % palette.length]));
     const pct = ((slice.value / total) * 100).toFixed(0);
-    const label=chartModel.sliceLabel?(slice.sliceLabel==null?"":` — ${slice.sliceLabel}`):` — ${pct}%`;
-    const y = legendY + (index * 20);
-    return `
-      <rect x="${legendX}" y="${y}" width="12" height="12" rx="2" fill="${escapeXml(fill)}" />
-      <text x="${legendX + 18}" y="${y + 11}" font-size="11" fill="#344054">${escapeXml(slice.name)}${escapeXml(label)}</text>
-    `;
+    const suffix = chartModel.sliceLabel ? (slice.sliceLabel == null ? "" : ` — ${slice.sliceLabel}`) : ` — ${pct}%`;
+    const lines = wrapReportPrintLabel(`${slice.name}${suffix}`, labelCharacters);
+    const y = legendBottom;
+    legendBottom += Math.max(20, lines.length * 14 + 6);
+    return `<rect x="${legendX}" y="${y}" width="12" height="12" rx="2" fill="${escapeXml(fill)}" />` +
+      lines.map((line, lineIndex) => `<text x="${legendX + 18}" y="${y + 11 + lineIndex * 14}" font-size="11" fill="#344054">${escapeXml(line)}</text>`).join("");
   }).join("\n");
   const centerGraphic=center?donutCenterSvg(center,cx,cy,innerRadius):null;
   const donutHole = innerRadius > 0
     ? `<circle cx="${cx}" cy="${cy}" r="${innerRadius}" fill="#ffffff" />`
     : "";
-  const height = Math.max(size, (slices.length * 20) + 24);
+  const height = Math.max(size, legendBottom + 6);
   return {
     svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
       ${total>0?paths:`<circle cx="${cx}" cy="${cy}" r="${r}" fill="#d8e1e8"/>`}
