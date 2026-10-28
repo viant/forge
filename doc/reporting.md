@@ -846,6 +846,16 @@ Authoring fields:
 - `title`
 - `datasetRef`
 - `columns[]`
+- `runtime.quickFilter` (optional boolean, enabled only when `true`)
+
+Plain `tableBlock` authors can set `runtime.quickFilter: true` to expose the
+existing shared table search. For example, a service-usage evidence table can
+filter its already-returned rows by a displayed date or category. Omission keeps
+the existing plain-table behavior; hierarchical and pivot tables retain their
+existing search behavior. This local presentation filter does not issue a source
+query, change authorization, or search unloaded pages. It reuses the shared table's
+page reset and empty/recovery behavior. The setting survives report-document
+normalization and lowering into the runtime ReportSpec.
 
 Runtime behavior:
 

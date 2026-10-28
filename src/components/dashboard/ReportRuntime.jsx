@@ -2438,7 +2438,7 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, on
           dashboard: {
             table: {
               columns,
-              quickFilter:!!(authoredBlock.hierarchy || authoredBlock.pivot),
+              quickFilter:!!(authoredBlock.hierarchy || authoredBlock.pivot || authoredBlock.runtime?.quickFilter === true),
               hierarchy:authoredBlock.hierarchy,
               analyticsMaterialized:true,
               pivot:authoredBlock.pivot,

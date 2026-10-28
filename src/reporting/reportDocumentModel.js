@@ -2075,7 +2075,7 @@ export function buildReportDocumentChartBlock(block = {}) {
 
 export function buildReportDocumentTableBlock(block = {}) {
   const normalized = normalizeReportDocumentTableBlock(block);
-  return block?.runtime?.printRowReference === true
+  return block?.runtime?.printRowReference === true || block?.runtime?.quickFilter === true
     ? withReportBlockRuntime(normalized, block)
     : normalized;
 }
@@ -2124,6 +2124,7 @@ export function normalizeReportBlockRuntime(runtime = null, block = {}) {
     : (Array.isArray(block?.actions) ? cloneValue(block.actions) : []);
   const normalized = {
     ...(source?.printRowReference === true ? { printRowReference: true } : {}),
+    ...(source?.quickFilter === true ? { quickFilter: true } : {}),
     ...(visibleWhen ? { visibleWhen } : {}),
     ...(filterBindings && Object.keys(filterBindings).length > 0 ? { filterBindings } : {}),
     ...(selectionBindings && Object.keys(selectionBindings).length > 0 ? { selectionBindings } : {}),
