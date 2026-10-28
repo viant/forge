@@ -43,8 +43,10 @@ func (g *Gateway) discoverStandardResources(ctx context.Context, actor identity.
 	minTTL := int(^uint(0) >> 1)
 	allPublic := true
 	seenCursor := map[string]bool{}
+	diagnostic := mcpReferenceDiagnosticFromContext(ctx)
 	for cursor, page := (*string)(nil), 0; page < 100; page++ {
 		listTiming := observe.Start(ctx, "gateway.resource.list", observe.Labels{Provider: name})
+		diagnostic.begin("outbound_request")
 		listed, err := client.ListResources(ctx, cursor)
 		listTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 		if err != nil {
@@ -52,9 +54,12 @@ func (g *Gateway) discoverStandardResources(ctx context.Context, actor identity.
 			if page == 0 && errors.As(err, &rpc) && rpc.Code == -32601 {
 				return capabilities{}, false, nil
 			}
+			markMCPReferenceFailure(ctx, "outbound_request", "resource_list_failed", err)
 			return capabilities{}, true, err
 		}
+		diagnostic.begin("postcheck")
 		if listed == nil || listed.ResultType != "" && listed.ResultType != schema.ResultTypeComplete || listed.TtlMs < 0 {
+			markMCPReferenceFailure(ctx, "postcheck", "invalid_list_response", identity.ErrResource)
 			return capabilities{}, true, identity.ErrResource
 		}
 		if listed.TtlMs < minTTL {
@@ -72,6 +77,7 @@ func (g *Gateway) discoverStandardResources(ctx context.Context, actor identity.
 				continue
 			}
 			if entry.Name == "" || result.indexedResources[entry.Uri].URI != "" {
+				markMCPReferenceFailure(ctx, "postcheck", "invalid_list_entry", identity.ErrResource)
 				return capabilities{}, true, identity.ErrResource
 			}
 			state := primitive.ResourceState{URI: entry.Uri, Kind: uri.Kind, Namespace: uri.Namespace, Name: uri.Name, Title: entry.Name}
@@ -90,6 +96,7 @@ func (g *Gateway) discoverStandardResources(ctx context.Context, actor identity.
 			break
 		}
 		if *listed.NextCursor == "" || seenCursor[*listed.NextCursor] || page == 99 {
+			markMCPReferenceFailure(ctx, "postcheck", "invalid_cursor", identity.ErrResource)
 			return capabilities{}, true, identity.ErrResource
 		}
 		seenCursor[*listed.NextCursor] = true
