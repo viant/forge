@@ -169,7 +169,8 @@ func (g *Gateway) generation(name string) uint64 {
 	defer g.mu.Unlock()
 	return g.generations[g.publishedCanonicalNameLocked(name)]
 }
-func (g *Gateway) actor(ctx context.Context) (identity.VerifiedActor, error) {
+func (g *Gateway) actor(ctx context.Context) (actor identity.VerifiedActor, resultErr error) {
+	defer func() { markMCPReferenceFailure(ctx, "actor", "actor_failed", resultErr) }()
 	if g == nil || g.Manager == nil || g.Actor == nil || g.Verify == nil {
 		return identity.VerifiedActor{}, identity.ErrResourceDenied
 	}
@@ -204,7 +205,8 @@ func (g *Gateway) actor(ctx context.Context) (identity.VerifiedActor, error) {
 	}
 	return a, nil
 }
-func (g *Gateway) final(ctx context.Context, a identity.VerifiedActor) error {
+func (g *Gateway) final(ctx context.Context, a identity.VerifiedActor) (resultErr error) {
+	defer func() { markMCPReferenceFailure(ctx, "postcheck", "actor_recheck_failed", resultErr) }()
 	g.mu.Lock()
 	closed := g.closed
 	g.mu.Unlock()
@@ -236,6 +238,7 @@ func actorKey(a identity.VerifiedActor, name string, generation uint64) string {
 func (g *Gateway) client(ctx context.Context, name string) (mcpclient.Interface, error) {
 	client, err := g.Manager.Get(g.Manager.WithAuthTokenContext(ctx, name), "", name)
 	if err != nil {
+		markMCPReferenceFailure(ctx, "connection_binding", "client_initialization_failed", err)
 		return nil, err
 	}
 	return &gatewayAuthClient{Interface: client, manager: g.Manager, name: name}, nil
@@ -268,10 +271,12 @@ func toolRaw(ctx context.Context, c mcpclient.Interface, method string, in any) 
 	dispatch := observe.Start(ctx, observe.Phase("gateway.mcp.call"), labels)
 	result, e := c.CallTool(ctx, &schema.CallToolRequestParams{Name: method, Arguments: args}, mcpclient.WithNoRetry())
 	if e != nil {
+		markMCPReferenceFailure(ctx, "outbound_request", "tool_call_failed", e)
 		dispatch.End(observe.OutcomeFor(e), observe.CacheUnknown)
 		return nil, e
 	}
 	if result == nil || result.IsError != nil && *result.IsError {
+		markMCPReferenceFailure(ctx, "postcheck", "tool_result_error", identity.ErrResourceDenied)
 		dispatch.End(observe.Denied, observe.CacheUnknown)
 		return nil, identity.ErrResourceDenied
 	}
@@ -315,6 +320,7 @@ func (g *Gateway) discoverMode(ctx context.Context, a identity.VerifiedActor, na
 	}
 	span := observe.Start(ctx, "gateway.provider.discovery", observe.Labels{Provider: name})
 	defer func() { span.End(observe.OutcomeFor(retErr), observe.CacheUnknown) }()
+	defer func() { markMCPReferenceFailure(ctx, "connection_binding", "discovery_failed", retErr) }()
 	var scopeErr error
 	ctx, scopeErr = ReadContext(ctx)
 	if scopeErr != nil {

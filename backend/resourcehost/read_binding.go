@@ -37,6 +37,9 @@ func (g *Gateway) resolveReadBinding(ctx context.Context, actor identity.Verifie
 	if options == nil {
 		return nil, ErrUnavailable
 	}
+	if options.ResolvedIdentity != nil {
+		mcpReferenceDiagnosticFromContext(ctx).bindServiceName(name, options.ResolvedIdentity.ServiceName)
+	}
 	// Initialize the normal manager client before pinning effective options:
 	// initialization may fill shared Name/Version defaults. Those defaults are
 	// part of the stable contract, not request-time configuration drift.
