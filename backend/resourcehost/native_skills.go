@@ -25,26 +25,57 @@ type NativeSkillSource struct {
 	LocalConnection string
 }
 
+// HasPublishedMetadata describes trusted host configuration only. Capability
+// detection has no caller context and must not enumerate session-bound sources.
+func (s *NativeSkillSource) HasPublishedMetadata() bool {
+	return s != nil && s.Gateway != nil && len(s.Gateway.publishedRegistrations()) > 0
+}
+
 func (s *NativeSkillSource) Names(ctx context.Context) ([]string, error) {
-	names, err := s.Gateway.Manager.Names(ctx)
+	registered := s.Gateway.publishedRegistrations()
+	excluded := []string{}
+	for _, source := range registered {
+		excluded = append(excluded, source.connection.Name)
+	}
+	names, err := s.Gateway.Manager.NamesExcluding(ctx, excluded)
 	if err != nil {
 		return nil, err
 	}
 	out := make([]string, 0, len(names))
 	for _, name := range names {
-		if name != s.LocalConnection {
+		// Published owners contribute through the shared gateway catalog. They
+		// must never also negotiate a native extension on the legacy transport.
+		_, published := s.Gateway.publishedByName(name)
+		if name != s.LocalConnection && !published {
 			out = append(out, name)
 		}
 	}
+	// Keep locally registered owners visible to generic skill delivery. Their
+	// options disable native discovery, so capability detection can run without
+	// a caller session or an MCP handshake; actual reads still check admission.
+	for _, source := range registered {
+		if source.connection.Name != s.LocalConnection {
+			out = append(out, source.connection.Name)
+		}
+	}
+	sort.Strings(out)
 	return out, nil
 }
 func (s *NativeSkillSource) Options(ctx context.Context, name string) (*cfg.MCPClient, error) {
+	if source, published := s.Gateway.publishedByName(name); published {
+		// These trusted registration options describe a route, never authority.
+		// CatalogScope and every delivery recheck the caller's local admission.
+		return &cfg.MCPClient{PrimitiveProviderIdentity: source.connection.ProviderIdentity, SkillDiscovery: &cfg.SkillDiscovery{Enabled: false}}, nil
+	}
 	return s.Gateway.Manager.Options(ctx, name)
 }
 func (s *NativeSkillSource) Get(ctx context.Context, conversation, name string) (client.Interface, error) {
 	a, err := s.Gateway.actor(ctx)
 	if err != nil {
 		return nil, &requiredSkillDiscoveryFailure{err}
+	}
+	if _, published := s.Gateway.publishedByName(name); published {
+		return nil, &requiredSkillDiscoveryFailure{identity.ErrResourceDenied}
 	}
 	c, err := s.Gateway.Manager.Get(ctx, conversation, name)
 	if err != nil {
@@ -56,9 +87,15 @@ func (s *NativeSkillSource) Get(ctx context.Context, conversation, name string) 
 	return &nativeSkillClient{Interface: c, gateway: s.Gateway}, nil
 }
 func (s *NativeSkillSource) WithAuthTokenContext(ctx context.Context, name string) context.Context {
+	if _, published := s.Gateway.publishedByName(name); published {
+		return ctx
+	}
 	return s.Gateway.Manager.WithAuthTokenContext(ctx, name)
 }
 func (s *NativeSkillSource) UseIDToken(ctx context.Context, name string) bool {
+	if _, published := s.Gateway.publishedByName(name); published {
+		return false
+	}
 	return s.Gateway.Manager.UseIDToken(ctx, name)
 }
 func (s *NativeSkillSource) CatalogScope(ctx context.Context, conversation string, names []string) (string, bool, error) {
@@ -74,8 +111,25 @@ func (s *NativeSkillSource) CatalogScope(ctx context.Context, conversation strin
 	if err != nil {
 		return "", false, err
 	}
-	parts := []string{base}
+	// Generic skill delivery also contributes cohort owners excluded from
+	// native discovery Names. Their local admission must fence cached pages.
+	publishedScope, err := s.Gateway.publishedAdmissionKeys(ctx)
+	if err != nil {
+		return "", false, &requiredSkillDiscoveryFailure{err}
+	}
+	parts := []string{base, publishedScope}
 	for _, name := range names {
+		if source, published := s.Gateway.publishedByName(name); published {
+			admission, err := source.source.AdmissionKey(ctx)
+			if err != nil || admission == "" {
+				if err == nil {
+					err = identity.ErrResourceDenied
+				}
+				return "", false, &requiredSkillDiscoveryFailure{err}
+			}
+			parts = append(parts, name, source.connection.ProviderIdentity, admission)
+			continue
+		}
 		options, err := s.Gateway.Manager.Options(ctx, name)
 		if err != nil {
 			return "", false, err
@@ -133,7 +187,12 @@ func (s *NativeSkillSource) VisibleCatalog(ctx context.Context, key string, unti
 	if a.ValidUntil.Before(until) {
 		until = a.ValidUntil
 	}
-	return s.Gateway.Manager.VisibleCatalog(ctx, key, until, load, sourceLease...)
+	names, err := s.Names(ctx)
+	if err != nil {
+		return nil, err
+	}
+	partition := s.Gateway.Manager.WithCatalogSources(ctx, manager.VisibleCatalogPartition{}, names)
+	return s.Gateway.Manager.VisibleCatalogInPartition(ctx, key, partition, until, load, sourceLease...)
 }
 func (s *NativeSkillSource) CheckVisibleCatalog(ctx context.Context, index *primitive.Catalog[json.RawMessage]) error {
 	a, err := s.Gateway.actor(ctx)
@@ -278,7 +337,10 @@ func (c *nativeSkillClient) ListResources(ctx context.Context, cursor *string, o
 // ReadSkillResource uses the already configured managing connection. Shared-index
 // skill definitions do not require the optional native skills extension.
 func (s *NativeSkillSource) ReadSkillResource(ctx context.Context, server, uri string) (*schema.ReadResourceResult, error) {
-	ctx = s.Gateway.Manager.WithAuthTokenContext(ctx, server)
+	if result, handled, err := s.readPublishedSkillResource(ctx, server, uri); handled {
+		return result, err
+	}
+	ctx = s.WithAuthTokenContext(ctx, server)
 	cli, err := s.Get(ctx, "", server)
 	if err != nil {
 		return nil, err

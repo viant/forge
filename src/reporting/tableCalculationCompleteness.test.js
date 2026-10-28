@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {buildReportFillFromReportSpec} from './reportFillModel.js';
+const field={id:'share',key:'share',kind:'tableCalc',label:'Share',dataType:'number',datasetRef:'primary',compute:{type:'percentOfTotal',sourceField:'amount',partitionBy:['cohort'],scale:1,nullPolicy:'null',requireComplete:true}};
+const spec={version:1,kind:'reportSpec',source:{kind:'report',containerId:'synthetic',stateKey:'synthetic',dataSourceRef:'rows'},title:'Complete partitions',parameters:{viewMode:'table',pageSize:100},layoutIntent:{kind:'stack',blockOrder:['table']},refinements:[],calculatedFields:[field],datasets:[{id:'primary',dataSourceRef:'rows',request:{}}],blocks:[{id:'table',kind:'tableBlock',datasetRef:'primary',title:'Shares',columns:[{key:'share',label:'Share'}]}]};
+const rows=[{cohort:'A',amount:10},{cohort:'B',amount:0},{cohort:'A',amount:30},{cohort:'B',amount:0},{cohort:'A',amount:null}];
+const fill=buildReportFillFromReportSpec(spec,{primary:{rows,hasMore:false,truncated:false}});
+assert.deepEqual(fill.datasets[0].rows.map(row=>row.share),[.25,null,.75,null,null]);
+assert.deepEqual(buildReportFillFromReportSpec(spec,{primary:{rows:[],hasMore:false}}).datasets[0].rows,[]);
+for(const provenance of [{},{hasMore:true},{hasMore:false,truncated:true},{hasMore:false,provenance:{truncated:true}}])assert.throws(()=>buildReportFillFromReportSpec(spec,{primary:{rows,...provenance}}),/complete input/);
+console.log('percent total null/zero partitions require complete producer provenance');

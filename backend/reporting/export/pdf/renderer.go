@@ -227,6 +227,10 @@ func (r *renderer) renderImageOperation(operation imagePaintOperation) {
 }
 
 func (r *renderer) renderTextOperation(operation textPaintOperation) {
+	if len(operation.textRuns) > 0 {
+		r.renderRichTextOperation(operation)
+		return
+	}
 	r.applyTextStyle(reportprint.Element{
 		FontFamily: operation.fontFamily,
 		FontSize:   operation.fontSize,
@@ -407,19 +411,12 @@ func (r *renderer) applyTextStyle(element reportprint.Element, defaultSize float
 }
 
 func fontStyle(weight string) string {
-	normalized := strings.ToLower(strings.TrimSpace(weight))
-	if normalized == "" {
-		return ""
-	}
+	bold, italic := reportprint.TextEmphasis(weight)
 	var style strings.Builder
-	if strings.Contains(normalized, "italic") || strings.Contains(normalized, "oblique") {
+	if italic {
 		style.WriteString("I")
 	}
-	if strings.Contains(normalized, "bold") {
-		style.WriteString("B")
-		return style.String()
-	}
-	if numeric, err := strconv.Atoi(normalized); err == nil && numeric >= 600 {
+	if bold {
 		style.WriteString("B")
 	}
 	return style.String()

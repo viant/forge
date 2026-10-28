@@ -1,3 +1,5 @@
+import {numericDisplayFormatSchema} from '../../components/categoryRange.js';
+import {pieSliceLabelSchema} from '../../components/pieSliceLabel.js';
 import {hierarchySchema,pivotSchema,columnGroupsSchema} from '../reportTableAnalytics.js';
 import {chartTooltipSchema,chartTooltipEntrySchema} from '../../components/chartTooltip.js';
 import {donutCenterSchema,resolvedDonutCenterSchema} from '../../components/donutCenter.js';
@@ -185,6 +187,8 @@ export const reportFillSchema = {
       required: ["type", "sourceField"],
       properties: {
         type: { const: "percentOfTotal" },
+        nullPolicy: {enum:["zero","null"]},
+        requireComplete: {type:"boolean"},
         sourceField: { type: "string" },
         partitionBy: {
           type: "array",
@@ -948,8 +952,12 @@ export const reportFillSchema = {
         type: { type: "string" },
         heatmap: heatmapSchema,
         categoryRange: categoryRangeSchema,
+        paletteMode:{enum:["declared"]},
+        palette:{type:"array",minItems:1,maxItems:64,items:{type:"string",pattern:"^#[0-9a-fA-F]{6}$"}},
         center: donutCenterSchema,
+        sliceLabel: pieSliceLabelSchema,
         appearance: {enum:["document"]},
+        allowTableSwitch: {type:"boolean"},
         layout: {enum:["small-multiples"]},
         stacked: {type:"boolean"},
         xField: { type: "string" },
@@ -1202,8 +1210,11 @@ export const reportFillSchema = {
         type: { type: "string" },
         heatmap: heatmapSchema,
         categoryRange: categoryRangeSchema,
+        paletteMode: {enum:["declared"]},
         center: donutCenterSchema,
+        sliceLabel: pieSliceLabelSchema,
         appearance: {enum:["document"]},
+        allowTableSwitch: {type:"boolean"},
         layout: {enum:["small-multiples"]},
         stacked: {type:"boolean"},
         preserveCategoryOrder: { type: "boolean" },
@@ -1417,6 +1428,7 @@ export const reportFillSchema = {
         description: { type: "string" },
         datasetRef: { type: "string" },
         itemTitleField: { type: "string", minLength: 1 },
+        markerColors:{type:"object",additionalProperties:{type:"string",pattern:"^#[0-9a-fA-F]{6}$"}},
         itemTitleLabel: { type: "string" },
         valueField: { type: "string" },
         valueLabel: { type: "string" },
@@ -1454,6 +1466,7 @@ export const reportFillSchema = {
                   index: { type: "integer", minimum: 0 },
                   title: { $ref: "#/$defs/jsonValue" },
                   itemTitleField: { type: "string" },
+                  markerColor:{type:"string",pattern:"^#[0-9a-fA-F]{6}$"},
                   itemTitleLabel: { type: "string" },
                   valueField: { type: "string" },
                   valueLabel: { type: "string" },
@@ -1520,7 +1533,6 @@ export const reportFillSchema = {
         layout: { enum: ["stack", "responsiveGrid"] },
         childBlockIds: {
           type: "array",
-          minItems: 1,
           items: { type: "string" },
         },
         content: {
@@ -1533,12 +1545,15 @@ export const reportFillSchema = {
             layout: { enum: ["stack", "responsiveGrid"] },
             childBlockIds: {
               type: "array",
-              minItems: 1,
               items: { type: "string" },
             },
           },
         },
       },
+      anyOf:[
+        {properties:{childBlockIds:{type:'array',minItems:1},content:{properties:{childBlockIds:{type:'array',minItems:1}}}}},
+        {type:'object',required:['runtime'],properties:{runtime:{required:['spacerHeight','chrome'],properties:{spacerHeight:{type:'number',minimum:0,maximum:10000},chrome:{const:'none'}}},childBlockIds:{type:'array',maxItems:0},content:{properties:{childBlockIds:{type:'array',maxItems:0}}}}},
+      ],
     },
     tabGroupTab: {
       type: "object",

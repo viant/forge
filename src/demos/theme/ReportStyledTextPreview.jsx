@@ -1,0 +1,10 @@
+import React from 'react';
+import {createRoot} from 'react-dom/client';
+import {ForgeThemeBoundary} from '../../components/ThemeBoundary.jsx';
+import ReportRuntime from '../../components/dashboard/ReportRuntime.jsx';
+import {reportStyledTextFixture} from '../../reporting/reportStyledTextFixture.js';
+import {buildReportFillFromReportSpec} from '../../reporting/reportFillModel.js';
+import '@blueprintjs/core/lib/css/blueprint.css';
+const {reportSpec,payloads}=reportStyledTextFixture();
+const reportFill=buildReportFillFromReportSpec(reportSpec,payloads);
+createRoot(document.getElementById('root')).render(<ForgeThemeBoundary><main style={{maxWidth:850,margin:'24px auto',padding:24}}><ReportRuntime reportSpec={reportSpec} reportFill={reportFill} presentationMode="report" showContextSummary={false}/></main></ForgeThemeBoundary>);

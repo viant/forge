@@ -690,6 +690,8 @@ function normalizePercentOfTotalCalculation(compute = {}) {
     type: "percentOfTotal",
     sourceField,
   };
+  if(compute.nullPolicy!==undefined){if(!['zero','null'].includes(compute.nullPolicy))throw Error('percentOfTotal nullPolicy must be zero or null');next.nullPolicy=compute.nullPolicy;}
+  if(compute.requireComplete!==undefined){if(typeof compute.requireComplete!=='boolean')throw Error('percentOfTotal requireComplete must be boolean');next.requireComplete=compute.requireComplete;}
   const partitionBy = normalizePartitionBy(compute?.partitionBy);
   if (partitionBy.length > 0) {
     next.partitionBy = partitionBy;
@@ -1056,11 +1058,11 @@ function applyReportCalculatedField(rows, definition) {
         }, 0);
         groupRows.forEach((row) => {
           const sourceValue = toFiniteNumber(resolveKey(row, sourceField));
-          let value = 0;
+          let value = definition.compute.nullPolicy==='null' ? null : 0;
           if (sourceValue != null && total !== 0) {
             value = (sourceValue / total) * scale;
           }
-          if (decimals != null) {
+          if (decimals != null && value != null) {
             value = Number(value.toFixed(decimals));
           }
           row[outputKey] = value;

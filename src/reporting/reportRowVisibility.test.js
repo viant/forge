@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {applyReportRowVisibility,normalizeReportRowVisibility} from './reportRowVisibility.js';
+import {buildReportFillFromReportSpec} from './reportFillModel.js';
+import {buildReportPrintFromReportFill} from './reportPrintModel.js';
+import {resolveReportRuntimeBlockRows} from './reportBlockRuntimeModel.js';
+const visibility={exclude:[{field:'category',values:['Unknown']}]};
+const rows=[{category:'A',amount:20},{category:'Unknown',amount:80},{category:null,amount:0}];
+assert.deepEqual(applyReportRowVisibility(rows,visibility).map(row=>row.category),['A',null]);assert.equal(rows.length,3);
+assert.throws(()=>applyReportRowVisibility([{}],visibility),/missing/);
+assert.throws(()=>normalizeReportRowVisibility({exclude:[{field:'category',values:[{}]}]}),/typed scalars/);
+const spec=JSON.parse(fs.readFileSync(new URL('../../doc/examples/donut-conversion-preview.json',import.meta.url))).reportSpec;
+spec.datasets=[{...spec.datasets[0],id:'primary',request:{dimensions:{category:true},measures:{amount:true},limit:100,offset:0}}];
+spec.calculatedFields=[{id:'share',key:'share',kind:'tableCalc',label:'Share',dataType:'number',datasetRef:'primary',dependencies:['amount'],compute:{type:'percentOfTotal',sourceField:'amount',scale:1,partitionBy:[],nullPolicy:'null',requireComplete:true}}];
+spec.blocks=[{id:'chart',kind:'chartBlock',title:'Visible categories',datasetRef:'primary',runtime:{rowVisibility:visibility},chartSpec:{type:'bar',xField:'category',yFields:['share']},chartModel:{type:'bar',xAxis:{dataKey:'category'},yAxis:{format:'percentFraction2'},series:{values:[{value:'share',label:'Share',type:'bar',format:'percentFraction2'}]}}}];spec.layoutIntent.blockOrder=['chart'];
+const fill=buildReportFillFromReportSpec(spec,{primary:{rows,hasMore:false}});
+assert.equal(fill.datasets[0].rows.length,3);assert.equal(fill.datasets[0].rows[0].share,.2);
+assert.deepEqual(fill.blocks[0].content.resolvedChart.rows.map(row=>[row.category,row.share]),[['A',.2]]);
+assert.equal(resolveReportRuntimeBlockRows(spec.blocks[0],fill.datasets[0].rows)[0].share,.2);
+const print=buildReportPrintFromReportFill({reportSpec:spec,reportFill:fill});assert.ok(JSON.stringify(print).includes('20.00%'));assert.ok(!JSON.stringify(print).includes('Unknown'));
+console.log('presentation-only hide retains complete calculation denominator and typed null identity in fill/runtime/print');
+
+assert.throws(()=>buildReportFillFromReportSpec({...spec,blocks:[{...spec.blocks[0],chartSpec:{...spec.blocks[0].chartSpec,type:'pie'}}]},{primary:{rows,hasMore:false}}),/hidden-angle geometry/);

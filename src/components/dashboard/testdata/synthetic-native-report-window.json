@@ -80,7 +80,8 @@
               },
               "datasetBindings": {
                 "primary": {
-                  "dataSourceRef": "sampleResult"
+                  "dataSourceRef": "sampleResult",
+                  "queryPath": "request"
                 }
               }
             }

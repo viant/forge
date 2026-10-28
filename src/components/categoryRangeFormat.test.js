@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {formatRangeValue,buildCategoryRange,categoryRangeSvg,normalizeCategoryRange} from './categoryRange.js';
+const percent={kind:'bar',field:'rate',label:'Rate',format:{scale:100,decimals:2,suffix:'%'}};
+assert.equal(formatRangeValue(.04,percent),'4.00%');assert.equal(formatRangeValue(0,percent),'0.00%');assert.equal(formatRangeValue(null,percent),'Unavailable');
+const currency={kind:'bar',field:'amount',label:'Amount',format:{prefix:'$',decimals:2,grouping:true,negativeStyle:'parentheses'}};
+assert.equal(formatRangeValue(-1234.5,currency),'($1,234.50)');assert.equal(formatRangeValue(0,currency),'$0.00');
+const config={categoryField:'label',arrangement:'overlay',series:[percent,{...percent,kind:'marker',field:'target',label:'Target'}]};
+const result=categoryRangeSvg(buildCategoryRange(config,[{label:'North',rate:.04,target:.03}]),680,{interactive:true});
+assert.match(result.svg,/4.00%/);assert.match(result.svg,/3.00%/);assert.match(result.svg,/data-series="1"/);
+assert.throws(()=>normalizeCategoryRange({...config,series:[{...percent,format:{scale:Infinity}}]}),/finite/);
+console.log('category range formats preserve percent scale, currency precision and negative accounting');

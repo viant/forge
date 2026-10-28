@@ -1439,3 +1439,62 @@ formattingRules:
 
 For whole-row highlighting, use `target: row` and a workspace row class such as
 `example-row-warning`. Keep thresholds in metadata and colors in semantic CSS tokens.
+
+### Explicit MCP argument projection
+
+A datasource `backend` with `kind: mcp_tool` may declare `args`, mapping exact
+transport argument paths to `inputs.*` selectors over its pinned-merged logical request. This
+uses the existing datasource selector and dotted indexed-argument machinery;
+service, method and exact component identity remain fixed admitted metadata.
+Both ordinary MCP tools and pinned component calls use the same projection.
+Absent or empty `args` keeps existing pass-through behavior.
+
+```yaml
+selectors:
+  data: data
+  dataInfo: .
+backend:
+  kind: mcp_tool
+  service: authorized-producer
+  method: compose
+  mcpRequest:
+    queryPath: query
+    hasMorePath: hasMore
+  args:
+    cubes.0.filters: inputs.query.filters
+  pinned:
+    sql: SELECT * FROM cube(1) UNION ALL SELECT * FROM cube(2) LIMIT 100
+    cubes.1.inheritFrom: 1
+```
+
+The example is a neutral declaration, not a deployed producer. Component-owned
+producers also require their admitted exact `component` pin. Report requests
+remain typed logical queries under `query`; scope edits still change
+`query.filters`. Only mapped arguments and authored pinned values reach the
+producer. Logical request metadata exclusions apply before projection, so an
+alias cannot forward an excluded credential field. Admission and cache input
+identity continue to use the logical request. A projection change invalidates
+cached results. Exact pinned targets override a mapping; overlapping parent and
+child targets or conflicting object/array shapes fail before dispatch. Indexed
+segments use canonical nonnegative integers no larger than 4095.
+
+A missing selector omits its target. Explicit null, false, zero and empty arrays
+remain present and typed. Producer-required inputs must still be declared and
+validated by the datasource/producer contract; omission does not synthesize a
+scope, credential or default. Author mappings only for inputs the producer
+actually accepts.
+
+Unlike row-concatenating composite calls, this single-tool path preserves the
+producer envelope. `dataInfo: .` retains columns and `hasMore`, `complete`,
+`truncated`, `limit` and `offset` when present, including false and zero. A tail
+page can have `hasMore: false` while remaining `truncated: true`; it must not be
+represented as a complete report. The current native compose request accepts
+`cubes` and `sql`; pagination comes from the validated SQL literals. This example
+does not apply report `limit`/`offset` dynamically. Dynamic report pagination
+requires an explicit producer pagination contract, not extra undeclared tool
+arguments or `completeResult: true`.
+
+For single-tool `args`, missing selectors are omitted; existing composite
+`MCPCall.Args` retains its historical null-for-missing behavior. Metadata-named
+targets are excluded again after projection. Indexed paths can create null gaps
+in sparse arrays; the producer validates whether its input allows those gaps.

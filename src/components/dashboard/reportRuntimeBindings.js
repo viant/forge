@@ -1,17 +1,25 @@
 import {resolveKey} from '../../utils/selector.js';
 import {buildReportFillFromReportSpec} from '../../reporting/reportFillModel.js';
+import {boundReportScopeSpec, reportScopeSourceAvailable, ReportScopeUnavailableError} from './reportRuntimeScopeControls.js';
 
 // Bind an authored report to the enclosing window's existing datasource signals.
 // The ordinary window lifecycle owns fetching, authorization, and refresh.
 export function resolveBoundReportRuntime(config = {}, context = {}) {
-    const bindings = config.datasetBindings;
-    if (!bindings || !Object.keys(bindings).length) return {reportFill: config.reportFill || {}, status: 'ready'};
+    const bindings = config.datasetBindings || {};
+    const controlDatasets = new Set((config.reportSpec?.scope?.params || []).flatMap(param => (param.filterBindings || []).map(binding => binding.datasetRef)));
+    if (!Object.keys(bindings).length && config.reportFill != null) return {reportFill: config.reportFill, status: 'ready', scopeControlsUnavailable: controlDatasets.size > 0};
+    if (!Object.keys(bindings).length && !controlDatasets.size) return {reportFill: config.reportFill || {}, status: 'ready'};
     const payloads = {};
     const unavailableDatasets = [];
-    let status = 'ready';
+    let scopeControlsUnavailable = [...controlDatasets].some(datasetId => !bindings[datasetId]);
+    let status = scopeControlsUnavailable ? 'error' : 'ready';
     for (const [datasetId, binding] of Object.entries(bindings)) {
         const source = binding.dataSourceRef ? context.Context?.(binding.dataSourceRef) : context;
         const control = source?.signals?.control?.value || {};
+        if (controlDatasets.has(datasetId) && !reportScopeSourceAvailable(source)) {
+            scopeControlsUnavailable = true;
+            status = 'error';
+        }
         if (binding.optional && (!source || control.error || control.loading || control.loaded === false)) {
             payloads[datasetId] = {rows: []};
             unavailableDatasets.push(datasetId);
@@ -24,7 +32,20 @@ export function resolveBoundReportRuntime(config = {}, context = {}) {
         const selected = binding.selector ? resolveKey(value, binding.selector) : value;
         payloads[datasetId] = {rows: Array.isArray(selected) ? selected : selected && typeof selected === 'object' ? [selected] : []};
     }
-    // Never show a prior advertiser/date's rows while its replacement is pending.
-    if (status !== 'ready') return {reportFill: null, status};
-    return {reportFill: buildReportFillFromReportSpec(config.reportSpec || {}, payloads), status, ...(unavailableDatasets.length ? {unavailableDatasets} : {})};
+    // Never show prior scope rows while their replacement is pending.
+    let reportSpec = config.reportSpec;
+    if (!scopeControlsUnavailable) {
+        try {
+            reportSpec = boundReportScopeSpec(config, context);
+        } catch (error) {
+            if (!(error instanceof ReportScopeUnavailableError)) throw error;
+            scopeControlsUnavailable = true;
+            status = 'error';
+        }
+    }
+    if (status !== 'ready') {
+        const emptyPayloads = Object.fromEntries(Object.keys(bindings).map(id => [id, {rows: []}]));
+        return {reportSpec, reportFill: null, pendingReportFill: buildReportFillFromReportSpec(reportSpec, emptyPayloads), status, scopeControlsUnavailable};
+    }
+    return {reportSpec, reportFill: buildReportFillFromReportSpec(reportSpec, payloads), status, ...(unavailableDatasets.length ? {unavailableDatasets} : {})};
 }

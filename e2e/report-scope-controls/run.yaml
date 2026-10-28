@@ -1,0 +1,210 @@
+# Synthetic native UI contract. Start an isolated Vite preview and Chrome CDP
+# through Endly process:start, then supply previewURL and debuggerAddress.
+pipeline:
+  open:
+    action: webdriver:open
+    sessionID: scope-controls
+    debuggerAddress: $debuggerAddress
+    directCDP: true
+    browser: chrome
+  initial:
+    action: webdriver:run
+    sessionID: scope-controls
+    autoStart: false
+    commands:
+      - get($previewURL/report-scope-controls-preview.html)
+      - expect("body").toContainText("Initial sample")
+  select:
+    action: webdriver:run
+    sessionID: scope-controls
+    autoStart: false
+    commands:
+      - (xpath://button[@aria-label='Toggle report filters']).click
+      - expect("xpath://button[@aria-label='Toggle report filters']").toHaveAttribute("aria-pressed", "true")
+      - (xpath://button[normalize-space(.)='Second mode']).click
+      - expect("#request-state").toContainText('"page":1')
+      - expect("#request-state").toContainText('"fixedActor":"fixture"')
+      - expect("#request-state").toContainText('"offset":0')
+      - expect("#request-state").toContainText('"mode":2')
+      - expect("#request-state").toContainText('"fixedScope":7')
+      - expect("#request-state").toContainText('"fetchCount":1')
+      - expect("body").toContainText("Loading report")
+      - expect(page.locator("xpath://td[contains(.,'Initial sample')]")).toHaveCount("0", 1000)
+  complete:
+    action: webdriver:run
+    sessionID: scope-controls
+    autoStart: false
+    commands:
+      - (xpath://button[normalize-space(.)='Complete response']).click
+      - expect("body").toContainText("Updated sample")
+  numeric:
+    action: webdriver:run
+    sessionID: scope-controls
+    autoStart: false
+    commands:
+      - expect("xpath://button[@aria-label='Toggle report filters']").toHaveAttribute("aria-pressed", "true")
+      - (xpath://input[@aria-label='Minimum samples']).clear
+      - (xpath://input[@aria-label='Minimum samples']).sendKeys(25)
+      - (xpath://h1).click
+      - expect("#request-state").toContainText('"minimum":25')
+      - expect("#request-state").toContainText('"fetchCount":2')
+  denied:
+    action: webdriver:run
+    sessionID: scope-controls
+    autoStart: false
+    commands:
+      - (xpath://button[normalize-space(.)='Denied response']).click
+      - expect("body").toContainText("could not be loaded")
+      - expect(page.locator("xpath://td[contains(.,'Updated sample')]")).toHaveCount("0", 1000)
+  empty:
+    action: webdriver:run
+    sessionID: scope-controls
+    autoStart: false
+    commands:
+      - (xpath://button[normalize-space(.)='Empty response']).click
+      - expect("body").toContainText("No data")
+      - expect(page.locator("xpath://td[contains(.,'Updated sample')]")).toHaveCount("0", 1000)
+  dateEnd:
+    action: webdriver:run
+    sessionID: scope-controls
+    autoStart: false
+    commands:
+      - expect("xpath://button[@aria-label='Toggle report filters']").toHaveAttribute("aria-pressed", "true")
+      - (xpath://input[@aria-label='End date or relative expression']).clear
+      - (xpath://input[@aria-label='End date or relative expression']).sendKeys(2026-02-28)
+      - (xpath://h1).click
+      - expect("#request-state").toContainText('"from":"2026-01-01"')
+      - expect("#request-state").toContainText('"to":"2026-02-28"')
+      - expect("#request-state").toContainText('"fetchCount":3')
+      - expect("#request-state").toContainText('"offset":0')
+      - expect("#request-state").toContainText('"page":1')
+      - expect("body").toContainText("Loading report")
+  dateStart:
+    action: webdriver:run
+    sessionID: scope-controls
+    autoStart: false
+    commands:
+      - (xpath://button[normalize-space(.)='Complete response']).click
+      - expect("xpath://button[@aria-label='Toggle report filters']").toHaveAttribute("aria-pressed", "true")
+      - (xpath://input[@aria-label='Start date or relative expression']).clear
+      - (xpath://input[@aria-label='Start date or relative expression']).sendKeys(2026-01-05)
+      - (xpath://h1).click
+      - expect("#request-state").toContainText('"from":"2026-01-05"')
+      - expect("#request-state").toContainText('"to":"2026-02-28"')
+      - expect("#request-state").toContainText('"fetchCount":4')
+      - expect(page.locator("xpath://td[contains(.,'Updated sample')]")).toHaveCount("0", 1000)
+  requiredKinds:
+    action: webdriver:run
+    sessionID: scope-controls
+    autoStart: false
+    commands:
+      - (xpath://button[normalize-space(.)='Complete response']).click
+      - expect("xpath://button[@aria-label='Toggle report filters']").toHaveAttribute("aria-pressed", "true")
+      - (xpath://button[normalize-space(.)='Required alpha']).click
+      - expect("#request-state").toContainText('"requiredKinds":["a"]')
+      - expect("#request-state").toContainText('"fetchCount":4')
+      - (xpath://button[normalize-space(.)='Required beta']).click
+      - expect("#request-state").toContainText('"requiredKinds":["a","b"]')
+      - expect("#request-state").toContainText('"fetchCount":5')
+      - (xpath://button[normalize-space(.)='Complete response']).click
+      - expect("xpath://button[@aria-label='Toggle report filters']").toHaveAttribute("aria-pressed", "true")
+      - (xpath://button[normalize-space(.)='Required alpha']).click
+      - expect("#request-state").toContainText('"requiredKinds":["b"]')
+      - expect("#request-state").toContainText('"fetchCount":6')
+      - (xpath://button[normalize-space(.)='Complete response']).click
+      - expect("xpath://button[@aria-label='Toggle report filters']").toHaveAttribute("aria-pressed", "true")
+      - (xpath://button[normalize-space(.)='Required beta']).click
+      - expect("#request-state").toContainText('"requiredKinds":["b"]')
+      - expect("#request-state").toContainText('"fetchCount":6')
+  optionalKinds:
+    action: webdriver:run
+    sessionID: scope-controls
+    autoStart: false
+    commands:
+      - (xpath://button[normalize-space(.)='Optional gamma']).click
+      - expect("#request-state").toContainText('"optionalKinds":[]')
+      - expect("#request-state").toContainText('"fetchCount":7')
+      - (xpath://button[normalize-space(.)='Complete response']).click
+      - expect("xpath://button[@aria-label='Toggle report filters']").toHaveAttribute("aria-pressed", "true")
+      - (xpath://button[normalize-space(.)='Optional delta']).click
+      - expect("#request-state").toContainText('"optionalKinds":["y"]')
+      - expect("#request-state").toContainText('"fetchCount":8')
+      - (xpath://button[normalize-space(.)='Complete response']).click
+      - expect("xpath://button[@aria-label='Toggle report filters']").toHaveAttribute("aria-pressed", "true")
+      - (xpath://button[normalize-space(.)='Optional delta']).click
+      - expect("#request-state").toContainText('"optionalKinds":[]')
+      - expect("#request-state").toContainText('"fetchCount":9')
+      - expect("#request-state").toContainText('"requiredKinds":["b"]')
+      - expect("#request-state").toContainText('"fixedActor":"fixture"')
+      - expect("#request-state").toContainText('"fixedScope":7')
+      - expect("#request-state").toContainText('"mode":2')
+      - expect("#request-state").toContainText('"minimum":25')
+      - expect("#request-state").toContainText('"offset":0')
+      - expect("#request-state").toContainText('"page":1')
+      - expect("#request-state").toContainText('"from":"2026-01-05"')
+      - expect("#request-state").toContainText('"to":"2026-02-28"')
+  invalidInputs:
+    action: webdriver:run
+    sessionID: scope-controls
+    autoStart: false
+    commands:
+      - (xpath://button[normalize-space(.)='Complete response']).click
+      - (xpath://input[@aria-label='Minimum samples']).clear
+      - (xpath://h1).click
+      - expect("body").toContainText("A value is required.")
+      - expect("xpath://input[@aria-label='Minimum samples']").toHaveAttribute("aria-invalid", "true")
+      - expect("#request-state").toContainText('"minimum":25')
+      - expect("#request-state").toContainText('"fetchCount":9')
+      - (xpath://input[@aria-label='Minimum samples']).sendKeys(9007199254740993)
+      - (xpath://h1).click
+      - expect("body").toContainText("Enter a whole number between")
+      - expect("#request-state").toContainText('"minimum":25')
+      - expect("#request-state").toContainText('"fetchCount":9')
+      - (xpath://input[@aria-label='Minimum samples']).clear
+      - (xpath://input[@aria-label='Minimum samples']).sendKeys(25)
+      - (xpath://h1).click
+      - (xpath://input[@aria-label='Start date or relative expression']).clear
+      - (xpath://input[@aria-label='Start date or relative expression']).sendKeys(not-a-date)
+      - (xpath://h1).click
+      - expect("body").toContainText("Enter a valid date")
+      - expect("xpath://input[@aria-label='Start date or relative expression']").toHaveAttribute("aria-invalid", "true")
+      - expect("#request-state").toContainText('"from":"2026-01-05"')
+      - expect("#request-state").toContainText('"fetchCount":9')
+      - (xpath://input[@aria-label='Start date or relative expression']).clear
+      - (xpath://input[@aria-label='Start date or relative expression']).sendKeys(2026-03-01)
+      - (xpath://h1).click
+      - expect("body").toContainText("Start date must be on or before end date.")
+      - expect("#request-state").toContainText('"from":"2026-01-05"')
+      - expect("#request-state").toContainText('"to":"2026-02-28"')
+      - expect("#request-state").toContainText('"fetchCount":9')
+      - (xpath://input[@aria-label='Start date or relative expression']).clear
+      - (xpath://input[@aria-label='Start date or relative expression']).sendKeys(2026-02-30)
+      - (xpath://h1).click
+      - expect("body").toContainText("Enter a valid date")
+      - expect("#request-state").toContainText('"fetchCount":9')
+      - (xpath://input[@aria-label='Start date or relative expression']).clear
+      - (xpath://input[@aria-label='Start date or relative expression']).sendKeys(2026-01-05)
+      - (xpath://h1).click
+      - expect(page.locator("xpath://p[@role='alert']")).toHaveCount("0", 1000)
+  optionalScalars:
+    action: webdriver:run
+    sessionID: scope-controls
+    autoStart: false
+    commands:
+      - (xpath://input[@aria-label='Optional count']).clear
+      - (xpath://h1).click
+      - expect("#request-state").toContainText('"optionalCount":null')
+      - expect("#request-state").toContainText('"fetchCount":10')
+      - (xpath://input[@aria-label='Optional amount']).clear
+      - (xpath://h1).click
+      - expect("#request-state").toContainText('"optionalAmount":null')
+      - expect("#request-state").toContainText('"fetchCount":11')
+      - expect("#request-state").toContainText('"minimum":25')
+      - expect("#request-state").toContainText('"from":"2026-01-05"')
+      - expect("#request-state").toContainText('"to":"2026-02-28"')
+      - expect("#request-state").toContainText('"fixedActor":"fixture"')
+      - expect("#request-state").toContainText('"fixedScope":7')
+      - expect("#request-state").toContainText('"offset":0')
+      - expect("#request-state").toContainText('"page":1')
+      - expect(page.locator("xpath://td[contains(.,'Updated sample')]")).toHaveCount("0", 1000)
+      - expect(page.locator("xpath://p[@role='alert']")).toHaveCount("0", 1000)

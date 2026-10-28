@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {normalizeChartTooltip,buildChartTooltipEntries,chartTooltipPrintLines} from './chartTooltip.js';
+const config={fields:[{field:'rate',label:'Rate',format:'percentFraction2'}],lines:[[{text:'Measured <script> is literal text'}],[{text:'Current: '},{field:'rate'},{text:'; repeated: '},{field:'rate'}],[]]};
+const chart={type:'bar',xAxis:{dataKey:'group'},series:{values:[{value:'count',label:'Count'}]},tooltip:config};
+const entries=buildChartTooltipEntries(chart,[{group:'North',count:20,rate:.25}]);
+assert.deepEqual(entries[0].lines,['Measured <script> is literal text','Current: 25.00%; repeated: 25.00%','']);
+assert.ok(chartTooltipPrintLines(config,entries).includes('Current: 25.00%; repeated: 25.00%'));
+assert.throws(()=>normalizeChartTooltip({...config,lines:[[{field:'secret'}]]}),/admitted/);
+assert.throws(()=>normalizeChartTooltip({...config,lines:[[{text:'a',field:'rate'}]]}),/text or field/);
+const staticEntries=buildChartTooltipEntries({...chart,tooltip:{fields:[],lines:[[{text:'Explanation'}]]}},[{group:'North',count:20}]);
+assert.deepEqual(staticEntries[0].lines,['Explanation']);
+console.log('tooltip templates retain static text, repeated admitted fields and safe print lines');

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/viant/authz"
 	"github.com/viant/forge/backend/provider/contract/observe"
@@ -19,6 +20,12 @@ type ArtifactStore interface {
 	Has(context.Context, RootRef) (bool, error)
 	Get(context.Context, RootRef) (*Artifact, error)
 	Put(context.Context, *Artifact) error
+}
+
+// VerifiedArtifactStore verifies immutable bytes on insertion or cold hydrate,
+// then returns owned bytes from that verified cache without rehashing hot reads.
+type VerifiedArtifactStore interface {
+	GetVerified(context.Context, RootRef) (*Artifact, error)
 }
 
 // ManifestStore persists only the last verified index and policy snapshot for
@@ -49,6 +56,8 @@ type partitionState struct {
 }
 type admission struct {
 	tenant, policyIndex string
+	validUntil          time.Time
+	denied              bool
 	cohorts             map[string]string // admitted cohort name -> current policy hash
 	manifestHash        string
 	selections          map[string]effectiveSelection
@@ -667,6 +676,11 @@ func (r *Replica) Admit(ctx context.Context) (admitErr error) {
 		matched[cohort.Name] = cohort.PolicyHash
 	}
 	if len(matched) == 0 {
+		r.mu.Lock()
+		if r.ready && r.latest.Hash == manifest.Hash {
+			r.admissions[key] = admission{tenant: facts.Tenant, validUntil: facts.ValidUntil, denied: true, policyIndex: policyIndexHash(manifest, facts.Tenant), cohorts: matched, manifestHash: manifest.Hash, selections: map[string]effectiveSelection{}}
+		}
+		r.mu.Unlock()
 		return ErrDenied
 	}
 	r.mu.RLock()
@@ -690,7 +704,7 @@ func (r *Replica) Admit(ctx context.Context) (admitErr error) {
 	if !r.ready || r.latest.Hash != manifest.Hash {
 		return ErrUnavailable
 	}
-	held := admission{tenant: facts.Tenant, policyIndex: policyIndexHash(manifest, facts.Tenant), cohorts: matched, manifestHash: manifest.Hash, selections: map[string]effectiveSelection{}}
+	held := admission{tenant: facts.Tenant, validUntil: facts.ValidUntil, policyIndex: policyIndexHash(manifest, facts.Tenant), cohorts: matched, manifestHash: manifest.Hash, selections: map[string]effectiveSelection{}}
 	if r.cfg.Cohort == nil {
 		roots, selectionErr := effectiveRoots(manifest, held, "")
 		held.selections[""] = effectiveSelection{roots, selectionErr}
@@ -712,9 +726,14 @@ func (r *Replica) EnsureAdmitted(ctx context.Context) error {
 	}
 	r.mu.RLock()
 	held, ok := r.admissions[key]
-	current := ok && held.policyIndex == policyIndexHash(r.latest, held.tenant) && held.manifestHash == r.latest.Hash
+	// Manifest activation refreshes this pointer only when policy heads are
+	// unchanged. No policy hashing, sorting or evaluation belongs on an open.
+	current := ok && r.ready && held.manifestHash == r.latest.Hash && held.validUntil.After(time.Now())
 	r.mu.RUnlock()
 	if current {
+		if held.denied {
+			return ErrDenied
+		}
 		return nil
 	}
 	return r.Admit(ctx)
@@ -748,13 +767,19 @@ func (r *Replica) Open(ctx context.Context, uri string) (view *View, openErr err
 	// A compressed backing/hot scache may hydrate while a notification or
 	// admission change races. Do no MCP I/O here; recheck local state at release.
 	getTiming := timing(ctx, phaseStoreGet, r.cfg.Source, ref.Kind)
-	loaded, err := r.cfg.Store.Get(ctx, ref)
+	var loaded *Artifact
+	verified, hasVerifiedStore := r.cfg.Store.(VerifiedArtifactStore)
+	if hasVerifiedStore {
+		loaded, err = verified.GetVerified(ctx, ref)
+	} else {
+		loaded, err = r.cfg.Store.Get(ctx, ref)
+	}
 	loadedBytes := int64(0)
 	if loaded != nil {
 		loadedBytes = int64(len(loaded.Payload))
 	}
 	getTiming.EndBytes(timingOutcome(err), observe.CacheUnknown, loadedBytes)
-	if err != nil || loaded == nil || loaded.Root != ref || ValidateArtifact(loaded) != nil {
+	if err != nil || loaded == nil || loaded.Root != ref || !hasVerifiedStore && ValidateArtifact(loaded) != nil {
 		return nil, ErrUnavailable
 	}
 	r.mu.RLock()
@@ -872,7 +897,7 @@ func (r *Replica) ensureSelection(key, selected string) error {
 }
 
 func (r *Replica) selectedRootLocked(admitted admission, uri, selected string) (RootRef, error) {
-	if admitted.manifestHash != r.latest.Hash {
+	if admitted.manifestHash != r.latest.Hash || !admitted.validUntil.After(time.Now()) {
 		return RootRef{}, ErrDenied
 	}
 	selection, ok := admitted.selections[selected]
@@ -947,7 +972,7 @@ func (r *Replica) PermittedRoots(ctx context.Context) ([]RootRef, error) {
 	if len(r.latest.Cohorts) == 0 {
 		return nil, ErrDenied
 	}
-	if admitted.manifestHash != r.latest.Hash {
+	if admitted.manifestHash != r.latest.Hash || !admitted.validUntil.After(time.Now()) {
 		return nil, ErrDenied
 	}
 	selection, ok := admitted.selections[selected]

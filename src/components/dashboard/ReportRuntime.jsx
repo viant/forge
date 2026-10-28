@@ -1,3 +1,5 @@
+import {parseReportMarkdownInline} from '../../reporting/reportMarkdownInline.js';
+import {validateDonutCenterDataset} from '../donutCenter.js';
 import {mergeHierarchySelections} from '../../reporting/reportTableAnalytics.js';
 import GeoGeometryMap from './GeoGeometryMap.jsx';
 import {resolveReportRuntimeChartRowLimit} from '../chartAppearance.js';
@@ -15,6 +17,9 @@ import { buildRuntimeSections } from "./reportSections.js";
 export { buildRuntimeSections } from "./reportSections.js";
 import {WorkspacePresentationProvider, useWorkspacePresentation, distinctWorkspaceTitle} from '../../core/context/WorkspacePresentation.jsx';
 import { resolveReportRuntimeCompositeOwnership } from "./reportRuntimeStructure.js";
+import { compositeBare } from "../../reporting/reportCompositeLayout.js";
+import ReportCompositeGrid from './ReportCompositeGrid.jsx';
+import {reportExternalLinks} from '../../reporting/reportExternalLinks.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@blueprintjs/core";
 
@@ -145,13 +150,13 @@ function supportsReportRuntimeExecution(execution = null, runtimeHandlers = null
   return false;
 }
 
-function createRuntimeContext(dataset = {}, locale = "en-US", { publicMode = false } = {}) {
+function createRuntimeContext(dataset = {}, locale = "en-US", { publicMode = false, loading = false, error = null } = {}) {
   const rows = Array.isArray(dataset?.rows) ? dataset.rows : [];
   const diagnostics = Array.isArray(dataset?.provenance?.diagnostics) ? dataset.provenance.diagnostics : [];
   const errorDiagnostic = diagnostics.find((entry) => normalizeString(entry?.severity).toLowerCase() === "error") || null;
   const controlValue = errorDiagnostic && !(publicMode && rows.length > 0)
     ? { loading: false, error: errorDiagnostic?.message || "Dataset failed to load." }
-    : { loading: false, error: null };
+    : { loading, error };
   return {
     locale,
     identity: {
@@ -1349,29 +1354,23 @@ function HostIntentPanel({ hostIntent = null, runtimeHandlers = null }) {
 }
 
 function renderRuntimeMarkdownInline(value = "", documentPresentation = false) {
-  const segments = String(value || "").split(/(\*\*[^*]+?\*\*|`[^`]+?`|\*[^*]+?\*)/g).filter((segment) => segment !== "");
-  return segments.map((segment, index) => {
-    if (segment.startsWith("**") && segment.endsWith("**")) {
-      return <strong key={index}>{segment.slice(2, -2)}</strong>;
+  return parseReportMarkdownInline(value || "").map((run,index)=>{
+    if(run.fontWeight==='bold italic')return <strong key={index}><em>{run.text}</em></strong>;
+    if(run.fontWeight==='bold')return <strong key={index}>{run.text}</strong>;
+    if(run.fontWeight==='italic')return <em key={index}>{run.text}</em>;
+    if(run.code){
+      if(documentPresentation)return <Typography key={index} as="code" typeRole="code" className="forge-report-document-code">{run.text}</Typography>;
+      return <code key={index} style={{ fontSize: "0.92em", background: "var(--forge-report-surface-subtle, #eef3f8)", borderRadius: 4, padding: "1px 4px" }}>{run.text}</code>;
     }
-    if (segment.startsWith("*") && segment.endsWith("*")) {
-      return <em key={index}>{segment.slice(1, -1)}</em>;
-    }
-    if (segment.startsWith("`") && segment.endsWith("`")) {
-      if (documentPresentation) return <Typography key={index} as="code" typeRole="code" className="forge-report-document-code">{segment.slice(1,-1)}</Typography>;
-      return (
-        <code key={index} style={{ fontSize: "0.92em", background: "var(--forge-report-surface-subtle, #eef3f8)", borderRadius: 4, padding: "1px 4px" }}>
-          {segment.slice(1, -1)}
-        </code>
-      );
-    }
-    return segment;
+    return run.text;
   });
 }
 
 function RuntimeMarkdownBody({ markdown = "" }) {
   const documentPresentation = React.useContext(DocumentPresentationContext);
   const lines = String(markdown || "").replace(/\r\n/g, "\n").split("\n");
+  const firstContentLine = lines.findIndex(line => line.trim());
+  const lastContentLine = lines.length - 1 - [...lines].reverse().findIndex(line => line.trim());
   let codeEnd = -1;
   const renderedLines = lines
     .map((line, index) => {
@@ -1394,7 +1393,8 @@ function RuntimeMarkdownBody({ markdown = "" }) {
       }
       const trimmed = normalizeString(line);
       if (!trimmed) {
-        return null;
+        return index > firstContentLine && index < lastContentLine
+          ? <div key={index} aria-hidden="true" data-report-markdown-blank-line style={{minHeight: "0.5em"}} /> : null;
       }
       if (documentPresentation) {
         const heading = trimmed.match(/^#{1,2}\s+(.*)/);
@@ -1449,12 +1449,14 @@ function MarkdownBlock({ block = {} }) {
   const firstHeadingText = firstLine.startsWith("## ")
     ? normalizeString(firstLine.slice(3))
     : (firstLine.startsWith("# ") ? normalizeString(firstLine.slice(2)) : "");
-  const panelTitle = firstHeadingText && title && firstHeadingText.toLowerCase() === title.toLowerCase()
+  const bare=compositeBare(block);
+  const panelTitle = bare || firstHeadingText && title && firstHeadingText.toLowerCase() === title.toLowerCase()
     ? ""
     : title;
   return (
-    <RuntimePanel title={panelTitle}>
+    <RuntimePanel title={panelTitle} style={bare ? {border:0,padding:0,background:'transparent',boxShadow:'none'} : undefined}>
       <RuntimeMarkdownBody markdown={markdown || "No narrative content."} />
+      {reportExternalLinks(block).map(link=><Typography as="p" typeRole="body" key={link.url}><a href={link.url} target="_blank" rel="noopener noreferrer">{link.label}</a></Typography>)}
     </RuntimePanel>
   );
 }
@@ -1702,7 +1704,7 @@ function CollectionBlock({ block = {}, diagnostics = [], locale = "en-US", onRet
       <Typography as="p" typeRole="body">{normalizeString(content?.emptyLabel || 'No collection items available.')}</Typography> :
       <div className="forge-report-document-collection" data-layout={layout} style={{'--forge-report-collection-columns':layout === 'list' ? 1 : gridColumns}}>
         {items.map((item,index) => <section key={item.id || index}>
-          <Typography as="h3" typeRole="label">{normalizeString(item.title || `Item ${index+1}`)}</Typography>
+          <Typography as="h3" typeRole="label">{item.markerColor?<svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" style={{marginInlineEnd:"var(--forge-spacing-2, 8px)"}}><rect width="12" height="12" fill={item.markerColor}/></svg>:null}{normalizeString(item.title || `Item ${index+1}`)}</Typography>
           {item.toneLabel ? <Typography as="p" typeRole="small" className="forge-report-document-badge" data-forge-status={item.tone}>{item.toneLabel}</Typography> : null}
           {item.valueLabel ? <dl><Typography as="dt" typeRole="metadata">{item.valueLabel}</Typography><Typography as="dd" typeRole="metric">{formatKpiValue(item.value,normalizeString(item.valueFormat || item.format),locale)}</Typography></dl> : null}
           {item.secondaryLabel ? <Typography as="p" typeRole="body">{item.secondaryLabel}: {formatKpiValue(item.secondaryValue,normalizeString(item.secondaryFormat),locale)}</Typography> : null}
@@ -1751,7 +1753,7 @@ function CollectionBlock({ block = {}, diagnostics = [], locale = "en-US", onRet
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                  <div style={{ fontSize: "var(--forge-report-type-body-size, 14px)", lineHeight: "var(--forge-report-type-body-line-height, normal)", fontWeight: 700, color: textColor || "var(--forge-report-text, #182026)" }}>{title}</div>
+                  <div style={{ fontSize: "var(--forge-report-type-body-size, 14px)", lineHeight: "var(--forge-report-type-body-line-height, normal)", fontWeight: 700, color: textColor || "var(--forge-report-text, #182026)" }}>{item.markerColor?<svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12"><rect width="12" height="12" fill={item.markerColor}/></svg>:null}{title}</div>
                   {normalizeString(item?.toneLabel) ? (
                     <span style={{ fontSize: "var(--forge-report-type-caption-size, 10px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)", fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase", color: textColor || "var(--forge-report-text-secondary, #30404d)" }}>
                       {normalizeString(item.toneLabel)}
@@ -2462,7 +2464,7 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, on
         context={createRuntimeContext({
           ...dataset,
           rows: runtimeTableRows,
-        }, locale, { publicMode })}
+        }, locale, { publicMode, loading: page.loading, error: page.error })}
         locale={locale}
         initialPresentationState={initialPresentationState}
         onPresentationStateChange={handleTablePresentationChange}
@@ -2480,9 +2482,10 @@ function FilterBarBlock({ block = {}, scopeParams = new Map(), activeScopeSummar
   const normalizedDatasetRef = resolveRuntimeBlockDatasetRef(block, { availableDatasetRefs }).datasetRef;
   const isPrimaryScope = normalizedDatasetRef === "primary";
   const canEditFilterParams = params.some((param) => (
-    (normalizeString(param?.type).toLowerCase() === "daterange" && typeof runtimeHandlers?.setScopeParamDate === "function")
+    (runtimeHandlers?.canEditScopeParam?.(param) !== false) && ((normalizeString(param?.type).toLowerCase() === "daterange" && typeof runtimeHandlers?.setScopeParamDate === "function")
     || (Array.isArray(param?.options) && param.options.length > 0 && typeof runtimeHandlers?.toggleScopeParamOption === "function")
-  ));
+    || (['integer', 'number', 'text'].includes(param?.type) && typeof runtimeHandlers?.setScopeParamValue === 'function')
+  )));
   return (
     <RuntimePanel
       title={canEditFilterParams
@@ -2513,11 +2516,16 @@ function FilterBarBlock({ block = {}, scopeParams = new Map(), activeScopeSummar
             description,
           };
           const canEditDateRange = normalizeString(interactiveFilter?.type).toLowerCase() === "daterange"
+            && runtimeHandlers?.canEditScopeParam?.(interactiveFilter) !== false
             && typeof runtimeHandlers?.setScopeParamDate === "function";
           const canEditOptions = Array.isArray(interactiveFilter?.options)
+            && runtimeHandlers?.canEditScopeParam?.(interactiveFilter) !== false
             && interactiveFilter.options.length > 0
             && typeof runtimeHandlers?.toggleScopeParamOption === "function";
-          const canToggleEnabled = typeof runtimeHandlers?.setScopeParamEnabled === "function";
+          const canToggleEnabled = runtimeHandlers?.canToggleScopeParam?.(interactiveFilter) !== false && typeof runtimeHandlers?.setScopeParamEnabled === "function";
+          const canEditValue = ['integer', 'number', 'text'].includes(interactiveFilter?.type)
+            && runtimeHandlers?.canEditScopeParam?.(interactiveFilter) !== false
+            && typeof runtimeHandlers?.setScopeParamValue === 'function';
           const filterEnabled = interactiveFilter?.enabled !== false;
           const wrapFilterControl = (control) => (
             <div key={param?.id} className="forge-report-runtime-filter-control" style={{ display: "inline-flex", alignItems: "flex-start", gap: 6 }}>
@@ -2535,13 +2543,15 @@ function FilterBarBlock({ block = {}, scopeParams = new Map(), activeScopeSummar
               ) : null}
             </div>
           );
-          if (canEditDateRange || canEditOptions) {
+          if (canEditDateRange || canEditOptions || canEditValue) {
             return wrapFilterControl(
               <InlineStaticFilterControl
                 filter={interactiveFilter}
                 value={param?.value}
+                commitOnBlur={runtimeHandlers?.scopeControlCommitMode === 'blur'}
                 onToggle={(optionValue) => runtimeHandlers.toggleScopeParamOption(interactiveFilter, optionValue)}
                 onDateRange={(edge, value) => runtimeHandlers.setScopeParamDate(interactiveFilter, edge, value)}
+                onValue={value => runtimeHandlers.setScopeParamValue(interactiveFilter, value)}
               />
             );
           }
@@ -3087,6 +3097,7 @@ export default function ReportRuntime({
   selectedSectionId = "",
   onSectionChange = null,
   sectionLoading = false,
+  retainEmptySectionContent = false,
   sectionNavigation = null,
   sectionError = "",
   onSectionRetry = null,
@@ -3220,6 +3231,7 @@ export default function ReportRuntime({
     () => buildReportRuntimeFilterToolbarModel(topFilterBarBlocks),
     [topFilterBarBlocks],
   );
+  const clearableScopeFilters = filterToolbarModel.filters.filter(filter => runtimeHandlers?.canClearScopeParam?.(filter) !== false);
   const hasTopLevelRefinementBarBlock = useMemo(
     () => allRuntimeBlocks.some((block) => normalizeString(block?.kind) === "refinementBarBlock"),
     [allRuntimeBlocks],
@@ -3441,7 +3453,7 @@ export default function ReportRuntime({
           block={block}
           diagnostics={resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset, publicDiagnosticsMode)}
           dataset={dataset}
-          page={datasetPages[dataset?.id] || {}}
+          page={{...datasetPages[dataset?.id], ...(sectionLoading ? {loading: true} : {}), ...(sectionError ? {error: sectionError} : {})}}
           onDatasetPageChange={onDatasetPageChange}
           onDatasetExpand={onDatasetExpand}
           displayMode={tableDisplayModes ? (tableDisplayModes[block.id] || "default") : undefined}
@@ -3543,6 +3555,8 @@ export default function ReportRuntime({
               container={{
                 id: block.id,
                 kind: "dashboard.chart",
+                requestFilters: dataset?.request?.filters,
+                ...(chartModel.center?.datasetRef ? {centerRows: validateDonutCenterDataset(datasetIndex.get(chartModel.center.datasetRef)), centerInputs: datasetIndex.get(chartModel.center.datasetRef)?.request?.filters} : {}),
                 title: normalizeString(block?.title || block?.content?.chartSpec?.title || block?.chartSpec?.title || "Chart"),
                 dataSourceRef: normalizeString(dataset?.dataSourceRef || block?.datasetRef),
                 chart: {
@@ -3565,6 +3579,8 @@ export default function ReportRuntime({
             />
           ) : chartLoading ? (
             <div role="status" aria-busy="true">Loading chart…</div>
+          ) : sectionError ? (
+            <div role="alert">{sectionError}</div>
           ) : emptyChart ? (
             <div className="forge-report-runtime-chart-empty" role="status"
               style={{ fontSize: "var(--forge-report-type-small-size, 12px)", color: "var(--forge-report-text-muted, #5f6b7c)", lineHeight: "var(--forge-report-type-small-line-height, 1.5)" }}>
@@ -3590,32 +3606,31 @@ export default function ReportRuntime({
       return <GeoMapBlock key={block.id} block={block} diagnostics={resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset, publicDiagnosticsMode)} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />;
     }
     if (kind === "compositeBlock") {
+      const spacerHeight = (block?.content?.runtime || block?.runtime || {}).spacerHeight;
+      if (Number.isFinite(spacerHeight) && spacerHeight >= 0) return <div key={block.id} aria-hidden="true" style={{height: spacerHeight}} />;
       const childBlockIds = runtimeCompositeConfig.childrenById.get(normalizeString(block?.id)) || [];
       const childBlocks = childBlockIds
         .map((blockId) => runtimeBlockIndex.get(normalizeString(blockId)) || null)
-        .filter(Boolean);
+        .filter(Boolean)
+        .filter(child => isReportRuntimeBlockVisible(child, {metrics: resolveRuntimeDataset(child)?.rows?.[0] || {}, filters: runtimeFilterValues, selection: runtimeSelection}));
       const compositeLayout = resolveReportRuntimeCompositeLayout(block);
       const compositeColumns = resolveReportRuntimeCompositeColumns(block, runtimeViewportWidth);
+      const bare = compositeBare(block);
       const hasAuthoredCompositeLayout = !!normalizeString(block?.content?.layout || block?.layout);
       const documentMetricGrid = documentPresentation && !hasAuthoredCompositeLayout && childBlocks.length > 0
         && childBlocks.every(child => child.kind === "kpiBlock");
       return (
         <RuntimePanel
           key={block.id}
+          style={bare ? {border: 0, padding: 0, background: 'transparent', boxShadow: 'none'} : undefined}
           headerAction={headerActions?.get(normalizeString(block.id))}
-          title={documentPresentation && childBlocks.every(child => child.kind === "kpiBlock") ? "" : normalizeString(block?.title || block?.content?.title || "Grouped Panel")}
+          title={bare || documentPresentation && childBlocks.every(child => child.kind === "kpiBlock") ? "" : normalizeString(block?.title || block?.content?.title || "Grouped Panel")}
           subtitle={normalizeString(block?.content?.description || block?.description)}
         >
           {childBlocks.length > 0 ? (
-            hasAuthoredCompositeLayout || documentMetricGrid ? <div
+            hasAuthoredCompositeLayout || documentMetricGrid ? <ReportCompositeGrid
+              block={block} blocks={childBlocks} columns={compositeColumns} viewportWidth={runtimeViewportWidth} layout={documentMetricGrid ? "documentMetrics" : compositeLayout}
               className={documentMetricGrid ? "forge-report-document-metrics" : undefined}
-              data-report-runtime-composite-layout={documentMetricGrid ? "documentMetrics" : compositeLayout}
-              data-report-runtime-composite-columns={documentMetricGrid ? undefined : compositeColumns}
-              style={documentMetricGrid ? undefined : {
-                display: "grid",
-                gridTemplateColumns: `repeat(${compositeColumns}, minmax(0, 1fr))`,
-                gap: "var(--forge-spacing-4, 16px)",
-              }}
             >
               {childBlocks.map((childBlock) => {
                 const rendered = renderBlock(childBlock);
@@ -3628,7 +3643,7 @@ export default function ReportRuntime({
                   {rendered}
                 </div>;
               })}
-            </div> : renderLayoutBlockGrid(childBlocks, `runtime:${normalizeString(block?.id || "composite")}`)
+            </ReportCompositeGrid> : renderLayoutBlockGrid(childBlocks, `runtime:${normalizeString(block?.id || "composite")}`)
           ) : (
             <div style={{ fontSize: "var(--forge-report-type-small-size, 12px)", color: "var(--forge-report-text-muted, #5f6b7c)", lineHeight: "var(--forge-report-type-small-line-height, 1.5)" }}>
               Add one or more child blocks to this grouped panel.
@@ -3728,7 +3743,7 @@ export default function ReportRuntime({
     <div data-forge-report-active-section={resolvedActiveSectionId} data-forge-report-section-state={sectionError?'error':sectionLoading?'loading':'ready'} data-forge-report-appearance={documentPresentation ? 'document' : undefined} style={documentPresentation ? undefined : { display: "flex", flexDirection: "column", gap: 16 }}>
       {documentPresentation ? <header className="forge-report-document-header">
         <div><Typography as="h1" typeRole="title">{title || reportDocument?.title || reportSpec?.title}</Typography>{subtitle || reportDocument?.subtitle ? <Typography as="p" typeRole="body">{subtitle || reportDocument.subtitle}</Typography> : null}</div>
-        <div className="forge-report-document-actions">{reportActions}{topFilterBarBlocks.length ? <Button variant="ghost" icon="lucide:sliders-horizontal" hideLabel aria-label="Toggle report filters" aria-pressed={filterPanelOpen} onClick={() => setFilterPanelOpen(open => !open)}/> : null}{filterToolbarModel.activeCount > 0 && typeof runtimeHandlers?.clearScopeParams === 'function' ? <Button variant="link" aria-label="Clear all report filters" onClick={() => runtimeHandlers.clearScopeParams(filterToolbarModel.filters)}>Clear all</Button> : null}</div>
+        <div className="forge-report-document-actions">{reportActions}{topFilterBarBlocks.length ? <Button variant="ghost" icon="lucide:sliders-horizontal" hideLabel aria-label="Toggle report filters" aria-pressed={filterPanelOpen} onClick={() => setFilterPanelOpen(open => !open)}/> : null}{filterToolbarModel.activeCount > 0 && clearableScopeFilters.length > 0 && typeof runtimeHandlers?.clearScopeParams === 'function' ? <Button variant="link" aria-label="Clear all report filters" onClick={() => runtimeHandlers.clearScopeParams(clearableScopeFilters)}>Clear all</Button> : null}</div>
       </header> : null}
       {showContextSummary && !reportPresentation ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -3789,8 +3804,8 @@ export default function ReportRuntime({
           >
             <Icon icon="filter" size={13} aria-hidden="true" />{!workspacePresentation ? <> Filters{filterToolbarModel.activeCount > 0 ? ` (${filterToolbarModel.activeCount})` : ""}</> : null}
           </button>
-          {filterToolbarModel.activeCount > 0 && typeof runtimeHandlers?.clearScopeParams === "function" ? (
-            <button type="button" className="forge-report-runtime-filter-clear" aria-label="Clear all report filters" onClick={() => runtimeHandlers.clearScopeParams(filterToolbarModel.filters)} >
+          {filterToolbarModel.activeCount > 0 && clearableScopeFilters.length > 0 && typeof runtimeHandlers?.clearScopeParams === "function" ? (
+            <button type="button" className="forge-report-runtime-filter-clear" aria-label="Clear all report filters" onClick={() => runtimeHandlers.clearScopeParams(clearableScopeFilters)} >
               Clear all
             </button>
           ) : null}
@@ -3831,19 +3846,23 @@ export default function ReportRuntime({
                       <div>{sectionError ? <><p>{sectionError}</p>{onSectionRetry ? <button type="button" onClick={onSectionRetry}>Retry section</button> : null}</>
                         : "Loading section…"}</div>
                     </section>
-                  ) : <>
+                  ) : null}
+                  {retainEmptySectionContent || !(sectionLoading || sectionError) ? <div hidden={!!(sectionLoading || sectionError)} style={sectionLoading || sectionError ? undefined : {display: "contents"}}>
                     {section.block && (!documentPresentation || sectionHeaderAction) && hasSectionHeaderDetail(section.block, sectionHeaderAction, section.navigationLabel)
                       ? renderBlock(section.block)
                       : null}
                     {renderLayoutBlockGrid(section.items, `runtime:${section.id}`)}
-                  </>}
+                  </div> : null}
                 </div>
               </WorkspacePresentationProvider>
             );
           })}
         </div>
       ) : (
-        renderLayoutBlockGrid(visibleRuntimeBlocks, "runtime")
+        <>
+          {documentPresentation ? renderTopFilters() : null}
+          {renderLayoutBlockGrid(visibleRuntimeBlocks, "runtime")}
+        </>
       )}
     </div>
     </DocumentPresentationContext.Provider>

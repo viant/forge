@@ -20,6 +20,11 @@ assert.deepEqual(resolveThemeAwareChartPalette(['#1f77b4', '#ff7f0e']), [
 ]);
 assert.deepEqual(resolveChartTypography(null), {
     family: 'system-ui, sans-serif',
+    bodyFamily: 'system-ui, sans-serif',
+    bodyWeight: 400,
+    bodyLetterSpacing: '0em',
+    bodySize: 14,
+    bodyLineHeight: 20,
     captionFamily: 'system-ui, sans-serif',
     captionWeight: 400,
     captionLetterSpacing: '0em',
@@ -80,3 +85,11 @@ console.log('authored chart presentation survives normalization and renderer mod
 const amounts=[{name:'Zero',value:0},{name:'Negative',value:-5},{name:'Missing',value:null}];
 assert.deepEqual(buildPieChartData(amounts,'name','value'),[],'Legacy positive-only behavior stays compatible');
 assert.deepEqual(buildPieChartData(amounts,'name','value',{includeNonPositive:true}).map(({name,value})=>({name,value})),[{name:'Zero',value:0},{name:'Negative',value:-5}],'Document states distinguish real zero/negative values from missing data');
+assert.deepEqual(resolveThemeAwareChartPalette(['#137cbd','#8a7644'],{forceRole:true,declared:true}),['#137cbd','#8a7644']);
+assert.match(resolveThemeAwareChartPalette(['#137cbd','#8a7644'],{forceRole:true})[1],/^var\(/,'Omitted declared mode retains theme role resolution');
+assert.throws(()=>resolveThemeAwareChartPalette(['red'],{declared:true}),/hex/);
+const fixed={type:'donut',xField:'category',yFields:['amount'],paletteMode:'declared',palette:['#426b85','#8a7644'],categoryColors:{First:'#426b85',Second:'#8a7644'}};
+const fixedModel=buildExplicitReportBuilderChartContainer({},config,{},fixed).chart;
+assert.equal(fixedModel.paletteMode,'declared');assert.deepEqual(fixedModel.series.palette,fixed.palette);
+assert.throws(()=>normalizeReportBuilderChartSpec({...fixed,categoryColors:undefined}),/category colors/);
+assert.throws(()=>normalizeReportBuilderChartSpec({...fixed,palette:Array(65).fill('#123456')}),/1–64/);

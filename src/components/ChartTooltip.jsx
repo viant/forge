@@ -11,10 +11,10 @@ export function ChartTooltipBody({entries=[],popup=false}) {
     {entries.map(entry=><section key={entry.id} aria-label={`${entry.category} / ${entry.seriesLabel}`}>
       <Typography as="h3" typeRole="label">{entry.category} / {entry.seriesLabel}</Typography>
       <Typography as="p" typeRole="metadata">{entry.rowCount} source {entry.rowCount===1?'row':'rows'}</Typography>
-      <dl>{entry.fields.map(field=><React.Fragment key={field.field}>
+      {entry.lines ? entry.lines.map((line,index)=><Typography as="p" typeRole="body" key={index}>{line || '\u00a0'}</Typography>) : <dl>{entry.fields.map(field=><React.Fragment key={field.field}>
         <Typography as="dt" typeRole="label">{field.label}{field.aggregate==='unique'?'':` (${field.aggregate})`}</Typography>
         <Typography as="dd" typeRole="body">{field.displayValue}</Typography>
-      </React.Fragment>)}</dl>
+      </React.Fragment>)}</dl>}
     </section>)}
   </div>;
 }

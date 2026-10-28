@@ -2,6 +2,7 @@ package reportfill
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/viant/forge/backend/reporting/tablemeta"
@@ -272,6 +273,7 @@ type ResolvedChart struct {
 }
 
 type ChartTooltipEntry struct {
+	Lines       []string            `json:"lines,omitempty"`
 	ID          string              `json:"id"`
 	Category    string              `json:"category"`
 	SeriesKey   string              `json:"seriesKey"`
@@ -289,6 +291,9 @@ type ChartTooltipField struct {
 }
 
 type DonutCenter struct {
+	ValueRole      string   `json:"valueRole,omitempty"`
+	ValueEmphasis  string   `json:"valueEmphasis,omitempty"`
+	LabelEmphasis  string   `json:"labelEmphasis,omitempty"`
 	Label          string   `json:"label"`
 	Value          *float64 `json:"value"`
 	FormattedValue string   `json:"formattedValue"`
@@ -388,9 +393,10 @@ type KPIContent struct {
 // sparkline contracts. Missing observations remain nil, never implicit zeros.
 type KPISparklineSpec = reportspec.KPISparklineSpec
 type KPISparklineContent struct {
-	Values           []*float64 `json:"values"`
-	Labels           []string   `json:"labels"`
-	ComparisonValues []*float64 `json:"comparisonValues,omitempty"`
+	ValueColor       *reportspec.ResolvedValueColor `json:"valueColor,omitempty"`
+	Values           []*float64                     `json:"values"`
+	Labels           []string                       `json:"labels"`
+	ComparisonValues []*float64                     `json:"comparisonValues,omitempty"`
 }
 
 type BadgeItem struct {
@@ -414,6 +420,7 @@ type BadgesContent struct {
 }
 
 type CollectionItemContent struct {
+	MarkerColor     string `json:"markerColor,omitempty"`
 	Index           *int   `json:"index,omitempty"`
 	Title           any    `json:"title"`
 	ItemTitleField  string `json:"itemTitleField,omitempty"`
@@ -1488,7 +1495,7 @@ func (r *ReportFill) Validate() error {
 			if block.ChartContent.ResolvedChart.SeriesKeys == nil {
 				return fmt.Errorf("reportFill.blocks[%d].content.resolvedChart.seriesKeys is required for chartBlock", index)
 			}
-			if len(block.ChartContent.ResolvedChart.SeriesKeys) == 0 && !(block.ChartContent.ResolvedChart.Type == "donut" && block.ChartContent.ResolvedChart.Center != nil && len(block.ChartContent.ResolvedChart.Rows) == 0) {
+			if len(block.ChartContent.ResolvedChart.SeriesKeys) == 0 && !(len(block.ChartContent.ResolvedChart.Rows) == 0 && ((block.ChartContent.ResolvedChart.Type == "donut" && block.ChartContent.ResolvedChart.Center != nil) || len(block.ChartContent.ResolvedChart.TooltipEntries) > 0)) {
 				return fmt.Errorf("reportFill.blocks[%d].content.resolvedChart.seriesKeys must not be empty for chartBlock", index)
 			}
 			for seriesIndex, seriesKey := range block.ChartContent.ResolvedChart.SeriesKeys {
@@ -1500,6 +1507,14 @@ func (r *ReportFill) Validate() error {
 				return fmt.Errorf("reportFill.blocks[%d].content.resolvedChart.rows is required for chartBlock", index)
 			}
 			if center := block.ChartContent.ResolvedChart.Center; center != nil {
+				if center.ValueRole != "" && center.ValueRole != "small" && center.ValueRole != "body" {
+					return fmt.Errorf("unsupported donut center value role")
+				}
+				for _, emphasis := range []string{center.ValueEmphasis, center.LabelEmphasis} {
+					if emphasis != "" && emphasis != "bold" && emphasis != "italic" && emphasis != "bold italic" {
+						return fmt.Errorf("unsupported donut center emphasis")
+					}
+				}
 				if block.ChartContent.ResolvedChart.Type != "donut" || center.Scope != "dataset" || strings.TrimSpace(center.Label) == "" {
 					return fmt.Errorf("reportFill donut center requires donut type, label and dataset scope")
 				}
@@ -1600,6 +1615,9 @@ func (r *ReportFill) Validate() error {
 				return fmt.Errorf("reportFill.blocks[%d].content.rowCount is required for kpiBlock", index)
 			}
 			if sparkline := block.KPIContent.Sparkline; sparkline != nil {
+				if err := sparkline.ValueColor.Validate(); err != nil {
+					return fmt.Errorf("reportFill.blocks[%d].sparkline: %w", index, err)
+				}
 				if sparkline.Values == nil || sparkline.Labels == nil || len(sparkline.Values) != len(sparkline.Labels) {
 					return fmt.Errorf("reportFill.blocks[%d].content.sparkline requires aligned values and labels", index)
 				}
@@ -1639,6 +1657,16 @@ func (r *ReportFill) Validate() error {
 			}
 			if !isAllowedReportBodyFormat(block.BodyFormat) {
 				return fmt.Errorf("reportFill.blocks[%d].bodyFormat %q is not supported for collectionBlock", index, block.BodyFormat)
+			}
+			for _, item := range block.CollectionContent.Items {
+				if item.MarkerColor != "" {
+					if len(item.MarkerColor) != 7 || item.MarkerColor[0] != '#' {
+						return fmt.Errorf("collection marker color must be six-digit hex")
+					}
+					if _, err := hex.DecodeString(item.MarkerColor[1:]); err != nil {
+						return fmt.Errorf("collection marker color must be six-digit hex")
+					}
+				}
 			}
 			if block.CollectionContent.Columns < 1 {
 				return fmt.Errorf("reportFill.blocks[%d].content.columns must be >= 1 for collectionBlock", index)

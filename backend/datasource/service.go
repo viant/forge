@@ -337,6 +337,9 @@ func (s *Service) Fetch(ctx context.Context, id string, inputs map[string]interf
 	if ds.Backend == nil {
 		return nil, fmt.Errorf("datasource %q has no backend", id)
 	}
+	if err := ds.Backend.ValidateArgumentProjection(); err != nil {
+		return nil, err
+	}
 	if len(ds.Backend.MethodVariants) > 0 {
 		if _, err := ds.Backend.DeclaredMCPMethods(); err != nil {
 			return nil, err
@@ -390,6 +393,14 @@ func (s *Service) Fetch(ctx context.Context, id string, inputs map[string]interf
 		}
 	}
 	cacheKey := responseAliasCacheKey(buildCacheKey(scopeID, ds.ID, policy.Key, mergedArgs), aliases) + criteriaKey
+	if len(ds.Backend.Args) > 0 {
+		declaration, err := json.Marshal(ds.Backend.Args)
+		if err != nil {
+			return nil, err
+		}
+		digest := sha256.Sum256(declaration)
+		cacheKey += "|argument-projection-v1:" + hex.EncodeToString(digest[:])
+	}
 	if pin, bound := runtimerequestctx.ResolvedResourceFromContext(ctx); bound {
 		target := opts.Target
 		if target == nil {
@@ -621,6 +632,7 @@ func (s *Service) InvalidateDefinitionCache(ctx context.Context, ds *dsproto.Dat
 	s.cache.drop(prefix + inputsHash)
 	s.cache.dropPrefix(prefix + inputsHash + "|response-aliases-v1:")
 	s.cache.dropPrefix(prefix + inputsHash + "|method-variants-v1:")
+	s.cache.dropPrefix(prefix + inputsHash + "|argument-projection-v1:")
 	return nil
 }
 
@@ -675,6 +687,7 @@ func (s *Service) runBackendRaw(ctx context.Context, ds *dsproto.DataSource, arg
 		return filterInlineRows(rows, ds.Backend.InlineFilters, args)
 
 	case dsproto.BackendMCPTool:
+		args = mcpToolArguments(ds.Backend, args)
 		if ds.Backend.Component != nil {
 			raw, err := s.components.ExecuteComponent(ctx, ds.Backend.Service, ds.Backend.Method, *ds.Backend.Component, transportArguments(args, ds.Backend.RequestMetadata))
 			if err != nil {

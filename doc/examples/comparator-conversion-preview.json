@@ -1,0 +1,287 @@
+{
+  "provenance": "Independently authored synthetic report and invented measurements. No production source, captures, or fact data.",
+  "reportSpec": {
+    "blocks": [
+      {
+        "blockIds": [
+          "tab_1_chart_1"
+        ],
+        "id": "tab_1",
+        "kind": "sectionBlock",
+        "navigationLabel": "Overview",
+        "title": "Overview"
+      },
+      {
+        "chartModel": {
+          "categoryRange": {
+            "arrangement": "overlay",
+            "categoryField": "region",
+            "orientation": "horizontal",
+            "series": [
+              {
+                "color": "#426b85",
+                "field": "actual",
+                "format": {
+                  "decimals": 2,
+                  "scale": 100,
+                  "suffix": "%"
+                },
+                "kind": "bar",
+                "label": "Observed"
+              },
+              {
+                "color": "#172447",
+                "field": "target",
+                "format": {
+                  "decimals": 2,
+                  "scale": 100,
+                  "suffix": "%"
+                },
+                "kind": "marker",
+                "label": "Reference"
+              }
+            ]
+          },
+          "series": {
+            "valueKey": "actual",
+            "values": [
+              {
+                "color": "#426b85",
+                "label": "Observed",
+                "type": "bar",
+                "value": "actual"
+              },
+              {
+                "color": "#172447",
+                "label": "Reference",
+                "type": "bar",
+                "value": "target"
+              }
+            ]
+          },
+          "type": "category-range",
+          "xAxis": {
+            "dataKey": "region"
+          }
+        },
+        "chartSpec": {
+          "categoryRange": {
+            "arrangement": "overlay",
+            "categoryField": "region",
+            "orientation": "horizontal",
+            "series": [
+              {
+                "color": "#426b85",
+                "field": "actual",
+                "format": {
+                  "decimals": 2,
+                  "scale": 100,
+                  "suffix": "%"
+                },
+                "kind": "bar",
+                "label": "Observed"
+              },
+              {
+                "color": "#172447",
+                "field": "target",
+                "format": {
+                  "decimals": 2,
+                  "scale": 100,
+                  "suffix": "%"
+                },
+                "kind": "marker",
+                "label": "Reference"
+              }
+            ]
+          },
+          "type": "category-range",
+          "xField": "region",
+          "yFields": [
+            "actual",
+            "target"
+          ]
+        },
+        "datasetRef": "daily",
+        "id": "tab_1_chart_1",
+        "kind": "chartBlock",
+        "title": "Trend"
+      },
+      {
+        "blockIds": [
+          "tab_2_chart_1"
+        ],
+        "id": "tab_2",
+        "kind": "sectionBlock",
+        "navigationLabel": "Details",
+        "title": "Details"
+      },
+      {
+        "chartModel": {
+          "categoryRange": {
+            "arrangement": "overlay",
+            "categoryField": "region",
+            "orientation": "horizontal",
+            "series": [
+              {
+                "color": "#426b85",
+                "field": "actual",
+                "format": {
+                  "decimals": 2,
+                  "scale": 100,
+                  "suffix": "%"
+                },
+                "kind": "bar",
+                "label": "Observed"
+              },
+              {
+                "color": "#172447",
+                "field": "target",
+                "format": {
+                  "decimals": 2,
+                  "scale": 100,
+                  "suffix": "%"
+                },
+                "kind": "marker",
+                "label": "Reference"
+              }
+            ]
+          },
+          "series": {
+            "valueKey": "actual",
+            "values": [
+              {
+                "color": "#426b85",
+                "label": "Observed",
+                "type": "bar",
+                "value": "actual"
+              },
+              {
+                "color": "#172447",
+                "label": "Reference",
+                "type": "bar",
+                "value": "target"
+              }
+            ]
+          },
+          "type": "category-range",
+          "xAxis": {
+            "dataKey": "region"
+          }
+        },
+        "chartSpec": {
+          "categoryRange": {
+            "arrangement": "overlay",
+            "categoryField": "region",
+            "orientation": "horizontal",
+            "series": [
+              {
+                "color": "#426b85",
+                "field": "actual",
+                "format": {
+                  "decimals": 2,
+                  "scale": 100,
+                  "suffix": "%"
+                },
+                "kind": "bar",
+                "label": "Observed"
+              },
+              {
+                "color": "#172447",
+                "field": "target",
+                "format": {
+                  "decimals": 2,
+                  "scale": 100,
+                  "suffix": "%"
+                },
+                "kind": "marker",
+                "label": "Reference"
+              }
+            ]
+          },
+          "type": "category-range",
+          "xField": "region",
+          "yFields": [
+            "actual",
+            "target"
+          ]
+        },
+        "datasetRef": "daily",
+        "id": "tab_2_chart_1",
+        "kind": "chartBlock",
+        "title": "Trend"
+      }
+    ],
+    "calculatedFields": [],
+    "datasets": [
+      {
+        "id": "daily",
+        "dataSourceRef": "usage",
+        "request": {
+          "measures": {
+            "actual": true,
+            "target": true
+          },
+          "dimensions": {
+            "region": true
+          },
+          "limit": 100,
+          "offset": 0
+        }
+      }
+    ],
+    "kind": "reportSpec",
+    "layoutIntent": {
+      "kind": "dashboard",
+      "resultPanePosition": "main",
+      "blockOrder": [
+        "tab_1",
+        "tab_1_chart_1",
+        "tab_2",
+        "tab_2_chart_1"
+      ]
+    },
+    "parameters": {
+      "viewMode": "chart",
+      "groupBy": "",
+      "pageSize": 100,
+      "orderField": "",
+      "orderDir": "asc"
+    },
+    "refinements": [],
+    "source": {
+      "kind": "dataSource",
+      "containerId": "usage",
+      "stateKey": "usage",
+      "dataSourceRef": "usage"
+    },
+    "title": "Service usage",
+    "version": 1
+  },
+  "datasets": {
+    "daily": {
+      "rows": [
+        {
+          "region": "North",
+          "actual": 0.04,
+          "target": 0.03
+        },
+        {
+          "region": "South",
+          "actual": null,
+          "target": 0
+        },
+        {
+          "region": "West",
+          "actual": 0,
+          "target": 0.02
+        },
+        {
+          "region": "East",
+          "actual": 0.025
+        }
+      ],
+      "hasMore": false,
+      "truncated": false
+    }
+  }
+}

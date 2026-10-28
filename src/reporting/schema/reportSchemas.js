@@ -1,3 +1,5 @@
+import {validateReportRowVisibilityBlock} from '../reportRowVisibility.js';
+import {donutCenterFields,normalizeDonutCenter} from '../../components/donutCenter.js';
 import { validateReportSchema } from "./reportSchemaValidator.js";
 import { reportExportRequestSchema } from "./reportExportRequestSchema.js";
 import { reportFillSchema } from "./reportFillSchema.js";
@@ -265,13 +267,34 @@ function validateTabGroupSectionReferences(value = null, { useContent = false } 
   });
 }
 
+function validateIndependentDonutCenters(value) {
+ const errors=[];
+ for(const [index,block] of (value?.blocks||[]).entries()) {
+  const center=block?.chartSpec?.center;
+  if(!center?.datasetRef)continue;
+  const fail=message=>errors.push({path:`$.blocks[${index}].chartSpec.center`,code:'invalid',message});
+  try{normalizeDonutCenter(center,block.chartSpec.type);}catch(error){fail(error.message);continue;}
+  const dataset=value.datasets?.find(entry=>entry.id===center.datasetRef);
+  if(!dataset){fail('Donut center dataset is unavailable.');continue;}
+  if(Object.values(dataset.request?.dimensions||{}).some(Boolean)||Number(dataset.request?.offset)>0){fail('Independent donut center requires an ungrouped scalar request.');continue;}
+  for(const field of donutCenterFields(center)){
+   const calculated=value.calculatedFields?.some(entry=>entry.datasetRef===center.datasetRef&&(entry.key===field||entry.id===field));
+   if(!dataset.request?.measures?.[field]&&!calculated)fail(`Donut center measure '${field}' is not admitted by its dataset.`);
+  }
+ }
+ return errors;
+}
+
 export function validateReportSpec(value = null) {
   const topLevel = validateReportSchema(reportSpecSchema, value);
   const calculatedFieldErrors = validateReportSpecCalculatedFields(value);
+  const visibilityErrors=[];for(const [index,block] of (value?.blocks||[]).entries()){try{validateReportRowVisibilityBlock(block)}catch(error){visibilityErrors.push({path:`$.blocks[${index}].runtime.rowVisibility`,code:'invalid',message:error.message})}}
   const compositeReferenceErrors = validateCompositeBlockReferences(value);
   const errors = [
     ...filterRedundantCalculatedFieldSchemaErrors(topLevel.errors, calculatedFieldErrors),
     ...calculatedFieldErrors,
+    ...visibilityErrors,
+    ...validateIndependentDonutCenters(value),
     ...compositeReferenceErrors,
     ...validateTabGroupSectionReferences(value),
   ];
@@ -295,7 +318,12 @@ export function validateReportFill(value = null) {
 }
 
 export function validateReportPrint(value = null) {
-  return validateReportSchema(reportPrintSchema, value);
+  const result=validateReportSchema(reportPrintSchema,value);
+  const errors=[...result.errors];
+  for(const [pageIndex,page] of (Array.isArray(value?.pages)?value.pages:[]).entries())for(const region of ['elements','headerElements','footerElements'])for(const [index,element] of (Array.isArray(page?.[region])?page[region]:[]).entries()){
+    if(Array.isArray(element?.textRuns)&&element.textRuns.every(run=>run&&typeof run.text==='string')&&element.textRuns.map(run=>run.text).join('')!==element.text)errors.push({path:`$.pages[${pageIndex}].${region}[${index}].textRuns`,message:'Text runs must concatenate to text.'});
+  }
+  return {...result,valid:errors.length===0,errors};
 }
 
 function prefixNestedValidationErrors(errors = [], prefix = "$") {

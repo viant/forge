@@ -150,6 +150,9 @@ func (r *MCPReferenceReader) memoSave(ctx context.Context, selected *Located[jso
 }
 
 func (r *MCPReferenceReader) memoEligible(ctx context.Context, connection Connection, uri identity.ResourceURI) bool {
+	if _, ok := r.gateway.publishedByName(connection.Name); ok {
+		return false
+	}
 	options, err := r.gateway.Manager.Options(ctx, connection.Name)
 	if err != nil || options == nil || options.PrimitiveProviderIdentity != connection.ProviderIdentity || len(options.PrimitiveNamespaces) != 1 || options.PrimitiveNamespaces[0] != "ns://"+uri.Namespace {
 		return false

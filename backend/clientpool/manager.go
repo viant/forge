@@ -1307,3 +1307,41 @@ func (m *Manager) StartReaper(ctx context.Context, interval time.Duration) (stop
 	}()
 	return func() { close(done) }
 }
+
+// CatalogNamesExcluding enumerates configured discovery roots while omitting
+// trusted, separately supplied metadata sources before option preparation. It
+// does not initialize clients or promote ordinary tool connections to roots.
+// Process-owned registrations retain the normal configured-name collision rule.
+func (m *Manager) CatalogNamesExcluding(ctx context.Context, excluded []string) ([]string, error) {
+	if m == nil || ctx == nil || ctx.Err() != nil {
+		return nil, errors.New("mcp catalog inventory unavailable")
+	}
+	skip := map[string]bool{}
+	for _, name := range excluded {
+		skip[name] = true
+	}
+	var names []string
+	var err error
+	if lister, ok := m.prov.(interface {
+		CatalogNames(context.Context) ([]string, error)
+	}); ok {
+		names, err = lister.CatalogNames(ctx)
+	} else if lister, ok := m.prov.(providerLister); ok {
+		names, err = lister.Names(ctx)
+	} else if m.prov != nil {
+		return nil, errors.New("mcp provider does not expose connection inventory")
+	}
+	if err != nil {
+		return nil, err
+	}
+	filtered := make([]string, 0, len(names))
+	for _, name := range names {
+		if m.IsLocalClient(name) {
+			return nil, fmt.Errorf("mcp local connection collides with configured provider %q", name)
+		}
+		if !skip[name] {
+			filtered = append(filtered, name)
+		}
+	}
+	return m.mergeInventoryNames(ctx, filtered)
+}

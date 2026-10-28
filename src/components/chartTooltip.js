@@ -1,3 +1,4 @@
+import {requestLabelInputSchema,normalizeRequestLabelInput,resolveRequestLabelInput} from './requestLabelInput.js';
 import {aggregateDirectSeriesData,buildPieChartData,chartCategoryRowOptions,materializeChartDisplayRows,transformData,readChartDataValue,formatChartDisplayValue,applyChartRowLimit} from './chartData.js';
 import {buildHeatmap} from './categoricalHeatmap.js';
 import {buildCategoryRange} from './categoryRange.js';
@@ -5,19 +6,21 @@ import {buildCategoryRange} from './categoryRange.js';
 const formats=['text','date','number','number2','number5','currency','currency2','percent','percentFraction','percentFraction2','compactNumber'];
 const aggregates=['unique','sum','avg','min','max'];
 export const chartTooltipSchema={type:'object',additionalProperties:false,required:['fields'],properties:{
-  print:{enum:['details','omit']},fields:{type:'array',minItems:1,maxItems:16,items:{type:'object',additionalProperties:false,required:['field','label'],properties:{
+  lines:{type:'array',minItems:1,maxItems:64,items:{type:'array',maxItems:128,items:{oneOf:[{type:'object',additionalProperties:false,required:['text'],properties:{text:{type:'string',maxLength:10000}}},{type:'object',additionalProperties:false,required:['field'],properties:{field:{type:'string'}}},{type:'object',additionalProperties:false,required:['input'],properties:{input:requestLabelInputSchema}}]}}},
+  print:{enum:['details','omit']},fields:{type:'array',maxItems:16,items:{type:'object',additionalProperties:false,required:['field','label'],properties:{
     field:{type:'string',minLength:1,pattern:'^\\S(?:[\\s\\S]*\\S)?$'},label:{type:'string',minLength:1,pattern:'^\\S(?:[\\s\\S]*\\S)?$'},format:{enum:formats},unit:{type:'string'},aggregate:{enum:aggregates},
   }}},
 }};
 export const chartTooltipEntrySchema={type:'object',additionalProperties:false,required:['id','category','seriesKey','seriesLabel','rowCount','fields'],properties:{
+  lines:{type:'array',maxItems:64,items:{type:'string'}},
   id:{type:'string'},category:{type:'string'},seriesKey:{type:'string'},seriesLabel:{type:'string'},rowCount:{type:'integer',minimum:0},
   fields:{type:'array',items:{type:'object',additionalProperties:false,required:['field','label','displayValue','aggregate','state'],properties:{field:{type:'string'},label:{type:'string'},displayValue:{type:'string'},aggregate:{enum:aggregates},state:{enum:['value','missing','null','mixed']}}}},
 }};
 const fail=message=>{throw new Error(`chart.tooltip: ${message}`);};
 export function normalizeChartTooltip(value) {
   if(value==null)return null;
-  if(typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(key=>!['fields','print'].includes(key)))fail('expected fields and optional print policy');
-  if(!Array.isArray(value.fields)||!value.fields.length||value.fields.length>16)fail('fields must contain 1–16 explicit fields');
+  if(typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(key=>!['fields','print','lines'].includes(key)))fail('expected fields, optional template lines and print policy');
+  if(!Array.isArray(value.fields)||(!value.fields.length&&!value.lines)||value.fields.length>16)fail('fields must contain 1–16 explicit fields unless template lines are supplied');
   const seen=new Set();
   const fields=value.fields.map((field,index)=>{
     if(!field||typeof field!=='object'||Array.isArray(field)||Object.keys(field).some(key=>!['field','label','format','unit','aggregate'].includes(key)))fail(`field ${index} has unsupported properties`);
@@ -30,7 +33,21 @@ export function normalizeChartTooltip(value) {
     return {...field,format,aggregate};
   });
   const print=value.print===undefined?'details':value.print;if(!['details','omit'].includes(print))fail('print must be details or omit');
-  return {fields,print};
+  let lines;
+  if(value.lines!==undefined){
+    if(!Array.isArray(value.lines)||!value.lines.length||value.lines.length>64)fail('template requires 1–64 lines');
+    lines=value.lines.map(line=>{
+      if(!Array.isArray(line)||line.length>128)fail('template line requires at most 128 segments');
+      return line.map(segment=>{
+        if(!segment||typeof segment!=='object'||Array.isArray(segment)||Object.keys(segment).length!==1)fail('template segment requires text or field');
+        if(typeof segment.text==='string'&&segment.text.length<=10000)return {text:segment.text};
+        if(segment.input)return {input:normalizeRequestLabelInput(segment.input)};
+        if(typeof segment.field==='string'&&seen.has(segment.field))return {field:segment.field};
+        fail('template segment field must be admitted in fields');
+      });
+    });
+  }
+  return {fields,print,...(lines?{lines}:{})};
 }
 export const chartTooltipFields=value=>normalizeChartTooltip(value)?.fields.map(field=>field.field)||[];
 export const chartTooltipEntryId=(category,seriesKey)=>JSON.stringify([category,String(seriesKey)]);
@@ -76,14 +93,17 @@ function sourceRows(row,seriesKey) {
   // Never follow a producer row's own similarly named nested property.
   return rows||[row];
 }
-export function buildChartTooltipEntries(chart,source=[]) {
+export function buildChartTooltipEntries(chart,source=[],requestFilters) {
   const config=normalizeChartTooltip(chart.tooltip);if(!config)return [];
   const type=chart.type;
   if(!['line','area','bar','horizontal_bar','funnel_bar','composed','combo','pie','donut','heatmap','category-range'].includes(type))fail(`unsupported chart type ${type}`);
   const entries=[];
   const add=(category,seriesKey,seriesLabel,rows,identity)=>{
     if(!['string','number','boolean'].includes(typeof category)||(typeof category==='number'&&!Number.isFinite(category)))fail('category keys must be scalar strings, finite numbers or booleans');
-    entries.push({id:identity?JSON.stringify(identity):chartTooltipEntryId(category,seriesKey),category:String(category),seriesKey:String(seriesKey),seriesLabel:String(seriesLabel),rowCount:rows.length,fields:config.fields.map(field=>fieldValue(rows,field))});
+    const fields=config.fields.map(field=>fieldValue(rows,field));
+    const values=new Map(fields.map(field=>[field.field,field.displayValue]));
+    const lines=config.lines?.map(line=>line.map(segment=>segment.input?resolveRequestLabelInput(segment.input,requestFilters):segment.text??values.get(segment.field)).join(''));
+    entries.push({id:identity?JSON.stringify(identity):chartTooltipEntryId(category,seriesKey),category:String(category),seriesKey:String(seriesKey),seriesLabel:String(seriesLabel),rowCount:rows.length,fields,...(lines?{lines}:{})});
   };
   if(type==='heatmap') {
     const model=buildHeatmap(chart.heatmap,source);
@@ -106,9 +126,10 @@ export function buildChartTooltipEntries(chart,source=[]) {
       applyChartRowLimit(data,chart.rowLimit).forEach(row=>keys.forEach(key=>{if(row.__chartSelectionRows?.[key])add(readChartDataValue(row,chart.xAxis.dataKey),key,key,sourceRows(row,key));}));
     }
   }
+  if(!entries.length&&config.lines?.some(line=>line.some(segment=>segment.input)))add('Dataset','details','Details',[]);
   return entries;
 }
 export function chartTooltipPrintLines(config,entries=[]) {
   if(!normalizeChartTooltip(config)||normalizeChartTooltip(config).print==='omit')return [];
-  return entries.flatMap(entry=>[`${entry.category} / ${entry.seriesLabel} (${entry.rowCount} source ${entry.rowCount===1?'row':'rows'})`,...entry.fields.map(field=>`${field.label}${field.aggregate==='unique'?'':` [${field.aggregate}]`}: ${field.displayValue}`)]);
+  return entries.flatMap(entry=>[`${entry.category} / ${entry.seriesLabel} (${entry.rowCount} source ${entry.rowCount===1?'row':'rows'})`,...(entry.lines||entry.fields.map(field=>`${field.label}${field.aggregate==='unique'?'':` [${field.aggregate}]`}: ${field.displayValue}`))]);
 }

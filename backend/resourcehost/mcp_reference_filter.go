@@ -29,6 +29,27 @@ func (r *MCPReferenceReader) filteredMCPRows(ctx context.Context, root Connectio
 		return nil, false, identity.ErrResource
 	}
 	g := r.gateway
+	if source, ok := g.publishedByName(root.Name); ok {
+		if root.ProviderIdentity != source.connection.ProviderIdentity {
+			return nil, true, ErrCollision
+		}
+		actor, err := g.actor(ctx)
+		if err != nil {
+			return nil, true, err
+		}
+		rows, err := g.listPublished(ctx, source, "mcp", "", root)
+		if err != nil {
+			return nil, true, err
+		}
+		out := make([]Located[json.RawMessage], 0, len(rows))
+		for _, row := range rows {
+			out = append(out, Located[json.RawMessage]{LocatedResource: row})
+		}
+		if err = g.final(ctx, actor); err != nil {
+			return nil, true, err
+		}
+		return out, true, nil
+	}
 	actor, err := g.actor(ctx)
 	if err != nil {
 		markMCPReferenceFailure(ctx, "actor", "actor_failed", err)

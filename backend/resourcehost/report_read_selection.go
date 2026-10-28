@@ -90,6 +90,12 @@ func (s *resourceReadSequence) refreshReportReads(ctx context.Context) error {
 		if err != nil || key != held.key {
 			return identity.ErrResourceDenied
 		}
+		if held.pin.Kind == identity.PublishedCandidate {
+			if err := s.gateway.verifyPublishedPin(ctx, held.connection, held.pin); err != nil {
+				return err
+			}
+			continue
+		}
 		fresh, err := get[json.RawMessage](ctx, s.gateway, held.connection, identity.ResourceRef{URI: held.pin.URI, Revision: held.pin.Selector()}, &held.pin, true, false)
 		if err != nil {
 			return err

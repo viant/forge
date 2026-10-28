@@ -81,6 +81,18 @@ func GetWithCodec[T any](ctx context.Context, g *Gateway, connection Connection,
 	if codec.ID == "" || codec.Parse == nil {
 		return nil, identity.ErrResource
 	}
+	if g != nil {
+		uri, err := identity.ParseResourceURI(ref.URI)
+		if err != nil {
+			return nil, err
+		}
+		if _, covered, err := g.publishedForURI(connection, uri); covered {
+			if err != nil {
+				return nil, err
+			}
+			return getPublishedWithCodec(ctx, g, connection, ref, pin, codec)
+		}
+	}
 	raw, err := Get[json.RawMessage](ctx, g, connection, ref, pin)
 	if err != nil {
 		return nil, err

@@ -1,3 +1,4 @@
+import {applyReportRowVisibility,validateReportRowVisibilityBlock} from './reportRowVisibility.js';
 import { resolveKey } from "../utils/selector.js";
 import {
   applyDashboardFiltersToCollection,
@@ -62,7 +63,8 @@ export function resolveReportRuntimeBlockRows(block = {}, rows = [], {
     ? block.runtime
     : {};
   const filtered = applyDashboardFiltersToCollection(rows, runtime?.filterBindings, filters);
-  return applyDashboardSelectionToCollection(filtered, runtime?.selectionBindings, selection);
+  validateReportRowVisibilityBlock(block);
+  return applyReportRowVisibility(applyDashboardSelectionToCollection(filtered, runtime?.selectionBindings, selection),runtime.rowVisibility);
 }
 
 export function isReportRuntimeBlockVisible(block = {}, {

@@ -165,6 +165,12 @@ func (s *Store) Get(ctx context.Context, ref artifactcohort.RootRef) (*artifactc
 	return &artifactcohort.Artifact{Root: ref, Payload: owned}, nil
 }
 
+// GetVerified uses the digest-checked immutable backing/hot cache. Hot bytes
+// are copied for the caller; they do not need another JSON/hash validation.
+func (s *Store) GetVerified(ctx context.Context, ref artifactcohort.RootRef) (*artifactcohort.Artifact, error) {
+	return s.Get(ctx, ref)
+}
+
 // Has checks a trusted manifest's exact immutable root/version/hash binding.
 // It does not touch scache, decompress bytes or validate the payload again.
 // Get performs digest validation when a cold backing entry is hydrated.

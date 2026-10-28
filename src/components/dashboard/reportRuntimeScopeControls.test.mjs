@@ -1,0 +1,60 @@
+import assert from 'node:assert/strict';
+import {boundReportScopeHandlers, boundReportScopeSpec} from './reportRuntimeScopeControls.js';
+import {resolveBoundReportRuntime} from './reportRuntimeBindings.js';
+const sources = {};
+function source(name) {
+ let input = {page: 4, parameters: {auth: 'fixed', body: {query: {offset: 60, limit: 20, filters: {fixed: 9, mode: 1}}}}};
+ const control = {value: {loaded: true}};
+ const events = [];
+ const handlers = {peekInput: () => input, setLoading: value => {control.value.loading = value; events.push('loading');}, setError: value => {control.value.error=value;}, setInputParameters: parameters => {input={...input,parameters}; events.push('parameters');}, setPage: page => {input={...input,page};}, fetchCollection: () => events.push('fetch')};
+ return sources[name] = {signals: {control, collection: {value: [{label:'prior', amount:1}]}}, handlers:{dataSource:handlers}, events};
+}
+source('a'); source('b');
+const param = {id:'mode', kind:'select', label:'Mode', required:true, value:1, options:[{label:'First',value:1},{label:'Second',value:2}],filterBindings:[{datasetRef:'first',path:'mode'},{datasetRef:'second',path:'mode'}]};
+const config = {reportSpec:{scope:{params:[param]},datasets:[{id:'first',request:{}},{id:'second',request:{}}]},datasetBindings:{first:{dataSourceRef:'a',queryPath:'body.query'},second:{dataSourceRef:'b',queryPath:'body.query'}}};
+const context = {Context:name=>sources[name]};
+const handlers = boundReportScopeHandlers(config,context);
+assert.equal(handlers.canEditScopeParam({id:'missing'}),false);
+assert.throws(()=>handlers.toggleScopeParamOption({id:'mode'},3),/Unknown/);
+assert.equal(handlers.toggleScopeParamOption({id:'mode',filterBindings:[{datasetRef:'evil',path:'auth'}]},2),true);
+for (const s of Object.values(sources)) {
+ const i=s.handlers.dataSource.peekInput();
+ assert.equal(i.page,1); assert.equal(i.parameters.auth,'fixed');
+ assert.deepEqual(i.parameters.body.query,{offset:0,limit:20,filters:{fixed:9,mode:2}});
+ assert.deepEqual(s.events,['loading','parameters','fetch']);
+}
+assert.equal(boundReportScopeSpec(config,context).scope.params[0].value,2);
+assert.equal(handlers.toggleScopeParamOption(param,2),false);
+assert.deepEqual(sources.a.events,['loading','parameters','fetch']);
+assert.equal(param.value,1);
+assert.equal(resolveBoundReportRuntime(config,context).reportFill,null);
+assert.equal(resolveBoundReportRuntime(config,context).status,'loading');
+assert.ok(resolveBoundReportRuntime(config,context).pendingReportFill.datasets.every(dataset=>dataset.rows.length===0));
+sources.a.signals.control.value={error:{status:403},loaded:true};
+assert.equal(resolveBoundReportRuntime(config,context).status,'error');
+assert.equal(resolveBoundReportRuntime(config,context).reportFill,null);
+assert.throws(()=>boundReportScopeHandlers({...config, reportSpec:{...config.reportSpec,scope:{params:[{...param,filterBindings:[{datasetRef:'first',path:'__proto__.polluted'}]}]}}},context).canEditScopeParam(param),/Unsafe/);
+console.log('report runtime scope controls passed');
+// A range writes two declared scalar inputs in one query and fetches once.
+source('range');
+const range={id:'range',kind:'dateRange',label:'Dates',value:{start:'2026-01-01',end:'2026-01-31'},filterBindings:[{datasetRef:'dates',path:'from',valuePath:'start'},{datasetRef:'dates',path:'to',valuePath:'end'}]};
+const ranges={reportSpec:{scope:{params:[range]},datasets:[{id:'dates',request:{}}]},datasetBindings:{dates:{dataSourceRef:'range',queryPath:'body.query'}}};
+const rangeHandlers=boundReportScopeHandlers(ranges,context);
+range.value={...range.value,preset:'last7Days',startExpression:'7 days ago'};
+const rangeDefault=structuredClone(range.value);
+rangeHandlers.setScopeParamDate(range,'end','2026-02-28');
+assert.deepEqual(sources.range.handlers.dataSource.peekInput().parameters.body.query.filters,{fixed:9,mode:1,from:'2026-01-01',to:'2026-02-28'});
+assert.deepEqual(sources.range.events,['loading','parameters','fetch']);
+assert.deepEqual(boundReportScopeSpec(ranges,context).scope.params[0].value,{start:'2026-01-01',end:'2026-02-28'});
+assert.deepEqual(range.value,rangeDefault);
+const nullable={...param,id:'nullable',required:false,value:1,filterBindings:[{datasetRef:'first',path:'nullable'}]};
+const nullableConfig={...config,reportSpec:{...config.reportSpec,scope:{params:[nullable]}}};
+const old=sources.a.handlers.dataSource.peekInput().parameters;
+sources.a.handlers.dataSource.setInputParameters({...old,body:{query:{...old.body.query,filters:{nullable:null}}}});
+assert.equal(boundReportScopeSpec(nullableConfig,context).scope.params[0].value,null);
+source('a');source('b');
+const differing=sources.b.handlers.dataSource.peekInput().parameters;
+sources.b.handlers.dataSource.setInputParameters({...differing,body:{query:{...differing.body.query,filters:{mode:2}}}});
+assert.throws(()=>boundReportScopeSpec(config,context),/inconsistent/);
+assert.throws(()=>boundReportScopeHandlers(config,context).toggleScopeParamOption(param,2),/inconsistent/);
+assert.equal(sources.a.events.length,0);

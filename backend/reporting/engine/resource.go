@@ -64,7 +64,7 @@ func (s *Service) compileResolved(ctx context.Context, request *CompileRequest, 
 	if admitted != nil {
 		if pin == nil || !identity.SameResolvedResource(*pin, admitted.pin) ||
 			!identity.MetadataExpiryValid(pin.ValidUntil, s.now()) || ctx.Err() != nil ||
-			identity.ContentFingerprint(admitted.raw) != pin.ContentFingerprint {
+			pin.Kind != identity.PublishedCandidate && identity.ContentFingerprint(admitted.raw) != pin.ContentFingerprint {
 			err = identity.ErrResourceDenied
 		} else {
 			raw = append(json.RawMessage(nil), admitted.raw...)
@@ -75,6 +75,14 @@ func (s *Service) compileResolved(ctx context.Context, request *CompileRequest, 
 	readTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
 		return nil, nil, nil, err
+	}
+	if pin == nil {
+		return nil, nil, nil, identity.ErrResourceDenied
+	}
+	if pin.Kind == identity.PublishedCandidate {
+		if _, ok := resolver.(PublishedResourceVerifier); !ok {
+			return nil, nil, nil, identity.ErrResourceDenied
+		}
 	}
 	if windowBuilder {
 		raw = append(json.RawMessage(nil), admitted.windowEnvelope...)

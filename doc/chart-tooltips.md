@@ -94,3 +94,16 @@ mounted renderer checks. `go test ./backend/reporting/materializer -run
 TestChartTooltipMaterialization` covers canonical fill, PDF text and HTML escaping.
 `npm run test:chart-tooltip-browser` checks actual hover, arrow-key inspection,
 native selection and popup bounds at desktop and phone widths.
+
+Template segments may also declare `input: {path, labels: [{value, label}]}`.
+This display-only mapping reads the owning chart dataset's effective request
+filters, with the same safe path and exact typed option identity as donut center
+labels. Missing/unmapped values fail. Labels are escaped text, never executable
+markup or templates. A direct Chart supplies `container.requestFilters`; native
+report fill and runtime use the chart dataset's request. Center labels continue
+to use their independently declared scalar dataset request.
+
+When a declared input label has no numeric rows, a zero-row Dataset details entry
+retains the selected label and explicit missing numeric fields. The browser
+inspector and paginated print details preserve that entry. No data row or numeric
+result is fabricated.
