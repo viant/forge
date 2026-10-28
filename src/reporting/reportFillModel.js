@@ -1,3 +1,4 @@
+import {applyReportRowVisibility,validateReportRowVisibilityBlock} from './reportRowVisibility.js';
 import {validateNumericDisplayFormat,formatRangeValue} from '../components/categoryRange.js';
 import {resolveTemplateRequestInput,escapeTemplateText} from './reportTemplateRequestInputs.js';
 import {validateDonutCenterDataset} from '../components/donutCenter.js';
@@ -1053,14 +1054,15 @@ function buildReportFillBlocks(reportSpec = {}, datasetsById = new Map(), {
     const runtimeSelectionBindings = block?.runtime?.selectionBindings && typeof block.runtime.selectionBindings === "object" && !Array.isArray(block.runtime.selectionBindings)
       ? block.runtime.selectionBindings
       : {};
+    validateReportRowVisibilityBlock(block);
     const runtimeRows = sourceDataset
-      ? applyDashboardSelectionToCollection(
+      ? applyReportRowVisibility(applyDashboardSelectionToCollection(
         applyDashboardFiltersToCollection(sourceDataset?.rows || [], runtimeFilterBindings, runtimeFilterValues),
         runtimeSelectionBindings,
         runtimeSelection,
-      )
+      ),block.runtime?.rowVisibility)
       : [];
-    const dataset = sourceDataset && (Object.keys(runtimeFilterBindings).length > 0 || Object.keys(runtimeSelectionBindings).length > 0)
+    const dataset = sourceDataset && (Object.keys(runtimeFilterBindings).length > 0 || Object.keys(runtimeSelectionBindings).length > 0 || block.runtime?.rowVisibility)
       ? {
         ...sourceDataset,
         rows: runtimeRows,

@@ -1,4 +1,4 @@
-import {donutCenterSvg,donutCenterDescription} from '../components/donutCenter.js';
+import {donutCenterSvg,donutCenterDescription,donutCenterPrintDescription} from '../components/donutCenter.js';
 import {buildCategoryRange,categoryRangeSvg,categoryRangePrintPages} from '../components/categoryRange.js';
 import {buildHeatmap,heatmapSvg,heatmapPrintPages} from '../components/categoricalHeatmap.js';
 import {resolveCategoryColor,resolveChartCategoryColor} from '../components/chartTheme.js';
@@ -798,7 +798,7 @@ function renderCategoryChartSvg({
       ${legend}
     </svg>`,
     height,
-    ...(center?{labelDetails:[...(centerGraphic?.needsDetails?[donutCenterDescription(center)]:[]),...(slices.length===0?["No slice data."]:[])]}:{}),
+    ...(center?{labelDetails:[...(centerGraphic?.needsDetails?[donutCenterPrintDescription(center)]:[]),...(slices.length===0?["No slice data."]:[])]}:{}),
     diagnostics: [],
   };
 }

@@ -291,6 +291,9 @@ type ChartTooltipField struct {
 }
 
 type DonutCenter struct {
+	ValueRole      string   `json:"valueRole,omitempty"`
+	ValueEmphasis  string   `json:"valueEmphasis,omitempty"`
+	LabelEmphasis  string   `json:"labelEmphasis,omitempty"`
 	Label          string   `json:"label"`
 	Value          *float64 `json:"value"`
 	FormattedValue string   `json:"formattedValue"`
@@ -1503,6 +1506,14 @@ func (r *ReportFill) Validate() error {
 				return fmt.Errorf("reportFill.blocks[%d].content.resolvedChart.rows is required for chartBlock", index)
 			}
 			if center := block.ChartContent.ResolvedChart.Center; center != nil {
+				if center.ValueRole != "" && center.ValueRole != "small" && center.ValueRole != "body" {
+					return fmt.Errorf("unsupported donut center value role")
+				}
+				for _, emphasis := range []string{center.ValueEmphasis, center.LabelEmphasis} {
+					if emphasis != "" && emphasis != "bold" && emphasis != "italic" && emphasis != "bold italic" {
+						return fmt.Errorf("unsupported donut center emphasis")
+					}
+				}
 				if block.ChartContent.ResolvedChart.Type != "donut" || center.Scope != "dataset" || strings.TrimSpace(center.Label) == "" {
 					return fmt.Errorf("reportFill donut center requires donut type, label and dataset scope")
 				}

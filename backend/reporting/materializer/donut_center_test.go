@@ -39,6 +39,7 @@ func TestDonutCenterMaterialization(t *testing.T) {
 	}{
 		{"sum", fixture.ChartSpec["center"].(map[string]any), fixture.Rows, "500"},
 		{"scalar", fixture.Occupancy, fixture.Rows, "72.5%"},
+		{"emphasis", map[string]any{"label": "Occupancy rate", "value": map[string]any{"field": "occupancyRate", "operation": "scalar"}, "format": "percent", "valueRole": "body", "valueEmphasis": "bold italic", "labelEmphasis": "italic"}, fixture.Rows, "72.5%"},
 		{"wrapped-whole-words", map[string]any{"label": "Total items", "value": map[string]any{"field": "items", "operation": "sum"}, "format": "number"}, fixture.Rows, "500"},
 		{"zero", fixture.Occupancy, fixture.ZeroRows, "0.0%"},
 		{"null", fixture.Occupancy, fixture.NullRows, "Unavailable"},
@@ -159,6 +160,10 @@ func TestIndependentDonutReviewArtifact(t *testing.T) {
 	primary["request"] = request(map[string]bool{"category": true}, map[string]bool{"items": true, "share": true}, 100)
 	summary := map[string]any{"id": "summary", "dataSourceRef": primary["dataSourceRef"], "request": request(map[string]bool{}, map[string]bool{"rate": true, "count": true}, 2)}
 	spec["datasets"] = []any{primary, summary}
+	if os.Getenv("DONUT_REVIEW_STYLE") == "1" {
+		fixture.Independent.Center["valueRole"] = "body"
+		fixture.Independent.Center["valueEmphasis"] = "bold"
+	}
 	chartSpec := map[string]any{"type": "donut", "xField": "category", "yFields": []string{"items"}, "center": fixture.Independent.Center, "sliceLabel": fixture.Independent.SliceLabel, "paletteMode": "declared", "palette": fixture.Independent.Palette, "categoryColors": fixture.Independent.CategoryColors}
 	chart := map[string]any{"type": "donut", "center": fixture.Independent.Center, "sliceLabel": fixture.Independent.SliceLabel, "paletteMode": "declared", "series": map[string]any{"nameKey": "category", "valueKey": "items", "palette": fixture.Independent.Palette, "categoryColors": fixture.Independent.CategoryColors}}
 	spec["blocks"] = []any{map[string]any{"id": "collection", "kind": "chartBlock", "title": "Independent selected metric (invented)", "datasetRef": "primary", "chartSpec": chartSpec, "chartModel": chart}}

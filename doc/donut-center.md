@@ -128,3 +128,12 @@ fail. Declared lookup is case-sensitive, so distinct source categories keep
 independent colors. The compiled model retains `paletteMode` and the same palette
 and map for browser and PDF. Omitting the mode preserves existing theme-role
 resolution. The independent example and mounted/print checks compare exact colors.
+
+Center typography can opt into `valueRole: "body"`; omission retains the existing
+`small` role. The full shared role supplies size, family, weight, line height and
+letter spacing. Optional `valueEmphasis` and `labelEmphasis` accept `normal`,
+`bold`, `italic`, or `bold italic`. They are independent of the numeric format.
+The same emphasis is retained in SVG/PDF and in the visible fallback description.
+Fit checks use the selected typography; a label that does not fit is retained in
+the details rather than clipped. Source-specific size-to-role mappings belong in
+authored conversion metadata, not the chart renderer.
