@@ -569,3 +569,12 @@ if (process.env.FORGE_CHART_PAGINATION_BASELINE_ROOT) {
   }
   console.log(`reportPrintChartSvg ✓ ${cases.length} independent old/new edge cases (complete SVGs, ticks, labels, diagnostics and heights)`);
 }
+
+// Narrow category legends wrap under the chart, preserving complete labels.
+const narrowCategory=buildReportPrintChartSvg({chartModel:{type:'donut',series:{nameKey:'name',valueKey:'value'}},resolvedChart:{type:'donut',kind:'category',rows:[{name:'Reference collection with a deliberately long category name',value:60},{name:'Science',value:40}]},width:220});
+assert.equal(narrowCategory.diagnostics.length,0);
+assert.ok(narrowCategory.height>180);
+const legendLines=[...narrowCategory.svg.matchAll(/<text x="([0-9.]+)" y="([0-9.]+)"[^>]*>(.*?)<\/text>/g)];
+assert.ok(legendLines.length>3);assert.ok(legendLines.every(m=>Number(m[1])===30&&Number(m[2])>180));
+assert.match(legendLines.map(m=>m[3]).join(' '),/Reference collection with a deliberately long category name/);
+assert.ok(legendLines.every(m=>m[3].length*11+Number(m[1])<=220));

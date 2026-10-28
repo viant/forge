@@ -602,3 +602,35 @@ func TestReviewTableSelectionContract(t *testing.T) {
 		require.Error(t, err)
 	}
 }
+
+func TestStrictReportSpecViewerRoundTrip(t *testing.T) {
+	fixture := loadReportSpecFixtureMap(t, "capacity-direct-series-export-request-fixture.v1.json")
+	fixture["viewer"] = map[string]any{"appearance": "document", "allowChartTableSwitch": false}
+	data, err := json.Marshal(fixture)
+	require.NoError(t, err)
+	spec, err := DecodeJSON(data)
+	require.NoError(t, err)
+	require.Equal(t, "document", spec.Viewer.Appearance)
+	require.NotNil(t, spec.Viewer.AllowChartTableSwitch)
+	require.False(t, *spec.Viewer.AllowChartTableSwitch)
+	encoded, err := json.Marshal(spec)
+	require.NoError(t, err)
+	again, err := DecodeJSON(encoded)
+	require.NoError(t, err)
+	require.Equal(t, spec.Viewer, again.Viewer)
+	fixture["viewer"] = map[string]any{"appearance": "unsupported"}
+	data, err = json.Marshal(fixture)
+	require.NoError(t, err)
+	_, err = DecodeJSON(data)
+	require.ErrorContains(t, err, "viewer.appearance")
+	fixture["viewer"] = map[string]any{"appearance": "document", "unknown": true}
+	data, err = json.Marshal(fixture)
+	require.NoError(t, err)
+	_, err = DecodeJSON(data)
+	require.ErrorContains(t, err, "unknown field")
+}
+
+func TestNilReportSpecValidation(t *testing.T) {
+	var spec *ReportSpec
+	require.ErrorContains(t, spec.Validate(), "reportSpec is required")
+}

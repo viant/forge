@@ -322,22 +322,23 @@ type TextClamp struct {
 }
 
 type rawReportSpec struct {
-	Version          int               `json:"version"`
-	Kind             string            `json:"kind"`
-	Source           Source            `json:"source"`
-	Title            string            `json:"title"`
-	Subtitle         string            `json:"subtitle,omitempty"`
-	Theme            map[string]any    `json:"theme,omitempty"`
-	Binding          *Binding          `json:"binding,omitempty"`
-	SemanticSummary  *SemanticSummary  `json:"semanticSummary,omitempty"`
-	Parameters       *Parameters       `json:"parameters"`
-	LayoutIntent     *LayoutIntent     `json:"layoutIntent"`
-	Scope            *Scope            `json:"scope,omitempty"`
-	DrillMetadata    map[string]any    `json:"drillMetadata,omitempty"`
-	Refinements      []map[string]any  `json:"refinements"`
-	CalculatedFields []map[string]any  `json:"calculatedFields"`
-	Datasets         []Dataset         `json:"datasets"`
-	Blocks           []json.RawMessage `json:"blocks"`
+	Viewer           *ReportViewerSettings `json:"viewer,omitempty"`
+	Version          int                   `json:"version"`
+	Kind             string                `json:"kind"`
+	Source           Source                `json:"source"`
+	Title            string                `json:"title"`
+	Subtitle         string                `json:"subtitle,omitempty"`
+	Theme            map[string]any        `json:"theme,omitempty"`
+	Binding          *Binding              `json:"binding,omitempty"`
+	SemanticSummary  *SemanticSummary      `json:"semanticSummary,omitempty"`
+	Parameters       *Parameters           `json:"parameters"`
+	LayoutIntent     *LayoutIntent         `json:"layoutIntent"`
+	Scope            *Scope                `json:"scope,omitempty"`
+	DrillMetadata    map[string]any        `json:"drillMetadata,omitempty"`
+	Refinements      []map[string]any      `json:"refinements"`
+	CalculatedFields []map[string]any      `json:"calculatedFields"`
+	Datasets         []Dataset             `json:"datasets"`
+	Blocks           []json.RawMessage     `json:"blocks"`
 }
 
 type rawBlockHeader struct {
@@ -570,6 +571,7 @@ func DecodeJSON(data []byte) (*ReportSpec, error) {
 		return nil, err
 	}
 	spec := &ReportSpec{
+		Viewer:           raw.Viewer,
 		Version:          raw.Version,
 		Kind:             raw.Kind,
 		Source:           raw.Source,
@@ -603,6 +605,9 @@ func DecodeJSON(data []byte) (*ReportSpec, error) {
 func (r *ReportSpec) Validate() error {
 	if r == nil {
 		return fmt.Errorf("reportSpec is required")
+	}
+	if r.Viewer != nil && r.Viewer.Appearance != "" && r.Viewer.Appearance != "document" {
+		return fmt.Errorf("reportSpec.viewer.appearance must be document")
 	}
 	if r.Version < 1 {
 		return fmt.Errorf("reportSpec.version must be >= 1")
