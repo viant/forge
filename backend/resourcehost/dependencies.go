@@ -72,6 +72,13 @@ func (g *Gateway) configuredOwnerConnection(ctx context.Context, owner string) (
 	if g == nil || g.Manager == nil || owner == "" || ctx == nil || ctx.Err() != nil {
 		return Connection{}, true, identity.ErrResourceDenied
 	}
+	for _, source := range g.publishedRegistrations() {
+		if source.connection.ProviderIdentity == owner {
+			connection := source.connection
+			connection.Generation = g.generation(connection.Name)
+			return connection, true, nil
+		}
+	}
 	names, err := g.Manager.CatalogProviderNames(ctx, owner)
 	if err != nil {
 		return Connection{}, true, err

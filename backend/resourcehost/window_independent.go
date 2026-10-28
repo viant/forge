@@ -8,7 +8,7 @@ import (
 	"github.com/viant/forge/backend/types"
 )
 
-func (c *WindowCatalog) resolveIndependentDatasource(ctx context.Context, connection Connection, definition *Result[*types.CompiledWindowResource], parent identity.ResolvedResource, target *types.WindowTarget, id string, variant *types.WindowResourceVariant) (*dsproto.DataSource, error) {
+func (c *WindowCatalog) resolveIndependentDatasource(ctx context.Context, connection Connection, definition *Result[json.RawMessage], parent identity.ResolvedResource, target *types.WindowTarget, id string, variant *types.WindowResourceVariant) (*dsproto.DataSource, error) {
 	if target == nil || c.VerifyWindowTarget(ctx, parent, *target, variant.Fingerprint) != nil {
 		return nil, identity.ErrResourceDenied
 	}

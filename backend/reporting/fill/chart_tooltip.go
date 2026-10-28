@@ -5,7 +5,7 @@ import "fmt"
 func validateChartTooltipEntries(entries []ChartTooltipEntry) error {
 	ids := map[string]bool{}
 	for _, entry := range entries {
-		if entry.ID == "" || ids[entry.ID] || entry.RowCount < 0 || len(entry.Fields) == 0 || len(entry.Fields) > 16 {
+		if entry.ID == "" || ids[entry.ID] || entry.RowCount < 0 || (len(entry.Fields) == 0 && len(entry.Lines) == 0) || len(entry.Fields) > 16 || len(entry.Lines) > 64 {
 			return fmt.Errorf("resolvedChart.tooltipEntries requires unique ids, nonnegative rowCount and 1–16 fields")
 		}
 		ids[entry.ID] = true

@@ -82,7 +82,7 @@ for(const orientation of ['horizontal','vertical']) {
  assert.equal(pages.reduce((n,p)=>n+p.categoryCount,0),10);
  for(const [i,p] of pages.entries()) {
   assert.equal(p.width,540);assert.ok(p.height<=(i===0&&!p.startNewPage?350:616));
-  assert.match(p.svg,/font-size="12"/);assert.match(p.svg,/Target range/);assert.match(p.svg,/>99<\/text>/);
+  assert.match(p.svg,/font-size="12"/);assert.match(p.svg,/Target range/);assert.match(p.svg,/>99 °C<\/text>/);
   // Constant measured bars retain identical numeric geometry on every page.
   const rect=p.svg.match(/<rect x="([^"]+)" y="([^"]+)" width="([^"]+)" height="([^"]+)" fill="#426b85"/);
   assert.ok(rect);

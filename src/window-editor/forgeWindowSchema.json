@@ -6862,6 +6862,13 @@
     "github.com/viant/forge/backend/datasource/contract.Backend": {
       "additionalProperties": true,
       "properties": {
+        "args": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Args optionally projects logical inputs into mcp_tool arguments using the\nsame inputs.* selector grammar as MCPCall.Args, but omits missing values\ninstead of emitting null. Selectors read pinned-merged logical inputs.\nOnly mapped and pinned arguments\nare dispatched; absent or empty Args preserves legacy pass-through.",
+          "type": "object"
+        },
         "authorization": {
           "$ref": "#/$defs/github.com~1viant~1forge~1backend~1datasource~1contract.AuthorizationBinding"
         },
@@ -7346,7 +7353,7 @@
   "$ref": "#/$defs/Window",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "x-forge-provenance": {
-    "baseCommit": "914ca4d1831654feadf302813c86fb1316fe7735",
+    "baseCommit": "6c0e265f6a8f415ae89934be66da51cc34c29f99",
     "generator": "scripts/window-schema/main.go",
     "sha256": {
       "choice_browser.go": "935cbeddb231dd329374114c5f38454dc7c44c2ab70a45ea3c0f37ce7f3aee26",
@@ -7354,16 +7361,19 @@
       "dialog_resource.go": "36dbaee1db9c979ba32359f29d61af006ae9bcb32e8b35e74c6fa0a4243466e8",
       "form.go": "aa2114822f1e688942aa4b63ec51c4b4c0f728b44b6d82b8b04fbf95efa807f0",
       "gate_requirements_editor.go": "94b32304fae82298136f1b9ed5f6d440e427ab74aaccfafca0382721e3edc0a9",
+      "github.com/viant/forge/backend/datasource/contract.argument_projection.go": "d516237702990088462ce88689ed3056f8129369354d44e70e6116baaa2c644d",
       "github.com/viant/forge/backend/datasource/contract.backend_json.go": "aa901f5debe6f5c0876faf0188f4355b5b77fd4616c0be6651cc649696e40da7",
-      "github.com/viant/forge/backend/datasource/contract.datasource.go": "c5c5978ee764e082f373713ebd13be74d816ebb5286ffdcab77dbc3d3dcfe7b4",
+      "github.com/viant/forge/backend/datasource/contract.datasource.go": "6d49322e43b3736a8ddd6cb07fa5e61d48ccf8984507783594b5d9279c778efd",
       "github.com/viant/forge/backend/datasource/contract.denial.go": "33f9f5fd666591f7b90392b410efe982051197652fa18881f8f2a238b7e24d05",
       "github.com/viant/forge/backend/datasource/contract.method_variants.go": "e4aa1178a31ee0f8ebd15dfd83c512dc8a8d84afb8ba5e6a856cc993870e682c",
+      "github.com/viant/forge/backend/provider/contract.ai.go": "071d8a38f9c8053870320205f7441e8db2673015b51932f5bed35a870bd49651",
       "github.com/viant/forge/backend/provider/contract.catalog.go": "570746519947177f2681e7ce63da4461173f129149bdfdcb4d22eaf12d6fc1d7",
       "github.com/viant/forge/backend/provider/contract.datasource.go": "a29fb4c0208c3036e572d9bd952e3df0ef6c99362a85249ce5067f1d2820c932",
       "github.com/viant/forge/backend/provider/contract.lifecycle.go": "e4ffdcd8a6660bc325a894206df8f0162b88cd677d1f4ecd01f81c3d7b471bda",
       "github.com/viant/forge/backend/provider/contract.mcp_app.go": "a52f98962f47f5766d96a451465297f2728a32504509514dbd511b4ab74a134d",
       "github.com/viant/forge/backend/provider/contract.methods.go": "6e4a0230d460203501f3c9e64a4d20ed1b30dd45fa9ff5fbbe7adf5f0710b975",
-      "github.com/viant/forge/backend/provider/contract.model.go": "fd8546cc7a8a3a40288eba267c771dc45584b563cc9b1a2e6d8ee11656d5096b",
+      "github.com/viant/forge/backend/provider/contract.model.go": "7c4ef67413d95c9d15d1b1fd64c5cb95608c251e7cc680599d94ec7b88d389cf",
+      "github.com/viant/forge/backend/provider/contract.namespace_sync.go": "4a113c3b2523b2c8c63cb3d3077879b8d239c975c9c53ef783abc05d7f4e5769",
       "github.com/viant/forge/backend/provider/contract.toolfeed.go": "67049e40066c4f0594a8f799d202159cbe73ab224128612f73462897819db50f",
       "github.com/viant/forge/backend/resource.actor.go": "514487161fff419ba4a593e267eb6f997e67decaa18070fce8ef113449feeb2e",
       "github.com/viant/forge/backend/resource.authority.go": "1e4c2912a8a4f78e4db3d88f708b39703986999fcbd45256cdc14400faafbbd9",
@@ -7371,7 +7381,7 @@
       "github.com/viant/forge/backend/resource.metadata_expiry.go": "80024234c7390ec0f29edef05627019e70f703b3bf295dfeda5518d93cae7851",
       "github.com/viant/forge/backend/resource.policy_id.go": "d758c5d33930277b10e57938b989ed7c199999dd2a42a7014fc072891ac2c59e",
       "github.com/viant/forge/backend/resource.renewal.go": "8ec8a5ac014ea46027bc7af3f0da0e0fd55d58cf615dcd5092a5ba3266ed7bf8",
-      "github.com/viant/forge/backend/resource.resource.go": "b9a066383710fcb6047f18183fd539278153a4832abd4a546484a341934a2828",
+      "github.com/viant/forge/backend/resource.resource.go": "f034588234379b03ab3f8a72968ca961523ea991780089674b07139d1fe681e6",
       "github.com/viant/forge/backend/resource.selection_binding.go": "a09f48c8aef6c4395435e1e73beba7cbeb47c4f803761da126a38d450926890b",
       "github.com/viant/forge/backend/window/contract.component.go": "1f3b9b0e6ff7b707dfbbae3d9ecafaa145c5a8eb682156da64290464717eb1d8",
       "github.com/viant/forge/backend/window/contract.model.go": "ba7b581c5a80d94fbd95b45d5b1a7d8c7971a5c207d02acc502afa9826a8070b",

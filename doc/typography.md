@@ -627,3 +627,118 @@ same table. Native grouped headers and shared buttons retain semantic typography
 focus, selection and local scrolling. The laboratory example is entirely invented.
 See [table analytics](table-analytics.md) for totals, filter/sort/page semantics,
 complete evidence exports and migration limits.
+
+### Bound standalone report scope controls
+
+Published native report windows now carry each dataset's explicit `queryPath` in
+`datasetBindings`. A scope parameter can declare `filterBindings`, each with a
+`datasetRef` and `path` relative to that dataset request's `filters`. Optional
+`valuePath` selects a part of the control value, for example `start`/`end` for two
+independent date inputs. Paths reject prototype traversal and overlapping writes.
+Unbound scope parameters remain descriptive. Shared bindings must agree on the
+current value for each value path; conflicting datasets fail rather than display
+one arbitrary dataset's scope.
+
+The existing inline filter control handles declared options, date ranges, and
+scalar `integer`, `number`, or `text` values. Scalar fields use the shared input
+part and label/body roles, commit on blur or Enter, and retain native required
+and numeric validation. Each change batches all targeted inputs per datasource,
+resets query offset and source page, and refreshes through the ordinary datasource
+handlers. Fixed request/actor inputs remain intact. Pending, error, denied, and
+empty results retain the ordinary report binding states; prior rows are hidden
+before input mutation.
+
+`report-scope-controls-preview.html` is an independently invented fixture of the
+actual native renderer with a deliberately simulated datasource. Its Endly
+workflow is `e2e/report-scope-controls/run.yaml`. It is UI contract evidence, not
+an external producer or authorization integration claim. Existing ReportBuilder
+controls and producer authorization remain separate owners; option discovery and
+provider-specific input paths must come from authored producer metadata.
+
+Document reports expose the same filter toggle with or without a section tab
+rail, including stacked and single-section documents. The mounted controls
+regression uses document appearance and opens the actual header toggle before
+editing. Refresh keeps the renderer mounted with an empty pending fill: selected
+tabs, open filters, and table sort survive while old rows and metric values are
+removed. Local table pagination resets alongside request offset and source page.
+
+Bound standalone date fields commit on blur or Enter, so a refresh cannot remove
+the field halfway through typing. This opt-in uses the existing date input helper
+in both document and legacy presentation. Relative presets still commit directly.
+The expanded fixture checks declared `start`/`end` bindings, required multi-select
+protection, optional multi-select clearing, and preservation of unrelated inputs.
+
+Bound control defaults must satisfy required-value rules. Native validation and
+the converter reject numeric values outside JavaScript's safe range before JSON
+reaches the browser; a larger identifier requires a producer-declared string
+input, never an implicit numeric-to-string conversion. Converter output runs the
+native report validator before materialization, including overlapping-binding
+checks. Split date inputs reconstruct explicit endpoint values without carrying
+stale preset or expression metadata from their original defaults.
+
+Editable bound controls report invalid drafts inline with `role="alert"`,
+`aria-invalid`, and an associated description. Clearing an optional integer or
+number commits explicit null; clearing a required field, entering an unsafe
+integer, or entering an invalid/inverted date range preserves the effective
+request and performs no fetch. Valid corrections clear the draft error. The
+native browser fixture covers these real input/blur paths in the same Endly run.
+
+Pending and failed bound reports pass their lifecycle state to both charts and
+tables, so only a successful empty response displays “No data.” Tab contents
+use `retainEmptySectionContent` only with an empty pending fill while the
+transition is visible; hidden DOM
+contains no previous rows or metric values. Missing datasource control handlers
+produce the neutral unavailable state and leave scope inputs descriptive.
+
+Optional text and date-edge clears preserve the shared input convention of an
+empty string; numeric clears use null, and multi-select clears use an empty
+array. These values are not coerced across producer types. Split date bindings
+carry endpoints only, so preset buttons do not retain a pressed selection;
+reapplying a preset can refresh its resolved dates.
+
+An explicit static `reportFill` without populated `datasetBindings` remains a static
+preview, including when its authored scope carries filter bindings. Those bound
+inputs stay descriptive even if the host supplies legacy editing callbacks;
+legacy scopes without filter bindings keep their existing host behavior. Missing
+runtime bindings, handlers, or request defaults use the unavailable state;
+malformed authored paths and non-object requests still fail explicitly. Bound
+reports may show both an outer status banner and an inline chart/table status.
+
+Bound controls do not delegate bulk clear or enable toggles to legacy host
+callbacks. Mixed reports pass only legacy unbound filters to host Clear all.
+Toggle permission is independent of value-edit permission, preserving existing
+read-only-value controls whose host still permits enabling or disabling them.
+
+Independent donut center datasets and explicit pie slice labels use the same
+shared Chart and small/caption typography. Conditional centers retain exact
+numeric formats and labels from the same admitted request, including null and
+empty results. See [donut center and slice labels](donut-center.md) for complete
+scalar input requirements and the independently invented native specimen.
+
+### Source-bound narrative text
+
+Native `markdownBlock` accepts an explicit `datasetRef` and optional
+`templateRequestInputs`, whose aliases reuse the typed request-label mapping
+contract. `${input.choice}` reads only that dataset's admitted request filters;
+it never substitutes a workbook's saved default. Missing inputs, undeclared
+aliases and unmatched typed values are errors. Request label text and
+`${format(row.field,text)}` are escaped literal text, with no HTML execution or
+template re-evaluation. The limited native Markdown renderer and canonical print
+path preserve escaped punctuation identically. Null/missing row values use the
+existing em-dash placeholder; they do not become a zero or a current date.
+
+A static narrative may still omit datasetRef. Source date text without an authored
+format retains the producer's display string. A freshness token must bind to an
+actual producer freshness field; rendering time is not a substitute. Formatted
+source text can preserve bold/italic spans and literal explanatory help, while
+fonts and colors remain owned by the shared presentation system. Unsupported
+source format patterns, nontext channels and plotted axes remain explicit
+conversion responsibilities. The source-text checks run with
+`npx vite-node src/reporting/reportTemplateRequestInputs.render.test.mjs`.
+
+Repeated collection labels can retain authored numeric units through
+`templateFieldDisplayMap[field].numericFormat`, reusing the shared numeric
+format contract. Optional `markerColors` maps exact item-title categories to
+six-digit hex swatches. The existing collection renderer places a small decorative
+square beside its semantic label; the text remains readable without color.
+Resolved marker colors and formatted text follow the same canonical print path.

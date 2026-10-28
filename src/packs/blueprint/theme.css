@@ -137,9 +137,9 @@
     --forge-text-inverse: #ffffff;
     --forge-border-color: var(--forge-control-border);
     --forge-border-strong: var(--forge-control-border);
-    --forge-interaction-color: var(--forge-button-text);
-    --forge-interaction-hover-color: var(--forge-button-text);
-    --forge-interaction-active-color: var(--forge-button-text);
+    --forge-interaction-color: var(--forge-focus-color);
+    --forge-interaction-hover-color: var(--forge-focus-color);
+    --forge-interaction-active-color: var(--forge-focus-color);
     --forge-tab-active-color: var(--forge-focus-color);
     --forge-selected-background: color-mix(in srgb, var(--forge-control-bg) 85%, var(--forge-focus-color));
     --forge-status-info-background: #ebf1f5;

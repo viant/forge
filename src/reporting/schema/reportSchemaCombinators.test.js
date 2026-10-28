@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {validateReportSchema} from './reportSchemaValidator.js';
+const schema={type:'object',required:['kind','children'],properties:{kind:{const:'group'},children:{type:'array',items:{type:'string'}}},anyOf:[{properties:{children:{type:'array',minItems:1}}},{required:['spacer'],type:'object',properties:{spacer:{type:'number'}}}]};
+assert.equal(validateReportSchema(schema,{kind:'group',children:['chart']}).valid,true);
+assert.equal(validateReportSchema(schema,{kind:'chart',children:['chart']}).valid,false,'matching anyOf cannot bypass discriminator');
+assert.equal(validateReportSchema(schema,{children:['chart']}).valid,false,'matching anyOf cannot bypass required sibling');
+assert.equal(validateReportSchema(schema,{kind:'group',children:[12]}).valid,false,'matching anyOf cannot bypass array item types');
+const one={oneOf:[{type:'object',required:['text']},{type:'object',required:['field']}],type:'object',additionalProperties:false,properties:{text:{type:'string'},field:{type:'string'}}};
+assert.equal(validateReportSchema(one,{text:'Literal'}).valid,true);
+assert.equal(validateReportSchema(one,{text:'Literal',field:'amount'}).valid,false);
+assert.equal(validateReportSchema(one,{text:12}).valid,false);
+console.log('schema combinators preserve sibling constraints and exclusive template segments');

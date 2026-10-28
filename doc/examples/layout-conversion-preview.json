@@ -1,0 +1,409 @@
+{
+  "provenance": "Independently authored synthetic report and invented measurements. No production source, captures, or fact data.",
+  "reportSpec": {
+    "blocks": [
+      {
+        "blockIds": [
+          "tab_1_group_1"
+        ],
+        "id": "tab_1",
+        "kind": "sectionBlock",
+        "navigationLabel": "Overview",
+        "title": "Overview"
+      },
+      {
+        "chartModel": {
+          "series": {
+            "palette": [
+              "#426b85"
+            ],
+            "values": [
+              {
+                "color": "#426b85",
+                "label": "amount",
+                "type": "line",
+                "value": "amount"
+              }
+            ]
+          },
+          "type": "line",
+          "xAxis": {
+            "dataKey": "day",
+            "label": "day"
+          }
+        },
+        "chartSpec": {
+          "type": "line",
+          "xField": "day",
+          "yFields": [
+            "amount"
+          ]
+        },
+        "datasetRef": "daily",
+        "id": "tab_1_chart_4",
+        "kind": "chartBlock",
+        "title": "Trend"
+      },
+      {
+        "childBlockIds": [],
+        "id": "tab_1_group_5",
+        "kind": "compositeBlock",
+        "layout": "stack",
+        "runtime": {
+          "chrome": "none",
+          "spacerHeight": 8
+        },
+        "title": "Spacing"
+      },
+      {
+        "chartModel": {
+          "series": {
+            "palette": [
+              "#426b85"
+            ],
+            "values": [
+              {
+                "color": "#426b85",
+                "label": "amount",
+                "type": "line",
+                "value": "amount"
+              }
+            ]
+          },
+          "type": "line",
+          "xAxis": {
+            "dataKey": "day",
+            "label": "day"
+          }
+        },
+        "chartSpec": {
+          "type": "line",
+          "xField": "day",
+          "yFields": [
+            "amount"
+          ]
+        },
+        "datasetRef": "daily",
+        "id": "tab_1_chart_6",
+        "kind": "chartBlock",
+        "title": "Trend"
+      },
+      {
+        "childBlockIds": [
+          "tab_1_chart_4",
+          "tab_1_group_5",
+          "tab_1_chart_6"
+        ],
+        "id": "tab_1_group_3",
+        "kind": "compositeBlock",
+        "layout": "stack",
+        "runtime": {
+          "chrome": "none"
+        },
+        "title": "Layout"
+      },
+      {
+        "chartModel": {
+          "series": {
+            "palette": [
+              "#426b85"
+            ],
+            "values": [
+              {
+                "color": "#426b85",
+                "label": "amount",
+                "type": "line",
+                "value": "amount"
+              }
+            ]
+          },
+          "type": "line",
+          "xAxis": {
+            "dataKey": "day",
+            "label": "day"
+          }
+        },
+        "chartSpec": {
+          "type": "line",
+          "xField": "day",
+          "yFields": [
+            "amount"
+          ]
+        },
+        "datasetRef": "daily",
+        "id": "tab_1_chart_7",
+        "kind": "chartBlock",
+        "title": "Trend"
+      },
+      {
+        "childBlockIds": [
+          "tab_1_group_3",
+          "tab_1_chart_7"
+        ],
+        "id": "tab_1_group_2",
+        "kind": "compositeBlock",
+        "layout": "responsiveGrid",
+        "runtime": {
+          "childWeights": {
+            "tab_1_chart_7": 75000,
+            "tab_1_group_3": 25000
+          },
+          "chrome": "none"
+        },
+        "title": "Layout"
+      },
+      {
+        "childBlockIds": [
+          "tab_1_group_2"
+        ],
+        "id": "tab_1_group_1",
+        "kind": "compositeBlock",
+        "layout": "stack",
+        "runtime": {
+          "chrome": "none"
+        },
+        "title": "Layout"
+      },
+      {
+        "blockIds": [
+          "tab_2_group_1"
+        ],
+        "id": "tab_2",
+        "kind": "sectionBlock",
+        "navigationLabel": "Details",
+        "title": "Details"
+      },
+      {
+        "chartModel": {
+          "series": {
+            "palette": [
+              "#426b85"
+            ],
+            "values": [
+              {
+                "color": "#426b85",
+                "label": "amount",
+                "type": "line",
+                "value": "amount"
+              }
+            ]
+          },
+          "type": "line",
+          "xAxis": {
+            "dataKey": "day",
+            "label": "day"
+          }
+        },
+        "chartSpec": {
+          "type": "line",
+          "xField": "day",
+          "yFields": [
+            "amount"
+          ]
+        },
+        "datasetRef": "daily",
+        "id": "tab_2_chart_4",
+        "kind": "chartBlock",
+        "title": "Trend"
+      },
+      {
+        "childBlockIds": [],
+        "id": "tab_2_group_5",
+        "kind": "compositeBlock",
+        "layout": "stack",
+        "runtime": {
+          "chrome": "none",
+          "spacerHeight": 8
+        },
+        "title": "Spacing"
+      },
+      {
+        "chartModel": {
+          "series": {
+            "palette": [
+              "#426b85"
+            ],
+            "values": [
+              {
+                "color": "#426b85",
+                "label": "amount",
+                "type": "line",
+                "value": "amount"
+              }
+            ]
+          },
+          "type": "line",
+          "xAxis": {
+            "dataKey": "day",
+            "label": "day"
+          }
+        },
+        "chartSpec": {
+          "type": "line",
+          "xField": "day",
+          "yFields": [
+            "amount"
+          ]
+        },
+        "datasetRef": "daily",
+        "id": "tab_2_chart_6",
+        "kind": "chartBlock",
+        "title": "Trend"
+      },
+      {
+        "childBlockIds": [
+          "tab_2_chart_4",
+          "tab_2_group_5",
+          "tab_2_chart_6"
+        ],
+        "id": "tab_2_group_3",
+        "kind": "compositeBlock",
+        "layout": "stack",
+        "runtime": {
+          "chrome": "none"
+        },
+        "title": "Layout"
+      },
+      {
+        "chartModel": {
+          "series": {
+            "palette": [
+              "#426b85"
+            ],
+            "values": [
+              {
+                "color": "#426b85",
+                "label": "amount",
+                "type": "line",
+                "value": "amount"
+              }
+            ]
+          },
+          "type": "line",
+          "xAxis": {
+            "dataKey": "day",
+            "label": "day"
+          }
+        },
+        "chartSpec": {
+          "type": "line",
+          "xField": "day",
+          "yFields": [
+            "amount"
+          ]
+        },
+        "datasetRef": "daily",
+        "id": "tab_2_chart_7",
+        "kind": "chartBlock",
+        "title": "Trend"
+      },
+      {
+        "childBlockIds": [
+          "tab_2_group_3",
+          "tab_2_chart_7"
+        ],
+        "id": "tab_2_group_2",
+        "kind": "compositeBlock",
+        "layout": "responsiveGrid",
+        "runtime": {
+          "childWeights": {
+            "tab_2_chart_7": 75000,
+            "tab_2_group_3": 25000
+          },
+          "chrome": "none"
+        },
+        "title": "Layout"
+      },
+      {
+        "childBlockIds": [
+          "tab_2_group_2"
+        ],
+        "id": "tab_2_group_1",
+        "kind": "compositeBlock",
+        "layout": "stack",
+        "runtime": {
+          "chrome": "none"
+        },
+        "title": "Layout"
+      }
+    ],
+    "calculatedFields": [],
+    "datasets": [
+      {
+        "id": "daily",
+        "dataSourceRef": "usage",
+        "request": {
+          "limit": 100,
+          "offset": 0
+        }
+      }
+    ],
+    "kind": "reportSpec",
+    "layoutIntent": {
+      "kind": "dashboard",
+      "resultPanePosition": "main",
+      "blockOrder": [
+        "tab_1",
+        "tab_1_chart_4",
+        "tab_1_group_5",
+        "tab_1_chart_6",
+        "tab_1_group_3",
+        "tab_1_chart_7",
+        "tab_1_group_2",
+        "tab_1_group_1",
+        "tab_2",
+        "tab_2_chart_4",
+        "tab_2_group_5",
+        "tab_2_chart_6",
+        "tab_2_group_3",
+        "tab_2_chart_7",
+        "tab_2_group_2",
+        "tab_2_group_1"
+      ]
+    },
+    "parameters": {
+      "viewMode": "chart",
+      "groupBy": "",
+      "pageSize": 100,
+      "orderField": "",
+      "orderDir": "asc"
+    },
+    "refinements": [],
+    "source": {
+      "kind": "dataSource",
+      "containerId": "usage",
+      "stateKey": "usage",
+      "dataSourceRef": "usage"
+    },
+    "title": "Service usage",
+    "version": 1
+  },
+  "datasets": {
+    "daily": {
+      "rows": [
+        {
+          "day": "2026-01-01",
+          "amount": 9
+        },
+        {
+          "day": "2026-01-02",
+          "amount": 14
+        },
+        {
+          "day": "2026-01-03",
+          "amount": 11
+        },
+        {
+          "day": "2026-01-04",
+          "amount": 21
+        },
+        {
+          "day": "2026-01-05",
+          "amount": 17
+        }
+      ],
+      "hasMore": false,
+      "truncated": false
+    }
+  }
+}

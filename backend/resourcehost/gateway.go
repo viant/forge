@@ -44,6 +44,7 @@ type LocatedResource struct {
 	Resource         primitive.ResourceState    `json:"resource"`
 }
 type capabilities struct {
+	published              bool
 	lastUsed               uint64
 	cacheKey               string
 	sharedIndex            bool
@@ -68,6 +69,8 @@ func discoveryCacheUntil(c capabilities) time.Time {
 }
 
 type Gateway struct {
+	publishedMetadata       []publishedMetadataRegistration
+	publishedCompiled       *publishedCompiledCache
 	Manager                 *manager.Manager
 	Actor                   ActorResolver
 	Verify                  ActorVerifier
@@ -131,6 +134,7 @@ func (g *Gateway) Close() {
 	g.mu.Lock()
 	g.closed = true
 	g.cache = map[string]capabilities{}
+	g.publishedCompiled = nil
 	g.capabilityHints = map[string]capabilityHint{}
 	stop := g.stopChanges
 	stopResource := g.stopResourceChanges
@@ -147,14 +151,15 @@ func (g *Gateway) Close() {
 func (g *Gateway) Invalidate(connection string) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
+	connection = g.publishedCanonicalNameLocked(connection)
 	g.generations[connection]++
 	for key, c := range g.cache {
-		if c.connection.Name == connection {
+		if g.publishedCanonicalNameLocked(c.connection.Name) == connection {
 			delete(g.cache, key)
 		}
 	}
 	for key, hint := range g.capabilityHints {
-		if hint.connection == connection {
+		if g.publishedCanonicalNameLocked(hint.connection) == connection {
 			delete(g.capabilityHints, key)
 		}
 	}
@@ -162,7 +167,7 @@ func (g *Gateway) Invalidate(connection string) {
 func (g *Gateway) generation(name string) uint64 {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	return g.generations[name]
+	return g.generations[g.publishedCanonicalNameLocked(name)]
 }
 func (g *Gateway) actor(ctx context.Context) (actor identity.VerifiedActor, resultErr error) {
 	defer func() { markMCPReferenceFailure(ctx, "actor", "actor_failed", resultErr) }()
@@ -310,6 +315,9 @@ func (g *Gateway) discover(ctx context.Context, a identity.VerifiedActor, name s
 }
 
 func (g *Gateway) discoverMode(ctx context.Context, a identity.VerifiedActor, name string, force bool, bindings ...*resourceReadBinding) (resolved capabilities, retErr error) {
+	if source, ok := g.publishedByName(name); ok {
+		return g.publishedCapabilities(ctx, source, name)
+	}
 	span := observe.Start(ctx, "gateway.provider.discovery", observe.Labels{Provider: name})
 	defer func() { span.End(observe.OutcomeFor(retErr), observe.CacheUnknown) }()
 	defer func() { markMCPReferenceFailure(ctx, "connection_binding", "discovery_failed", retErr) }()
@@ -819,7 +827,7 @@ func supports(c capabilities, namespace, kind, operation string) bool {
 		for _, k := range ns.Kinds {
 			if k.Kind == kind {
 				for _, op := range k.Operations {
-					if op == operation && k.Methods[operation] != "" {
+					if op == operation && (c.published || k.Methods[operation] != "") {
 						return true
 					}
 				}
@@ -874,6 +882,28 @@ func list[T any](ctx context.Context, g *Gateway, kind, namespace, excludedLocal
 	if e != nil {
 		return nil, e
 	}
+	if source, covered := g.publishedNamespace(namespace); covered {
+		if source.connection.Name == excludedLocal {
+			return []Located[T]{}, nil
+		}
+		connection := source.connection
+		if roots, explicit := ctx.Value(catalogRootsKey{}).([]Connection); explicit {
+			matched := false
+			for _, root := range roots {
+				if source.matchesName(root.Name) && (root.ProviderIdentity == "" || root.ProviderIdentity == source.connection.ProviderIdentity) {
+					if matched {
+						return nil, ErrCollision
+					}
+					connection.Name = root.Name
+					matched = true
+				}
+			}
+			if !matched {
+				return []Located[T]{}, nil
+			}
+		}
+		ctx = context.WithValue(ctx, catalogRootsKey{}, []Connection{connection})
+	}
 	discovered, e := g.discoverExcept(ctx, excludedLocal)
 	if e != nil {
 		return nil, e
@@ -885,6 +915,9 @@ func list[T any](ctx context.Context, g *Gateway, kind, namespace, excludedLocal
 			continue
 		}
 		caps := capabilities{namespaces: []primitive.NamespaceCapabilities{ns.NamespaceCapabilities}}
+		if _, ok := g.publishedByName(ns.Connection.Name); ok {
+			caps.published = true
+		}
 		if !supports(caps, ns.Namespace, kind, "list") {
 			continue
 		}
@@ -899,6 +932,20 @@ func list[T any](ctx context.Context, g *Gateway, kind, namespace, excludedLocal
 				}
 				seen[key] = true
 				out = append(out, Located[T]{LocatedResource: LocatedResource{Connection: ns.Connection, Resource: resource}})
+			}
+			continue
+		}
+		if source, ok := g.publishedByName(ns.Connection.Name); ok {
+			rows, err := g.listPublished(ctx, source, kind, ns.Namespace, ns.Connection)
+			if err != nil {
+				return nil, err
+			}
+			for _, row := range rows {
+				value, err := decodeDefinition[T](row.Resource.Definition)
+				if err != nil {
+					return nil, err
+				}
+				out = append(out, Located[T]{LocatedResource: row, Definition: value})
 			}
 			continue
 		}
@@ -980,6 +1027,12 @@ func get[T any](ctx context.Context, g *Gateway, connection Connection, ref iden
 	if e != nil {
 		return nil, e
 	}
+	if source, covered, err := g.publishedForURI(connection, uri); covered {
+		if err != nil {
+			return nil, err
+		}
+		return getPublished[T](ctx, g, source, connection, uri, ref, pin, a, decoders...)
+	}
 	binding, e := g.resolveReadBinding(ctx, a, connection.Name)
 	if e != nil {
 		return nil, e
@@ -1037,6 +1090,10 @@ func get[T any](ctx context.Context, g *Gateway, connection Connection, ref iden
 		return nil, identity.ErrResourceDenied
 	}
 	actual := result.ResolvedResource
+	// Published candidates are issued only by the trusted local source branch.
+	if actual.Kind == identity.PublishedCandidate {
+		return nil, identity.ErrResourceDenied
+	}
 	if uri.Kind == "navigation" && !c.sharedIndex {
 		if !menuRead || result.MenuProjection == nil || result.MenuProjection.SchemaVersion != 1 || result.Resource.FormatVersion != 1 || result.Resource.Lifecycle != actual.Kind || !declaresMenuFormat(c, uri.Namespace) || len(result.Resource.Definition) != 0 || len(result.Resource.DefinitionBytes) != 0 || ValidateMenu(1, result.MenuProjection.DefinitionBytes) != nil || identity.ContentFingerprint(result.MenuProjection.DefinitionBytes) != result.MenuProjection.ContentFingerprint {
 			return nil, identity.ErrResourceDenied

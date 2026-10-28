@@ -21,6 +21,19 @@ func (g *Gateway) getForProvider(ctx context.Context, owner string, ref identity
 	if owner == "" || pin != nil && pin.ProviderIdentity != owner {
 		return nil, Connection{}, identity.ErrResourceDenied
 	}
+	uri, err := identity.ParseResourceURI(ref.URI)
+	if err != nil {
+		return nil, Connection{}, err
+	}
+	if source, covered := g.publishedNamespace(uri.Namespace); covered {
+		if owner != source.connection.ProviderIdentity {
+			return nil, Connection{}, identity.ErrResourceDenied
+		}
+		connection := source.connection
+		connection.Generation = g.generation(connection.Name)
+		result, err := g.Get(ctx, connection, ref, pin)
+		return result, connection, err
+	}
 	connection, found, err := g.configuredOwnerConnection(ctx, owner)
 	if err != nil {
 		return nil, Connection{}, err

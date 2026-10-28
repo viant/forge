@@ -1,0 +1,4019 @@
+{
+  "expected": {
+    "blockId": "tab_1_chart_2",
+    "datasetId": "high757692Fb",
+    "rowCount": 143,
+    "title": "High",
+    "valueField": "amountB2e691ae"
+  },
+  "reportFill": {
+    "version": 1,
+    "kind": "reportFill",
+    "specVersion": 1,
+    "specHash": "fnv1a:46aeff8f",
+    "source": {
+      "kind": "dashboard.reportBuilder",
+      "containerId": "report_42",
+      "stateKey": "report_42",
+      "dataSourceRef": "usageHigh91Fd3c73"
+    },
+    "parameters": {
+      "viewMode": "chart",
+      "groupBy": "",
+      "pageSize": 100,
+      "orderField": "",
+      "orderDir": "asc"
+    },
+    "refinements": [],
+    "calculatedFields": [],
+    "datasets": [
+      {
+        "id": "high757692Fb",
+        "dataSourceRef": "usageHigh91Fd3c73",
+        "request": {
+          "kind": "query",
+          "measures": {
+            "amountB2e691ae": true
+          },
+          "dimensions": {
+            "category0C5e9017": true
+          },
+          "filters": {
+            "minimumAmount4319B999": 0,
+            "predicateD2f147bd": true
+          },
+          "limit": 256,
+          "offset": 0
+        },
+        "provenance": {
+          "requestHash": "fnv1a:ade5ca11",
+          "rowCount": 143,
+          "truncated": false,
+          "hasMore": false,
+          "diagnostics": []
+        },
+        "rows": [
+          {
+            "amountB2e691ae": 1,
+            "category0C5e9017": "C001"
+          },
+          {
+            "amountB2e691ae": 2,
+            "category0C5e9017": "C002"
+          },
+          {
+            "amountB2e691ae": 3,
+            "category0C5e9017": "C003"
+          },
+          {
+            "amountB2e691ae": 4,
+            "category0C5e9017": "C004"
+          },
+          {
+            "amountB2e691ae": 5,
+            "category0C5e9017": "C005"
+          },
+          {
+            "amountB2e691ae": 6,
+            "category0C5e9017": "C006"
+          },
+          {
+            "amountB2e691ae": 7,
+            "category0C5e9017": "C007"
+          },
+          {
+            "amountB2e691ae": 8,
+            "category0C5e9017": "C008"
+          },
+          {
+            "amountB2e691ae": 9,
+            "category0C5e9017": "C009"
+          },
+          {
+            "amountB2e691ae": 10,
+            "category0C5e9017": "C010"
+          },
+          {
+            "amountB2e691ae": 11,
+            "category0C5e9017": "C011"
+          },
+          {
+            "amountB2e691ae": 12,
+            "category0C5e9017": "C012"
+          },
+          {
+            "amountB2e691ae": 13,
+            "category0C5e9017": "C013"
+          },
+          {
+            "amountB2e691ae": 14,
+            "category0C5e9017": "C014"
+          },
+          {
+            "amountB2e691ae": 15,
+            "category0C5e9017": "C015"
+          },
+          {
+            "amountB2e691ae": 16,
+            "category0C5e9017": "C016"
+          },
+          {
+            "amountB2e691ae": 17,
+            "category0C5e9017": "C017"
+          },
+          {
+            "amountB2e691ae": 18,
+            "category0C5e9017": "C018"
+          },
+          {
+            "amountB2e691ae": 19,
+            "category0C5e9017": "C019"
+          },
+          {
+            "amountB2e691ae": 20,
+            "category0C5e9017": "C020"
+          },
+          {
+            "amountB2e691ae": 21,
+            "category0C5e9017": "C021"
+          },
+          {
+            "amountB2e691ae": 22,
+            "category0C5e9017": "C022"
+          },
+          {
+            "amountB2e691ae": 23,
+            "category0C5e9017": "C023"
+          },
+          {
+            "amountB2e691ae": 24,
+            "category0C5e9017": "C024"
+          },
+          {
+            "amountB2e691ae": 25,
+            "category0C5e9017": "C025"
+          },
+          {
+            "amountB2e691ae": 26,
+            "category0C5e9017": "C026"
+          },
+          {
+            "amountB2e691ae": 27,
+            "category0C5e9017": "C027"
+          },
+          {
+            "amountB2e691ae": 28,
+            "category0C5e9017": "C028"
+          },
+          {
+            "amountB2e691ae": 29,
+            "category0C5e9017": "C029"
+          },
+          {
+            "amountB2e691ae": 30,
+            "category0C5e9017": "C030"
+          },
+          {
+            "amountB2e691ae": 31,
+            "category0C5e9017": "C031"
+          },
+          {
+            "amountB2e691ae": 32,
+            "category0C5e9017": "C032"
+          },
+          {
+            "amountB2e691ae": 33,
+            "category0C5e9017": "C033"
+          },
+          {
+            "amountB2e691ae": 34,
+            "category0C5e9017": "C034"
+          },
+          {
+            "amountB2e691ae": 35,
+            "category0C5e9017": "C035"
+          },
+          {
+            "amountB2e691ae": 36,
+            "category0C5e9017": "C036"
+          },
+          {
+            "amountB2e691ae": 37,
+            "category0C5e9017": "C037"
+          },
+          {
+            "amountB2e691ae": 38,
+            "category0C5e9017": "C038"
+          },
+          {
+            "amountB2e691ae": 39,
+            "category0C5e9017": "C039"
+          },
+          {
+            "amountB2e691ae": 40,
+            "category0C5e9017": "C040"
+          },
+          {
+            "amountB2e691ae": 41,
+            "category0C5e9017": "C041"
+          },
+          {
+            "amountB2e691ae": 42,
+            "category0C5e9017": "C042"
+          },
+          {
+            "amountB2e691ae": 43,
+            "category0C5e9017": "C043"
+          },
+          {
+            "amountB2e691ae": 44,
+            "category0C5e9017": "C044"
+          },
+          {
+            "amountB2e691ae": 45,
+            "category0C5e9017": "C045"
+          },
+          {
+            "amountB2e691ae": 46,
+            "category0C5e9017": "C046"
+          },
+          {
+            "amountB2e691ae": 47,
+            "category0C5e9017": "C047"
+          },
+          {
+            "amountB2e691ae": 48,
+            "category0C5e9017": "C048"
+          },
+          {
+            "amountB2e691ae": 49,
+            "category0C5e9017": "C049"
+          },
+          {
+            "amountB2e691ae": 50,
+            "category0C5e9017": "C050"
+          },
+          {
+            "amountB2e691ae": 51,
+            "category0C5e9017": "C051"
+          },
+          {
+            "amountB2e691ae": 52,
+            "category0C5e9017": "C052"
+          },
+          {
+            "amountB2e691ae": 53,
+            "category0C5e9017": "C053"
+          },
+          {
+            "amountB2e691ae": 54,
+            "category0C5e9017": "C054"
+          },
+          {
+            "amountB2e691ae": 55,
+            "category0C5e9017": "C055"
+          },
+          {
+            "amountB2e691ae": 56,
+            "category0C5e9017": "C056"
+          },
+          {
+            "amountB2e691ae": 57,
+            "category0C5e9017": "C057"
+          },
+          {
+            "amountB2e691ae": 58,
+            "category0C5e9017": "C058"
+          },
+          {
+            "amountB2e691ae": 59,
+            "category0C5e9017": "C059"
+          },
+          {
+            "amountB2e691ae": 60,
+            "category0C5e9017": "C060"
+          },
+          {
+            "amountB2e691ae": 61,
+            "category0C5e9017": "C061"
+          },
+          {
+            "amountB2e691ae": 62,
+            "category0C5e9017": "C062"
+          },
+          {
+            "amountB2e691ae": 63,
+            "category0C5e9017": "C063"
+          },
+          {
+            "amountB2e691ae": 64,
+            "category0C5e9017": "C064"
+          },
+          {
+            "amountB2e691ae": 65,
+            "category0C5e9017": "C065"
+          },
+          {
+            "amountB2e691ae": 66,
+            "category0C5e9017": "C066"
+          },
+          {
+            "amountB2e691ae": 67,
+            "category0C5e9017": "C067"
+          },
+          {
+            "amountB2e691ae": 68,
+            "category0C5e9017": "C068"
+          },
+          {
+            "amountB2e691ae": 69,
+            "category0C5e9017": "C069"
+          },
+          {
+            "amountB2e691ae": 70,
+            "category0C5e9017": "C070"
+          },
+          {
+            "amountB2e691ae": 71,
+            "category0C5e9017": "C071"
+          },
+          {
+            "amountB2e691ae": 72,
+            "category0C5e9017": "C072"
+          },
+          {
+            "amountB2e691ae": 73,
+            "category0C5e9017": "C073"
+          },
+          {
+            "amountB2e691ae": 74,
+            "category0C5e9017": "C074"
+          },
+          {
+            "amountB2e691ae": 75,
+            "category0C5e9017": "C075"
+          },
+          {
+            "amountB2e691ae": 76,
+            "category0C5e9017": "C076"
+          },
+          {
+            "amountB2e691ae": 77,
+            "category0C5e9017": "C077"
+          },
+          {
+            "amountB2e691ae": 78,
+            "category0C5e9017": "C078"
+          },
+          {
+            "amountB2e691ae": 79,
+            "category0C5e9017": "C079"
+          },
+          {
+            "amountB2e691ae": 80,
+            "category0C5e9017": "C080"
+          },
+          {
+            "amountB2e691ae": 81,
+            "category0C5e9017": "C081"
+          },
+          {
+            "amountB2e691ae": 82,
+            "category0C5e9017": "C082"
+          },
+          {
+            "amountB2e691ae": 83,
+            "category0C5e9017": "C083"
+          },
+          {
+            "amountB2e691ae": 84,
+            "category0C5e9017": "C084"
+          },
+          {
+            "amountB2e691ae": 85,
+            "category0C5e9017": "C085"
+          },
+          {
+            "amountB2e691ae": 86,
+            "category0C5e9017": "C086"
+          },
+          {
+            "amountB2e691ae": 87,
+            "category0C5e9017": "C087"
+          },
+          {
+            "amountB2e691ae": 88,
+            "category0C5e9017": "C088"
+          },
+          {
+            "amountB2e691ae": 89,
+            "category0C5e9017": "C089"
+          },
+          {
+            "amountB2e691ae": 90,
+            "category0C5e9017": "C090"
+          },
+          {
+            "amountB2e691ae": 91,
+            "category0C5e9017": "C091"
+          },
+          {
+            "amountB2e691ae": 92,
+            "category0C5e9017": "C092"
+          },
+          {
+            "amountB2e691ae": 93,
+            "category0C5e9017": "C093"
+          },
+          {
+            "amountB2e691ae": 94,
+            "category0C5e9017": "C094"
+          },
+          {
+            "amountB2e691ae": 95,
+            "category0C5e9017": "C095"
+          },
+          {
+            "amountB2e691ae": 96,
+            "category0C5e9017": "C096"
+          },
+          {
+            "amountB2e691ae": 97,
+            "category0C5e9017": "C097"
+          },
+          {
+            "amountB2e691ae": 98,
+            "category0C5e9017": "C098"
+          },
+          {
+            "amountB2e691ae": 99,
+            "category0C5e9017": "C099"
+          },
+          {
+            "amountB2e691ae": 100,
+            "category0C5e9017": "C100"
+          },
+          {
+            "amountB2e691ae": 101,
+            "category0C5e9017": "C101"
+          },
+          {
+            "amountB2e691ae": 102,
+            "category0C5e9017": "C102"
+          },
+          {
+            "amountB2e691ae": 103,
+            "category0C5e9017": "C103"
+          },
+          {
+            "amountB2e691ae": 104,
+            "category0C5e9017": "C104"
+          },
+          {
+            "amountB2e691ae": 105,
+            "category0C5e9017": "C105"
+          },
+          {
+            "amountB2e691ae": 106,
+            "category0C5e9017": "C106"
+          },
+          {
+            "amountB2e691ae": 107,
+            "category0C5e9017": "C107"
+          },
+          {
+            "amountB2e691ae": 108,
+            "category0C5e9017": "C108"
+          },
+          {
+            "amountB2e691ae": 109,
+            "category0C5e9017": "C109"
+          },
+          {
+            "amountB2e691ae": 110,
+            "category0C5e9017": "C110"
+          },
+          {
+            "amountB2e691ae": 111,
+            "category0C5e9017": "C111"
+          },
+          {
+            "amountB2e691ae": 112,
+            "category0C5e9017": "C112"
+          },
+          {
+            "amountB2e691ae": 113,
+            "category0C5e9017": "C113"
+          },
+          {
+            "amountB2e691ae": 114,
+            "category0C5e9017": "C114"
+          },
+          {
+            "amountB2e691ae": 115,
+            "category0C5e9017": "C115"
+          },
+          {
+            "amountB2e691ae": 116,
+            "category0C5e9017": "C116"
+          },
+          {
+            "amountB2e691ae": 117,
+            "category0C5e9017": "C117"
+          },
+          {
+            "amountB2e691ae": 118,
+            "category0C5e9017": "C118"
+          },
+          {
+            "amountB2e691ae": 119,
+            "category0C5e9017": "C119"
+          },
+          {
+            "amountB2e691ae": 120,
+            "category0C5e9017": "C120"
+          },
+          {
+            "amountB2e691ae": 121,
+            "category0C5e9017": "C121"
+          },
+          {
+            "amountB2e691ae": 122,
+            "category0C5e9017": "C122"
+          },
+          {
+            "amountB2e691ae": 123,
+            "category0C5e9017": "C123"
+          },
+          {
+            "amountB2e691ae": 124,
+            "category0C5e9017": "C124"
+          },
+          {
+            "amountB2e691ae": 125,
+            "category0C5e9017": "C125"
+          },
+          {
+            "amountB2e691ae": 126,
+            "category0C5e9017": "C126"
+          },
+          {
+            "amountB2e691ae": 127,
+            "category0C5e9017": "C127"
+          },
+          {
+            "amountB2e691ae": 128,
+            "category0C5e9017": "C128"
+          },
+          {
+            "amountB2e691ae": 129,
+            "category0C5e9017": "C129"
+          },
+          {
+            "amountB2e691ae": 130,
+            "category0C5e9017": "C130"
+          },
+          {
+            "amountB2e691ae": 131,
+            "category0C5e9017": "C131"
+          },
+          {
+            "amountB2e691ae": 132,
+            "category0C5e9017": "C132"
+          },
+          {
+            "amountB2e691ae": 133,
+            "category0C5e9017": "C133"
+          },
+          {
+            "amountB2e691ae": 134,
+            "category0C5e9017": "C134"
+          },
+          {
+            "amountB2e691ae": 135,
+            "category0C5e9017": "C135"
+          },
+          {
+            "amountB2e691ae": 136,
+            "category0C5e9017": "C136"
+          },
+          {
+            "amountB2e691ae": 137,
+            "category0C5e9017": "C137"
+          },
+          {
+            "amountB2e691ae": 138,
+            "category0C5e9017": "C138"
+          },
+          {
+            "amountB2e691ae": 139,
+            "category0C5e9017": "C139"
+          },
+          {
+            "amountB2e691ae": 140,
+            "category0C5e9017": "C140"
+          },
+          {
+            "amountB2e691ae": 141,
+            "category0C5e9017": "C141"
+          },
+          {
+            "amountB2e691ae": 142,
+            "category0C5e9017": "C142"
+          },
+          {
+            "amountB2e691ae": 143,
+            "category0C5e9017": "C143"
+          }
+        ]
+      },
+      {
+        "id": "low66F1ad66",
+        "dataSourceRef": "usageLow91993157",
+        "request": {
+          "kind": "query",
+          "measures": {
+            "amountB2e691ae": true
+          },
+          "dimensions": {
+            "category0C5e9017": true
+          },
+          "filters": {
+            "minimumAmount4319B999": 0,
+            "predicateD2f147bd": false
+          },
+          "limit": 256,
+          "offset": 0
+        },
+        "provenance": {
+          "requestHash": "fnv1a:08c09798",
+          "rowCount": 0,
+          "truncated": false,
+          "hasMore": false,
+          "diagnostics": []
+        },
+        "rows": []
+      }
+    ],
+    "blocks": [
+      {
+        "blockIds": [
+          "tab_1_group_1"
+        ],
+        "id": "tab_1",
+        "kind": "sectionBlock",
+        "navigationLabel": "Summary",
+        "title": "Summary",
+        "content": {
+          "title": "Summary",
+          "navigationLabel": "Summary",
+          "blockIds": [
+            "tab_1_group_1"
+          ]
+        }
+      },
+      {
+        "collapsible": true,
+        "columns": [
+          {
+            "key": "category0C5e9017",
+            "label": "Category"
+          },
+          {
+            "key": "amountB2e691ae",
+            "label": "Amount",
+            "kind": "number"
+          }
+        ],
+        "datasetRef": "high757692Fb",
+        "defaultCollapsed": false,
+        "id": "tab_1_chart_2",
+        "kind": "tableBlock",
+        "runtime": {
+          "requireCompleteDataset": true
+        },
+        "title": "High",
+        "content": {
+          "columns": [
+            {
+              "key": "category0C5e9017",
+              "label": "Category"
+            },
+            {
+              "key": "amountB2e691ae",
+              "label": "Amount",
+              "kind": "number"
+            }
+          ],
+          "rowCount": 143,
+          "resolvedRows": [
+            {
+              "rowIndex": 0,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C001",
+                  "displayValue": "C001",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 1,
+                  "displayValue": 1,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 1,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C002",
+                  "displayValue": "C002",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 2,
+                  "displayValue": 2,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 2,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C003",
+                  "displayValue": "C003",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 3,
+                  "displayValue": 3,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 3,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C004",
+                  "displayValue": "C004",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 4,
+                  "displayValue": 4,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 4,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C005",
+                  "displayValue": "C005",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 5,
+                  "displayValue": 5,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 5,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C006",
+                  "displayValue": "C006",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 6,
+                  "displayValue": 6,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 6,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C007",
+                  "displayValue": "C007",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 7,
+                  "displayValue": 7,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 7,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C008",
+                  "displayValue": "C008",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 8,
+                  "displayValue": 8,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 8,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C009",
+                  "displayValue": "C009",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 9,
+                  "displayValue": 9,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 9,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C010",
+                  "displayValue": "C010",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 10,
+                  "displayValue": 10,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 10,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C011",
+                  "displayValue": "C011",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 11,
+                  "displayValue": 11,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 11,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C012",
+                  "displayValue": "C012",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 12,
+                  "displayValue": 12,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 12,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C013",
+                  "displayValue": "C013",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 13,
+                  "displayValue": 13,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 13,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C014",
+                  "displayValue": "C014",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 14,
+                  "displayValue": 14,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 14,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C015",
+                  "displayValue": "C015",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 15,
+                  "displayValue": 15,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 15,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C016",
+                  "displayValue": "C016",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 16,
+                  "displayValue": 16,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 16,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C017",
+                  "displayValue": "C017",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 17,
+                  "displayValue": 17,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 17,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C018",
+                  "displayValue": "C018",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 18,
+                  "displayValue": 18,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 18,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C019",
+                  "displayValue": "C019",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 19,
+                  "displayValue": 19,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 19,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C020",
+                  "displayValue": "C020",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 20,
+                  "displayValue": 20,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 20,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C021",
+                  "displayValue": "C021",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 21,
+                  "displayValue": 21,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 21,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C022",
+                  "displayValue": "C022",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 22,
+                  "displayValue": 22,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 22,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C023",
+                  "displayValue": "C023",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 23,
+                  "displayValue": 23,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 23,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C024",
+                  "displayValue": "C024",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 24,
+                  "displayValue": 24,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 24,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C025",
+                  "displayValue": "C025",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 25,
+                  "displayValue": 25,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 25,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C026",
+                  "displayValue": "C026",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 26,
+                  "displayValue": 26,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 26,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C027",
+                  "displayValue": "C027",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 27,
+                  "displayValue": 27,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 27,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C028",
+                  "displayValue": "C028",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 28,
+                  "displayValue": 28,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 28,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C029",
+                  "displayValue": "C029",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 29,
+                  "displayValue": 29,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 29,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C030",
+                  "displayValue": "C030",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 30,
+                  "displayValue": 30,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 30,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C031",
+                  "displayValue": "C031",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 31,
+                  "displayValue": 31,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 31,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C032",
+                  "displayValue": "C032",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 32,
+                  "displayValue": 32,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 32,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C033",
+                  "displayValue": "C033",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 33,
+                  "displayValue": 33,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 33,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C034",
+                  "displayValue": "C034",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 34,
+                  "displayValue": 34,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 34,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C035",
+                  "displayValue": "C035",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 35,
+                  "displayValue": 35,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 35,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C036",
+                  "displayValue": "C036",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 36,
+                  "displayValue": 36,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 36,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C037",
+                  "displayValue": "C037",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 37,
+                  "displayValue": 37,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 37,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C038",
+                  "displayValue": "C038",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 38,
+                  "displayValue": 38,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 38,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C039",
+                  "displayValue": "C039",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 39,
+                  "displayValue": 39,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 39,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C040",
+                  "displayValue": "C040",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 40,
+                  "displayValue": 40,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 40,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C041",
+                  "displayValue": "C041",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 41,
+                  "displayValue": 41,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 41,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C042",
+                  "displayValue": "C042",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 42,
+                  "displayValue": 42,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 42,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C043",
+                  "displayValue": "C043",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 43,
+                  "displayValue": 43,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 43,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C044",
+                  "displayValue": "C044",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 44,
+                  "displayValue": 44,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 44,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C045",
+                  "displayValue": "C045",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 45,
+                  "displayValue": 45,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 45,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C046",
+                  "displayValue": "C046",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 46,
+                  "displayValue": 46,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 46,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C047",
+                  "displayValue": "C047",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 47,
+                  "displayValue": 47,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 47,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C048",
+                  "displayValue": "C048",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 48,
+                  "displayValue": 48,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 48,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C049",
+                  "displayValue": "C049",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 49,
+                  "displayValue": 49,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 49,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C050",
+                  "displayValue": "C050",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 50,
+                  "displayValue": 50,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 50,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C051",
+                  "displayValue": "C051",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 51,
+                  "displayValue": 51,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 51,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C052",
+                  "displayValue": "C052",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 52,
+                  "displayValue": 52,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 52,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C053",
+                  "displayValue": "C053",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 53,
+                  "displayValue": 53,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 53,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C054",
+                  "displayValue": "C054",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 54,
+                  "displayValue": 54,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 54,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C055",
+                  "displayValue": "C055",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 55,
+                  "displayValue": 55,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 55,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C056",
+                  "displayValue": "C056",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 56,
+                  "displayValue": 56,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 56,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C057",
+                  "displayValue": "C057",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 57,
+                  "displayValue": 57,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 57,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C058",
+                  "displayValue": "C058",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 58,
+                  "displayValue": 58,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 58,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C059",
+                  "displayValue": "C059",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 59,
+                  "displayValue": 59,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 59,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C060",
+                  "displayValue": "C060",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 60,
+                  "displayValue": 60,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 60,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C061",
+                  "displayValue": "C061",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 61,
+                  "displayValue": 61,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 61,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C062",
+                  "displayValue": "C062",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 62,
+                  "displayValue": 62,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 62,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C063",
+                  "displayValue": "C063",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 63,
+                  "displayValue": 63,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 63,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C064",
+                  "displayValue": "C064",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 64,
+                  "displayValue": 64,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 64,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C065",
+                  "displayValue": "C065",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 65,
+                  "displayValue": 65,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 65,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C066",
+                  "displayValue": "C066",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 66,
+                  "displayValue": 66,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 66,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C067",
+                  "displayValue": "C067",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 67,
+                  "displayValue": 67,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 67,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C068",
+                  "displayValue": "C068",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 68,
+                  "displayValue": 68,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 68,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C069",
+                  "displayValue": "C069",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 69,
+                  "displayValue": 69,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 69,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C070",
+                  "displayValue": "C070",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 70,
+                  "displayValue": 70,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 70,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C071",
+                  "displayValue": "C071",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 71,
+                  "displayValue": 71,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 71,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C072",
+                  "displayValue": "C072",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 72,
+                  "displayValue": 72,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 72,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C073",
+                  "displayValue": "C073",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 73,
+                  "displayValue": 73,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 73,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C074",
+                  "displayValue": "C074",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 74,
+                  "displayValue": 74,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 74,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C075",
+                  "displayValue": "C075",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 75,
+                  "displayValue": 75,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 75,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C076",
+                  "displayValue": "C076",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 76,
+                  "displayValue": 76,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 76,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C077",
+                  "displayValue": "C077",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 77,
+                  "displayValue": 77,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 77,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C078",
+                  "displayValue": "C078",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 78,
+                  "displayValue": 78,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 78,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C079",
+                  "displayValue": "C079",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 79,
+                  "displayValue": 79,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 79,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C080",
+                  "displayValue": "C080",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 80,
+                  "displayValue": 80,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 80,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C081",
+                  "displayValue": "C081",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 81,
+                  "displayValue": 81,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 81,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C082",
+                  "displayValue": "C082",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 82,
+                  "displayValue": 82,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 82,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C083",
+                  "displayValue": "C083",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 83,
+                  "displayValue": 83,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 83,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C084",
+                  "displayValue": "C084",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 84,
+                  "displayValue": 84,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 84,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C085",
+                  "displayValue": "C085",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 85,
+                  "displayValue": 85,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 85,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C086",
+                  "displayValue": "C086",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 86,
+                  "displayValue": 86,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 86,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C087",
+                  "displayValue": "C087",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 87,
+                  "displayValue": 87,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 87,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C088",
+                  "displayValue": "C088",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 88,
+                  "displayValue": 88,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 88,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C089",
+                  "displayValue": "C089",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 89,
+                  "displayValue": 89,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 89,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C090",
+                  "displayValue": "C090",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 90,
+                  "displayValue": 90,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 90,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C091",
+                  "displayValue": "C091",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 91,
+                  "displayValue": 91,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 91,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C092",
+                  "displayValue": "C092",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 92,
+                  "displayValue": 92,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 92,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C093",
+                  "displayValue": "C093",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 93,
+                  "displayValue": 93,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 93,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C094",
+                  "displayValue": "C094",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 94,
+                  "displayValue": 94,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 94,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C095",
+                  "displayValue": "C095",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 95,
+                  "displayValue": 95,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 95,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C096",
+                  "displayValue": "C096",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 96,
+                  "displayValue": 96,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 96,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C097",
+                  "displayValue": "C097",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 97,
+                  "displayValue": 97,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 97,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C098",
+                  "displayValue": "C098",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 98,
+                  "displayValue": 98,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 98,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C099",
+                  "displayValue": "C099",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 99,
+                  "displayValue": 99,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 99,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C100",
+                  "displayValue": "C100",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 100,
+                  "displayValue": 100,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 100,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C101",
+                  "displayValue": "C101",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 101,
+                  "displayValue": 101,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 101,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C102",
+                  "displayValue": "C102",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 102,
+                  "displayValue": 102,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 102,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C103",
+                  "displayValue": "C103",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 103,
+                  "displayValue": 103,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 103,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C104",
+                  "displayValue": "C104",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 104,
+                  "displayValue": 104,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 104,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C105",
+                  "displayValue": "C105",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 105,
+                  "displayValue": 105,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 105,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C106",
+                  "displayValue": "C106",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 106,
+                  "displayValue": 106,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 106,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C107",
+                  "displayValue": "C107",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 107,
+                  "displayValue": 107,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 107,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C108",
+                  "displayValue": "C108",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 108,
+                  "displayValue": 108,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 108,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C109",
+                  "displayValue": "C109",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 109,
+                  "displayValue": 109,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 109,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C110",
+                  "displayValue": "C110",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 110,
+                  "displayValue": 110,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 110,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C111",
+                  "displayValue": "C111",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 111,
+                  "displayValue": 111,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 111,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C112",
+                  "displayValue": "C112",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 112,
+                  "displayValue": 112,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 112,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C113",
+                  "displayValue": "C113",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 113,
+                  "displayValue": 113,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 113,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C114",
+                  "displayValue": "C114",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 114,
+                  "displayValue": 114,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 114,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C115",
+                  "displayValue": "C115",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 115,
+                  "displayValue": 115,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 115,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C116",
+                  "displayValue": "C116",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 116,
+                  "displayValue": 116,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 116,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C117",
+                  "displayValue": "C117",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 117,
+                  "displayValue": 117,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 117,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C118",
+                  "displayValue": "C118",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 118,
+                  "displayValue": 118,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 118,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C119",
+                  "displayValue": "C119",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 119,
+                  "displayValue": 119,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 119,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C120",
+                  "displayValue": "C120",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 120,
+                  "displayValue": 120,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 120,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C121",
+                  "displayValue": "C121",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 121,
+                  "displayValue": 121,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 121,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C122",
+                  "displayValue": "C122",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 122,
+                  "displayValue": 122,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 122,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C123",
+                  "displayValue": "C123",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 123,
+                  "displayValue": 123,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 123,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C124",
+                  "displayValue": "C124",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 124,
+                  "displayValue": 124,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 124,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C125",
+                  "displayValue": "C125",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 125,
+                  "displayValue": 125,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 125,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C126",
+                  "displayValue": "C126",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 126,
+                  "displayValue": 126,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 126,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C127",
+                  "displayValue": "C127",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 127,
+                  "displayValue": 127,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 127,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C128",
+                  "displayValue": "C128",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 128,
+                  "displayValue": 128,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 128,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C129",
+                  "displayValue": "C129",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 129,
+                  "displayValue": 129,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 129,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C130",
+                  "displayValue": "C130",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 130,
+                  "displayValue": 130,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 130,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C131",
+                  "displayValue": "C131",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 131,
+                  "displayValue": 131,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 131,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C132",
+                  "displayValue": "C132",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 132,
+                  "displayValue": 132,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 132,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C133",
+                  "displayValue": "C133",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 133,
+                  "displayValue": 133,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 133,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C134",
+                  "displayValue": "C134",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 134,
+                  "displayValue": 134,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 134,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C135",
+                  "displayValue": "C135",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 135,
+                  "displayValue": 135,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 135,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C136",
+                  "displayValue": "C136",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 136,
+                  "displayValue": 136,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 136,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C137",
+                  "displayValue": "C137",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 137,
+                  "displayValue": 137,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 137,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C138",
+                  "displayValue": "C138",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 138,
+                  "displayValue": 138,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 138,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C139",
+                  "displayValue": "C139",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 139,
+                  "displayValue": 139,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 139,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C140",
+                  "displayValue": "C140",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 140,
+                  "displayValue": 140,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 140,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C141",
+                  "displayValue": "C141",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 141,
+                  "displayValue": 141,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 141,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C142",
+                  "displayValue": "C142",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 142,
+                  "displayValue": 142,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 142,
+              "cells": [
+                {
+                  "key": "category0C5e9017",
+                  "sourceKey": "category0C5e9017",
+                  "displayKey": "category0C5e9017",
+                  "value": "C143",
+                  "displayValue": "C143",
+                  "visualState": null
+                },
+                {
+                  "key": "amountB2e691ae",
+                  "sourceKey": "amountB2e691ae",
+                  "displayKey": "amountB2e691ae",
+                  "value": 143,
+                  "displayValue": 143,
+                  "visualState": null
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "chartModel": {
+          "series": {
+            "palette": [
+              "#426b85"
+            ],
+            "values": [
+              {
+                "color": "#426b85",
+                "label": "Amount",
+                "type": "bar",
+                "value": "amountB2e691ae"
+              }
+            ]
+          },
+          "type": "bar",
+          "xAxis": {
+            "dataKey": "category0C5e9017",
+            "label": "Category"
+          }
+        },
+        "chartSpec": {
+          "type": "bar",
+          "xField": "category0C5e9017",
+          "yFields": [
+            "amountB2e691ae"
+          ]
+        },
+        "datasetRef": "low66F1ad66",
+        "id": "tab_1_chart_3",
+        "kind": "chartBlock",
+        "runtime": {
+          "requireCompleteDataset": true
+        },
+        "title": "Low",
+        "content": {
+          "chartSpec": {
+            "type": "bar",
+            "xField": "category0C5e9017",
+            "yFields": [
+              "amountB2e691ae"
+            ]
+          },
+          "chartModel": {
+            "series": {
+              "palette": [
+                "#426b85"
+              ],
+              "values": [
+                {
+                  "color": "#426b85",
+                  "label": "Amount",
+                  "type": "bar",
+                  "value": "amountB2e691ae"
+                }
+              ]
+            },
+            "type": "bar",
+            "xAxis": {
+              "dataKey": "category0C5e9017",
+              "label": "Category"
+            }
+          },
+          "rowCount": 0,
+          "resolvedChart": null
+        }
+      },
+      {
+        "id": "tab_1_group_4",
+        "kind": "filterBarBlock",
+        "paramIds": [
+          "minimumAmount4319B999"
+        ],
+        "title": "Filters",
+        "content": {
+          "title": "Filters",
+          "mode": "baseline",
+          "placement": "inherit",
+          "groupOrder": [],
+          "visibleGroups": [],
+          "collapsedGroups": [],
+          "params": [
+            {
+              "id": "minimumAmount4319B999",
+              "groupId": "minimumAmount4319B999",
+              "label": "Minimum amount",
+              "type": "integer",
+              "required": true,
+              "value": 0
+            }
+          ]
+        }
+      },
+      {
+        "childBlockIds": [
+          "tab_1_chart_2",
+          "tab_1_chart_3",
+          "tab_1_group_4"
+        ],
+        "id": "tab_1_group_1",
+        "kind": "compositeBlock",
+        "layout": "stack",
+        "runtime": {
+          "chrome": "none"
+        },
+        "title": "Layout",
+        "content": {
+          "title": "Layout",
+          "layout": "stack",
+          "childBlockIds": [
+            "tab_1_chart_2",
+            "tab_1_chart_3",
+            "tab_1_group_4"
+          ]
+        }
+      }
+    ],
+    "diagnostics": []
+  },
+  "reportSpec": {
+    "blocks": [
+      {
+        "blockIds": [
+          "tab_1_group_1"
+        ],
+        "id": "tab_1",
+        "kind": "sectionBlock",
+        "navigationLabel": "Summary",
+        "title": "Summary"
+      },
+      {
+        "collapsible": true,
+        "columns": [
+          {
+            "key": "category0C5e9017",
+            "label": "Category"
+          },
+          {
+            "key": "amountB2e691ae",
+            "label": "Amount",
+            "kind": "number"
+          }
+        ],
+        "datasetRef": "high757692Fb",
+        "defaultCollapsed": false,
+        "id": "tab_1_chart_2",
+        "kind": "tableBlock",
+        "runtime": {
+          "requireCompleteDataset": true
+        },
+        "title": "High"
+      },
+      {
+        "chartModel": {
+          "series": {
+            "palette": [
+              "#426b85"
+            ],
+            "values": [
+              {
+                "color": "#426b85",
+                "label": "Amount",
+                "type": "bar",
+                "value": "amountB2e691ae"
+              }
+            ]
+          },
+          "type": "bar",
+          "xAxis": {
+            "dataKey": "category0C5e9017",
+            "label": "Category"
+          }
+        },
+        "chartSpec": {
+          "type": "bar",
+          "xField": "category0C5e9017",
+          "yFields": [
+            "amountB2e691ae"
+          ]
+        },
+        "datasetRef": "low66F1ad66",
+        "id": "tab_1_chart_3",
+        "kind": "chartBlock",
+        "runtime": {
+          "requireCompleteDataset": true
+        },
+        "title": "Low"
+      },
+      {
+        "id": "tab_1_group_4",
+        "kind": "filterBarBlock",
+        "paramIds": [
+          "minimumAmount4319B999"
+        ],
+        "title": "Filters"
+      },
+      {
+        "childBlockIds": [
+          "tab_1_chart_2",
+          "tab_1_chart_3",
+          "tab_1_group_4"
+        ],
+        "id": "tab_1_group_1",
+        "kind": "compositeBlock",
+        "layout": "stack",
+        "runtime": {
+          "chrome": "none"
+        },
+        "title": "Layout"
+      }
+    ],
+    "calculatedFields": [],
+    "datasets": [
+      {
+        "id": "high757692Fb",
+        "dataSourceRef": "usageHigh91Fd3c73",
+        "request": {
+          "kind": "query",
+          "measures": {
+            "amountB2e691ae": true
+          },
+          "dimensions": {
+            "category0C5e9017": true
+          },
+          "filters": {
+            "minimumAmount4319B999": 0,
+            "predicateD2f147bd": true
+          },
+          "limit": 256,
+          "offset": 0
+        }
+      },
+      {
+        "id": "low66F1ad66",
+        "dataSourceRef": "usageLow91993157",
+        "request": {
+          "kind": "query",
+          "measures": {
+            "amountB2e691ae": true
+          },
+          "dimensions": {
+            "category0C5e9017": true
+          },
+          "filters": {
+            "minimumAmount4319B999": 0,
+            "predicateD2f147bd": false
+          },
+          "limit": 256,
+          "offset": 0
+        }
+      }
+    ],
+    "kind": "reportSpec",
+    "layoutIntent": {
+      "kind": "dashboard",
+      "resultPanePosition": "main",
+      "blockOrder": [
+        "tab_1",
+        "tab_1_chart_2",
+        "tab_1_chart_3",
+        "tab_1_group_4",
+        "tab_1_group_1"
+      ]
+    },
+    "parameters": {
+      "viewMode": "chart",
+      "groupBy": "",
+      "pageSize": 100,
+      "orderField": "",
+      "orderDir": "asc"
+    },
+    "refinements": [],
+    "scope": {
+      "params": [
+        {
+          "id": "minimumAmount4319B999",
+          "kind": "integer",
+          "label": "Minimum amount",
+          "filterBindings": [
+            {
+              "datasetRef": "high757692Fb",
+              "path": "minimumAmount4319B999"
+            },
+            {
+              "datasetRef": "low66F1ad66",
+              "path": "minimumAmount4319B999"
+            }
+          ],
+          "required": true,
+          "value": 0
+        }
+      ],
+      "dataSourceRef": "usageHigh91Fd3c73"
+    },
+    "source": {
+      "kind": "dashboard.reportBuilder",
+      "containerId": "report_42",
+      "stateKey": "report_42",
+      "dataSourceRef": "usageHigh91Fd3c73"
+    },
+    "title": "Usage",
+    "version": 1
+  }
+}

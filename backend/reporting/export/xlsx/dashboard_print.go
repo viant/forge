@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"sort"
-	"strconv"
 	"strings"
 	"unicode/utf16"
 
@@ -481,11 +480,7 @@ func (w *visualDashboardWriter) printElement(sheet string, element reportprint.E
 		if style.Font.Color == "" {
 			style.Font.Color = "101828"
 		}
-		style.Font.Bold = element.FontWeight == "bold" || element.FontWeight == "600" || element.FontWeight == "700"
-		if weight, err := strconv.Atoi(element.FontWeight); err == nil && weight >= 600 {
-			style.Font.Bold = true
-		}
-		style.Font.Italic = strings.Contains(strings.ToLower(element.FontWeight), "italic") || strings.Contains(strings.ToLower(element.FontWeight), "oblique")
+		style.Font.Bold, style.Font.Italic = reportprint.TextEmphasis(element.FontWeight)
 		value := element.Text
 		{
 			oldID, err := w.file.GetCellStyle(sheet, first)
@@ -501,7 +496,22 @@ func (w *visualDashboardWriter) printElement(sheet string, element reportprint.E
 		if err = w.file.MergeCell(sheet, first, last); err != nil {
 			return err
 		}
-		if err = setXLSXText(w.file, sheet, first, value); err != nil {
+		if len(element.TextRuns) > 0 {
+			runs := make([]excelize.RichTextRun, 0, len(element.TextRuns))
+			for _, run := range element.TextRuns {
+				font := *style.Font
+				weight := run.FontWeight
+				if weight == "" {
+					weight = element.FontWeight
+				}
+				font.Bold, font.Italic = reportprint.TextEmphasis(weight)
+				runs = append(runs, excelize.RichTextRun{Text: run.Text, Font: &font})
+			}
+			err = w.file.SetCellRichText(sheet, first, runs)
+		} else {
+			err = setXLSXText(w.file, sheet, first, value)
+		}
+		if err != nil {
 			return err
 		}
 		id, err := w.file.NewStyle(style)

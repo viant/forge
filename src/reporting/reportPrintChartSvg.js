@@ -1,7 +1,7 @@
-import {donutCenterSvg,donutCenterDescription} from '../components/donutCenter.js';
+import {donutCenterSvg,donutCenterDescription,donutCenterPrintDescription} from '../components/donutCenter.js';
 import {buildCategoryRange,categoryRangeSvg,categoryRangePrintPages} from '../components/categoryRange.js';
 import {buildHeatmap,heatmapSvg,heatmapPrintPages} from '../components/categoricalHeatmap.js';
-import {resolveCategoryColor} from '../components/chartTheme.js';
+import {resolveCategoryColor,resolveChartCategoryColor} from '../components/chartTheme.js';
 import { compactReportPrintSequence, wrapReportPrintLabel } from "./reportPrintLabels.js";
 import { formatExportNumericValue } from "./reportExportValueFormatter.js";
 import { normalizeChartAnnotations, resolveChartAnnotationStrokeDasharray } from "./reportChartAnnotations.js";
@@ -133,7 +133,7 @@ function resolveCartesianSeriesDescriptors(chartModel = {}, resolvedChart = {}) 
           key: normalizedKey,
           label: normalizedKey,
           type: chartType,
-          color: printColor(resolveCategoryColor(chartModel?.series?.categoryColors, normalizedKey, palette[index % palette.length])),
+          color: printColor(resolveChartCategoryColor(chartModel, normalizedKey, palette[index % palette.length])),
           format: normalizeString(chartModel?.yAxis?.format),
           dataLabels: "",
           pointColorMode: "",
@@ -149,6 +149,7 @@ function resolveCategorySlices(resolvedChart = {}) {
     .map((row) => ({
       name: normalizeString(row?.name),
       value: normalizeNumber(row?.value) || 0,
+      ...(Object.hasOwn(row||{},"sliceLabel")?{sliceLabel:row.sliceLabel}:{}),
     }))
     .filter((entry) => entry.name);
 }
@@ -742,7 +743,7 @@ function renderCategoryChartSvg({
     const fraction = slice.value / total;
     const angle = fraction * 2 * Math.PI;
     const endAngle = startAngle + angle;
-    const fill = printColor(resolveCategoryColor(chartModel?.series?.categoryColors, slice.name, palette[index % palette.length]));
+    const fill = printColor(resolveChartCategoryColor(chartModel, slice.name, palette[index % palette.length]));
     const outerPath = (() => {
       if (slices.length === 1) {
         return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${escapeXml(fill)}" />`;
@@ -775,12 +776,13 @@ function renderCategoryChartSvg({
   const legendX = size + 20;
   const legendY = 18;
   const legend = slices.map((slice, index) => {
-    const fill = printColor(resolveCategoryColor(chartModel?.series?.categoryColors, slice.name, palette[index % palette.length]));
+    const fill = printColor(resolveChartCategoryColor(chartModel, slice.name, palette[index % palette.length]));
     const pct = ((slice.value / total) * 100).toFixed(0);
+    const label=chartModel.sliceLabel?(slice.sliceLabel==null?"":` — ${slice.sliceLabel}`):` — ${pct}%`;
     const y = legendY + (index * 20);
     return `
       <rect x="${legendX}" y="${y}" width="12" height="12" rx="2" fill="${escapeXml(fill)}" />
-      <text x="${legendX + 18}" y="${y + 11}" font-size="11" fill="#344054">${escapeXml(slice.name)} — ${escapeXml(pct)}%</text>
+      <text x="${legendX + 18}" y="${y + 11}" font-size="11" fill="#344054">${escapeXml(slice.name)}${escapeXml(label)}</text>
     `;
   }).join("\n");
   const centerGraphic=center?donutCenterSvg(center,cx,cy,innerRadius):null;
@@ -796,7 +798,7 @@ function renderCategoryChartSvg({
       ${legend}
     </svg>`,
     height,
-    ...(center?{labelDetails:[...(centerGraphic?.needsDetails?[donutCenterDescription(center)]:[]),...(slices.length===0?["No slice data."]:[])]}:{}),
+    ...(center?{labelDetails:[...(centerGraphic?.needsDetails?[donutCenterPrintDescription(center)]:[]),...(slices.length===0?["No slice data."]:[])]}:{}),
     diagnostics: [],
   };
 }
@@ -1165,7 +1167,7 @@ function renderHorizontalBarChartSvg({
       const barWidth = Math.max(1, Math.abs(valueX - baselineX));
       const labelX = value >= 0 ? valueX + 6 : valueX - 6;
       const labelAnchor = value >= 0 ? "start" : "end";
-      const fillColor = printColor(resolveCategoryColor(chartModel?.series?.categoryColors, readChartDataValue(row, xAxisKey), resolveSeriesPointColor(series, value, series.color)));
+      const fillColor = printColor(resolveChartCategoryColor(chartModel, readChartDataValue(row, xAxisKey), resolveSeriesPointColor(series, value, series.color)));
       const valueLabel = shouldRenderReportPrintSeriesDataLabels(series, "horizontal_bar", rows.length)
         ? `<text x="${labelX}" y="${barY + perSeriesHeight - 2}" text-anchor="${labelAnchor}" font-size="10" fill="#667085">${escapeXml(formatSeriesDataLabel(value, series.format))}</text>`
         : "";

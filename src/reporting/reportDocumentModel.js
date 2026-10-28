@@ -1,3 +1,5 @@
+import {normalizeTemplateRequestInputs} from './reportTemplateRequestInputs.js';
+import {donutCenterFields} from '../components/donutCenter.js';
 import {chartTooltipFields} from '../components/chartTooltip.js';
 import {tableAnalyticsFields} from './reportTableAnalytics.js';
 import {buildGeoGeometry} from './geoGeometry.js';
@@ -237,7 +239,8 @@ function buildAuthoredChartBlockState(baseState = {}, chartSpec = {}, fieldCatal
   addSelection(chartSpec?.heatmap?.rowField);
   addSelection(chartSpec?.heatmap?.columnField);
   addSelection(chartSpec?.heatmap?.valueField);
-  addSelection(chartSpec?.center?.value?.field);
+  if(!chartSpec?.center?.datasetRef)donutCenterFields(chartSpec?.center).forEach(addSelection);
+  addSelection(chartSpec?.sliceLabel?.field);
   addSelection(chartSpec?.xField);
   addSelection(chartSpec?.seriesField);
   normalizeStringArray(chartSpec?.yFields).forEach((fieldKey) => addSelection(fieldKey));
@@ -379,14 +382,14 @@ function resolveAuthoredFieldDisplayDescriptor(fieldCatalog = {}, field = "") {
   };
 }
 
-function buildAuthoredTemplateFieldDisplayMap(template = "", fieldCatalog = {}) {
-  const mappings = {};
+function buildAuthoredTemplateFieldDisplayMap(template = "", fieldCatalog = {}, authored = {}) {
+  const mappings = cloneValue(authored||{});
   const matches = String(template || "").matchAll(/\brow\.([A-Za-z_][A-Za-z0-9_.]*)/g);
   for (const match of matches) {
     const field = normalizeString(match?.[1]);
     const descriptor = resolveAuthoredFieldDisplayDescriptor(fieldCatalog, field);
     if (field && descriptor) {
-      mappings[field] = descriptor;
+      mappings[field] = {...mappings[field],...descriptor};
     }
   }
   return Object.keys(mappings).length > 0 ? mappings : null;
@@ -394,7 +397,7 @@ function buildAuthoredTemplateFieldDisplayMap(template = "", fieldCatalog = {}) 
 
 function buildAuthoredMarkdownBlock(block = {}, fieldCatalog = {}) {
   const normalizedBlock = buildReportDocumentMarkdownBlock(block);
-  const templateFieldDisplayMap = buildAuthoredTemplateFieldDisplayMap(normalizedBlock?.markdown, fieldCatalog);
+  const templateFieldDisplayMap = buildAuthoredTemplateFieldDisplayMap(normalizedBlock?.markdown, fieldCatalog, normalizedBlock.templateFieldDisplayMap);
   return {
     ...normalizedBlock,
     ...(templateFieldDisplayMap ? { templateFieldDisplayMap } : {}),
@@ -405,7 +408,7 @@ function buildAuthoredCollectionBlock(block = {}, fieldCatalog = {}) {
   const normalizedBlock = buildReportDocumentCollectionBlock(block);
   const itemTitleDisplay = resolveAuthoredFieldDisplayDescriptor(fieldCatalog, normalizedBlock?.itemTitleField);
   const secondaryDisplay = resolveAuthoredFieldDisplayDescriptor(fieldCatalog, normalizedBlock?.secondaryField);
-  const templateFieldDisplayMap = buildAuthoredTemplateFieldDisplayMap(normalizedBlock?.bodyTemplate, fieldCatalog);
+  const templateFieldDisplayMap = buildAuthoredTemplateFieldDisplayMap(normalizedBlock?.bodyTemplate, fieldCatalog, normalizedBlock.templateFieldDisplayMap);
   return {
     ...normalizedBlock,
     ...(itemTitleDisplay?.displayKey ? { itemTitleDisplayKey: itemTitleDisplay.displayKey } : {}),
@@ -605,8 +608,17 @@ function augmentReportRequestForAuthoredBlocks(baseSpec = {}, blocks = [], confi
       case "chartBlock":
         for(const field of chartTooltipFields(normalizedBlock?.chartSpec?.tooltip)) enableField(field,normalizedDatasetRef,request);
         if(normalizedBlock?.chartSpec?.categoryRange) for(const field of [normalizedBlock.chartSpec.categoryRange.categoryField,...categoryRangeFields(normalizedBlock.chartSpec.categoryRange)]) enableField(field,normalizedDatasetRef,request);
-        enableField(normalizedBlock?.chartSpec?.center?.value?.field,normalizedDatasetRef,request);
+        if(normalizedBlock?.chartSpec?.center){
+          const center=normalizedBlock.chartSpec.center,ref=center.datasetRef||normalizedDatasetRef;
+          const target=nextSpec.datasets.find(entry=>normalizeString(entry.id)===ref);
+          if(!target)throw new Error(`Donut center dataset '${ref}' is unavailable.`);
+          for(const field of donutCenterFields(center)){
+            const catalog=resolveReportBuilderCatalogEntry(datasetFieldCatalogs.get(ref)||fieldCatalog,field);
+            if(!catalog||!['measure','calculated'].includes(catalog.kind)||!enableField(field,ref,target.request))throw new Error('Donut center fields must be declared measures of their dataset.');
+          }
+        }
         for (const key of ["rowField","columnField","valueField"]) enableField(normalizedBlock?.chartSpec?.heatmap?.[key], normalizedDatasetRef, request);
+        enableField(normalizedBlock?.chartSpec?.sliceLabel?.field, normalizedDatasetRef, request);
         enableField(normalizedBlock?.chartSpec?.xField, normalizedDatasetRef, request);
         normalizeString(normalizedBlock?.chartSpec?.seriesField)
           && enableField(normalizedBlock.chartSpec.seriesField, normalizedDatasetRef, request);
@@ -1512,12 +1524,16 @@ export function buildReportDocumentMarkdownBlock({
   title = "",
   markdown = "",
   datasetRef = "",
+  templateRequestInputs,
+  templateFieldDisplayMap,
 } = {}) {
   return {
     id: normalizeString(id || "markdownBlock"),
     kind: "markdownBlock",
     title: normalizeString(title),
     markdown: String(markdown || ""),
+    ...(templateRequestInputs ? {templateRequestInputs: normalizeTemplateRequestInputs(templateRequestInputs)} : {}),
+    ...(templateFieldDisplayMap?{templateFieldDisplayMap:cloneValue(templateFieldDisplayMap)}:{}),
     ...(normalizeString(datasetRef) ? { datasetRef: normalizeString(datasetRef) } : {}),
   };
 }
@@ -1682,6 +1698,7 @@ export function buildReportDocumentCollectionBlock(block = {}) {
     title: normalizeString(block?.title || "Collection") || "Collection",
     datasetRef: normalizeString(block?.datasetRef || "primary"),
     ...(itemTitleField ? { itemTitleField } : {}),
+    ...(block.markerColors?{markerColors:cloneValue(block.markerColors)}:{}),
     ...(normalizeString(block?.itemTitleLabel) ? { itemTitleLabel: normalizeString(block.itemTitleLabel) } : {}),
     ...(normalizeString(block?.itemTitleDisplayKey) ? { itemTitleDisplayKey: normalizeString(block.itemTitleDisplayKey) } : {}),
     ...(block?.itemTitleDisplayValueMap && typeof block.itemTitleDisplayValueMap === "object" && !Array.isArray(block.itemTitleDisplayValueMap)

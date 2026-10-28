@@ -18,6 +18,10 @@ var ErrResourceStale = errors.New("resolved resource content changed")
 
 const WorkingCandidate = "working"
 const StampedCandidate = "stamped"
+
+// PublishedCandidate selects the immutable content already chosen by the
+// authenticated local cohort. It has no independent revision selector.
+const PublishedCandidate = "published"
 const ResourcePathMaxLength = 512
 
 // ResourceURI is a logical identity. Namespace never denotes a network host.
@@ -102,10 +106,10 @@ type ResourceCandidate struct {
 }
 
 func (c ResourceCandidate) Valid() bool {
-	if c.Kind != WorkingCandidate && c.Kind != StampedCandidate {
+	if c.Kind != WorkingCandidate && c.Kind != StampedCandidate && c.Kind != PublishedCandidate {
 		return false
 	}
-	if c.Kind == WorkingCandidate && c.Revision != "" || c.Kind == StampedCandidate && (!resourceName(c.Revision) || c.Revision == WorkingCandidate) {
+	if (c.Kind == WorkingCandidate || c.Kind == PublishedCandidate) && c.Revision != "" || c.Kind == StampedCandidate && (!resourceName(c.Revision) || c.Revision == WorkingCandidate) {
 		return false
 	}
 	if len(c.ContentFingerprint) != 64 {

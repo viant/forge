@@ -83,3 +83,67 @@ assert.doesNotMatch(printWords.svg,/>Occupanc<\/text>|>y rate<\/text>/);
 const printLibrary=buildReportPrintChartSvg({chartModel:{...chart,center},resolvedChart:buildReportFillChartPayload({...chart,center},fixture.rows),width:680});
 assert.ok(printLibrary.labelDetails.some(line=>line.includes('Catalogued items')));
 assert.doesNotMatch(printLibrary.svg,/>Catalogue<\/text>|>d items<\/text>/);
+// Independent scalar producers preserve ratios and zero through conditional formats.
+const independent={label:'Selected metric',datasetRef:'summary',alternatives:[{field:'ratio',operation:'scalar',format:'percentfraction2'},{field:'count',operation:'scalar',format:'number'}]};
+const independentChart={...chart,center:independent};
+const independentRows=[{ratio:.125,count:null}];
+assert.equal(buildReportFillChartPayload(independentChart,fixture.rows,independentRows).center.formattedValue,'12.50%');
+assert.equal(resolveDonutCenter(independent,fixture.rows,'donut',[{ratio:null,count:0}]).value,0);
+assert.equal(resolveDonutCenter(independent,fixture.rows,'donut',[{ratio:null,count:null}]).value,null);
+assert.throws(()=>resolveDonutCenter(independent,fixture.rows,'donut',[{ratio:.2,count:0}]),/mutually exclusive/);
+assert.throws(()=>resolveDonutCenter(independent,fixture.rows),/dataset is unavailable/);
+assert.deepEqual(resolveReportBuilderChartDependencies(config,{...occupancySpec,center:independent}).measureIds,['items']);
+const independentSpec=JSON.parse(JSON.stringify(spec));
+independentSpec.datasets.push({...independentSpec.datasets[0],id:'summary',request:{dimensions:{},measures:{ratio:true,count:true}}});
+const independentBlock=independentSpec.blocks.find(b=>b.id==='collection');
+independentBlock.chartSpec.center=independent;independentBlock.chartModel.center=independent;
+assert.equal(validateReportSpec(independentSpec).valid,true,JSON.stringify(validateReportSpec(independentSpec)));
+const independentFill=buildReportFillFromReportSpec(independentSpec,{primary:{rows:fixture.rows},summary:{rows:independentRows,hasMore:false}});
+assert.equal(independentFill.blocks.find(b=>b.id==='collection').content.resolvedChart.center.formattedValue,'12.50%');
+assert.equal(validateReportFill(independentFill).valid,true,JSON.stringify(validateReportFill(independentFill)));
+assert.match(JSON.stringify(buildReportPrintFromReportFill({reportSpec:independentSpec,reportFill:independentFill})),/12.50%/);
+assert.throws(()=>resolveDonutCenter(independent,fixture.rows,'donut',[{ratio:null}]),/absent/);
+assert.throws(()=>resolveDonutCenter(independent,fixture.rows,'donut',[{ratio:null,count:1},{ratio:null,count:1}]),/one scalar row/);
+for(const flags of [{hasMore:true},{truncated:true}]) {
+ assert.throws(()=>buildReportFillFromReportSpec(independentSpec,{primary:{rows:fixture.rows},summary:{rows:independentRows,hasMore:false,...flags}}),/complete scalar/);
+}
+const absentCenter=structuredClone(independentSpec);absentCenter.datasets=absentCenter.datasets.filter(d=>d.id!=='summary');
+assert.equal(validateReportSpec(absentCenter).valid,false);
+const unboundCenter=structuredClone(independentSpec);unboundCenter.datasets.find(d=>d.id==='summary').request.measures={ratio:true};
+assert.equal(validateReportSpec(unboundCenter).valid,false);
+const currencyCenter={...independent,alternatives:[{field:'count',operation:'scalar',label:'Selected charge',format:{prefix:'$',decimals:0,grouping:true,negativeStyle:'parentheses'}}]};
+assert.equal(resolveDonutCenter(currencyCenter,[],'donut',[{count:-1234}]).formattedValue,'($1,234)');
+assert.equal(resolveDonutCenter(currencyCenter,[],'donut',[{count:0}]).label,'Selected charge');
+const parameterCenter={...independent,labelInput:{path:'metric',labels:[{value:1,label:'Capacity'},{value:2,label:'Share'}]}};
+for(const rows of [[],[{ratio:null,count:null}]])assert.equal(resolveDonutCenter(parameterCenter,[],'donut',rows,{metric:2}).label,'Share');
+assert.equal(resolveDonutCenter(parameterCenter,[],'donut',[{ratio:null,count:0}],{metric:1}).label,'Capacity');
+assert.throws(()=>resolveDonutCenter(parameterCenter,[],'donut',[],{metric:'1'}),/declared label/);
+assert.throws(()=>resolveDonutCenter(parameterCenter,[],'donut',[],{}),/missing/);
+assert.throws(()=>normalizeDonutCenter({...parameterCenter,labelInput:{...parameterCenter.labelInput,path:'__proto__.metric'}}),/safe filter path/);
+for(const selection of [1,2]){
+ const labelled=structuredClone(independentSpec);const block=labelled.blocks.find(b=>b.id==='collection');block.chartSpec.center=parameterCenter;block.chartModel.center=parameterCenter;labelled.datasets.find(d=>d.id==='summary').request.filters={metric:selection};
+ const fill=buildReportFillFromReportSpec(labelled,{primary:{rows:[]},summary:{rows:[],hasMore:false}});
+ const label=selection===1?'Capacity':'Share';assert.equal(fill.blocks.find(b=>b.id==='collection').content.resolvedChart.center.label,label);
+ assert.ok(JSON.stringify(buildReportPrintFromReportFill({reportSpec:labelled,reportFill:fill})).includes(label));
+}
+assert.throws(()=>buildReportFillFromReportSpec(independentSpec,{primary:{rows:[]},summary:{rows:independentRows}}),/explicitly complete/);
+
+const fixedChart={...chart,paletteMode:'declared',center:fixture.independent.center,sliceLabel:fixture.independent.sliceLabel,series:{nameKey:'category',valueKey:'items',palette:fixture.independent.palette,categoryColors:fixture.independent.categoryColors}};
+const subset=[fixture.independent.sliceRows[2],fixture.independent.sliceRows[0]];
+const fixedPayload=buildReportFillChartPayload(fixedChart,subset,fixture.independent.rows,fixture.independent.inputs);
+const fixedPrint=buildReportPrintChartSvg({chartModel:fixedChart,resolvedChart:fixedPayload});
+assert.ok(fixedPrint.svg.indexOf('fill="#72577c"')<fixedPrint.svg.indexOf('fill="#426b85"'));
+assert.ok(!fixedPrint.svg.includes('fill="#8a7644"'));
+assert.ok(fixedPrint.svg.includes('20.0%')&&fixedPrint.svg.includes('48.0%'));
+const emphatic={...fixture.occupancy,valueRole:'body',valueEmphasis:'bold italic',labelEmphasis:'italic'};
+const emphaticResult=resolveDonutCenter(emphatic,fixture.rows);
+assert.equal(emphaticResult.valueRole,'body');assert.equal(emphaticResult.valueEmphasis,'bold italic');
+assert.throws(()=>normalizeDonutCenter({...emphatic,valueRole:'display'}),/role/);
+assert.throws(()=>normalizeDonutCenter({...emphatic,valueEmphasis:'font-size:30'}),/emphasis/);
+const emphaticChart={...chart,center:emphatic};const emphaticPayload=buildReportFillChartPayload(emphaticChart,fixture.rows);
+const emphaticSvg=buildReportPrintChartSvg({chartModel:emphaticChart,resolvedChart:emphaticPayload,width:680});
+assert.ok(emphaticSvg.svg.includes('font-weight="bold"')&&emphaticSvg.svg.includes('font-style="italic"'));
+const emphaticSpec=structuredClone(spec);emphaticSpec.blocks.find(b=>b.id==='collection').chartSpec.center=emphatic;emphaticSpec.blocks.find(b=>b.id==='collection').chartModel.center=emphatic;
+const emphaticFill=buildReportFillFromReportSpec(emphaticSpec,{primary:{rows:fixture.rows}});
+assert.equal(validateReportFill(emphaticFill).valid,true,JSON.stringify(validateReportFill(emphaticFill)));
+assert.equal(validateReportPrint(buildReportPrintFromReportFill({reportSpec:emphaticSpec,reportFill:emphaticFill})).valid,true);

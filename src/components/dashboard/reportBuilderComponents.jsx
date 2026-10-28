@@ -782,14 +782,32 @@ export function ReportBuilderSemanticFieldGroups({
     );
 }
 
-function ReportDateRangeControl({value = {}, onDateRange}) {
+function reportDateInputProps(value, edge, onDateRange, commitOnBlur, onIssue = null) {
+    const current = value?.[`${edge}Expression`] ?? value?.[edge] ?? '';
+    return commitOnBlur ? {
+        defaultValue: current,
+        onBlur: event => {
+            if (!event.target.checkValidity()) { onIssue?.(event.target.validationMessage || 'Enter a required date.'); return; }
+            if (event.target.value !== current) onDateRange(edge, event.target.value);
+            else onIssue?.(null);
+        },
+        onInput: () => onIssue?.(null),
+        onKeyDown: event => { if (event.key === 'Enter') event.currentTarget.blur(); },
+    } : {value: current, onChange: event => onDateRange(edge, event.target.value)};
+}
+
+function ReportDateRangeControl({value = {}, onDateRange, commitOnBlur = false, required = false, onIssue = null, invalid = false, descriptionID}) {
     return <>
         <div className="forge-report-builder__date-range">
             <input type="text" aria-label="Start date or relative expression" placeholder="YYYY-MM-DD or 7 days ago"
-                value={value?.startExpression ?? value?.start ?? ''} onChange={(event) => onDateRange('start', event.target.value)} />
+                aria-invalid={invalid || undefined} aria-describedby={descriptionID}
+                key={commitOnBlur ? `start:${JSON.stringify(value)}` : 'start'} required={commitOnBlur && required}
+                {...reportDateInputProps(value, 'start', onDateRange, commitOnBlur, onIssue)} />
             <span>to</span>
             <input type="text" aria-label="End date or relative expression" placeholder="YYYY-MM-DD or today"
-                value={value?.endExpression ?? value?.end ?? ''} onChange={(event) => onDateRange('end', event.target.value)} />
+                aria-invalid={invalid || undefined} aria-describedby={descriptionID}
+                key={commitOnBlur ? `end:${JSON.stringify(value)}` : 'end'} required={commitOnBlur && required}
+                {...reportDateInputProps(value, 'end', onDateRange, commitOnBlur, onIssue)} />
         </div>
         <div className="forge-report-builder-text-options" role="group" aria-label="Relative date presets">
             {[['today', 'Today'], ['yesterday', 'Yesterday'], ['last7Days', 'Last 7 days'], ['last30Days', 'Last 30 days']].map(([preset, label]) => (
@@ -4932,12 +4950,39 @@ export function InlineStaticFilterControl({
     value,
     onToggle,
     onDateRange,
+    onValue,
+    commitOnBlur = false,
     issue = null,
     providerDiagnostics = [],
 }) {
     const documentPresentation = React.useContext(DocumentPresentationContext);
+    const [validationError, setValidationError] = useState(null);
+    const validationID = React.useId();
+    const commit = (callback) => {
+        try { const result = callback(); setValidationError(null); return result; }
+        catch (error) { setValidationError(error?.message || 'This value could not be applied.'); return false; }
+    };
+    const applyDate = (edge, next) => commit(() => onDateRange(edge, next));
+    const validationNotice = validationError ? <Typography as="p" typeRole="metadata" role="alert" id={validationID}>{validationError}</Typography> : null;
     if (!filter) {
         return null;
+    }
+    if (['number', 'integer', 'text'].includes(filter.type) && typeof onValue === 'function') {
+        return <label className="forge-report-document-value-filter" {...typographyProps('label')}>
+            {filter.label || filter.id}
+            <input key={JSON.stringify(value)} type={filter.type === 'text' ? 'text' : 'number'}
+                aria-label={filter.label || filter.id}
+                step={filter.type === 'integer' ? '1' : 'any'} required={filter.required === true}
+                aria-invalid={!!validationError || undefined} aria-describedby={validationError ? validationID : undefined}
+                defaultValue={value ?? ''} {...typographyProps('body')} data-forge-part="input"
+                onBlur={event => {
+                    if (!event.target.checkValidity()) { setValidationError(event.target.validity.valueMissing ? 'A value is required.' : event.target.validationMessage || 'Enter a valid value.'); return; }
+                    const next = filter.type === 'text' ? event.target.value : event.target.value === '' ? null : Number(event.target.value);
+                    if (!Object.is(next, value)) commit(() => onValue(next));
+                    else setValidationError(null);
+                }} onInput={() => setValidationError(null)} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }}/>
+            {validationNotice}
+        </label>;
     }
     const options = Array.isArray(filter.options) ? filter.options : [];
     const plainOptions = !String(filter.presentation || "").trim() && options.every((option) => !option.icon);
@@ -4966,25 +5011,29 @@ export function InlineStaticFilterControl({
                 {['start','end'].map(edge => <label key={edge} {...typographyProps('metadata')}>
                     {edge === 'start' ? 'Start date or relative expression' : 'End date or relative expression'}
                     <input type="text" {...typographyProps('body')} data-forge-part="input"
+                        required={commitOnBlur && filter.required === true}
+                        aria-invalid={!!validationError || undefined} aria-describedby={validationError ? validationID : undefined}
                         aria-label={`${edge === 'start' ? 'Start' : 'End'} date or relative expression`}
                         placeholder={edge === 'start' ? 'YYYY-MM-DD or 7 days ago' : 'YYYY-MM-DD or today'}
-                        value={value?.[`${edge}Expression`] ?? value?.[edge] ?? ''}
-                        onChange={event=>onDateRange(edge,event.target.value)}/>
+                        key={commitOnBlur ? JSON.stringify(value) : edge}
+                        {...reportDateInputProps(value, edge, applyDate, commitOnBlur, setValidationError)}/>
                 </label>)}
             </div>
             <div className="forge-report-document-actions" role="group" aria-label="Relative date presets">
-                {[['today','Today'],['yesterday','Yesterday'],['last7Days','Last 7 days'],['last30Days','Last 30 days']].map(([preset,label])=><SharedButton key={preset} variant="ghost" size="compact" aria-pressed={value?.preset===preset} onClick={()=>onDateRange('preset',preset)}>{label}</SharedButton>)}
+                {[['today','Today'],['yesterday','Yesterday'],['last7Days','Last 7 days'],['last30Days','Last 30 days']].map(([preset,label])=><SharedButton key={preset} variant="ghost" size="compact" aria-pressed={value?.preset===preset} onClick={()=>applyDate('preset',preset)}>{label}</SharedButton>)}
             </div>
             {description ? <Typography as="p" typeRole="metadata">{description}</Typography> : null}
             {semanticNotice ? <Typography as="p" typeRole="metadata" role="alert">{semanticNotice}</Typography> : null}
+            {validationNotice}
         </fieldset>;
         return (
             <div className={rootClassName} title={title}>
                 <div className="forge-report-builder__inline-filter-row">
                     <span className="forge-report-builder__inline-filter-label">{filter.label || filter.id}</span>
-                    <ReportDateRangeControl value={value} onDateRange={onDateRange} />
+                    <ReportDateRangeControl value={value} onDateRange={applyDate} commitOnBlur={commitOnBlur} required={filter.required} onIssue={setValidationError} invalid={!!validationError} descriptionID={validationError ? validationID : undefined} />
                 </div>
                 {description ? <div className="forge-report-builder__inline-filter-description">{description}</div> : null}
+                {validationNotice}
                 {semanticNotice ? (
                     <div className={`forge-report-builder__inline-filter-description ${issue ? "forge-report-builder__inline-filter-description--danger" : "forge-report-builder__inline-filter-description--warning"}`}>
                         {semanticNotice}
@@ -5011,7 +5060,7 @@ export function InlineStaticFilterControl({
                                     active ? "is-active" : "",
                                 ].filter(Boolean).join(" ")}
                                 aria-pressed={active}
-                                onClick={() => onToggle(option.value)}
+                                onClick={() => commit(() => onToggle(option.value))}
                                 title={option.label}
                             >
                                 {option.icon ? <span className="forge-report-builder-icon-button__icon"><Icon icon={option.icon} size={18} /></span> : null}
@@ -5027,6 +5076,7 @@ export function InlineStaticFilterControl({
                     {semanticNotice}
                 </div>
             ) : null}
+            {validationNotice}
         </div>
     );
 }
