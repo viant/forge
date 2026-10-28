@@ -75,5 +75,8 @@
 .forge-segmented-control__option[data-forge-type] { transition-property: background-color, color, border-color; transition-duration: var(--forge-motion-fast, 120ms); transition-timing-function: var(--forge-motion-easing); }
 .forge-segmented-control__option[data-forge-type][aria-pressed="true"] { background: var(--forge-selected-background); color: var(--forge-text); font-weight: inherit; box-shadow: none; }
 .forge-segmented-control__option[data-forge-type]:focus-visible, .forge-switch[data-forge-type]:focus-visible { outline: var(--forge-focus-width, 2px) solid var(--forge-focus-color); outline-offset: var(--forge-focus-offset, 2px); }
-@media (pointer: coarse) { .forge-button[data-forge-variant] { min-height: 44px; min-width: 44px; } }
+@media (pointer: coarse) {
+    .forge-button[data-forge-variant],
+    .forge-button[data-forge-variant][data-forge-size] { min-height: 44px; min-width: 44px; }
+}
 @media (prefers-reduced-motion: reduce) { .forge-button[data-forge-variant], .forge-segmented-control__option[data-forge-type] { transition-duration: 0s; } .forge-button__busy { animation: none; } }
