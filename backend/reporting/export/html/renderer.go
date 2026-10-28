@@ -64,11 +64,47 @@ func renderElement(out *strings.Builder, e reportprint.Element) error {
 			x, anchor = x+b.Width/2, "middle"
 		}
 		weight := "400"
-		if e.FontWeight == "bold" || e.FontWeight == "600" || e.FontWeight == "700" {
+		bold, italic := reportprint.TextEmphasis(e.FontWeight)
+		if bold {
 			weight = "700"
 		}
+		style := "normal"
+		if italic {
+			style = "italic"
+		}
+		if len(e.TextRuns) > 0 {
+			lines := [][]reportprint.TextRun{{}}
+			for _, run := range e.TextRuns {
+				for i, part := range strings.Split(run.Text, "\n") {
+					if i > 0 {
+						lines = append(lines, nil)
+					}
+					lines[len(lines)-1] = append(lines[len(lines)-1], reportprint.TextRun{Text: part, FontWeight: run.FontWeight})
+				}
+			}
+			for i, runs := range lines {
+				fmt.Fprintf(out, `<text x="%g" y="%g" xml:space="preserve" font-family="Arial,sans-serif" font-size="%g" text-anchor="%s" fill="%s">`, x, b.Y+size+float64(i)*size*1.2, size, anchor, safeColor(e.Color, "#101828"))
+				for _, run := range runs {
+					declared := run.FontWeight
+					if declared == "" {
+						declared = e.FontWeight
+					}
+					bold, italic := reportprint.TextEmphasis(declared)
+					weight, style := "400", "normal"
+					if bold {
+						weight = "700"
+					}
+					if italic {
+						style = "italic"
+					}
+					fmt.Fprintf(out, `<tspan font-weight="%s" font-style="%s">%s</tspan>`, weight, style, html.EscapeString(run.Text))
+				}
+				out.WriteString(`</text>`)
+			}
+			return
+		}
 		for i, line := range strings.Split(value, "\n") {
-			fmt.Fprintf(out, `<text x="%g" y="%g" font-family="Arial,sans-serif" font-size="%g" font-weight="%s" text-anchor="%s" fill="%s">%s</text>`, x, b.Y+size+float64(i)*size*1.2, size, weight, anchor, safeColor(e.Color, "#101828"), html.EscapeString(line))
+			fmt.Fprintf(out, `<text x="%g" y="%g" font-family="Arial,sans-serif" font-size="%g" font-weight="%s" font-style="%s" text-anchor="%s" fill="%s">%s</text>`, x, b.Y+size+float64(i)*size*1.2, size, weight, style, anchor, safeColor(e.Color, "#101828"), html.EscapeString(line))
 		}
 	}
 	switch e.Kind {

@@ -133,7 +133,15 @@ func (w *visualDashboardWriter) printDataBarLabel(sheet string, e reportprint.El
 	}
 	var body strings.Builder
 	for i, line := range lines {
-		fmt.Fprintf(&body, `<text x="%g" y="%g" text-anchor="%s" font-family="%s" font-size="%g" font-weight="%s" fill="#%s">%s</text>`, x, y+float64(i)*lineHeight, anchor, html.EscapeString(firstText(e.FontFamily, "Arial")), size, html.EscapeString(firstText(e.FontWeight, "normal")), firstText(excelChartColor(e.Color), "000000"), html.EscapeString(line))
+		bold, italic := reportprint.TextEmphasis(e.FontWeight)
+		weight, style := "400", "normal"
+		if bold {
+			weight = "700"
+		}
+		if italic {
+			style = "italic"
+		}
+		fmt.Fprintf(&body, `<text x="%g" y="%g" text-anchor="%s" font-family="%s" font-size="%g" font-weight="%s" font-style="%s" fill="#%s">%s</text>`, x, y+float64(i)*lineHeight, anchor, html.EscapeString(firstText(e.FontFamily, "Arial")), size, weight, style, firstText(excelChartColor(e.Color), "000000"), html.EscapeString(line))
 	}
 	markup := fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="%g" height="%g">%s</svg>`, e.Box.Width, e.Box.Height, body.String())
 	return w.printPicture(sheet, e.Box, offset, ".svg", []byte(markup), "Data bar label: "+e.Text)

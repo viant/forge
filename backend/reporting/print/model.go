@@ -50,6 +50,7 @@ type Page struct {
 }
 
 type Element struct {
+	TextRuns        []TextRun    `json:"textRuns,omitempty"`
 	ID              string       `json:"id"`
 	Kind            string       `json:"kind"`
 	Box             Box          `json:"box"`
@@ -228,6 +229,24 @@ func validateElements(elements []Element, location string) error {
 		}
 		if element.Box.Width < 0 || element.Box.Height < 0 || element.Box.X < 0 || element.Box.Y < 0 {
 			return fmt.Errorf("%s[%d].box values must be >= 0", location, index)
+		}
+		if element.TextRuns != nil {
+			if kind != "text" || len(element.TextRuns) == 0 {
+				return fmt.Errorf("%s[%d].textRuns requires nonempty text runs on a text element", location, index)
+			}
+			var fullText strings.Builder
+			for _, run := range element.TextRuns {
+				if strings.Contains(run.Text, "\r") {
+					return fmt.Errorf("%s[%d].textRuns require normalized LF line breaks", location, index)
+				}
+				if run.Text == "" {
+					return fmt.Errorf("%s[%d].textRuns cannot contain an empty run", location, index)
+				}
+				fullText.WriteString(run.Text)
+			}
+			if fullText.String() != element.Text {
+				return fmt.Errorf("%s[%d].textRuns must concatenate to text", location, index)
+			}
 		}
 		switch kind {
 		case "line":
