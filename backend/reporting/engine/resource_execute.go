@@ -244,6 +244,13 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 		if prepared != nil {
 			return ctx.Err()
 		}
+		if pin.Kind == identity.PublishedCandidate {
+			verifier, ok := resolver.(PublishedResourceVerifier)
+			if !ok {
+				return identity.ErrResourceDenied
+			}
+			return verifier.VerifyPublishedResource(ctx, *pin)
+		}
 		original := cloneResolvedResource(pin)
 		_, fresh, e := resolver.ReadResolved(ctx, *pin)
 		if e != nil {
@@ -702,7 +709,7 @@ func NewResourceDatasetExecutorWithProvider(executor dssvc.ToolExecutor, authori
 		if executor == nil && components == nil && provider == nil || authorize == nil {
 			return nil, identity.ErrResourceDenied
 		}
-		service := dssvc.New(dssvc.Options{ProviderExecute: provider, ComponentDispatcher: components, Store: exactReportDatasourceStore{descriptor}, Executor: executor, DisableCache: true, AuthorizeDefinition: authorize})
+		service := dssvc.New(dssvc.Options{ProviderExecute: provider, ComponentDispatcher: components, Store: exactReportDatasourceStore{descriptor}, Executor: executor, DisableCache: true, AuthorizeDefinition: authorize, ResolveDefinition: publishedWindowReportResolver(ctx, pin, descriptor)})
 		return service.Fetch(requestctx.WithResolvedResource(ctx, pin), descriptor.ID, inputs, dssvc.FetchOptions{BypassCache: true})
 	}
 }

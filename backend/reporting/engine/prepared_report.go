@@ -60,12 +60,25 @@ func (s *Service) ExecutePreparedReport(ctx context.Context, prepared *PreparedR
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	published, err := s.preparedPublishedVerifier(ctx, prepared.pin)
+	if err != nil {
+		return nil, err
+	}
 	copy := *request
 	copy.Resource = nil
 	copy.ResolvedResource = cloneResolvedResource(&prepared.pin)
 	copy.DependencyPins = cloneDependencyPins(prepared.dependencies)
 	copy.DependencyToken = prepared.token
-	return s.executeResourceDefinition(context.WithValue(ctx, preparedReportKey{}, prepared), &copy, nil)
+	result, err := s.executeResourceDefinition(context.WithValue(ctx, preparedReportKey{}, prepared), &copy, nil)
+	if err != nil {
+		return nil, err
+	}
+	if published != nil {
+		if err = published.VerifyPublishedResource(ctx, prepared.pin); err != nil {
+			return nil, err
+		}
+	}
+	return result, nil
 }
 
 func preparedReportFromContext(ctx context.Context) *PreparedReport {

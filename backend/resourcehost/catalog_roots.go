@@ -24,13 +24,48 @@ func ListPageFrom[T any](ctx context.Context, g *Gateway, roots []Connection, ki
 func (g *Gateway) catalogConnectionNames(ctx context.Context) ([]string, error) {
 	roots, ok := ctx.Value(catalogRootsKey{}).([]Connection)
 	if !ok {
-		return g.Manager.CatalogNames(ctx)
+		var names []string
+		var err error
+		sources := g.publishedRegistrations()
+		if len(sources) > 0 {
+			excluded := make([]string, 0, len(sources))
+			for _, source := range sources {
+				for alias := range source.aliases {
+					excluded = append(excluded, alias)
+				}
+			}
+			names, err = g.Manager.CatalogNamesExcluding(ctx, excluded)
+		} else {
+			names, err = g.Manager.CatalogNames(ctx)
+		}
+		if err != nil {
+			return nil, err
+		}
+		seen := map[string]bool{}
+		for _, name := range names {
+			seen[name] = true
+		}
+		for _, source := range g.publishedRegistrations() {
+			if !seen[source.connection.Name] {
+				names = append(names, source.connection.Name)
+			}
+		}
+		sort.Strings(names)
+		return names, nil
 	}
 	seen := map[string]bool{}
 	names := make([]string, 0, len(roots))
 	for _, root := range roots {
 		if root.Name == "" || seen[root.Name] {
 			return nil, ErrCollision
+		}
+		if source, ok := g.publishedByName(root.Name); ok {
+			if root.ProviderIdentity != "" && root.ProviderIdentity != source.connection.ProviderIdentity {
+				return nil, ErrCollision
+			}
+			names = append(names, root.Name)
+			seen[root.Name] = true
+			continue
 		}
 		options, err := g.Manager.Options(ctx, root.Name)
 		if err != nil {
@@ -63,6 +98,19 @@ func catalogRootMatches(ctx context.Context, connection Connection) bool {
 func GetFrom[T any](ctx context.Context, g *Gateway, root Connection, ref identity.ResourceRef, decode DefinitionDecoder[T]) (*Result[T], error) {
 	if ctx == nil || g == nil || g.Manager == nil || root.Name == "" {
 		return nil, identity.ErrResourceDenied
+	}
+	uri, err := identity.ParseResourceURI(ref.URI)
+	if err != nil {
+		return nil, err
+	}
+	if source, covered := g.publishedNamespace(uri.Namespace); covered {
+		if !source.matchesName(root.Name) || root.ProviderIdentity != "" && root.ProviderIdentity != source.connection.ProviderIdentity {
+			return nil, ErrCollision
+		}
+		connection := source.connection
+		connection.Name = root.Name
+		connection.Generation = g.generation(connection.Name)
+		return Get[T](ctx, g, connection, ref, nil, decode)
 	}
 	actor, err := g.actor(ctx)
 	if err != nil {

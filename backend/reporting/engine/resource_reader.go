@@ -16,6 +16,13 @@ type ResourceReader interface {
 	ReadResolved(context.Context, identity.ResolvedResource) (json.RawMessage, *identity.ResolvedResource, error)
 }
 
+// PublishedResourceVerifier is implemented only by trusted, locally admitted
+// published readers. It fences an exact root/session without loading its body
+// or authorizing embedded dependencies as separate resources.
+type PublishedResourceVerifier interface {
+	VerifyPublishedResource(context.Context, identity.ResolvedResource) error
+}
+
 // ResourceDefinitionReader returns the managing provider's complete get result,
 // keeping header metadata and definition on the same delivery path.
 type ResourceDefinitionReader interface {

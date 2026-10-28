@@ -42,6 +42,32 @@ func (g *Gateway) catalog(ctx context.Context, kind, category string, load func(
 	if err != nil {
 		return nil, actor, err
 	}
+	if len(g.publishedRegistrations()) > 0 {
+		admission, err := g.publishedAdmissionKeys(ctx)
+		if err != nil {
+			return nil, actor, err
+		}
+		items, err := load(ctx)
+		if err != nil {
+			return nil, actor, err
+		}
+		raw, err := json.Marshal(items)
+		if err != nil {
+			return nil, actor, err
+		}
+		if err = g.final(ctx, actor); err != nil {
+			return nil, actor, err
+		}
+		fresh, err := g.publishedAdmissionKeys(ctx)
+		if err != nil {
+			return nil, actor, err
+		}
+		if fresh != admission {
+			return nil, actor, identity.ErrResourceDenied
+		}
+		catalogSucceeded = true
+		return primitive.NewCatalog(actorKey(actor, "published", 0)+admission+string(raw), items), actor, nil
+	}
 	names, err := g.catalogConnectionNames(ctx)
 	if err != nil {
 		return nil, actor, err
@@ -160,6 +186,9 @@ func (g *Gateway) catalog(ctx context.Context, kind, category string, load func(
 // a resource Get or an authorization decision; selected reads still reach the
 // owning MCP and retain their original lease.
 func (g *Gateway) catalogCapability(ctx context.Context, actor identity.VerifiedActor, name string) (capabilities, error) {
+	if source, ok := g.publishedByName(name); ok {
+		return g.publishedCapabilities(ctx, source, name)
+	}
 	probe := observe.Start(ctx, observe.Phase("catalog.capability.hint"), observe.Labels{})
 	if sequenceFromContext(ctx) != nil {
 		probe.End(observe.OK, observe.CacheBypass)
@@ -223,7 +252,7 @@ func ListPage[T any](ctx context.Context, g *Gateway, kind string, query Catalog
 	}
 	var definitionLease time.Time
 	index, actor, err := g.catalog(ctx, catalogKind, kind, func(ctx context.Context) ([]primitive.CatalogItem[json.RawMessage], error) {
-		rows, err := g.List(ctx, kind, "")
+		rows, err := g.List(ctx, kind, query.Namespace)
 		if err != nil {
 			return nil, err
 		}
@@ -284,8 +313,10 @@ func ListPage[T any](ctx context.Context, g *Gateway, kind string, query Catalog
 	if err = g.final(ctx, actor); err != nil {
 		return nil, err
 	}
-	if err = g.Manager.CheckVisibleCatalog(ctx, index); err != nil {
-		return nil, err
+	if len(g.publishedRegistrations()) == 0 {
+		if err = g.Manager.CheckVisibleCatalog(ctx, index); err != nil {
+			return nil, err
+		}
 	}
 	return result, nil
 }
@@ -329,8 +360,10 @@ func (g *Gateway) NamespacePage(ctx context.Context, query CatalogQuery) (*Names
 	if err = g.final(ctx, actor); err != nil {
 		return nil, err
 	}
-	if err = g.Manager.CheckVisibleCatalog(ctx, index); err != nil {
-		return nil, err
+	if len(g.publishedRegistrations()) == 0 {
+		if err = g.Manager.CheckVisibleCatalog(ctx, index); err != nil {
+			return nil, err
+		}
 	}
 	return result, nil
 }

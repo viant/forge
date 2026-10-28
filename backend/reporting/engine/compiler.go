@@ -50,27 +50,39 @@ func (s *Service) compileUnscoped(ctx context.Context, request *CompileRequest, 
 	}
 	if pin != nil {
 		recheckTiming := observe.Start(ctx, "report.compile.recheck", observe.Labels{Kind: "report"})
-		raw, fresh, err := resolver.ReadResolved(ctx, *pin)
-		if err != nil {
-			recheckTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
-			return nil, err
+		if pin.Kind == identity.PublishedCandidate {
+			verifier, ok := resolver.(PublishedResourceVerifier)
+			if !ok {
+				return nil, identity.ErrResourceDenied
+			}
+			if err := verifier.VerifyPublishedResource(ctx, *pin); err != nil {
+				recheckTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
+				return nil, err
+			}
+			recheckTiming.End(observe.OK, observe.CacheUnknown)
+		} else {
+			raw, fresh, err := resolver.ReadResolved(ctx, *pin)
+			if err != nil {
+				recheckTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
+				return nil, err
+			}
+			pin = fresh
+			if admitted != nil && len(admitted.windowEnvelope) > 0 {
+				// ReadResolved above revalidated the original window. The derived
+				// envelope has no independent persisted identity to read or refresh.
+				raw = admitted.windowEnvelope
+			}
+			var envelope registry.ReportEnvelope
+			if json.Unmarshal(raw, &envelope) != nil {
+				recheckTiming.End(observe.Error, observe.CacheUnknown)
+				return nil, identity.ErrResourceDenied
+			}
+			if err = s.verifyDependencies(ctx, *pin, envelope, request.DependencyPins, request.DependencyToken); err != nil {
+				recheckTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
+				return nil, err
+			}
+			recheckTiming.End(observe.OK, observe.CacheUnknown)
 		}
-		pin = fresh
-		if admitted != nil && len(admitted.windowEnvelope) > 0 {
-			// ReadResolved above revalidated the original window. The derived
-			// envelope has no independent persisted identity to read or refresh.
-			raw = admitted.windowEnvelope
-		}
-		var envelope registry.ReportEnvelope
-		if json.Unmarshal(raw, &envelope) != nil {
-			recheckTiming.End(observe.Error, observe.CacheUnknown)
-			return nil, identity.ErrResourceDenied
-		}
-		if err = s.verifyDependencies(ctx, *pin, envelope, request.DependencyPins, request.DependencyToken); err != nil {
-			recheckTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
-			return nil, err
-		}
-		recheckTiming.End(observe.OK, observe.CacheUnknown)
 	}
 	next := cloneCompileResult(result)
 	if pin != nil {

@@ -32,9 +32,22 @@ func (s *Service) ExecutePreparedWindowBuilder(ctx context.Context, prepared *Pr
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	published, err := s.preparedPublishedVerifier(ctx, prepared.pin)
+	if err != nil {
+		return nil, err
+	}
 	copy := *request
 	copy.Resource = nil
 	copy.ResolvedResource = cloneResolvedResource(&prepared.pin)
 	copy.DependencyPins = cloneDependencyPins(prepared.dependencies)
-	return s.executeResourceDefinition(context.WithValue(ctx, preparedReportKey{}, prepared), &copy, derive)
+	result, err := s.executeResourceDefinition(context.WithValue(ctx, preparedReportKey{}, prepared), &copy, derive)
+	if err != nil {
+		return nil, err
+	}
+	if published != nil {
+		if err = published.VerifyPublishedResource(ctx, prepared.pin); err != nil {
+			return nil, err
+		}
+	}
+	return result, nil
 }

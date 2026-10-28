@@ -57,6 +57,16 @@ func (s *Service) bindOperationDependencies(ctx context.Context, originalParent,
 }
 
 func (s *Service) bindDependencies(ctx context.Context, parent *identity.ResolvedResource, definition registry.ReportEnvelope, original map[string]identity.ResolvedResource, token string) (map[string]identity.ResolvedResource, string, error) {
+	// A trusted published reader admitted the producer-validated closed root.
+	// Embedded descriptors belong to that root, not separate permission roots.
+	// Browser child pins cannot manufacture or broaden this local selection.
+	if parent != nil && parent.Kind == identity.PublishedCandidate {
+		if len(original) != 0 || token != "" {
+			return nil, "", identity.ErrResourceDenied
+		}
+		return nil, "", nil
+	}
+
 	if len(definition.DataSourceResources) == 0 {
 		if len(original) > 0 || token != "" {
 			return nil, "", identity.ErrResourceDenied

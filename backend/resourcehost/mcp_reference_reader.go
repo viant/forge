@@ -19,12 +19,13 @@ type MCPDefinitionSource struct{ ConnectionName, ProviderIdentity, Namespace str
 // gateway. It retains only bounded, scoped URI-to-owner selections; no catalog
 // bytes, credentials or resolved client configurations are stored here.
 type MCPReferenceReader struct {
-	gateway  *Gateway
-	internal MCPDefinitionSource
-	catalogs []identity.ResourceRef
-	reserved map[string]bool
-	memoMu   sync.RWMutex
-	memo     map[mcpReferenceMemoKey]mcpReferenceMemoEntry
+	gateway              *Gateway
+	internal             MCPDefinitionSource
+	catalogs             []identity.ResourceRef
+	reserved             map[string]bool
+	memoMu               sync.RWMutex
+	localGenerationNonce uint64
+	memo                 map[mcpReferenceMemoKey]mcpReferenceMemoEntry
 }
 
 func NewMCPReferenceReader(g *Gateway, internal MCPDefinitionSource, catalogs []identity.ResourceRef) (*MCPReferenceReader, error) {
@@ -82,7 +83,7 @@ func (r *MCPReferenceReader) DefinitionGeneration(ctx context.Context) string {
 	for _, name := range names {
 		parts = append(parts, fmt.Sprintf("%s:%d:%v", name, r.gateway.generation(name), r.gateway.Manager.ResourceCatalogGeneration(ctx, name)))
 	}
-	return strings.Join(parts, "|")
+	return strings.Join(parts, "|") + r.publishedDefinitionGeneration(ctx)
 }
 
 func (r *MCPReferenceReader) DefinitionContentGeneration(ctx context.Context) string {
@@ -96,7 +97,7 @@ func (r *MCPReferenceReader) DefinitionContentGeneration(ctx context.Context) st
 	for _, name := range names {
 		parts = append(parts, fmt.Sprintf("%s:%d:%v:%v", name, r.gateway.generation(name), r.gateway.Manager.ResourceCatalogGeneration(ctx, name), r.gateway.Manager.ResourceContentGeneration(ctx, name)))
 	}
-	return strings.Join(parts, "|")
+	return strings.Join(parts, "|") + r.publishedDefinitionGeneration(ctx)
 }
 func (r *MCPReferenceReader) rows(ctx context.Context, root Connection, namespace string) ([]Located[json.RawMessage], error) {
 	if root.Name != r.internal.ConnectionName {
@@ -177,6 +178,16 @@ func (r *MCPReferenceReader) catalogConnectionNames(ctx context.Context) (map[st
 	return names, nil
 }
 func (r *MCPReferenceReader) effectiveOptions(ctx context.Context, source Connection, namespace string, config *mcpcfg.MCPClient) (*mcpcfg.MCPClient, error) {
+	if _, ok := r.gateway.publishedByName(source.Name); ok {
+		config.ToolsListVisibility = mcpcfg.ToolsListVisibilityPrivate
+		scopes := map[string]string{}
+		for key := range config.ResourceCacheScopes {
+			scopes[key] = mcpcfg.ResourceCacheUser
+		}
+		scopes["*"] = mcpcfg.ResourceCacheUser
+		config.ResourceCacheScopes = scopes
+		return config, nil
+	}
 	options, err := r.gateway.Manager.Options(ctx, source.Name)
 	if err != nil {
 		return nil, err
@@ -216,22 +227,28 @@ func (r *MCPReferenceReader) inventory(ctx context.Context, external bool, targe
 		}
 		for _, root := range roots {
 			if len(targetNamespace) == 1 && targetNamespace[0] != "" {
-				options, optionsErr := r.gateway.Manager.Options(ctx, root.Name)
-				if optionsErr != nil {
-					return nil, optionsErr
-				}
-				if options == nil {
-					return nil, ErrUnavailable
-				}
-				if len(options.PrimitiveNamespaces) > 0 {
-					matches := false
-					for _, namespace := range options.PrimitiveNamespaces {
-						if namespace == targetNamespace[0] || namespace == "ns://"+targetNamespace[0] {
-							matches = true
-						}
+				if source, ok := r.gateway.publishedByName(root.Name); ok {
+					if !source.namespaces[targetNamespace[0]] {
+						continue
 					}
-					if !matches {
-						continue // Explicit producer namespace restrictions exclude this URI.
+				} else {
+					options, optionsErr := r.gateway.Manager.Options(ctx, root.Name)
+					if optionsErr != nil {
+						return nil, optionsErr
+					}
+					if options == nil {
+						return nil, ErrUnavailable
+					}
+					if len(options.PrimitiveNamespaces) > 0 {
+						matches := false
+						for _, namespace := range options.PrimitiveNamespaces {
+							if namespace == targetNamespace[0] || namespace == "ns://"+targetNamespace[0] {
+								matches = true
+							}
+						}
+						if !matches {
+							continue // Explicit producer namespace restrictions exclude this URI.
+						}
 					}
 				}
 			}
