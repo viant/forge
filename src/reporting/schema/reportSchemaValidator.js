@@ -71,9 +71,7 @@ function validateNode(schema = {}, value, path = "$", rootSchema = schema) {
   if (Array.isArray(normalizedSchema.anyOf) && normalizedSchema.anyOf.length > 0) {
     const candidateErrors = normalizedSchema.anyOf.map((candidate) => validateNode(candidate, value, path, rootSchema));
     const successful = candidateErrors.find((errors) => errors.length === 0);
-    if (successful) {
-      return [];
-    }
+    if (!successful) {
     const mostSpecific = candidateErrors
       .filter((errors) => errors.length > 0)
       .sort((left, right) => {
@@ -89,6 +87,12 @@ function validateNode(schema = {}, value, path = "$", rootSchema = schema) {
       code: "anyOf",
       message: "Value does not match any allowed schema branch.",
     }];
+    }
+  }
+
+  if(Array.isArray(normalizedSchema.oneOf)&&normalizedSchema.oneOf.length){
+    const matches=normalizedSchema.oneOf.filter(candidate=>validateNode(candidate,value,path,rootSchema).length===0);
+    if(matches.length!==1)return [{path,code:'oneOf',message:'Value must match exactly one allowed schema branch.'}];
   }
 
   if (Object.prototype.hasOwnProperty.call(normalizedSchema, "const") && value !== normalizedSchema.const) {
@@ -121,7 +125,7 @@ function validateNode(schema = {}, value, path = "$", rootSchema = schema) {
   const errors = [];
   const effectiveType = declaredTypes[0];
 
-  if (effectiveType === "object" || (!declaredTypes.length && normalizedSchema.properties)) {
+  if (effectiveType === "object" || (!declaredTypes.length && isObjectLike(value) && (normalizedSchema.properties || normalizedSchema.required || normalizedSchema.additionalProperties !== undefined))) {
     const properties = isObjectLike(normalizedSchema.properties) ? normalizedSchema.properties : {};
     const required = Array.isArray(normalizedSchema.required) ? normalizedSchema.required : [];
     required.forEach((key) => {

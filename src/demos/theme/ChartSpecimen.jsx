@@ -15,6 +15,7 @@ const days = ['2026-01-01', '2026-01-02', '2026-01-03', '2026-01-04', '2026-01-0
 const rows = days.map((date, index) => ({date, first: [12, 18, 14, 22, 16][index], second: [8, 11, 9, 14, 12][index]}));
 const series = [{value: 'first', name: 'Primary', type: 'line'}, {value: 'second', name: 'Secondary', type: 'line'}];
 export const chartExamples = [
+    {id:"donut-independent",title:"Independent selected metric (invented)",rows:donutFixture.independent.sliceRows,centerRows:donutFixture.independent.rows,centerInputs:donutFixture.independent.inputs,chart:{type:"donut",animation:false,center:donutFixture.independent.center,sliceLabel:donutFixture.independent.sliceLabel,paletteMode:"declared",series:{nameKey:"category",valueKey:"items",palette:donutFixture.independent.palette,categoryColors:donutFixture.independent.categoryColors}}},
     ...[{id:"donut-center",title:donutFixture.title,center:donutFixture.chartSpec.center},{id:"donut-center-occupancy",title:"Independent occupancy rate (invented)",center:donutFixture.occupancy},{id:"donut-center-long",title:"Long center label (invented)",center:{...donutFixture.chartSpec.center,label:donutFixture.longLabel}}].map(entry=>({...entry,rows:donutFixture.rows,chart:{type:"donut",animation:false,center:entry.center,series:{nameKey:"category",valueKey:"items"}}})),
     {id:"category-range",title:rangeFixture.title,rows:rangeFixture.rows,chartSpec:rangeFixture.chartSpec,config:{}},
     {id:"category-range-signed",title:signedRangeFixture.title,rows:signedRangeFixture.rows,chartSpec:signedRangeFixture.chartSpec,config:{}},
@@ -37,7 +38,7 @@ export function ChartExample({example, state = 'populated', onSelect}) {
         const signals = {collection:signal(data),control:signal({loading:state==='loading',error:state==='error'?'Example chart could not load. Try again.':null}),selection:signal({}),input:signal({})};
         return {signals};
     }, [example, state]);
-    return <Chart key={state} container={{id:`chart-example-${example.id}`,title:example.title,chart:{appearance:'document',showControls:false,...chart}}} context={context} embedded onDatumSelect={onSelect}/>;
+    return <Chart key={state} container={{...(example.centerRows?{centerRows:["empty","loading","error"].includes(state)?[]:example.centerRows,centerInputs:example.centerInputs}:{}),id:`chart-example-${example.id}`,title:example.title,chart:{appearance:'document',showControls:false,...chart}}} context={context} embedded onDatumSelect={onSelect}/>;
 }
 
 export default function ChartSpecimen() {

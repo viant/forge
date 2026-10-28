@@ -1,5 +1,6 @@
+import {normalizePieSliceLabel} from '../pieSliceLabel.js';
 import {normalizeChartTooltip,chartTooltipFields} from '../chartTooltip.js';
-import {normalizeDonutCenter} from '../donutCenter.js';
+import {normalizeDonutCenter,donutCenterFields} from '../donutCenter.js';
 import {normalizeCategoryRange,categoryRangeFields} from '../categoryRange.js';
 import {normalizeHeatmap} from '../categoricalHeatmap.js';
 import {normalizeChartMetricSelection, applyChartMetricSelection} from "../chartMetricSelection.js";
@@ -491,7 +492,13 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
     const highlights = normalizeStringArray(chartSpec.highlights);
     const type = String(chartSpec.type || "").trim().toLowerCase() || "line";
     if(type === "category-range" && ["seriesField","seriesOptions","metricSelection","layout","stacked"].some(key=>chartSpec[key]!=null)) throw new Error("Category range uses its own declared series and orientation.");
+    if(chartSpec.paletteMode!==undefined&&chartSpec.paletteMode!=='declared')throw new Error('Unsupported chart palette mode.');
+    if(chartSpec.paletteMode==='declared'&&(!Array.isArray(chartSpec.palette)||!chartSpec.palette.length||chartSpec.palette.length>64||chartSpec.palette.some(color=>typeof color!=='string'||!/^#[0-9a-f]{6}$/i.test(color))))throw new Error('Declared palette requires 1–64 six-digit hex colors.');
+    if(chartSpec.palette!==undefined&&chartSpec.paletteMode!=='declared')throw new Error('Explicit palette requires declared mode.');
+    if(chartSpec.paletteMode==='declared'&&Object.values(chartSpec.categoryColors||{}).some(color=>typeof color!=='string'||!/^#[0-9a-f]{6}$/i.test(color)))throw new Error('Declared category colors must be six-digit hex colors.');
+    if(chartSpec.paletteMode==='declared'&&['pie','donut'].includes(type)&&(!chartSpec.categoryColors||!Object.keys(chartSpec.categoryColors).length))throw new Error('Declared category palette requires explicit category colors.');
     const center=normalizeDonutCenter(chartSpec.center,type);
+    const sliceLabel=normalizePieSliceLabel(chartSpec.sliceLabel,type);
     const categoryRange = type === "category-range" ? normalizeCategoryRange(chartSpec.categoryRange) : null;
     if(type === "heatmap" && ["seriesField","seriesOptions","metricSelection","layout","stacked"].some(key=>chartSpec[key]!=null)) throw new Error("Heatmap uses its own declared fields, color scale and category order; seriesField, seriesOptions, metricSelection, layout and stacked are unsupported.");
     const heatmap = type === "heatmap" ? normalizeHeatmap(chartSpec.heatmap) : null;
@@ -510,7 +517,9 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
         type,
         ...(heatmap ? {heatmap} : {}),
         ...(categoryRange ? {categoryRange} : {}),
+        ...(chartSpec.paletteMode?{paletteMode:chartSpec.paletteMode,palette:[...chartSpec.palette]}:{}),
         ...(center ? {center} : {}),
+        ...(sliceLabel?{sliceLabel}:{}),
         ...(chartSpec.appearance ? {appearance:chartSpec.appearance} : {}),
         ...(tooltip ? {tooltip} : {}),
         ...(chartSpec.layout ? {layout:chartSpec.layout} : {}),
@@ -575,7 +584,8 @@ function sanitizeChartSpecAgainstConfig(config = {}, chartSpec = null) {
         return null;
     }
 
-    if(normalized.center&&!universe.has(normalized.center.value.field))return null;
+    if(normalized.sliceLabel&&!universe.has(normalized.sliceLabel.field))return null;
+    if(normalized.center&&!normalized.center.datasetRef&&donutCenterFields(normalized.center).some(field=>!universe.has(field)))return null;
     if (normalized.type === "heatmap") return universe.has(normalized.heatmap.columnField) ? normalized : null;
     if (normalized.type === "category-range") return normalized;
     const family = chartFamilyForType(normalized.type);
@@ -843,7 +853,8 @@ export function validateReportBuilderChartSpec(config = {}, chartSpec = null, co
         return {valid:errors.length===0,errors};
     }
     if (normalized.type === "category-range") return {valid:errors.length===0,errors};
-    if(normalized.center){const centerField=fields.get(normalized.center.value.field);if(!centerField||centerField.kind!=="measure")errors.push({field:"center.value.field",code:!centerField?"missingField":"wrongKind"});}
+    if(normalized.sliceLabel){const field=fields.get(normalized.sliceLabel.field);if(!field||field.kind!=="measure")errors.push({field:"sliceLabel.field",code:!field?"missingField":"wrongKind"});}
+    if(normalized.center&&!normalized.center.datasetRef)for(const key of donutCenterFields(normalized.center)){const centerField=fields.get(key);if(!centerField||centerField.kind!=="measure")errors.push({field:"center.value.field",code:!centerField?"missingField":"wrongKind"});}
     const family = chartFamilyForType(normalized.type);
 
     if (normalized.seriesField) {
@@ -1394,7 +1405,7 @@ export function resolveReportBuilderChartDependencies(config = {}, chartSpec = n
     });
     const measures = [];
     const seenMeasures = new Set();
-    normalizeStringArray([...(normalized.yFields||[]),normalized.center?.value?.field,...chartTooltipFields(normalized.tooltip)]).forEach((fieldKey) => {
+    normalizeStringArray([...(normalized.yFields||[]),normalized.sliceLabel?.field,...(!normalized.center?.datasetRef?donutCenterFields(normalized.center):[]),...chartTooltipFields(normalized.tooltip)]).forEach((fieldKey) => {
         const measure = resolveReportBuilderMeasureByField(config, fieldKey);
         const measureId = String(measure?.id || "").trim();
         if (!measure || !measureId || seenMeasures.has(measureId)) {
@@ -2337,7 +2348,7 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
     if (!xField || yMeasures.length === 0) {
         return container;
     }
-    const configuredPalette = config.result?.palette;
+    const configuredPalette = normalized.palette || config.result?.palette;
     const palette = Array.isArray(configuredPalette) && configuredPalette.length > 0
         ? configuredPalette
         : DEFAULT_CHART_PALETTE;
@@ -2356,6 +2367,8 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
             chart: {
                 type: seriesType,
                 ...(normalized.center?{center:normalized.center}:{}),
+                ...(normalized.sliceLabel?{sliceLabel:normalized.sliceLabel}:{}),
+                ...(normalized.paletteMode?{paletteMode:normalized.paletteMode}:{}),
                 ...(normalized.appearance ? {appearance:normalized.appearance} : {}),
         ...(normalized.tooltip ? {tooltip:normalized.tooltip} : {}),
                 series: {
@@ -2376,7 +2389,8 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
     const hasXDisplayValueMap = xField?.displayValueMap && typeof xField.displayValueMap === "object" && !Array.isArray(xField.displayValueMap);
     const baseChart = {
         type: seriesType,
-        ...(normalized.appearance ? {appearance:normalized.appearance} : {}),
+        ...(normalized.paletteMode?{paletteMode:normalized.paletteMode}:{}),
+                ...(normalized.appearance ? {appearance:normalized.appearance} : {}),
         ...(normalized.tooltip ? {tooltip:normalized.tooltip} : {}),
         ...(normalized.layout ? {layout:normalized.layout} : {}),
         ...(typeof normalized.stacked === 'boolean' ? {stacked:normalized.stacked} : {}),

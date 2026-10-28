@@ -43359,9 +43359,387 @@ Please __addLocaleData before adding additional unit data`);
     });
   }
 
+  // src/components/requestLabelInput.js
+  var requestLabelInputSchema = { type: "object", additionalProperties: false, required: ["path", "labels"], properties: { path: { type: "string", minLength: 1 }, labels: { type: "array", minItems: 1, items: { type: "object", additionalProperties: false, required: ["value", "label"], properties: { value: { type: ["string", "number", "boolean"] }, label: { type: "string", minLength: 1 } } } } } };
+  function normalizeRequestLabelInput(selector) {
+    if (!selector || typeof selector !== "object" || Array.isArray(selector) || Object.keys(selector).some((key2) => !["path", "labels"].includes(key2)) || typeof selector.path !== "string" || !selector.path.split(".").every((key2) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(key2) && !["__proto__", "prototype", "constructor"].includes(key2)) || !Array.isArray(selector.labels) || !selector.labels.length) throw new Error("Request label requires a safe filter path and explicit labels.");
+    const keys3 = /* @__PURE__ */ new Set();
+    for (const entry of selector.labels) {
+      if (!entry || Object.keys(entry).some((key3) => !["value", "label"].includes(key3)) || !["number", "string", "boolean"].includes(typeof entry.value) || typeof entry.value === "number" && (!Number.isFinite(entry.value) || Math.abs(entry.value) > Number.MAX_SAFE_INTEGER) || typeof entry.label !== "string" || !entry.label.trim()) throw new Error("Invalid request label mapping.");
+      const key2 = JSON.stringify(entry.value);
+      if (keys3.has(key2)) throw new Error("Duplicate request label value.");
+      keys3.add(key2);
+    }
+    return JSON.parse(JSON.stringify(selector));
+  }
+  function resolveRequestLabelInput(input, filters) {
+    const config = normalizeRequestLabelInput(input);
+    let selector = filters;
+    for (const key2 of config.path.split(".")) {
+      if (!selector || typeof selector !== "object" || !Object.hasOwn(selector, key2)) throw new Error("Request label input is missing from its dataset request.");
+      selector = selector[key2];
+    }
+    const selected = config.labels.find((entry) => entry.value === selector);
+    if (!selected) throw new Error("Request label input has no declared label.");
+    return selected.label;
+  }
+
+  // src/reporting/reportTemplateRequestInputs.js
+  function normalizeTemplateRequestInputs(value) {
+    if (value == null) return void 0;
+    if (typeof value !== "object" || Array.isArray(value)) throw new Error("Template request inputs require an object.");
+    const result = {};
+    for (const [alias, input] of Object.entries(value)) {
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(alias) || ["__proto__", "prototype", "constructor"].includes(alias)) throw new Error("Unsafe template input alias.");
+      result[alias] = normalizeRequestLabelInput(input);
+    }
+    return result;
+  }
+  function escapeTemplateText(value) {
+    return String(value).replace(/[\\`*_{}\[\]()#+\-!|<>.~]/g, "\\$&");
+  }
+  function resolveTemplateRequestInput(alias, inputs, dataset) {
+    var _a5;
+    const declared = normalizeTemplateRequestInputs(inputs);
+    if (!declared || !Object.hasOwn(declared, alias)) throw new Error("Template request input is not declared.");
+    return escapeTemplateText(resolveRequestLabelInput(declared[alias], (_a5 = dataset == null ? void 0 : dataset.request) == null ? void 0 : _a5.filters));
+  }
+
+  // src/components/categoryRange.js
+  var string = { type: "string", minLength: 1 };
+  var numericDisplayFormatSchema = { type: "object", additionalProperties: false, properties: { decimals: { type: "integer", minimum: 0, maximum: 10 }, suffix: { type: "string" }, prefix: { type: "string" }, scale: { type: "number" }, grouping: { type: "boolean" }, negativeStyle: { enum: ["minus", "parentheses"] } } };
+  var common = { label: string, color: { type: "string", pattern: "^#[0-9a-fA-F]{6}$" }, format: numericDisplayFormatSchema };
+  var categoryRangeSchema = { type: "object", additionalProperties: false, required: ["categoryField", "series"], properties: { categoryField: string, orientation: { enum: ["horizontal", "vertical"] }, arrangement: { enum: ["lanes", "overlay"] }, series: { type: "array", minItems: 1, items: { anyOf: [
+    { type: "object", additionalProperties: false, required: ["kind", "field", "label"], properties: { ...common, kind: { enum: ["bar", "marker"] }, field: string } },
+    { type: "object", additionalProperties: false, required: ["kind", "startField", "endField", "label"], properties: { ...common, kind: { const: "range" }, startField: string, endField: string } }
+  ] } } } };
+  function categoryRangeFields(config) {
+    return [...new Set(config.series.flatMap((s4) => s4.kind === "range" ? [s4.startField, s4.endField] : [s4.field]))];
+  }
+  function normalizeCategoryRange(input) {
+    if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Category range configuration is required.");
+    for (const key2 of Object.keys(input)) if (!Object.hasOwn(categoryRangeSchema.properties, key2)) throw new Error(`Unknown category range option: ${key2}`);
+    if (typeof input.categoryField !== "string" || !input.categoryField.trim()) throw new Error("Category range categoryField is required.");
+    if (input.orientation !== void 0 && !["horizontal", "vertical"].includes(input.orientation)) throw new Error("Category range orientation must be horizontal or vertical.");
+    if (input.arrangement !== void 0 && !["lanes", "overlay"].includes(input.arrangement)) throw new Error("Category range arrangement must be lanes or overlay.");
+    if (!Array.isArray(input.series) || !input.series.length) throw new Error("Category range series are required.");
+    for (const s4 of input.series) {
+      if (!s4 || !["bar", "range", "marker"].includes(s4.kind)) throw new Error("Unsupported category range series kind.");
+      const fields2 = s4.kind === "range" ? ["startField", "endField"] : ["field"];
+      for (const key2 of Object.keys(s4)) if (!["kind", ...fields2, ...Object.keys(common)].includes(key2)) throw new Error(`Unknown category range series option: ${key2}`);
+      for (const key2 of ["label", ...fields2]) if (typeof s4[key2] !== "string" || !s4[key2].trim()) throw new Error(`Category range ${key2} is required.`);
+      if (s4.color !== void 0 && !/^#[0-9a-f]{6}$/i.test(s4.color)) throw new Error("Category range color must be a six-digit hex color.");
+      validateNumericDisplayFormat(s4.format);
+    }
+    if (categoryRangeFields(input).includes(input.categoryField)) throw new Error("Category and numeric fields must be distinct.");
+    return JSON.parse(JSON.stringify({ ...input, orientation: input.orientation || "horizontal" }));
+  }
+  function formatRangeValue(value, series) {
+    var _a5;
+    if (value == null) return "Unavailable";
+    const format2 = series.format || {}, scaled = value * ((_a5 = format2.scale) != null ? _a5 : 1);
+    if (!Number.isFinite(scaled)) throw new Error("Category range formatted value overflowed.");
+    const absolute = Math.abs(scaled), digits = format2.decimals;
+    const numeric = format2.grouping ? new Intl.NumberFormat("en-US", { minimumFractionDigits: digits != null ? digits : 0, maximumFractionDigits: digits != null ? digits : 10, useGrouping: true }).format(absolute) : digits === void 0 ? String(absolute) : absolute.toFixed(digits);
+    const text3 = `${format2.prefix || ""}${numeric}${format2.suffix || ""}`;
+    return scaled < 0 ? format2.negativeStyle === "parentheses" ? `(${text3})` : `-${text3}` : text3;
+  }
+  function buildCategoryRange(input, rows = []) {
+    const config = normalizeCategoryRange(input), seen = /* @__PURE__ */ new Set(), bounds = [0];
+    const categories = rows.map((row, index) => {
+      const category = row == null ? void 0 : row[config.categoryField];
+      if (typeof category !== "string" || !category.length || seen.has(category)) throw new Error("Category range requires unique nonempty category strings; aggregate explicitly.");
+      seen.add(category);
+      const marks = config.series.map((series, seriesIndex) => {
+        const fields2 = series.kind === "range" ? [series.startField, series.endField] : [series.field];
+        const values = fields2.map((field) => {
+          var _a5;
+          return (_a5 = row[field]) != null ? _a5 : null;
+        });
+        if (values.some((v2) => v2 !== null && (typeof v2 !== "number" || !Number.isFinite(v2)))) throw new Error("Category range values must be finite numbers or null.");
+        bounds.push(...values.filter((v2) => v2 !== null));
+        const available = values.every((v2) => v2 !== null);
+        return { series, seriesIndex, values, available, start: available ? series.kind === "bar" ? 0 : Math.min(...values) : null, end: available ? Math.max(...values) : null, label: `${series.label}: ${values.map((v2) => formatRangeValue(v2, series)).join(" to ")}` };
+      });
+      return { category, row, index, marks };
+    });
+    let min = Math.min(...bounds), max = Math.max(...bounds);
+    if (min === max) {
+      min -= 1;
+      max += 1;
+    }
+    return { config, categories, domain: [min, max] };
+  }
+  var escape = (value) => String(value).replace(/[&<>"']/g, (c3) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c3]);
+  var wrap = (value, size = 22) => String(value).match(new RegExp(`.{1,${size}}`, "gu")) || [""];
+  var textLines = (lines2, x2, y4, anchor = "start") => lines2.map((line, i3) => `<text x="${x2}" y="${y4 + i3 * 16}" text-anchor="${anchor}">${escape(line)}</text>`).join("");
+  var text = (value, x2, y4, anchor = "start", size = 22) => textLines(wrap(value, size), x2, y4, anchor);
+  function categoryRangeSvg(model, width = 680, { interactive = false, selectable = false, print = false } = {}) {
+    const { config, categories, domain } = model, vertical = config.orientation === "vertical";
+    width = print ? width : Math.max(640, width, vertical ? categories.length * Math.max(180, config.series.length * 44) : 0);
+    const left = vertical ? 64 : print ? Math.min(180, width * 0.25) : 180, right = vertical ? 24 : print ? Math.min(220, width * 0.35) : 220, top = 32, plotHeight = 260;
+    const categoryWrap = vertical ? 18 : print ? Math.max(1, Math.floor((left - 12) / 8)) : 22;
+    const valueWrap = print ? Math.max(1, Math.floor((vertical ? (width - left - right) / Math.max(1, categories.length) : right - 16) / 8)) : 24;
+    const legendWrap = print ? Math.max(1, Math.floor((width - left - 24) / 8)) : 40;
+    const categoryLines = categories.map((c3) => wrap(c3.category, categoryWrap));
+    const valueLines = categories.map((c3) => c3.marks.map((mark) => wrap(mark.values.map((v2) => formatRangeValue(v2, mark.series)).join(" to "), valueWrap)));
+    const laneHeights = valueLines.map((values) => values.map((lines2) => Math.max(44, lines2.length * 16 + 12)));
+    const rowHeights = categories.map((c3, i3) => Math.max(72, laneHeights[i3].reduce((sum2, h4) => sum2 + h4, 0) + 12, categoryLines[i3].length * 16 + 16));
+    const valueRowHeights = config.series.map((s4, i3) => Math.max(24, ...valueLines.map((values) => values[i3].length * 16 + 8)));
+    const valuesTop = top + plotHeight + Math.max(1, ...categoryLines.map((lines2) => lines2.length)) * 16 + 32;
+    const categoryBottom = vertical ? valuesTop + valueRowHeights.reduce((sum2, h4) => sum2 + h4, 0) : top + rowHeights.reduce((a4, b3) => a4 + b3, 0);
+    const legendEntries = config.series.map((series) => {
+      const lines2 = wrap(`${series.label} (${series.kind})`, legendWrap);
+      return { series, lines: lines2, height: Math.max(24, lines2.length * 16 + 8) };
+    });
+    const legendHeight = legendEntries.reduce((sum2, entry) => sum2 + entry.height, 0);
+    const height = Math.max(120, categoryBottom + legendHeight + 32);
+    const ratio = (v2) => Number.isFinite(domain[1] - domain[0]) ? (v2 - domain[0]) / (domain[1] - domain[0]) : (v2 / 2 - domain[0] / 2) / (domain[1] / 2 - domain[0] / 2);
+    const scale = (v2) => vertical ? top + plotHeight - ratio(v2) * plotHeight : left + ratio(v2) * (width - left - right);
+    const color = (s4) => s4.color || "#526c80";
+    const axis = vertical ? `<line x1="${left}" x2="${width - right}" y1="${scale(0)}" y2="${scale(0)}" stroke="#a0a0a0"/>` : `<line x1="${scale(0)}" x2="${scale(0)}" y1="${top}" y2="${categoryBottom}" stroke="#a0a0a0"/>`;
+    const axisSeries = config.series.every((series) => {
+      var _a5;
+      return JSON.stringify(series.format || {}) === JSON.stringify(((_a5 = config.series[0]) == null ? void 0 : _a5.format) || {});
+    }) ? config.series[0] : {};
+    const ticks = [domain[0], domain[1]].map((v2) => vertical ? text(formatRangeValue(v2, axisSeries), left - 8, scale(v2), "end") : text(formatRangeValue(v2, axisSeries), scale(v2), 18, "middle")).join("");
+    const marks = categories.map((category, index) => {
+      const band = (width - left - right) / Math.max(1, categories.length), center = left + (index + 0.5) * band;
+      const y4 = top + rowHeights.slice(0, index).reduce((a4, b3) => a4 + b3, 0);
+      const label = vertical ? textLines(categoryLines[index], center, top + plotHeight + 20, "middle") : textLines(categoryLines[index], left - 12, y4 + 20, "end");
+      return label + category.marks.map((mark) => {
+        const { series, seriesIndex, available } = mark;
+        const laneOffset = laneHeights[index].slice(0, seriesIndex).reduce((sum2, h4) => sum2 + h4, 0);
+        const lane = config.arrangement === "overlay" ? vertical ? center : y4 + 24 : vertical ? center + (seriesIndex - (config.series.length - 1) / 2) * 44 : y4 + 24 + laneOffset;
+        const description = `${category.category}, ${mark.label}`;
+        let shape = "";
+        if (available) {
+          const a4 = scale(mark.start), b3 = scale(mark.end), lo = Math.min(a4, b3), length = Math.abs(b3 - a4), thickness = series.kind === "bar" ? 12 : 6;
+          if (series.kind === "marker" || length === 0) shape = vertical ? `<line x1="${lane - 8}" x2="${lane + 8}" y1="${a4}" y2="${a4}" stroke="${color(series)}" stroke-width="3"/>` : `<line x1="${a4}" x2="${a4}" y1="${lane - 8}" y2="${lane + 8}" stroke="${color(series)}" stroke-width="3"/>`;
+          else shape = vertical ? `<rect x="${lane - thickness / 2}" y="${lo}" width="${thickness}" height="${length}" fill="${color(series)}"/>` : `<rect x="${lo}" y="${lane - thickness / 2}" width="${length}" height="${thickness}" fill="${color(series)}"/>`;
+        }
+        const valueY = vertical ? valuesTop + valueRowHeights.slice(0, seriesIndex).reduce((sum2, h4) => sum2 + h4, 0) : y4 + 28 + laneOffset;
+        const quantity = textLines(valueLines[index][seriesIndex], vertical ? center : width - 16, valueY, vertical ? "middle" : "end");
+        const attrs = interactive ? ` data-category="${index}" data-series="${seriesIndex}" tabindex="0" role="${selectable && available ? "button" : "img"}" aria-label="${escape(description)}"` : "";
+        let hit = "";
+        if (interactive && config.arrangement === "overlay" && available) {
+          const start = scale(mark.start), end = scale(mark.end), length = Math.abs(end - start), origin = Math.min(start, end);
+          hit = vertical ? `<rect x="${lane - 14}" y="${length ? origin : start - 8}" width="28" height="${Math.max(16, length)}" fill="transparent"/>` : `<rect x="${length ? origin : start - 8}" y="${lane - 14}" width="${Math.max(16, length)}" height="28" fill="transparent"/>`;
+        } else if (interactive && config.arrangement !== "overlay") hit = `<rect x="${vertical ? lane - 22 : left}" y="${vertical ? top : lane - 22}" width="${vertical ? 44 : width - left}" height="${vertical ? plotHeight : laneHeights[index][seriesIndex]}" fill="transparent"/>`;
+        return `<g${attrs}>${interactive ? `<title>${escape(description)}</title>` : ""}${hit}${shape}${quantity}</g>`;
+      }).join("");
+    }).join("");
+    let legendY = categoryBottom + 24;
+    const legend = legendEntries.map(({ series, lines: lines2, height: height2 }) => {
+      const y4 = legendY;
+      legendY += height2;
+      return `<rect x="${left}" y="${y4 - 10}" width="12" height="12" fill="${color(series)}"/>${textLines(lines2, left + 20, y4)}`;
+    }).join("");
+    return { svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><g font-size="12" fill="#263238">${axis}${ticks}${marks}${legend}</g></svg>`, width, height, diagnostics: [] };
+  }
+  function categoryRangePrintPages(model, { width = 540, maxHeight = 616, firstMaxHeight = maxHeight } = {}) {
+    const fail3 = (message) => [{ svg: "", width, height: 0, diagnostics: [{ code: "categoryRangePrintLayoutUnavailable", severity: "warning", message }] }];
+    if (!Number.isFinite(width) || width < 260 || !Number.isFinite(maxHeight) || maxHeight < 120) return fail3("Category-range print needs a content area at least 260 wide and 120 high. Use a larger page or a wider chart block.");
+    const vertical = model.config.orientation === "vertical";
+    const band = Math.max(180, model.config.series.length * 44);
+    const maxColumns = vertical ? Math.floor((width - 88) / band) : model.categories.length || 1;
+    if (maxColumns < 1) return fail3("Category-range series cannot fit at readable size. Use a wider page or split the authored series across chart blocks.");
+    const render = (offset, count) => categoryRangeSvg({ ...model, categories: model.categories.slice(offset, offset + count) }, width, { print: true });
+    if (!model.categories.length) {
+      const empty2 = render(0, 0);
+      return empty2.height <= maxHeight ? [{ ...empty2, startNewPage: empty2.height > firstMaxHeight }] : fail3("Category-range legend cannot fit the print page. Shorten labels or split the authored series across chart blocks.");
+    }
+    for (let i3 = 0; i3 < model.categories.length; i3++) if (render(i3, 1).height > maxHeight) return fail3(`Category-range category ${i3 + 1} and its complete labels/legend exceed the page height. Shorten labels or split the authored series across chart blocks.`);
+    const pages = [];
+    for (let offset = 0; offset < model.categories.length; ) {
+      let budget = pages.length === 0 ? Math.min(firstMaxHeight, maxHeight) : maxHeight;
+      let startNewPage = false;
+      if (render(offset, 1).height > budget) {
+        budget = maxHeight;
+        startNewPage = true;
+      }
+      let count = 1, upper = Math.min(maxColumns, model.categories.length - offset);
+      while (count < upper) {
+        const candidate = Math.ceil((count + upper) / 2);
+        if (render(offset, candidate).height <= budget) count = candidate;
+        else upper = candidate - 1;
+      }
+      pages.push({ ...render(offset, count), startNewPage, categoryOffset: offset, categoryCount: count });
+      offset += count;
+    }
+    return pages;
+  }
+  function validateNumericDisplayFormat(format2) {
+    if (format2 !== void 0) {
+      if (!format2 || typeof format2 !== "object" || Array.isArray(format2) || Object.keys(format2).some((k2) => !["decimals", "suffix", "prefix", "scale", "grouping", "negativeStyle"].includes(k2))) throw new Error("Invalid category range format.");
+      if (format2.decimals !== void 0 && (!Number.isInteger(format2.decimals) || format2.decimals < 0 || format2.decimals > 10)) throw new Error("Category range decimals must be an integer from zero to ten.");
+      if (format2.suffix !== void 0 && typeof format2.suffix !== "string") throw new Error("Category range suffix must be a string.");
+      if (format2.prefix !== void 0 && typeof format2.prefix !== "string") throw new Error("Category range prefix must be a string.");
+      if (format2.scale !== void 0 && (typeof format2.scale !== "number" || !Number.isFinite(format2.scale))) throw new Error("Category range scale must be finite.");
+      if (format2.grouping !== void 0 && typeof format2.grouping !== "boolean") throw new Error("Category range grouping must be boolean.");
+      if (format2.negativeStyle !== void 0 && !["minus", "parentheses"].includes(format2.negativeStyle)) throw new Error("Invalid category range negative style.");
+    }
+  }
+
   // src/utils/isNumericValue.js
   function isNumericValue(value) {
     return (typeof value === "number" || typeof value === "string" && value.trim() !== "") && Number.isFinite(Number(value));
+  }
+
+  // src/reporting/reportExportValueFormatter.js
+  function normalizeString(value = "") {
+    return String(value || "").trim();
+  }
+  function isPlainObject(value) {
+    return !!value && typeof value === "object" && !Array.isArray(value);
+  }
+  function normalizeFiniteNumber(value) {
+    return isNumericValue(value) ? Number(value) : null;
+  }
+  var dateFormatters = /* @__PURE__ */ new Map();
+  var numberFormatters = /* @__PURE__ */ new Map();
+  function exportFormatter(cache, Constructor, options) {
+    const key2 = JSON.stringify(options);
+    if (cache.has(key2)) return cache.get(key2);
+    const formatter = new Constructor("en-US", options);
+    if (cache.size >= 16) cache.delete(cache.keys().next().value);
+    cache.set(key2, formatter);
+    return formatter;
+  }
+  function formatExportDateValue(value, {
+    includeTime = false
+  } = {}) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return String(value);
+    }
+    return exportFormatter(dateFormatters, Intl.DateTimeFormat, {
+      timeZone: "UTC",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      ...includeTime ? { hour: "numeric", minute: "2-digit" } : {}
+    }).format(date);
+  }
+  function formatGroupedNumberWithSpaces(value, {
+    minimumFractionDigits = 0,
+    maximumFractionDigits = 0
+  } = {}) {
+    const numeric = normalizeFiniteNumber(value);
+    if (numeric == null) {
+      return normalizeString(value);
+    }
+    return exportFormatter(numberFormatters, Intl.NumberFormat, {
+      minimumFractionDigits,
+      maximumFractionDigits,
+      useGrouping: true
+    }).format(numeric).replace(/,/g, " ");
+  }
+  function formatExportNumericValue(value, format2 = "", {
+    axis = false
+  } = {}) {
+    const normalizedFormat = normalizeString(format2).toLowerCase();
+    if (["id", "raw", "plain", "text"].includes(normalizedFormat)) return String(value);
+    const numeric = normalizeFiniteNumber(value);
+    if (numeric == null) {
+      return normalizeString(value);
+    }
+    switch (normalizedFormat) {
+      case "currency":
+      case "currency2":
+        return exportFormatter(numberFormatters, Intl.NumberFormat, {
+          style: "currency",
+          currency: "USD",
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        }).format(numeric);
+      case "compact":
+      case "compactnumber":
+        {
+          const absolute = Math.abs(numeric);
+          const compactUnits = [
+            [1e12, "T"],
+            [1e9, "B"],
+            [1e6, "M"],
+            [1e3, "K"]
+          ];
+          const match2 = compactUnits.find(([threshold]) => absolute >= threshold);
+          if (match2) {
+            const [threshold, suffix] = match2;
+            const precision = axis ? 1 : absolute / threshold >= 100 ? 0 : 2;
+            return `${(numeric / threshold).toFixed(precision).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1")}${suffix}`;
+          }
+        }
+        return formatGroupedNumberWithSpaces(numeric, {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: Number.isInteger(numeric) ? 0 : 2
+        });
+      case "percent":
+        return `${numeric.toFixed(1)}%`;
+      case "percentfraction":
+        return `${(numeric * 100).toFixed(1)}%`;
+      case "percentfraction2":
+        return `${(numeric * 100).toFixed(2)}%`;
+      case "number":
+        return exportFormatter(numberFormatters, Intl.NumberFormat, {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: axis ? Number.isInteger(numeric) ? 0 : 1 : 5,
+          useGrouping: true
+        }).format(numeric);
+      case "number2":
+        return exportFormatter(numberFormatters, Intl.NumberFormat, {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 2,
+          useGrouping: true
+        }).format(numeric);
+      case "number5":
+        return exportFormatter(numberFormatters, Intl.NumberFormat, {
+          minimumFractionDigits: 5,
+          maximumFractionDigits: 5,
+          useGrouping: true
+        }).format(numeric);
+      case "":
+        return exportFormatter(numberFormatters, Intl.NumberFormat, {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: Number.isInteger(numeric) ? 0 : 2,
+          useGrouping: true
+        }).format(numeric);
+      default:
+        return exportFormatter(numberFormatters, Intl.NumberFormat, {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: Number.isInteger(numeric) ? 0 : 2,
+          useGrouping: true
+        }).format(numeric);
+    }
+  }
+  function formatExportValue(value, format2 = "", options = {}) {
+    if (value === void 0 || value === null || value === "") {
+      return "\u2014";
+    }
+    if (Array.isArray(value)) {
+      return value.map((entry) => formatExportValue(entry, format2, options)).join(", ");
+    }
+    if (isPlainObject(value)) {
+      const start = normalizeString(value == null ? void 0 : value.start);
+      const end = normalizeString(value == null ? void 0 : value.end);
+      if (start || end) {
+        if (start && end) {
+          return `${start} to ${end}`;
+        }
+        return start || end;
+      }
+      return JSON.stringify(value);
+    }
+    const normalizedFormat = normalizeString(format2).toLowerCase();
+    if (["id", "raw", "plain", "text"].includes(normalizedFormat)) return String(value);
+    if (normalizedFormat === "date" || normalizedFormat === "datetime") {
+      return formatExportDateValue(value, { includeTime: normalizedFormat === "datetime" });
+    }
+    const numeric = normalizeFiniteNumber(value);
+    if (numeric != null) {
+      return formatExportNumericValue(numeric, format2, options);
+    }
+    return String(value);
   }
 
   // node_modules/@babel/runtime/helpers/esm/typeof.js
@@ -45453,6 +45831,118 @@ Please __addLocaleData before adding additional unit data`);
     return `M ${x2 + tl} ${y4} L ${right - tr} ${y4} C ${right - tr + k2 * tr} ${y4} ${right} ${y4 + tr - k2 * tr} ${right} ${y4 + tr} L ${right} ${bottom - br} C ${right} ${bottom - br + k2 * br} ${right - br + k2 * br} ${bottom} ${right - br} ${bottom} L ${x2 + bl} ${bottom} C ${x2 + bl - k2 * bl} ${bottom} ${x2} ${bottom - bl + k2 * bl} ${x2} ${bottom - bl} L ${x2} ${y4 + tl} C ${x2} ${y4 + tl - k2 * tl} ${x2 + tl - k2 * tl} ${y4} ${x2 + tl} ${y4} Z`;
   }
 
+  // src/components/donutCenter.js
+  var donutCenterFormats = ["number", "number2", "currency", "currency2", "compact", "percent", "percentfraction", "percentfraction2", "plain"];
+  var formatSchema = { anyOf: [{ enum: donutCenterFormats }, numericDisplayFormatSchema] };
+  var checkFormat = (format2) => {
+    if (typeof format2 === "string") {
+      if (!donutCenterFormats.includes(format2)) throw new Error("Unsupported donut center format.");
+    } else {
+      if (!format2) throw new Error("Donut center format is required.");
+      validateNumericDisplayFormat(format2);
+    }
+  };
+  var valueSchema = { type: "object", additionalProperties: false, required: ["field", "operation"], properties: { field: { type: "string", minLength: 1 }, operation: { enum: ["scalar", "sum"] } } };
+  var donutCenterSchema = { type: "object", additionalProperties: false, required: ["label"], oneOf: [{ required: ["value", "format"], not: { required: ["alternatives"] } }, { required: ["alternatives"], not: { anyOf: [{ required: ["value"] }, { required: ["format"] }] } }], properties: { label: { type: "string", minLength: 1 }, labelInput: requestLabelInputSchema, datasetRef: { type: "string", minLength: 1 }, format: formatSchema, value: valueSchema, alternatives: { type: "array", minItems: 1, items: { ...valueSchema, required: ["field", "operation", "format"], properties: { ...valueSchema.properties, label: { type: "string", minLength: 1 }, format: formatSchema } } } } };
+  function donutCenterFields(center) {
+    var _a5;
+    return ((_a5 = center == null ? void 0 : center.alternatives) == null ? void 0 : _a5.map((item) => item.field)) || ((center == null ? void 0 : center.value) ? [center.value.field] : []);
+  }
+  function normalizeDonutCenter(input, type = "donut") {
+    if (input === void 0) return void 0;
+    if (type !== "donut") throw new Error("Center content is supported only on donut charts.");
+    if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some((k2) => !["label", "value", "format", "datasetRef", "alternatives", "labelInput"].includes(k2))) throw new Error("Donut center requires label and explicit value bindings.");
+    if (typeof input.label !== "string" || !input.label.trim()) throw new Error("Donut center label is required.");
+    if (input.datasetRef !== void 0 && (typeof input.datasetRef !== "string" || !input.datasetRef.trim())) throw new Error("Donut center datasetRef must name a dataset.");
+    if (input.labelInput !== void 0) {
+      if (!input.datasetRef) throw new Error("Donut center label input requires an independent dataset.");
+      normalizeRequestLabelInput(input.labelInput);
+    }
+    const check = (value, alternative = false) => {
+      if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some((k2) => !["field", "operation", ...alternative ? ["format", "label"] : []].includes(k2)) || typeof value.field !== "string" || !value.field.trim() || !["scalar", "sum"].includes(value.operation)) throw new Error("Donut center value requires an explicit field and scalar or sum operation.");
+      if (alternative) {
+        checkFormat(value.format);
+        if (value.label !== void 0 && (typeof value.label !== "string" || !value.label.trim())) throw new Error("Donut center alternative label is invalid.");
+      }
+      return { ...value };
+    };
+    let binding;
+    if (input.alternatives !== void 0) {
+      if (input.value !== void 0 || input.format !== void 0 || !Array.isArray(input.alternatives) || !input.alternatives.length) throw new Error("Donut center alternatives require exclusive bindings.");
+      binding = { alternatives: input.alternatives.map((value) => check(value, true)) };
+      if (new Set(binding.alternatives.map((value) => value.field)).size !== binding.alternatives.length) throw new Error("Donut center alternatives must use distinct fields.");
+    } else {
+      checkFormat(input.format);
+      binding = { value: check(input.value), format: input.format };
+    }
+    return { label: input.label, ...binding, ...input.labelInput ? { labelInput: JSON.parse(JSON.stringify(input.labelInput)) } : {}, ...input.datasetRef ? { datasetRef: input.datasetRef } : {} };
+  }
+  function resolveDonutCenter(input, rows = [], type = "donut", centerRows, centerInputs) {
+    var _a5, _b, _c;
+    const config = normalizeDonutCenter(input, type);
+    if (!config) return null;
+    if (config.datasetRef) {
+      if (!Array.isArray(centerRows)) throw new Error("Donut center dataset is unavailable.");
+      rows = centerRows;
+      if (rows.length > 1) throw new Error("Independent donut center requires at most one scalar row.");
+      for (const row of rows) for (const field of donutCenterFields(config)) if (readChartDataValue(row, field) === void 0) throw new Error(`Donut center field '${field}' is absent from its dataset.`);
+    }
+    const resolve = (binding) => {
+      var _a6;
+      const values = rows.map((row) => {
+        var _a7;
+        return (_a7 = readChartDataValue(row, binding.field)) != null ? _a7 : null;
+      });
+      if (values.some((v2) => v2 !== null && (typeof v2 !== "number" || !Number.isFinite(v2)))) throw new Error("Donut center values must be finite numbers or null.");
+      if (binding.operation === "scalar") {
+        if (values.some((v2) => v2 !== values[0])) throw new Error("Donut center scalar values must agree across all returned rows.");
+        return (_a6 = values[0]) != null ? _a6 : null;
+      }
+      const present2 = values.filter((v2) => v2 !== null);
+      if (!present2.length) return null;
+      const sum2 = present2.reduce((total, v2) => total + v2, 0);
+      if (!Number.isFinite(sum2)) throw new Error("Donut center sum exceeds the finite numeric range.");
+      return sum2;
+    };
+    const alternatives = (config.alternatives || [{ ...config.value, format: config.format }]).map((binding) => ({ value: resolve(binding), format: binding.format, label: binding.label }));
+    const active = alternatives.filter((item) => item.value !== null);
+    if (active.length > 1) throw new Error("Donut center alternatives are mutually exclusive; multiple values are active.");
+    let label = ((_a5 = active[0]) == null ? void 0 : _a5.label) || config.label;
+    if (config.labelInput) label = resolveRequestLabelInput(config.labelInput, centerInputs);
+    const value = (_c = (_b = active[0]) == null ? void 0 : _b.value) != null ? _c : null;
+    return { label, value, formattedValue: value === null ? "Unavailable" : typeof active[0].format === "object" ? formatRangeValue(value, { format: active[0].format }) : formatExportNumericValue(value, active[0].format), scope: "dataset" };
+  }
+  function validateDonutCenterDataset(dataset) {
+    var _a5, _b, _c;
+    if (!dataset || !Array.isArray(dataset.rows)) throw new Error("Donut center dataset is unavailable.");
+    if (((_a5 = dataset.provenance) == null ? void 0 : _a5.hasMore) || ((_b = dataset.provenance) == null ? void 0 : _b.truncated) || dataset.hasMore || dataset.truncated || Number((_c = dataset.request) == null ? void 0 : _c.offset) > 0) throw new Error("Donut center requires a complete scalar dataset.");
+    return dataset.rows;
+  }
+  var donutCenterDescription = (center) => `${center.label}: ${center.formattedValue}. Dataset value; slice selection does not change it.`;
+  function layoutDonutCenter(center, radius, { valueSize = 14, labelSize = 12, lineHeight = 16, measure = (text3, size) => [...text3].reduce((sum2, char) => sum2 + size * (/[WM@%]|[^\x00-\x7F]/u.test(char) ? 1 : 0.65), 0) } = {}) {
+    const width = Math.max(0, Math.SQRT2 * radius - 12), height = width;
+    const words = center.label.trim().split(/\s+/u), lines2 = [];
+    const wordsFit = words.every((word) => measure(word, labelSize, "label") <= width);
+    let current = "";
+    if (wordsFit) for (const word of words) {
+      const candidate = current ? `${current} ${word}` : word;
+      if (current && measure(candidate, labelSize, "label") > width) {
+        lines2.push(current);
+        current = word;
+      } else current = candidate;
+    }
+    if (current) lines2.push(current);
+    const valueFits = measure(center.formattedValue, valueSize, "value") <= width;
+    const fits = wordsFit && valueFits && valueSize + 6 + lines2.length * lineHeight <= height;
+    return { value: valueFits ? center.formattedValue : "\u2026", labelLines: fits ? lines2 : [], needsDetails: !fits, valueSize, labelSize, lineHeight, height: fits ? valueSize + 6 + lines2.length * lineHeight : valueSize };
+  }
+  var escape2 = (value) => String(value).replace(/[&<>"']/g, (c3) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c3]);
+  function donutCenterSvg(center, cx, cy, radius) {
+    const layout = layoutDonutCenter(center, radius);
+    const y4 = cy - layout.height / 2 + layout.valueSize * 0.8;
+    return { svg: `<text x="${cx}" y="${y4}" text-anchor="middle" font-size="${layout.valueSize}" fill="#344054">${escape2(layout.value)}</text>` + layout.labelLines.map((line, i3) => `<text x="${cx}" y="${y4 + layout.valueSize + 4 + i3 * layout.lineHeight}" text-anchor="middle" font-size="${layout.labelSize}" fill="#344054">${escape2(line)}</text>`).join(""), needsDetails: layout.needsDetails };
+  }
+
   // src/components/categoricalHeatmap.js
   var hex = /^#[0-9a-f]{6}$/i;
   var heatmapSchema = {
@@ -45516,10 +46006,10 @@ Please __addLocaleData before adding additional unit data`);
     }));
     return { config, cells };
   }
-  var escape = (value) => String(value).replace(/[&<>"']/g, (c3) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c3]);
+  var escape3 = (value) => String(value).replace(/[&<>"']/g, (c3) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c3]);
   var lines = (value) => String(value).split(/\r?\n/u).flatMap((line) => line.match(/.{1,12}/gu) || [""]);
-  function text(value, x2, y4, anchor = "middle") {
-    return lines(value).map((line, i3) => `<text x="${x2}" y="${y4 + i3 * 16}" text-anchor="${anchor}">${escape(line)}</text>`).join("");
+  function text2(value, x2, y4, anchor = "middle") {
+    return lines(value).map((line, i3) => `<text x="${x2}" y="${y4 + i3 * 16}" text-anchor="${anchor}">${escape3(line)}</text>`).join("");
   }
   function heatmapSvg(model, width = 680, { interactive = false, selectable = false, print = false, title = "Categorical heatmap" } = {}) {
     const { config, cells } = model, left = 164, top = 20 + Math.max(...config.columnCategories.map((v2) => lines(v2).length)) * 16;
@@ -45532,18 +46022,18 @@ Please __addLocaleData before adding additional unit data`);
     const legendColumns = Math.max(1, Math.floor((width - left - 12) / 156));
     const legendRowHeight = Math.max(26, ...legendEntries.map((entry) => lines(entry.label).length * 16 + 10));
     const height = Math.max(120, bottom + (legendEntries.length ? Math.ceil(legendEntries.length / legendColumns) * legendRowHeight + 20 : 12));
-    const labels = config.columnCategories.map((v2, c3) => text(v2, left + (c3 + 0.5) * cellWidth, 20)).join("") + config.rowCategories.map((v2, r2) => text(v2, left - 10, y4(r2) + 22, "end")).join("");
+    const labels = config.columnCategories.map((v2, c3) => text2(v2, left + (c3 + 0.5) * cellWidth, 20)).join("") + config.rowCategories.map((v2, r2) => text2(v2, left - 10, y4(r2) + 22, "end")).join("");
     const marks = cells.map((cell, index) => {
       const description = `${cell.rowValue}, ${cell.columnValue}: ${cell.label}`;
       const rgb = [1, 3, 5].map((i3) => parseInt(cell.color.slice(i3, i3 + 2), 16));
       const foreground = (rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1e3 < 140 ? "#ffffff" : "#111111";
-      return `<g${interactive ? ` data-cell="${index}" tabindex="${index === 0 ? 0 : -1}" role="${selectable && cell.value !== null ? "button" : "img"}" aria-label="${escape(description)}"` : ""}>${interactive ? `<title>${escape(description)}</title>` : ""}<rect x="${left + cell.c * cellWidth}" y="${y4(cell.r)}" width="${cellWidth}" height="${heights[cell.r]}" fill="${cell.color}" stroke="#ffffff"/>${config.cellLabels ? `<g fill="${foreground}">${text(cell.label, left + (cell.c + 0.5) * cellWidth, y4(cell.r) + (heights[cell.r] - lines(cell.label).length * 16) / 2 + 12)}</g>` : ""}</g>`;
+      return `<g${interactive ? ` data-cell="${index}" tabindex="${index === 0 ? 0 : -1}" role="${selectable && cell.value !== null ? "button" : "img"}" aria-label="${escape3(description)}"` : ""}>${interactive ? `<title>${escape3(description)}</title>` : ""}<rect x="${left + cell.c * cellWidth}" y="${y4(cell.r)}" width="${cellWidth}" height="${heights[cell.r]}" fill="${cell.color}" stroke="#ffffff"/>${config.cellLabels ? `<g fill="${foreground}">${text2(cell.label, left + (cell.c + 0.5) * cellWidth, y4(cell.r) + (heights[cell.r] - lines(cell.label).length * 16) / 2 + 12)}</g>` : ""}</g>`;
     }).join("");
     const legend = legendEntries.map((entry, i3) => {
       const x2 = left + i3 % legendColumns * 156, top2 = bottom + 16 + Math.floor(i3 / legendColumns) * legendRowHeight;
-      return `<rect x="${x2}" y="${top2}" width="18" height="18" fill="${entry.color}"/>${text(entry.label, x2 + 24, top2 + 14, "start")}`;
+      return `<rect x="${x2}" y="${top2}" width="18" height="18" fill="${entry.color}"/>${text2(entry.label, x2 + 24, top2 + 14, "start")}`;
     }).join("");
-    return { svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" ${interactive ? `role="group" aria-label="${escape(title)}"` : ""} font-family="sans-serif" font-size="12" fill="#263238"><g font-size="12" fill="#263238">${labels}${marks}${legend}</g></svg>`, height, width, diagnostics: [] };
+    return { svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" ${interactive ? `role="group" aria-label="${escape3(title)}"` : ""} font-family="sans-serif" font-size="12" fill="#263238"><g font-size="12" fill="#263238">${labels}${marks}${legend}</g></svg>`, height, width, diagnostics: [] };
   }
   function heatmapPrintPages(model, { width = 680, maxHeight = 620, firstMaxHeight = maxHeight } = {}) {
     const { config, cells } = model;
@@ -45582,158 +46072,6 @@ Please __addLocaleData before adding additional unit data`);
     return pages;
   }
 
-  // src/components/categoryRange.js
-  var string = { type: "string", minLength: 1 };
-  var common = { label: string, color: { type: "string", pattern: "^#[0-9a-fA-F]{6}$" }, format: { type: "object", additionalProperties: false, properties: { decimals: { type: "integer", minimum: 0, maximum: 10 }, suffix: { type: "string" } } } };
-  var categoryRangeSchema = { type: "object", additionalProperties: false, required: ["categoryField", "series"], properties: { categoryField: string, orientation: { enum: ["horizontal", "vertical"] }, series: { type: "array", minItems: 1, items: { anyOf: [
-    { type: "object", additionalProperties: false, required: ["kind", "field", "label"], properties: { ...common, kind: { enum: ["bar", "marker"] }, field: string } },
-    { type: "object", additionalProperties: false, required: ["kind", "startField", "endField", "label"], properties: { ...common, kind: { const: "range" }, startField: string, endField: string } }
-  ] } } } };
-  function categoryRangeFields(config) {
-    return [...new Set(config.series.flatMap((s4) => s4.kind === "range" ? [s4.startField, s4.endField] : [s4.field]))];
-  }
-  function normalizeCategoryRange(input) {
-    if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Category range configuration is required.");
-    for (const key2 of Object.keys(input)) if (!Object.hasOwn(categoryRangeSchema.properties, key2)) throw new Error(`Unknown category range option: ${key2}`);
-    if (typeof input.categoryField !== "string" || !input.categoryField.trim()) throw new Error("Category range categoryField is required.");
-    if (input.orientation !== void 0 && !["horizontal", "vertical"].includes(input.orientation)) throw new Error("Category range orientation must be horizontal or vertical.");
-    if (!Array.isArray(input.series) || !input.series.length) throw new Error("Category range series are required.");
-    for (const s4 of input.series) {
-      if (!s4 || !["bar", "range", "marker"].includes(s4.kind)) throw new Error("Unsupported category range series kind.");
-      const fields2 = s4.kind === "range" ? ["startField", "endField"] : ["field"];
-      for (const key2 of Object.keys(s4)) if (!["kind", ...fields2, ...Object.keys(common)].includes(key2)) throw new Error(`Unknown category range series option: ${key2}`);
-      for (const key2 of ["label", ...fields2]) if (typeof s4[key2] !== "string" || !s4[key2].trim()) throw new Error(`Category range ${key2} is required.`);
-      if (s4.color !== void 0 && !/^#[0-9a-f]{6}$/i.test(s4.color)) throw new Error("Category range color must be a six-digit hex color.");
-      if (s4.format !== void 0) {
-        if (!s4.format || typeof s4.format !== "object" || Array.isArray(s4.format) || Object.keys(s4.format).some((k2) => !["decimals", "suffix"].includes(k2))) throw new Error("Invalid category range format.");
-        if (s4.format.decimals !== void 0 && (!Number.isInteger(s4.format.decimals) || s4.format.decimals < 0 || s4.format.decimals > 10)) throw new Error("Category range decimals must be an integer from zero to ten.");
-        if (s4.format.suffix !== void 0 && typeof s4.format.suffix !== "string") throw new Error("Category range suffix must be a string.");
-      }
-    }
-    if (categoryRangeFields(input).includes(input.categoryField)) throw new Error("Category and numeric fields must be distinct.");
-    return JSON.parse(JSON.stringify({ ...input, orientation: input.orientation || "horizontal" }));
-  }
-  var formatRangeValue = (value, series) => {
-    var _a5, _b;
-    return value == null ? "Unavailable" : `${((_a5 = series.format) == null ? void 0 : _a5.decimals) === void 0 ? value : value.toFixed(series.format.decimals)}${((_b = series.format) == null ? void 0 : _b.suffix) || ""}`;
-  };
-  function buildCategoryRange(input, rows = []) {
-    const config = normalizeCategoryRange(input), seen = /* @__PURE__ */ new Set(), bounds = [0];
-    const categories = rows.map((row, index) => {
-      const category = row == null ? void 0 : row[config.categoryField];
-      if (typeof category !== "string" || !category.length || seen.has(category)) throw new Error("Category range requires unique nonempty category strings; aggregate explicitly.");
-      seen.add(category);
-      const marks = config.series.map((series, seriesIndex) => {
-        const fields2 = series.kind === "range" ? [series.startField, series.endField] : [series.field];
-        const values = fields2.map((field) => {
-          var _a5;
-          return (_a5 = row[field]) != null ? _a5 : null;
-        });
-        if (values.some((v2) => v2 !== null && (typeof v2 !== "number" || !Number.isFinite(v2)))) throw new Error("Category range values must be finite numbers or null.");
-        bounds.push(...values.filter((v2) => v2 !== null));
-        const available = values.every((v2) => v2 !== null);
-        return { series, seriesIndex, values, available, start: available ? series.kind === "bar" ? 0 : Math.min(...values) : null, end: available ? Math.max(...values) : null, label: `${series.label}: ${values.map((v2) => formatRangeValue(v2, series)).join(" to ")}` };
-      });
-      return { category, row, index, marks };
-    });
-    let min = Math.min(...bounds), max = Math.max(...bounds);
-    if (min === max) {
-      min -= 1;
-      max += 1;
-    }
-    return { config, categories, domain: [min, max] };
-  }
-  var escape2 = (value) => String(value).replace(/[&<>"']/g, (c3) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c3]);
-  var wrap = (value, size = 22) => String(value).match(new RegExp(`.{1,${size}}`, "gu")) || [""];
-  var textLines = (lines2, x2, y4, anchor = "start") => lines2.map((line, i3) => `<text x="${x2}" y="${y4 + i3 * 16}" text-anchor="${anchor}">${escape2(line)}</text>`).join("");
-  var text2 = (value, x2, y4, anchor = "start", size = 22) => textLines(wrap(value, size), x2, y4, anchor);
-  function categoryRangeSvg(model, width = 680, { interactive = false, selectable = false, print = false } = {}) {
-    const { config, categories, domain } = model, vertical = config.orientation === "vertical";
-    width = print ? width : Math.max(640, width, vertical ? categories.length * Math.max(180, config.series.length * 44) : 0);
-    const left = vertical ? 64 : print ? Math.min(180, width * 0.25) : 180, right = vertical ? 24 : print ? Math.min(220, width * 0.35) : 220, top = 32, plotHeight = 260;
-    const categoryWrap = vertical ? 18 : print ? Math.max(1, Math.floor((left - 12) / 8)) : 22;
-    const valueWrap = print ? Math.max(1, Math.floor((vertical ? (width - left - right) / Math.max(1, categories.length) : right - 16) / 8)) : 24;
-    const legendWrap = print ? Math.max(1, Math.floor((width - left - 24) / 8)) : 40;
-    const categoryLines = categories.map((c3) => wrap(c3.category, categoryWrap));
-    const valueLines = categories.map((c3) => c3.marks.map((mark) => wrap(mark.values.map((v2) => formatRangeValue(v2, mark.series)).join(" to "), valueWrap)));
-    const laneHeights = valueLines.map((values) => values.map((lines2) => Math.max(44, lines2.length * 16 + 12)));
-    const rowHeights = categories.map((c3, i3) => Math.max(72, laneHeights[i3].reduce((sum2, h4) => sum2 + h4, 0) + 12, categoryLines[i3].length * 16 + 16));
-    const valueRowHeights = config.series.map((s4, i3) => Math.max(24, ...valueLines.map((values) => values[i3].length * 16 + 8)));
-    const valuesTop = top + plotHeight + Math.max(1, ...categoryLines.map((lines2) => lines2.length)) * 16 + 32;
-    const categoryBottom = vertical ? valuesTop + valueRowHeights.reduce((sum2, h4) => sum2 + h4, 0) : top + rowHeights.reduce((a4, b3) => a4 + b3, 0);
-    const legendEntries = config.series.map((series) => {
-      const lines2 = wrap(`${series.label} (${series.kind})`, legendWrap);
-      return { series, lines: lines2, height: Math.max(24, lines2.length * 16 + 8) };
-    });
-    const legendHeight = legendEntries.reduce((sum2, entry) => sum2 + entry.height, 0);
-    const height = Math.max(120, categoryBottom + legendHeight + 32);
-    const ratio = (v2) => Number.isFinite(domain[1] - domain[0]) ? (v2 - domain[0]) / (domain[1] - domain[0]) : (v2 / 2 - domain[0] / 2) / (domain[1] / 2 - domain[0] / 2);
-    const scale = (v2) => vertical ? top + plotHeight - ratio(v2) * plotHeight : left + ratio(v2) * (width - left - right);
-    const color = (s4) => s4.color || "#526c80";
-    const axis = vertical ? `<line x1="${left}" x2="${width - right}" y1="${scale(0)}" y2="${scale(0)}" stroke="#a0a0a0"/>` : `<line x1="${scale(0)}" x2="${scale(0)}" y1="${top}" y2="${categoryBottom}" stroke="#a0a0a0"/>`;
-    const ticks = [domain[0], domain[1]].map((v2) => vertical ? text2(v2, left - 8, scale(v2), "end") : text2(v2, scale(v2), 18, "middle")).join("");
-    const marks = categories.map((category, index) => {
-      const band = (width - left - right) / Math.max(1, categories.length), center = left + (index + 0.5) * band;
-      const y4 = top + rowHeights.slice(0, index).reduce((a4, b3) => a4 + b3, 0);
-      const label = vertical ? textLines(categoryLines[index], center, top + plotHeight + 20, "middle") : textLines(categoryLines[index], left - 12, y4 + 20, "end");
-      return label + category.marks.map((mark) => {
-        const { series, seriesIndex, available } = mark;
-        const laneOffset = laneHeights[index].slice(0, seriesIndex).reduce((sum2, h4) => sum2 + h4, 0);
-        const lane = vertical ? center + (seriesIndex - (config.series.length - 1) / 2) * 44 : y4 + 24 + laneOffset;
-        const description = `${category.category}, ${mark.label}`;
-        let shape = "";
-        if (available) {
-          const a4 = scale(mark.start), b3 = scale(mark.end), lo = Math.min(a4, b3), length = Math.abs(b3 - a4), thickness = series.kind === "bar" ? 12 : 6;
-          if (series.kind === "marker" || length === 0) shape = vertical ? `<line x1="${lane - 8}" x2="${lane + 8}" y1="${a4}" y2="${a4}" stroke="${color(series)}" stroke-width="3"/>` : `<line x1="${a4}" x2="${a4}" y1="${lane - 8}" y2="${lane + 8}" stroke="${color(series)}" stroke-width="3"/>`;
-          else shape = vertical ? `<rect x="${lane - thickness / 2}" y="${lo}" width="${thickness}" height="${length}" fill="${color(series)}"/>` : `<rect x="${lo}" y="${lane - thickness / 2}" width="${length}" height="${thickness}" fill="${color(series)}"/>`;
-        }
-        const valueY = vertical ? valuesTop + valueRowHeights.slice(0, seriesIndex).reduce((sum2, h4) => sum2 + h4, 0) : y4 + 28 + laneOffset;
-        const quantity = textLines(valueLines[index][seriesIndex], vertical ? center : width - 16, valueY, vertical ? "middle" : "end");
-        const attrs = interactive ? ` data-category="${index}" data-series="${seriesIndex}" tabindex="0" role="${selectable && available ? "button" : "img"}" aria-label="${escape2(description)}"` : "";
-        return `<g${attrs}>${interactive ? `<title>${escape2(description)}</title>` : ""}${interactive ? `<rect x="${vertical ? lane - 22 : left}" y="${vertical ? top : lane - 22}" width="${vertical ? 44 : width - left}" height="${vertical ? plotHeight : laneHeights[index][seriesIndex]}" fill="transparent"/>` : ""}${shape}${quantity}</g>`;
-      }).join("");
-    }).join("");
-    let legendY = categoryBottom + 24;
-    const legend = legendEntries.map(({ series, lines: lines2, height: height2 }) => {
-      const y4 = legendY;
-      legendY += height2;
-      return `<rect x="${left}" y="${y4 - 10}" width="12" height="12" fill="${color(series)}"/>${textLines(lines2, left + 20, y4)}`;
-    }).join("");
-    return { svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><g font-size="12" fill="#263238">${axis}${ticks}${marks}${legend}</g></svg>`, width, height, diagnostics: [] };
-  }
-  function categoryRangePrintPages(model, { width = 540, maxHeight = 616, firstMaxHeight = maxHeight } = {}) {
-    const fail3 = (message) => [{ svg: "", width, height: 0, diagnostics: [{ code: "categoryRangePrintLayoutUnavailable", severity: "warning", message }] }];
-    if (!Number.isFinite(width) || width < 260 || !Number.isFinite(maxHeight) || maxHeight < 120) return fail3("Category-range print needs a content area at least 260 wide and 120 high. Use a larger page or a wider chart block.");
-    const vertical = model.config.orientation === "vertical";
-    const band = Math.max(180, model.config.series.length * 44);
-    const maxColumns = vertical ? Math.floor((width - 88) / band) : model.categories.length || 1;
-    if (maxColumns < 1) return fail3("Category-range series cannot fit at readable size. Use a wider page or split the authored series across chart blocks.");
-    const render = (offset, count) => categoryRangeSvg({ ...model, categories: model.categories.slice(offset, offset + count) }, width, { print: true });
-    if (!model.categories.length) {
-      const empty2 = render(0, 0);
-      return empty2.height <= maxHeight ? [{ ...empty2, startNewPage: empty2.height > firstMaxHeight }] : fail3("Category-range legend cannot fit the print page. Shorten labels or split the authored series across chart blocks.");
-    }
-    for (let i3 = 0; i3 < model.categories.length; i3++) if (render(i3, 1).height > maxHeight) return fail3(`Category-range category ${i3 + 1} and its complete labels/legend exceed the page height. Shorten labels or split the authored series across chart blocks.`);
-    const pages = [];
-    for (let offset = 0; offset < model.categories.length; ) {
-      let budget = pages.length === 0 ? Math.min(firstMaxHeight, maxHeight) : maxHeight;
-      let startNewPage = false;
-      if (render(offset, 1).height > budget) {
-        budget = maxHeight;
-        startNewPage = true;
-      }
-      let count = 1, upper = Math.min(maxColumns, model.categories.length - offset);
-      while (count < upper) {
-        const candidate = Math.ceil((count + upper) / 2);
-        if (render(offset, candidate).height <= budget) count = candidate;
-        else upper = candidate - 1;
-      }
-      pages.push({ ...render(offset, count), startNewPage, categoryOffset: offset, categoryCount: count });
-      offset += count;
-    }
-    return pages;
-  }
-
   // src/components/chartTooltip.js
   var formats = ["text", "date", "number", "number2", "number5", "currency", "currency2", "percent", "percentFraction", "percentFraction2", "compactNumber"];
   var aggregates = ["unique", "sum", "avg", "min", "max"];
@@ -45742,8 +46080,8 @@ Please __addLocaleData before adding additional unit data`);
   };
   function normalizeChartTooltip(value) {
     if (value == null) return null;
-    if (typeof value !== "object" || Array.isArray(value) || Object.keys(value).some((key2) => !["fields", "print"].includes(key2))) fail("expected fields and optional print policy");
-    if (!Array.isArray(value.fields) || !value.fields.length || value.fields.length > 16) fail("fields must contain 1\u201316 explicit fields");
+    if (typeof value !== "object" || Array.isArray(value) || Object.keys(value).some((key2) => !["fields", "print", "lines"].includes(key2))) fail("expected fields, optional template lines and print policy");
+    if (!Array.isArray(value.fields) || !value.fields.length && !value.lines || value.fields.length > 16) fail("fields must contain 1\u201316 explicit fields unless template lines are supplied");
     const seen = /* @__PURE__ */ new Set();
     const fields2 = value.fields.map((field, index) => {
       if (!field || typeof field !== "object" || Array.isArray(field) || Object.keys(field).some((key2) => !["field", "label", "format", "unit", "aggregate"].includes(key2))) fail(`field ${index} has unsupported properties`);
@@ -45758,7 +46096,21 @@ Please __addLocaleData before adding additional unit data`);
     });
     const print = value.print === void 0 ? "details" : value.print;
     if (!["details", "omit"].includes(print)) fail("print must be details or omit");
-    return { fields: fields2, print };
+    let lines2;
+    if (value.lines !== void 0) {
+      if (!Array.isArray(value.lines) || !value.lines.length || value.lines.length > 64) fail("template requires 1\u201364 lines");
+      lines2 = value.lines.map((line) => {
+        if (!Array.isArray(line) || line.length > 128) fail("template line requires at most 128 segments");
+        return line.map((segment) => {
+          if (!segment || typeof segment !== "object" || Array.isArray(segment) || Object.keys(segment).length !== 1) fail("template segment requires text or field");
+          if (typeof segment.text === "string" && segment.text.length <= 1e4) return { text: segment.text };
+          if (segment.input) return { input: normalizeRequestLabelInput(segment.input) };
+          if (typeof segment.field === "string" && seen.has(segment.field)) return { field: segment.field };
+          fail("template segment field must be admitted in fields");
+        });
+      });
+    }
+    return { fields: fields2, print, ...lines2 ? { lines: lines2 } : {} };
   }
   var chartTooltipFields = (value) => {
     var _a5;
@@ -45808,16 +46160,23 @@ Please __addLocaleData before adding additional unit data`);
     const rows = Array.isArray(source) ? source : Array.isArray(source == null ? void 0 : source[seriesKey]) ? source[seriesKey] : null;
     return rows || [row];
   }
-  function buildChartTooltipEntries(chart, source = []) {
-    var _a5, _b, _c, _d;
+  function buildChartTooltipEntries(chart, source = [], requestFilters) {
+    var _a5, _b, _c, _d, _e;
     const config = normalizeChartTooltip(chart.tooltip);
     if (!config) return [];
     const type = chart.type;
     if (!["line", "area", "bar", "horizontal_bar", "funnel_bar", "composed", "combo", "pie", "donut", "heatmap", "category-range"].includes(type)) fail(`unsupported chart type ${type}`);
     const entries = [];
     const add = (category, seriesKey, seriesLabel, rows, identity) => {
+      var _a6;
       if (!["string", "number", "boolean"].includes(typeof category) || typeof category === "number" && !Number.isFinite(category)) fail("category keys must be scalar strings, finite numbers or booleans");
-      entries.push({ id: identity ? JSON.stringify(identity) : chartTooltipEntryId(category, seriesKey), category: String(category), seriesKey: String(seriesKey), seriesLabel: String(seriesLabel), rowCount: rows.length, fields: config.fields.map((field) => fieldValue(rows, field)) });
+      const fields2 = config.fields.map((field) => fieldValue(rows, field));
+      const values = new Map(fields2.map((field) => [field.field, field.displayValue]));
+      const lines2 = (_a6 = config.lines) == null ? void 0 : _a6.map((line) => line.map((segment) => {
+        var _a7;
+        return segment.input ? resolveRequestLabelInput(segment.input, requestFilters) : (_a7 = segment.text) != null ? _a7 : values.get(segment.field);
+      }).join(""));
+      entries.push({ id: identity ? JSON.stringify(identity) : chartTooltipEntryId(category, seriesKey), category: String(category), seriesKey: String(seriesKey), seriesLabel: String(seriesLabel), rowCount: rows.length, fields: fields2, ...lines2 ? { lines: lines2 } : {} });
     };
     if (type === "heatmap") {
       const model = buildHeatmap(chart.heatmap, source);
@@ -45846,11 +46205,12 @@ Please __addLocaleData before adding additional unit data`);
         }));
       }
     }
+    if (!entries.length && ((_e = config.lines) == null ? void 0 : _e.some((line) => line.some((segment) => segment.input)))) add("Dataset", "details", "Details", []);
     return entries;
   }
   function chartTooltipPrintLines(config, entries = []) {
     if (!normalizeChartTooltip(config) || normalizeChartTooltip(config).print === "omit") return [];
-    return entries.flatMap((entry) => [`${entry.category} / ${entry.seriesLabel} (${entry.rowCount} source ${entry.rowCount === 1 ? "row" : "rows"})`, ...entry.fields.map((field) => `${field.label}${field.aggregate === "unique" ? "" : ` [${field.aggregate}]`}: ${field.displayValue}`)]);
+    return entries.flatMap((entry) => [`${entry.category} / ${entry.seriesLabel} (${entry.rowCount} source ${entry.rowCount === 1 ? "row" : "rows"})`, ...entry.lines || entry.fields.map((field) => `${field.label}${field.aggregate === "unique" ? "" : ` [${field.aggregate}]`}: ${field.displayValue}`)]);
   }
 
   // src/reporting/reportTableAnalytics.js
@@ -46145,12 +46505,12 @@ Please __addLocaleData before adding additional unit data`);
   }
 
   // src/reporting/reportDatasetRefModel.js
-  function normalizeString(value = "") {
+  function normalizeString2(value = "") {
     return String(value || "").trim();
   }
   function normalizeDatasetRefs(datasetRefs = []) {
     const seen = /* @__PURE__ */ new Set();
-    return (Array.isArray(datasetRefs) ? datasetRefs : []).map((entry) => normalizeString(entry)).filter((entry) => {
+    return (Array.isArray(datasetRefs) ? datasetRefs : []).map((entry) => normalizeString2(entry)).filter((entry) => {
       if (!entry || seen.has(entry)) {
         return false;
       }
@@ -46159,12 +46519,14 @@ Please __addLocaleData before adding additional unit data`);
     });
   }
   function getReportBlockDatasetRefs(block = {}) {
-    var _a5, _b;
+    var _a5, _b, _c, _d, _e, _f, _g;
     return normalizeDatasetRefs([
       block == null ? void 0 : block.datasetRef,
       block == null ? void 0 : block.secondaryDatasetRef,
       (_a5 = block == null ? void 0 : block.sparkline) == null ? void 0 : _a5.datasetRef,
-      (_b = block == null ? void 0 : block.sparkline) == null ? void 0 : _b.comparisonDatasetRef
+      (_b = block == null ? void 0 : block.sparkline) == null ? void 0 : _b.comparisonDatasetRef,
+      (_d = (_c = block == null ? void 0 : block.chartSpec) == null ? void 0 : _c.center) == null ? void 0 : _d.datasetRef,
+      (_g = (_f = (_e = block == null ? void 0 : block.content) == null ? void 0 : _e.chartSpec) == null ? void 0 : _f.center) == null ? void 0 : _g.datasetRef
     ]);
   }
   function resolveImplicitSingleReportDatasetRef(datasetRefs = []) {
@@ -46176,7 +46538,7 @@ Please __addLocaleData before adding additional unit data`);
     availableDatasetRefs = [],
     fallbackDatasetRef = "primary"
   } = {}) {
-    const explicitDatasetRef = normalizeString(preferredDatasetRef);
+    const explicitDatasetRef = normalizeString2(preferredDatasetRef);
     if (explicitDatasetRef) {
       return {
         datasetRef: explicitDatasetRef,
@@ -46191,7 +46553,7 @@ Please __addLocaleData before adding additional unit data`);
       };
     }
     return {
-      datasetRef: normalizeString(fallbackDatasetRef || "primary") || "primary",
+      datasetRef: normalizeString2(fallbackDatasetRef || "primary") || "primary",
       source: "fallback"
     };
   }
@@ -46299,219 +46661,19 @@ Please __addLocaleData before adding additional unit data`);
     return result === null || !Number.isFinite(result) ? null : result;
   }
 
-  // src/reporting/reportExportValueFormatter.js
-  function normalizeString2(value = "") {
-    return String(value || "").trim();
-  }
-  function isPlainObject(value) {
-    return !!value && typeof value === "object" && !Array.isArray(value);
-  }
-  function normalizeFiniteNumber(value) {
-    return isNumericValue(value) ? Number(value) : null;
-  }
-  var dateFormatters = /* @__PURE__ */ new Map();
-  var numberFormatters = /* @__PURE__ */ new Map();
-  function exportFormatter(cache, Constructor, options) {
-    const key2 = JSON.stringify(options);
-    if (cache.has(key2)) return cache.get(key2);
-    const formatter = new Constructor("en-US", options);
-    if (cache.size >= 16) cache.delete(cache.keys().next().value);
-    cache.set(key2, formatter);
-    return formatter;
-  }
-  function formatExportDateValue(value, {
-    includeTime = false
-  } = {}) {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-      return String(value);
-    }
-    return exportFormatter(dateFormatters, Intl.DateTimeFormat, {
-      timeZone: "UTC",
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      ...includeTime ? { hour: "numeric", minute: "2-digit" } : {}
-    }).format(date);
-  }
-  function formatGroupedNumberWithSpaces(value, {
-    minimumFractionDigits = 0,
-    maximumFractionDigits = 0
-  } = {}) {
-    const numeric = normalizeFiniteNumber(value);
-    if (numeric == null) {
-      return normalizeString2(value);
-    }
-    return exportFormatter(numberFormatters, Intl.NumberFormat, {
-      minimumFractionDigits,
-      maximumFractionDigits,
-      useGrouping: true
-    }).format(numeric).replace(/,/g, " ");
-  }
-  function formatExportNumericValue(value, format2 = "", {
-    axis = false
-  } = {}) {
-    const normalizedFormat = normalizeString2(format2).toLowerCase();
-    if (["id", "raw", "plain", "text"].includes(normalizedFormat)) return String(value);
-    const numeric = normalizeFiniteNumber(value);
-    if (numeric == null) {
-      return normalizeString2(value);
-    }
-    switch (normalizedFormat) {
-      case "currency":
-      case "currency2":
-        return exportFormatter(numberFormatters, Intl.NumberFormat, {
-          style: "currency",
-          currency: "USD",
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2
-        }).format(numeric);
-      case "compact":
-      case "compactnumber":
-        {
-          const absolute = Math.abs(numeric);
-          const compactUnits = [
-            [1e12, "T"],
-            [1e9, "B"],
-            [1e6, "M"],
-            [1e3, "K"]
-          ];
-          const match2 = compactUnits.find(([threshold]) => absolute >= threshold);
-          if (match2) {
-            const [threshold, suffix] = match2;
-            const precision = axis ? 1 : absolute / threshold >= 100 ? 0 : 2;
-            return `${(numeric / threshold).toFixed(precision).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1")}${suffix}`;
-          }
-        }
-        return formatGroupedNumberWithSpaces(numeric, {
-          minimumFractionDigits: 0,
-          maximumFractionDigits: Number.isInteger(numeric) ? 0 : 2
-        });
-      case "percent":
-        return `${numeric.toFixed(1)}%`;
-      case "percentfraction":
-        return `${(numeric * 100).toFixed(1)}%`;
-      case "percentfraction2":
-        return `${(numeric * 100).toFixed(2)}%`;
-      case "number":
-        return exportFormatter(numberFormatters, Intl.NumberFormat, {
-          minimumFractionDigits: 0,
-          maximumFractionDigits: axis ? Number.isInteger(numeric) ? 0 : 1 : 5,
-          useGrouping: true
-        }).format(numeric);
-      case "number2":
-        return exportFormatter(numberFormatters, Intl.NumberFormat, {
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 2,
-          useGrouping: true
-        }).format(numeric);
-      case "number5":
-        return exportFormatter(numberFormatters, Intl.NumberFormat, {
-          minimumFractionDigits: 5,
-          maximumFractionDigits: 5,
-          useGrouping: true
-        }).format(numeric);
-      case "":
-        return exportFormatter(numberFormatters, Intl.NumberFormat, {
-          minimumFractionDigits: 0,
-          maximumFractionDigits: Number.isInteger(numeric) ? 0 : 2,
-          useGrouping: true
-        }).format(numeric);
-      default:
-        return exportFormatter(numberFormatters, Intl.NumberFormat, {
-          minimumFractionDigits: 0,
-          maximumFractionDigits: Number.isInteger(numeric) ? 0 : 2,
-          useGrouping: true
-        }).format(numeric);
-    }
-  }
-  function formatExportValue(value, format2 = "", options = {}) {
-    if (value === void 0 || value === null || value === "") {
-      return "\u2014";
-    }
-    if (Array.isArray(value)) {
-      return value.map((entry) => formatExportValue(entry, format2, options)).join(", ");
-    }
-    if (isPlainObject(value)) {
-      const start = normalizeString2(value == null ? void 0 : value.start);
-      const end = normalizeString2(value == null ? void 0 : value.end);
-      if (start || end) {
-        if (start && end) {
-          return `${start} to ${end}`;
-        }
-        return start || end;
-      }
-      return JSON.stringify(value);
-    }
-    const normalizedFormat = normalizeString2(format2).toLowerCase();
-    if (["id", "raw", "plain", "text"].includes(normalizedFormat)) return String(value);
-    if (normalizedFormat === "date" || normalizedFormat === "datetime") {
-      return formatExportDateValue(value, { includeTime: normalizedFormat === "datetime" });
-    }
-    const numeric = normalizeFiniteNumber(value);
-    if (numeric != null) {
-      return formatExportNumericValue(numeric, format2, options);
-    }
-    return String(value);
-  }
-
-  // src/components/donutCenter.js
-  var donutCenterFormats = ["number", "number2", "currency", "currency2", "compact", "percent", "percentfraction", "percentfraction2", "plain"];
-  function normalizeDonutCenter(input, type = "donut") {
+  // src/components/pieSliceLabel.js
+  function normalizePieSliceLabel(input, type) {
     if (input === void 0) return void 0;
-    if (type !== "donut") throw new Error("Center content is supported only on donut charts.");
-    if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some((k2) => !["label", "value", "format"].includes(k2))) throw new Error("Donut center requires label, explicit value binding and format.");
-    if (typeof input.label !== "string" || !input.label.trim()) throw new Error("Donut center label is required.");
-    if (!donutCenterFormats.includes(input.format)) throw new Error("Unsupported donut center format.");
-    const value = input.value;
-    if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some((k2) => !["field", "operation"].includes(k2)) || typeof value.field !== "string" || !value.field.trim() || !["scalar", "sum"].includes(value.operation)) throw new Error("Donut center value requires an explicit field and scalar or sum operation.");
-    return { label: input.label, value: { field: value.field, operation: value.operation }, format: input.format };
+    if (!["pie", "donut"].includes(type) || !input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some((key2) => !["field", "format"].includes(key2)) || typeof input.field !== "string" || !input.field.trim() || !input.format) throw new Error("Slice labels require an explicit numeric field and format on a pie or donut.");
+    validateNumericDisplayFormat(input.format);
+    return { field: input.field, format: { ...input.format } };
   }
-  function resolveDonutCenter(input, rows = [], type = "donut") {
-    var _a5;
-    const config = normalizeDonutCenter(input, type);
+  function resolvePieSliceLabel(config, rows) {
     if (!config) return null;
-    const values = rows.map((row) => {
-      var _a6;
-      return (_a6 = readChartDataValue(row, config.value.field)) != null ? _a6 : null;
-    });
-    if (values.some((v2) => v2 !== null && (typeof v2 !== "number" || !Number.isFinite(v2)))) throw new Error("Donut center values must be finite numbers or null.");
-    let value = null;
-    if (config.value.operation === "scalar") {
-      if (values.some((v2) => v2 !== values[0])) throw new Error("Donut center scalar values must agree across all returned rows.");
-      value = (_a5 = values[0]) != null ? _a5 : null;
-    } else {
-      const present2 = values.filter((v2) => v2 !== null);
-      if (present2.length) {
-        value = present2.reduce((sum2, v2) => sum2 + v2, 0);
-        if (!Number.isFinite(value)) throw new Error("Donut center sum exceeds the finite numeric range.");
-      }
-    }
-    return { label: config.label, value, formattedValue: value === null ? "Unavailable" : formatExportNumericValue(value, config.format), scope: "dataset" };
-  }
-  var donutCenterDescription = (center) => `${center.label}: ${center.formattedValue}. Dataset value; slice selection does not change it.`;
-  function layoutDonutCenter(center, radius, { valueSize = 14, labelSize = 12, lineHeight = 16, measure = (text3, size) => [...text3].reduce((sum2, char) => sum2 + size * (/[WM@%]|[^\x00-\x7F]/u.test(char) ? 1 : 0.65), 0) } = {}) {
-    const width = Math.max(0, Math.SQRT2 * radius - 12), height = width;
-    const words = center.label.trim().split(/\s+/u), lines2 = [];
-    const wordsFit = words.every((word) => measure(word, labelSize, "label") <= width);
-    let current = "";
-    if (wordsFit) for (const word of words) {
-      const candidate = current ? `${current} ${word}` : word;
-      if (current && measure(candidate, labelSize, "label") > width) {
-        lines2.push(current);
-        current = word;
-      } else current = candidate;
-    }
-    if (current) lines2.push(current);
-    const valueFits = measure(center.formattedValue, valueSize, "value") <= width;
-    const fits = wordsFit && valueFits && valueSize + 6 + lines2.length * lineHeight <= height;
-    return { value: valueFits ? center.formattedValue : "\u2026", labelLines: fits ? lines2 : [], needsDetails: !fits, valueSize, labelSize, lineHeight, height: fits ? valueSize + 6 + lines2.length * lineHeight : valueSize };
-  }
-  var escape3 = (value) => String(value).replace(/[&<>"']/g, (c3) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c3]);
-  function donutCenterSvg(center, cx, cy, radius) {
-    const layout = layoutDonutCenter(center, radius);
-    const y4 = cy - layout.height / 2 + layout.valueSize * 0.8;
-    return { svg: `<text x="${cx}" y="${y4}" text-anchor="middle" font-size="${layout.valueSize}" fill="#344054">${escape3(layout.value)}</text>` + layout.labelLines.map((line, i3) => `<text x="${cx}" y="${y4 + layout.valueSize + 4 + i3 * layout.lineHeight}" text-anchor="middle" font-size="${layout.labelSize}" fill="#344054">${escape3(line)}</text>`).join(""), needsDetails: layout.needsDetails };
+    const values = rows.map((row) => readChartDataValue(row, config.field));
+    if (values.some((value) => value === void 0 || value !== null && (typeof value !== "number" || !Number.isFinite(value)))) throw new Error("Slice label field must contain finite numbers or explicit null.");
+    if (values.some((value) => value !== values[0])) throw new Error("Slice label values must agree within a category.");
+    return values[0] == null ? null : formatRangeValue(values[0], config);
   }
 
   // src/components/chartAppearance.js
@@ -47646,6 +47808,14 @@ Please __addLocaleData before adding additional unit data`);
       type: "percentOfTotal",
       sourceField
     };
+    if (compute.nullPolicy !== void 0) {
+      if (!["zero", "null"].includes(compute.nullPolicy)) throw Error("percentOfTotal nullPolicy must be zero or null");
+      next.nullPolicy = compute.nullPolicy;
+    }
+    if (compute.requireComplete !== void 0) {
+      if (typeof compute.requireComplete !== "boolean") throw Error("percentOfTotal requireComplete must be boolean");
+      next.requireComplete = compute.requireComplete;
+    }
     const partitionBy = normalizePartitionBy(compute == null ? void 0 : compute.partitionBy);
     if (partitionBy.length > 0) {
       next.partitionBy = partitionBy;
@@ -47982,11 +48152,11 @@ Please __addLocaleData before adding additional unit data`);
         }, 0);
         groupRows.forEach((row) => {
           const sourceValue = toFiniteNumber(resolveKey(row, sourceField));
-          let value = 0;
+          let value = definition2.compute.nullPolicy === "null" ? null : 0;
           if (sourceValue != null && total !== 0) {
             value = sourceValue / total * scale;
           }
-          if (decimals != null) {
+          if (decimals != null && value != null) {
             value = Number(value.toFixed(decimals));
           }
           row[outputKey] = value;
@@ -50553,7 +50723,13 @@ Please __addLocaleData before adding additional unit data`);
     const highlights = normalizeStringArray3(chartSpec.highlights);
     const type = String(chartSpec.type || "").trim().toLowerCase() || "line";
     if (type === "category-range" && ["seriesField", "seriesOptions", "metricSelection", "layout", "stacked"].some((key2) => chartSpec[key2] != null)) throw new Error("Category range uses its own declared series and orientation.");
+    if (chartSpec.paletteMode !== void 0 && chartSpec.paletteMode !== "declared") throw new Error("Unsupported chart palette mode.");
+    if (chartSpec.paletteMode === "declared" && (!Array.isArray(chartSpec.palette) || !chartSpec.palette.length || chartSpec.palette.length > 64 || chartSpec.palette.some((color) => typeof color !== "string" || !/^#[0-9a-f]{6}$/i.test(color)))) throw new Error("Declared palette requires 1\u201364 six-digit hex colors.");
+    if (chartSpec.palette !== void 0 && chartSpec.paletteMode !== "declared") throw new Error("Explicit palette requires declared mode.");
+    if (chartSpec.paletteMode === "declared" && Object.values(chartSpec.categoryColors || {}).some((color) => typeof color !== "string" || !/^#[0-9a-f]{6}$/i.test(color))) throw new Error("Declared category colors must be six-digit hex colors.");
+    if (chartSpec.paletteMode === "declared" && ["pie", "donut"].includes(type) && (!chartSpec.categoryColors || !Object.keys(chartSpec.categoryColors).length)) throw new Error("Declared category palette requires explicit category colors.");
     const center = normalizeDonutCenter(chartSpec.center, type);
+    const sliceLabel = normalizePieSliceLabel(chartSpec.sliceLabel, type);
     const categoryRange = type === "category-range" ? normalizeCategoryRange(chartSpec.categoryRange) : null;
     if (type === "heatmap" && ["seriesField", "seriesOptions", "metricSelection", "layout", "stacked"].some((key2) => chartSpec[key2] != null)) throw new Error("Heatmap uses its own declared fields, color scale and category order; seriesField, seriesOptions, metricSelection, layout and stacked are unsupported.");
     const heatmap = type === "heatmap" ? normalizeHeatmap(chartSpec.heatmap) : null;
@@ -50572,7 +50748,9 @@ Please __addLocaleData before adding additional unit data`);
       type,
       ...heatmap ? { heatmap } : {},
       ...categoryRange ? { categoryRange } : {},
+      ...chartSpec.paletteMode ? { paletteMode: chartSpec.paletteMode, palette: [...chartSpec.palette] } : {},
       ...center ? { center } : {},
+      ...sliceLabel ? { sliceLabel } : {},
       ...chartSpec.appearance ? { appearance: chartSpec.appearance } : {},
       ...tooltip ? { tooltip } : {},
       ...chartSpec.layout ? { layout: chartSpec.layout } : {},
@@ -50633,7 +50811,8 @@ Please __addLocaleData before adding additional unit data`);
     if (normalized.yFields.some((entry) => !universe.has(entry))) {
       return null;
     }
-    if (normalized.center && !universe.has(normalized.center.value.field)) return null;
+    if (normalized.sliceLabel && !universe.has(normalized.sliceLabel.field)) return null;
+    if (normalized.center && !normalized.center.datasetRef && donutCenterFields(normalized.center).some((field) => !universe.has(field))) return null;
     if (normalized.type === "heatmap") return universe.has(normalized.heatmap.columnField) ? normalized : null;
     if (normalized.type === "category-range") return normalized;
     const family = chartFamilyForType(normalized.type);
@@ -50871,8 +51050,12 @@ Please __addLocaleData before adding additional unit data`);
       return { valid: errors.length === 0, errors };
     }
     if (normalized.type === "category-range") return { valid: errors.length === 0, errors };
-    if (normalized.center) {
-      const centerField = fields2.get(normalized.center.value.field);
+    if (normalized.sliceLabel) {
+      const field = fields2.get(normalized.sliceLabel.field);
+      if (!field || field.kind !== "measure") errors.push({ field: "sliceLabel.field", code: !field ? "missingField" : "wrongKind" });
+    }
+    if (normalized.center && !normalized.center.datasetRef) for (const key2 of donutCenterFields(normalized.center)) {
+      const centerField = fields2.get(key2);
       if (!centerField || centerField.kind !== "measure") errors.push({ field: "center.value.field", code: !centerField ? "missingField" : "wrongKind" });
     }
     const family = chartFamilyForType(normalized.type);
@@ -51602,7 +51785,7 @@ Please __addLocaleData before adding additional unit data`);
     if (!xField || yMeasures.length === 0) {
       return container;
     }
-    const configuredPalette = (_a5 = config.result) == null ? void 0 : _a5.palette;
+    const configuredPalette = normalized.palette || ((_a5 = config.result) == null ? void 0 : _a5.palette);
     const palette = Array.isArray(configuredPalette) && configuredPalette.length > 0 ? configuredPalette : DEFAULT_CHART_PALETTE;
     const seriesType = normalized.type || "line";
     const family = chartFamilyForType(seriesType);
@@ -51618,6 +51801,8 @@ Please __addLocaleData before adding additional unit data`);
         chart: {
           type: seriesType,
           ...normalized.center ? { center: normalized.center } : {},
+          ...normalized.sliceLabel ? { sliceLabel: normalized.sliceLabel } : {},
+          ...normalized.paletteMode ? { paletteMode: normalized.paletteMode } : {},
           ...normalized.appearance ? { appearance: normalized.appearance } : {},
           ...normalized.tooltip ? { tooltip: normalized.tooltip } : {},
           series: {
@@ -51635,6 +51820,7 @@ Please __addLocaleData before adding additional unit data`);
     const hasXDisplayValueMap = (xField == null ? void 0 : xField.displayValueMap) && typeof xField.displayValueMap === "object" && !Array.isArray(xField.displayValueMap);
     const baseChart = {
       type: seriesType,
+      ...normalized.paletteMode ? { paletteMode: normalized.paletteMode } : {},
       ...normalized.appearance ? { appearance: normalized.appearance } : {},
       ...normalized.tooltip ? { tooltip: normalized.tooltip } : {},
       ...normalized.layout ? { layout: normalized.layout } : {},
@@ -53221,7 +53407,8 @@ Please __addLocaleData before adding additional unit data`);
     addSelection((_a5 = chartSpec == null ? void 0 : chartSpec.heatmap) == null ? void 0 : _a5.rowField);
     addSelection((_b = chartSpec == null ? void 0 : chartSpec.heatmap) == null ? void 0 : _b.columnField);
     addSelection((_c = chartSpec == null ? void 0 : chartSpec.heatmap) == null ? void 0 : _c.valueField);
-    addSelection((_e = (_d = chartSpec == null ? void 0 : chartSpec.center) == null ? void 0 : _d.value) == null ? void 0 : _e.field);
+    if (!((_d = chartSpec == null ? void 0 : chartSpec.center) == null ? void 0 : _d.datasetRef)) donutCenterFields(chartSpec == null ? void 0 : chartSpec.center).forEach(addSelection);
+    addSelection((_e = chartSpec == null ? void 0 : chartSpec.sliceLabel) == null ? void 0 : _e.field);
     addSelection(chartSpec == null ? void 0 : chartSpec.xField);
     addSelection(chartSpec == null ? void 0 : chartSpec.seriesField);
     normalizeStringArray6(chartSpec == null ? void 0 : chartSpec.yFields).forEach((fieldKey) => addSelection(fieldKey));
@@ -53332,21 +53519,21 @@ Please __addLocaleData before adding additional unit data`);
       ...displayValueMap ? { displayValueMap } : {}
     };
   }
-  function buildAuthoredTemplateFieldDisplayMap(template = "", fieldCatalog = {}) {
-    const mappings = {};
+  function buildAuthoredTemplateFieldDisplayMap(template = "", fieldCatalog = {}, authored = {}) {
+    const mappings = cloneValue19(authored || {});
     const matches = String(template || "").matchAll(/\brow\.([A-Za-z_][A-Za-z0-9_.]*)/g);
     for (const match2 of matches) {
       const field = normalizeString30(match2 == null ? void 0 : match2[1]);
       const descriptor = resolveAuthoredFieldDisplayDescriptor(fieldCatalog, field);
       if (field && descriptor) {
-        mappings[field] = descriptor;
+        mappings[field] = { ...mappings[field], ...descriptor };
       }
     }
     return Object.keys(mappings).length > 0 ? mappings : null;
   }
   function buildAuthoredMarkdownBlock(block = {}, fieldCatalog = {}) {
     const normalizedBlock = buildReportDocumentMarkdownBlock(block);
-    const templateFieldDisplayMap = buildAuthoredTemplateFieldDisplayMap(normalizedBlock == null ? void 0 : normalizedBlock.markdown, fieldCatalog);
+    const templateFieldDisplayMap = buildAuthoredTemplateFieldDisplayMap(normalizedBlock == null ? void 0 : normalizedBlock.markdown, fieldCatalog, normalizedBlock.templateFieldDisplayMap);
     return {
       ...normalizedBlock,
       ...templateFieldDisplayMap ? { templateFieldDisplayMap } : {}
@@ -53356,7 +53543,7 @@ Please __addLocaleData before adding additional unit data`);
     const normalizedBlock = buildReportDocumentCollectionBlock(block);
     const itemTitleDisplay = resolveAuthoredFieldDisplayDescriptor(fieldCatalog, normalizedBlock == null ? void 0 : normalizedBlock.itemTitleField);
     const secondaryDisplay = resolveAuthoredFieldDisplayDescriptor(fieldCatalog, normalizedBlock == null ? void 0 : normalizedBlock.secondaryField);
-    const templateFieldDisplayMap = buildAuthoredTemplateFieldDisplayMap(normalizedBlock == null ? void 0 : normalizedBlock.bodyTemplate, fieldCatalog);
+    const templateFieldDisplayMap = buildAuthoredTemplateFieldDisplayMap(normalizedBlock == null ? void 0 : normalizedBlock.bodyTemplate, fieldCatalog, normalizedBlock.templateFieldDisplayMap);
     return {
       ...normalizedBlock,
       ...(itemTitleDisplay == null ? void 0 : itemTitleDisplay.displayKey) ? { itemTitleDisplayKey: itemTitleDisplay.displayKey } : {},
@@ -53513,8 +53700,17 @@ Please __addLocaleData before adding additional unit data`);
         case "chartBlock":
           for (const field of chartTooltipFields((_a5 = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _a5.tooltip)) enableField(field, normalizedDatasetRef, request);
           if ((_b = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _b.categoryRange) for (const field of [normalizedBlock.chartSpec.categoryRange.categoryField, ...categoryRangeFields(normalizedBlock.chartSpec.categoryRange)]) enableField(field, normalizedDatasetRef, request);
-          enableField((_e = (_d = (_c = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _c.center) == null ? void 0 : _d.value) == null ? void 0 : _e.field, normalizedDatasetRef, request);
-          for (const key2 of ["rowField", "columnField", "valueField"]) enableField((_g = (_f = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _f.heatmap) == null ? void 0 : _g[key2], normalizedDatasetRef, request);
+          if ((_c = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _c.center) {
+            const center = normalizedBlock.chartSpec.center, ref = center.datasetRef || normalizedDatasetRef;
+            const target = nextSpec.datasets.find((entry) => normalizeString30(entry.id) === ref);
+            if (!target) throw new Error(`Donut center dataset '${ref}' is unavailable.`);
+            for (const field of donutCenterFields(center)) {
+              const catalog = resolveReportBuilderCatalogEntry(datasetFieldCatalogs.get(ref) || fieldCatalog, field);
+              if (!catalog || !["measure", "calculated"].includes(catalog.kind) || !enableField(field, ref, target.request)) throw new Error("Donut center fields must be declared measures of their dataset.");
+            }
+          }
+          for (const key2 of ["rowField", "columnField", "valueField"]) enableField((_e = (_d = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _d.heatmap) == null ? void 0 : _e[key2], normalizedDatasetRef, request);
+          enableField((_g = (_f = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _f.sliceLabel) == null ? void 0 : _g.field, normalizedDatasetRef, request);
           enableField((_h = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _h.xField, normalizedDatasetRef, request);
           normalizeString30((_i = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _i.seriesField) && enableField(normalizedBlock.chartSpec.seriesField, normalizedDatasetRef, request);
           (Array.isArray((_j = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _j.yFields) ? normalizedBlock.chartSpec.yFields : []).forEach((fieldKey) => enableField(fieldKey, normalizedDatasetRef, request));
@@ -54281,13 +54477,17 @@ Please __addLocaleData before adding additional unit data`);
     id = "markdownBlock",
     title = "",
     markdown = "",
-    datasetRef = ""
+    datasetRef = "",
+    templateRequestInputs,
+    templateFieldDisplayMap
   } = {}) {
     return {
       id: normalizeString30(id || "markdownBlock"),
       kind: "markdownBlock",
       title: normalizeString30(title),
       markdown: String(markdown || ""),
+      ...templateRequestInputs ? { templateRequestInputs: normalizeTemplateRequestInputs(templateRequestInputs) } : {},
+      ...templateFieldDisplayMap ? { templateFieldDisplayMap: cloneValue19(templateFieldDisplayMap) } : {},
       ...normalizeString30(datasetRef) ? { datasetRef: normalizeString30(datasetRef) } : {}
     };
   }
@@ -54408,6 +54608,7 @@ Please __addLocaleData before adding additional unit data`);
       title: normalizeString30((block == null ? void 0 : block.title) || "Collection") || "Collection",
       datasetRef: normalizeString30((block == null ? void 0 : block.datasetRef) || "primary"),
       ...itemTitleField ? { itemTitleField } : {},
+      ...block.markerColors ? { markerColors: cloneValue19(block.markerColors) } : {},
       ...normalizeString30(block == null ? void 0 : block.itemTitleLabel) ? { itemTitleLabel: normalizeString30(block.itemTitleLabel) } : {},
       ...normalizeString30(block == null ? void 0 : block.itemTitleDisplayKey) ? { itemTitleDisplayKey: normalizeString30(block.itemTitleDisplayKey) } : {},
       ...(block == null ? void 0 : block.itemTitleDisplayValueMap) && typeof block.itemTitleDisplayValueMap === "object" && !Array.isArray(block.itemTitleDisplayValueMap) ? { itemTitleDisplayValueMap: cloneValue19(block.itemTitleDisplayValueMap) } : {},
@@ -55746,8 +55947,8 @@ Please __addLocaleData before adding additional unit data`);
   function cloneChartRows(rows = []) {
     return (Array.isArray(rows) ? rows : []).map((row) => cloneValue21(row));
   }
-  function buildBaseReportFillChartPayload(chart = {}, rows = []) {
-    var _a5, _b, _c, _d, _e, _f, _g;
+  function buildBaseReportFillChartPayload(chart = {}, rows = [], centerRows, centerInputs, requestFilters) {
+    var _a5, _b, _c, _d, _e, _f, _g, _h, _i;
     const type = normalizeString33(chart == null ? void 0 : chart.type).toLowerCase();
     if (type === "category-range") {
       const model = buildCategoryRange(chart.categoryRange, rows);
@@ -55757,18 +55958,19 @@ Please __addLocaleData before adding additional unit data`);
       buildHeatmap(chart.heatmap, rows);
       return { kind: "heatmap", type, seriesKeys: [chart.heatmap.valueField], rows: cloneChartRows(rows) };
     }
-    const center = resolveDonutCenter(chart.center, rows, type);
+    const center = resolveDonutCenter(chart.center, rows, type, centerRows, centerInputs);
     const chartRows = materializeChartDisplayRows(chart, rows);
-    if (!type || chartRows.length === 0 && !center) {
+    if (!type || chartRows.length === 0 && !center && !((_b = (_a5 = chart.tooltip) == null ? void 0 : _a5.lines) == null ? void 0 : _b.some((line) => line.some((segment) => segment.input)))) {
       return null;
     }
     if (type === "pie" || type === "donut") {
-      const nameKey2 = normalizeString33(chart.tooltip ? chartTooltipPieFields(chart).nameKey : ((_a5 = chart == null ? void 0 : chart.series) == null ? void 0 : _a5.nameKey) || "name");
-      const valueKey3 = normalizeString33(chart.tooltip ? chartTooltipPieFields(chart).valueKey : ((_b = chart == null ? void 0 : chart.series) == null ? void 0 : _b.valueKey) || "value");
+      const nameKey2 = normalizeString33(chart.tooltip ? chartTooltipPieFields(chart).nameKey : ((_c = chart == null ? void 0 : chart.series) == null ? void 0 : _c.nameKey) || "name");
+      const valueKey3 = normalizeString33(chart.tooltip ? chartTooltipPieFields(chart).valueKey : ((_d = chart == null ? void 0 : chart.series) == null ? void 0 : _d.valueKey) || "value");
       if (!nameKey2 || !valueKey3) {
         return null;
       }
       const resolvedRows = buildPieChartData(chartRows, nameKey2, valueKey3, chartCategoryRowOptions(chart));
+      if (chart.sliceLabel) for (const row of resolvedRows) row.sliceLabel = resolvePieSliceLabel(chart.sliceLabel, row.__chartSelectionRows || []);
       return {
         kind: "category",
         ...center ? { center } : {},
@@ -55780,11 +55982,11 @@ Please __addLocaleData before adding additional unit data`);
       };
     }
     if (isDirectSeriesChart(chart)) {
-      const xAxisKey2 = normalizeString33((_c = chart == null ? void 0 : chart.xAxis) == null ? void 0 : _c.dataKey);
+      const xAxisKey2 = normalizeString33((_e = chart == null ? void 0 : chart.xAxis) == null ? void 0 : _e.dataKey);
       if (!xAxisKey2) {
         return null;
       }
-      const seriesValues = Array.isArray((_d = chart == null ? void 0 : chart.series) == null ? void 0 : _d.values) ? chart.series.values : [];
+      const seriesValues = Array.isArray((_f = chart == null ? void 0 : chart.series) == null ? void 0 : _f.values) ? chart.series.values : [];
       const seriesKeys = seriesValues.map((entry) => normalizeChartKey(entry == null ? void 0 : entry.value)).filter(Boolean);
       const resolvedRows = aggregateDirectSeriesData(chartRows, xAxisKey2, seriesValues);
       return {
@@ -55795,9 +55997,9 @@ Please __addLocaleData before adding additional unit data`);
         rows: cloneChartRows(resolvedRows)
       };
     }
-    const xAxisKey = normalizeString33((_e = chart == null ? void 0 : chart.xAxis) == null ? void 0 : _e.dataKey);
-    const nameKey = normalizeString33((_f = chart == null ? void 0 : chart.series) == null ? void 0 : _f.nameKey);
-    const valueKey2 = normalizeString33((_g = chart == null ? void 0 : chart.series) == null ? void 0 : _g.valueKey);
+    const xAxisKey = normalizeString33((_g = chart == null ? void 0 : chart.xAxis) == null ? void 0 : _g.dataKey);
+    const nameKey = normalizeString33((_h = chart == null ? void 0 : chart.series) == null ? void 0 : _h.nameKey);
+    const valueKey2 = normalizeString33((_i = chart == null ? void 0 : chart.series) == null ? void 0 : _i.valueKey);
     if (!xAxisKey || !nameKey || !valueKey2) {
       return null;
     }
@@ -55812,11 +56014,11 @@ Please __addLocaleData before adding additional unit data`);
       seriesKeys: Array.isArray(keys3) ? keys3.map((entry) => String(entry)) : []
     };
   }
-  function buildReportFillChartPayload(chart = {}, rows = []) {
+  function buildReportFillChartPayload(chart = {}, rows = [], centerRows, centerInputs, requestFilters) {
     if (chart == null) return null;
-    const result = buildBaseReportFillChartPayload(chart, rows);
+    const result = buildBaseReportFillChartPayload(chart, rows, centerRows, centerInputs, requestFilters);
     if (chart.tooltip) {
-      const tooltipEntries = buildChartTooltipEntries(chart, rows);
+      const tooltipEntries = buildChartTooltipEntries(chart, rows, requestFilters);
       if (result) return { ...result, tooltipEntries };
     }
     return result;
@@ -59235,6 +59437,11 @@ ${indent}${end}`;
     return hashString(JSON.stringify(reportFill || {}));
   }
   function buildReportFillDataset(dataset = {}, payload = {}, calculatedFields = []) {
+    var _a5, _b;
+    if (calculatedFields.some((field) => {
+      var _a6;
+      return field.datasetRef === dataset.id && ((_a6 = field.compute) == null ? void 0 : _a6.requireComplete) === true;
+    }) && (payload.hasMore !== false || payload.truncated === true || ((_a5 = payload.provenance) == null ? void 0 : _a5.hasMore) === true || ((_b = payload.provenance) == null ? void 0 : _b.truncated) === true)) throw Error(`Dataset ${dataset.id} requires explicitly complete input for table calculations`);
     const rawRows = Array.isArray(payload == null ? void 0 : payload.rows) ? payload.rows.map((row) => cloneValue24(row)) : [];
     const rows = applyReportCalculatedFields(rawRows, calculatedFields, {
       datasetRef: normalizeString36(dataset == null ? void 0 : dataset.id)
@@ -59473,6 +59680,7 @@ ${indent}${end}`;
     return void 0;
   }
   function resolveReportFillTemplateToken(token = "", {
+    templateRequestInputs = null,
     content = {},
     row = null,
     dataset = null,
@@ -59484,6 +59692,7 @@ ${indent}${end}`;
     if (!normalizedToken) {
       return "";
     }
+    if (normalizedToken.startsWith("input.")) return resolveTemplateRequestInput(normalizedToken.slice(6), templateRequestInputs, dataset);
     const timeAtMatch = normalizedToken.match(/^timeAt\(\s*["'](.+?)["'](?:\s*,\s*["'](date|dateTime)["'])?\s*\)$/i);
     if (timeAtMatch) {
       return formatReportRelativeTime(timeAtMatch[1], { format: timeAtMatch[2] || "date" });
@@ -59507,6 +59716,7 @@ ${indent}${end}`;
         datasetsByAlias,
         fieldDisplayMap
       });
+      if (formatMatch[2] === "text") return escapeTemplateText(formatReportFillKpiMacroValue(rawValue));
       return formatReportFillKpiMacroValue(rawValue, resolveReportFillMacroFormat(formatMatch[2]));
     }
     const helperMatch = normalizedToken.match(/^fmt\.(compact|compactNumber|currency|percent|percentFraction|number|number5)\((.+)\)$/i);
@@ -59541,6 +59751,17 @@ ${indent}${end}`;
     }
     if (normalizedToken === "dataset.dataSourceRef") {
       return normalizeString36((dataset == null ? void 0 : dataset.dataSourceRef) || "");
+    }
+    if (normalizedToken.startsWith("row.")) {
+      const descriptor = fieldDisplayMap == null ? void 0 : fieldDisplayMap[normalizedToken.slice(4)];
+      if (descriptor == null ? void 0 : descriptor.numericFormat) {
+        validateNumericDisplayFormat(descriptor.numericFormat);
+        const value = resolveKey(row || {}, descriptor.sourceKey || normalizedToken.slice(4));
+        if (value === void 0) throw new Error("Formatted template numeric field is missing.");
+        if (value === null) return "";
+        if (typeof value !== "number" || !Number.isFinite(value)) throw new Error("Formatted template field must be a finite number or null.");
+        return formatRangeValue(value, { format: descriptor.numericFormat });
+      }
     }
     const resolved = resolveReportFillTemplateRawValue(normalizedToken, {
       content,
@@ -59634,7 +59855,7 @@ ${indent}${end}`;
   function buildReportFillCollectionItemContent(block = {}, row = null, rowIndex = 0, dataset = {}, {
     datasetsByAlias = /* @__PURE__ */ new Map()
   } = {}) {
-    var _a5;
+    var _a5, _b;
     const itemTitleField = normalizeString36(block == null ? void 0 : block.itemTitleField);
     const valueField = normalizeString36(block == null ? void 0 : block.valueField);
     const secondaryField = normalizeString36(block == null ? void 0 : block.secondaryField);
@@ -59647,7 +59868,14 @@ ${indent}${end}`;
     const toneField = normalizeString36(block == null ? void 0 : block.toneField);
     const toneValue = toneField && row ? row[toneField] : null;
     const toneRule = (Array.isArray(block == null ? void 0 : block.toneRules) ? block.toneRules : []).find((rule) => JSON.stringify(rule == null ? void 0 : rule.value) === JSON.stringify(toneValue)) || null;
+    let markerColor;
+    if (block.markerColors) {
+      const key2 = String((_b = row == null ? void 0 : row[itemTitleField]) != null ? _b : "");
+      if (!Object.hasOwn(block.markerColors, key2) || !/^#[0-9a-f]{6}$/i.test(block.markerColors[key2])) throw new Error("Collection marker requires a declared color for its category.");
+      markerColor = block.markerColors[key2];
+    }
     const content = {
+      ...markerColor ? { markerColor } : {},
       index: rowIndex,
       title: itemTitleField && row ? resolveReportFillFieldDisplayValue(row, {
         sourceField: itemTitleField,
@@ -59951,8 +60179,10 @@ ${indent}${end}`;
   function buildReportFillMarkdownContent(block = {}, dataset = {}, {
     datasetsByAlias = /* @__PURE__ */ new Map()
   } = {}) {
+    if (Object.keys(block.templateRequestInputs || {}).length && !block.datasetRef) throw new Error("Template request inputs require an explicit dataset.");
     const selectedRow = resolveReportFillSelectedRow(dataset, "firstrow");
     const markdown = resolveReportFillTemplateMarkdown(String((block == null ? void 0 : block.markdown) || ""), {
+      templateRequestInputs: block.templateRequestInputs,
       content: {},
       row: selectedRow,
       dataset,
@@ -60023,9 +60253,11 @@ ${indent}${end}`;
     const availableDatasetRefs = Array.from(datasetsById.keys());
     const datasetsByAlias = buildReportFillDatasetAliasMap(datasetsById);
     return (Array.isArray(reportSpec == null ? void 0 : reportSpec.blocks) ? reportSpec.blocks : []).map((block) => {
-      var _a6, _b, _c, _d, _e, _f, _g;
+      var _a6, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
       const normalizedBlock = cloneValue24(block);
       delete normalizedBlock.templateFieldDisplayMap;
+      delete normalizedBlock.markerColors;
+      delete normalizedBlock.templateRequestInputs;
       delete normalizedBlock.itemTitleDisplayKey;
       delete normalizedBlock.itemTitleDisplayValueMap;
       delete normalizedBlock.secondaryDisplayKey;
@@ -60081,7 +60313,7 @@ ${indent}${end}`;
             chartSpec,
             chartModel,
             rowCount: Number(((_f = dataset == null ? void 0 : dataset.provenance) == null ? void 0 : _f.rowCount) || 0),
-            resolvedChart: buildReportFillChartPayload(chartModel, (dataset == null ? void 0 : dataset.rows) || [])
+            resolvedChart: buildReportFillChartPayload(chartModel, (dataset == null ? void 0 : dataset.rows) || [], ((_g = chartModel == null ? void 0 : chartModel.center) == null ? void 0 : _g.datasetRef) ? validateDonutCenterDataset(datasetsById.get(chartModel.center.datasetRef)) : void 0, ((_h = chartModel == null ? void 0 : chartModel.center) == null ? void 0 : _h.datasetRef) ? (_j = (_i = datasetsById.get(chartModel.center.datasetRef)) == null ? void 0 : _i.request) == null ? void 0 : _j.filters : (_k = dataset == null ? void 0 : dataset.request) == null ? void 0 : _k.filters, (_l = dataset == null ? void 0 : dataset.request) == null ? void 0 : _l.filters)
           }
         };
       }
@@ -60090,7 +60322,7 @@ ${indent}${end}`;
           ...normalizedBlock,
           content: {
             geo: cloneValue24((block == null ? void 0 : block.geo) || {}),
-            rowCount: Number(((_g = dataset == null ? void 0 : dataset.provenance) == null ? void 0 : _g.rowCount) || 0),
+            rowCount: Number(((_m = dataset == null ? void 0 : dataset.provenance) == null ? void 0 : _m.rowCount) || 0),
             resolvedGeo: buildReportFillGeoPayload(block, (dataset == null ? void 0 : dataset.rows) || [])
           }
         };
@@ -60235,6 +60467,7 @@ ${indent}${end}`;
     runtimeSelection = {},
     tablePresentations = null
   } = {}) {
+    var _a5, _b, _c, _d, _e, _f, _g, _h, _i;
     const normalizedReportSpec = cloneValue24(reportSpec || {});
     const specHash = buildReportSpecHash(normalizedReportSpec);
     const normalizedScopeParams = normalizeReportSpecScopeParams(normalizedReportSpec);
@@ -60245,6 +60478,17 @@ ${indent}${end}`;
       };
     }
     const calculatedFields = cloneReportCalculatedFields((normalizedReportSpec == null ? void 0 : normalizedReportSpec.calculatedFields) || []);
+    for (const block of (normalizedReportSpec == null ? void 0 : normalizedReportSpec.blocks) || []) {
+      if (((_a5 = block.runtime) == null ? void 0 : _a5.requireCompleteDataset) === true) {
+        const payload2 = datasetPayloads == null ? void 0 : datasetPayloads[block.datasetRef];
+        const source = (_b = normalizedReportSpec.datasets) == null ? void 0 : _b.find((dataset) => dataset.id === block.datasetRef);
+        if (!payload2 || payload2.hasMore !== false || payload2.truncated === true || ((_c = payload2.provenance) == null ? void 0 : _c.hasMore) === true || ((_d = payload2.provenance) == null ? void 0 : _d.truncated) === true || Number((_e = source == null ? void 0 : source.request) == null ? void 0 : _e.offset) > 0) throw new Error("Block requires explicitly complete dataset input.");
+      }
+      const ref = (_g = (_f = block == null ? void 0 : block.chartSpec) == null ? void 0 : _f.center) == null ? void 0 : _g.datasetRef;
+      if (!ref) continue;
+      const payload = datasetPayloads == null ? void 0 : datasetPayloads[ref];
+      if (!payload || payload.hasMore !== false || payload.truncated === true || ((_h = payload.provenance) == null ? void 0 : _h.hasMore) === true || ((_i = payload.provenance) == null ? void 0 : _i.truncated) === true) throw new Error("Donut center requires explicitly complete scalar input.");
+    }
     const datasets = (Array.isArray(normalizedReportSpec == null ? void 0 : normalizedReportSpec.datasets) ? normalizedReportSpec.datasets : []).map((dataset) => buildReportFillDataset(dataset, (datasetPayloads == null ? void 0 : datasetPayloads[normalizeString36(dataset == null ? void 0 : dataset.id)]) || {}, calculatedFields));
     const datasetsById = new Map(datasets.map((dataset) => [dataset.id, dataset]));
     return applyReportTablePresentations({
@@ -60262,10 +60506,77 @@ ${indent}${end}`;
         runtimeSelection
       }),
       diagnostics: datasets.flatMap((dataset) => {
-        var _a5;
-        return ((_a5 = dataset == null ? void 0 : dataset.provenance) == null ? void 0 : _a5.diagnostics) || [];
+        var _a6;
+        return ((_a6 = dataset == null ? void 0 : dataset.provenance) == null ? void 0 : _a6.diagnostics) || [];
       })
     }, tablePresentations);
+  }
+
+  // src/reporting/reportMarkdownEscapes.js
+  function protectReportMarkdownEscapes(value = "") {
+    const source = String(value);
+    let marker = "\uE000";
+    while (source.includes(marker)) marker += "\uE000";
+    const literals = [];
+    const text3 = source.replace(/(`+)([^`]*?)\1|\\([\\`*_{}\[\]()#+\-!|<>.~])/g, (whole, codeMarker, code, literal) => codeMarker ? whole : `${marker}${literals.push(literal) - 1}\uE001`);
+    const restore = (value2) => String(value2).replace(new RegExp(`${marker}(\\d+)\\uE001`, "g"), (_2, index) => literals[Number(index)]);
+    return { text: text3, restore };
+  }
+
+  // src/reporting/reportMarkdownInline.js
+  function parseReportMarkdownInline(value = "") {
+    const escaped = protectReportMarkdownEscapes(value);
+    return escaped.text.split(/(\*\*\*[^*]+?\*\*\*|\*\*[^*]+?\*\*|`[^`]+?`|\*[^*]+?\*)/g).filter(Boolean).map((segment) => {
+      if (segment.startsWith("***") && segment.endsWith("***")) return { text: escaped.restore(segment.slice(3, -3)), fontWeight: "bold italic" };
+      if (segment.startsWith("**") && segment.endsWith("**")) return { text: escaped.restore(segment.slice(2, -2)), fontWeight: "bold" };
+      if (segment.startsWith("*") && segment.endsWith("*")) return { text: escaped.restore(segment.slice(1, -1)), fontWeight: "italic" };
+      if (segment.startsWith("`") && segment.endsWith("`")) return { text: escaped.restore(segment.slice(1, -1)), code: true };
+      return { text: escaped.restore(segment) };
+    });
+  }
+
+  // src/reporting/reportCompositeLayout.js
+  function compositeChildWeights(block, children) {
+    var _a5, _b;
+    const runtime = ((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.runtime) || (block == null ? void 0 : block.runtime) || {};
+    if (runtime.childWeights == null) return null;
+    if (typeof runtime.childWeights !== "object" || Array.isArray(runtime.childWeights)) throw Error("Composite childWeights must be an object");
+    const declared = ((_b = block == null ? void 0 : block.content) == null ? void 0 : _b.childBlockIds) || (block == null ? void 0 : block.childBlockIds) || [];
+    if (Object.keys(runtime.childWeights).length !== declared.length || declared.some((id) => !Number.isFinite(runtime.childWeights[id]) || runtime.childWeights[id] <= 0)) throw Error("Composite childWeights must provide a positive finite weight for every child");
+    const weights = children.map((child) => runtime.childWeights[child.id]);
+    if (weights.some((weight) => !Number.isFinite(weight))) throw Error("Composite child is missing a weight");
+    const total = weights.reduce((sum2, value) => sum2 + value, 0);
+    if (!Number.isFinite(total)) throw Error("Composite childWeights total is invalid");
+    return weights.map((weight) => weight / total);
+  }
+  function compositeBare(block) {
+    var _a5;
+    return (((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.runtime) || (block == null ? void 0 : block.runtime) || {}).chrome === "none";
+  }
+  function compositeWeightedTemplate(block, children, width) {
+    var _a5;
+    const weights = compositeChildWeights(block, children);
+    if (!weights) return null;
+    const runtime = ((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.runtime) || (block == null ? void 0 : block.runtime) || {};
+    const minimum = Number.isFinite(runtime.minColumnWidth) && runtime.minColumnWidth > 0 ? Math.max(40, runtime.minColumnWidth) : 240;
+    const available = Math.max(0, width - 16 * Math.max(0, children.length - 1));
+    if (width > 0 && children.some((child, index) => {
+      var _a6, _b, _c, _d;
+      return ((_d = (_a6 = child == null ? void 0 : child.runtime) == null ? void 0 : _a6.spacerHeight) != null ? _d : (_c = (_b = child == null ? void 0 : child.content) == null ? void 0 : _b.runtime) == null ? void 0 : _c.spacerHeight) == null && weights[index] * available < minimum;
+    })) return "minmax(0, 1fr)";
+    return weights.map((weight) => `minmax(0, ${weight}fr)`).join(" ");
+  }
+
+  // src/reporting/reportExternalLinks.js
+  function reportExternalLinks(block) {
+    var _a5;
+    const links = (((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.runtime) || (block == null ? void 0 : block.runtime) || {}).links;
+    if (links === void 0) return [];
+    if (!Array.isArray(links) || links.length > 16) throw Error("Report external links require at most16 links");
+    return links.map((link) => {
+      if (!link || typeof link !== "object" || Array.isArray(link) || Object.keys(link).some((key2) => !["label", "url"].includes(key2)) || typeof link.label !== "string" || !link.label.trim() || typeof link.url !== "string" || link.url.length > 2048 || !/^https?:\/\/[^\s/?#@]+(?:[/?#][^\s]*)?$/.test(link.url)) throw Error("Report external link requires a label and absolute HTTP(S) URL without credentials");
+      return { label: link.label, url: link.url };
+    });
   }
 
   // src/reporting/reportPrintLabels.js
@@ -60363,10 +60674,57 @@ ${indent}${end}`;
   }
 
   // src/components/chartTheme.js
+  var LEGACY_CHART_ROLE_BY_COLOR = /* @__PURE__ */ new Map([
+    ["#1f77b4", 1],
+    ["#ff7f0e", 2],
+    ["#2ca02c", 3],
+    ["#d62728", 4],
+    ["#9467bd", 5],
+    ["#8c564b", 6],
+    ["#2f6de1", 1],
+    ["#7a46d8", 2],
+    ["#db2f7d", 3],
+    ["#f55d1f", 4],
+    ["#d79619", 5],
+    ["#2aa84a", 6],
+    ["#137cbd", 1],
+    ["#0f9960", 2],
+    ["#d9822b", 3],
+    ["#8f398f", 4],
+    ["#c23030", 5],
+    ["#5c7080", 6]
+  ]);
+  function normalizedColor(value) {
+    return String(value || "").trim().toLowerCase();
+  }
+  function chartSeriesColor(role, fallback) {
+    const normalizedRole = ((Number(role) || 1) - 1) % 6 + 1;
+    return `var(--forge-chart-series-${normalizedRole}, ${fallback})`;
+  }
+  function resolveThemeAwareChartColor(value, index = 0, { forceRole = false, declared = false } = {}) {
+    const color = String(value || "").trim();
+    if (declared) {
+      if (!/^#[0-9a-f]{6}$/i.test(color)) throw new Error("Declared chart colors must be six-digit hex colors.");
+      return color;
+    }
+    if (!color || color.startsWith("var(")) return color;
+    const mappedRole = LEGACY_CHART_ROLE_BY_COLOR.get(normalizedColor(color));
+    if (!mappedRole && !forceRole) return color;
+    return chartSeriesColor(mappedRole || index % 6 + 1, color);
+  }
   function resolveCategoryColor(colors, category, fallback) {
     const key2 = String(category != null ? category : "").trim().toLowerCase();
     const entry = Object.entries(colors || {}).find(([name]) => name.trim().toLowerCase() === key2);
     return typeof (entry == null ? void 0 : entry[1]) === "string" && entry[1].trim() ? entry[1].trim() : fallback;
+  }
+  function resolveChartCategoryColor(chart, category, fallback) {
+    var _a5, _b;
+    if ((chart == null ? void 0 : chart.paletteMode) !== "declared") return resolveCategoryColor((_a5 = chart == null ? void 0 : chart.series) == null ? void 0 : _a5.categoryColors, category, fallback);
+    const key2 = String(category != null ? category : "");
+    const colors = ((_b = chart.series) == null ? void 0 : _b.categoryColors) || {};
+    if (Object.hasOwn(colors, key2)) return resolveThemeAwareChartColor(colors[key2], 0, { declared: true });
+    if (["pie", "donut"].includes(chart.type)) throw new Error("Declared category palettes require a color for every category.");
+    return fallback;
   }
 
   // src/reporting/reportChartAnnotations.js
@@ -60590,7 +60948,7 @@ ${indent}${end}`;
     }
     if (normalizeString39(resolvedChart == null ? void 0 : resolvedChart.kind) === "groupedSeries") {
       return (Array.isArray(resolvedChart == null ? void 0 : resolvedChart.seriesKeys) ? resolvedChart.seriesKeys : []).map((seriesKey, index) => {
-        var _a6, _b;
+        var _a6;
         const normalizedKey = normalizeString39(seriesKey);
         if (!normalizedKey) {
           return null;
@@ -60599,8 +60957,8 @@ ${indent}${end}`;
           key: normalizedKey,
           label: normalizedKey,
           type: chartType,
-          color: printColor(resolveCategoryColor((_a6 = chartModel == null ? void 0 : chartModel.series) == null ? void 0 : _a6.categoryColors, normalizedKey, palette[index % palette.length])),
-          format: normalizeString39((_b = chartModel == null ? void 0 : chartModel.yAxis) == null ? void 0 : _b.format),
+          color: printColor(resolveChartCategoryColor(chartModel, normalizedKey, palette[index % palette.length])),
+          format: normalizeString39((_a6 = chartModel == null ? void 0 : chartModel.yAxis) == null ? void 0 : _a6.format),
           dataLabels: "",
           pointColorMode: ""
         };
@@ -60611,7 +60969,8 @@ ${indent}${end}`;
   function resolveCategorySlices(resolvedChart = {}) {
     return (Array.isArray(resolvedChart == null ? void 0 : resolvedChart.rows) ? resolvedChart.rows : []).map((row) => ({
       name: normalizeString39(row == null ? void 0 : row.name),
-      value: normalizeNumber2(row == null ? void 0 : row.value) || 0
+      value: normalizeNumber2(row == null ? void 0 : row.value) || 0,
+      ...Object.hasOwn(row || {}, "sliceLabel") ? { sliceLabel: row.sliceLabel } : {}
     })).filter((entry) => entry.name);
   }
   function resolveCartesianRows(resolvedChart = {}) {
@@ -61155,11 +61514,10 @@ ${indent}${end}`;
     const innerRadius = chartType === "donut" ? r2 * (center ? 0.7 : 0.56) : 0;
     let startAngle = -Math.PI / 2;
     const paths = slices.map((slice, index) => {
-      var _a5;
       const fraction = slice.value / total;
       const angle = fraction * 2 * Math.PI;
       const endAngle = startAngle + angle;
-      const fill = printColor(resolveCategoryColor((_a5 = chartModel == null ? void 0 : chartModel.series) == null ? void 0 : _a5.categoryColors, slice.name, palette[index % palette.length]));
+      const fill = printColor(resolveChartCategoryColor(chartModel, slice.name, palette[index % palette.length]));
       const outerPath = (() => {
         if (slices.length === 1) {
           return `<circle cx="${cx}" cy="${cy}" r="${r2}" fill="${escapeXml(fill)}" />`;
@@ -61192,13 +61550,13 @@ ${indent}${end}`;
     const legendX = size + 20;
     const legendY = 18;
     const legend = slices.map((slice, index) => {
-      var _a5;
-      const fill = printColor(resolveCategoryColor((_a5 = chartModel == null ? void 0 : chartModel.series) == null ? void 0 : _a5.categoryColors, slice.name, palette[index % palette.length]));
+      const fill = printColor(resolveChartCategoryColor(chartModel, slice.name, palette[index % palette.length]));
       const pct = (slice.value / total * 100).toFixed(0);
+      const label = chartModel.sliceLabel ? slice.sliceLabel == null ? "" : ` \u2014 ${slice.sliceLabel}` : ` \u2014 ${pct}%`;
       const y4 = legendY + index * 20;
       return `
       <rect x="${legendX}" y="${y4}" width="12" height="12" rx="2" fill="${escapeXml(fill)}" />
-      <text x="${legendX + 18}" y="${y4 + 11}" font-size="11" fill="#344054">${escapeXml(slice.name)} \u2014 ${escapeXml(pct)}%</text>
+      <text x="${legendX + 18}" y="${y4 + 11}" font-size="11" fill="#344054">${escapeXml(slice.name)}${escapeXml(label)}</text>
     `;
     }).join("\n");
     const centerGraphic = center ? donutCenterSvg(center, cx, cy, innerRadius) : null;
@@ -61542,7 +61900,6 @@ ${indent}${end}`;
       });
     }).join("\n");
     const renderedSeries = seriesDescriptors.map((series, seriesIndex) => rows.map((row, rowIndex) => {
-      var _a5;
       const value = normalizeNumber2(row == null ? void 0 : row[series.key]);
       if (value == null) {
         return "";
@@ -61554,7 +61911,7 @@ ${indent}${end}`;
       const barWidth = Math.max(1, Math.abs(valueX - baselineX));
       const labelX = value >= 0 ? valueX + 6 : valueX - 6;
       const labelAnchor = value >= 0 ? "start" : "end";
-      const fillColor = printColor(resolveCategoryColor((_a5 = chartModel == null ? void 0 : chartModel.series) == null ? void 0 : _a5.categoryColors, readChartDataValue(row, xAxisKey), resolveSeriesPointColor(series, value, series.color)));
+      const fillColor = printColor(resolveChartCategoryColor(chartModel, readChartDataValue(row, xAxisKey), resolveSeriesPointColor(series, value, series.color)));
       const valueLabel = shouldRenderReportPrintSeriesDataLabels(series, "horizontal_bar", rows.length) ? `<text x="${labelX}" y="${barY + perSeriesHeight - 2}" text-anchor="${labelAnchor}" font-size="10" fill="#667085">${escapeXml(formatSeriesDataLabel(value, series.format))}</text>` : "";
       return `
         <path class="forge-chart-bar" d="${buildChartBarPath({ x: x2, y: barY, width: barWidth, height: perSeriesHeight, value })}" fill="${escapeXml(fillColor)}" />
@@ -67501,6 +67858,12 @@ ${indent}${end}`;
       ...next,
       text: text3
     };
+    if (Object.hasOwn(element, "textRuns")) {
+      if (!Array.isArray(element.textRuns) || !element.textRuns.length || element.textRuns.some((run) => !run || typeof run !== "object" || Array.isArray(run) || typeof run.text !== "string" || !run.text || run.text.includes("\r") || Object.keys(run).some((key2) => !["text", "fontWeight"].includes(key2)) || run.fontWeight !== void 0 && typeof run.fontWeight !== "string")) throw new Error("Invalid print text runs.");
+      if (element.textRuns.map((run) => run.text).join("") !== String(element.text)) throw new Error("Print text runs must concatenate to text.");
+      result.textRuns = element.textRuns.map((run) => ({ text: normalizeReportPrintText(run.text), ...run.fontWeight ? { fontWeight: run.fontWeight } : {} }));
+      if (result.textRuns.map((run) => run.text).join("") !== text3) throw new Error("Print text normalization crosses run boundaries.");
+    }
     const fontFamily = normalizeString41(element == null ? void 0 : element.fontFamily);
     const fontWeight = normalizeString41(element == null ? void 0 : element.fontWeight);
     const color = normalizeString41(element == null ? void 0 : element.color);
@@ -67928,8 +68291,45 @@ ${indent}${end}`;
       (Array.isArray((_a5 = reportSpec == null ? void 0 : reportSpec.layoutIntent) == null ? void 0 : _a5.items) ? reportSpec.layoutIntent.items : []).map((item) => [normalizeString41(item == null ? void 0 : item.blockId), resolveReportLayoutSpan(item)]).filter(([blockId]) => !!blockId)
     );
   }
+  function buildReportPrintMarkdownLines(markdown, width, fontSize = REPORT_PRINT_THEME.bodyFontSize) {
+    var _a5;
+    const output = [];
+    for (const rawLine of String(markdown).replace(/\r\n/g, "\n").trim().split("\n")) {
+      const protectedLine = protectReportMarkdownEscapes(rawLine);
+      const line = protectedLine.text.replace(/!?(?:\[([^\]]+)\])\([^\)]+\)/g, "$1").replace(/^\s{0,3}#{1,6}\s*/, "").replace(/^\s*[-*+]\s+/, "").replace(/^\s*\d+\.\s+/, "");
+      const runs = parseReportMarkdownInline(line).map((run) => ({ ...run, text: normalizeReportPrintText(protectedLine.restore(run.text)) }));
+      const characters = [];
+      for (const run of runs) for (const character of run.text.split("")) {
+        if (/\s/.test(character)) {
+          if (characters.length && characters[characters.length - 1].text !== " ") characters.push({ text: " ", fontWeight: run.fontWeight || "normal" });
+        } else characters.push({ text: character, fontWeight: run.fontWeight || "normal" });
+      }
+      while (((_a5 = characters[characters.length - 1]) == null ? void 0 : _a5.text) === " ") characters.pop();
+      const plain = characters.map((entry) => entry.text).join("");
+      if (!plain) {
+        output.push({ text: "" });
+        continue;
+      }
+      let cursor = 0;
+      for (const wrapped of wrapReportPrintText(plain, width, fontSize)) {
+        const start = plain.indexOf(wrapped, cursor);
+        const selected = characters.slice(start, start + wrapped.length);
+        cursor = start + wrapped.length;
+        const textRuns = [];
+        for (const character of selected) {
+          const prior = textRuns[textRuns.length - 1];
+          if ((prior == null ? void 0 : prior.fontWeight) === character.fontWeight) prior.text += character.text;
+          else textRuns.push({ ...character });
+        }
+        const styled = textRuns.some((run) => run.fontWeight !== "normal");
+        output.push({ text: wrapped, ...styled ? textRuns.length === 1 ? { fontWeight: textRuns[0].fontWeight } : { textRuns } : {} });
+      }
+    }
+    return output;
+  }
   function normalizeMarkdownToPlainText(markdown = "") {
-    return String(markdown || "").replace(/\r\n/g, "\n").replace(/!?(?:\[([^\]]+)\])\([^\)]+\)/g, "$1").replace(/(\*\*|__)(.+?)\1/g, "$2").replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, "$1").replace(/(?<!_)_([^_]+)_(?!_)/g, "$1").replace(/`([^`]+)`/g, "$1").split("\n").map((line) => line.replace(/^\s{0,3}#{1,6}\s*/, "").replace(/^\s*[-*+]\s+/, "").replace(/^\s*\d+\.\s+/, "").trimEnd()).join("\n").trim();
+    const escaped = protectReportMarkdownEscapes(markdown || "");
+    return escaped.restore(escaped.text.replace(/\r\n/g, "\n").replace(/!?(?:\[([^\]]+)\])\([^\)]+\)/g, "$1").replace(/\*\*\*([^*]+?)\*\*\*/g, "$1").replace(/(\*\*|__)(.+?)\1/g, "$2").replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, "$1").replace(/(?<!_)_([^_]+)_(?!_)/g, "$1").replace(/`([^`]+)`/g, "$1").split("\n").map((line) => line.replace(/^\s{0,3}#{1,6}\s*/, "").replace(/^\s*[-*+]\s+/, "").replace(/^\s*\d+\.\s+/, "").trimEnd()).join("\n").trim());
   }
   function formatReportPrintValue(value, format2 = "") {
     return normalizePresentationText(formatExportValue(value, format2));
@@ -68215,12 +68615,13 @@ ${indent}${end}`;
       if (!line && line !== "") {
         return;
       }
-      if (line === "") {
+      if (line === "" || (line == null ? void 0 : line.text) === "") {
         ensureLineSpace(lineHeight / 2);
         state.cursorY += lineHeight / 2;
         return;
       }
-      wrapReportPrintText(line, boxWidth, fontSize).forEach((wrappedLine) => {
+      const styledLine = line && typeof line === "object" ? line : null;
+      (styledLine ? [styledLine.text] : wrapReportPrintText(line, boxWidth, fontSize)).forEach((wrappedLine) => {
         ensureLineSpace(lineHeight);
         const element = pushReportPrintElement(state, buildReportPrintTextElement({
           id: `${idPrefix}_${sequence}`,
@@ -68232,8 +68633,10 @@ ${indent}${end}`;
             height: lineHeight
           },
           text: wrappedLine,
+          ...(styledLine == null ? void 0 : styledLine.textRuns) ? { textRuns: styledLine.textRuns } : {},
           fontSize,
           ...fontWeight ? { fontWeight } : {},
+          ...(styledLine == null ? void 0 : styledLine.fontWeight) ? { fontWeight: styledLine.fontWeight } : {},
           ...color ? { color } : {},
           ...align ? { align } : {}
         }));
@@ -68247,6 +68650,7 @@ ${indent}${end}`;
     return firstElement;
   }
   function reportPrintTitleHeight(state, block, layoutNote = "") {
+    if (compositeBare(block)) return 0;
     return wrapReportPrintText(resolveReportPrintBlockTitle(block), state.contentWidth, REPORT_PRINT_THEME.titleFontSize).length * REPORT_PRINT_THEME.titleLineHeight + (layoutNote ? wrapReportPrintText(layoutNote, state.contentWidth, REPORT_PRINT_THEME.warningFontSize).length * REPORT_PRINT_THEME.warningLineHeight : 0) + 4;
   }
   function renderReportPrintSectionTitle(state = {}, block = {}, {
@@ -68254,6 +68658,7 @@ ${indent}${end}`;
     continuation = false
   } = {}) {
     var _a5, _b, _c;
+    if (compositeBare(block)) return null;
     const title = resolveReportPrintBlockTitle(block);
     const blockId = normalizeString41((block == null ? void 0 : block.id) || (block == null ? void 0 : block.kind) || "block");
     const idSuffix = continuation ? `_page_${(_a5 = state.currentPage) == null ? void 0 : _a5.number}` : "";
@@ -68349,13 +68754,14 @@ ${indent}${end}`;
   function renderReportPrintGridRow(state = {}, entries = []) {
     const rowEntries = (Array.isArray(entries) ? entries : []).filter((entry) => !!(entry == null ? void 0 : entry.block) && Number.isFinite(entry == null ? void 0 : entry.span) && entry.span > 0).map((entry) => ({
       block: entry.block,
-      span: Math.max(1, Math.min(REPORT_LAYOUT_GRID_COLUMNS, Math.trunc(entry.span)))
+      span: Math.max(1, Math.min(REPORT_LAYOUT_GRID_COLUMNS, Math.trunc(entry.span))),
+      fraction: entry.fraction
     }));
     if (rowEntries.length === 0) {
       return;
     }
     ensureReportPrintPage(state);
-    if (rowEntries.length > 1 && state.cursorY > state.contentTop) {
+    if (rowEntries.length > 1 && state.cursorY > state.contentTop + (state.sectionHeadingHeight || 0)) {
       const probe = { ...state, pages: [], bookmarks: [], diagnostics: [], currentPage: null, currentPageIndex: null };
       moveToReportPrintPage(probe, 0);
       probe.cursorY = state.cursorY;
@@ -68374,15 +68780,18 @@ ${indent}${end}`;
       (state.contentWidth - REPORT_PRINT_THEME.columnGap * (REPORT_LAYOUT_GRID_COLUMNS - 1)) / REPORT_LAYOUT_GRID_COLUMNS
     );
     let consumedColumns = 0;
+    let consumedWidth = 0;
+    const weightedWidth = state.contentWidth - REPORT_PRINT_THEME.columnGap * (rowEntries.length - 1);
     const childStates = rowEntries.map((entry) => {
       const span = Math.max(1, Math.min(REPORT_LAYOUT_GRID_COLUMNS - consumedColumns, entry.span));
       const childState = buildScopedReportPrintState(state, {
-        contentLeft: state.contentLeft + consumedColumns * (unitWidth + REPORT_PRINT_THEME.columnGap),
-        contentWidth: unitWidth * span + REPORT_PRINT_THEME.columnGap * Math.max(0, span - 1),
+        contentLeft: state.contentLeft + (entry.fraction ? consumedWidth : consumedColumns * (unitWidth + REPORT_PRINT_THEME.columnGap)),
+        contentWidth: entry.fraction ? weightedWidth * entry.fraction : unitWidth * span + REPORT_PRINT_THEME.columnGap * Math.max(0, span - 1),
         startPageIndex: startPosition.pageIndex,
         startCursorY: startPosition.cursorY
       });
       consumedColumns += span;
+      if (entry.fraction) consumedWidth += weightedWidth * entry.fraction + REPORT_PRINT_THEME.columnGap;
       return childState;
     });
     childStates.forEach((childState, index) => {
@@ -68455,7 +68864,7 @@ ${indent}${end}`;
     layoutNote = ""
   } = {}) {
     const titleHeight = reportPrintTitleHeight(state, block, layoutNote);
-    const bodyHeight = lines2.reduce((height, line) => height + (line === "" ? REPORT_PRINT_THEME.bodyLineHeight / 2 : wrapReportPrintText(line, state.contentWidth).length * REPORT_PRINT_THEME.bodyLineHeight), 0);
+    const bodyHeight = lines2.reduce((height, line) => height + (line === "" || (line == null ? void 0 : line.text) === "" ? REPORT_PRINT_THEME.bodyLineHeight / 2 : (typeof line === "object" ? 1 : wrapReportPrintText(line, state.contentWidth).length) * REPORT_PRINT_THEME.bodyLineHeight), 0);
     const sectionHeight = titleHeight + bodyHeight;
     ensureReportPrintSpace(state, sectionHeight <= state.contentBottom - state.contentTop ? sectionHeight : titleHeight + REPORT_PRINT_THEME.bodyLineHeight);
     renderReportPrintSectionTitle(state, block, { layoutNote });
@@ -68468,8 +68877,8 @@ ${indent}${end}`;
   }
   function renderReportPrintMarkdownBlock(state = {}, block = {}, options = {}) {
     var _a5;
-    const markdown = normalizeMarkdownToPlainText(((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.markdown) || (block == null ? void 0 : block.markdown) || "");
-    const lines2 = markdown ? markdown.split("\n") : ["No narrative content."];
+    const markdown = String(((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.markdown) || (block == null ? void 0 : block.markdown) || "");
+    const lines2 = [...markdown ? buildReportPrintMarkdownLines(markdown, state.contentWidth) : ["No narrative content."], ...reportExternalLinks(block).map((link) => `${link.label}: ${link.url}`)];
     renderReportPrintTextSectionBlock(state, block, lines2, options);
   }
   function renderReportPrintFilterBarBlock(state = {}, block = {}, options = {}) {
@@ -68672,9 +69081,16 @@ ${indent}${end}`;
   function renderReportPrintCompositeBlock(state = {}, block = {}, {
     layoutNote = ""
   } = {}) {
-    var _a5, _b, _c;
-    renderReportPrintSectionTitle(state, block, { layoutNote });
-    const description = normalizeString41(((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.description) || (block == null ? void 0 : block.description));
+    var _a5, _b, _c, _d;
+    const spacerHeight = (((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.runtime) || (block == null ? void 0 : block.runtime) || {}).spacerHeight;
+    if (Number.isFinite(spacerHeight) && spacerHeight >= 0) {
+      ensureReportPrintPage(state);
+      ensureReportPrintSpace(state, spacerHeight);
+      state.cursorY = Math.min(state.contentBottom, state.cursorY + spacerHeight);
+      return;
+    }
+    if (!compositeBare(block)) renderReportPrintSectionTitle(state, block, { layoutNote });
+    const description = normalizeString41(((_b = block == null ? void 0 : block.content) == null ? void 0 : _b.description) || (block == null ? void 0 : block.description));
     if (description) {
       renderReportPrintTextLines(state, {
         idPrefix: `${normalizeString41((block == null ? void 0 : block.id) || "composite")}__description`,
@@ -68683,7 +69099,7 @@ ${indent}${end}`;
       });
       state.cursorY += 4;
     }
-    const childBlockIds = Array.isArray((_b = block == null ? void 0 : block.content) == null ? void 0 : _b.childBlockIds) ? block.content.childBlockIds : Array.isArray(block == null ? void 0 : block.childBlockIds) ? block.childBlockIds : [];
+    const childBlockIds = Array.isArray((_c = block == null ? void 0 : block.content) == null ? void 0 : _c.childBlockIds) ? block.content.childBlockIds : Array.isArray(block == null ? void 0 : block.childBlockIds) ? block.childBlockIds : [];
     const childBlocks = childBlockIds.filter((blockId) => state.visibleBlockIds.has(normalizeString41(blockId))).map((blockId) => state.blocksById.get(normalizeString41(blockId)) || null).filter(Boolean);
     if (childBlocks.length === 0) {
       renderReportPrintTextLines(state, {
@@ -68694,7 +69110,18 @@ ${indent}${end}`;
       finishReportPrintBlock(state);
       return;
     }
-    const authoredLayout = normalizeString41(((_c = block == null ? void 0 : block.content) == null ? void 0 : _c.layout) || (block == null ? void 0 : block.layout));
+    const authoredLayout = normalizeString41(((_d = block == null ? void 0 : block.content) == null ? void 0 : _d.layout) || (block == null ? void 0 : block.layout));
+    const weights = compositeChildWeights(block, childBlocks);
+    if (weights) {
+      if (compositeWeightedTemplate(block, childBlocks, state.contentWidth) === "minmax(0, 1fr)") {
+        childBlocks.forEach((child) => renderReportPrintBlock(state, child, {}));
+        finishReportPrintBlock(state);
+        return;
+      }
+      renderReportPrintGridRow(state, childBlocks.map((child, index) => ({ block: child, span: 1, fraction: weights[index] })));
+      finishReportPrintBlock(state);
+      return;
+    }
     const layout = authoredLayout === "responsiveGrid" ? "responsiveGrid" : "stack";
     if (authoredLayout === "stack") {
       childBlocks.forEach((childBlock) => renderReportPrintBlock(state, childBlock, {}));
@@ -68933,7 +69360,7 @@ ${indent}${end}`;
       const layouts = rowItems.map((item, columnIndex) => {
         const innerWidth = Math.max(1, cardWidth - padding * 2);
         const toneLabel = normalizeString41((item == null ? void 0 : item.toneLabel) || (item == null ? void 0 : item.tone)).toUpperCase();
-        const titleWidth = Math.max(80, innerWidth - (toneLabel ? 58 : 0));
+        const titleWidth = Math.max(80, innerWidth - (toneLabel ? 58 : 0) - (item.markerColor ? 16 : 0));
         const titleLines = wrapReportPrintText(normalizeString41((item == null ? void 0 : item.title) || `Item ${rowIndex * columns + columnIndex + 1}`), titleWidth, 11);
         const detailLines = [];
         if (normalizeString41((item == null ? void 0 : item.valueField) || (item == null ? void 0 : item.valueLabel))) {
@@ -68942,8 +69369,10 @@ ${indent}${end}`;
         if (normalizeString41((item == null ? void 0 : item.secondaryField) || (item == null ? void 0 : item.secondaryLabel))) {
           detailLines.push(`${normalizeString41((item == null ? void 0 : item.secondaryLabel) || (item == null ? void 0 : item.secondaryField))}: ${formatReportPrintValue(item == null ? void 0 : item.secondaryValue, normalizeString41(item == null ? void 0 : item.secondaryFormat))}`);
         }
-        detailLines.push(...normalizeMarkdownToPlainText((item == null ? void 0 : item.bodyMarkdown) || "").split("\n").map((entry) => normalizeString41(entry)).filter(Boolean));
-        const bodyLines = detailLines.flatMap((line) => wrapReportPrintText(line, innerWidth, 9));
+        const bodyLines = [
+          ...detailLines.flatMap((line) => wrapReportPrintText(line, innerWidth, 9).map((text3) => ({ text: text3 }))),
+          ...String((item == null ? void 0 : item.bodyMarkdown) || "").trim() ? buildReportPrintMarkdownLines(item.bodyMarkdown, innerWidth, 9) : []
+        ];
         return {
           item,
           toneLabel,
@@ -68978,15 +69407,16 @@ ${indent}${end}`;
           radius: 2
         }));
         let textY = rowY + padding;
+        if (item.markerColor) pushReportPrintElement(state, buildReportPrintRectElement({ id: `${blockId}__marker_${rowIndex}_${columnIndex}`, kind: "rect", box: { x: cardX + padding, y: textY + 2, width: 10, height: 10 }, fillColor: item.markerColor }));
         layout.titleLines.forEach((line, lineIndex) => {
           pushReportPrintElement(state, buildReportPrintTextElement({
             id: `${blockId}__card_${rowIndex}_${columnIndex}__title_${lineIndex}`,
             kind: "text",
-            box: { x: cardX + padding, y: textY, width: cardWidth - padding * 2 - (layout.toneLabel ? 58 : 0), height: 14 },
+            box: { x: cardX + padding + (item.markerColor ? 16 : 0), y: textY, width: cardWidth - padding * 2 - (layout.toneLabel ? 58 : 0) - (item.markerColor ? 16 : 0), height: 14 },
             text: line,
             fontSize: 11,
             fontWeight: "600",
-            color: accentColor
+            color: normalizeString41(item == null ? void 0 : item.textColor) || REPORT_PRINT_THEME.titleColor
           }));
           textY += 14;
         });
@@ -69008,7 +69438,7 @@ ${indent}${end}`;
             id: `${blockId}__card_${rowIndex}_${columnIndex}__body_${lineIndex}`,
             kind: "text",
             box: { x: cardX + padding, y: textY, width: cardWidth - padding * 2, height: 13 },
-            text: line,
+            ...line,
             fontSize: 9,
             color: REPORT_PRINT_THEME.bodyColor
           }));
@@ -69569,7 +69999,7 @@ ${indent}${end}`;
   function renderReportPrintChartBlock(state = {}, block = {}, {
     layoutNote = ""
   } = {}) {
-    var _a5, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u;
+    var _a5, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y;
     const datasetRef = normalizeString41(block == null ? void 0 : block.datasetRef);
     const declared = (Array.isArray((_a5 = state.reportSpec) == null ? void 0 : _a5.datasets) ? state.reportSpec.datasets : []).some((dataset2) => (dataset2 == null ? void 0 : dataset2.id) === datasetRef);
     const dataset = (Array.isArray((_b = state.reportFill) == null ? void 0 : _b.datasets) ? state.reportFill.datasets : []).find((dataset2) => (dataset2 == null ? void 0 : dataset2.id) === datasetRef);
@@ -69578,14 +70008,16 @@ ${indent}${end}`;
       ensureReportPrintSpace(state, reportPrintTitleHeight(state, block, layoutNote) + REPORT_PRINT_THEME.bodyLineHeight);
       renderReportPrintSectionTitle(state, block, { layoutNote });
       renderReportPrintTextLines(state, { idPrefix: `${normalizeString41(block.id)}__empty`, lines: ["No data for the selected scope."], color: REPORT_PRINT_THEME.mutedColor });
+      const requestDetails = chartTooltipPrintLines((_i = (_h = block == null ? void 0 : block.content) == null ? void 0 : _h.chartModel) == null ? void 0 : _i.tooltip, (_k = (_j = block == null ? void 0 : block.content) == null ? void 0 : _j.resolvedChart) == null ? void 0 : _k.tooltipEntries);
+      if (requestDetails.length) renderReportPrintTextLines(state, { idPrefix: `${block.id}__tooltip_details`, lines: requestDetails, fontSize: 9, lineHeight: 12 });
       finishReportPrintBlock(state);
       return;
     }
     const titleHeight = reportPrintTitleHeight(state, block, layoutNote);
     const chartPages = buildReportPrintChartPages({
-      chartModel: ((_h = block == null ? void 0 : block.content) == null ? void 0 : _h.chartModel) || (block == null ? void 0 : block.chartModel) || {},
-      resolvedChart: ((_i = block == null ? void 0 : block.content) == null ? void 0 : _i.resolvedChart) || null,
-      rowLimit: (_l = (_k = (_j = block == null ? void 0 : block.content) == null ? void 0 : _j.rowLimit) != null ? _k : block == null ? void 0 : block.rowLimit) != null ? _l : 0,
+      chartModel: ((_l = block == null ? void 0 : block.content) == null ? void 0 : _l.chartModel) || (block == null ? void 0 : block.chartModel) || {},
+      resolvedChart: ((_m = block == null ? void 0 : block.content) == null ? void 0 : _m.resolvedChart) || null,
+      rowLimit: (_p = (_o = (_n = block == null ? void 0 : block.content) == null ? void 0 : _n.rowLimit) != null ? _o : block == null ? void 0 : block.rowLimit) != null ? _p : 0,
       width: state.contentWidth,
       maxHeight: state.contentBottom - state.contentTop - titleHeight,
       firstMaxHeight: state.contentBottom - state.cursorY - titleHeight >= 180 ? state.contentBottom - state.cursorY - titleHeight : state.contentBottom - state.contentTop - titleHeight - (state.sectionHeadingHeight || 0)
@@ -69615,7 +70047,7 @@ ${indent}${end}`;
       }
       ensureReportPrintSpace(state, chartHeight);
       const svgElement = pushReportPrintElement(state, buildReportPrintSvgElement({
-        id: `${normalizeString41((block == null ? void 0 : block.id) || "chart")}__svg_page_${(_m = state.currentPage) == null ? void 0 : _m.number}`,
+        id: `${normalizeString41((block == null ? void 0 : block.id) || "chart")}__svg_page_${(_q = state.currentPage) == null ? void 0 : _q.number}`,
         kind: "svg",
         box: {
           x: state.contentLeft,
@@ -69624,7 +70056,7 @@ ${indent}${end}`;
           height: chartHeight
         },
         svg: svgResult.svg,
-        ...Number.isInteger(svgResult.sourceRowCount) && svgResult.sourceRowCount > 0 && (chartPages.length > 1 || svgResult.sourceRowCount < (((_p = (_o = (_n = block == null ? void 0 : block.content) == null ? void 0 : _n.resolvedChart) == null ? void 0 : _o.rows) == null ? void 0 : _p.length) || 0)) ? { chartSource: {
+        ...Number.isInteger(svgResult.sourceRowCount) && svgResult.sourceRowCount > 0 && (chartPages.length > 1 || svgResult.sourceRowCount < (((_t = (_s = (_r = block == null ? void 0 : block.content) == null ? void 0 : _r.resolvedChart) == null ? void 0 : _s.rows) == null ? void 0 : _t.length) || 0)) ? { chartSource: {
           blockId: block.id,
           rowOffset: svgResult.sourceRowOffset || 0,
           rowCount: svgResult.sourceRowCount,
@@ -69640,12 +70072,12 @@ ${indent}${end}`;
           elementId: svgElement == null ? void 0 : svgElement.id
         });
       });
-      if ((_q = svgResult.labelDetails) == null ? void 0 : _q.length) {
+      if ((_u = svgResult.labelDetails) == null ? void 0 : _u.length) {
         renderReportPrintTextLines(state, { idPrefix: `${block.id}__labels_${pageIndex}`, lines: svgResult.labelDetails, fontSize: 9, lineHeight: 12 });
       }
       finishReportPrintBlock(state);
     }
-    const tooltipLines = chartTooltipPrintLines((_s = (_r = block == null ? void 0 : block.content) == null ? void 0 : _r.chartModel) == null ? void 0 : _s.tooltip, (_u = (_t = block == null ? void 0 : block.content) == null ? void 0 : _t.resolvedChart) == null ? void 0 : _u.tooltipEntries);
+    const tooltipLines = chartTooltipPrintLines((_w = (_v = block == null ? void 0 : block.content) == null ? void 0 : _v.chartModel) == null ? void 0 : _w.tooltip, (_y = (_x = block == null ? void 0 : block.content) == null ? void 0 : _x.resolvedChart) == null ? void 0 : _y.tooltipEntries);
     if (tooltipLines.length) {
       renderReportPrintTextLines(state, { idPrefix: `${block.id}__tooltip_details`, lines: tooltipLines, fontSize: 9, lineHeight: 12 });
       finishReportPrintBlock(state);

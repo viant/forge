@@ -1,3 +1,4 @@
+import {resolvePieSliceLabel} from '../components/pieSliceLabel.js';
 import {buildChartTooltipEntries,chartTooltipPieFields} from '../components/chartTooltip.js';
 import {resolveDonutCenter} from '../components/donutCenter.js';
 import {buildCategoryRange,categoryRangeFields} from '../components/categoryRange.js';
@@ -29,7 +30,7 @@ function cloneChartRows(rows = []) {
   return (Array.isArray(rows) ? rows : []).map((row) => cloneValue(row));
 }
 
-function buildBaseReportFillChartPayload(chart = {}, rows = []) {
+function buildBaseReportFillChartPayload(chart = {}, rows = [], centerRows, centerInputs, requestFilters) {
   const type = normalizeString(chart?.type).toLowerCase();
   if(type === "category-range") {
     const model=buildCategoryRange(chart.categoryRange,rows);
@@ -39,9 +40,9 @@ function buildBaseReportFillChartPayload(chart = {}, rows = []) {
     buildHeatmap(chart.heatmap,rows);
     return {kind:"heatmap",type,seriesKeys:[chart.heatmap.valueField],rows:cloneChartRows(rows)};
   }
-  const center=resolveDonutCenter(chart.center,rows,type);
+  const center=resolveDonutCenter(chart.center,rows,type,centerRows,centerInputs);
   const chartRows = materializeChartDisplayRows(chart, rows);
-  if (!type || (chartRows.length === 0&&!center)) {
+  if (!type || (chartRows.length === 0&&!center&&!chart.tooltip?.lines?.some(line=>line.some(segment=>segment.input)))) {
     return null;
   }
   if (type === "pie" || type === "donut") {
@@ -51,6 +52,7 @@ function buildBaseReportFillChartPayload(chart = {}, rows = []) {
       return null;
     }
     const resolvedRows = buildPieChartData(chartRows, nameKey, valueKey, chartCategoryRowOptions(chart));
+    if(chart.sliceLabel)for(const row of resolvedRows)row.sliceLabel=resolvePieSliceLabel(chart.sliceLabel,row.__chartSelectionRows||[]);
     return {
       kind: "category",
       ...(center?{center}:{}),
@@ -97,12 +99,12 @@ function buildBaseReportFillChartPayload(chart = {}, rows = []) {
   };
 }
 
-export function buildReportFillChartPayload(chart = {}, rows = []) {
+export function buildReportFillChartPayload(chart = {}, rows = [], centerRows, centerInputs, requestFilters) {
   // An authored chart may not compile yet; retain the legacy absent-model result.
   if (chart == null) return null;
-  const result = buildBaseReportFillChartPayload(chart, rows);
+  const result = buildBaseReportFillChartPayload(chart, rows, centerRows, centerInputs, requestFilters);
   if(chart.tooltip) {
-    const tooltipEntries=buildChartTooltipEntries(chart,rows);
+    const tooltipEntries=buildChartTooltipEntries(chart,rows,requestFilters);
     if(result)return {...result,tooltipEntries};
   }
   return result;

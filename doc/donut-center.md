@@ -38,7 +38,7 @@ For a direct Chart, use the same `center` object alongside the existing series:
 }}} context={context}/>
 ```
 
-The field belongs to the chart's already-declared dataset. Authored report
+By default, the field belongs to the chart's already-declared dataset. Authored report
 validation requires a measure field and includes it in the canonical request
 projection even when it is not a slice measure. Producer-provided or existing
 calculated measures can be bound by their declared field. There is no automatic
@@ -90,3 +90,41 @@ narrow/empty states. The shared chart specimen includes the collection, independ
 occupancy and long-label examples. Workspace browser checks measure every center
 text corner against its hole at desktop/phone sizes. The Go materializer test
 renders real PDFs for sum, scalar, zero, null, empty and complete long-label output.
+
+An independent scalar center opts into `datasetRef`. The producer must return at
+most one row with every declared measure present (explicit null is valid), no
+grouping, offset zero, and `hasMore: false`. Missing completeness evidence,
+truncation, missing fields and multiple rows fail explicitly. This is useful when
+a ratio or distinct count must be calculated at a different grain from slices.
+The report's dataset dependency closure includes the scalar source for lazy tabs.
+
+`alternatives: [{field, operation: "scalar", format}]` replaces `value`/`format`
+for mutually exclusive numeric fields. Zero is active; null is inactive. More
+than one active alternative fails, and no active alternative is unavailable.
+Formats may also use the shared explicit numeric display object (`decimals`,
+`prefix`, `suffix`, `scale`, `grouping`, `negativeStyle`) to retain authored units.
+
+Optional `labelInput: {path, labels: [{value, label}]}` reads only the same scalar
+dataset's effective request filters. The path rejects prototype traversal, and
+option identity preserves value type. Missing or unmapped inputs fail rather
+than falling back to another selection's label. It retains the selected label
+when the metric is null or the scalar producer has no facts. A direct Chart
+receives the corresponding `container.centerRows` and `container.centerInputs`;
+the native report runtime and fill supply these from the same admitted dataset.
+Literal centers retain their existing behavior.
+
+An explicit pie/donut `sliceLabel: {field, format}` displays a declared numeric
+measure independently from slice size. Null suppresses that label; zero displays
+zero. Repeated category rows must agree on the label value. The shared Chart uses
+semantic small typography, while canonical print retains the exact label beside
+the category. Conditional label calculations use the ordinary calculation DAG,
+including complete-partition percent-of-total followed by an expression.
+The new independent example is synthetic and appears in the existing ChartSpecimen.
+
+`chartSpec.paletteMode: "declared"` with `palette` selects literal six-digit hex
+colors (1–64 entries). Pie/donut charts also require explicit `categoryColors` for
+stable category identity when rows are filtered or reordered; missing categories
+fail. Declared lookup is case-sensitive, so distinct source categories keep
+independent colors. The compiled model retains `paletteMode` and the same palette
+and map for browser and PDF. Omitting the mode preserves existing theme-role
+resolution. The independent example and mounted/print checks compare exact colors.

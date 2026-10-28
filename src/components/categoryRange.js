@@ -1,7 +1,8 @@
 // Generic category-local scalar, interval and comparator marks. No field inference.
 const string = {type:'string',minLength:1};
-const common = {label:string,color:{type:'string',pattern:'^#[0-9a-fA-F]{6}$'},format:{type:'object',additionalProperties:false,properties:{decimals:{type:'integer',minimum:0,maximum:10},suffix:{type:'string'}}}};
-export const categoryRangeSchema = {type:'object',additionalProperties:false,required:['categoryField','series'],properties:{categoryField:string,orientation:{enum:['horizontal','vertical']},series:{type:'array',minItems:1,items:{anyOf:[
+export const numericDisplayFormatSchema={type:'object',additionalProperties:false,properties:{decimals:{type:'integer',minimum:0,maximum:10},suffix:{type:'string'},prefix:{type:'string'},scale:{type:'number'},grouping:{type:'boolean'},negativeStyle:{enum:['minus','parentheses']}}};
+const common = {label:string,color:{type:'string',pattern:'^#[0-9a-fA-F]{6}$'},format:numericDisplayFormatSchema};
+export const categoryRangeSchema = {type:'object',additionalProperties:false,required:['categoryField','series'],properties:{categoryField:string,orientation:{enum:['horizontal','vertical']},arrangement:{enum:['lanes','overlay']},series:{type:'array',minItems:1,items:{anyOf:[
   {type:'object',additionalProperties:false,required:['kind','field','label'],properties:{...common,kind:{enum:['bar','marker']},field:string}},
   {type:'object',additionalProperties:false,required:['kind','startField','endField','label'],properties:{...common,kind:{const:'range'},startField:string,endField:string}},
 ]}}}};
@@ -11,6 +12,7 @@ export function normalizeCategoryRange(input) {
   for(const key of Object.keys(input)) if(!Object.hasOwn(categoryRangeSchema.properties,key)) throw new Error(`Unknown category range option: ${key}`);
   if(typeof input.categoryField!=='string'||!input.categoryField.trim()) throw new Error('Category range categoryField is required.');
   if(input.orientation!==undefined&&!['horizontal','vertical'].includes(input.orientation)) throw new Error('Category range orientation must be horizontal or vertical.');
+  if(input.arrangement!==undefined&&!['lanes','overlay'].includes(input.arrangement))throw new Error('Category range arrangement must be lanes or overlay.');
   if(!Array.isArray(input.series)||!input.series.length) throw new Error('Category range series are required.');
   for(const s of input.series) {
     if(!s||!['bar','range','marker'].includes(s.kind)) throw new Error('Unsupported category range series kind.');
@@ -18,16 +20,20 @@ export function normalizeCategoryRange(input) {
     for(const key of Object.keys(s)) if(!['kind',...fields,...Object.keys(common)].includes(key)) throw new Error(`Unknown category range series option: ${key}`);
     for(const key of ['label',...fields]) if(typeof s[key]!=='string'||!s[key].trim()) throw new Error(`Category range ${key} is required.`);
     if(s.color!==undefined&&!/^#[0-9a-f]{6}$/i.test(s.color)) throw new Error('Category range color must be a six-digit hex color.');
-    if(s.format!==undefined) {
-      if(!s.format||typeof s.format!=='object'||Array.isArray(s.format)||Object.keys(s.format).some(k=>!['decimals','suffix'].includes(k))) throw new Error('Invalid category range format.');
-      if(s.format.decimals!==undefined&&(!Number.isInteger(s.format.decimals)||s.format.decimals<0||s.format.decimals>10)) throw new Error('Category range decimals must be an integer from zero to ten.');
-      if(s.format.suffix!==undefined&&typeof s.format.suffix!=='string') throw new Error('Category range suffix must be a string.');
-    }
+    validateNumericDisplayFormat(s.format);
   }
   if(categoryRangeFields(input).includes(input.categoryField)) throw new Error('Category and numeric fields must be distinct.');
   return JSON.parse(JSON.stringify({...input,orientation:input.orientation||'horizontal'}));
 }
-export const formatRangeValue=(value,series)=>value==null?'Unavailable':`${series.format?.decimals===undefined?value:value.toFixed(series.format.decimals)}${series.format?.suffix||''}`;
+export function formatRangeValue(value,series){
+ if(value==null)return 'Unavailable';
+ const format=series.format||{},scaled=value*(format.scale??1);
+ if(!Number.isFinite(scaled))throw new Error('Category range formatted value overflowed.');
+ const absolute=Math.abs(scaled),digits=format.decimals;
+ const numeric=format.grouping?new Intl.NumberFormat('en-US',{minimumFractionDigits:digits??0,maximumFractionDigits:digits??10,useGrouping:true}).format(absolute):digits===undefined?String(absolute):absolute.toFixed(digits);
+ const text=`${format.prefix||''}${numeric}${format.suffix||''}`;
+ return scaled<0?(format.negativeStyle==='parentheses'?`(${text})`:`-${text}`):text;
+}
 export function buildCategoryRange(input,rows=[]) {
   const config=normalizeCategoryRange(input),seen=new Set(),bounds=[0];
   const categories=rows.map((row,index)=>{
@@ -78,7 +84,8 @@ export function categoryRangeSvg(model,width=680,{interactive=false,selectable=f
   const scale=v=>vertical?top+plotHeight-ratio(v)*plotHeight:left+ratio(v)*(width-left-right);
   const color=s=>s.color||'#526c80';
   const axis=vertical?`<line x1="${left}" x2="${width-right}" y1="${scale(0)}" y2="${scale(0)}" stroke="#a0a0a0"/>`:`<line x1="${scale(0)}" x2="${scale(0)}" y1="${top}" y2="${categoryBottom}" stroke="#a0a0a0"/>`;
-  const ticks=[domain[0],domain[1]].map(v=>vertical?text(v,left-8,scale(v),'end'):text(v,scale(v),18,'middle')).join('');
+  const axisSeries=config.series.every(series=>JSON.stringify(series.format||{})===JSON.stringify(config.series[0]?.format||{}))?config.series[0]:{};
+  const ticks=[domain[0],domain[1]].map(v=>vertical?text(formatRangeValue(v,axisSeries),left-8,scale(v),'end'):text(formatRangeValue(v,axisSeries),scale(v),18,'middle')).join('');
   const marks=categories.map((category,index)=>{
     const band=(width-left-right)/Math.max(1,categories.length),center=left+(index+.5)*band;
     const y=top+rowHeights.slice(0,index).reduce((a,b)=>a+b,0);
@@ -87,7 +94,7 @@ export function categoryRangeSvg(model,width=680,{interactive=false,selectable=f
       const {series,seriesIndex,available}=mark;
       // Series occupy distinct lanes within each category so no mark obscures another.
       const laneOffset=laneHeights[index].slice(0,seriesIndex).reduce((sum,h)=>sum+h,0);
-      const lane=vertical?center+(seriesIndex-(config.series.length-1)/2)*44:y+24+laneOffset;
+      const lane=config.arrangement==='overlay'?(vertical?center:y+24):(vertical?center+(seriesIndex-(config.series.length-1)/2)*44:y+24+laneOffset);
       const description=`${category.category}, ${mark.label}`;
       let shape='';
       if(available){
@@ -99,7 +106,12 @@ export function categoryRangeSvg(model,width=680,{interactive=false,selectable=f
       const valueY=vertical?valuesTop+valueRowHeights.slice(0,seriesIndex).reduce((sum,h)=>sum+h,0):y+28+laneOffset;
       const quantity=textLines(valueLines[index][seriesIndex],vertical?center:width-16,valueY,vertical?'middle':'end');
       const attrs=interactive?` data-category="${index}" data-series="${seriesIndex}" tabindex="0" role="${selectable&&available?'button':'img'}" aria-label="${escape(description)}"`:'';
-      return `<g${attrs}>${interactive?`<title>${escape(description)}</title>`:''}${interactive?`<rect x="${vertical?lane-22:left}" y="${vertical?top:lane-22}" width="${vertical?44:width-left}" height="${vertical?plotHeight:laneHeights[index][seriesIndex]}" fill="transparent"/>`:''}${shape}${quantity}</g>`;
+      let hit='';
+      if(interactive&&config.arrangement==='overlay'&&available){
+        const start=scale(mark.start),end=scale(mark.end),length=Math.abs(end-start),origin=Math.min(start,end);
+        hit=vertical?`<rect x="${lane-14}" y="${length?origin:start-8}" width="28" height="${Math.max(16,length)}" fill="transparent"/>`:`<rect x="${length?origin:start-8}" y="${lane-14}" width="${Math.max(16,length)}" height="28" fill="transparent"/>`;
+      }else if(interactive&&config.arrangement!=='overlay')hit=`<rect x="${vertical?lane-22:left}" y="${vertical?top:lane-22}" width="${vertical?44:width-left}" height="${vertical?plotHeight:laneHeights[index][seriesIndex]}" fill="transparent"/>`;
+      return `<g${attrs}>${interactive?`<title>${escape(description)}</title>`:''}${hit}${shape}${quantity}</g>`;
     }).join('');
   }).join('');
   let legendY=categoryBottom+24;
@@ -131,4 +143,16 @@ export function categoryRangePrintPages(model,{width=540,maxHeight=616,firstMaxH
     offset+=count;
   }
   return pages;
+}
+
+export function validateNumericDisplayFormat(format) {
+    if(format!==undefined) {
+      if(!format||typeof format!=='object'||Array.isArray(format)||Object.keys(format).some(k=>!['decimals','suffix','prefix','scale','grouping','negativeStyle'].includes(k))) throw new Error('Invalid category range format.');
+      if(format.decimals!==undefined&&(!Number.isInteger(format.decimals)||format.decimals<0||format.decimals>10)) throw new Error('Category range decimals must be an integer from zero to ten.');
+      if(format.suffix!==undefined&&typeof format.suffix!=='string') throw new Error('Category range suffix must be a string.');
+      if(format.prefix!==undefined&&typeof format.prefix!=='string')throw new Error('Category range prefix must be a string.');
+      if(format.scale!==undefined&&(typeof format.scale!=='number'||!Number.isFinite(format.scale)))throw new Error('Category range scale must be finite.');
+      if(format.grouping!==undefined&&typeof format.grouping!=='boolean')throw new Error('Category range grouping must be boolean.');
+      if(format.negativeStyle!==undefined&&!['minus','parentheses'].includes(format.negativeStyle))throw new Error('Invalid category range negative style.');
+    }
 }

@@ -27,7 +27,7 @@ assert.ok(html.includes('Count'), 'native report table column must be visible');
 assert.ok(/>7</.test(html), 'provider datasource rows must fill the native report table');
 state.signals.control.value={loading:true};
 html=render();
-assert.ok(html.includes('Loading overview'));
+assert.ok(html.includes('Loading report'));
 assert.ok(!/>7</.test(html), 'old report rows must disappear during protected refresh');
 state.signals.control.value={error:'denied'};
 html=render();

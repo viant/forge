@@ -1,11 +1,148 @@
 {
- "provenance":"Independently invented public examples. Counts and occupancy are illustrative, not observed data or recommendations.",
- "title":"Library collection",
- "chartSpec":{"type":"donut","xField":"category","yFields":["items"],"center":{"label":"Catalogued items","value":{"field":"items","operation":"sum"},"format":"number"}},
- "rows":[{"category":"Fiction","items":240,"occupancyRate":72.5},{"category":"Reference","items":160,"occupancyRate":72.5},{"category":"Science","items":100,"occupancyRate":72.5}],
- "occupancy":{"label":"Occupancy rate","value":{"field":"occupancyRate","operation":"scalar"},"format":"percent"},
- "zeroRows":[{"category":"Fiction","items":0,"occupancyRate":0},{"category":"Reference","items":0,"occupancyRate":0}],
- "nullRows":[{"category":"Fiction","items":240,"occupancyRate":null},{"category":"Reference","items":160,"occupancyRate":null}],
- "noDataRows":[],
- "longLabel":"Catalogued items across the complete synthetic collection, including reference material and science volumes"
+  "provenance": "Independently invented public examples. Counts and occupancy are illustrative, not observed data or recommendations.",
+  "title": "Library collection",
+  "chartSpec": {
+    "type": "donut",
+    "xField": "category",
+    "yFields": [
+      "items"
+    ],
+    "center": {
+      "label": "Catalogued items",
+      "value": {
+        "field": "items",
+        "operation": "sum"
+      },
+      "format": "number"
+    }
+  },
+  "rows": [
+    {
+      "category": "Fiction",
+      "items": 240,
+      "occupancyRate": 72.5
+    },
+    {
+      "category": "Reference",
+      "items": 160,
+      "occupancyRate": 72.5
+    },
+    {
+      "category": "Science",
+      "items": 100,
+      "occupancyRate": 72.5
+    }
+  ],
+  "occupancy": {
+    "label": "Occupancy rate",
+    "value": {
+      "field": "occupancyRate",
+      "operation": "scalar"
+    },
+    "format": "percent"
+  },
+  "zeroRows": [
+    {
+      "category": "Fiction",
+      "items": 0,
+      "occupancyRate": 0
+    },
+    {
+      "category": "Reference",
+      "items": 0,
+      "occupancyRate": 0
+    }
+  ],
+  "nullRows": [
+    {
+      "category": "Fiction",
+      "items": 240,
+      "occupancyRate": null
+    },
+    {
+      "category": "Reference",
+      "items": 160,
+      "occupancyRate": null
+    }
+  ],
+  "noDataRows": [],
+  "longLabel": "Catalogued items across the complete synthetic collection, including reference material and science volumes",
+  "independent": {
+    "center": {
+      "datasetRef": "summary",
+      "label": "Selected measure",
+      "labelInput": {
+        "path": "metric",
+        "labels": [
+          {
+            "value": 1,
+            "label": "Occupancy rate"
+          },
+          {
+            "value": 2,
+            "label": "Book count"
+          }
+        ]
+      },
+      "alternatives": [
+        {
+          "field": "rate",
+          "operation": "scalar",
+          "format": "percentfraction2"
+        },
+        {
+          "field": "count",
+          "operation": "scalar",
+          "format": {
+            "decimals": 0,
+            "grouping": true
+          }
+        }
+      ]
+    },
+    "rows": [
+      {
+        "rate": 0.725,
+        "count": null
+      }
+    ],
+    "inputs": {
+      "metric": 1
+    },
+    "sliceLabel": {
+      "field": "share",
+      "format": {
+        "scale": 100,
+        "decimals": 1,
+        "suffix": "%"
+      }
+    },
+    "sliceRows": [
+      {
+        "category": "Fiction",
+        "items": 240,
+        "share": 0.48
+      },
+      {
+        "category": "Reference",
+        "items": 160,
+        "share": 0.32
+      },
+      {
+        "category": "Science",
+        "items": 100,
+        "share": 0.2
+      }
+    ],
+    "palette": [
+      "#426b85",
+      "#8a7644",
+      "#72577c"
+    ],
+    "categoryColors": {
+      "Fiction": "#426b85",
+      "Reference": "#8a7644",
+      "Science": "#72577c"
+    }
+  }
 }

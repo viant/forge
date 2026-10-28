@@ -17,6 +17,7 @@ import {aggregateGeoRows, buildGeoConfig, DEFAULT_GEO_PALETTE, findGeoColorRule,
 import ReportRuntime from "./ReportRuntime.jsx";
 import {resolveBoundReportRuntime} from './reportRuntimeBindings.js';
 import { resolveDashboardReportRuntimeHandlers } from "./dashboardReportRuntimeHandlers.js";
+import {boundReportScopeHandlers} from './reportRuntimeScopeControls.js';
 import DashboardTableContent from "./DashboardTableContent.jsx";
 import { buildTableRuntimeColumns, resolveTableCellVisualState } from "./tableCellVisuals.js";
 import { withFrozenIdentifierColumn } from "./tableFrozenIdentifier.js";
@@ -1252,19 +1253,35 @@ export function DashboardReportRuntime({container, context}) {
     const config = getDashboardReportRuntimeConfig(container);
     const reportSpec = config.reportSpec || EMPTY_REPORT_RUNTIME_SPEC;
     const bound = resolveBoundReportRuntime(config, context);
-    const runtimeHandlers = useMemo(() => resolveDashboardReportRuntimeHandlers({
-        context,
-        reportSpec,
-    }), [context?.handlers?.reportRuntime, context?.handlers?.semanticModel, reportSpec]);
-    if (bound.status !== 'ready') return <div className={`forge-report-binding-state is-${bound.status}`} role={bound.status === 'error' ? 'alert' : 'status'}>
-        {bound.status === 'error' ? 'This overview could not be loaded. Use Refresh to try again.' : 'Loading overview…'}
-    </div>;
+    const runtimeHandlers = useMemo(() => {
+        const legacyHandlers = resolveDashboardReportRuntimeHandlers({context, reportSpec}) || {};
+        const boundIds = new Set((reportSpec.scope?.params || []).filter(param => param.filterBindings?.length).map(param => param.id));
+        const canClearScopeParam = filter => !boundIds.has(filter?.id) && legacyHandlers.canClearScopeParam?.(filter) !== false;
+        const handlers = boundIds.size ? {...legacyHandlers,
+            canClearScopeParam,
+            canToggleScopeParam: filter => !boundIds.has(filter?.id) && legacyHandlers.canToggleScopeParam?.(filter) !== false,
+            ...(typeof legacyHandlers.clearScopeParams === 'function' ? {clearScopeParams: filters => {
+                const permitted = filters.filter(canClearScopeParam);
+                if (permitted.length) legacyHandlers.clearScopeParams(permitted);
+            }} : {}),
+        } : legacyHandlers;
+        if (bound.scopeControlsUnavailable) {
+            return {...handlers, canEditScopeParam: filter => !boundIds.has(filter?.id) && legacyHandlers.canEditScopeParam?.(filter) !== false};
+        }
+        return {...handlers, ...(config.datasetBindings && reportSpec.scope?.params?.some(param => param.filterBindings?.length) ? boundReportScopeHandlers(config, context) : {})};
+    }, [context, context?.handlers?.reportRuntime, context?.handlers?.semanticModel, reportSpec, config.datasetBindings, bound.scopeControlsUnavailable]);
     return (
         <>
-        {bound.unavailableDatasets?.length > 0 ? <div className="forge-report-binding-state is-error" role="alert">Current delivery data is unavailable. Performance for the selected date range remains below.</div> : null}
+        {bound.status !== 'ready' ? <div className={`forge-report-binding-state is-${bound.status}`} role={bound.status === 'error' ? 'alert' : 'status'}>
+            {bound.status === 'error' ? 'This report could not be loaded. Use Refresh to try again.' : 'Loading report…'}
+        </div> : null}
+        {bound.unavailableDatasets?.length > 0 ? <div className="forge-report-binding-state is-error" role="alert">Some report data is unavailable. Available data remains below.</div> : null}
         <ReportRuntime
-            reportSpec={reportSpec}
-            reportFill={bound.reportFill}
+            reportSpec={bound.reportSpec || reportSpec}
+            reportFill={bound.reportFill || bound.pendingReportFill}
+            retainEmptySectionContent={true}
+            sectionLoading={bound.status === 'loading'}
+            sectionError={bound.status === 'error' ? 'This report could not be loaded. Use Refresh to try again.' : ''}
             title={config.title || container?.title || ""}
             subtitle={config.subtitle || container?.subtitle || ""}
             locale={config.locale || getDashboardLocale(context)}

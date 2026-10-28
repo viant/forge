@@ -1,4 +1,8 @@
+import {parseReportMarkdownInline} from './reportMarkdownInline.js';
+import {protectReportMarkdownEscapes} from './reportMarkdownEscapes.js';
 import {chartTooltipPrintLines} from '../components/chartTooltip.js';
+import {compositeChildWeights, compositeBare,compositeWeightedTemplate} from './reportCompositeLayout.js';
+import {reportExternalLinks} from './reportExternalLinks.js';
 import {qualifiedTableColumnLabel} from './reportTableAnalytics.js';
 import {resolveChartBarRadius} from '../components/chartData.js';
 import {buildRuntimeSections} from './reportSections.js';
@@ -193,6 +197,12 @@ export function buildReportPrintTextElement(element = {}) {
     ...next,
     text,
   };
+  if(Object.hasOwn(element,'textRuns')){
+    if(!Array.isArray(element.textRuns)||!element.textRuns.length||element.textRuns.some(run=>!run||typeof run!=='object'||Array.isArray(run)||typeof run.text!=='string'||!run.text||run.text.includes('\r')||Object.keys(run).some(key=>!['text','fontWeight'].includes(key))||run.fontWeight!==undefined&&typeof run.fontWeight!=='string'))throw new Error('Invalid print text runs.');
+    if(element.textRuns.map(run=>run.text).join('')!==String(element.text))throw new Error('Print text runs must concatenate to text.');
+    result.textRuns=element.textRuns.map(run=>({text:normalizeReportPrintText(run.text),...(run.fontWeight?{fontWeight:run.fontWeight}:{})}));
+    if(result.textRuns.map(run=>run.text).join('')!==text)throw new Error('Print text normalization crosses run boundaries.');
+  }
   const fontFamily = normalizeString(element?.fontFamily);
   const fontWeight = normalizeString(element?.fontWeight);
   const color = normalizeString(element?.color);
@@ -651,11 +661,40 @@ function buildLayoutSpanByBlockId(reportSpec = {}) {
   );
 }
 
+// Preserve emphasis while reusing the canonical line-break budget. Runs share
+// one line box; PDF positions them with real font advances, never guessed x boxes.
+export function buildReportPrintMarkdownLines(markdown,width,fontSize=REPORT_PRINT_THEME.bodyFontSize){
+  const output=[];
+  for(const rawLine of String(markdown).replace(/\r\n/g,'\n').trim().split('\n')){
+    const protectedLine=protectReportMarkdownEscapes(rawLine);
+    const line=protectedLine.text.replace(/!?(?:\[([^\]]+)\])\([^\)]+\)/g,'$1').replace(/^\s{0,3}#{1,6}\s*/, '').replace(/^\s*[-*+]\s+/, '').replace(/^\s*\d+\.\s+/, '');
+    const runs=parseReportMarkdownInline(line).map(run=>({...run,text:normalizeReportPrintText(protectedLine.restore(run.text))}));
+    const characters=[];
+    for(const run of runs)for(const character of run.text.split('')){
+      if(/\s/.test(character)){if(characters.length&&characters[characters.length-1].text!==' ')characters.push({text:' ',fontWeight:run.fontWeight||'normal'});}
+      else characters.push({text:character,fontWeight:run.fontWeight||'normal'});
+    }
+    while(characters[characters.length-1]?.text===' ')characters.pop();
+    const plain=characters.map(entry=>entry.text).join('');
+    if(!plain){output.push({text:''});continue;}
+    let cursor=0;
+    for(const wrapped of wrapReportPrintText(plain,width,fontSize)){
+      const start=plain.indexOf(wrapped,cursor);const selected=characters.slice(start,start+wrapped.length);cursor=start+wrapped.length;
+      const textRuns=[];for(const character of selected){const prior=textRuns[textRuns.length-1];if(prior?.fontWeight===character.fontWeight)prior.text+=character.text;else textRuns.push({...character});}
+      const styled=textRuns.some(run=>run.fontWeight!=='normal');
+      output.push({text:wrapped,...(styled ? (textRuns.length===1?{fontWeight:textRuns[0].fontWeight}:{textRuns}) : {})});
+    }
+  }
+  return output;
+}
+
 function normalizeMarkdownToPlainText(markdown = "") {
-  return String(markdown || "")
+  const escaped = protectReportMarkdownEscapes(markdown || "");
+  return escaped.restore(escaped.text
     .replace(/\r\n/g, "\n")
     // Print blocks are text-only; preserve the content without exposing Markdown markers.
     .replace(/!?(?:\[([^\]]+)\])\([^\)]+\)/g, "$1")
+    .replace(/\*\*\*([^*]+?)\*\*\*/g, "$1")
     .replace(/(\*\*|__)(.+?)\1/g, "$2")
     .replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, "$1")
     .replace(/(?<!_)_([^_]+)_(?!_)/g, "$1")
@@ -667,7 +706,7 @@ function normalizeMarkdownToPlainText(markdown = "") {
       .replace(/^\s*\d+\.\s+/, "")
       .trimEnd())
     .join("\n")
-    .trim();
+    .trim());
 }
 
 function formatReportPrintValue(value, format = "") {
@@ -980,12 +1019,13 @@ function renderReportPrintTextLines(state = {}, {
     if (!line && line !== "") {
       return;
     }
-    if (line === "") {
+    if (line === "" || line?.text === "") {
       ensureLineSpace(lineHeight / 2);
       state.cursorY += lineHeight / 2;
       return;
     }
-    wrapReportPrintText(line, boxWidth, fontSize).forEach((wrappedLine) => {
+    const styledLine=line&&typeof line==='object' ? line : null;
+    (styledLine ? [styledLine.text] : wrapReportPrintText(line, boxWidth, fontSize)).forEach((wrappedLine) => {
       ensureLineSpace(lineHeight);
       const element = pushReportPrintElement(state, buildReportPrintTextElement({
         id: `${idPrefix}_${sequence}`,
@@ -997,8 +1037,10 @@ function renderReportPrintTextLines(state = {}, {
           height: lineHeight,
         },
         text: wrappedLine,
+        ...(styledLine?.textRuns ? {textRuns:styledLine.textRuns} : {}),
         fontSize,
         ...(fontWeight ? { fontWeight } : {}),
+        ...(styledLine?.fontWeight ? {fontWeight:styledLine.fontWeight} : {}),
         ...(color ? { color } : {}),
         ...(align ? { align } : {}),
       }));
@@ -1013,6 +1055,7 @@ function renderReportPrintTextLines(state = {}, {
 }
 
 function reportPrintTitleHeight(state, block, layoutNote = "") {
+  if(compositeBare(block))return 0;
   return wrapReportPrintText(resolveReportPrintBlockTitle(block), state.contentWidth, REPORT_PRINT_THEME.titleFontSize).length * REPORT_PRINT_THEME.titleLineHeight
     + (layoutNote ? wrapReportPrintText(layoutNote, state.contentWidth, REPORT_PRINT_THEME.warningFontSize).length * REPORT_PRINT_THEME.warningLineHeight : 0) + 4;
 }
@@ -1021,6 +1064,7 @@ function renderReportPrintSectionTitle(state = {}, block = {}, {
   layoutNote = "",
   continuation = false,
 } = {}) {
+  if(compositeBare(block))return null;
   const title = resolveReportPrintBlockTitle(block);
   const blockId = normalizeString(block?.id || block?.kind || "block");
   const idSuffix = continuation ? `_page_${state.currentPage?.number}` : "";
@@ -1132,12 +1176,13 @@ function renderReportPrintGridRow(state = {}, entries = []) {
     .map((entry) => ({
       block: entry.block,
       span: Math.max(1, Math.min(REPORT_LAYOUT_GRID_COLUMNS, Math.trunc(entry.span))),
+      fraction: entry.fraction,
     }));
   if (rowEntries.length === 0) {
     return;
   }
   ensureReportPrintPage(state);
-  if (rowEntries.length > 1 && state.cursorY > state.contentTop) {
+  if (rowEntries.length > 1 && state.cursorY > state.contentTop + (state.sectionHeadingHeight || 0)) {
     // Render the authored row into detached pages first. If either column
     // would spill, move the whole row together; rendering children directly
     // from the old cursor can strand a half-width partner on the next page.
@@ -1160,15 +1205,18 @@ function renderReportPrintGridRowAtCurrentPosition(state, rowEntries) {
     (state.contentWidth - (REPORT_PRINT_THEME.columnGap * (REPORT_LAYOUT_GRID_COLUMNS - 1))) / REPORT_LAYOUT_GRID_COLUMNS,
   );
   let consumedColumns = 0;
+  let consumedWidth = 0;
+  const weightedWidth = state.contentWidth - REPORT_PRINT_THEME.columnGap * (rowEntries.length - 1);
   const childStates = rowEntries.map((entry) => {
     const span = Math.max(1, Math.min(REPORT_LAYOUT_GRID_COLUMNS - consumedColumns, entry.span));
     const childState = buildScopedReportPrintState(state, {
-      contentLeft: state.contentLeft + (consumedColumns * (unitWidth + REPORT_PRINT_THEME.columnGap)),
-      contentWidth: (unitWidth * span) + (REPORT_PRINT_THEME.columnGap * Math.max(0, span - 1)),
+      contentLeft: state.contentLeft + (entry.fraction ? consumedWidth : consumedColumns * (unitWidth + REPORT_PRINT_THEME.columnGap)),
+      contentWidth: entry.fraction ? weightedWidth * entry.fraction : (unitWidth * span) + (REPORT_PRINT_THEME.columnGap * Math.max(0, span - 1)),
       startPageIndex: startPosition.pageIndex,
       startCursorY: startPosition.cursorY,
     });
     consumedColumns += span;
+    if (entry.fraction) consumedWidth += weightedWidth * entry.fraction + REPORT_PRINT_THEME.columnGap;
     return childState;
   });
   childStates.forEach((childState, index) => {
@@ -1248,9 +1296,9 @@ function renderReportPrintTextSectionBlock(state = {}, block = {}, lines = [], {
   layoutNote = "",
 } = {}) {
   const titleHeight = reportPrintTitleHeight(state, block, layoutNote);
-  const bodyHeight = lines.reduce((height, line) => height + (line === ""
+  const bodyHeight = lines.reduce((height, line) => height + (line === "" || line?.text === ""
     ? REPORT_PRINT_THEME.bodyLineHeight / 2
-    : wrapReportPrintText(line, state.contentWidth).length * REPORT_PRINT_THEME.bodyLineHeight), 0);
+    : (typeof line==='object'?1:wrapReportPrintText(line, state.contentWidth).length) * REPORT_PRINT_THEME.bodyLineHeight), 0);
   // Keep a short narrative/filter context intact when it fits on a fresh page.
   // Oversized sections may split, but every continuation needs its own heading.
   const sectionHeight = titleHeight + bodyHeight;
@@ -1267,8 +1315,8 @@ function renderReportPrintTextSectionBlock(state = {}, block = {}, lines = [], {
 }
 
 function renderReportPrintMarkdownBlock(state = {}, block = {}, options = {}) {
-  const markdown = normalizeMarkdownToPlainText(block?.content?.markdown || block?.markdown || "");
-  const lines = markdown ? markdown.split("\n") : ["No narrative content."];
+  const markdown = String(block?.content?.markdown || block?.markdown || "");
+  const lines = [...(markdown ? buildReportPrintMarkdownLines(markdown,state.contentWidth) : ["No narrative content."]),...reportExternalLinks(block).map(link=>`${link.label}: ${link.url}`)];
   renderReportPrintTextSectionBlock(state, block, lines, options);
 }
 
@@ -1482,7 +1530,14 @@ function renderReportPrintSectionBlock(state = {}, block = {}, {
 function renderReportPrintCompositeBlock(state = {}, block = {}, {
   layoutNote = "",
 } = {}) {
-  renderReportPrintSectionTitle(state, block, { layoutNote });
+  const spacerHeight = (block?.content?.runtime || block?.runtime || {}).spacerHeight;
+  if (Number.isFinite(spacerHeight) && spacerHeight >= 0) {
+    ensureReportPrintPage(state);
+    ensureReportPrintSpace(state, spacerHeight);
+    state.cursorY = Math.min(state.contentBottom, state.cursorY + spacerHeight);
+    return;
+  }
+  if (!compositeBare(block)) renderReportPrintSectionTitle(state, block, { layoutNote });
   const description = normalizeString(block?.content?.description || block?.description);
   if (description) {
     renderReportPrintTextLines(state, {
@@ -1509,6 +1564,17 @@ function renderReportPrintCompositeBlock(state = {}, block = {}, {
     return;
   }
   const authoredLayout = normalizeString(block?.content?.layout || block?.layout);
+  const weights = compositeChildWeights(block, childBlocks);
+  if (weights) {
+    if(compositeWeightedTemplate(block,childBlocks,state.contentWidth)==='minmax(0, 1fr)'){
+      childBlocks.forEach(child=>renderReportPrintBlock(state,child,{}));
+      finishReportPrintBlock(state);
+      return;
+    }
+    renderReportPrintGridRow(state, childBlocks.map((child, index) => ({block: child, span: 1, fraction: weights[index]})));
+    finishReportPrintBlock(state);
+    return;
+  }
   const layout = authoredLayout === "responsiveGrid" ? "responsiveGrid" : "stack";
   if (authoredLayout === "stack") {
     childBlocks.forEach((childBlock) => renderReportPrintBlock(state, childBlock, {}));
@@ -1761,7 +1827,7 @@ function renderReportPrintCollectionBlock(state = {}, block = {}, {
     const layouts = rowItems.map((item, columnIndex) => {
       const innerWidth = Math.max(1, cardWidth - (padding * 2));
       const toneLabel = normalizeString(item?.toneLabel || item?.tone).toUpperCase();
-      const titleWidth = Math.max(80, innerWidth - (toneLabel ? 58 : 0));
+      const titleWidth = Math.max(80, innerWidth - (toneLabel ? 58 : 0) - (item.markerColor?16:0));
       const titleLines = wrapReportPrintText(normalizeString(item?.title || `Item ${(rowIndex * columns) + columnIndex + 1}`), titleWidth, 11);
       const detailLines = [];
       if (normalizeString(item?.valueField || item?.valueLabel)) {
@@ -1770,8 +1836,10 @@ function renderReportPrintCollectionBlock(state = {}, block = {}, {
       if (normalizeString(item?.secondaryField || item?.secondaryLabel)) {
         detailLines.push(`${normalizeString(item?.secondaryLabel || item?.secondaryField)}: ${formatReportPrintValue(item?.secondaryValue, normalizeString(item?.secondaryFormat))}`);
       }
-      detailLines.push(...normalizeMarkdownToPlainText(item?.bodyMarkdown || "").split("\n").map((entry) => normalizeString(entry)).filter(Boolean));
-      const bodyLines = detailLines.flatMap((line) => wrapReportPrintText(line, innerWidth, 9));
+      const bodyLines = [
+        ...detailLines.flatMap(line=>wrapReportPrintText(line,innerWidth,9).map(text=>({text}))),
+        ...(String(item?.bodyMarkdown||'').trim()?buildReportPrintMarkdownLines(item.bodyMarkdown,innerWidth,9):[]),
+      ];
       return {
         item,
         toneLabel,
@@ -1806,15 +1874,16 @@ function renderReportPrintCollectionBlock(state = {}, block = {}, {
         radius: 2,
       }));
       let textY = rowY + padding;
+      if(item.markerColor)pushReportPrintElement(state,buildReportPrintRectElement({id:`${blockId}__marker_${rowIndex}_${columnIndex}`,kind:'rect',box:{x:cardX+padding,y:textY+2,width:10,height:10},fillColor:item.markerColor}));
       layout.titleLines.forEach((line, lineIndex) => {
         pushReportPrintElement(state, buildReportPrintTextElement({
           id: `${blockId}__card_${rowIndex}_${columnIndex}__title_${lineIndex}`,
           kind: "text",
-          box: { x: cardX + padding, y: textY, width: cardWidth - (padding * 2) - (layout.toneLabel ? 58 : 0), height: 14 },
+          box: { x: cardX + padding + (item.markerColor?16:0), y: textY, width: cardWidth - (padding * 2) - (layout.toneLabel ? 58 : 0) - (item.markerColor?16:0), height: 14 },
           text: line,
           fontSize: 11,
           fontWeight: "600",
-          color: accentColor,
+          color: normalizeString(item?.textColor) || REPORT_PRINT_THEME.titleColor,
         }));
         textY += 14;
       });
@@ -1836,7 +1905,7 @@ function renderReportPrintCollectionBlock(state = {}, block = {}, {
           id: `${blockId}__card_${rowIndex}_${columnIndex}__body_${lineIndex}`,
           kind: "text",
           box: { x: cardX + padding, y: textY, width: cardWidth - (padding * 2), height: 13 },
-          text: line,
+          ...line,
           fontSize: 9,
           color: REPORT_PRINT_THEME.bodyColor,
         }));
@@ -2449,6 +2518,8 @@ function renderReportPrintChartBlock(state = {}, block = {}, {
     ensureReportPrintSpace(state, reportPrintTitleHeight(state, block, layoutNote) + REPORT_PRINT_THEME.bodyLineHeight);
     renderReportPrintSectionTitle(state, block, {layoutNote});
     renderReportPrintTextLines(state, {idPrefix: `${normalizeString(block.id)}__empty`, lines: ["No data for the selected scope."], color: REPORT_PRINT_THEME.mutedColor});
+    const requestDetails=chartTooltipPrintLines(block?.content?.chartModel?.tooltip,block?.content?.resolvedChart?.tooltipEntries);
+    if(requestDetails.length)renderReportPrintTextLines(state,{idPrefix:`${block.id}__tooltip_details`,lines:requestDetails,fontSize:9,lineHeight:12});
     finishReportPrintBlock(state);
     return;
   }

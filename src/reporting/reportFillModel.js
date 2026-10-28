@@ -1,3 +1,6 @@
+import {validateNumericDisplayFormat,formatRangeValue} from '../components/categoryRange.js';
+import {resolveTemplateRequestInput,escapeTemplateText} from './reportTemplateRequestInputs.js';
+import {validateDonutCenterDataset} from '../components/donutCenter.js';
 import {materializeAnalyticalTable,buildTableHierarchy,hierarchyRows} from './reportTableAnalytics.js';
 import {applyReportTablePresentations} from './reportTablePresentation.js';
 import {materializeKpiSparkline} from './reportKpiSparklineModel.js';
@@ -83,6 +86,7 @@ export function buildReportFillHash(reportFill = {}) {
 }
 
 function buildReportFillDataset(dataset = {}, payload = {}, calculatedFields = []) {
+  if(calculatedFields.some(field=>field.datasetRef===dataset.id&&field.compute?.requireComplete===true)&&(payload.hasMore!==false||payload.truncated===true||payload.provenance?.hasMore===true||payload.provenance?.truncated===true))throw Error(`Dataset ${dataset.id} requires explicitly complete input for table calculations`);
   const rawRows = Array.isArray(payload?.rows) ? payload.rows.map((row) => cloneValue(row)) : [];
   const rows = applyReportCalculatedFields(rawRows, calculatedFields, {
     datasetRef: normalizeString(dataset?.id),
@@ -363,6 +367,7 @@ function resolveReportFillTemplateRawValue(token = "", {
 }
 
 function resolveReportFillTemplateToken(token = "", {
+  templateRequestInputs = null,
   content = {},
   row = null,
   dataset = null,
@@ -374,6 +379,7 @@ function resolveReportFillTemplateToken(token = "", {
   if (!normalizedToken) {
     return "";
   }
+  if (normalizedToken.startsWith('input.')) return resolveTemplateRequestInput(normalizedToken.slice(6),templateRequestInputs,dataset);
   const timeAtMatch = normalizedToken.match(/^timeAt\(\s*["'](.+?)["'](?:\s*,\s*["'](date|dateTime)["'])?\s*\)$/i);
   if (timeAtMatch) {
     return formatReportRelativeTime(timeAtMatch[1], { format: timeAtMatch[2] || "date" });
@@ -397,6 +403,7 @@ function resolveReportFillTemplateToken(token = "", {
       datasetsByAlias,
       fieldDisplayMap,
     });
+    if(formatMatch[2]==='text') return escapeTemplateText(formatReportFillKpiMacroValue(rawValue));
     return formatReportFillKpiMacroValue(rawValue, resolveReportFillMacroFormat(formatMatch[2]));
   }
   const helperMatch = normalizedToken.match(/^fmt\.(compact|compactNumber|currency|percent|percentFraction|number|number5)\((.+)\)$/i);
@@ -431,6 +438,17 @@ function resolveReportFillTemplateToken(token = "", {
   }
   if (normalizedToken === "dataset.dataSourceRef") {
     return normalizeString(dataset?.dataSourceRef || "");
+  }
+  if(normalizedToken.startsWith('row.')) {
+    const descriptor=fieldDisplayMap?.[normalizedToken.slice(4)];
+    if(descriptor?.numericFormat){
+      validateNumericDisplayFormat(descriptor.numericFormat);
+      const value=resolveKey(row||{},descriptor.sourceKey||normalizedToken.slice(4));
+      if(value===undefined)throw new Error('Formatted template numeric field is missing.');
+      if(value===null)return '';
+      if(typeof value!=='number'||!Number.isFinite(value))throw new Error('Formatted template field must be a finite number or null.');
+      return formatRangeValue(value,{format:descriptor.numericFormat});
+    }
   }
   const resolved = resolveReportFillTemplateRawValue(normalizedToken, {
     content,
@@ -552,7 +570,14 @@ function buildReportFillCollectionItemContent(block = {}, row = null, rowIndex =
   const toneValue = toneField && row ? row[toneField] : null;
   const toneRule = (Array.isArray(block?.toneRules) ? block.toneRules : [])
     .find((rule) => JSON.stringify(rule?.value) === JSON.stringify(toneValue)) || null;
+  let markerColor;
+  if(block.markerColors){
+    const key=String(row?.[itemTitleField]??'');
+    if(!Object.hasOwn(block.markerColors,key)||!/^#[0-9a-f]{6}$/i.test(block.markerColors[key]))throw new Error('Collection marker requires a declared color for its category.');
+    markerColor=block.markerColors[key];
+  }
   const content = {
+    ...(markerColor?{markerColor}:{}),
     index: rowIndex,
     title: itemTitleField && row
       ? resolveReportFillFieldDisplayValue(row, {
@@ -915,8 +940,10 @@ function buildReportFillBadgesContent(block = {}, dataset = {}) {
 function buildReportFillMarkdownContent(block = {}, dataset = {}, {
   datasetsByAlias = new Map(),
 } = {}) {
+  if(Object.keys(block.templateRequestInputs || {}).length && !block.datasetRef) throw new Error('Template request inputs require an explicit dataset.');
   const selectedRow = resolveReportFillSelectedRow(dataset, "firstrow");
   const markdown = resolveReportFillTemplateMarkdown(String(block?.markdown || ""), {
+    templateRequestInputs: block.templateRequestInputs,
     content: {},
     row: selectedRow,
     dataset,
@@ -1008,6 +1035,8 @@ function buildReportFillBlocks(reportSpec = {}, datasetsById = new Map(), {
     // ReportFill stores those resolved values, so it does not duplicate the
     // ReportSpec's source-to-display presentation contract.
     delete normalizedBlock.templateFieldDisplayMap;
+    delete normalizedBlock.markerColors;
+    delete normalizedBlock.templateRequestInputs;
     delete normalizedBlock.itemTitleDisplayKey;
     delete normalizedBlock.itemTitleDisplayValueMap;
     delete normalizedBlock.secondaryDisplayKey;
@@ -1071,7 +1100,7 @@ function buildReportFillBlocks(reportSpec = {}, datasetsById = new Map(), {
           chartSpec,
           chartModel,
           rowCount: Number(dataset?.provenance?.rowCount || 0),
-          resolvedChart: buildReportFillChartPayload(chartModel, dataset?.rows || []),
+          resolvedChart: buildReportFillChartPayload(chartModel, dataset?.rows || [], chartModel?.center?.datasetRef ? validateDonutCenterDataset(datasetsById.get(chartModel.center.datasetRef)) : undefined, chartModel?.center?.datasetRef ? datasetsById.get(chartModel.center.datasetRef)?.request?.filters : dataset?.request?.filters, dataset?.request?.filters),
         },
       };
     }
@@ -1249,6 +1278,17 @@ export function buildReportFillFromReportSpec(reportSpec = {}, datasetPayloads =
     };
   }
   const calculatedFields = cloneReportCalculatedFields(normalizedReportSpec?.calculatedFields || []);
+  for(const block of normalizedReportSpec?.blocks||[]) {
+    if(block.runtime?.requireCompleteDataset===true){
+      const payload=datasetPayloads?.[block.datasetRef];
+      const source=normalizedReportSpec.datasets?.find(dataset=>dataset.id===block.datasetRef);
+      if(!payload||payload.hasMore!==false||payload.truncated===true||payload.provenance?.hasMore===true||payload.provenance?.truncated===true||Number(source?.request?.offset)>0)throw new Error('Block requires explicitly complete dataset input.');
+    }
+    const ref=block?.chartSpec?.center?.datasetRef;
+    if(!ref)continue;
+    const payload=datasetPayloads?.[ref];
+    if(!payload||payload.hasMore!==false||payload.truncated===true||payload.provenance?.hasMore===true||payload.provenance?.truncated===true)throw new Error('Donut center requires explicitly complete scalar input.');
+  }
   const datasets = (Array.isArray(normalizedReportSpec?.datasets) ? normalizedReportSpec.datasets : []).map((dataset) => (
     buildReportFillDataset(dataset, datasetPayloads?.[normalizeString(dataset?.id)] || {}, calculatedFields)
   ));
