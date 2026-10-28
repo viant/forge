@@ -25,3 +25,17 @@ func TestBackendJSONPreservesExplicitEmptyRowsAndMissingRows(t *testing.T) {
 		})
 	}
 }
+
+func TestBackendArgumentProjectionRoundTrip(t *testing.T) {
+	var backend Backend
+	require.NoError(t, yaml.Unmarshal([]byte("kind: mcp_tool\nservice: fixture\nmethod: compose\nargs:\n  cubes.0.filters: inputs.query.filters\npinned:\n  cubes.1.inheritFrom: 1\n"), &backend))
+	require.NoError(t, backend.ValidateArgumentProjection())
+	raw, err := json.Marshal(backend)
+	require.NoError(t, err)
+	var decoded Backend
+	require.NoError(t, json.Unmarshal(raw, &decoded))
+	require.Equal(t, backend.Args, decoded.Args)
+	require.NoError(t, decoded.ValidateArgumentProjection())
+	decoded.Kind = BackendMCPTools
+	require.Error(t, decoded.ValidateArgumentProjection())
+}
