@@ -22,3 +22,22 @@ assert.deepEqual(dated.values,[2,null,0,null]);assert.deepEqual(dated.labels,['2
 assert.throws(()=>materializeKpiSparkline({...declaration,comparisonDatasetRef:undefined,periodStartPath:'filters.from',periodEndPath:'filters.to'},()=>({request:{filters:{from:'2026-02-30',to:'2026-10-04'}},rows:[]})),/valid civil dates/);
 
 assert.throws(()=>lowerReportDocumentToReportSpec({...document,blocks:document.blocks.map(b=>b.id==='total'?{...b,sparkline:{...declaration,valueField:'notApproved'}}:b)}),/fields must be declared/);
+
+// Explicit quantitative colors share browser geometry and printable SVG.
+const colorConfig={field:'amount',colors:['#000000','#808080','#ffffff'],domain:{mode:'extent'},opacity:.6};
+const colorDeclaration={datasetRef:'daily',categoryField:'day',valueField:'amount',valueColor:colorConfig};
+const colorDataset={hasMore:false,rows:[{day:'1',amount:0},{day:'2',amount:100},{day:'3',amount:null},{day:'4',amount:50}]};
+const colorContent=materializeKpiSparkline(colorDeclaration,()=>colorDataset);
+assert.deepEqual(colorContent.valueColor.domain,[0,100]);
+const colorSvg=buildKpiSparklineSvg(colorContent);
+assert.match(colorSvg,/stroke-opacity="0.6"/);assert.match(colorSvg,/fill-opacity="0.6" fill="#808080"/);
+assert.doesNotMatch(colorSvg,/linearGradient|NaN/);
+assert.throws(()=>materializeKpiSparkline(colorDeclaration,()=>({...colorDataset,hasMore:true})),/complete dataset/);
+assert.throws(()=>materializeKpiSparkline(colorDeclaration,()=>({...colorDataset,request:{offset:1}})),/complete dataset/);
+assert.throws(()=>normalizeKpiSparkline({...colorDeclaration,valueColor:{...colorConfig,field:'other'}}),/plotted measure/);
+
+const coloredSpec=JSON.parse(JSON.stringify(spec));coloredSpec.blocks.find(b=>b.id==='total').sparkline={...declaration,valueColor:colorConfig};
+const coloredPayload={primary:{rows:[{amount:1}]},daily:{rows:[{day:'1',amount:1}]},priorDaily:{rows:[{day:'1',amount:2}]}};
+assert.throws(()=>buildReportFillFromReportSpec(coloredSpec,coloredPayload),/explicitly complete/);
+assert.throws(()=>buildReportFillFromReportSpec(coloredSpec,{...coloredPayload,daily:{...coloredPayload.daily,provenance:{hasMore:false}}}),/explicitly complete/);
+assert.doesNotThrow(()=>buildReportFillFromReportSpec(coloredSpec,{...coloredPayload,daily:{...coloredPayload.daily,hasMore:false}}));

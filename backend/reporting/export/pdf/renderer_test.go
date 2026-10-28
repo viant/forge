@@ -1967,6 +1967,52 @@ func TestRender_SVGLineOpacityUsesStrokeChannel(t *testing.T) {
 	require.True(t, hasMatchingAlphaDefinition(string(result.Bytes), 0.25))
 }
 
+func TestRender_SVGPathOpacityUsesStrokeChannel(t *testing.T) {
+	report := &reportprint.ReportPrint{
+		Version:     1,
+		Kind:        "reportPrint",
+		SpecVersion: 1,
+		SpecHash:    "fnv1a:test-spec",
+		FillVersion: 1,
+		FillHash:    "fnv1a:test-fill",
+		Source: reportprint.Source{
+			Kind:          "dashboard.reportBuilder",
+			ContainerID:   "svgLineOpacityBuilder",
+			StateKey:      "svgLineOpacityBuilder",
+			DataSourceRef: "demoReportSource",
+		},
+		Title: "SVG Line Opacity",
+		PageGeometry: reportprint.PageGeometry{
+			Width:        612,
+			Height:       792,
+			MarginTop:    36,
+			MarginRight:  36,
+			MarginBottom: 36,
+			MarginLeft:   36,
+			HeaderHeight: 36,
+			FooterHeight: 24,
+		},
+		Pages: []reportprint.Page{
+			{
+				Number: 1,
+				Elements: []reportprint.Element{
+					{
+						ID:   "svg_line_opacity_1",
+						Kind: "svg",
+						Box:  reportprint.Box{X: 36, Y: 84, Width: 220, Height: 80},
+						SVG:  `<svg viewBox="0 0 220 80" width="220" height="80"><path d="M20,20L200,20" fill="none" stroke="#344054" opacity="0.5" stroke-opacity="0.5" /></svg>`,
+					},
+				},
+			},
+		},
+	}
+
+	result, err := Render(report, Options{})
+	require.NoError(t, err)
+	require.Empty(t, result.Diagnostics)
+	require.True(t, hasMatchingAlphaDefinition(string(result.Bytes), 0.25))
+}
+
 func TestRender_ZeroSizedSVGBoxReportsViewportDiagnostic(t *testing.T) {
 	report := &reportprint.ReportPrint{
 		Version:     1,

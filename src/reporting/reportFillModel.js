@@ -1281,6 +1281,11 @@ export function buildReportFillFromReportSpec(reportSpec = {}, datasetPayloads =
   }
   const calculatedFields = cloneReportCalculatedFields(normalizedReportSpec?.calculatedFields || []);
   for(const block of normalizedReportSpec?.blocks||[]) {
+    if(block.sparkline?.valueColor){
+      const ref=block.sparkline.datasetRef,payload=datasetPayloads?.[ref];
+      const source=normalizedReportSpec.datasets?.find(dataset=>dataset.id===ref);
+      if(!payload||payload.hasMore!==false||payload.truncated===true||payload.provenance?.hasMore===true||payload.provenance?.truncated===true||Number(source?.request?.offset)>0)throw new Error('KPI value color requires explicitly complete dataset input.');
+    }
     if(block.runtime?.requireCompleteDataset===true){
       const payload=datasetPayloads?.[block.datasetRef];
       const source=normalizedReportSpec.datasets?.find(dataset=>dataset.id===block.datasetRef);

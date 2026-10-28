@@ -31675,10 +31675,10 @@ Valid values are ${Array.from(VALID_ROUNDING_INCREMENTS).join(", ")}.`, RangeErr
     if (digitReplacementTable) n2 = n2.replace(/\d/g, (digit) => digitReplacementTable[+digit] || digit);
     const decimalSepIndex = n2.indexOf(".");
     let integer;
-    let fraction;
+    let fraction2;
     if (decimalSepIndex > 0) {
       integer = n2.slice(0, decimalSepIndex);
-      fraction = n2.slice(decimalSepIndex + 1);
+      fraction2 = n2.slice(decimalSepIndex + 1);
     } else integer = n2;
     const patternGroups = decimalNumberPattern.split(".")[0].split(",");
     const primaryGroupingSize = patternGroups.length > 1 ? patternGroups[patternGroups.length - 1].length : 3;
@@ -31710,14 +31710,14 @@ Valid values are ${Array.from(VALID_ROUNDING_INCREMENTS).join(", ")}.`, RangeErr
       type: "integer",
       value: integer
     });
-    if (fraction !== void 0) {
+    if (fraction2 !== void 0) {
       const decimalSepSymbol = style === "currency" && symbols.currencyDecimal != null ? symbols.currencyDecimal : symbols.decimal;
       result.push({
         type: "decimal",
         value: decimalSepSymbol
       }, {
         type: "fraction",
-        value: fraction
+        value: fraction2
       });
     }
     if ((notation === "scientific" || notation === "engineering") && x2.isFinite()) {
@@ -46570,38 +46570,105 @@ Please __addLocaleData before adding additional unit data`);
     };
   }
 
+  // src/components/valueColorScale.js
+  var hex2 = /^#[0-9a-f]{6}$/i;
+  var valueColorSchema = { type: "object", additionalProperties: false, required: ["field", "colors", "domain"], properties: { field: { type: "string", minLength: 1 }, colors: { type: "array", minItems: 2, maxItems: 64, items: { type: "string", pattern: "^#[0-9a-fA-F]{6}$" } }, reverse: { type: "boolean" }, opacity: { type: "number", minimum: 0, maximum: 1 }, domain: { type: "object", additionalProperties: false, required: ["mode"], properties: { mode: { enum: ["extent", "diverging", "fixed"] }, center: { type: "number" }, fullRange: { type: "boolean" }, min: { type: "number" }, max: { type: "number" } } } } };
+  function normalizeValueColor(input) {
+    if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some((key2) => !Object.hasOwn(valueColorSchema.properties, key2)) || typeof input.field !== "string" || !input.field.trim()) throw new Error("Value color requires an explicit measure field.");
+    if (!Array.isArray(input.colors) || input.colors.length < 2 || input.colors.length > 64 || input.colors.some((color) => !hex2.test(color))) throw new Error("Value color requires 2\u201364 six-digit hex stops.");
+    const domain = input.domain;
+    if (!domain || typeof domain !== "object" || Array.isArray(domain) || Object.keys(domain).some((key2) => !["mode", "center", "fullRange", "min", "max"].includes(key2)) || !["extent", "diverging", "fixed"].includes(domain.mode)) throw new Error("Value color requires an explicit domain policy.");
+    if (domain.mode === "extent" && Object.keys(domain).length !== 1) throw new Error("Extent color domain has no authored bounds.");
+    if (domain.mode === "diverging" && (!Number.isFinite(domain.center) || typeof domain.fullRange !== "boolean" || Object.keys(domain).length !== 3 || input.colors.length % 2 !== 1)) throw new Error("Diverging color domain requires a finite center, explicit fullRange and odd color count.");
+    if (domain.mode === "fixed" && (!Number.isFinite(domain.min) || !Number.isFinite(domain.max) || domain.min >= domain.max || Object.keys(domain).length !== 3)) throw new Error("Fixed color domain requires increasing finite bounds.");
+    if (input.reverse !== void 0 && typeof input.reverse !== "boolean") throw new Error("Value color reverse must be boolean.");
+    if (input.opacity !== void 0 && (!Number.isFinite(input.opacity) || input.opacity < 0 || input.opacity > 1)) throw new Error("Value color opacity must be between zero and one.");
+    return JSON.parse(JSON.stringify(input));
+  }
+  function resolveValueColor(input, rows) {
+    var _a5;
+    const config = normalizeValueColor(input), values = [];
+    for (const row of rows) {
+      const value = row == null ? void 0 : row[config.field];
+      if (value === void 0) throw new Error("Value color measure is missing.");
+      if (value === null) continue;
+      if (typeof value !== "number" || !Number.isFinite(value)) throw new Error("Value color measure must be finite or null.");
+      values.push(value);
+    }
+    let min, max;
+    if (config.domain.mode === "fixed") {
+      min = config.domain.min;
+      max = config.domain.max;
+    } else if (values.length) {
+      min = values.reduce((a4, b3) => Math.min(a4, b3), Infinity);
+      max = values.reduce((a4, b3) => Math.max(a4, b3), -Infinity);
+      if (config.domain.mode === "diverging") {
+        const center = config.domain.center;
+        if (config.domain.fullRange) {
+          min = Math.min(min, center);
+          max = Math.max(max, center);
+        } else {
+          const extent = Math.max(Math.abs(min - center), Math.abs(max - center));
+          min = center - extent;
+          max = center + extent;
+        }
+        if (!Number.isFinite(min) || !Number.isFinite(max)) throw new Error("Value color domain overflowed.");
+      }
+    }
+    return { field: config.field, colors: config.reverse ? [...config.colors].reverse() : [...config.colors], domain: min === void 0 ? null : config.domain.mode === "diverging" ? [min, config.domain.center, max] : [min, max], opacity: (_a5 = config.opacity) != null ? _a5 : 1 };
+  }
+  function fraction(value, min, max) {
+    if (min === max) return 0.5;
+    const span = max - min;
+    return Math.max(0, Math.min(1, Number.isFinite(span) ? (value - min) / span : (value / 2 - min / 2) / (max / 2 - min / 2)));
+  }
+  function valueColorAt(model, value) {
+    if (value === null) return null;
+    if (typeof value !== "number" || !Number.isFinite(value) || !model.domain) throw new Error("A finite value and resolved color domain are required.");
+    const fractionValue = model.domain.length === 3 ? value <= model.domain[1] ? model.domain[0] === model.domain[1] ? 0.5 : fraction(value, model.domain[0], model.domain[1]) * 0.5 : model.domain[1] === model.domain[2] ? 0.5 : 0.5 + fraction(value, model.domain[1], model.domain[2]) * 0.5 : fraction(value, ...model.domain);
+    const t3 = fractionValue * (model.colors.length - 1), index = Math.min(model.colors.length - 2, Math.floor(t3)), weight = t3 - index;
+    const channels = (color) => [1, 3, 5].map((i3) => parseInt(color.slice(i3, i3 + 2), 16)), a4 = channels(model.colors[index]), b3 = channels(model.colors[index + 1]);
+    return "#" + a4.map((v2, i3) => Math.round(v2 + (b3[i3] - v2) * weight).toString(16).padStart(2, "0")).join("");
+  }
+
   // src/reporting/reportKpiSparklineModel.js
   var kpiSparklineSchema = {
     type: "object",
     additionalProperties: false,
     required: ["datasetRef", "valueField", "categoryField"],
-    properties: { datasetRef: { type: "string", minLength: 1 }, valueField: { type: "string", minLength: 1 }, categoryField: { type: "string", minLength: 1 }, comparisonDatasetRef: { type: "string", minLength: 1 }, periodStartPath: { type: "string", minLength: 1 }, periodEndPath: { type: "string", minLength: 1 } }
+    properties: { datasetRef: { type: "string", minLength: 1 }, valueField: { type: "string", minLength: 1 }, categoryField: { type: "string", minLength: 1 }, comparisonDatasetRef: { type: "string", minLength: 1 }, periodStartPath: { type: "string", minLength: 1 }, periodEndPath: { type: "string", minLength: 1 }, valueColor: valueColorSchema }
   };
   function normalizeKpiSparkline(value) {
     if (value == null) return null;
     if (typeof value !== "object" || Array.isArray(value) || Object.keys(value).some((key2) => !Object.hasOwn(kpiSparklineSchema.properties, key2))) throw Error("Invalid KPI sparkline declaration.");
     const result = {};
     for (const key2 of Object.keys(kpiSparklineSchema.properties)) {
+      if (key2 === "valueColor") continue;
       if (["comparisonDatasetRef", "periodStartPath", "periodEndPath"].includes(key2) && value[key2] === void 0) continue;
       if (typeof value[key2] !== "string" || !value[key2].trim()) throw Error("KPI sparkline requires " + key2 + ".");
       result[key2] = value[key2].trim();
+    }
+    if (value.valueColor !== void 0) {
+      result.valueColor = normalizeValueColor(value.valueColor);
+      if (result.valueColor.field !== result.valueField) throw Error("KPI value color must use the plotted measure.");
     }
     if (Boolean(result.periodStartPath) !== Boolean(result.periodEndPath)) throw Error("KPI sparkline requires both period paths.");
     return result;
   }
   function materializeKpiSparkline(declaration, resolveDataset) {
+    var _a5, _b, _c, _d;
     const config = normalizeKpiSparkline(declaration);
     if (!config) return null;
     const read2 = (ref) => {
       const dataset = resolveDataset(ref);
       if (!dataset) throw Error("KPI sparkline dataset '" + ref + "' is unavailable.");
       const rows = [...dataset.rows || []].sort((a4, b3) => {
-        var _a5, _b;
-        return String((_a5 = a4[config.categoryField]) != null ? _a5 : "").localeCompare(String((_b = b3[config.categoryField]) != null ? _b : ""), "en", { numeric: true });
+        var _a6, _b2;
+        return String((_a6 = a4[config.categoryField]) != null ? _a6 : "").localeCompare(String((_b2 = b3[config.categoryField]) != null ? _b2 : ""), "en", { numeric: true });
       });
       const labels = rows.map((row) => {
-        var _a5;
-        return String((_a5 = row[config.categoryField]) != null ? _a5 : "");
+        var _a6;
+        return String((_a6 = row[config.categoryField]) != null ? _a6 : "");
       });
       if (labels.some((label) => !label) || new Set(labels).size !== labels.length) throw Error("KPI sparkline requires one row per category.");
       if (config.periodStartPath) {
@@ -46627,9 +46694,15 @@ Please __addLocaleData before adding additional unit data`);
       return { labels, values: rows.map((row) => isNumericValue(row[config.valueField]) ? Number(row[config.valueField]) : null) };
     };
     const current = read2(config.datasetRef);
+    let valueColor;
+    if (config.valueColor) {
+      const dataset = resolveDataset(config.datasetRef);
+      if (((_b = (_a5 = dataset.provenance) == null ? void 0 : _a5.hasMore) != null ? _b : dataset.hasMore) !== false || ((_c = dataset.provenance) == null ? void 0 : _c.truncated) || dataset.truncated || Number((_d = dataset.request) == null ? void 0 : _d.offset) > 0) throw Error("KPI value color requires a complete dataset.");
+      valueColor = resolveValueColor(config.valueColor, current.values.map((value) => ({ [config.valueField]: value })));
+    }
     const comparison = config.comparisonDatasetRef ? read2(config.comparisonDatasetRef) : null;
     if (config.periodStartPath && comparison && comparison.values.length !== current.values.length) throw Error("KPI sparkline comparison periods must have equal length.");
-    return { ...current, ...comparison ? { comparisonValues: comparison.values } : {} };
+    return { ...current, ...comparison ? { comparisonValues: comparison.values } : {}, ...valueColor ? { valueColor } : {} };
   }
   function kpiSparklineGeometry(content, width = 160, height = 36) {
     const series = [content == null ? void 0 : content.values, content == null ? void 0 : content.comparisonValues].map((values) => Array.isArray(values) ? values.map((v2) => isNumericValue(v2) ? Number(v2) : null) : []);
@@ -46648,14 +46721,38 @@ Please __addLocaleData before adding additional unit data`);
         open = true;
         return s4;
       }).filter(Boolean).join(" ");
-    }), points: series.map((values) => values.flatMap((v2, i3) => v2 === null ? [] : [{ ...point(v2, i3), isolated: values[i3 - 1] == null && values[i3 + 1] == null }])) };
+    }), points: series.map((values) => values.flatMap((v2, i3) => v2 === null ? [] : [{ ...point(v2, i3), index: i3, isolated: values[i3 - 1] == null && values[i3 + 1] == null }])) };
   }
   function buildKpiSparklineSvg(content, width = 160, height = 36) {
     const geometry = kpiSparklineGeometry(content, width, height);
     if (!geometry) return "";
-    const lines2 = geometry.paths.map((d4, i3) => d4 ? `<path d="${d4}" fill="none" stroke="${i3 ? "#6d7e8c" : "#2868a9"}" stroke-width="${i3 ? "1.25" : "1.75"}"${i3 ? ' stroke-dasharray="3 2"' : ""}/>` : "").join("");
-    const dots = geometry.points.flatMap((points, i3) => points.filter((p4) => p4.isolated).map((p4) => `<circle cx="${p4.x}" cy="${p4.y}" r="1.75" fill="${i3 ? "#6d7e8c" : "#2868a9"}"/>`)).join("");
+    const colored = kpiSparklineColorSegments(content, geometry);
+    const lines2 = geometry.paths.map((d4, i3) => d4 && !(i3 === 0 && colored) ? `<path d="${d4}" fill="none" stroke="${i3 ? "#6d7e8c" : "#2868a9"}" stroke-width="${i3 ? "1.25" : "1.75"}"${i3 ? ' stroke-dasharray="3 2"' : ""}/>` : "").join("") + (colored ? colored.map((s4) => `<path d="M${s4.x1},${s4.y1}L${s4.x2},${s4.y2}" fill="none" stroke="${s4.color}" stroke-opacity="${content.valueColor.opacity}" stroke-width="1.75"/>`).join("") : "");
+    const dots = geometry.points.flatMap((points, i3) => points.filter((p4) => p4.isolated).map((p4) => {
+      var _a5, _b;
+      return `<circle cx="${p4.x}" cy="${p4.y}" r="1.75" fill-opacity="${i3 ? 1 : (_b = (_a5 = content.valueColor) == null ? void 0 : _a5.opacity) != null ? _b : 1}" fill="${i3 ? "#6d7e8c" : content.valueColor ? valueColorAt(content.valueColor, content.values[pointIndex(content, p4, geometry)]) : "#2868a9"}"/>`;
+    })).join("");
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">${lines2}${dots}</svg>`;
+  }
+  function pointIndex(content, point, geometry) {
+    return point.index;
+  }
+  function kpiSparklineColorSegments(content, geometry) {
+    if (!(content == null ? void 0 : content.valueColor)) return null;
+    const model = content.valueColor;
+    if (!Array.isArray(model.colors) || model.colors.some((c3) => !/^#[0-9a-f]{6}$/i.test(c3)) || model.colors.length < 2 || model.colors.length > 64 || !Number.isFinite(model.opacity) || model.opacity < 0 || model.opacity > 1) throw Error("Invalid resolved KPI value color.");
+    if (model.domain !== null && (!Array.isArray(model.domain) || ![2, 3].includes(model.domain.length) || model.domain.some((v2) => !Number.isFinite(v2)) || model.domain.some((v2, i3) => i3 > 0 && v2 < model.domain[i3 - 1]))) throw Error("Invalid resolved KPI color domain.");
+    const points = geometry.points[0], segments = [];
+    for (let i3 = 1; i3 < points.length; i3++) {
+      const a4 = points[i3 - 1], b3 = points[i3], ai = pointIndex(content, a4, geometry), bi = pointIndex(content, b3, geometry);
+      if (bi !== ai + 1) continue;
+      const steps = Math.min(1024, Math.max(1, Math.ceil(Math.abs(b3.x - a4.x))));
+      for (let step = 0; step < steps; step++) {
+        const t0 = step / steps, t1 = (step + 1) / steps, t3 = (t0 + t1) / 2;
+        segments.push({ x1: a4.x + (b3.x - a4.x) * t0, y1: a4.y + (b3.y - a4.y) * t0, x2: a4.x + (b3.x - a4.x) * t1, y2: a4.y + (b3.y - a4.y) * t1, color: valueColorAt(model, content.values[ai] * (1 - t3) + content.values[bi] * t3) });
+      }
+    }
+    return segments;
   }
 
   // src/reporting/reportKpiComparisonModel.js
@@ -59177,12 +59274,12 @@ ${indent}${end}`;
     return match2 ? match2[1] : "";
   }
   function buildReportVisualTint(color = "", amount = 0.86) {
-    const hex2 = normalizeHexColor(color);
-    if (!hex2) {
+    const hex3 = normalizeHexColor(color);
+    if (!hex3) {
       return "";
     }
     const ratio = Math.max(0, Math.min(1, Number(amount) || 0));
-    const channels = [0, 2, 4].map((offset) => Number.parseInt(hex2.slice(offset, offset + 2), 16));
+    const channels = [0, 2, 4].map((offset) => Number.parseInt(hex3.slice(offset, offset + 2), 16));
     const tinted = channels.map((channel) => Math.round(channel + (255 - channel) * ratio).toString(16).padStart(2, "0")).join("");
     return `#${tinted}`;
   }
@@ -60512,7 +60609,7 @@ ${indent}${end}`;
     runtimeSelection = {},
     tablePresentations = null
   } = {}) {
-    var _a5, _b, _c, _d, _e, _f, _g, _h, _i;
+    var _a5, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
     const normalizedReportSpec = cloneValue24(reportSpec || {});
     const specHash = buildReportSpecHash(normalizedReportSpec);
     const normalizedScopeParams = normalizeReportSpecScopeParams(normalizedReportSpec);
@@ -60524,15 +60621,20 @@ ${indent}${end}`;
     }
     const calculatedFields = cloneReportCalculatedFields((normalizedReportSpec == null ? void 0 : normalizedReportSpec.calculatedFields) || []);
     for (const block of (normalizedReportSpec == null ? void 0 : normalizedReportSpec.blocks) || []) {
-      if (((_a5 = block.runtime) == null ? void 0 : _a5.requireCompleteDataset) === true) {
-        const payload2 = datasetPayloads == null ? void 0 : datasetPayloads[block.datasetRef];
-        const source = (_b = normalizedReportSpec.datasets) == null ? void 0 : _b.find((dataset) => dataset.id === block.datasetRef);
-        if (!payload2 || payload2.hasMore !== false || payload2.truncated === true || ((_c = payload2.provenance) == null ? void 0 : _c.hasMore) === true || ((_d = payload2.provenance) == null ? void 0 : _d.truncated) === true || Number((_e = source == null ? void 0 : source.request) == null ? void 0 : _e.offset) > 0) throw new Error("Block requires explicitly complete dataset input.");
+      if ((_a5 = block.sparkline) == null ? void 0 : _a5.valueColor) {
+        const ref2 = block.sparkline.datasetRef, payload2 = datasetPayloads == null ? void 0 : datasetPayloads[ref2];
+        const source = (_b = normalizedReportSpec.datasets) == null ? void 0 : _b.find((dataset) => dataset.id === ref2);
+        if (!payload2 || payload2.hasMore !== false || payload2.truncated === true || ((_c = payload2.provenance) == null ? void 0 : _c.hasMore) === true || ((_d = payload2.provenance) == null ? void 0 : _d.truncated) === true || Number((_e = source == null ? void 0 : source.request) == null ? void 0 : _e.offset) > 0) throw new Error("KPI value color requires explicitly complete dataset input.");
       }
-      const ref = (_g = (_f = block == null ? void 0 : block.chartSpec) == null ? void 0 : _f.center) == null ? void 0 : _g.datasetRef;
+      if (((_f = block.runtime) == null ? void 0 : _f.requireCompleteDataset) === true) {
+        const payload2 = datasetPayloads == null ? void 0 : datasetPayloads[block.datasetRef];
+        const source = (_g = normalizedReportSpec.datasets) == null ? void 0 : _g.find((dataset) => dataset.id === block.datasetRef);
+        if (!payload2 || payload2.hasMore !== false || payload2.truncated === true || ((_h = payload2.provenance) == null ? void 0 : _h.hasMore) === true || ((_i = payload2.provenance) == null ? void 0 : _i.truncated) === true || Number((_j = source == null ? void 0 : source.request) == null ? void 0 : _j.offset) > 0) throw new Error("Block requires explicitly complete dataset input.");
+      }
+      const ref = (_l = (_k = block == null ? void 0 : block.chartSpec) == null ? void 0 : _k.center) == null ? void 0 : _l.datasetRef;
       if (!ref) continue;
       const payload = datasetPayloads == null ? void 0 : datasetPayloads[ref];
-      if (!payload || payload.hasMore !== false || payload.truncated === true || ((_h = payload.provenance) == null ? void 0 : _h.hasMore) === true || ((_i = payload.provenance) == null ? void 0 : _i.truncated) === true) throw new Error("Donut center requires explicitly complete scalar input.");
+      if (!payload || payload.hasMore !== false || payload.truncated === true || ((_m = payload.provenance) == null ? void 0 : _m.hasMore) === true || ((_n = payload.provenance) == null ? void 0 : _n.truncated) === true) throw new Error("Donut center requires explicitly complete scalar input.");
     }
     const datasets = (Array.isArray(normalizedReportSpec == null ? void 0 : normalizedReportSpec.datasets) ? normalizedReportSpec.datasets : []).map((dataset) => buildReportFillDataset(dataset, (datasetPayloads == null ? void 0 : datasetPayloads[normalizeString36(dataset == null ? void 0 : dataset.id)]) || {}, calculatedFields));
     const datasetsById = new Map(datasets.map((dataset) => [dataset.id, dataset]));
@@ -61487,8 +61589,8 @@ ${indent}${end}`;
     return `${line} ${closing}`;
   }
   function resolveArcSegmentCount(angle = 0) {
-    const fraction = Math.max(0, Math.abs(angle) / (Math.PI * 2));
-    return Math.max(6, Math.ceil(fraction * 48));
+    const fraction2 = Math.max(0, Math.abs(angle) / (Math.PI * 2));
+    return Math.max(6, Math.ceil(fraction2 * 48));
   }
   function buildArcPoints({
     cx = 0,
@@ -61560,8 +61662,8 @@ ${indent}${end}`;
     const innerRadius = chartType === "donut" ? r2 * (center ? 0.7 : 0.56) : 0;
     let startAngle = -Math.PI / 2;
     const paths = slices.map((slice, index) => {
-      const fraction = slice.value / total;
-      const angle = fraction * 2 * Math.PI;
+      const fraction2 = slice.value / total;
+      const angle = fraction2 * 2 * Math.PI;
       const endAngle = startAngle + angle;
       const fill = printColor(resolveChartCategoryColor(chartModel, slice.name, palette[index % palette.length]));
       const outerPath = (() => {
@@ -61701,9 +61803,9 @@ ${indent}${end}`;
       bounds
     });
     const yTicks = Array.from({ length: 4 }, (_2, index) => {
-      const fraction = index / 3;
-      const value = bounds.maxValue - fraction * valueRange;
-      const y4 = topPad + fraction * plotHeight;
+      const fraction2 = index / 3;
+      const value = bounds.maxValue - fraction2 * valueRange;
+      const y4 = topPad + fraction2 * plotHeight;
       return {
         value,
         y: y4
@@ -61917,9 +62019,9 @@ ${indent}${end}`;
     });
     const makeTicks = (count) => Array.from({ length: count }, (_2, index) => {
       var _a5;
-      const fraction = index / (count - 1);
-      const value = bounds.minValue + fraction * valueRange;
-      const x2 = leftPad + fraction * plotWidth;
+      const fraction2 = index / (count - 1);
+      const value = bounds.minValue + fraction2 * valueRange;
+      const x2 = leftPad + fraction2 * plotWidth;
       return {
         value,
         x: x2,
