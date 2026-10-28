@@ -20,6 +20,11 @@ assert.deepEqual(resolveThemeAwareChartPalette(['#1f77b4', '#ff7f0e']), [
 ]);
 assert.deepEqual(resolveChartTypography(null), {
     family: 'system-ui, sans-serif',
+    bodyFamily: 'system-ui, sans-serif',
+    bodyWeight: 400,
+    bodyLetterSpacing: '0em',
+    bodySize: 14,
+    bodyLineHeight: 20,
     captionFamily: 'system-ui, sans-serif',
     captionWeight: 400,
     captionLetterSpacing: '0em',
