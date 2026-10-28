@@ -50,8 +50,16 @@ func (s *Service) FetchResourceDatasource(ctx context.Context, owner identity.Re
 	if pin == nil || !identity.MetadataExpiryValid(pin.ValidUntil, s.now()) {
 		return nil, identity.ErrResourceDenied
 	}
+	var published PublishedResourceVerifier
+	if pin.Kind == identity.PublishedCandidate {
+		var ok bool
+		published, ok = reader.(PublishedResourceVerifier)
+		if !ok {
+			return nil, identity.ErrResourceDenied
+		}
+	}
 	var envelope registry.ReportEnvelope
-	if json.Unmarshal(raw, &envelope) != nil || envelope.SchemaVersion != 1 {
+	if json.Unmarshal(raw, &envelope) != nil || !(envelope.SchemaVersion == 1 || published != nil && envelope.SchemaVersion == 2 && envelope.Format == registry.ResourceReportFormat) {
 		return nil, identity.ErrResourceDenied
 	}
 	var descriptor dsproto.DataSource
@@ -76,6 +84,12 @@ func (s *Service) FetchResourceDatasource(ctx context.Context, owner identity.Re
 	}
 	if !identity.MetadataExpiryValid(pin.ValidUntil, s.now()) {
 		return nil, identity.ErrResourceDenied
+	}
+	if published != nil {
+		if err := published.VerifyPublishedResource(ctx, *pin); err != nil {
+			return nil, err
+		}
+		return out, nil
 	}
 	_, fresh, err := reader.ReadResolved(ctx, *pin)
 	if err != nil {

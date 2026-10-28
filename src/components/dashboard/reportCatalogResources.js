@@ -70,7 +70,8 @@ export async function readReportCatalogResource(report, reportStore) {
     const result = await reportStore.getReport(buildReportCatalogResourceRequest(report));
     const resolved = result?.resource;
     if (!object(resolved) || resolved.uri !== report.resourceUri
-        || !["working", "stamped"].includes(resolved.kind)
+        || !["working", "stamped", "published"].includes(resolved.kind)
+        || (resolved.kind === "published" && !!resolved.revision)
         || !resolved.contentFingerprint || !resolved.authorityBinding || !resolved.validUntil) {
         throw new Error("The report service did not return the selected resource. Refresh and try again.");
     }

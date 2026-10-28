@@ -239,16 +239,13 @@ func (c *WindowCatalog) getForProvider(ctx context.Context, explicitOwner string
 		ref = *input.Resource
 	}
 	ctx = requestctx.WithWindowTarget(ctx, input.Target)
-	result, e := GetWithCodec[*types.CompiledWindowResource](ctx, c.Gateway, loc.Connection, ref, input.ResolvedResource, DefinitionCodec[*types.CompiledWindowResource]{ID: "forge.window.resource.v1", Parse: types.CompileWindowResource})
+	selectionTiming := observe.Start(ctx, "window.target.select", observe.Labels{})
+	read, e := c.readWindow(ctx, loc.Connection, ref, input.ResolvedResource, input.Target)
+	selectionTiming.End(observe.OutcomeFor(e), observe.CacheUnknown)
 	if e != nil {
 		return nil, fmt.Errorf("window read/select: %w", e)
 	}
-	selectionTiming := observe.Start(ctx, "window.target.select", observe.Labels{})
-	selected, e := result.Definition.Select(input.Target)
-	selectionTiming.End(observe.OutcomeFor(e), observe.CacheUnknown)
-	if e != nil {
-		return nil, e
-	}
+	result, selected := read.result, read.variant
 	if selected == nil {
 		return nil, identity.ErrResourceDenied
 	}
@@ -289,7 +286,7 @@ func (c *WindowCatalog) getForProvider(ctx context.Context, explicitOwner string
 		return nil, identity.ErrResourceDenied
 	}
 	var dependencyPins map[string]identity.ResolvedResource
-	if len(selected.DataSourceResources) > 0 && !result.Definition.IndependentDefinitions() {
+	if pin.Kind != identity.PublishedCandidate && len(selected.DataSourceResources) > 0 && !read.independent {
 		var existing map[string]identity.ResolvedResource
 		if input.Target != nil && input.Target.SelectionToken != "" {
 			if e = c.TargetProof.Verify(ctx, pin, *input.Target, selected.Fingerprint, input.Target.SelectionToken); e != nil {
@@ -346,7 +343,7 @@ func (c *WindowCatalog) getForProvider(ctx context.Context, explicitOwner string
 	if err := projectWindowDatasourceTransport(definition, selected.DataSources, c.nativeHTTPWindows[nativeConnection][loc.URI]); err != nil {
 		return nil, err
 	}
-	if result.Definition.IndependentDefinitions() {
+	if read.independent {
 		projectIndependentDatasourceTransport(definition, selected.DataSourceResources)
 	}
 	if c.Gateway.generation(loc.Connection.Name) != loc.Connection.Generation {
@@ -354,6 +351,11 @@ func (c *WindowCatalog) getForProvider(ctx context.Context, explicitOwner string
 	}
 	if ctx.Err() != nil || !identity.MetadataExpiryValid(pin.ValidUntil, time.Now()) {
 		return nil, identity.ErrResourceDenied
+	}
+	if pin.Kind == identity.PublishedCandidate {
+		if e = c.Gateway.verifyPublishedPin(ctx, loc.Connection, pin); e != nil {
+			return nil, e
+		}
 	}
 	definition.Resource = &pin
 	definition.ResourceTarget = &target
@@ -406,6 +408,16 @@ func (c *WindowCatalog) CheckWindowContent(ctx context.Context, key string, pin 
 		if err != nil || uri.Kind != "window" || uri.String() != pin.URI {
 			return identity.ErrResourceDenied
 		}
+	}
+	if pin.Kind == identity.PublishedCandidate {
+		uri, _ := identity.ParseResourceURI(pin.URI)
+		source, ok := c.Gateway.publishedNamespace(uri.Namespace)
+		if !ok {
+			return identity.ErrResourceDenied
+		}
+		connection := source.connection
+		connection.Generation = c.Gateway.generation(connection.Name)
+		return c.Gateway.verifyPublishedPin(ctx, connection, pin)
 	}
 	if check := c.ContentCurrent[pin.ProviderIdentity]; check != nil {
 		if err := check(ctx, pin); err != nil {

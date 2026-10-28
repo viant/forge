@@ -81,6 +81,23 @@ func (s *resourceReadSequence) selectionKey(ctx context.Context, read selectedRe
 	if err != nil {
 		return "", err
 	}
+	uri, err := identity.ParseResourceURI(read.pin.URI)
+	if err != nil {
+		return "", err
+	}
+	if source, covered, err := s.gateway.publishedForURI(read.connection, uri); covered {
+		if err != nil {
+			return "", err
+		}
+		admission, err := source.source.AdmissionKey(ctx)
+		if err != nil {
+			return "", err
+		}
+		if admission == "" {
+			return "", identity.ErrResourceDenied
+		}
+		return publishedAuthority(actor, source, uri, read.pin.ContentFingerprint, admission), nil
+	}
 	options, err := s.gateway.Manager.Options(ctx, read.connection.Name)
 	if err != nil {
 		return "", err
@@ -395,6 +412,12 @@ func (s *resourceReadSequence) refreshSelectedResources(ctx context.Context) err
 			if err != nil || routed != held.connection {
 				return identity.ErrResourceDenied
 			}
+		}
+		if held.pin.Kind == identity.PublishedCandidate {
+			if err := s.gateway.verifyPublishedPin(ctx, held.connection, held.pin); err != nil {
+				return err
+			}
+			continue
 		}
 		current, err := get[json.RawMessage](ctx, s.gateway, held.connection, identity.ResourceRef{URI: held.pin.URI, Revision: held.pin.Selector()}, &held.pin, true, false)
 		if err != nil {

@@ -17,6 +17,28 @@ func (g *Gateway) ConnectionForProvider(ctx context.Context, owner string) (Conn
 	return g.dependencyConnection(ctx, Connection{}, owner)
 }
 func (g *Gateway) ConnectionForResource(ctx context.Context, uri identity.ResourceURI, owner string) (result Connection, resultErr error) {
+	for _, source := range g.publishedRegistrations() {
+		if source.namespaces[uri.Namespace] {
+			if owner != "" && owner != source.connection.ProviderIdentity {
+				return Connection{}, identity.ErrResourceDenied
+			}
+			actor, err := g.actor(ctx)
+			if err != nil {
+				return Connection{}, err
+			}
+			caps, err := g.publishedCapabilities(ctx, source)
+			if err != nil {
+				return Connection{}, err
+			}
+			if !supports(caps, uri.Namespace, uri.Kind, "get") {
+				return Connection{}, identity.ErrResourceDenied
+			}
+			if err = g.final(ctx, actor); err != nil {
+				return Connection{}, err
+			}
+			return caps.connection, nil
+		}
+	}
 	span := observe.Start(ctx, "gateway.routing", observe.Labels{Kind: uri.Kind})
 	defer func() { span.End(observe.OutcomeFor(resultErr), observe.CacheUnknown) }()
 	if connection, found, err := g.configuredOwnerConnection(ctx, owner); owner != "" && (found || err != nil) {
@@ -99,6 +121,22 @@ func (c *WindowCatalog) verifyDependencyReads(ctx context.Context, parent identi
 	if e := c.TargetProof.Verify(ctx, parent, *target, variant.Fingerprint, target.SelectionToken); e != nil {
 		return nil, e
 	}
+	if parent.Kind == identity.PublishedCandidate {
+		if len(target.DependencyPins) > 0 {
+			return nil, identity.ErrResourceDenied
+		}
+		uri, err := identity.ParseResourceURI(parent.URI)
+		if err != nil {
+			return nil, err
+		}
+		source, ok := c.Gateway.publishedNamespace(uri.Namespace)
+		if !ok {
+			return nil, identity.ErrResourceDenied
+		}
+		connection := source.connection
+		connection.Generation = c.Gateway.generation(connection.Name)
+		return nil, c.Gateway.verifyPublishedPin(ctx, connection, parent)
+	}
 	if len(variant.DataSourceResources) == 0 {
 		if len(target.DependencyPins) > 0 {
 			return nil, identity.ErrResourceDenied
@@ -130,15 +168,12 @@ func (c *WindowCatalog) ResolveDatasource(ctx context.Context, parent identity.R
 	if e != nil {
 		return nil, e
 	}
-	definition, e := GetWithCodec[*types.CompiledWindowResource](ctx, c.Gateway, connection, identity.ResourceRef{URI: parent.URI, Revision: parent.Selector()}, &parent, DefinitionCodec[*types.CompiledWindowResource]{ID: "forge.window.resource.v1", Parse: types.CompileWindowResource})
+	read, e := c.readWindow(ctx, connection, identity.ResourceRef{URI: parent.URI, Revision: parent.Selector()}, &parent, target)
 	if e != nil {
 		return nil, e
 	}
-	variant, e := definition.Definition.Select(target)
-	if e != nil {
-		return nil, e
-	}
-	if definition.Definition.IndependentDefinitions() {
+	definition, variant := read.result, read.variant
+	if read.independent {
 		return c.resolveIndependentDatasource(ctx, connection, definition, parent, target, id, variant)
 	}
 	reads, e := c.verifyDependencyReads(ctx, parent, target, variant, sequenceFromContext(ctx) != nil)
@@ -156,6 +191,9 @@ func (c *WindowCatalog) ResolveDatasource(ctx context.Context, parent identity.R
 	reads = append(reads, selectedResourceRead{connection: connection, pin: parent, result: definition.GetResult, definitionCache: definition.definitionCache})
 	if e = c.registerSelectedDatasource(ctx, parent, target, id, variant, reads); e != nil {
 		return nil, e
+	}
+	if parent.Kind == identity.PublishedCandidate {
+		return &datasource, c.Gateway.verifyPublishedPin(ctx, connection, parent)
 	}
 	if _, e = Get[json.RawMessage](ctx, c.Gateway, connection, identity.ResourceRef{URI: parent.URI}, &parent); e != nil {
 		return nil, e

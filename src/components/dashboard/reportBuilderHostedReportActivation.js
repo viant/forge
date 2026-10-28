@@ -176,8 +176,8 @@ export function resolveHostedReportWorkspaceMode(container = null) {
 
 export function buildHostedReportActivationRequest(reportId = "", artifactId = "", pin = null) {
  if (pin) {
- if (pin.uri !== normalizeString(reportId) || !["working","stamped"].includes(pin.kind) || !pin.contentFingerprint || !pin.authorityBinding) throw new Error("Selected report resource is invalid.");
- return {resource: {uri: pin.uri, revision: pin.kind === "working" ? "working" : pin.revision}, resolvedResource: cloneValue(pin), reportId: pin.uri};
+ if (pin.uri !== normalizeString(reportId) || !["working","stamped","published"].includes(pin.kind) || (pin.kind === "published" && !!pin.revision) || !pin.contentFingerprint || !pin.authorityBinding) throw new Error("Selected report resource is invalid.");
+ return {resource: pin.kind === "published" ? {uri:pin.uri} : {uri: pin.uri, revision: pin.kind === "working" ? "working" : pin.revision}, resolvedResource: cloneValue(pin), reportId: pin.uri};
  }
     const normalizedArtifactId = normalizeString(artifactId);
     if (normalizedArtifactId) {

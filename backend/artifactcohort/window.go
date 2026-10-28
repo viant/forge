@@ -10,7 +10,7 @@ import (
 )
 
 // OpenWindowVariant selects one variant from a producer-validated, closed
-// schema 2 artifact. It does not walk dependencies or ask the producer to
+// schema 2/3 artifact. It does not walk dependencies or ask the producer to
 // revalidate the graph. The returned variant is request-owned and includes its
 // inline datasource descriptors for the existing authorized execution path.
 func (r *Replica) OpenWindowVariant(ctx context.Context, uri string, requested *types.WindowTarget) (selected *types.WindowResourceVariant, selectedHash string, openErr error) {
@@ -37,7 +37,7 @@ func (r *Replica) OpenWindowVariant(ctx context.Context, uri string, requested *
 	if err != nil {
 		return nil, "", ErrInvalid
 	}
-	if envelope.SchemaVersion != 2 || envelope.Format != types.WindowBundleFormat {
+	if !(envelope.SchemaVersion == 2 && envelope.Format == types.WindowBundleFormat || envelope.SchemaVersion == 3 && envelope.Format == types.WindowReferencesFormat) {
 		return nil, "", ErrInvalid
 	}
 	target := types.WindowTarget{}
