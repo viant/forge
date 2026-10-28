@@ -363,6 +363,10 @@ export function aggregateDirectSeriesData(rawData = [], xAxisKey = "", seriesDef
     );
 }
 
+export function chartCategoryRowOptions(chart = {}) {
+    return {includeNonPositive: chart.appearance === 'document'};
+}
+
 export function buildPieChartData(rawData = [], nameKey = "", valueKey = "", {includeNonPositive = false} = {}) {
     const resolvedNameKey = normalizeChartKey(nameKey);
     const resolvedValueKey = normalizeChartKey(valueKey);

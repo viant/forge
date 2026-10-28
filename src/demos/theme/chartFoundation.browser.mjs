@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 export async function verifyChartFoundation(page,{expectedFont}={}) {
     const specimen = page.getByRole('region',{name:'Chart foundation',exact:true});
     const example = id => specimen.locator(`[data-chart-example="${id}"]`);
-    assert.equal(await specimen.locator('[data-chart-example]').count(),10);
+    assert.equal(await specimen.locator('[data-chart-example]').count(),17);
     const line = example('line');
     await line.locator('.recharts-line-curve').first().waitFor();
     for (const id of ['line','area','bar','composed','stacked']) assert.ok(await example(id).locator('svg.recharts-surface').count()>0,id);
@@ -34,6 +34,49 @@ export async function verifyChartFoundation(page,{expectedFont}={}) {
     assert.equal(await points.nth(1).evaluate(node=>node===document.activeElement),true);
     await points.nth(1).press('Enter');
     assert.match(await specimen.locator(':scope > [role="status"]').textContent(),/selections recorded: 2/);
+    const matrix=example('heatmap');
+    const cells=matrix.locator('[data-cell]');
+    assert.equal(await cells.count(),9);
+    assert.equal(await cells.nth(2).getAttribute('aria-label'),'Monday, Evening: 0');
+    assert.equal(await cells.nth(4).getAttribute('aria-label'),'Tuesday, Afternoon: No data');
+    assert.equal(await cells.nth(8).getAttribute('aria-label'),'Wednesday, Evening: No data');
+    await cells.first().focus();await cells.first().press('ArrowRight');
+    assert.equal(await cells.nth(1).evaluate(node=>node===document.activeElement),true);
+    assert.equal(await cells.nth(1).evaluate(node=>getComputedStyle(node).outlineStyle),'solid');
+    await cells.nth(1).press('Enter');
+    assert.match(await specimen.locator(':scope > [role="status"]').textContent(),/selections recorded: 3/);
+    const matrixColors=await cells.locator('rect').evaluateAll(nodes=>nodes.map(n=>n.getAttribute('fill')));
+    assert.notEqual(matrixColors[2],matrixColors[4]);assert.equal(matrixColors[4],matrixColors[8]);
+    const scroller=matrix.locator('.forge-categorical-heatmap');
+    assert.equal(await scroller.evaluate(n=>getComputedStyle(n).overflowX),'auto');
+    assert.equal(await cells.first().evaluate(n=>n.getBoundingClientRect().height>=44),true);
+    const ranges=example('category-range');
+    const rangeMarks=ranges.locator('[data-category]');
+    assert.equal(await rangeMarks.count(),9);
+    assert.equal(await rangeMarks.nth(2).getAttribute('aria-label'),'Room A, Target: 22 °C');
+    assert.equal(await rangeMarks.nth(5).getAttribute('aria-label'),'Room B, Target: 23 °C');
+    assert.equal(await rangeMarks.nth(8).getAttribute('aria-label'),'Room C, Target: 20 °C');
+    await rangeMarks.nth(2).focus();
+    assert.equal(await rangeMarks.nth(2).evaluate(n=>getComputedStyle(n).outlineStyle),'solid');
+    await rangeMarks.nth(2).press('Enter');
+    assert.match(await specimen.locator(':scope > [role="status"]').textContent(),/selections recorded: 4/);
+    assert.equal(await rangeMarks.nth(2).evaluate(n=>n.getBoundingClientRect().height>=44),true);
+    assert.equal(await ranges.locator('.forge-category-range').evaluate(n=>getComputedStyle(n).overflowX),'auto');
+    assert.equal(await example('category-range-signed').locator('[data-category]').count(),15);
+    assert.equal(await ranges.locator('.forge-category-range').evaluate(n=>n.getBoundingClientRect().right<=innerWidth+1),true);
+    const center=example('donut-center').locator('[data-forge-donut-center]');
+    assert.match(await center.getAttribute('aria-label'),/Catalogued items: 500/);
+    assert.match(await example('donut-center-occupancy').locator('[data-forge-donut-center]').getAttribute('aria-label'),/72.5%/);
+    assert.match(await example('donut-center-long').locator('[data-forge-donut-center-details]').textContent(),/complete synthetic collection/);
+    for(const [id,label] of [['donut-center','Catalogued items'],['donut-center-occupancy','Occupancy rate']]) {
+      const lines=await example(id).locator('[data-forge-donut-center] text').evaluateAll(nodes=>nodes.slice(1).map(node=>node.textContent));
+      if(lines.length)assert.equal(lines.join(' '),label);
+      else assert.ok((await example(id).locator('[data-forge-donut-center-details]').textContent()).includes(label));
+      assert.ok(lines.every(line=>line===line.trim()));
+    }
+    for(const id of ['donut-center','donut-center-occupancy','donut-center-long']) {
+      assert.equal(await example(id).locator('[data-forge-donut-center]').evaluate(node=>{const cx=Number(node.dataset.centerCx),cy=Number(node.dataset.centerCy),r=Number(node.dataset.centerRadius);return [...node.querySelectorAll('text')].every(text=>{const b=text.getBBox();return [[b.x,b.y],[b.x+b.width,b.y],[b.x,b.y+b.height],[b.x+b.width,b.y+b.height]].every(([x,y])=>Math.hypot(x-cx,y-cy)<=r+1);});}),true,'Center text fits its hole');
+    }
     const pie=example('pie');
     await pie.getByRole('button',{name:'Table',exact:true}).click();
     assert.equal(await pie.locator('tbody tr').count(),3);
@@ -48,10 +91,10 @@ export async function verifyChartFoundation(page,{expectedFont}={}) {
     for(const [value,message] of [['empty','No data for the selected period.'],['loading','Loading chart…'],['error','Example chart could not load. Try again.'],['zero','All values are zero for the selected period.']]) {
         await state.selectOption(value);
         await specimen.getByText(message,{exact:true}).first().waitFor();
-        assert.equal(await specimen.getByText(message,{exact:true}).count(),10,`${value} covers every example`);
+        assert.equal(await specimen.getByText(message,{exact:true}).count(),['loading','error'].includes(value)?17:10,`${value} covers applicable examples`);
     }
     await state.selectOption('negative');
-    assert.equal(await specimen.getByText('Pie and donut charts require non-negative values. Use a bar chart to compare negative values.',{exact:true}).count(),2);
+    assert.equal(await specimen.getByText('Pie and donut charts require non-negative values. Use a bar chart to compare negative values.',{exact:true}).count(),5);
     for (const bar of await comparison.locator('.forge-chart-comparison-track > span').evaluateAll(nodes=>nodes.map(node=>({left:parseFloat(node.style.left),width:parseFloat(node.style.width)})))) assert.ok(bar.left>=0 && bar.width>=0 && bar.left+bar.width<=100.001);
     await state.selectOption('sparse');
     await line.locator('.recharts-line-curve').first().waitFor();
@@ -72,11 +115,11 @@ export async function verifyChartFoundation(page,{expectedFont}={}) {
     const typography=await line.locator('.recharts-cartesian-axis-tick text').first().evaluate(node=>{const css=getComputedStyle(node);return {size:parseFloat(css.fontSize),roleSize:parseFloat(css.getPropertyValue('--forge-type-small-size')),family:css.fontFamily,weight:Number(css.fontWeight),roleWeight:Number(css.getPropertyValue('--forge-type-small-weight'))};});
     assert.equal(typography.size,typography.roleSize);
     assert.equal(typography.weight,typography.roleWeight);
-    const overflow=await specimen.evaluate(root=>[...root.querySelectorAll('*')].filter(node=>{const rect=node.getBoundingClientRect();return rect.width>0 && rect.right>innerWidth+1 && !node.closest('.forge-chart-table-scroll') && getComputedStyle(node).position!=='fixed';}).map(node=>node.className?.baseVal||node.className).slice(0,5));
+    const overflow=await specimen.evaluate(root=>[...root.querySelectorAll('*')].filter(node=>{const rect=node.getBoundingClientRect();return rect.width>0 && rect.right>innerWidth+1 && !node.closest('.forge-chart-table-scroll, .forge-categorical-heatmap, .forge-category-range') && getComputedStyle(node).position!=='fixed';}).map(node=>node.className?.baseVal||node.className).slice(0,5));
     assert.deepEqual(overflow,[],'Chart examples must fit the page');
     const clippedValueTicks=await specimen.locator('.recharts-yAxis .recharts-cartesian-axis-tick text').evaluateAll(nodes=>nodes.filter(node=>{const rect=node.getBoundingClientRect(),svg=node.closest('svg').getBoundingClientRect();return rect.width>0 && rect.left<svg.left-1;}).map(node=>node.textContent));
     assert.deepEqual(clippedValueTicks,[],'Numeric axis labels must fit inside their chart');
-    return {examples:10,states:7,selection:'keyboard comparison and series toggle',table:'pie data',sparse:'gaps and common scale',typography};
+    return {examples:17,states:7,selection:'keyboard comparison and series toggle',table:'pie data',sparse:'gaps and common scale',typography};
 }
 
 export async function verifyAuthoredCharts(page,charts,referenceStyles=[]) {

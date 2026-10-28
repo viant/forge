@@ -1,3 +1,4 @@
+import {buildTableHierarchy,hierarchyRows,interactiveTableColumns} from './reportTableAnalytics.js';
 import {resolveTableLink} from '../utils/tableLink.js';
 import {buildRuntimeTableRows} from './reportRuntimeTableRows.js';
 import {compareDashboardTableValues} from '../components/dashboard/dashboardTableSort.js';
@@ -17,10 +18,12 @@ export function applyReportTablePresentations(reportFill, presentations = null) 
   for (const [id, state] of Object.entries(presentations)) {
     const block = blocks.get(id);
     if (!block || block.kind !== 'tableBlock') throw Error(`Unknown report table: ${id}.`);
-    if (!object(state) || !fields(state, ['filter', 'sort'])) throw Error(`Invalid presentation for table ${id}.`);
+    if (!object(state) || !fields(state, ['filter', 'sort', 'expandedKeys'])) throw Error(`Invalid presentation for table ${id}.`);
+    if(state.expandedKeys!==undefined&&(!Array.isArray(state.expandedKeys)||state.expandedKeys.some(key=>typeof key!=='string')))throw Error('Invalid hierarchy expanded keys.');
     const filter = state.filter ?? '';
     if (typeof filter !== 'string' || filter.length > 4096) throw Error(`Invalid filter for table ${id}.`);
-    const columns = block.content?.columns;
+    const allColumns = block.content?.columns;
+    const columns=Array.isArray(allColumns)?interactiveTableColumns(allColumns,block.hierarchy):allColumns;
     const rows = block.content?.resolvedRows;
     if (!Array.isArray(columns) || !Array.isArray(rows)) throw Error(`Report table ${id} is not materialized.`);
     const sort = state.sort;
@@ -38,9 +41,15 @@ export function applyReportTablePresentations(reportFill, presentations = null) 
       return [column.key,link ? link.text : value];
     }))]));
     const query = filter.trim().toLowerCase();
-    const selected = query ? rows.filter(row => (row.cells || []).some(cell =>
+    let selected = query ? rows.filter(row => (row.cells || []).some(cell =>
       columns.some(column => column.key === cell.key) && String(values.get(row).get(cell.key) ?? '').toLowerCase().includes(query))) : rows.slice();
-    if (sortColumn) selected.sort((a, b) => compareDashboardTableValues(
+    if(block.hierarchy){
+      const model=buildTableHierarchy(runtimeRows,{...block.hierarchy,totals:{mode:'producer'}});
+      const matches=query?new Set(selected.map(row=>runtimeRows[rows.indexOf(row)][block.hierarchy.keyField])):null;
+      const sourceRows=new Map(runtimeRows.map((row,index)=>[row,rows[index]]));
+      const comparison=sortColumn?(a,b)=>compareDashboardTableValues(values.get(sourceRows.get(a)).get(sort.key),values.get(sourceRows.get(b)).get(sort.key),sortColumn,sort.direction):null;
+      selected=hierarchyRows(model,{matchedKeys:matches,compare:comparison}).nodes.map(node=>rows[node.sourceIndex]);
+    } else if (sortColumn) selected.sort((a, b) => compareDashboardTableValues(
       values.get(a).get(sort.key),
       values.get(b).get(sort.key), sortColumn, sort.direction));
     replacements.set(id, {...block, content: {...block.content, rowCount: selected.length, resolvedRows: selected}});

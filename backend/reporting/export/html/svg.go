@@ -28,6 +28,12 @@ var svgElements = map[string]bool{
 // inert drawing primitives and attributes so no active or linked content can be
 // carried into the HTML document.
 func validateEmbeddedSVG(input string) error {
+	return ValidateEmbeddedSVG(input)
+}
+
+// ValidateEmbeddedSVG admits only self-contained inert drawing primitives.
+// Other document exporters use the same boundary before embedding SVG assets.
+func ValidateEmbeddedSVG(input string) error {
 	decoder := xml.NewDecoder(strings.NewReader(input))
 	depth, roots := 0, 0
 	var names []string
@@ -109,7 +115,7 @@ func validateSVGAttribute(attr xml.Attr) error {
 		valid = value == "butt" || value == "round" || value == "square"
 	case "stroke-linejoin":
 		valid = value == "miter" || value == "round" || value == "bevel"
-	case "id":
+	case "id", "class":
 		valid = svgIdentifier.MatchString(value)
 	case "style":
 		valid = validateSVGStyle(value)

@@ -241,6 +241,15 @@ export function isTransientWindowMetadataError(error) {
         || (error.status == null && error.name === 'TypeError');
 }
 
+export function isStaleWindowMetadataTransport(error, previous, current) {
+    // A replaced bridge can invalidate an instance binding without changing
+    // resource access. Retry the producer read; never grant access locally.
+    return Number(error?.status) === 403 && !!previous?.sessionId && !!current?.sessionId
+        && !!previous.clientId && !!previous.url
+        && previous.clientId === current.clientId && previous.url === current.url
+        && previous.sessionId !== current.sessionId;
+}
+
 export function formatWindowMetadataError(error) {
     if (!error) return '';
     if (error.code === 'WINDOW_AUTHORIZATION_EXPIRED' || error.code === 'PREVIEW_AUTHORIZATION_EXPIRED') return 'Permissions expired. Refresh permission checks or reopen this window.';
@@ -1384,11 +1393,15 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
     const [fetchError, setFetchError] = useState(null);
     const [metadataRetryVersion, setMetadataRetryVersion] = useState(0);
     const retryableError = useRef(null);
+    const failedMetadataTransport = useRef(null);
     retryableError.current = loading ? null : fetchError;
     useEffect(() => {
-        const retry = () => {
-            if (!isTransientWindowMetadataError(retryableError.current)) return;
+        const retry = (event) => {
+            const replacedTransport = event?.detail?.reason === 'transport-ready'
+                && isStaleWindowMetadataTransport(retryableError.current, failedMetadataTransport.current, getActiveUIBridgeTransportContext());
+            if (!isTransientWindowMetadataError(retryableError.current) && !replacedTransport) return;
             retryableError.current = null;
+            failedMetadataTransport.current = null;
             setFetchError(null);
             setMetadataRetryVersion((version) => version + 1);
         };
@@ -1528,6 +1541,7 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
             sessionId: resolveWindowModelCacheScope(services,getActiveUIBridgeTransportContext()?.sessionId),
         };
         const responseInfo = {};
+        const attemptTransport = getActiveUIBridgeTransportContext();
         withWindowPermissionDeadline(async () => {
             recordWindowPerfPhase('metadata-request-scheduled',windowId);
             return connector.get({responseInfo,ifNoneMatch:await publishedWindowConditionalETag(modelIdentity)})
@@ -1594,6 +1608,12 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
                 rejectWindowStateAdoption(adoption);
                 if (Number(err?.status) === 504) expired = true;
                 if (!cancelled) {
+                    failedMetadataTransport.current = attemptTransport;
+                    if (isStaleWindowMetadataTransport(err, attemptTransport, getActiveUIBridgeTransportContext())) {
+                        setFetchError(null);
+                        setMetadataRetryVersion(version => version + 1);
+                        return;
+                    }
                     const protectedRequest = fetchedProtectedMetadata || isProtectedWindowMetadata(existingMetadata) || isProtectedWindowMetadata(window?.inlineMetadata);
                     if (!hasInlineFallback || protectedRequest || Number(err?.status) === 401 || Number(err?.status) === 403) {
                         console.error('Error fetching metadata', err);

@@ -1,0 +1,115 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {buildCategoryRange,categoryRangeSvg,categoryRangeSelection,normalizeCategoryRange} from './categoryRange.js';
+import {normalizeReportBuilderChartSpec,buildExplicitReportBuilderChartContainer} from './dashboard/reportBuilderUtils.js';
+import {buildReportFillChartPayload} from '../reporting/reportFillChartPayload.js';
+import {buildReportPrintChartSvg} from '../reporting/reportPrintChartSvg.js';
+const fixture=JSON.parse(fs.readFileSync(new URL('../../doc/examples/category-range.json',import.meta.url),'utf8'));
+const config=fixture.chartSpec.categoryRange;
+const model=buildCategoryRange(config,fixture.rows);
+assert.deepEqual(model.domain,[0,25]);
+assert.deepEqual(model.categories.map(c=>c.marks[2].values[0]),[22,23,20]);
+assert.deepEqual(model.categories.map(c=>c.category),['Room A','Room B','Room C']);
+const signed=buildCategoryRange(config,fixture.signedRows);
+assert.deepEqual(signed.domain,[-7,8]);
+assert.deepEqual(signed.categories[1].marks[1].values,[3,-2]);
+assert.equal(signed.categories[1].marks[1].start,-2);
+assert.equal(signed.categories[2].marks[1].start,signed.categories[2].marks[1].end);
+assert.equal(signed.categories[3].marks[1].available,false);
+assert.equal(signed.categories[4].marks[1].available,false);
+assert.equal(categoryRangeSelection(signed,3,1),null);
+assert.deepEqual(categoryRangeSelection(signed,1,1).range,{startField:'targetMin',endField:'targetMax',start:3,end:-2});
+assert.throws(()=>buildCategoryRange(config,[fixture.rows[0],fixture.rows[0]]),/unique/);
+assert.throws(()=>buildCategoryRange(config,[{...fixture.rows[0],targetMin:'20'}]),/finite/);
+assert.throws(()=>normalizeCategoryRange({...config,extra:true}),/Unknown/);
+assert.deepEqual(buildCategoryRange(config,[]).domain,[-1,1]);
+const spec=normalizeReportBuilderChartSpec(fixture.chartSpec);
+assert.deepEqual(spec.yFields,['measuredCelsius','targetMin','targetMax','targetCelsius']);
+const chart=buildExplicitReportBuilderChartContainer({}, {}, {},spec).chart;
+const rows=fixture.rows.map(row=>({...row,unplotted:'retained'}));
+const fill=buildReportFillChartPayload(chart,rows);
+assert.deepEqual(fill.rows,rows);
+assert.deepEqual(JSON.parse(JSON.stringify(fill)),fill);
+assert.equal(buildReportPrintChartSvg({chartModel:chart,resolvedChart:fill}).svg,categoryRangeSvg(buildCategoryRange(config,rows)).svg);
+for(const orientation of ['horizontal','vertical']) {
+ const graphic=categoryRangeSvg(buildCategoryRange({...config,orientation},fixture.signedRows),480,{interactive:true,selectable:true});
+ assert.ok(!/NaN|Infinity/.test(graphic.svg));assert.match(graphic.svg,/Zero deviation/);assert.match(graphic.svg,/aria-label=/);assert.match(graphic.svg,/Target range/);
+}
+console.log('category range model, contracts, raw fill and shared print geometry passed');
+const {buildReportBuilderReportDocument,lowerReportDocumentToReportSpec}=await import('../reporting/reportDocumentModel.js');
+const {buildReportFillFromReportSpec}=await import('../reporting/reportFillModel.js');
+const {buildReportPrintFromReportFill}=await import('../reporting/reportPrintModel.js');
+const {validateReportSpec,validateReportFill,validateReportPrint}=await import('../reporting/schema/reportSchemas.js');
+const catalog={dataSourceRef:'synthetic',dimensions:[{id:'room',key:'room',label:'Room',paramPath:'dimensions.room'}],measures:spec.yFields.map(id=>({id,key:id,label:id,paramPath:`measures.${id}`}))};
+const block={id:'ranges',kind:'chartBlock',datasetRef:'primary',chartSpec:fixture.chartSpec};
+const document=buildReportBuilderReportDocument({container:{id:'synthetic-ranges',dataSourceRef:'synthetic'},config:catalog,state:{selectedDimensions:['room'],selectedMeasures:spec.yFields,reportDocumentBlocks:[block]}});
+const report=lowerReportDocumentToReportSpec(JSON.parse(JSON.stringify(document)));
+assert.equal(validateReportSpec(report).valid,true,JSON.stringify(validateReportSpec(report)));
+assert.equal(report.blocks.find(b=>b.id==='ranges').chartModel.type,'category-range');
+const reportFill=buildReportFillFromReportSpec(report,{primary:{rows}});
+assert.equal(validateReportFill(reportFill).valid,true,JSON.stringify(validateReportFill(reportFill)));
+assert.deepEqual(reportFill.blocks.find(b=>b.id==='ranges').content.resolvedChart.rows,rows);
+const print=buildReportPrintFromReportFill({reportSpec:report,reportFill});
+assert.equal(validateReportPrint(print).valid,true,JSON.stringify(validateReportPrint(print)));
+assert.match(JSON.stringify(print),/Target range/);
+const {resolveReportRuntimeChartActionFields}=await import('./dashboard/reportRuntimeModel.js');
+const {resolveReportRuntimeChartInteractionSupport}=await import('./dashboard/reportRuntimeChartInteractions.js');
+assert.deepEqual(resolveReportRuntimeChartActionFields(report,report.blocks.find(b=>b.id==='ranges')).map(f=>f.valueKey),['room']);
+assert.equal(resolveReportRuntimeChartInteractionSupport(spec).enabled,true);
+const {resolveReportBuilderChartDependencies,validateReportBuilderChartSpec}=await import('./dashboard/reportBuilderUtils.js');
+assert.deepEqual(resolveReportBuilderChartDependencies(catalog,fixture.chartSpec).measureIds,spec.yFields);
+console.log('category range authored projection, fill, schema, print and runtime actions passed');
+const signedFixture=JSON.parse(fs.readFileSync(new URL('../../doc/examples/category-range-signed.json',import.meta.url),'utf8'));
+const signedOffsets=buildCategoryRange(signedFixture.chartSpec.categoryRange,signedFixture.rows);
+assert.deepEqual(signedOffsets.categories.slice(0,3).map(c=>c.marks[0].values[0]),[-3,0,4]);
+assert.deepEqual(signedOffsets.domain,[-7,8]);
+const columns=[{key:'room',kind:'dimension'},...spec.yFields.map(key=>({key,kind:'measure'}))];
+assert.equal(validateReportBuilderChartSpec(catalog,fixture.chartSpec,columns).valid,true);
+assert.equal(validateReportBuilderChartSpec(catalog,fixture.chartSpec,columns.filter(c=>c.key!=='targetMax')).valid,false);
+assert.throws(()=>normalizeReportBuilderChartSpec({...fixture.chartSpec,stacked:true}),/own declared series/);
+assert.equal(normalizeReportBuilderChartSpec({...fixture.chartSpec,seriesField:null,seriesOptions:null}).type,'category-range');
+assert.throws(()=>normalizeCategoryRange({...config,series:[{kind:'range',startField:'a',endField:'b',label:'R',format:{decimals:20}}]}),/decimals/);
+assert.match(categoryRangeSvg(signed).svg,/Unavailable/);
+assert.doesNotMatch(categoryRangeSvg(signed).svg,/data-category|aria-label|tabindex/);
+
+const {buildReportPrintChartPages}=await import('../reporting/reportPrintChartSvg.js');
+for(const orientation of ['horizontal','vertical']) {
+ const manyRows=Array.from({length:10},(_,i)=>({...fixture.rows[0],room:`Room ${i}`,targetCelsius:i===9?99:22}));
+ const pageChart={...chart,categoryRange:{...config,orientation}};
+ const payload=buildReportFillChartPayload(pageChart,manyRows),before=JSON.stringify(payload);
+ const pages=buildReportPrintChartPages({chartModel:pageChart,resolvedChart:payload,width:540,maxHeight:616,firstMaxHeight:350});
+ assert.ok(pages.length>1);
+ assert.equal(pages.reduce((n,p)=>n+p.categoryCount,0),10);
+ for(const [i,p] of pages.entries()) {
+  assert.equal(p.width,540);assert.ok(p.height<=(i===0&&!p.startNewPage?350:616));
+  assert.match(p.svg,/font-size="12"/);assert.match(p.svg,/Target range/);assert.match(p.svg,/>99<\/text>/);
+  // Constant measured bars retain identical numeric geometry on every page.
+  const rect=p.svg.match(/<rect x="([^"]+)" y="([^"]+)" width="([^"]+)" height="([^"]+)" fill="#426b85"/);
+  assert.ok(rect);
+  const first=pages[0].svg.match(/<rect x="([^"]+)" y="([^"]+)" width="([^"]+)" height="([^"]+)" fill="#426b85"/);
+  assert.equal(rect[orientation==='horizontal'?3:4],first[orientation==='horizontal'?3:4]);
+ }
+ for(let i=0;i<10;i++) assert.equal(pages.map(p=>p.svg).join('').split(`>Room ${i}</text>`).length-1,1);
+ assert.equal(JSON.stringify(payload),before);
+ const jump=buildReportPrintChartPages({chartModel:pageChart,resolvedChart:payload,width:540,maxHeight:616,firstMaxHeight:180});
+ assert.equal(jump[0].startNewPage,true);
+ const singleReport={...report,blocks:report.blocks.filter(b=>b.id==='ranges').map(b=>({...b,title:'Category comparison',chartModel:pageChart,chartSpec:{...spec,categoryRange:pageChart.categoryRange}})),layoutIntent:{kind:'single',blockOrder:['ranges']}};
+ const manyFill=buildReportFillFromReportSpec(singleReport,{primary:{rows:manyRows}});
+ const manyPrint=buildReportPrintFromReportFill({reportSpec:singleReport,reportFill:manyFill});
+ assert.ok(manyPrint.pages.length>1);
+ const bottom=manyPrint.pageGeometry.height-manyPrint.pageGeometry.marginBottom-manyPrint.pageGeometry.footerHeight-8;
+ for(const element of manyPrint.pages.flatMap(p=>p.elements).filter(e=>e.kind==='svg')) assert.ok(element.box.y+element.box.height<=bottom,JSON.stringify(element.box));
+ assert.deepEqual(manyFill.blocks.find(b=>b.id==='ranges').content.resolvedChart.rows,manyRows);
+}
+const tooLong={...chart,categoryRange:{...config,series:config.series.map(s=>({...s,label:'oversized label '.repeat(500)}))}};
+const noFit=buildReportPrintChartPages({chartModel:tooLong,resolvedChart:buildReportFillChartPayload(tooLong,fixture.rows),width:540,maxHeight:616});
+assert.equal(noFit.length,1);assert.equal(noFit[0].svg,'');assert.equal(noFit[0].diagnostics[0].code,'categoryRangePrintLayoutUnavailable');
+for(const key of ['chartSpec','chartModel']) {
+ const invalid=JSON.parse(JSON.stringify(report));delete invalid.blocks.find(b=>b.id==='ranges')[key].categoryRange;
+ assert.equal(validateReportSpec(invalid).valid,false,`${key} must require categoryRange`);
+ const invalidFill=JSON.parse(JSON.stringify(reportFill));delete invalidFill.blocks.find(b=>b.id==='ranges').content[key].categoryRange;
+ assert.equal(validateReportFill(invalidFill).valid,false,`fill ${key} must require categoryRange`);
+}
+const {resolveReportRuntimeChartSelectionSummary}=await import('./dashboard/reportRuntimeChartActionModel.js');
+assert.equal(resolveReportRuntimeChartSelectionSummary({selection:categoryRangeSelection(model,0,1)}),'Room A • Target range');
+console.log('category range readable pagination, global scales, page bounds and conditional config requirements passed');

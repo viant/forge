@@ -39,7 +39,7 @@ function resolveUniqueSelectionFieldValue(rows = [], selector = "") {
 function resolveChartFieldSelectionValues(field = {}, selection = null) {
   const row = selection?.row && typeof selection.row === "object" ? selection.row : null;
   const selectionRows = Array.isArray(selection?.selectionRows) ? selection.selectionRows : [];
-  const sourceFallback = field?.selectionSource === "seriesKey"
+  const sourceFallback = ["rowValue","columnValue"].includes(field?.selectionSource) ? selection?.[field.selectionSource] : field?.selectionSource === "seriesKey"
     ? selection?.seriesKey
     : selection?.xValue;
   const rowValue = row ? resolveKey(row, field?.valueKey) : undefined;
@@ -97,6 +97,7 @@ export function resolveReportRuntimeChartSelectionSummary({
   blockTitle = "",
   selection = null,
 } = {}) {
+  if (selection?.source === "heatmap") return `${selection.rowValue} • ${selection.columnValue}`;
   const xValue = selection?.displayXValue ?? selection?.xValue;
   const seriesKey = normalizeString(selection?.displaySeriesKey ?? selection?.seriesKey);
   if (selection?.source === "pie" && xValue !== undefined && xValue !== null && xValue !== "") {

@@ -1,3 +1,9 @@
+import {resolveDonutCenter} from './donutCenter.js';
+import {DonutCenterLabel,DonutCenterDetails,EmptyDonutCenter} from './DonutCenter.jsx';
+import {buildChartTooltipEntries,chartTooltipEntryId,chartTooltipPieFields} from './chartTooltip.js';
+import {ChartHoverTooltip,ChartTooltipInspector} from './ChartTooltip.jsx';
+import CategoryRange from './CategoryRange.jsx';
+import CategoricalHeatmap from './CategoricalHeatmap.jsx';
 import {applyChartMetricSelection} from "./chartMetricSelection.js";
 import {resolveCategoryColor} from './chartTheme.js';
 import {normalizeChartExtent, resolveChartMargins} from './chartExtent.js';
@@ -18,6 +24,7 @@ import {
     AreaChart,
     Area,
     ComposedChart,
+    Curve,
     PieChart,
     Pie,
     Cell,
@@ -27,6 +34,7 @@ import {
     Tooltip,
     Legend,
     LabelList,
+    Label,
     ReferenceArea,
     ReferenceDot,
     ReferenceLine,
@@ -40,6 +48,7 @@ import {
     applyChartRowLimit,
     buildPieSliceCellKey,
     buildPieChartData,
+    chartCategoryRowOptions,
     fillMissingTemporalBuckets,
     formatChartNumber,
     formatChartDisplayValue,
@@ -101,6 +110,16 @@ import SharedButton from './Button.jsx';
 import {validateChartAppearance, resolveDocumentChartStyle, sharedChartDomain} from './chartAppearance.js';
 
 let categoryTickMeasureCanvas = null;
+
+function visiblePiePercentage({value, percent}) {
+    return Number(value) > 0 && Number.isFinite(percent) && Math.round(percent * 100) > 0;
+}
+
+function PiePercentageLeader(props) {
+    return visiblePiePercentage(props)
+        ? <Curve {...props} type="linear" className="recharts-pie-label-line" />
+        : null;
+}
 
 function measureCategoryTickText(value, style = {}) {
     if (typeof document === "undefined") return String(value || "").length * 6.5;
@@ -513,7 +532,7 @@ export function resolveEmptyChartMessage(metrics = {}) {
     return 'No data for the selected period.';
 }
 
-const Chart = ({container, context, isActive = true, embedded = false, onDatumSelect = null, onLegendItemSelect = null, showControls = true, allowTableSwitch = undefined, onMetricSelectionChange = null}) => {
+const Chart = ({container, context, isActive = true, embedded = false, onDatumSelect = null, onLegendItemSelect = null, showControls = true, allowTableSwitch = undefined, onMetricSelectionChange = null, tooltipEntriesOverride = null, showTooltipInspector = true, onTooltipInspect = null}) => {
     const viewSwitchEnabled = typeof allowTableSwitch === "boolean" ? allowTableSwitch : (typeof container?.chart?.allowTableSwitch === "boolean" ? container.chart.allowTableSwitch : showControls !== false);
     const controlsVisible = container?.chart?.showControls !== false && showControls !== false;
     useSignals();
@@ -535,7 +554,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         cartesianGrid = {strokeDasharray: "3 3"},
         width,
         height,
-        series,
+        series = {},
     } = chart;
     const palette = useMemo(() => resolveThemeAwareChartPalette(series?.palette || [], {forceRole:documentAppearance}), [series?.palette,documentAppearance]);
     const [chartTypography, setChartTypography] = useState(() => ({...resolveChartTypography(null), documentStyle: resolveDocumentChartStyle(null)}));
@@ -603,6 +622,8 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     const chartMetrics = chartContext?.signals?.metrics?.value || {};
     const collectionOverride = Array.isArray(container?.collection) ? container.collection : null;
     const effectiveCollection = collectionOverride || collection;
+    const centerState=useMemo(()=>{try{return {resolved:resolveDonutCenter(chart.center,effectiveCollection||[],type)};}catch(error){return {error:error.message};}},[chart.center,effectiveCollection,type]);
+    const [centerNeedsDetails,setCenterNeedsDetails]=useState(false);
     const effectiveLoading = resolveChartLoadingState({
         loading,
         collectionOverride,
@@ -627,11 +648,12 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     const isPieChart = responsiveChartType === "pie" || responsiveChartType === "donut";
     const isHorizontalBar = isHorizontalBarType(responsiveChartType);
     const prepared = useMemo(() => {
+        if(type === "category-range" || type === "heatmap") return {chartData:effectiveCollection || [],availableDataKeys:[],yAxisLabel:""};
         const chartRows = materializeChartDisplayRows(chart, effectiveCollection || []);
         if (isPieChart) {
-            const nameKey = series.nameKey || "name";
-            const valueKey = series.valueKey || selectedValueKey || "value";
-            const rows = applyChartRowLimit(buildPieChartData(chartRows, nameKey, valueKey, {includeNonPositive:documentAppearance}), chart?.rowLimit);
+            const nameKey = chart.tooltip ? chartTooltipPieFields(chart).nameKey : series.nameKey || "name";
+            const valueKey = chart.tooltip ? chartTooltipPieFields(chart).valueKey : series.valueKey || selectedValueKey || "value";
+            const rows = applyChartRowLimit(buildPieChartData(chartRows, nameKey, valueKey, chartCategoryRowOptions(chart)), chart?.rowLimit);
             return {
                 chartData: rows,
                 availableDataKeys: rows.map((row) => row.name),
@@ -668,6 +690,12 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     });
 
     const chartData = visibleState.chartData;
+    const tooltipResult = useMemo(() => {
+        try {return {entries:tooltipEntriesOverride || buildChartTooltipEntries(chart,effectiveCollection || []),error:null};}
+        catch(error){return {entries:[],error:error.message || 'Chart details could not be built.'};}
+    }, [chart,effectiveCollection,tooltipEntriesOverride]);
+    const tooltipEntries=tooltipResult.entries;
+    const [tooltipActiveId,setTooltipActiveId] = useState(null);
     const availableDataKeys = visibleState.availableDataKeys;
     const yAxisLabel = visibleState.yAxisLabel;
     const staleWhileLoading = visibleState.staleWhileLoading;
@@ -738,8 +766,8 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     }, [isPieChart, seriesDefinitions, series.valueKey, selectedValueKey]);
 
     const allTableColumns = useMemo(
-        () => isPieChart ? ['name', 'value'] : [xAxis?.dataKey, ...stableAvailableDataKeys].filter(Boolean),
-        [isPieChart, xAxis?.dataKey, stableAvailableDataKeys],
+        () => type === 'category-range' ? Array.from(new Set([chart.categoryRange?.categoryField,...chartData.flatMap(row=>Object.keys(row))].filter(Boolean))) : type === 'heatmap' ? Array.from(new Set([chart.heatmap?.rowField,chart.heatmap?.columnField,chart.heatmap?.valueField,...chartData.flatMap(row=>Object.keys(row))].filter(Boolean))) : isPieChart ? ['name', 'value'] : [xAxis?.dataKey, ...stableAvailableDataKeys].filter(Boolean),
+        [type, chart.categoryRange, chart.heatmap, chartData, isPieChart, xAxis?.dataKey, stableAvailableDataKeys],
     );
     const [visibleColumns, setVisibleColumns] = useState(allTableColumns);
 
@@ -974,12 +1002,13 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     }));
     const normalizedChartData = normalizedAllChartData;
     const smallMultiplesDomain = smallMultiples ? sharedChartDomain(normalizedChartData,renderableSeriesDefinitions,leftAxis.domain) : null;
+    const inspectTooltip = (category,seriesKey) => {const entry=tooltipEntries.find(entry=>entry.id===chartTooltipEntryId(category,seriesKey));if(entry){setTooltipActiveId(entry.id);onTooltipInspect?.(entry.id);}};
     const documentPoint = (props,entry) => {
         const value=readChartDataValue(props.payload,entry.value);
         if(!isChartNumericValue(value)) return null;
         const label=`${entry.name || entry.label || entry.value}, ${formatChartXAxisValue(readChartDataValue(props.payload,xAxis.dataKey),resolvedTickFormat,resolvedTickValueMode)}: ${formatValueByFormat(value,entry.format || leftAxis.format)}`;
         const color=resolveCategoryColor(chart.series?.categoryColors,readChartDataValue(props.payload,xAxis.dataKey),resolveConditionalSeriesColor(entry,value,entry.color));
-        return <ChartPoint {...props} seriesKey={String(entry.value)} category={String(readChartDataValue(props.payload,xAxis.dataKey) ?? "")} firstIndex={normalizedChartData.findIndex(row=>isChartNumericValue(readChartDataValue(row,entry.value)))} label={label} color={color} style={documentStyle} onSelect={interactiveDatumSelection ? ()=>emitSeriesDatumSelection(entry.value,props.payload) : undefined}/>;
+        return <ChartPoint {...props} seriesKey={String(entry.value)} category={String(readChartDataValue(props.payload,xAxis.dataKey) ?? "")} firstIndex={normalizedChartData.findIndex(row=>isChartNumericValue(readChartDataValue(row,entry.value)))} label={label} color={color} style={documentStyle} onInspect={chart.tooltip?()=>inspectTooltip(readChartDataValue(props.payload,xAxis.dataKey),entry.value):undefined} onSelect={interactiveDatumSelection ? ()=>emitSeriesDatumSelection(entry.value,props.payload) : undefined}/>;
     };
 
     const resolvedChartAnnotations = React.useMemo(() => (
@@ -995,13 +1024,15 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         const row = props.payload ?? normalizedChartData[props.index];
         const value = row?.[entry.value] ?? (Array.isArray(props.value) ? props.value.at(-1) : props.value);
         if (!Number.isFinite(Number(value)) || value === null || value === "") return null;
-        const category = String(row?.[xAxis?.dataKey] ?? "");
+        const category = readChartDataValue(row,xAxis?.dataKey);
         return <circle
             key={props.index}
             cx={props.cx}
             cy={props.cy}
             r={visible ? (embedded || interactiveDatumSelection ? 4 : 3) : 6}
             {...chartPointIdentity(entry.value, row)}
+            onMouseEnter={chart.tooltip?()=>inspectTooltip(category,entry.value):undefined}
+            onFocus={chart.tooltip?()=>inspectTooltip(category,entry.value):undefined}
             role="img"
             aria-label={`${entry.label || entry.value} at ${category}: ${value}`}
             strokeWidth={visible ? 1 : 0}
@@ -1128,6 +1159,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 />
             ) : null}
             <Tooltip
+                {...(chart.tooltip ? {content: props => <ChartHoverTooltip {...props} entries={tooltipEntries} chart={chart}/>, allowEscapeViewBox: {x:false,y:false}, wrapperStyle:{maxWidth:"100%",pointerEvents:"none"}} : {})}
                 labelFormatter={(val) => formatChartXAxisValue(val, resolvedTickFormat, resolvedTickValueMode)}
                 formatter={(value, name, item) => {
                     const formatType = item?.payload?.__seriesFormats?.[item?.dataKey] || item?.payload?.__seriesAxes?.[item?.dataKey];
@@ -1142,19 +1174,19 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     );
 
     const composedChart = (
-        <ComposedChart accessibilityLayer={documentAppearance || undefined} data={normalizedChartData} margin={chartMargin}>
+        <ComposedChart accessibilityLayer={documentAppearance || !!chart.tooltip || undefined} data={normalizedChartData} margin={chartMargin}>
             {sharedChartChildren}
         </ComposedChart>
     );
 
     const lineChart = (
-        <LineChart accessibilityLayer={documentAppearance || undefined} data={normalizedChartData} margin={chartMargin}>
+        <LineChart accessibilityLayer={documentAppearance || !!chart.tooltip || undefined} data={normalizedChartData} margin={chartMargin}>
             {sharedChartChildren}
         </LineChart>
     );
 
     const barChart = (
-        <BarChart accessibilityLayer={documentAppearance || undefined} data={normalizedChartData} margin={chartMargin}>
+        <BarChart accessibilityLayer={documentAppearance || !!chart.tooltip || undefined} data={normalizedChartData} margin={chartMargin}>
             {sharedChartChildren}
         </BarChart>
     );
@@ -1171,7 +1203,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         const primaryDataLabelFormatter = buildDataLabelFormatter(primarySeries.format || leftAxis.format);
 
         return (
-            <BarChart accessibilityLayer={documentAppearance || undefined} data={normalizedChartData} margin={chartMargin} layout="vertical">
+            <BarChart accessibilityLayer={documentAppearance || !!chart.tooltip || undefined} data={normalizedChartData} margin={chartMargin} layout="vertical">
                 <CartesianGrid strokeDasharray={documentAppearance ? undefined : cartesianGrid.strokeDasharray} vertical={!documentAppearance} stroke={gridStroke}/>
                 {resolvedChartAnnotations.background}
                 <XAxis
@@ -1195,6 +1227,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                     tick={renderYAxisCategoryTick}
                 />
                 <Tooltip
+                {...(chart.tooltip ? {content: props => <ChartHoverTooltip {...props} entries={tooltipEntries} chart={chart}/>, allowEscapeViewBox: {x:false,y:false}, wrapperStyle:{maxWidth:"100%",pointerEvents:"none"}} : {})}
                     formatter={(value) => tooltipFormatterForFormat(primarySeries.format || leftAxis.format)(value)}
                     contentStyle={embedded || documentAppearance ? {fontSize: chartTypography.captionSize, lineHeight: `${chartTypography.captionLineHeight}px`, fontFamily: chartTypography.captionFamily, fontWeight: chartTypography.captionWeight, letterSpacing: chartTypography.captionLetterSpacing, color: "var(--forge-chart-text, #30404d)", background: "var(--forge-chart-surface, #ffffff)", borderRadius: documentAppearance ? "var(--forge-radius-surface, 8px)" : "8px", border: documentAppearance ? "var(--forge-border-width, 1px) solid var(--forge-chart-border, #d8e1e8)" : "1px solid var(--forge-chart-border, #d8e1e8)"} : undefined}
                 />
@@ -1252,7 +1285,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     })();
 
     const areaChart = (
-        <AreaChart accessibilityLayer={documentAppearance || undefined} data={normalizedChartData} margin={chartMargin}>
+        <AreaChart accessibilityLayer={documentAppearance || !!chart.tooltip || undefined} data={normalizedChartData} margin={chartMargin}>
             {sharedChartChildren}
         </AreaChart>
     );
@@ -1264,7 +1297,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         ? palette
         : resolveThemeAwareChartPalette(['#137cbd', '#0f9960', '#d9822b', '#8f398f', '#c23030', '#5c7080', '#2965cc', '#29a634'], {forceRole: true});
     const compactPie = isPieChart && Number(chartSize.width || 0) > 0 && Number(chartSize.width || 0) <= 520;
-    const pieInnerRadius = type === "donut" ? (compactPie ? "34%" : "45%") : 0;
+    const pieInnerRadius = type === "donut" ? (chart.center?(compactPie?"40%":"55%"):(compactPie ? "34%" : "45%")) : 0;
     const pieChart = (
         <PieChart margin={embedded ? {top: 8, right: 8, bottom: 8, left: 8} : {top: 10, right: 10, bottom: 10, left: 10}}>
             <Pie
@@ -1278,14 +1311,16 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 innerRadius={pieInnerRadius}
                 outerRadius={compactPie ? "52%" : "78%"}
                 paddingAngle={pieFilteredData.length > 1 ? 2 : 0}
-                label={embedded || compactPie || documentAppearance ? false : ({name, percent}) => `${name} ${(percent * 100).toFixed(0)}%`}
-                labelLine={!embedded && !compactPie && !documentAppearance}
+                label={embedded || compactPie || documentAppearance ? false : props => visiblePiePercentage(props) ? `${props.name} ${(props.percent * 100).toFixed(0)}%` : null}
+                labelLine={!embedded && !compactPie && !documentAppearance ? PiePercentageLeader : false}
             >
+                {centerState.resolved && <Label position="center" content={<DonutCenterLabel center={centerState.resolved} typography={chartTypography} measure={(text,size,role)=>measureCategoryTickText(text,{fontSize:size,fontFamily:role==='value'?chartTypography.smallFamily:chartTypography.captionFamily,fontWeight:role==='value'?chartTypography.smallWeight:chartTypography.captionWeight,letterSpacing:role==='value'?chartTypography.smallLetterSpacing:chartTypography.captionLetterSpacing})} onLayout={setCenterNeedsDetails}/>}/>}
                 {pieFilteredData.map((entry, index) => (
                     <Cell key={buildPieSliceCellKey(entry, index)} fill={resolveCategoryColor(chart?.series?.categoryColors, entry.name, piePalette[index % piePalette.length])} />
                 ))}
             </Pie>
             <Tooltip
+                {...(chart.tooltip ? {content: props => <ChartHoverTooltip {...props} entries={tooltipEntries} chart={chart}/>, allowEscapeViewBox: {x:false,y:false}, wrapperStyle:{maxWidth:"100%",pointerEvents:"none"}} : {})}
                 formatter={(value) => formatLargeNumber(value)}
                 contentStyle={embedded || documentAppearance ? {fontSize: chartTypography.captionSize, lineHeight: `${chartTypography.captionLineHeight}px`, fontFamily: chartTypography.captionFamily, fontWeight: chartTypography.captionWeight, letterSpacing: chartTypography.captionLetterSpacing, color: "var(--forge-chart-text, #30404d)", background: "var(--forge-chart-surface, #ffffff)", borderRadius: documentAppearance ? "var(--forge-radius-surface, 8px)" : "8px", border: documentAppearance ? "var(--forge-border-width, 1px) solid var(--forge-chart-border, #d8e1e8)" : "1px solid var(--forge-chart-border, #d8e1e8)"} : undefined}
             />
@@ -1478,8 +1513,8 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     })();
     const chartViewportStyle = {
         width: "100%",
-        height: smallMultiples || (documentAppearance && isHorizontalBar && renderableSeriesDefinitions.length === 1) ? 'auto' : effectiveViewportHeight,
-        minHeight: smallMultiples || (documentAppearance && isHorizontalBar && renderableSeriesDefinitions.length === 1) ? undefined : resolvedMinHeight || undefined,
+        height: (centerState.resolved && (showZeroDataMessage||showEmptyDataMessage||showSelectionMessage)) || type === "category-range" || type === "heatmap" || smallMultiples || (documentAppearance && isHorizontalBar && renderableSeriesDefinitions.length === 1) ? 'auto' : effectiveViewportHeight,
+        minHeight: (centerState.resolved && (showZeroDataMessage||showEmptyDataMessage||showSelectionMessage)) || type === "category-range" || type === "heatmap" || smallMultiples || (documentAppearance && isHorizontalBar && renderableSeriesDefinitions.length === 1) ? undefined : resolvedMinHeight || undefined,
         minWidth: 0,
         flex: "0 0 auto",
         margin: isHorizontalBar ? "0 auto" : undefined,
@@ -1584,7 +1619,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                             onChange={handleValueKeyChange}
                             selectedValue={selectedValueKey}
                         >
-                            {series.values.map((option, index) => (
+                            {(series.values || []).map((option, index) => (
                                 <Radio key={option.value + index} label={option.label} value={option.value}/>
                             ))}
                         </RadioGroup>
@@ -1650,6 +1685,13 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                                 Loading chart…
                             </div>
                         </div>
+                    ) : centerState.error ? (<Typography as="p" typeRole="body" role="alert">{centerState.error}</Typography>
+                    ) : centerState.resolved && (showZeroDataMessage||showEmptyDataMessage||showSelectionMessage) ? (
+                        <EmptyDonutCenter center={centerState.resolved} typography={chartTypography} message={showSelectionMessage?"No slices selected.":showZeroDataMessage?"All slice values are zero.":"No slice data."}/>
+                    ) : type === "category-range" ? (
+                        <CategoryRange onInspect={chart.tooltip?(rowIndex,seriesIndex)=>inspectTooltip(readChartDataValue(chartData[rowIndex],chart.categoryRange.categoryField),seriesIndex):undefined} config={chart.categoryRange} rows={chartData} width={chartSize.width || 680} onSelect={interactiveDatumSelection?onDatumSelect:undefined}/>
+                    ) : type === "heatmap" ? (
+                        <CategoricalHeatmap onInspect={chart.tooltip?index=>setTooltipActiveId(tooltipEntries[index]?.id):undefined} title={container.title || chart.title || "Categorical heatmap"} config={chart.heatmap} rows={chartData} width={chartSize.width || 680} onSelect={interactiveDatumSelection?onDatumSelect:undefined}/>
                     ) : showZeroDataMessage ? (
                         <div
                             style={{
@@ -1720,12 +1762,12 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                                     normalizedChartData.find(row=>String(readChartDataValue(row,xAxis.dataKey))===String(selection.xValue))) : undefined;
                                 return <figure key={entry.value}>
                                     <Typography as="figcaption" typeRole="label">{entry.name || entry.label || entry.value}</Typography>
-                                    <Chart container={{id:`${chartExportId}-${entry.value}`,collection:normalizedChartData,chart:childChart}} context={chartContext} embedded onDatumSelect={select}/>
+                                    <Chart container={{id:`${chartExportId}-${entry.value}`,collection:normalizedChartData,chart:childChart}} context={chartContext} embedded onDatumSelect={select} tooltipEntriesOverride={chart.tooltip?tooltipEntries.filter(detail=>detail.seriesKey===String(entry.value)):null} showTooltipInspector={false} onTooltipInspect={setTooltipActiveId}/>
                                 </figure>;
                             })}
                         </div>
                     ) : documentAppearance && isHorizontalBar && renderableSeriesDefinitions.length === 1 ? (
-                        <ComparisonBars rows={normalizedChartData} series={renderableSeriesDefinitions[0]} categoryKey={xAxis.dataKey} colors={chart.series?.categoryColors} colorForValue={value=>resolveConditionalSeriesColor(renderableSeriesDefinitions[0],value,renderableSeriesDefinitions[0].color)} formatter={buildDataLabelFormatter((renderableSeriesDefinitions[0].format || leftAxis.format) === 'currency' ? 'currency2' : renderableSeriesDefinitions[0].format || leftAxis.format)} onSelect={interactiveDatumSelection ? row => emitSeriesDatumSelection(renderableSeriesDefinitions[0].value,row) : undefined}/>
+                        <ComparisonBars onInspect={chart.tooltip?row=>inspectTooltip(readChartDataValue(row,xAxis.dataKey),renderableSeriesDefinitions[0].value):undefined} rows={normalizedChartData} series={renderableSeriesDefinitions[0]} categoryKey={xAxis.dataKey} colors={chart.series?.categoryColors} colorForValue={value=>resolveConditionalSeriesColor(renderableSeriesDefinitions[0],value,renderableSeriesDefinitions[0].color)} formatter={buildDataLabelFormatter((renderableSeriesDefinitions[0].format || leftAxis.format) === 'currency' ? 'currency2' : renderableSeriesDefinitions[0].format || leftAxis.format)} onSelect={interactiveDatumSelection ? row => emitSeriesDatumSelection(renderableSeriesDefinitions[0].value,row) : undefined}/>
                     ) : chartCanRenderViewport ? (
                         <ResponsiveContainer width={chartSize.width} height={chartSize.height}>
                             {isPieChart
@@ -1773,6 +1815,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 </div>
             )}
 
+            {centerState.resolved && centerNeedsDetails && !showZeroDataMessage && !showEmptyDataMessage && !showSelectionMessage && <DonutCenterDetails center={centerState.resolved}/>}
             {staleWhileLoading ? (
                 <div
                     style={{
@@ -1829,6 +1872,9 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                     })}
                 </div>
             </Dialog>
+
+            {chart.tooltip && !effectiveLoading && !error && tooltipResult.error ? <Typography as="p" typeRole="body" role="alert">{tooltipResult.error}</Typography> : null}
+            {chart.tooltip && showTooltipInspector && !effectiveLoading && !error && !tooltipResult.error ? <ChartTooltipInspector entries={tooltipEntries} activeId={tooltipActiveId} onChange={setTooltipActiveId}/> : null}
 
             <Dialog isOpen={!embedded && !!expandedCell} onClose={() => setExpandedCell(null)} title={expandedCell?.title || "Cell content"}>
                 <div style={{padding: 12, whiteSpace: "pre-wrap", wordBreak: "break-word"}}>

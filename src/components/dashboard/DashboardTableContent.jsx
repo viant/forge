@@ -1,3 +1,5 @@
+import {buildTableHierarchy,hierarchyRows,tableHeaderGroups,qualifiedTableColumnLabel,interactiveTableColumns} from '../../reporting/reportTableAnalytics.js';
+import Button from '../Button.jsx';
 import React, { useEffect, useMemo, useState } from "react";
 import { useSignalEffect } from "@preact/signals-react";
 import { Icon } from "@blueprintjs/core";
@@ -70,6 +72,14 @@ export default function DashboardTableContent({
     initialPresentationState = null,
 }) {
     const {collection, loading, error, selection} = useDataSourceState(context);
+    const hierarchy=container.dashboard?.table?.hierarchy || container.hierarchy;
+    const columnGroups=container.dashboard?.table?.columnGroups || container.columnGroups || [];
+    const [expandedKeys,setExpandedKeys]=useState(()=>new Set(initialPresentationState?.expandedKeys || hierarchy?.defaultExpandedKeys || []));
+    const hierarchyResult=useMemo(()=>{
+        if(!hierarchy)return {};
+        try{return {model:buildTableHierarchy(collection || [],container.dashboard?.table?.analyticsMaterialized ? {...hierarchy,totals:{mode:'producer'}} : hierarchy)};}catch(error){return {error:error.message};}
+    },[collection,hierarchy,container.dashboard?.table?.analyticsMaterialized]);
+    const hierarchyModel=hierarchyResult.model;
     const dashboardFilterSignal = context?.dashboardKey ? getDashboardFilterSignal(context.dashboardKey) : null;
     const dashboardSelectionSignal = context?.dashboardKey ? getDashboardSelectionSignal(context.dashboardKey) : null;
     const dashboardFilters = useSignalSnapshot(dashboardFilterSignal, {});
@@ -80,7 +90,7 @@ export default function DashboardTableContent({
     const density = container.dashboard?.table?.density || container.density || "comfortable";
     const rowActions = container.dashboard?.table?.rowActions || container.rowActions || [];
     const rowActionDisplayMode = container.dashboard?.table?.rowActionDisplay || container.rowActionDisplay || "compact";
-    const mobileCards = container?.mobileCards?.enabled === true && rowActions.length === 0
+    const mobileCards = !hierarchy && container?.mobileCards?.enabled === true && rowActions.length === 0
         ? container.mobileCards
         : null;
     const mobileFieldKeys = Array.isArray(mobileCards?.fields) ? mobileCards.fields : [];
@@ -89,7 +99,7 @@ export default function DashboardTableContent({
     const uniqueFields = (Array.isArray(context?.dataSource?.uniqueKey) ? context.dataSource.uniqueKey : [])
         .map((entry) => String(entry?.field || entry || '').trim())
         .filter(Boolean);
-    const rowIdentity = (row) => uniqueFields.length > 0
+    const rowIdentity = (row) => hierarchy ? row[hierarchy.keyField] : uniqueFields.length > 0
         ? uniqueFields.map((field) => JSON.stringify(resolveKey(row, field) ?? null)).join('|')
         : row;
     const selectedIdentities = new Set(selectedRows.map(rowIdentity));
@@ -102,7 +112,8 @@ export default function DashboardTableContent({
 
     const documentTable = container.tablePresentation?.variant === 'document';
     if (container.tablePresentation?.variant && !documentTable) throw new Error(`Unsupported table variant: ${container.tablePresentation.variant}`);
-    const rawColumns = container.dashboard?.table?.columns || container.columns || [];
+    const declaredColumns=container.dashboard?.table?.columns || container.columns || [];
+    const rawColumns=useMemo(()=>interactiveTableColumns(declaredColumns,hierarchy),[declaredColumns,hierarchy]);
     const normalizedColumns = useMemo(() => rawColumns.map((col) => {
         if (typeof col === 'string') {
             return {key: col, label: titleizeDashboardKey(col)};
@@ -153,9 +164,9 @@ export default function DashboardTableContent({
         () => buildTableRuntimeColumns(normalizedColumns, quickFilteredCollection),
         [normalizedColumns, quickFilteredCollection],
     );
-    const displayColumns = useMemo(() => documentTable ? runtimeColumns.map(column => ({...column, frozen: false})) : withFrozenIdentifierColumn(runtimeColumns), [runtimeColumns, documentTable]);
+    const displayColumns = useMemo(() => documentTable || hierarchy || columnGroups.length>0 || container.dashboard?.table?.pivot || container.pivot ? runtimeColumns.map(column => ({...column, frozen: false})) : withFrozenIdentifierColumn(runtimeColumns), [runtimeColumns, documentTable, hierarchy, columnGroups, container.dashboard?.table?.pivot, container.pivot]);
     // Read-only records keep the same data/formatting path. Interactive tables retain their actions and selection.
-    const recordTitleColumn = documentTable && !multiSelect && rowActions.length === 0
+    const recordTitleColumn = documentTable && !hierarchy && !multiSelect && rowActions.length === 0
         ? displayColumns.find(column => column.key === container.tablePresentation?.recordTitleField) : null;
     const mobileTitleColumn = mobileCards
         ? displayColumns.find((column) => column.key === mobileCards.titleField)
@@ -177,30 +188,27 @@ export default function DashboardTableContent({
     const pagingEnabled = context?.dataSource?.paging?.enabled === true || container?.paging?.enabled === true;
     const pageSize = Math.max(1, Number(container?.paging?.size || context?.dataSource?.paging?.size || 20));
 
-    const allSortedRows = useMemo(() => {
-        if (!sortKey) return quickFilteredCollection.slice(0, limit);
-        const sortColumn = runtimeColumns.find((col) => col.key === sortKey);
-        const ordered = [...quickFilteredCollection].sort((a, b) => {
-            const avRaw = resolveDashboardTableColumnValue(a, sortColumn, { preferDisplay: true });
-            const bvRaw = resolveDashboardTableColumnValue(b, sortColumn, { preferDisplay: true });
-            const avLink = resolveTableLink({row: a, column: sortColumn, value: avRaw});
-            const bvLink = resolveTableLink({row: b, column: sortColumn, value: bvRaw});
-            const av = avLink ? avLink.text : avRaw;
-            const bv = bvLink ? bvLink.text : bvRaw;
-            return compareDashboardTableValues(av, bv, sortColumn, sortDir);
-        });
-        return ordered.slice(0, limit);
-    }, [quickFilteredCollection, limit, runtimeColumns, sortKey, sortDir]);
-    const pageCount = pagingEnabled ? Math.max(1, Math.ceil(allSortedRows.length / pageSize)) : 1;
-    const currentPage = Math.min(page, pageCount);
-    const sortLabel = sortKey ? (displayColumns.find((column) => column.key === sortKey)?.label || sortKey) : "";
-    const sortedRows = pagingEnabled
-        ? allSortedRows.slice((currentPage - 1) * pageSize, currentPage * pageSize)
-        : allSortedRows;
+    const compareRows=(a,b)=>{
+        const column=runtimeColumns.find(col=>col.key===sortKey);
+        const value=row=>{const raw=resolveDashboardTableColumnValue(row,column,{preferDisplay:true});return resolveTableLink({row,column,value:raw})?.text ?? raw;};
+        return compareDashboardTableValues(value(a),value(b),column,sortDir);
+    };
+    const matchedKeys=hierarchyModel && (container.dashboard?.table?.forceHierarchyExpansion || quickFilter.trim() || quickFilteredCollection.length!==(collection||[]).length)
+        ? new Set(quickFilteredCollection.map(row=>row[hierarchy.keyField])) : null;
+    const legacySortedRows=useMemo(()=>(sortKey?[...quickFilteredCollection].sort(compareRows):quickFilteredCollection).slice(0,limit),[quickFilteredCollection,sortKey,sortDir,runtimeColumns,limit]);
+    const allSortedRows = hierarchyModel
+        ? hierarchyRows(hierarchyModel,{matchedKeys,compare:sortKey?compareRows:null}).nodes.map(node=>node.row)
+        : legacySortedRows;
+    const hierarchicalView=hierarchyModel ? hierarchyRows(hierarchyModel,{matchedKeys,compare:sortKey?compareRows:null,expandedKeys,page,pageSize:pagingEnabled?pageSize:Infinity,rootLimit:container.dashboard?.table?.hierarchyRootLimit ?? container.hierarchyRootLimit ?? Infinity}) : null;
+    const pageCount=hierarchicalView?.pageCount ?? (pagingEnabled?Math.max(1,Math.ceil(allSortedRows.length/pageSize)):1);
+    const currentPage=Math.min(page,pageCount);
+    const sortLabel=sortKey?(displayColumns.find(column=>column.key===sortKey)?.label||sortKey):'';
+    const sortedRows=hierarchicalView ? hierarchicalView.nodes.map(node=>node.row) : pagingEnabled ? allSortedRows.slice((currentPage-1)*pageSize,currentPage*pageSize) : allSortedRows;
     useEffect(() => { setPage(1); }, [quickFilter, sortKey, sortDir, pageSize, pagingEnabled, container?.paging?.resetKey]);
     useEffect(() => {
         onPresentationStateChange?.({
             rowCount: allSortedRows.length,
+            ...(hierarchy?{expandedKeys:Array.from(expandedKeys),rootCount:hierarchicalView?.rootCount,visibleRootCount:hierarchicalView?.visibleRootCount,visibleRowCount:sortedRows.length}:{}),
             filter: quickFilter.trim(),
             sort: sortKey ? {
                 key: sortKey,
@@ -208,7 +216,7 @@ export default function DashboardTableContent({
                 direction: sortDir,
             } : null,
         });
-    }, [allSortedRows.length, onPresentationStateChange, quickFilter, sortDir, sortKey, sortLabel]);
+    }, [allSortedRows.length, onPresentationStateChange, quickFilter, sortDir, sortKey, sortLabel, expandedKeys, hierarchy, hierarchicalView?.rootCount, hierarchicalView?.visibleRootCount, sortedRows.length]);
     const allSelected = multiSelect && sortedRows.length > 0 && sortedRows.every(rowSelected);
     const partiallySelected = multiSelect && !allSelected && sortedRows.some(rowSelected);
     const selectionLabelField = String(container?.selectionLabelField || displayColumns[0]?.key || '').trim();
@@ -247,8 +255,10 @@ export default function DashboardTableContent({
         }
     };
 
+    if(hierarchyResult.error)return <Typography as="p" typeRole="body" role="alert">{hierarchyResult.error}</Typography>;
     return (
         <>
+            {hierarchy?<Typography as="p" typeRole="metadata">{hierarchy.totals.mode==='sum-leaves'?'Parent totals sum the complete admitted leaf rows.':'Parent totals are supplied by the producer.'} Filtering retains the original totals and ancestor context.</Typography>:null}
             {loading ? <div role="status" style={subtitleStyle}>Loading…</div> : null}
             {error ? <div role="alert" style={{...subtitleStyle, color: 'var(--forge-status-danger-foreground, #a82a2a)'}}>{formatDataSourceError(error)}</div> : null}
             {!loading && !error && sortedRows.length === 0 ? <div role="status" style={subtitleStyle}>No data.</div> : null}
@@ -298,6 +308,7 @@ export default function DashboardTableContent({
                             {rowActions.length > 0 ? <col style={{width: `${tableLayout.actionsWidth}px`}} /> : null}
                         </colgroup>
                         <thead>
+                        {columnGroups.length>0?<tr>{multiSelect?<th/>:null}{tableHeaderGroups(displayColumns,columnGroups).map((group,index)=><th key={index} scope="colgroup" colSpan={group.span}>{group.label}</th>)}{rowActions.length?<th/>:null}</tr>:null}
                         <tr>
                             {multiSelect ? (
                                 <th style={{width: 42, textAlign: 'center'}}>
@@ -315,6 +326,7 @@ export default function DashboardTableContent({
                                 </th>
                             ) : null}
                             {displayColumns.map((col) => {
+                                const fullLabel=qualifiedTableColumnLabel(col,columnGroups);
                                 const active = sortKey === col.key;
                                 const arrow = active ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '';
                                 return (
@@ -324,7 +336,7 @@ export default function DashboardTableContent({
                                         aria-sort={active ? sortDir === 'asc' ? 'ascending' : 'descending' : 'none'}
                                         style={{textAlign: col.align || 'left', color: active ? 'var(--forge-dashboard-table-link, #2367d1)' : undefined, ...(col.frozen ? {'--forge-frozen-column-width': `${col.resolvedCompactWidth}px`, '--forge-frozen-left': multiSelect ? '42px' : '0px'} : {})}}
                                     >
-                                        <button type="button" className="forge-dashboard-table__sort-button" title={col.label || col.key} aria-label={`Sort by ${col.label || col.key}`} onClick={() => handleSort(col.key)}><span className="forge-dashboard-table__header-label">{col.label || col.key}</span><span aria-hidden="true">{arrow}</span></button>
+                                        <button type="button" className="forge-dashboard-table__sort-button" title={fullLabel} aria-label={`Sort by ${fullLabel}`} onClick={() => handleSort(col.key)}><span className="forge-dashboard-table__header-label">{col.label || col.key}</span><span aria-hidden="true">{arrow}</span></button>
                                     </th>
                                 );
                             })}
@@ -349,7 +361,7 @@ export default function DashboardTableContent({
                                 ...categoricalRowClassNames(row, displayColumns),
                             ].filter(Boolean).join(" ");
                             return (
-                                <tr key={index} className={rowClassName} style={rowStyle}>
+                                <tr key={hierarchy?row[hierarchy.keyField]:index} data-hierarchy-key={hierarchy?row[hierarchy.keyField]:undefined} data-hierarchy-level={hierarchyModel?.nodes.get(row[hierarchy?.keyField])?.depth} className={rowClassName} style={rowStyle}>
                                     {multiSelect ? (
                                         <td style={{textAlign: 'center'}}>
                                             <label className="forge-table-selection-target"><input
@@ -357,7 +369,7 @@ export default function DashboardTableContent({
                                                 disabled={container.readOnly === true}
                                                 aria-label={`Select ${selectionRowLabel(row,index)}`}
                                                 checked={rowSelected(row)}
-                                                onChange={() => selectionHandlers.toggleSelection?.({row, rowIndex: index})}
+                                                onChange={() => selectionHandlers.toggleSelection?.({row:hierarchy?(collection||[]).find(source=>source[hierarchy.keyField]===row[hierarchy.keyField]):row, rowIndex: index})}
                                             /></label>
                                         </td>
                                     ) : null}
@@ -379,7 +391,10 @@ export default function DashboardTableContent({
                                         );
                                         return (
                                             <td key={`${index}-${ci}`} className={[cellClassName, col.frozen ? 'forge-table-frozen-identifier' : ''].filter(Boolean).join(' ')} style={{...cellStyle, ...(col.frozen ? {'--forge-frozen-column-width': `${col.resolvedCompactWidth}px`, '--forge-frozen-left': multiSelect ? '42px' : '0px'} : {})}}>
-                                                {clampedText ? (
+                                                {hierarchy && col.key===hierarchy.labelField ? <span className="forge-table-hierarchy-label" style={{paddingInlineStart:(hierarchyModel?.nodes.get(row[hierarchy.keyField])?.depth || 0)*20}}>
+                                                    {hierarchyModel?.nodes.get(row[hierarchy.keyField])?.children.length ? <Button variant="ghost" size="compact" icon={expandedKeys.has(row[hierarchy.keyField])||matchedKeys?'lucide:chevron-down':'lucide:chevron-right'} hideLabel aria-label={`${expandedKeys.has(row[hierarchy.keyField])||matchedKeys?'Collapse':'Expand'} ${String(row[hierarchy.labelField]??row[hierarchy.keyField])}`} aria-expanded={!!matchedKeys||expandedKeys.has(row[hierarchy.keyField])} disabled={!!matchedKeys} onClick={()=>setExpandedKeys(current=>{const next=new Set(current),id=row[hierarchy.keyField];if(next.has(id))next.delete(id);else next.add(id);return next;})}/> : <span className="forge-table-hierarchy-spacer"/>}
+                                                    {renderedCell}
+                                                </span> : clampedText ? (
                                                     <span
                                                         className="forge-dashboard-table-cell-label-clamp"
                                                         title={clampedText.fullText}
@@ -520,7 +535,7 @@ export default function DashboardTableContent({
             {pagingEnabled && pageCount > 1 ? (
                 <div className="forge-dashboard-table-pager">
                     <button type="button" disabled={currentPage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</button>
-                    <span>{container?.paging?.rangeLabel === 'complete'
+                    <span>{hierarchicalView ? `Root groups ${(currentPage-1)*pageSize+1}–${Math.min(currentPage*pageSize,hierarchicalView.rootCount)} of ${hierarchicalView.rootCount}` : container?.paging?.rangeLabel === 'complete'
                         ? `Rows ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, allSortedRows.length)} of ${allSortedRows.length}`
                         : `Page ${currentPage} of ${pageCount}`}</span>
                     <button type="button" disabled={currentPage >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>Next</button>

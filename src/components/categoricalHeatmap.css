@@ -1,0 +1,6 @@
+.forge-categorical-heatmap { width:100%; overflow:auto; }
+.forge-categorical-heatmap svg { display:block; font:inherit; letter-spacing:inherit; }
+.forge-categorical-heatmap [data-cell]:focus-visible { outline:var(--forge-focus-width,2px) solid var(--forge-focus-color,#137cbd); outline-offset:var(--forge-focus-offset,2px); }
+
+.forge-categorical-heatmap svg text { font:inherit; letter-spacing:inherit; }
+.forge-categorical-heatmap svg g { font-size:inherit; }

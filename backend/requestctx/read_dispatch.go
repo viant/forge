@@ -76,3 +76,19 @@ func BeginResourceReadDispatch(ctx context.Context) (func() error, error) {
 		return finalErr
 	}, nil
 }
+
+// ResourceReadPublication checks the existing POST release obligations at an
+// intermediate output boundary, retaining the original operation and deadline.
+type ResourceReadPublication interface{ BeforePublication(context.Context) error }
+
+func CheckResourceReadPublication(ctx context.Context) error {
+	value := ctx.Value(resourceReadDispatchKey{})
+	if value == nil {
+		return ctx.Err()
+	}
+	lifecycle, ok := value.(ResourceReadPublication)
+	if !ok {
+		return identity.ErrResourceDenied
+	}
+	return lifecycle.BeforePublication(ctx)
+}

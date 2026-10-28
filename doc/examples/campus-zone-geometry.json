@@ -1,0 +1,222 @@
+{
+  "provenance": "Independently invented campus zones and values; no external geographic assets or real campus data.",
+  "block": {
+    "id": "campus",
+    "kind": "geoMapBlock",
+    "title": "Campus zone utilization",
+    "datasetRef": "primary",
+    "geo": {
+      "shape": "geojson",
+      "projection": "planar",
+      "key": "zoneId",
+      "metric": {
+        "key": "utilization",
+        "label": "Utilization",
+        "format": "percent"
+      },
+      "geometry": {
+        "type": "FeatureCollection",
+        "features": [
+          {
+            "type": "Feature",
+            "id": "North",
+            "properties": {
+              "label": "North"
+            },
+            "geometry": {
+              "type": "Polygon",
+              "coordinates": [
+                [
+                  [
+                    0,
+                    6
+                  ],
+                  [
+                    8,
+                    6
+                  ],
+                  [
+                    8,
+                    10
+                  ],
+                  [
+                    0,
+                    10
+                  ],
+                  [
+                    0,
+                    6
+                  ]
+                ],
+                [
+                  [
+                    2,
+                    7
+                  ],
+                  [
+                    4,
+                    7
+                  ],
+                  [
+                    4,
+                    8
+                  ],
+                  [
+                    2,
+                    8
+                  ],
+                  [
+                    2,
+                    7
+                  ]
+                ]
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "East",
+            "properties": {
+              "label": "East"
+            },
+            "geometry": {
+              "type": "MultiPolygon",
+              "coordinates": [
+                [
+                  [
+                    [
+                      9,
+                      4
+                    ],
+                    [
+                      11,
+                      4
+                    ],
+                    [
+                      11,
+                      9
+                    ],
+                    [
+                      9,
+                      9
+                    ],
+                    [
+                      9,
+                      4
+                    ]
+                  ]
+                ],
+                [
+                  [
+                    [
+                      12,
+                      7
+                    ],
+                    [
+                      13,
+                      7
+                    ],
+                    [
+                      13,
+                      8
+                    ],
+                    [
+                      12,
+                      8
+                    ],
+                    [
+                      12,
+                      7
+                    ]
+                  ]
+                ]
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "South",
+            "properties": {
+              "label": "South"
+            },
+            "geometry": {
+              "type": "Polygon",
+              "coordinates": [
+                [
+                  [
+                    2,
+                    0
+                  ],
+                  [
+                    10,
+                    0
+                  ],
+                  [
+                    10,
+                    3
+                  ],
+                  [
+                    2,
+                    3
+                  ],
+                  [
+                    2,
+                    0
+                  ]
+                ]
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "West",
+            "properties": {
+              "label": "West"
+            },
+            "geometry": {
+              "type": "Polygon",
+              "coordinates": [
+                [
+                  [
+                    -1,
+                    2
+                  ],
+                  [
+                    1,
+                    2
+                  ],
+                  [
+                    1,
+                    5
+                  ],
+                  [
+                    -1,
+                    5
+                  ],
+                  [
+                    -1,
+                    2
+                  ]
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "rows": [
+    {
+      "zoneId": "North",
+      "utilization": 70
+    },
+    {
+      "zoneId": "East",
+      "utilization": 0
+    },
+    {
+      "zoneId": "South",
+      "utilization": null
+    }
+  ]
+}

@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/viant/forge/backend/reporting/tablemeta"
 	"io"
+	"math"
 	"reflect"
 	"sort"
 	"strings"
@@ -110,6 +112,10 @@ type Provenance struct {
 }
 
 type Block struct {
+	Hierarchy    *tablemeta.Hierarchy    `json:"hierarchy,omitempty"`
+	Pivot        *tablemeta.Pivot        `json:"pivot,omitempty"`
+	ColumnGroups []tablemeta.ColumnGroup `json:"columnGroups,omitempty"`
+
 	ID                       string                `json:"id"`
 	Kind                     string                `json:"kind"`
 	Title                    string                `json:"title,omitempty"`
@@ -166,6 +172,7 @@ type Block struct {
 	ChartContent             *ChartContent         `json:"-"`
 	GeoContent               *GeoContent           `json:"-"`
 	KPIContent               *KPIContent           `json:"-"`
+	Sparkline                *KPISparklineSpec     `json:"sparkline,omitempty"`
 	CollectionContent        *CollectionContent    `json:"-"`
 	SectionContent           *SectionContent       `json:"-"`
 	CompositeContent         *CompositeContent     `json:"-"`
@@ -205,9 +212,10 @@ type TableColumn struct {
 }
 
 type TableContent struct {
-	Columns      []TableColumn      `json:"columns"`
-	RowCount     int                `json:"rowCount"`
-	ResolvedRows []ResolvedTableRow `json:"resolvedRows"`
+	ColumnGroups []tablemeta.ColumnGroup `json:"columnGroups,omitempty"`
+	Columns      []TableColumn           `json:"columns"`
+	RowCount     int                     `json:"rowCount"`
+	ResolvedRows []ResolvedTableRow      `json:"resolvedRows"`
 }
 
 type ResolvedTableRow struct {
@@ -252,13 +260,39 @@ type ChartContent struct {
 }
 
 type ResolvedChart struct {
-	Kind       string           `json:"kind"`
-	Type       string           `json:"type"`
-	NameKey    string           `json:"nameKey,omitempty"`
-	ValueKey   string           `json:"valueKey,omitempty"`
-	XAxisKey   string           `json:"xAxisKey,omitempty"`
-	SeriesKeys []string         `json:"seriesKeys"`
-	Rows       []map[string]any `json:"rows"`
+	TooltipEntries []ChartTooltipEntry `json:"tooltipEntries,omitempty"`
+	Center         *DonutCenter        `json:"center,omitempty"`
+	Kind           string              `json:"kind"`
+	Type           string              `json:"type"`
+	NameKey        string              `json:"nameKey,omitempty"`
+	ValueKey       string              `json:"valueKey,omitempty"`
+	XAxisKey       string              `json:"xAxisKey,omitempty"`
+	SeriesKeys     []string            `json:"seriesKeys"`
+	Rows           []map[string]any    `json:"rows"`
+}
+
+type ChartTooltipEntry struct {
+	ID          string              `json:"id"`
+	Category    string              `json:"category"`
+	SeriesKey   string              `json:"seriesKey"`
+	SeriesLabel string              `json:"seriesLabel"`
+	RowCount    int                 `json:"rowCount"`
+	Fields      []ChartTooltipField `json:"fields"`
+}
+
+type ChartTooltipField struct {
+	Field        string `json:"field"`
+	Label        string `json:"label"`
+	DisplayValue string `json:"displayValue"`
+	Aggregate    string `json:"aggregate"`
+	State        string `json:"state"`
+}
+
+type DonutCenter struct {
+	Label          string   `json:"label"`
+	Value          *float64 `json:"value"`
+	FormattedValue string   `json:"formattedValue"`
+	Scope          string   `json:"scope"`
 }
 
 type GeoContent struct {
@@ -269,18 +303,30 @@ type GeoContent struct {
 
 type ResolvedGeo struct {
 	labelFieldPresent bool
-	Shape             string              `json:"shape"`
-	KeyField          string              `json:"keyField"`
-	LabelField        string              `json:"labelField"`
-	MetricKey         string              `json:"metricKey"`
-	MetricLabel       string              `json:"metricLabel"`
-	Format            string              `json:"format"`
-	Aggregate         string              `json:"aggregate"`
-	Regions           []ResolvedGeoRegion `json:"regions"`
-	Ranking           []ResolvedGeoRegion `json:"ranking"`
-	ActiveRegion      *ResolvedGeoRegion  `json:"activeRegion"`
-	Summary           *ResolvedGeoSummary `json:"summary"`
-	Legend            *ResolvedGeoLegend  `json:"legend"`
+	Geometry          *ResolvedGeoGeometry `json:"geometry,omitempty"`
+	Shape             string               `json:"shape"`
+	KeyField          string               `json:"keyField"`
+	LabelField        string               `json:"labelField"`
+	MetricKey         string               `json:"metricKey"`
+	MetricLabel       string               `json:"metricLabel"`
+	Format            string               `json:"format"`
+	Aggregate         string               `json:"aggregate"`
+	Regions           []ResolvedGeoRegion  `json:"regions"`
+	Ranking           []ResolvedGeoRegion  `json:"ranking"`
+	ActiveRegion      *ResolvedGeoRegion   `json:"activeRegion"`
+	Summary           *ResolvedGeoSummary  `json:"summary"`
+	Legend            *ResolvedGeoLegend   `json:"legend"`
+}
+
+type ResolvedGeoGeometry struct {
+	ViewBox  []float64            `json:"viewBox"`
+	Features []ResolvedGeoFeature `json:"features"`
+}
+
+type ResolvedGeoFeature struct {
+	Key   string `json:"key"`
+	Label string `json:"label"`
+	Path  string `json:"path"`
 }
 
 type ResolvedGeoRegion struct {
@@ -313,28 +359,38 @@ type ResolvedGeoLegendRule struct {
 }
 
 type KPIContent struct {
-	Title                    string         `json:"title"`
-	Description              string         `json:"description,omitempty"`
-	ValueField               string         `json:"valueField"`
-	ValueLabel               string         `json:"valueLabel"`
-	ValueFormat              string         `json:"valueFormat,omitempty"`
-	Suffix                   string         `json:"suffix,omitempty"`
-	Tone                     string         `json:"tone,omitempty"`
-	Value                    any            `json:"value"`
-	RowCount                 *int           `json:"rowCount"`
-	SecondaryField           string         `json:"secondaryField,omitempty"`
-	SecondaryLabel           string         `json:"secondaryLabel,omitempty"`
-	SecondaryFormat          string         `json:"secondaryFormat,omitempty"`
-	SecondaryTrend           bool           `json:"secondaryTrend,omitempty"`
-	SecondaryDisplayKey      string         `json:"secondaryDisplayKey,omitempty"`
-	SecondaryDisplayValueMap map[string]any `json:"secondaryDisplayValueMap,omitempty"`
-	SecondaryValue           any            `json:"secondaryValue,omitempty"`
-	EmptyLabel               string         `json:"emptyLabel,omitempty"`
-	RowSelector              string         `json:"rowSelector,omitempty"`
-	PresentationMode         string         `json:"presentationMode,omitempty"`
-	BodyFormat               string         `json:"bodyFormat,omitempty"`
-	BodyTemplate             string         `json:"bodyTemplate,omitempty"`
-	BodyMarkdown             string         `json:"bodyMarkdown,omitempty"`
+	Sparkline                *KPISparklineContent `json:"sparkline,omitempty"`
+	Title                    string               `json:"title"`
+	Description              string               `json:"description,omitempty"`
+	ValueField               string               `json:"valueField"`
+	ValueLabel               string               `json:"valueLabel"`
+	ValueFormat              string               `json:"valueFormat,omitempty"`
+	Suffix                   string               `json:"suffix,omitempty"`
+	Tone                     string               `json:"tone,omitempty"`
+	Value                    any                  `json:"value"`
+	RowCount                 *int                 `json:"rowCount"`
+	SecondaryField           string               `json:"secondaryField,omitempty"`
+	SecondaryLabel           string               `json:"secondaryLabel,omitempty"`
+	SecondaryFormat          string               `json:"secondaryFormat,omitempty"`
+	SecondaryTrend           bool                 `json:"secondaryTrend,omitempty"`
+	SecondaryDisplayKey      string               `json:"secondaryDisplayKey,omitempty"`
+	SecondaryDisplayValueMap map[string]any       `json:"secondaryDisplayValueMap,omitempty"`
+	SecondaryValue           any                  `json:"secondaryValue,omitempty"`
+	EmptyLabel               string               `json:"emptyLabel,omitempty"`
+	RowSelector              string               `json:"rowSelector,omitempty"`
+	PresentationMode         string               `json:"presentationMode,omitempty"`
+	BodyFormat               string               `json:"bodyFormat,omitempty"`
+	BodyTemplate             string               `json:"bodyTemplate,omitempty"`
+	BodyMarkdown             string               `json:"bodyMarkdown,omitempty"`
+}
+
+// KPISparklineSpec and KPISparklineContent mirror the canonical public Forge
+// sparkline contracts. Missing observations remain nil, never implicit zeros.
+type KPISparklineSpec = reportspec.KPISparklineSpec
+type KPISparklineContent struct {
+	Values           []*float64 `json:"values"`
+	Labels           []string   `json:"labels"`
+	ComparisonValues []*float64 `json:"comparisonValues,omitempty"`
 }
 
 type BadgeItem struct {
@@ -536,6 +592,10 @@ type rawBlockHeader struct {
 }
 
 type rawTableBlock struct {
+	Hierarchy    *tablemeta.Hierarchy    `json:"hierarchy,omitempty"`
+	Pivot        *tablemeta.Pivot        `json:"pivot,omitempty"`
+	ColumnGroups []tablemeta.ColumnGroup `json:"columnGroups,omitempty"`
+
 	ID               string        `json:"id"`
 	Kind             string        `json:"kind"`
 	Title            string        `json:"title,omitempty"`
@@ -560,28 +620,29 @@ type rawChartBlock struct {
 }
 
 type rawKPIBlock struct {
-	ID                       string         `json:"id"`
-	Kind                     string         `json:"kind"`
-	Title                    string         `json:"title"`
-	DatasetRef               string         `json:"datasetRef"`
-	ValueField               string         `json:"valueField"`
-	ValueLabel               string         `json:"valueLabel"`
-	ValueFormat              string         `json:"valueFormat,omitempty"`
-	Suffix                   string         `json:"suffix,omitempty"`
-	SecondaryField           string         `json:"secondaryField,omitempty"`
-	SecondaryLabel           string         `json:"secondaryLabel,omitempty"`
-	SecondaryFormat          string         `json:"secondaryFormat,omitempty"`
-	SecondaryTrend           bool           `json:"secondaryTrend,omitempty"`
-	SecondaryDisplayKey      string         `json:"secondaryDisplayKey,omitempty"`
-	SecondaryDisplayValueMap map[string]any `json:"secondaryDisplayValueMap,omitempty"`
-	Description              string         `json:"description,omitempty"`
-	Tone                     string         `json:"tone,omitempty"`
-	EmptyLabel               string         `json:"emptyLabel,omitempty"`
-	RowSelector              string         `json:"rowSelector,omitempty"`
-	PresentationMode         string         `json:"presentationMode,omitempty"`
-	BodyFormat               string         `json:"bodyFormat,omitempty"`
-	BodyTemplate             string         `json:"bodyTemplate,omitempty"`
-	Content                  KPIContent     `json:"content"`
+	Sparkline                *KPISparklineSpec `json:"sparkline,omitempty"`
+	ID                       string            `json:"id"`
+	Kind                     string            `json:"kind"`
+	Title                    string            `json:"title"`
+	DatasetRef               string            `json:"datasetRef"`
+	ValueField               string            `json:"valueField"`
+	ValueLabel               string            `json:"valueLabel"`
+	ValueFormat              string            `json:"valueFormat,omitempty"`
+	Suffix                   string            `json:"suffix,omitempty"`
+	SecondaryField           string            `json:"secondaryField,omitempty"`
+	SecondaryLabel           string            `json:"secondaryLabel,omitempty"`
+	SecondaryFormat          string            `json:"secondaryFormat,omitempty"`
+	SecondaryTrend           bool              `json:"secondaryTrend,omitempty"`
+	SecondaryDisplayKey      string            `json:"secondaryDisplayKey,omitempty"`
+	SecondaryDisplayValueMap map[string]any    `json:"secondaryDisplayValueMap,omitempty"`
+	Description              string            `json:"description,omitempty"`
+	Tone                     string            `json:"tone,omitempty"`
+	EmptyLabel               string            `json:"emptyLabel,omitempty"`
+	RowSelector              string            `json:"rowSelector,omitempty"`
+	PresentationMode         string            `json:"presentationMode,omitempty"`
+	BodyFormat               string            `json:"bodyFormat,omitempty"`
+	BodyTemplate             string            `json:"bodyTemplate,omitempty"`
+	Content                  KPIContent        `json:"content"`
 }
 
 type rawBadgesBlock struct {
@@ -850,7 +911,8 @@ func decodeJSON(data []byte, datasourceRequests bool) (*ReportFill, error) {
 				return nil, fmt.Errorf("decode reportFill.blocks[%d] tableBlock: %w", index, err)
 			}
 			fill.Blocks = append(fill.Blocks, Block{
-				ID:               tableBlock.ID,
+				ID:        tableBlock.ID,
+				Hierarchy: tableBlock.Hierarchy, Pivot: tableBlock.Pivot, ColumnGroups: tableBlock.ColumnGroups,
 				Kind:             tableBlock.Kind,
 				Title:            tableBlock.Title,
 				AccentTone:       tableBlock.AccentTone,
@@ -908,6 +970,7 @@ func decodeJSON(data []byte, datasourceRequests bool) (*ReportFill, error) {
 				BodyFormat:               kpiBlock.BodyFormat,
 				BodyTemplate:             kpiBlock.BodyTemplate,
 				KPIContent:               &kpiBlock.Content,
+				Sparkline:                kpiBlock.Sparkline,
 			})
 		case "badgesBlock":
 			badgesBlock := rawBadgesBlock{}
@@ -1290,6 +1353,15 @@ func (r *ReportFill) Validate() error {
 			return fmt.Errorf("reportFill.blocks[%d].kind is required", index)
 		}
 		if strings.TrimSpace(block.Kind) == "tableBlock" {
+			{
+				keys := make([]string, len(block.Columns))
+				for i, column := range block.Columns {
+					keys[i] = column.Key
+				}
+				if err := tablemeta.Validate(block.Hierarchy, block.Pivot, block.ColumnGroups, keys); err != nil {
+					return err
+				}
+			}
 			if strings.TrimSpace(block.DatasetRef) == "" {
 				return fmt.Errorf("reportFill.blocks[%d].datasetRef is required for tableBlock", index)
 			}
@@ -1309,6 +1381,15 @@ func (r *ReportFill) Validate() error {
 			}
 			if block.Content == nil {
 				return fmt.Errorf("reportFill.blocks[%d].content is required for tableBlock", index)
+			}
+			{
+				keys := make([]string, len(block.Content.Columns))
+				for i, column := range block.Content.Columns {
+					keys[i] = column.Key
+				}
+				if err := tablemeta.Validate(nil, nil, block.Content.ColumnGroups, keys); err != nil {
+					return err
+				}
 			}
 			if len(block.Content.Columns) == 0 {
 				return fmt.Errorf("reportFill.blocks[%d].content.columns must not be empty for tableBlock", index)
@@ -1407,7 +1488,7 @@ func (r *ReportFill) Validate() error {
 			if block.ChartContent.ResolvedChart.SeriesKeys == nil {
 				return fmt.Errorf("reportFill.blocks[%d].content.resolvedChart.seriesKeys is required for chartBlock", index)
 			}
-			if len(block.ChartContent.ResolvedChart.SeriesKeys) == 0 {
+			if len(block.ChartContent.ResolvedChart.SeriesKeys) == 0 && !(block.ChartContent.ResolvedChart.Type == "donut" && block.ChartContent.ResolvedChart.Center != nil && len(block.ChartContent.ResolvedChart.Rows) == 0) {
 				return fmt.Errorf("reportFill.blocks[%d].content.resolvedChart.seriesKeys must not be empty for chartBlock", index)
 			}
 			for seriesIndex, seriesKey := range block.ChartContent.ResolvedChart.SeriesKeys {
@@ -1418,7 +1499,23 @@ func (r *ReportFill) Validate() error {
 			if block.ChartContent.ResolvedChart.Rows == nil {
 				return fmt.Errorf("reportFill.blocks[%d].content.resolvedChart.rows is required for chartBlock", index)
 			}
+			if center := block.ChartContent.ResolvedChart.Center; center != nil {
+				if block.ChartContent.ResolvedChart.Type != "donut" || center.Scope != "dataset" || strings.TrimSpace(center.Label) == "" {
+					return fmt.Errorf("reportFill donut center requires donut type, label and dataset scope")
+				}
+			}
+			if err := validateChartTooltipEntries(block.ChartContent.ResolvedChart.TooltipEntries); err != nil {
+				return err
+			}
 			switch strings.TrimSpace(block.ChartContent.ResolvedChart.Kind) {
+			case "category-range":
+				if block.ChartContent.ResolvedChart.Type != "category-range" {
+					return fmt.Errorf("reportFill category-range payload requires matching type")
+				}
+			case "heatmap":
+				if block.ChartContent.ResolvedChart.Type != "heatmap" {
+					return fmt.Errorf("reportFill heatmap payload requires heatmap type")
+				}
 			case "directSeries":
 				if strings.TrimSpace(block.ChartContent.ResolvedChart.XAxisKey) == "" {
 					return fmt.Errorf("reportFill.blocks[%d].content.resolvedChart.xAxisKey is required for directSeries", index)
@@ -1501,6 +1598,18 @@ func (r *ReportFill) Validate() error {
 			}
 			if block.KPIContent.RowCount == nil {
 				return fmt.Errorf("reportFill.blocks[%d].content.rowCount is required for kpiBlock", index)
+			}
+			if sparkline := block.KPIContent.Sparkline; sparkline != nil {
+				if sparkline.Values == nil || sparkline.Labels == nil || len(sparkline.Values) != len(sparkline.Labels) {
+					return fmt.Errorf("reportFill.blocks[%d].content.sparkline requires aligned values and labels", index)
+				}
+				for _, series := range [][]*float64{sparkline.Values, sparkline.ComparisonValues} {
+					for _, value := range series {
+						if value != nil && (math.IsNaN(*value) || math.IsInf(*value, 0)) {
+							return fmt.Errorf("reportFill.blocks[%d].content.sparkline requires finite values", index)
+						}
+					}
+				}
 			}
 		}
 		if strings.TrimSpace(block.Kind) == "collectionBlock" {
@@ -1735,6 +1844,9 @@ func (r *ReportFill) Validate() error {
 			}
 			if block.GeoContent.ResolvedGeo == nil {
 				return fmt.Errorf("reportFill.blocks[%d].content.resolvedGeo is required for geoMapBlock", index)
+			}
+			if err := validateGeoGeometry(block.GeoContent.ResolvedGeo); err != nil {
+				return err
 			}
 			if strings.TrimSpace(block.GeoContent.ResolvedGeo.Shape) == "" {
 				return fmt.Errorf("reportFill.blocks[%d].content.resolvedGeo.shape is required for geoMapBlock", index)
@@ -2021,7 +2133,7 @@ func decodeRequestPayload(payload json.RawMessage, index int) (reportspec.Reques
 
 func isAllowedReportValueFormat(value string) bool {
 	switch strings.TrimSpace(value) {
-	case "", "currency", "number", "number5", "percent", "percentFraction", "compact", "compactNumber":
+	case "", "currency", "currency2", "number", "number5", "percent", "percentFraction", "percentFraction2", "compact", "compactNumber":
 		return true
 	default:
 		return false

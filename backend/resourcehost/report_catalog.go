@@ -118,6 +118,9 @@ func readReport[T any](ctx context.Context, r *gatewayReportReader, ref identity
 	if err != nil {
 		return nil, err
 	}
+	if len(refresh) > 1 && refresh[1] {
+		ctx = withFreshMetadataSelection(ctx)
+	}
 	force := len(refresh) > 0 && refresh[0]
 	got, err := get[T](ctx, r.catalog.Gateway, connection, ref, pin, force, false)
 	if err != nil {

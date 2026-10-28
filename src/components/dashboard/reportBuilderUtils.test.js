@@ -348,7 +348,7 @@ assert.deepEqual(semanticDefaultState.binding, {
 assert.equal(isExplicitReportBuilderChartMode(config), false);
 assert.deepEqual(
     getReportBuilderSupportedChartTypes(config),
-    ["line", "bar", "area", "pie", "donut", "horizontal_bar", "funnel_bar"],
+    ["line", "bar", "area", "pie", "donut", "horizontal_bar", "funnel_bar", "heatmap", "category-range"],
 );
 assert.equal(getReportBuilderResultPanePosition(config), "right");
 assert.equal(

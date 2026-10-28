@@ -59,6 +59,15 @@ function validateNode(schema = {}, value, path = "$", rootSchema = schema) {
     return [];
   }
 
+  // Standard conditional requirements are needed by discriminated chart contracts.
+  const conditionalErrors=[];
+  if(Array.isArray(normalizedSchema.allOf)) for(const branch of normalizedSchema.allOf) conditionalErrors.push(...validateNode(branch,value,path,rootSchema));
+  if(normalizedSchema.if) {
+    const branch=validateNode(normalizedSchema.if,value,path,rootSchema).length===0?normalizedSchema.then:normalizedSchema.else;
+    if(branch) conditionalErrors.push(...validateNode(branch,value,path,rootSchema));
+  }
+  if(conditionalErrors.length) return conditionalErrors;
+
   if (Array.isArray(normalizedSchema.anyOf) && normalizedSchema.anyOf.length > 0) {
     const candidateErrors = normalizedSchema.anyOf.map((candidate) => validateNode(candidate, value, path, rootSchema));
     const successful = candidateErrors.find((errors) => errors.length === 0);
@@ -156,6 +165,9 @@ function validateNode(schema = {}, value, path = "$", rootSchema = schema) {
   }
 
   if (effectiveType === "array" && Array.isArray(value)) {
+    if (Number.isInteger(normalizedSchema.maxItems) && value.length > normalizedSchema.maxItems) {
+      errors.push({path,code:"maxItems",message:`Expected at most ${normalizedSchema.maxItems} item(s).`});
+    }
     if (Number.isFinite(Number(normalizedSchema.minItems)) && value.length < Number(normalizedSchema.minItems)) {
       errors.push({
         path,
@@ -171,6 +183,15 @@ function validateNode(schema = {}, value, path = "$", rootSchema = schema) {
   }
 
   // JSON Schema string lengths count Unicode code points, not UTF-16 units.
+  if (typeof value === "string" && typeof normalizedSchema.pattern === "string") {
+    try {
+      if (!new RegExp(normalizedSchema.pattern, "u").test(value)) {
+        errors.push({path, code: "pattern", message: `String must match ${normalizedSchema.pattern}.`});
+      }
+    } catch {
+      errors.push({path, code: "invalidPattern", message: `Invalid schema regular expression: ${normalizedSchema.pattern}.`});
+    }
+  }
   if (typeof value === "string" && Number.isInteger(normalizedSchema.minLength)
       && Array.from(value).length < normalizedSchema.minLength) {
     errors.push({

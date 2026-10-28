@@ -28,6 +28,24 @@ selector, ordinary same-version unions still work; conflicting versions return
 `ErrConflict` from `Open`/`PermittedRoots` rather than picking an arbitrary one.
 This remains a local lookup with no added MCP calls.
 
+## Namespace synchronization transport
+
+New host bindings use `NamespaceCaller`: `namespaces/list` advertises the optional
+`synchronization` capability, and `namespaces/get` with
+`{"namespace":"example","sync":{"knownHash":"saved-index-hash"}}` returns a
+host-authorized `sync.catalog` plus the advertised immutable `fetchMethod`.
+An unchanged catalog is only `{"hash":"...","unchanged":true}`. The complete
+catalog retains named policies, cohort assignments and namespace/kind partition
+hashes. `artifact/fetch` downloads only missing exact root revisions, including
+MCP definitions. Neither endpoint belongs on the interactive request path.
+
+A missing synchronization response fails explicitly; `NamespaceCaller` never
+falls back to `artifact/discover` or ordinary resource discovery. The older
+`MCPCaller` remains available to explicitly configured existing clients, not as
+an automatic fallback. A namespace-bound client rejects foreign partitions.
+On restart the producer must confirm the saved index before local admissions
+are established; immutable payloads can be reused from backing storage.
+
 ## Registration and synchronization
 
 This package is an opt-in host/producer contract over an already authenticated MCP connection. A producer validates the complete top-level artifact at publication, including every declared private dependency, before `Publisher.Publish` activates the immutable version. A published window contains its selected datasource/dialog/CSS definitions in its schema 2 closure. Dependencies do not gain public versions or separate access grants. Window, skill, intent, agent, report, prompt, eval, navigation, toolfeed, and feed roots follow the same top-level rule. This production contract supersedes the exploratory signed PoC under Agently Core's performance output; it adds no new signature or event-sequence protocol.

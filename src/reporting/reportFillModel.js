@@ -1,3 +1,4 @@
+import {materializeAnalyticalTable,buildTableHierarchy,hierarchyRows} from './reportTableAnalytics.js';
 import {applyReportTablePresentations} from './reportTablePresentation.js';
 import {materializeKpiSparkline} from './reportKpiSparklineModel.js';
 import { calculateKpiSecondaryValue, normalizeKpiSecondaryCalculation } from "./reportKpiComparisonModel.js";
@@ -1041,14 +1042,23 @@ function buildReportFillBlocks(reportSpec = {}, datasetsById = new Map(), {
       }
       : sourceDataset;
     if (normalizeString(block?.kind) === "tableBlock") {
-      const columns = cloneValue(block?.columns || []);
+      if((block.hierarchy||block.pivot)&&(sourceDataset?.provenance?.hasMore||sourceDataset?.provenance?.truncated||Number(sourceDataset?.request?.offset)>0)) throw new Error('Hierarchy and pivot tables require a complete admitted dataset; partial pages cannot be aggregated.');
+      const analytic=materializeAnalyticalTable(block,block.hierarchy ? sourceDataset?.rows || [] : dataset?.rows || []);
+      let tableRows=analytic.rows,sourceIndexes=analytic.sourceIndexes;
+      if(block.hierarchy && dataset!==sourceDataset) {
+        const model=buildTableHierarchy(tableRows,{...block.hierarchy,totals:{mode:'producer'}});
+        const filtered=hierarchyRows(model,{matchedKeys:new Set((dataset?.rows||[]).map(row=>row[block.hierarchy.keyField]))}).nodes;
+        tableRows=filtered.map(node=>node.row);sourceIndexes=filtered.map(node=>analytic.sourceIndexes[node.sourceIndex]);
+      }
+      const columns=cloneValue(analytic.columns || []);
       return {
         ...normalizedBlock,
         content: {
           columns,
-          rowCount: Number(dataset?.provenance?.rowCount || 0),
+          ...(analytic.columnGroups.length?{columnGroups:analytic.columnGroups}:{}),
+          rowCount: tableRows.length,
           resolvedRows: buildReportFillTableRows(block.selection && !columns.some(column => column.key === block.selection.field)
-            ? [...columns,{key:block.selection.field,label:'Selected'}] : columns, dataset?.rows || []),
+            ? [...columns,{key:block.selection.field,label:'Selected'}] : columns, tableRows).map((row,index)=>sourceIndexes?{...row,rowIndex:sourceIndexes[index]}:row),
         },
       };
     }

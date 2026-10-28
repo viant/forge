@@ -4,9 +4,33 @@ import { runUICommand } from "./commands.js";
 import {
   registerReportWindowActions,
   scheduleReportWindowMutation,
+  reportWindowRunReceipt,
+  reportWindowMaterialization,
 } from "./reportActions.js";
 
 const calls = [];
+
+// Synthetic live execution: no persistence is available, but orchestration can
+// follow its exact identity without treating the dispatch as completed data.
+assert.deepEqual(reportWindowRunReceipt({ok:true,runId:'live-1',durable:false}), {
+  ok:true,accepted:true,status:'running',materializationId:'live-1',
+});
+assert.deepEqual(reportWindowRunReceipt({ok:true,runId:'saved-1',durable:true}), {
+  ok:true,durable:true,reportRunId:'saved-1',
+});
+assert.equal(reportWindowRunReceipt({ok:true}).ok,false);
+assert.deepEqual(reportWindowRunReceipt({ok:false,error:'failed'}),{ok:false,error:'failed'});
+const live = {runId:'live-1',durable:false,status:'running'};
+assert.equal(reportWindowMaterialization(live,{fresh:true,status:'completed'}).status,'running');
+assert.equal(reportWindowMaterialization({...live,status:'completed'},{fresh:false}).status,'running');
+assert.deepEqual(reportWindowMaterialization({...live,status:'completed'},{fresh:true,datasets:[]}), {
+  fresh:true,datasets:[],id:'live-1',status:'completed',errors:[],
+});
+assert.equal(reportWindowMaterialization({...live,runId:'live-2'},{fresh:true}).id,'live-2');
+assert.deepEqual(reportWindowMaterialization({...live,status:'failed',error:{message:'source unavailable'}},{}).errors,['source unavailable']);
+assert.equal(reportWindowMaterialization({...live,status:'superseded'},{}).status,'failed');
+const savedMaterialization={status:'completed'};
+assert.equal(reportWindowMaterialization({...live,durable:true},savedMaterialization),savedMaterialization);
 const unregister = registerReportWindowActions("report-window-1", {
   getCurrent: () => ({
     ok: true,

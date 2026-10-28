@@ -15,7 +15,6 @@ import (
 	client "github.com/viant/mcp/client"
 	cfg "github.com/viant/mcp/client/config"
 	"sort"
-	"strings"
 	"time"
 )
 
@@ -81,7 +80,9 @@ func (s *NativeSkillSource) CatalogScope(ctx context.Context, conversation strin
 		if err != nil {
 			return "", false, err
 		}
-		automatic := options != nil && options.SkillDiscovery == nil && options.ResolvedIdentity != nil && strings.HasPrefix(options.ResolvedIdentity.ResourceURI, "mcp://")
+		// Automatic discovery is optional for both configured and published MCPs.
+		// Explicit skill discovery retains its required-provider failure semantics.
+		automatic := options != nil && options.SkillDiscovery == nil
 		if automatic {
 			// Separate provider contact from the credential/configuration scope
 			// checks below. A contact failure is optional; a scope failure is not.

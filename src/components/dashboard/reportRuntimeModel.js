@@ -493,6 +493,10 @@ export function resolveReportRuntimeChartActionFields(reportSpec = {}, block = {
   const chartSpec = block?.content?.chartSpec || block?.chartSpec || {};
   const datasetRef = normalizeString(block?.datasetRef);
   const next = [];
+  if (chartSpec.type === 'heatmap' && chartSpec.heatmap) return ['rowField','columnField'].map(kind=>{
+    const valueKey=chartSpec.heatmap[kind],column=resolveReportRuntimeFieldColumn(reportSpec,datasetRef,valueKey);
+    return {kind,valueKey,displayValueKey:valueKey,label:resolveReportRuntimeFieldLabel(reportSpec,datasetRef,valueKey,valueKey),selectionSource:kind==='rowField'?'rowValue':'columnValue',runtimeFilterable:column?.runtimeFilterable===true};
+  });
   const xField = normalizeString(chartSpec?.xField);
   if (xField) {
     const xColumn = resolveReportRuntimeFieldColumn(reportSpec, datasetRef, xField);

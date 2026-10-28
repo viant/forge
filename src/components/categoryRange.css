@@ -1,0 +1,5 @@
+.forge-category-range { width:100%; overflow:auto; }
+.forge-category-range svg { display:block; font:inherit; letter-spacing:inherit; }
+.forge-category-range svg text { font:inherit; letter-spacing:inherit; }
+.forge-category-range svg g { font-size:inherit; }
+.forge-category-range [data-category]:focus-visible { outline:var(--forge-focus-width,2px) solid var(--forge-focus-color,#137cbd); outline-offset:var(--forge-focus-offset,2px); }

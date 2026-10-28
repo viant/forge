@@ -1,3 +1,7 @@
+import {normalizeChartTooltip,chartTooltipFields} from '../chartTooltip.js';
+import {normalizeDonutCenter} from '../donutCenter.js';
+import {normalizeCategoryRange,categoryRangeFields} from '../categoryRange.js';
+import {normalizeHeatmap} from '../categoricalHeatmap.js';
 import {normalizeChartMetricSelection, applyChartMetricSelection} from "../chartMetricSelection.js";
 import {validateChartAppearance} from '../chartAppearance.js';
 import { resolveKey } from "../../utils/selector.js";
@@ -480,13 +484,19 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
         return null;
     }
     validateChartAppearance(chartSpec);
+    const tooltip = normalizeChartTooltip(chartSpec.tooltip);
     const title = String(chartSpec.title || "").trim();
     const eyebrow = String(chartSpec.eyebrow || "").trim();
     const accentTone = String(chartSpec.accentTone || "").trim();
     const highlights = normalizeStringArray(chartSpec.highlights);
     const type = String(chartSpec.type || "").trim().toLowerCase() || "line";
-    const xField = normalizeChartSpecValue(chartSpec.xField);
-    const yFields = normalizeStringArray(chartSpec.yFields || chartSpec.yField).filter(Boolean);
+    if(type === "category-range" && ["seriesField","seriesOptions","metricSelection","layout","stacked"].some(key=>chartSpec[key]!=null)) throw new Error("Category range uses its own declared series and orientation.");
+    const center=normalizeDonutCenter(chartSpec.center,type);
+    const categoryRange = type === "category-range" ? normalizeCategoryRange(chartSpec.categoryRange) : null;
+    if(type === "heatmap" && ["seriesField","seriesOptions","metricSelection","layout","stacked"].some(key=>chartSpec[key]!=null)) throw new Error("Heatmap uses its own declared fields, color scale and category order; seriesField, seriesOptions, metricSelection, layout and stacked are unsupported.");
+    const heatmap = type === "heatmap" ? normalizeHeatmap(chartSpec.heatmap) : null;
+    const xField = categoryRange?.categoryField || heatmap?.rowField || normalizeChartSpecValue(chartSpec.xField);
+    const yFields = categoryRange ? categoryRangeFields(categoryRange) : heatmap ? [heatmap.valueField] : normalizeStringArray(chartSpec.yFields || chartSpec.yField).filter(Boolean);
     const seriesField = normalizeChartSpecValue(chartSpec.seriesField);
     const seriesOptions = normalizeChartSeriesOptions(chartSpec.seriesOptions);
     const categoryLabel = normalizeChartCategoryLabel(chartSpec.categoryLabel);
@@ -498,7 +508,11 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
         ...(accentTone ? { accentTone } : {}),
         ...(highlights.length > 0 ? { highlights } : {}),
         type,
+        ...(heatmap ? {heatmap} : {}),
+        ...(categoryRange ? {categoryRange} : {}),
+        ...(center ? {center} : {}),
         ...(chartSpec.appearance ? {appearance:chartSpec.appearance} : {}),
+        ...(tooltip ? {tooltip} : {}),
         ...(chartSpec.layout ? {layout:chartSpec.layout} : {}),
         ...(typeof chartSpec.stacked === 'boolean' ? {stacked:chartSpec.stacked} : {}),
         xField,
@@ -550,6 +564,7 @@ function sanitizeChartSpecAgainstConfig(config = {}, chartSpec = null) {
         return null;
     }
     const universe = chartConfigUniverse(config);
+    if (chartTooltipFields(normalized.tooltip).some(field => !universe.has(field))) return null;
     if (!normalized.xField || !universe.has(normalized.xField)) {
         return null;
     }
@@ -560,6 +575,9 @@ function sanitizeChartSpecAgainstConfig(config = {}, chartSpec = null) {
         return null;
     }
 
+    if(normalized.center&&!universe.has(normalized.center.value.field))return null;
+    if (normalized.type === "heatmap") return universe.has(normalized.heatmap.columnField) ? normalized : null;
+    if (normalized.type === "category-range") return normalized;
     const family = chartFamilyForType(normalized.type);
 
     if (SINGLE_MEASURE_CATEGORY_TYPES.has(normalized.type) && normalized.yFields.length > 1) {
@@ -797,6 +815,7 @@ export function validateReportBuilderChartSpec(config = {}, chartSpec = null, co
         errors.push({ field: "type", code: "unsupportedType" });
     }
     const fields = chartFieldIndex(columns);
+    chartTooltipFields(normalized.tooltip).forEach((field,index) => {if(!fields.has(field))errors.push({field:`tooltip.fields.${index}.field`,code:"missingField"});});
     const xField = normalized.xField ? fields.get(normalized.xField) : null;
     if (!xField) {
         errors.push({ field: "xField", code: "missingField" });
@@ -818,6 +837,13 @@ export function validateReportBuilderChartSpec(config = {}, chartSpec = null, co
         });
     }
 
+    if (normalized.type === "heatmap") {
+        const column = fields.get(normalized.heatmap.columnField);
+        if (!column || column.kind !== "dimension") errors.push({field:"heatmap.columnField",code:!column?"missingField":"wrongKind"});
+        return {valid:errors.length===0,errors};
+    }
+    if (normalized.type === "category-range") return {valid:errors.length===0,errors};
+    if(normalized.center){const centerField=fields.get(normalized.center.value.field);if(!centerField||centerField.kind!=="measure")errors.push({field:"center.value.field",code:!centerField?"missingField":"wrongKind"});}
     const family = chartFamilyForType(normalized.type);
 
     if (normalized.seriesField) {
@@ -1357,7 +1383,7 @@ export function resolveReportBuilderChartDependencies(config = {}, chartSpec = n
     }
     const dimensions = [];
     const seen = new Set();
-    [normalized.xField, normalized.seriesField].forEach((fieldKey) => {
+    [normalized.xField, normalized.seriesField, normalized.heatmap?.columnField,...chartTooltipFields(normalized.tooltip)].forEach((fieldKey) => {
         const dimension = resolveReportBuilderDimensionByField(config, fieldKey);
         const dimensionId = String(dimension?.id || "").trim();
         if (!dimension || !dimensionId || seen.has(dimensionId)) {
@@ -1368,7 +1394,7 @@ export function resolveReportBuilderChartDependencies(config = {}, chartSpec = n
     });
     const measures = [];
     const seenMeasures = new Set();
-    normalizeStringArray(normalized.yFields).forEach((fieldKey) => {
+    normalizeStringArray([...(normalized.yFields||[]),normalized.center?.value?.field,...chartTooltipFields(normalized.tooltip)]).forEach((fieldKey) => {
         const measure = resolveReportBuilderMeasureByField(config, fieldKey);
         const measureId = String(measure?.id || "").trim();
         if (!measure || !measureId || seenMeasures.has(measureId)) {
@@ -2301,6 +2327,8 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
     if (!normalized) {
         return container;
     }
+    if (normalized.type === "category-range") return {...container,chart:{type:"category-range",categoryRange:normalized.categoryRange,...(normalized.appearance?{appearance:normalized.appearance}:{}),...(normalized.tooltip?{tooltip:normalized.tooltip}:{}),...(typeof normalized.allowTableSwitch === "boolean"?{allowTableSwitch:normalized.allowTableSwitch}:{}),xAxis:{dataKey:normalized.xField},series:{valueKey:normalized.yFields[0],values:normalized.yFields.map(value=>({value,label:value,type:"bar"}))}}};
+    if (normalized.type === "heatmap") return {...container, chart:{type:"heatmap",heatmap:normalized.heatmap,...(normalized.appearance?{appearance:normalized.appearance}:{}),...(normalized.tooltip?{tooltip:normalized.tooltip}:{}),...(typeof normalized.allowTableSwitch === "boolean"?{allowTableSwitch:normalized.allowTableSwitch}:{}),series:{valueKey:normalized.heatmap.valueField,values:[{value:normalized.heatmap.valueField,label:normalized.heatmap.valueField,type:"heatmap"}]}}};
     const measures = getSelectableReportBuilderMeasures(config);
     const xField = resolveReportBuilderDimensionByField(config, normalized.xField);
     const yMeasures = normalizeStringArray(normalized.yFields)
@@ -2327,7 +2355,9 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
             collection: container.collection,
             chart: {
                 type: seriesType,
+                ...(normalized.center?{center:normalized.center}:{}),
                 ...(normalized.appearance ? {appearance:normalized.appearance} : {}),
+        ...(normalized.tooltip ? {tooltip:normalized.tooltip} : {}),
                 series: {
                     nameKey: xDisplayKey || normalized.xField,
                     ...(xSourceKey && ((xDisplayKey && xDisplayKey !== xSourceKey) || hasXDisplayValueMap) ? { sourceNameKey: xSourceKey } : {}),
@@ -2347,6 +2377,7 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
     const baseChart = {
         type: seriesType,
         ...(normalized.appearance ? {appearance:normalized.appearance} : {}),
+        ...(normalized.tooltip ? {tooltip:normalized.tooltip} : {}),
         ...(normalized.layout ? {layout:normalized.layout} : {}),
         ...(typeof normalized.stacked === 'boolean' ? {stacked:normalized.stacked} : {}),
         ...(normalized.preserveCategoryOrder === true ? {preserveCategoryOrder:true} : {}),

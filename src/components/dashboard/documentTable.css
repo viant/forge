@@ -184,3 +184,6 @@
 .forge-document-table .forge-table-selection-target input[type="checkbox"] { box-sizing: border-box; width: var(--forge-selection-indicator-size, 16px); height: var(--forge-selection-indicator-size, 16px); min-width: var(--forge-selection-indicator-size, 16px); min-height: var(--forge-selection-indicator-size, 16px); margin: 0; padding: 0; accent-color: var(--forge-action); cursor: pointer; }
 .forge-document-table .forge-table-selection-target input:focus:not(:focus-visible) { outline: none; box-shadow: none; }
 .forge-document-table .forge-table-selection-target input:focus-visible { outline: var(--forge-focus-width, 2px) solid var(--forge-focus-color, var(--forge-action)); outline-offset: var(--forge-focus-offset, 2px); }
+
+.forge-table-hierarchy-label { display:flex; align-items:center; gap:var(--forge-spacing-1,4px); }
+.forge-table-hierarchy-spacer { display:inline-block; width:32px; flex-shrink:0; }
