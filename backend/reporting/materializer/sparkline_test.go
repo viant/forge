@@ -80,4 +80,22 @@ func TestBundledKpiSparklineRetainsAuthorizedDatasetAndPrint(t *testing.T) {
 	require.Contains(t, string(artifacts.ReportPrint), "#ffffff")
 	_, badFillErr := reportfill.DecodeJSON(bytes.Replace(artifacts.ReportFill, []byte(`"opacity":1`), []byte(`"opacity":2`), 1))
 	require.ErrorContains(t, badFillErr, "opacity")
+
+	// Completeness belongs to the declared dependency even without value colors.
+	for _, item := range validationSpec["blocks"].([]any) {
+		block := item.(map[string]any)
+		if block["id"] != "current" {
+			continue
+		}
+		delete(block["sparkline"].(map[string]any), "valueColor")
+		block["runtime"] = map[string]any{"requireCompleteDataset": true}
+	}
+	plainSpec, err := json.Marshal(validationSpec)
+	require.NoError(t, err)
+	complete := map[string]json.RawMessage{"primary": json.RawMessage(`{"hasMore":false,"rows":[{"spend":2}]}`), "daily": json.RawMessage(`{"hasMore":false,"rows":[{"day":"2026-10-01","spend":2}]}`)}
+	_, err = Materialize(context.Background(), plainSpec, complete)
+	require.NoError(t, err)
+	complete["daily"] = json.RawMessage(`{"hasMore":true,"rows":[{"day":"2026-10-01","spend":2}]}`)
+	_, err = Materialize(context.Background(), plainSpec, complete)
+	require.ErrorContains(t, err, "complete dataset input for 'daily'")
 }
