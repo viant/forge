@@ -33,11 +33,13 @@ jobs:
         with:
           go-version-file: forge/go.mod
           cache-dependency-path: forge/go.sum
-      - run: go test ./backend/types ./backend/reporting/spec
+      - run: go test ./backend/types ./backend/reporting/spec ./backend/reporting/fill ./backend/reporting/materializer ./backend/reporting/export/pdf
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: node --no-warnings src/components/Chart.test.js && node --no-warnings src/components/dashboard/reportBuilderUtils.test.js
       - run: npm run test:schema-form-layout
+      - run: npm run test:kpi-sparkline
+      - run: node --no-warnings src/components/valueColorScale.test.js
       - run: npm run test:workspace-theme
       - run: npm run build
       - name: Check contributor entry points

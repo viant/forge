@@ -814,6 +814,12 @@ func (r *ReportSpec) Validate() error {
 			}
 		case "kpiBlock":
 			if spark := block.Sparkline; spark != nil {
+				if err := spark.ValueColor.Validate(); err != nil {
+					return fmt.Errorf("reportSpec.blocks[%d].sparkline: %w", index, err)
+				}
+				if spark.ValueColor != nil && spark.ValueColor.Field != spark.ValueField {
+					return fmt.Errorf("sparkline color must use the plotted measure")
+				}
 				if strings.TrimSpace(spark.DatasetRef) == "" || strings.TrimSpace(spark.ValueField) == "" || strings.TrimSpace(spark.CategoryField) == "" || (strings.TrimSpace(spark.PeriodStartPath) == "") != (strings.TrimSpace(spark.PeriodEndPath) == "") {
 					return fmt.Errorf("reportSpec.blocks[%d].sparkline requires dataset, fields and paired period paths", index)
 				}

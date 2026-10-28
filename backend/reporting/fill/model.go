@@ -393,9 +393,10 @@ type KPIContent struct {
 // sparkline contracts. Missing observations remain nil, never implicit zeros.
 type KPISparklineSpec = reportspec.KPISparklineSpec
 type KPISparklineContent struct {
-	Values           []*float64 `json:"values"`
-	Labels           []string   `json:"labels"`
-	ComparisonValues []*float64 `json:"comparisonValues,omitempty"`
+	ValueColor       *reportspec.ResolvedValueColor `json:"valueColor,omitempty"`
+	Values           []*float64                     `json:"values"`
+	Labels           []string                       `json:"labels"`
+	ComparisonValues []*float64                     `json:"comparisonValues,omitempty"`
 }
 
 type BadgeItem struct {
@@ -1614,6 +1615,9 @@ func (r *ReportFill) Validate() error {
 				return fmt.Errorf("reportFill.blocks[%d].content.rowCount is required for kpiBlock", index)
 			}
 			if sparkline := block.KPIContent.Sparkline; sparkline != nil {
+				if err := sparkline.ValueColor.Validate(); err != nil {
+					return fmt.Errorf("reportFill.blocks[%d].sparkline: %w", index, err)
+				}
 				if sparkline.Values == nil || sparkline.Labels == nil || len(sparkline.Values) != len(sparkline.Labels) {
 					return fmt.Errorf("reportFill.blocks[%d].content.sparkline requires aligned values and labels", index)
 				}
