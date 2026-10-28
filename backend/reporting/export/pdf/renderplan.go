@@ -40,6 +40,7 @@ type renderOperation struct {
 }
 
 type textPaintOperation struct {
+	textRuns      []reportprint.TextRun
 	box           reportprint.Box
 	text          string
 	fontFamily    string
@@ -427,6 +428,7 @@ func buildTextPaintOperation(element reportprint.Element, defaultVerticalAlign s
 		verticalAlign = strings.TrimSpace(defaultVerticalAlign)
 	}
 	return &textPaintOperation{
+		textRuns:      element.TextRuns,
 		box:           element.Box,
 		text:          element.Text,
 		fontFamily:    element.FontFamily,

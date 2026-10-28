@@ -130,6 +130,7 @@ export const reportPrintSchema = {
         box: { $ref: "#/$defs/box" },
         zIndex: { type: "integer", minimum: 0 },
         text: { type: "string" },
+        textRuns: {type:"array",minItems:1,items:{type:"object",additionalProperties:false,required:["text"],properties:{text:{type:"string",minLength:1,pattern:"^[^\\r]*$"},fontWeight:{type:"string"}}}},
         fontFamily: { type: "string" },
         fontSize: { type: "number", minimum: 1 },
         fontWeight: { type: "string" },
