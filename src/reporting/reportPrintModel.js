@@ -1392,7 +1392,9 @@ function renderReportPrintKpiBlock(state = {}, block = {}, {
   if (!showCard && detailLines.length === 0) {
     detailLines.push(`${valueLabel}: ${valueText}`);
   }
+  const sparklineDetailLines=content.sparkline?.details?.print==='details'?content.sparkline.details.points.map(point=>point.text):[];
   if (!showCard) {
+    detailLines.push(...sparklineDetailLines);
     renderReportPrintSectionTitle(state, block, { layoutNote });
     renderReportPrintTextLines(state, {
       idPrefix: `${blockId}__detail`,
@@ -1483,6 +1485,7 @@ function renderReportPrintKpiBlock(state = {}, block = {}, {
   }
   if(sparklineSvg)pushReportPrintElement(state,buildReportPrintSvgElement({id:`${blockId}__sparkline`,kind:'svg',box:{x:state.contentLeft+cardPadding,y:cardY+cardHeight-cardPadding-36,width:innerWidth,height:36},svg:sparklineSvg}));
   state.cursorY = cardY + cardHeight;
+  if(sparklineDetailLines.length)renderReportPrintTextLines(state,{idPrefix:`${blockId}__sparkline_detail`,lines:sparklineDetailLines,fontSize:9,lineHeight:12});
   finishReportPrintBlock(state);
 }
 

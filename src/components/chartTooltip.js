@@ -3,7 +3,8 @@ import {aggregateDirectSeriesData,buildPieChartData,chartCategoryRowOptions,mate
 import {buildHeatmap} from './categoricalHeatmap.js';
 import {buildCategoryRange} from './categoryRange.js';
 
-const formats=['text','date','number','number2','number5','currency','currency2','percent','percentFraction','percentFraction2','compactNumber'];
+export const chartTooltipFormats=['text','date','number','number2','number5','currency','currency2','percent','percentFraction','percentFraction2','compactNumber'];
+const formats=chartTooltipFormats;
 const aggregates=['unique','sum','avg','min','max'];
 export const chartTooltipSchema={type:'object',additionalProperties:false,required:['fields'],properties:{
   lines:{type:'array',minItems:1,maxItems:64,items:{type:'array',maxItems:128,items:{oneOf:[{type:'object',additionalProperties:false,required:['text'],properties:{text:{type:'string',maxLength:10000}}},{type:'object',additionalProperties:false,required:['field'],properties:{field:{type:'string'}}},{type:'object',additionalProperties:false,required:['input'],properties:{input:requestLabelInputSchema}}]}}},

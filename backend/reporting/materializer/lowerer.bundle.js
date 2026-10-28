@@ -46085,7 +46085,8 @@ Please __addLocaleData before adding additional unit data`);
   }
 
   // src/components/chartTooltip.js
-  var formats = ["text", "date", "number", "number2", "number5", "currency", "currency2", "percent", "percentFraction", "percentFraction2", "compactNumber"];
+  var chartTooltipFormats = ["text", "date", "number", "number2", "number5", "currency", "currency2", "percent", "percentFraction", "percentFraction2", "compactNumber"];
+  var formats = chartTooltipFormats;
   var aggregates = ["unique", "sum", "avg", "min", "max"];
   var fail = (message) => {
     throw new Error(`chart.tooltip: ${message}`);
@@ -46570,6 +46571,37 @@ Please __addLocaleData before adding additional unit data`);
     };
   }
 
+  // src/reporting/kpiSparklineDetails.js
+  var numericFormats = chartTooltipFormats.filter((format2) => !["text", "date"].includes(format2));
+  var sparklineDetailsSchema = { type: "object", additionalProperties: false, required: ["categoryLabel", "categoryFormat", "valueLabel", "valueFormat", "print"], properties: { categoryLabel: { type: "string", minLength: 1 }, categoryFormat: { enum: ["text", "date"] }, valueLabel: { type: "string", minLength: 1 }, valueFormat: { enum: numericFormats }, unit: { type: "string" }, seriesLabel: { type: "string", minLength: 1 }, comparisonLabel: { type: "string", minLength: 1 }, print: { enum: ["details", "omit"] } } };
+  function normalizeSparklineDetails(value) {
+    if (value === void 0) return void 0;
+    if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some((key2) => !Object.hasOwn(sparklineDetailsSchema.properties, key2))) throw Error("Invalid sparkline details.");
+    for (const key2 of ["categoryLabel", "valueLabel", ...["seriesLabel", "comparisonLabel"].filter((key3) => value[key3] !== void 0)]) if (typeof value[key2] !== "string" || !value[key2].trim()) throw Error("Sparkline details require " + key2 + ".");
+    if (!["text", "date"].includes(value.categoryFormat) || !numericFormats.includes(value.valueFormat) || !["details", "omit"].includes(value.print) || value.unit !== void 0 && typeof value.unit !== "string") throw Error("Unsupported sparkline detail format or print policy.");
+    return { ...value };
+  }
+  function materializeSparklineDetails(config, current, comparison) {
+    const details = normalizeSparklineDetails(config);
+    if (!details) return void 0;
+    const points = [];
+    [current, comparison].forEach((series, seriesIndex) => {
+      if (!series) return;
+      series.labels.forEach((label, index) => {
+        if (details.categoryFormat === "date") {
+          const date = /* @__PURE__ */ new Date(label + "T00:00:00Z");
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(label) || !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== label) throw Error("Sparkline date details require YYYY-MM-DD civil dates.");
+        }
+        const value = series.values[index];
+        if (value === null) return;
+        const name = seriesIndex ? details.comparisonLabel || "Comparison" : details.seriesLabel || "Selected";
+        const formatted = String(formatChartDisplayValue(value, details.valueFormat)) + (details.unit ? ` ${details.unit}` : "");
+        points.push({ series: seriesIndex, index, text: `${name} \u2014 ${details.categoryLabel}: ${label}; ${details.valueLabel}: ${formatted}` });
+      });
+    });
+    return { print: details.print, points };
+  }
+
   // src/components/valueColorScale.js
   var hex2 = /^#[0-9a-f]{6}$/i;
   var valueColorSchema = { type: "object", additionalProperties: false, required: ["field", "colors", "domain"], properties: { field: { type: "string", minLength: 1 }, colors: { type: "array", minItems: 2, maxItems: 64, items: { type: "string", pattern: "^#[0-9a-fA-F]{6}$" } }, reverse: { type: "boolean" }, opacity: { type: "number", minimum: 0, maximum: 1 }, domain: { type: "object", additionalProperties: false, required: ["mode"], properties: { mode: { enum: ["extent", "diverging", "fixed"] }, center: { type: "number" }, fullRange: { type: "boolean" }, min: { type: "number" }, max: { type: "number" } } } } };
@@ -46636,18 +46668,19 @@ Please __addLocaleData before adding additional unit data`);
     type: "object",
     additionalProperties: false,
     required: ["datasetRef", "valueField", "categoryField"],
-    properties: { datasetRef: { type: "string", minLength: 1 }, valueField: { type: "string", minLength: 1 }, categoryField: { type: "string", minLength: 1 }, comparisonDatasetRef: { type: "string", minLength: 1 }, periodStartPath: { type: "string", minLength: 1 }, periodEndPath: { type: "string", minLength: 1 }, valueColor: valueColorSchema }
+    properties: { details: sparklineDetailsSchema, datasetRef: { type: "string", minLength: 1 }, valueField: { type: "string", minLength: 1 }, categoryField: { type: "string", minLength: 1 }, comparisonDatasetRef: { type: "string", minLength: 1 }, periodStartPath: { type: "string", minLength: 1 }, periodEndPath: { type: "string", minLength: 1 }, valueColor: valueColorSchema }
   };
   function normalizeKpiSparkline(value) {
     if (value == null) return null;
     if (typeof value !== "object" || Array.isArray(value) || Object.keys(value).some((key2) => !Object.hasOwn(kpiSparklineSchema.properties, key2))) throw Error("Invalid KPI sparkline declaration.");
     const result = {};
     for (const key2 of Object.keys(kpiSparklineSchema.properties)) {
-      if (key2 === "valueColor") continue;
+      if (key2 === "valueColor" || key2 === "details") continue;
       if (["comparisonDatasetRef", "periodStartPath", "periodEndPath"].includes(key2) && value[key2] === void 0) continue;
       if (typeof value[key2] !== "string" || !value[key2].trim()) throw Error("KPI sparkline requires " + key2 + ".");
       result[key2] = value[key2].trim();
     }
+    if (value.details !== void 0) result.details = normalizeSparklineDetails(value.details);
     if (value.valueColor !== void 0) {
       result.valueColor = normalizeValueColor(value.valueColor);
       if (result.valueColor.field !== result.valueField) throw Error("KPI value color must use the plotted measure.");
@@ -46702,7 +46735,8 @@ Please __addLocaleData before adding additional unit data`);
     }
     const comparison = config.comparisonDatasetRef ? read2(config.comparisonDatasetRef) : null;
     if (config.periodStartPath && comparison && comparison.values.length !== current.values.length) throw Error("KPI sparkline comparison periods must have equal length.");
-    return { ...current, ...comparison ? { comparisonValues: comparison.values } : {}, ...valueColor ? { valueColor } : {} };
+    const details = materializeSparklineDetails(config.details, current, comparison);
+    return { ...current, ...details ? { details } : {}, ...comparison ? { comparisonValues: comparison.values } : {}, ...valueColor ? { valueColor } : {} };
   }
   function kpiSparklineGeometry(content, width = 160, height = 36) {
     const series = [content == null ? void 0 : content.values, content == null ? void 0 : content.comparisonValues].map((values) => Array.isArray(values) ? values.map((v2) => isNumericValue(v2) ? Number(v2) : null) : []);
@@ -69078,7 +69112,7 @@ ${indent}${end}`;
   function renderReportPrintKpiBlock(state = {}, block = {}, {
     layoutNote = ""
   } = {}) {
-    var _a5, _b;
+    var _a5, _b, _c, _d;
     const content = (block == null ? void 0 : block.content) || {};
     const tone = resolveReportPrintKpiTone((content == null ? void 0 : content.tone) || (block == null ? void 0 : block.tone));
     const presentationMode = normalizeReportPrintKpiPresentationMode(block);
@@ -69103,7 +69137,9 @@ ${indent}${end}`;
     if (!showCard && detailLines.length === 0) {
       detailLines.push(`${valueLabel}: ${valueText}`);
     }
+    const sparklineDetailLines = ((_b = (_a5 = content.sparkline) == null ? void 0 : _a5.details) == null ? void 0 : _b.print) === "details" ? content.sparkline.details.points.map((point) => point.text) : [];
     if (!showCard) {
+      detailLines.push(...sparklineDetailLines);
       renderReportPrintSectionTitle(state, block, { layoutNote });
       renderReportPrintTextLines(state, {
         idPrefix: `${blockId}__detail`,
@@ -69149,10 +69185,10 @@ ${indent}${end}`;
       pushReportPrintBookmark(state, {
         id: `bookmark.${blockId}`,
         title,
-        pageNumber: (_a5 = state.currentPage) == null ? void 0 : _a5.number,
+        pageNumber: (_c = state.currentPage) == null ? void 0 : _c.number,
         elementId: titleElement.id,
         level: 1,
-        y: (_b = titleElement.box) == null ? void 0 : _b.y
+        y: (_d = titleElement.box) == null ? void 0 : _d.y
       });
     }
     renderReportPrintTextLines(state, {
@@ -69189,6 +69225,7 @@ ${indent}${end}`;
     }
     if (sparklineSvg) pushReportPrintElement(state, buildReportPrintSvgElement({ id: `${blockId}__sparkline`, kind: "svg", box: { x: state.contentLeft + cardPadding, y: cardY + cardHeight - cardPadding - 36, width: innerWidth, height: 36 }, svg: sparklineSvg }));
     state.cursorY = cardY + cardHeight;
+    if (sparklineDetailLines.length) renderReportPrintTextLines(state, { idPrefix: `${blockId}__sparkline_detail`, lines: sparklineDetailLines, fontSize: 9, lineHeight: 12 });
     finishReportPrintBlock(state);
   }
   function renderReportPrintBadgesBlock(state = {}, block = {}, {
