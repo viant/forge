@@ -1931,6 +1931,8 @@ assert.equal(validateReportSpec(mappedColorSpec).valid,false,'Category colors re
 // Resolved chart and filled calculation contracts retain authored semantics.
 const declaredFixture=JSON.parse(readFileSync(new URL('../../../doc/examples/donut-emphasis-conversion-preview.json',import.meta.url),'utf8'));
 declaredFixture.reportSpec.layoutIntent.resultPanePosition="bottom";
+declaredFixture.reportSpec.blocks[0].chartSpec.allowTableSwitch=false;
+declaredFixture.reportSpec.blocks[0].chartModel.allowTableSwitch=false;
 assert.equal(validateReportSpec(declaredFixture.reportSpec).valid,true);
 declaredFixture.reportSpec.calculatedFields=[{id:'fraction',key:'fraction',label:'Fraction',kind:'tableCalc',dataType:'number',datasetRef:'primary',dependencies:['items'],compute:{type:'percentOfTotal',sourceField:'items',partitionBy:[],scale:1,nullPolicy:'null',requireComplete:true}}];
 const declaredFill=buildReportFillFromReportSpec(declaredFixture.reportSpec,declaredFixture.datasets);
