@@ -234,7 +234,24 @@ func indexedDefinitionGet(ctx context.Context, c mcpclient.Interface, caps capab
 // Their provider receipt remains validated even when resources/list replaces get.
 func decodeCollectionIndex(raw json.RawMessage, legacyOwner []string) (namespaces.ListResult, error) {
 	if len(legacyOwner) == 0 {
-		return decodeNamespaceIndex[namespaces.ListResult](raw, "namespaces")
+		// Synchronization is an optional host-startup advertisement. Recognize
+		// only its explicit contract; unrelated fields remain strict errors.
+		type synchronizedNamespaceIndex struct {
+			Namespaces []struct {
+				namespaces.Namespace
+				Synchronization *primitive.NamespaceSyncCapability `json:"synchronization,omitempty"`
+			} `json:"namespaces"`
+			NextCursor *string `json:"nextCursor,omitempty"`
+		}
+		listed, err := decodeNamespaceIndex[synchronizedNamespaceIndex](raw, "namespaces")
+		if err != nil {
+			return namespaces.ListResult{}, err
+		}
+		result := namespaces.ListResult{Namespaces: make([]namespaces.Namespace, 0, len(listed.Namespaces)), NextCursor: listed.NextCursor}
+		for _, namespace := range listed.Namespaces {
+			result.Namespaces = append(result.Namespaces, namespace.Namespace)
+		}
+		return result, nil
 	}
 	var listed struct {
 		ProviderIdentity string `json:"providerIdentity"`
