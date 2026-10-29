@@ -1,3 +1,4 @@
+import {verifyAttachmentDialog, verifyComposerFileDrop} from '../src/demos/theme/attachmentDialog.browser.mjs';
 import assert from 'node:assert/strict';
 import {createServer} from 'vite';
 import {chromium} from 'playwright';
@@ -34,6 +35,8 @@ try {
             if(process.env.FORGE_FOCUS_EVIDENCE) for(const id of ['donut-center','donut-center-long']) await proof.locator(`[data-chart-example="${id}"]`).screenshot({path:path.join(process.env.FORGE_FOCUS_EVIDENCE,`${id}-${viewport.width}.png`)});
             assert.deepEqual(failures,[]);await proof.close();continue;
         }
+        await verifyAttachmentDialog(proof);
+        await verifyComposerFileDrop(proof);
         const foundation = proof.locator('.forge-foundation-specimen');
         const analyticalDocument = foundation.getByRole('region',{name:'Analytical document specimen',exact:true});
         const switchSetting=analyticalDocument.getByRole('combobox',{name:'Chart data switching',exact:true});
@@ -310,7 +313,8 @@ try {
             return {role:node.dataset.forgeType, tag:node.tagName, id:node.id, className:node.className, size:parseFloat(css.fontSize), weight:Number(css.fontWeight), line:parseFloat(css.lineHeight), tracking:css.letterSpacing, family:css.fontFamily};
         }));
         for (const actual of await readRoles()) {
-            assert.equal(actual.size, tokens[`typography.${actual.role}.size`], JSON.stringify(actual));
+            const touchComposer = viewport.width <= 760 && actual.tag === 'TEXTAREA' && actual.className.includes('forge-document-textarea');
+            assert.equal(actual.size, touchComposer ? 16 : tokens[`typography.${actual.role}.size`], JSON.stringify(actual));
             assert.equal(actual.weight, tokens[`typography.${actual.role}.weight`], JSON.stringify(actual));
             assert.equal(actual.line, tokens[`typography.${actual.role}.lineHeight`], JSON.stringify(actual));
         }
@@ -330,7 +334,8 @@ try {
         await proof.waitForFunction(() => getComputedStyle(document.querySelector('.recharts-cartesian-axis-tick text')).fontSize === '13px');
         if (viewport.width === 390) await proof.waitForFunction(() => window.__typeMeasurements.some(entry => entry.font.includes('500 13px monospace')));
         for (const actual of await readRoles()) {
-            assert.equal(actual.size, tokens[`typography.${actual.role}.size`]+2, JSON.stringify(actual));
+            const touchComposer = viewport.width <= 760 && actual.tag === 'TEXTAREA' && actual.className.includes('forge-document-textarea');
+            assert.equal(actual.size, touchComposer ? 16 : tokens[`typography.${actual.role}.size`]+2, JSON.stringify(actual));
             assert.equal(actual.line, tokens[`typography.${actual.role}.lineHeight`]+4, JSON.stringify(actual));
             assert.equal(actual.weight, 500, JSON.stringify(actual));
             assert.match(actual.family, /monospace/);
@@ -367,6 +372,8 @@ try {
     // Mode button is outside the popup. Wait for its exit transition to finish
     // before reopening; visibility alone is true during Blueprint's exit state.
     await portal.waitFor({state: 'hidden'});
+    await verifyAttachmentDialog(page);
+    await verifyComposerFileDrop(page);
     await page.getByRole('button', {name: 'Open popup'}).click();
     await portal.waitFor({state: 'visible'});
     assert.equal(await portal.evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(36, 45, 61)');

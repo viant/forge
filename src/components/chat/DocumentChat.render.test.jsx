@@ -3,6 +3,7 @@ import {createRoot} from 'react-dom/client';
 import {Simulate} from 'react-dom/test-utils';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import fs from 'node:fs';
+import AttachmentDialog from './AttachmentDialog.jsx';
 import Composer from './Composer.jsx';
 import StarterTaskBrowser from './StarterTaskBrowser.jsx';
 import useComposerDraft from './useComposerDraft.js';
@@ -109,14 +110,197 @@ describe('document composer and task discovery', () => {
         expect(host.querySelectorAll('.forge-task-row')).toHaveLength(1);
     });
 
+    it('shows preparation, progress, failure recovery and blocks Send until files are ready', async () => {
+        const cancel = vi.fn(), retry = vi.fn(), submit = vi.fn();
+        const file = new File(['example'], 'Example.csv');
+        const view = (status, progress = 0, attachments = []) => <Composer appearance="document" showUpload uploads={[{id:'one',name:file.name,file,status,progress}]}
+            attachments={attachments} onCancelUpload={cancel} onRetryUpload={retry} onSubmit={submit}/>;
+        await render(view('idle'));
+        await change(host.querySelector('textarea'),'Retained draft');
+        expect(host.textContent).toContain('Preparing…');
+        expect(host.textContent).toContain(file.name);
+        expect(host.querySelector('textarea').disabled).toBe(false);
+        expect(host.querySelector('[data-testid=chat-composer-send]').disabled).toBe(true);
+        await press(host.querySelector('textarea'),'Enter'); expect(submit).not.toHaveBeenCalled();
+        await render(view('uploading', .5));
+        expect(host.textContent).toContain('Uploading 50%');
+        expect(host.querySelector('[role=progressbar]').getAttribute('aria-valuenow')).toBe('50');
+        await click(host.querySelector('[aria-label="Cancel upload of Example.csv"]'));
+        expect(cancel).toHaveBeenCalledWith('one');
+        await render(view('uploading', 1)); expect(host.textContent).toContain('Finishing upload…');
+        await render(view('error'));
+        expect(host.querySelector('[role=alert]').textContent).toBe('Upload failed');
+        await click(host.querySelector('[aria-label="Retry upload of Example.csv"]'));
+        expect(retry).toHaveBeenCalledWith(expect.objectContaining({id:'one',file}));
+        await click(host.querySelector('[aria-label="Remove failed upload Example.csv"]'));
+        expect(cancel).toHaveBeenCalledWith('one');
+        await render(view('done',1,[{name:file.name}]));
+        expect(host.querySelector('[aria-label="File uploads"]')).toBeNull();
+        expect(host.textContent).toContain('Ready to send');
+        expect(host.querySelector('[data-testid=chat-composer-send]').disabled).toBe(false);
+        expect(host.querySelector('textarea').value).toBe('Retained draft');
+    });
+
+    it('retains attachment elements and file order through out-of-order completion', async () => {
+        const remove = vi.fn();
+        const files = [{id:'a',name:'First.txt',status:'uploading',progress:.4},{id:'b',name:'Second.txt',status:'uploading',progress:.4}];
+        const view = (uploads, attachments) => <Composer appearance="document" showUpload uploads={uploads} attachments={attachments} onRemoveAttachment={remove}/>;
+        await render(view(files, []));
+        const [first,second] = host.querySelectorAll('.forge-upload-chip');
+        await render(view([files[0],{...files[1],status:'done'}],[{name:'Second.txt',uploadId:'b'}]));
+        expect([...host.querySelectorAll('.forge-upload-chip')]).toEqual([first,second]);
+        await render(view(files.map(file => ({...file,status:'done'})),[{name:'Second.txt',uploadId:'b'},{name:'First.txt',uploadId:'a'}]));
+        expect([...host.querySelectorAll('.forge-upload-chip')]).toEqual([first,second]);
+        expect(first.textContent).toContain('Ready to send');
+        expect(host.querySelector('[role=progressbar]:not([aria-hidden=true])')).toBeNull();
+        await click(host.querySelector('[aria-label="Remove First.txt"]'));
+        expect(remove).toHaveBeenCalledWith(1);
+        await render(view(files.map(file => ({...file,status:'done'})),[{name:'Second.txt',uploadId:'b'}]));
+        expect(host.querySelectorAll('.forge-upload-chip')).toHaveLength(1);
+        expect(host.querySelector('.forge-upload-chip')).toBe(second);
+    });
+
     it('keeps the shared recipe semantic and rejects hardcoded styling bypasses', () => {
         const css = fs.readFileSync('src/components/chat/documentChat.css', 'utf8');
         const bypass = /#[\da-f]{3,8}\b|\b(?:rgb|hsl)a?\(|!important|(?:^|[;{])\s*(?:font-size|font-weight|line-height|letter-spacing)\s*:\s*-?\d/i;
         expect(bypass.test(css)).toBe(false); expect(bypass.test('.bad {font-size: 13px}')).toBe(true);
-        for (const path of ['./DocumentComposer.jsx', './StarterTaskBrowser.jsx']) {
+        for (const path of ['./DocumentComposer.jsx', './StarterTaskBrowser.jsx', './AttachmentDialog.jsx']) {
             const source = fs.readFileSync(`src/components/chat/${path.slice(2)}`, 'utf8');
             expect(source).not.toMatch(/Viant|Steward|IBM Plex|fontSize\s*:|fontFamily\s*:/);
             expect(source).toContain("typographyProps('body')");
         }
+    });
+
+    it('uploads dropped files once, keeps the draft and clears nested drag feedback', async () => {
+        const upload = vi.fn(), submit = vi.fn();
+        await render(<Composer appearance="document" showUpload onDropFiles={upload} onSubmit={submit}/>);
+        const shell = host.querySelector('[data-testid=chat-composer-shell]'), input = host.querySelector('textarea');
+        await change(input, 'Keep this draft');
+        const files = [new File(['example'], 'Example.csv'), new File([], 'Empty.txt')];
+        const transfer = {types:['Files'],files,dropEffect:'none'};
+        await act(async () => Simulate.dragEnter(shell, {dataTransfer:transfer}));
+        await act(async () => Simulate.dragEnter(input, {dataTransfer:transfer}));
+        await act(async () => Simulate.dragLeave(input, {dataTransfer:transfer}));
+        expect(shell.textContent).toContain('Drop files to upload');
+        await act(async () => Simulate.dragOver(input, {dataTransfer:transfer}));
+        expect(transfer.dropEffect).toBe('copy');
+        await act(async () => Simulate.drop(input, {dataTransfer:transfer}));
+        expect(upload).toHaveBeenCalledExactlyOnceWith(files);
+        expect(submit).not.toHaveBeenCalled();
+        expect(input.value).toBe('Keep this draft');
+        expect(shell.textContent).not.toContain('Drop files to upload');
+        await act(async () => Simulate.dragEnter(shell, {dataTransfer:transfer}));
+        await act(async () => Simulate.dragLeave(shell, {dataTransfer:transfer}));
+        expect(shell.textContent).not.toContain('Drop files to upload');
+        await act(async () => Simulate.dragEnter(shell, {dataTransfer:transfer}));
+        await act(async () => Simulate.dragEnd(shell));
+        expect(shell.textContent).not.toContain('Drop files to upload');
+    });
+
+    it('leaves text drops alone and blocks empty or unavailable file uploads', async () => {
+        const upload = vi.fn();
+        const view = props => <Composer appearance="document" showUpload onDropFiles={upload} {...props}/>;
+        const drag = async (type, transfer) => {
+            const event = new Event(type, {bubbles:true,cancelable:true});
+            Object.defineProperty(event, 'dataTransfer', {value:transfer});
+            await act(async () => host.querySelector('[data-testid=chat-composer-shell]').dispatchEvent(event));
+            return event;
+        };
+        await render(view({}));
+        const text = {types:['text/plain'],files:[]};
+        expect((await drag('dragover',text)).defaultPrevented).toBe(false);
+        expect((await drag('drop',text)).defaultPrevented).toBe(false);
+        const empty = {types:['Files'],files:[],dropEffect:'none'};
+        await drag('drop',empty); expect(upload).not.toHaveBeenCalled();
+        const file = {types:['Files'],files:[new File(['example'],'Example.csv')],dropEffect:'copy'};
+        await drag('dragenter',file);
+        expect(host.textContent).toContain('Drop files to upload');
+        for (const props of [{disabled:true},{showUpload:false},{onDropFiles:undefined}]) {
+            await render(view(props));
+            expect(host.textContent).not.toContain('Drop files to upload');
+            expect((await drag('dragover',file)).defaultPrevented).toBe(true);
+            expect(file.dropEffect).toBe('none');
+            expect((await drag('drop',file)).defaultPrevented).toBe(true);
+            expect(upload).not.toHaveBeenCalled();
+        }
+    });
+});
+
+
+describe('attachment dialog', () => {
+    const selected = () => document.querySelector('.forge-attachment-dialog');
+    const pick = async files => act(async () => Simulate.change(selected().querySelector('input[type=file]'), {target:{files,value:''}}));
+    const files = [new File(['example'], 'Example.csv', {lastModified:1}), new File([], 'Empty.txt', {lastModified:2})];
+
+    it('retains native selection, exact-file deduplication, removal, upload and fresh reopen', async () => {
+        const upload = vi.fn(), close = vi.fn();
+        const view = isOpen => <AttachmentDialog isOpen={isOpen} onSelect={upload} onClose={close}/>;
+        await render(view(true));
+        const uploadButton = () => [...selected().querySelectorAll('button')].find(node => node.textContent === 'Upload');
+        expect(uploadButton().disabled).toBe(true);
+        expect(selected().querySelector('input').multiple).toBe(true);
+        await pick(files); await pick([files[0]]); await pick([]);
+        expect(selected().querySelectorAll('li')).toHaveLength(2);
+        expect(selected().textContent).toContain('0 B');
+        const changed = new File(['example'], 'Example.csv', {lastModified:3});
+        await pick([changed]);
+        expect(selected().querySelectorAll('li')).toHaveLength(3);
+        await click(selected().querySelector('[aria-label="Remove Empty.txt"]'));
+        await click(uploadButton());
+        expect(upload).toHaveBeenCalledExactlyOnceWith([files[0], changed]);
+        await click([...selected().querySelectorAll('button')].find(node => node.textContent === 'Close'));
+        expect(close).toHaveBeenCalledOnce();
+        await render(view(false)); await render(view(true));
+        expect(selected().querySelectorAll('li')).toHaveLength(0);
+        expect(uploadButton().disabled).toBe(true);
+    });
+
+    it('retains progress and distinguishes failed, completed and canceled uploads', async () => {
+        const view = status => <AttachmentDialog isOpen onClose={() => {}} uploads={[{name:files[0].name,size:files[0].size,status,progress:0.4,error:new Error('Example failure')}]}/>;
+        await render(view('uploading')); await pick([files[0]]);
+        expect(selected().querySelector('[role=progressbar]').getAttribute('aria-valuenow')).toBe('40');
+        expect(selected().querySelector('[role=status]').textContent).toBe('40%');
+        await render(view('error')); expect(selected().querySelector('[role=alert]').textContent).toBe('Example failure');
+        await render(view('done')); expect(selected().querySelector('[role=status]').textContent).toBe('Uploaded');
+        await render(view('aborted')); expect(selected().querySelector('[role=status]').textContent).toBe('Upload canceled');
+        expect(selected().querySelector('li').textContent).toContain(files[0].name);
+    });
+
+    it('adds dropped files to the picker selection and waits for Upload', async () => {
+        const upload = vi.fn();
+        const view = isOpen => <AttachmentDialog isOpen={isOpen} onClose={() => {}} onSelect={upload}/>;
+        await render(view(true));
+        const input = selected().querySelector('input[type=file]');
+        const body = selected().querySelector('.bp6-dialog-body');
+        const transfer = {types:['Files'],files,dropEffect:'none'};
+        await pick([files[0]]);
+        await act(async () => Simulate.dragEnter(body, {dataTransfer:transfer}));
+        await act(async () => Simulate.dragEnter(input, {dataTransfer:transfer}));
+        await act(async () => Simulate.dragLeave(input, {dataTransfer:transfer}));
+        expect(selected().textContent).toContain('Release to add files');
+        await act(async () => Simulate.dragOver(input, {dataTransfer:transfer}));
+        expect(transfer.dropEffect).toBe('copy');
+        await act(async () => Simulate.drop(input, {dataTransfer:transfer}));
+        expect(selected().querySelectorAll('li')).toHaveLength(2);
+        expect(selected().textContent).toContain('2 files selected');
+        expect(selected().textContent).toContain('Drop more files here');
+        expect(upload).not.toHaveBeenCalled();
+        await pick(files);
+        expect(selected().querySelectorAll('li')).toHaveLength(2);
+        await click(selected().querySelector('[aria-label="Remove Empty.txt"]'));
+        expect(selected().textContent).toContain('1 file selected');
+        await click([...selected().querySelectorAll('button')].find(node => node.textContent === 'Upload'));
+        expect(upload).toHaveBeenCalledExactlyOnceWith([files[0]]);
+        await act(async () => Simulate.dragEnter(body, {dataTransfer:transfer}));
+        await render(view(false)); await render(view(true));
+        expect(selected().querySelectorAll('li')).toHaveLength(0);
+        expect(selected().textContent).toContain('Drop files here');
+        expect(selected().textContent).not.toContain('Release to add files');
+    });
+
+    it('keeps the shared attachment recipe free of local appearance overrides', () => {
+        const css = fs.readFileSync('src/components/chat/AttachmentDialog.css', 'utf8');
+        expect(css).not.toMatch(/#[\da-f]{3,8}\b|\b(?:rgb|hsl)a?\(|!important/);
+        expect(fs.readFileSync('src/components/chat/AttachmentDialog.jsx', 'utf8')).not.toMatch(/style=|fontSize\s*:|fontFamily\s*:/);
     });
 });

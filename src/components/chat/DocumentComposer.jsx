@@ -4,6 +4,8 @@ import Icon from '../Icon.jsx';
 import SelectControl from '../SelectControl.jsx';
 import {typographyProps} from '../Typography.jsx';
 import CameraCapture from './CameraCapture.jsx';
+import UploadChips from './UploadChips.jsx';
+import useFileDrop from './useFileDrop.js';
 import './documentChat.css';
 
 function Disclosure({icon, label, children, disabled}) {
@@ -27,8 +29,8 @@ function Disclosure({icon, label, children, disabled}) {
     </details>;
 }
 
-export default function DocumentComposer({renderInput, onSubmit, inputHostRef, draft, attachments = [], onRemoveAttachment,
-    disabled, inputInvalid, showUpload, onOpenAttach, onCaptureImage, showMic, micOn, toggleMic,
+export default function DocumentComposer({renderInput, onSubmit, inputHostRef, draft, attachments = [], onRemoveAttachment, uploads = [], onCancelUpload, onRetryUpload,
+    disabled, inputInvalid, showUpload, onDropFiles, onOpenAttach, onCaptureImage, showMic, micOn, toggleMic,
     showAbort, onAbort, submitText, queueTray, usageSummary, usageTooltip,
     agentOptions = [], agentValue, onAgentChange, modelOptions = [], modelValue, onModelChange,
     reasoningOptions = [], reasoningValue, onReasoningChange, autoSelectTools, onAutoSelectToolsChange,
@@ -41,6 +43,7 @@ export default function DocumentComposer({renderInput, onSubmit, inputHostRef, d
         </SelectControl>
     </label> : null;
     const [keyboardFocus, setKeyboardFocus] = useState(false);
+    const {fileDrag, dropHandlers} = useFileDrop(onDropFiles, showUpload && !disabled);
     useEffect(() => {
         const key = event => {if (event.key === 'Tab') setKeyboardFocus(true);};
         document.addEventListener('keydown', key);
@@ -50,15 +53,21 @@ export default function DocumentComposer({renderInput, onSubmit, inputHostRef, d
     const canSend = !disabled && !inputInvalid && (!!String(draft).trim() || attachments.length > 0);
     return <form className={`chat-composer forge-document-composer${keyboardFocus ? ' is-keyboard-focus' : ''}`} onPointerDownCapture={() => setKeyboardFocus(false)} data-testid="chat-composer" onSubmit={onSubmit}>
         {queueTray}
-        <div className="forge-document-composer-shell" data-testid="chat-composer-shell">
-            {attachments.length > 0 ? <ul className="forge-composer-attachments" aria-label="Attached files" data-testid="chat-attachments">
-                {attachments.map((file, index) => <li key={`${file.name}-${index}`} {...typographyProps('small')}><span>{file.name}</span>
-                    <Button variant="ghost" icon="lucide:x" hideLabel aria-label={`Remove ${file.name}`} disabled={disabled} onClick={() => onRemoveAttachment?.(index)}/></li>)}
-            </ul> : null}
+        <div className={`forge-document-composer-shell${fileDrag ? ' is-file-dragging' : ''}`} data-testid="chat-composer-shell" {...dropHandlers}>
+            {fileDrag ? <div className="forge-composer-file-drop" role="status" {...typographyProps('label')}>
+                <Icon name="lucide:paperclip"/><span>Drop files to upload</span>
+            </div> : null}
+            <UploadChips uploads={uploads} attachments={attachments} onRemove={onRemoveAttachment}
+                onCancel={onCancelUpload} onRetry={showUpload ? onRetryUpload : undefined} disabled={disabled}/>
             <div ref={inputHostRef} className="forge-document-input">{renderInput({className: 'forge-document-textarea', documentAppearance: true, describedBy: instructionsId})}</div>
             <div className="forge-document-toolbar" data-testid="chat-composer-bar">
                 {showUpload ? <Disclosure label="Add photos or files" icon="lucide:plus" disabled={disabled}>
-                    <Button variant="ghost" icon="lucide:paperclip" disabled={disabled} onClick={onOpenAttach}>Add photos or files</Button>
+                    <Button variant="ghost" icon="lucide:paperclip" disabled={disabled} onClick={event => {
+                        const disclosure = event.currentTarget.closest('details');
+                        disclosure?.removeAttribute('open');
+                        disclosure?.querySelector('summary')?.focus();
+                        onOpenAttach?.();
+                    }}>Add photos or files</Button>
                     {typeof onCaptureImage === 'function' ? <CameraCapture disabled={disabled} onCapture={onCaptureImage} documentAppearance/> : null}
                 </Disclosure> : null}
                 {(agentOptions.length || modelOptions.length || reasoningOptions.length || hasToolsPicker || showSettings) ? <Disclosure label="Tools" icon="lucide:sliders-horizontal" disabled={disabled}>

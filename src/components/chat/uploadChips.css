@@ -1,0 +1,10 @@
+.forge-upload-chips { display: flex; flex-wrap: wrap; gap: var(--forge-spacing-2, 8px); margin: 0; padding: 0; list-style: none; }
+.forge-upload-chip { display: flex; align-items: center; gap: var(--forge-spacing-2, 8px); box-sizing: border-box; width: var(--forge-chat-attachment-width, 280px); max-width: 100%; padding: var(--forge-spacing-2, 8px); border-radius: var(--forge-control-radius, 6px); background: var(--forge-surface-subtle); color: var(--forge-text); }
+.forge-upload-chip__content { display: grid; flex: 1; gap: var(--forge-spacing-1, 4px); min-width: 0; }
+.forge-upload-chip__name { overflow-wrap: anywhere; }
+.forge-upload-chip [data-forge-type="metadata"] { color: var(--forge-text-muted); }
+.forge-upload-chips .forge-upload-chip .bp6-progress-bar { background: var(--forge-border-color); }
+.forge-upload-chips .forge-upload-chip .bp6-progress-meter { background-color: var(--forge-interaction-color); }
+.forge-upload-chip[data-upload-status="error"] :is(.forge-icon, [role="alert"]) { color: var(--forge-status-danger-foreground); }
+@media (prefers-reduced-motion: reduce) { .forge-upload-chips li.forge-upload-chip .bp6-progress-bar .bp6-progress-meter { animation: none; } }
+.forge-upload-chip:is([data-upload-status="done"], [data-upload-status="error"]) .bp6-progress-bar { visibility: hidden; }
