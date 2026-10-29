@@ -8,9 +8,45 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/viant/authz"
+	"github.com/viant/forge/backend/artifactcohort"
 	primitive "github.com/viant/forge/backend/provider/contract"
 	identity "github.com/viant/forge/backend/resource"
 )
+
+type deniedCohortFacts struct{}
+
+func (deniedCohortFacts) Resolve(context.Context) (authz.Facts, error) {
+	return authz.Facts{}, authz.ErrDenied
+}
+
+func TestRealCohortDenialIsLocalToDiscovery(t *testing.T) {
+	g, _, trap, _ := publishedFixture(t)
+	replica, err := artifactcohort.NewReplica(artifactcohort.Config{
+		Enabled: true, Source: "restricted-producer", Tenant: "tenant", Account: "account",
+		Caller: artifactcohort.NamespaceCaller{Namespace: "restricted"}, Facts: deniedCohortFacts{},
+		SessionKey: func(context.Context) (string, error) { return "", authz.ErrDenied },
+	})
+	require.NoError(t, err)
+	source, err := artifactcohort.NewMetadataSource(replica, []string{"restricted"})
+	require.NoError(t, err)
+	_, denial := source.AdmissionKey(context.Background())
+	require.ErrorIs(t, denial, artifactcohort.ErrDenied)
+	require.True(t, purePublishedDenial(denial), "real cohort errors use the typed HTTP 403 contract")
+	require.False(t, purePublishedDenial(errors.Join(denial, errors.New("corrupt manifest"))))
+	connection := Connection{Name: "restricted", ProviderIdentity: "restricted-producer"}
+	require.NoError(t, g.RegisterPublishedMetadataSource(connection, []string{"restricted"}, source))
+	for _, kind := range []string{"mcp", "skill", "navigation", "report"} {
+		page, err := ListPage[json.RawMessage](context.Background(), g, kind, CatalogQuery{}, true)
+		require.NoError(t, err, kind)
+		require.Len(t, page.Items, 1, kind)
+	}
+	_, _, err = (&NativeSkillSource{Gateway: g}).CatalogScope(context.Background(), "", []string{"restricted"})
+	require.NoError(t, err)
+	_, err = g.Get(context.Background(), connection, identity.ResourceRef{URI: "report://restricted/sample"}, nil)
+	require.ErrorIs(t, err, artifactcohort.ErrDenied)
+	require.Zero(t, trap.calls, "local denial must not contact another transport")
+}
 
 func TestDeniedPublishedProviderDoesNotBlockOtherCatalogs(t *testing.T) {
 	g, allowed, trap, _ := publishedFixture(t)
