@@ -2202,7 +2202,7 @@ func decodeRequestPayload(payload json.RawMessage, index int) (reportspec.Reques
 
 func isAllowedReportValueFormat(value string) bool {
 	switch strings.TrimSpace(value) {
-	case "", "currency", "currency2", "number", "number5", "percent", "percentFraction", "percentFraction2", "compact", "compactNumber":
+	case "", "currency", "currency2", "number", "number2", "number5", "percent", "percentFraction", "percentFraction2", "compact", "compactNumber":
 		return true
 	default:
 		return false

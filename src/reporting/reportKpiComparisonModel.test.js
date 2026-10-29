@@ -33,6 +33,19 @@ const fillValidation=validateReportFill(fill);assert.equal(fillValidation.valid,
 const print=buildReportPrintFromReportFill({reportSpec:spec,reportFill:fill});
 const printValidation=validateReportPrint(print);assert.equal(printValidation.valid,true,JSON.stringify(printValidation));
 assert.match(JSON.stringify(print), /-20(?:\.0+)?%/,'Print lost shared comparison value');
+// Numeric precision is an existing formatter capability and must survive the
+// authored contract, fill validation and canonical print without rounding data.
+const preciseSpec=structuredClone(spec);
+const preciseBlock=preciseSpec.blocks.find(b=>b.id==='movement');
+preciseBlock.valueFormat='number2';preciseBlock.secondaryFormat='number2';
+assert.equal(validateReportSpec(preciseSpec).valid,true);
+const preciseFill=buildReportFillFromReportSpec(preciseSpec,{primary:{rows:[{amount:1.2345}]},previous:{rows:[{amount:2}]}});
+assert.equal(validateReportFill(preciseFill).valid,true);
+assert.equal(preciseFill.blocks.find(b=>b.id==='movement').content.value,1.2345);
+const precisePrint=buildReportPrintFromReportFill({reportSpec:preciseSpec,reportFill:preciseFill});
+assert.equal(validateReportPrint(precisePrint).valid,true);
+assert.match(JSON.stringify(precisePrint),/1\.23/);
+assert.match(JSON.stringify(precisePrint),/-0\.38/);
 for(const previous of [[],[{amount:null}],[{amount:0}]]) {
  const empty=buildReportFillFromReportSpec(spec,{primary:{rows:[{amount:80}]},previous:{rows:previous}});
  assert.equal(empty.blocks.find(b=>b.id==='movement').content.secondaryValue,null);
