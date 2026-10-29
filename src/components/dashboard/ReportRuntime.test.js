@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import "./ReportRuntime.geoLayout.test.jsx";
 
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -2127,8 +2128,9 @@ const malformedTableColumnsHtml = renderToStaticMarkup(
 );
 assert.ok(malformedTableColumnsHtml.includes("No table fields selected. Edit this table block in Design to choose at least one field."));
 
-const singleDatasetRuntimeHtml = renderToStaticMarkup(
-  React.createElement(ReportRuntime, {
+// Legacy fills without resolvedRows fall back to the sole available dataset.
+// An explicit resolvedRows array is authoritative, including an empty result.
+const singleDatasetRuntimeProps = {
     reportSpec: {
       title: "Single Dataset Runtime",
       layoutIntent: {
@@ -2172,15 +2174,38 @@ const singleDatasetRuntimeHtml = renderToStaticMarkup(
               { key: "eventDate", sourceKey: "eventDate", displayKey: "eventDate", label: "Date", kind: "dimension" },
               { key: "totalSpend", sourceKey: "totalSpend", displayKey: "totalSpend", label: "Spend", kind: "measure", format: "currency" },
             ],
-            resolvedRows: [],
           },
         },
       ],
     },
-  }),
+};
+const singleDatasetRuntimeHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, singleDatasetRuntimeProps),
 );
 assert.ok(singleDatasetRuntimeHtml.includes("2026-05-01"));
 assert.match(singleDatasetRuntimeHtml, /(1200|1,200|\$1,200)/);
+
+const emptyResolvedDatasetRuntimeProps = structuredClone(singleDatasetRuntimeProps);
+emptyResolvedDatasetRuntimeProps.reportFill.blocks[0].content.resolvedRows = [];
+const emptyResolvedDatasetRuntimeHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, emptyResolvedDatasetRuntimeProps),
+);
+assert.ok(!emptyResolvedDatasetRuntimeHtml.includes("2026-05-01"), "an explicit empty result must not restore source rows");
+assert.ok(emptyResolvedDatasetRuntimeHtml.includes("No data."));
+
+const explicitDatasetRuntimeProps = structuredClone(singleDatasetRuntimeProps);
+explicitDatasetRuntimeProps.reportSpec.blocks[0].datasetRef = "comparison";
+explicitDatasetRuntimeProps.reportSpec.datasets.push({ id: "comparison", request: {} });
+explicitDatasetRuntimeProps.reportFill.datasets.push({
+  id: "comparison",
+  rows: [{ eventDate: "2026-05-02", totalSpend: 2400 }],
+  provenance: { diagnostics: [] },
+});
+const explicitDatasetRuntimeHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, explicitDatasetRuntimeProps),
+);
+assert.ok(explicitDatasetRuntimeHtml.includes("2026-05-02"), "the authored dataset binding must select the comparison rows");
+assert.ok(!explicitDatasetRuntimeHtml.includes("2026-05-01"));
 
 const wideHalfTableHtml = renderToStaticMarkup(
   React.createElement(ReportRuntime, {
@@ -3562,18 +3587,18 @@ const collapsedTableHtml = renderToStaticMarkup(React.createElement(ReportRuntim
     title: "Collapsible report",
     parameters: { pageSize: 25 },
     datasets: [{ id: "primary", dataSourceRef: "advanced.reporting", request: {} }],
-    blocks: [{ id: "creativeTable", kind: "tableBlock", title: "Creatives", datasetRef: "primary", collapsible: true, defaultCollapsed: true, labelClamp: { lines: 2, maxCharacters: 12 }, columns: [{ key: "creative", label: "Creative" }] }],
+    blocks: [{ id: "recordsTable", kind: "tableBlock", title: "Records", datasetRef: "primary", collapsible: true, defaultCollapsed: true, labelClamp: { lines: 2, maxCharacters: 12 }, columns: [{ key: "record", label: "Record" }] }],
   },
   reportFill: {
     diagnostics: [],
-    datasets: [{ id: "primary", dataSourceRef: "advanced.reporting", provenance: { rowCount: 1 }, rows: [{ creative: "Kroil\uFFFD\uFFFD creative name that is long" }] }],
-    blocks: [{ id: "creativeTable", kind: "tableBlock", title: "Creatives", datasetRef: "primary", collapsible: true, defaultCollapsed: true, labelClamp: { lines: 2, maxCharacters: 12 }, columns: [{ key: "creative", label: "Creative" }], content: { rowCount: 1, columns: [{ key: "creative", label: "Creative" }], resolvedRows: [] } }],
+    datasets: [{ id: "primary", dataSourceRef: "advanced.reporting", provenance: { rowCount: 1 }, rows: [{ record: "Sample\uFFFD\uFFFD record name that is long" }] }],
+    blocks: [{ id: "recordsTable", kind: "tableBlock", title: "Records", datasetRef: "primary", collapsible: true, defaultCollapsed: true, labelClamp: { lines: 2, maxCharacters: 12 }, columns: [{ key: "record", label: "Record" }], content: { rowCount: 1, columns: [{ key: "record", label: "Record" }] } }],
   },
 }));
-assert.ok(collapsedTableHtml.includes('aria-label="Expand Creatives"'));
+assert.ok(collapsedTableHtml.includes('aria-label="Expand Records"'));
 assert.ok(collapsedTableHtml.includes('aria-expanded="false"'));
 assert.ok(collapsedTableHtml.includes("Showing 1 of 1 row"));
-assert.ok(collapsedTableHtml.includes("Kroil"));
+assert.ok(collapsedTableHtml.includes("Sample"));
 
 console.log("ReportRuntime ✓ renders semantic binding chips and actionable runtime diagnostics");
 

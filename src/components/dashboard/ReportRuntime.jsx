@@ -2916,7 +2916,7 @@ function GeoMapBlock({ block = {}, diagnostics = [], onRetryProviderActions = nu
   }
   return (
     <RuntimePanel
-      className="forge-report-runtime-geo-panel"
+      className="forge-report-runtime-geo-panel forge-report-runtime-geo-responsive"
       title={normalizeString(block?.title || "Geo Map")}
       subtitle={normalizeString(resolvedGeo?.metricLabel || geo?.metric?.label)
         ? `${normalizeString(resolvedGeo?.metricLabel || geo?.metric?.label)} across ${shape}`
@@ -2934,7 +2934,7 @@ function GeoMapBlock({ block = {}, diagnostics = [], onRetryProviderActions = nu
           No geo data.
         </div>
       ) : (
-        <div className="forge-report-runtime-geo-layout" style={{ display: "grid", gridTemplateColumns: "minmax(320px, 1fr) minmax(220px, 320px)", gap: 16 }}>
+        <div className="forge-report-runtime-geo-layout" style={{ display: "grid", gridTemplateColumns: "minmax(496px, 1fr) minmax(220px, 320px)", gap: 16 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, fontSize: "var(--forge-report-type-small-size, 12px)", lineHeight: "var(--forge-report-type-small-line-height, normal)", color: "var(--forge-report-text-secondary, #30404d)" }}>
               <span><strong>{Number(resolvedGeo?.summary?.regionCount || 0)}</strong> Regions</span>

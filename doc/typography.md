@@ -6,6 +6,11 @@ synthetic runnable example](geo-geometry.md) for Polygon/MultiPolygon shapes,
 keyboard selection, missing-value states, and matching canonical print paths.
 This opt-in map does not change the legacy world or US tile appearance.
 
+Legacy report tile and world maps adapt their detail sidebar to the widget's
+container width. A map placed in a narrow dashboard column stacks its selected
+area and ranking below the map, even on a wide screen. Compact tile spacing also
+follows the widget width; source values, labels and rankings remain unchanged.
+
 The renderer supplies generic behavior, semantic hooks and neutral fallback
 recipes. Workspaces supply palettes, font assets, reviewed values, business
 content and variant selection. Customer styling never belongs in shared code.
