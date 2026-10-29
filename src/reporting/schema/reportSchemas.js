@@ -5,7 +5,7 @@ import { reportExportRequestSchema } from "./reportExportRequestSchema.js";
 import { reportFillSchema } from "./reportFillSchema.js";
 import { reportPrintSchema } from "./reportPrintSchema.js";
 import { reportSpecSchema } from "./reportSpecSchema.js";
-import { normalizeReportCalculatedField } from "../calculatedFieldModel.js";
+import { normalizeReportCalculatedField, validateReportCalculatedFieldDependencies } from "../calculatedFieldModel.js";
 import { buildReportFillHash, buildReportSpecHash } from "../reportFillModel.js";
 
 export { reportSpecSchema, reportFillSchema, reportPrintSchema, reportExportRequestSchema };
@@ -288,6 +288,10 @@ function validateIndependentDonutCenters(value) {
 export function validateReportSpec(value = null) {
   const topLevel = validateReportSchema(reportSpecSchema, value);
   const calculatedFieldErrors = validateReportSpecCalculatedFields(value);
+  if (!calculatedFieldErrors.length) {
+    try { validateReportCalculatedFieldDependencies(value?.calculatedFields || []); }
+    catch (error) { calculatedFieldErrors.push({ path: "$.calculatedFields", code: "invalid", message: error.message }); }
+  }
   const visibilityErrors=[];for(const [index,block] of (value?.blocks||[]).entries()){try{validateReportRowVisibilityBlock(block)}catch(error){visibilityErrors.push({path:`$.blocks[${index}].runtime.rowVisibility`,code:'invalid',message:error.message})}}
   const compositeReferenceErrors = validateCompositeBlockReferences(value);
   const errors = [

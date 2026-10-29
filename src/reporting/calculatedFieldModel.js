@@ -903,7 +903,7 @@ export function normalizeReportCalculatedField(definition = {}, {
     label: normalizeString(definition?.label || id),
     dataType: normalizeString(definition?.dataType || "number") || "number",
     ...(normalizeString(definition?.format) ? { format: normalizeString(definition.format) } : {}),
-    ...(normalizeString(datasetRef || definition?.datasetRef) ? { datasetRef: normalizeString(datasetRef || definition?.datasetRef) } : {}),
+    ...(normalizeString(definition?.datasetRef || datasetRef) ? { datasetRef: normalizeString(definition?.datasetRef || datasetRef) } : {}),
     dependencies: normalizedExpression?.dependencies || normalizedCompute?.dependencies || [],
     ...(normalizedExpression ? { expr: normalizedExpression.expr } : { compute: normalizedCompute.compute }),
   };
@@ -949,7 +949,28 @@ function sortRowsByOrder(rowsToSort = [], orderBy = []) {
   });
 }
 
+// References stay local when a dataset context is known; unscoped selections
+// must be unique across the available catalog.
+export function resolveReportCalculatedFieldReference(definitions, reference, { datasetRef } = {}) {
+  const candidates = definitions.filter(definition =>
+    (datasetRef === undefined || !definition.datasetRef || definition.datasetRef === datasetRef)
+    && [definition.id, definition.key].includes(normalizeString(reference)));
+  if (candidates.length > 1) throw new Error(`Ambiguous calculated field reference '${reference}' in dataset '${datasetRef ?? "unspecified"}'. Use a unique id or declare datasetRef.`);
+  return candidates[0] || null;
+}
+
+function validateCalculatedFieldAliases(definitions) {
+  definitions.forEach((definition, index) => {
+    definitions.slice(0, index).forEach(previous => {
+      if (definition.datasetRef && previous.datasetRef && definition.datasetRef !== previous.datasetRef) return;
+      const alias = [definition.id, definition.key].find(value => [previous.id, previous.key].includes(value));
+      if (alias) throw new Error(`Ambiguous calculated field alias '${alias}' in dataset '${definition.datasetRef || previous.datasetRef || "all"}': '${previous.id}' and '${definition.id}'. Use unique ids and keys within each dataset.`);
+    });
+  });
+}
+
 function topologicallySortCalculatedFields(definitions = []) {
+  validateCalculatedFieldAliases(definitions);
   const byKey = new Map(
     definitions
       .map((definition) => [normalizeString(definition?.key || definition?.id), definition])
@@ -982,7 +1003,10 @@ function topologicallySortCalculatedFields(definitions = []) {
 }
 
 export function validateReportCalculatedFieldDependencies(definitions = []) {
-  topologicallySortCalculatedFields(normalizeReportCalculatedFields(definitions));
+  const normalized = normalizeReportCalculatedFields(definitions);
+  validateCalculatedFieldAliases(normalized);
+  const scopes = new Set(normalized.map(definition => definition.datasetRef || ""));
+  scopes.forEach(datasetRef => topologicallySortCalculatedFields(normalized.filter(definition => !definition.datasetRef || definition.datasetRef === datasetRef)));
 }
 
 export function applyReportCalculatedFields(rows = [], calculatedFields = [], {
