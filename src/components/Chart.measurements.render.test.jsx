@@ -45,6 +45,35 @@ it('switches primary and secondary metrics through shared native controls',async
  }finally{await act(async()=>root.unmount());host.remove();width.mockRestore();height.mockRestore();}
 });
 
+it('switches horizontal primary metrics, formats its value axis and preserves table columns',async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ const width=vi.spyOn(HTMLElement.prototype,'clientWidth','get').mockReturnValue(600);
+ const height=vi.spyOn(HTMLElement.prototype,'clientHeight','get').mockReturnValue(320);
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);const changed=vi.fn();
+ const options=[{value:'amount',label:'Amount',format:'currency2'},{value:'count',label:'Count',format:'compactNumber'},{value:'rate',label:'Rate',format:'percentFraction2'}];
+ const container={id:'metrics',dataSourceRef:'daily',chart:{type:'horizontal_bar',xAxis:{dataKey:'day'},series:{values:options.map(option=>({...option,type:'horizontal_bar'}))},metricSelection:{primaryField:'amount',secondaryField:''}}};
+ const context={identity:{dataSourceRef:'daily'},signals:{collection:{value:[{day:'one',amount:10,count:100,rate:.1},{day:'two',amount:20,count:200,rate:.2}]},control:{value:{}},metrics:{value:{}},windowForm:{value:{}}}};
+ try{
+  await act(async()=>{root.render(<Chart container={container} context={context} onMetricSelectionChange={changed}/>);});
+  const primary=host.querySelector('select[aria-label="Primary metric"]'),secondary=host.querySelector('select[aria-label="Secondary metric"]');
+  expect(primary.value).toBe('amount');expect(secondary).toBeNull();
+  expect([...primary.options].map(o=>o.value)).toEqual(['amount','count','rate']);
+  expect(host.querySelectorAll('.recharts-xAxis').length).toBe(1);
+  for(const field of ['count','rate','amount']) {
+   await act(async()=>{primary.value=field;primary.dispatchEvent(new Event('change',{bubbles:true}));});
+   expect(changed).toHaveBeenLastCalledWith({primaryField:field,secondaryField:''});
+   expect(host.querySelectorAll('.recharts-xAxis').length).toBe(1);
+   const labels=[...host.querySelectorAll('.recharts-xAxis .recharts-cartesian-axis-tick-value')].map(node=>node.textContent);
+   expect(labels.length).toBeGreaterThan(0);
+   if(field==='rate')expect(labels.every(label=>label.endsWith('%'))).toBe(true);
+   if(field==='amount')expect(labels.some(label=>label.includes('$'))).toBe(true);
+  }
+  await act(async()=>[...host.querySelectorAll('button')].find(button=>button.textContent==='Table').click());
+  expect([...host.querySelectorAll('th')].map(node=>node.textContent)).toEqual(['Date','Amount']);
+  expect(host.querySelector('table').textContent).toContain('$10.00');
+ }finally{await act(async()=>root.unmount());host.remove();width.mockRestore();height.mockRestore();}
+});
+
 it('gates chart/table switching independently and returns to chart when disabled',async()=>{
  globalThis.IS_REACT_ACT_ENVIRONMENT=true;
  const width=vi.spyOn(HTMLElement.prototype,'clientWidth','get').mockReturnValue(600);

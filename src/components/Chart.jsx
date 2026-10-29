@@ -1543,7 +1543,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             </div>}
             {(!embedded || documentAppearance) && chart.metricSelection ? (
                 <div className="forge-chart-metric-selectors" role="group" aria-label="Trend metrics">
-                    {[["primaryField", "Primary metric"], ["secondaryField", "Secondary metric"]].map(([field, label]) => {
+                    {(chart.type === "horizontal_bar" ? [["primaryField", "Primary metric"]] : [["primaryField", "Primary metric"], ["secondaryField", "Secondary metric"]]).map(([field, label]) => {
                         const selectProps={
                             'aria-label':label,value:chart.metricSelection[field],onChange:event=>{
                                 const choice = {primaryField: chart.metricSelection.primaryField, secondaryField: chart.metricSelection.secondaryField, [field]: event.target.value};

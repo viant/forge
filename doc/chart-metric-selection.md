@@ -45,3 +45,23 @@ and the existing bundled Goja spec/fill/print golden fixtures. Overview's native
 YAML is authored with six approved metric choices. A deployed browser check,
 responsive control check, and complete option/export interaction audit are still
 required after publication. The source change is not a published report rollout.
+
+## Horizontal bars
+
+`horizontal_bar` supports primary metric selection on its single numeric x axis.
+Declare `metricSelection: {primaryField: amount, secondaryField: ""}` with the
+approved fields in `yFields`. The native control exposes only Primary metric;
+each choice retains its declared label and format in chart, table and print.
+The category axis remains horizontal-bar categories, and selected presentation
+state follows the same run/export contract described above.
+
+A nonempty `secondaryField` is rejected for this type. Horizontal bars do not
+implement independent secondary value axes. Metric options must be unstacked
+horizontal bars on the single value axis; combo series, right-axis options and
+small multiples are rejected. Line, area, bar and combo charts retain their
+existing primary and optional secondary controls.
+
+The synthetic `reportHorizontalMetricSelection.test.js` fixture exercises three
+formats, all primary choices, schema preservation, immutable datasource requests,
+fill and canonical print. Native rendered checks cover orientation, numeric-axis
+format changes, the primary-only control and selected-metric table output.

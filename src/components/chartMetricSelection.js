@@ -8,10 +8,13 @@ export function normalizeChartMetricSelection(value, fields = []) {
 }
 export function applyChartMetricSelection(chart, selection = null) {
  if (!chart?.metricSelection) return chart;
- if (chart.series?.nameKey || !['line','area','bar','combo','composed'].includes(chart.type)) throw Error('Metric selection requires a direct cartesian chart.');
+ if (chart.series?.nameKey || !['line','area','bar','horizontal_bar','combo','composed'].includes(chart.type)) throw Error('Metric selection requires a direct cartesian chart.');
  const options=chart.metricSelection.options||chart.series?.values||[];
  const fields=options.map(option=>option.value);
  const defaults=normalizeChartMetricSelection(chart.metricSelection,fields);
+ const horizontal=chart.type==='horizontal_bar';
+ if(horizontal && (defaults.secondaryField || selection?.secondaryField)) throw Error('Horizontal metric selection supports one primary metric; secondaryField must be empty.');
+ if(horizontal && (chart.stacked || chart.layout || options.some(option=>option.axis==='right' || option.stackId || (option.type && option.type!=='horizontal_bar')))) throw Error('Horizontal metric selection requires unstacked horizontal bar options on one value axis.');
  let selected=defaults;
  if(selection){try{selected=normalizeChartMetricSelection(selection,fields)}catch{selected=defaults}}
  const primary=options.find(option=>option.value===selected.primaryField);
