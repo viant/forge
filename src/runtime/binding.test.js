@@ -101,3 +101,17 @@ console.log('binding adapters ✓ signal-backed getters use reactive values');
  assert.deepEqual(adapter.get(),['display']);
  assert.equal(Object.hasOwn(windowForm.value,'filters.channels'),false);
 }
+
+// Window-local choices need no datasource or transport. Read the current signal
+// so options refresh when an authorized presentation snapshot is replaced.
+const choiceSignal = {value: {selected: 1, choices: [{value: 1, label: 'One'}]}, peek() {return this.value;}};
+const choiceAdapter = resolveStateAdapter('windowForm')({signals: {windowForm: choiceSignal}}, {dataField: 'selected', optionsField: 'choices'});
+assert.deepEqual(choiceAdapter.getOptions(), [{value: 1, label: 'One'}]);
+choiceSignal.value = {selected: 1, choices: [{value: 2, label: 'Two'}]};
+assert.deepEqual(choiceAdapter.getOptions(), [{value: 2, label: 'Two'}]);
+choiceAdapter.set(2);
+assert.equal(choiceAdapter.get(), 2);
+assert.deepEqual(choiceAdapter.getOptions(), [{value: 2, label: 'Two'}]);
+const defaultChoices = resolveStateAdapter('windowForm')({signals: {windowForm: {value: {itemOptions: ['a']}}}}, {dataField: 'item'});
+assert.deepEqual(defaultChoices.getOptions(), ['a']);
+assert.deepEqual(resolveStateAdapter('windowForm')({}, {id: 'missing'}).getOptions(), []);
