@@ -14,7 +14,15 @@ import (
 )
 
 func (g *Gateway) ConnectionForProvider(ctx context.Context, owner string) (Connection, error) {
-	return g.dependencyConnection(ctx, Connection{}, owner)
+	return g.dependencyConnection(ctx, Connection{}, owner, "")
+}
+
+// ConnectionForNamespace resolves a provider's explicit namespace route.
+func (g *Gateway) ConnectionForNamespace(ctx context.Context, owner, namespace string) (Connection, error) {
+	if namespace == "" {
+		return g.ConnectionForProvider(ctx, owner)
+	}
+	return g.dependencyConnection(ctx, Connection{}, owner, namespace)
 }
 func (g *Gateway) ConnectionForResource(ctx context.Context, uri identity.ResourceURI, owner string) (result Connection, resultErr error) {
 	for _, source := range g.publishedRegistrations() {
@@ -41,7 +49,7 @@ func (g *Gateway) ConnectionForResource(ctx context.Context, uri identity.Resour
 	}
 	span := observe.Start(ctx, "gateway.routing", observe.Labels{Kind: uri.Kind})
 	defer func() { span.End(observe.OutcomeFor(resultErr), observe.CacheUnknown) }()
-	if connection, found, err := g.configuredOwnerConnection(ctx, owner); owner != "" && (found || err != nil) {
+	if connection, found, err := g.configuredOwnerNamespaceConnection(ctx, owner, uri.Namespace); owner != "" && (found || err != nil) {
 		if err != nil {
 			return Connection{}, err
 		}
@@ -63,7 +71,7 @@ func (g *Gateway) ConnectionForResource(ctx context.Context, uri identity.Resour
 			return connection, nil
 		}
 	}
-	if connection, found, err := g.declaredOwnerConnection(ctx, owner); found || err != nil {
+	if connection, found, err := g.declaredOwnerNamespaceConnection(ctx, owner, uri.Namespace); found || err != nil {
 		if err != nil {
 			return Connection{}, err
 		}
@@ -146,7 +154,7 @@ func (c *WindowCatalog) verifyDependencyReads(ctx context.Context, parent identi
 	if len(target.DependencyPins) != len(variant.DataSourceResources) {
 		return nil, identity.ErrResourceDenied
 	}
-	connection, e := c.Gateway.ConnectionForProvider(ctx, parent.ProviderIdentity)
+	connection, e := c.Gateway.ConnectionForNamespace(ctx, parent.ProviderIdentity, resourceNamespace(parent.URI))
 	if e != nil {
 		return nil, e
 	}

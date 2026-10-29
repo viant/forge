@@ -24,12 +24,12 @@ func NewAuthoring(gateway *Gateway, owner string) (*Authoring, error) {
 	return &Authoring{gateway: gateway, owner: owner}, nil
 }
 
-func (a *Authoring) connection(ctx context.Context) (Connection, error) {
-	connection, found, err := a.gateway.configuredOwnerConnection(ctx, a.owner)
+func (a *Authoring) connection(ctx context.Context, namespace string) (Connection, error) {
+	connection, found, err := a.gateway.configuredOwnerNamespaceConnection(ctx, a.owner, namespace)
 	if err != nil || found {
 		return connection, err
 	}
-	return a.gateway.ConnectionForProvider(ctx, a.owner)
+	return a.gateway.ConnectionForNamespace(ctx, a.owner, namespace)
 }
 
 func invokeAuthoring[T any](ctx context.Context, a *Authoring, value, operation string, input any) (T, error) {
@@ -41,7 +41,7 @@ func invokeAuthoring[T any](ctx context.Context, a *Authoring, value, operation 
 	if err != nil {
 		return zero, err
 	}
-	connection, err := a.connection(ctx)
+	connection, err := a.connection(ctx, uri.Namespace)
 	if err != nil {
 		return zero, err
 	}
@@ -99,7 +99,7 @@ func (a *Authoring) GetResource(ctx context.Context, uri string) (*primitive.Res
 	if a == nil {
 		return nil, ErrUnavailable
 	}
-	connection, err := a.connection(ctx)
+	connection, err := a.connection(ctx, resourceNamespace(uri))
 	if err != nil {
 		return nil, err
 	}

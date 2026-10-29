@@ -12,11 +12,11 @@ import (
 	"strings"
 )
 
-func (g *Gateway) dependencyConnection(ctx context.Context, parent Connection, owner string) (Connection, error) {
-	if owner == parent.ProviderIdentity {
+func (g *Gateway) dependencyConnection(ctx context.Context, parent Connection, owner, namespace string) (Connection, error) {
+	if owner == parent.ProviderIdentity && namespace == "" {
 		return parent, nil
 	}
-	if connection, found, err := g.declaredOwnerConnection(ctx, owner); found || err != nil {
+	if connection, found, err := g.declaredOwnerNamespaceConnection(ctx, owner, namespace); found || err != nil {
 		return connection, err
 	}
 	discovered, e := g.Discover(ctx)
@@ -25,7 +25,7 @@ func (g *Gateway) dependencyConnection(ctx context.Context, parent Connection, o
 	}
 	var found Connection
 	for _, ns := range discovered {
-		if ns.Connection.ProviderIdentity == owner {
+		if ns.Connection.ProviderIdentity == owner && (namespace == "" || ns.Namespace == namespace) {
 			if found.Name != "" && found != ns.Connection {
 				return Connection{}, ErrCollision
 			}
@@ -42,6 +42,9 @@ func (g *Gateway) dependencyConnection(ctx context.Context, parent Connection, o
 // grant. Validate all configured claims without contacting unrelated endpoints,
 // then verify the selected provider's live identity under the current actor.
 func (g *Gateway) declaredOwnerConnection(ctx context.Context, owner string) (Connection, bool, error) {
+	return g.declaredOwnerNamespaceConnection(ctx, owner, "")
+}
+func (g *Gateway) declaredOwnerNamespaceConnection(ctx context.Context, owner, namespace string) (Connection, bool, error) {
 	if owner == "" {
 		return Connection{}, false, nil
 	}
@@ -49,7 +52,7 @@ func (g *Gateway) declaredOwnerConnection(ctx context.Context, owner string) (Co
 	if err != nil {
 		return Connection{}, true, err
 	}
-	connection, found, err := g.configuredOwnerConnection(ctx, owner)
+	connection, found, err := g.configuredOwnerNamespaceConnection(ctx, owner, namespace)
 	if !found || err != nil {
 		return connection, found, err
 	}
@@ -69,28 +72,53 @@ func (g *Gateway) declaredOwnerConnection(ctx context.Context, owner string) (Co
 // configuredOwnerConnection resolves only trusted routing claims. Its caller
 // must perform a fresh provider operation before using any resource or facts.
 func (g *Gateway) configuredOwnerConnection(ctx context.Context, owner string) (Connection, bool, error) {
+	return g.configuredOwnerNamespaceConnection(ctx, owner, "")
+}
+
+// A provider may expose separate namespace endpoints. Unscoped lookups must
+// remain ambiguous when more than one connection claims the same owner.
+func (g *Gateway) configuredOwnerNamespaceConnection(ctx context.Context, owner, namespace string) (Connection, bool, error) {
 	if g == nil || g.Manager == nil || owner == "" || ctx == nil || ctx.Err() != nil {
 		return Connection{}, true, identity.ErrResourceDenied
 	}
-	for _, source := range g.publishedRegistrations() {
-		if source.connection.ProviderIdentity == owner {
-			connection := source.connection
-			connection.Generation = g.generation(connection.Name)
-			return connection, true, nil
-		}
-	}
-	names, err := g.Manager.CatalogProviderNames(ctx, owner)
+	names, err := g.catalogConnectionNames(ctx)
 	if err != nil {
 		return Connection{}, true, err
 	}
-	if len(names) > 1 {
-		return Connection{}, true, fmt.Errorf("%w: owner %q configured by %q", ErrCollision, owner, names)
+	var selected Connection
+	for _, name := range names {
+		candidate := Connection{Name: name, ProviderIdentity: owner, Generation: g.generation(name)}
+		if source, ok := g.publishedByName(name); ok {
+			if source.connection.ProviderIdentity != owner || namespace != "" && !source.namespaces[namespace] {
+				continue
+			}
+		} else {
+			options, err := g.Manager.Options(ctx, name)
+			if err != nil {
+				return Connection{}, true, err
+			}
+			if options == nil || options.PrimitiveProviderIdentity != owner {
+				continue
+			}
+			if namespace != "" && len(options.PrimitiveNamespaces) > 0 {
+				matches := false
+				for _, claim := range options.PrimitiveNamespaces {
+					if claim == namespace || claim == "ns://"+namespace {
+						matches = true
+						break
+					}
+				}
+				if !matches {
+					continue
+				}
+			}
+		}
+		if selected.Name != "" && selected.Name != name {
+			return Connection{}, true, fmt.Errorf("%w: owner %q namespace %q configured by multiple connections", ErrCollision, owner, namespace)
+		}
+		selected = candidate
 	}
-	if len(names) == 0 {
-		return Connection{}, false, nil
-	}
-	selected := names[0]
-	return Connection{Name: selected, ProviderIdentity: owner, Generation: g.generation(selected)}, true, nil
+	return selected, selected.Name != "", nil
 }
 
 // ResolveDependencyPins authorizes each explicit child candidate and compares
@@ -112,7 +140,7 @@ func (g *Gateway) resolveDependencyReads(ctx context.Context, parent Connection,
 		if ref.Validate(parentPin.Kind == identity.StampedCandidate) != nil || descriptors[id] == nil {
 			return nil, nil, identity.ErrResourceDenied
 		}
-		connection, e := g.dependencyConnection(ctx, parent, ref.ProviderIdentity)
+		connection, e := g.dependencyConnection(ctx, parent, ref.ProviderIdentity, resourceNamespace(ref.Resource.URI))
 		if e != nil {
 			return nil, nil, e
 		}
@@ -184,4 +212,12 @@ func (g *Gateway) resolveDependencyReads(ctx context.Context, parent Connection,
 		}
 	}
 	return result, reads, nil
+}
+
+func resourceNamespace(value string) string {
+	uri, err := identity.ParseResourceURI(value)
+	if err != nil {
+		return ""
+	}
+	return uri.Namespace
 }

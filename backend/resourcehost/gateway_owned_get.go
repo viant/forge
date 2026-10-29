@@ -34,12 +34,12 @@ func (g *Gateway) getForProvider(ctx context.Context, owner string, ref identity
 		result, err := g.Get(ctx, connection, ref, pin)
 		return result, connection, err
 	}
-	connection, found, err := g.configuredOwnerConnection(ctx, owner)
+	connection, found, err := g.configuredOwnerNamespaceConnection(ctx, owner, uri.Namespace)
 	if err != nil {
 		return nil, Connection{}, err
 	}
 	if !found {
-		connection, err = g.ConnectionForProvider(ctx, owner)
+		connection, err = g.ConnectionForResource(ctx, uri, owner)
 		if err != nil {
 			return nil, Connection{}, err
 		}

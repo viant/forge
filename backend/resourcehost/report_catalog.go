@@ -108,7 +108,7 @@ func readReport[T any](ctx context.Context, r *gatewayReportReader, ref identity
 	var connection Connection
 	if owner != "" {
 		var found bool
-		connection, found, err = r.catalog.Gateway.configuredOwnerConnection(ctx, owner)
+		connection, found, err = r.catalog.Gateway.configuredOwnerNamespaceConnection(ctx, owner, uri.Namespace)
 		if err == nil && !found {
 			connection, err = r.catalog.Gateway.ConnectionForResource(ctx, uri, owner)
 		}

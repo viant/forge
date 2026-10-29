@@ -40,7 +40,7 @@ func (c *WindowCatalog) FetchProviderDatasource(ctx context.Context, pin identit
 	if err := matchProviderProof(pin, target.ExecutionProof); err != nil {
 		return nil, err
 	}
-	connection, err := c.Gateway.ConnectionForProvider(ctx, pin.ProviderIdentity)
+	connection, err := c.Gateway.ConnectionForNamespace(ctx, pin.ProviderIdentity, resourceNamespace(pin.URI))
 	if err != nil {
 		return nil, err
 	}

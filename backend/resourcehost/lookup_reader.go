@@ -22,7 +22,7 @@ func (r *LookupReader) LoadAll(ctx context.Context, scope DefinitionScope) ([]*l
 	ids := map[string]string{}
 	var roots []Connection
 	if scope.ProviderIdentity != "" {
-		root, err := r.Gateway.ConnectionForProvider(ctx, scope.ProviderIdentity)
+		root, err := r.Gateway.ConnectionForNamespace(ctx, scope.ProviderIdentity, scope.Namespace)
 		if err != nil {
 			return nil, err
 		}
