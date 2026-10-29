@@ -322,6 +322,13 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 		}
 	}
 	executionSpec := compiled.ReportSpec
+	datasetParameters := request.Parameters
+	if len(envelope.BuilderDefinition) == 0 {
+		executionSpec, datasetParameters, err = bindNativeScopeParameters(executionSpec, request.Parameters)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if len(request.ChartMetricSelections) > 0 {
 		executionSpec, err = materializer.Present(ctx, executionSpec, request.ChartMetricSelections)
 		if err != nil {
@@ -397,7 +404,7 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 		if len(descriptorRaw) == 0 || decodeReportDatasource(descriptorRaw, descriptor) != nil || descriptor.ID != dataset.DataSourceRef || descriptor.Backend == nil {
 			return nil, identity.ErrResourceDenied
 		}
-		args, err := reportDatasetArguments(dataset.Request, request.Parameters, descriptor, envelope.BuilderDefinition, dataset.Scope)
+		args, err := reportDatasetArguments(dataset.Request, datasetParameters, descriptor, envelope.BuilderDefinition, dataset.Scope)
 		if err != nil {
 			return nil, err
 		}
