@@ -719,15 +719,24 @@ function formatReportPrintValue(value, format = "") {
 
 function formatReportPrintFilterParamValue(param = {}) {
   const value = param?.value;
+  const options = Array.isArray(param?.options) ? param.options : [];
+  const optionLabel = option => normalizeString(option?.label) || formatReportPrintValue(option?.value);
   const unset = value == null
     || (Array.isArray(value) && value.length === 0)
     || (typeof value === "string" && !value.trim());
   if (unset && param?.multiple === true) {
-    const optionLabels = (Array.isArray(param?.options) ? param.options : [])
-      .map((option) => normalizeString(option?.label || option?.value))
+    const optionLabels = options
+      .map(optionLabel)
       .filter(Boolean);
     return optionLabels.length > 0 ? `All (${optionLabels.join(", ")})` : "All";
   }
+  if (options.length > 0 && Array.isArray(value)) {
+    const selected = options.filter(option => value.some(item => Object.is(item, option?.value)));
+    const unknown = value.filter(item => !options.some(option => Object.is(item, option?.value)));
+    return [...selected.map(optionLabel), ...unknown.map(item => formatReportPrintValue(item))].join(", ");
+  }
+  const selected = options.find(option => Object.is(option?.value, value));
+  if (selected) return optionLabel(selected);
   return formatReportPrintValue(value);
 }
 
@@ -1231,8 +1240,7 @@ function renderReportPrintGridRowAtCurrentPosition(state, rowEntries) {
 
 function buildFilterBarLines(block = {}, reportSpec = {}) {
   const scopeParams = new Map(normalizeReportSpecScopeParams(reportSpec).map((param) => [param.id, param]));
-  const params = (Array.isArray(block?.content?.params) ? block.content.params : []).filter((param) => {
-    const definition = { ...scopeParams.get(param.id), ...param };
+  const params = (Array.isArray(block?.content?.params) ? block.content.params : []).map(param => ({...scopeParams.get(param.id), ...param})).filter((definition) => {
     return definition.hidden !== true && definition.visible !== false && definition.presentation !== "hidden";
   });
   const criteria = Array.isArray(block?.content?.criteria) ? block.content.criteria : [];

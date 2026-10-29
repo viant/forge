@@ -55105,6 +55105,7 @@ Please __addLocaleData before adding additional unit data`);
     const actions = Array.isArray(source == null ? void 0 : source.actions) ? cloneValue19(source.actions) : Array.isArray(block == null ? void 0 : block.actions) ? cloneValue19(block.actions) : [];
     const normalized = {
       ...(source == null ? void 0 : source.printRowReference) === true ? { printRowReference: true } : {},
+      ...(source == null ? void 0 : source.quickFilter) === true ? { quickFilter: true } : {},
       ...visibleWhen ? { visibleWhen } : {},
       ...filterBindings && Object.keys(filterBindings).length > 0 ? { filterBindings } : {},
       ...selectionBindings && Object.keys(selectionBindings).length > 0 ? { selectionBindings } : {},
@@ -68525,11 +68526,20 @@ ${indent}${end}`;
   }
   function formatReportPrintFilterParamValue(param = {}) {
     const value = param == null ? void 0 : param.value;
+    const options = Array.isArray(param == null ? void 0 : param.options) ? param.options : [];
+    const optionLabel = (option) => normalizeString41(option == null ? void 0 : option.label) || formatReportPrintValue(option == null ? void 0 : option.value);
     const unset = value == null || Array.isArray(value) && value.length === 0 || typeof value === "string" && !value.trim();
     if (unset && (param == null ? void 0 : param.multiple) === true) {
-      const optionLabels = (Array.isArray(param == null ? void 0 : param.options) ? param.options : []).map((option) => normalizeString41((option == null ? void 0 : option.label) || (option == null ? void 0 : option.value))).filter(Boolean);
+      const optionLabels = options.map(optionLabel).filter(Boolean);
       return optionLabels.length > 0 ? `All (${optionLabels.join(", ")})` : "All";
     }
+    if (options.length > 0 && Array.isArray(value)) {
+      const selected2 = options.filter((option) => value.some((item) => Object.is(item, option == null ? void 0 : option.value)));
+      const unknown = value.filter((item) => !options.some((option) => Object.is(item, option == null ? void 0 : option.value)));
+      return [...selected2.map(optionLabel), ...unknown.map((item) => formatReportPrintValue(item))].join(", ");
+    }
+    const selected = options.find((option) => Object.is(option == null ? void 0 : option.value, value));
+    if (selected) return optionLabel(selected);
     return formatReportPrintValue(value);
   }
   function inferReportPrintNumericFormat(value, format2 = "") {
@@ -68991,8 +69001,7 @@ ${indent}${end}`;
   function buildFilterBarLines(block = {}, reportSpec = {}) {
     var _a5, _b, _c;
     const scopeParams = new Map(normalizeReportSpecScopeParams(reportSpec).map((param) => [param.id, param]));
-    const params = (Array.isArray((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.params) ? block.content.params : []).filter((param) => {
-      const definition = { ...scopeParams.get(param.id), ...param };
+    const params = (Array.isArray((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.params) ? block.content.params : []).map((param) => ({ ...scopeParams.get(param.id), ...param })).filter((definition) => {
       return definition.hidden !== true && definition.visible !== false && definition.presentation !== "hidden";
     });
     const criteria = Array.isArray((_b = block == null ? void 0 : block.content) == null ? void 0 : _b.criteria) ? block.content.criteria : [];
