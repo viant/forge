@@ -37,3 +37,7 @@
 .forge-window-manager-tab > [role="tab"] {
   font-weight: 600;
 }
+
+/* Custom renderers and content-sized windows share one bounded scroll host.
+   Fill-sized layouts may still own their internal scrolling. */
+.forge-window-content-root { overflow: auto; }

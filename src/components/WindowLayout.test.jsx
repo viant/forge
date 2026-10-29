@@ -27,6 +27,9 @@ describe('resolveWindowLayoutContext', () => {
     expect(resolveWindowLayoutOverflow({layout: {divider: {visible: true}}, containers: [{id: 'list'}, {id: 'details'}]}, true)).toBe('hidden');
     expect(resolveWindowLayoutOverflow({dashboard: {}, containers: [{id: 'a'}, {id: 'b'}]}, true)).toBe('hidden');
     expect(resolveWindowLayoutOverflow({}, true)).toBe('hidden');
+    expect(resolveWindowLayoutOverflow({sizingMode:'content'}, true)).toBe('auto');
+    expect(resolveWindowLayoutOverflow({sizingMode:'fill'}, true)).toBe('hidden');
+    expect(resolveWindowLayoutOverflow({sizingMode:'content',layout:{kind:'split'}}, true)).toBe('hidden');
     expect(resolveWindowLayoutOverflow({scrollMode: 'self'}, false)).toBe('visible');
   });
 });

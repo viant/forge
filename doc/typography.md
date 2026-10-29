@@ -749,3 +749,12 @@ KPI sparklines can opt into explicit point detail metadata and print policy.
 The shared sparkline supplies keyboard, hover and tap access with caption-role
 status text and a shared Dismiss action. See [sparkline point details](kpi-sparkline-details.md)
 for the neutral reading-trend fixture and compatibility limits.
+
+
+### Window viewport scrolling
+
+`WindowManager` keeps rendered content in a bounded, scrollable frame. Custom
+renderers such as reports can exceed the viewport without being clipped.
+A window root declaring `sizingMode: content` scrolls at the window layout;
+explicit fill-sized and split layouts retain their own internal scrolling.
+The frame remains mounted across tab visits and docking changes.
