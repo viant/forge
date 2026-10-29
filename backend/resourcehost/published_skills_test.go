@@ -58,8 +58,9 @@ func TestPublishedSkillSourceUsesClosedPackageAndNeverLegacyOwner(t *testing.T) 
 	require.ErrorIs(t, err, identity.ErrResourceDenied)
 	_, err = skills.ReadSkillResource(ctx, "catalog", uri+"/refs/note.txt")
 	require.ErrorIs(t, err, identity.ErrResourceDenied)
-	_, _, err = skills.CatalogScope(ctx, "", nil)
-	require.ErrorIs(t, err, identity.ErrResourceDenied)
+	deniedScope, _, err := skills.CatalogScope(ctx, "", nil)
+	require.NoError(t, err, "denied optional catalog must not block unrelated skills")
+	require.NotEqual(t, fresh, deniedScope)
 	require.Zero(t, trap.calls)
 }
 
