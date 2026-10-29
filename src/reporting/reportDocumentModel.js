@@ -1619,7 +1619,7 @@ export function buildReportDocumentKpiBlock(block = {}) {
     title: normalizeString(block?.title || "KPI"),
     datasetRef: normalizeString(block?.datasetRef || "primary"),
     valueField,
-    valueLabel: normalizeString(block?.valueLabel || valueField || "Value"),
+    valueLabel: normalizeString(block?.valueLabel || block?.title || valueField || "Value"),
     ...(valueFormat ? { valueFormat } : {}),
     ...(suffix ? { suffix } : {}),
     ...(block.sparkline ? {sparkline:normalizeKpiSparkline(block.sparkline)} : {}),

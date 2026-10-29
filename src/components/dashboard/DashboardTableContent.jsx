@@ -1,6 +1,6 @@
 import {buildTableHierarchy,hierarchyRows,tableHeaderGroups,qualifiedTableColumnLabel,interactiveTableColumns} from '../../reporting/reportTableAnalytics.js';
 import Button from '../Button.jsx';
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSignalEffect } from "@preact/signals-react";
 import { Icon } from "@blueprintjs/core";
 
@@ -204,6 +204,19 @@ export default function DashboardTableContent({
     const currentPage=Math.min(page,pageCount);
     const sortLabel=sortKey?(displayColumns.find(column=>column.key===sortKey)?.label||sortKey):'';
     const sortedRows=hierarchicalView ? hierarchicalView.nodes.map(node=>node.row) : pagingEnabled ? allSortedRows.slice((currentPage-1)*pageSize,currentPage*pageSize) : allSortedRows;
+    const tableWrapRef = useRef(null);
+    const [documentOverflow, setDocumentOverflow] = useState(false);
+    useEffect(() => {
+        const wrap = tableWrapRef.current;
+        if (!documentTable || !wrap) return;
+        const update = () => setDocumentOverflow(wrap.scrollWidth > wrap.clientWidth + 1);
+        update();
+        const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(update) : null;
+        observer?.observe(wrap);
+        if (wrap.firstElementChild) observer?.observe(wrap.firstElementChild);
+        window.addEventListener('resize', update);
+        return () => {observer?.disconnect(); window.removeEventListener('resize', update);};
+    }, [documentTable, tableLayout.minWidth, sortedRows.length, recordTitleColumn, loading, error]);
     useEffect(() => { setPage(1); }, [quickFilter, sortKey, sortDir, pageSize, pagingEnabled, container?.paging?.resetKey]);
     useEffect(() => {
         onPresentationStateChange?.({
@@ -286,10 +299,11 @@ export default function DashboardTableContent({
                         </div>)}</dl>
                     </details>)}
                 </div> : <>
-                {tableLayout.horizontallyScrollable ? (
+                {documentTable ? documentOverflow ? <Typography as="p" typeRole="metadata" className="forge-document-table-scroll-hint">Scroll horizontally to view all columns</Typography> : null : tableLayout.horizontallyScrollable ? (
                     <div className={`forge-dashboard-table-scroll-hint${mobileCards ? ' forge-dashboard-table-scroll-hint--mobile-cards' : ''}`}>Scroll horizontally to view all columns</div>
                 ) : null}
                 <div
+                    ref={tableWrapRef}
                     className={`forge-dashboard-table-wrap${documentTable ? ' forge-document-table-wrap' : ''}${mobileCards ? ' forge-dashboard-table-wrap--mobile-cards' : ''}`}
                     role={tableLayout.horizontallyScrollable ? "region" : undefined}
                     aria-label={tableLayout.horizontallyScrollable ? "Scrollable data table" : undefined}

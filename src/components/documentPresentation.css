@@ -36,7 +36,7 @@
 .forge-container[data-forge-appearance="document"] [data-forge-part="container-section"] > .bp6-section-header { min-height: 0; padding: 0; margin-bottom: var(--forge-spacing-3, 12px); border: 0; background: transparent; box-shadow: none; }
 .forge-container[data-forge-appearance="document"] .bp6-section-header-left { padding: 0; }
 .forge-container[data-forge-appearance="document"] :is([data-forge-part="section-content"], .forge-container-body) { padding: 0; }
-.forge-container[data-forge-appearance="document"] p[data-forge-type="body"] { max-width: 72ch; margin: 0; }
+.forge-container[data-forge-appearance="document"] p[data-forge-type="body"] { max-width: 100%; margin: 0; }
 .forge-document-records { display: flex; flex-wrap: wrap; gap: var(--forge-spacing-3, 12px) var(--forge-document-record-gap, 30px); margin: 0; padding-block: var(--forge-document-record-padding, 18px); border-block: var(--forge-border-width, 1px) solid var(--forge-border-color); }
 .forge-document-records > div { min-width: 92px; }
 .forge-document-records dt { color: var(--forge-text-muted); }

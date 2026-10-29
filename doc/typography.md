@@ -507,8 +507,10 @@ badges and existing body markdown. Neither implies task mutation or drag behavio
 The neutral ReportDocumentSpecimen exercises both, including empty-state roles.
 
 A document composite containing only KPI blocks defaults to a responsive metric
-grid when no layout was authored. It uses three, two or one columns based on the
-report container. An explicit `stack` or `responsiveGrid` keeps its prior behavior.
+grid when no layout was authored. Detailed metrics use three, two or one columns
+based on the report container. Plain summaries fit readable tracks to available
+width, with a 220px default minimum and 128px below 600px. An explicit `stack`
+or `responsiveGrid` keeps its prior behavior.
 Document-table defaults give a non-identifier dimension the flexible column when
 no `flex` was authored. Explicit flex selections keep priority; width applies
 to bounded columns, while the flexible column uses minWidth. Measures and
@@ -770,3 +772,25 @@ Window hosts can place the existing runtime tabs in their header using
 retained panels; keyboard selection and close admission remain shared.
 Optional `tabListClassName`, `tabItemClassName`, and `renderTabLabel` adapt the
 host's header appearance without creating a second navigation state.
+
+## Document report presentation follow-up
+
+Document prose fills the available width inside its padding. Empty Markdown lines
+do not add spacer rows; flat numbered and bullet sequences retain semantic lists,
+inline emphasis and original priorities. Fenced code stays literal. Nested lists
+and continuation blocks are outside this bounded parser. Legacy prose retains its
+existing spacing. Missing metric labels prefer an authored title through both the
+browser compiler and embedded materializer; explicit labels remain authoritative.
+Unavailable metrics retain their readable caption, and zero remains a value.
+
+Document tables show horizontal-scroll guidance only when measured content
+overflows. Sorting and row values survive resizing. Document section navigation
+selects SectionTabRail overflowBehavior=menu: tabs remain when they fit, then a
+labeled native select preserves section identity and disabled choices. Editable
+or reorderable rails retain their existing scrolling controls. The native select
+uses shared body roles and a 44px minimum height on narrow screens.
+
+The maintained DocumentSpecimen and ReportDocumentSpecimen exercise these
+capabilities with independently invented data. Existing required render/browser
+checks cover wide/narrow composition, large/missing values, paragraph spacing,
+list semantics, table overflow, section switching and legacy compatibility.
