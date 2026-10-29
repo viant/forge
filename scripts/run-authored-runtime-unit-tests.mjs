@@ -256,6 +256,7 @@ const runtimeUnitTests = [
   "scripts/report-builder-preview-reopen-report-document-location-actionable-diagnostics-left-rail-layout-scenario-assets.test.mjs",
   "scripts/report-builder-preview-reopen-report-document-location-chart-actionable-diagnostics-left-rail-layout-scenario-assets.test.mjs",
   "src/reporting/calculatedFieldModel.test.js",
+  "src/reporting/windowCalculationContract.test.js",
   "src/reporting/reportSpecModel.test.js",
   "src/reporting/reportBuilderDrillMetadata.test.js",
   "src/reporting/reportRuntimeBlock.test.js",

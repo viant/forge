@@ -215,6 +215,11 @@ function validateNode(schema = {}, value, path = "$", rootSchema = schema) {
     }
   }
 
+  if ((effectiveType === "number" || effectiveType === "integer") && Number.isFinite(normalizedSchema.maximum)
+      && Number(value) > normalizedSchema.maximum) {
+    errors.push({path, code: "maximum", message: `Expected number <= ${normalizedSchema.maximum}.`});
+  }
+
   return errors;
 }
 
