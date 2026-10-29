@@ -50,7 +50,7 @@ import {
 import "./chat.css";
 
 import AttachmentDialog from './chat/AttachmentDialog.jsx';
-import useUpload, { UploadStatus } from '../hooks/useUpload.js';
+import useUpload, { UploadStatus, isUnresolvedUpload } from '../hooks/useUpload.js';
 import {
     defaultNormalizeMessages,
     normalizeLegacyMessages,
@@ -460,6 +460,7 @@ export default function Chat({
     // 🛑  Local component state reflecting incoming signals
     // ---------------------------------------------------------------------
     const [attachOpen, setAttachOpen] = useState(false);
+    const uploadInputRef = useRef(null);
     const [pendingAttachments, setPendingAttachments] = useState([]);
     const batchIdsRef = useRef(new Set());
     const [abortVisible, setAbortVisible] = useState(false);
@@ -792,6 +793,7 @@ export default function Chat({
     };
 
     const handleSubmit = ({ content, toolNames = [] }) => {
+        if (documentAppearance && uploader.items.some(isUnresolvedUpload)) return;
         const submitModel = (() => {
             if (usesExternalComposerProps) {
                 return normalizeString(externalComposerProps?.submitModel)
@@ -870,26 +872,21 @@ export default function Chat({
         }
     };
 
-    const startUploads = async (files) => {
+    const startUploads = (files) => {
         if (!files || files.length === 0) return;
         const draftBeforeUpload = String(composerDraft || '');
-        let extraFields = {};
-        if (events.onUploadPrepare?.isDefined?.()) {
-            try {
-                extraFields = normalizeUploadPrepareResult(await events.onUploadPrepare.execute({
-                    context,
-                    files: Array.from(files),
-                }));
-            } catch (err) {
-                console.error('[forge][chat] upload prepare failed', err);
-                return;
-            }
-        }
-        preserveDraftForConversation(extraFields?.conversationId || extraFields?.conversationID, draftBeforeUpload);
-        const ids = uploader.start(files, extraFields);
-        if (Array.isArray(ids)) {
-            ids.forEach(id => batchIdsRef.current.add(id));
-        }
+        const prepare = async () => {
+            const extraFields = events.onUploadPrepare?.isDefined?.()
+                ? normalizeUploadPrepareResult(await events.onUploadPrepare.execute({context, files: Array.from(files)}))
+                : {};
+            preserveDraftForConversation(extraFields?.conversationId || extraFields?.conversationID, draftBeforeUpload);
+            return extraFields;
+        };
+        if (documentAppearance) {uploader.start(files, prepare); return;}
+        prepare().then(fields => {
+            const ids = uploader.start(files, fields);
+            if (Array.isArray(ids)) ids.forEach(id => batchIdsRef.current.add(id));
+        }).catch(error => console.error('[forge][chat] upload prepare failed', error));
     };
 
     // When uploads complete, collect attachments for the next user prompt (no auto message)
@@ -912,6 +909,7 @@ export default function Chat({
                 size,
                 mime,
             };
+            Object.defineProperty(attachment, 'uploadId', {value: u.id, enumerable: false});
             if (u.file) {
                 Object.defineProperty(attachment, 'file', {
                     value: u.file,
@@ -1061,7 +1059,9 @@ export default function Chat({
                     sendTooltip={chatCfg?.tooltips?.send}
                     abortTooltip={chatCfg?.tooltips?.abort}
                     onSubmit={handleSubmit}
+                    onDropFiles={startUploads}
                     onOpenAttach={() => {
+                        if (documentAppearance) {uploadInputRef.current?.click(); return;}
                         // Clear previous upload state so dialog starts fresh
                         try { uploader.reset(); } catch (_) {}
                         announcedDone.current = new Set();
@@ -1087,6 +1087,10 @@ export default function Chat({
                     showAbort={effectiveShowAbortWhileRunning}
                     disabled={composerDisabled}
                     attachments={pendingAttachments}
+                    uploads={documentAppearance ? uploader.items.map(upload => upload.status === UploadStatus.DONE && !announcedDone.current.has(upload.id)
+                        ? {...upload, status: UploadStatus.UPLOADING} : upload) : []}
+                    onCancelUpload={uploader.abort}
+                    onRetryUpload={upload => {uploader.abort(upload.id); startUploads([upload.file]);}}
                     getMessageHistory={context?.handlers?.chat?.getComposerHistory}
                     onRemoveAttachment={(idx) => setPendingAttachments(prev => {
                         const next = prev.filter((_, i) => i !== idx);
@@ -1208,13 +1212,19 @@ export default function Chat({
 
             {!(documentAppearance && showStarterTasks) && composer}
 
-            {/* Attachment dialog */}
-            <AttachmentDialog
+            {documentAppearance && <input ref={uploadInputRef} type="file" multiple hidden aria-label="Choose files"
+                disabled={composerDisabled || !chatCfg.showUpload} onChange={event => {
+                    const files = Array.from(event.target.files || []);
+                    event.target.value = '';
+                    startUploads(files);
+                }}/>}
+            {/* Retain the legacy presentation's attachment workflow. */}
+            {!documentAppearance && <AttachmentDialog
                 isOpen={attachOpen}
                 onClose={() => setAttachOpen(false)}
                 onSelect={(files) => { startUploads(files); }}
                 uploads={uploader.items}
-            />
+            />}
 
             {/* No external progress panel; attachments are shown in-input */}
         </div>

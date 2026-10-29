@@ -1,4 +1,6 @@
-import React, {useState} from 'react';
+import React, {useRef, useState} from 'react';
+import AttachmentDialog from '../../components/chat/AttachmentDialog.jsx';
+import Composer from '../../components/chat/Composer.jsx';
 import DocumentSpecimen from './DocumentSpecimen.jsx';
 import ReportDocumentSpecimen from './ReportDocumentSpecimen.jsx';
 import {signal} from '@preact/signals-react';
@@ -36,6 +38,13 @@ export default function FoundationSpecimen({iconExamples = ['menu', 'search', 'p
     const state = useState({foundationName: '', foundationAmount: 12345, foundationSelect: 'all', foundationRadio: 'daily', foundationCheck: true, foundationSwitch: false});
     const [saved, setSaved] = useState(0);
     const [dialog, setDialog] = useState(false);
+    const [attachmentsOpen, setAttachmentsOpen] = useState(false);
+    const [uploads, setUploads] = useState([]);
+    const [dropFiles, setDropFiles] = useState([]);
+    const [dropDraft, setDropDraft] = useState('');
+    const [dropDisabled, setDropDisabled] = useState(false);
+    const [dropStage, setDropStage] = useState('done');
+    const dropPicker = useRef(null);
     const [tableState, setTableState] = useState('populated');
     const [section, setSection] = useState('overview');
     const input = (id, label, widget, extra = {}) => <WidgetRenderer key={id} state={state}
@@ -109,8 +118,31 @@ export default function FoundationSpecimen({iconExamples = ['menu', 'search', 'p
             <div className="forge-foundation-row">
                 <Popover content={<div className="forge-foundation-overlay"><Typography as="p" typeRole="body">Popover content uses the raised surface and overlay elevation.</Typography></div>}><Button variant="secondary">Open example popover</Button></Popover>
                 <Button variant="secondary" onClick={() => setDialog(true)}>Open example dialog</Button>
+                <Button variant="secondary" onClick={() => setAttachmentsOpen(true)}>Open attachment dialog</Button>
             </div>
+            <AttachmentDialog isOpen={attachmentsOpen} onClose={() => setAttachmentsOpen(false)} uploads={uploads} onSelect={files => setUploads(files.map(file => ({name:file.name,size:file.size,status:"error",progress:0.4,error:new Error("Example upload failed. Select Upload to retry.")})))}/>
             <Dialog className="forge-foundation-overlay" isOpen={dialog} onClose={() => setDialog(false)} onOpened={node => node.querySelector('[data-dialog-initial-focus]')?.focus()} title="Example dialog"><Typography as="p" typeRole="body">Focus stays inside while open. Escape closes the dialog and returns focus to its trigger.</Typography><Button variant="primary" data-dialog-initial-focus onClick={() => setDialog(false)}>Close example dialog</Button></Dialog>
+        </section>
+        <section aria-label="File drop composer">
+            <Typography as="h2" typeRole="section">File uploads in chat</Typography>
+            <label {...typographyProps('label')}><input type="checkbox" checked={dropDisabled} onChange={event => setDropDisabled(event.target.checked)}/> Disable example uploads</label>
+            <label {...typographyProps('label')}>Upload stage <SelectControl {...typographyProps('body')} aria-label="Example upload stage" value={dropStage} onChange={event => setDropStage(event.target.value)}>
+                <option value="idle">Preparing</option><option value="uploading">Uploading</option><option value="finishing">Finishing</option><option value="error">Failed</option><option value="done">Ready</option>
+            </SelectControl></label>
+            <input ref={dropPicker} type="file" multiple hidden aria-label="Choose example files" onChange={event => {
+                const files = Array.from(event.target.files || []); event.target.value = '';
+                setDropFiles(current => [...current, ...files]);
+            }}/>
+            <div className="forge-document-chat">
+                <Composer appearance="document" draftKey="file-drop-example" draftValue={dropDraft} onDraftChange={setDropDraft}
+                    showUpload disabled={dropDisabled} onDropFiles={files => setDropFiles(current => [...current, ...files])}
+                    onOpenAttach={() => dropPicker.current?.click()} attachments={dropStage === 'done' ? dropFiles.map((file, index) => ({name:file.name, uploadId:`example-${index}`})) : []}
+                    uploads={dropFiles.map((file, index) => ({id:`example-${index}`, index, name:file.name, file, status:dropStage === 'finishing' ? 'uploading' : dropStage, progress:dropStage === 'idle' ? 0 : dropStage === 'finishing' ? 1 : .4}))}
+                    onCancelUpload={id => setDropFiles(current => current.filter((_, index) => `example-${index}` !== id))}
+                    onRetryUpload={() => setDropStage('uploading')}
+                    onRemoveAttachment={index => setDropFiles(current => current.filter((_, i) => i !== index))}/>
+            </div>
+            <Typography as="p" typeRole="metadata">Use the stage control to inspect upload feedback. This local example makes no network requests.</Typography>
         </section>
         <section id="foundation-data" aria-label="Data display">
             <Typography as="h2" typeRole="section">Data display and states</Typography>

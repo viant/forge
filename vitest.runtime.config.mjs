@@ -9,6 +9,7 @@ export default defineConfig({
       'src/components/SectionTabRail.test.js',
       'src/components/dashboard/KpiSparkline.details.render.test.jsx',
       'src/components/chat/DocumentChat.render.test.jsx',
+      'src/hooks/useUpload.render.test.jsx',
       'src/components/primitives/UploadCollection.render.test.jsx',
       'src/components/table/TableViewPresets.render.test.jsx',
       'src/components/control/ProgressBar.render.test.jsx',
