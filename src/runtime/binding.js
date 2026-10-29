@@ -125,7 +125,7 @@ registerStateAdapter('windowForm', (ctx, item) => {
     const fieldKey = item.dataField || item.bindingPath || item.id;
     return {
         get: () => resolveSelector(ctx?.signals?.windowForm?.value || {}, fieldKey),
-        getOptions: () => [],
+        getOptions: () => resolveSelector(ctx?.signals?.windowForm?.value || {}, item.optionsField || fieldKey + 'Options') || [],
         set: (v) => {
             const prev = ctx?.signals?.windowForm?.peek?.() || {};
             if (ctx?.signals?.windowForm) {
