@@ -36,7 +36,13 @@ func TestRealCohortDenialIsLocalToDiscovery(t *testing.T) {
 	require.False(t, purePublishedDenial(errors.Join(denial, errors.New("corrupt manifest"))))
 	connection := Connection{Name: "restricted", ProviderIdentity: "restricted-producer"}
 	require.NoError(t, g.RegisterPublishedMetadataSource(connection, []string{"restricted"}, source))
-	for _, kind := range []string{"mcp", "skill", "navigation", "report"} {
+	reader := &MCPReferenceReader{gateway: g, internal: MCPDefinitionSource{ConnectionName: "internal", ProviderIdentity: "internal", Namespace: "workspace"}}
+	definitions, supported, err := reader.filteredMCPRows(context.Background(), connection)
+	require.NoError(t, err, "retained tool inventory must omit denied cohort definitions")
+	require.True(t, supported)
+	require.Empty(t, definitions)
+
+	for _, kind := range []string{"mcp", "skill", "navigation", "report", "prompt", "agent", "eval", "playbook", "toolfeed"} {
 		page, err := ListPage[json.RawMessage](context.Background(), g, kind, CatalogQuery{}, true)
 		require.NoError(t, err, kind)
 		require.Len(t, page.Items, 1, kind)
@@ -58,7 +64,7 @@ func TestDeniedPublishedProviderDoesNotBlockOtherCatalogs(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, namespaces, 1)
 	require.Equal(t, "example", namespaces[0].Namespace)
-	for _, kind := range []string{"mcp", "skill", "navigation", "report"} {
+	for _, kind := range []string{"mcp", "skill", "navigation", "report", "prompt", "agent", "eval", "playbook", "toolfeed"} {
 		page, err := ListPage[json.RawMessage](ctx, g, kind, CatalogQuery{}, true)
 		require.NoError(t, err, kind)
 		require.Len(t, page.Items, 1, kind)
