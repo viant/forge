@@ -122,7 +122,7 @@ func (g *Gateway) FetchDatasource(ctx context.Context, pin identity.ResolvedReso
 	deadline = identity.MinimumMetadataExpiry(deadline, actor.ValidUntil)
 	ctx, cancel := identity.WithMetadataExpiry(ctx, deadline)
 	defer cancel()
-	connection, err := g.ConnectionForProvider(ctx, pin.ProviderIdentity)
+	connection, err := g.ConnectionForNamespace(ctx, pin.ProviderIdentity, uri.Namespace)
 	if err != nil {
 		return nil, err
 	}

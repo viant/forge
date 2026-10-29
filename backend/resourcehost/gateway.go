@@ -759,6 +759,7 @@ func (g *Gateway) discoverExcept(ctx context.Context, excludedLocal string) (out
 	sort.Strings(names)
 	out := []DiscoveredNamespace{}
 	owners := map[string]string{}
+	reservedOwner := ""
 	if excludedLocal != "" {
 		options, err := g.Manager.Options(ctx, excludedLocal)
 		if err != nil || options == nil || options.PrimitiveProviderIdentity == "" {
@@ -766,7 +767,7 @@ func (g *Gateway) discoverExcept(ctx context.Context, excludedLocal string) (out
 		}
 		// Reserve the known local owner even without contacting its endpoint.
 		// A different connection claiming that owner is still a collision.
-		owners[options.PrimitiveProviderIdentity] = excludedLocal
+		reservedOwner = options.PrimitiveProviderIdentity
 	}
 	selected := make([]string, 0, len(names))
 	for _, name := range names {
@@ -788,10 +789,16 @@ func (g *Gateway) discoverExcept(ctx context.Context, excludedLocal string) (out
 		if !catalogRootMatches(ctx, c.connection) {
 			return nil, ErrCollision
 		}
-		if prior := owners[c.connection.ProviderIdentity]; prior != "" && prior != name {
-			return nil, fmt.Errorf("%w: owner %q advertised by %q and %q", ErrCollision, c.connection.ProviderIdentity, prior, name)
+		if c.connection.ProviderIdentity == reservedOwner {
+			return nil, ErrCollision
 		}
-		owners[c.connection.ProviderIdentity] = name
+		for _, ns := range c.namespaces {
+			key := c.connection.ProviderIdentity + "\x00" + ns.Namespace
+			if prior := owners[key]; prior != "" && prior != name {
+				return nil, fmt.Errorf("%w: owner %q namespace %q advertised by %q and %q", ErrCollision, c.connection.ProviderIdentity, ns.Namespace, prior, name)
+			}
+			owners[key] = name
+		}
 		// Export detached contract maps; caller mutation must not alter the
 		// manager-bound metadata reused by internal Get/action dispatch.
 		exported := cloneCapabilities(c)

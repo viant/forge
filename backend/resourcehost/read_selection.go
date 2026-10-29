@@ -403,12 +403,12 @@ func (s *resourceReadSequence) refreshSelectedResources(ctx context.Context) err
 		if err != nil || key != held.key {
 			return identity.ErrResourceDenied
 		}
-		routed, found, err := s.gateway.configuredOwnerConnection(ctx, held.pin.ProviderIdentity)
+		routed, found, err := s.gateway.configuredOwnerNamespaceConnection(ctx, held.pin.ProviderIdentity, resourceNamespace(held.pin.URI))
 		if err != nil || found && routed != held.connection {
 			return identity.ErrResourceDenied
 		}
 		if !found {
-			routed, err = s.gateway.ConnectionForProvider(ctx, held.pin.ProviderIdentity)
+			routed, err = s.gateway.ConnectionForNamespace(ctx, held.pin.ProviderIdentity, resourceNamespace(held.pin.URI))
 			if err != nil || routed != held.connection {
 				return identity.ErrResourceDenied
 			}

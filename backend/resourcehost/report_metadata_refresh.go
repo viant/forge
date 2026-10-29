@@ -81,7 +81,7 @@ func (r *gatewayReportReader) ReadDefinitionFresh(ctx context.Context, ref ident
 	}
 	if len(definition.DataSourceResources) > 0 {
 		gateway := r.catalog.Gateway
-		connection, found, err := gateway.configuredOwnerConnection(ctx, previous.ProviderIdentity)
+		connection, found, err := gateway.configuredOwnerNamespaceConnection(ctx, previous.ProviderIdentity, resourceNamespace(ref.URI))
 		if err != nil {
 			return nil, err
 		}

@@ -71,9 +71,6 @@ func (g *Gateway) RegisterPublishedMetadataSource(connection Connection, namespa
 		return identity.ErrResourceDenied
 	}
 	for _, registered := range g.publishedMetadata {
-		if registered.connection.ProviderIdentity == connection.ProviderIdentity {
-			return ErrCollision
-		}
 		for name := range names {
 			if registered.matchesName(name) {
 				return ErrCollision

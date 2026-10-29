@@ -58,7 +58,7 @@ func ResolveDefinitionIn[T any](ctx context.Context, g *Gateway, kind, key strin
 		// An authored relative reference belongs to its selected provider. Use
 		// the existing rooted catalog/cache instead of discovering other MCPs.
 		// Absolute URIs retain cross-provider resolution semantics.
-		connection, found, err := g.configuredOwnerConnection(ctx, scope.ProviderIdentity)
+		connection, found, err := g.configuredOwnerNamespaceConnection(ctx, scope.ProviderIdentity, scope.Namespace)
 		if err != nil {
 			return nil, err
 		}

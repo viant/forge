@@ -18,7 +18,7 @@ func (c *WindowCatalog) fetchReferencedDatasource(ctx context.Context, parent id
 	deadline := identity.MinimumMetadataExpiry(parent.ValidUntil, child.ValidUntil)
 	ctx, cancel := identity.WithMetadataExpiry(ctx, deadline)
 	defer cancel()
-	connection, err := c.Gateway.ConnectionForProvider(ctx, parent.ProviderIdentity)
+	connection, err := c.Gateway.ConnectionForNamespace(ctx, parent.ProviderIdentity, resourceNamespace(parent.URI))
 	if err != nil {
 		return nil, err
 	}

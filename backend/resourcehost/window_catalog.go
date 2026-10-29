@@ -424,7 +424,7 @@ func (c *WindowCatalog) CheckWindowContent(ctx context.Context, key string, pin 
 			return err
 		}
 	} else {
-		connection, err := c.Gateway.ConnectionForProvider(ctx, pin.ProviderIdentity)
+		connection, err := c.Gateway.ConnectionForNamespace(ctx, pin.ProviderIdentity, resourceNamespace(pin.URI))
 		if err != nil {
 			return err
 		}

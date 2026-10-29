@@ -178,7 +178,7 @@ func (r *HostedAppReader) Read(ctx context.Context, uri string) (*schema.ReadRes
 	if closure.EntryPath != "index.html" || !hostedSHA256(closure.Fingerprint) || !hostedSHA256(closure.EntrySHA256) {
 		return nil, identity.ErrResourceDenied
 	}
-	connection, err := r.Gateway.ConnectionForProvider(ctx, b.ProviderIdentity)
+	connection, err := r.Gateway.ConnectionForNamespace(ctx, b.ProviderIdentity, resourceNamespace(b.WindowURI))
 	if err != nil {
 		return nil, err
 	}

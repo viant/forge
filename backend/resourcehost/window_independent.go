@@ -15,7 +15,7 @@ func (c *WindowCatalog) resolveIndependentDatasource(ctx context.Context, connec
 	raw := variant.DataSources[id]
 	reads := []selectedResourceRead{{connection: connection, pin: parent, result: definition.GetResult, definitionCache: definition.definitionCache}}
 	if ref, ok := variant.DataSourceResources[id]; ok {
-		childConnection, err := c.Gateway.dependencyConnection(ctx, connection, ref.ProviderIdentity)
+		childConnection, err := c.Gateway.dependencyConnection(ctx, connection, ref.ProviderIdentity, resourceNamespace(ref.Resource.URI))
 		if err != nil {
 			return nil, err
 		}
