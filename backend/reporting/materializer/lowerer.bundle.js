@@ -90,10 +90,13 @@ var ForgeAuthoredLowerer = (() => {
   function applyChartMetricSelection(chart, selection = null) {
     var _a5, _b;
     if (!(chart == null ? void 0 : chart.metricSelection)) return chart;
-    if (((_a5 = chart.series) == null ? void 0 : _a5.nameKey) || !["line", "area", "bar", "combo", "composed"].includes(chart.type)) throw Error("Metric selection requires a direct cartesian chart.");
+    if (((_a5 = chart.series) == null ? void 0 : _a5.nameKey) || !["line", "area", "bar", "horizontal_bar", "combo", "composed"].includes(chart.type)) throw Error("Metric selection requires a direct cartesian chart.");
     const options = chart.metricSelection.options || ((_b = chart.series) == null ? void 0 : _b.values) || [];
     const fields2 = options.map((option) => option.value);
     const defaults = normalizeChartMetricSelection(chart.metricSelection, fields2);
+    const horizontal = chart.type === "horizontal_bar";
+    if (horizontal && (defaults.secondaryField || (selection == null ? void 0 : selection.secondaryField))) throw Error("Horizontal metric selection supports one primary metric; secondaryField must be empty.");
+    if (horizontal && (chart.stacked || chart.layout || options.some((option) => option.axis === "right" || option.stackId || option.type && option.type !== "horizontal_bar"))) throw Error("Horizontal metric selection requires unstacked horizontal bar options on one value axis.");
     let selected = defaults;
     if (selection) {
       try {
@@ -50914,7 +50917,11 @@ Please __addLocaleData before adding additional unit data`);
     const seriesOptions = normalizeChartSeriesOptions(chartSpec.seriesOptions);
     const categoryLabel = normalizeChartCategoryLabel(chartSpec.categoryLabel);
     const metricSelection = normalizeChartMetricSelection(chartSpec.metricSelection, yFields);
-    if (metricSelection && (seriesField || !["line", "area", "bar", "combo"].includes(type))) throw new Error("Metric selection requires a direct cartesian chart.");
+    if (metricSelection && (seriesField || !["line", "area", "bar", "horizontal_bar", "combo"].includes(type))) throw new Error("Metric selection requires a direct cartesian chart.");
+    if (metricSelection && type === "horizontal_bar") {
+      if (metricSelection.secondaryField) throw new Error("Horizontal metric selection supports one primary metric; secondaryField must be empty.");
+      if (chartSpec.stacked || chartSpec.layout || Object.values(seriesOptions || {}).some((option) => option.axis === "right" || option.stackId || option.type && option.type !== "horizontal_bar")) throw new Error("Horizontal metric selection requires unstacked horizontal bar options on one value axis.");
+    }
     return {
       ...title ? { title } : {},
       ...eyebrow ? { eyebrow } : {},

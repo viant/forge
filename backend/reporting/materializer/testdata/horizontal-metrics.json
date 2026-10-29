@@ -1,0 +1,178 @@
+{
+  "version": 1,
+  "kind": "reportSpec",
+  "source": {
+    "kind": "dashboard.reportBuilder",
+    "containerId": "sample",
+    "stateKey": "sample",
+    "dataSourceRef": "records"
+  },
+  "title": "Report",
+  "parameters": {
+    "viewMode": "chart",
+    "groupBy": "",
+    "pageSize": 1,
+    "orderField": "",
+    "orderDir": "desc"
+  },
+  "layoutIntent": {
+    "kind": "single",
+    "resultPanePosition": "right",
+    "blockOrder": [
+      "primaryTable",
+      "primaryChart"
+    ]
+  },
+  "refinements": [],
+  "calculatedFields": [],
+  "scope": {
+    "params": [],
+    "dataSourceRef": "records"
+  },
+  "datasets": [
+    {
+      "id": "primary",
+      "dataSourceRef": "records",
+      "request": {
+        "measures": {
+          "amount": true,
+          "count": true,
+          "ratio": true
+        },
+        "dimensions": {
+          "category": true
+        },
+        "limit": 50,
+        "offset": 0
+      }
+    }
+  ],
+  "blocks": [
+    {
+      "id": "primaryTable",
+      "kind": "tableBlock",
+      "datasetRef": "primary",
+      "columns": [
+        {
+          "key": "category",
+          "sourceKey": "category",
+          "displayKey": "category",
+          "label": "Category",
+          "kind": "dimension"
+        },
+        {
+          "key": "amount",
+          "sourceKey": "amount",
+          "displayKey": "amount",
+          "label": "Amount",
+          "kind": "measure",
+          "format": "currency2",
+          "align": "right"
+        },
+        {
+          "key": "count",
+          "sourceKey": "count",
+          "displayKey": "count",
+          "label": "Count",
+          "kind": "measure",
+          "format": "compactNumber",
+          "align": "right"
+        },
+        {
+          "key": "ratio",
+          "sourceKey": "ratio",
+          "displayKey": "ratio",
+          "label": "Ratio",
+          "kind": "measure",
+          "format": "percentFraction2",
+          "align": "right"
+        }
+      ]
+    },
+    {
+      "id": "primaryChart",
+      "kind": "chartBlock",
+      "datasetRef": "primary",
+      "chartSpec": {
+        "type": "horizontal_bar",
+        "xField": "category",
+        "yFields": [
+          "amount",
+          "count",
+          "ratio"
+        ],
+        "metricSelection": {
+          "primaryField": "amount",
+          "secondaryField": ""
+        }
+      },
+      "chartModel": {
+        "type": "horizontal_bar",
+        "xAxis": {
+          "dataKey": "category",
+          "label": "Category"
+        },
+        "yAxis": {
+          "format": "currency2"
+        },
+        "metricSelection": {
+          "primaryField": "amount",
+          "secondaryField": "",
+          "options": [
+            {
+              "value": "amount",
+              "label": "Amount",
+              "color": "#1f77b4",
+              "format": "currency2",
+              "type": "horizontal_bar"
+            },
+            {
+              "value": "count",
+              "label": "Count",
+              "color": "#ff7f0e",
+              "format": "compactNumber",
+              "type": "horizontal_bar"
+            },
+            {
+              "value": "ratio",
+              "label": "Ratio",
+              "color": "#2ca02c",
+              "format": "percentFraction2",
+              "type": "horizontal_bar"
+            }
+          ]
+        },
+        "series": {
+          "values": [
+            {
+              "value": "amount",
+              "label": "Amount",
+              "color": "#1f77b4",
+              "format": "currency2",
+              "type": "horizontal_bar",
+              "axis": "left"
+            }
+          ],
+          "palette": [
+            "#1f77b4",
+            "#ff7f0e",
+            "#2ca02c",
+            "#d62728",
+            "#9467bd",
+            "#8c564b",
+            "#e377c2",
+            "#7f7f7f",
+            "#bcbd22",
+            "#17becf"
+          ]
+        },
+        "axes": {
+          "left": {
+            "format": "currency2",
+            "label": "Amount"
+          }
+        }
+      }
+    }
+  ]
+}

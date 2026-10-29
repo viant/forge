@@ -508,7 +508,11 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
     const seriesOptions = normalizeChartSeriesOptions(chartSpec.seriesOptions);
     const categoryLabel = normalizeChartCategoryLabel(chartSpec.categoryLabel);
     const metricSelection = normalizeChartMetricSelection(chartSpec.metricSelection, yFields);
-    if (metricSelection && (seriesField || !["line", "area", "bar", "combo"].includes(type))) throw new Error("Metric selection requires a direct cartesian chart.");
+    if (metricSelection && (seriesField || !["line", "area", "bar", "horizontal_bar", "combo"].includes(type))) throw new Error("Metric selection requires a direct cartesian chart.");
+    if (metricSelection && type === "horizontal_bar") {
+        if (metricSelection.secondaryField) throw new Error("Horizontal metric selection supports one primary metric; secondaryField must be empty.");
+        if (chartSpec.stacked || chartSpec.layout || Object.values(seriesOptions || {}).some(option => option.axis === "right" || option.stackId || (option.type && option.type !== "horizontal_bar"))) throw new Error("Horizontal metric selection requires unstacked horizontal bar options on one value axis.");
+    }
     return {
         ...(title ? { title } : {}),
         ...(eyebrow ? { eyebrow } : {}),
