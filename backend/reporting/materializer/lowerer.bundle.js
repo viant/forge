@@ -48185,7 +48185,7 @@ Please __addLocaleData before adding additional unit data`);
       label: normalizeString4((definition == null ? void 0 : definition.label) || id),
       dataType: normalizeString4((definition == null ? void 0 : definition.dataType) || "number") || "number",
       ...normalizeString4(definition == null ? void 0 : definition.format) ? { format: normalizeString4(definition.format) } : {},
-      ...normalizeString4(datasetRef || (definition == null ? void 0 : definition.datasetRef)) ? { datasetRef: normalizeString4(datasetRef || (definition == null ? void 0 : definition.datasetRef)) } : {},
+      ...normalizeString4((definition == null ? void 0 : definition.datasetRef) || datasetRef) ? { datasetRef: normalizeString4((definition == null ? void 0 : definition.datasetRef) || datasetRef) } : {},
       dependencies: (normalizedExpression == null ? void 0 : normalizedExpression.dependencies) || (normalizedCompute == null ? void 0 : normalizedCompute.dependencies) || [],
       ...normalizedExpression ? { expr: normalizedExpression.expr } : { compute: normalizedCompute.compute }
     };
@@ -48221,7 +48221,22 @@ Please __addLocaleData before adding additional unit data`);
       return 0;
     });
   }
+  function resolveReportCalculatedFieldReference(definitions, reference, { datasetRef } = {}) {
+    const candidates = definitions.filter((definition) => (datasetRef === void 0 || !definition.datasetRef || definition.datasetRef === datasetRef) && [definition.id, definition.key].includes(normalizeString4(reference)));
+    if (candidates.length > 1) throw new Error(`Ambiguous calculated field reference '${reference}' in dataset '${datasetRef != null ? datasetRef : "unspecified"}'. Use a unique id or declare datasetRef.`);
+    return candidates[0] || null;
+  }
+  function validateCalculatedFieldAliases(definitions) {
+    definitions.forEach((definition, index) => {
+      definitions.slice(0, index).forEach((previous) => {
+        if (definition.datasetRef && previous.datasetRef && definition.datasetRef !== previous.datasetRef) return;
+        const alias = [definition.id, definition.key].find((value) => [previous.id, previous.key].includes(value));
+        if (alias) throw new Error(`Ambiguous calculated field alias '${alias}' in dataset '${definition.datasetRef || previous.datasetRef || "all"}': '${previous.id}' and '${definition.id}'. Use unique ids and keys within each dataset.`);
+      });
+    });
+  }
   function topologicallySortCalculatedFields(definitions = []) {
+    validateCalculatedFieldAliases(definitions);
     const byKey = new Map(
       definitions.map((definition) => [normalizeString4((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id)), definition]).filter(([key2]) => !!key2)
     );
@@ -48254,7 +48269,10 @@ Please __addLocaleData before adding additional unit data`);
     return sorted;
   }
   function validateReportCalculatedFieldDependencies(definitions = []) {
-    topologicallySortCalculatedFields(normalizeReportCalculatedFields(definitions));
+    const normalized = normalizeReportCalculatedFields(definitions);
+    validateCalculatedFieldAliases(normalized);
+    const scopes = new Set(normalized.map((definition) => definition.datasetRef || ""));
+    scopes.forEach((datasetRef) => topologicallySortCalculatedFields(normalized.filter((definition) => !definition.datasetRef || definition.datasetRef === datasetRef)));
   }
   function applyReportCalculatedFields(rows = [], calculatedFields = [], {
     datasetRef = ""
@@ -53177,21 +53195,18 @@ Please __addLocaleData before adding additional unit data`);
     });
     validateReportCalculatedFieldDependencies(availableDefinitions);
     if (selectedMeasureIds.length === 0) return [];
-    const definitionsById = new Map(
-      availableDefinitions.flatMap((definition) => [[normalizeString28((definition == null ? void 0 : definition.id) || (definition == null ? void 0 : definition.key)), definition], [normalizeString28((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id)), definition]]).filter(([id]) => !!id)
-    );
     const visiting = /* @__PURE__ */ new Set();
     const visited = /* @__PURE__ */ new Set();
     const selectedDefinitions = [];
-    function visitDefinition(id) {
-      const definition = definitionsById.get(normalizeString28(id));
+    function visitDefinition(id, datasetRef) {
+      const definition = resolveReportCalculatedFieldReference(availableDefinitions, id, { datasetRef });
       if (!definition) return;
-      const normalizedId = normalizeString28(definition.id || definition.key);
+      const normalizedId = JSON.stringify([definition.datasetRef || "primary", definition.id || definition.key]);
       if (!normalizedId || visited.has(normalizedId)) return;
       if (visiting.has(normalizedId)) throw new Error("Calculated field dependencies contain a cycle: " + [...visiting, normalizedId].join(", "));
       visiting.add(normalizedId);
       normalizeStringArray5(definition == null ? void 0 : definition.dependencies).forEach((dependencyId) => {
-        if (dependencyId !== normalizedId && dependencyId !== definition.key) visitDefinition(dependencyId);
+        if (dependencyId !== definition.id && dependencyId !== definition.key) visitDefinition(dependencyId, definition.datasetRef);
       });
       visiting.delete(normalizedId);
       visited.add(normalizedId);
@@ -53530,7 +53545,7 @@ Please __addLocaleData before adding additional unit data`);
   function resolveReportBuilderFieldId(entry = {}) {
     return normalizeString30((entry == null ? void 0 : entry.id) || (entry == null ? void 0 : entry.key));
   }
-  function buildReportBuilderFieldCatalog(config = {}) {
+  function buildReportBuilderFieldCatalog(config = {}, datasetRef = "primary") {
     const lookup = /* @__PURE__ */ new Map();
     const addEntries = (entries = [], kind = "") => {
       buildReportBuilderFieldLookup(entries).forEach((entry, alias) => {
@@ -53541,16 +53556,13 @@ Please __addLocaleData before adding additional unit data`);
     };
     addEntries(config == null ? void 0 : config.dimensions, "dimension");
     addEntries(config == null ? void 0 : config.measures, "measure");
-    addEntries(
-      normalizeReportCalculatedFields([
-        ...Array.isArray(config == null ? void 0 : config.calculatedFields) ? config.calculatedFields : [],
-        ...Array.isArray(config == null ? void 0 : config.computedMeasures) ? config.computedMeasures : [],
-        ...Array.isArray(config == null ? void 0 : config.tableCalculations) ? config.tableCalculations : []
-      ], {
-        datasetRef: "primary"
-      }),
-      "calculated"
-    );
+    const calculatedFields = normalizeReportCalculatedFields([
+      ...Array.isArray(config == null ? void 0 : config.calculatedFields) ? config.calculatedFields : [],
+      ...Array.isArray(config == null ? void 0 : config.computedMeasures) ? config.computedMeasures : [],
+      ...Array.isArray(config == null ? void 0 : config.tableCalculations) ? config.tableCalculations : []
+    ], { datasetRef }).filter((field) => field.datasetRef === datasetRef);
+    validateReportCalculatedFieldDependencies(calculatedFields);
+    addEntries(calculatedFields, "calculated");
     return { lookup };
   }
   function resolveReportBuilderCatalogEntry(fieldCatalog = {}, fieldKey = "") {
@@ -53811,14 +53823,14 @@ Please __addLocaleData before adding additional unit data`);
     const fieldCatalog = buildReportBuilderFieldCatalog(config);
     const datasetFieldCatalogs = new Map(normalizeReportBuilderPublishedDataSources(config).map((source) => [
       source.id,
-      buildReportBuilderFieldCatalog(buildReportBuilderPublishedDatasetConfig(config, source, { borrowBase: true }))
+      buildReportBuilderFieldCatalog(buildReportBuilderPublishedDatasetConfig(config, source, { borrowBase: true }), source.id)
     ]));
     const calculatedFields = Array.isArray(nextSpec == null ? void 0 : nextSpec.calculatedFields) ? nextSpec.calculatedFields : [];
     nextSpec.calculatedFields = calculatedFields;
     const calculatedFieldIds = new Set(
       calculatedFields.map((field) => {
         const fieldId = resolveReportBuilderFieldId(field);
-        return fieldId ? `${normalizeString30((field == null ? void 0 : field.datasetRef) || "primary") || "primary"}:${fieldId}` : "";
+        return fieldId ? JSON.stringify([normalizeString30((field == null ? void 0 : field.datasetRef) || "primary") || "primary", fieldId]) : "";
       }).filter(Boolean)
     );
     const visitingCalculatedFields = /* @__PURE__ */ new Set();
@@ -53841,7 +53853,7 @@ Please __addLocaleData before adding additional unit data`);
         if (!calculatedFieldId) {
           return false;
         }
-        const calculatedFieldKey = `${normalizedDatasetRef}:${calculatedFieldId}`;
+        const calculatedFieldKey = JSON.stringify([normalizedDatasetRef, calculatedFieldId]);
         if (!calculatedFieldIds.has(calculatedFieldKey)) {
           nextSpec.calculatedFields.push({
             ...cloneValue19(calculatedField),
@@ -55564,7 +55576,7 @@ Please __addLocaleData before adding additional unit data`);
         const datasetConfig = buildStaticDatasetReportBuilderConfig(effectiveConfig, staticDataset);
         return {
           config: datasetConfig,
-          fieldCatalog: buildReportBuilderFieldCatalog(datasetConfig),
+          fieldCatalog: buildReportBuilderFieldCatalog(datasetConfig, normalizedDatasetRef),
           container: {
             ...loweredContainer,
             dataSourceRef: normalizeString30((staticDataset == null ? void 0 : staticDataset.dataSourceRef) || (loweredContainer == null ? void 0 : loweredContainer.dataSourceRef))
@@ -55576,7 +55588,7 @@ Please __addLocaleData before adding additional unit data`);
         const datasetConfig = buildReportBuilderPublishedDatasetConfig(effectiveConfig, publishedDataset, { borrowBase: true });
         return {
           config: datasetConfig,
-          fieldCatalog: buildReportBuilderFieldCatalog(datasetConfig),
+          fieldCatalog: buildReportBuilderFieldCatalog(datasetConfig, normalizedDatasetRef),
           container: {
             ...loweredContainer,
             dataSourceRef: normalizeString30((publishedDataset == null ? void 0 : publishedDataset.dataSourceRef) || (loweredContainer == null ? void 0 : loweredContainer.dataSourceRef))

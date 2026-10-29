@@ -20,7 +20,7 @@ import {
 import { buildReportBuilderScopeParams } from "./reportBuilderScopeParamModel.js";
 import { getScopeParamValue, resolveScopeParamId } from "./scopeStateModel.js";
 import { normalizeReportRefinements } from "./reportRefinementModel.js";
-import { normalizeReportCalculatedFields, validateReportCalculatedFieldDependencies } from "./calculatedFieldModel.js";
+import { normalizeReportCalculatedFields, validateReportCalculatedFieldDependencies, resolveReportCalculatedFieldReference } from "./calculatedFieldModel.js";
 import { resolveReportBuilderDrillMetadata } from "./reportBuilderDrillMetadata.js";
 import { normalizeReportTableCellVisual } from "./tableVisualSpec.js";
 import { normalizePresentationClampConfig } from "../utils/presentationText.js";
@@ -514,24 +514,19 @@ function buildReportSpecCalculatedFields(config = {}, state = {}) {
   });
   validateReportCalculatedFieldDependencies(availableDefinitions);
   if (selectedMeasureIds.length === 0) return [];
-  const definitionsById = new Map(
-    availableDefinitions
-      .flatMap((definition) => [[normalizeString(definition?.id || definition?.key), definition], [normalizeString(definition?.key || definition?.id), definition]])
-      .filter(([id]) => !!id),
-  );
   const visiting = new Set();
   const visited = new Set();
   const selectedDefinitions = [];
 
-  function visitDefinition(id) {
-    const definition = definitionsById.get(normalizeString(id));
+  function visitDefinition(id, datasetRef) {
+    const definition = resolveReportCalculatedFieldReference(availableDefinitions, id, { datasetRef });
     if (!definition) return;
-    const normalizedId = normalizeString(definition.id || definition.key);
+    const normalizedId = JSON.stringify([definition.datasetRef || "primary", definition.id || definition.key]);
     if (!normalizedId || visited.has(normalizedId)) return;
     if (visiting.has(normalizedId)) throw new Error("Calculated field dependencies contain a cycle: " + [...visiting, normalizedId].join(", "));
     visiting.add(normalizedId);
     normalizeStringArray(definition?.dependencies).forEach((dependencyId) => {
-      if (dependencyId !== normalizedId && dependencyId !== definition.key) visitDefinition(dependencyId);
+      if (dependencyId !== definition.id && dependencyId !== definition.key) visitDefinition(dependencyId, definition.datasetRef);
     });
     visiting.delete(normalizedId);
     visited.add(normalizedId);

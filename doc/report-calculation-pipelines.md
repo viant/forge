@@ -39,3 +39,19 @@ following counts of 0–10,000. Full partitions may retain optional ordering.
 Reopening these definitions preserves every order key/direction, dataset scope
 and output key. Row-calculation authoring also accepts table results and validates
 the combined dependency graph before saving.
+
+## Calculation identity and dataset scope
+
+A declared `datasetRef` is preserved through builder documents, saved JSON,
+lowering, fill and print. The normalizer option supplies a default only when the
+definition does not declare one. Field IDs and output keys are aliases within
+their dataset: two datasets may use the same output key or ID with different
+formulas. Dependencies resolve against calculations in the same dataset; fields
+from another dataset do not supply local calculation dependencies.
+
+Within a dataset, duplicate IDs, duplicate keys, and ID/key alias collisions are
+invalid. An unscoped fill calculation applies to all datasets, so its aliases
+must not overlap scoped calculations. Validation reports the conflicting alias,
+dataset, and calculation IDs instead of choosing one definition. A builder
+selection without a dataset context must identify a unique calculation alias;
+use a unique ID when multiple datasets share an output key.
