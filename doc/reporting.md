@@ -483,6 +483,13 @@ Authoring fields:
 - optional `visibleGroups`
 - optional `collapsedGroups`
 
+Canonical print/PDF summaries resolve selected values through declared scope
+option labels using typed identity: numeric `1` and string `"1"` remain distinct.
+Multiple selections print in option declaration order; unmapped values retain
+their raw display instead of disappearing. Empty multiple selection retains the
+existing `All` summary. Choice metadata missing from a fill can be read from the
+matching reportSpec scope parameter; selected values remain those of the fill.
+
 Supported `mode` values:
 
 - `baseline`

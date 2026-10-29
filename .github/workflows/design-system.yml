@@ -41,6 +41,7 @@ jobs:
       - run: npm run test:kpi-sparkline
       - run: node --no-warnings src/components/valueColorScale.test.js
       - run: node --no-warnings src/reporting/reportTableQuickFilter.test.js
+      - run: node --no-warnings src/reporting/reportPrintChoiceLabels.test.js
       - run: npm run test:workspace-theme
       - run: npm run build
       - name: Check contributor entry points
