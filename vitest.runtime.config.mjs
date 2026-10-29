@@ -5,6 +5,7 @@ export default defineConfig({
     environment: 'jsdom',
     include: [
       'src/components/WindowContent.placement.test.jsx',
+      'src/components/WindowLayout.test.jsx',
       'src/components/dashboard/KpiSparkline.details.render.test.jsx',
       'src/components/chat/DocumentChat.render.test.jsx',
       'src/components/primitives/UploadCollection.render.test.jsx',

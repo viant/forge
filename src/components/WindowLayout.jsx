@@ -20,6 +20,7 @@ export function resolveWindowLayoutOverflow(content, fillParent = true) {
     if (String(content?.scrollMode || '').trim().toLowerCase() === 'self') return 'auto';
     // Split panels need the viewport height; content-height collapses them.
     if (content?.layout?.kind === 'split' || content?.layout?.divider?.visible === true) return 'hidden';
+    if (content?.sizingMode === 'content') return 'auto';
     if (!content?.dashboard && Array.isArray(content?.containers) && content.containers.length > 1) return 'auto';
     return 'hidden';
 }
