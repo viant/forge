@@ -90,3 +90,40 @@ it('gates chart/table switching independently and returns to chart when disabled
   await render(false,false);expect(button('Table')).toBeUndefined();expect(host.querySelector('table')).toBeNull();
  }finally{await act(async()=>root.unmount());host.remove();width.mockRestore();height.mockRestore();}
 });
+
+it('keeps horizontal chart sizing stable across its own percentage breakpoint',async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ const previousObserver=globalThis.ResizeObserver,observers=[];
+ globalThis.ResizeObserver=class {
+  constructor(callback){this.callback=callback;this.targets=new Set();observers.push(this);}
+  observe(target){this.targets.add(target);}
+  unobserve(target){this.targets.delete(target);}
+  disconnect(){this.targets.clear();}
+ };
+ let availableWidth=566;
+ const host=document.createElement('div');host.style.padding='0 16px';document.body.append(host);
+ const width=vi.spyOn(HTMLElement.prototype,'clientWidth','get').mockImplementation(function(){
+  if(this===host)return availableWidth+32;
+  if(this.matches('[data-forge-part="chart-viewport"]'))return Math.round(availableWidth*Number.parseFloat(this.parentElement.style.width)/100);
+  return availableWidth;
+ });
+ const height=vi.spyOn(HTMLElement.prototype,'clientHeight','get').mockReturnValue(240);
+ const root=createRoot(host);
+ const container={id:'responsive-horizontal',dataSourceRef:'rows',chart:{type:'horizontal_bar',xAxis:{dataKey:'label'},series:{values:[{value:'amount',label:'Amount'}]}}};
+ const context={identity:{dataSourceRef:'rows'},signals:{collection:{value:[{label:'Synthetic long category label',amount:12}]},control:{value:{}},metrics:{value:{}},windowForm:{value:{}}}};
+ const chart=()=>host.querySelector('[data-forge-chart-type]');
+ const measure=async()=>act(async()=>{
+  for(const observer of observers)if([...observer.targets].some(target=>target.matches('[data-forge-part="chart-viewport"]')))observer.callback([]);
+ });
+ try{
+  await act(async()=>root.render(<Chart container={container} context={context}/>));
+  const widths=[];
+  for(let frame=0;frame<12;frame++){await measure();widths.push(chart().style.width);}
+  expect(new Set(widths)).toEqual(new Set(['85%']));
+  expect(observers.some(observer=>observer.targets.has(host))).toBe(true);
+  availableWidth=420;await measure();await measure();expect(chart().style.width).toBe('100%');
+  availableWidth=566;await measure();await measure();expect(chart().style.width).toBe('85%');
+ }finally{
+  await act(async()=>root.unmount());host.remove();width.mockRestore();height.mockRestore();globalThis.ResizeObserver=previousObserver;
+ }
+});

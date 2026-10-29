@@ -227,23 +227,30 @@ function ChartActionButton({
 
 function useMeasuredContainer() {
     const ref = React.useRef(null);
-    const [size, setSize] = useState({width: 0, height: 0});
+    const [size, setSize] = useState({width: 0, height: 0, availableWidth: 0});
 
     useEffect(() => {
         const node = ref.current;
         if (!node || typeof ResizeObserver === "undefined") return undefined;
+        // The viewport's parent is the percentage-sized chart root. Its
+        // containing block provides a stable basis for responsive breakpoints.
+        const containingBlock = node.parentElement?.parentElement;
         const update = () => {
             const nextWidth = Number(node.clientWidth || 0);
             const nextHeight = Number(node.clientHeight || 0);
+            const style = containingBlock ? window.getComputedStyle(containingBlock) : null;
+            const horizontalPadding = (Number.parseFloat(style?.paddingLeft) || 0) + (Number.parseFloat(style?.paddingRight) || 0);
+            const availableWidth = Math.max(0, Number(containingBlock?.clientWidth || 0) - horizontalPadding) || nextWidth;
             setSize((prev) => (
-                prev.width === nextWidth && prev.height === nextHeight
+                prev.width === nextWidth && prev.height === nextHeight && prev.availableWidth === availableWidth
                     ? prev
-                    : {width: nextWidth, height: nextHeight}
+                    : {width: nextWidth, height: nextHeight, availableWidth}
             ));
         };
         update();
         const observer = new ResizeObserver(() => update());
         observer.observe(node);
+        if (containingBlock) observer.observe(containingBlock);
         return () => observer.disconnect();
     }, []);
 
@@ -799,6 +806,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     const authoredCategoryLabelConfig = normalizeChartCategoryLabelConfig(xAxis?.categoryLabel);
     const horizontalBarLayout = resolveHorizontalBarLayout({
         containerWidth: chartSize.width,
+        availableWidth: chartSize.availableWidth,
         embedded,
         categoryLabel: authoredCategoryLabelConfig,
     });
