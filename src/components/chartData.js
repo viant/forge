@@ -62,11 +62,15 @@ export function resolveHorizontalBarDataLabelLayout({ x = 0, width = 0, value = 
 
 export function resolveHorizontalBarLayout({
     containerWidth = 0,
+    availableWidth = containerWidth,
     embedded = false,
     categoryLabel = null,
 } = {}) {
     const width = Math.max(0, Number(containerWidth) || 0);
-    const compact = width > 0 && width <= 520;
+    // Breakpoints use the containing block, not this chart's own percentage
+    // width; otherwise 85%/100% sizing can repeatedly cross the threshold.
+    const available = Math.max(0, Number(availableWidth) || width);
+    const compact = available > 0 && available <= 520;
     const lines = Math.max(1, Math.min(2, Number(categoryLabel?.lines) || 2));
     const categoryShare = compact ? 0.4 : 0.42;
     const categoryWidth = Math.round(Math.max(
