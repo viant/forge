@@ -1,0 +1,147 @@
+import assert from 'node:assert/strict';
+
+export async function verifyComposerFileDrop(page) {
+    const specimen = page.getByRole('region',{name:'File drop composer',exact:true});
+    const input = specimen.getByRole('textbox',{name:'Message',exact:true});
+    const shell = specimen.getByTestId('chat-composer-shell');
+    const disabled = specimen.getByRole('checkbox',{name:'Disable example uploads',exact:true});
+    await input.fill('Keep this draft');
+    const files = await page.evaluateHandle(() => {
+        const transfer = new DataTransfer();
+        transfer.items.add(new File(['example'],'Example.csv',{type:'text/csv'}));
+        transfer.items.add(new File([],'Empty.txt',{type:'text/plain'}));
+        return transfer;
+    });
+    await shell.dispatchEvent('dragenter',{dataTransfer:files});
+    await input.dispatchEvent('dragenter',{dataTransfer:files});
+    await input.dispatchEvent('dragleave',{dataTransfer:files});
+    const hint = specimen.locator('.forge-composer-file-drop');
+    assert.equal(await hint.textContent(),'Drop files to upload');
+    assert.equal(await hint.evaluate(node=>getComputedStyle(node).pointerEvents),'none');
+    await input.dispatchEvent('dragover',{dataTransfer:files});
+    await input.dispatchEvent('drop',{dataTransfer:files});
+    assert.equal(await hint.count(),0);
+    assert.equal(await specimen.getByRole('listitem').count(),2);
+    assert.equal(await input.inputValue(),'Keep this draft');
+    await disabled.check();
+    await shell.dispatchEvent('dragenter',{dataTransfer:files});
+    await shell.dispatchEvent('drop',{dataTransfer:files});
+    assert.equal(await hint.count(),0);
+    assert.equal(await specimen.getByRole('listitem').count(),2);
+    await disabled.uncheck();
+    await specimen.getByRole('button',{name:'Remove Empty.txt',exact:true}).click();
+    assert.equal(await specimen.getByRole('listitem').count(),1);
+    const stage = specimen.getByRole('combobox',{name:'Example upload stage',exact:true});
+    await stage.selectOption('idle');
+    const card = specimen.locator('.forge-upload-chip').first();
+    const size = await card.boundingBox();
+    await card.evaluate(node=>{window.__uploadCard = node;});
+    assert.match(await specimen.textContent(),/Preparing…/);
+    await stage.selectOption('uploading');
+    assert.equal(await specimen.getByRole('progressbar').getAttribute('aria-valuenow'),'40');
+    await page.emulateMedia({reducedMotion:'reduce'});
+    assert.equal(await specimen.locator('.bp6-progress-meter').evaluate(node=>getComputedStyle(node).animationName),'none');
+    await page.emulateMedia({reducedMotion:'no-preference'});
+    assert.equal(await specimen.getByTestId('chat-composer-send').isDisabled(),true);
+    assert.equal(await input.inputValue(),'Keep this draft');
+    await stage.selectOption('error');
+    assert.equal(await specimen.getByRole('alert').textContent(),'Upload failed');
+    await specimen.getByRole('button',{name:'Retry upload of Example.csv',exact:true}).click();
+    assert.match(await specimen.textContent(),/Uploading 40%/);
+    await stage.selectOption('finishing');
+    assert.match(await specimen.textContent(),/Finishing upload…/);
+    await stage.selectOption('done');
+    assert.equal(await specimen.getByRole('progressbar').count(),0);
+    assert.equal(await specimen.getByTestId('chat-composer-send').isDisabled(),false);
+    const readySize = await card.boundingBox();
+    assert.equal(await card.evaluate(node=>node === window.__uploadCard),true,'The same card survives completion');
+    assert.ok(Math.abs(readySize.width-size.width)<1 && Math.abs(readySize.height-size.height)<1,'The card keeps its dimensions');
+    await files.dispose();
+}
+
+// Exercise the real dialog with independent local files, without a server upload.
+export async function verifyAttachmentDialog(page) {
+    const trigger = page.getByRole('button', {name:'Open attachment dialog',exact:true});
+    await trigger.click();
+    const dialog = page.getByRole('dialog', {name:'Attach files',exact:true});
+    const input = dialog.getByLabel('Choose files', {exact:true});
+    await input.waitFor();
+    await page.waitForFunction(() => document.activeElement?.type === 'file');
+    assert.equal(await dialog.getByRole('button',{name:'Upload',exact:true}).isDisabled(), true);
+    assert.equal(await input.getAttribute('multiple'), '');
+    assert.equal(await input.evaluate(node=>getComputedStyle(node.nextElementSibling).fontSize === getComputedStyle(node.parentElement).fontSize),true);
+    assert.equal(await input.evaluate(node=>{
+        const action=getComputedStyle(node.nextElementSibling,'::after');
+        const canvas=document.createElement('canvas').getContext('2d');canvas.font=action.font;
+        return parseFloat(action.width)>=canvas.measureText('Browse files').width-0.5;
+    }),true,'The complete Browse files action fits at both widths');
+    const dropped = await page.evaluateHandle(() => {
+        const transfer = new DataTransfer();
+        transfer.items.add(new File(['Example'],'Dropped example.csv',{type:'text/csv',lastModified:1}));
+        return transfer;
+    });
+    const body = dialog.locator('.bp6-dialog-body');
+    await body.dispatchEvent('dragenter',{dataTransfer:dropped});
+    await input.dispatchEvent('dragenter',{dataTransfer:dropped});
+    await input.dispatchEvent('dragleave',{dataTransfer:dropped});
+    assert.match(await dialog.textContent(),/Release to add files/);
+    await input.hover();
+    assert.equal(await input.evaluate(node=>{
+        const prior=node.closest('[data-forge-theme]').style.getPropertyValue('--forge-selected-background');
+        const scope=node.closest('[data-forge-theme]');scope.style.setProperty('--forge-selected-background','rgb(12, 34, 56)');
+        const color=getComputedStyle(node.nextElementSibling).backgroundColor;
+        if(prior)scope.style.setProperty('--forge-selected-background',prior);else scope.style.removeProperty('--forge-selected-background');
+        return color;
+    }),'rgb(12, 34, 56)','Dragging takes precedence over hover and follows the selected-surface role');
+    await input.dispatchEvent('dragover',{dataTransfer:dropped});
+    await input.dispatchEvent('drop',{dataTransfer:dropped});
+    await body.dispatchEvent('drop',{dataTransfer:dropped});
+    assert.equal(await dialog.getByRole('listitem').count(),1,'Repeated drops retain exact-file deduplication');
+    assert.equal(await dialog.getByRole('alert').count(),0,'Drop stages a file without uploading it');
+    await dialog.getByRole('button',{name:'Remove Dropped example.csv',exact:true}).click();
+    assert.equal(await dialog.getByRole('listitem').count(),0);
+    assert.equal(await dialog.getByRole('button',{name:'Upload',exact:true}).isDisabled(),true);
+    await dropped.dispose();
+    const files = [{name:'Example-long-name-that-remains-readable-on-narrow-screens-and-keeps-its-extension.csv',mimeType:'text/csv',buffer:Buffer.from('Example')}, {name:'Empty.txt',mimeType:'text/plain',buffer:Buffer.alloc(0)}];
+    await input.setInputFiles(files);
+    assert.equal(await dialog.getByRole('listitem').count(),2);
+    assert.equal(await dialog.locator('.forge-attachment-dialog__name').first().textContent(),files[0].name);
+    assert.equal(await dialog.evaluate(node=>node.scrollWidth <= node.clientWidth),true);
+    assert.equal(await dialog.locator('.forge-attachment-dialog__name').first().evaluate(node=>node.clientWidth > 0 && node.scrollWidth <= node.clientWidth),true);
+    await dialog.getByRole('button',{name:'Upload',exact:true}).click();
+    await dialog.getByRole('alert').first().waitFor();
+    assert.match(await dialog.getByRole('alert').first().textContent(),/Example upload failed/);
+    assert.equal(await dialog.getByRole('progressbar').first().getAttribute('aria-valuenow'),'40');
+    await dialog.getByRole('button',{name:'Remove Empty.txt',exact:true}).click();
+    assert.equal(await dialog.getByRole('listitem').count(),1);
+    const colors=await dialog.evaluate(node=>{
+        const scope=node.closest('[data-forge-theme]');
+        const prior=scope.style.getPropertyValue('--forge-surface-raised');
+        scope.style.setProperty('--forge-surface-raised','rgb(12, 34, 56)');
+        const changed=getComputedStyle(node).backgroundColor;
+        if(prior)scope.style.setProperty('--forge-surface-raised',prior);else scope.style.removeProperty('--forge-surface-raised');
+        return changed;
+    });
+    assert.equal(colors,'rgb(12, 34, 56)');
+    assert.equal(await dialog.evaluate(node=>{
+        const scope=node.closest('[data-forge-theme]');
+        const prior=scope.style.getPropertyValue('--forge-type-body-size');
+        scope.style.setProperty('--forge-type-body-size','19px');
+        const size=getComputedStyle(node.querySelector('.bp6-file-upload-input')).fontSize;
+        if(prior)scope.style.setProperty('--forge-type-body-size',prior);else scope.style.removeProperty('--forge-type-body-size');
+        return size;
+    }),'19px');
+    await input.focus();
+    await page.keyboard.press('Shift+Tab');
+    assert.equal(await dialog.locator('.bp6-dialog-close-button').evaluate(node=>node === document.activeElement),true);
+    await page.keyboard.press('Tab');
+    assert.deepEqual(await input.evaluate(node=>({focused:node === document.activeElement,outline:getComputedStyle(node.nextElementSibling).outlineStyle,shadow:getComputedStyle(node.nextElementSibling).boxShadow})),{focused:true,outline:'solid',shadow:'none'},'Keyboard focus has one themed ring without the legacy shadow');
+    await page.keyboard.press('Escape');
+    await dialog.waitFor({state:'detached'});
+    assert.equal(await trigger.evaluate(node=>node === document.activeElement),true);
+    await trigger.click();
+    await input.waitFor();
+    assert.equal(await dialog.getByRole('listitem').count(),0);
+    await dialog.getByRole('button',{name:'Close',exact:true}).last().click();
+    await dialog.waitFor({state:'detached'});
+}

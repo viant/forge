@@ -56,6 +56,24 @@ cannot attach a photo after cancellation. A supported browser, camera, secure
 context (including localhost), and camera permission are required. Merely adding
 the component does not grant permission.
 
+Document Composer also accepts files dropped over its message field or toolbar
+when `showUpload` is enabled, `disabled` is false and `onDropFiles` is supplied.
+The callback receives the native Files as one array. Chat passes that array to
+its existing upload preparation and upload service, without sending the draft
+or opening the picker. The shared surface shows “Drop files to upload” while
+files are over it, including movement between its children, and clears on leave,
+drop or drag end. Unavailable file drops cannot navigate the browser away from
+the draft. Ordinary text dragging retains native behavior. The existing picker
+remains the keyboard and touch alternative; no folder traversal or file policy
+is added. FoundationSpecimen demonstrates local multiple-file drops and the
+disabled state, with checks in the existing workspace-theme runner.
+
+The legacy Attach files dialog accepts drops into its chooser or selection body too.
+These append to its existing selection, deduplicating exact files across picker
+and drop, and wait for Upload. Its native Browse files control remains available
+by mouse, keyboard and touch. Both surfaces share useFileDrop; the modal stages
+files while the document chat box invokes the existing upload flow directly.
+
 Agent/Model labels and reasoning controls remain host-configurable. Icon palette
 and field styling should use CSS classes/tokens. The Agently host owns bottom
 composer docking and chat/workspace transitions; do not apply chat sizing rules
@@ -174,3 +192,24 @@ checks cover the frame and semantic roles alongside Home regression. This frame
 does not migrate report bodies or prove report saving, permission recovery or
 cross-device retention. Brand colors, font assets and product copy remain
 workspace-owned.
+
+
+### Document chat file selection and upload feedback
+
+Document Chat opens the native picker directly from Add photos or files. Dropping
+or picking starts the same upload flow without an intermediate modal or Upload
+confirmation. Camera keeps its explicit capture preview. Legacy Chat retains its
+existing dialog contract.
+
+UploadChips shows each selected file immediately, including async preparation,
+transfer progress and the final response wait. Cancel removes a pending file;
+late results cannot restore it. Failed files stay visible with Retry/remove and
+are excluded from the message payload. Send stays blocked until each unresolved
+file finishes or is removed, while the draft remains editable. Ready attachments
+continue through the existing payload and removal handlers. The specimen uses
+independent files and an explicit stage control; it executes no real upload.
+
+Upload and ready states share the same keyed attachment card, width and reserved
+progress space, so completion only changes the status. File order remains stable
+when responses arrive out of order. Ready removal uses the original attachment
+index and internal upload identity is excluded from serialized message fields.
