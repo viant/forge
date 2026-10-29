@@ -1388,6 +1388,7 @@ function renderReportPrintKpiBlock(state = {}, block = {}, {
   const blockId = normalizeString(block?.id || block?.kind || "block");
   const title = resolveReportPrintBlockTitle(block);
   const valueLabel = normalizeString(content?.valueLabel || content?.valueField || "Value");
+  const showValueLabel = !!valueLabel && valueLabel.toLowerCase() !== title.toLowerCase();
   const valueText = `${formatReportPrintValue(content?.value, valueFormat)}${normalizeString(content?.suffix || block?.suffix)}`;
   const detailLines = [];
   if (showCard && normalizeString(content?.secondaryField || content?.secondaryLabel)) {
@@ -1423,7 +1424,7 @@ function renderReportPrintKpiBlock(state = {}, block = {}, {
     92,
     (cardPadding * 2)
       + (titleLines.length * 16)
-      + 12
+      + (showValueLabel ? 12 : 0)
       + (valueLines.length * 24)
       + (wrappedDetails.length > 0 ? 6 + (wrappedDetails.length * 14) : 0),
   );
@@ -1459,7 +1460,7 @@ function renderReportPrintKpiBlock(state = {}, block = {}, {
       y: titleElement.box?.y,
     });
   }
-  renderReportPrintTextLines(state, {
+  if (showValueLabel) renderReportPrintTextLines(state, {
     idPrefix: `${blockId}__value_label`,
     lines: [valueLabel.toUpperCase()],
     x: state.contentLeft + cardPadding,
