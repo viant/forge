@@ -484,15 +484,15 @@
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92);
 }
 
-@media (max-width: 700px) {
+.forge-report-runtime-geo-responsive {
+    container-type: inline-size;
+    container-name: forge-runtime-geo;
+}
+
+/* Twelve 34px tiles and eleven 8px gaps need 496px beside a 220px sidebar. */
+@container forge-runtime-geo (max-width: 732px) {
     .forge-report-runtime-geo-layout {
         grid-template-columns: minmax(0, 1fr) !important;
-    }
-
-    .forge-report-runtime-geo-tiles {
-        grid-template-columns: repeat(12, minmax(20px, 1fr)) !important;
-        grid-template-rows: repeat(8, minmax(28px, 1fr)) !important;
-        gap: 4px !important;
     }
 
     .forge-report-runtime-geo-details {
@@ -500,7 +500,17 @@
         min-width: 0;
         max-width: 100%;
     }
+}
 
+@container forge-runtime-geo (max-width: 600px) {
+    .forge-report-runtime-geo-tiles {
+        grid-template-columns: repeat(12, minmax(20px, 1fr)) !important;
+        grid-template-rows: repeat(8, minmax(28px, 1fr)) !important;
+        gap: 4px !important;
+    }
+}
+
+@media (max-width: 700px) {
     .forge-dashboard-table-scroll-hint {
         display: flex;
         align-items: center;
