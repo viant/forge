@@ -54683,7 +54683,7 @@ Please __addLocaleData before adding additional unit data`);
     const bodyFormat = normalizeString30(block == null ? void 0 : block.bodyFormat).toLowerCase();
     const normalizedBodyFormat = bodyFormat === "markdown" ? "markdown" : "markdown";
     const bodyTemplate = String((block == null ? void 0 : block.bodyTemplate) || "");
-    return {
+    return withReportBlockRuntime({
       id: normalizeString30((block == null ? void 0 : block.id) || "kpiBlock"),
       kind: "kpiBlock",
       title: normalizeString30((block == null ? void 0 : block.title) || "KPI"),
@@ -54710,7 +54710,7 @@ Please __addLocaleData before adding additional unit data`);
       ...normalizedPresentationMode !== "card" ? { presentationMode: normalizedPresentationMode } : {},
       ...normalizedPresentationMode !== "card" || bodyTemplate.trim() ? { bodyFormat: normalizedBodyFormat } : {},
       ...bodyTemplate.trim() ? { bodyTemplate } : {}
-    };
+    }, block);
   }
   function normalizeCollectionLayout(value = "") {
     const normalized = normalizeString30(value).toLowerCase();
@@ -55104,6 +55104,7 @@ Please __addLocaleData before adding additional unit data`);
     const selectionBindings = isPlainObject8(source == null ? void 0 : source.selectionBindings) ? cloneValue19(source.selectionBindings) : isPlainObject8(block == null ? void 0 : block.selectionBindings) ? cloneValue19(block.selectionBindings) : null;
     const actions = Array.isArray(source == null ? void 0 : source.actions) ? cloneValue19(source.actions) : Array.isArray(block == null ? void 0 : block.actions) ? cloneValue19(block.actions) : [];
     const normalized = {
+      ...typeof (source == null ? void 0 : source.requireCompleteDataset) === "boolean" ? { requireCompleteDataset: source.requireCompleteDataset } : {},
       ...(source == null ? void 0 : source.printRowReference) === true ? { printRowReference: true } : {},
       ...(source == null ? void 0 : source.quickFilter) === true ? { quickFilter: true } : {},
       ...visibleWhen ? { visibleWhen } : {},
