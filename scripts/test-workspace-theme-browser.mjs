@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import {verifyChartFoundation} from '../src/demos/theme/chartFoundation.browser.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const server = await createServer({root, server: {hmr:process.env.FORGE_CHARTS_ONLY?false:undefined, host: '127.0.0.1', port: 0, fs: {allow: [path.dirname(root)]}}});
+const server = await createServer({root, server: {hmr:process.env.FORGE_CHARTS_ONLY?false:undefined, host: '127.0.0.1', port: 0, fs: {allow: [path.dirname(root),fs.realpathSync(path.join(root,'node_modules'))]}}});
 let browser;
 try {
     await server.listen();
@@ -59,6 +59,18 @@ try {
         await analyticalDocument.getByRole('tab',{name:'Records',exact:true}).click();
         assert.equal(await analyticalDocument.locator('.forge-document-table').count(),2);
         assert.match(await analyticalDocument.locator('.forge-document-table').first().textContent(),/First example/);
+        const supportingTable=analyticalDocument.locator('[data-report-runtime-block-id="detail"]');
+        const supportingWrap=supportingTable.locator('.forge-document-table-wrap');
+        const scrollHint=supportingTable.locator('.forge-document-table-scroll-hint');
+        assert.equal(await scrollHint.count(),0,'Fitting tables do not suggest a horizontal swipe');
+        await supportingWrap.evaluate(node=>node.style.width='240px');
+        await scrollHint.waitFor({state:'visible'});
+        assert.equal(await scrollHint.getAttribute('data-forge-type'),'metadata');
+        await supportingTable.getByRole('button',{name:'Sort by Records',exact:true}).click();
+        await supportingTable.getByRole('button',{name:'Sort by Records',exact:true}).click();
+        await supportingWrap.evaluate(node=>node.style.removeProperty('width'));
+        await scrollHint.waitFor({state:'detached',timeout:3000});
+        assert.equal(await supportingTable.locator('tbody tr').first().locator('td').last().textContent(),'12,345','Resize retains sorting and source values');
         const review = analyticalDocument.locator('[data-forge-review-table="choices"]');
         const firstChoice = review.getByRole('checkbox',{name:'Select First example',exact:true});
         assert.equal(await firstChoice.isChecked(),false);
@@ -104,12 +116,47 @@ try {
 
         await analyticalDocument.getByRole('tab',{name:'Overview',exact:true}).click();
         assert.equal(await analyticalDocument.getByRole('heading',{name:'Assessment',exact:true}).getAttribute('data-forge-type'),'heading');
+        const emptyStatus=analyticalDocument.locator('[data-report-runtime-block-id="signals-empty"]');
+        assert.equal(await emptyStatus.locator('p').textContent(),'No status information available.');
+        assert.equal(await emptyStatus.locator('p').getAttribute('data-forge-type'),'body');
+        for (const selector of ['.forge-report-document-assessment p[data-forge-type="body"]','.forge-report-document-prose p[data-forge-type="body"]']) {
+            const paragraphWidth=await analyticalDocument.locator(selector).first().evaluate(node=>{const parent=node.parentElement,style=getComputedStyle(parent);return {actual:node.getBoundingClientRect().width,available:parent.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)};});
+            assert.ok(Math.abs(paragraphWidth.actual-paragraphWidth.available)<=1,'Document paragraphs fill the available width inside their padding');
+        }
+        const proseSpacing=await analyticalDocument.locator('[data-report-runtime-block-id="readout"] .forge-report-document-prose').evaluate(node=>{const paragraphs=[...node.querySelectorAll('p')];return {count:paragraphs.length,gap:parseFloat(getComputedStyle(node).rowGap),gaps:paragraphs.slice(1).map((p,i)=>p.getBoundingClientRect().top-paragraphs[i].getBoundingClientRect().bottom)};});
+        assert.equal(proseSpacing.count,3);
+        assert.ok(proseSpacing.gaps.every(gap=>Math.abs(gap-proseSpacing.gap)<=1),'Blank source lines must not add space beyond the shared paragraph gap');
+        const nextSteps=analyticalDocument.locator('[data-report-runtime-block-id="next-steps"] ol');
+        assert.equal(await nextSteps.getAttribute('data-forge-type'),'body');
+        assert.equal(await nextSteps.locator('li').count(),3);
+        assert.deepEqual(await nextSteps.locator('li').evaluateAll(nodes=>nodes.map(node=>node.value)),[1,2,3]);
+        assert.equal(await nextSteps.locator('strong').textContent(),'Check the scope.');
+        assert.equal(await nextSteps.evaluate(node=>getComputedStyle(node).listStyleType),'decimal');
+        assert.equal(await nextSteps.evaluate(node=>node.scrollWidth<=node.clientWidth),true);
         assert.equal(await analyticalDocument.locator('.forge-report-document-badge').first().getAttribute('data-forge-type'),'small');
         assert.match(await analyticalDocument.locator('[data-report-runtime-kpi-trend]').textContent(),/-12\.0%/);
         assert.equal(await analyticalDocument.locator('.forge-report-runtime-kpi-panel').count(),0);
-        const metrics=analyticalDocument.locator('.forge-report-document-metrics');
+        const metrics=analyticalDocument.locator('.forge-report-document-metrics:not(.is-summary)');
         assert.equal(await metrics.locator('.forge-report-document-metric').count(),2);
         assert.equal(await metrics.evaluate(node=>getComputedStyle(node).gridTemplateColumns.split(' ').length),viewport.width===390?1:3);
+        const summaryMetrics=analyticalDocument.locator('.forge-report-document-metrics.is-summary');
+        assert.equal(await summaryMetrics.locator('.forge-report-document-metric').count(),8);
+        assert.equal(await summaryMetrics.locator('p').count(),0,'A missing metric caption uses its readable title without exposing the source key');
+        for(const [id,label] of [['summary-forecast','Forecast records'],['summary-estimate','Estimated amount']]) {
+            const missing=summaryMetrics.locator(`[data-report-runtime-block-id="${id}"]`);
+            assert.equal(await missing.locator('dt').textContent(),label,'Unavailable metrics retain their identity');
+            assert.equal(await missing.locator('dd').textContent(),'No KPI value available.');
+            assert.equal(await missing.locator('dd').getAttribute('data-forge-type'),'body');
+        }
+        assert.equal(await summaryMetrics.locator('[data-report-runtime-block-id="summary-pending"] dd').textContent(),'0','Measured zero remains distinct from missing values');
+        assert.equal(await summaryMetrics.evaluate(node=>getComputedStyle(node).gridTemplateColumns.split(' ').length),viewport.width===390?2:4,'Simple metrics use available report width instead of a three-column desktop cap');
+        assert.equal(await summaryMetrics.evaluate(node=>node.scrollWidth<=node.clientWidth),true,'Large formatted values and labels stay inside the metric group');
+        assert.match(await summaryMetrics.textContent(),/\$123,456,789\.12/);
+        if(process.env.FORGE_FOCUS_EVIDENCE) await summaryMetrics.screenshot({path:path.join(process.env.FORGE_FOCUS_EVIDENCE,`summary-metrics-${viewport.width}.png`)});
+        const analyticalRoot=analyticalDocument.locator('.forge-container[data-forge-appearance="document"]');
+        await analyticalRoot.evaluate(node=>node.style.width='280px');
+        assert.equal(await summaryMetrics.evaluate(node=>getComputedStyle(node).gridTemplateColumns.split(' ').length),1);
+        await analyticalRoot.evaluate(node=>node.style.removeProperty('width'));
         const documentExample = foundation.getByRole('region', {name:'Document presentation specimen', exact:true});
         const documentRoot = documentExample.locator('.forge-container[data-forge-appearance="document"]');
         assert.equal(await documentExample.getByRole('heading', {name:'Example working document', level:1}).count(),1);
@@ -128,6 +175,31 @@ try {
         assert.ok(dateWidths.every(width=>width>100));
         assert.equal(await documentRoot.evaluate(node=>parseFloat(getComputedStyle(node).paddingInlineStart)),viewport.width===390?16:36);
         assert.equal(await documentExample.locator('.forge-document-records dt').first().getAttribute('data-forge-type'),'metadata');
+        const documentMenu = documentExample.getByRole('combobox',{name:'Document sections',exact:true});
+        if (viewport.width === 390) {
+            await documentMenu.waitFor();
+            assert.equal(await documentMenu.evaluate(node=>node.getBoundingClientRect().height>=44),true);
+            await documentMenu.selectOption('document-history');
+        } else {
+            assert.equal(await documentMenu.count(),0);
+            await documentExample.getByRole('tab',{name:'History',exact:true}).click();
+            await documentRoot.evaluate(node=>node.style.width='280px');
+            await documentMenu.waitFor();
+            assert.equal(await documentMenu.inputValue(),'document-history');
+        }
+        assert.equal(await documentExample.getByText('History section content.',{exact:true}).isVisible(),true);
+        assert.equal(await exampleName.inputValue(),'Retained document edit');
+        assert.equal(await documentExample.getByRole('tablist',{name:'Document sections',exact:true}).count(),0,'Hidden tabs are excluded from accessible navigation');
+        assert.equal(await documentMenu.getAttribute('data-forge-type'),'body');
+        await documentMenu.evaluate(node=>{for(const [key,value] of Object.entries({size:'17px',weight:'500','line-height':'24px','letter-spacing':'.02em',family:'monospace'}))node.style.setProperty(`--forge-type-body-${key}`,value);});
+        const menuType = await documentMenu.evaluate(node=>{const css=getComputedStyle(node);return [css.fontSize,css.fontWeight,css.lineHeight,css.letterSpacing,css.fontFamily];});
+        assert.deepEqual(menuType,['17px','500','24px','0.34px','monospace']);
+        await documentMenu.evaluate(node=>{for(const key of ['size','weight','line-height','letter-spacing','family'])node.style.removeProperty(`--forge-type-body-${key}`);});
+        if (viewport.width !== 390) {
+            await documentRoot.evaluate(node=>node.style.removeProperty('width'));
+            await documentExample.getByRole('tab',{name:'History',exact:true}).waitFor();
+            assert.equal(await documentExample.getByRole('tab',{name:'History',exact:true}).getAttribute('aria-selected'),'true');
+        }
 
         for (const name of ['Semantic colors', 'Spacing and surfaces', 'Actions and icons', 'Form controls', 'Feedback', 'Overlays', 'Data display']) assert.equal(await foundation.getByRole('region', {name, exact: true}).count(), 1);
         const primary = foundation.getByRole('button', {name: 'Save example', exact: true});

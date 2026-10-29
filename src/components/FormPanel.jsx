@@ -13,12 +13,14 @@ import {findBusSignal, getViewSignal} from "../core/index.js";
 import {isContainerVisible, trackContainerVisibility, trackVisibleWhen, evaluatePlainVisibleWhen} from "./visibleWhen.js";
 import {initialBusMessageState, mergeSelectedTab, nextBusMessage, resolveDataSourceFetchMode} from './FormPanelState';
 import SectionTabRail from './SectionTabRail.jsx';
+import {DocumentPresentationContext} from './documentPresentation.js';
 import {useViewPartition} from './useViewPartition.js';
 
 const FormPanel = ({context, container, children, sizingMode = 'fill', dataSourceFetchMode = 'always'}) => {
     useSignals();
     const operationRoot=useRef(null);
     const workspacePresentation = useWorkspacePresentation();
+    const documentPresentation = React.useContext(DocumentPresentationContext);
     const containers = container.containers || [];
     containers.forEach((entry) => {trackContainerVisibility(entry, context);trackVisibleWhen(entry.disabledWhen, context);});
     const tabDisabled = tab => !!tab?.disabledWhen && evaluatePlainVisibleWhen(tab.disabledWhen, context);
@@ -150,6 +152,7 @@ const FormPanel = ({context, container, children, sizingMode = 'fill', dataSourc
         return (
             <div ref={operationRoot} className={`form-panel forge-form-panel-section-tabs${compactTabs ? ' is-compact' : ''}${fillAvailableHeight ? ' is-fill' : ''}`}>
                 <SectionTabRail
+                    overflowBehavior={documentPresentation ? 'menu' : 'scroll'}
                     items={visibleContainers.map((tab,index) => ({id: tab.id, label: tab.title, icon: tab.icon, disabled:tabDisabled(tab), panelId:`${tabDOMPrefix}-panel-${index}`}))}
                     selectedId={selected?.id}
                     onChange={handleTabChange}

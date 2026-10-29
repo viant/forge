@@ -520,7 +520,7 @@ function buildReportFillKpiContent(block = {}, dataset = {}, {
       : {}),
     ...(normalizeString(block?.tone) ? { tone: normalizeString(block.tone) } : {}),
     valueField,
-    valueLabel: normalizeString(block?.valueLabel || valueField || "Value"),
+    valueLabel: normalizeString(block?.valueLabel || block?.title || valueField || "Value"),
     ...(normalizeString(block?.valueFormat) ? { valueFormat: normalizeString(block.valueFormat) } : {}),
     ...(normalizeString(block?.suffix) ? { suffix: normalizeString(block.suffix) } : {}),
     value: valueField && selectedRow ? resolveKey(selectedRow, valueField) ?? null : null,

@@ -123,3 +123,14 @@
     background: var(--forge-report-surface, #fff);
     font: inherit;
 }
+
+.forge-section-tab-rail-frame.is-menu { display: grid; grid-template-columns: minmax(0, 1fr); }
+.forge-section-tab-rail-frame.is-menu > .forge-section-tab-rail,
+.forge-section-tab-menu { grid-area: 1 / 1; min-width: 0; }
+.forge-section-tab-rail-frame.is-menu > .forge-section-tab-rail { box-sizing: border-box; visibility: hidden; }
+.forge-section-tab-menu { display: flex; align-items: center; gap: var(--forge-spacing-3, 12px); }
+.forge-section-tab-menu > span:first-child { flex: none; color: var(--forge-text-muted); }
+.forge-section-tab-menu > .forge-select-control { flex: 1; }
+@media (max-width: 760px) {
+    .forge-section-tab-menu select { min-height: var(--forge-form-mobile-control-height, 44px); }
+}

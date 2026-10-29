@@ -247,6 +247,20 @@ await import('../../reporting/inlineReportCompiler.test.js');
 
 const {default: GeographicReportRuntime}=await import('../../components/dashboard/ReportRuntime.jsx');
 const {compileInlineReport: compileGeographicReport}=await import('../../reporting/inlineReportCompiler.js');
+const paragraphCompiled=compileGeographicReport({reportId:'paragraph-spacing',grammar:'report-document-v1',source:{title:'Paragraph spacing',viewer:{appearance:'document'},blocks:[{id:'copy',kind:'markdownBlock',markdown:'First paragraph.\n\n\nSecond paragraph.\n\n```text\nfirst line\n\nthird line\n```'}]}});
+const paragraphHTML=renderToStaticMarkup(<GeographicReportRuntime {...paragraphCompiled}/>);
+assert.equal((paragraphHTML.match(/<p\b/g)||[]).length,2);
+assert.match(paragraphHTML,/<code>first line\n\nthird line<\/code>/,'Blank lines inside code remain content');
+assert.match(renderToStaticMarkup(<GeographicReportRuntime {...paragraphCompiled} reportSpec={{...paragraphCompiled.reportSpec,viewer:{}}}/>),/data-report-markdown-blank-line/,'Legacy report spacing is retained');
+const listCompiled=compileGeographicReport({reportId:'narrative-lists',grammar:'report-document-v1',source:{title:'Narrative lists',viewer:{appearance:'document'},blocks:[{id:'lists',kind:'markdownBlock',markdown:'3. **First step** with <literal> evidence.\n\n7. Keep its original priority.\n\n- One observation.\n- Another observation.\n\nAfter the lists.\n\n```text\n1. literal\n- literal\n```'}]}});
+const listHTML=renderToStaticMarkup(<GeographicReportRuntime {...listCompiled}/>);
+assert.match(listHTML,/<ol(?=[^>]*start="3")(?=[^>]*class="forge-report-document-list")/);
+assert.match(listHTML,/<li[^>]*value="3"[^>]*><strong>First step<\/strong> with &lt;literal&gt; evidence\.<\/li>/);
+assert.match(listHTML,/<li[^>]*value="7"[^>]*>Keep its original priority\.<\/li>/);
+assert.equal((listHTML.match(/<ul\b/g)||[]).length,1);
+assert.equal((listHTML.match(/<li\b/g)||[]).length,4);
+assert.match(listHTML,/<code>1\. literal\n- literal<\/code>/);
+assert.doesNotMatch(renderToStaticMarkup(<GeographicReportRuntime {...listCompiled} reportSpec={{...listCompiled.reportSpec,viewer:{}}}/>),/forge-report-document-list/,'Legacy narrative presentation stays compatible');
 const geographicSource={title:'Geographic evidence',viewer:{appearance:'document'},blocks:[
   {id:'states',kind:'geoMapBlock',title:'State evidence',datasetRef:'states',geo:{shape:'us-states',key:'code',labelKey:'name',metric:{key:'count',label:'Records',format:'number'},aggregate:'sum'}},
   {id:'empty',kind:'geoMapBlock',title:'Missing geography',datasetRef:'empty',geo:{shape:'us-states',key:'code',metric:{key:'count',label:'Records',format:'number'},aggregate:'sum'}},
@@ -289,6 +303,10 @@ assert.match(emptyWorkflowHTML,/No process steps configured/);assert.match(empty
 console.log('semantic read-only process/stage documents and empty states passed');
 
 assert.match(analyticalDocument,/class="forge-report-document-metrics"/);
+assert.match(analyticalDocument,/class="forge-report-document-metrics is-summary"/,'Plain summary metrics use compact responsive composition alongside rich metric cards');
+assert.match(analyticalDocument,/<p[^>]*data-forge-type="body"[^>]*>No status information available.<\/p>/);
+assert.doesNotMatch(analyticalDocument,/No pills configured/);
+for(const label of ['Forecast records','Estimated amount'])assert.match(analyticalDocument,new RegExp(`<dt[^>]*data-forge-type="metadata"[^>]*>${label}</dt><dd[^>]*data-forge-type="body"[^>]*>No KPI value available.</dd>`),'Unavailable document metrics retain a labeled value');
 const explicitStackSource={title:'Explicit stack',viewer:{appearance:'document'},blocks:[{id:'a',kind:'kpiBlock',value:1},{id:'b',kind:'kpiBlock',value:2},{id:'group',kind:'compositeBlock',layout:'stack',childBlockIds:['a','b']}]};
 const explicitStack=compileGeographicReport({reportId:'explicit-stack',grammar:'report-document-v1',source:explicitStackSource});
 assert.doesNotMatch(renderToStaticMarkup(<GeographicReportRuntime {...explicitStack}/>),/class="forge-report-document-metrics"/,'Explicit composite layouts remain authoritative');
