@@ -1613,7 +1613,7 @@ export function buildReportDocumentKpiBlock(block = {}) {
   const bodyFormat = normalizeString(block?.bodyFormat).toLowerCase();
   const normalizedBodyFormat = bodyFormat === "markdown" ? "markdown" : "markdown";
   const bodyTemplate = String(block?.bodyTemplate || "");
-  return {
+  return withReportBlockRuntime({
     id: normalizeString(block?.id || "kpiBlock"),
     kind: "kpiBlock",
     title: normalizeString(block?.title || "KPI"),
@@ -1650,7 +1650,7 @@ export function buildReportDocumentKpiBlock(block = {}) {
     ...(normalizedPresentationMode !== "card" ? { presentationMode: normalizedPresentationMode } : {}),
     ...((normalizedPresentationMode !== "card" || bodyTemplate.trim()) ? { bodyFormat: normalizedBodyFormat } : {}),
     ...(bodyTemplate.trim() ? { bodyTemplate } : {}),
-  };
+  }, block);
 }
 
 function normalizeCollectionLayout(value = "") {
@@ -2123,6 +2123,7 @@ export function normalizeReportBlockRuntime(runtime = null, block = {}) {
     ? cloneValue(source.actions)
     : (Array.isArray(block?.actions) ? cloneValue(block.actions) : []);
   const normalized = {
+    ...(typeof source?.requireCompleteDataset === "boolean" ? { requireCompleteDataset: source.requireCompleteDataset } : {}),
     ...(source?.printRowReference === true ? { printRowReference: true } : {}),
     ...(source?.quickFilter === true ? { quickFilter: true } : {}),
     ...(visibleWhen ? { visibleWhen } : {}),

@@ -99,3 +99,54 @@ func TestBundledKpiSparklineRetainsAuthorizedDatasetAndPrint(t *testing.T) {
 	_, err = Materialize(context.Background(), plainSpec, complete)
 	require.ErrorContains(t, err, "complete dataset input for 'daily'")
 }
+
+// TestBundledAuthoredKpiCompletenessRoundTrip starts with authored metadata so
+// the native lowering path cannot silently discard the materialization guard.
+func TestBundledAuthoredKpiCompletenessRoundTrip(t *testing.T) {
+	raw, err := os.ReadFile("testdata/authored-envelope.json")
+	require.NoError(t, err)
+	var envelope registry.ReportEnvelope
+	require.NoError(t, json.Unmarshal(raw, &envelope))
+	envelope.ReportDocument = json.RawMessage(`{"version":1,"kind":"reportDocument","title":"Complete input","blocks":[{"id":"total","kind":"kpiBlock","datasetRef":"primary","valueField":"spend","runtime":{"requireCompleteDataset":true}}]}`)
+	for id, descriptor := range envelope.DataSources {
+		var compact bytes.Buffer
+		require.NoError(t, json.Compact(&compact, descriptor))
+		envelope.DataSources[id] = json.RawMessage(compact.Bytes())
+	}
+	var compactBuilder bytes.Buffer
+	require.NoError(t, json.Compact(&compactBuilder, envelope.BuilderDefinition))
+	envelope.BuilderDefinition = json.RawMessage(compactBuilder.Bytes())
+	envelope.Dependencies = []registry.ReportDependency{
+		{Kind: "builder", ID: envelope.BuilderRef, ContentFingerprint: identity.ContentFingerprint(envelope.BuilderDefinition)},
+		{Kind: "datasource", ID: "sampleRows", ContentFingerprint: identity.ContentFingerprint(envelope.DataSources["sampleRows"])},
+		{Kind: "report", ID: "report://example/complete", ContentFingerprint: identity.ContentFingerprint(envelope.ReportDocument)},
+	}
+	raw, err = json.Marshal(envelope)
+	require.NoError(t, err)
+	lowered, err := Lower(context.Background(), raw)
+	require.NoError(t, err)
+	var spec map[string]any
+	require.NoError(t, json.Unmarshal(lowered, &spec))
+	found := false
+	for _, item := range spec["blocks"].([]any) {
+		block := item.(map[string]any)
+		if block["id"] == "total" {
+			found = true
+			require.Equal(t, true, block["runtime"].(map[string]any)["requireCompleteDataset"])
+		}
+	}
+	require.True(t, found)
+	artifacts, err := Materialize(context.Background(), lowered, map[string]json.RawMessage{"primary": json.RawMessage(`{"hasMore":false,"rows":[{"eventDate":"2026-10-01","spend":2}]}`)})
+	require.NoError(t, err)
+	require.Contains(t, string(artifacts.ReportFill), `"requireCompleteDataset":true`)
+	require.Contains(t, string(artifacts.ReportPrint), `total`)
+	for _, partial := range []string{
+		`{"hasMore":true,"rows":[{"spend":2}]}`,
+		`{"rows":[{"spend":2}]}`,
+		`{"hasMore":false,"truncated":true,"rows":[{"spend":2}]}`,
+		`{"hasMore":false,"provenance":{"hasMore":true},"rows":[{"spend":2}]}`,
+	} {
+		_, err = Materialize(context.Background(), lowered, map[string]json.RawMessage{"primary": json.RawMessage(partial)})
+		require.ErrorContains(t, err, "complete dataset input for 'primary'")
+	}
+}

@@ -1,6 +1,7 @@
 import assert from'node:assert/strict';
+import { isReportRuntimeBlockVisible } from './reportBlockRuntimeModel.js';
 import{materializeKpiSparkline,kpiSparklineGeometry,buildKpiSparklineSvg,normalizeKpiSparkline}from'./reportKpiSparklineModel.js';
-import{buildReportBuilderReportDocument,lowerReportDocumentToReportSpec}from'./reportDocumentModel.js';
+import{buildReportBuilderReportDocument,buildReportDocumentKpiBlock,normalizeReportBuilderDocumentBlocks,lowerReportDocumentToReportSpec}from'./reportDocumentModel.js';
 import{buildReportFillFromReportSpec}from'./reportFillModel.js';import{buildReportPrintFromReportFill}from'./reportPrintModel.js';import{validateReportSpec,validateReportFill,validateReportPrint}from'./schema/reportSchemas.js';
 const declaration={datasetRef:'daily',categoryField:'day',valueField:'amount',comparisonDatasetRef:'priorDaily'};
 const content=materializeKpiSparkline(declaration,ref=>({rows:ref==='daily'?[{day:'2026-10-03',amount:0},{day:'2026-10-01',amount:3},{day:'2026-10-02',amount:null}]:[{day:'2026-09-01',amount:2},{day:'2026-09-02',amount:4}]}));
@@ -54,3 +55,57 @@ for(const ref of ['daily','priorDaily']) {
 }
 // Legacy uncolored sparklines without an explicit completeness contract remain compatible.
 assert.doesNotThrow(()=>buildReportFillFromReportSpec(spec,coloredPayload));
+
+
+// Independently authored synthetic metadata must survive the public builder and
+// a JSON save/reopen before materialization enforces the completeness contract.
+const authoredRuntime = {
+  requireCompleteDataset: true,
+  filterBindings: { selectedGroup: 'group' },
+  selectionBindings: { selectedItem: 'item' },
+  visibleWhen: { selector: 'dashboard.selection.selectedItem', notEmpty: true },
+  actions: [{ id: 'selectItem', kind: 'select', dimension: 'item' }],
+  unsupportedOption: { ignored: true },
+};
+const builtKpi = buildReportDocumentKpiBlock({ ...kpi, runtime: authoredRuntime });
+const { unsupportedOption, ...supportedRuntime } = JSON.parse(JSON.stringify(authoredRuntime));
+assert.deepEqual(builtKpi.runtime, supportedRuntime);
+authoredRuntime.filterBindings.selectedGroup = 'changed';
+authoredRuntime.actions[0].id = 'changed';
+assert.equal(builtKpi.runtime.filterBindings.selectedGroup, 'group');
+assert.equal(builtKpi.runtime.actions[0].id, 'selectItem');
+assert.equal(Object.hasOwn(buildReportDocumentKpiBlock(kpi), 'runtime'), false);
+assert.deepEqual(buildReportDocumentKpiBlock({ ...kpi, runtime: { requireCompleteDataset: false } }).runtime, { requireCompleteDataset: false });
+for (const runtime of [null, [], 'invalid', { requireCompleteDataset: 'true' }, { unsupportedOption: true }]) {
+  assert.equal(Object.hasOwn(buildReportDocumentKpiBlock({ ...kpi, runtime }), 'runtime'), false);
+}
+const savedDocument = JSON.parse(JSON.stringify({ ...document, blocks: document.blocks.map(block => block.id === kpi.id ? builtKpi : block) }));
+const guardedSpec = lowerReportDocumentToReportSpec(savedDocument);
+assert.deepEqual(guardedSpec.blocks.find(block => block.id === kpi.id).runtime, supportedRuntime);
+const guardedFill = buildReportFillFromReportSpec(guardedSpec, completeTrendPayload);
+const filledKpi = guardedFill.blocks.find(block => block.id === kpi.id);
+assert.equal(filledKpi.content.value, 1);
+assert.deepEqual(filledKpi.runtime, supportedRuntime);
+assert.equal(validateReportFill(guardedFill).valid, true);
+assert.equal(isReportRuntimeBlockVisible(filledKpi, { selection: {} }), false);
+assert.equal(isReportRuntimeBlockVisible(filledKpi, { selection: { selectedItem: 'one' } }), true);
+assert.equal(validateReportPrint(buildReportPrintFromReportFill({ reportSpec: guardedSpec, reportFill: guardedFill })).valid, true);
+for (const ref of ['primary', 'daily', 'priorDaily']) {
+  for (const partial of [{ hasMore: true }, { hasMore: undefined }, { truncated: true }, { provenance: { hasMore: true } }, { provenance: { truncated: true } }]) {
+    assert.throws(() => buildReportFillFromReportSpec(guardedSpec, {
+      ...completeTrendPayload,
+      [ref]: { ...completeTrendPayload[ref], ...partial },
+    }), new RegExp("complete dataset input for '" + ref + "'"));
+  }
+  const pagedSpec = JSON.parse(JSON.stringify(guardedSpec));
+  pagedSpec.datasets.find(dataset => dataset.id === ref).request.offset = 1;
+  assert.throws(() => buildReportFillFromReportSpec(pagedSpec, completeTrendPayload), /complete dataset input/);
+}
+// Composite normalization uses the same supported guard, including when another
+// recognized field causes the runtime metadata to be normalized.
+const compositeRuntime = { requireCompleteDataset: true, visibleWhen: { selector: 'dashboard.selection.selectedItem', notEmpty: true } };
+const [guardedComposite] = normalizeReportBuilderDocumentBlocks([{ id: 'group', kind: 'compositeBlock', datasetRef: 'primary', childBlockIds: ['total'], runtime: compositeRuntime }]);
+assert.deepEqual(guardedComposite.runtime, compositeRuntime);
+const compositeSpec = { ...spec, blocks: [...spec.blocks, guardedComposite] };
+assert.throws(() => buildReportFillFromReportSpec(compositeSpec, coloredPayload), /complete dataset input for 'primary'/);
+assert.doesNotThrow(() => buildReportFillFromReportSpec(compositeSpec, completeTrendPayload));
