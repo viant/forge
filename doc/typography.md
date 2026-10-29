@@ -794,3 +794,93 @@ The maintained DocumentSpecimen and ReportDocumentSpecimen exercise these
 capabilities with independently invented data. Existing required render/browser
 checks cover wide/narrow composition, large/missing values, paragraph spacing,
 list semantics, table overflow, section switching and legacy compatibility.
+
+
+## Chat attachments
+
+The legacy Chat attachment action opens AttachmentDialog using the shared
+foundation overlay, Button variants and body/section/metadata roles. Its native
+multiple-file picker, selection identity (name, size and modification time),
+removal, upload callback and fresh-open reset remain unchanged. File names wrap
+in a flexible list instead of competing with fixed progress columns. The body
+scrolls within the viewport while Close and Upload remain available.
+
+The picker receives initial keyboard focus; Tab stays within the Blueprint
+dialog, Escape closes it and focus returns to the trigger. File picker and
+icon actions retain coarse-pointer targets. Progress has an accessible value;
+failed, completed and canceled states include text. Workspace palette, type,
+spacing, focus, border and radius tokens determine appearance in both modes.
+FoundationSpecimen's attachment example uses local files and a simulated failure,
+never a network upload. Existing workspace-theme component/browser checks cover
+selection, deduplication, removal, callbacks, progress, focus, token consumption
+and narrow widths. Other chat dialogs and upload service behavior are outside
+this migration.
+
+Document Composer's optional `onDropFiles` callback uses the existing Chat upload
+pipeline when uploads are available. The message shell shows a pointer-transparent,
+label-role drop hint using selected-surface/text/interaction tokens. Files upload
+without submitting or editing the message. Disabled and non-upload configurations
+reject file drops while ordinary text drags retain native behavior. The picker
+stays available for keyboard and touch. FoundationSpecimen's real Composer
+demonstrates this with local files, and the existing component/browser checks
+cover nested enter/leave, multiple files, draft retention, disabled drops and
+the existing 16px phone textarea exception. Legacy composer rendering is unchanged.
+
+AttachmentDialog also accepts drops over its body, including the native chooser
+and selected file list. Its spacious chooser shows a paperclip, a plain drop
+instruction and the complete Browse files action. Both native choices and drops
+use the same selection merger, retaining exact-file deduplication by name, size
+and modification time. A drop adds files for review; only Upload invokes the
+existing upload callback. The selected-file count is announced politely. The
+active drag follows selected-surface/interaction roles and takes precedence over
+hover. Browse remains a native keyboard/touch file control with its focus ring.
+The shared useFileDrop hook owns drag depth, file-only handling and reset for
+both this modal and DocumentComposer. Closing the modal clears drag state and
+reopening clears selection. No file policies, folder traversal or service change.
+The real FoundationSpecimen and existing component/browser checks exercise both
+consumers, mixed selection, repeated drops, manual Upload, dark mode and narrow
+widths. Shared defaults stay neutral; workspaces retain their fonts and palette.
+
+
+### Direct picker and visible upload lifecycle
+
+Document Chat's Add photos or files action opens its native multiple-file picker
+synchronously from the button gesture. Canceling the picker keeps the draft and
+existing files. Opening it again does not reset or abort other uploads. Its
+hidden input resets after each selection so the same file can be selected again.
+The legacy presentation retains its separately documented dialog behavior.
+
+Picker, drop, camera and audio files share useUpload. It stages files before
+optional async preparation, then exposes preparing, uploading, finishing and
+failed states to the real Composer through UploadChips. Each visible file has
+progress and cancel; failures retain the file and offer Retry or remove. A transfer at 100%
+still says Finishing upload until a valid response supplies a file URI.
+Network/preparation/service/invalid-response failures remain visible rather than
+being presented as successful attachments. Cancel/reset/unmount prevent pending
+preparation and late responses from starting or restoring a canceled transfer.
+Existing plain extraFields callers and synchronous returned IDs remain supported.
+
+The draft stays editable. Button and keyboard submission wait for unresolved
+uploads, including failures, so a message cannot silently omit an intended file.
+Ready attachments keep their existing canonical payload and removal behavior.
+Retry reruns normal preparation and permissions; no automatic retry, file policy,
+new service or backend contract is added. UploadChips uses the existing small/
+metadata roles, shared actions and palette, with reduced-motion behavior.
+FoundationSpecimen exposes all upload stages through the real Composer. Existing
+workspace checks include hook races/failures, state rendering, responsive and dark
+presentation, motion, and unchanged legacy dialog behavior.
+
+
+### Stable attachment cards
+
+Document Composer uses one keyed UploadChips list for preparing, uploading,
+finishing and ready attachments. A card retains its width and progress row
+through completion, so changing status does not resize or replace it. Completed
+progress is hidden visually and from assistive technology. Ready files say Ready
+to send and retain the existing remove action. Filenames can wrap at narrow widths.
+Chat keeps an internal, non-enumerable uploadId on ready files to preserve card
+identity and selection order when uploads finish out of order; the message
+payload fields stay unchanged. Canonical attachment indices still drive removal.
+The real specimen and existing desktop/phone browser checks assert stable card
+identity and dimensions, alongside component coverage for out-of-order completion
+and correct removal. No size animation, dependency or service change is added.

@@ -27,7 +27,9 @@
 .forge-document-chat > .chat-feed-stage > :is(.app-chat-feed, .chat-feed) { width: min(100%, 748px); margin-inline: auto; }
 .forge-document-chat .forge-document-composer { background: transparent; padding-top: 0; }
 .forge-document-composer { width: min(100%, 748px); margin: auto auto 0; flex: none; }
-.forge-document-composer-shell { display: flex; flex-direction: column; gap: var(--forge-spacing-2, 8px); padding: 12px 12px 10px 16px; border: var(--forge-border-width, 1px) solid var(--chat-border); border-radius: var(--chat-radius); background: var(--chat-surface); }
+.forge-document-composer-shell { position: relative; display: flex; flex-direction: column; gap: var(--forge-spacing-2, 8px); padding: 12px 12px 10px 16px; border: var(--forge-border-width, 1px) solid var(--chat-border); border-radius: var(--chat-radius); background: var(--chat-surface); }
+.forge-document-composer-shell.is-file-dragging { border-color: var(--forge-interaction-color); border-style: dashed; }
+.forge-composer-file-drop { position: absolute; inset: 0; z-index: 1; pointer-events: none; display: flex; align-items: center; justify-content: center; gap: var(--forge-spacing-2, 8px); padding: var(--forge-spacing-4, 16px); border-radius: inherit; background: var(--chat-selected); color: var(--chat-text); }
 .forge-document-composer.is-keyboard-focus .forge-document-composer-shell:has(.forge-document-textarea:focus-visible) { outline: var(--forge-focus-width, 2px) solid var(--chat-focus); outline-offset: var(--forge-focus-offset, 2px); }
 .forge-document-input { min-width: 0; }
 .forge-document-input .forge-document-textarea { display: block; box-sizing: border-box; width: 100%; min-height: 36px; max-height: 200px; padding: 6px 0; resize: none; overflow-y: auto; border: 0; border-radius: 0; box-shadow: none; background: transparent; color: var(--chat-text); caret-color: var(--chat-text); }
@@ -48,9 +50,6 @@
 .forge-composer-setting { display: flex; flex-direction: column; gap: var(--forge-spacing-1, 4px); }
 .forge-composer-setting select { width: 100%; }
 .forge-composer-auto-tools { display: flex; align-items: center; gap: var(--forge-spacing-2, 8px); }
-.forge-composer-attachments { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--forge-spacing-2, 8px); }
-.forge-composer-attachments li { display: flex; align-items: center; max-width: 100%; gap: var(--forge-spacing-1, 4px); padding-left: var(--forge-spacing-2, 8px); border-radius: var(--forge-control-radius, 6px); background: var(--chat-subtle); }
-.forge-composer-attachments li > span { overflow-wrap: anywhere; }
 .forge-task-browser { margin-top: 30px; }
 .forge-task-heading { margin-bottom: 8px; min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: var(--forge-spacing-3, 12px); flex-wrap: wrap; }
 .forge-task-heading h2 { margin: 0; }

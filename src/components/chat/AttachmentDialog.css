@@ -1,0 +1,91 @@
+/* The existing dialog, file picker and progress controls consume workspace roles. */
+.forge-foundation-overlay.forge-attachment-dialog.bp6-dialog {
+    padding: 0;
+    max-height: calc(100dvh - var(--forge-spacing-6, 24px) * 2);
+    overflow: hidden;
+    border-radius: var(--forge-radius-surface, 12px);
+    background: var(--forge-surface-raised, var(--forge-surface));
+    color: var(--forge-text);
+}
+.forge-attachment-dialog.bp6-dialog .bp6-dialog-header {
+    padding: var(--forge-spacing-4, 16px) var(--forge-spacing-5, 20px);
+    background: inherit;
+    color: inherit;
+    box-shadow: none;
+}
+.forge-attachment-dialog.bp6-dialog .bp6-dialog-header .bp6-heading { color: inherit; }
+.forge-attachment-dialog.bp6-dialog .bp6-dialog-close-button { color: var(--forge-text-muted); }
+.forge-attachment-dialog.bp6-dialog .bp6-dialog-body {
+    margin: 0;
+    padding: 0 var(--forge-spacing-5, 20px) var(--forge-spacing-5, 20px);
+    overflow-y: auto;
+    min-height: 0;
+}
+.forge-attachment-dialog.bp6-dialog .bp6-dialog-footer {
+    padding: var(--forge-spacing-4, 16px) var(--forge-spacing-5, 20px);
+    border-top: var(--forge-border-width, 1px) solid var(--forge-border-color);
+}
+.forge-attachment-dialog.bp6-dialog .bp6-dialog-footer-actions { gap: var(--forge-spacing-2, 8px); flex-wrap: wrap; }
+.forge-attachment-dialog.bp6-dialog .bp6-file-input { display: block; height: auto; width: 100%; }
+.forge-attachment-dialog.bp6-dialog .bp6-file-upload-input {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    box-sizing: border-box;
+    align-items: center;
+    justify-content: center;
+    gap: var(--forge-spacing-2, 8px);
+    height: auto;
+    min-height: var(--forge-control-height, 36px);
+    padding: var(--forge-spacing-6, 24px) var(--forge-spacing-4, 16px);
+    border: var(--forge-border-width, 1px) dashed var(--forge-control-border);
+    border-radius: var(--forge-control-radius, 4px);
+    background: var(--forge-surface);
+    color: var(--forge-control-text);
+    box-shadow: none;
+    font: inherit;
+    letter-spacing: inherit;
+}
+.forge-attachment-dialog.bp6-dialog .bp6-file-input:hover .bp6-file-upload-input { background: var(--forge-surface-subtle); }
+.forge-attachment-dialog.bp6-dialog .is-file-dragging .bp6-file-input .bp6-file-upload-input { background: var(--forge-selected-background); border-color: var(--forge-interaction-color); }
+.forge-attachment-dialog.bp6-dialog .bp6-file-upload-input > .forge-icon { color: var(--forge-text-muted); }
+.forge-attachment-dialog.bp6-dialog .bp6-file-upload-input::after {
+    position: static;
+    flex: none;
+    width: auto;
+    max-width: 100%;
+    height: auto;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--forge-interaction-color);
+    box-shadow: none;
+    font: inherit;
+    letter-spacing: inherit;
+}
+.forge-attachment-dialog.bp6-dialog .bp6-file-input input:focus + .bp6-file-upload-input { box-shadow: none; }
+.forge-attachment-dialog.bp6-dialog .bp6-file-input input:focus-visible + .bp6-file-upload-input {
+    outline: var(--forge-focus-width, 2px) solid var(--forge-focus-color);
+    outline-offset: var(--forge-focus-offset, 2px);
+}
+.forge-attachment-dialog__count { color: var(--forge-text-muted); margin: var(--forge-spacing-4, 16px) 0 var(--forge-spacing-2, 8px); }
+.forge-attachment-dialog__files { list-style: none; padding: 0; margin: 0; }
+.forge-attachment-dialog__file {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: var(--forge-spacing-2, 8px) var(--forge-spacing-3, 12px);
+    padding-block: var(--forge-spacing-3, 12px);
+    border-top: var(--forge-border-width, 1px) solid var(--forge-border-color);
+}
+.forge-attachment-dialog__name { overflow-wrap: anywhere; }
+.forge-attachment-dialog__size { color: var(--forge-text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.forge-attachment-dialog__progress { grid-column: 1 / -1; display: grid; gap: var(--forge-spacing-1, 4px); color: var(--forge-text-muted); overflow-wrap: anywhere; }
+.forge-attachment-dialog__progress .bp6-progress-bar { background: var(--forge-surface-subtle); }
+.forge-attachment-dialog__progress .bp6-progress-meter { background-color: var(--forge-interaction-color); }
+.forge-attachment-dialog__progress[data-upload-status="error"] { color: var(--forge-status-danger-foreground); }
+.forge-attachment-dialog__progress[data-upload-status="error"] .bp6-progress-meter { background-color: var(--forge-status-danger-foreground); }
+@media (pointer: coarse) {
+    .forge-attachment-dialog.bp6-dialog .bp6-file-upload-input,
+    .forge-attachment-dialog.bp6-dialog .bp6-dialog-close-button { min-height: 44px; min-width: 44px; }
+}

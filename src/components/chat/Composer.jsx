@@ -2,6 +2,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useLayoutEffect } from "react";
 import { Button, Menu, MenuDivider, MenuItem, Popover, Tag, TextArea } from "@blueprintjs/core";
 import { PaperPlaneRight, Stop, Microphone, ListBullets, UserCircle, Lightbulb, Brain, ImageSquare, XCircle, CaretDown, CaretUp } from '@phosphor-icons/react';
+import {isUnresolvedUpload} from '../../hooks/useUpload.js';
 import DocumentComposer from './DocumentComposer.jsx';
 import {typographyProps} from '../Typography.jsx';
 import Icon from '../Icon.jsx';
@@ -121,6 +122,7 @@ export default function Composer({
     onQueueEdit,
     onQueueSteer,
     onSubmit,
+    onDropFiles,
     onOpenAttach,
     onOpenSettings,
     onAbort,
@@ -143,6 +145,9 @@ export default function Composer({
     inputProps = {},
     disabled = false,
     attachments = [],
+    uploads = [],
+    onCancelUpload,
+    onRetryUpload,
     onRemoveAttachment,
 	autoResize = true,
 	maxRows = 10,
@@ -657,7 +662,7 @@ export default function Composer({
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (disabled || inputInvalid) return; // Keep lookup validation authoritative
+        if (disabled || inputInvalid || uploads.some(isUnresolvedUpload)) return; // Keep lookup validation authoritative
         const resolver = inputValueResolverRef.current;
         const resolvedValue = typeof resolver === 'function' ? resolver() : '';
         const content = String(resolvedValue || draftRef.current || '').trim();
@@ -1397,7 +1402,8 @@ export default function Composer({
 
         if (documentAppearance) return <DocumentComposer renderInput={renderComposerInput} inputHostRef={inputHostRef}
             onSubmit={handleSubmit} draft={draft} attachments={attachments} onRemoveAttachment={onRemoveAttachment}
-            disabled={disabled} inputInvalid={inputInvalid} showUpload={showUpload} onOpenAttach={onOpenAttach} onCaptureImage={onCaptureImage}
+            uploads={uploads} onCancelUpload={onCancelUpload} onRetryUpload={onRetryUpload}
+            disabled={disabled} inputInvalid={inputInvalid || uploads.some(isUnresolvedUpload)} showUpload={showUpload} onDropFiles={onDropFiles} onOpenAttach={onOpenAttach} onCaptureImage={onCaptureImage}
             showMic={showMic} micOn={micOn} toggleMic={toggleMic} showAbort={showAbortButton} onAbort={handleAbort}
             submitText={submitText} queueTray={queueTray} usageSummary={usageSummary} usageTooltip={usageTooltip}
             agentOptions={normalizedAgentOptions} agentValue={agentValue} onAgentChange={onAgentChange}
