@@ -836,6 +836,20 @@ const cloneWindowNavigationTrail = (trail = []) => {
     }
 };
 
+// Reopening an existing ancestor selects it; it must not move beneath its own
+// descendant and detach the entire tree from the owning workspace.
+export function resolveWindowParentKey(windows, windowId, requestedParent, currentParent = null) {
+    const byId = new Map(windows.map(entry => [entry.windowId, entry]));
+    const seen = new Set();
+    let parent = requestedParent;
+    while (parent) {
+        if (parent === windowId || seen.has(parent)) return currentParent;
+        seen.add(parent);
+        parent = byId.get(parent)?.parentKey;
+    }
+    return requestedParent;
+}
+
 export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab = true, parameters = {}, options = {}) => {
     if(windowData) {
         parameters['windowData'] = windowData;
@@ -866,6 +880,7 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
         ? undefined
         : activeWindows.value.find((win) => win.windowId === windowId)
             || resolveHostedRegionReplacementWindow(activeWindows.value.filter(win => String(win.windowScopeId || "") === windowScopeId), parentKey, inTab, options);
+    parentKey = resolveWindowParentKey(activeWindows.peek(), existingWindow?.windowId || windowId, parentKey, existingWindow?.parentKey ?? null);
     let result = existingWindow
     if (!existingWindow) {
         // Optionally auto-index title for a nicer UX when multiple instances

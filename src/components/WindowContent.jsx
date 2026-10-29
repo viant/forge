@@ -779,7 +779,7 @@ function resolveNumericWindowRuntimeHint(metadata, key = '') {
     return Number.isFinite(value) && value > 0 ? value : undefined;
 }
 
-function syncWindowRuntimeHints(windowId, metadata, windowState = null) {
+export function syncWindowRuntimeHints(windowId, metadata, windowState = null) {
     const normalizedWindowId = String(windowId || '').trim();
     if (!normalizedWindowId || !metadata || typeof metadata !== 'object') {
         return;
@@ -792,13 +792,15 @@ function syncWindowRuntimeHints(windowId, metadata, windowState = null) {
     const next = { ...matched };
     let changed = false;
 
+    // Authored placement is a default; it must not relocate an already placed
+    // host window or its linked children into a different surface.
     const metadataPresentation = String(metadata?.presentation || '').trim();
-    if (metadataPresentation && String(next.presentation || '').trim() !== metadataPresentation) {
+    if (metadataPresentation && !String(next.presentation || '').trim()) {
         next.presentation = metadataPresentation;
         changed = true;
     }
     const metadataRegion = String(metadata?.region || '').trim();
-    if (metadataRegion && String(next.region || '').trim() !== metadataRegion) {
+    if (metadataRegion && !String(next.region || '').trim()) {
         next.region = metadataRegion;
         changed = true;
     }
