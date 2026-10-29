@@ -1,4 +1,5 @@
 /* Shared anatomy. Workspaces select the palette, scale and table recipes. */
+.forge-document-table-scroll-hint { margin: 0 0 var(--forge-spacing-2, 8px); color: var(--forge-text-muted); }
 .forge-document-table-wrap {
     container-type: inline-size;
     overflow-x: auto;

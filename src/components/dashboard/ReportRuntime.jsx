@@ -1371,17 +1371,17 @@ function RuntimeMarkdownBody({ markdown = "" }) {
   const lines = String(markdown || "").replace(/\r\n/g, "\n").split("\n");
   const firstContentLine = lines.findIndex(line => line.trim());
   const lastContentLine = lines.length - 1 - [...lines].reverse().findIndex(line => line.trim());
-  let codeEnd = -1;
+  let blockEnd = -1;
   const renderedLines = lines
     .map((line, index) => {
-      if (index <= codeEnd) return null;
+      if (index <= blockEnd) return null;
       const fence = line.match(/^ {0,3}(`{3,}|~{3,})([^\r\n]*)$/);
       if (fence && (fence[1][0] !== "`" || !fence[2].includes("`"))) {
         const marker = fence[1][0];
         const close = new RegExp(`^ {0,3}${marker}{${fence[1].length},}\\s*$`);
         let end = index + 1;
         while (end < lines.length && !close.test(lines[end])) end++;
-        codeEnd = end;
+        blockEnd = end;
         if (documentPresentation) return <Typography key={index} as="pre" typeRole="code" className="forge-report-document-code-block"><code>{lines.slice(index+1,end).join('\n')}</code></Typography>;
         // React escapes the literal payload. Code must not pass through inline
         // Markdown processing or lose selector spacing, line breaks or symbols.
@@ -1393,10 +1393,27 @@ function RuntimeMarkdownBody({ markdown = "" }) {
       }
       const trimmed = normalizeString(line);
       if (!trimmed) {
+        if (documentPresentation) return null;
         return index > firstContentLine && index < lastContentLine
           ? <div key={index} aria-hidden="true" data-report-markdown-blank-line style={{minHeight: "0.5em"}} /> : null;
       }
       if (documentPresentation) {
+        // shortcut: flat lists only; extend the block parser when nested lists are required.
+        const firstItem = trimmed.match(/^(\d+)\.\s+(.*)$|^[-*+]\s+(.*)$/);
+        if (firstItem) {
+          const ordered = firstItem[1] !== undefined;
+          const items = [];
+          let end = index;
+          for (; end < lines.length; end++) {
+            const candidate = lines[end].trim();
+            if (!candidate) continue;
+            const item = candidate.match(ordered ? /^(\d+)\.\s+(.*)$/ : /^[-*+]\s+(.*)$/);
+            if (!item) break;
+            items.push(<Typography key={end} as="li" typeRole="body" value={ordered ? Number(item[1]) : undefined}>{renderRuntimeMarkdownInline(item[ordered ? 2 : 1], true)}</Typography>);
+          }
+          blockEnd = end - 1;
+          return <Typography key={index} as={ordered ? 'ol' : 'ul'} typeRole="body" className="forge-report-document-list" start={ordered ? Number(firstItem[1]) : undefined}>{items}</Typography>;
+        }
         const heading = trimmed.match(/^#{1,2}\s+(.*)/);
         return <Typography key={index} as={heading ? 'h3' : 'p'} typeRole={heading ? 'section' : 'body'} className="forge-report-document-copy">{renderRuntimeMarkdownInline(heading ? heading[1] : trimmed,true)}</Typography>;
       }
@@ -1495,14 +1512,14 @@ function BadgesBlock({ block = {}, locale = "en-US", theme = {} }) {
       {items.length ? items.map((item, index) => <Typography key={item.id || index} as="span" typeRole="small"
         className="forge-report-document-badge" data-forge-status={item.tone}>
         {item.displayValue ? `${item.label}: ${item.displayValue}` : item.label}
-      </Typography>) : <Typography as="p" typeRole="body">No pills configured.</Typography>}
+      </Typography>) : <Typography as="p" typeRole="body">No status information available.</Typography>}
     </div>
   </RuntimePanel>;
   return (
     <RuntimePanel title={normalizeString(block?.title || content?.title || "Status Pills")}>
       {items.length === 0 ? (
         <div style={{ fontSize: "var(--forge-report-type-small-size, 12px)", color: "var(--forge-report-text-muted, #5f6b7c)", lineHeight: "var(--forge-report-type-small-line-height, 1.5)" }}>
-          No pills configured.
+          No status information available.
         </div>
       ) : (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
@@ -1577,7 +1594,10 @@ function KpiBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProvi
   if (documentPresentation) return <section className="forge-report-document-metric" data-report-runtime-kpi-tone={normalizeString(content?.tone) || 'neutral'}>
     <BlockDiagnosticsCallout diagnostics={diagnostics} onRetryProviderActions={onRetryProviderActions} providerActionsLoading={providerActionsLoading}/>
     {invalidDiagnostic ? <BlockErrorCallout diagnostic={invalidDiagnostic}/> : !rowCount || !hasPrimaryValue ?
-      <Typography as="p" typeRole="body">{normalizeString(content?.emptyLabel || 'No KPI value available.')}</Typography> : <>
+      <dl>
+        <Typography as="dt" typeRole="metadata">{blockTitle === 'KPI' ? valueLabel : blockTitle}</Typography>
+        <Typography as="dd" typeRole="body">{normalizeString(content?.emptyLabel || 'No KPI value available.')}</Typography>
+      </dl> : <>
       {showCard ? <>
         <dl>
           <Typography as="dt" typeRole="metadata">{blockTitle === 'KPI' ? valueLabel : blockTitle}</Typography>
@@ -3619,6 +3639,11 @@ export default function ReportRuntime({
       const hasAuthoredCompositeLayout = !!normalizeString(block?.content?.layout || block?.layout);
       const documentMetricGrid = documentPresentation && !hasAuthoredCompositeLayout && childBlocks.length > 0
         && childBlocks.every(child => child.kind === "kpiBlock");
+      const summaryMetrics = documentMetricGrid && childBlocks.every(child => {
+        const content = child.content || {};
+        return !content.secondaryField && !content.sparkline && !content.bodyMarkdown && !content.description
+          && !["body", "both"].includes(normalizeString(content.presentationMode || child.presentationMode).toLowerCase());
+      });
       return (
         <RuntimePanel
           key={block.id}
@@ -3630,7 +3655,7 @@ export default function ReportRuntime({
           {childBlocks.length > 0 ? (
             hasAuthoredCompositeLayout || documentMetricGrid ? <ReportCompositeGrid
               block={block} blocks={childBlocks} columns={compositeColumns} viewportWidth={runtimeViewportWidth} layout={documentMetricGrid ? "documentMetrics" : compositeLayout}
-              className={documentMetricGrid ? "forge-report-document-metrics" : undefined}
+              className={documentMetricGrid ? `forge-report-document-metrics${summaryMetrics ? " is-summary" : ""}` : undefined}
             >
               {childBlocks.map((childBlock) => {
                 const rendered = renderBlock(childBlock);
@@ -3822,6 +3847,7 @@ export default function ReportRuntime({
             </div>
           ) : null}
           <SectionTabRail
+            overflowBehavior={documentPresentation ? 'menu' : 'scroll'}
             items={runtimeSections.map((section) => ({id: section.id, label: section.navigationLabel}))}
             selectedId={resolvedActiveSectionId}
             onChange={changeSection}

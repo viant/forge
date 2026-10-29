@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { buildReportFillFromReportSpec } from "./reportFillModel.js";
 
 import {
   compileInlineReport,
@@ -71,6 +72,35 @@ const canonical = compileInlineReport({
 
 assert.deepEqual(canonical.reportSpec.blocks.map((entry) => entry.id), ["intro", "detail"]);
 assert.equal(canonical.reportFill.datasets.find((entry) => entry.id === "rows")?.rows[0]?.market, "US");
+
+const metricLabels = compileInlineReport({
+  reportId: "metric-labels",
+  grammar: "report-document-v1",
+  source: {
+    title: "Metric label defaults",
+    viewer: { appearance: "document" },
+    blocks: [
+      { id: "records", kind: "kpiBlock", title: "Observed records", datasetRef: "readings", valueField: "recordCount", valueFormat: "number" },
+      { id: "temperature", kind: "kpiBlock", title: "Temperature", valueLabel: "Degrees Celsius", datasetRef: "readings", valueField: "readingValue", valueFormat: "number2" },
+    ],
+  },
+  dataSources: { readings: { rows: [{ recordCount: 0, readingValue: 21.2345 }] } },
+});
+for (const [id, label, value] of [["records", "Observed records", 0], ["temperature", "Degrees Celsius", 21.2345]]) {
+  assert.equal(metricLabels.reportSpec.blocks.find(block => block.id === id).valueLabel, label);
+  const content = metricLabels.reportFill.blocks.find(block => block.id === id).content;
+  assert.equal(content.valueLabel, label);
+  assert.equal(content.value, value, "Label defaults must not round or coerce source values");
+}
+const metricPrintText = metricLabels.reportPrint.pages.flatMap(page => page.elements.map(element => element.text)).join("\n");
+assert.match(metricPrintText, /OBSERVED RECORDS/);
+assert.match(metricPrintText, /DEGREES CELSIUS/);
+assert.doesNotMatch(metricPrintText, /recordCount|readingValue/);
+const nativeMetricFill = buildReportFillFromReportSpec({
+  ...metricLabels.reportSpec,
+  blocks: metricLabels.reportSpec.blocks.map(block => block.id === "records" ? { ...block, valueLabel: undefined } : block),
+}, metricLabels.datasetPayloads);
+assert.equal(nativeMetricFill.blocks.find(block => block.id === "records").content.valueLabel, "Observed records", "Native specs use the same missing-label default");
 
 const diagnosticOverview = compileInlineReport({
   reportId: "order-2672373-troubleshoot",

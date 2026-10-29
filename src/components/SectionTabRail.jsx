@@ -1,5 +1,7 @@
 import React from 'react';
 import {Icon} from '@blueprintjs/core';
+import SelectControl from './SelectControl.jsx';
+import {typographyProps} from './Typography.jsx';
 import './SectionTabRail.css';
 
 export function revealSelectedTab(rail, selected, behavior) {
@@ -16,7 +18,7 @@ export function revealSelectedTab(rail, selected, behavior) {
 }
 
 /** Shared visual navigation primitive used by report sections and form panels. */
-export default function SectionTabRail({items = [], selectedId = '', onChange, onRename, onReorder, onEditingChange, ariaLabel = 'Sections', showIcons = false, compact = false, idPrefix = '', panelId = ''}) {
+export default function SectionTabRail({items = [], selectedId = '', onChange, onRename, onReorder, onEditingChange, ariaLabel = 'Sections', showIcons = false, compact = false, idPrefix = '', panelId = '', overflowBehavior = 'scroll'}) {
     const [editingId, setEditingId] = React.useState('');
     const [editingLabel, setEditingLabel] = React.useState('');
     const draggingId = React.useRef('');
@@ -35,7 +37,9 @@ export default function SectionTabRail({items = [], selectedId = '', onChange, o
     };
     const tabRefs = React.useRef([]);
     const railRef = React.useRef(null);
-    const [overflow, setOverflow] = React.useState({left: false, right: false});
+    const [overflow, setOverflow] = React.useState({left: false, right: false, hasOverflow: false});
+    const useMenu = overflowBehavior === 'menu' && overflow.hasOverflow && !onRename && !onReorder;
+    const measurementKey = JSON.stringify(items.map(item => [item.id, item.label || item.title || item.id]));
     const generatedId = React.useId().replace(/:/g, '');
     const baseId = String(idPrefix || generatedId).replace(/[^A-Za-z0-9_-]/g, '-');
     const selectedIndex = Math.max(0, items.findIndex((item) => String(item?.id || '') === String(selectedId || '')));
@@ -55,8 +59,9 @@ export default function SectionTabRail({items = [], selectedId = '', onChange, o
             const next = {
                 left: rail.scrollLeft > edgeTolerance,
                 right: rail.scrollLeft < maxLeft - edgeTolerance,
+                hasOverflow: maxLeft > 1,
             };
-            setOverflow((previous) => previous.left === next.left && previous.right === next.right ? previous : next);
+            setOverflow((previous) => previous.left === next.left && previous.right === next.right && previous.hasOverflow === next.hasOverflow ? previous : next);
         };
         const frame = requestAnimationFrame(update);
         rail.addEventListener('scroll', update, {passive: true});
@@ -69,7 +74,7 @@ export default function SectionTabRail({items = [], selectedId = '', onChange, o
             rail.removeEventListener('scroll', update);
             observer?.disconnect();
         };
-    }, [items.length, compact, revealSelected]);
+    }, [measurementKey, compact, revealSelected, overflowBehavior]);
     const scrollRail = (direction) => {
         const rail = railRef.current;
         if (!rail) return;
@@ -101,9 +106,16 @@ export default function SectionTabRail({items = [], selectedId = '', onChange, o
     const showLeftCue = overflow.left && selectedIndex > 0;
     const showRightCue = overflow.right && selectedIndex < items.length - 1;
     return (
-        <div className={`forge-section-tab-rail-frame${showLeftCue ? ' has-left-overflow' : ''}${showRightCue ? ' has-right-overflow' : ''}`}>
-        {showLeftCue ? <button type="button" className="forge-section-tab-rail-cue is-left" aria-label="Scroll tabs left" onClick={() => scrollRail(-1)}><Icon icon="chevron-left" size={14}/></button> : null}
-        <div ref={railRef} className={`forge-section-tab-rail${compact ? ' is-compact' : ''}`} role="tablist" aria-label={ariaLabel}>
+        <div className={`forge-section-tab-rail-frame${useMenu ? ' is-menu' : ''}${showLeftCue ? ' has-left-overflow' : ''}${showRightCue ? ' has-right-overflow' : ''}`}>
+        {useMenu ? <label className="forge-section-tab-menu">
+            <span {...typographyProps('metadata')}>Section</span>
+            <SelectControl {...typographyProps('body')} aria-label={ariaLabel} aria-controls={panelId || undefined} value={selectedId || items[selectedIndex]?.id || ''}
+                onChange={event => onChange?.(event.target.value)}>
+                {items.map(item => <option key={item.id} value={item.id} disabled={item.disabled === true}>{item.label || item.title || item.id}</option>)}
+            </SelectControl>
+        </label> : null}
+        {!useMenu && showLeftCue ? <button type="button" className="forge-section-tab-rail-cue is-left" aria-label="Scroll tabs left" onClick={() => scrollRail(-1)}><Icon icon="chevron-left" size={14}/></button> : null}
+        <div ref={railRef} className={`forge-section-tab-rail${compact ? ' is-compact' : ''}`} role="tablist" aria-label={ariaLabel} aria-hidden={useMenu || undefined}>
             {items.map((item, index) => {
                 const selected = String(item?.id || '') === String(selectedId || '');
                 if (editingId === item.id) return <input key={item.id} autoFocus
@@ -148,7 +160,7 @@ export default function SectionTabRail({items = [], selectedId = '', onChange, o
                 );
             })}
         </div>
-        {showRightCue ? <button type="button" className="forge-section-tab-rail-cue is-right" aria-label="Scroll tabs right" onClick={() => scrollRail(1)}><Icon icon="chevron-right" size={14}/></button> : null}
+        {!useMenu && showRightCue ? <button type="button" className="forge-section-tab-rail-cue is-right" aria-label="Scroll tabs right" onClick={() => scrollRail(1)}><Icon icon="chevron-right" size={14}/></button> : null}
         </div>
     );
 }

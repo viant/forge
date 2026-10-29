@@ -9,6 +9,8 @@
 .forge-report-document-panel-title, .forge-report-document-panel-subtitle, .forge-report-document-copy { margin: 0; }
 .forge-report-document-panel-subtitle { color: var(--forge-text-muted); }
 .forge-report-document-prose { display: flex; flex-direction: column; gap: var(--forge-spacing-3, 12px); }
+.forge-report-document-list { display: grid; gap: var(--forge-spacing-3, 12px); margin: 0; padding-inline-start: var(--forge-spacing-6, 24px); list-style-type: disc; }
+ol.forge-report-document-list { list-style-type: decimal; }
 .forge-report-document-code { background: var(--forge-surface-subtle); border-radius: var(--forge-control-radius, 8px); padding-inline: var(--forge-spacing-1, 4px); }
 .forge-report-document-code-block { background: var(--forge-surface-subtle); border-radius: var(--forge-control-radius, 8px); padding: var(--forge-spacing-3, 12px); margin: 0; max-width: 100%; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
 .forge-report-document-metric dl { margin: 0; }
@@ -16,8 +18,11 @@
 .forge-report-document-metric p { margin: 0; }
 .forge-report-document-metric dt { color: var(--forge-text-muted); }
 .forge-report-document-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--forge-spacing-6, 24px); }
+.forge-report-document-metrics.is-summary { grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--forge-report-summary-metric-min-width, 220px)), 1fr)); }
 @container (max-width: 760px) { .forge-report-document-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @container (max-width: 600px) { .forge-report-document-metrics { grid-template-columns: minmax(0, 1fr); } }
+@container (max-width: 600px) { .forge-report-document-metrics.is-summary { grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--forge-report-summary-metric-min-width, 128px)), 1fr)); } }
+.forge-report-document-metrics.is-summary dd { overflow-wrap: anywhere; }
 .forge-report-document-metric dd { margin: var(--forge-spacing-1, 4px) 0 0; font-variant-numeric: tabular-nums; }
 [data-forge-report-appearance="document"] .forge-report-runtime-table-panel { overflow: visible; }
 .forge-report-document-notice { display: flex; flex-wrap: wrap; align-items: center; gap: var(--forge-spacing-2, 8px); color: var(--forge-text-muted); }
