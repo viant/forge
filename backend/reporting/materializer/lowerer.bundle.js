@@ -69135,6 +69135,7 @@ ${indent}${end}`;
     const blockId = normalizeString41((block == null ? void 0 : block.id) || (block == null ? void 0 : block.kind) || "block");
     const title = resolveReportPrintBlockTitle(block);
     const valueLabel = normalizeString41((content == null ? void 0 : content.valueLabel) || (content == null ? void 0 : content.valueField) || "Value");
+    const showValueLabel = !!valueLabel && valueLabel.toLowerCase() !== title.toLowerCase();
     const valueText = `${formatReportPrintValue(content == null ? void 0 : content.value, valueFormat)}${normalizeString41((content == null ? void 0 : content.suffix) || (block == null ? void 0 : block.suffix))}`;
     const detailLines = [];
     if (showCard && normalizeString41((content == null ? void 0 : content.secondaryField) || (content == null ? void 0 : content.secondaryLabel))) {
@@ -69167,7 +69168,7 @@ ${indent}${end}`;
     const sparklineSvg = content.sparkline ? buildKpiSparklineSvg(content.sparkline, innerWidth, 36) : "";
     const cardHeight = (sparklineSvg ? 44 : 0) + Math.max(
       92,
-      cardPadding * 2 + titleLines.length * 16 + 12 + valueLines.length * 24 + (wrappedDetails.length > 0 ? 6 + wrappedDetails.length * 14 : 0)
+      cardPadding * 2 + titleLines.length * 16 + (showValueLabel ? 12 : 0) + valueLines.length * 24 + (wrappedDetails.length > 0 ? 6 + wrappedDetails.length * 14 : 0)
     );
     ensureReportPrintSpace(state, cardHeight);
     const cardY = state.cursorY;
@@ -69201,7 +69202,7 @@ ${indent}${end}`;
         y: (_d = titleElement.box) == null ? void 0 : _d.y
       });
     }
-    renderReportPrintTextLines(state, {
+    if (showValueLabel) renderReportPrintTextLines(state, {
       idPrefix: `${blockId}__value_label`,
       lines: [valueLabel.toUpperCase()],
       x: state.contentLeft + cardPadding,

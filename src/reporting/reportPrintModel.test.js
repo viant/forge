@@ -1427,3 +1427,61 @@ const wideCells=wideEvidence.pages.flatMap(p=>p.elements).filter(e=>e.kind==='ta
 for(const column of wideColumns.slice(1))assert.equal(wideCells.filter(e=>e.columnKey===column.key).length,2,'Wide columns survive horizontal pagination');
 assert.ok(wideCells.filter(e=>e.columnKey==='recordId').length>2,'Wide panes repeat their identifying column');
 console.log('reportPrintModel ✓ packs compact evidence without losing wide-table cells');
+
+// Neutral hand-authored fill fixtures cover label visibility independently of
+// producer title defaults, including legacy fills with omitted metadata.
+function printMetric({ title, content = {}, mode = 'card', sparkline = false } = {}) {
+  const block = {
+    id: 'metric', kind: 'kpiBlock', title,
+    content: { value: 42, rowCount: 1, presentationMode: mode, ...content,
+      ...(sparkline ? { sparkline: { values: [1, null, 3], labels: ['A', 'B', 'C'] } } : {}) },
+  };
+  const spec = { ...authoredKpiGridSpec, title: 'Summary', blocks: [block],
+    layoutIntent: { kind: 'single', blockOrder: ['metric'] } };
+  const fill = buildReportFillFromReportSpec(spec, { metrics: { rows: [{ amount: 42 }] } });
+  fill.blocks = [block];
+  const print = buildReportPrintFromReportFill({ reportSpec: spec, reportFill: fill });
+  return print.pages.flatMap(page => page.elements);
+}
+for (const mode of ['card', 'both', 'body']) {
+  for (const sparkline of [false, true]) {
+    for (const valueLabel of ['Capacity', 'cApAcItY', 'Available']) {
+      const elements = printMetric({ title: 'Capacity', content: { valueLabel }, mode, sparkline });
+      const find = id => elements.find(element => element.id === `metric__${id}`);
+      assert.equal(!!find('value_label_0'), mode !== 'body' && valueLabel === 'Available');
+      assert.equal(!!find('sparkline'), mode !== 'body' && sparkline);
+      if (mode !== 'body') {
+        assert.equal(find('value_0').text, '42');
+        assert.equal(find('value_0').box.y - find('title_0').box.y, valueLabel === 'Available' ? 28 : 16,
+          'omitted labels must not leave an extra line before the value');
+      } else {
+        assert.equal(find('detail_0').text, `${valueLabel}: 42`, 'body fallback keeps the value label');
+      }
+    }
+  }
+}
+for (const [input, title, label] of [
+  [{}, 'KPI', 'VALUE'],
+  [{ content: { valueLabel: '', valueField: 'amount' } }, 'KPI', 'AMOUNT'],
+  [{ content: { valueLabel: 'Capacity' } }, 'Capacity', null],
+  [{ content: { title: 'Capacity', valueLabel: 'CAPACITY' } }, 'Capacity', null],
+  [{ title: 'Value', content: { valueLabel: '' } }, 'Value', null],
+]) {
+  const elements = printMetric(input);
+  assert.equal(elements.find(element => element.id === 'metric__title_0').text, title);
+  assert.equal(elements.find(element => element.id === 'metric__value_label_0')?.text ?? null, label);
+}
+for (const mode of ['body', 'both']) {
+  const elements = printMetric({ title: 'Capacity', mode, content: { valueLabel: 'capacity', bodyMarkdown: 'Observed capacity.' } });
+  assert.equal(elements.find(element => element.id === 'metric__detail_0').text, 'Observed capacity.');
+}
+for (const sparkline of [false, true]) {
+  const shared = { title: 'Capacity', sparkline, content: { description: 'Line one\nLine two\nLine three\nLine four' } };
+  const same = printMetric({ ...shared, content: { ...shared.content, valueLabel: 'capacity' } });
+  const distinct = printMetric({ ...shared, content: { ...shared.content, valueLabel: 'Available' } });
+  assert.equal(distinct.find(element => element.id === 'metric__card').box.height - same.find(element => element.id === 'metric__card').box.height, 12,
+    'card measurement and rendering must omit the same label line');
+  if (sparkline) {
+    assert.equal(distinct.find(element => element.id === 'metric__sparkline').box.y - same.find(element => element.id === 'metric__sparkline').box.y, 12);
+  }
+}
