@@ -37,6 +37,15 @@ func (r *MCPReferenceReader) filteredMCPRows(ctx context.Context, root Connectio
 		if err != nil {
 			return nil, true, err
 		}
+		// Definition inventory is aggregate discovery too. A locally denied
+		// cohort contributes no MCP definitions; do not contact its producer or
+		// let its absence abort unrelated retained tool resolution.
+		if _, err = source.source.AdmissionKey(ctx); err != nil {
+			if purePublishedDenial(err) {
+				return nil, true, g.final(ctx, actor)
+			}
+			return nil, true, err
+		}
 		rows, err := g.listPublished(ctx, source, "mcp", "", root)
 		if err != nil {
 			return nil, true, err
