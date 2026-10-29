@@ -46789,6 +46789,38 @@ Please __addLocaleData before adding additional unit data`);
     return segments;
   }
 
+  // src/reporting/reportRowVisibility.js
+  function normalizeReportRowVisibility(input) {
+    if (input === void 0) return null;
+    if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some((key2) => key2 !== "exclude") || !Array.isArray(input.exclude) || !input.exclude.length || input.exclude.length > 32) throw new Error("Row visibility requires 1\u201332 explicit exclusions.");
+    const fields2 = /* @__PURE__ */ new Set();
+    for (const item of input.exclude) {
+      if (!item || typeof item !== "object" || Array.isArray(item) || Object.keys(item).some((key2) => !["field", "values"].includes(key2)) || typeof item.field !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(item.field) || ["__proto__", "constructor", "prototype"].includes(item.field) || fields2.has(item.field) || !Array.isArray(item.values) || !item.values.length || item.values.length > 128) throw new Error("Row visibility exclusions require distinct admitted fields and explicit values.");
+      fields2.add(item.field);
+      if (item.values.some((value) => value !== null && !["string", "boolean", "number"].includes(typeof value) || typeof value === "number" && (!Number.isFinite(value) || Math.abs(value) > Number.MAX_SAFE_INTEGER))) throw new Error("Row visibility values must be safe typed scalars or null.");
+    }
+    return JSON.parse(JSON.stringify(input));
+  }
+  function applyReportRowVisibility(rows, input) {
+    const config = normalizeReportRowVisibility(input);
+    if (!config) return rows;
+    return rows.filter((row) => {
+      for (const { field, values } of config.exclude) {
+        if (!Object.hasOwn(row || {}, field)) throw new Error(`Row visibility field '${field}' is missing.`);
+        if (values.some((value) => value === row[field])) return false;
+      }
+      return true;
+    });
+  }
+  function validateReportRowVisibilityBlock(block) {
+    var _a5, _b, _c, _d, _e, _f, _g;
+    if (((_a5 = block == null ? void 0 : block.runtime) == null ? void 0 : _a5.rowVisibility) === void 0) return;
+    normalizeReportRowVisibility(block.runtime.rowVisibility);
+    const type = ((_b = block.chartSpec) == null ? void 0 : _b.type) || ((_c = block.chartModel) == null ? void 0 : _c.type) || ((_e = (_d = block.content) == null ? void 0 : _d.chartSpec) == null ? void 0 : _e.type) || ((_g = (_f = block.content) == null ? void 0 : _f.chartModel) == null ? void 0 : _g.type);
+    if (["pie", "donut"].includes(type)) throw new Error("Pie/donut hidden-angle geometry requires explicit translation.");
+    if (!["chartBlock", "collectionBlock", "tableBlock"].includes(block.kind) || block.pivot || block.hierarchy) throw new Error("Row visibility requires a chart, collection or flat producer table.");
+  }
+
   // src/reporting/reportKpiComparisonModel.js
   function normalizeKpiSecondaryCalculation(value = "") {
     const mode = String(value || "value").trim();
@@ -55099,11 +55131,13 @@ Please __addLocaleData before adding additional unit data`);
   }
   function normalizeReportBlockRuntime(runtime = null, block = {}) {
     const source = isPlainObject8(runtime) ? runtime : {};
+    const rowVisibility = source.rowVisibility === void 0 ? null : normalizeReportRowVisibility(source.rowVisibility);
     const visibleWhen = isPlainObject8(source == null ? void 0 : source.visibleWhen) ? cloneValue19(source.visibleWhen) : isPlainObject8(block == null ? void 0 : block.visibleWhen) ? cloneValue19(block.visibleWhen) : null;
     const filterBindings = isPlainObject8(source == null ? void 0 : source.filterBindings) ? cloneValue19(source.filterBindings) : isPlainObject8(block == null ? void 0 : block.filterBindings) ? cloneValue19(block.filterBindings) : null;
     const selectionBindings = isPlainObject8(source == null ? void 0 : source.selectionBindings) ? cloneValue19(source.selectionBindings) : isPlainObject8(block == null ? void 0 : block.selectionBindings) ? cloneValue19(block.selectionBindings) : null;
     const actions = Array.isArray(source == null ? void 0 : source.actions) ? cloneValue19(source.actions) : Array.isArray(block == null ? void 0 : block.actions) ? cloneValue19(block.actions) : [];
     const normalized = {
+      ...rowVisibility ? { rowVisibility } : {},
       ...typeof (source == null ? void 0 : source.requireCompleteDataset) === "boolean" ? { requireCompleteDataset: source.requireCompleteDataset } : {},
       ...(source == null ? void 0 : source.printRowReference) === true ? { printRowReference: true } : {},
       ...(source == null ? void 0 : source.quickFilter) === true ? { quickFilter: true } : {},
@@ -55709,38 +55743,6 @@ Please __addLocaleData before adding additional unit data`);
     });
     if (diagnostics.length) throw new AuthoredReportChartValidationError(diagnostics);
     return reportSpec;
-  }
-
-  // src/reporting/reportRowVisibility.js
-  function normalizeReportRowVisibility(input) {
-    if (input === void 0) return null;
-    if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some((key2) => key2 !== "exclude") || !Array.isArray(input.exclude) || !input.exclude.length || input.exclude.length > 32) throw new Error("Row visibility requires 1\u201332 explicit exclusions.");
-    const fields2 = /* @__PURE__ */ new Set();
-    for (const item of input.exclude) {
-      if (!item || typeof item !== "object" || Array.isArray(item) || Object.keys(item).some((key2) => !["field", "values"].includes(key2)) || typeof item.field !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(item.field) || ["__proto__", "constructor", "prototype"].includes(item.field) || fields2.has(item.field) || !Array.isArray(item.values) || !item.values.length || item.values.length > 128) throw new Error("Row visibility exclusions require distinct admitted fields and explicit values.");
-      fields2.add(item.field);
-      if (item.values.some((value) => value !== null && !["string", "boolean", "number"].includes(typeof value) || typeof value === "number" && (!Number.isFinite(value) || Math.abs(value) > Number.MAX_SAFE_INTEGER))) throw new Error("Row visibility values must be safe typed scalars or null.");
-    }
-    return JSON.parse(JSON.stringify(input));
-  }
-  function applyReportRowVisibility(rows, input) {
-    const config = normalizeReportRowVisibility(input);
-    if (!config) return rows;
-    return rows.filter((row) => {
-      for (const { field, values } of config.exclude) {
-        if (!Object.hasOwn(row || {}, field)) throw new Error(`Row visibility field '${field}' is missing.`);
-        if (values.some((value) => value === row[field])) return false;
-      }
-      return true;
-    });
-  }
-  function validateReportRowVisibilityBlock(block) {
-    var _a5, _b, _c, _d, _e, _f, _g;
-    if (((_a5 = block == null ? void 0 : block.runtime) == null ? void 0 : _a5.rowVisibility) === void 0) return;
-    normalizeReportRowVisibility(block.runtime.rowVisibility);
-    const type = ((_b = block.chartSpec) == null ? void 0 : _b.type) || ((_c = block.chartModel) == null ? void 0 : _c.type) || ((_e = (_d = block.content) == null ? void 0 : _d.chartSpec) == null ? void 0 : _e.type) || ((_g = (_f = block.content) == null ? void 0 : _f.chartModel) == null ? void 0 : _g.type);
-    if (["pie", "donut"].includes(type)) throw new Error("Pie/donut hidden-angle geometry requires explicit translation.");
-    if (!["chartBlock", "collectionBlock", "tableBlock"].includes(block.kind) || block.pivot || block.hierarchy) throw new Error("Row visibility requires a chart, collection or flat producer table.");
   }
 
   // src/utils/linkTarget.js

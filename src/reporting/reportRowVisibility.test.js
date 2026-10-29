@@ -4,6 +4,7 @@ import {applyReportRowVisibility,normalizeReportRowVisibility} from './reportRow
 import {buildReportFillFromReportSpec} from './reportFillModel.js';
 import {buildReportPrintFromReportFill} from './reportPrintModel.js';
 import {resolveReportRuntimeBlockRows} from './reportBlockRuntimeModel.js';
+import {buildReportBuilderReportDocument,lowerReportDocumentToReportSpec,normalizeReportBlockRuntime} from './reportDocumentModel.js';
 const visibility={exclude:[{field:'category',values:['Unknown']}]};
 const rows=[{category:'A',amount:20},{category:'Unknown',amount:80},{category:null,amount:0}];
 assert.deepEqual(applyReportRowVisibility(rows,visibility).map(row=>row.category),['A',null]);assert.equal(rows.length,3);
@@ -21,3 +22,28 @@ const print=buildReportPrintFromReportFill({reportSpec:spec,reportFill:fill});as
 console.log('presentation-only hide retains complete calculation denominator and typed null identity in fill/runtime/print');
 
 assert.throws(()=>buildReportFillFromReportSpec({...spec,blocks:[{...spec.blocks[0],chartSpec:{...spec.blocks[0].chartSpec,type:'pie'}}]},{primary:{rows,hasMore:false}}),/hidden-angle geometry/);
+
+// Authoring/save/reopen must preserve exclusions without moving them ahead of
+// table calculations. The hidden row must still contribute to the denominator.
+const declaredVisibility=structuredClone(visibility);
+const authoredBlock={...spec.blocks[0],runtime:{requireCompleteDataset:true,rowVisibility:declaredVisibility}};
+const config={dataSourceRef:'records',dimensions:[{id:'category',key:'category',label:'Category',paramPath:'dimensions.category'}],measures:[{id:'amount',key:'amount',label:'Amount',paramPath:'measures.amount'}],calculatedFields:spec.calculatedFields.map(field=>({...field,format:'percentFraction2'}))};
+const document=buildReportBuilderReportDocument({container:{id:'summary',dataSourceRef:'records'},config,state:{selectedDimensions:['category'],selectedMeasures:['amount'],reportDocumentBlocks:[authoredBlock]},additionalBlocks:[authoredBlock]});
+declaredVisibility.exclude[0].values[0]='A';
+const lowered=lowerReportDocumentToReportSpec(JSON.parse(JSON.stringify(document)));
+const retained=lowered.blocks.find(block=>block.id==='chart');
+assert.deepEqual(retained.runtime.rowVisibility,visibility);
+assert.equal(retained.runtime.requireCompleteDataset,true);
+const authoredFill=buildReportFillFromReportSpec(lowered,{primary:{rows,hasMore:false}});
+assert.equal(authoredFill.datasets.find(dataset=>dataset.id==='primary').rows.length,3);
+assert.deepEqual(authoredFill.blocks.find(block=>block.id==='chart').content.resolvedChart.rows.map(row=>[row.category,row.share]),[['A',.2]]);
+const authoredPrint=buildReportPrintFromReportFill({reportSpec:lowered,reportFill:authoredFill});
+const chartElements=authoredPrint.pages.flatMap(page=>page.elements).filter(element=>element.id==='chart'||String(element.id).startsWith('chart__'));
+assert.ok(chartElements.length>0);
+assert.ok(JSON.stringify(chartElements).includes('20.00%'));
+assert.ok(!JSON.stringify(chartElements).includes('Unknown'));
+for(const invalid of [null,[],{exclude:[]},{exclude:[{field:'category',values:[{}]}]}]){
+ assert.throws(()=>normalizeReportBlockRuntime({rowVisibility:invalid}),/visibility/);
+}
+assert.equal(normalizeReportBlockRuntime({unrecognized:true}),null);
+console.log('authored row visibility survives JSON/lowering and remains post-calculation in fill and print');

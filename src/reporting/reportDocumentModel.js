@@ -7,6 +7,7 @@ import {categoryRangeFields} from '../components/categoryRange.js';
 import {normalizeReportViewerSettings} from './reportViewerSettings.js';
 import {getReportBlockDatasetRefs} from './reportDatasetRefModel.js';
 import {normalizeKpiSparkline} from './reportKpiSparklineModel.js';
+import {normalizeReportRowVisibility} from './reportRowVisibility.js';
 import { normalizeKpiSecondaryCalculation } from "./reportKpiComparisonModel.js";
 import {
   buildReportBuilderPublishedDatasetConfig,
@@ -2110,6 +2111,7 @@ export function buildReportDocumentGeoMapBlock(block = {}) {
 
 export function normalizeReportBlockRuntime(runtime = null, block = {}) {
   const source = isPlainObject(runtime) ? runtime : {};
+  const rowVisibility = source.rowVisibility === undefined ? null : normalizeReportRowVisibility(source.rowVisibility);
   const visibleWhen = isPlainObject(source?.visibleWhen)
     ? cloneValue(source.visibleWhen)
     : (isPlainObject(block?.visibleWhen) ? cloneValue(block.visibleWhen) : null);
@@ -2123,6 +2125,7 @@ export function normalizeReportBlockRuntime(runtime = null, block = {}) {
     ? cloneValue(source.actions)
     : (Array.isArray(block?.actions) ? cloneValue(block.actions) : []);
   const normalized = {
+    ...(rowVisibility ? {rowVisibility} : {}),
     ...(typeof source?.requireCompleteDataset === "boolean" ? { requireCompleteDataset: source.requireCompleteDataset } : {}),
     ...(source?.printRowReference === true ? { printRowReference: true } : {}),
     ...(source?.quickFilter === true ? { quickFilter: true } : {}),
