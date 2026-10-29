@@ -298,15 +298,24 @@ func (g *Gateway) publishedAdmissionKeys(ctx context.Context) (string, error) {
 // Only a pure producer admission denial is optional during aggregate discovery.
 // Never hide joined failures, cancellation or malformed publication evidence.
 func purePublishedDenial(err error) bool {
+	denied := false
 	for current := err; current != nil; current = errors.Unwrap(current) {
 		if _, joined := current.(interface{ Unwrap() []error }); joined {
 			return false
 		}
+		if current == context.Canceled || current == context.DeadlineExceeded || current == identity.ErrInvalid || current == identity.ErrResourceStale || current == identity.ErrResource {
+			return false
+		}
 		if current == identity.ErrResourceDenied {
-			return true
+			denied = true
+		}
+		// Cohort metadata exposes producer denial as HTTP 403 without wrapping
+		// the resource sentinel. Honor that existing typed contract, not text.
+		if status, ok := current.(interface{ HTTPStatusCode() int }); ok && status.HTTPStatusCode() == 403 {
+			denied = true
 		}
 	}
-	return false
+	return denied
 }
 
 type publishedDiscoveryDenied struct{ error }
