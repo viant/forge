@@ -1,3 +1,4 @@
+import {windowCalculationDefinitions} from "./windowCalculationSchema.js";
 import {numericDisplayFormatSchema} from '../../components/categoryRange.js';
 import {templateRequestInputsSchema} from '../reportTemplateRequestInputs.js';
 import {pieSliceLabelSchema} from '../../components/pieSliceLabel.js';
@@ -316,9 +317,12 @@ export const reportSpecSchema = {
         compute: { $ref: "#/$defs/calculatedFieldCompute" },
       },
     },
+    ...windowCalculationDefinitions,
     calculatedFieldCompute: {
       anyOf: [
         { $ref: "#/$defs/ratioCompute" },
+        { $ref: "#/$defs/lagCompute" },
+        { $ref: "#/$defs/windowMaxCompute" },
         { $ref: "#/$defs/percentOfTotalCompute" },
         { $ref: "#/$defs/deltaFromPreviousCompute" },
         { $ref: "#/$defs/runningTotalCompute" },
