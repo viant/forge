@@ -763,3 +763,10 @@ renderers such as reports can exceed the viewport without being clipped.
 A window root declaring `sizingMode: content` scrolls at the window layout;
 explicit fill-sized and split layouts retain their own internal scrolling.
 The frame remains mounted across tab visits and docking changes.
+
+
+Window hosts can place the existing runtime tabs in their header using
+`workspaceRuntime.tabMount` on `WindowManager`. The same tabs control the
+retained panels; keyboard selection and close admission remain shared.
+Optional `tabListClassName`, `tabItemClassName`, and `renderTabLabel` adapt the
+host's header appearance without creating a second navigation state.

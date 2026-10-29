@@ -174,10 +174,10 @@ const WindowManager = ({renderWindowContent, isTabVisible, includeHosted = false
             style={{flex: 1, minHeight: 0, width: '100%', position: 'relative', display: 'flex', flexDirection: 'column'}}
         >
             {/* Tabs for windows in tabbed mode */}
-            <WorkspaceRuntimeSurface className="forge-window-manager-tabs" style={{flex:1,minHeight:0}}
+            <WorkspaceRuntimeSurface tabMount={workspaceRuntime.tabMount} className="forge-window-manager-tabs" style={{flex:1,minHeight:0}}
                 tabProps={{id:'window-manager-tabs',tabIdFor:(id,windowId)=>`bp6-tab-title_${id}_${windowId}`,panelIdFor:(id,windowId)=>`bp6-tab-panel_${id}_${windowId}`,entries:tabWindows,selectedId:visibleTabId,onSelect:handleTabChange,onClose:closeWindow,
-                    onRuntimeEvent:workspaceRuntime.onRuntimeEvent,className:'bp6-tab-list',itemClassName:'forge-window-manager-tab',tabClassName:'bp6-tab',ariaLabel:'Open windows',
-                    renderLabel:resolveDisplayWindowTitle,
+                    onRuntimeEvent:workspaceRuntime.onRuntimeEvent,className:workspaceRuntime.tabListClassName || 'bp6-tab-list',itemClassName:workspaceRuntime.tabItemClassName || 'forge-window-manager-tab',tabClassName:'bp6-tab',ariaLabel:'Open windows',
+                    renderLabel:workspaceRuntime.renderTabLabel || resolveDisplayWindowTitle,
                     renderLeading:(win,{close})=><WindowControls onClose={close} onMaximize={event=>{event.stopPropagation();undockWindow(win.windowId);}} showMinimize={false} showMaximize/>,
                     renderClose:()=>null}}
                 panelProps={{id:'window-manager-tabs',tabIdFor:(id,windowId)=>`bp6-tab-title_${id}_${windowId}`,panelIdFor:(id,windowId)=>`bp6-tab-panel_${id}_${windowId}`,entries:tabWindows,selectedId:visibleTabId,className:'forge-window-manager-tabs__panel',

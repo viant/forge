@@ -1,3 +1,4 @@
+import {createPortal} from 'react-dom';
 import React,{useEffect,useRef} from 'react';
 import {WorkspacePresentationProvider} from '../core/context/WorkspacePresentation.jsx';
 import {RetainedWindowContent} from './WindowContentMount.jsx';
@@ -76,6 +77,7 @@ export function WorkspaceRuntimePanels({id='workspace',entries=[],selectedId,act
     const windows=workspaceRuntimeEntries(entries),selected=windows.some(entry=>identity(entry)===selectedId)?selectedId:identity(windows[0]);
     return windows.map(entry=><RuntimePanel key={identity(entry)} entry={entry} id={id} tabIdFor={tabIdFor} panelIdFor={panelIdFor} active={active&&identity(entry)===selected} preload={preloadContent(entry)===true} className={className} panelProps={panelProps(entry)} presentation={getPresentation?.(entry)} renderContent={renderContent} onLifecycle={onLifecycle} onRuntimeEvent={onRuntimeEvent}/>);
 }
-export default function WorkspaceRuntimeSurface({children,tabProps,panelProps,className='',style}) {
-    return <div className={className} style={style} data-forge-workspace-runtime="true"><WorkspaceRuntimeTabs {...tabProps}/>{children}<WorkspaceRuntimePanels {...panelProps}/></div>;
+export default function WorkspaceRuntimeSurface({children,tabProps,panelProps,className='',style,tabMount}) {
+    return <div className={className} style={style} data-forge-workspace-runtime="true">{tabMount ? createPortal(<WorkspaceRuntimeTabs {...tabProps}/>,tabMount) : <WorkspaceRuntimeTabs {...tabProps}/>}
+{children}<WorkspaceRuntimePanels {...panelProps}/></div>;
 }
