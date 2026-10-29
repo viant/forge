@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"reflect"
 	"sort"
 	"strings"
@@ -272,17 +273,63 @@ func (g *Gateway) publishedAdmissionKeys(ctx context.Context) (string, error) {
 	keys := []string{}
 	for _, source := range g.publishedRegistrations() {
 		key, err := source.source.AdmissionKey(ctx)
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
+		if purePublishedDenial(err) {
+			// Denied providers contribute no catalog entries. Record the state so
+			// granting/revoking access invalidates pagination without blocking peers.
+			keys = append(keys, source.connection.Name+"\x00denied")
+			continue
+		}
 		if err != nil {
 			return "", err
 		}
 		if key == "" {
 			return "", identity.ErrResourceDenied
 		}
-		keys = append(keys, source.connection.Name+"\x00"+key)
+		keys = append(keys, source.connection.Name+"\x00admitted\x00"+key)
 	}
 	sort.Strings(keys)
 	raw, _ := json.Marshal(keys)
 	return identity.ContentFingerprint(raw), nil
+}
+
+// Only a pure producer admission denial is optional during aggregate discovery.
+// Never hide joined failures, cancellation or malformed publication evidence.
+func purePublishedDenial(err error) bool {
+	for current := err; current != nil; current = errors.Unwrap(current) {
+		if _, joined := current.(interface{ Unwrap() []error }); joined {
+			return false
+		}
+		if current == identity.ErrResourceDenied {
+			return true
+		}
+	}
+	return false
+}
+
+type publishedDiscoveryDenied struct{ error }
+
+func (e *publishedDiscoveryDenied) Unwrap() error { return e.error }
+
+func (g *Gateway) aggregatePublishedCapabilities(ctx context.Context, source publishedMetadataRegistration, name string) (capabilities, error) {
+	_, err := source.source.AdmissionKey(ctx)
+	if ctx.Err() != nil {
+		return capabilities{}, ctx.Err()
+	}
+	if purePublishedDenial(err) {
+		return capabilities{}, &publishedDiscoveryDenied{err}
+	}
+	if err != nil {
+		return capabilities{}, err
+	}
+	return g.publishedCapabilities(ctx, source, name)
+}
+
+func isPublishedDiscoveryDenied(err error) bool {
+	_, ok := err.(*publishedDiscoveryDenied)
+	return ok
 }
 
 func (s publishedMetadataRegistration) matchesName(name string) bool {

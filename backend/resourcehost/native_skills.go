@@ -121,6 +121,13 @@ func (s *NativeSkillSource) CatalogScope(ctx context.Context, conversation strin
 	for _, name := range names {
 		if source, published := s.Gateway.publishedByName(name); published {
 			admission, err := source.source.AdmissionKey(ctx)
+			if ctx.Err() != nil {
+				return "", false, ctx.Err()
+			}
+			if purePublishedDenial(err) {
+				parts = append(parts, name, source.connection.ProviderIdentity, "denied")
+				continue
+			}
 			if err != nil || admission == "" {
 				if err == nil {
 					err = identity.ErrResourceDenied

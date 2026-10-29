@@ -779,7 +779,7 @@ func (g *Gateway) discoverExcept(ctx context.Context, excludedLocal string) (out
 	})
 	for i, name := range selected {
 		c, e := results[i].value, results[i].err
-		if errors.Is(e, ErrUnavailable) || aggregateLinkRequired(e) {
+		if errors.Is(e, ErrUnavailable) || aggregateLinkRequired(e) || isPublishedDiscoveryDenied(e) {
 			continue
 		}
 		if e != nil {

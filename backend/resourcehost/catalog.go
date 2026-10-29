@@ -91,7 +91,7 @@ func (g *Gateway) catalog(ctx context.Context, kind, category string, load func(
 	})
 	for i, name := range names {
 		caps, discoverErr := results[i].value, results[i].err
-		if aggregateLinkRequired(discoverErr) {
+		if aggregateLinkRequired(discoverErr) || isPublishedDiscoveryDenied(discoverErr) {
 			continue
 		}
 		if discoverErr != nil && !errors.Is(discoverErr, ErrUnavailable) {
@@ -187,7 +187,7 @@ func (g *Gateway) catalog(ctx context.Context, kind, category string, load func(
 // owning MCP and retain their original lease.
 func (g *Gateway) catalogCapability(ctx context.Context, actor identity.VerifiedActor, name string) (capabilities, error) {
 	if source, ok := g.publishedByName(name); ok {
-		return g.publishedCapabilities(ctx, source, name)
+		return g.aggregatePublishedCapabilities(ctx, source, name)
 	}
 	probe := observe.Start(ctx, observe.Phase("catalog.capability.hint"), observe.Labels{})
 	if sequenceFromContext(ctx) != nil {
