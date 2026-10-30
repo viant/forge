@@ -38,3 +38,18 @@ func TestLogicalReferenceRetainsSourceIdentity(t *testing.T) {
 		t.Fatal("foreign source accepted")
 	}
 }
+
+func TestLegacyDatasourceReferenceReadIgnoresConsumerHash(t *testing.T) {
+	var ref DataSourceReference
+	decoder := json.NewDecoder(strings.NewReader(`{"resource":{"uri":"datasource://example/rows","revision":"working"},"providerIdentity":"provider","contentFingerprint":"obsolete"}`))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&ref); err != nil {
+		t.Fatal(err)
+	}
+	if ref.ContentFingerprint != "" {
+		t.Fatal("consumer hash retained")
+	}
+	if err := ref.Validate(false); err != nil {
+		t.Fatal(err)
+	}
+}
