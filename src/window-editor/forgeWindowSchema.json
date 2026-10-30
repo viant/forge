@@ -2687,6 +2687,9 @@
           "additionalProperties": {},
           "type": "object"
         },
+        "lifecycle": {
+          "$ref": "#/$defs/DraftLifecycleSpec"
+        },
         "onReset": {
           "type": "string"
         },
@@ -2712,6 +2715,59 @@
         },
         "wrapContent": {
           "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "DraftLifecycleSource": {
+      "additionalProperties": true,
+      "properties": {
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "defaults": {
+          "items": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "parameters": {
+          "items": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "DraftLifecycleSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "defaults": {
+          "items": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "key": {
+          "items": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "load": {
+          "type": "string"
+        },
+        "openWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "source": {
+          "$ref": "#/$defs/DraftLifecycleSource"
         }
       },
       "type": "object"
@@ -7393,12 +7449,13 @@
   "$ref": "#/$defs/Window",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "x-forge-provenance": {
-    "baseCommit": "d728463f20ec68ccc3d84349acd949b02dd18a9e",
+    "baseCommit": "134c3fac0cb6442147f68eadd8c6ee0864c946c5",
     "generator": "scripts/window-schema/main.go",
     "sha256": {
       "choice_browser.go": "935cbeddb231dd329374114c5f38454dc7c44c2ab70a45ea3c0f37ce7f3aee26",
       "datasource_projection.go": "87f165b7c9558d0c43fadc6b006bb0f110bd905226b5301dcb5d8a06eb2a692e",
       "dialog_resource.go": "36dbaee1db9c979ba32359f29d61af006ae9bcb32e8b35e74c6fa0a4243466e8",
+      "draft_lifecycle.go": "9309eaa6cdbceb860378bd5a6a559427304a564288ea61a7c3334014b5e8d306",
       "form.go": "aa2114822f1e688942aa4b63ec51c4b4c0f728b44b6d82b8b04fbf95efa807f0",
       "gate_requirements_editor.go": "94b32304fae82298136f1b9ed5f6d440e427ab74aaccfafca0382721e3edc0a9",
       "github.com/viant/forge/backend/datasource/contract.argument_projection.go": "d516237702990088462ce88689ed3056f8129369354d44e70e6116baaa2c644d",
@@ -7435,12 +7492,12 @@
       "model.go": "dcf76f651cb09b19b5ea5447336cb57db3552a6ec708ce9f05ad0c551a17368f",
       "parameter_editor.go": "a176f3b63d74714d216daf57ba5c3c3ee8e12aaf8ccf2c0ee1b663c95a657bf6",
       "predicate_composition_editor.go": "881bcf68a5f5e16cae2f58ef7495ac14582398236cfd263cc8585e89f97cab4b",
-      "presentation_primitives.go": "02a6a592152be515ce4a0632a586a1c94c926090ebfe39e5a29868d2b496b6cb",
+      "presentation_primitives.go": "ae8194ad62c4c19cc32efd4e1bfdaede79c19a13fd34efb682bce19457030aba",
       "preview_workbench.go": "eccac81a142c97d69c2e86be4443a4c79719f57a195ca4270540baa1c15636d6",
       "reader_workbench.go": "4c41b6e595a1152d9dd002144bb974057616338c1bf813a053d0dcb64e7895c0",
       "resource_assignment.go": "80ad53f8050041d9e652f3954084f6148fc8e53c324510126904a5ab35e3507e",
       "resource_model.go": "2d09c19334a806ae9879b9e022e403640cc5ca0f7cabe494b38aaa86881cd610",
-      "resource_model_validation.go": "349b7142c01101b092a793e17636da792b7d580460eaa479270aa9f5ff8b382f",
+      "resource_model_validation.go": "5fc795950cc92aa29db822a0a6850bd11fe1abf78e991c79e137b281c15251d5",
       "resource_policy_editor.go": "6f3a00bf5ac0751a133fe121e727f5aa2671489dfb07b98a29314cc7a380b8c2",
       "result_preview.go": "bd913237174dc663cf40a5cd30bf5e835ec077930e7f0916f7ce906671f3dbff",
       "rule_editor.go": "3eda2833f57c5a64adec603e42213423907151451998fa4ba538fe258273f6e6",
