@@ -3,6 +3,7 @@ import Button from '../Button.jsx';
 import SelectControl from '../SelectControl.jsx';
 import ArrayFields from '../primitives/ArrayFields.jsx';
 import {typographyProps} from '../Typography.jsx';
+import {getWidget, listWidgets} from '../../runtime/widgetRegistry.js';
 import './ReportFilterBar.css';
 
 function Choice({control, values, onChange, loadChoices, scopeKey, onChoices}) {
@@ -55,18 +56,37 @@ function Choice({control, values, onChange, loadChoices, scopeKey, onChoices}) {
     </fieldset>;
 }
 
+function DatePresets({control, values, onDatePreset, onDateRange, onDateDraft}) {
+    if (!control.datePresets) return null;
+    if (!listWidgets().includes('dateRangePreset') || typeof onDatePreset !== 'function' || typeof onDateRange !== 'function') {
+        return <span role="status">Date presets are unavailable in this host. Enter dates manually.</span>;
+    }
+    const Preset = getWidget('dateRangePreset');
+    return <>
+        <Preset item={{id: control.id, label: control.label}} value={control.presetValue || 'custom'}
+            range={{start: values[control.start], end: values[control.end]}} options={control.datePresets.options}
+            onPresetRequest={option => onDatePreset(control.id, option.value)}
+            onRangeChange={range => onDateRange(control.id, range)} onDraftChange={() => onDateDraft?.(control.id)}
+            presetPending={control.presetPending === true} customApplyEnabled/>
+        {control.presetError && <span role="alert">{control.presetError} Enter dates manually or retry the preset.</span>}
+        {control.presetError && <Button type="button" variant="ghost" onClick={() => onDatePreset(control.id, control.presetRequestedValue || control.datePresets.default)}>Retry date preset</Button>}
+    </>;
+}
+
 // Hosts normalize published metadata into controls and own authenticated choice
 // transport. This component never constructs resource URIs or permission grants.
 export default function ReportFilterBar({controls = [], values = {}, onChange, onApply, onReset, loadChoices,
-    scopeKey = '', onChoices, busy = false, applyDisabled = false, error = '', placement = 'top', className = ''}) {
+    scopeKey = '', onChoices, onDatePreset, onDateRange, onDateDraft, busy = false, applyDisabled = false, error = '', placement = 'top', className = ''}) {
     if (!controls.length) return null;
     return <form className={`forge-report-filter-bar ${className}`.trim()} data-filter-placement={['left','rail-left'].includes(placement)?'left':['right','rail-right'].includes(placement)?'right':'top'} aria-label="Report filters"
         onSubmit={event => {event.preventDefault(); onApply?.();}} {...typographyProps('body')}>
         {controls.map(control => {
             if (control.kind === 'choice') return <Choice key={control.id} {...{control, values, onChange, loadChoices, scopeKey, onChoices}}/>;
             if (control.kind === 'dateRange') return <fieldset key={control.id}><legend>{control.label}</legend>
+                <DatePresets {...{control, values, onDatePreset, onDateRange, onDateDraft}}/>
                 {[['from', control.start], ['to', control.end]].map(([edge, alias]) => <label key={alias}>{control.label} {edge}
                     <input type="date" required={control.required} aria-required={control.required || undefined} value={values[alias] ?? ''} onChange={event => onChange(alias, event.target.value)}/></label>)}
+                {control.datePresetError && <span role="alert">{control.datePresetError} Enter dates manually.</span>}
             </fieldset>;
             if (control.kind === 'boolean') return <label key={control.id}><input aria-label={control.label} type="checkbox" checked={values[control.id] === true}
                 onChange={event => onChange(control.id,event.target.checked)}/>{control.label}</label>;
