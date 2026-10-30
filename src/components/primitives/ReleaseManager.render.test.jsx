@@ -263,3 +263,21 @@ it('shows a previously selected policy removed from candidates but will not repu
     expect(button(view.host,'Publish').disabled).toBe(true);
   }finally{await view.close();}
 });
+
+it('offers an optional validation slot with the current exact selection without gating publish',async()=>{
+  const adapter=api();
+  const host=document.createElement('div');document.body.append(host);const view=createRoot(host);
+  const validation=vi.fn(({roots,disabled})=><div aria-label="Validation extension">{roots.map(root=>root.uri).join(',')}:{String(disabled)}</div>);
+  try {
+    await act(async()=>view.render(<ReleaseManager api={adapter} channelKey={scope} renderValidation={validation}/>));
+    expect(host.querySelector('[aria-label="Validation extension"]')).not.toBeNull();
+    expect(validation.mock.calls.at(-1)[0]).toMatchObject({roots:[],disabled:false});
+    await include(host);
+    expect(validation.mock.calls.at(-1)[0].roots).toEqual([rootRef]);
+    await text(host.querySelector('#release-name'),'review');
+    await click(host.querySelector('input[type="checkbox"]'));
+    expect(button(host,'Publish').disabled).toBe(false);
+    await click(button(host,'Publish'));
+    expect(adapter.publish).toHaveBeenCalledOnce();
+  } finally {await act(async()=>view.unmount());host.remove();}
+});
