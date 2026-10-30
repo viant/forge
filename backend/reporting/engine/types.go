@@ -29,8 +29,8 @@ type Diagnostic struct {
 // CompileRequest carries an authored artifact into the backend compile seam.
 type CompileRequest struct {
 	Parameters       map[string]interface{}               `json:"parameters,omitempty"`
-	DependencyPins   map[string]identity.ResolvedResource `json:"dependencyPins,omitempty"`
-	DependencyToken  string                               `json:"dependencyToken,omitempty"`
+	DependencyPins   map[string]identity.ResolvedResource `json:"-"`
+	DependencyToken  string                               `json:"-"`
 	ResolvedResource *identity.ResolvedResource           `json:"resolvedResource,omitempty"`
 	Resource         *identity.ResourceRef                `json:"resource,omitempty"`
 	ArtifactRef      string                               `json:"artifactRef,omitempty"`
@@ -40,8 +40,8 @@ type CompileRequest struct {
 
 // CompileResult is the canonical compile response.
 type CompileResult struct {
-	DependencyPins  map[string]identity.ResolvedResource `json:"dependencyPins,omitempty"`
-	DependencyToken string                               `json:"dependencyToken,omitempty"`
+	DependencyPins  map[string]identity.ResolvedResource `json:"-"`
+	DependencyToken string                               `json:"-"`
 	Resource        *identity.ResolvedResource           `json:"resource,omitempty"`
 	ArtifactRef     string                               `json:"artifactRef,omitempty"`
 	ReportSpec      json.RawMessage                      `json:"reportSpec,omitempty"`
