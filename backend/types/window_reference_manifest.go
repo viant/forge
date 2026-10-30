@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	primitive "github.com/viant/forge/backend/provider/contract"
-	identity "github.com/viant/forge/backend/resource"
 )
 
 // WindowReferenceSchemaVersion identifies independently delivered datasource
@@ -19,12 +18,12 @@ func validateWindowReferenceManifest(v WindowResourceVariant) error {
 	if err := ValidateResourceModelStructure(v.Window); err != nil {
 		return err
 	}
-	if len(v.DataSources)+len(v.DataSourceResources) != len(v.Window.DataSource) || len(v.Window.ResourceDependencies) != len(v.Window.DataSource) {
+	if len(v.DataSources)+len(v.DataSourceResources) != len(v.Window.DataSource) {
 		return fmt.Errorf("incomplete window reference manifest")
 	}
 	for id := range v.Window.DataSource {
-		if id == "" || v.Window.ResourceDependencies[id] == "" {
-			return fmt.Errorf("missing datasource fingerprint")
+		if id == "" {
+			return fmt.Errorf("missing datasource identity")
 		}
 		ref, remote := v.DataSourceResources[id]
 		raw, inline := v.DataSources[id]
@@ -71,10 +70,10 @@ func MaterializeWindowReferences(manifest WindowResourceVariant, definitions map
 	if result.DataSources == nil {
 		result.DataSources = map[string]json.RawMessage{}
 	}
-	for id, ref := range manifest.DataSourceResources {
+	for id := range manifest.DataSourceResources {
 		raw, ok := definitions[id]
-		if !ok || identity.ContentFingerprint(raw) != ref.ContentFingerprint {
-			return nil, fmt.Errorf("datasource resource fingerprint mismatch: %s", id)
+		if !ok {
+			return nil, fmt.Errorf("missing datasource resource: %s", id)
 		}
 		var envelope struct {
 			SchemaVersion int             `json:"schemaVersion"`
@@ -95,10 +94,6 @@ func MaterializeWindowReferences(manifest WindowResourceVariant, definitions map
 		bytes, err := json.Marshal(descriptor)
 		if err != nil {
 			return nil, err
-		}
-		fingerprint, err := WindowDescriptorFingerprint(bytes)
-		if err != nil || fingerprint != manifest.Window.ResourceDependencies[id] {
-			return nil, fmt.Errorf("datasource descriptor fingerprint mismatch: %s", id)
 		}
 		result.DataSources[id], err = CanonicalWindowDescriptor(bytes)
 		if err != nil {

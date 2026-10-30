@@ -38,7 +38,7 @@ func (c *WindowCatalog) fetchReferencedDatasource(ctx context.Context, parent id
 			return err
 		}
 		ref, ok := variant.DataSourceResources[expected.ID]
-		if !ok || ref.Resource.URI != child.URI || ref.Resource.Revision != child.Selector() || ref.ProviderIdentity != child.ProviderIdentity || ref.ContentFingerprint != child.ContentFingerprint {
+		if !ok || !ref.MatchesResolved(child) {
 			return identity.ErrResourceDenied
 		}
 		var actual dsproto.DataSource

@@ -39,6 +39,9 @@ func CompileWindowResource(raw json.RawMessage) (*CompiledWindowResource, error)
 	if err := decodeWindowResourceJSON(raw, &result.envelope); err != nil {
 		return nil, err
 	}
+	if err := normalizeLegacyReferenceKeys(raw, &result.envelope); err != nil {
+		return nil, err
+	}
 	if err := result.envelope.Validate(); err != nil {
 		return nil, err
 	}

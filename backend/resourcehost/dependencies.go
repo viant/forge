@@ -147,7 +147,7 @@ func (g *Gateway) resolveDependencyReads(ctx context.Context, parent Connection,
 		var original *identity.ResolvedResource
 		if existing != nil {
 			pin, ok := existing[id]
-			if !ok || pin.URI != ref.Resource.URI || pin.Selector() != ref.Resource.Revision || pin.ContentFingerprint != ref.ContentFingerprint || pin.ProviderIdentity != ref.ProviderIdentity {
+			if !ok || !ref.MatchesResolved(pin) {
 				return nil, nil, identity.ErrResourceDenied
 			}
 			original = &pin
@@ -156,7 +156,7 @@ func (g *Gateway) resolveDependencyReads(ctx context.Context, parent Connection,
 		if e != nil {
 			return nil, nil, fmt.Errorf("dependency %q (%s): %w", id, ref.Resource.URI, e)
 		}
-		if child.ResolvedResource.ContentFingerprint != ref.ContentFingerprint || child.ResolvedResource.ProviderIdentity != ref.ProviderIdentity {
+		if !ref.MatchesResolved(*child.ResolvedResource) {
 			return nil, nil, identity.ErrResourceDenied
 		}
 		var envelope struct {
