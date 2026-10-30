@@ -2329,6 +2329,18 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, on
       sort: tablePresentation.sort ? {key: tablePresentation.sort.key, direction: tablePresentation.sort.direction} : null,
     });
   }, [block.id, tablePresentation.filter, tablePresentation.sort, tablePresentation.expandedKeys, onTablePresentationChange]);
+  const handleDatasetSortChange = (sort) => {
+    onDatasetSortChange?.({datasetId:dataset.id, blockId:block.id, sort});
+    // A producer refresh can unmount this table before its presentation effect
+    // runs. Retain the interaction in the host during the same event instead.
+    const next = {...tablePresentation, sort};
+    setTablePresentation(next);
+    onTablePresentationChange?.(block.id, {
+      filter: next.filter,
+      ...(authoredBlock.hierarchy ? {expandedKeys:next.expandedKeys} : {}),
+      sort: sort ? {key:sort.key, direction:sort.direction} : null,
+    });
+  };
   if (invalidDiagnostic) {
     return (
       <RuntimePanel
@@ -2447,7 +2459,7 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, on
         initialPresentationState={initialPresentationState}
         remoteSort={partialDataset}
         canSortColumn={partialDataset ? column => !!reportDatasetSortField(reportSpec, authoredBlock, column) : null}
-        onSortChange={partialDataset && onDatasetSortChange ? sort => onDatasetSortChange({datasetId:dataset.id, blockId:block.id, sort}) : null}
+        onSortChange={partialDataset && onDatasetSortChange ? handleDatasetSortChange : null}
         loading={page.loading} error={page.error} disabled={page.loading || !!page.error}
         selectionLabelFields={authoredBlock.selection.labelFields}
         onRowsChange={runtimeHandlers?.onTableReviewChange ? rows => runtimeHandlers.onTableReviewChange({
@@ -2495,7 +2507,7 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, on
         initialPresentationState={initialPresentationState}
         remoteSort={partialDataset}
         canSortColumn={partialDataset ? column => !!reportDatasetSortField(reportSpec, authoredBlock, column) : null}
-        onSortChange={partialDataset && onDatasetSortChange ? sort => onDatasetSortChange({datasetId:dataset.id, blockId:block.id, sort}) : null}
+        onSortChange={partialDataset && onDatasetSortChange ? handleDatasetSortChange : null}
         onPresentationStateChange={handleTablePresentationChange}
       />}
       </div>
