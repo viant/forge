@@ -127,3 +127,34 @@ explicit totals, duplicates/cycles, nulls/zero, schema round trips, raw evidence
 and actual CSV/XLSX/HTML/multipage PDF output. This change adds authored metadata;
 it does not add a visual pivot designer, native iOS rendering, lazy child loading,
 automatic non-additive aggregation, or hierarchy-plus-pivot combination.
+
+Partial native report datasets delegate table sorting to their host through
+`ReportRuntime.onDatasetSortChange({datasetId, blockId, sort: {key, direction}})`.
+The table keeps the producer's order and hides pending/failed rows. Hosts that
+omit the callback disable partial-page sort actions; complete local datasets
+continue sorting their whole collection before display pagination.
+
+`DashboardReportRuntime` implements this callback with the existing authored
+`datasetBindings[datasetId].queryPath` and the existing datasource `setSort`
+handler. The adapter reconstructs the authored query parameter because `setSort`
+accepts a top-level destination; `setSort` owns page reset, fetch scheduling,
+cancellation and failure publication. Existing `serverTableSortValues`
+normalization supplies the primary order and secondary entries. It
+places the chosen field first in that query's `orderBy`, retains existing
+authored secondary order entries (falling back to an initial source-order snapshot only when
+no authored order is provided), resets offset and that source to page one,
+and preserves filters, fixed inputs and other queries. Normalized
+`collectionInfo` supplies completeness and page ownership. Producer-side
+validation and admission remain authoritative.
+
+Bounded `ExecuteResource` reads reuse `tablePresentations` to resolve a sort
+against admitted table columns and push `orderBy` into a datasource that admits
+that input. The effective spec records the request actually fetched. Bounded materialization
+removes only producer-consumed sort choices so its local comparator cannot
+reinterpret the producer's order; filters, expansions and other choices remain. Conflicting
+sorts for tables sharing a dataset, pinned order, unsupported display mappings,
+and analytical partial datasets fail explicitly. Partial-page sort buttons for
+presentation relation paths, object/array companions and local calculated fields
+are disabled; those columns keep display-value sorting on complete local data. Complete output keeps the
+existing global materializer sort. No completion/fetch-all request is necessary
+for an ordinary partial table sort.

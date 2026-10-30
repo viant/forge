@@ -70,6 +70,9 @@ export default function DashboardTableContent({
     subtitleStyle = DEFAULT_SUBTITLE_STYLE,
     onPresentationStateChange = null,
     initialPresentationState = null,
+    remoteSort = false,
+    onSortChange = null,
+    canSortColumn = null,
 }) {
     const {collection, loading, error, selection} = useDataSourceState(context);
     const hierarchy=container.dashboard?.table?.hierarchy || container.hierarchy;
@@ -182,6 +185,7 @@ export default function DashboardTableContent({
         hasRowActions: rowActions.length > 0,
     }), [displayColumns, multiSelect, rowActions.length, documentTable]);
 
+    const [sortError, setSortError] = useState('');
     const [sortKey, setSortKey] = useState(() => initialPresentationState?.sort?.key || null);
     const [sortDir, setSortDir] = useState(() => initialPresentationState?.sort?.direction === 'desc' ? 'desc' : 'asc');
     const [page, setPage] = useState(1);
@@ -195,15 +199,15 @@ export default function DashboardTableContent({
     };
     const matchedKeys=hierarchyModel && (container.dashboard?.table?.forceHierarchyExpansion || quickFilter.trim() || quickFilteredCollection.length!==(collection||[]).length)
         ? new Set(quickFilteredCollection.map(row=>row[hierarchy.keyField])) : null;
-    const legacySortedRows=useMemo(()=>(sortKey?[...quickFilteredCollection].sort(compareRows):quickFilteredCollection).slice(0,limit),[quickFilteredCollection,sortKey,sortDir,runtimeColumns,limit]);
+    const legacySortedRows=useMemo(()=>(sortKey && !remoteSort?[...quickFilteredCollection].sort(compareRows):quickFilteredCollection).slice(0,limit),[quickFilteredCollection,sortKey,sortDir,runtimeColumns,limit,remoteSort]);
     const allSortedRows = hierarchyModel
-        ? hierarchyRows(hierarchyModel,{matchedKeys,compare:sortKey?compareRows:null}).nodes.map(node=>node.row)
+        ? hierarchyRows(hierarchyModel,{matchedKeys,compare:sortKey && !remoteSort?compareRows:null}).nodes.map(node=>node.row)
         : legacySortedRows;
-    const hierarchicalView=hierarchyModel ? hierarchyRows(hierarchyModel,{matchedKeys,compare:sortKey?compareRows:null,expandedKeys,page,pageSize:pagingEnabled?pageSize:Infinity,rootLimit:container.dashboard?.table?.hierarchyRootLimit ?? container.hierarchyRootLimit ?? Infinity}) : null;
+    const hierarchicalView=hierarchyModel ? hierarchyRows(hierarchyModel,{matchedKeys,compare:sortKey && !remoteSort?compareRows:null,expandedKeys,page,pageSize:pagingEnabled?pageSize:Infinity,rootLimit:container.dashboard?.table?.hierarchyRootLimit ?? container.hierarchyRootLimit ?? Infinity}) : null;
     const pageCount=hierarchicalView?.pageCount ?? (pagingEnabled?Math.max(1,Math.ceil(allSortedRows.length/pageSize)):1);
     const currentPage=Math.min(page,pageCount);
     const sortLabel=sortKey?(displayColumns.find(column=>column.key===sortKey)?.label||sortKey):'';
-    const sortedRows=hierarchicalView ? hierarchicalView.nodes.map(node=>node.row) : pagingEnabled ? allSortedRows.slice((currentPage-1)*pageSize,currentPage*pageSize) : allSortedRows;
+    const sortedRows=remoteSort && (loading || error) ? [] : hierarchicalView ? hierarchicalView.nodes.map(node=>node.row) : pagingEnabled ? allSortedRows.slice((currentPage-1)*pageSize,currentPage*pageSize) : allSortedRows;
     const tableWrapRef = useRef(null);
     const [documentOverflow, setDocumentOverflow] = useState(false);
     useEffect(() => {
@@ -239,6 +243,11 @@ export default function DashboardTableContent({
         .filter(value => value !== undefined && value !== null && value !== '').join(' · ') || `row ${index + 1}`;
 
     const handleSort = (key) => {
+        if (loading || error || (remoteSort && !onSortChange) || canSortColumn?.(runtimeColumns.find(column => column.key === key)) === false) return;
+        try {
+            onSortChange?.({key, direction: sortKey === key && sortDir === 'asc' ? 'desc' : 'asc'});
+            setSortError('');
+        } catch (failure) { setSortError(failure.message || 'Report sorting is unavailable.'); return; }
         if (sortKey === key) {
             setSortDir((prev) => prev === 'asc' ? 'desc' : 'asc');
         } else {
@@ -272,6 +281,7 @@ export default function DashboardTableContent({
     return (
         <>
             {hierarchy?<Typography as="p" typeRole="metadata">{hierarchy.totals.mode==='sum-leaves'?'Parent totals sum the complete admitted leaf rows.':'Parent totals are supplied by the producer.'} Filtering retains the original totals and ancestor context.</Typography>:null}
+            {sortError ? <div role="alert">{sortError}</div> : null}
             {loading ? <div role="status" style={subtitleStyle}>Loading…</div> : null}
             {error ? <div role="alert" style={{...subtitleStyle, color: 'var(--forge-status-danger-foreground, #a82a2a)'}}>{formatDataSourceError(error)}</div> : null}
             {!loading && !error && sortedRows.length === 0 ? <div role="status" style={subtitleStyle}>No data.</div> : null}
@@ -350,7 +360,7 @@ export default function DashboardTableContent({
                                         aria-sort={active ? sortDir === 'asc' ? 'ascending' : 'descending' : 'none'}
                                         style={{textAlign: col.align || 'left', color: active ? 'var(--forge-dashboard-table-link, #2367d1)' : undefined, ...(col.frozen ? {'--forge-frozen-column-width': `${col.resolvedCompactWidth}px`, '--forge-frozen-left': multiSelect ? '42px' : '0px'} : {})}}
                                     >
-                                        <button type="button" className="forge-dashboard-table__sort-button" title={fullLabel} aria-label={`Sort by ${fullLabel}`} onClick={() => handleSort(col.key)}><span className="forge-dashboard-table__header-label">{col.label || col.key}</span><span aria-hidden="true">{arrow}</span></button>
+                                        <button type="button" className="forge-dashboard-table__sort-button" title={fullLabel} aria-label={`Sort by ${fullLabel}`} disabled={loading || !!error || (remoteSort && !onSortChange) || canSortColumn?.(col) === false} onClick={() => handleSort(col.key)}><span className="forge-dashboard-table__header-label">{col.label || col.key}</span><span aria-hidden="true">{arrow}</span></button>
                                     </th>
                                 );
                             })}

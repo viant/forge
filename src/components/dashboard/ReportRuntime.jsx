@@ -1,3 +1,4 @@
+import {reportDatasetSortField} from './reportRuntimeTableSort.js';
 import {parseReportMarkdownInline} from '../../reporting/reportMarkdownInline.js';
 import {validateDonutCenterDataset} from '../donutCenter.js';
 import {mergeHierarchySelections} from '../../reporting/reportTableAnalytics.js';
@@ -2259,7 +2260,7 @@ function resolveRuntimeCompositeConfig(blocks = []) {
   return { composites, ...resolveReportRuntimeCompositeOwnership(blocks) };
 }
 
-function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, onDatasetExpand = null, block = {}, diagnostics = [], dataset = {}, reportSpec = {}, providerActionsByField = new Map(), runtimeHandlers = null, locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false, onRuntimeSelection = null, publicMode = false, displayMode, onDisplayModeChange = null, initialPresentationState = null, onTablePresentationChange = null }) {
+function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, onDatasetExpand = null, onDatasetSortChange = null, block = {}, diagnostics = [], dataset = {}, reportSpec = {}, providerActionsByField = new Map(), runtimeHandlers = null, locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false, onRuntimeSelection = null, publicMode = false, displayMode, onDisplayModeChange = null, initialPresentationState = null, onTablePresentationChange = null }) {
   const documentPresentation = React.useContext(DocumentPresentationContext);
   const authoredBlock = (Array.isArray(reportSpec?.blocks) ? reportSpec.blocks : [])
     .find((candidate) => normalizeString(candidate?.id) === normalizeString(block?.id)) || {};
@@ -2352,6 +2353,7 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, on
   const collapsedPreviewLimit = Math.min(5, authoredBlock.hierarchy?hierarchyRootCount:runtimeTableRows.length);
   // Display paging is only for a complete result already held by this report.
   // Partial results keep their host-owned ReportDatasetPager below the table.
+  const partialDataset = dataset?.provenance?.hasMore === true || dataset?.provenance?.truncated === true || Number(page?.offset) > 0;
   const locallyComplete = dataset?.provenance?.hasMore === false
     && dataset?.provenance?.truncated !== true
     && !(Number(page?.offset) > 0);
@@ -2443,6 +2445,10 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, on
       {authoredBlock.selection?.mode === 'checkbox' ? <ReviewTable
         id={block.id} rows={runtimeTableRows} columns={columns} selectionField={authoredBlock.selection.field}
         initialPresentationState={initialPresentationState}
+        remoteSort={partialDataset}
+        canSortColumn={partialDataset ? column => !!reportDatasetSortField(reportSpec, authoredBlock, column) : null}
+        onSortChange={partialDataset && onDatasetSortChange ? sort => onDatasetSortChange({datasetId:dataset.id, blockId:block.id, sort}) : null}
+        loading={page.loading} error={page.error} disabled={page.loading || !!page.error}
         selectionLabelFields={authoredBlock.selection.labelFields}
         onRowsChange={runtimeHandlers?.onTableReviewChange ? rows => runtimeHandlers.onTableReviewChange({
           blockId:block.id, selection:authoredBlock.hierarchy?mergeHierarchySelections(sourceRows,rows,authoredBlock.hierarchy,authoredBlock.selection.field):mergeReportTableSelections(sourceRows, dataset.rows, rows, authoredBlock.selection.field),
@@ -2487,6 +2493,9 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, on
         }, locale, { publicMode, loading: page.loading, error: page.error })}
         locale={locale}
         initialPresentationState={initialPresentationState}
+        remoteSort={partialDataset}
+        canSortColumn={partialDataset ? column => !!reportDatasetSortField(reportSpec, authoredBlock, column) : null}
+        onSortChange={partialDataset && onDatasetSortChange ? sort => onDatasetSortChange({datasetId:dataset.id, blockId:block.id, sort}) : null}
         onPresentationStateChange={handleTablePresentationChange}
       />}
       </div>
@@ -3124,6 +3133,7 @@ export default function ReportRuntime({
   onChartMetricSelectionChange = null,
   datasetPages = {},
   onDatasetPageChange = null,
+  onDatasetSortChange = null,
   onDatasetExpand = null,
   tableDisplayModes = null,
   onTableDisplayModeChange = null,
@@ -3475,6 +3485,7 @@ export default function ReportRuntime({
           dataset={dataset}
           page={{...datasetPages[dataset?.id], ...(sectionLoading ? {loading: true} : {}), ...(sectionError ? {error: sectionError} : {})}}
           onDatasetPageChange={onDatasetPageChange}
+          onDatasetSortChange={onDatasetSortChange}
           onDatasetExpand={onDatasetExpand}
           displayMode={tableDisplayModes ? (tableDisplayModes[block.id] || "default") : undefined}
           onDisplayModeChange={onTableDisplayModeChange}

@@ -156,3 +156,46 @@ it('restores a host-held Paginate choice after a data refresh and resets it for 
     expect(host.textContent).toContain('Showing 5 of 116 rows');
   } finally { await act(async () => root.unmount()); host.remove(); }
 });
+
+it('delegates partial page sorting and hides rows during the server request', async () => {
+  globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+  const host=document.createElement('div');document.body.append(host);const root=createRoot(host),request=vi.fn();
+  const input=fixture([{id:40},{id:30}],{hasMore:true},{offset:25,pageSize:2});
+  input.reportSpec.blocks[0].collapsible=false;input.reportFill.blocks[0].content.collapsible=false;
+  const values=()=>[...host.querySelectorAll('tbody tr')].map(row=>Number(row.querySelector('td').textContent));
+  try {
+    await act(async()=>root.render(<ReportRuntime {...input} onDatasetSortChange={request}/>));
+    await act(async()=>host.querySelector('[aria-label="Sort by ID"]').click());
+    expect(request).toHaveBeenLastCalledWith({datasetId:'primary',blockId:'evidence',sort:{key:'id',direction:'asc'}});
+    expect(values()).toEqual([40,30]);
+    input.datasetPages.primary.loading=true;
+    await act(async()=>root.render(<ReportRuntime {...input} onDatasetSortChange={request}/>));
+    expect(values()).toEqual([]);
+    input.datasetPages.primary={offset:25,pageSize:2,error:'Sort request failed'};
+    await act(async()=>root.render(<ReportRuntime {...input} onDatasetSortChange={request}/>));
+    expect(values()).toEqual([]);expect(host.textContent).toContain('Sort request failed');
+    input.datasetPages.primary={offset:0,pageSize:2};input.reportFill.datasets[0].rows=[{id:1},{id:2}];
+    await act(async()=>root.render(<ReportRuntime {...input} onDatasetSortChange={request}/>));
+    expect(values()).toEqual([1,2]);
+  } finally {await act(async()=>root.unmount());host.remove();}
+});
+
+it('disables presentation relation and calculated sorts for partial pages while complete rows keep display sorting',async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host),request=vi.fn();
+ const input=fixture([{id:1,ownerId:20,owner:{name:'Zinc'},doubled:2},{id:2,ownerId:10,owner:{name:'Amber'},doubled:4}],{hasMore:true});
+ const columns=[{key:'ownerId',label:'Owner',displayKey:'owner.name'},{key:'doubled',label:'Doubled'}];
+ input.reportSpec.blocks[0]={...input.reportSpec.blocks[0],columns,collapsible:false};
+ input.reportSpec.calculatedFields=[{id:'doubled',key:'doubled',datasetRef:'primary',expr:'id * 2'}];
+ input.reportFill.blocks[0].content={columns,collapsible:false};
+ try {
+  await act(async()=>root.render(<ReportRuntime {...input} onDatasetSortChange={request}/>));
+  expect(host.querySelector('[aria-label="Sort by Owner"]').disabled).toBe(true);
+  expect(host.querySelector('[aria-label="Sort by Doubled"]').disabled).toBe(true);expect(request).not.toHaveBeenCalled();
+  input.reportFill.datasets[0].provenance={hasMore:false};
+  await act(async()=>root.render(<ReportRuntime {...input} onDatasetSortChange={request}/>));
+  const owner=host.querySelector('[aria-label="Sort by Owner"]');expect(owner.disabled).toBe(false);
+  await act(async()=>owner.click());
+  expect(host.querySelector('tbody tr').textContent).toContain('Amber');expect(request).not.toHaveBeenCalled();
+ } finally {await act(async()=>root.unmount());host.remove();}
+});

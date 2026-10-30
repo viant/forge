@@ -341,6 +341,14 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 	if err := materializer.ValidateTablePresentations(executionSpec, request.TablePresentations); err != nil {
 		return nil, err
 	}
+	pageSorts := map[string]string{}
+	consumedSorts := map[string]string{}
+	if request.DatasetFetchMode == DatasetFetchPage {
+		pageSorts, err = reportDatasetSorts(executionSpec, request.TablePresentations)
+		if err != nil {
+			return nil, err
+		}
+	}
 	selectedIDs := request.DatasetIDs
 	var tableProjection *tableExecutionProjection
 	if request.TableBlockID != nil {
@@ -405,6 +413,14 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 		if err != nil {
 			return nil, err
 		}
+		if order, ok := pageSorts[dataset.ID]; ok {
+			if selected == nil || selected[dataset.ID] {
+				if err := applyReportDatasetSort(descriptor, args, order); err != nil {
+					return nil, err
+				}
+				consumedSorts[dataset.ID] = order
+			}
+		}
 		args, err = materializer.MapBuilderRequest(ctx, envelope.BuilderDefinition, args, dataset.ID)
 		if err != nil {
 			return nil, err
@@ -443,6 +459,7 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 			return nil, identity.ErrResourceDenied
 		}
 	}
+	executionPresentations := reportPageTablePresentations(executionSpec, request.TablePresentations, consumedSorts)
 	// Plans and effectiveDatasets share the bound argument maps. Resolve only
 	// comparison dates again after newly submitted aliases have been bound.
 	if err := applyReportPreviousPeriods(effectiveDatasets); err != nil {
@@ -547,7 +564,7 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 				payloads[plans[index].id] = fetchedPayloads[index]
 			}
 			var initialArtifacts *materializer.Artifacts
-			initialArtifacts, err = materializer.MaterializeSection(ctx, section, payloads, request.TablePresentations)
+			initialArtifacts, err = materializer.MaterializeSection(ctx, section, payloads, executionPresentations)
 			if err == nil {
 				err = finalCheck()
 			}
@@ -579,14 +596,14 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 	// A selected-table result returns its derived presentation spec with the
 	// matching fill/print hashes; admission and release still use the full pin.
 	materializationSpec := effectiveSpec
-	presentations := request.TablePresentations
+	presentations := executionPresentations
 	if tableProjection != nil {
 		materializationSpec, err = tableProjection.materializationSpec(effectiveSpec)
 		if err != nil {
 			return nil, err
 		}
 		presentations = nil
-		if presentation, ok := request.TablePresentations[tableProjection.id]; ok {
+		if presentation, ok := executionPresentations[tableProjection.id]; ok {
 			presentations = materializer.TablePresentations{tableProjection.id: presentation}
 		}
 	}
