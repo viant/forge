@@ -199,3 +199,51 @@ it('disables presentation relation and calculated sorts for partial pages while 
   expect(host.querySelector('tbody tr').textContent).toContain('Amber');expect(request).not.toHaveBeenCalled();
  } finally {await act(async()=>root.unmount());host.remove();}
 });
+
+it.each([false, true])('retains remote sort and quick filter when a request replaces the mounted table (review %s)', async (review) => {
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const host = document.createElement('div'); document.body.append(host);
+  const root = createRoot(host), requests = [];
+  let finish;
+  function PreviewHost() {
+    const [loading, setLoading] = useState(false);
+    const [presentations, setPresentations] = useState({ evidence: {filter:'',sort:null} });
+    const [data, setData] = useState([{id:40},{id:30}]);
+    const [offset, setOffset] = useState(2);
+    const input = fixture(data, {hasMore:true}, {offset,pageSize:2});
+    input.reportSpec.blocks[0].collapsible = false;
+    input.reportSpec.blocks[0].runtime = {quickFilter:true};
+    if (review) input.reportSpec.blocks[0].selection = {mode:'checkbox',field:'selected'};
+    input.reportFill.blocks[0].content.collapsible = false;
+    return loading ? <div role="status">Refreshing rows</div> : <ReportRuntime {...input}
+      tablePresentations={presentations}
+      onDatasetPageChange={() => {}}
+      onTablePresentationChange={(id, state) => setPresentations(current => JSON.stringify(current[id]) === JSON.stringify(state) ? current : {...current,[id]:state})}
+      onDatasetSortChange={request => {
+        requests.push(request);
+        setLoading(true);
+        setOffset(0);
+        finish = () => {setData(request.sort.direction === 'asc' ? [{id:10},{id:20}] : [{id:90},{id:80}]);setLoading(false);};
+      }}/>
+  }
+  const sort = () => host.querySelector('[aria-label="Sort by ID"]');
+  try {
+    await act(async () => root.render(<PreviewHost/>));
+    const search = host.querySelector('input[placeholder="Quick filter rows..."]');
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(search,'0');
+      search.dispatchEvent(new Event('input',{bubbles:true}));
+    });
+    await act(async () => sort().click());
+    expect(host.textContent).toContain('Refreshing rows');
+    await act(async () => finish());
+    expect(sort().closest('th').getAttribute('aria-sort')).toBe('ascending');
+    expect(host.querySelector('input[placeholder="Quick filter rows..."]').value).toBe('0');
+    expect(host.textContent).toContain('Rows 1–2');
+    await act(async () => sort().click());
+    expect(requests.map(request => request.sort.direction)).toEqual(['asc','desc']);
+    await act(async () => finish());
+    expect(sort().closest('th').getAttribute('aria-sort')).toBe('descending');
+    expect(host.querySelector('input[placeholder="Quick filter rows..."]').value).toBe('0');
+  } finally {await act(async () => root.unmount());host.remove();}
+});
