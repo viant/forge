@@ -64,3 +64,13 @@ test('KPI-only sparkline dependencies join the visible section without loading u
 test('duplicate authored block identities retain full validation',()=>{
  const doc=structuredClone(authored);doc.reportDocument.blocks.push({...doc.reportDocument.blocks.find(b=>b.id==='trend'),datasetRef:'campaign'});assert.equal(reportSectionDatasets(doc),null);
 });
+
+test('nested declared references share the backend section closure',()=>{
+ const doc=structuredClone(authored);
+ doc.builderDefinition.reportBuilder.dataSources.push({id:'center'},{id:'visibility'});
+ doc.reportDocument.blocks.find(b=>b.id==='impressions').chartSpec={center:{datasetRef:'center'}};
+ doc.reportDocument.blocks.find(b=>b.id==='impressions').runtime={visibility:{datasetRefs:['visibility']}};
+ assert.deepEqual(reportSectionDatasets(doc).bySection.overview,['summary','daily','center','visibility']);
+ doc.reportDocument.blocks.find(b=>b.id==='impressions').runtime.visibility.datasetRefs=['unknown'];
+ assert.equal(reportSectionDatasets(doc),null);
+});
