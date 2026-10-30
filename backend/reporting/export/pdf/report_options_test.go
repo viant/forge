@@ -117,3 +117,17 @@ func TestReportOptionPrimaryContextIgnoresFilterCaption(t *testing.T) {
 	options := Options{ReportSpec: json.RawMessage(`{"datasets":[{"id":"primary","request":{"options":{"minimum":5000}}},{"id":"evidence","label":"Raw evidence","request":{"options":{"minimum":0}}}],"blocks":[{"kind":"filterBarBlock","title":"Report filters","datasetRef":"primary"}]}`)}
 	require.Equal(t, []string{"minimum (Report results): 5000", "minimum (Raw evidence): 0"}, reportOptionLines(options))
 }
+
+func TestReportOptionsRespectDeclaredScopeCatalog(t *testing.T) {
+	options := Options{ReportSpec: json.RawMessage(`{"scope":{"params":[{"id":"mode","kind":"select","label":"Collection mode","value":"reviewed","options":[{"value":"reviewed","label":"Reviewed collection"}]}]},"datasets":[{"id":"internal_source_a","request":{"options":{"mode":"reviewed","fixedGrouping":"segment","sourceOnly":true}}},{"id":"internal_source_b","request":{"options":{"fixedGrouping":"sample","sourceOnly":false}}}]}`)}
+	before := string(options.ReportSpec)
+	require.Empty(t, reportOptionLines(options), "scope controls retain their canonical filter-bar context without an appendix of fixed inputs")
+	require.Equal(t, before, string(options.ReportSpec))
+	// Separately declared public options retain their effective values and labels.
+	options.Metadata = json.RawMessage(`{"reportOptions":[{"name":"mode","label":"Collection mode","values":[{"value":"reviewed","label":"Reviewed collection"}]}]}`)
+	require.Equal(t, []string{"Collection mode: Reviewed collection"}, reportOptionLines(options))
+	// An explicitly empty scope catalog does not expose internal inputs either.
+	options.Metadata = nil
+	options.ReportSpec = json.RawMessage(`{"scope":{"params":[]},"datasets":[{"request":{"options":{"fixedGrouping":"sample"}}}]}`)
+	require.Empty(t, reportOptionLines(options))
+}

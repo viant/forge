@@ -61598,23 +61598,66 @@ ${indent}${end}`;
     };
   }
   function buildLegendSvg(seriesDescriptors = [], width = 680, y4 = 0) {
-    const itemWidth = 160;
-    const rowHeight = 18;
-    const perRow = Math.max(1, Math.floor(Math.max(width, itemWidth) / itemWidth));
-    const items = seriesDescriptors.map((series, index) => {
+    const availableWidth = Math.max(1, width - 24);
+    const perRow = Math.max(1, Math.min(seriesDescriptors.length, Math.floor(availableWidth / 160)));
+    const itemWidth = availableWidth / perRow;
+    const maxCharacters = Math.max(1, Math.floor((itemWidth - 30) / 11));
+    const entries = seriesDescriptors.map((series) => ({ series, lines: wrapReportPrintLabel(series.label, maxCharacters) }));
+    const rowHeights = [];
+    entries.forEach((entry, index) => {
+      const row = Math.floor(index / perRow);
+      rowHeights[row] = Math.max(rowHeights[row] || 18, entry.lines.length * 14 + 4);
+    });
+    let rowY = y4;
+    const rowOffsets = rowHeights.map((height) => {
+      const offset = rowY;
+      rowY += height;
+      return offset;
+    });
+    const items = entries.map(({ series, lines: lines2 }, index) => {
       const column = index % perRow;
       const row = Math.floor(index / perRow);
       const itemX = 12 + column * itemWidth;
-      const itemY = y4 + row * rowHeight;
+      const itemY = rowOffsets[row];
       return `
       <rect x="${itemX}" y="${itemY + 3}" width="12" height="12" rx="2" fill="${escapeXml(series.color)}" />
-      <text x="${itemX + 18}" y="${itemY + 14}" font-size="11" fill="#344054">${escapeXml(series.label)}</text>
+      ${lines2.map((line, lineIndex) => `<text x="${itemX + 18}" y="${itemY + 14 + lineIndex * 14}" font-size="11" fill="#344054">${escapeXml(line)}</text>`).join("")}
     `;
     }).join("\n");
     return {
       svg: items,
-      height: Math.ceil(seriesDescriptors.length / perRow) * rowHeight + 4
+      height: rowY - y4 + 4
     };
+  }
+  function buildLegendContinuationPages(seriesDescriptors, width, maxHeight) {
+    const maxCharacters = Math.max(1, Math.floor((width - 42) / 11));
+    const pages = [];
+    let items = [];
+    let y4 = 0;
+    const flush = () => {
+      if (!items.length) return;
+      const height = Math.max(120, y4 + 4);
+      pages.push({ svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">${items.join("")}</svg>`, height, diagnostics: [], startNewPage: true });
+      items = [];
+      y4 = 0;
+    };
+    for (const series of seriesDescriptors) {
+      const lines2 = wrapReportPrintLabel(series.label, maxCharacters);
+      while (lines2.length) {
+        const capacity = Math.floor((maxHeight - y4 - 8) / 14);
+        if (capacity < 1) {
+          flush();
+          continue;
+        }
+        const part = lines2.splice(0, capacity);
+        items.push(`<rect x="12" y="${y4 + 3}" width="12" height="12" rx="2" fill="${escapeXml(series.color)}" />`);
+        items.push(...part.map((line, index) => `<text x="30" y="${y4 + 14 + index * 14}" font-size="11" fill="#344054">${escapeXml(line)}</text>`));
+        y4 += part.length * 14 + 4;
+        if (lines2.length) flush();
+      }
+    }
+    flush();
+    return pages;
   }
   function buildPolylinePath(points = []) {
     if (points.length === 0) {
@@ -61803,7 +61846,8 @@ ${indent}${end}`;
   function renderCartesianChartSvg({
     chartModel = {},
     resolvedChart = {},
-    width = 680
+    width = 680,
+    omitLegend = false
   } = {}) {
     var _a5, _b, _c;
     const rows = resolveCartesianRows(resolvedChart);
@@ -61867,7 +61911,7 @@ ${indent}${end}`;
       return leftPad + index * (plotWidth / (rows.length - 1));
     });
     const labelStep = Math.max(1, Math.ceil(rows.length / 6));
-    const legend = buildLegendSvg(seriesDescriptors, width, plotHeight + bottomPad + 4);
+    const legend = omitLegend ? { svg: "", height: 0 } : buildLegendSvg(seriesDescriptors, width, plotHeight + bottomPad + 4);
     const height = topPad + plotHeight + bottomPad + legend.height + 12;
     const annotations = renderCartesianAnnotationsSvg({
       chartModel,
@@ -62023,7 +62067,8 @@ ${indent}${end}`;
     resolvedChart = {},
     width = 680,
     valueBounds = null,
-    categoryOffset = 0
+    categoryOffset = 0,
+    omitLegend = false
   } = {}) {
     const rows = resolveCartesianRows(resolvedChart);
     const seriesDescriptors = resolveCartesianSeriesDescriptors(chartModel, resolvedChart);
@@ -62081,7 +62126,7 @@ ${indent}${end}`;
     const valueRange = bounds.maxValue - bounds.minValue || 1;
     const baselineX = leftPad + (0 - bounds.minValue) / valueRange * plotWidth;
     const perSeriesHeight = Math.max(10, Math.floor((rowHeight - Math.max(0, seriesDescriptors.length - 1) * 4) / Math.max(seriesDescriptors.length, 1)));
-    const legend = buildLegendSvg(seriesDescriptors, width, topPad + plotHeight + bottomPad + 4);
+    const legend = omitLegend ? { svg: "", height: 0 } : buildLegendSvg(seriesDescriptors, width, topPad + plotHeight + bottomPad + 4);
     const height = baseHeight + legend.height;
     const annotations = renderHorizontalBarAnnotationsSvg({
       chartModel,
@@ -62196,14 +62241,25 @@ ${indent}${end}`;
     resolvedChart = { ...resolvedChart, rows: applyChartRowLimit(resolvedChart == null ? void 0 : resolvedChart.rows, rowLimit) };
     const type = normalizeString39((chartModel == null ? void 0 : chartModel.type) || (resolvedChart == null ? void 0 : resolvedChart.type)).toLowerCase();
     if (!["horizontal_bar", "funnel_bar"].includes(type) || !["directSeries", "groupedSeries"].includes(resolvedChart == null ? void 0 : resolvedChart.kind)) {
-      return [{ ...buildReportPrintChartSvg({ chartModel, resolvedChart, width }), sourceRowOffset: 0, sourceRowCount: resolvedChart.rows.length }];
+      const result = buildReportPrintChartSvg({ chartModel, resolvedChart, width });
+      if (result.svg && result.height > maxHeight && ["directSeries", "groupedSeries"].includes(resolvedChart == null ? void 0 : resolvedChart.kind)) {
+        const plot = renderCartesianChartSvg({ chartModel, resolvedChart, width, omitLegend: true });
+        if (plot.height <= maxHeight && maxHeight >= 120) {
+          const descriptors2 = resolveCartesianSeriesDescriptors(chartModel, resolvedChart).filter((series) => resolvedChart.rows.some((row) => normalizeNumber2(row == null ? void 0 : row[series.key]) != null));
+          return [{ ...plot, sourceRowOffset: 0, sourceRowCount: resolvedChart.rows.length }, ...buildLegendContinuationPages(descriptors2, width, maxHeight)];
+        }
+      }
+      return [{ ...result, sourceRowOffset: 0, sourceRowCount: resolvedChart.rows.length }];
     }
     const rows = resolveCartesianRows(resolvedChart);
     if (!rows.length) return [buildReportPrintChartSvg({ chartModel, resolvedChart, width })];
     const descriptors = resolveCartesianSeriesDescriptors(chartModel, resolvedChart);
     const valueBounds = computeCartesianValueBounds(rows, descriptors);
     const hasLayout = valueBounds && descriptors.length > 0 && descriptors.every((series) => resolveChartSupportedSeriesType(series.type) === "horizontal_bar");
-    const legendHeight = hasLayout ? buildLegendSvg(descriptors, width, 0).height : 0;
+    const fullLegendHeight = hasLayout ? buildLegendSvg(descriptors, width, 0).height : 0;
+    const minimumPlotHeight = horizontalBarChartMetrics(1, descriptors.length).height;
+    const omitLegend = hasLayout && maxHeight >= 120 && minimumPlotHeight <= maxHeight && minimumPlotHeight + fullLegendHeight > maxHeight;
+    const legendHeight = omitLegend ? 0 : fullLegendHeight;
     const pages = [];
     let offset = 0;
     while (offset < rows.length) {
@@ -62216,10 +62272,10 @@ ${indent}${end}`;
         if (height <= availableHeight) count = middle;
         else upper = middle - 1;
       }
-      pages.push({ ...renderHorizontalBarChartSvg({ chartModel, resolvedChart: { ...resolvedChart, rows: rows.slice(offset, offset + count) }, width, valueBounds, categoryOffset: offset }), sourceRowOffset: offset, sourceRowCount: count, sourceValueBounds: valueBounds });
+      pages.push({ ...renderHorizontalBarChartSvg({ chartModel, resolvedChart: { ...resolvedChart, rows: rows.slice(offset, offset + count) }, width, valueBounds, categoryOffset: offset, omitLegend }), sourceRowOffset: offset, sourceRowCount: count, sourceValueBounds: valueBounds });
       offset += count;
     }
-    return pages;
+    return omitLegend ? [...pages, ...buildLegendContinuationPages(descriptors, width, maxHeight)] : pages;
   }
 
   // src/reporting/reportPrintGeoSvg.js
@@ -70254,19 +70310,22 @@ ${indent}${end}`;
       return;
     }
     const titleHeight = reportPrintTitleHeight(state, block, layoutNote);
+    const continuationBlock = { ...block, title: `${resolveReportPrintBlockTitle(block)} (continued)`, content: { ...block.content, title: `${resolveReportPrintBlockTitle(block)} (continued)` } };
+    const continuationTitleHeight = reportPrintTitleHeight(state, continuationBlock, layoutNote);
     const chartPages = buildReportPrintChartPages({
       chartModel: ((_l = block == null ? void 0 : block.content) == null ? void 0 : _l.chartModel) || (block == null ? void 0 : block.chartModel) || {},
       resolvedChart: ((_m = block == null ? void 0 : block.content) == null ? void 0 : _m.resolvedChart) || null,
       rowLimit: (_p = (_o = (_n = block == null ? void 0 : block.content) == null ? void 0 : _n.rowLimit) != null ? _o : block == null ? void 0 : block.rowLimit) != null ? _p : 0,
       width: state.contentWidth,
-      maxHeight: state.contentBottom - state.contentTop - titleHeight,
+      maxHeight: state.contentBottom - state.contentTop - Math.max(titleHeight, continuationTitleHeight),
       firstMaxHeight: state.contentBottom - state.cursorY - titleHeight >= 180 ? state.contentBottom - state.cursorY - titleHeight : state.contentBottom - state.contentTop - titleHeight - (state.sectionHeadingHeight || 0)
     });
     for (const [pageIndex, svgResult] of chartPages.entries()) {
       if ((svgResult == null ? void 0 : svgResult.startNewPage) && state.cursorY > state.contentTop) startNextReportPrintPage(state);
-      const pageBlock = pageIndex === 0 ? block : { ...block, title: `${resolveReportPrintBlockTitle(block)} (continued)`, content: { ...block.content, title: `${resolveReportPrintBlockTitle(block)} (continued)` } };
+      const pageBlock = pageIndex === 0 ? block : continuationBlock;
+      const pageTitleHeight = pageIndex === 0 ? titleHeight : continuationTitleHeight;
       const chartHeight = (svgResult == null ? void 0 : svgResult.svg) ? Math.max(120, Number(svgResult.height) || 0) : REPORT_PRINT_THEME.bodyLineHeight;
-      ensureReportPrintSpace(state, titleHeight + chartHeight);
+      ensureReportPrintSpace(state, pageTitleHeight + chartHeight);
       renderReportPrintSectionTitle(state, pageBlock, { layoutNote, continuation: pageIndex > 0 });
       if (!(svgResult == null ? void 0 : svgResult.svg)) {
         const placeholder = renderReportPrintTextLines(state, {

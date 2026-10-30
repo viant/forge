@@ -587,23 +587,69 @@ function renderHorizontalBarAnnotationsSvg({
 }
 
 function buildLegendSvg(seriesDescriptors = [], width = 680, y = 0) {
-  const itemWidth = 160;
-  const rowHeight = 18;
-  const perRow = Math.max(1, Math.floor(Math.max(width, itemWidth) / itemWidth));
-  const items = seriesDescriptors.map((series, index) => {
+  const availableWidth = Math.max(1, width - 24);
+  const perRow = Math.max(1, Math.min(seriesDescriptors.length, Math.floor(availableWidth / 160)));
+  const itemWidth = availableWidth / perRow;
+  // Use the same conservative glyph bound as category legends. Every line
+  // stays inside its column, including unbroken identifiers and wide glyphs.
+  const maxCharacters = Math.max(1, Math.floor((itemWidth - 30) / 11));
+  const entries = seriesDescriptors.map(series => ({series, lines: wrapReportPrintLabel(series.label, maxCharacters)}));
+  const rowHeights = [];
+  entries.forEach((entry, index) => {
+    const row = Math.floor(index / perRow);
+    rowHeights[row] = Math.max(rowHeights[row] || 18, entry.lines.length * 14 + 4);
+  });
+  let rowY = y;
+  const rowOffsets = rowHeights.map(height => {
+    const offset = rowY;
+    rowY += height;
+    return offset;
+  });
+  const items = entries.map(({series, lines}, index) => {
     const column = index % perRow;
     const row = Math.floor(index / perRow);
     const itemX = 12 + (column * itemWidth);
-    const itemY = y + (row * rowHeight);
+    const itemY = rowOffsets[row];
     return `
       <rect x="${itemX}" y="${itemY + 3}" width="12" height="12" rx="2" fill="${escapeXml(series.color)}" />
-      <text x="${itemX + 18}" y="${itemY + 14}" font-size="11" fill="#344054">${escapeXml(series.label)}</text>
+      ${lines.map((line, lineIndex) => `<text x="${itemX + 18}" y="${itemY + 14 + lineIndex * 14}" font-size="11" fill="#344054">${escapeXml(line)}</text>`).join("")}
     `;
   }).join("\n");
   return {
     svg: items,
-    height: (Math.ceil(seriesDescriptors.length / perRow) * rowHeight) + 4,
+    height: rowY - y + 4,
   };
+}
+
+// A legend that cannot share a printable page with its plot becomes bounded
+// continuation content. Even one unusually long label can span several pages;
+// repeat its swatch so every continuation retains the series/color mapping.
+function buildLegendContinuationPages(seriesDescriptors, width, maxHeight) {
+  const maxCharacters = Math.max(1, Math.floor((width - 42) / 11));
+  const pages = [];
+  let items = [];
+  let y = 0;
+  const flush = () => {
+    if (!items.length) return;
+    const height = Math.max(120, y + 4);
+    pages.push({svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">${items.join("")}</svg>`, height, diagnostics: [], startNewPage: true});
+    items = [];
+    y = 0;
+  };
+  for (const series of seriesDescriptors) {
+    const lines = wrapReportPrintLabel(series.label, maxCharacters);
+    while (lines.length) {
+      const capacity = Math.floor((maxHeight - y - 8) / 14);
+      if (capacity < 1) { flush(); continue; }
+      const part = lines.splice(0, capacity);
+      items.push(`<rect x="12" y="${y + 3}" width="12" height="12" rx="2" fill="${escapeXml(series.color)}" />`);
+      items.push(...part.map((line, index) => `<text x="30" y="${y + 14 + index * 14}" font-size="11" fill="#344054">${escapeXml(line)}</text>`));
+      y += part.length * 14 + 4;
+      if (lines.length) flush();
+    }
+  }
+  flush();
+  return pages;
 }
 
 function buildPolylinePath(points = []) {
@@ -812,6 +858,7 @@ function renderCartesianChartSvg({
   chartModel = {},
   resolvedChart = {},
   width = 680,
+  omitLegend = false,
 } = {}) {
   const rows = resolveCartesianRows(resolvedChart);
   const seriesDescriptors = resolveCartesianSeriesDescriptors(chartModel, resolvedChart)
@@ -883,7 +930,7 @@ function renderCartesianChartSvg({
     return leftPad + (index * (plotWidth / (rows.length - 1)));
   });
   const labelStep = Math.max(1, Math.ceil(rows.length / 6));
-  const legend = buildLegendSvg(seriesDescriptors, width, plotHeight + bottomPad + 4);
+  const legend = omitLegend ? {svg: "", height: 0} : buildLegendSvg(seriesDescriptors, width, plotHeight + bottomPad + 4);
   const height = topPad + plotHeight + bottomPad + legend.height + 12;
   const annotations = renderCartesianAnnotationsSvg({
     chartModel,
@@ -1049,6 +1096,7 @@ function renderHorizontalBarChartSvg({
   width = 680,
   valueBounds = null,
   categoryOffset = 0,
+  omitLegend = false,
 } = {}) {
   const rows = resolveCartesianRows(resolvedChart);
   const seriesDescriptors = resolveCartesianSeriesDescriptors(chartModel, resolvedChart);
@@ -1109,7 +1157,7 @@ function renderHorizontalBarChartSvg({
   const valueRange = bounds.maxValue - bounds.minValue || 1;
   const baselineX = leftPad + (((0 - bounds.minValue) / valueRange) * plotWidth);
   const perSeriesHeight = Math.max(10, Math.floor((rowHeight - (Math.max(0, seriesDescriptors.length - 1) * 4)) / Math.max(seriesDescriptors.length, 1)));
-  const legend = buildLegendSvg(seriesDescriptors, width, topPad + plotHeight + bottomPad + 4);
+  const legend = omitLegend ? {svg: "", height: 0} : buildLegendSvg(seriesDescriptors, width, topPad + plotHeight + bottomPad + 4);
   const height = baseHeight + legend.height;
   const annotations = renderHorizontalBarAnnotationsSvg({
     chartModel,
@@ -1239,7 +1287,16 @@ export function buildReportPrintChartPages({ chartModel = {}, resolvedChart = {}
   resolvedChart = { ...resolvedChart, rows: applyChartRowLimit(resolvedChart?.rows, rowLimit) };
   const type = normalizeString(chartModel?.type || resolvedChart?.type).toLowerCase();
   if (!["horizontal_bar", "funnel_bar"].includes(type) || !["directSeries", "groupedSeries"].includes(resolvedChart?.kind)) {
-    return [{...buildReportPrintChartSvg({ chartModel, resolvedChart, width }), sourceRowOffset: 0, sourceRowCount: resolvedChart.rows.length}];
+    const result = buildReportPrintChartSvg({ chartModel, resolvedChart, width });
+    if (result.svg && result.height > maxHeight && ["directSeries", "groupedSeries"].includes(resolvedChart?.kind)) {
+      const plot = renderCartesianChartSvg({chartModel, resolvedChart, width, omitLegend: true});
+      if (plot.height <= maxHeight && maxHeight >= 120) {
+        const descriptors = resolveCartesianSeriesDescriptors(chartModel, resolvedChart)
+          .filter(series => resolvedChart.rows.some(row => normalizeNumber(row?.[series.key]) != null));
+        return [{...plot, sourceRowOffset: 0, sourceRowCount: resolvedChart.rows.length}, ...buildLegendContinuationPages(descriptors, width, maxHeight)];
+      }
+    }
+    return [{...result, sourceRowOffset: 0, sourceRowCount: resolvedChart.rows.length}];
   }
   const rows = resolveCartesianRows(resolvedChart);
   if (!rows.length) return [buildReportPrintChartSvg({ chartModel, resolvedChart, width })];
@@ -1247,7 +1304,10 @@ export function buildReportPrintChartPages({ chartModel = {}, resolvedChart = {}
   const valueBounds = computeCartesianValueBounds(rows, descriptors);
   const hasLayout = valueBounds && descriptors.length > 0
     && descriptors.every((series) => resolveChartSupportedSeriesType(series.type) === "horizontal_bar");
-  const legendHeight = hasLayout ? buildLegendSvg(descriptors, width, 0).height : 0;
+  const fullLegendHeight = hasLayout ? buildLegendSvg(descriptors, width, 0).height : 0;
+  const minimumPlotHeight = horizontalBarChartMetrics(1, descriptors.length).height;
+  const omitLegend = hasLayout && maxHeight >= 120 && minimumPlotHeight <= maxHeight && minimumPlotHeight + fullLegendHeight > maxHeight;
+  const legendHeight = omitLegend ? 0 : fullLegendHeight;
   const pages = [];
   let offset = 0;
   while (offset < rows.length) {
@@ -1262,8 +1322,8 @@ export function buildReportPrintChartPages({ chartModel = {}, resolvedChart = {}
       if (height <= availableHeight) count = middle;
       else upper = middle - 1;
     }
-    pages.push({...renderHorizontalBarChartSvg({ chartModel, resolvedChart: { ...resolvedChart, rows: rows.slice(offset, offset + count) }, width, valueBounds, categoryOffset: offset }), sourceRowOffset:offset, sourceRowCount:count, sourceValueBounds:valueBounds});
+    pages.push({...renderHorizontalBarChartSvg({ chartModel, resolvedChart: { ...resolvedChart, rows: rows.slice(offset, offset + count) }, width, valueBounds, categoryOffset: offset, omitLegend }), sourceRowOffset:offset, sourceRowCount:count, sourceValueBounds:valueBounds});
     offset += count;
   }
-  return pages;
+  return omitLegend ? [...pages, ...buildLegendContinuationPages(descriptors, width, maxHeight)] : pages;
 }
