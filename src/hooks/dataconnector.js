@@ -77,11 +77,11 @@ export function createDataConnector(dataSource, runtime = {}) {
         }
     }
 
-    function applyRequestPreparation({url, method, headers, queryParams, body}) {
+    async function applyRequestPreparation({url, method, headers, queryParams, body}) {
         if (typeof prepareRequest !== 'function') {
             return {url, method, headers, queryParams, body};
         }
-        const overrides = prepareRequest({
+        const overrides = await prepareRequest({
             dataSource,
             url,
             method,
@@ -277,7 +277,7 @@ export function createDataConnector(dataSource, runtime = {}) {
             let body = {};
             url = applyParameters({url, headers, queryParams, body}, inputParameters);
             appendServiceTargetContext(queryParams);
-            ({url, method, headers, queryParams, body} = applyRequestPreparation({url, method, headers, queryParams, body}));
+            ({url, method, headers, queryParams, body} = await applyRequestPreparation({url, method, headers, queryParams, body}));
             const finalUrl = appendQueryParams(url, queryParams);
 
             const request = {method, headers};
@@ -351,7 +351,7 @@ export function createDataConnector(dataSource, runtime = {}) {
                 : body;
             if (invocationId) headers = {...(headers || {}), 'X-Forge-Invocation-Id': String(invocationId)};
             if (requestMethod === 'GET' && ifNoneMatch) headers = {...(headers || {}), 'If-None-Match': String(ifNoneMatch)};
-            ({url, method, headers, queryParams, body: payload} = applyRequestPreparation({
+            ({url, method, headers, queryParams, body: payload} = await applyRequestPreparation({
                 url,
                 method: requestMethod,
                 headers,
@@ -438,7 +438,7 @@ export function createDataConnector(dataSource, runtime = {}) {
             // apply path/query/header/body parameters
             url = applyParameters({url, headers, queryParams, body}, inputParameters);
             appendServiceTargetContext(queryParams);
-            ({url, method, headers, queryParams, body} = applyRequestPreparation({
+            ({url, method, headers, queryParams, body} = await applyRequestPreparation({
                 url,
                 method: String(method || 'POST').toUpperCase(),
                 headers,
@@ -478,7 +478,7 @@ export function createDataConnector(dataSource, runtime = {}) {
             let queryParams = new URLSearchParams();
             url = applyParameters({url, headers, queryParams, body}, inputParameters);
             appendServiceTargetContext(queryParams);
-            ({url, method, headers, queryParams, body} = applyRequestPreparation({
+            ({url, method, headers, queryParams, body} = await applyRequestPreparation({
                 url,
                 method: String(method || 'PATCH').toUpperCase(),
                 headers,
@@ -513,7 +513,7 @@ export function createDataConnector(dataSource, runtime = {}) {
             let queryParams = new URLSearchParams();
             url = applyParameters({url, headers, queryParams, body}, inputParameters);
             appendServiceTargetContext(queryParams);
-            ({url, method, headers, queryParams, body} = applyRequestPreparation({
+            ({url, method, headers, queryParams, body} = await applyRequestPreparation({
                 url,
                 method: String(method || 'PUT').toUpperCase(),
                 headers,
@@ -548,7 +548,7 @@ export function createDataConnector(dataSource, runtime = {}) {
             let queryParams = new URLSearchParams();
             url = `${url}/${id}`;
             appendServiceTargetContext(queryParams);
-            ({url, method, headers, queryParams} = applyRequestPreparation({
+            ({url, method, headers, queryParams} = await applyRequestPreparation({
                 url,
                 method: String(method || 'DELETE').toUpperCase(),
                 headers,

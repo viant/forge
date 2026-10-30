@@ -19,5 +19,19 @@ try {
  const detached=getActiveUIBridgeTransportContext();detached.sessionId='forged';
  assert.equal(getActiveUIBridgeTransportContext().sessionId,'owned-session');
  stop();assert.equal(getActiveUIBridgeTransportContext(),null);
+ let restoring, release;
+ const restoreStarted=new Promise(resolve=>{restoring=resolve});
+ const restorePending=new Promise(resolve=>{release=resolve});
+ globalThis.fetch=async(_url,init)=>{
+  const request=JSON.parse(init.body),headers={'Mcp-Session-Id':'early-session'};
+  if(request.method==='ui.snapshot.get'){restoring();await restorePending;}
+  if(request.method==='ui.poll')return new Response('',{status:202,headers});
+  return new Response(JSON.stringify({jsonrpc:'2.0',id:request.id,result:request.method==='ui.snapshot.get'?{snapshot:{windows:[]}}:{ok:true}}),{status:200,headers});
+ };
+ stop=startUIBridgeHTTP({url:'http://owned/v1/ui/rpc',clientId:'early-client',snapshotIntervalMs:60000,pollCycleDelayMs:1000});
+ await restoreStarted;
+ assert.equal(getActiveUIBridgeTransportContext()?.sessionId,'early-session','authenticated transport must not wait for window snapshot restoration');
+ release();assert.equal(await waitForUIBridgeReady(2000),true);
+ stop();assert.equal(getActiveUIBridgeTransportContext(),null);
  console.log('bridge transport ownership lifecycle PASS');
 } finally {stop?.();Object.assign(globalThis,original);}

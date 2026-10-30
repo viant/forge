@@ -89,6 +89,7 @@ describe('createDataConnector', () => {
 
         const first = connector.get({});
         const second = connector.get({});
+        await vi.waitFor(()=>expect(global.fetch).toHaveBeenCalledTimes(1));
         resolveFetch();
 
         await expect(first).resolves.toEqual({ ok: true });
@@ -324,5 +325,13 @@ it('does not turn an untyped403 or401 into a dataset marker',async()=>{
 it('explicit fresh metadata reads bypass pending GET sharing and browser response caches',async()=>{
  const completions=[];global.fetch=vi.fn(()=>new Promise(resolve=>completions.push(()=>resolve({ok:true,json:async()=>({fresh:true})}))));
  const connector=createDataConnector({service:{URL:'/v1/workspace/metadata',method:'GET'}},{endpoints:{},targetContext:{},auth:{}});
- const normal=connector.get({}),fresh=connector.get({fresh:true});expect(global.fetch).toHaveBeenCalledTimes(2);expect(global.fetch.mock.calls[0][1]).not.toHaveProperty('cache');expect(global.fetch.mock.calls[1][1].cache).toBe('no-store');for(const complete of completions)complete();await normal;await fresh;
+ const normal=connector.get({}),fresh=connector.get({fresh:true});await vi.waitFor(()=>expect(global.fetch).toHaveBeenCalledTimes(2));expect(global.fetch.mock.calls[0][1]).not.toHaveProperty('cache');expect(global.fetch.mock.calls[1][1].cache).toBe('no-store');for(const complete of completions)complete();await normal;await fresh;
+});
+
+it('awaits host request preparation before sending any datasource request',async()=>{
+ let ready;const preparation=new Promise(resolve=>{ready=resolve});
+ global.fetch=vi.fn(async()=>new Response(JSON.stringify({data:[]}),{status:200}));
+ const connector=createDataConnector({service:{URL:'/rows',method:'POST'}},{prepareRequest:async()=>{await preparation;return {headers:{'Mcp-Session-Id':'negotiated'}};}});
+ const pending=connector.get();await Promise.resolve();expect(global.fetch).not.toHaveBeenCalled();
+ ready();await pending;expect(global.fetch).toHaveBeenCalledOnce();expect(global.fetch.mock.calls[0][1].headers['Mcp-Session-Id']).toBe('negotiated');
 });
