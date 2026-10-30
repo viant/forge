@@ -670,7 +670,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         }
 
         if (directSeriesChart) {
-            const sorted = applyChartRowLimit(aggregateDirectSeriesData(chartRows, xAxis?.dataKey, seriesDefinitions), chart?.rowLimit);
+            const sorted = applyChartRowLimit(aggregateDirectSeriesData(chartRows, xAxis?.dataKey, seriesDefinitions, chart), chart?.rowLimit);
             return {
                 chartData: sorted,
                 availableDataKeys: seriesDefinitions.map((entry) => entry.value),

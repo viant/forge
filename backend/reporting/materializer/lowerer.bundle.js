@@ -45737,7 +45737,7 @@ Please __addLocaleData before adding additional unit data`);
     const keys3 = Array.from(keysSet);
     return { data: data2, keys: keys3 };
   }
-  function aggregateDirectSeriesData(rawData = [], xAxisKey = "", seriesDefinitions = []) {
+  function aggregateDirectSeriesData(rawData = [], xAxisKey = "", seriesDefinitions = [], options = {}) {
     const key2 = normalizeChartKey(xAxisKey);
     if (!key2 || !Array.isArray(rawData) || rawData.length === 0) {
       return Array.isArray(rawData) ? rawData : [];
@@ -45770,7 +45770,9 @@ Please __addLocaleData before adding additional unit data`);
       existing.__chartSelectionRows.push(row);
       grouped.set(bucketKey, existing);
     });
-    return Array.from(grouped.values()).sort(
+    const rows = Array.from(grouped.values());
+    if ((options == null ? void 0 : options.preserveCategoryOrder) === true) return rows;
+    return rows.sort(
       (left, right) => new Date(readChartDataValue(left, key2)) - new Date(readChartDataValue(right, key2))
     );
   }
@@ -46211,7 +46213,7 @@ Please __addLocaleData before adding additional unit data`);
       } else if (!((_a5 = chart.series) == null ? void 0 : _a5.nameKey)) {
         if (typeof ((_b = chart.xAxis) == null ? void 0 : _b.dataKey) !== "string" || !chart.xAxis.dataKey.trim()) fail("Cartesian tooltip requires an explicit nonempty xAxis.dataKey");
         if (!Array.isArray((_c = chart.series) == null ? void 0 : _c.values) || !chart.series.values.length || chart.series.values.some((series) => typeof series.value !== "string" || !series.value.trim())) fail("Cartesian tooltip requires explicit nonempty series value keys");
-        applyChartRowLimit(aggregateDirectSeriesData(rows, chart.xAxis.dataKey, chart.series.values), chart.rowLimit).forEach((row) => (chart.series.values || []).forEach((series) => add(readChartDataValue(row, chart.xAxis.dataKey), series.value, series.label || series.name || series.value, sourceRows(row, series.value))));
+        applyChartRowLimit(aggregateDirectSeriesData(rows, chart.xAxis.dataKey, chart.series.values, chart), chart.rowLimit).forEach((row) => (chart.series.values || []).forEach((series) => add(readChartDataValue(row, chart.xAxis.dataKey), series.value, series.label || series.name || series.value, sourceRows(row, series.value))));
       } else {
         if (typeof ((_d = chart.xAxis) == null ? void 0 : _d.dataKey) !== "string" || !chart.xAxis.dataKey.trim()) fail("Cartesian tooltip requires an explicit nonempty xAxis.dataKey");
         const { data: data2, keys: keys3 } = transformData(rows, chart, chart.series.valueKey);
@@ -56200,7 +56202,7 @@ Please __addLocaleData before adding additional unit data`);
       }
       const seriesValues = Array.isArray((_f = chart == null ? void 0 : chart.series) == null ? void 0 : _f.values) ? chart.series.values : [];
       const seriesKeys = seriesValues.map((entry) => normalizeChartKey(entry == null ? void 0 : entry.value)).filter(Boolean);
-      const resolvedRows = aggregateDirectSeriesData(chartRows, xAxisKey2, seriesValues);
+      const resolvedRows = aggregateDirectSeriesData(chartRows, xAxisKey2, seriesValues, chart);
       return {
         kind: "directSeries",
         type,
@@ -70820,6 +70822,11 @@ ${indent}${end}`;
     if (type === "integer" || type === "number") return "compactNumber";
     return "";
   }
+  function normalizeDisplayKey(value) {
+    const path = normalizeString42(value);
+    if (path) assertSafeAssignmentPath(path);
+    return path;
+  }
   function normalizeTablePresentation(value = null) {
     if (!value || typeof value !== "object" || Array.isArray(value)) return null;
     const labelClamp = normalizePresentationClampConfig((value == null ? void 0 : value.labelClamp) || (value == null ? void 0 : value.LabelClamp));
@@ -70867,7 +70874,8 @@ ${indent}${end}`;
       role: normalizeString42(column == null ? void 0 : column.role).toLowerCase(),
       type: normalizeString42(column == null ? void 0 : column.type).toLowerCase(),
       format: normalizeFormat(column),
-      label: normalizeString42(column == null ? void 0 : column.label) || humanize(column == null ? void 0 : column.name)
+      label: normalizeString42(column == null ? void 0 : column.label) || humanize(column == null ? void 0 : column.name),
+      displayKey: normalizeDisplayKey(column == null ? void 0 : column.displayKey)
     })).filter((column) => column.name && (column.role === "dimension" || column.role === "measure"));
     if (columns.length === 0) {
       return finish();
@@ -70880,6 +70888,7 @@ ${indent}${end}`;
       id: column.name,
       key: column.name,
       label: column.label,
+      ...column.displayKey ? { displayKey: column.displayKey } : {},
       ...column.format ? { format: column.format } : {},
       ...defaultDimensions.has(column.name) ? { default: true } : {},
       paramPath: `dimensions.${column.name}`
