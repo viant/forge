@@ -3,6 +3,7 @@ import { Button, Dialog, Icon, Menu, MenuDivider, MenuItem, Popover } from "@blu
 import { useSignals } from "@preact/signals-react/runtime";
 
 import LookupSelectionInput from "../lookup/LookupSelectionInput.jsx";
+import { reportBuilderOptionValueKey } from "./reportBuilderOptions.js";
 import MarkdownEditor from "../MarkdownEditor.jsx";
 import { useDataSourceState } from "../../hooks/useDataSourceState.js";
 import { resolveReportDatasetRefResolution } from "../../reporting/reportDatasetRefModel.js";
@@ -5052,7 +5053,7 @@ export function InlineStaticFilterControl({
                         const active = activeValues.includes(option.value);
                         return (
                             <button
-                                key={String(option.value)}
+                                key={reportBuilderOptionValueKey(option.value)}
                                 type="button"
                                 className={[
                                     plainOptions ? "forge-report-builder-text-option" : "forge-report-builder-icon-button",
@@ -5179,7 +5180,7 @@ export function StaticFilterSection({
                     const active = activeValues.includes(option.value);
                     return (
                         <button
-                            key={String(option.value)}
+                            key={reportBuilderOptionValueKey(option.value)}
                             type="button"
                             className={[
                                 "forge-report-builder-icon-button",

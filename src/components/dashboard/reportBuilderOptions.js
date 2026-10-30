@@ -38,7 +38,7 @@ function coerceValue(value, type) {
   return String(value);
 }
 
-function valueKey(value) {
+export function reportBuilderOptionValueKey(value) {
   return `${typeof value}:${JSON.stringify(value)}`;
 }
 
@@ -69,10 +69,10 @@ export function normalizeReportBuilderOptionDefinitions(values = []) {
       const optionValues = (Array.isArray(entry.values) ? entry.values : [])
         .map((value) => normalizeValueEntry(value, type))
         .filter(Boolean);
-      const allowedKeys = new Set(optionValues.map((value) => valueKey(value.value)));
+      const allowedKeys = new Set(optionValues.map((value) => reportBuilderOptionValueKey(value.value)));
       const coercedDefault = coerceValue(entry.default, type);
       const defaultValue = coercedDefault !== undefined
-        && (allowedKeys.size === 0 || allowedKeys.has(valueKey(coercedDefault)))
+        && (allowedKeys.size === 0 || allowedKeys.has(reportBuilderOptionValueKey(coercedDefault)))
         ? coercedDefault
         : undefined;
       const presentation = entry.presentation;
@@ -94,10 +94,10 @@ export function normalizeReportBuilderOptionDefinitions(values = []) {
 export function resolveEffectiveReportBuilderOptions(definitions = [], selected = {}) {
   const source = selected && typeof selected === "object" && !Array.isArray(selected) ? selected : {};
   return normalizeReportBuilderOptionDefinitions(definitions).reduce((result, definition) => {
-    const allowed = new Set(definition.values.map((entry) => valueKey(entry.value)));
+    const allowed = new Set(definition.values.map((entry) => reportBuilderOptionValueKey(entry.value)));
     const selectedValue = coerceValue(source[definition.name], definition.type);
     const selectedValid = selectedValue !== undefined
-      && (allowed.size === 0 || allowed.has(valueKey(selectedValue)));
+      && (allowed.size === 0 || allowed.has(reportBuilderOptionValueKey(selectedValue)));
     if (selectedValid) {
       result[definition.name] = selectedValue;
     } else if (Object.prototype.hasOwnProperty.call(definition, "default")) {

@@ -3759,7 +3759,11 @@ export default function ReportRuntime({
             gap: 16,
           }}
         >
-          {topFilterBarBlocks.map((block) => renderFilterBarBlock(block))}
+          {topFilterBarBlocks.map((block) => (
+            <div key={block.id} data-report-runtime-block-id={normalizeString(block.id)}>
+              {renderFilterBarBlock(block)}
+            </div>
+          ))}
         </div>
       ) : null);
 
