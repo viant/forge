@@ -9,7 +9,7 @@ import {getWindowContext} from '../../core/context/registry.js';
 import {removeSignalsForKey} from '../../core/store/signals.js';
 import {useDataSourceHandlers} from '../../hooks/dataSource.js';
 
-const settle = fn => act(async () => { fn?.(); for (let i=0;i<25;i++) await Promise.resolve(); });
+const settle = fn => act(async () => { fn?.(); for (let i=0;i<60;i++) await Promise.resolve(); });
 function fixture(id, parentId) {
   const signals = {form: signal({}), formStatus: signal({dirty:false,version:0}), windowForm:signal({open:true,parentId}), input:signal({}), selection:signal({}), control:signal({}), collection:signal([])};
   const identity = {windowId:id,dataSourceId:`${id}DSdraft`,dataSourceRef:'draft'};
@@ -54,6 +54,7 @@ it('isolates two windows, preserves edits, ignores old openings, resets latest d
 });
 
 it('loads a declared source through the mounted native datasource transport and selectors',async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
  const host=document.createElement('div');document.body.append(host);const root=createRoot(host),windowId='native-draft-defaults';
  const calls=[];
  const metadata={dataSource:{draft:{id:'draft',autoFetch:false},settings:{id:'settings',autoFetch:false,service:{uri:'mcp://fixture/settings'},selectors:{data:'data'},selectionMode:'single'}},view:{dataSourceRef:'draft',content:{id:'editor',dataSourceRef:'draft',fetchData:false,draftForm:{lifecycle:{defaults:[{name:'parentId',default:7},{name:'enabled',default:false}],source:{dataSourceRef:'settings',parameters:[{name:'id',default:7}],defaults:[{name:'currency',in:'form',location:'settings.currency'},{name:'count',in:'form',location:'settings.count',codec:{name:'int'}}]}}}}}};

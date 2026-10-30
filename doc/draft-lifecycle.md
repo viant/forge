@@ -43,7 +43,9 @@ These are independently authored generic examples. Declare each draft datasource
 with `autoFetch: false` and `fetchData: false` on its container; lifecycle owns its
 initial baseline. The optional source is a **separate read datasource**, mounted
 by the normal window dependency collector. Its native selectors, transforms,
-parameter codecs and authorization apply. One source response is mapped using
+parameter codecs and authorization apply. The source uses the native `fetchCollection({result: "records"})` completion,
+which snapshots normalized records; callers omitting `result` keep their existing
+raw payload completion. One source response is mapped using
 existing Parameter rows against that invocation's returned records; `form` maps
 from the first record and `selection` obeys the source selection mode. Missing
 rows/fields use explicit authored defaults. Business requirements for matching

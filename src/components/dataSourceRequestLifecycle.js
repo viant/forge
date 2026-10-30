@@ -2,7 +2,7 @@ const pending = new Map();
 
 const key = (dataSourceId, requestId) => `${String(dataSourceId || '')}\u001f${String(requestId || '')}`;
 
-export function beginDataSourceRequest(dataSourceId, requestId, windowId = '') {
+export function beginDataSourceRequest(dataSourceId, requestId, windowId = '', result = 'payload') {
   if (!dataSourceId || !requestId) return null;
   const requestKey = key(dataSourceId, requestId);
   const existing = pending.get(requestKey);
@@ -13,7 +13,7 @@ export function beginDataSourceRequest(dataSourceId, requestId, windowId = '') {
   // A caller may be detached by an authorization context change before it
   // awaits the promise. Keep rejection observable without an unhandled event.
   promise.catch(() => {});
-  pending.set(requestKey, {promise, resolve, reject, windowId: String(windowId || '').trim()});
+  pending.set(requestKey, {promise, resolve, reject, result, windowId: String(windowId || '').trim()});
   return promise;
 }
 
@@ -32,14 +32,20 @@ export function invalidateWindowDataSourceRequests(windowId) {
   return invalidated;
 }
 
-export function settleDataSourceRequest(dataSourceId, requestId, error = null, value = undefined) {
+export function settleDataSourceRequest(dataSourceId, requestId, error = null, value = undefined, records = undefined) {
   if (!dataSourceId || !requestId) return false;
   const requestKey = key(dataSourceId, requestId);
   const entry = pending.get(requestKey);
   if (!entry) return false;
   pending.delete(requestKey);
   if (error) entry.reject(error);
-  else entry.resolve(value);
+  else if (entry.result === 'records') {
+    if (!Array.isArray(records)) entry.reject(new Error('Datasource records were superseded before completion.'));
+    else {
+      try { entry.resolve(typeof structuredClone === 'function' ? structuredClone(records) : JSON.parse(JSON.stringify(records))); }
+      catch (error) { entry.reject(error); }
+    }
+  } else entry.resolve(value);
   return true;
 }
 

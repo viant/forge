@@ -10,7 +10,7 @@ export async function loadDraftSource(context, source, signal) {
   if (!ds?.fetchCollection || !ds?.setInputParameters) throw new Error('Draft defaults datasource is unavailable.');
   const parameters = resolveParameters(source.parameters || [], context);
   ds.setInputParameters(parameters);
-  const completion = ds.fetchCollection({invocationId: crypto.randomUUID(), cache: {bypassCache: true}});
+  const completion = ds.fetchCollection({result: 'records', invocationId: crypto.randomUUID(), cache: {bypassCache: true}});
   if (!completion?.then) throw new Error('Draft defaults datasource must return a completion promise.');
   const records = await completion;
   if (signal.aborted) return {};

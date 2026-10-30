@@ -172,7 +172,7 @@ export default function DataSource({context}) {
             projectionRef.current = {signature, parentIdentity, inactive: !!parentControl.inactive};
             flagReadDone();
             if (notify && events.onSuccess?.isDefined?.()) events.onSuccess.execute({collection: records, payload});
-            settleDataSourceRequest(identity.dataSourceId, requestId, null, records);
+            settleDataSourceRequest(identity.dataSourceId, requestId, null, records, records);
         } catch (err) {
             const retainDraft = signals.formStatus?.peek?.()?.dirty === true
                 && !isDataSourceLocalDenial(err, context) && !isProtectedUpstreamDenial(context, err);
@@ -742,7 +742,7 @@ export default function DataSource({context}) {
                 }
             } catch (_) {
             }
-            settleDataSourceRequest(requestDataSourceId, requestId, null, payload);
+            settleDataSourceRequest(requestDataSourceId, requestId, null, payload, records);
         } catch (err) {
             if (!authorizationIsCurrent()) return;
             if (!mountedRef.current) {
