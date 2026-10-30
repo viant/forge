@@ -56,7 +56,8 @@ func CompileCohorts(ctx context.Context, channel Channel, bundle Bundle, namedDo
 		selection := authz.Document{Resource: resource, Revision: int64(channel.Revision), Policies: map[string]authz.Policy{}}
 		for _, action := range actions {
 			copy := ref
-			selection.Policies[action] = authz.Policy{Mode: "named", Named: &copy}
+			declared, _ := authz.PolicyForAction(definition.Policies, action)
+			selection.Policies[action] = authz.Policy{Mode: "named", Named: &copy, Priority: declared.Priority}
 		}
 		resolved, used, err := authz.ResolveNamedDocument(ctx, store, selection)
 		if err != nil {
@@ -77,7 +78,7 @@ func CompileCohorts(ctx context.Context, channel Channel, bundle Bundle, namedDo
 			return Compilation{}, ErrInvalid
 		}
 		result.Policies = append(result.Policies, document)
-		result.Cohorts = append(result.Cohorts, artifactcohort.Cohort{Tenant: channel.Key.Tenant, Name: ReleaseCohortName(channel.Key, ref), PolicyResource: resource, Roots: append([]artifactcohort.RootRef(nil), bundle.Roots...)})
+		result.Cohorts = append(result.Cohorts, artifactcohort.Cohort{Tenant: channel.Key.Tenant, Name: ReleaseCohortName(channel.Key, ref), PolicyResource: resource, Priority: join.Priority, Roots: append([]artifactcohort.RootRef(nil), bundle.Roots...)})
 	}
 	for resource, revision := range dependencies {
 		result.Dependencies = append(result.Dependencies, authz.NamedDependency{Resource: resource, Revision: revision})
@@ -92,6 +93,7 @@ func joinUsePolicies(policies map[string]authz.Policy, actions []string) (authz.
 	rules := []authz.Rule{}
 	scopes := map[string]bool{}
 	entityType := ""
+	priority := 0
 	for _, action := range actions {
 		policy, found := authz.PolicyForAction(policies, action)
 		if !found || policy.Mode == "deny" {
@@ -99,6 +101,11 @@ func joinUsePolicies(policies map[string]authz.Policy, actions []string) (authz.
 		}
 		if policy.Mode != "protected" || policy.Rule == nil {
 			return authz.Policy{}, ErrInvalid
+		}
+		// Release use is ranked by execution priority. Describe/discover remain
+		// mandatory gates, but cannot change which permitted revision is used.
+		if action == "execute" {
+			priority = policy.Priority
 		}
 		if policy.EntityType != "" {
 			// Replica.Admit rejects bounded join decisions. Keep this mandatory
@@ -124,7 +131,7 @@ func joinUsePolicies(policies map[string]authz.Policy, actions []string) (authz.
 	if len(rules) > 1 {
 		rule = authz.Rule{Kind: "all", Rules: rules}
 	}
-	join := authz.Policy{Mode: "protected", Rule: &rule, EntityType: entityType}
+	join := authz.Policy{Mode: "protected", Rule: &rule, EntityType: entityType, Priority: priority}
 	for scope := range scopes {
 		join.RequiredScopes = append(join.RequiredScopes, scope)
 	}
