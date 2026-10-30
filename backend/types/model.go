@@ -1527,6 +1527,7 @@ type MediaPreviewOptions struct {
 }
 
 type Column struct {
+	MutationCommands []TableCellMutationCommand `json:"mutationCommands,omitempty" yaml:"mutationCommands,omitempty"`
 	// MutationCommand opts button cells into the shared writer lifecycle using the clicked row.
 	MutationCommand  *MutationCommand       `json:"mutationCommand,omitempty" yaml:"mutationCommand,omitempty"`
 	ID               string                 `json:"id" yaml:"id"`
@@ -1570,6 +1571,12 @@ type Column struct {
 	HiddenWhen            map[string]interface{} `json:"hiddenWhen,omitempty" yaml:"hiddenWhen,omitempty"`
 	DisabledWhen          map[string]interface{} `json:"disabledWhen,omitempty" yaml:"disabledWhen,omitempty"`
 	ReadOnlyWhen          map[string]interface{} `json:"readOnlyWhen,omitempty" yaml:"readOnlyWhen,omitempty"`
+}
+
+// TableCellMutationCommand chooses a fixed command using native row predicates.
+type TableCellMutationCommand struct {
+	When    map[string]interface{} `json:"when,omitempty" yaml:"when,omitempty"`
+	Command *MutationCommand       `json:"command" yaml:"command"`
 }
 
 type TableCellBadge struct {

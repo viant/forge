@@ -45,6 +45,32 @@ function stateEntry(context, key) {
   return states.get(key);
 }
 
+// Optional command groups share the same context ownership as lifecycle state.
+// Leases belong to one invocation, so another row cannot release its guard.
+function acquireSerialization(context, command, key) {
+  const name = String(command.serializationGroup || '').trim();
+  if (!name) return true;
+  const entry = stateEntry(context, key);
+  if (!entry) return false;
+  const states = commandStates.get(stableContextOwner(context));
+  states.serializationGroups ||= new Map();
+  const groupKey = JSON.stringify([context?.identity?.windowId || '', name]);
+  const groups = states.serializationGroups;
+  if (groups.has(groupKey)) return false;
+  const lease = {groups, groupKey};
+  groups.set(groupKey, lease);
+  entry.serializationLease = lease;
+  return true;
+}
+
+function releaseSerialization(context, key) {
+  const entry = stateEntry(context, key);
+  const lease = entry?.serializationLease;
+  if (!lease) return;
+  if (lease.groups.get(lease.groupKey) === lease) lease.groups.delete(lease.groupKey);
+  delete entry.serializationLease;
+}
+
 function publish(context, key, patch) {
   const entry = stateEntry(context, key);
   if (!entry) return;
@@ -231,6 +257,7 @@ export function resolveIndeterminateCommand(context, command = {}, message = '')
   if (current.phase !== 'indeterminate') return false;
   try { releaseTransport(context?.Context?.(String(command.dataSourceRef || '').trim()), key); } catch (_) { return false; }
   publish(context, key, {phase: 'idle', guarded: false, pending: false, retryAllowed: true, message, writerStatus: 'idle', syncStatus: 'not_started'});
+  releaseSerialization(context, key);
   return true;
 }
 
@@ -238,6 +265,10 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
   const targetRef = String(command.dataSourceRef || '').trim();
   const key = commandGuardKey(command);
   if (!targetRef || !key || getCommandState(context, command).guarded) return {accepted: false, status: 'suppressed'};
+  if (!acquireSerialization(context, command, key)) {
+    publish(context, key, {phase: 'idle', guarded: false, pending: false, retryAllowed: true, error: null, message: 'Another command in this group is running.', writerStatus: 'not_invoked', syncStatus: 'not_started'});
+    return {accepted: false, status: 'group_busy'};
+  }
   const protectedWindow = context?.identity?.protectedWindow === true;
   const windowId = context?.identity?.windowId;
   const authorizationEpoch = protectedWindow ? protectedWindowEpoch(windowId) : null;
@@ -359,6 +390,9 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
     publish(context, key, {phase: 'failed', guarded: false, pending: false, retryAllowed: true, error, message: commandErrorMessage(error), writerStatus: writerInvoked ? 'failed' : 'not_invoked', syncStatus: 'not_started'});
     notifyLifecycle(lifecycle, 'onSettled', {status: 'failed', error, invocationId: id});
     return {accepted: writerInvoked, status: 'failed', error, invocationId: id};
+  } finally {
+    const current = getCommandState(context, command);
+    if (!(current.guarded && current.phase === 'indeterminate')) releaseSerialization(context, key);
   }
 }
 

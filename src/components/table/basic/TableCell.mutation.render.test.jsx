@@ -5,7 +5,7 @@ import {signal} from '@preact/signals-react';
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
 import TableCell from './TableCell.jsx';
 import {tableCellMutation} from './tableCellMutation.js';
-import {getCommandState, resetCommandState, resolveIndeterminateCommand} from '../../primitives/commandExecutor.js';
+import {executeCommand, getCommandState, resetCommandState, resolveIndeterminateCommand} from '../../primitives/commandExecutor.js';
 let host, root;
 const settle = async action => act(async () => {action?.(); for(let i=0;i<20;i++) await Promise.resolve();});
 beforeEach(()=>{globalThis.IS_REACT_ACT_ENVIRONMENT=true;host=document.createElement('div');document.body.append(host);root=createRoot(host);});
@@ -19,7 +19,7 @@ function fixture(windowId='fixture') {
 }
 const command={dataSourceRef:'patch',prepare:'fixture.prepare'};
 function cells(f,rows=[{id:1},{id:2}],spec=command,handlers={}) {
- return <table><tbody>{rows.map((row,index)=><tr key={row.id}><TableCell context={f.context} cell={{value:'Remove',displayedText:'Remove'}} cellSelection={{row,rowIndex:index,col:{id:'remove',name:'Remove record',type:'button',mutationCommand:spec}}} columnHandlers={handlers} onRowClick={()=>{}}/></tr>)}</tbody></table>;
+ return <table><tbody>{rows.map((row,index)=><tr key={row.id}><TableCell context={f.context} cell={{value:'Remove',displayedText:'Remove'}} cellSelection={{row,rowIndex:index,col:{id:'remove',name:'Remove record',type:'button',...(Array.isArray(spec)?{mutationCommands:spec}:{mutationCommand:spec})}}} columnHandlers={handlers} onRowClick={()=>{}}/></tr>)}</tbody></table>;
 }
 const buttons=()=>[...host.querySelectorAll('td button')];
 it('targets the clicked row, prevents duplicate/shared-writer writes, and keeps row state while sorting',async()=>{
@@ -49,10 +49,10 @@ it('exposes retryable failure, resets terminal state on remount, and isolates wi
  await settle(()=>buttons()[0].click());expect(f.writes).toHaveLength(2);await settle(()=>f.finishes[1]());}finally{log.mockRestore()}
 });
 it('retains unknown-outcome guard across remount and requires explicit authoritative resolution',async()=>{
- vi.useFakeTimers();const f=fixture();const spec={...command,timeoutMs:1000};
+ vi.useFakeTimers();const f=fixture();const spec={...command,timeoutMs:1000,serializationGroup:'row-changes'};
  try{await settle(()=>root.render(cells(f,[{id:1}],spec)));await settle(()=>buttons()[0].click());await act(async()=>{await vi.advanceTimersByTimeAsync(1100)});
  expect(host.textContent).toMatch(/unknown/i);expect(buttons()[0].disabled).toBe(true);
- const key=tableCellMutation(f.context,{id:'remove',name:'Remove record',mutationCommand:spec},{id:1});expect(resetCommandState(f.context,key)).toBe(false);
+ const key=tableCellMutation(f.context,{id:'remove',name:'Remove record',...(Array.isArray(spec)?{mutationCommands:spec}:{mutationCommand:spec})},{id:1});expect(resetCommandState(f.context,key)).toBe(false);
  await settle(()=>root.render(null));await settle(()=>root.render(cells(f,[{id:1}],spec)));expect(buttons()[0].disabled).toBe(true);expect(f.writes).toHaveLength(1);expect(getCommandState(f.context,key).phase).toBe('indeterminate');await settle(()=>expect(resolveIndeterminateCommand(f.context,key)).toBe(true));
  }finally{vi.useRealTimers()}
 });
@@ -71,4 +71,45 @@ it('prepares a typed payload from the clicked row through the shared resource mo
  await settle(()=>root.render(cells(f,[{id:0,name:'Synthetic'}],spec)));await settle(()=>buttons()[0].click());
  expect(f.writes).toEqual([{Records:[{Id:0,Name:'Synthetic'}]}]);expect(f.prepare).not.toHaveBeenCalled();await settle(()=>f.finishes[0]());
  f.context.metadata.dataSource.rows.uniqueKey=[{field:'enabled'}];expect(tableCellMutation(f.context,{id:'remove',mutationCommand:command},{enabled:false})).not.toBeNull();
+});
+
+it('selects fixed row variants with native predicates and fails closed for ambiguous or unmatched rows',async()=>{
+ const f=fixture(),g=fixture();f.context.Context=ref=>ref==='patch'?g.context.Context():null;
+ const variants=[{when:{source:'row',field:'mode',equals:'first'},command:{...command,commandId:'first'}},{when:{source:'row',field:'mode',equals:'second'},command:{...command,commandId:'second',dataSourceRef:'other'}}];
+ const col={id:'remove',mutationCommands:variants};
+ expect(tableCellMutation(f.context,col,{id:1,mode:'first'}).dataSourceRef).toBe('patch');expect(tableCellMutation(f.context,col,{id:2,mode:'second'}).dataSourceRef).toBe('other');
+ expect(tableCellMutation(f.context,col,{id:3})).toBeNull();expect(tableCellMutation(f.context,{...col,mutationCommand:command},{id:3}).dataSourceRef).toBe('patch');
+ expect(tableCellMutation(f.context,{...col,mutationCommands:[...variants,{command}]},{id:1,mode:'first'})).toBeNull();
+ await settle(()=>root.render(cells(f,[{id:1,mode:'first'},{id:2,mode:'other'}],variants)));expect(buttons()[0].disabled).toBe(false);expect(buttons()[1].disabled).toBe(true);
+ await settle(()=>buttons()[0].click());expect(g.writes).toEqual([{id:1}]);await settle(()=>g.finishes[0]());
+});
+it('serializes different writers before confirmation and preparation, then releases cancellation and success',async()=>{
+ const f=fixture(),g=fixture();const firstWriter=f.context.Context(),secondWriter=g.context.Context();f.context.Context=ref=>ref==='patch'?firstWriter:secondWriter;
+ const variants=[{when:{source:'row',field:'id',equals:1},command:{...command,confirm:'Continue?',serializationGroup:'changes'}},{when:{source:'row',field:'id',equals:2},command:{...command,dataSourceRef:'other',serializationGroup:'changes'}}];
+ await settle(()=>root.render(cells(f,undefined,variants)));await settle(()=>buttons()[0].click());await settle(()=>buttons()[1].click());
+ expect(f.prepare).not.toHaveBeenCalled();expect(f.writes).toHaveLength(0);expect(g.writes).toHaveLength(0);expect(host.textContent).toContain('Another command in this group is running.');
+ await settle(()=>[...document.querySelectorAll('.bp6-alert button')].find(b=>b.textContent==='Cancel').click());
+ await settle(()=>buttons()[1].click());expect(g.writes).toEqual([{id:2}]);await settle(()=>g.finishes[0]());
+ await settle(()=>buttons()[0].click());await settle(()=>[...document.querySelectorAll('.bp6-alert button')].find(b=>b.textContent==='Remove record').click());expect(f.writes).toEqual([{id:1}]);await settle(()=>f.finishes[0]());
+});
+it('releases group leases on validation and preparation errors and never releases another active command',async()=>{
+ const f=fixture();const c={...command,commandId:'one',serializationGroup:'changes'},d={...c,commandId:'two',dataSourceRef:'other'};
+ const log=vi.spyOn(console,'error').mockImplementation(()=>{});
+ try{
+ expect((await executeCommand(f.context,{...c,validateWhen:{source:'windowForm',field:'allowed',equals:true}})).status).toBe('invalid');
+ const throwingCondition={};Object.defineProperty(throwingCondition,'source',{get(){throw new Error('Synthetic validation error')}});expect((await executeCommand(f.context,{...c,validateWhen:throwingCondition})).status).toBe('failed');
+ f.context.lookupHandler=()=>{throw new Error('Synthetic preparation error')};expect((await executeCommand(f.context,c)).status).toBe('failed');
+ f.context.lookupHandler=()=>f.prepare;const running=executeCommand(f.context,c,{row:{id:1}});for(let i=0;i<20;i++)await Promise.resolve();
+ expect(resolveIndeterminateCommand(f.context,d)).toBe(false);expect((await executeCommand(f.context,d,{row:{id:2}})).status).toBe('group_busy');expect(f.writes).toEqual([{id:1}]);
+ f.finishes[0](new Error('Synthetic writer error'));expect((await running).status).toBe('failed');const next=executeCommand(f.context,d,{row:{id:2}});for(let i=0;i<20;i++)await Promise.resolve();expect(f.writes).toHaveLength(2);f.finishes[1]();await next;
+ }finally{log.mockRestore()}
+});
+it('keeps serialization through unknown outcomes and isolates the same group in other windows',async()=>{
+ vi.useFakeTimers();const f=fixture('first'),g=fixture('second');const c={...command,commandId:'one',serializationGroup:'changes',timeoutMs:1000},d={...c,commandId:'two',dataSourceRef:'other'};
+ try{
+ const first=executeCommand(f.context,c,{row:{id:1}});await vi.advanceTimersByTimeAsync(1100);expect((await first).status).toBe('indeterminate');
+ expect((await executeCommand(f.context,d,{row:{id:2}})).status).toBe('group_busy');expect(resolveIndeterminateCommand(f.context,d)).toBe(false);
+ const other=executeCommand(g.context,d,{row:{id:2}});for(let i=0;i<20;i++)await Promise.resolve();expect(g.writes).toHaveLength(1);g.finishes[0]();await other;
+ expect(resolveIndeterminateCommand(f.context,c)).toBe(true);const next=executeCommand(f.context,d,{row:{id:2}});for(let i=0;i<20;i++)await Promise.resolve();expect(f.writes).toHaveLength(2);f.finishes[1]();await next;
+ }finally{vi.useRealTimers()}
 });

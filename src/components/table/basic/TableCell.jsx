@@ -168,13 +168,13 @@ const TableCell = ({
                 icon: resolveButtonIcon(col, value, cellProps.icon),
                 'aria-pressed': resolveButtonPressed(col, value),
             };
-            if (col.mutationCommand) {
+            if (col.mutationCommand || col.mutationCommands) {
                 const command = tableCellMutation(context, col, row);
                 cellContent = command
                     ? <TableCellMutation key={command.commandId} context={context} command={command}
                         extras={{row, value, rowIndex: cellSelection.rowIndex, columnId: col.id}} buttonProps={buttonProps}/>
                     : <Button {...isolateButtonCellProps({...buttonProps, onClick: undefined})} disabled
-                        aria-label={buttonProps['aria-label'] || col.name || col.id} title="A complete datasource uniqueKey is required for this action."/>;
+                        aria-label={buttonProps['aria-label'] || col.name || col.id} title="A complete datasource uniqueKey and an unambiguous mutation command are required for this action."/>;
                 break;
             }
             cellContent = <Button
@@ -399,7 +399,7 @@ const TableCell = ({
         );
     }
 
-    if(React.isValidElement(cellContent) && ['button','link','checkbox'].includes(type) && !(type === 'button' && col.mutationCommand)) {
+    if(React.isValidElement(cellContent) && ['button','link','checkbox'].includes(type) && !(type === 'button' && (col.mutationCommand || col.mutationCommands))) {
         const props=cellContent.props,actions={};
         if(typeof props.onClick==='function' && type!=='checkbox')actions.click=({event})=>(props.onClick.operate || props.onClick)(event);
         if(type==='checkbox' && col.multiSelect===true && typeof props.onChange==='function')actions.setValue=({value:checked})=>{

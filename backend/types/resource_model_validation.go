@@ -230,6 +230,9 @@ func validateContainerResourceModels(window *Window, container *Container, valid
 	if container.Table != nil {
 		for index := range container.Table.Columns {
 			commands = append(commands, container.Table.Columns[index].MutationCommand)
+			for _, variant := range container.Table.Columns[index].MutationCommands {
+				commands = append(commands, variant.Command)
+			}
 		}
 	}
 	if container.EditableCollection != nil {

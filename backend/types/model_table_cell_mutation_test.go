@@ -8,3 +8,10 @@ func TestTableCellMutationValidatesResourcePayload(t *testing.T) {
 		t.Fatal("unknown column payload model accepted")
 	}
 }
+
+func TestTableCellVariantValidatesResourcePayload(t *testing.T) {
+	w := &Window{View: View{Content: &Container{ID: "list", Table: &Table{Columns: []Column{{ID: "remove", Type: "button", MutationCommands: []TableCellMutationCommand{{Command: &MutationCommand{DataSourceRef: "patch", SerializationGroup: "changes", Payload: &ResourcePayloadPreparation{ModelRef: "missing"}}}}}}}}}}
+	if err := ValidateResourceModelStructure(w); err == nil {
+		t.Fatal("unknown variant payload model accepted")
+	}
+}

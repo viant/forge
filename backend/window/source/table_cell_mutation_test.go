@@ -31,6 +31,11 @@ view:
             confirm: Remove this record?
             timeoutMs: 2500
             refresh: [{dataSourceRef: rows}]
+          mutationCommands:
+            - when: {source: row, field: mode, equals: primary}
+              command: {dataSourceRef: patch, serializationGroup: recordChanges}
+            - when: {source: row, field: mode, equals: secondary}
+              command: {dataSourceRef: patch, serializationGroup: recordChanges}
         - {id: name, name: Name}
 `,
 		"extension/forge/datasources/rows.yaml":  "id: rows\nuniqueKey: [{field: id}]\nbackend: {kind: inline, rows: [{id: 0, name: Sample}]}\n",
@@ -70,6 +75,9 @@ view:
 	expected := &types.MutationCommand{DataSourceRef: "patch", Prepare: "Fixture.prepare", Confirm: "Remove this record?", TimeoutMs: 2500, Refresh: []types.RefreshSpec{{DataSourceRef: "rows"}}}
 	if !reflect.DeepEqual(cols[0].MutationCommand, expected) {
 		t.Fatalf("command lost: %#v", cols[0].MutationCommand)
+	}
+	if len(cols[0].MutationCommands) != 2 || cols[0].MutationCommands[0].When["source"] != "row" || cols[0].MutationCommands[1].Command.SerializationGroup != "recordChanges" {
+		t.Fatal("row variants/group lost through source capture/recompile")
 	}
 	if cols[1].MutationCommand != nil || cols[1].ID != "name" {
 		t.Fatal("legacy column changed")
