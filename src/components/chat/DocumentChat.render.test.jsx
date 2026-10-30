@@ -5,6 +5,8 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import fs from 'node:fs';
 import AttachmentDialog from './AttachmentDialog.jsx';
 import Composer from './Composer.jsx';
+import Chat from '../Chat.jsx';
+import {signal} from '@preact/signals-react';
 import StarterTaskBrowser from './StarterTaskBrowser.jsx';
 import useComposerDraft from './useComposerDraft.js';
 
@@ -46,6 +48,48 @@ describe('document composer and task discovery', () => {
         expect(host.querySelector('textarea').value).toBe('B');
         await render(<Chat id="a"/>); expect(host.querySelector('textarea').value).toBe('');
         expect(JSON.parse(sessionStorage.getItem('forge.composerDrafts.v1'))).toMatchObject({a: '', b: 'B'});
+    });
+
+    it('focuses the selected task composer without stealing input from another chat', async () => {
+        const frames = [];
+        const animation = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
+            frames.push(callback);
+            return frames.length;
+        });
+        const context = {
+            identity: {windowId: 'example-home'},
+            signals: {collection: signal([]), control: signal({}), selection: signal(null), message: signal('')},
+            handlers: {chat: {}},
+            Context: () => null,
+            lookupHandler: name => name === 'chat.renderFeed' ? () => null
+                : name === 'chat.resolveComposerProps' ? () => ({commandCenter: true, starterTasks: [
+                    {id: 'example-task', title: 'Review an example', prompt: 'Starter request.'},
+                ]}) : undefined,
+        };
+        try {
+            await render(<><Composer appearance="document" draftKey="other"/>
+                <Chat context={context} container={{chat: {appearance: 'document'}}}/></>);
+            const other = host.querySelector('textarea');
+            const home = host.querySelector('[data-testid=chat-root]');
+            const input = home.querySelector('textarea');
+            await click(home.querySelector('.forge-task-row'));
+            // Run the delayed task-selection focus after an editor has already been focused.
+            await act(async () => {
+                input.focus();
+                frames.splice(0).forEach(callback => callback(0));
+            });
+            expect(document.activeElement).toBe(input);
+            expect(document.activeElement).not.toBe(other);
+            await change(input, 'Edited starter request.');
+            await click(home.querySelector('.forge-task-back'));
+            await click(home.querySelector('.forge-task-row'));
+            await act(async () => frames.splice(0).forEach(callback => callback(0)));
+            expect(document.activeElement).toBe(input);
+            expect(input.value).toBe('Edited starter request.');
+        } finally {
+            animation.mockRestore();
+            window.history.replaceState(null, '', '/');
+        }
     });
 
     it('groups real selector callbacks under Tools and returns focus on Escape', async () => {

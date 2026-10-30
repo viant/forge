@@ -460,6 +460,7 @@ export default function Chat({
     // 🛑  Local component state reflecting incoming signals
     // ---------------------------------------------------------------------
     const [attachOpen, setAttachOpen] = useState(false);
+    const chatRootRef = useRef(null);
     const uploadInputRef = useRef(null);
     const [pendingAttachments, setPendingAttachments] = useState([]);
     const batchIdsRef = useRef(new Set());
@@ -1121,6 +1122,7 @@ export default function Chat({
 
     return (
         <div
+            ref={chatRootRef}
             className={`forge-chat-container${documentAppearance ? ` forge-document-chat${showStarterTasks ? " is-starting" : ""}${showStarterTasks && taskLibrary && !selectedStarter ? " is-task-library" : ""}` : " px-4 pt-4 gap-3"}${effectiveHeight !== undefined ? " has-explicit-height" : ""}`}
             data-testid="chat-root"
             style={{
@@ -1176,7 +1178,7 @@ export default function Chat({
                         if (raw[`starter:${task.id}`] === undefined) raw[`starter:${task.id}`] = prompt;
                         sessionStorage.setItem(COMPOSER_DRAFTS_KEY, JSON.stringify(raw));
                     } catch {}
-                    requestAnimationFrame(() => document.querySelector('[data-testid="chat-composer-input"]')?.focus({preventScroll: true}));
+                    requestAnimationFrame(() => chatRootRef.current?.querySelector('[data-testid="chat-composer-input"]')?.focus({preventScroll: true}));
                 }}/><div className="forge-chat-home-recent">{externalComposerProps?.renderHomeRecent?.()}</div></div> : showStarterTasks ? (
                     <div className="chat-starter-stage" data-testid="chat-starter-stage">
                         <StarterTaskGrid
