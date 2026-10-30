@@ -15,12 +15,30 @@ function normalizeDatasetRefs(datasetRefs = []) {
     });
 }
 
-// The shared closure for primary, comparison and KPI trend datasets. Hosts use
-// this when planning lazy section reads, so optional visuals cannot lose data.
+// Match the backend section planner's declared-reference closure, including
+// nested content, trends, centers and scope/visibility bindings. Hosts use this
+// when planning lazy reads, so optional visuals cannot lose required data.
 export function getReportBlockDatasetRefs(block = {}) {
-  return normalizeDatasetRefs([block?.datasetRef, block?.secondaryDatasetRef,
-    block?.sparkline?.datasetRef, block?.sparkline?.comparisonDatasetRef,
-    block?.chartSpec?.center?.datasetRef,block?.content?.chartSpec?.center?.datasetRef]);
+  const refs = [], visited = new WeakSet();
+  const collect = value => {
+    if (!value || typeof value !== "object" || visited.has(value)) return;
+    visited.add(value);
+    if (Array.isArray(value)) {
+      value.forEach(collect);
+      return;
+    }
+    for (const [key, item] of Object.entries(value)) {
+      if (["datasetRef", "secondaryDatasetRef", "comparisonDatasetRef"].includes(key)) {
+        refs.push(item);
+      } else if (key === "datasetRefs") {
+        if (Array.isArray(item)) refs.push(...item);
+      } else {
+        collect(item);
+      }
+    }
+  };
+  collect(block);
+  return normalizeDatasetRefs(refs);
 }
 
 export function resolveImplicitSingleReportDatasetRef(datasetRefs = []) {

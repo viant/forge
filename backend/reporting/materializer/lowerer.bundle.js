@@ -46535,15 +46535,26 @@ Please __addLocaleData before adding additional unit data`);
     });
   }
   function getReportBlockDatasetRefs(block = {}) {
-    var _a5, _b, _c, _d, _e, _f, _g;
-    return normalizeDatasetRefs([
-      block == null ? void 0 : block.datasetRef,
-      block == null ? void 0 : block.secondaryDatasetRef,
-      (_a5 = block == null ? void 0 : block.sparkline) == null ? void 0 : _a5.datasetRef,
-      (_b = block == null ? void 0 : block.sparkline) == null ? void 0 : _b.comparisonDatasetRef,
-      (_d = (_c = block == null ? void 0 : block.chartSpec) == null ? void 0 : _c.center) == null ? void 0 : _d.datasetRef,
-      (_g = (_f = (_e = block == null ? void 0 : block.content) == null ? void 0 : _e.chartSpec) == null ? void 0 : _f.center) == null ? void 0 : _g.datasetRef
-    ]);
+    const refs = [], visited = /* @__PURE__ */ new WeakSet();
+    const collect = (value) => {
+      if (!value || typeof value !== "object" || visited.has(value)) return;
+      visited.add(value);
+      if (Array.isArray(value)) {
+        value.forEach(collect);
+        return;
+      }
+      for (const [key2, item] of Object.entries(value)) {
+        if (["datasetRef", "secondaryDatasetRef", "comparisonDatasetRef"].includes(key2)) {
+          refs.push(item);
+        } else if (key2 === "datasetRefs") {
+          if (Array.isArray(item)) refs.push(...item);
+        } else {
+          collect(item);
+        }
+      }
+    };
+    collect(block);
+    return normalizeDatasetRefs(refs);
   }
   function resolveImplicitSingleReportDatasetRef(datasetRefs = []) {
     const normalizedDatasetRefs = normalizeDatasetRefs(datasetRefs);
