@@ -10,15 +10,15 @@ import (
 	"time"
 )
 
-// PrepareNativePresentationRead refreshes only an expired public window metadata
-// lease held by the current negotiated UI transport client. It grants no data or
-// business permission and never refreshes datasource/report/private pins.
+// PrepareNativePresentationRead restores the private selection held by the
+// negotiated UI instance. Only expired public presentation leases can renew;
+// private datasource and report leases retain their original deadlines.
 func (s *Service) PrepareNativePresentationRead(ctx context.Context, resource *identity.ResolvedResource, target *types.WindowTarget) (*identity.ResolvedResource, *types.WindowTarget, error) {
-	if resource == nil || identity.MetadataExpiryValid(resource.ValidUntil, time.Now()) {
+	if resource == nil {
 		return resource, target, nil
 	}
 	original := windowResourcePin{Resource: *resource, Target: target}
-	if !defaultPresentationPin(original) || s.ns.Resolver == nil {
+	if !identity.MetadataExpiryValid(resource.ValidUntil, time.Now()) && (!defaultPresentationPin(original) || s.ns.Resolver == nil) {
 		return nil, nil, identity.ErrResourceDenied
 	}
 	bridge, session, err := s.nativePresentationSession(ctx)
@@ -34,8 +34,8 @@ func (s *Service) PrepareNativePresentationRead(ctx context.Context, resource *i
 		if key.Namespace != session.ns || key.ClientID != session.clientID || (requestedWindow != "" && key.WindowID != requestedWindow) {
 			continue
 		}
-		same := identity.SameResolvedResource(pin.Resource, *resource) && types.SameWindowTarget(pin.Target, target)
-		if pin.PresentedResource != nil && identity.SameResolvedResource(*pin.PresentedResource, *resource) && types.SameWindowTarget(pin.PresentedTarget, target) {
+		same := identity.SameResolvedResource(pin.Resource, *resource) && (types.SameConsumerWindowTarget(target, pin.Target) || types.SameWindowTarget(pin.Target, target))
+		if pin.PresentedResource != nil && identity.SameResolvedResource(*pin.PresentedResource, *resource) && (types.SameConsumerWindowTarget(target, pin.PresentedTarget) || types.SameWindowTarget(pin.PresentedTarget, target)) {
 			same = true
 		}
 		if same {

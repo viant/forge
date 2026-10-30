@@ -130,7 +130,7 @@ func (s *Service) authorizePinnedCommand(ctx context.Context, ns, clientID, meth
 		if value, exists := input[key]; exists {
 			raw, err := json.Marshal(value)
 			var target *types.WindowTarget
-			if err != nil || json.Unmarshal(raw, &target) != nil || (!types.SameWindowTarget(target, pin.Target) && (pin.PresentedTarget == nil || !types.SameWindowTarget(target, pin.PresentedTarget))) {
+			if err != nil || json.Unmarshal(raw, &target) != nil || (!types.SameConsumerWindowTarget(target, pin.Target) && !types.SameWindowTarget(target, pin.Target) && (pin.PresentedTarget == nil || !types.SameConsumerWindowTarget(target, pin.PresentedTarget) && !types.SameWindowTarget(target, pin.PresentedTarget))) {
 				return nil, identity.ErrResourceDenied
 			}
 		}
@@ -188,8 +188,8 @@ func (s *Service) filterResourceSnapshot(ctx context.Context, ns, clientID strin
 			return nil, identity.ErrResourceDenied
 		}
 		content["resource"] = pin.Resource
-		content["resourceTarget"] = pin.Target
-		content["metadata"] = definition.Definition
+		content["resourceTarget"] = types.ConsumerWindowTarget(pin.Target)
+		content["metadata"] = types.ConsumerWindow(definition.Definition)
 		if sources, ok := content["dataSources"].(map[string]any); ok {
 			for id := range sources {
 				if _, allowed := definition.Definition.DataSource[id]; !allowed {
@@ -389,4 +389,24 @@ func samePresentationDimensions(a, b *types.WindowTarget) bool {
 	left, right := *a, *b
 	left.SelectionToken, right.SelectionToken = "", ""
 	return types.SameWindowTarget(&left, &right)
+}
+
+// WindowResourceTarget returns the private selection only after the owning
+// instance has passed its ordinary resource revalidation.
+func (s *Service) WindowResourceTarget(ctx context.Context, namespace, clientID, windowID, windowKey string) (*types.WindowTarget, error) {
+	if _, err := s.WindowResource(ctx, namespace, clientID, windowID, windowKey); err != nil {
+		return nil, err
+	}
+	pin, ok := s.getWindowPin(windowPinKey{Namespace: namespace, ClientID: clientID, WindowID: windowID})
+	if !ok {
+		return nil, identity.ErrResourceDenied
+	}
+	if pin.Target == nil {
+		return nil, nil
+	}
+	target, err := pin.Target.Normalize()
+	if err != nil {
+		return nil, err
+	}
+	return &target, nil
 }
