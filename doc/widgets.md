@@ -291,3 +291,45 @@ link:
 non-HTTP(S) base produces no resolved destination. Existing row-based templates
 retain their behavior when `hrefTemplateSource` is omitted. Use the owning CSS
 class and workspace tokens for appearance.
+
+### Declared report calendar presets
+
+A report date-range predicate may opt into `datePresets`. The declaration names a
+held calendar datasource, one selected identity input, exact identity/timezone
+selectors, at most16 case-insensitively unique options and a declared relative default. The
+calendar datasource must explicitly set `cache.enabled:false`. Hosts use
+`normalizeReportDatePresets`, `reportDatePresetInputs` and
+`decodeReportDateCalendar` from `forge/reporting`; one matching row and a valid
+named IANA timezone are required; numeric offset strings are not calendar identities. Missing context never becomes browser-local or UTC.
+
+```yaml
+datePresets:
+  calendar:
+    dataSourceRef: calendarContext
+    input: {name: Ids, parameter: entityId, array: true}
+    identityField: id
+    timeZoneField: zone.iana
+  default: completedSeven
+  options:
+    - {value: yesterday, label: Yesterday}
+    - {value: last_month, label: Previous month}
+    - {value: completedSeven, label: Completed seven days, range: {kind: relativeDays, startOffset: -7, endOffset: -1}}
+    - {value: custom, label: Custom}
+```
+
+`relativeDays` uses bounded integer civil-day offsets (`-36600..0`, start no
+later than end) in the explicit timezone. `yesterday`, `last_month` and
+`month_to_date` reuse the existing resolver. Existing window preset aliases keep
+their legacy meanings. Labels do not redefine interval semantics.
+
+`DateRangePresetInput` additionally supports controlled `range:{start,end}`,
+`onRangeChange(pair)`, `onPresetRequest(option)`, `onDraftChange()` and
+`presetPending`. Controlled mode never seeds window-form signals or resolves its
+legacy timezone default. The host owns asynchronous context and the one atomic
+range commit; the widget delegates relative requests and keeps custom edits
+local until Apply dates. It exposes no unbound partial-data checkbox.
+`ReportFilterBar` wires this through the registered widget with `onDatePreset`,
+`onDateRange` and `onDateDraft`; manual fields stay available if a host cannot
+resolve presets. Hosts must invalidate stale context/operation replies, gate
+initial relative execution until concrete dates exist, preserve manual values,
+and export the applied pair rather than an unsubmitted draft.

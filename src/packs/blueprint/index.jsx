@@ -181,11 +181,18 @@ export function DateRangePresetInput({
     timeZoneSelector = '',
     customApplyEnabled = false,
     customDisabledMessage = 'Custom dates are saved as a draft and do not refresh data yet.',
+    range,
+    onRangeChange,
+    onPresetRequest,
+    onDraftChange,
+    presetPending = false,
 }) {
+    const controlled = range != null && typeof onRangeChange === 'function';
     const [open, setOpen] = React.useState(false);
+    const [presetRequestError, setPresetRequestError] = React.useState('');
     const triggerRef = React.useRef(null);
     const [popupPosition, setPopupPosition] = React.useState({top: 0, left: 0});
-    const windowForm = context?.signals?.windowForm?.value || {};
+    const windowForm = controlled ? {[startField]: range.start, [endField]: range.end} : context?.signals?.windowForm?.value || {};
     const metrics = context?.signals?.metrics?.value || context?.signals?.metrics?.peek?.() || {};
     const resolvedTimeZone = timeZoneSelector
         ? resolveSelector(metrics, timeZoneSelector) || timeZone
@@ -211,15 +218,29 @@ export function DateRangePresetInput({
     };
     const setAppliedField = (field, nextValue) => setAppliedFields({[field]: nextValue});
     React.useLayoutEffect(() => {
+        if (controlled) return;
         if (String(value).toLowerCase() === 'custom') return;
         const resolved = resolveDateRangePreset(value, new Date(), resolvedLifetimeStart, resolvedTimeZone);
         if (!resolved) return;
         const current = context?.signals?.windowForm?.peek?.() || context?.signals?.windowForm?.value || {};
         const patch = resolveDateRangePresetSyncPatch(current, resolved, {startField, endField, granularityField});
         if (patch) setAppliedFields(patch);
-    }, [value, context, startField, endField, granularityField, resolvedLifetimeStart, resolvedTimeZone]);
+    }, [controlled, value, context, startField, endField, granularityField, resolvedLifetimeStart, resolvedTimeZone]);
     const choosePreset = (option, strict=false) => {
         if (String(option?.value).toLowerCase() === 'custom') return;
+        if (controlled) {
+            // The host owns asynchronous context, generation checks and the one
+            // atomic range commit. No default timezone/signal effect runs here.
+            setPresetRequestError('');
+            return Promise.resolve().then(() => onPresetRequest?.(option)).then(result => {
+                if (result !== false) setOpen(false);
+                return result;
+            }).catch(error => {
+                setPresetRequestError('The date preset could not resolve. Enter dates manually or retry.');
+                if (strict) throw error;
+                return false;
+            });
+        }
         const resolved = resolveDateRangePreset(option?.value, new Date(), resolvedLifetimeStart, resolvedTimeZone);
         const result=batch(() => {
             if (resolved) {
@@ -236,6 +257,12 @@ export function DateRangePresetInput({
     const applyCustomDraft = (draft,strict=false) => {
         if (!customApplyEnabled || !draft.start || !draft.end || draft.start > draft.end) return false;
         const error=validateWidgetControlValue(draft,{item:{widget:'dateRange'},props:{}});if(error)throw new Error(error);
+        if (controlled) {
+            setPresetRequestError('');
+            onRangeChange({start: draft.start, end: draft.end});
+            setOpen(false);
+            return true;
+        }
         const startDate = new Date(`${draft.start}T00:00:00Z`),endDate = new Date(`${draft.end}T00:00:00Z`);
         const durationDays = Math.floor((endDate.getTime()-startDate.getTime())/86400000)+1;
         const result=batch(()=>{
@@ -290,6 +317,8 @@ export function DateRangePresetInput({
             >
                 {triggerLabel}
             </Button>
+            {controlled && presetPending && <span role="status">Resolving date preset…</span>}
+            {presetRequestError && <span role="alert">{presetRequestError}</span>}
             {open && typeof document !== 'undefined' ? createPortal((
                 <div
                     role="dialog"
@@ -316,6 +345,7 @@ export function DateRangePresetInput({
                                 minimal={String(option.value) !== String(value)}
                                 intent={String(option.value) === String(value) ? 'primary' : 'none'}
                                 alignText="left"
+                                disabled={option.disabled === true || controlled && typeof onPresetRequest !== 'function'}
                                 onClick={() => choosePreset(option)}
                             >
                                 {option.label}
@@ -333,7 +363,7 @@ export function DateRangePresetInput({
                                 aria-label="Custom start date"
                                 value={customDraft.start}
                                 max={customDraft.end || undefined}
-                                onChange={(event) => setCustomDraft(previous => ({...previous, start: event.target.value}))}
+                                onChange={(event) => { onDraftChange?.(); setCustomDraft(previous => ({...previous, start: event.target.value})); }}
                             />
                         </label>
                         <label style={{display: 'grid', gap: 4, fontSize: 11, color: '#596579'}}>
@@ -344,19 +374,19 @@ export function DateRangePresetInput({
                                 aria-label="Custom end date"
                                 value={customDraft.end}
                                 min={customDraft.start || undefined}
-                                onChange={(event) => setCustomDraft(previous => ({...previous, end: event.target.value}))}
+                                onChange={(event) => { onDraftChange?.(); setCustomDraft(previous => ({...previous, end: event.target.value})); }}
                             />
                         </label>
                     </div>
                     {invalid ? <div role="alert" style={{color: '#b42318', fontSize: 11, marginTop: 7}}>Start date must be on or before end date.</div> : null}
                     <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 10}}>
                         <span style={{display: 'grid', gap: 4, color: '#6c7587', fontSize: 10, lineHeight: 1.3}}>
-                            <Checkbox
+                            {!controlled && <Checkbox
                                 className="forge-blueprint-checkbox-compat"
                                 checked={includePartialData}
                                 label="Include today's partial data"
                                 onChange={(event) => setAppliedField(includePartialDataField, event.target.checked)}
-                            />
+                            />}
                             {customApplyEnabled ? null : customDisabledMessage}
                         </span>
                         <Button type="button" intent="primary" disabled={!customApplyEnabled || !customDraft.start || !customDraft.end || invalid} onClick={applyCustom}>
