@@ -21,12 +21,14 @@ const activated = (result, expectedRevision) => {
 
 // The host supplies the verified namespace scope. This component only submits
 // exact server-provided references; it never computes membership or admission.
-export default function ReleaseManager({api, channelKey, disabled = false, onActivated}) {
+// renderValidation({roots, disabled}) may render a host-owned, optional check.
+// Its result never changes publish, promotion, or rollback eligibility.
+export default function ReleaseManager({api, channelKey, disabled = false, onActivated, renderValidation}) {
   const scopeID = JSON.stringify([channelKey?.tenant, channelKey?.account, channelKey?.workspace, channelKey?.namespace]);
-  return <ScopedReleaseManager key={scopeID} api={api} channelKey={channelKey} disabled={disabled} onActivated={onActivated}/>;
+  return <ScopedReleaseManager key={scopeID} api={api} channelKey={channelKey} disabled={disabled} onActivated={onActivated} renderValidation={renderValidation}/>;
 }
 
-function ScopedReleaseManager({api, channelKey, disabled, onActivated}) {
+function ScopedReleaseManager({api, channelKey, disabled, onActivated, renderValidation}) {
   const scopeID = JSON.stringify([channelKey?.tenant, channelKey?.account, channelKey?.workspace, channelKey?.namespace]);
   const [channels, setChannels] = useState([]);
   const [candidates, setCandidates] = useState([]);
@@ -231,6 +233,7 @@ function ScopedReleaseManager({api, channelKey, disabled, onActivated}) {
         </FormGroup>;
       }) : <p>No artifact revisions are available.</p>}
     </fieldset>
+    {renderValidation?.({roots, disabled:disabled || pending || loading || !inventoryReady || !currentRootsKnown})}
     {!currentRootsKnown && <Callout intent="warning">This server has not supplied the active release’s included artifacts. Refresh its history before changing the bundle.</Callout>}
     {current && <p>Current release revision {current.revision}</p>}
     <details><summary>Technical details</summary>
