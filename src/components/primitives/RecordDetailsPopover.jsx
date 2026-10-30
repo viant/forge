@@ -1,5 +1,6 @@
+import Popover from '../Popover.jsx';
 import React from 'react';
-import {Button,Popover} from '@blueprintjs/core';
+import {Button} from '@blueprintjs/core';
 import {resolveSelector} from '../../utils/selector.js';
 import {formatDisplayValue} from '../../utils/formatValue.js';
 import './RecordDetailsPopover.css';
@@ -19,8 +20,8 @@ export default function RecordDetailsPopover({context,record,identity,label,trig
   React.useEffect(()=>{close();return()=>{cancel();if(activeByOwner.get(key)?.owner===owner.current)activeByOwner.delete(key);};},[key,identity]);
   React.useEffect(()=>{if(disabled)close();},[disabled]);
   const focusContent=()=>{focusRequested.current=true;content.current?.querySelector('button')?.focus();};
-  return <Popover isOpen={open} onInteraction={next=>next?show():close()} placement="right" autoFocus={false} minimal
-    popoverClassName="forge-record-details-popover" modifiers={{flip:{enabled:true},preventOverflow:{enabled:true,options:{rootBoundary:'viewport',padding:8}}}}
+  return <Popover popupKind="dialog" isOpen={open} onInteraction={next=>next?show():close()} placement="right" autoFocus={false} minimal
+    popoverClassName="forge-record-details-popover"
     content={<div ref={node=>{content.current=node;if(node&&focusRequested.current){focusRequested.current=false;node.querySelector('button')?.focus();}}} className="forge-record-details" role="dialog" aria-hidden={!open} aria-label={`Details for ${label}`} onPointerEnter={cancel} onPointerLeave={leave} onKeyDown={event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();close();}}}>
       <header><strong>{label}</strong><Button small minimal icon="cross" aria-label={`Close details for ${label}`} onClick={close}/></header>
       {pathItems.length?<nav aria-label={`Path for ${label}`} className="forge-record-details__path">{pathItems.map((entry,index)=><React.Fragment key={index}>{index?<span aria-hidden="true"> / </span>:null}{entry?.current||!onPath?<span>{pathLabel(entry)}</span>:<button type="button" disabled={!!entry?.disabled} onClick={()=>{close();onPath(pathValue(entry,index),index);}}>{pathLabel(entry)}</button>}</React.Fragment>)}</nav>:null}

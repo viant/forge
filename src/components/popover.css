@@ -1,0 +1,14 @@
+.forge-anchored-popover {
+    max-width: calc(100vw - 24px);
+    max-width: calc(100dvw - 24px);
+    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - 24px);
+}
+.forge-anchored-popover > .bp6-popover-content {
+    box-sizing: border-box;
+    max-width: inherit;
+    max-height: inherit;
+    min-width: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+}

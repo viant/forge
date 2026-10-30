@@ -1,10 +1,11 @@
+import Popover from '../../components/Popover.jsx';
 import React, {useState} from 'react';
 import TypographySpecimen from './TypographySpecimen.jsx';
 import ChartSpecimen from './ChartSpecimen.jsx';
 import FoundationSpecimen from './FoundationSpecimen.jsx';
 import Typography from '../../components/Typography.jsx';
 import {createRoot} from 'react-dom/client';
-import {Button, Popover, Dialog} from '@blueprintjs/core';
+import {Button, Dialog} from '@blueprintjs/core';
 import '@blueprintjs/core/lib/css/blueprint.css';
 import '../../packs/blueprint/index.jsx';
 import {ForgeThemeProvider, ForgeThemeBoundary} from '../../components/ThemeBoundary.jsx';

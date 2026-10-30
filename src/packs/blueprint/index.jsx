@@ -1,3 +1,5 @@
+import {anchoredPopoverProps} from '../../components/anchoredPopoverProps.js';
+import '../../components/popover.css';
 import SharedIcon from '../../components/Icon.jsx';
 import {useRegisteredControlActions} from '../../runtime/useRegisteredControlActions.js';
 import {isLiveControlVisible,validateWidgetControlValue} from '../../core/ui/controlActions.js';
@@ -783,7 +785,7 @@ export function registerPack() {
                     inputProps={resolvedInputProps}
                     menuProps={resolvedMenuProps}
                     popoverContentProps={popoverContentProps}
-                    popoverProps={focusSafePopoverProps}
+                    popoverProps={anchoredPopoverProps(focusSafePopoverProps)}
                     popoverTargetProps={resolvedPopoverTargetProps}
                     placeholder={placeholder}
                     onItemSelect={(item) => commitSelectOption(item, onChange)}
@@ -995,7 +997,7 @@ export function registerPack() {
                     }}
                     onItemSelect={toggle}
                     onRemove={remove}
-                    popoverProps={{ minimal: true, matchTargetWidth: true, placement: 'bottom-start', onOpening: () => requestOptions('open') }}
+                    popoverProps={anchoredPopoverProps({minimal: true, matchTargetWidth: true, placement: 'bottom-start', onOpening: () => requestOptions('open')})}
                 />
             );
         },

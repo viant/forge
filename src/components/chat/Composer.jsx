@@ -1,6 +1,7 @@
+import Popover from '../Popover.jsx';
 // Composer.jsx – TextArea prompt with send/upload/tools controls
 import React, { useCallback, useEffect, useMemo, useRef, useState, useLayoutEffect } from "react";
-import { Button, Menu, MenuDivider, MenuItem, Popover, Tag, TextArea } from "@blueprintjs/core";
+import { Button, Menu, MenuDivider, MenuItem, Tag, TextArea } from "@blueprintjs/core";
 import { PaperPlaneRight, Stop, Microphone, ListBullets, UserCircle, Lightbulb, Brain, ImageSquare, XCircle, CaretDown, CaretUp } from '@phosphor-icons/react';
 import {isUnresolvedUpload} from '../../hooks/useUpload.js';
 import DocumentComposer from './DocumentComposer.jsx';
