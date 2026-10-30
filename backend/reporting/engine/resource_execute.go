@@ -40,8 +40,8 @@ type ExecuteResourceRequest struct {
 	// follows only the continuation contract declared by the approved datasource.
 	DatasetPageOffsets    map[string]int                               `json:"datasetPageOffsets,omitempty"`
 	DatasetFetchMode      DatasetFetchMode                             `json:"datasetFetchMode,omitempty"`
-	DependencyPins        map[string]identity.ResolvedResource         `json:"dependencyPins,omitempty"`
-	DependencyToken       string                                       `json:"dependencyToken,omitempty"`
+	DependencyPins        map[string]identity.ResolvedResource         `json:"-"`
+	DependencyToken       string                                       `json:"-"`
 	Resource              *identity.ResourceRef                        `json:"resource,omitempty"`
 	ResolvedResource      *identity.ResolvedResource                   `json:"resolvedResource,omitempty"`
 	Parameters            map[string]interface{}                       `json:"parameters,omitempty"`
@@ -62,8 +62,8 @@ const (
 )
 
 type ExecuteResourceResult struct {
-	DependencyPins  map[string]identity.ResolvedResource `json:"dependencyPins,omitempty"`
-	DependencyToken string                               `json:"dependencyToken,omitempty"`
+	DependencyPins  map[string]identity.ResolvedResource `json:"-"`
+	DependencyToken string                               `json:"-"`
 	Resource        *identity.ResolvedResource           `json:"resource"`
 	ReportSpec      json.RawMessage                      `json:"reportSpec"`
 	ReportFill      json.RawMessage                      `json:"reportFill"`
