@@ -4,6 +4,8 @@ package types
 // primitives. Business validation and persistence remain owned by the target
 // datasource; Forge owns pending/success/error state and reconciliation.
 type MutationCommand struct {
+	// SerializationGroup optionally serializes commands in the same context/window, across writers.
+	SerializationGroup  string                      `json:"serializationGroup,omitempty" yaml:"serializationGroup,omitempty"`
 	ClassName           string                      `json:"className,omitempty" yaml:"className,omitempty"`
 	CommandID           string                      `json:"commandId,omitempty" yaml:"commandId,omitempty"`
 	Label               string                      `json:"label,omitempty" yaml:"label,omitempty"`

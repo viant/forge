@@ -643,3 +643,36 @@ it is never automatically retried. No new lock, backend service or mutation
 lifecycle is introduced. Independently authored component and native source
 capture/recompile tests cover this contract. Host integration and real writer
 persistence require their own qualification.
+
+A cell can choose between fixed commands using `mutationCommands`. Conditions use
+the existing predicate vocabulary, evaluated against the clicked row. Exactly
+one matching entry selects its command. Multiple matches disable activation;
+zero matches use the optional singular `mutationCommand` fallback or disable the
+button when no fallback exists. The selected variant retains its own lifecycle
+identity within the row.
+
+```yaml
+mutationCommands:
+  - when: {source: row, field: mode, equals: primary}
+    command:
+      dataSourceRef: primaryPatch
+      serializationGroup: recordChanges
+      prepare: Records.preparePrimary
+  - when: {source: row, field: mode, equals: secondary}
+    command:
+      dataSourceRef: secondaryPatch
+      serializationGroup: recordChanges
+      prepare: Records.prepareSecondary
+```
+
+Optional `serializationGroup` on any `MutationCommand` shares one guard across
+commands in the same context/window, even when they use different writers. The
+executor acquires it before validation, confirmation and preparation. Another
+activation reports that the group is busy and performs no preparation or write.
+Cancellation, validation/preparation errors, writer failure and acknowledged
+completion release the invocation's own lease. Unknown outcomes retain it until
+`resolveIndeterminateCommand` resolves that command after authoritative readback.
+Another row cannot release the lease. Separate windows and ungrouped commands
+keep their independent behavior. The existing target transport guard still
+serializes commands sharing one writer. This is optional concurrency control,
+not authorization, automatic queuing or retry.
