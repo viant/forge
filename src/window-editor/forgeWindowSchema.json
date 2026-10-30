@@ -763,6 +763,10 @@
         "multiSelect": {
           "type": "boolean"
         },
+        "mutationCommand": {
+          "$ref": "#/$defs/MutationCommand",
+          "description": "MutationCommand opts button cells into the shared writer lifecycle using the clicked row."
+        },
         "name": {
           "type": "string"
         },
@@ -7016,6 +7020,13 @@
           "description": "ID uniquely identifies this datasource within a workspace. It is\nalso the URL path segment used by the HTTP endpoint\n/v1/api/datasources/{id}/fetch.",
           "type": "string"
         },
+        "operations": {
+          "additionalProperties": {
+            "$ref": "#/$defs/github.com~1viant~1forge~1backend~1datasource~1contract.Operation"
+          },
+          "description": "Operations are server-owned named actions; undeclared names are denied.",
+          "type": "object"
+        },
         "responseAliases": {
           "additionalProperties": {
             "type": "string"
@@ -7202,6 +7213,15 @@
       },
       "type": "object"
     },
+    "github.com/viant/forge/backend/datasource/contract.Operation": {
+      "additionalProperties": true,
+      "properties": {
+        "backend": {
+          "$ref": "#/$defs/github.com~1viant~1forge~1backend~1datasource~1contract.Backend"
+        }
+      },
+      "type": "object"
+    },
     "github.com/viant/forge/backend/datasource/contract.RefreshPolicy": {
       "type": "string"
     },
@@ -7233,9 +7253,6 @@
     "github.com/viant/forge/backend/provider/contract.DataSourceReference": {
       "additionalProperties": true,
       "properties": {
-        "contentFingerprint": {
-          "type": "string"
-        },
         "providerIdentity": {
           "type": "string"
         },
@@ -7353,7 +7370,7 @@
   "$ref": "#/$defs/Window",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "x-forge-provenance": {
-    "baseCommit": "6c0e265f6a8f415ae89934be66da51cc34c29f99",
+    "baseCommit": "19f2a75306c9c88d02b953b6efccc7c081b3f62f",
     "generator": "scripts/window-schema/main.go",
     "sha256": {
       "choice_browser.go": "935cbeddb231dd329374114c5f38454dc7c44c2ab70a45ea3c0f37ce7f3aee26",
@@ -7363,12 +7380,13 @@
       "gate_requirements_editor.go": "94b32304fae82298136f1b9ed5f6d440e427ab74aaccfafca0382721e3edc0a9",
       "github.com/viant/forge/backend/datasource/contract.argument_projection.go": "d516237702990088462ce88689ed3056f8129369354d44e70e6116baaa2c644d",
       "github.com/viant/forge/backend/datasource/contract.backend_json.go": "aa901f5debe6f5c0876faf0188f4355b5b77fd4616c0be6651cc649696e40da7",
-      "github.com/viant/forge/backend/datasource/contract.datasource.go": "6d49322e43b3736a8ddd6cb07fa5e61d48ccf8984507783594b5d9279c778efd",
+      "github.com/viant/forge/backend/datasource/contract.datasource.go": "010b2d890ac19fe895525ef8827ca767bd83002ab39236f05531c688d2e9d3f3",
       "github.com/viant/forge/backend/datasource/contract.denial.go": "33f9f5fd666591f7b90392b410efe982051197652fa18881f8f2a238b7e24d05",
       "github.com/viant/forge/backend/datasource/contract.method_variants.go": "e4aa1178a31ee0f8ebd15dfd83c512dc8a8d84afb8ba5e6a856cc993870e682c",
+      "github.com/viant/forge/backend/datasource/contract.operation.go": "92f01c7ca32a99ceaebde0e5aba2a3ba97168465f65003bca44344bc6dcdb99a",
       "github.com/viant/forge/backend/provider/contract.ai.go": "071d8a38f9c8053870320205f7441e8db2673015b51932f5bed35a870bd49651",
       "github.com/viant/forge/backend/provider/contract.catalog.go": "570746519947177f2681e7ce63da4461173f129149bdfdcb4d22eaf12d6fc1d7",
-      "github.com/viant/forge/backend/provider/contract.datasource.go": "a29fb4c0208c3036e572d9bd952e3df0ef6c99362a85249ce5067f1d2820c932",
+      "github.com/viant/forge/backend/provider/contract.datasource.go": "58b7fdcebae2a54f2650473e7454c2e4a1d3eb70f06aad57d6fb18aecad115fa",
       "github.com/viant/forge/backend/provider/contract.lifecycle.go": "e4ffdcd8a6660bc325a894206df8f0162b88cd677d1f4ecd01f81c3d7b471bda",
       "github.com/viant/forge/backend/provider/contract.mcp_app.go": "a52f98962f47f5766d96a451465297f2728a32504509514dbd511b4ab74a134d",
       "github.com/viant/forge/backend/provider/contract.methods.go": "6e4a0230d460203501f3c9e64a4d20ed1b30dd45fa9ff5fbbe7adf5f0710b975",
@@ -7391,7 +7409,7 @@
       "host_content.go": "f9f870afe88756eb3abd04b79cc717f60a696a5dc2501dec11ffba0f87dbc0fd",
       "json_metadata_clone.go": "baa9bde7e567774737f28b87c45a2bb145d9c5b2fadc81da3024578b17c6c09c",
       "local_state_owner.go": "987402ce2487f4b7714a3991c405aab0dda74a573d8690f8f6561d4ce020ab8f",
-      "model.go": "b75e36af5463849294e8ea2a2ef21dd0f5212d01859bc15242a5d066585dd636",
+      "model.go": "cad585d0cdce915ca58b9b1b00d27f95cfc01e7b1f05e3d7bf5393c936edae65",
       "parameter_editor.go": "a176f3b63d74714d216daf57ba5c3c3ee8e12aaf8ccf2c0ee1b663c95a657bf6",
       "predicate_composition_editor.go": "881bcf68a5f5e16cae2f58ef7495ac14582398236cfd263cc8585e89f97cab4b",
       "presentation_primitives.go": "02a6a592152be515ce4a0632a586a1c94c926090ebfe39e5a29868d2b496b6cb",
@@ -7399,14 +7417,16 @@
       "reader_workbench.go": "4c41b6e595a1152d9dd002144bb974057616338c1bf813a053d0dcb64e7895c0",
       "resource_assignment.go": "80ad53f8050041d9e652f3954084f6148fc8e53c324510126904a5ab35e3507e",
       "resource_model.go": "2d09c19334a806ae9879b9e022e403640cc5ca0f7cabe494b38aaa86881cd610",
-      "resource_model_validation.go": "09a5af2720d7f627338949626bb627dbbcf625bfe3a6aeb56f634327a0e3222e",
+      "resource_model_validation.go": "1ef4fb0724967b7c166bca644f6b1d108776d490552da159fa0439c459f42a48",
       "resource_policy_editor.go": "6f3a00bf5ac0751a133fe121e727f5aa2671489dfb07b98a29314cc7a380b8c2",
       "result_preview.go": "bd913237174dc663cf40a5cd30bf5e835ec077930e7f0916f7ce906671f3dbff",
       "rule_editor.go": "3eda2833f57c5a64adec603e42213423907151451998fa4ba538fe258273f6e6",
-      "window_compiled_resource.go": "57eb863c93ec4ea1c661678f99b31924d266e0f7d2a878dd3531fd46e3e18acd",
+      "window_compiled_resource.go": "674537675ed4f58a3f331541f443ed593bfe61eaced1a8e9c4624253cb5de881",
+      "window_consumer.go": "68fb1c0e6023416f0f27420c0a5fcd0c08b1ce6502ca63cf97a96236e0918837",
       "window_descriptor.go": "99170237b79c06523e72302b7917e0f573ef5f54bbc4bf0b8a4625915274c789",
-      "window_reference_manifest.go": "fe66bf7b36823b396742d8e36d8aa5c559c494125e0f4ed1bba89219fbaf0635",
-      "window_resource.go": "f9426cf66d40ae52bf029f4776fbc34930764a31ff850f38c76e72e8ab960a2e",
+      "window_reference_legacy.go": "013864c78676878e1c2dc2af275ff6dbc55870ba355f3b27759f7af64c017b76",
+      "window_reference_manifest.go": "e8245d783f99d3a59143fd1e37e364c040389fa409b457207da567d9112ddb5b",
+      "window_resource.go": "cf6b91b8d52a014de705e52b50bc9c1df07ec2c5eeffff1abb88c04297baaa61",
       "window_target_proof.go": "53605c132aae2b8c8d6e377daaae416f347e0ff8c48a39fb2a0f15f95ad5faeb",
       "workflow_primitives.go": "930a4ad96dc4b108c3436dc175014ca766bf2921e4a40ec3bfca7d622ecd3ff1",
       "workspace_summary.go": "d9cf3867d3d3bfa3f65c9fdeccad91d21bd9d2602e066823bb36cbff079c86c1"
