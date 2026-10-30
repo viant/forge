@@ -43,17 +43,8 @@ func (p *Publisher) RetainBatch(ctx context.Context, artifacts []*Artifact, vali
 		if input == nil {
 			return nil, ErrInvalid
 		}
-		// Match Publish's exact wire-byte normalization before hashing. Do not
-		// accept a supplied hash that describes different bytes.
-		canonical, err := json.Marshal(json.RawMessage(input.Payload))
+		candidate, err := canonicalArtifact(input.Root, input.Payload)
 		if err != nil {
-			return nil, ErrInvalid
-		}
-		candidate := &Artifact{Root: RootRef{URI: input.Root.URI, Kind: input.Root.Kind, Version: input.Root.Version, Hash: Hash(canonical)}, Payload: bytes.Clone(canonical)}
-		if input.Root.Hash != "" && input.Root.Hash != candidate.Root.Hash {
-			return nil, ErrInvalid
-		}
-		if err = ValidateArtifact(candidate); err != nil {
 			return nil, err
 		}
 		key := RootKey(candidate.Root)
@@ -106,18 +97,8 @@ func (p *Publisher) Publish(ctx context.Context, root RootRef, payload json.RawM
 	if p == nil || ctx == nil || ctx.Err() != nil || validator == nil {
 		return nil, 0, ErrInvalid
 	}
-	// encoding/json compacts RawMessage and HTML-escapes when the Artifact is
-	// later encoded on the MCP wire. Normalize exactly once at publication so
-	// the stored bytes, content hash and text-decoded wire bytes are identical.
-	canonical, marshalErr := json.Marshal(json.RawMessage(payload))
-	if marshalErr != nil {
-		return nil, 0, ErrInvalid
-	}
-	candidate := &Artifact{Root: RootRef{URI: root.URI, Kind: root.Kind, Version: root.Version, Hash: Hash(canonical)}, Payload: bytes.Clone(canonical)}
-	if root.Hash != "" && root.Hash != candidate.Root.Hash {
-		return nil, 0, ErrInvalid
-	}
-	if err := ValidateArtifact(candidate); err != nil {
+	candidate, err := canonicalArtifact(root, payload)
+	if err != nil {
 		return nil, 0, err
 	}
 	if err := validator(ctx, bytes.Clone(candidate.Payload)); err != nil {
