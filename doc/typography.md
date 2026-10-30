@@ -284,6 +284,11 @@ Icon contract. Agently owns shell-specific geometry and placement; workspace
 assets continue to own branding. The navigation and header specimens exercise
 these exports without adding a customer-specific icon package.
 
+Response actions can use `lucide:thumbs-up`, `lucide:thumbs-down` and
+`lucide:ellipsis` through the same Icon and Button contracts. FoundationSpecimen
+includes these glyphs; selected state remains the consumer's semantic state,
+without a separate filled-icon API or dependency.
+
 ### Document chat consumers
 
 `chat.appearance: document` uses the actual shared composer and task browser.

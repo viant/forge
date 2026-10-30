@@ -2,7 +2,7 @@ import React from 'react';
 import {Icon as BlueprintIcon} from '@blueprintjs/core';
 import {ArrowLeft, ArrowRight, ArrowUp, Bell, Gauge, LogOut, Building, Camera, Check, CloudUpload, Clock3, FileText, Flag, House, LayoutGrid, Maximize, Mic, Minimize, SlidersHorizontal, ChevronDown, ChevronRight, CircleAlert, CircleHelp, CirclePause, LoaderCircle, Link, RotateCcw, FileDown, History,
     Maximize2, Menu, MessageSquare, Minimize2, Paperclip, PanelRight, PanelRightClose,
-    PanelRightOpen, Plus, RefreshCw, Search, Settings, Square, Trash2, User, X, ZoomIn, ZoomOut} from 'lucide-react';
+    PanelRightOpen, Plus, RefreshCw, Search, Settings, Square, ThumbsUp, ThumbsDown, Ellipsis, Trash2, User, X, ZoomIn, ZoomOut} from 'lucide-react';
 import './foundations.css';
 
 const icons = {
@@ -18,6 +18,7 @@ const icons = {
     square: Square, 'trash-2': Trash2, user: User, x: X, bell: Bell, gauge: Gauge, 'log-out': LogOut,
     'zoom-in': ZoomIn, 'zoom-out': ZoomOut,
     'circle-help': CircleHelp, 'circle-pause': CirclePause, 'loader-circle': LoaderCircle, link: Link, 'rotate-ccw': RotateCcw,
+    'thumbs-up': ThumbsUp, 'thumbs-down': ThumbsDown, ellipsis: Ellipsis,
 };
 export const iconNames = Object.freeze(Object.keys(icons).map(name => `lucide:${name}`));
 
