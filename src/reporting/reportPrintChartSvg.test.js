@@ -578,3 +578,35 @@ const legendLines=[...narrowCategory.svg.matchAll(/<text x="([0-9.]+)" y="([0-9.
 assert.ok(legendLines.length>3);assert.ok(legendLines.every(m=>Number(m[1])===30&&Number(m[2])>180));
 assert.match(legendLines.map(m=>m[3]).join(' '),/Reference collection with a deliberately long category name/);
 assert.ok(legendLines.every(m=>m[3].length*11+Number(m[1])<=220));
+
+// Independent neutral series labels must remain complete in adjacent PDF tiles.
+const longSeriesLabels = [
+  'Reference collection with a deliberately long series label',
+  'Experimental collection with another complete series label',
+  'WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW',
+];
+for (const width of [220, 640]) {
+  for (const type of ['bar', 'horizontal_bar', 'line', 'area']) {
+    const result = buildReportPrintChartSvg({
+      chartModel: {type, series: {values: longSeriesLabels.map((label, index) => ({value: `value${index}`, label, type}))}},
+      resolvedChart: {kind: 'directSeries', type, seriesKeys: ['value0', 'value1', 'value2'], xAxisKey: 'category', rows: [{category: 'Sample', value0: 1, value1: 2, value2: 3}]},
+      width,
+    });
+    assert.deepEqual(result.diagnostics, []);
+    const entries = [...result.svg.matchAll(/<rect x="([\d.]+)" y="([\d.]+)" width="12" height="12" rx="2"[^>]*\/>\s*((?:<text[^>]*>[^<]*<\/text>\s*)+)/g)];
+    assert.equal(entries.length, longSeriesLabels.length);
+    const boxes = entries.map((entry, index) => {
+      const lines = [...entry[3].matchAll(/<text x="([\d.]+)" y="([\d.]+)"[^>]*>(.*?)<\/text>/g)];
+      assert.equal(lines.map(line => line[3]).join(' ').replaceAll(' ', ''), longSeriesLabels[index].replaceAll(' ', ''));
+      assert.ok(lines.length > 1, 'long labels wrap rather than overlap');
+      const right = Math.max(...lines.map(line => Number(line[1]) + line[3].length * 11));
+      const bottom = Number(lines.at(-1)[2]);
+      assert.ok(right <= width - 12);
+      assert.ok(bottom <= result.height);
+      return {left: Number(entry[1]), top: Number(entry[2]), right, bottom};
+    });
+    boxes.forEach((box, index) => boxes.slice(index + 1).forEach(other => {
+      assert.ok(box.right <= other.left || other.right <= box.left || box.bottom < other.top || other.bottom < box.top, 'series legend labels occupy separate boxes');
+    }));
+  }
+}

@@ -2540,21 +2540,24 @@ function renderReportPrintChartBlock(state = {}, block = {}, {
     return;
   }
   const titleHeight = reportPrintTitleHeight(state, block, layoutNote);
+  const continuationBlock = { ...block, title: `${resolveReportPrintBlockTitle(block)} (continued)`, content: { ...block.content, title: `${resolveReportPrintBlockTitle(block)} (continued)` } };
+  const continuationTitleHeight = reportPrintTitleHeight(state, continuationBlock, layoutNote);
   const chartPages = buildReportPrintChartPages({
     chartModel: block?.content?.chartModel || block?.chartModel || {},
     resolvedChart: block?.content?.resolvedChart || null,
     rowLimit: block?.content?.rowLimit ?? block?.rowLimit ?? 0,
     width: state.contentWidth,
-    maxHeight: state.contentBottom - state.contentTop - titleHeight,
+    maxHeight: state.contentBottom - state.contentTop - Math.max(titleHeight, continuationTitleHeight),
     firstMaxHeight: state.contentBottom - state.cursorY - titleHeight >= 180
       ? state.contentBottom - state.cursorY - titleHeight
       : state.contentBottom - state.contentTop - titleHeight - (state.sectionHeadingHeight || 0),
   });
   for (const [pageIndex, svgResult] of chartPages.entries()) {
     if(svgResult?.startNewPage && state.cursorY > state.contentTop) startNextReportPrintPage(state);
-    const pageBlock = pageIndex === 0 ? block : { ...block, title: `${resolveReportPrintBlockTitle(block)} (continued)`, content: { ...block.content, title: `${resolveReportPrintBlockTitle(block)} (continued)` } };
+    const pageBlock = pageIndex === 0 ? block : continuationBlock;
+    const pageTitleHeight = pageIndex === 0 ? titleHeight : continuationTitleHeight;
     const chartHeight = svgResult?.svg ? Math.max(120, Number(svgResult.height) || 0) : REPORT_PRINT_THEME.bodyLineHeight;
-    ensureReportPrintSpace(state, titleHeight + chartHeight);
+    ensureReportPrintSpace(state, pageTitleHeight + chartHeight);
     renderReportPrintSectionTitle(state, pageBlock, { layoutNote, continuation: pageIndex > 0 });
     if (!svgResult?.svg) {
       const placeholder = renderReportPrintTextLines(state, {

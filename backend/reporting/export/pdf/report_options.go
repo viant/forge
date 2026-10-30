@@ -28,6 +28,9 @@ func reportOptionLines(options Options) []string {
 	}
 	_ = json.Unmarshal(options.Metadata, &metadata)
 	var spec struct {
+		Scope *struct {
+			Params json.RawMessage `json:"params"`
+		} `json:"scope"`
 		Datasets []struct {
 			ID      string `json:"id"`
 			Label   string `json:"label"`
@@ -97,7 +100,11 @@ func reportOptionLines(options Options) []string {
 		for _, name := range names {
 			// A definition list is the public control catalog. Compatibility
 			// request fields absent from it must not become printed controls.
-			visible := len(metadata.Definitions) == 0
+			// Authored scope controls are already rendered by the canonical
+			// filter bar with their labels and choice labels. Their presence
+			// also declares the public catalog: fixed dataset inputs must not
+			// become extra controls merely because reportOptions is absent.
+			visible := len(metadata.Definitions) == 0 && (spec.Scope == nil || len(spec.Scope.Params) == 0)
 			for _, definition := range metadata.Definitions {
 				if definition.Name != name {
 					continue
