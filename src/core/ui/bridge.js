@@ -302,7 +302,8 @@ export function startUIBridgeHTTP(options = {}) {
   let sessionId = null;
   let snapshotGzip = false;
   let maxInflatedSnapshotBytes = 32 * 1024 * 1024;
-  const transportContext = () => !stopped && readyToPublish && sessionId ? { url, clientId, sessionHeader, sessionId } : null;
+  let handshakeReady = false;
+  const transportContext = () => !stopped && handshakeReady && sessionId ? { url, clientId, sessionHeader, sessionId } : null;
   activeHTTPTransportContext = transportContext;
   let lastEventId = null;
   let streamAbort = null;
@@ -597,6 +598,7 @@ export function startUIBridgeHTTP(options = {}) {
     generation++;
     sessionId = null;
     snapshotGzip = false;
+    handshakeReady = false;
     readyToPublish = false;
     readyToPoll = false;
     lastSnapshotText = '';
@@ -720,6 +722,7 @@ export function startUIBridgeHTTP(options = {}) {
     try {
       const hello = await rpc('ui.hello', { clientId, token: options.token || undefined }, 1, scope);
       requireCurrent(scope);
+      handshakeReady = true;
       snapshotGzip = Array.isArray(hello?.capabilities?.snapshotRequestEncodings) && hello.capabilities.snapshotRequestEncodings.includes('gzip');
       const advertisedLimit = hello?.capabilities?.maxInflatedSnapshotBytes;
       maxInflatedSnapshotBytes = Number.isSafeInteger(advertisedLimit) && advertisedLimit > 0
@@ -748,6 +751,7 @@ export function startUIBridgeHTTP(options = {}) {
       if (!current(scope)) return;
       settleBridgeReadyState(false);
       if (isUnauthorizedError(err)) {
+        handshakeReady = false;
         readyToPublish = false;
         scheduleAuthRetry();
         return;
@@ -793,6 +797,7 @@ export function startUIBridgeHTTP(options = {}) {
     detachStartupWait = null;
     if (activeSnapshotPublisher) activeSnapshotPublisher = null;
     settleBridgeReadyState(false);
+    handshakeReady = false;
     readyToPublish = false;
     readyToPoll = false;
     cancelPollSleep?.();
