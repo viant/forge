@@ -581,3 +581,65 @@ window-state mirror. For example,
 reads and subscribes to that datasource's control signal. Combine it with
 `loading: false` and an empty `error` predicate before a full-replacement
 mutation. Other leaf scopes also honor an explicit `dataSourceRef`.
+
+### Table button cell mutations
+
+A basic table `type: button` column can declare `mutationCommand` using the same
+command contract as standalone buttons. It reuses `MutationCommand` and the
+existing command executor for confirmation, payload preparation, async `prepare`,
+writer invocation, reconciliation, refresh and lifecycle presentation.
+
+```yaml
+dataSource:
+  records:
+    uniqueKey: [{field: id}]
+view:
+  content:
+    id: recordsTable
+    dataSourceRef: records
+    table:
+      columns:
+        - id: remove
+          name: Remove record
+          type: button
+          icon: trash
+          mutationCommand:
+            dataSourceRef: recordPatch
+            prepare: Records.prepareRemoval
+            confirm: Remove this record?
+            refresh: [{dataSourceRef: records, bypassCache: true}]
+```
+
+The independently invented example names no application or service. The host's
+prepare handler receives `{context, parameters, extras, signal}`; `extras` contains
+`row`, `value`, `rowIndex` and `columnId` from the activated cell. Return the writer's
+parameter map from `prepare`, or use the existing typed `payload` contract with
+`source: {scope: extras, selector: row}`. Without payload/prepare, these extras use
+the executor's ordinary parameter merge semantics. They are not permission facts.
+The command uses the clicked row directly and does not select it first.
+
+Declare a complete datasource `uniqueKey`. Compound keys use their ordered,
+typed field values; zero and false are valid. Missing/null/empty or non-scalar key
+components disable the action with an explanatory title. There is no row-index
+fallback. A row's lifecycle follows its identity when sorting or paging, and
+separate window instances retain separate command state. Authored `commandId`
+is a namespace within the derived window/datasource/column/row identity, rather
+than a replacement for that identity.
+
+When `mutationCommand` is present, it owns activation and takes precedence over
+legacy cell `onClick` handlers. Other button appearance and availability policies
+remain in effect. Without it, the existing event path is unchanged. The button
+has an accessible action name, native keyboard activation, disabled/pending
+presentation and the shared polite lifecycle status. Confirmation uses the shared
+accessible dialog; cancellation never invokes preparation or the writer.
+
+A second activation of a guarded command cannot write again. Different rows
+sharing a writer also use the existing datasource transport guard, preventing
+concurrent input replacement; the second row reports that the datasource is busy.
+Failures remain visible and retryable; a remounted terminal failure resets its
+presentation through the existing primitive. An unknown writer outcome remains
+guarded across remounts and requires the existing authoritative resolution path;
+it is never automatically retried. No new lock, backend service or mutation
+lifecycle is introduced. Independently authored component and native source
+capture/recompile tests cover this contract. Host integration and real writer
+persistence require their own qualification.

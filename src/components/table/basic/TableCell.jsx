@@ -18,6 +18,8 @@ import {resolveTableStackedValue} from './tableStackedValue.js';
 import {resolveButtonIcon, resolveButtonPressed} from './buttonIcon.js';
 import {isolateButtonCellProps} from './buttonCellEvents.js';
 import {applyDynamicCellProperties} from './cellProperties.js';
+import TableCellMutation from './TableCellMutation.jsx';
+import {tableCellMutation} from './tableCellMutation.js';
 
 const defaultCellProperties = (item) => {
     const properties = {};
@@ -160,13 +162,28 @@ const TableCell = ({
                 style={{marginLeft: 4}}
             />
             break;
-        case "button":
+        case "button": {
+            const buttonProps = {
+                ...cellProps,
+                icon: resolveButtonIcon(col, value, cellProps.icon),
+                'aria-pressed': resolveButtonPressed(col, value),
+            };
+            if (col.mutationCommand) {
+                const command = tableCellMutation(context, col, row);
+                cellContent = command
+                    ? <TableCellMutation key={command.commandId} context={context} command={command}
+                        extras={{row, value, rowIndex: cellSelection.rowIndex, columnId: col.id}} buttonProps={buttonProps}/>
+                    : <Button {...isolateButtonCellProps({...buttonProps, onClick: undefined})} disabled
+                        aria-label={buttonProps['aria-label'] || col.name || col.id} title="A complete datasource uniqueKey is required for this action."/>;
+                break;
+            }
             cellContent = <Button
                 {...isolateButtonCellProps(cellProps)}
                 icon={resolveButtonIcon(col, value, cellProps.icon)}
                 aria-pressed={resolveButtonPressed(col, value)}
             />;
             break;
+        }
         case "progress":
             cellContent = (
                 <ProgressBar value={value} text={displayedText} {...cellProps} progress={cellProps.progress ?? col.progress} row={row}/>
@@ -382,7 +399,7 @@ const TableCell = ({
         );
     }
 
-    if(React.isValidElement(cellContent) && ['button','link','checkbox'].includes(type)) {
+    if(React.isValidElement(cellContent) && ['button','link','checkbox'].includes(type) && !(type === 'button' && col.mutationCommand)) {
         const props=cellContent.props,actions={};
         if(typeof props.onClick==='function' && type!=='checkbox')actions.click=({event})=>(props.onClick.operate || props.onClick)(event);
         if(type==='checkbox' && col.multiSelect===true && typeof props.onChange==='function')actions.setValue=({value:checked})=>{
