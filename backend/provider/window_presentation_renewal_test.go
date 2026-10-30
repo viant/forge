@@ -149,3 +149,36 @@ func TestPresentationReadRequiresExactCurrentAttachedClient(t *testing.T) {
 		t.Fatal("closed session reused")
 	}
 }
+
+func TestConsumerTargetRestoresOnlyOwnedPrivateSelection(t *testing.T) {
+	svc, ctx, _ := feedOwnershipFixture(t)
+	svc.hub.httpStreamable()
+	bridge := svc.hub.httpBridge
+	bridge.bindSession(context.WithValue(ctx, jsonrpc.SessionKey, &base.Session{Id: "private-session"}), "client-a", "alice", nil, svc.hub.clients["alice"]["client-a"])
+	ctx = requestctx.WithUIBridgeSessionID(ctx, "private-session")
+	child := identity.ResolvedResource{URI: "datasource://example/rows", ProviderIdentity: "owner", ResourceCandidate: identity.ResourceCandidate{Kind: identity.WorkingCandidate, ContentFingerprint: identity.ContentFingerprint([]byte("private-source"))}, AuthorityBinding: "actor", ValidUntil: time.Now().Add(time.Minute)}
+	private := &types.WindowTarget{Platform: "web", SelectionToken: "opaque", DependencyPins: map[string]identity.ResolvedResource{"rows": child}}
+	pin := child
+	pin.URI = "window://example/view"
+	catalog := &presentationCatalog{pin: pin, target: private}
+	svc.cfg.WindowDefinitions = catalog
+	key := windowPinKey{Namespace: "alice", ClientID: "client-a", WindowID: "instance"}
+	svc.resourcePins = map[windowPinKey]windowResourcePin{key: {WindowKey: "view", Resource: pin, Target: private}}
+	public := types.ConsumerWindowTarget(private)
+	_, actual, err := svc.PrepareNativePresentationRead(ctx, &pin, public)
+	if err != nil || actual.DependencyPins["rows"] != child {
+		t.Fatalf("private selection not restored: %v", err)
+	}
+	if len(public.DependencyPins) != 0 {
+		t.Fatal("consumer target mutated")
+	}
+	counterfeit := *public
+	counterfeit.SelectionToken = "counterfeit"
+	if _, _, err = svc.PrepareNativePresentationRead(ctx, &pin, &counterfeit); err == nil {
+		t.Fatal("counterfeit selection admitted")
+	}
+	catalog.denied = true
+	if _, _, err = svc.PrepareNativePresentationRead(ctx, &pin, public); err == nil {
+		t.Fatal("backend denial ignored")
+	}
+}

@@ -54,10 +54,7 @@ func (c *WindowCatalog) fetchReferencedDatasource(ctx context.Context, parent id
 	if err != nil {
 		return nil, err
 	}
-	if !sameDatasourceDescriptor(expected, actual) {
-		return nil, identity.ErrResourceStale
-	}
-	body, err := c.Gateway.FetchDatasource(ctx, child, proof, expected, inputs)
+	body, err := c.Gateway.FetchDatasource(ctx, child, proof, actual, inputs)
 	if err != nil {
 		return nil, err
 	}

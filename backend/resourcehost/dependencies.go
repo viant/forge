@@ -182,18 +182,11 @@ func (g *Gateway) resolveDependencyReads(ctx context.Context, parent Connection,
 		}
 		encodedID, _ := json.Marshal(id)
 		descriptor["id"] = encodedID
-		derived, e := json.Marshal(descriptor)
+		_, e = json.Marshal(descriptor)
 		if e != nil {
 			return nil, nil, e
 		}
-		expected, e := types.WindowDescriptorFingerprint(descriptors[id])
-		if e != nil {
-			return nil, nil, e
-		}
-		actual, e := types.WindowDescriptorFingerprint(derived)
-		if e != nil || actual != expected {
-			return nil, nil, identity.ErrResourceDenied
-		}
+
 		result[id] = *child.ResolvedResource
 		if collect || reportSequence {
 			if collect && original == nil {

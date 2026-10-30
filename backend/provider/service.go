@@ -184,14 +184,15 @@ func (s *Service) UICommand(ctx context.Context, in *UICommandInput) (output *UI
 			if options == nil {
 				options = map[string]any{}
 			}
-			options["inlineMetadata"] = resolved.Definition
+			publicDefinition := types.ConsumerWindow(resolved.Definition)
+			options["inlineMetadata"] = publicDefinition
 			options["resource"] = resolved.Definition.Resource
 			params["options"] = options
 			params["resource"] = resolved.Definition.Resource
-			params["target"] = resolved.Definition.ResourceTarget
-			options["target"] = resolved.Definition.ResourceTarget
+			params["target"] = publicDefinition.ResourceTarget
+			options["target"] = publicDefinition.ResourceTarget
 			if in.Method == "ui.window.openDynamic" {
-				params["metadata"] = resolved.Definition
+				params["metadata"] = publicDefinition
 			}
 			openedPin = resolved.Definition.Resource
 			openedTarget = resolved.Definition.ResourceTarget
