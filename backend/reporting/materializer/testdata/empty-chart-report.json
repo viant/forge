@@ -1,0 +1,25 @@
+{
+  "reportSpec": {
+    "version": 1,
+    "kind": "reportSpec",
+    "title": "Collection summary",
+    "source": {"kind":"dashboard.reportBuilder","containerId":"collection","stateKey":"collection","dataSourceRef":"collection"},
+    "parameters": {"viewMode":"chart","groupBy":"","pageSize":10,"orderField":"","orderDir":"asc"},
+    "refinements": [],
+    "calculatedFields": [],
+    "layoutIntent": {"kind":"single","blockOrder":["details","emptyChart","populatedChart"]},
+    "datasets": [
+      {"id":"primary","dataSourceRef":"collection","request":{"limit":10,"offset":0}},
+      {"id":"empty","dataSourceRef":"collection","request":{"limit":10,"offset":0}}
+    ],
+    "blocks": [
+      {"id":"details","kind":"tableBlock","datasetRef":"primary","columns":[{"key":"category","sourceKey":"category","displayKey":"category","label":"Category","kind":"dimension"},{"key":"amount","sourceKey":"amount","displayKey":"amount","label":"Amount","kind":"measure","format":"number2"}]},
+      {"id":"emptyChart","kind":"chartBlock","title":"Empty collection","datasetRef":"empty","chartSpec":{"type":"horizontal_bar","xField":"category","yFields":["amount"]},"chartModel":{"type":"horizontal_bar","xAxis":{"dataKey":"category"},"series":{"values":[{"value":"amount","label":"Amount","type":"horizontal_bar"}]}}},
+      {"id":"populatedChart","kind":"chartBlock","title":"Available collection","datasetRef":"primary","chartSpec":{"type":"horizontal_bar","xField":"category","yFields":["amount"]},"chartModel":{"type":"horizontal_bar","xAxis":{"dataKey":"category"},"series":{"values":[{"value":"amount","label":"Amount","type":"horizontal_bar"}]}}}
+    ]
+  },
+  "datasets": {
+    "primary": {"rows":[{"category":"Reference","amount":7.25},{"category":"Science","amount":3.5}],"hasMore":false},
+    "empty": {"rows":[],"hasMore":false}
+  }
+}

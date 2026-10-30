@@ -56174,7 +56174,7 @@ Please __addLocaleData before adding additional unit data`);
     return (Array.isArray(rows) ? rows : []).map((row) => cloneValue21(row));
   }
   function buildBaseReportFillChartPayload(chart = {}, rows = [], centerRows, centerInputs, requestFilters) {
-    var _a5, _b, _c, _d, _e, _f, _g, _h, _i;
+    var _a5, _b, _c, _d, _e, _f, _g;
     const type = normalizeString33(chart == null ? void 0 : chart.type).toLowerCase();
     if (type === "category-range") {
       const model = buildCategoryRange(chart.categoryRange, rows);
@@ -56186,12 +56186,12 @@ Please __addLocaleData before adding additional unit data`);
     }
     const center = resolveDonutCenter(chart.center, rows, type, centerRows, centerInputs);
     const chartRows = materializeChartDisplayRows(chart, rows);
-    if (!type || chartRows.length === 0 && !center && !((_b = (_a5 = chart.tooltip) == null ? void 0 : _a5.lines) == null ? void 0 : _b.some((line) => line.some((segment) => segment.input)))) {
+    if (!type) {
       return null;
     }
     if (type === "pie" || type === "donut") {
-      const nameKey2 = normalizeString33(chart.tooltip ? chartTooltipPieFields(chart).nameKey : ((_c = chart == null ? void 0 : chart.series) == null ? void 0 : _c.nameKey) || "name");
-      const valueKey2 = normalizeString33(chart.tooltip ? chartTooltipPieFields(chart).valueKey : ((_d = chart == null ? void 0 : chart.series) == null ? void 0 : _d.valueKey) || "value");
+      const nameKey2 = normalizeString33(chart.tooltip ? chartTooltipPieFields(chart).nameKey : ((_a5 = chart == null ? void 0 : chart.series) == null ? void 0 : _a5.nameKey) || "name");
+      const valueKey2 = normalizeString33(chart.tooltip ? chartTooltipPieFields(chart).valueKey : ((_b = chart == null ? void 0 : chart.series) == null ? void 0 : _b.valueKey) || "value");
       if (!nameKey2 || !valueKey2) {
         return null;
       }
@@ -56208,11 +56208,11 @@ Please __addLocaleData before adding additional unit data`);
       };
     }
     if (isDirectSeriesChart(chart)) {
-      const xAxisKey2 = normalizeString33((_e = chart == null ? void 0 : chart.xAxis) == null ? void 0 : _e.dataKey);
+      const xAxisKey2 = normalizeString33((_c = chart == null ? void 0 : chart.xAxis) == null ? void 0 : _c.dataKey);
       if (!xAxisKey2) {
         return null;
       }
-      const seriesValues = Array.isArray((_f = chart == null ? void 0 : chart.series) == null ? void 0 : _f.values) ? chart.series.values : [];
+      const seriesValues = Array.isArray((_d = chart == null ? void 0 : chart.series) == null ? void 0 : _d.values) ? chart.series.values : [];
       const seriesKeys = seriesValues.map((entry) => normalizeChartKey(entry == null ? void 0 : entry.value)).filter(Boolean);
       const resolvedRows = aggregateDirectSeriesData(chartRows, xAxisKey2, seriesValues, chart);
       return {
@@ -56223,9 +56223,9 @@ Please __addLocaleData before adding additional unit data`);
         rows: cloneChartRows(resolvedRows)
       };
     }
-    const xAxisKey = normalizeString33((_g = chart == null ? void 0 : chart.xAxis) == null ? void 0 : _g.dataKey);
-    const nameKey = normalizeString33((_h = chart == null ? void 0 : chart.series) == null ? void 0 : _h.nameKey);
-    const valueKey = normalizeString33((_i = chart == null ? void 0 : chart.series) == null ? void 0 : _i.valueKey);
+    const xAxisKey = normalizeString33((_e = chart == null ? void 0 : chart.xAxis) == null ? void 0 : _e.dataKey);
+    const nameKey = normalizeString33((_f = chart == null ? void 0 : chart.series) == null ? void 0 : _f.nameKey);
+    const valueKey = normalizeString33((_g = chart == null ? void 0 : chart.series) == null ? void 0 : _g.valueKey);
     if (!xAxisKey || !nameKey || !valueKey) {
       return null;
     }
@@ -59663,7 +59663,7 @@ ${indent}${end}`;
     return hashString(JSON.stringify(reportFill || {}));
   }
   function buildReportFillDataset(dataset = {}, payload = {}, calculatedFields = []) {
-    var _a5, _b;
+    var _a5, _b, _c, _d, _e;
     if (calculatedFields.some((field) => {
       var _a6;
       return field.datasetRef === dataset.id && ((_a6 = field.compute) == null ? void 0 : _a6.requireComplete) === true;
@@ -59685,8 +59685,8 @@ ${indent}${end}`;
       provenance: {
         requestHash: hashString(stableJSONStringify(request)),
         rowCount: rows.length,
-        truncated: !!(payload == null ? void 0 : payload.hasMore),
-        hasMore: !!(payload == null ? void 0 : payload.hasMore),
+        truncated: !!((payload == null ? void 0 : payload.truncated) || ((_c = payload == null ? void 0 : payload.provenance) == null ? void 0 : _c.truncated) || (payload == null ? void 0 : payload.hasMore) || ((_d = payload == null ? void 0 : payload.provenance) == null ? void 0 : _d.hasMore)),
+        hasMore: !!((payload == null ? void 0 : payload.hasMore) || ((_e = payload == null ? void 0 : payload.provenance) == null ? void 0 : _e.hasMore)),
         diagnostics
       },
       rows
@@ -60467,7 +60467,8 @@ ${indent}${end}`;
   }
   function buildReportFillBlocks(reportSpec = {}, datasetsById = /* @__PURE__ */ new Map(), {
     unifiedFilterContent = null,
-    runtimeSelection = {}
+    runtimeSelection = {},
+    datasetPayloads = {}
   } = {}) {
     var _a5;
     const scopeParams = Array.isArray((_a5 = reportSpec == null ? void 0 : reportSpec.scope) == null ? void 0 : _a5.params) ? reportSpec.scope.params : [];
@@ -60479,7 +60480,7 @@ ${indent}${end}`;
     const availableDatasetRefs = Array.from(datasetsById.keys());
     const datasetsByAlias = buildReportFillDatasetAliasMap(datasetsById);
     return (Array.isArray(reportSpec == null ? void 0 : reportSpec.blocks) ? reportSpec.blocks : []).map((block) => {
-      var _a6, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
+      var _a6, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q;
       const normalizedBlock = cloneValue24(block);
       delete normalizedBlock.templateFieldDisplayMap;
       delete normalizedBlock.markerColors;
@@ -60532,6 +60533,13 @@ ${indent}${end}`;
         };
       }
       if (normalizeString36(block == null ? void 0 : block.kind) === "chartBlock") {
+        if (block.chartModel && (!dataset || dataset.rows.length === 0)) {
+          const payload = datasetPayloads[datasetResolution.datasetRef];
+          const diagnostics = [...(payload == null ? void 0 : payload.diagnostics) || [], ...((_h = payload == null ? void 0 : payload.provenance) == null ? void 0 : _h.diagnostics) || []];
+          if (!sourceDataset || !Array.isArray(payload == null ? void 0 : payload.rows) || sourceDataset.provenance.hasMore || sourceDataset.provenance.truncated || Number((_i = sourceDataset.request) == null ? void 0 : _i.offset) > 0 || diagnostics.length > 0) {
+            throw new Error(`Chart '${block.id}' requires complete empty dataset input for '${block.datasetRef}'.`);
+          }
+        }
         const chartSpec = cloneValue24((block == null ? void 0 : block.chartSpec) || null);
         const chartModel = cloneValue24((block == null ? void 0 : block.chartModel) || null);
         return {
@@ -60539,8 +60547,8 @@ ${indent}${end}`;
           content: {
             chartSpec,
             chartModel,
-            rowCount: Number(((_h = dataset == null ? void 0 : dataset.provenance) == null ? void 0 : _h.rowCount) || 0),
-            resolvedChart: buildReportFillChartPayload(chartModel, (dataset == null ? void 0 : dataset.rows) || [], ((_i = chartModel == null ? void 0 : chartModel.center) == null ? void 0 : _i.datasetRef) ? validateDonutCenterDataset(datasetsById.get(chartModel.center.datasetRef)) : void 0, ((_j = chartModel == null ? void 0 : chartModel.center) == null ? void 0 : _j.datasetRef) ? (_l = (_k = datasetsById.get(chartModel.center.datasetRef)) == null ? void 0 : _k.request) == null ? void 0 : _l.filters : (_m = dataset == null ? void 0 : dataset.request) == null ? void 0 : _m.filters, (_n = dataset == null ? void 0 : dataset.request) == null ? void 0 : _n.filters)
+            rowCount: Number(((_j = dataset == null ? void 0 : dataset.provenance) == null ? void 0 : _j.rowCount) || 0),
+            resolvedChart: buildReportFillChartPayload(chartModel, (dataset == null ? void 0 : dataset.rows) || [], ((_k = chartModel == null ? void 0 : chartModel.center) == null ? void 0 : _k.datasetRef) ? validateDonutCenterDataset(datasetsById.get(chartModel.center.datasetRef)) : void 0, ((_l = chartModel == null ? void 0 : chartModel.center) == null ? void 0 : _l.datasetRef) ? (_n = (_m = datasetsById.get(chartModel.center.datasetRef)) == null ? void 0 : _m.request) == null ? void 0 : _n.filters : (_o = dataset == null ? void 0 : dataset.request) == null ? void 0 : _o.filters, (_p = dataset == null ? void 0 : dataset.request) == null ? void 0 : _p.filters)
           }
         };
       }
@@ -60549,7 +60557,7 @@ ${indent}${end}`;
           ...normalizedBlock,
           content: {
             geo: cloneValue24((block == null ? void 0 : block.geo) || {}),
-            rowCount: Number(((_o = dataset == null ? void 0 : dataset.provenance) == null ? void 0 : _o.rowCount) || 0),
+            rowCount: Number(((_q = dataset == null ? void 0 : dataset.provenance) == null ? void 0 : _q.rowCount) || 0),
             resolvedGeo: buildReportFillGeoPayload(block, (dataset == null ? void 0 : dataset.rows) || [])
           }
         };
@@ -60738,7 +60746,8 @@ ${indent}${end}`;
       datasets,
       blocks: buildReportFillBlocks(normalizedReportSpec, datasetsById, {
         unifiedFilterContent,
-        runtimeSelection
+        runtimeSelection,
+        datasetPayloads
       }),
       diagnostics: datasets.flatMap((dataset) => {
         var _a6;
