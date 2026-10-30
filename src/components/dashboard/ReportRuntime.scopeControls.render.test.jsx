@@ -252,3 +252,17 @@ it('sorts a partial standalone report through its bound producer query',async()=
   expect(parameters.query.offset).toBe(0);expect(parameters.query.filters).toEqual({region:'east'});expect(parameters.other).toEqual({offset:80});expect(parameters.actor).toBe('fixed');expect(fetches).toHaveBeenCalledTimes(2);
  } finally {await act(async()=>root.unmount());host.remove();}
 });
+
+it('reports the actually displayed section on initial render and selection',async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);const changed=vi.fn();
+ const reportSpec={title:'Example',blocks:[
+  {id:'tabs',kind:'tabGroupBlock',sectionIds:['summary','detail'],defaultSectionId:'summary',includeUnlistedSections:false},
+  {id:'summary',kind:'sectionBlock',title:'Summary',blockIds:['summaryBody']},{id:'summaryBody',kind:'markdownBlock',markdown:'Summary body'},
+  {id:'detail',kind:'sectionBlock',title:'Detail',blockIds:['detailBody']},{id:'detailBody',kind:'markdownBlock',markdown:'Detail body'}]};
+ try{await act(async()=>root.render(<ReportRuntime reportSpec={reportSpec} reportFill={buildReportFillFromReportSpec(reportSpec,{})} onActiveSectionChange={changed}/>));
+ expect(changed).toHaveBeenLastCalledWith('summary');
+ const tab=[...host.querySelectorAll('[role="tab"]')].find(node=>node.textContent==='Detail');expect(tab).toBeTruthy();
+ await act(async()=>tab.click());expect(changed).toHaveBeenLastCalledWith('detail');expect(host.textContent).toContain('Detail body');
+ }finally{await act(async()=>root.unmount());host.remove();}
+});

@@ -1097,6 +1097,7 @@ export const dockWindow = (windowId) => {
         return win;
     });
     selectedTabId.value = windowId;
+    selectedWindowId.value = windowId;
 };
 
 export const undockWindow = (windowId) => {
