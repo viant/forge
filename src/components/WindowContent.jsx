@@ -482,6 +482,7 @@ function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}, fetchU
     addCommand(node.scheduleEditor?.mutation);
     addCommand(node.wizard?.submit);
     addCommand(node.draftForm?.submit);
+    addRef(node.draftForm?.lifecycle?.source?.dataSourceRef, true);
     if(node.predicateCompositionEditor) addRef(node.predicateCompositionEditor.dataSourceRef || node.dataSourceRef,true);
     if(node.gateRequirementsEditor) {
         addRef(node.gateRequirementsEditor.dataSourceRef || node.dataSourceRef,true);
@@ -503,6 +504,7 @@ function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}, fetchU
     if (node.parameterEditor) {
         addRef(node.parameterEditor.dataSourceRef, true);
         addCommand(node.parameterEditor.draft?.submit);
+        addRef(node.parameterEditor.draft?.lifecycle?.source?.dataSourceRef, true);
         collectRequiredDataSourceRefs({items:node.parameterEditor.fields}, scope, refs, viewState, fetchUsage, fetcherOwned);
         for (const section of node.parameterEditor.sections || []) collectRequiredDataSourceRefs({items:section.fields,visibleWhen:section.visibleWhen}, scope, refs, viewState, fetchUsage, fetcherOwned);
     }

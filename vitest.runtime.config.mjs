@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     include: [
+      'src/components/primitives/DraftForm.lifecycle.render.test.jsx',
       'src/components/table/basic/TableCell.mutation.render.test.jsx',
       'src/utils/applicationScope.test.js',
       'src/components/ResourceWindow.applicationScope.render.test.jsx',

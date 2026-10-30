@@ -5,6 +5,7 @@ import {Alert, Button} from '@blueprintjs/core';
 import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
 import MutationCommand, {useMutationCommandState} from './MutationCommand.jsx';
 import {usePredicateSignals} from './usePredicateSignals.js';
+import {useDraftLifecycle} from './useDraftLifecycle.js';
 import {draftSnapshot, resetDraft, validateDraft, retainedDraftBaseline, retainDraftBaseline} from './draftFormModel.js';
 
 export default function DraftForm({container, context, children}) {
@@ -13,6 +14,7 @@ export default function DraftForm({container, context, children}) {
   const ref = spec.dataSourceRef || container.dataSourceRef;
   const dataContext = !ref || context.identity?.dataSourceRef === ref ? context : context.Context?.(ref) || context;
   usePredicateSignals(dataContext, [spec.dirtyWhen, spec.validWhen, spec.submitWhen]);
+  const lifecycle = useDraftLifecycle(spec.lifecycle, dataContext);
   const form = dataContext?.signals?.form?.value || dataContext?.handlers?.dataSource?.getFormData?.() || {};
   const formStatus = dataContext?.signals?.formStatus?.value || {};
   const snapshot = draftSnapshot(form);
@@ -40,7 +42,7 @@ export default function DraftForm({container, context, children}) {
     if (!resetDraft(dataContext, retainedDraftBaseline(baselineOwner, baseline), busy)) return;
     if (spec.onReset && typeof dataContext?.lookupHandler === 'function') {
       const handler = dataContext.lookupHandler(spec.onReset);
-      if (typeof handler === 'function') handler({context: dataContext, values: JSON.parse(baseline)});
+      if (typeof handler === 'function') handler({context: dataContext, values: JSON.parse(retainedDraftBaseline(baselineOwner, baseline))});
     }
   };
   const resetControlId=`${container.id || 'draft'}:reset`;
@@ -49,10 +51,11 @@ export default function DraftForm({container, context, children}) {
   useRegisteredControlActions(operationMeta,()=>({visible:isLiveControlVisible(operationRoot.current),disabled:!dirty||busy,readOnly:false,actions:{click:requestReset}}),`${dirty}:${busy}`);
   useRegisteredControlActions({...operationMeta,controlId:`${resetControlId}:confirm`},()=>({visible:confirmReset&&isLiveControlVisible(operationRoot.current),disabled:!confirmReset||busy,readOnly:false,actions:{click:()=>{setConfirmReset(false);reset();}}}),`${confirmReset}:${busy}`);
   useRegisteredControlActions({...operationMeta,controlId:`${resetControlId}:cancel`},()=>({visible:confirmReset&&isLiveControlVisible(operationRoot.current),disabled:!confirmReset,readOnly:false,actions:{click:()=>setConfirmReset(false)}}),`${confirmReset}`);
+  useRegisteredControlActions({...operationMeta,controlId:`${container.id || 'draft'}:retry`},()=>({visible:lifecycle.status==='failed'&&isLiveControlVisible(operationRoot.current),disabled:lifecycle.status!=='failed'||busy,readOnly:false,actions:{click:lifecycle.retry}}),`${lifecycle.status}:${busy}`);
   const body = children ? <fieldset className="forge-draft-form__fields" data-forge-part="draft-fields" disabled={busy}>{children}</fieldset> : null;
   return <div ref={operationRoot} className={`forge-draft-form${children ? ' forge-draft-form--editor' : ''}`} data-forge-primitive="draftForm" aria-busy={busy || undefined}>
     <div className="forge-draft-form__actions" data-forge-part="draft-actions">
-      {spec.submit && (!spec.submitWhen || evaluatePlainVisibleWhen(spec.submitWhen, dataContext)) ? <MutationCommand command={command} context={dataContext} extras={{data: form}} disabled={!dirty || !valid} onSettled={({status, warnings = []}) => {
+      {spec.submit && (!spec.submitWhen || evaluatePlainVisibleWhen(spec.submitWhen, dataContext)) ? <MutationCommand command={command} context={dataContext} extras={{data: form}} disabled={!dirty || !valid || !lifecycle.ready} onSettled={({status, warnings = []}) => {
         if (status !== 'succeeded' || warnings.length) return;
         // A child editor is locked for the full command, including synchronization.
         // Standalone draft toolbars must also preserve programmatic edits made in flight.
@@ -66,6 +69,8 @@ export default function DraftForm({container, context, children}) {
       <span className="forge-draft-form__status" aria-live="polite">{dirty ? 'Unsaved changes' : 'No unsaved changes'}</span>
       {dirty && validationMessage ? <span data-forge-part="validation-message" role="status">{validationMessage}</span> : null}
     </div>
+    {spec.lifecycle && lifecycle.status === 'loading' ? <span role="status">Loading defaults…</span> : null}
+    {spec.lifecycle && lifecycle.status === 'failed' ? <div role="alert">{lifecycle.error}<Button disabled={busy} onClick={lifecycle.retry}>Retry</Button></div> : null}
     {body}
     <Alert isOpen={confirmReset} intent="warning" confirmButtonText={spec.resetLabel || 'Reset'} cancelButtonText="Cancel" onCancel={() => setConfirmReset(false)} onConfirm={() => { setConfirmReset(false); reset(); }}>{spec.confirmDiscard}</Alert>
   </div>;
