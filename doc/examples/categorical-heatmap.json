@@ -15,5 +15,72 @@
   "temperatureDeviation": {
     "chartSpec":{"type":"heatmap","heatmap":{"rowField":"zone","columnField":"period","valueField":"deviation","rowCategories":["North","South"],"columnCategories":["Early","Late"],"colorScale":{"type":"diverging","domain":[-5,0,5],"colors":["#2166ac","#f7f7f7","#b2182b"]}}},
     "rows":[{"zone":"North","period":"Early","deviation":-5},{"zone":"North","period":"Late","deviation":0},{"zone":"South","period":"Early","deviation":2.5},{"zone":"South","period":"Late","deviation":5}]
+  },
+  "compact": {
+    "title": "Compact categorical matrix (invented)",
+    "chartSpec": {
+      "type": "heatmap",
+      "heatmap": {
+        "rowField": "segment",
+        "columnField": "category",
+        "valueField": "amount",
+        "rowCategories": [
+          "Group A",
+          "Group B",
+          "Group C",
+          "Group D"
+        ],
+        "columnCategories": [
+          "One",
+          "Two",
+          "Three",
+          "Four",
+          "Five",
+          "Six",
+          "Seven"
+        ],
+        "colorScale": {
+          "type": "sequential",
+          "domain": [
+            0,
+            1000000
+          ],
+          "colors": [
+            "#eff3ff",
+            "#08519c"
+          ]
+        }
+      }
+    },
+    "rows": [
+      {"segment":"Group A","category":"One","amount":123456},
+      {"segment":"Group A","category":"Two","amount":123457},
+      {"segment":"Group A","category":"Three","amount":123458},
+      {"segment":"Group A","category":"Four","amount":123459},
+      {"segment":"Group A","category":"Five","amount":123460},
+      {"segment":"Group A","category":"Six","amount":123461},
+      {"segment":"Group A","category":"Seven","amount":123462},
+      {"segment":"Group B","category":"One","amount":123463},
+      {"segment":"Group B","category":"Two","amount":123464},
+      {"segment":"Group B","category":"Three","amount":123465},
+      {"segment":"Group B","category":"Four","amount":123466},
+      {"segment":"Group B","category":"Five","amount":123467},
+      {"segment":"Group B","category":"Six","amount":123468},
+      {"segment":"Group B","category":"Seven","amount":123469},
+      {"segment":"Group C","category":"One","amount":123470},
+      {"segment":"Group C","category":"Two","amount":123471},
+      {"segment":"Group C","category":"Three","amount":123472},
+      {"segment":"Group C","category":"Four","amount":123473},
+      {"segment":"Group C","category":"Five","amount":123474},
+      {"segment":"Group C","category":"Six","amount":123475},
+      {"segment":"Group C","category":"Seven","amount":123476},
+      {"segment":"Group D","category":"One","amount":123477},
+      {"segment":"Group D","category":"Two","amount":123478},
+      {"segment":"Group D","category":"Three","amount":123479},
+      {"segment":"Group D","category":"Four","amount":123480},
+      {"segment":"Group D","category":"Five","amount":123481},
+      {"segment":"Group D","category":"Six","amount":123482},
+      {"segment":"Group D","category":"Seven","amount":123483}
+    ]
   }
 }

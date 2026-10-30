@@ -41,3 +41,28 @@ it('keeps arrow edges bounded, roves one tab stop, names the chart and renders e
   expect(host.querySelector('[role="alert"]').textContent).toContain('Heatmap configuration is required');
  }finally{await act(async()=>root.unmount());host.remove();}
 });
+it('keeps a compact seven by four matrix readable with all keyboard/click coordinates',async()=>{
+ const {default:CategoricalHeatmap}=await import('./CategoricalHeatmap.jsx');
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host),onSelect=vi.fn();
+ const config=fixture.compact.chartSpec.heatmap;
+ const rows=config.rowCategories.flatMap((segment,r)=>config.columnCategories.map((category,c)=>({segment,category,amount:123456+r*7+c})));
+ try {
+  for(const width of [390,768]) {
+   await act(async()=>root.render(<CategoricalHeatmap config={config} rows={rows} width={width} onSelect={onSelect}/>));
+   const svg=host.querySelector('svg'),cells=host.querySelectorAll('[data-cell]');
+   expect(Number(svg.getAttribute('width'))).toBeLessThanOrEqual(Math.max(width,620));
+   expect(cells.length).toBe(28);
+   for(const [index,cell] of [...cells].entries()) {
+    expect(cell.textContent).toContain(String(rows[index].amount));
+    await act(async()=>cell.dispatchEvent(new MouseEvent('click',{bubbles:true})));
+    expect(onSelect.mock.calls.at(-1)[0].row).toEqual(rows[index]);
+   }
+   await act(async()=>cells[0].dispatchEvent(new KeyboardEvent('keydown',{key:'End',bubbles:true})));
+   expect(document.activeElement).toBe(cells[27]);
+   expect(host.querySelectorAll('[data-cell][tabindex="0"]').length).toBe(1);
+   await act(async()=>cells[27].dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true})));
+   expect(onSelect.mock.calls.at(-1)[0].row).toEqual(rows[27]);
+  }
+ } finally {await act(async()=>root.unmount());host.remove();}
+});

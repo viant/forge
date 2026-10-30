@@ -1,3 +1,4 @@
+import {measureChartText} from './chartTextMeasure.js';
 // Generic categorical matrix contract. No producer or business-field inference.
 const hex = /^#[0-9a-f]{6}$/i;
 export const heatmapSchema = {
@@ -66,15 +67,23 @@ export function heatmapSelection(config,cell) {
 const escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const lines=value=>String(value).split(/\r?\n/u).flatMap(line=>line.match(/.{1,12}/gu)||['']);
 function text(value,x,y,anchor='middle') {return lines(value).map((line,i)=>`<text x="${x}" y="${y+i*16}" text-anchor="${anchor}">${escape(line)}</text>`).join('');}
+// Measure the same complete wrapped lines that are emitted in both renderers.
+const labelWidth=value=>Math.max(...lines(value).map(line=>measureChartText(line,12)));
+function heatmapWidths({config,cells}) {
+  const left=Math.max(44,...config.rowCategories.map(value=>labelWidth(value)+22));
+  const cellWidth=Math.max(44,...config.columnCategories.map(value=>labelWidth(value)+24),...(config.cellLabels?cells.map(cell=>labelWidth(cell.label)+24):[]));
+  return {left,cellWidth};
+}
 export function heatmapSvg(model,width=680,{interactive=false,selectable=false,print=false,title='Categorical heatmap'}={}) {
-  const {config,cells}=model, left=164, top=20+Math.max(...config.columnCategories.map(v=>lines(v).length))*16;
-  if (!print) width=Math.max(width,left+12+config.columnCategories.length*156);
+  const {config,cells}=model, {left,cellWidth:minimumCellWidth}=heatmapWidths(model), top=20+Math.max(...config.columnCategories.map(v=>lines(v).length))*16;
+  const legendEntries=config.legend ? [...config.colorScale.domain.map((value,i)=>({label:String(value),color:config.colorScale.colors[i]})),{label:config.noData.label,color:config.noData.color}] : [];
+  const legendWidth=Math.max(44,...legendEntries.map(entry=>labelWidth(entry.label)+36));
+  if (!print) width=Math.max(width,left+12+Math.max(config.columnCategories.length*minimumCellWidth,legendEntries.length?legendWidth:0));
   const cellWidth=(width-left-12)/config.columnCategories.length;
   const heights=config.rowCategories.map(v=>Math.max(48,lines(v).length*16+16,config.cellLabels ? Math.max(...cells.map(cell=>lines(cell.label).length))*16+16 : 0));
   const y=r=>top+heights.slice(0,r).reduce((a,b)=>a+b,0);
   const bottom=y(heights.length);
-  const legendEntries=config.legend ? [...config.colorScale.domain.map((value,i)=>({label:String(value),color:config.colorScale.colors[i]})),{label:config.noData.label,color:config.noData.color}] : [];
-  const legendColumns=Math.max(1,Math.floor((width-left-12)/156));
+  const legendColumns=Math.max(1,Math.floor((width-left-12)/legendWidth));
   const legendRowHeight=Math.max(26,...legendEntries.map(entry=>lines(entry.label).length*16+10));
   const height=Math.max(120,bottom+(legendEntries.length ? Math.ceil(legendEntries.length/legendColumns)*legendRowHeight+20 : 12));
   const labels=config.columnCategories.map((v,c)=>text(v,left+(c+.5)*cellWidth,20)).join('')+config.rowCategories.map((v,r)=>text(v,left-10,y(r)+22,'end')).join('');
@@ -85,7 +94,7 @@ export function heatmapSvg(model,width=680,{interactive=false,selectable=false,p
     return `<g${interactive?` data-cell="${index}" tabindex="${index===0?0:-1}" role="${selectable&&cell.value!==null?'button':'img'}" aria-label="${escape(description)}"`:''}>${interactive?`<title>${escape(description)}</title>`:''}<rect x="${left+cell.c*cellWidth}" y="${y(cell.r)}" width="${cellWidth}" height="${heights[cell.r]}" fill="${cell.color}" stroke="#ffffff"/>${config.cellLabels?`<g fill="${foreground}">${text(cell.label,left+(cell.c+.5)*cellWidth,y(cell.r)+(heights[cell.r]-lines(cell.label).length*16)/2+12)}</g>`:''}</g>`;
   }).join('');
   const legend=legendEntries.map((entry,i)=>{
-    const x=left+(i%legendColumns)*156,top=bottom+16+Math.floor(i/legendColumns)*legendRowHeight;
+    const x=left+(i%legendColumns)*legendWidth,top=bottom+16+Math.floor(i/legendColumns)*legendRowHeight;
     return `<rect x="${x}" y="${top}" width="18" height="18" fill="${entry.color}"/>${text(entry.label,x+24,top+14,'start')}`;
   }).join('');
   return {svg:`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" ${interactive?`role="group" aria-label="${escape(title)}"`:""} font-family="sans-serif" font-size="12" fill="#263238"><g font-size="12" fill="#263238">${labels}${marks}${legend}</g></svg>`,height,width,diagnostics:[]};
@@ -95,9 +104,11 @@ export function heatmapSvg(model,width=680,{interactive=false,selectable=false,p
 // and color legend; source rows and the explicit color domain never change.
 export function heatmapPrintPages(model,{width=680,maxHeight=620,firstMaxHeight=maxHeight}={}) {
   const {config,cells}=model;
-  const columnCount=Math.floor((width-176)/156);
+  const {left,cellWidth}=heatmapWidths(model);
+  const columnCount=Math.floor((width-left-12)/cellWidth);
   const noFit=message=>[{svg:'',height:0,diagnostics:[{code:'heatmapPrintLayoutDoesNotFit',severity:'warning',message,suggestedFix:'Increase page dimensions or shorten category/no-data labels.'}]}];
-  if(columnCount<1) return noFit('Heatmap print width must be at least 332 points for readable labels.');
+  const legendWidth=config.legend?Math.max(...[...config.colorScale.domain.map(String),config.noData.label].map(value=>labelWidth(value)+36)):0;
+  if(columnCount<1 || width-left-12<legendWidth) return noFit('Heatmap print width cannot fit one readable column, its row labels and legend.');
   const pages=[];
   for(let columnStart=0;columnStart<config.columnCategories.length;columnStart+=columnCount) {
     const columnCategories=config.columnCategories.slice(columnStart,columnStart+columnCount);

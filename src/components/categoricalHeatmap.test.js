@@ -133,3 +133,29 @@ for(const schema of [reportSpecSchema,reportFillSchema]) for(const [name,value] 
  const missing={...value};delete missing.heatmap;
  assert.equal(validateReportSchema({...schema,$ref:`#/$defs/${name}`},missing).valid,false,`${name} must require its heatmap config`);
 }
+
+// Independently invented compact matrix: seven short categories, four segments.
+// Keep every exact coordinate/value through narrow screen and canonical print.
+const compactConfig=fixture.compact.chartSpec.heatmap;
+const compactRows=compactConfig.rowCategories.flatMap((segment,r)=>compactConfig.columnCategories.map((category,c)=>({segment,category,amount:123456+r*7+c})));
+const compactModel=buildHeatmap(compactConfig,compactRows);
+for(const width of [320,540,680,1024]) {
+ const graphic=heatmapSvg(compactModel,width,{interactive:true});
+ assert.ok(graphic.width<=Math.max(width,620),`content should fit a compact chart: ${graphic.width}`);
+ assert.equal((graphic.svg.match(/data-cell="/g)||[]).length,28);
+ for(const row of compactRows) assert.ok(graphic.svg.includes(`>${row.amount}</text>`));
+ const rects=[...graphic.svg.matchAll(/<rect x="([^"]+)" y="[^"]+" width="([^"]+)" height="([^"]+)" fill="[^"]+" stroke="#ffffff"/g)];
+ assert.equal(rects.length,28);
+ for(const rect of rects) {assert.ok(Number(rect[2])>=44);assert.ok(Number(rect[3])>=44);assert.ok(Number(rect[1])+Number(rect[2])<=graphic.width+.001);}
+}
+const compactTiles=heatmapPrintPages(compactModel,{width:540,maxHeight:620});
+assert.equal(compactTiles.length,2,'six-digit cells tile only when their readable width requires it');
+assert.equal(compactTiles.reduce((total,tile)=>total+(tile.svg.match(/stroke="#ffffff"/g)||[]).length,0),28);
+for(const row of compactRows) assert.ok(compactTiles.some(tile=>tile.svg.includes(`>${row.amount}</text>`)));
+const completeLabel='WWWWWWWWWWWW漢字 complete wrapped label';
+const wrappedModel=buildHeatmap({...compactConfig,rowCategories:[completeLabel],columnCategories:[completeLabel]},[]);
+const wrappedGraphic=heatmapSvg(wrappedModel,100);
+assert.ok(wrappedGraphic.svg.replace(/<[^>]*>/g,'').includes(completeLabel));
+assert.ok(wrappedGraphic.width>100,'readable long text retains a local scroller');
+assert.equal(heatmapSvg(buildHeatmap({...compactConfig,cellLabels:false},compactRows),540).width,540);
+console.log('PASS content-sized heatmap width, complete labels and compact print coverage');

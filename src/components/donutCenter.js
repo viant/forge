@@ -1,3 +1,4 @@
+import {measureChartText} from './chartTextMeasure.js';
 import {requestLabelInputSchema,normalizeRequestLabelInput,resolveRequestLabelInput} from './requestLabelInput.js';
 import {numericDisplayFormatSchema,validateNumericDisplayFormat,formatRangeValue} from './categoryRange.js';
 import {formatExportNumericValue} from '../reporting/reportExportValueFormatter.js';
@@ -63,7 +64,7 @@ export function validateDonutCenterDataset(dataset) {
  return dataset.rows;
 }
 export const donutCenterDescription=center=>`${center.label}: ${center.formattedValue}. Dataset value; slice selection does not change it.`;
-export function layoutDonutCenter(center,radius,{valueSize=14,labelSize=12,lineHeight=16,measure=(text,size,role,emphasis)=>[...text].reduce((sum,char)=>sum+size*(/[WM@%]|[^\x00-\x7F]/u.test(char)?1:.65),0)*(emphasis?.includes('bold')?1.1:1)}={}) {
+export function layoutDonutCenter(center,radius,{valueSize=14,labelSize=12,lineHeight=16,measure=measureChartText}={}) {
  const width=Math.max(0,Math.SQRT2*radius-12),height=width;
  // The generic print/category helpers hard-split or truncate oversized words.
  // Center labels instead move intact to the visible details when a word cannot fit.
