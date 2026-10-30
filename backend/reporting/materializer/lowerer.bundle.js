@@ -45703,13 +45703,13 @@ Please __addLocaleData before adding additional unit data`);
       return nextRow;
     });
   }
-  function transformData(rawData, chart, valueKey2) {
+  function transformData(rawData, chart, valueKey) {
     const { xAxis, series } = chart;
     const groupedData = {};
     const keysSet = /* @__PURE__ */ new Set();
     const xAxisKey = normalizeChartKey(xAxis == null ? void 0 : xAxis.dataKey);
     const seriesNameKey = normalizeChartKey(series == null ? void 0 : series.nameKey);
-    const resolvedValueKey = normalizeChartKey(valueKey2);
+    const resolvedValueKey = normalizeChartKey(valueKey);
     rawData.forEach((item) => {
       const seriesName = readChartDataValue(item, seriesNameKey);
       const timestamp2 = readChartDataValue(item, xAxisKey);
@@ -45756,16 +45756,16 @@ Please __addLocaleData before adding additional unit data`);
         seedChartBucket(key2, bucketKey),
         []
       );
-      valueKeys.forEach((valueKey2) => {
-        const rawValue = readChartDataValue(row, valueKey2);
+      valueKeys.forEach((valueKey) => {
+        const rawValue = readChartDataValue(row, valueKey);
         const numeric = Number(rawValue);
         if (!isChartNumericValue(rawValue)) {
-          if (!(valueKey2 in existing) && rawValue !== void 0) {
-            existing[valueKey2] = rawValue;
+          if (!(valueKey in existing) && rawValue !== void 0) {
+            existing[valueKey] = rawValue;
           }
           return;
         }
-        existing[valueKey2] = Number(existing[valueKey2] || 0) + numeric;
+        existing[valueKey] = Number(existing[valueKey] || 0) + numeric;
       });
       existing.__chartSelectionRows.push(row);
       grouped.set(bucketKey, existing);
@@ -45777,9 +45777,9 @@ Please __addLocaleData before adding additional unit data`);
   function chartCategoryRowOptions(chart = {}) {
     return { includeNonPositive: chart.appearance === "document" };
   }
-  function buildPieChartData(rawData = [], nameKey = "", valueKey2 = "", { includeNonPositive = false } = {}) {
+  function buildPieChartData(rawData = [], nameKey = "", valueKey = "", { includeNonPositive = false } = {}) {
     const resolvedNameKey = normalizeChartKey(nameKey);
-    const resolvedValueKey = normalizeChartKey(valueKey2);
+    const resolvedValueKey = normalizeChartKey(valueKey);
     if (!resolvedNameKey || !resolvedValueKey || !Array.isArray(rawData) || rawData.length === 0) {
       return [];
     }
@@ -46203,10 +46203,10 @@ Please __addLocaleData before adding additional unit data`);
     } else {
       const rows = materializeChartDisplayRows(chart, source);
       if (type === "pie" || type === "donut") {
-        const { nameKey, valueKey: valueKey2 } = chartTooltipPieFields(chart);
-        applyChartRowLimit(buildPieChartData(rows, nameKey, valueKey2, chartCategoryRowOptions(chart)), chart.rowLimit).forEach((row) => {
+        const { nameKey, valueKey } = chartTooltipPieFields(chart);
+        applyChartRowLimit(buildPieChartData(rows, nameKey, valueKey, chartCategoryRowOptions(chart)), chart.rowLimit).forEach((row) => {
           var _a6, _b2, _c2;
-          return add(row.name, row.name, ((_c2 = (_b2 = (_a6 = chart.series) == null ? void 0 : _a6.values) == null ? void 0 : _b2.find((v2) => v2.value === valueKey2)) == null ? void 0 : _c2.label) || valueKey2, sourceRows(row, row.name));
+          return add(row.name, row.name, ((_c2 = (_b2 = (_a6 = chart.series) == null ? void 0 : _a6.values) == null ? void 0 : _b2.find((v2) => v2.value === valueKey)) == null ? void 0 : _c2.label) || valueKey, sourceRows(row, row.name));
         });
       } else if (!((_a5 = chart.series) == null ? void 0 : _a5.nameKey)) {
         if (typeof ((_b = chart.xAxis) == null ? void 0 : _b.dataKey) !== "string" || !chart.xAxis.dataKey.trim()) fail("Cartesian tooltip requires an explicit nonempty xAxis.dataKey");
@@ -50404,7 +50404,7 @@ Please __addLocaleData before adding additional unit data`);
     if (value === void 0 || value === null) return void 0;
     return String(value);
   }
-  function valueKey(value) {
+  function reportBuilderOptionValueKey(value) {
     return `${typeof value}:${JSON.stringify(value)}`;
   }
   function normalizeValueEntry(entry, type) {
@@ -50426,9 +50426,9 @@ Please __addLocaleData before adding additional unit data`);
       seen.add(name);
       const type = normalizedType(entry.type);
       const optionValues = (Array.isArray(entry.values) ? entry.values : []).map((value) => normalizeValueEntry(value, type)).filter(Boolean);
-      const allowedKeys = new Set(optionValues.map((value) => valueKey(value.value)));
+      const allowedKeys = new Set(optionValues.map((value) => reportBuilderOptionValueKey(value.value)));
       const coercedDefault = coerceValue(entry.default, type);
-      const defaultValue = coercedDefault !== void 0 && (allowedKeys.size === 0 || allowedKeys.has(valueKey(coercedDefault))) ? coercedDefault : void 0;
+      const defaultValue = coercedDefault !== void 0 && (allowedKeys.size === 0 || allowedKeys.has(reportBuilderOptionValueKey(coercedDefault))) ? coercedDefault : void 0;
       const presentation = entry.presentation;
       const anchorBlockId = typeof (presentation == null ? void 0 : presentation.anchorBlockId) === "string" ? presentation.anchorBlockId.trim() : "";
       return {
@@ -50445,9 +50445,9 @@ Please __addLocaleData before adding additional unit data`);
   function resolveEffectiveReportBuilderOptions(definitions = [], selected = {}) {
     const source = selected && typeof selected === "object" && !Array.isArray(selected) ? selected : {};
     return normalizeReportBuilderOptionDefinitions(definitions).reduce((result, definition) => {
-      const allowed = new Set(definition.values.map((entry) => valueKey(entry.value)));
+      const allowed = new Set(definition.values.map((entry) => reportBuilderOptionValueKey(entry.value)));
       const selectedValue = coerceValue(source[definition.name], definition.type);
-      const selectedValid = selectedValue !== void 0 && (allowed.size === 0 || allowed.has(valueKey(selectedValue)));
+      const selectedValid = selectedValue !== void 0 && (allowed.size === 0 || allowed.has(reportBuilderOptionValueKey(selectedValue)));
       if (selectedValid) {
         result[definition.name] = selectedValue;
       } else if (Object.prototype.hasOwnProperty.call(definition, "default")) {
@@ -50710,6 +50710,9 @@ Please __addLocaleData before adding additional unit data`);
         end: seeded.end || ""
       };
     }
+    if (filter.default !== void 0) {
+      return clone4(filter.default);
+    }
     const defaults = normalizeArray3(filter.options).filter((option) => option == null ? void 0 : option.default).map((option) => option.value);
     if (filter.multiple) {
       return defaults;
@@ -50852,9 +50855,9 @@ Please __addLocaleData before adding additional unit data`);
     }
     return getVisibleReportBuilderDimensions(config).find((entry) => {
       const dimensionId = String((entry == null ? void 0 : entry.id) || "").trim();
-      const valueKey2 = reportBuilderDimensionValueKey(entry);
+      const valueKey = reportBuilderDimensionValueKey(entry);
       const displayKey = resolveReportBuilderDimensionDisplayKey(entry);
-      return target === dimensionId || target === valueKey2 || target === displayKey;
+      return target === dimensionId || target === valueKey || target === displayKey;
     }) || null;
   }
   function normalizeChartSpecValue(value) {
@@ -51091,8 +51094,8 @@ Please __addLocaleData before adding additional unit data`);
     }
     return getSelectableReportBuilderMeasures(config).find((entry) => {
       const measureId = String((entry == null ? void 0 : entry.id) || "").trim();
-      const valueKey2 = String((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id) || "").trim();
-      return target === measureId || target === valueKey2;
+      const valueKey = String((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id) || "").trim();
+      return target === measureId || target === valueKey;
     }) || null;
   }
   function resolveReportBuilderOrderFieldEntries(config = {}) {
@@ -51741,8 +51744,8 @@ Please __addLocaleData before adding additional unit data`);
       }
       return measures.find((item) => {
         const measureId = String((item == null ? void 0 : item.id) || "").trim();
-        const valueKey2 = String((item == null ? void 0 : item.key) || (item == null ? void 0 : item.id) || "").trim();
-        return target === measureId || target === valueKey2;
+        const valueKey = String((item == null ? void 0 : item.key) || (item == null ? void 0 : item.id) || "").trim();
+        return target === measureId || target === valueKey;
       }) || null;
     };
     const calculatedFieldById = /* @__PURE__ */ new Map();
@@ -56163,18 +56166,18 @@ Please __addLocaleData before adding additional unit data`);
     }
     if (type === "pie" || type === "donut") {
       const nameKey2 = normalizeString33(chart.tooltip ? chartTooltipPieFields(chart).nameKey : ((_c = chart == null ? void 0 : chart.series) == null ? void 0 : _c.nameKey) || "name");
-      const valueKey3 = normalizeString33(chart.tooltip ? chartTooltipPieFields(chart).valueKey : ((_d = chart == null ? void 0 : chart.series) == null ? void 0 : _d.valueKey) || "value");
-      if (!nameKey2 || !valueKey3) {
+      const valueKey2 = normalizeString33(chart.tooltip ? chartTooltipPieFields(chart).valueKey : ((_d = chart == null ? void 0 : chart.series) == null ? void 0 : _d.valueKey) || "value");
+      if (!nameKey2 || !valueKey2) {
         return null;
       }
-      const resolvedRows = buildPieChartData(chartRows, nameKey2, valueKey3, chartCategoryRowOptions(chart));
+      const resolvedRows = buildPieChartData(chartRows, nameKey2, valueKey2, chartCategoryRowOptions(chart));
       if (chart.sliceLabel) for (const row of resolvedRows) row.sliceLabel = resolvePieSliceLabel(chart.sliceLabel, row.__chartSelectionRows || []);
       return {
         kind: "category",
         ...center ? { center } : {},
         type,
         nameKey: nameKey2,
-        valueKey: valueKey3,
+        valueKey: valueKey2,
         rows: cloneChartRows(resolvedRows),
         seriesKeys: resolvedRows.map((row) => normalizeString33(row == null ? void 0 : row.name)).filter(Boolean)
       };
@@ -56197,17 +56200,17 @@ Please __addLocaleData before adding additional unit data`);
     }
     const xAxisKey = normalizeString33((_g = chart == null ? void 0 : chart.xAxis) == null ? void 0 : _g.dataKey);
     const nameKey = normalizeString33((_h = chart == null ? void 0 : chart.series) == null ? void 0 : _h.nameKey);
-    const valueKey2 = normalizeString33((_i = chart == null ? void 0 : chart.series) == null ? void 0 : _i.valueKey);
-    if (!xAxisKey || !nameKey || !valueKey2) {
+    const valueKey = normalizeString33((_i = chart == null ? void 0 : chart.series) == null ? void 0 : _i.valueKey);
+    if (!xAxisKey || !nameKey || !valueKey) {
       return null;
     }
-    const { data: data2, keys: keys3 } = transformData(chartRows, chart, valueKey2);
+    const { data: data2, keys: keys3 } = transformData(chartRows, chart, valueKey);
     return {
       kind: "groupedSeries",
       type,
       xAxisKey,
       nameKey,
-      valueKey: valueKey2,
+      valueKey,
       rows: cloneChartRows(data2),
       seriesKeys: Array.isArray(keys3) ? keys3.map((entry) => String(entry)) : []
     };
@@ -71152,10 +71155,15 @@ ${indent}${end}`;
       dataSourceRef: String(source.dataSourceRef || ((_a5 = sourceDocument.scope) == null ? void 0 : _a5.dataSourceRef) || config.dataSourceRef || builderDefinition.dataSourceRef || "")
     };
     const authoredBlocks = (Array.isArray(sourceDocument.blocks) ? sourceDocument.blocks : []).filter((block) => (block == null ? void 0 : block.kind) !== "reportBuilderBlock").map((block) => clone7(block));
+    const savedState = isObject(envelope.state) ? clone7(envelope.state) : {};
+    const state = mergeScopeParamValues(savedState, {
+      ...listScopeParamValues(buildReportBuilderDefaultState(config)),
+      ...listScopeParamValues(savedState)
+    });
     const generated = buildReportBuilderReportDocument({
       container,
       config,
-      state: bindInvocationScope(config, isObject(envelope.state) ? clone7(envelope.state) : {}, requestBaseParameters),
+      state: bindInvocationScope(config, state, requestBaseParameters),
       additionalBlocks: authoredBlocks,
       refinements: Array.isArray(sourceDocument.refinements) ? sourceDocument.refinements : [],
       semanticSummary: isObject(sourceDocument.semanticSummary) ? sourceDocument.semanticSummary : null

@@ -16,6 +16,8 @@ import {lowerValidatedReportDocument} from "../../../../src/reporting/reportChar
 import {buildReportFillFromReportSpec} from "../../../../src/reporting/reportFillModel.js";
 import {buildReportPrintFromReportFill} from "../../../../src/reporting/reportPrintModel.js";
 import {updateReportDateRangeValue} from "../../../../src/reporting/reportDateRangeValue.js";
+import {buildReportBuilderDefaultState} from "../../../../src/components/dashboard/reportBuilderUtils.js";
+import {listScopeParamValues, mergeScopeParamValues} from "../../../../src/reporting/scopeStateModel.js";
 import {normalizeReportBuilderPredicates} from "../../../../src/components/dashboard/reportBuilderPredicates.js";
 import {prepareWindowBuilderExport} from "../../../../src/reporting/windowBuilderExportState.js";
 import {mapReportRequestEnvelope, reportRequestWindowIdentity} from "../../../../src/reporting/reportRequestEnvelope.js";
@@ -104,10 +106,17 @@ import {mapReportRequestEnvelope, reportRequestWindowIdentity} from "../../../..
       dataSourceRef: String(source.dataSourceRef || ((_a5 = sourceDocument.scope) == null ? void 0 : _a5.dataSourceRef) || config.dataSourceRef || builderDefinition.dataSourceRef || "")
     };
     const authoredBlocks = (Array.isArray(sourceDocument.blocks) ? sourceDocument.blocks : []).filter((block) => (block == null ? void 0 : block.kind) !== "reportBuilderBlock").map((block) => clone(block));
+    // Scope metadata is built directly from state. Seed only its missing values
+    // from the canonical defaults, then retain saved and invocation precedence.
+    const savedState = isObject(envelope.state) ? clone(envelope.state) : {};
+    const state = mergeScopeParamValues(savedState, {
+      ...listScopeParamValues(buildReportBuilderDefaultState(config)),
+      ...listScopeParamValues(savedState),
+    });
     const generated = buildReportBuilderReportDocument({
       container,
       config,
-      state: bindInvocationScope(config, isObject(envelope.state) ? clone(envelope.state) : {}, requestBaseParameters),
+      state: bindInvocationScope(config, state, requestBaseParameters),
       additionalBlocks: authoredBlocks,
       refinements: Array.isArray(sourceDocument.refinements) ? sourceDocument.refinements : [],
       semanticSummary: isObject(sourceDocument.semanticSummary) ? sourceDocument.semanticSummary : null
