@@ -8,7 +8,7 @@ vi.mock('@blueprintjs/core', () => ({
     HTMLSelect: props => <select {...props}/>,
 }));
 vi.mock('./ReportRuntime.jsx', () => ({default: ({reportSpec,onChartMetricSelectionChange,sectionNavigation,selectedSectionId,onSectionChange,sectionLoading}) => <>
-    {sectionNavigation?.map(section=><button key={section.id} onClick={()=>onSectionChange(section.id)}>{section.label}</button>)}
+    {(sectionNavigation || (reportSpec.blocks || []).filter(block=>block.kind==='sectionBlock').map(block=>({id:block.id,label:block.title}))).map(section=><button key={section.id} onClick={()=>onSectionChange(section.id)}>{section.label}</button>)}
     {sectionLoading ? <p>Loading section…</p> : <output data-selected-section={selectedSectionId}>{reportSpec.title}</output>}
     {onChartMetricSelectionChange&&<button onClick={()=>onChartMetricSelectionChange({blockId:'trend',selection:{primaryField:'count',secondaryField:'rate'}})}>Choose metrics</button>}</>}));
 vi.mock('./ReportPrintPreview.jsx', () => ({default: () => <aside>Print</aside>}));
@@ -30,12 +30,12 @@ it('explains missing required inputs without exposing upstream details',async()=
         expect(view.host.textContent).not.toContain('internal/source');
     } finally {await view.close();}
 });
-async function mount(runReport, parameters={}, storeServices={}) {
+async function mount(runReport, parameters={}, storeServices={}, onViewStateChange) {
     globalThis.IS_REACT_ACT_ENVIRONMENT=true;
     const host=document.createElement('div'), root=createRoot(host);
     const handlers={reportStore:{runReport,...storeServices}, reportRuns:{capabilities:{browserSnapshots:false},begin:vi.fn(),complete:vi.fn()},dataSource:{fetchCollection:vi.fn()}};
     const render = async (changes={}) => {parameters={...parameters,...changes};await act(async()=>root.render(
-        <StrictMode><ReportResourceRuntime container={{parameters:{reportResource:pin,reportCapabilities:{run:true},...parameters}}} context={{handlers}}/></StrictMode>));};
+        <StrictMode><ReportResourceRuntime onViewStateChange={onViewStateChange} container={{parameters:{reportResource:pin,reportCapabilities:{run:true},...parameters}}} context={{handlers}}/></StrictMode>));};
     await render();
     return {host,handlers,render,close:()=>act(async()=>root.unmount())};
 }
@@ -529,4 +529,10 @@ it.each(['expired','malformed'])('rejects an %s fresh response before dispatch w
         expect(view.host.textContent).toContain('Report details are expired or invalid.');
         await view.render();expect(getReport).toHaveBeenCalledTimes(1);expect(run).not.toHaveBeenCalled();
     } finally {await view.close();vi.useRealTimers();}
+});
+
+it('publishes current report view context without copying report rows',async()=>{
+ const states=[];const run=vi.fn(async()=>({...result(),reportSpec:{title:'Current report',blocks:[{kind:'tabGroupBlock',defaultSectionId:'summary'},{kind:'sectionBlock',id:'summary',title:'Summary'},{kind:'sectionBlock',id:'detail',title:'Detail'}]},reportFill:{datasets:[{rows:[{privateField:'not context'}]}]}}));
+ const view=await mount(run,{executeOnOpen:true},{},value=>states.push(value));
+ try {expect(states.at(-1)).toMatchObject({title:'Current report',status:'ready',activeSectionId:'summary'});await act(async()=>button(view,'Detail').click());expect(states.at(-1).activeSectionId).toBe('detail');expect(run).toHaveBeenCalledOnce();expect(JSON.stringify(states)).not.toContain('privateField');}finally{await view.close();}
 });

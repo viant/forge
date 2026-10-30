@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 
 import {
+  activeWindows, selectedWindowId, selectedTabId, dockWindow,
   busSignals,
   findBusSignal,
   findMetricsSignal,
@@ -133,3 +134,13 @@ restored.value={fetch:false,filter:{Name:'restored'}};
 scoped.getInputSignal('filter-restored',defaults);
 assert.deepEqual(restored.peek().filter,{Name:'restored'});
 console.log('Datasource initial filters preserve later edits, clears and restored state');
+
+// Restoring a floating child makes it the focused context, not its parent.
+activeWindows.value = [{windowId: 'parent', inTab: true}, {windowId: 'child', inTab: false}];
+selectedWindowId.value = selectedTabId.value = 'parent';
+dockWindow('child');
+assert.equal(selectedWindowId.peek(), 'child');
+assert.equal(selectedTabId.peek(), 'child');
+assert.equal(activeWindows.peek()[1].inTab, true);
+activeWindows.value = [];
+selectedWindowId.value = selectedTabId.value = null;

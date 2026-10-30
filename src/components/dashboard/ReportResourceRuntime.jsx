@@ -35,7 +35,7 @@ export function validateReportSectionSnapshot(value, expected, choices = {}) {
     return value;
 }
 
-export default function ReportResourceRuntime({container, context}) {
+export default function ReportResourceRuntime({container, context, onViewStateChange}) {
     const pin = hostedReportResource(container);
     const parameters = hostedReportParameters(container);
     const canRun = parameters.reportCapabilities?.run === true || parameters.reportCapabilities?.runRange === true;
@@ -47,6 +47,7 @@ export default function ReportResourceRuntime({container, context}) {
     const [sectionSnapshot, setSectionSnapshot] = useState(null);
     const result = runResult?.result || sectionSnapshot || null;
     const [selectedSectionId, setSelectedSectionId] = useState("");
+    const [visibleSectionId, setVisibleSectionId] = useState("");
     const selectedSection = useRef("");
     const changeSection = id => {selectedSection.current=id;setSelectedSectionId(id);};
     const [error, setError] = useState("");
@@ -65,6 +66,10 @@ export default function ReportResourceRuntime({container, context}) {
     const pendingRun = useRef(null);
     const metadataCache = useRef(null);
     const [metadataRefreshing, setMetadataRefreshing] = useState(false);
+    const displayedSection = visibleSectionId || selectedSectionId || result?.reportSpec?.blocks?.find(block=>block.kind==='tabGroupBlock')?.defaultSectionId || '';
+    const displayedTitle = result?.reportSpec?.title || parameters.reportTitle || '';
+    const displayedStatus = progress ? 'loading' : error ? 'error' : result ? 'ready' : 'idle';
+    useEffect(()=>{onViewStateChange?.({resourceUri:pin?.uri || '',title:displayedTitle,status:displayedStatus,activeSectionId:displayedSection});},[onViewStateChange,pin?.uri,displayedTitle,displayedStatus,displayedSection]);
     const metadataIdentity = JSON.stringify(pin);
     const getReport = services.reportStore?.getReport;
     const actionPin = useCallback(async (selectedPin, options) => {
@@ -176,7 +181,7 @@ export default function ReportResourceRuntime({container, context}) {
         {metadataRefreshing && <Callout role="status" aria-live="polite" data-forge-status="info" icon={<Spinner size={18}/>}>Refreshing report details.</Callout>}
         {error && <Callout intent="danger" title="Report unavailable">{error}</Callout>}
         {result && !output.printModel && <ReportRuntime reportSpec={result.reportSpec} reportFill={result.reportFill} presentationMode="report" onChartMetricSelectionChange={changeMetrics}
-            selectedSectionId={selectedSectionId} onSectionChange={changeSection}
+            selectedSectionId={selectedSectionId} onSectionChange={changeSection} onActiveSectionChange={setVisibleSectionId}
             sectionNavigation={sectionSnapshot?.sections || null}
             sectionLoading={!!sectionSnapshot && selectedSectionId !== sectionSnapshot.sectionId}/>}
         {output.printModel && <ReportPrintPreview reportPrint={output.printModel}/>}

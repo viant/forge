@@ -3137,6 +3137,7 @@ export default function ReportRuntime({
   sectionPresentation = "tabs",
   selectedSectionId = "",
   onSectionChange = null,
+  onActiveSectionChange = null,
   sectionLoading = false,
   retainEmptySectionContent = false,
   sectionNavigation = null,
@@ -3723,6 +3724,7 @@ export default function ReportRuntime({
     section.block ? [section.block, ...section.items] : section.items
   ));
   const resolvedActiveSectionId = normalizeString(selectedSectionId || activeSectionId || runtimeTabGroup?.defaultSectionId || runtimeSections[0]?.id);
+  useEffect(()=>{onActiveSectionChange?.(resolvedActiveSectionId);},[onActiveSectionChange,resolvedActiveSectionId]);
   const changeSection = useCallback((sectionId) => {
     const selected = normalizeString(sectionId);
     setActiveSectionId(selected);
