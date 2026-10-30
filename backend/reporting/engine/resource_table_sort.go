@@ -8,6 +8,7 @@ import (
 
 	dsproto "github.com/viant/forge/backend/datasource/contract"
 	"github.com/viant/forge/backend/reporting/materializer"
+	reportspec "github.com/viant/forge/backend/reporting/spec"
 )
 
 var reportSortField = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
@@ -22,21 +23,7 @@ func reportDatasetSorts(spec json.RawMessage, choices materializer.TablePresenta
 			Key        string `json:"key"`
 			DatasetRef string `json:"datasetRef"`
 		} `json:"calculatedFields"`
-		Blocks []struct {
-			ID         string `json:"id"`
-			DatasetRef string `json:"datasetRef"`
-			Kind       string `json:"kind"`
-			Hierarchy  any    `json:"hierarchy"`
-			Pivot      any    `json:"pivot"`
-			Columns    []struct {
-				DataType        string         `json:"dataType"`
-				Kind            string         `json:"kind"`
-				Key             string         `json:"key"`
-				SourceKey       string         `json:"sourceKey"`
-				DisplayKey      string         `json:"displayKey"`
-				DisplayValueMap map[string]any `json:"displayValueMap"`
-			} `json:"columns"`
-		} `json:"blocks"`
+		Blocks []reportspec.Block `json:"blocks"`
 	}
 	if err := json.Unmarshal(spec, &document); err != nil {
 		return nil, err
@@ -60,7 +47,7 @@ func reportDatasetSorts(spec json.RawMessage, choices materializer.TablePresenta
 			if field == "" {
 				field = column.Key
 			}
-			if !reportSortField.MatchString(field) || (column.DisplayKey != "" && column.DisplayKey != field) || len(column.DisplayValueMap) > 0 || column.DataType == "object" || column.DataType == "array" || column.Kind == "object" || column.Kind == "array" {
+			if !reportSortField.MatchString(field) || (column.DisplayKey != "" && column.DisplayKey != field) || len(column.DisplayValueMap) > 0 || column.Kind == "object" || column.Kind == "array" {
 				return nil, fmt.Errorf("table column does not support producer sorting")
 			}
 			dataset := block.DatasetRef

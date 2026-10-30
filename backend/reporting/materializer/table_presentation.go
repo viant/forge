@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/viant/forge/backend/reporting/tablemeta"
+	reportspec "github.com/viant/forge/backend/reporting/spec"
 )
 
 var ErrTablePresentation = errors.New("invalid report table presentation")
@@ -42,15 +42,7 @@ func ValidateTablePresentations(spec json.RawMessage, presentations TablePresent
 		return fmt.Errorf("%w: too many table choices", ErrTablePresentation)
 	}
 	var document struct {
-		Blocks []struct {
-			ID        string               `json:"id"`
-			Hierarchy *tablemeta.Hierarchy `json:"hierarchy,omitempty"`
-			Pivot     *tablemeta.Pivot     `json:"pivot,omitempty"`
-			Kind      string               `json:"kind"`
-			Columns   []struct {
-				Key string `json:"key"`
-			} `json:"columns"`
-		} `json:"blocks"`
+		Blocks []reportspec.Block `json:"blocks"`
 	}
 	if err := json.Unmarshal(spec, &document); err != nil {
 		return err
