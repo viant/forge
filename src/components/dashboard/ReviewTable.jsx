@@ -9,7 +9,7 @@ import './reviewTable.css';
 // Selection is a local review choice. This component never submits business actions.
 export default function ReviewTable({id = 'review', title, description, rows = [], columns = [],
     selectionField = 'selected', selectionLabelFields, originalRows, onRowsChange, actions, onDownload, container = {},
-    locale = 'en-US', onPresentationStateChange, initialPresentationState, disabled = false, showDownload = true}) {
+    locale = 'en-US', onPresentationStateChange, initialPresentationState, remoteSort = false, onSortChange = null, canSortColumn = null, loading = false, error = null, disabled = false, showDownload = true}) {
     const [draft, setDraft] = useState(null);
     const [exportError, setExportError] = useState('');
     const currentRows = draft?.source === rows ? draft.rows : rows;
@@ -34,7 +34,7 @@ export default function ReviewTable({id = 'review', title, description, rows = [
     };
     const context = {
         dataSource: {selectionMode: 'multi'},
-        signals: {collection: {value: currentRows}, control: {value: {}}, selection: {value: {selection: selected}}},
+        signals: {collection: {value: currentRows}, control: {value: {loading, error}}, selection: {value: {selection: selected}}},
         handlers: {dataSource: {
             toggleSelection: ({row}) => update(currentRows.map(candidate => candidate === row
                 ? {...candidate, [selectionField]: !Boolean(candidate[selectionField])} : candidate)),
@@ -47,7 +47,7 @@ export default function ReviewTable({id = 'review', title, description, rows = [
         {description ? <Typography as="p" typeRole="body">{description}</Typography> : null}
         <DashboardTableContent container={{...container, id, readOnly: disabled, selectionLabelFields, tablePresentation: {variant:'document'},
             dashboard: {...container.dashboard, table: {...container.dashboard?.table, columns}}}}
-            context={context} locale={locale} initialPresentationState={initialPresentationState} onPresentationStateChange={onPresentationStateChange}/>
+            context={context} locale={locale} remoteSort={remoteSort} onSortChange={onSortChange} canSortColumn={canSortColumn} initialPresentationState={initialPresentationState} onPresentationStateChange={onPresentationStateChange}/>
         <div className="forge-review-table__footer">
             <Typography typeRole="metadata" role="status" aria-live="polite">
                 {selected.length} of {currentRows.length} selected{changed === null ? '' : ` · ${changed ? `${changed} row${changed === 1 ? '' : 's'} changed` : 'No changes yet'}`}

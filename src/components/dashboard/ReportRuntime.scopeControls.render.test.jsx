@@ -231,3 +231,24 @@ it.each(['report','preview'])('keeps typed choices distinct in multiple addressa
   expect(warnings).not.toHaveBeenCalled();
  }finally{await act(async()=>root.unmount());warnings.mockRestore();host.remove();}
 });
+
+it('sorts a partial standalone report through its bound producer query',async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ let parameters={actor:'fixed',query:{filters:{region:'east'},limit:2,offset:2,orderBy:['id asc']},other:{offset:80}};
+ const collection=signal([{id:40},{id:30}]),control=signal({loaded:true}),collectionInfo=signal({hasMore:true});
+ const population=[40,30,1,99,2,98],fetches=vi.fn(()=>{
+  const ordered=[...population].sort((a,b)=>parameters.query.orderBy[0].endsWith('desc')?b-a:a-b);
+  collection.value=ordered.slice(0,2).map(id=>({id}));control.value={loaded:true};
+ });
+ const source={signals:{collection,control,collectionInfo},handlers:{dataSource:{setSort:({parameter,value})=>{parameters={...parameters,[parameter]:value};fetches();},peekInput:()=>({parameters}),setInputParameters:next=>{parameters=next;},setPage:vi.fn(),setLoading:loading=>{control.value={loaded:true,loading};},setError:()=>{},fetchCollection:fetches}}};
+ const config={reportSpec:{title:'Inventory',datasets:[{id:'records',request:parameters.query}],blocks:[{id:'items',kind:'tableBlock',datasetRef:'records',columns:[{key:'id',label:'ID'}]}]},datasetBindings:{records:{dataSourceRef:'reader',queryPath:'query'}}};
+ const values=()=>[...host.querySelectorAll('tbody tr')].map(row=>Number(row.querySelector('td').textContent));
+ try {
+  await act(async()=>root.render(<DashboardReportRuntime container={{reportRuntime:config}} context={{Context:()=>source}}/>));
+  expect(values()).toEqual([40,30]);
+  await act(async()=>host.querySelector('[aria-label="Sort by ID"]').click());expect(values()).toEqual([1,2]);
+  await act(async()=>host.querySelector('[aria-label="Sort by ID"]').click());expect(values()).toEqual([99,98]);
+  expect(parameters.query.offset).toBe(0);expect(parameters.query.filters).toEqual({region:'east'});expect(parameters.other).toEqual({offset:80});expect(parameters.actor).toBe('fixed');expect(fetches).toHaveBeenCalledTimes(2);
+ } finally {await act(async()=>root.unmount());host.remove();}
+});

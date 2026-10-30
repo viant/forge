@@ -17,6 +17,7 @@ import {aggregateGeoRows, buildGeoConfig, DEFAULT_GEO_PALETTE, findGeoColorRule,
 import ReportRuntime from "./ReportRuntime.jsx";
 import {resolveBoundReportRuntime} from './reportRuntimeBindings.js';
 import { resolveDashboardReportRuntimeHandlers } from "./dashboardReportRuntimeHandlers.js";
+import {boundReportDatasetSortHandler, boundReportDatasetPages} from './reportRuntimeTableSort.js';
 import {boundReportScopeHandlers} from './reportRuntimeScopeControls.js';
 import DashboardTableContent from "./DashboardTableContent.jsx";
 import { buildTableRuntimeColumns, resolveTableCellVisualState } from "./tableCellVisuals.js";
@@ -1253,6 +1254,8 @@ export function DashboardReportRuntime({container, context}) {
     const config = getDashboardReportRuntimeConfig(container);
     const reportSpec = config.reportSpec || EMPTY_REPORT_RUNTIME_SPEC;
     const bound = resolveBoundReportRuntime(config, context);
+    const sortFallbackOrders = useMemo(() => new Map(), [reportSpec, config.datasetBindings]);
+    const onDatasetSortChange = useMemo(() => boundReportDatasetSortHandler(config, context, sortFallbackOrders), [context, reportSpec, config.datasetBindings, sortFallbackOrders]);
     const runtimeHandlers = useMemo(() => {
         const legacyHandlers = resolveDashboardReportRuntimeHandlers({context, reportSpec}) || {};
         const boundIds = new Set((reportSpec.scope?.params || []).filter(param => param.filterBindings?.length).map(param => param.id));
@@ -1279,6 +1282,8 @@ export function DashboardReportRuntime({container, context}) {
         <ReportRuntime
             reportSpec={bound.reportSpec || reportSpec}
             reportFill={bound.reportFill || bound.pendingReportFill}
+            onDatasetSortChange={Object.keys(config.datasetBindings || {}).length ? onDatasetSortChange : null}
+            datasetPages={boundReportDatasetPages(config, context)}
             retainEmptySectionContent={true}
             sectionLoading={bound.status === 'loading'}
             sectionError={bound.status === 'error' ? 'This report could not be loaded. Use Refresh to try again.' : ''}

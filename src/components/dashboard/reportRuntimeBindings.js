@@ -1,4 +1,4 @@
-import {resolveKey} from '../../utils/selector.js';
+import {resolveKey, resolveSelector} from '../../utils/selector.js';
 import {buildReportFillFromReportSpec} from '../../reporting/reportFillModel.js';
 import {boundReportScopeSpec, reportScopeSourceAvailable, ReportScopeUnavailableError} from './reportRuntimeScopeControls.js';
 
@@ -30,13 +30,18 @@ export function resolveBoundReportRuntime(config = {}, context = {}) {
         const scope = binding.scope === 'metrics' ? 'metrics' : 'collection';
         const value = source?.signals?.[scope]?.value;
         const selected = binding.selector ? resolveKey(value, binding.selector) : value;
-        payloads[datasetId] = {rows: Array.isArray(selected) ? selected : selected && typeof selected === 'object' ? [selected] : []};
+        payloads[datasetId] = {rows: Array.isArray(selected) ? selected : selected && typeof selected === 'object' ? [selected] : [], hasMore: source?.signals?.collectionInfo?.value?.hasMore === true || source?.signals?.collectionInfo?.value?.hasNext === true};
     }
     // Never show prior scope rows while their replacement is pending.
-    let reportSpec = config.reportSpec;
+    let reportSpec = {...config.reportSpec, datasets: (config.reportSpec?.datasets || []).map(dataset => {
+        const binding = bindings[dataset.id];
+        const source = binding?.dataSourceRef ? context.Context?.(binding.dataSourceRef) : context;
+        const request = binding?.queryPath ? resolveSelector(source?.handlers?.dataSource?.peekInput?.()?.parameters, binding.queryPath) : null;
+        return request ? {...dataset, request} : dataset;
+    })};
     if (!scopeControlsUnavailable) {
         try {
-            reportSpec = boundReportScopeSpec(config, context);
+            reportSpec = boundReportScopeSpec({...config, reportSpec}, context);
         } catch (error) {
             if (!(error instanceof ReportScopeUnavailableError)) throw error;
             scopeControlsUnavailable = true;

@@ -9,6 +9,7 @@ const viteNodePath = path.join(repoRoot, "node_modules", "vite-node", "vite-node
 
 const runtimeUnitTests = [
   "src/reporting/windowBuilderExportState.test.js",
+  "src/components/dashboard/reportRuntimeTableSort.test.mjs",
   "src/reporting/reportRequestEnvelope.test.js",
   "src/components/dashboard/reportBuilderImmediateExport.test.js",
   "src/components/dashboard/reportBuilderExportSubmission.test.js",
