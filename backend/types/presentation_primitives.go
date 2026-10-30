@@ -1,6 +1,23 @@
 package types
 
+// DraftLifecycleSpec opts a draft into a fresh baseline per opening/context key.
+// Load names a caller-owned handler returning a defaults map; business policy stays there.
+type DraftLifecycleSource struct {
+	DataSourceRef string                   `json:"dataSourceRef" yaml:"dataSourceRef"`
+	Parameters    []map[string]interface{} `json:"parameters,omitempty" yaml:"parameters,omitempty"`
+	Defaults      []map[string]interface{} `json:"defaults,omitempty" yaml:"defaults,omitempty"`
+}
+
+type DraftLifecycleSpec struct {
+	Source   *DraftLifecycleSource    `json:"source,omitempty" yaml:"source,omitempty"`
+	OpenWhen map[string]interface{}   `json:"openWhen,omitempty" yaml:"openWhen,omitempty"`
+	Key      []map[string]interface{} `json:"key,omitempty" yaml:"key,omitempty"`
+	Defaults []map[string]interface{} `json:"defaults,omitempty" yaml:"defaults,omitempty"`
+	Load     string                   `json:"load,omitempty" yaml:"load,omitempty"`
+}
+
 type DraftFormSpec struct {
+	Lifecycle      *DraftLifecycleSpec    `json:"lifecycle,omitempty" yaml:"lifecycle,omitempty"`
 	SubmitWhen     map[string]interface{} `json:"submitWhen,omitempty" yaml:"submitWhen,omitempty"`
 	WrapContent    bool                   `json:"wrapContent,omitempty" yaml:"wrapContent,omitempty"`
 	Validate       string                 `json:"validate,omitempty" yaml:"validate,omitempty"`

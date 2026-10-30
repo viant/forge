@@ -270,7 +270,15 @@ func validateContainerResourceModels(window *Window, container *Container, valid
 	if container.ScheduleEditor != nil {
 		commands = append(commands, container.ScheduleEditor.Mutation)
 	}
+	if container.ParameterEditor != nil {
+		if err := validateDraftLifecycle(window, container.ParameterEditor.Draft, container.ParameterEditor.DataSourceRef, validateDataSources); err != nil {
+			return err
+		}
+	}
 	if container.DraftForm != nil {
+		if err := validateDraftLifecycle(window, container.DraftForm, container.DataSourceRef, validateDataSources); err != nil {
+			return err
+		}
 		commands = append(commands, container.DraftForm.Submit)
 	}
 	if container.ResourceHeader != nil {

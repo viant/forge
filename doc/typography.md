@@ -942,3 +942,14 @@ payload fields stay unchanged. Canonical attachment indices still drive removal.
 The real specimen and existing desktop/phone browser checks assert stable card
 identity and dimensions, alongside component coverage for out-of-order completion
 and correct removal. No size animation, dependency or service change is added.
+
+### Draft initialization and defaults
+
+The existing DraftForm accepts opt-in [data-driven lifecycle metadata](draft-lifecycle.md)
+for fresh dialog/parent baselines and optional native datasource defaults. Loading
+uses a polite status; failed defaults retain edits and expose an alert and shared
+Retry button. Existing Save/Reset actions, discard confirmation and form controls
+keep their semantics. Synthetic mounted tests exercise two independent windows,
+reset/cancel and native read completion. Persistent editors without lifecycle
+metadata retain their existing save synchronization; consumer migrations and
+browser/business persistence qualification remain separate.
