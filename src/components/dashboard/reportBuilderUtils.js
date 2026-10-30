@@ -259,6 +259,9 @@ function defaultStaticFilterValue(filter = {}) {
             end: seeded.end || "",
         };
     }
+    if (filter.default !== undefined) {
+        return clone(filter.default);
+    }
     const defaults = normalizeArray(filter.options)
         .filter((option) => option?.default)
         .map((option) => option.value);

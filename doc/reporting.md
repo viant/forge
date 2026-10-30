@@ -179,6 +179,8 @@ reportBuilder:
 Lowering rules:
 
 - `pinned: true` and date ranges become static filters
+- pinned value filters use an explicit `default` without coercion, including typed arrays for multiple selections; `null` clears the default and is omitted from requests
+- when a value filter has no explicit default, options marked `default: true` seed the selection
 - include/exclude predicates become directional dynamic filters
 - neutral predicates use the `scope` bucket unless another bucket is declared
 - group membership produces unified filter families
