@@ -1,9 +1,10 @@
 import React, {act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {signal} from '@preact/signals-react';
-import {expect, it} from 'vitest';
+import {expect, it, vi} from 'vitest';
 import {buildReportFillFromReportSpec} from '../../reporting/reportFillModel.js';
 import {DashboardReportRuntime} from './DashboardBlocks.jsx';
+import ReportRuntime from './ReportRuntime.jsx';
 
 it('mounts native controls, refreshes through the datasource, resets pages and hides stale rows', async () => {
  globalThis.IS_REACT_ACT_ENVIRONMENT=true;
@@ -28,6 +29,7 @@ it('mounts native controls, refreshes through the datasource, resets pages and h
   await act(async()=>render());expect(host.textContent).toContain('Old evidence');
   expect(host.querySelector('[aria-label="Toggle report filters"]').getAttribute('aria-pressed')).toBe('false');
   await act(async()=>host.querySelector('[aria-label="Toggle report filters"]').click());
+  expect(host.querySelector('[data-report-runtime-block-id="filters"]')).toBeTruthy();
   const choose=[...host.querySelectorAll('button')].find(b=>b.textContent==='Second mode');expect(choose).toBeTruthy();
   await act(async()=>choose.click());
   expect(fetches).toBe(1);expect(input.page).toBe(1);expect(input.parameters.actor).toBe('fixed');
@@ -198,4 +200,34 @@ it.each([false,true])('routes host clear/toggle only to legacy scope in mixed st
   await act(async()=>host.querySelector('[aria-label="Clear all report filters"]').click());
   expect(cleared).toEqual([['legacy']]);
  }finally{await act(async()=>root.unmount());host.remove();}
+});
+
+it.each(['report','preview'])('keeps typed choices distinct in multiple addressable filter bars in %s mode', async presentationMode=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ const warnings=vi.spyOn(console,'error').mockImplementation(()=>{});
+ const params=['left','right'].map((id,index)=>({id,kind:'select',label:id,value:index?'1':1,options:[{label:id+' numeric',value:1},{label:id+' text',value:'1'}],filterBindings:[{datasetRef:'primary',path:id}]}));
+ const reportSpec={title:'Neutral filters',scope:{params},datasets:[{id:'primary'}],layoutIntent:{blockOrder:['leftBar','rightBar']},blocks:params.map(param=>({id:param.id+'Bar',kind:'filterBarBlock',title:param.label,paramIds:[param.id]}))};
+ function Fixture(){
+  const [spec,setSpec]=React.useState(reportSpec);
+  return <ReportRuntime reportSpec={spec} reportFill={buildReportFillFromReportSpec(spec,{primary:{rows:[]}})} runtimeHandlers={{canEditScopeParam:()=>true,toggleScopeParamOption:(param,value)=>setSpec(current=>({...current,scope:{params:current.scope.params.map(entry=>entry.id===param.id?{...entry,value}:entry)}}))}} presentationMode={presentationMode}/>;
+ }
+ try{
+  await act(async()=>root.render(<Fixture/>));
+  const toggle=host.querySelector('[aria-label="Toggle report filters"]');
+  if(presentationMode==='report' && toggle.getAttribute('aria-pressed')==='false') await act(async()=>toggle.click());
+  const bar=id=>host.querySelector(`[data-report-runtime-block-id="${id}Bar"]`);
+  for(const param of params){
+   expect(host.querySelectorAll(`[data-report-runtime-block-id="${param.id}Bar"]`)).toHaveLength(1);
+   expect(bar(param.id).querySelectorAll('button[title]')).toHaveLength(2);
+   expect(bar(param.id).querySelector('button[aria-pressed="true"]').title).toBe(param.id+(param.id==='left'?' numeric':' text'));
+   for(const kind of ['text','numeric']){
+    await act(async()=>bar(param.id).querySelector(`button[title="${param.id} ${kind}"]`).click());
+    expect(bar(param.id).querySelectorAll('button[aria-pressed="true"]')).toHaveLength(1);
+    expect(bar(param.id).querySelector('button[aria-pressed="true"]').title).toBe(param.id+' '+kind);
+    expect(bar(param.id).querySelectorAll('button[title]')).toHaveLength(2);
+   }
+  }
+  expect(warnings).not.toHaveBeenCalled();
+ }finally{await act(async()=>root.unmount());warnings.mockRestore();host.remove();}
 });
