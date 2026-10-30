@@ -395,6 +395,65 @@ const defaultState = buildReportBuilderDefaultState(lowered);
     assert.deepEqual(resolveReportBuilderReadiness(lowered, emptyDateState), { canRun: false, reason: "requiredFilter" });
 }
 
+// Explicit pinned defaults retain their authored types and override option defaults.
+{
+    const definitions = [
+        { id: "minimumCount", default: 1000 },
+        { id: "numericChoice", default: 1 },
+        { id: "stringChoice", default: "1" },
+        { id: "disabled", default: false },
+        { id: "zero", default: 0 },
+        { id: "cleared", default: null },
+        { id: "empty", default: "" },
+        { id: "typedMany", multiple: true, default: [1, "1", false, 0] },
+        { id: "emptyMany", multiple: true, default: [] },
+        { id: "legacyChoice" },
+        { id: "legacyMany", multiple: true },
+        { id: "undefinedChoice", default: undefined },
+    ];
+    const defaultConfig = {
+        predicates: definitions.map((definition) => ({
+            pinned: true,
+            options: [{ value: "fallback", default: true }],
+            ...definition,
+            ...(definition.id === "minimumCount" ? { options: undefined } : {}),
+        })),
+    };
+    const expected = {
+        minimumCount: 1000,
+        numericChoice: 1,
+        stringChoice: "1",
+        disabled: false,
+        zero: 0,
+        cleared: null,
+        empty: "",
+        typedMany: [1, "1", false, 0],
+        emptyMany: [],
+        legacyChoice: "fallback",
+        legacyMany: ["fallback"],
+        undefinedChoice: "fallback",
+    };
+    const loweredDefaults = lowerReportBuilderPredicates(defaultConfig);
+    const seeded = buildReportBuilderDefaultState(defaultConfig);
+    assert.deepEqual(seeded.scopeParams, expected);
+    assert.deepEqual(buildReportBuilderDefaultState(loweredDefaults).scopeParams, expected);
+    const legacySeeded = buildReportBuilderDefaultState({ staticFilters: loweredDefaults.staticFilters });
+    assert.deepEqual(legacySeeded.scopeParams, expected);
+    legacySeeded.scopeParams.typedMany.push(2);
+    assert.deepEqual(loweredDefaults.staticFilters.find((entry) => entry.id === "typedMany").default, [1, "1", false, 0]);
+    const request = buildReportBuilderRequest(defaultConfig, seeded);
+    assert.equal(request.filters.minimumCount, 1000);
+    assert.equal(request.filters.numericChoice, 1);
+    assert.equal(request.filters.stringChoice, "1");
+    assert.equal(request.filters.disabled, false);
+    assert.equal(request.filters.zero, 0);
+    assert.equal(Object.hasOwn(request.filters, "cleared"), false);
+    assert.deepEqual(request.filters.typedMany, [1, "1", false, 0]);
+    seeded.scopeParams.typedMany.push(2);
+    assert.deepEqual(definitions.find((entry) => entry.id === "typedMany").default, [1, "1", false, 0]);
+    assert.deepEqual(buildReportBuilderDefaultState(loweredDefaults).scopeParams.typedMany, [1, "1", false, 0]);
+}
+
 // --- prefill -------------------------------------------------------------------
 
 const prefillWindowForm = {
