@@ -92,7 +92,7 @@ func (s *Service) bindDependencies(ctx context.Context, parent *identity.Resolve
 	}
 	for id, ref := range definition.DataSourceResources {
 		pin, ok := pins[id]
-		if !ok || ref.Validate(parent.Kind == identity.StampedCandidate) != nil || pin.URI != ref.Resource.URI || pin.Selector() != ref.Resource.Revision || pin.ContentFingerprint != ref.ContentFingerprint || pin.ProviderIdentity != ref.ProviderIdentity || !pin.ResourceCandidate.Valid() || pin.AuthorityBinding == "" || !identity.MetadataExpiryValid(pin.ValidUntil, s.now()) {
+		if !ok || ref.Validate(parent.Kind == identity.StampedCandidate) != nil || !ref.MatchesResolved(pin) || !pin.ResourceCandidate.Valid() || pin.AuthorityBinding == "" || !identity.MetadataExpiryValid(pin.ValidUntil, s.now()) {
 			return nil, "", identity.ErrResourceDenied
 		}
 		if original != nil {

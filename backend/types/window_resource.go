@@ -243,6 +243,9 @@ func selectWindowResource(raw json.RawMessage, requested *WindowTarget, referenc
 	if decodeWindowResourceJSON(raw, &envelope) != nil {
 		return nil, fmt.Errorf("invalid window bundle")
 	}
+	if err := normalizeLegacyReferenceKeys(raw, &envelope); err != nil {
+		return nil, err
+	}
 	if err := envelope.Validate(); err != nil {
 		return nil, err
 	}

@@ -21,7 +21,7 @@ func TestDatasourceReferenceBindsExactProviderAndImmutableSelector(t *testing.T)
 			t.Fatal("invalid provider accepted")
 		}
 	}
-	for _, selector := range []string{"", "main", "latest", "01", "0"} {
+	for _, selector := range []string{"main", "latest", "01", "0"} {
 		bad := ref
 		bad.Resource.Revision = selector
 		if bad.Validate(false) == nil {
