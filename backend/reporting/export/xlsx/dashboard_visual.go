@@ -8,7 +8,6 @@ import (
 
 	reportfill "github.com/viant/forge/backend/reporting/fill"
 	reportprint "github.com/viant/forge/backend/reporting/print"
-	"github.com/viant/forge/backend/reporting/tablemeta"
 	"github.com/xuri/excelize/v2"
 )
 
@@ -241,25 +240,9 @@ func (w *visualDashboardWriter) visualGroup(sheet string, group dashboardGroup) 
 				return err
 			}
 			row++
-			columns := append([]reportfill.TableColumn{}, block.Content.Columns...)
-			for i := range columns {
-				columns[i].Label = tablemeta.Header(columns[i].Label, columns[i].Key, block.Content.ColumnGroups)
-			}
-			rows := make([][]any, 0, len(block.Content.ResolvedRows))
-			for _, resolved := range block.Content.ResolvedRows {
-				cells := map[string]any{}
-				for _, cell := range resolved.Cells {
-					cells[cell.Key] = cell.Value
-				}
-				values := make([]any, len(columns))
-				for i, column := range columns {
-					value, ok := cells[column.Key]
-					if !ok {
-						return fmt.Errorf("xlsx export missing cell for column %q at row %d", column.Key, resolved.RowIndex)
-					}
-					values[i] = value
-				}
-				rows = append(rows, values)
+			columns, rows, err := dashboardTableValues(block)
+			if err != nil {
+				return err
 			}
 			if err := w.table(sheet, row, columns, rows); err != nil {
 				return err

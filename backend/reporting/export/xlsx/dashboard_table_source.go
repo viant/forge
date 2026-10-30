@@ -30,9 +30,9 @@ func dashboardTableValues(block reportfill.Block) ([]reportfill.TableColumn, [][
 	}
 	rows := make([][]any, 0, len(block.Content.ResolvedRows))
 	for _, resolved := range block.Content.ResolvedRows {
-		cells := map[string]any{}
+		cells := map[string]reportfill.ResolvedTableCell{}
 		for _, cell := range resolved.Cells {
-			cells[cell.Key] = cell.Value
+			cells[cell.Key] = cell
 		}
 		values := make([]any, len(columns))
 		for i, column := range columns {
@@ -40,7 +40,7 @@ func dashboardTableValues(block reportfill.Block) ([]reportfill.TableColumn, [][
 			if !ok {
 				return nil, nil, fmt.Errorf("xlsx export missing cell for column %q at row %d", column.Key, resolved.RowIndex)
 			}
-			values[i] = value
+			values[i] = dashboardTableCellValue(column, value)
 		}
 		rows = append(rows, values)
 	}
@@ -66,4 +66,15 @@ func (w *visualDashboardWriter) tableSource(block reportfill.Block) (string, err
 		return "", err
 	}
 	return sheet, w.finishSheet(sheet, len(rows)+4, len(columns), false)
+}
+
+// Display aliases and value maps are semantic labels. Keep numeric formatting
+// separate so workbook measurements retain their original precision and type.
+func dashboardTableCellValue(column reportfill.TableColumn, cell reportfill.ResolvedTableCell) any {
+	sourceKey := firstText(cell.SourceKey, column.SourceKey, column.Key)
+	displayKey := firstText(cell.DisplayKey, column.DisplayKey, sourceKey)
+	if displayKey != sourceKey || len(column.DisplayValueMap) > 0 {
+		return cell.DisplayValue
+	}
+	return cell.Value
 }
