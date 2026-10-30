@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {activeWindows,getMetadataSignal,getFormSignal,getInputSignal,getSelectionSignal,getViewSignal} from '../store/signals.js';
 import {getOperationRevision} from './operationRevision.js';
-import {registerWorkspaceRefresh,listWorkspaceRefreshCapabilities,refreshWorkspace} from './workspaceRefresh.js';
+import {registerWorkspaceRefresh,registerWorkspaceRefreshScopes,listWorkspaceRefreshCapabilities,refreshWorkspace} from './workspaceRefresh.js';
 const windowId='neutral-refresh';activeWindows.value=[{windowId,conversationId:'chat'}];getMetadataSignal(windowId).value={dataSource:{record:{}}};
 const form=getFormSignal(`${windowId}DSrecord`),input=getInputSignal(`${windowId}DSrecord`),selection=getSelectionSignal(`${windowId}DSrecord`),view=getViewSignal(windowId);
 form.value={name:'unsaved'};input.value={filter:{name:'keep'},page:3};selection.value={selected:{id:7}};view.value={tabs:{sections:'second'}};
@@ -17,3 +17,14 @@ const c3=registerWorkspaceRefresh({windowId,scope:'form',formId:'editor'},{admit
 // A generic, non-network host may explicitly stage its own normal read result.
 let normalReads=0;const c4=registerWorkspaceRefresh({windowId,scope:'tab',containerId:'sections',tabId:'second'},{admit:async()=>true,data:async()=>{const result=++normalReads;return {commit:()=>assert.equal(result,1)};}});await refreshWorkspace({windowId,scope:'tab',containerId:'sections',tabId:'second'});assert.equal(normalReads,1);c4();
 activeWindows.value=[];console.log('PASS scoped refresh explicit capabilities, normal host callbacks, state retention, stale/denied/unregistered fail closed');
+
+const adapter={admit:async()=>true,metadata:async()=>({commit:()=>{}})};
+const reserved={windowId:'batch-owner',scope:'form',formId:'existing'};
+const releaseExisting=registerWorkspaceRefresh(reserved,adapter);
+assert.throws(()=>registerWorkspaceRefreshScopes([{windowId:'batch-owner',scope:'window'},reserved],()=>adapter),/already registered/);
+assert.deepEqual(listWorkspaceRefreshCapabilities('batch-owner').map(({scope})=>scope),['form']);
+releaseExisting();
+const releaseBatch=registerWorkspaceRefreshScopes([{windowId:'batch-owner',scope:'window'},reserved],()=>adapter);
+assert.equal(listWorkspaceRefreshCapabilities('batch-owner').length,2);
+releaseBatch();releaseBatch();
+assert.equal(listWorkspaceRefreshCapabilities('batch-owner').length,0);

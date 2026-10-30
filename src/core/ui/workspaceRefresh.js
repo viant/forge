@@ -23,6 +23,18 @@ export function registerWorkspaceRefresh(target,adapter) {
     const registration={target:normalized,adapter};registrations.set(id,registration);
     return ()=>{if(registrations.get(id)===registration)registrations.delete(id);};
 }
+// Register one owner's declared scopes atomically. A failed later scope must
+// not leave earlier entries alive after React abandons the mounting effect.
+export function registerWorkspaceRefreshScopes(targets, createAdapter) {
+    const cleanups=[];
+    try {
+        for(const target of targets)cleanups.push(registerWorkspaceRefresh(target,createAdapter(target)));
+    } catch(error) {
+        for(const cleanup of cleanups.reverse())cleanup();
+        throw error;
+    }
+    return ()=>{for(const cleanup of cleanups)cleanup();};
+}
 export function listWorkspaceRefreshCapabilities(windowId) {
     return [...registrations.values()].filter(entry=>entry.target.windowId===windowId).map(({target,adapter})=>({...target,metadata:typeof adapter.metadata==='function',data:typeof adapter.data==='function',preservesLocalState:true}));
 }

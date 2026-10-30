@@ -1,5 +1,5 @@
 import {useEffect,useRef,useMemo} from 'react';
-import {registerWorkspaceRefresh,workspaceRefreshTarget} from '../core/ui/workspaceRefresh.js';
+import {registerWorkspaceRefreshScopes,workspaceRefreshTarget} from '../core/ui/workspaceRefresh.js';
 
 export function declaredWorkspaceRefreshTargets(windowId,metadata) {
     const result=[{windowId,scope:'window'}],seen=new WeakSet();
@@ -24,7 +24,7 @@ export function useWorkspaceRefresh({window,metadata,host,loadMetadata,prepareMe
     useEffect(()=>{
         if(typeof host?.loadMetadata!=='function'||!metadata)return;
         {
-            const cleanups=targets.map(target=>registerWorkspaceRefresh(target,{
+            return registerWorkspaceRefreshScopes(targets,target=>({
                 admit:async request=>{
                     const source=current.current,expected=scopeIdentity(source.metadata);
                     const definition=await source.host.loadMetadata({window:source.window,target:request,load:source.loadMetadata});
@@ -38,7 +38,6 @@ export function useWorkspaceRefresh({window,metadata,host,loadMetadata,prepareMe
                 },
                 metadata:async({admission})=>({commit:()=>admission.source.publishMetadata(admission.definition)}),
             }));
-            return ()=>cleanups.forEach(cleanup=>cleanup());
         }
     },[window.windowId,host,!!metadata,signature]);
 }
