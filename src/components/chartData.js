@@ -327,7 +327,7 @@ export function transformData(rawData, chart, valueKey) {
     return { data, keys };
 }
 
-export function aggregateDirectSeriesData(rawData = [], xAxisKey = "", seriesDefinitions = []) {
+export function aggregateDirectSeriesData(rawData = [], xAxisKey = "", seriesDefinitions = [], options = {}) {
     const key = normalizeChartKey(xAxisKey);
     if (!key || !Array.isArray(rawData) || rawData.length === 0) {
         return Array.isArray(rawData) ? rawData : [];
@@ -362,7 +362,9 @@ export function aggregateDirectSeriesData(rawData = [], xAxisKey = "", seriesDef
         existing.__chartSelectionRows.push(row);
         grouped.set(bucketKey, existing);
     });
-    return Array.from(grouped.values()).sort(
+    const rows = Array.from(grouped.values());
+    if (options?.preserveCategoryOrder === true) return rows;
+    return rows.sort(
         (left, right) => new Date(readChartDataValue(left, key)) - new Date(readChartDataValue(right, key)),
     );
 }
