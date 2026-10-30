@@ -43,7 +43,7 @@ for (const key of ["amount", "precision", "id"]) {
 }
 
 const smallSpec = { ...spec, blocks: [{ ...spec.blocks[0], columns: [{ key: "amount", label: "Amount", format: "currency2" }] }] };
-const smallFill = buildReportFillFromReportSpec(smallSpec, { primary: { rows: Array.from({ length: 100 }, () => ({ amount: 12.34 })) } });
+const smallFill = buildReportFillFromReportSpec(smallSpec, { primary: { rows: Array.from({ length: 100 }, () => ({ amount: 12.345 })) } });
 // Pathway compaction creates replacement cells after measuring the source;
 // the memo must use the replacement display text and preserve detail text.
 const pathway = Array.from({ length: 16 }, (_, index) => `Touchpoint ${index + 1}`).join(" -> ");
