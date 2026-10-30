@@ -155,6 +155,12 @@ assert.throws(() => renderToStaticMarkup(<SharedButton variant="primary" style={
 assert.throws(() => renderToStaticMarkup(<SharedButton variant="ghost" hideLabel icon="lucide:search"/>), /accessible name/);
 assert.throws(() => renderToStaticMarkup(<SharedIcon name="lucide:missing"/>), /Unsupported icon/);
 for (const name of iconNames) assert.match(renderToStaticMarkup(<SharedIcon name={name} label="Example icon"/>), /aria-label="Example icon"/);
+for (const name of ['thumbs-up', 'thumbs-down', 'ellipsis']) {
+    const html = renderToStaticMarkup(<SharedButton variant="ghost" size="compact" icon={`lucide:${name}`} hideLabel aria-label="Example response action"/>);
+    assert.match(html, /<svg[^>]*aria-hidden="true"/);
+    assert.match(html, new RegExp(`lucide-${name}`));
+    assert.match(html, /aria-label="Example response action"/);
+}
 for (const file of ['../../components/Button.jsx', '../../components/Icon.jsx', '../../components/foundations.css', '../../demos/theme/FoundationSpecimen.jsx', '../../demos/theme/foundationSpecimen.css']) {
     const source = fs.readFileSync(new URL(file, import.meta.url), 'utf8');
     assert.doesNotMatch(source, /(?:IBM Plex|Steward|Viant|#2d5bff|#1a1d24)/i, 'Workspace branding must stay in workspace-owned assets');
