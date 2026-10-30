@@ -1,3 +1,4 @@
+import Popover from '../Popover.jsx';
 import {updateReportChartTableSwitch} from '../../reporting/reportViewerSettings.js';
 import {reportDatasetReadContextIdentity} from './reportBuilderConcurrentRead.js';
 import {authoredReportCsvTables, renderReportTableCsv} from '../../reporting/reportTableCsv.js';
@@ -26,7 +27,7 @@ import {
 } from "./reportBuilderDatasourceDispatch.js";
 import ReportBuilderManualRunControl from "./ReportBuilderManualRunControl.jsx";
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Button, Dialog, Icon, Menu, MenuDivider, MenuItem, Popover, Tooltip } from "@blueprintjs/core";
+import { Button, Dialog, Icon, Menu, MenuDivider, MenuItem, Tooltip } from "@blueprintjs/core";
 import { useSignals } from "@preact/signals-react/runtime";
 
 import Chart from "../Chart.jsx";

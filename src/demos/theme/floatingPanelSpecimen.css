@@ -1,0 +1,2 @@
+.forge-floating-panel-specimen { display: flex; flex-wrap: wrap; gap: var(--forge-spacing-2, 8px); overflow: hidden; padding: var(--forge-spacing-3, 12px); }
+.forge-floating-panel-example { display: flex; flex-direction: column; width: 240px; padding: var(--forge-spacing-3, 12px); }

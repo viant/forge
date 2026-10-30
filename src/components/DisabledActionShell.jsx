@@ -1,5 +1,6 @@
+import Popover from './Popover.jsx';
 import React from 'react';
-import {Button, Callout, Popover} from '@blueprintjs/core';
+import {Button, Callout} from '@blueprintjs/core';
 import './DisabledActionShell.css';
 
 export function nextDisabledReasonOpen(current, eventType) {

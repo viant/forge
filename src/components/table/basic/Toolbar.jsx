@@ -1,3 +1,4 @@
+import Popover from '../../Popover.jsx';
 import NativeControlTarget from '../../../runtime/NativeControlTarget.jsx';
 import RegisteredPopover from '../../RegisteredPopover.jsx';
 import {validateWidgetControlValue} from '../../../core/ui/controlActions.js';
@@ -7,7 +8,7 @@ import {useWorkspacePresentation, workspaceToolbarItem} from '../../../core/cont
 import React from 'react';
 import ForgeButton from '../../Button.jsx';
 import ForgeIcon from '../../Icon.jsx';
-import {Button, Checkbox, Menu, MenuItem, Popover, Switch} from '@blueprintjs/core';
+import {Button, Checkbox, Menu, MenuItem, Switch} from '@blueprintjs/core';
 import { useSignals } from '@preact/signals-react/runtime';
 import QuickFilterInputs from './QuickFilterInputs.jsx';
 import QuickFilterToggle from './QuickFilterToggle.jsx';

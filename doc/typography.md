@@ -74,6 +74,51 @@ appearance on new variants. The specimen runs with neutral shared fixtures or
 externally supplied workspace assets. This is bounded foundation evidence, not
 a claim that every legacy control, table interaction or device has migrated.
 
+## Anchored panels stay visible
+
+Use `Popover` from `forge/components` (or `forge/theme`) for anchored menus,
+settings panels and contextual content. Library-owned Select panels receive
+`anchoredPopoverProps(existingProps)`. The preferred placement describes intent;
+it never forces a panel outside the visible viewport.
+
+- Try the preferred side, then available bottom/top/right/left alternatives.
+- Keep at least 12px from viewport edges and an 8px gap from the trigger when
+  space permits. Shift inside those edges if no side fits completely.
+- Render through the existing theme-owned portal using fixed positioning so
+  scroll containers and headers cannot crop the panel.
+- Limit oversized panels to the viewport with internal scrolling. Every action
+  remains reachable; never hide overflow or shrink text to make a menu fit.
+- Reposition on scroll, viewport resize and content-size changes through the
+  existing positioning engine. Keep Escape, outside-click dismissal, trigger
+  focus return, disabled states and nested controls working.
+- Neighboring menus in one toolbar share a vertical placement decision based on
+  the tallest menu before either opens. If it cannot fit above, both open below;
+  if neither side fits, both use the roomier side with internal scrolling.
+  Recompute together on content, layout, scroll and viewport changes. The shared
+  document composer implements this for its attachment and Tools controls.
+  Individual horizontal shifting and natural panel sizes remain intact; child
+  popovers do not independently flip away from the group's chosen direction.
+- Native browser select menus keep browser positioning and keyboard behavior.
+  Tooltips and modal dialogs retain their distinct semantics. Do not implement
+  anchored panels with absolute top/bottom offsets or import raw Blueprint
+  Popover in application/component code.
+
+```jsx
+import {Popover, Button} from 'forge/components';
+
+<Popover minimal popupKind="dialog" placement="top-start" shouldReturnFocusOnClose
+  content={<div role="dialog" aria-label="Options">...</div>}>
+  <Button variant="secondary">Options</Button>
+</Popover>
+```
+
+The shared composer, registered controls, record/media previews, report menus,
+table controls and host popovers use this path. The neutral anchored-panel
+specimen demonstrates all preferred directions and oversized content. The
+existing required workspace-theme command checks viewport edges, clipped
+parents, scrolling, resize and Escape/focus, and rejects new raw Popover imports.
+This is web behavior; native applications retain their platform interaction.
+
 ## Semantic typography
 
 Forge consumes the existing portable workspace contract. Workspace theme values
@@ -321,6 +366,14 @@ content allocation as well as the separate composer/task consumers. Five-propert
 small-role perturbations cover category controls and task descriptions, and
 body-role perturbations cover real message content. Keep workspace-selected
 sizes, palettes, fonts and task wording outside this shared recipe.
+
+The selected starter's return action reuses the library's `Button variant="link"`
+with the `small` role and `forge-task-back` geometry. A content-width frame aligns
+the compact action with the Home heading without stretching its hit area across
+the page. Both return paths keep the 44px target, keyboard focus and independent
+Home/starter drafts; returning from a library selection retains search and filters.
+The native Chat Home specimen and existing host browser checks exercise these
+states at desktop and phone widths. Selection and return never submit a request.
 
 ### Compound editors in document tables
 

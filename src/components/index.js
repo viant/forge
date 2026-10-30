@@ -76,3 +76,6 @@ export {default as Icon, iconNames} from './Icon.jsx';
 export {default as SelectControl} from './SelectControl.jsx';
 
 export {default as ReviewTable} from './dashboard/ReviewTable.jsx';
+
+export {default as Popover} from './Popover.jsx';
+export {anchoredPopoverProps} from './anchoredPopoverProps.js';

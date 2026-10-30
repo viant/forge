@@ -1,5 +1,6 @@
+import Popover from './Popover.jsx';
 import React from 'react';
-import {Popover} from '@blueprintjs/core';
+
 import {useSignals} from '@preact/signals-react/runtime';
 import NativeControlTarget from '../runtime/NativeControlTarget.jsx';
 

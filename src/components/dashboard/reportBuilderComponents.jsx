@@ -1,5 +1,6 @@
+import Popover from '../Popover.jsx';
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Dialog, Icon, Menu, MenuDivider, MenuItem, Popover } from "@blueprintjs/core";
+import { Button, Dialog, Icon, Menu, MenuDivider, MenuItem } from "@blueprintjs/core";
 import { useSignals } from "@preact/signals-react/runtime";
 
 import LookupSelectionInput from "../lookup/LookupSelectionInput.jsx";

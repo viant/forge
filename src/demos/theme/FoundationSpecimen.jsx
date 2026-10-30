@@ -1,10 +1,12 @@
+import FloatingPanelSpecimen from './FloatingPanelSpecimen.jsx';
+import Popover from '../../components/Popover.jsx';
 import React, {useRef, useState} from 'react';
 import AttachmentDialog from '../../components/chat/AttachmentDialog.jsx';
 import Composer from '../../components/chat/Composer.jsx';
 import DocumentSpecimen from './DocumentSpecimen.jsx';
 import ReportDocumentSpecimen from './ReportDocumentSpecimen.jsx';
 import {signal} from '@preact/signals-react';
-import {Button as BlueprintButton, Callout, Card, Dialog, Popover, Tag} from '@blueprintjs/core';
+import {Button as BlueprintButton, Callout, Card, Dialog, Tag} from '@blueprintjs/core';
 import Button from '../../components/Button.jsx';
 import SectionTabRail from '../../components/SectionTabRail.jsx';
 import SelectControl from '../../components/SelectControl.jsx';
@@ -112,6 +114,7 @@ export default function FoundationSpecimen({iconExamples = ['menu', 'search', 'p
             <Callout data-forge-status="warning" icon={null} {...typographyProps('body')}>Review the assumptions before continuing.</Callout>
             <Callout data-forge-status="danger" icon={null} {...typographyProps('body')}>The example could not be saved. Check the required fields and try again.</Callout>
         </section>
+        <FloatingPanelSpecimen/>
         <section id="foundation-overlays" aria-label="Overlays">
             <Typography as="h2" typeRole="section">Overlays, focus and motion</Typography>
             <Typography as="p" typeRole="body">Use Tab to inspect focus. Popovers and dialogs inherit this theme. Reduced motion removes transitions and the loading rotation.</Typography>
@@ -135,6 +138,9 @@ export default function FoundationSpecimen({iconExamples = ['menu', 'search', 'p
             }}/>
             <div className="forge-document-chat">
                 <Composer appearance="document" draftKey="file-drop-example" draftValue={dropDraft} onDraftChange={setDropDraft}
+                    agentOptions={[{value:'example',label:'Example agent'}]} agentValue="example"
+                    modelOptions={[{value:'example',label:'Example model'}]} modelValue="example"
+                    reasoningOptions={[{value:'medium',label:'Medium'}]} reasoningValue="medium"
                     showUpload disabled={dropDisabled} onDropFiles={files => setDropFiles(current => [...current, ...files])}
                     onOpenAttach={() => dropPicker.current?.click()} attachments={dropStage === 'done' ? dropFiles.map((file, index) => ({name:file.name, uploadId:`example-${index}`})) : []}
                     uploads={dropFiles.map((file, index) => ({id:`example-${index}`, index, name:file.name, file, status:dropStage === 'finishing' ? 'uploading' : dropStage, progress:dropStage === 'idle' ? 0 : dropStage === 'finishing' ? 1 : .4}))}
