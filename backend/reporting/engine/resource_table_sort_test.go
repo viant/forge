@@ -33,10 +33,25 @@ func TestReportPageSortUsesAdmittedColumns(t *testing.T) {
 	require.Error(t, applyReportDatasetSort(&dsproto.DataSource{Backend: &dsproto.Backend{}}, map[string]any{}, "count asc"))
 }
 
+func TestReportPageSortUsesCanonicalMixedBlocks(t *testing.T) {
+	spec := json.RawMessage(`{"blocks":[{"id":"cards","kind":"collectionBlock","layout":"grid","columns":4},{"id":"items","kind":"tableBlock","datasetRef":"records","columns":[{"key":"quantity","sourceKey":"count"}]}]}`)
+	sorts, err := reportDatasetSorts(spec, nil)
+	require.NoError(t, err)
+	require.Empty(t, sorts)
+	sorts, err = reportDatasetSorts(spec, materializer.TablePresentations{"items": {Sort: &materializer.TableSort{Key: "quantity", Direction: "asc"}}})
+	require.NoError(t, err)
+	require.Equal(t, map[string]string{"records": "count asc"}, sorts)
+	for _, columns := range []string{`4`, `"count"`, `{"key":"count"}`, `[1]`, `[{"key":{"unsafe":"count"}}]`} {
+		malformed := json.RawMessage(`{"blocks":[{"id":"items","kind":"tableBlock","columns":` + columns + `}]}`)
+		_, err := reportDatasetSorts(malformed, nil)
+		require.Error(t, err, columns)
+	}
+}
+
 // Independent six-row inventory fixture: both extrema are outside the initial
 // two-row page. The ordinary admitted executor, rather than the renderer, sorts.
 func TestResourcePageSortFetchesGlobalOrder(t *testing.T) {
-	raw := json.RawMessage(`{"schemaVersion":1,"reportDocument":{"title":"Inventory"},"reportSpec":{"version":1,"kind":"reportSpec","source":{"kind":"report","containerId":"inventory","stateKey":"inventory","dataSourceRef":"reader"},"title":"Inventory","parameters":{"viewMode":"table","groupBy":"","pageSize":2,"orderField":"","orderDir":"asc"},"layoutIntent":{"kind":"stack","resultPanePosition":"bottom","blockOrder":["items"]},"refinements":[],"calculatedFields":[],"datasets":[{"id":"records","dataSourceRef":"reader","request":{"offset":0,"limit":2,"orderBy":["id asc"],"filters":{"region":"east"}},"resultContract":{"shape":"rows","rowPath":"rows","hasMorePath":"dataInfo.hasMore"}}],"blocks":[{"id":"items","kind":"tableBlock","datasetRef":"records","columns":[{"key":"count","label":"Count"}]}]},"dataSources":{"reader":{"id":"reader","cardinality":"collection","paging":{"enabled":true,"mode":"offset","parameters":{"page":"offset","size":"limit"},"dataInfoSelectors":{"hasMore":"hasMore"}},"backend":{"kind":"mcp_tool","service":"inventory","method":"read"}}}}`)
+	raw := json.RawMessage(`{"schemaVersion":1,"reportDocument":{"title":"Inventory"},"reportSpec":{"version":1,"kind":"reportSpec","source":{"kind":"report","containerId":"inventory","stateKey":"inventory","dataSourceRef":"reader"},"title":"Inventory","parameters":{"viewMode":"table","groupBy":"","pageSize":2,"orderField":"","orderDir":"asc"},"layoutIntent":{"kind":"stack","resultPanePosition":"bottom","blockOrder":["items","cards"]},"refinements":[],"calculatedFields":[],"datasets":[{"id":"records","dataSourceRef":"reader","request":{"offset":0,"limit":2,"orderBy":["id asc"],"filters":{"region":"east"}},"resultContract":{"shape":"rows","rowPath":"rows","hasMorePath":"dataInfo.hasMore"}}],"blocks":[{"id":"items","kind":"tableBlock","datasetRef":"records","columns":[{"key":"count","label":"Count"}]},{"id":"cards","kind":"collectionBlock","datasetRef":"records","layout":"grid","columns":4,"itemTitleField":"id"}]},"dataSources":{"reader":{"id":"reader","cardinality":"collection","paging":{"enabled":true,"mode":"offset","parameters":{"page":"offset","size":"limit"},"dataInfoSelectors":{"hasMore":"hasMore"}},"backend":{"kind":"mcp_tool","service":"inventory","method":"read"}}}}`)
 	uri, _ := identity.ParseResourceURI("report://example/inventory")
 	resolver := &identity.ResourceResolver{Source: &identity.LocalResource{URI: uri, Load: func(context.Context) (json.RawMessage, error) { return raw, nil }}, Policy: reportPolicyFunc(func(_ context.Context, _ identity.ResourceRef, c []identity.ResourceCandidate) (identity.ResourceDecision, error) {
 		return identity.ResourceDecision{Candidate: c[0], AuthorityBinding: "synthetic", ValidUntil: time.Now().Add(time.Minute)}, nil

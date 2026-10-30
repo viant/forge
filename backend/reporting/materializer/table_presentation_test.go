@@ -71,3 +71,20 @@ func TestTablePresentationsValidateAgainstTrustedSpec(t *testing.T) {
 		})
 	}
 }
+
+func TestTablePresentationsUseCanonicalMixedBlocks(t *testing.T) {
+	spec := json.RawMessage(`{"blocks":[{"id":"cards","kind":"collectionBlock","layout":"grid","columns":4},{"id":"items","kind":"tableBlock","columns":[{"key":"count"}]}]}`)
+	choices := TablePresentations{"items": {Filter: "Cedar", Sort: &TableSort{Key: "count", Direction: "asc"}}}
+	if err := ValidateTablePresentations(spec, choices); err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateTablePresentations(spec, TablePresentations{"cards": {Sort: &TableSort{Key: "count", Direction: "asc"}}}); err == nil {
+		t.Fatal("collection must not admit table sorting")
+	}
+	for _, columns := range []string{`4`, `"count"`, `{"key":"count"}`, `[1]`, `[{"key":{"unsafe":"count"}}]`} {
+		malformed := json.RawMessage(`{"blocks":[{"id":"items","kind":"tableBlock","columns":` + columns + `}]}`)
+		if err := ValidateTablePresentations(malformed, choices); err == nil {
+			t.Fatalf("malformed table columns admitted: %s", columns)
+		}
+	}
+}
