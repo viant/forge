@@ -43612,6 +43612,18 @@ Please __addLocaleData before adding additional unit data`);
     cache.set(key2, formatter);
     return formatter;
   }
+  function formatExportDecimal(numeric, options) {
+    const absolute = Math.abs(numeric);
+    const decimal = String(absolute);
+    const [integer, fraction2 = ""] = decimal.split(".");
+    if (absolute <= Number.MAX_SAFE_INTEGER && !decimal.includes("e") && fraction2.length <= options.maximumFractionDigits) {
+      const sign = numeric < 0 || Object.is(numeric, -0) ? "-" : "";
+      const grouped = integer.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      const digits = fraction2.padEnd(options.minimumFractionDigits, "0");
+      return `${sign}${options.style === "currency" ? "$" : ""}${grouped}${digits ? `.${digits}` : ""}`;
+    }
+    return exportFormatter(numberFormatters, Intl.NumberFormat, options).format(numeric);
+  }
   function formatExportDateValue(value, {
     includeTime = false
   } = {}) {
@@ -43635,11 +43647,11 @@ Please __addLocaleData before adding additional unit data`);
     if (numeric == null) {
       return normalizeString(value);
     }
-    return exportFormatter(numberFormatters, Intl.NumberFormat, {
+    return formatExportDecimal(numeric, {
       minimumFractionDigits,
       maximumFractionDigits,
       useGrouping: true
-    }).format(numeric).replace(/,/g, " ");
+    }).replace(/,/g, " ");
   }
   function formatExportNumericValue(value, format2 = "", {
     axis = false
@@ -43653,12 +43665,12 @@ Please __addLocaleData before adding additional unit data`);
     switch (normalizedFormat) {
       case "currency":
       case "currency2":
-        return exportFormatter(numberFormatters, Intl.NumberFormat, {
+        return formatExportDecimal(numeric, {
           style: "currency",
           currency: "USD",
           minimumFractionDigits: 2,
           maximumFractionDigits: 2
-        }).format(numeric);
+        });
       case "compact":
       case "compactnumber":
         {
@@ -43687,35 +43699,35 @@ Please __addLocaleData before adding additional unit data`);
       case "percentfraction2":
         return `${(numeric * 100).toFixed(2)}%`;
       case "number":
-        return exportFormatter(numberFormatters, Intl.NumberFormat, {
+        return formatExportDecimal(numeric, {
           minimumFractionDigits: 0,
           maximumFractionDigits: axis ? Number.isInteger(numeric) ? 0 : 1 : 5,
           useGrouping: true
-        }).format(numeric);
+        });
       case "number2":
-        return exportFormatter(numberFormatters, Intl.NumberFormat, {
+        return formatExportDecimal(numeric, {
           minimumFractionDigits: 0,
           maximumFractionDigits: 2,
           useGrouping: true
-        }).format(numeric);
+        });
       case "number5":
-        return exportFormatter(numberFormatters, Intl.NumberFormat, {
+        return formatExportDecimal(numeric, {
           minimumFractionDigits: 5,
           maximumFractionDigits: 5,
           useGrouping: true
-        }).format(numeric);
+        });
       case "":
-        return exportFormatter(numberFormatters, Intl.NumberFormat, {
+        return formatExportDecimal(numeric, {
           minimumFractionDigits: 0,
           maximumFractionDigits: Number.isInteger(numeric) ? 0 : 2,
           useGrouping: true
-        }).format(numeric);
+        });
       default:
-        return exportFormatter(numberFormatters, Intl.NumberFormat, {
+        return formatExportDecimal(numeric, {
           minimumFractionDigits: 0,
           maximumFractionDigits: Number.isInteger(numeric) ? 0 : 2,
           useGrouping: true
-        }).format(numeric);
+        });
     }
   }
   function formatExportValue(value, format2 = "", options = {}) {

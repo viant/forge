@@ -271,6 +271,7 @@ const runtimeUnitTests = [
   "src/reporting/reportRuntimeRefinementFilter.test.js",
   "src/reporting/reportRuntimeRequestRefinementModel.test.js",
   "src/reporting/reportPrintChartSvg.test.js",
+  "src/reporting/reportExportNumericExact.test.js",
   "src/components/dashboard/reportBuilderDocumentBlocks.test.js",
   "src/components/dashboard/reportBuilderFilterSurface.test.js",
   "src/components/dashboard/reportBuilderFilterSurfaceRender.test.js",

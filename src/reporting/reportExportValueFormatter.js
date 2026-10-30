@@ -22,6 +22,24 @@ function exportFormatter(cache,Constructor,options){
   cache.set(key,formatter);
   return formatter;
 }
+// Values whose shortest decimal already fits the requested precision need
+// grouping/padding only. Keep Intl as the authority whenever rounding, exponent
+// expansion or magnitudes beyond safe integers are involved. This avoids the
+// bundled Intl polyfill's decimal arithmetic for each distinct exact table cell.
+function formatExportDecimal(numeric, options) {
+  const absolute = Math.abs(numeric);
+  const decimal = String(absolute);
+  const [integer, fraction = ""] = decimal.split(".");
+  if (absolute <= Number.MAX_SAFE_INTEGER && !decimal.includes("e")
+    && fraction.length <= options.maximumFractionDigits) {
+    const sign = numeric < 0 || Object.is(numeric, -0) ? "-" : "";
+    const grouped = integer.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    const digits = fraction.padEnd(options.minimumFractionDigits, "0");
+    return `${sign}${options.style === "currency" ? "$" : ""}${grouped}${digits ? `.${digits}` : ""}`;
+  }
+  return exportFormatter(numberFormatters, Intl.NumberFormat, options).format(numeric);
+}
+
 function formatExportDateValue(value, {
   includeTime = false,
 } = {}) {
@@ -46,11 +64,11 @@ function formatGroupedNumberWithSpaces(value, {
   if (numeric == null) {
     return normalizeString(value);
   }
-  return exportFormatter(numberFormatters,Intl.NumberFormat, {
+  return formatExportDecimal(numeric, {
     minimumFractionDigits,
     maximumFractionDigits,
     useGrouping: true,
-  }).format(numeric).replace(/,/g, " ");
+  }).replace(/,/g, " ");
 }
 
 export function formatExportNumericValue(value, format = "", {
@@ -65,12 +83,12 @@ export function formatExportNumericValue(value, format = "", {
   switch (normalizedFormat) {
     case "currency":
     case "currency2":
-      return exportFormatter(numberFormatters,Intl.NumberFormat, {
+      return formatExportDecimal(numeric, {
         style: "currency",
         currency: "USD",
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
-      }).format(numeric);
+      });
     case "compact":
     case "compactnumber":
       {
@@ -99,35 +117,35 @@ export function formatExportNumericValue(value, format = "", {
     case "percentfraction2":
       return `${(numeric * 100).toFixed(2)}%`;
     case "number":
-      return exportFormatter(numberFormatters,Intl.NumberFormat, {
+      return formatExportDecimal(numeric, {
         minimumFractionDigits: 0,
         maximumFractionDigits: axis ? (Number.isInteger(numeric) ? 0 : 1) : 5,
         useGrouping: true,
-      }).format(numeric);
+      });
     case "number2":
-      return exportFormatter(numberFormatters,Intl.NumberFormat, {
+      return formatExportDecimal(numeric, {
         minimumFractionDigits: 0,
         maximumFractionDigits: 2,
         useGrouping: true,
-      }).format(numeric);
+      });
     case "number5":
-      return exportFormatter(numberFormatters,Intl.NumberFormat, {
+      return formatExportDecimal(numeric, {
         minimumFractionDigits: 5,
         maximumFractionDigits: 5,
         useGrouping: true,
-      }).format(numeric);
+      });
     case "":
-      return exportFormatter(numberFormatters,Intl.NumberFormat, {
+      return formatExportDecimal(numeric, {
         minimumFractionDigits: 0,
         maximumFractionDigits: Number.isInteger(numeric) ? 0 : 2,
         useGrouping: true,
-      }).format(numeric);
+      });
     default:
-      return exportFormatter(numberFormatters,Intl.NumberFormat, {
+      return formatExportDecimal(numeric, {
         minimumFractionDigits: 0,
         maximumFractionDigits: Number.isInteger(numeric) ? 0 : 2,
         useGrouping: true,
-      }).format(numeric);
+      });
   }
 }
 
