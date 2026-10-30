@@ -12,7 +12,9 @@ func TestMetadataSourceAllKindsStayLocalAndSelectOneHash(t *testing.T) {
 	ctx := actorContext("alice", "operator")
 	publisher := NewPublisher()
 	roots := []RootRef{}
-	kinds := []string{"navigation", "window", "report", "mcp", "skill", "playbook", "toolfeed", "eval", "agent", "prompt"}
+	// Navigation uses the separately fingerprinted GetMenu contract, covered by
+	// metadata_menu_test.go; ordinary kinds retain exact source-byte delivery.
+	kinds := []string{"window", "report", "mcp", "skill", "playbook", "toolfeed", "eval", "agent", "prompt"}
 	for _, kind := range kinds {
 		a, _, err := publisher.Publish(ctx, RootRef{URI: kind + "://example/sample", Kind: kind, Version: 7}, json.RawMessage(`{"schemaVersion":1,"title":"Synthetic fixture"}`), allowPublished)
 		if err != nil {

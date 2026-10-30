@@ -28,16 +28,18 @@ type PublishedValue[T any] struct {
 	Value    T
 	Resource *identity.ResolvedResource
 	// Metadata contains detached publication headers, without definition bodies.
-	Metadata *primitive.ResourceState
+	Metadata       *primitive.ResourceState
+	MenuProjection *primitive.MenuProjection
 }
-type publishedCompiledKey struct{ provider, uri, hash, codec string }
+type publishedCompiledKey struct{ provider, uri, hash, codec, admission string }
 type publishedCompiledEntry struct {
-	ready     chan struct{}
-	value     any
-	err       error
-	immutable bool
-	bytes     int
-	metadata  *primitive.ResourceState
+	ready      chan struct{}
+	value      any
+	err        error
+	immutable  bool
+	bytes      int
+	metadata   *primitive.ResourceState
+	projection *primitive.MenuProjection
 }
 type publishedCompiledCache struct {
 	mu      sync.Mutex
@@ -109,7 +111,12 @@ func Load[T any](ctx context.Context, source *Gateway, uriText string, codec Pub
 		return nil, identity.ErrResourceDenied
 	}
 	cache := source.publishedCompiledCache()
-	key := publishedCompiledKey{connection.ProviderIdentity, uriText, hash, codec.ID}
+	key := publishedCompiledKey{provider: connection.ProviderIdentity, uri: uriText, hash: hash, codec: codec.ID}
+	// Navigation bytes are derived from this admitted root set while their
+	// immutable source hash can stay identical across callers and selectors.
+	if uri.Kind == "navigation" {
+		key.admission = admission
+	}
 	entry, found, err := cache.entry(ctx, key, codec.Immutable)
 	if err != nil {
 		return nil, err
@@ -125,6 +132,7 @@ func Load[T any](ctx context.Context, source *Gateway, uriText string, codec Pub
 		got, readErr := Get[json.RawMessage](ctx, source, connection, identity.ResourceRef{URI: uriText}, &selected)
 		if readErr == nil {
 			entry.metadata = publishedMetadataHeader(got.Resource)
+			entry.projection = clonePublishedMenu(got.MenuProjection)
 			decode := observe.Start(ctx, "artifact.load.decode", observe.Labels{Provider: connection.Name, Kind: uri.Kind})
 			entry.value, entry.err = codec.Decode(ctx, uriText, got.Definition)
 			decode.End(observe.OutcomeFor(entry.err), observe.CacheMiss)
@@ -184,7 +192,16 @@ func Load[T any](ctx context.Context, source *Gateway, uriText string, codec Pub
 	if err = source.verifyPublishedPin(ctx, connection, selected); err != nil {
 		return nil, err
 	}
-	return &PublishedValue[T]{Value: value, Resource: &selected, Metadata: publishedMetadataHeader(entry.metadata)}, nil
+	return &PublishedValue[T]{Value: value, Resource: &selected, Metadata: publishedMetadataHeader(entry.metadata), MenuProjection: clonePublishedMenu(entry.projection)}, nil
+}
+
+func clonePublishedMenu(value *primitive.MenuProjection) *primitive.MenuProjection {
+	if value == nil {
+		return nil
+	}
+	copy := *value
+	copy.DefinitionBytes = bytes.Clone(value.DefinitionBytes)
+	return &copy
 }
 
 // Bound retained and in-flight cache slots. A distinct cold key waits only when

@@ -45,12 +45,14 @@ func getPublishedWithCodec[T any](ctx context.Context, g *Gateway, connection Co
 	if state == nil {
 		return nil, identity.ErrResourceDenied
 	}
-	state.Definition = bytes.Clone(loaded.Value.raw)
-	state.DefinitionBytes = state.Definition
+	if loaded.MenuProjection == nil {
+		state.Definition = bytes.Clone(loaded.Value.raw)
+		state.DefinitionBytes = state.Definition
+	}
 	if err = g.verifyPublishedPin(ctx, connection, selected); err != nil {
 		return nil, err
 	}
-	return &Result[T]{GetResult: primitive.GetResult{Resource: state, ResolvedResource: &selected}, Definition: definition}, nil
+	return &Result[T]{GetResult: primitive.GetResult{Resource: state, ResolvedResource: &selected, MenuProjection: loaded.MenuProjection}, Definition: definition}, nil
 }
 
 // VerifyPublishedMetadata fences an exact previously selected root without

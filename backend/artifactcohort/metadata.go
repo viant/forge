@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"sort"
+	"sync"
+	"time"
 
 	primitive "github.com/viant/forge/backend/provider/contract"
 	identity "github.com/viant/forge/backend/resource"
@@ -14,8 +16,11 @@ import (
 // The immutable payload is authoritative; no revision is selected or retrieved
 // here. All methods are local and errors never initiate synchronization.
 type MetadataSource struct {
-	replica    *Replica
-	namespaces []string
+	replica      *Replica
+	namespaces   []string
+	menuMu       sync.Mutex
+	menus        map[string]*preparedMenus
+	menuBindings map[string]string // security admission key -> shared content key
 }
 
 func NewMetadataSource(replica *Replica, namespaces []string) (*MetadataSource, error) {
@@ -29,7 +34,7 @@ func NewMetadataSource(replica *Replica, namespaces []string) (*MetadataSource, 
 		}
 		seen[namespace] = true
 	}
-	return &MetadataSource{replica: replica, namespaces: append([]string(nil), namespaces...)}, nil
+	return &MetadataSource{replica: replica, namespaces: append([]string(nil), namespaces...), menus: map[string]*preparedMenus{}, menuBindings: map[string]string{}}, nil
 }
 func (s *MetadataSource) claims(namespace string) bool {
 	for _, name := range s.namespaces {
@@ -51,11 +56,19 @@ func (s *MetadataSource) Namespaces(ctx context.Context) (result []primitive.Nam
 	if err != nil {
 		return nil, err
 	}
+	menus, err := s.preparedNavigation(ctx)
+	if err != nil {
+		return nil, err
+	}
+	roots = menus.roots
 	kinds := map[string]map[string]bool{}
 	for _, namespace := range s.namespaces {
 		kinds[namespace] = map[string]bool{}
 	}
 	for _, root := range roots {
+		if root.Kind == "navigation" && menus.visible[root.URI] == nil {
+			continue
+		}
 		uri, err := identity.ParseResourceURI(root.URI)
 		if err != nil || !s.claims(uri.Namespace) {
 			return nil, ErrInvalid
@@ -71,7 +84,11 @@ func (s *MetadataSource) Namespaces(ctx context.Context) (result []primitive.Nam
 		}
 		sort.Strings(names)
 		for _, kind := range names {
-			capability.Kinds = append(capability.Kinds, primitive.KindSupport{Kind: kind, Operations: []string{"list", "get"}})
+			support := primitive.KindSupport{Kind: kind, Operations: []string{"list", "get"}}
+			if kind == "navigation" {
+				support.FormatVersions = []int64{1}
+			}
+			capability.Kinds = append(capability.Kinds, support)
 		}
 		result = append(result, capability)
 	}
@@ -86,8 +103,19 @@ func (s *MetadataSource) List(ctx context.Context, kind, namespace string) (resu
 	if err != nil {
 		return nil, err
 	}
+	var menus *preparedMenus
+	if kind == "navigation" {
+		menus, err = s.preparedNavigation(ctx)
+		if err != nil {
+			return nil, err
+		}
+		roots = menus.roots
+	}
 	result = []primitive.ResourceState{}
 	for _, root := range roots {
+		if root.Kind == "navigation" && menus != nil && menus.visible[root.URI] == nil {
+			continue
+		}
 		uri, err := identity.ParseResourceURI(root.URI)
 		if err != nil || !s.claims(uri.Namespace) {
 			return nil, ErrInvalid
@@ -105,6 +133,11 @@ func (s *MetadataSource) Get(ctx context.Context, uriText string) (result *primi
 	defer func() { failure = metadataAdmissionError(failure) }()
 	uri, err := identity.ParseResourceURI(uriText)
 	if err != nil || !s.claims(uri.Namespace) {
+		return nil, ErrDenied
+	}
+	// Navigation source bytes are not a visible definition. Only GetMenu may
+	// deliver its separately fingerprinted prepared projection.
+	if uri.Kind == "navigation" {
 		return nil, ErrDenied
 	}
 	if err = s.replica.EnsureAdmitted(ctx); err != nil {
@@ -148,13 +181,27 @@ func (s *MetadataSource) AdmissionKey(ctx context.Context) (result string, failu
 	if err != nil || session == "" {
 		return "", ErrDenied
 	}
+	selected, err := s.replica.selectedCohort(ctx)
+	if err != nil {
+		return "", err
+	}
+	if err = s.replica.ensureSelection(session, selected); err != nil {
+		return "", err
+	}
 	s.replica.mu.RLock()
 	defer s.replica.mu.RUnlock()
 	admission, ok := s.replica.admissions[session]
 	if !ok || admission.manifestHash != s.replica.latest.Hash {
 		return "", ErrDenied
 	}
-	raw, err := json.Marshal([]string{s.replica.cfg.Source, s.replica.cfg.Tenant, s.replica.cfg.Account, session, admission.manifestHash})
+	selection := admission.selections[selected]
+	if selection.err != nil {
+		return "", selection.err
+	}
+	if !admission.validUntil.After(time.Now()) {
+		return "", ErrDenied
+	}
+	raw, err := json.Marshal([]any{s.replica.cfg.Source, s.replica.cfg.Tenant, s.replica.cfg.Account, session, admission.manifestHash, selected, selection.fingerprint, s.replica.metadataEpoch})
 	if err != nil {
 		return "", err
 	}
