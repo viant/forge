@@ -93,3 +93,11 @@ moves the next tile to a fresh page; labels too tall for a complete page produce
 an explicit layout diagnostic instead of clipping or shrinking. Chart rowLimit does not truncate a
 matrix. The legacy fenced-report fallback is separate from canonical authored
 ReportSpec/Fill/Print and is not extended here.
+
+The compact synthetic example adds seven short categories and four segments with
+six-digit numeric labels. Browser width follows the available chart width and the
+measured complete wrapped text, with a minimum 44px cell width. Short labels do
+not reserve a fixed 156px per column or a fixed 164px row gutter. Longer content
+retains local horizontal scrolling instead of shrinking or dropping labels. The
+same portable text measurement and readable column widths determine print tiles;
+page boundaries repeat axes and legends without changing values or the scale.

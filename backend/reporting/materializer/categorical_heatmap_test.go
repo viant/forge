@@ -130,6 +130,15 @@ func TestCategoricalHeatmapMaterialization(t *testing.T) {
 }
 
 func TestCategoricalHeatmapMultiPagePDFBounds(t *testing.T) {
+	testCategoricalHeatmapPDFBounds(t, 20, 6, 0)
+}
+
+func TestCategoricalHeatmapCompactPDFBounds(t *testing.T) {
+	testCategoricalHeatmapPDFBounds(t, 4, 7, 123456)
+}
+
+func testCategoricalHeatmapPDFBounds(t *testing.T, rowCount, columnCount, offset int) {
+	t.Helper()
 	raw, err := os.ReadFile("testdata/presentation-report.json")
 	if err != nil {
 		t.Fatal(err)
@@ -138,21 +147,21 @@ func TestCategoricalHeatmapMultiPagePDFBounds(t *testing.T) {
 	if err = json.Unmarshal(raw, &spec); err != nil {
 		t.Fatal(err)
 	}
-	rowCategories := make([]string, 20)
-	columnCategories := make([]string, 6)
+	rowCategories := make([]string, rowCount)
+	columnCategories := make([]string, columnCount)
 	for i := range rowCategories {
 		rowCategories[i] = fmt.Sprintf("Row %d", i)
 	}
 	for i := range columnCategories {
 		columnCategories[i] = fmt.Sprintf("Column %d", i)
 	}
-	rows := make([]map[string]any, 0, 120)
+	rows := make([]map[string]any, 0, rowCount*columnCount)
 	for r, row := range rowCategories {
 		for c, column := range columnCategories {
-			rows = append(rows, map[string]any{"row": row, "column": column, "value": r*6 + c})
+			rows = append(rows, map[string]any{"row": row, "column": column, "value": offset + r*columnCount + c})
 		}
 	}
-	matrix := map[string]any{"rowField": "row", "columnField": "column", "valueField": "value", "rowCategories": rowCategories, "columnCategories": columnCategories, "colorScale": map[string]any{"type": "sequential", "domain": []int{0, 119}, "colors": []string{"#eff3ff", "#08519c"}}}
+	matrix := map[string]any{"rowField": "row", "columnField": "column", "valueField": "value", "rowCategories": rowCategories, "columnCategories": columnCategories, "colorScale": map[string]any{"type": "sequential", "domain": []int{0, offset + rowCount*columnCount - 1}, "colors": []string{"#eff3ff", "#08519c"}}}
 	chart := map[string]any{"type": "heatmap", "heatmap": matrix, "series": map[string]any{"valueKey": "value", "values": []any{map[string]any{"value": "value", "label": "Value", "type": "heatmap"}}}}
 	spec["blocks"] = []any{map[string]any{"id": "matrix", "kind": "chartBlock", "title": "Synthetic matrix", "datasetRef": "primary", "chartSpec": map[string]any{"type": "heatmap", "xField": "row", "yFields": []string{"value"}, "heatmap": matrix}, "chartModel": chart}}
 	spec["layoutIntent"] = map[string]any{"kind": "single", "blockOrder": []string{"matrix"}}
@@ -172,7 +181,7 @@ func TestCategoricalHeatmapMultiPagePDFBounds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(report.Pages) < 3 {
+	if rowCount > 4 && len(report.Pages) < 2 {
 		t.Fatalf("expected multiple row/column tile pages, got %d", len(report.Pages))
 	}
 	rendered, err := reportpdf.Render(report, reportpdf.Options{})
@@ -185,6 +194,21 @@ func TestCategoricalHeatmapMultiPagePDFBounds(t *testing.T) {
 	reader, err := pdfreader.NewReader(bytes.NewReader(rendered.Bytes), int64(len(rendered.Bytes)))
 	if err != nil {
 		t.Fatal(err)
+	}
+	plain, err := reader.GetPlainText()
+	if err != nil {
+		t.Fatal(err)
+	}
+	content, err := io.ReadAll(plain)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range rows {
+		for _, key := range []string{"row", "column", "value"} {
+			if !strings.Contains(string(content), fmt.Sprint(row[key])) {
+				t.Fatalf("PDF lost exact %s: %v", key, row[key])
+			}
+		}
 	}
 	cellCount, textCount := 0, 0
 	for _, page := range report.Pages {
@@ -224,7 +248,7 @@ func TestCategoricalHeatmapMultiPagePDFBounds(t *testing.T) {
 			}
 		}
 	}
-	if cellCount != 120 || textCount == 0 {
+	if cellCount != rowCount*columnCount || textCount == 0 {
 		t.Fatalf("lost matrix coverage/text: cells=%d text=%d", cellCount, textCount)
 	}
 	var evidence struct {
@@ -235,7 +259,7 @@ func TestCategoricalHeatmapMultiPagePDFBounds(t *testing.T) {
 	if err = json.Unmarshal(artifacts.ReportFill, &evidence); err != nil {
 		t.Fatal(err)
 	}
-	if len(evidence.Datasets) == 0 || len(evidence.Datasets[0].Rows) != 120 {
+	if len(evidence.Datasets) == 0 || len(evidence.Datasets[0].Rows) != rowCount*columnCount {
 		t.Fatal("pagination altered raw evidence")
 	}
 }

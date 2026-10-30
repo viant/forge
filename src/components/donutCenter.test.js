@@ -147,3 +147,12 @@ const emphaticSpec=structuredClone(spec);emphaticSpec.blocks.find(b=>b.id==='col
 const emphaticFill=buildReportFillFromReportSpec(emphaticSpec,{primary:{rows:fixture.rows}});
 assert.equal(validateReportFill(emphaticFill).valid,true,JSON.stringify(validateReportFill(emphaticFill)));
 assert.equal(validateReportPrint(buildReportPrintFromReportFill({reportSpec:emphaticSpec,reportFill:emphaticFill})).valid,true);
+
+// The shared portable estimate preserves the original center-layout default.
+const {measureChartText}=await import('./chartTextMeasure.js');
+for(const label of ['Simple label','WW@% wide 漢字','line with emphasis']) for(const emphasis of [undefined,'bold','italic','bold italic']) {
+ const original=(text,size,role,weight)=>[...text].reduce((sum,char)=>sum+size*(/[WM@%]|[^\x00-\x7F]/u.test(char)?1:.65),0)*(weight?.includes('bold')?1.1:1);
+ assert.equal(measureChartText(label,12,'label',emphasis),original(label,12,'label',emphasis));
+ const center={label,formattedValue:'123456',labelEmphasis:emphasis,valueEmphasis:emphasis};
+ assert.deepEqual(layoutDonutCenter(center,80),layoutDonutCenter(center,80,{measure:original}));
+}
