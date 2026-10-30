@@ -2,9 +2,12 @@ const text = value => String(value || "").trim();
 const clone = value => value == null ? value : JSON.parse(JSON.stringify(value));
 
 export function reportResourceFailureMessage(failure) {
-    const envelopes = [failure, failure?.data, failure?.details, failure?.response?.data];
+    const envelopes = [failure, failure?.data, failure?.details, failure?.response?.data, failure?.responseEnvelope];
     if (envelopes.some(value => Array.isArray(value?.diagnostics) && value.diagnostics.some(diagnostic => diagnostic?.code === "missing_report_parameter"))) {
         return "Enter all required report inputs before running the report. Date ranges need both a start and an end date.";
+    }
+    if (envelopes.some(value => Array.isArray(value?.diagnostics) && value.diagnostics.some(diagnostic => diagnostic?.code === "undeclared_report_parameter"))) {
+        return "The report received an input its definition does not support. Refresh the report; if this continues, its author needs to update the input mapping.";
     }
     return "This report could not be run. Please try again.";
 }
