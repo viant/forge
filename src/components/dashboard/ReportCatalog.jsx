@@ -1,3 +1,4 @@
+import Popover from '../Popover.jsx';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {
     Button,
@@ -7,7 +8,6 @@ import {
     Icon,
     Menu,
     MenuItem,
-    Popover,
     Spinner,
     Tag,
 } from "@blueprintjs/core";

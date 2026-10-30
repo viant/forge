@@ -6,7 +6,7 @@ import { useDataSourceState } from "../hooks/useDataSourceState.js";
 import MessageFeed from "./chat/MessageFeed.jsx";
 import "./chat/ChatContainer.css";
 import StarterTaskBrowser from './chat/StarterTaskBrowser.jsx';
-import Typography from './Typography.jsx';
+import Typography, {typographyProps} from './Typography.jsx';
 import SharedButton from './Button.jsx';
 import useStarterSelection from './chat/useStarterSelection.js';
 import useComposerDraft from './chat/useComposerDraft.js';
@@ -1129,7 +1129,7 @@ export default function Chat({
         >
 
             {documentAppearance && showStarterTasks ? <>
-                {selectedStarter ? <SharedButton className="forge-chat-task-back" variant="ghost" icon="lucide:arrow-left" onClick={() => setSelectedStarter(null)}>{selectedStarter.source.library ? 'All tasks' : 'New Chat'}</SharedButton> : null}
+                {selectedStarter ? <div className="forge-chat-task-back"><SharedButton className="forge-task-back" variant="link" {...typographyProps('small')} icon="lucide:arrow-left" onClick={() => setSelectedStarter(null)}>{selectedStarter.source.library ? 'All tasks' : 'New Chat'}</SharedButton></div> : null}
                 <Typography className="forge-chat-welcome" as="h1" typeRole="display">Start a new conversation</Typography>
             </> : null}
             {/* Optional toolbar */}
