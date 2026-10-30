@@ -1527,6 +1527,8 @@ type MediaPreviewOptions struct {
 }
 
 type Column struct {
+	// MutationCommand opts button cells into the shared writer lifecycle using the clicked row.
+	MutationCommand  *MutationCommand       `json:"mutationCommand,omitempty" yaml:"mutationCommand,omitempty"`
 	ID               string                 `json:"id" yaml:"id"`
 	Name             string                 `json:"name" yaml:"name"`
 	Width            int                    `json:"width,omitempty" yaml:"width,omitempty"`
