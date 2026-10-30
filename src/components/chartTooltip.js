@@ -120,7 +120,7 @@ export function buildChartTooltipEntries(chart,source=[],requestFilters) {
     } else if(!chart.series?.nameKey) {
       if(typeof chart.xAxis?.dataKey!=='string'||!chart.xAxis.dataKey.trim())fail('Cartesian tooltip requires an explicit nonempty xAxis.dataKey');
       if(!Array.isArray(chart.series?.values)||!chart.series.values.length||chart.series.values.some(series=>typeof series.value!=='string'||!series.value.trim()))fail('Cartesian tooltip requires explicit nonempty series value keys');
-      applyChartRowLimit(aggregateDirectSeriesData(rows,chart.xAxis.dataKey,chart.series.values),chart.rowLimit).forEach(row=>(chart.series.values||[]).forEach(series=>add(readChartDataValue(row,chart.xAxis.dataKey),series.value,series.label||series.name||series.value,sourceRows(row,series.value))));
+      applyChartRowLimit(aggregateDirectSeriesData(rows,chart.xAxis.dataKey,chart.series.values,chart),chart.rowLimit).forEach(row=>(chart.series.values||[]).forEach(series=>add(readChartDataValue(row,chart.xAxis.dataKey),series.value,series.label||series.name||series.value,sourceRows(row,series.value))));
     } else {
       if(typeof chart.xAxis?.dataKey!=='string'||!chart.xAxis.dataKey.trim())fail('Cartesian tooltip requires an explicit nonempty xAxis.dataKey');
       const {data,keys}=transformData(rows,chart,chart.series.valueKey);

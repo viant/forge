@@ -173,3 +173,21 @@ const explicitFormats=applyReportBuilderRuntimeFieldCatalog({runtimeFieldCatalog
   {fieldCatalog:{columns:[{name:'quantity',role:'measure',type:'number',format:'currency'},{name:'conversionRate',role:'measure',type:'number'}]}});
 assert.equal(explicitFormats.measures[0].format,'currency');
 assert.equal(explicitFormats.measures[1].format,'compactNumber');
+
+// Runtime discovery must preserve label paths without changing numeric keys or
+// making companion objects selectable dimensions.
+const relatedCatalog = {columns: [
+  {name: 'itemId', type: 'integer', role: 'dimension', displayKey: 'dictionary.label'},
+  {name: 'dictionary', type: 'object', role: ''},
+  {name: 'units', type: 'number', role: 'measure'},
+], defaultDimensions: ['itemId'], defaultMeasures: ['units']};
+const relatedConfig = applyReportBuilderRuntimeFieldCatalog({runtimeFieldCatalog: {enabled: true}}, {fieldCatalog: relatedCatalog});
+assert.equal(relatedConfig.dimensions.length, 1);
+assert.equal(relatedConfig.dimensions[0].key, 'itemId');
+assert.equal(relatedConfig.dimensions[0].paramPath, 'dimensions.itemId');
+assert.equal(relatedConfig.dimensions[0].displayKey, 'dictionary.label');
+for (const displayKey of ['__proto__.label', 'dictionary.constructor', 'dictionary.prototype.label']) {
+  assert.throws(() => applyReportBuilderRuntimeFieldCatalog({runtimeFieldCatalog: {enabled: true}}, {
+    fieldCatalog: {...relatedCatalog, columns: [{...relatedCatalog.columns[0], displayKey}]},
+  }), /Unsafe assignment path/);
+}

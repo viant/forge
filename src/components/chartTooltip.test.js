@@ -81,3 +81,12 @@ const emptyLabelFill=buildReportFillChartPayload(labelledChart,[],undefined,unde
 assert.equal(emptyLabelFill.tooltipEntries[0].rowCount,0);
 assert.equal(validateReportSchema({...reportFillSchema.$defs.resolvedChart,$defs:reportFillSchema.$defs},emptyLabelFill).valid,true);
 assert.ok(chartTooltipPrintLines(labelledChart.tooltip,emptyLabelFill.tooltipEntries).includes('Selected Count: Missing field'));
+
+// One producer-ranked category set must survive live aggregation, tooltips and PDF.
+const rankedItemsForTooltip=[45,48,51,54,57,50].map((id,index)=>({item:`Item ${String(id).padStart(3,'0')}`,units:10-index}));
+const rankedTooltipChart={type:'horizontal_bar',preserveCategoryOrder:true,rowLimit:5,xAxis:{dataKey:'item'},series:{values:[{value:'units',label:'Units'}]},tooltip:{fields:[{field:'units',label:'Units'}]}};
+const rankedTooltipEntries=buildChartTooltipEntries(rankedTooltipChart,rankedItemsForTooltip);
+assert.deepEqual(rankedTooltipEntries.map(entry=>entry.category),rankedItemsForTooltip.slice(0,5).map(row=>row.item));
+const rankedPrint=buildReportPrintChartSvg({chartModel:rankedTooltipChart,resolvedChart:buildReportFillChartPayload(rankedTooltipChart,rankedItemsForTooltip),width:640,rowLimit:5});
+for(const row of rankedItemsForTooltip.slice(0,5))assert.ok(rankedPrint.svg.includes(row.item));
+assert.ok(!rankedPrint.svg.includes('Item 050'));
