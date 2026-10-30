@@ -35,6 +35,9 @@ type DataSource struct {
 	// Backend describes the upstream source. Required.
 	Backend *Backend `json:"backend" yaml:"backend"`
 
+	// Operations are server-owned named actions; undeclared names are denied.
+	Operations map[string]*Operation `json:"operations,omitempty" yaml:"operations,omitempty"`
+
 	// ResponseAliases maps logical top-level row keys to exact producer keys.
 	// It applies only to newly fetched rows, preserving original keys/values.
 	ResponseAliases map[string]string `json:"responseAliases,omitempty" yaml:"responseAliases,omitempty"`

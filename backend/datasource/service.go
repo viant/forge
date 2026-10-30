@@ -184,6 +184,11 @@ type FetchOptions struct {
 // caller's identity is read from ctx by the configured IdentityFunc; auth to
 // the upstream MCP server is already attached to ctx by the tool registry.
 func (s *Service) Fetch(ctx context.Context, id string, inputs map[string]interface{}, opts FetchOptions) (result *dsproto.FetchResult, resultErr error) {
+	return s.executeDatasource(ctx, id, inputs, opts, nil)
+}
+
+// executeDatasource shares trusted resolution and release checks across reads and actions.
+func (s *Service) executeDatasource(ctx context.Context, id string, inputs map[string]interface{}, opts FetchOptions, operation *operationExecution) (result *dsproto.FetchResult, resultErr error) {
 	total := observe.Start(ctx, observe.Phase("datasource.service.fetch"), observe.Labels{Kind: "datasource"})
 	defer func() { total.End(observe.OutcomeFor(resultErr), observe.CacheUnknown) }()
 	if s == nil {
@@ -333,6 +338,14 @@ func (s *Service) Fetch(ctx context.Context, id string, inputs map[string]interf
 				}
 			}
 		}()
+	}
+	if operation != nil {
+		value, err := s.operateDeclared(ctx, ds, operation.name, inputs)
+		if err != nil {
+			return nil, err
+		}
+		operation.result = value
+		return &dsproto.FetchResult{}, nil
 	}
 	if ds.Backend == nil {
 		return nil, fmt.Errorf("datasource %q has no backend", id)
