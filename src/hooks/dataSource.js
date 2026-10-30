@@ -1046,7 +1046,7 @@ const setWindowFormData = ({values = {}, parameters = {}, replace = false, bumpP
             superseded.code = 'request_superseded';
             settleDataSourceRequest(identity?.dataSourceId, previousRequestId, superseded);
         }
-        const completion = requestId ? beginDataSourceRequest(identity?.dataSourceId, requestId, identity?.windowId) : null;
+        const completion = requestId ? beginDataSourceRequest(identity?.dataSourceId, requestId, identity?.windowId, props?.result) : null;
         try {
             const log = getLogger('ds');
             log.debug('[fetchCollection]', { ds: identity?.dataSourceRef, filter: newValue.filter });

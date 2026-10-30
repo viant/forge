@@ -3,6 +3,8 @@ package window
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -40,6 +42,32 @@ view:
 		"extension/forge/datasources/draft.yaml":    "id: draft\nautoFetch: false\nbackend: {kind: inline, rows: []}\n",
 		"extension/forge/datasources/settings.yaml": "id: settings\nautoFetch: false\nbackend: {kind: inline, rows: [{id: 7, currency: EUR}]}\n",
 	}}
+	root := t.TempDir()
+	for name, body := range manifest.Files {
+		filename := filepath.Join(root, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(filename), 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filename, []byte(body), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	captured, definition, err := CaptureWindowSource(context.Background(), root, manifest.Binding)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range manifest.Files {
+		if captured.Files[name] != body {
+			t.Fatalf("source bytes changed: %s", name)
+		}
+	}
+	recompiled, err := CompileWindowSource(context.Background(), captured)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(definition) != string(recompiled) {
+		t.Fatal("capture/recompile changed compiled bytes")
+	}
 	before, _ := json.Marshal(manifest)
 	for attempt := 0; attempt < 2; attempt++ {
 		compiled, err := CompileWindowSource(context.Background(), manifest)
