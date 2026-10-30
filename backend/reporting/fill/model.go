@@ -1257,6 +1257,27 @@ func extractFillBlockRuntime(payload json.RawMessage, label string) (map[string]
 	return runtime, sanitized, nil
 }
 
+// Empty category/grouped charts have no data-derived series keys. Admit that
+// canonical shape only when the referenced source is complete and successful.
+func (r *ReportFill) completeEmptyChart(block Block) bool {
+	if block.ChartContent == nil || block.ChartContent.RowCount == nil || *block.ChartContent.RowCount != 0 || block.ChartContent.ResolvedChart == nil || block.ChartContent.ResolvedChart.Rows == nil || len(block.ChartContent.ResolvedChart.Rows) != 0 {
+		return false
+	}
+	if kind := block.ChartContent.ResolvedChart.Kind; kind != "category" && kind != "groupedSeries" {
+		return false
+	}
+	for _, dataset := range r.Datasets {
+		if dataset.ID != block.DatasetRef {
+			continue
+		}
+		if dataset.Rows == nil || dataset.Provenance.Truncated || dataset.Provenance.HasMore || (dataset.Request.Offset != nil && *dataset.Request.Offset > 0) {
+			return false
+		}
+		return len(r.Diagnostics) == 0 && len(dataset.Provenance.Diagnostics) == 0
+	}
+	return false
+}
+
 func (r *ReportFill) Validate() error {
 	if r == nil {
 		return fmt.Errorf("reportFill is required")
@@ -1506,7 +1527,7 @@ func (r *ReportFill) Validate() error {
 			if block.ChartContent.ResolvedChart.SeriesKeys == nil {
 				return fmt.Errorf("reportFill.blocks[%d].content.resolvedChart.seriesKeys is required for chartBlock", index)
 			}
-			if len(block.ChartContent.ResolvedChart.SeriesKeys) == 0 && !(len(block.ChartContent.ResolvedChart.Rows) == 0 && ((block.ChartContent.ResolvedChart.Type == "donut" && block.ChartContent.ResolvedChart.Center != nil) || len(block.ChartContent.ResolvedChart.TooltipEntries) > 0)) {
+			if len(block.ChartContent.ResolvedChart.SeriesKeys) == 0 && !r.completeEmptyChart(block) && !(len(block.ChartContent.ResolvedChart.Rows) == 0 && ((block.ChartContent.ResolvedChart.Type == "donut" && block.ChartContent.ResolvedChart.Center != nil) || len(block.ChartContent.ResolvedChart.TooltipEntries) > 0)) {
 				return fmt.Errorf("reportFill.blocks[%d].content.resolvedChart.seriesKeys must not be empty for chartBlock", index)
 			}
 			for seriesIndex, seriesKey := range block.ChartContent.ResolvedChart.SeriesKeys {

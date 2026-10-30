@@ -42,7 +42,9 @@ function buildBaseReportFillChartPayload(chart = {}, rows = [], centerRows, cent
   }
   const center=resolveDonutCenter(chart.center,rows,type,centerRows,centerInputs);
   const chartRows = materializeChartDisplayRows(chart, rows);
-  if (!type || (chartRows.length === 0&&!center&&!chart.tooltip?.lines?.some(line=>line.some(segment=>segment.input)))) {
+  // Keep the canonical typed shape for complete empty results. Source
+  // completeness is checked by the fill builder before this pure projection.
+  if (!type) {
     return null;
   }
   if (type === "pie" || type === "donut") {

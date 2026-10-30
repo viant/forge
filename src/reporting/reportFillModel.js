@@ -113,8 +113,8 @@ function buildReportFillDataset(dataset = {}, payload = {}, calculatedFields = [
     provenance: {
       requestHash: hashString(stableJSONStringify(request)),
       rowCount: rows.length,
-      truncated: !!payload?.hasMore,
-      hasMore: !!payload?.hasMore,
+      truncated: !!(payload?.truncated || payload?.provenance?.truncated || payload?.hasMore || payload?.provenance?.hasMore),
+      hasMore: !!(payload?.hasMore || payload?.provenance?.hasMore),
       diagnostics,
     },
     rows,
@@ -1021,6 +1021,7 @@ function orderFilterBarEntries(entries = [], ordering = {}) {
 function buildReportFillBlocks(reportSpec = {}, datasetsById = new Map(), {
   unifiedFilterContent = null,
   runtimeSelection = {},
+  datasetPayloads = {},
 } = {}) {
   const scopeParams = Array.isArray(reportSpec?.scope?.params) ? reportSpec.scope.params : [];
   const runtimeFilterValues = scopeParams.reduce((result, param) => {
@@ -1094,6 +1095,14 @@ function buildReportFillBlocks(reportSpec = {}, datasetsById = new Map(), {
       };
     }
     if (normalizeString(block?.kind) === "chartBlock") {
+      if (block.chartModel && (!dataset || dataset.rows.length === 0)) {
+        const payload = datasetPayloads[datasetResolution.datasetRef];
+        const diagnostics = [...(payload?.diagnostics || []), ...(payload?.provenance?.diagnostics || [])];
+        if (!sourceDataset || !Array.isArray(payload?.rows)
+          || sourceDataset.provenance.hasMore || sourceDataset.provenance.truncated || Number(sourceDataset.request?.offset) > 0 || diagnostics.length > 0) {
+          throw new Error(`Chart '${block.id}' requires complete empty dataset input for '${block.datasetRef}'.`);
+        }
+      }
       const chartSpec = cloneValue(block?.chartSpec || null);
       const chartModel = cloneValue(block?.chartModel || null);
       return {
@@ -1316,6 +1325,7 @@ export function buildReportFillFromReportSpec(reportSpec = {}, datasetPayloads =
     blocks: buildReportFillBlocks(normalizedReportSpec, datasetsById, {
       unifiedFilterContent,
       runtimeSelection,
+      datasetPayloads,
     }),
     diagnostics: datasets.flatMap((dataset) => dataset?.provenance?.diagnostics || []),
   }, tablePresentations);
