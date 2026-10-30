@@ -77,3 +77,37 @@ func normalizeLegacyReferenceKeys(raw json.RawMessage, envelope *WindowResourceE
 	}
 	return nil
 }
+
+// NormalizeWindowReferenceVariant reads an internally stored variant, verifies
+// its original content key, and removes obsolete consumer reference hashes.
+// The caller must separately authorize the owning stored resource.
+func NormalizeWindowReferenceVariant(raw json.RawMessage, expected string) (*WindowResourceVariant, error) {
+	var variant WindowResourceVariant
+	if err := decodeWindowResourceJSON(raw, &variant); err != nil {
+		return nil, err
+	}
+	fingerprint, err := WindowVariantFingerprint(variant)
+	if err != nil {
+		return nil, err
+	}
+	if fingerprint == expected {
+		variant.Fingerprint = fingerprint
+		return &variant, nil
+	}
+	encoded, err := json.Marshal(struct {
+		Variants map[string]json.RawMessage `json:"variants"`
+	}{map[string]json.RawMessage{expected: raw}})
+	if err != nil {
+		return nil, err
+	}
+	envelope := WindowResourceEnvelope{Variants: map[string]WindowResourceVariant{expected: variant}}
+	if err = normalizeLegacyReferenceKeys(encoded, &envelope); err != nil {
+		return nil, err
+	}
+	normalized, ok := envelope.Variants[fingerprint]
+	if !ok {
+		return nil, fmt.Errorf("window variant fingerprint mismatch")
+	}
+	normalized.Fingerprint = fingerprint
+	return &normalized, nil
+}
