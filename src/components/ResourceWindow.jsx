@@ -16,6 +16,7 @@ export function ResourceWindow({uri,instanceKey=uri,parameters,hostServices,onCo
  const callbacks=useRef({});callbacks.current={onComplete,onClose,onNavigate,onDirtyChange};
  const [initialParameters]=useState(()=>parameters||{}),[state,setState]=useState({}),[attempt,setAttempt]=useState(0);
  const mountId=useId(),windowId=instanceKey+':'+mountId;
+ useEffect(()=>base.applicationScope?.bindWindow?.(windowId,base.windowState?.windowId),[base.applicationScope,base.windowState?.windowId,windowId]);
  const publishDirty=React.useCallback(()=>{
   const value=explicitDirty.current||dialogs.current.size>0||Array.from(childDirty.current.values()).some(Boolean);
   if(lastDirty.current===value)return;lastDirty.current=value;
