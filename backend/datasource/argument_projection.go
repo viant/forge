@@ -22,3 +22,8 @@ func mcpToolArguments(backend *dsproto.Backend, logical map[string]interface{}) 
 	}
 	return expandNestedArgs(mergeArgs(args, backend.Pinned))
 }
+
+// OperationArguments applies the same fixed, server-declared argument projection to actions.
+func OperationArguments(backend *dsproto.Backend, logical map[string]interface{}) map[string]interface{} {
+	return mcpToolArguments(backend, logical)
+}
