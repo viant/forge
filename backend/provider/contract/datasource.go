@@ -3,6 +3,8 @@
 package primitive
 
 import (
+	"bytes"
+	"encoding/json"
 	identity "github.com/viant/forge/backend/resource"
 	"strconv"
 	"strings"
@@ -42,4 +44,21 @@ func (r DataSourceReference) Validate(immutable bool) error {
 // Content identity belongs to the server's private resolution, not the consumer.
 func (r DataSourceReference) MatchesResolved(pin identity.ResolvedResource) bool {
 	return pin.URI == r.Resource.URI && pin.ProviderIdentity == r.ProviderIdentity && (r.Resource.Revision == "" || pin.Selector() == r.Resource.Revision)
+}
+
+// UnmarshalJSON accepts and discards legacy consumer hashes while preserving
+// strict source identity decoding for stored definitions.
+func (r *DataSourceReference) UnmarshalJSON(raw []byte) error {
+	var stored struct {
+		Resource          identity.ResourceRef `json:"resource"`
+		LegacyFingerprint json.RawMessage      `json:"contentFingerprint"`
+		ProviderIdentity  string               `json:"providerIdentity"`
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&stored); err != nil {
+		return err
+	}
+	*r = DataSourceReference{Resource: stored.Resource, ProviderIdentity: stored.ProviderIdentity}
+	return nil
 }
