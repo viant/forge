@@ -342,24 +342,21 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 		return nil, err
 	}
 	selectedIDs := request.DatasetIDs
+	var tableProjection *tableExecutionProjection
 	if request.TableBlockID != nil {
 		if selectedIDs != nil {
 			return nil, identity.ErrResourceDenied
 		}
-		var chosen string
-		for _, block := range spec.Blocks {
-			if block.Kind != "tableBlock" || *request.TableBlockID != "" && block.ID != *request.TableBlockID {
-				continue
-			}
-			if chosen != "" || block.DatasetRef == "" {
-				return nil, identity.ErrResourceDenied
-			}
-			chosen = block.DatasetRef
+		tableProjection, err = planTableExecution(executionSpec, *request.TableBlockID)
+		if err != nil {
+			return nil, err
 		}
-		if chosen == "" {
-			return nil, identity.ErrResourceDenied
+		selectedIDs = make([]string, 0, len(tableProjection.datasets))
+		for _, dataset := range spec.Datasets {
+			if tableProjection.datasets[dataset.ID] {
+				selectedIDs = append(selectedIDs, dataset.ID)
+			}
 		}
-		selectedIDs = []string{chosen}
 	}
 
 	type plannedDataset struct {
@@ -579,12 +576,26 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 		results[plan.id] = fetched[index]
 		payloads[plan.id] = fetchedPayloads[index]
 	}
+	// A selected-table result returns its derived presentation spec with the
+	// matching fill/print hashes; admission and release still use the full pin.
+	materializationSpec := effectiveSpec
+	presentations := request.TablePresentations
+	if tableProjection != nil {
+		materializationSpec, err = tableProjection.materializationSpec(effectiveSpec)
+		if err != nil {
+			return nil, err
+		}
+		presentations = nil
+		if presentation, ok := request.TablePresentations[tableProjection.id]; ok {
+			presentations = materializer.TablePresentations{tableProjection.id: presentation}
+		}
+	}
 	materializeTiming := observe.Start(ctx, "report.resource.materialize", observe.Labels{Kind: "report"})
 	var artifacts *materializer.Artifacts
 	if request.FillOnly {
-		artifacts, err = materializer.MaterializePresented(ctx, effectiveSpec, payloads, request.TablePresentations, true)
+		artifacts, err = materializer.MaterializePresented(ctx, materializationSpec, payloads, presentations, true)
 	} else {
-		artifacts, err = materializer.MaterializePresented(ctx, effectiveSpec, payloads, request.TablePresentations, false)
+		artifacts, err = materializer.MaterializePresented(ctx, materializationSpec, payloads, presentations, false)
 	}
 	materializeTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
@@ -596,7 +607,7 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 	if err != nil {
 		return nil, err
 	}
-	return &ExecuteResourceResult{DependencyPins: cloneDependencyPins(compiled.DependencyPins), DependencyToken: compiled.DependencyToken, Resource: cloneResolvedResource(pin), ReportSpec: cloneJSON(effectiveSpec), ReportFill: artifacts.ReportFill, ReportPrint: artifacts.ReportPrint, Datasets: results}, nil
+	return &ExecuteResourceResult{DependencyPins: cloneDependencyPins(compiled.DependencyPins), DependencyToken: compiled.DependencyToken, Resource: cloneResolvedResource(pin), ReportSpec: cloneJSON(materializationSpec), ReportFill: artifacts.ReportFill, ReportPrint: artifacts.ReportPrint, Datasets: results}, nil
 }
 func reportDatasetArguments(base, parameters map[string]interface{}, descriptor *dsproto.DataSource, builderRaw json.RawMessage, scope *reportExecutionDatasetScope) (map[string]interface{}, error) {
 	raw, err := json.Marshal(base)
