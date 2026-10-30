@@ -4,6 +4,8 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     include: [
+      'src/utils/applicationScope.test.js',
+      'src/components/ResourceWindow.applicationScope.render.test.jsx',
       'src/components/WindowContent.placement.test.jsx',
       'src/components/WindowLayout.test.jsx',
       'src/components/SectionTabRail.test.js',
