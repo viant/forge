@@ -34,7 +34,7 @@ const editableTable = {...table, dataSourceRef:'examples', allowAdd:false, colum
     {key:'notes',label:'Notes',flex:true,minWidth:240,editor:false},
 ]};
 
-export default function FoundationSpecimen({iconExamples = ['menu', 'search', 'plus', 'panel-right', 'maximize', 'minimize'].map(name => ({name: `lucide:${name}`, label: name}))}) {
+export default function FoundationSpecimen({iconExamples = ['menu', 'search', 'plus', 'panel-right', 'maximize', 'minimize', 'thumbs-up', 'thumbs-down', 'ellipsis'].map(name => ({name: `lucide:${name}`, label: name}))}) {
     const state = useState({foundationName: '', foundationAmount: 12345, foundationSelect: 'all', foundationRadio: 'daily', foundationCheck: true, foundationSwitch: false});
     const [saved, setSaved] = useState(0);
     const [dialog, setDialog] = useState(false);
