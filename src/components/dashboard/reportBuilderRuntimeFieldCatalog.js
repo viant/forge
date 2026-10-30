@@ -1,6 +1,7 @@
 import { normalizeReportBuilderOptionDefinitions } from "./reportBuilderOptions.js";
 import { normalizePresentationClampConfig } from "../../utils/presentationText.js";
 import {hydrateReportRequestEnvelope} from "../../reporting/reportRequestEnvelope.js";
+import {assertSafeAssignmentPath} from "../../utils/selector.js";
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -33,6 +34,12 @@ function normalizeFormat(column = {}) {
   if (type === "date") return "date";
   if (type === "integer" || type === "number") return "compactNumber";
   return "";
+}
+
+function normalizeDisplayKey(value) {
+  const path = normalizeString(value);
+  if (path) assertSafeAssignmentPath(path);
+  return path;
 }
 
 function normalizeTablePresentation(value = null) {
@@ -87,6 +94,7 @@ export function applyReportBuilderRuntimeFieldCatalog(config = {}, windowForm = 
       type: normalizeString(column?.type).toLowerCase(),
       format: normalizeFormat(column),
       label: normalizeString(column?.label) || humanize(column?.name),
+      displayKey: normalizeDisplayKey(column?.displayKey),
     }))
     .filter((column) => column.name && (column.role === "dimension" || column.role === "measure"));
   if (columns.length === 0) {
@@ -101,6 +109,7 @@ export function applyReportBuilderRuntimeFieldCatalog(config = {}, windowForm = 
     id: column.name,
     key: column.name,
     label: column.label,
+    ...(column.displayKey ? { displayKey: column.displayKey } : {}),
     ...(column.format ? { format: column.format } : {}),
     ...(defaultDimensions.has(column.name) ? { default: true } : {}),
     paramPath: `dimensions.${column.name}`,

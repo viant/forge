@@ -405,3 +405,9 @@ assert.match(broadBar,/L 300 245 C 300 245 300 245 300 245 L 0 245/,'Baseline st
 assert.equal(formatChartDisplayValue(0.00123,'number5'),'0.00123','Small cost values must retain authored precision');
 assert.equal(formatChartDisplayValue(0,'number5'),'0.00000');
 assert.equal(formatChartDisplayValue(1234.56789,'number'),'1,234.56789');
+
+// Ranked categorical labels must not be reinterpreted as dates before limiting.
+const rankedItems = [45,48,51,54,57,50].map((id,index) => ({item:`Item ${String(id).padStart(3,'0')}`,units:10-index}));
+const rankedData = aggregateDirectSeriesData(rankedItems,'item',[{value:'units'}],{preserveCategoryOrder:true});
+assert.deepEqual(applyChartRowLimit(rankedData,5).map(row=>row.item),rankedItems.slice(0,5).map(row=>row.item));
+assert.deepEqual(aggregateDirectSeriesData([{item:'Item 050',units:0},{item:'Item 045',units:null},{item:'Item 050',units:2}], 'item',[{value:'units'}],{preserveCategoryOrder:true}).map(row=>[row.item,row.units]),[['Item 050',2],['Item 045',null]]);

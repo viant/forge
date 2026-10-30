@@ -72,7 +72,7 @@ function buildBaseReportFillChartPayload(chart = {}, rows = [], centerRows, cent
     const seriesKeys = seriesValues
       .map((entry) => normalizeChartKey(entry?.value))
       .filter(Boolean);
-    const resolvedRows = aggregateDirectSeriesData(chartRows, xAxisKey, seriesValues);
+    const resolvedRows = aggregateDirectSeriesData(chartRows, xAxisKey, seriesValues, chart);
     return {
       kind: "directSeries",
       type,

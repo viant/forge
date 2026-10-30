@@ -119,3 +119,7 @@ assert.deepEqual(mappedCategoryPayload, {
 assert.equal(buildReportFillChartPayload({}, []), null);
 
 console.log("reportFillChartPayload ✓ builds grouped, direct, and category chart payloads for ReportFill");
+
+const rankedCategoryRows=[45,48,51,54,57,50].map((id,index)=>({item:`Item ${String(id).padStart(3,'0')}`,units:10-index}));
+const rankedCategoryPayload=buildReportFillChartPayload({type:'horizontal_bar',preserveCategoryOrder:true,rowLimit:5,xAxis:{dataKey:'item'},series:{values:[{value:'units',label:'Units'}]}},rankedCategoryRows);
+assert.deepEqual(rankedCategoryPayload.rows.map(row=>row.item),rankedCategoryRows.map(row=>row.item));
