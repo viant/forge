@@ -92,8 +92,10 @@ for (const [id, label, value] of [["records", "Observed records", 0], ["temperat
   assert.equal(content.valueLabel, label);
   assert.equal(content.value, value, "Label defaults must not round or coerce source values");
 }
-const metricPrintText = metricLabels.reportPrint.pages.flatMap(page => page.elements.map(element => element.text)).join("\n");
-assert.match(metricPrintText, /OBSERVED RECORDS/);
+const metricPrintElements = metricLabels.reportPrint.pages.flatMap(page => page.elements);
+const metricPrintText = metricPrintElements.map(element => element.text).join("\n");
+assert.equal(metricPrintElements.find(element => element.id === "records__title_0")?.text, "Observed records");
+assert.equal(metricPrintElements.some(element => element.id?.startsWith("records__value_label_")), false);
 assert.match(metricPrintText, /DEGREES CELSIUS/);
 assert.doesNotMatch(metricPrintText, /recordCount|readingValue/);
 const nativeMetricFill = buildReportFillFromReportSpec({
