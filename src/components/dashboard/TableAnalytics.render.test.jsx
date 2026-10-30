@@ -2,9 +2,12 @@ import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {it,expect,vi} from 'vitest';
 import DashboardTableContent from './DashboardTableContent.jsx';
+import ReportRuntime from './ReportRuntime.jsx';
 import ReviewTable from './ReviewTable.jsx';
 import fixture from '../../../doc/examples/laboratory-table-analytics.json';
+import {buildReportFillFromReportSpec} from '../../reporting/reportFillModel.js';
 import {materializeAnalyticalTable} from '../../reporting/reportTableAnalytics.js';
+import {renderReportTableCsv} from '../../reporting/reportTableCsv.js';
 const context=rows=>({signals:{collection:{value:rows},control:{value:{}},selection:{value:null}},identity:{dataSourceRef:'invented'}});
 const container={id:'inventory',tablePresentation:{variant:'document'},columns:fixture.hierarchy.columns,hierarchy:fixture.hierarchy.hierarchy,columnGroups:fixture.hierarchy.columnGroups,quickFilter:true,paging:{enabled:true,size:1,rangeLabel:'complete'}};
 it('expands nested rows inline, retains stable keys/state, filters ancestors and pages root subtrees',async()=>{
@@ -49,8 +52,6 @@ it('uses grouped pivot headers while keeping zero and null distinct',async()=>{
  }finally{await act(async()=>root.unmount());host.remove();}
 });
 it('maps canonical hierarchy review choices to the original source after tree ordering',async()=>{
- const {default:ReportRuntime}=await import('./ReportRuntime.jsx');
- const {buildReportFillFromReportSpec}=await import('../../reporting/reportFillModel.js');
  globalThis.IS_REACT_ACT_ENVIRONMENT=true;const host=document.createElement('div');document.body.append(host);const root=createRoot(host),onTableReviewChange=vi.fn();
  const rows=[...fixture.inventoryRows].reverse();
  const block={...fixture.hierarchy,datasetRef:'primary',selection:{mode:'checkbox',field:'selected'}};
@@ -68,7 +69,6 @@ it('maps canonical hierarchy review choices to the original source after tree or
 function reportSpecFor(block){return {version:1,kind:'reportSpec',title:'Invented analytical table',source:{kind:'report',containerId:'table',stateKey:'table',dataSourceRef:'invented'},parameters:{viewMode:'table',groupBy:'',pageSize:25,orderField:'',orderDir:'asc'},layoutIntent:{kind:'single',resultPanePosition:'bottom',blockOrder:[block.id]},refinements:[],calculatedFields:[],datasets:[{id:'primary',dataSourceRef:'invented',request:{}}],blocks:[{...block,datasetRef:'primary'}]};}
 async function changeSearch(input,value){await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));});}
 it('keeps the canonical export path out of actual ReportRuntime columns and matching',async()=>{
- const {default:ReportRuntime}=await import('./ReportRuntime.jsx');const {buildReportFillFromReportSpec}=await import('../../reporting/reportFillModel.js');const {renderReportTableCsv}=await import('../../reporting/reportTableCsv.js');
  globalThis.IS_REACT_ACT_ENVIRONMENT=true;const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
  const spec=reportSpecFor(fixture.hierarchy),fill=buildReportFillFromReportSpec(spec,{primary:{rows:fixture.inventoryRows}});
  expect(fill.blocks[0].content.columns[0].key).toBe('__forge_hierarchy_path');expect(renderReportTableCsv(fill.blocks[0])).toContain('Atlas / Room 101 / Optics');
@@ -81,7 +81,6 @@ it('keeps the canonical export path out of actual ReportRuntime columns and matc
  }finally{await act(async()=>root.unmount());host.remove();}
 });
 it('preserves declared pivot groups for arbitrary measure labels in actual legacy ReportRuntime',async()=>{
- const {default:ReportRuntime}=await import('./ReportRuntime.jsx');const {buildReportFillFromReportSpec}=await import('../../reporting/reportFillModel.js');
  globalThis.IS_REACT_ACT_ENVIRONMENT=true;const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
  const block=JSON.parse(JSON.stringify(fixture.pivot));block.columns.push({key:'checks',label:'Checks'});block.pivot.values=[{field:'count',label:'Publisher measurements',aggregate:'none'},{field:'checks',label:'Deal checks',aggregate:'none'}];
  const rows=fixture.inspectionRows.map(row=>({...row,checks:row.count==null?null:row.count+1}));const spec=reportSpecFor(block),fill=buildReportFillFromReportSpec(spec,{primary:{rows}});
@@ -93,7 +92,6 @@ it('preserves declared pivot groups for arbitrary measure labels in actual legac
  }finally{await act(async()=>root.unmount());host.remove();}
 });
 it('previews complete root subtrees and reports truthful root and visible-row counts',async()=>{
- const {default:ReportRuntime}=await import('./ReportRuntime.jsx');const {buildReportFillFromReportSpec}=await import('../../reporting/reportFillModel.js');
  globalThis.IS_REACT_ACT_ENVIRONMENT=true;const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
  const rows=Array.from({length:8},(_,i)=>[{nodeId:`r${i}`,parentId:null,name:`Root ${i}`,available:1,occupied:0},{nodeId:`c${i}`,parentId:`r${i}`,name:`Child ${i}`,available:1,occupied:0}]).flat();
  const block={...fixture.hierarchy,collapsible:true,hierarchy:{...fixture.hierarchy.hierarchy,defaultExpandedKeys:Array.from({length:8},(_,i)=>`r${i}`)}};
