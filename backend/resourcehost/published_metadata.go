@@ -32,6 +32,13 @@ type PublishedMetadataSource interface {
 	// root pointers only, without hydrating or decoding the artifact body.
 	CurrentHash(context.Context, string) (string, error)
 }
+
+// PublishedMenuProjectionSource exposes prepared menu bytes separately from
+// their immutable source fingerprint. It is an optional local source contract;
+// source selection and authorization remain owned by the admitted replica.
+type PublishedMenuProjectionSource interface {
+	GetMenu(context.Context, string) (*primitive.GetResult, error)
+}
 type publishedMetadataRegistration struct {
 	connection Connection
 	namespaces map[string]bool
@@ -178,13 +185,31 @@ func getPublished[T any](ctx context.Context, g *Gateway, source publishedMetada
 	if admission == "" {
 		return nil, identity.ErrResourceDenied
 	}
-	state, err := source.source.Get(ctx, ref.URI)
+	var state *primitive.ResourceState
+	var projection *primitive.MenuProjection
+	var definition json.RawMessage
+	if menus, ok := source.source.(PublishedMenuProjectionSource); ok && uri.Kind == "navigation" {
+		got, getErr := menus.GetMenu(ctx, ref.URI)
+		if getErr != nil {
+			return nil, getErr
+		}
+		if got == nil || got.Resource == nil || got.MenuProjection == nil || got.ResolvedResource != nil || got.ExecutionProof != nil || len(got.Resource.Definition) != 0 || len(got.Resource.DefinitionBytes) != 0 || got.MenuProjection.SchemaVersion != 1 || got.Resource.FormatVersion != 1 || len(got.MenuProjection.DefinitionBytes) == 0 {
+			return nil, identity.ErrResourceDenied
+		}
+		state, projection = got.Resource, got.MenuProjection
+		definition = projection.DefinitionBytes
+	} else {
+		state, err = source.source.Get(ctx, ref.URI)
+		if err != nil {
+			return nil, err
+		}
+	}
+	state, err = publishedState(state, uri, projection == nil)
 	if err != nil {
 		return nil, err
 	}
-	state, err = publishedState(state, uri, true)
-	if err != nil {
-		return nil, err
+	if projection == nil {
+		definition = state.Definition
 	}
 	actual := &identity.ResolvedResource{ProviderIdentity: connection.ProviderIdentity, URI: ref.URI, ResourceCandidate: identity.ResourceCandidate{Kind: identity.PublishedCandidate, ContentFingerprint: state.ContentFingerprint}, AuthorityBinding: publishedAuthority(actor, source, uri, state.ContentFingerprint, admission), ValidUntil: actor.ValidUntil}
 	if pin != nil {
@@ -199,9 +224,9 @@ func getPublished[T any](ctx context.Context, g *Gateway, source publishedMetada
 			return nil, identity.ErrResource
 		}
 		// Host decoders may mutate their input. Keep the selected owned bytes intact.
-		value, err = decoders[0](bytes.Clone(state.Definition))
+		value, err = decoders[0](bytes.Clone(definition))
 	} else {
-		value, err = decodeDefinition[T](state.Definition)
+		value, err = decodeDefinition[T](definition)
 	}
 	if err != nil {
 		return nil, err
@@ -231,7 +256,7 @@ func getPublished[T any](ctx context.Context, g *Gateway, source publishedMetada
 	if sequence := sequenceFromContext(ctx); sequence != nil {
 		sequence.constrainLease(actual.ValidUntil)
 	}
-	return &Result[T]{GetResult: primitive.GetResult{Resource: state, ResolvedResource: actual}, Definition: value}, nil
+	return &Result[T]{GetResult: primitive.GetResult{Resource: state, ResolvedResource: actual, MenuProjection: projection}, Definition: value}, nil
 }
 func (g *Gateway) listPublished(ctx context.Context, source publishedMetadataRegistration, kind, namespace string, locators ...Connection) ([]LocatedResource, error) {
 	rows, err := source.source.List(ctx, kind, namespace)

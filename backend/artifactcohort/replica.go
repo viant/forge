@@ -63,8 +63,19 @@ type admission struct {
 	selections          map[string]effectiveSelection
 }
 type effectiveSelection struct {
-	roots map[string]RootRef
-	err   error
+	roots       map[string]RootRef
+	err         error
+	fingerprint string
+}
+
+func preparedSelection(roots map[string]RootRef, err error) effectiveSelection {
+	refs := make([]RootRef, 0, len(roots))
+	for _, ref := range roots {
+		refs = append(refs, ref)
+	}
+	sort.Slice(refs, func(i, j int) bool { return refs[i].URI < refs[j].URI })
+	raw, _ := json.Marshal(refs)
+	return effectiveSelection{roots: roots, err: err, fingerprint: Hash(raw)}
 }
 
 // View exposes selected producer-closed bytes without granting access to the
@@ -96,6 +107,7 @@ type Replica struct {
 	admissions    map[string]admission
 	notifications map[string]uint64
 	ready         bool
+	metadataEpoch uint64 // local partition readiness generation, guarded by mu
 }
 
 func NewReplica(cfg Config) (*Replica, error) {
@@ -143,6 +155,7 @@ func (r *Replica) MarkUpdated(uri string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.notifications[partition]++
+	r.metadataEpoch++
 	if state := r.partitions[partition]; state != nil {
 		copy := *state
 		copy.stale = true
@@ -174,6 +187,7 @@ func (r *Replica) MarkDisconnected() {
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.metadataEpoch++
 	for key, state := range r.partitions {
 		r.notifications[key]++
 		copy := *state
@@ -207,6 +221,7 @@ func (r *Replica) MarkListChanged() {
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.metadataEpoch++
 	for key, state := range r.partitions {
 		_, kind, ok := cutPartition(key)
 		if !ok || kind != "policy" {
@@ -511,6 +526,7 @@ func (r *Replica) Sync(ctx context.Context) (syncErr error) {
 			}
 		}
 		r.partitions = next // full snapshot removes omitted roots
+		r.metadataEpoch++
 		r.latest = manifest
 		r.store = policyStore
 		r.refreshAdmissionSelectionsLocked()
@@ -559,6 +575,7 @@ func (r *Replica) Sync(ctx context.Context) (syncErr error) {
 			failed[got.key] = ErrUnavailable
 		} else {
 			r.partitions[got.key] = got.state
+			r.metadataEpoch++
 		}
 		r.mu.Unlock()
 		activateTiming.End(timingOutcome(failed[got.key]), observe.CacheUnknown)
@@ -580,6 +597,7 @@ func (r *Replica) Sync(ctx context.Context) (syncErr error) {
 			return firstPartitionError(failed)
 		}
 		r.partitions = staged
+		r.metadataEpoch++
 		r.latest = manifest
 		r.store = policyStore
 		r.ready = true
@@ -707,7 +725,7 @@ func (r *Replica) Admit(ctx context.Context) (admitErr error) {
 	held := admission{tenant: facts.Tenant, validUntil: facts.ValidUntil, policyIndex: policyIndexHash(manifest, facts.Tenant), cohorts: matched, manifestHash: manifest.Hash, selections: map[string]effectiveSelection{}}
 	if r.cfg.Cohort == nil {
 		roots, selectionErr := effectiveRoots(manifest, held, "")
-		held.selections[""] = effectiveSelection{roots, selectionErr}
+		held.selections[""] = preparedSelection(roots, selectionErr)
 	}
 	r.admissions[key] = held
 	return nil
@@ -869,7 +887,7 @@ func (r *Replica) refreshAdmissionSelectionsLocked() {
 		updated := make(map[string]effectiveSelection, len(held.selections))
 		for selected := range held.selections {
 			roots, selectionErr := effectiveRoots(r.latest, held, selected)
-			updated[selected] = effectiveSelection{roots, selectionErr}
+			updated[selected] = preparedSelection(roots, selectionErr)
 		}
 		held.selections = updated
 		held.manifestHash = r.latest.Hash
@@ -891,7 +909,7 @@ func (r *Replica) ensureSelection(key, selected string) error {
 		return nil
 	}
 	roots, selectionErr := effectiveRoots(r.latest, held, selected)
-	held.selections[selected] = effectiveSelection{roots, selectionErr}
+	held.selections[selected] = preparedSelection(roots, selectionErr)
 	r.admissions[key] = held
 	return nil
 }
