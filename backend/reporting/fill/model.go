@@ -739,6 +739,7 @@ type rawCollectionBlock struct {
 }
 
 type rawSectionBlock struct {
+	DatasetRef      string         `json:"datasetRef,omitempty"`
 	ID              string         `json:"id"`
 	Kind            string         `json:"kind"`
 	Title           string         `json:"title"`
@@ -750,6 +751,7 @@ type rawSectionBlock struct {
 }
 
 type rawCompositeBlock struct {
+	DatasetRef    string           `json:"datasetRef,omitempty"`
 	ID            string           `json:"id"`
 	Kind          string           `json:"kind"`
 	Title         string           `json:"title"`
@@ -1042,6 +1044,7 @@ func decodeJSON(data []byte, datasourceRequests bool) (*ReportFill, error) {
 				return nil, fmt.Errorf("decode reportFill.blocks[%d] sectionBlock: %w", index, err)
 			}
 			fill.Blocks = append(fill.Blocks, Block{
+				DatasetRef:     sectionBlock.DatasetRef,
 				ID:             sectionBlock.ID,
 				Kind:           sectionBlock.Kind,
 				Title:          sectionBlock.Title,
@@ -1056,6 +1059,7 @@ func decodeJSON(data []byte, datasourceRequests bool) (*ReportFill, error) {
 				return nil, fmt.Errorf("decode reportFill.blocks[%d] compositeBlock: %w", index, err)
 			}
 			fill.Blocks = append(fill.Blocks, Block{
+				DatasetRef:       compositeBlock.DatasetRef,
 				ID:               compositeBlock.ID,
 				Kind:             compositeBlock.Kind,
 				Title:            compositeBlock.Title,

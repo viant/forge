@@ -456,6 +456,7 @@ type rawGeoMapBlock struct {
 }
 
 type rawSectionBlock struct {
+	DatasetRef      string   `json:"datasetRef,omitempty"`
 	ID              string   `json:"id"`
 	Kind            string   `json:"kind"`
 	Title           string   `json:"title"`
@@ -466,6 +467,7 @@ type rawSectionBlock struct {
 }
 
 type rawCompositeBlock struct {
+	DatasetRef    string   `json:"datasetRef,omitempty"`
 	ID            string   `json:"id"`
 	Kind          string   `json:"kind"`
 	Title         string   `json:"title"`
@@ -1184,6 +1186,7 @@ func decodeBlock(payload json.RawMessage, index int) (result Block, resultErr er
 			return Block{}, err
 		}
 		return Block{
+			DatasetRef:      block.DatasetRef,
 			ID:              block.ID,
 			Kind:            block.Kind,
 			Title:           block.Title,
@@ -1197,6 +1200,7 @@ func decodeBlock(payload json.RawMessage, index int) (result Block, resultErr er
 			return Block{}, err
 		}
 		return Block{
+			DatasetRef:    block.DatasetRef,
 			ID:            block.ID,
 			Kind:          block.Kind,
 			Title:         block.Title,

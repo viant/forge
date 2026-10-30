@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"os"
 	"testing"
+
+	reportfill "github.com/viant/forge/backend/reporting/fill"
+	reportspec "github.com/viant/forge/backend/reporting/spec"
 )
 
 func TestContainerVisibilityUsesBoundDatasetInFillAndPrint(t *testing.T) {
@@ -25,14 +28,23 @@ func TestContainerVisibilityUsesBoundDatasetInFillAndPrint(t *testing.T) {
 				map[string]any{"id": "group", "kind": "compositeBlock", "title": "Bound question panel", "datasetRef": "studyScope", "runtime": runtime, "childBlockIds": []string{"metric"}},
 				map[string]any{"id": "metric", "kind": "kpiBlock", "title": "Impressions", "datasetRef": "primary", "valueField": "impressions", "valueLabel": "Impressions"},
 			}
-			spec["layoutIntent"] = map[string]any{"kind": "stack", "blockOrder": []string{"section", "group", "metric"}}
+			spec["layoutIntent"] = map[string]any{"kind": "stack", "resultPanePosition": "bottom", "blockOrder": []string{"section", "group", "metric"}}
 			spec["datasets"] = []any{
-				map[string]any{"id": "primary", "dataSourceRef": "approved", "request": map[string]any{}},
-				map[string]any{"id": "studyScope", "dataSourceRef": "approved", "request": map[string]any{}},
+				map[string]any{"id": "primary", "dataSourceRef": "approved", "request": map[string]any{"limit": 25, "offset": 0}},
+				map[string]any{"id": "studyScope", "dataSourceRef": "approved", "request": map[string]any{"limit": 25, "offset": 0}},
 			}
 			raw, err = json.Marshal(spec)
 			if err != nil {
 				t.Fatal(err)
+			}
+			decoded, err := reportspec.DecodeJSON(raw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, block := range decoded.Blocks {
+				if (block.ID == "section" || block.ID == "group") && block.DatasetRef != "studyScope" {
+					t.Fatalf("spec lost %s dataset", block.ID)
+				}
 			}
 			artifacts, err := Materialize(context.Background(), raw, map[string]json.RawMessage{
 				"primary":    json.RawMessage(`{"rows":[{"impressions":1900,"studyCount":99}]}`),
@@ -40,6 +52,15 @@ func TestContainerVisibilityUsesBoundDatasetInFillAndPrint(t *testing.T) {
 			})
 			if err != nil {
 				t.Fatal(err)
+			}
+			decodedFill, err := reportfill.DecodeJSON(artifacts.ReportFill)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, block := range decodedFill.Blocks {
+				if (block.ID == "section" || block.ID == "group") && block.DatasetRef != "studyScope" {
+					t.Fatalf("fill lost %s dataset", block.ID)
+				}
 			}
 			var fill struct {
 				Blocks []struct {
