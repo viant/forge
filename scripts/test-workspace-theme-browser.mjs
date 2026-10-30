@@ -392,6 +392,7 @@ try {
     await dialogInput.waitFor({state: 'hidden'});
     await page.getByRole('button', {name: 'Toggle wrapper'}).click();
     assert.equal(await input.inputValue(), 'Preserved value');
+    await page.keyboard.press('Tab');
     await input.focus();
     assert.equal(await input.evaluate(el => getComputedStyle(el).outlineStyle), 'solid');
     await page.getByRole('button', {name: 'Toggle surface'}).click();
