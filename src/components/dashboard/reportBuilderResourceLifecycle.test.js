@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {buildReportBuilderResourceSaveRequest,buildReportResourceRunRequest,validateReportResourceRunResult,resourceEditorDocument,resourceEditorDefinition} from "./reportBuilderResourceLifecycle.js";
+import {buildReportBuilderResourceSaveRequest,buildReportResourceRunRequest,validateReportResourceRunResult,resourceEditorDocument,resourceEditorDefinition,reportResourceFailureMessage} from "./reportBuilderResourceLifecycle.js";
 const pin={uri:"report://example/performance",kind:"working",contentFingerprint:"a".repeat(64),authorityBinding:"alice-account"};
 const request={reportDocument:{title:"New title"},reportSpec:{title:"New title"},reportId:"old-local-id",artifactRef:"old-local-alias",title:"New title"};
 const current={resource:pin,rowEtag:8,draftRevision:3,resourceDefinition:{schemaVersion:1,format:"forge.authoredReport",reportDocument:{title:"Old"},builderDefinition:{id:"trusted"},dependencies:[{id:"source",contentFingerprint:"b".repeat(64)}]}};
@@ -34,3 +34,10 @@ assert.throws(()=>validateReportResourceRunResult(fillOnly,pin,choices,{fillOnly
 const selectedFill={...fillOnly,reportSpec:{blocks:[{id:'trend',chartSpec:{metricSelection:choices.trend}}]}};
 assert.equal(validateReportResourceRunResult(selectedFill,pin,choices,{fillOnly:true}),selectedFill);
 console.log('reportBuilderResourceLifecycle ✓ explicit fill-only projection retains authority, scope and metric checks');
+
+for (const envelope of ['data', 'responseEnvelope']) {
+ const failure = {[envelope]:{diagnostics:[{code:'undeclared_report_parameter',message:'PRIVATE_VALUE'}]}};
+ assert.match(reportResourceFailureMessage(failure), /input its definition does not support/);
+ assert.ok(!reportResourceFailureMessage(failure).includes('PRIVATE_VALUE'));
+ assert.match(reportResourceFailureMessage({[envelope]:{diagnostics:[{code:'missing_report_parameter'}]}}), /Enter all required/);
+}
