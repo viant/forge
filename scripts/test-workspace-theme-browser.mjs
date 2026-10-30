@@ -1,3 +1,6 @@
+import '../src/components/chat/composerMenuPlacement.test.mjs';
+import '../src/components/anchoredPopoverProps.test.mjs';
+import {verifyFloatingPanels, verifyComposerMenuDirection} from '../src/demos/theme/floatingPanels.browser.mjs';
 import {verifyAttachmentDialog, verifyComposerFileDrop} from '../src/demos/theme/attachmentDialog.browser.mjs';
 import assert from 'node:assert/strict';
 import {createServer} from 'vite';
@@ -35,6 +38,8 @@ try {
             if(process.env.FORGE_FOCUS_EVIDENCE) for(const id of ['donut-center','donut-center-long']) await proof.locator(`[data-chart-example="${id}"]`).screenshot({path:path.join(process.env.FORGE_FOCUS_EVIDENCE,`${id}-${viewport.width}.png`)});
             assert.deepEqual(failures,[]);await proof.close();continue;
         }
+        await verifyFloatingPanels(proof);
+        await verifyComposerMenuDirection(proof);
         await verifyAttachmentDialog(proof);
         await verifyComposerFileDrop(proof);
         const foundation = proof.locator('.forge-foundation-specimen');
