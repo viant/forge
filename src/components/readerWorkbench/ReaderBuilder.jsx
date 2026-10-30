@@ -1,9 +1,10 @@
+import Popover from '../Popover.jsx';
 import {discoverViewColumns,sqlInspection} from './readerColumnDiscovery.js';
 import {WorkbenchAlert as Alert} from './WorkbenchMutationContext.jsx';
 import './ReaderWorkbench.css';
 import {WorkbenchMutationContext} from './WorkbenchMutationContext.jsx';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert as BlueprintAlert, Button, ButtonGroup, Callout, Card, Code, Divider, HTMLSelect, Icon, InputGroup, Menu, MenuItem, Popover, PopoverInteractionKind, Spinner, Tag } from '@blueprintjs/core';
+import { Alert as BlueprintAlert, Button, ButtonGroup, Callout, Card, Code, Divider, HTMLSelect, Icon, InputGroup, Menu, MenuItem, PopoverInteractionKind, Spinner, Tag } from '@blueprintjs/core';
 import { LazyEditor as Editor } from './LazyEditor.jsx';
 import { DownloadComponentButton, ImportComponentButton } from './ComponentTransfer.jsx';
 import { ReaderSubviewDialog } from './ReaderSubviewDialog.jsx';

@@ -54,15 +54,20 @@ describe('document composer and task discovery', () => {
             agentOptions={[{value: 'a', label: 'Agent A'}, {value: 'b', label: 'Agent B'}]} agentValue="a" onAgentChange={agent}
             modelOptions={[{value: 'm', label: 'Model M'}]} modelValue="m" onModelChange={model}
             reasoningOptions={[{value: 'low', label: 'Low'}]} onReasoningChange={reasoning}/>);
-        const tools = host.querySelector('summary[aria-label=Tools]');
-        await click(tools);
-        await change(host.querySelector('select[aria-label=Agent]'), 'b'); expect(agent).toHaveBeenCalledWith('b');
-        await change(host.querySelector('select[aria-label=Model]'), 'm'); expect(model).toHaveBeenCalledWith('m');
-        await change(host.querySelector('select[aria-label=Reasoning]'), 'low'); expect(reasoning).toHaveBeenCalledWith('low');
-        await press(host.querySelector('select[aria-label=Reasoning]'), 'Escape');
-        expect(tools.closest('details').open).toBe(false); expect(document.activeElement).toBe(tools);
-        await click(host.querySelector('summary[aria-label="Add photos or files"]'));
-        await click([...host.querySelectorAll('button')].find(button => button.textContent === 'Add photos or files'));
+        const tools = host.querySelector('button[aria-label=Tools]');
+        expect(tools.getAttribute('aria-haspopup')).toBe('dialog');
+        tools.focus(); await click(tools);
+        await change(document.querySelector('[role=dialog][aria-label=Tools] select[aria-label=Agent]'), 'b'); expect(agent).toHaveBeenCalledWith('b');
+        await change(document.querySelector('[role=dialog][aria-label=Tools] select[aria-label=Model]'), 'm'); expect(model).toHaveBeenCalledWith('m');
+        await change(document.querySelector('[role=dialog][aria-label=Tools] select[aria-label=Reasoning]'), 'low'); expect(reasoning).toHaveBeenCalledWith('low');
+        await press(document.querySelector('[role=dialog][aria-label=Tools] select[aria-label=Reasoning]'), 'Escape', {keyCode:27,which:27});
+        await act(() => new Promise(resolve => setTimeout(resolve,350)));
+        expect(tools.getAttribute('aria-expanded')).toBe('false'); expect(document.activeElement).toBe(tools);
+        await click(tools); await press(tools, 'Escape');
+        expect(tools.getAttribute('aria-expanded')).toBe('false');
+        await act(() => new Promise(resolve => setTimeout(resolve,350)));
+        await click(host.querySelector('button[aria-label="Add photos or files"]'));
+        await click([...document.querySelectorAll('[role=dialog].forge-composer-options button')].find(button => button.textContent === 'Add photos or files'));
         expect(attach).toHaveBeenCalledOnce();
     });
 
