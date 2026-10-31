@@ -16,9 +16,7 @@ import (
 // The immutable payload is authoritative; no revision is selected or retrieved
 // here. All methods are local and errors never initiate synchronization.
 type MetadataSource struct {
-	headerMu     sync.Mutex
-	headers      map[string]metadataHeader
-	headerBytes  int
+	HeaderProjector
 	replica      *Replica
 	namespaces   []string
 	menuMu       sync.Mutex
@@ -140,7 +138,7 @@ func (s *MetadataSource) List(ctx context.Context, kind, namespace string) (resu
 				return nil, err
 			}
 		}
-		result = append(result, primitive.ResourceState{URI: root.URI, Kind: root.Kind, Namespace: uri.Namespace, Name: uri.Name, Title: header.title(uri.Name), Description: header.Description, Lifecycle: identity.PublishedCandidate, ContentFingerprint: root.Hash})
+		result = append(result, primitive.ResourceState{URI: root.URI, Kind: root.Kind, Namespace: uri.Namespace, Name: uri.Name, Title: header.DisplayTitle(uri.Name), Description: header.Description, Lifecycle: identity.PublishedCandidate, ContentFingerprint: root.Hash})
 	}
 	return result, nil
 }
@@ -174,7 +172,7 @@ func (s *MetadataSource) Get(ctx context.Context, uriText string) (result *primi
 	if version == 0 {
 		version = 1
 	}
-	title := header.title(uri.Name)
+	title := header.DisplayTitle(uri.Name)
 	return &primitive.ResourceState{URI: uriText, Kind: uri.Kind, Namespace: uri.Namespace, Name: uri.Name, Title: title, Description: header.Description, Lifecycle: identity.PublishedCandidate, FormatVersion: version, ContentFingerprint: view.ETag(), DefinitionBytes: payload, Definition: json.RawMessage(payload)}, nil
 }
 
