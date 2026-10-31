@@ -68,3 +68,26 @@ func TestHeaderCacheSeparatesKindsAndHashes(t *testing.T) {
 	require.Equal(t, "review", profile.Name)
 	require.Equal(t, "Profile guidance", profile.Description)
 }
+
+func TestStandaloneHeaderProjectorPreservesPayloadAndReturnsValueCopies(t *testing.T) {
+	projector := new(HeaderProjector)
+	raw := json.RawMessage(`{"schemaVersion":1,"mimeType":"application/json","document":"---\nname: guide\ndescription: Shared guide\n---\nBody"}`)
+	original := append([]byte(nil), raw...)
+	header, err := projector.Project("skill", raw)
+	require.NoError(t, err)
+	require.Equal(t, "guide", header.DisplayTitle("fallback"))
+	require.Equal(t, "Shared guide", header.Description)
+	require.Equal(t, "application/json", header.MimeType)
+	cached, ok := projector.Cached("skill", Hash(raw))
+	require.True(t, ok)
+	require.Equal(t, header, cached)
+	header.Description = "caller mutation"
+	again, err := projector.Project("skill", raw)
+	require.NoError(t, err)
+	require.Equal(t, "Shared guide", again.Description)
+	require.Equal(t, original, []byte(raw), "projection must not rewrite immutable bytes")
+	next, err := projector.Project("skill", json.RawMessage(`{"schemaVersion":1,"document":"---\nname: guide\ndescription: Updated guide\n---\nBody"}`))
+	require.NoError(t, err)
+	require.Equal(t, "Updated guide", next.Description)
+	require.Empty(t, next.MimeType, "caller retains the original MIME default when none is declared")
+}
