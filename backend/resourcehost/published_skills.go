@@ -66,32 +66,34 @@ func compilePublishedSkill(ctx context.Context, uri string, raw json.RawMessage)
 	// Versioned producer definitions carry exact UTF-8 strings. The retained
 	// host-native carrier has no schemaVersion and uses JSON byte fields. Do
 	// not guess whether an arbitrary string happens to resemble base64.
-	var header struct {
-		SchemaVersion int64 `json:"schemaVersion"`
-	}
+	var header primitive.DocumentCarrier
 	if json.Unmarshal(raw, &header) != nil {
 		return nil, identity.ErrResource
 	}
-	var document []byte
+	document, err := header.Bytes()
+	if err != nil {
+		return nil, identity.ErrResource
+	}
 	var files map[string][]byte
 	if header.SchemaVersion != 0 {
-		var value primitive.SkillDocumentEnvelope
-		if header.SchemaVersion != 1 || json.Unmarshal(raw, &value) != nil {
+		var value struct {
+			Files map[string]string `json:"files"`
+		}
+		if json.Unmarshal(raw, &value) != nil {
 			return nil, identity.ErrResource
 		}
-		document, files = []byte(value.Document), map[string][]byte{}
+		files = map[string][]byte{}
 		for name, data := range value.Files {
 			files[name] = []byte(data)
 		}
 	} else {
 		var value struct {
-			Document []byte            `json:"document"`
-			Files    map[string][]byte `json:"files"`
+			Files map[string][]byte `json:"files"`
 		}
 		if json.Unmarshal(raw, &value) != nil {
 			return nil, identity.ErrResource
 		}
-		document, files = value.Document, value.Files
+		files = value.Files
 	}
 	if len(document) == 0 || !utf8.Valid(document) {
 		return nil, identity.ErrResource
