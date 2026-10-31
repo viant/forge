@@ -6,6 +6,31 @@ import {buildReportFillFromReportSpec} from '../../reporting/reportFillModel.js'
 import {DashboardReportRuntime} from './DashboardBlocks.jsx';
 import ReportRuntime from './ReportRuntime.jsx';
 
+it.each(['scope', 'builder'])('renders %s choice metadata as labels in read-only filter summaries without changing raw values', async origin => {
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ const options=[{value:1,label:'Numeric mode'},{value:'1',label:'Text mode'},{value:0,label:'Zero mode'},{value:false,label:'Disabled mode'}];
+ const params=[{id:'mode',value:1},{id:'modes',value:['1',false,0,99],multiple:true}];
+ const metadata=params.map(param=>({...param,kind:'select',type:'select',label:param.id,options}));
+ const reportSpec={title:'Choice specimen',scope:{params:origin==='scope'?metadata:params},datasets:[{id:'primary',request:{filters:{mode:1,modes:['1',false,0,99]}}}],layoutIntent:{blockOrder:['filters']},blocks:[
+  {id:'filters',kind:'filterBarBlock',title:'Inputs',paramIds:['mode','modes']},
+  ...(origin==='builder'?[{id:'definition',kind:'reportBuilderBlock',config:{staticFilters:metadata}}]:[]),
+ ]};
+ const before=JSON.stringify(reportSpec);
+ const reportFill=buildReportFillFromReportSpec(reportSpec,{});
+ const fillBefore=JSON.stringify(reportFill);
+ try {
+  await act(async()=>root.render(<ReportRuntime reportSpec={reportSpec} reportFill={reportFill} presentationMode="preview"/>));
+  const bar=host.querySelector('[data-report-runtime-block-id="filters"]');
+  expect(bar).toBeTruthy();
+  const values=[...bar.querySelectorAll('.forge-report-runtime-filter-control')].map(control=>control.textContent);
+  expect(values).toEqual(['modeNumeric mode','modesText mode, Disabled mode, Zero mode, 99']);
+  expect(JSON.stringify(reportSpec)).toBe(before);
+  expect(JSON.stringify(reportFill)).toBe(fillBefore);
+  expect(reportSpec.datasets[0].request.filters).toEqual({mode:1,modes:['1',false,0,99]});
+ } finally {await act(async()=>root.unmount());host.remove();}
+});
+
 it('mounts native controls, refreshes through the datasource, resets pages and hides stale rows', async () => {
  globalThis.IS_REACT_ACT_ENVIRONMENT=true;
  const host=document.createElement('div');document.body.append(host);const root=createRoot(host);

@@ -2616,7 +2616,7 @@ function FilterBarBlock({ block = {}, scopeParams = new Map(), activeScopeSummar
             >
               <span style={{ display: "inline-flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                 <strong style={{ color: "var(--forge-report-text, #182026)" }}>{label}</strong>
-                <span>{formatReportRuntimeScopeValue({ ...metadata, value: param?.value })}</span>
+                <span>{formatReportRuntimeScopeValue(interactiveFilter)}</span>
               </span>
               {description ? (
                 <span style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, 1.4)", color: "var(--forge-report-text-muted, #5f6b7c)" }}>{description}</span>
