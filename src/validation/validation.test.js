@@ -14,6 +14,8 @@ assert.ok(validateResource({n:0},required).length);
 assert.ok(validateResource({n:null},required).length);
 assert.deepEqual(validateResource({n:2},required),[]);
 assert.deepEqual(validateResource({n:0,b:false},{type:'object',required:['n','b'],properties:{n:{type:'integer'},b:{type:'boolean'}}}),[],'legacy required accepts0/false');
+assert.match(validateFieldRules(Number.MAX_SAFE_INTEGER+1,{type:'integer',validation:{checks:[{name:'le',parameters:['1']}]}})[0],/safe integer/);
+assert.equal(formatResourceTime('0100-01-02T10:20:30Z',{timeLayout:'2006-01-02'}),'0100-01-02');
 assert.deepEqual(validateResource('😀',{type:'string',maxLength:1}),[]);
 assert.ok(validateResource('😀a',{type:'string',maxLength:1}).length);
 assert.ok(validateResource('1',{type:'string',enum:[1]}).length,'enum remains typed');

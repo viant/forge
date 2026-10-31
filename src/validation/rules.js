@@ -20,6 +20,7 @@ export function validateFieldRules(value, schema = {}, {path = '$', present = va
  const type = String(schema.type || '').toLowerCase();
  // Missing Go scalar fields decode to their zero value. Pointers retain nil.
  const current = value === undefined && !spec.pointer ? ({string:'',integer:0,number:0,boolean:false}[type] ?? value) : value;
+ if (type === 'integer' && typeof current === 'number' && !Number.isSafeInteger(current)) return [`${path}: integer validation requires a safe integer`];
  // Native omitempty skips nil/empty string, not scalar false/0.
  if (spec.omitEmpty && (current == null || current === '')) return errors;
  for (const check of checks) {
