@@ -1,0 +1,14 @@
+.forge-scenario { color:var(--forge-text-color,#25313c); width:100%; min-width:0; }
+.forge-scenario-controls { display:flex;flex-wrap:wrap;gap:var(--forge-spacing-3,12px);margin-block:var(--forge-spacing-3,12px);align-items:center; }
+.forge-scenario-controls label { display:flex;flex-wrap:wrap;gap:8px;align-items:center; }
+.forge-scenario-controls input[type=range] { width:min(100%,280px);min-height:44px; }
+.forge-scenario-controls select { min-height:44px;max-width:100%; }
+.forge-scenario-graphic { overflow-x:auto; }
+.forge-scenario-graphic svg { display:block;min-width:680px;max-width:100%;height:auto; }
+.forge-scenario-graphic g:focus { outline:var(--forge-focus-width,2px) solid var(--forge-focus-color,#257c83);outline-offset:var(--forge-focus-offset,2px); }
+.forge-scenario table { width:100%;border-collapse:collapse; }
+.forge-scenario th,.forge-scenario td { padding:8px;text-align:left;border-bottom:1px solid var(--forge-border-color,#ccd2d8);overflow-wrap:anywhere; }
+@media(max-width:600px) { .forge-scenario table { font-size:var(--forge-type-small-size,12px); } .forge-scenario th,.forge-scenario td{padding:4px;} }
+@media print { .forge-scenario-controls {display:none;} .forge-scenario-graphic{overflow:visible;} }
+
+.forge-scenario-inactive { border-style:dashed; }

@@ -1,0 +1,34 @@
+# The iframe gives the real report a 390px browsing context without device emulation.
+pipeline:
+  open:
+    action: webdriver:open
+    sessionID: interactive-scenarios-narrow
+    debuggerAddress: $debuggerAddress
+    directCDP: true
+    browser: chrome
+  load:
+    action: webdriver:run
+    sessionID: interactive-scenarios-narrow
+    autoStart: false
+    commands:
+      - "get(about:blank)"
+      - "get($previewURL/interactive-scenarios-preview.html?narrow)"
+      - "page.frame(\"#scenario-frame\")"
+      - "expect(\"main > h1\").toHaveText(\"Interactive report scenarios\", 20000)"
+  layout:
+    action: webdriver:run
+    sessionID: interactive-scenarios-narrow
+    autoStart: false
+    actions:
+      - key: layout
+        calls:
+          - method: ExecuteScript
+            parameters:
+              - >-
+                const win=window.frames["scenario-frame"]||window; const doc=win.document;
+                return {viewport:win.innerWidth,pageFits:doc.documentElement.scrollWidth<=win.innerWidth,
+                localScroller:[...doc.querySelectorAll('.forge-scenario-graphic')].every(n=>n.clientWidth<=win.innerWidth),
+                sliders:[...doc.querySelectorAll('input[type=range]')].every(n=>n.getBoundingClientRect().height>=44)};
+              - [0]
+    expect:
+      layout: {viewport: 390, pageFits: true, localScroller: true, sliders: true}

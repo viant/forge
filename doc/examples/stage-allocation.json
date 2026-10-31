@@ -1,0 +1,346 @@
+{
+  "title": "Energy stage allocation",
+  "provenance": "Independently invented energy example. Energy/value are additive; efficiency is the ratio of pooled value to pooled energy.",
+  "chartSpec": {
+    "type": "stage-allocation",
+    "stageAllocation": {
+      "periodField": "period",
+      "stageField": "stage",
+      "categoryField": "category",
+      "periods": [
+        {
+          "id": "baseline",
+          "label": "Baseline"
+        },
+        {
+          "id": "spring",
+          "label": "Spring"
+        },
+        {
+          "id": "summer",
+          "label": "Summer"
+        }
+      ],
+      "baselinePeriod": "baseline",
+      "stages": [
+        {
+          "id": "generation",
+          "label": "Generation"
+        },
+        {
+          "id": "storage",
+          "label": "Storage"
+        },
+        {
+          "id": "delivery",
+          "label": "Delivery"
+        }
+      ],
+      "categories": [
+        {
+          "id": "solar",
+          "label": "Solar"
+        },
+        {
+          "id": "wind",
+          "label": "Wind"
+        },
+        {
+          "id": "hydro",
+          "label": "Hydro",
+          "inactive": true
+        }
+      ],
+      "metrics": [
+        {
+          "id": "energy",
+          "label": "Energy",
+          "field": "energy",
+          "additionField": "addedEnergy",
+          "unit": "MWh"
+        },
+        {
+          "id": "value",
+          "label": "Value",
+          "field": "value",
+          "additionField": "addedValue",
+          "unit": "credits"
+        },
+        {
+          "id": "efficiency",
+          "label": "Efficiency",
+          "type": "ratio",
+          "numeratorField": "value",
+          "denominatorField": "energy",
+          "additionNumeratorField": "addedValue",
+          "additionDenominatorField": "addedEnergy",
+          "unit": "credits/MWh"
+        }
+      ],
+      "state": {
+        "period": "spring",
+        "metric": "energy",
+        "activeCategories": []
+      },
+      "stateBindings": {
+        "period": {
+          "paramId": "period",
+          "path": "period"
+        },
+        "metric": {
+          "paramId": "metric",
+          "path": "metric"
+        },
+        "activeCategories": {
+          "paramId": "activeCategories",
+          "path": "activeCategories"
+        }
+      }
+    }
+  },
+  "rows": [
+    {
+      "period": "baseline",
+      "stage": "generation",
+      "category": "solar",
+      "energy": 100.0,
+      "value": 200.0,
+      "addedEnergy": 0,
+      "addedValue": 0
+    },
+    {
+      "period": "baseline",
+      "stage": "generation",
+      "category": "wind",
+      "energy": 120.0,
+      "value": 360.0,
+      "addedEnergy": 0,
+      "addedValue": 0
+    },
+    {
+      "period": "baseline",
+      "stage": "generation",
+      "category": "hydro",
+      "energy": 0,
+      "value": 0,
+      "addedEnergy": 40,
+      "addedValue": 160
+    },
+    {
+      "period": "baseline",
+      "stage": "storage",
+      "category": "solar",
+      "energy": 80.0,
+      "value": 160.0,
+      "addedEnergy": 0,
+      "addedValue": 0
+    },
+    {
+      "period": "baseline",
+      "stage": "storage",
+      "category": "wind",
+      "energy": 96.0,
+      "value": 288.0,
+      "addedEnergy": 0,
+      "addedValue": 0
+    },
+    {
+      "period": "baseline",
+      "stage": "storage",
+      "category": "hydro",
+      "energy": 0,
+      "value": 0,
+      "addedEnergy": 35,
+      "addedValue": 140
+    },
+    {
+      "period": "baseline",
+      "stage": "delivery",
+      "category": "solar",
+      "energy": 60.0,
+      "value": 120.0,
+      "addedEnergy": 0,
+      "addedValue": 0
+    },
+    {
+      "period": "baseline",
+      "stage": "delivery",
+      "category": "wind",
+      "energy": 72.0,
+      "value": 216.0,
+      "addedEnergy": 0,
+      "addedValue": 0
+    },
+    {
+      "period": "baseline",
+      "stage": "delivery",
+      "category": "hydro",
+      "energy": 0,
+      "value": 0,
+      "addedEnergy": 30,
+      "addedValue": 120
+    },
+    {
+      "period": "spring",
+      "stage": "generation",
+      "category": "solar",
+      "energy": 130.0,
+      "value": 260.0,
+      "addedEnergy": 0,
+      "addedValue": 0
+    },
+    {
+      "period": "spring",
+      "stage": "generation",
+      "category": "wind",
+      "energy": 150.0,
+      "value": 450.0,
+      "addedEnergy": 0,
+      "addedValue": 0
+    },
+    {
+      "period": "spring",
+      "stage": "generation",
+      "category": "hydro",
+      "energy": 0,
+      "value": 0,
+      "addedEnergy": 40,
+      "addedValue": 160
+    },
+    {
+      "period": "spring",
+      "stage": "storage",
+      "category": "solar",
+      "energy": 104.0,
+      "value": 208.0,
+      "addedEnergy": 0,
+      "addedValue": 0
+    },
+    {
+      "period": "spring",
+      "stage": "storage",
+      "category": "wind",
+      "energy": 120.0,
+      "value": 360.0,
+      "addedEnergy": 0,
+      "addedValue": 0
+    },
+    {
+      "period": "spring",
+      "stage": "storage",
+      "category": "hydro",
+      "energy": 0,
+      "value": 0,
+      "addedEnergy": 35,
+      "addedValue": 140
+    },
+    {
+      "period": "spring",
+      "stage": "delivery",
+      "category": "solar",
+      "energy": 78.0,
+      "value": 156.0,
+      "addedEnergy": 0,
+      "addedValue": 0
+    },
+    {
+      "period": "spring",
+      "stage": "delivery",
+      "category": "wind",
+      "energy": 90.0,
+      "value": 270.0,
+      "addedEnergy": 0,
+      "addedValue": 0
+    },
+    {
+      "period": "spring",
+      "stage": "delivery",
+      "category": "hydro",
+      "energy": 0,
+      "value": 0,
+      "addedEnergy": 30,
+      "addedValue": 120
+    },
+    {
+      "period": "summer",
+      "stage": "generation",
+      "category": "solar",
+      "energy": 160.0,
+      "value": 320.0,
+      "addedEnergy": 0,
+      "addedValue": 0
+    },
+    {
+      "period": "summer",
+      "stage": "generation",
+      "category": "wind",
+      "energy": 180.0,
+      "value": 540.0,
+      "addedEnergy": 0,
+      "addedValue": 0
+    },
+    {
+      "period": "summer",
+      "stage": "generation",
+      "category": "hydro",
+      "energy": 0,
+      "value": 0,
+      "addedEnergy": 40,
+      "addedValue": 160
+    },
+    {
+      "period": "summer",
+      "stage": "storage",
+      "category": "solar",
+      "energy": 128.0,
+      "value": 256.0,
+      "addedEnergy": 0,
+      "addedValue": 0
+    },
+    {
+      "period": "summer",
+      "stage": "storage",
+      "category": "wind",
+      "energy": 144.0,
+      "value": 432.0,
+      "addedEnergy": 0,
+      "addedValue": 0
+    },
+    {
+      "period": "summer",
+      "stage": "storage",
+      "category": "hydro",
+      "energy": 0,
+      "value": 0,
+      "addedEnergy": 35,
+      "addedValue": 140
+    },
+    {
+      "period": "summer",
+      "stage": "delivery",
+      "category": "solar",
+      "energy": 96.0,
+      "value": 192.0,
+      "addedEnergy": 0,
+      "addedValue": 0
+    },
+    {
+      "period": "summer",
+      "stage": "delivery",
+      "category": "wind",
+      "energy": 108.0,
+      "value": 324.0,
+      "addedEnergy": 0,
+      "addedValue": 0
+    },
+    {
+      "period": "summer",
+      "stage": "delivery",
+      "category": "hydro",
+      "energy": 0,
+      "value": 0,
+      "addedEnergy": 30,
+      "addedValue": 120
+    }
+  ]
+}

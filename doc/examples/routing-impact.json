@@ -1,0 +1,111 @@
+{
+  "title": "Depot routing impact",
+  "provenance": "Independently invented logistics example.",
+  "chartSpec": {
+    "type": "routing-impact",
+    "routingImpact": {
+      "idField": "id",
+      "sourceField": "origin",
+      "destinationField": "destination",
+      "categoryField": "category",
+      "routeField": "hub",
+      "amountField": "amount",
+      "eligibleField": "eligible",
+      "baselineShareField": "baselineShare",
+      "directLossField": "directLoss",
+      "indirectLossField": "indirectLoss",
+      "categories": [
+        {
+          "id": "ambient",
+          "label": "Ambient"
+        },
+        {
+          "id": "chilled",
+          "label": "Chilled"
+        }
+      ],
+      "presets": [
+        {
+          "id": "indirect",
+          "label": "All via hubs",
+          "share": 0
+        },
+        {
+          "id": "mix",
+          "label": "Current mix",
+          "share": 0.25
+        },
+        {
+          "id": "direct",
+          "label": "Direct first",
+          "share": 1
+        }
+      ],
+      "unit": "crates",
+      "outcomeLabel": "Delivered value",
+      "outcomeUnit": "credits",
+      "outcomeExpression": "scenarioDelivered * valuePerCrate",
+      "expressionFields": [
+        "valuePerCrate"
+      ],
+      "state": {
+        "share": 0.25,
+        "categories": [
+          "ambient",
+          "chilled"
+        ]
+      },
+      "stateBindings": {
+        "share": {
+          "paramId": "share",
+          "path": "share"
+        },
+        "categories": {
+          "paramId": "categories",
+          "path": "categories"
+        }
+      }
+    }
+  },
+  "rows": [
+    {
+      "id": "north-ambient",
+      "origin": "North depot",
+      "destination": "Harbor store",
+      "category": "ambient",
+      "hub": "Central hub",
+      "amount": 600,
+      "eligible": true,
+      "baselineShare": 0.25,
+      "directLoss": 0.02,
+      "indirectLoss": 0.12,
+      "valuePerCrate": 3
+    },
+    {
+      "id": "south-chilled",
+      "origin": "South depot",
+      "destination": "Valley store",
+      "category": "chilled",
+      "hub": "Cooling hub",
+      "amount": 300,
+      "eligible": true,
+      "baselineShare": 0.25,
+      "directLoss": 0.03,
+      "indirectLoss": 0.18,
+      "valuePerCrate": 5
+    },
+    {
+      "id": "north-remote",
+      "origin": "North depot",
+      "destination": "Hill store",
+      "category": "ambient",
+      "hub": "Central hub",
+      "amount": 100,
+      "eligible": false,
+      "baselineShare": 0,
+      "directLoss": 0.02,
+      "indirectLoss": 0.1,
+      "valuePerCrate": 4
+    }
+  ]
+}

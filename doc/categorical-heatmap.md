@@ -44,15 +44,26 @@ invalid fill. Forge does not guess an
 aggregation or silently overwrite data. Values must be finite numbers, null or
 absent. Zero is measured data; null and absent cells receive the no-data treatment.
 The model preserves the distinction between explicit null and absent coordinates.
-Filtering removes source records but keeps the declared axes and color domain.
+Filtering removes source records but keeps the declared axes. Fixed color domains
+remain unchanged.
 
 A sequential scale has two increasing finite domain stops and two six-digit hex
 colors. A diverging scale has three stops and three colors; the middle stop is
 its explicit neutral value (for example `[-5,0,5]`). Colors interpolate linearly
-in RGB between stops and clamp outside the domain. No auto-domain or implicit
-palette changes occur after filtering. The legend shows each declared stop and
+in RGB between stops and clamp outside the domain. The legend shows each declared stop and
 the no-data key. `cellLabels` and `legend` default to true; `noData` defaults to
 the values above. Labels show exact numeric values with no inferred units.
+
+For a sequential scale, opt in to `"domain": "auto"` to derive low/high stops from
+the finite values in the complete resolved matrix. For example, use
+`{"type":"sequential","domain":"auto","colors":["#eff3ff","#08519c"]}`
+to compare occupancy across the current filters. Null and absent cells do not
+affect the range; zero does. A constant matrix uses the palette midpoint and one
+legend value without inventing a wider numeric range. An empty/all-null matrix
+shows only the no-data key. Filtering may change an automatic domain; it never
+changes the declared colors. Diverging scales still require explicit stops so
+their neutral value is not inferred. Every print tile uses the full matrix's
+resolved domain, matching the interactive view rather than rescaling per tile.
 
 Heatmaps reject the generic `seriesField`, `seriesOptions`, `metricSelection`,
 `layout` and `stacked` options; their own fields, scale and ordered categories

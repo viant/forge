@@ -3,6 +3,8 @@
 const typedRequirements = [
   ['category-range','categoryRange'],
   ['heatmap','heatmap'],
+  ['routing-impact','routingImpact'],
+  ['stage-allocation','stageAllocation'],
 ].map(([type,field])=>({
   if:{type:'object',required:['type'],properties:{type:{const:type}}},
   then:{type:'object',required:[field]},

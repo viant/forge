@@ -7,7 +7,7 @@ export const heatmapSchema = {
   properties:{
     ...Object.fromEntries(['rowField','columnField','valueField'].map(key=>[key,{type:'string',minLength:1}])),
     ...Object.fromEntries(['rowCategories','columnCategories'].map(key=>[key,{type:'array',minItems:1,uniqueItems:true,items:{type:'string',minLength:1}}])),
-    colorScale:{type:'object',additionalProperties:false,required:['type','domain','colors'],properties:{type:{enum:['sequential','diverging']},domain:{type:'array',minItems:2,maxItems:3,items:{type:'number'}},colors:{type:'array',minItems:2,maxItems:3,items:{type:'string',pattern:'^#[0-9a-fA-F]{6}$'}}}},
+    colorScale:{type:'object',additionalProperties:false,required:['type','domain','colors'],properties:{type:{enum:['sequential','diverging']},domain:{oneOf:[{const:'auto'},{type:'array',minItems:2,maxItems:3,items:{type:'number'}}]},colors:{type:'array',minItems:2,maxItems:3,items:{type:'string',pattern:'^#[0-9a-fA-F]{6}$'}}}},
     noData:{type:'object',additionalProperties:false,properties:{color:{type:'string',pattern:'^#[0-9a-fA-F]{6}$'},label:{type:'string',minLength:1}}},
     cellLabels:{type:'boolean'},legend:{type:'boolean'},
   },
@@ -26,7 +26,8 @@ export function normalizeHeatmap(input) {
     if(value!==undefined&&(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(k=>!allowed.includes(k)))) throw new Error(`Invalid heatmap ${key} options.`);
   }
   const scale=input.colorScale, size=scale?.type==='diverging'?3:2;
-  if (!['sequential','diverging'].includes(scale?.type)||!Array.isArray(scale.domain)||scale.domain.length!==size||scale.domain.some((v,i)=>!Number.isFinite(v)||(i>0&&v<=scale.domain[i-1]))||!Array.isArray(scale.colors)||scale.colors.length!==size||scale.colors.some(c=>!hex.test(c))) throw new Error('Heatmap scale requires ordered finite domain stops and matching hex colors.');
+  const automatic=scale?.domain==='auto'&&scale?.type==='sequential';
+  if (!['sequential','diverging'].includes(scale?.type)||(!automatic&&(!Array.isArray(scale.domain)||scale.domain.length!==size||scale.domain.some((v,i)=>!Number.isFinite(v)||(i>0&&v<=scale.domain[i-1]))))||!Array.isArray(scale.colors)||scale.colors.length!==size||scale.colors.some(c=>!hex.test(c))) throw new Error('Heatmap scale requires ordered finite domain stops and matching hex colors; auto requires a sequential scale.');
   if (input.noData?.color!==undefined&&!hex.test(input.noData.color)) throw new Error('Heatmap no-data color must be a six-digit hex color.');
   if (input.noData?.label!==undefined&&(typeof input.noData.label!=='string'||!input.noData.label)) throw new Error('Heatmap no-data label must be nonempty.');
   for(const field of ['cellLabels','legend']) if(input[field]!==undefined&&typeof input[field]!=='boolean') throw new Error(`Heatmap ${field} must be boolean.`);
@@ -38,12 +39,13 @@ function colorAt(value,{domain,colors}) {
   const start=domain[index],end=domain[index+1],span=end-start;
   // Opposite-sign finite stops can have an infinite difference. Halving only
   // that case avoids overflow without losing precision for tiny finite spans.
-  const t=Number.isFinite(span) ? (v-start)/span : (v/2-start/2)/(end/2-start/2);
+  const t=span===0 ? .5 : Number.isFinite(span) ? (v-start)/span : (v/2-start/2)/(end/2-start/2);
   const channels=c=>[1,3,5].map(i=>parseInt(c.slice(i,i+2),16));
   const a=channels(colors[index]),b=channels(colors[index+1]);
   return '#'+a.map((v,i)=>Math.round(v+(b[i]-v)*t).toString(16).padStart(2,'0')).join('');
 }
-export function buildHeatmap(input,rows=[]) {
+export function buildHeatmap(input,rows=[]) {return buildHeatmapModel(input,rows);}
+function buildHeatmapModel(input,rows=[],resolvedScale) {
   const config=normalizeHeatmap(input), pairs=new Map();
   for (const row of rows) {
     const r=config.rowCategories.indexOf(row?.[config.rowField]),c=config.columnCategories.indexOf(row?.[config.columnField]);
@@ -54,11 +56,27 @@ export function buildHeatmap(input,rows=[]) {
     if(value!==null&&value!==undefined&&(typeof value!=='number'||!Number.isFinite(value))) throw new Error('Heatmap values must be finite numbers or null.');
     pairs.set(key,row);
   }
+  let scale=resolvedScale||config.colorScale;
+  if(scale.domain==='auto') {
+    let low=Infinity,high=-Infinity;
+    for(const row of pairs.values()) {
+      const value=row[config.valueField];
+      if(value!==null&&value!==undefined){low=Math.min(low,value);high=Math.max(high,value);}
+    }
+    scale={...scale,domain:low===Infinity?[]:[low,high]};
+  }
   const cells=config.rowCategories.flatMap((rowValue,r)=>config.columnCategories.map((columnValue,c)=>{
     const row=pairs.get(`${r}:${c}`), value=row?.[config.valueField]??null;
-    return {r,c,rowValue,columnValue,row:row??null,value,state:!row?'absent':value===null?'null':'value',color:value===null?config.noData.color:colorAt(value,config.colorScale),label:value===null?config.noData.label:String(value)};
+    return {r,c,rowValue,columnValue,row:row??null,value,state:!row?'absent':value===null?'null':'value',color:value===null?config.noData.color:colorAt(value,scale),label:value===null?config.noData.label:String(value)};
   }));
-  return {config,cells};
+  return {config,cells,scale};
+}
+function heatmapLegend({config,scale=config.colorScale}) {
+  if(!config.legend)return [];
+  const stops=scale.domain.length===2&&scale.domain[0]===scale.domain[1]
+    ? [{label:String(scale.domain[0]),color:colorAt(scale.domain[0],scale)}]
+    : scale.domain.map((value,i)=>({label:String(value),color:scale.colors[i]}));
+  return [...stops,{label:config.noData.label,color:config.noData.color}];
 }
 export function heatmapSelection(config,cell) {
   if(!cell.row||cell.value===null)return null;
@@ -76,7 +94,7 @@ function heatmapWidths({config,cells}) {
 }
 export function heatmapSvg(model,width=680,{interactive=false,selectable=false,print=false,title='Categorical heatmap'}={}) {
   const {config,cells}=model, {left,cellWidth:minimumCellWidth}=heatmapWidths(model), top=20+Math.max(...config.columnCategories.map(v=>lines(v).length))*16;
-  const legendEntries=config.legend ? [...config.colorScale.domain.map((value,i)=>({label:String(value),color:config.colorScale.colors[i]})),{label:config.noData.label,color:config.noData.color}] : [];
+  const legendEntries=heatmapLegend(model);
   const legendWidth=Math.max(44,...legendEntries.map(entry=>labelWidth(entry.label)+36));
   if (!print) width=Math.max(width,left+12+Math.max(config.columnCategories.length*minimumCellWidth,legendEntries.length?legendWidth:0));
   const cellWidth=(width-left-12)/config.columnCategories.length;
@@ -107,7 +125,7 @@ export function heatmapPrintPages(model,{width=680,maxHeight=620,firstMaxHeight=
   const {left,cellWidth}=heatmapWidths(model);
   const columnCount=Math.floor((width-left-12)/cellWidth);
   const noFit=message=>[{svg:'',height:0,diagnostics:[{code:'heatmapPrintLayoutDoesNotFit',severity:'warning',message,suggestedFix:'Increase page dimensions or shorten category/no-data labels.'}]}];
-  const legendWidth=config.legend?Math.max(...[...config.colorScale.domain.map(String),config.noData.label].map(value=>labelWidth(value)+36)):0;
+  const legendWidth=config.legend?Math.max(...heatmapLegend(model).map(entry=>labelWidth(entry.label)+36)):0;
   if(columnCount<1 || width-left-12<legendWidth) return noFit('Heatmap print width cannot fit one readable column, its row labels and legend.');
   const pages=[];
   for(let columnStart=0;columnStart<config.columnCategories.length;columnStart+=columnCount) {
@@ -119,7 +137,7 @@ export function heatmapPrintPages(model,{width=680,maxHeight=620,firstMaxHeight=
       for(let end=rowStart+1;end<=config.rowCategories.length;end++) {
         const rowCategories=config.rowCategories.slice(rowStart,end);
         const rows=cells.filter(cell=>cell.row && rowCategories.includes(cell.rowValue)&&columnCategories.includes(cell.columnValue)).map(cell=>cell.row);
-        const candidate=heatmapSvg(buildHeatmap({...config,rowCategories,columnCategories},rows),width,{print:true});
+        const candidate=heatmapSvg(buildHeatmapModel({...config,rowCategories,columnCategories},rows,model.scale),width,{print:true});
         if(candidate.height>budget) break;
         accepted=candidate;count=end-rowStart;
       }
@@ -128,7 +146,7 @@ export function heatmapPrintPages(model,{width=680,maxHeight=620,firstMaxHeight=
       if(!accepted && pages.length===0 && budget<maxHeight) {
         const rowCategories=[config.rowCategories[rowStart]];
         const rows=cells.filter(cell=>cell.row&&cell.rowValue===rowCategories[0]&&columnCategories.includes(cell.columnValue)).map(cell=>cell.row);
-        const candidate=heatmapSvg(buildHeatmap({...config,rowCategories,columnCategories},rows),width,{print:true});
+        const candidate=heatmapSvg(buildHeatmapModel({...config,rowCategories,columnCategories},rows,model.scale),width,{print:true});
         if(candidate.height<=maxHeight) {accepted={...candidate,startNewPage:true};count=1;}
       }
       if(!accepted) return noFit('Heatmap print page is too short for one readable row, its labels and legend.');

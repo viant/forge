@@ -1,3 +1,4 @@
+import {isScenarioType,freezeScenario} from '../components/scenarios/scenarioContract.js';
 import {resolvePieSliceLabel} from '../components/pieSliceLabel.js';
 import {buildChartTooltipEntries,chartTooltipPieFields} from '../components/chartTooltip.js';
 import {resolveDonutCenter} from '../components/donutCenter.js';
@@ -32,6 +33,7 @@ function cloneChartRows(rows = []) {
 
 function buildBaseReportFillChartPayload(chart = {}, rows = [], centerRows, centerInputs, requestFilters) {
   const type = normalizeString(chart?.type).toLowerCase();
+  if(isScenarioType(type)) return freezeScenario(chart,rows,requestFilters);
   if(type === "category-range") {
     const model=buildCategoryRange(chart.categoryRange,rows);
     return {kind:"category-range",type,seriesKeys:categoryRangeFields(model.config),rows:cloneChartRows(rows)};

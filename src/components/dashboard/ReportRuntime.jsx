@@ -1,3 +1,4 @@
+import {isScenarioType,scenarioKey,scenarioScopeHandler} from '../scenarios/scenarioContract.js';
 import {reportDatasetSortField} from './reportRuntimeTableSort.js';
 import {parseReportMarkdownInline} from '../../reporting/reportMarkdownInline.js';
 import {validateDonutCenterDataset} from '../donutCenter.js';
@@ -3614,6 +3615,7 @@ export default function ReportRuntime({
               embedded={false}
               showControls={!reportPresentation}
               allowTableSwitch={resolveReportChartTableSwitch({reportSpec,reportDocument,chartSpec:block?.chartSpec || block?.content?.chartSpec,presentationMode})}
+              onScenarioStateChange={isScenarioType(chartModel.type) ? scenarioScopeHandler(chartModel[scenarioKey(chartModel.type)],reportSpec?.scope?.params,scopeParamIndex,runtimeHandlers) : null}
               onMetricSelectionChange={onChartMetricSelectionChange ? selection => onChartMetricSelectionChange({blockId:block.id,selection}) : null}
               onDatumSelect={chartInteractionEnabled ? ((selection) => {
                 setSelectedChartSelection(block.id, selection);

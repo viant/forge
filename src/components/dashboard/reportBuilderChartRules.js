@@ -10,7 +10,7 @@ export const CHART_TYPE_LABELS = {
 
 export const CARTESIAN_CHART_TYPES = ["line", "bar", "area"];
 export const CATEGORY_CHART_TYPES = ["pie", "donut", "horizontal_bar", "funnel_bar"];
-export const ALL_SUPPORTED_CHART_TYPES = [...CARTESIAN_CHART_TYPES, ...CATEGORY_CHART_TYPES, "heatmap", "category-range"];
+export const ALL_SUPPORTED_CHART_TYPES = [...CARTESIAN_CHART_TYPES, ...CATEGORY_CHART_TYPES, "heatmap", "category-range", "routing-impact", "stage-allocation"];
 export const SINGLE_MEASURE_CATEGORY_TYPES = new Set(["pie", "donut", "funnel_bar"]);
 export const PER_SERIES_TYPE_CHOICES = ["line", "bar", "area"];
 

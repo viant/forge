@@ -1,3 +1,4 @@
+import {isScenarioType,scenarioKey,normalizeScenario,scenarioFields} from '../scenarios/scenarioContract.js';
 import {normalizePieSliceLabel} from '../pieSliceLabel.js';
 import {normalizeChartTooltip,chartTooltipFields} from '../chartTooltip.js';
 import {normalizeDonutCenter,donutCenterFields} from '../donutCenter.js';
@@ -505,8 +506,10 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
     const categoryRange = type === "category-range" ? normalizeCategoryRange(chartSpec.categoryRange) : null;
     if(type === "heatmap" && ["seriesField","seriesOptions","metricSelection","layout","stacked"].some(key=>chartSpec[key]!=null)) throw new Error("Heatmap uses its own declared fields, color scale and category order; seriesField, seriesOptions, metricSelection, layout and stacked are unsupported.");
     const heatmap = type === "heatmap" ? normalizeHeatmap(chartSpec.heatmap) : null;
-    const xField = categoryRange?.categoryField || heatmap?.rowField || normalizeChartSpecValue(chartSpec.xField);
-    const yFields = categoryRange ? categoryRangeFields(categoryRange) : heatmap ? [heatmap.valueField] : normalizeStringArray(chartSpec.yFields || chartSpec.yField).filter(Boolean);
+    if(isScenarioType(type) && ["seriesField","seriesOptions","metricSelection","layout","stacked","tooltip","center","sliceLabel"].some(key=>chartSpec[key]!=null))throw new Error("Scenario charts use their own declared state, fields and metric contracts.");
+    const scenario = isScenarioType(type) ? normalizeScenario(type,chartSpec[scenarioKey(type)]) : null;
+    const xField = (scenario ? scenarioFields(type,scenario)[0] : null) || categoryRange?.categoryField || heatmap?.rowField || normalizeChartSpecValue(chartSpec.xField);
+    const yFields = scenario ? [type === "routing-impact" ? scenario.amountField : (scenario.metrics[0].field || scenario.metrics[0].numeratorField)] : categoryRange ? categoryRangeFields(categoryRange) : heatmap ? [heatmap.valueField] : normalizeStringArray(chartSpec.yFields || chartSpec.yField).filter(Boolean);
     const seriesField = normalizeChartSpecValue(chartSpec.seriesField);
     const seriesOptions = normalizeChartSeriesOptions(chartSpec.seriesOptions);
     const categoryLabel = normalizeChartCategoryLabel(chartSpec.categoryLabel);
@@ -522,6 +525,7 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
         ...(accentTone ? { accentTone } : {}),
         ...(highlights.length > 0 ? { highlights } : {}),
         type,
+        ...(scenario ? {[scenarioKey(type)]:scenario} : {}),
         ...(heatmap ? {heatmap} : {}),
         ...(categoryRange ? {categoryRange} : {}),
         ...(chartSpec.paletteMode?{paletteMode:chartSpec.paletteMode,palette:[...chartSpec.palette]}:{}),
@@ -594,6 +598,7 @@ function sanitizeChartSpecAgainstConfig(config = {}, chartSpec = null) {
     if(normalized.sliceLabel&&!universe.has(normalized.sliceLabel.field))return null;
     if(normalized.center&&!normalized.center.datasetRef&&donutCenterFields(normalized.center).some(field=>!universe.has(field)))return null;
     if (normalized.type === "heatmap") return universe.has(normalized.heatmap.columnField) ? normalized : null;
+    if (isScenarioType(normalized.type)) return scenarioFields(normalized.type,normalized[scenarioKey(normalized.type)]).every(key=>universe.has(key)) ? normalized : null;
     if (normalized.type === "category-range") return normalized;
     const family = chartFamilyForType(normalized.type);
 
@@ -857,6 +862,10 @@ export function validateReportBuilderChartSpec(config = {}, chartSpec = null, co
     if (normalized.type === "heatmap") {
         const column = fields.get(normalized.heatmap.columnField);
         if (!column || column.kind !== "dimension") errors.push({field:"heatmap.columnField",code:!column?"missingField":"wrongKind"});
+        return {valid:errors.length===0,errors};
+    }
+    if (isScenarioType(normalized.type)) {
+        for(const key of scenarioFields(normalized.type,normalized[scenarioKey(normalized.type)])) if(!fields.has(key)) errors.push({field:key,code:"missingField"});
         return {valid:errors.length===0,errors};
     }
     if (normalized.type === "category-range") return {valid:errors.length===0,errors};
@@ -2345,6 +2354,7 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
     if (!normalized) {
         return container;
     }
+    if (isScenarioType(normalized.type)) return {...container,chart:{type:normalized.type,...(normalized.appearance?{appearance:normalized.appearance}:{}),...(typeof normalized.allowTableSwitch==='boolean'?{allowTableSwitch:normalized.allowTableSwitch}:{}),[scenarioKey(normalized.type)]:normalized[scenarioKey(normalized.type)],xAxis:{dataKey:normalized.xField},series:{valueKey:normalized.yFields[0],values:normalized.yFields.map(value=>({value,label:value,type:"bar"}))}}};
     if (normalized.type === "category-range") return {...container,chart:{type:"category-range",categoryRange:normalized.categoryRange,...(normalized.appearance?{appearance:normalized.appearance}:{}),...(normalized.tooltip?{tooltip:normalized.tooltip}:{}),...(typeof normalized.allowTableSwitch === "boolean"?{allowTableSwitch:normalized.allowTableSwitch}:{}),xAxis:{dataKey:normalized.xField},series:{valueKey:normalized.yFields[0],values:normalized.yFields.map(value=>({value,label:value,type:"bar"}))}}};
     if (normalized.type === "heatmap") return {...container, chart:{type:"heatmap",heatmap:normalized.heatmap,...(normalized.appearance?{appearance:normalized.appearance}:{}),...(normalized.tooltip?{tooltip:normalized.tooltip}:{}),...(typeof normalized.allowTableSwitch === "boolean"?{allowTableSwitch:normalized.allowTableSwitch}:{}),series:{valueKey:normalized.heatmap.valueField,values:[{value:normalized.heatmap.valueField,label:normalized.heatmap.valueField,type:"heatmap"}]}}};
     const measures = getSelectableReportBuilderMeasures(config);

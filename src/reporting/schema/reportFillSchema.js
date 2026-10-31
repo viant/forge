@@ -1,3 +1,4 @@
+import {routingImpactSchema,stageAllocationSchema} from '../../components/scenarios/scenarioContract.js';
 import {windowCalculationDefinitions} from "./windowCalculationSchema.js";
 import {numericDisplayFormatSchema} from '../../components/categoryRange.js';
 import {pieSliceLabelSchema} from '../../components/pieSliceLabel.js';
@@ -712,7 +713,7 @@ export const reportFillSchema = {
     },
     resolvedChart: {
       anyOf: [
-        ...["heatmap","category-range"].map(kind=>({type:"object",additionalProperties:false,required:["kind","type","seriesKeys","rows"],properties:{tooltipEntries:{type:"array",items:chartTooltipEntrySchema},kind:{const:kind},type:{const:kind},seriesKeys:{type:"array",items:{type:"string"}},rows:{type:"array",items:{$ref:"#/$defs/jsonObject"}}}})),
+        ...["heatmap","category-range","routing-impact","stage-allocation"].map(kind=>({type:"object",additionalProperties:false,required:["kind","type","seriesKeys","rows",...(["routing-impact","stage-allocation"].includes(kind)?["scenarioState"]:[])],properties:{scenarioState:{type:"object"},tooltipEntries:{type:"array",items:chartTooltipEntrySchema},kind:{const:kind},type:{const:kind},seriesKeys:{type:"array",items:{type:"string"}},rows:{type:"array",items:{$ref:"#/$defs/jsonObject"}}}})),
         { type: "null" },
         {
           type: "object",
@@ -954,6 +955,8 @@ export const reportFillSchema = {
           items: { type: "string" },
         },
         type: { type: "string" },
+        routingImpact: routingImpactSchema,
+        stageAllocation: stageAllocationSchema,
         heatmap: heatmapSchema,
         categoryRange: categoryRangeSchema,
         paletteMode:{enum:["declared"]},
@@ -1212,6 +1215,8 @@ export const reportFillSchema = {
       properties: {
         tooltip: chartTooltipSchema,
         type: { type: "string" },
+        routingImpact: routingImpactSchema,
+        stageAllocation: stageAllocationSchema,
         heatmap: heatmapSchema,
         categoryRange: categoryRangeSchema,
         paletteMode: {enum:["declared"]},

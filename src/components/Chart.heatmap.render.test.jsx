@@ -3,6 +3,21 @@ import {createRoot} from 'react-dom/client';
 import {expect,it,vi} from 'vitest';
 import Chart from './Chart.jsx';
 import fixture from '../../doc/examples/categorical-heatmap.json';
+it('renders automatic domains consistently after values change and for constant or missing data',async()=>{
+ const {default:CategoricalHeatmap}=await import('./CategoricalHeatmap.jsx');
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ const config={rowField:'row',columnField:'column',valueField:'value',rowCategories:['A'],columnCategories:['X','Y'],colorScale:{type:'sequential',domain:'auto',colors:['#000000','#ffffff']}};
+ try {
+  for(const values of [[2,8],[200,800],[0,0],[null,null]]) {
+   await act(async()=>root.render(<CategoricalHeatmap config={config} rows={values.map((value,i)=>({row:'A',column:i?'Y':'X',value}))} width={390}/>));
+   const cells=[...host.querySelectorAll('[data-cell]')];
+   expect(cells).toHaveLength(2);
+   expect(host.innerHTML).not.toContain('NaN');
+   expect(cells.map(cell=>cell.querySelector('rect').getAttribute('fill'))).toEqual(values[0]===null?['#eeeeee','#eeeeee']:values[0]===0?['#808080','#808080']:['#000000','#ffffff']);
+  }
+ } finally {await act(async()=>root.unmount());host.remove();}
+});
 import {buildExplicitReportBuilderChartContainer} from './dashboard/reportBuilderUtils.js';
 it('renders the actual Chart matrix, keyboard coordinates, no-data and complete table',async()=>{
  globalThis.IS_REACT_ACT_ENVIRONMENT=true;
