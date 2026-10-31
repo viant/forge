@@ -1,0 +1,628 @@
+[
+  {
+    "name": "integer scalar required zero",
+    "type": "integer",
+    "tag": "required",
+    "schema": {
+      "type": "integer",
+      "validation": {
+        "checks": [
+          {
+            "name": "required"
+          }
+        ]
+      }
+    },
+    "value": 0,
+    "valid": false
+  },
+  {
+    "name": "integer pointer required zero",
+    "type": "integer",
+    "tag": "required",
+    "schema": {
+      "type": "integer",
+      "validation": {
+        "checks": [
+          {
+            "name": "required"
+          }
+        ],
+        "pointer": true
+      },
+      "nullable": true
+    },
+    "value": 0,
+    "valid": true
+  },
+  {
+    "name": "integer pointer required nil",
+    "type": "integer",
+    "tag": "required",
+    "schema": {
+      "type": "integer",
+      "validation": {
+        "checks": [
+          {
+            "name": "required"
+          }
+        ],
+        "pointer": true
+      },
+      "nullable": true
+    },
+    "value": null,
+    "valid": false
+  },
+  {
+    "name": "integer scalar required missing",
+    "type": "integer",
+    "tag": "required",
+    "schema": {
+      "type": "integer",
+      "validation": {
+        "checks": [
+          {
+            "name": "required"
+          }
+        ]
+      }
+    },
+    "value": null,
+    "valid": false,
+    "missing": true
+  },
+  {
+    "name": "boolean scalar required zero",
+    "type": "boolean",
+    "tag": "required",
+    "schema": {
+      "type": "boolean",
+      "validation": {
+        "checks": [
+          {
+            "name": "required"
+          }
+        ]
+      }
+    },
+    "value": false,
+    "valid": false
+  },
+  {
+    "name": "boolean pointer required zero",
+    "type": "boolean",
+    "tag": "required",
+    "schema": {
+      "type": "boolean",
+      "validation": {
+        "checks": [
+          {
+            "name": "required"
+          }
+        ],
+        "pointer": true
+      },
+      "nullable": true
+    },
+    "value": false,
+    "valid": true
+  },
+  {
+    "name": "boolean pointer required nil",
+    "type": "boolean",
+    "tag": "required",
+    "schema": {
+      "type": "boolean",
+      "validation": {
+        "checks": [
+          {
+            "name": "required"
+          }
+        ],
+        "pointer": true
+      },
+      "nullable": true
+    },
+    "value": null,
+    "valid": false
+  },
+  {
+    "name": "boolean scalar required missing",
+    "type": "boolean",
+    "tag": "required",
+    "schema": {
+      "type": "boolean",
+      "validation": {
+        "checks": [
+          {
+            "name": "required"
+          }
+        ]
+      }
+    },
+    "value": null,
+    "valid": false,
+    "missing": true
+  },
+  {
+    "name": "string scalar required zero",
+    "type": "string",
+    "tag": "required",
+    "schema": {
+      "type": "string",
+      "validation": {
+        "checks": [
+          {
+            "name": "required"
+          }
+        ]
+      }
+    },
+    "value": "",
+    "valid": false
+  },
+  {
+    "name": "string pointer required zero",
+    "type": "string",
+    "tag": "required",
+    "schema": {
+      "type": "string",
+      "validation": {
+        "checks": [
+          {
+            "name": "required"
+          }
+        ],
+        "pointer": true
+      },
+      "nullable": true
+    },
+    "value": "",
+    "valid": true
+  },
+  {
+    "name": "string pointer required nil",
+    "type": "string",
+    "tag": "required",
+    "schema": {
+      "type": "string",
+      "validation": {
+        "checks": [
+          {
+            "name": "required"
+          }
+        ],
+        "pointer": true
+      },
+      "nullable": true
+    },
+    "value": null,
+    "valid": false
+  },
+  {
+    "name": "string scalar required missing",
+    "type": "string",
+    "tag": "required",
+    "schema": {
+      "type": "string",
+      "validation": {
+        "checks": [
+          {
+            "name": "required"
+          }
+        ]
+      }
+    },
+    "value": null,
+    "valid": false,
+    "missing": true
+  },
+  {
+    "name": "Unicode single supplementary codepoint",
+    "type": "string",
+    "tag": "le(1)",
+    "schema": {
+      "type": "string",
+      "validation": {
+        "checks": [
+          {
+            "name": "le",
+            "parameters": [
+              "1"
+            ]
+          }
+        ]
+      }
+    },
+    "value": "😀",
+    "valid": true
+  },
+  {
+    "name": "Unicode two codepoints",
+    "type": "string",
+    "tag": "le(1)",
+    "schema": {
+      "type": "string",
+      "validation": {
+        "checks": [
+          {
+            "name": "le",
+            "parameters": [
+              "1"
+            ]
+          }
+        ]
+      }
+    },
+    "value": "😀a",
+    "valid": false
+  },
+  {
+    "name": "combining marks count separately",
+    "type": "string",
+    "tag": "ge(2)",
+    "schema": {
+      "type": "string",
+      "validation": {
+        "checks": [
+          {
+            "name": "ge",
+            "parameters": [
+              "2"
+            ]
+          }
+        ]
+      }
+    },
+    "value": "é",
+    "valid": true
+  },
+  {
+    "name": "empty optional string",
+    "type": "string",
+    "tag": "omitempty,required",
+    "schema": {
+      "type": "string",
+      "validation": {
+        "checks": [
+          {
+            "name": "required"
+          }
+        ],
+        "omitEmpty": true
+      }
+    },
+    "value": "",
+    "valid": true
+  },
+  {
+    "name": "zero is not omitted",
+    "type": "integer",
+    "tag": "omitempty,gt(0)",
+    "schema": {
+      "type": "integer",
+      "validation": {
+        "checks": [
+          {
+            "name": "gt",
+            "parameters": [
+              "0"
+            ]
+          }
+        ],
+        "omitEmpty": true
+      }
+    },
+    "value": 0,
+    "valid": false
+  },
+  {
+    "name": "null pointer is omitted",
+    "type": "integer",
+    "tag": "omitempty,gt(0)",
+    "schema": {
+      "type": "integer",
+      "validation": {
+        "checks": [
+          {
+            "name": "gt",
+            "parameters": [
+              "0"
+            ]
+          }
+        ],
+        "pointer": true,
+        "omitEmpty": true
+      },
+      "nullable": true
+    },
+    "value": null,
+    "valid": true
+  },
+  {
+    "name": "non-null pointer zero not omitted",
+    "type": "integer",
+    "tag": "omitempty,gt(0)",
+    "schema": {
+      "type": "integer",
+      "validation": {
+        "checks": [
+          {
+            "name": "gt",
+            "parameters": [
+              "0"
+            ]
+          }
+        ],
+        "pointer": true,
+        "omitEmpty": true
+      },
+      "nullable": true
+    },
+    "value": 0,
+    "valid": false
+  },
+  {
+    "name": "upper numeric inclusive",
+    "type": "number",
+    "tag": "le(3)",
+    "schema": {
+      "type": "number",
+      "validation": {
+        "checks": [
+          {
+            "name": "le",
+            "parameters": [
+              "3"
+            ]
+          }
+        ]
+      }
+    },
+    "value": 3.0,
+    "valid": true
+  },
+  {
+    "name": "lower numeric strict",
+    "type": "number",
+    "tag": "gt(3)",
+    "schema": {
+      "type": "number",
+      "validation": {
+        "checks": [
+          {
+            "name": "gt",
+            "parameters": [
+              "3"
+            ]
+          }
+        ]
+      }
+    },
+    "value": 3.0,
+    "valid": false
+  },
+  {
+    "name": "integer choice",
+    "type": "integer",
+    "tag": "choice(0,2)",
+    "schema": {
+      "type": "integer",
+      "validation": {
+        "checks": [
+          {
+            "name": "choice",
+            "parameters": [
+              "0",
+              "2"
+            ]
+          }
+        ]
+      }
+    },
+    "value": 0,
+    "valid": true
+  },
+  {
+    "name": "integer choice rejection",
+    "type": "integer",
+    "tag": "choice(0,2)",
+    "schema": {
+      "type": "integer",
+      "validation": {
+        "checks": [
+          {
+            "name": "choice",
+            "parameters": [
+              "0",
+              "2"
+            ]
+          }
+        ]
+      }
+    },
+    "value": 1,
+    "valid": false
+  },
+  {
+    "name": "string choice",
+    "type": "string",
+    "tag": "choice(alpha,beta)",
+    "schema": {
+      "type": "string",
+      "validation": {
+        "checks": [
+          {
+            "name": "choice",
+            "parameters": [
+              "alpha",
+              "beta"
+            ]
+          }
+        ]
+      }
+    },
+    "value": "beta",
+    "valid": true
+  },
+  {
+    "name": "native domain sample.test",
+    "type": "string",
+    "tag": "domain",
+    "schema": {
+      "type": "string",
+      "validation": {
+        "checks": [
+          {
+            "name": "domain"
+          }
+        ]
+      }
+    },
+    "value": "sample.test",
+    "valid": true
+  },
+  {
+    "name": "native domain SAMPLE.TEST",
+    "type": "string",
+    "tag": "domain",
+    "schema": {
+      "type": "string",
+      "validation": {
+        "checks": [
+          {
+            "name": "domain"
+          }
+        ]
+      }
+    },
+    "value": "SAMPLE.TEST",
+    "valid": false
+  },
+  {
+    "name": "native domain https://sample.test/path",
+    "type": "string",
+    "tag": "domain",
+    "schema": {
+      "type": "string",
+      "validation": {
+        "checks": [
+          {
+            "name": "domain"
+          }
+        ]
+      }
+    },
+    "value": "https://sample.test/path",
+    "valid": true
+  },
+  {
+    "name": "native domain a.b",
+    "type": "string",
+    "tag": "domain",
+    "schema": {
+      "type": "string",
+      "validation": {
+        "checks": [
+          {
+            "name": "domain"
+          }
+        ]
+      }
+    },
+    "value": "a.b",
+    "valid": false
+  },
+  {
+    "name": "native domain x.ab",
+    "type": "string",
+    "tag": "domain",
+    "schema": {
+      "type": "string",
+      "validation": {
+        "checks": [
+          {
+            "name": "domain"
+          }
+        ]
+      }
+    },
+    "value": "x.ab",
+    "valid": true
+  },
+  {
+    "name": "native domain bad_name.sample.test",
+    "type": "string",
+    "tag": "domain",
+    "schema": {
+      "type": "string",
+      "validation": {
+        "checks": [
+          {
+            "name": "domain"
+          }
+        ]
+      }
+    },
+    "value": "bad_name.sample.test",
+    "valid": true
+  },
+  {
+    "name": "native domain localhost",
+    "type": "string",
+    "tag": "domain",
+    "schema": {
+      "type": "string",
+      "validation": {
+        "checks": [
+          {
+            "name": "domain"
+          }
+        ]
+      }
+    },
+    "value": "localhost",
+    "valid": false
+  },
+  {
+    "name": "missing scalar zero not omitted",
+    "type": "integer",
+    "tag": "omitempty,gt(0)",
+    "schema": {
+      "type": "integer",
+      "validation": {
+        "omitEmpty": true,
+        "checks": [
+          {
+            "name": "gt",
+            "parameters": [
+              "0"
+            ]
+          }
+        ]
+      }
+    },
+    "value": null,
+    "valid": false,
+    "missing": true
+  },
+  {
+    "name": "false scalar not omitted",
+    "type": "boolean",
+    "tag": "omitempty,required",
+    "schema": {
+      "type": "boolean",
+      "validation": {
+        "omitEmpty": true,
+        "checks": [
+          {
+            "name": "required"
+          }
+        ]
+      }
+    },
+    "value": false,
+    "valid": false
+  }
+]

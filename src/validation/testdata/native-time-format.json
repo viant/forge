@@ -1,0 +1,37 @@
+[
+  {
+    "tag": "dateFormat=YYYY-MM-DD,tz=UTC",
+    "instant": "2026-03-08T09:30:00Z",
+    "layout": "2006-01-02",
+    "zone": "UTC",
+    "expected": "2026-03-08"
+  },
+  {
+    "tag": "timeLayout=2006-01-02 15:04:05,tz=America/Los_Angeles",
+    "instant": "2026-03-08T09:30:00Z",
+    "layout": "2006-01-02 15:04:05",
+    "zone": "America/Los_Angeles",
+    "expected": "2026-03-08 01:30:00"
+  },
+  {
+    "tag": "timeLayout=2006-01-02 15:04:05,tz=America/Los_Angeles",
+    "instant": "2026-03-08T10:30:00Z",
+    "layout": "2006-01-02 15:04:05",
+    "zone": "America/Los_Angeles",
+    "expected": "2026-03-08 03:30:00"
+  },
+  {
+    "tag": "timeLayout=2006-01-02T15:04:05Z07:00,tz=America/Los_Angeles",
+    "instant": "2026-11-01T08:30:00Z",
+    "layout": "2006-01-02T15:04:05Z07:00",
+    "zone": "America/Los_Angeles",
+    "expected": "2026-11-01T01:30:00-07:00"
+  },
+  {
+    "tag": "timeLayout=2006-01-02T15:04:05Z07:00,tz=America/Los_Angeles",
+    "instant": "2026-11-01T09:30:00Z",
+    "layout": "2006-01-02T15:04:05Z07:00",
+    "zone": "America/Los_Angeles",
+    "expected": "2026-11-01T01:30:00-08:00"
+  }
+]

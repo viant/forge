@@ -1,3 +1,4 @@
+import {formatResourceTime} from './resourceTimeFormat.js';
 const formatUtcWallClock = (date, locale, kind) => {
     const year = date.getUTCFullYear();
     const day = date.getUTCDate();
@@ -18,6 +19,7 @@ const formatUtcWallClock = (date, locale, kind) => {
 };
 
 export const formatDisplayValue = (value, format, locale = 'en-US', options = {}) => {
+    if (options?.timeFormat) return formatResourceTime(value, options.timeFormat);
     if (value == null) return '-';
     if (typeof value === 'string' && value.trim() === '') return '';
 

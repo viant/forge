@@ -15,11 +15,13 @@ require (
 	github.com/viant/afs v1.30.1-0.20260914155934-90e95d483861
 	github.com/viant/authz v0.0.0-20261022171511-cc9325165338
 	github.com/viant/bintly v0.2.0
+	github.com/viant/govalidator v0.3.3
 	github.com/viant/jsonrpc v0.25.1-0.20261014230436-c7e03c1c46eb
 	github.com/viant/mcp v0.24.1-0.20261016035016-dc29fe9112e9
 	github.com/viant/mcp-protocol v0.19.1-0.20261014173008-af92f34f304b
 	github.com/viant/scache v0.5.1-0.20241014222741-4367658dff4f
 	github.com/viant/scy v0.30.0
+	github.com/viant/tagly v0.4.2-0.20261028223500-81e046a19ef9
 	github.com/viant/toolbox v0.37.1-0.20241210210120-32350b063cf8
 	github.com/viant/x v0.4.1-0.20260914174450-0e043f24aec5
 	github.com/xuri/excelize/v2 v2.10.0
@@ -50,6 +52,8 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/viant/gosh v0.3.0 // indirect
+	github.com/viant/parsly v0.3.3 // indirect
+	github.com/viant/structology v0.2.0 // indirect
 	github.com/viant/xunsafe v0.11.0 // indirect
 	golang.org/x/mod v0.38.0 // indirect
 )

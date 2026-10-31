@@ -20,6 +20,8 @@ type ResourceSchema struct {
 // ResourceFieldSchema is the typed field vocabulary shared by web and future
 // native interpreters. Ref points to another entry in Window.Schemas.
 type ResourceFieldSchema struct {
+	Validation *ResourceFieldValidation       `json:"validation,omitempty" yaml:"validation,omitempty"`
+	TimeFormat *ResourceTimeFormat            `json:"timeFormat,omitempty" yaml:"timeFormat,omitempty"`
 	Type       string                         `json:"type,omitempty" yaml:"type,omitempty"`
 	Ref        string                         `json:"$ref,omitempty" yaml:"$ref,omitempty"`
 	Format     string                         `json:"format,omitempty" yaml:"format,omitempty"`
