@@ -147,15 +147,19 @@ func printCells(box reportprint.Box, yOffset float64) (string, string, int, int,
 	return first, last, col, row, err
 }
 
-func (w *visualDashboardWriter) groupOwnsElement(group dashboardGroup, id string) bool {
-	for _, owner := range w.ownerIDs {
+func reportPrintElementOwner(owners []string, id string) string {
+	for _, owner := range owners {
 		if id == owner || strings.HasPrefix(id, owner+"__") {
-			for _, blockID := range group.ids {
-				if owner == blockID {
-					return true
-				}
-			}
-			return false
+			return owner
+		}
+	}
+	return ""
+}
+func (w *visualDashboardWriter) groupOwnsElement(group dashboardGroup, id string) bool {
+	owner := reportPrintElementOwner(w.ownerIDs, id)
+	for _, blockID := range group.ids {
+		if owner != "" && owner == blockID {
+			return true
 		}
 	}
 	return false
