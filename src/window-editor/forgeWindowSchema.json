@@ -4770,10 +4770,37 @@
           },
           "type": "array"
         },
+        "timeFormat": {
+          "$ref": "#/$defs/ResourceTimeFormat"
+        },
         "type": {
           "type": "string"
         },
+        "validation": {
+          "$ref": "#/$defs/ResourceFieldValidation"
+        },
         "writeOnly": {
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "ResourceFieldValidation": {
+      "additionalProperties": true,
+      "properties": {
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/ResourceValidationCheck"
+          },
+          "type": "array"
+        },
+        "omitEmpty": {
+          "type": "boolean"
+        },
+        "pointer": {
+          "type": "boolean"
+        },
+        "presenceOnly": {
           "type": "boolean"
         }
       },
@@ -5030,6 +5057,42 @@
         },
         "type": {
           "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ResourceTimeFormat": {
+      "additionalProperties": true,
+      "properties": {
+        "nullable": {
+          "type": "boolean"
+        },
+        "omitEmpty": {
+          "type": "boolean"
+        },
+        "timeLayout": {
+          "type": "string"
+        },
+        "timeZone": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ResourceValidationCheck": {
+      "additionalProperties": true,
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "parameters": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "type": "object"
@@ -7449,7 +7512,7 @@
   "$ref": "#/$defs/Window",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "x-forge-provenance": {
-    "baseCommit": "134c3fac0cb6442147f68eadd8c6ee0864c946c5",
+    "baseCommit": "cd4c93bd08f242bbadd6c3effd416797b38cb472",
     "generator": "scripts/window-schema/main.go",
     "sha256": {
       "choice_browser.go": "935cbeddb231dd329374114c5f38454dc7c44c2ab70a45ea3c0f37ce7f3aee26",
@@ -7496,7 +7559,8 @@
       "preview_workbench.go": "eccac81a142c97d69c2e86be4443a4c79719f57a195ca4270540baa1c15636d6",
       "reader_workbench.go": "4c41b6e595a1152d9dd002144bb974057616338c1bf813a053d0dcb64e7895c0",
       "resource_assignment.go": "80ad53f8050041d9e652f3954084f6148fc8e53c324510126904a5ab35e3507e",
-      "resource_model.go": "2d09c19334a806ae9879b9e022e403640cc5ca0f7cabe494b38aaa86881cd610",
+      "resource_field_attributes.go": "fc2ef49fcc4e88a78849581a9ccbdf62d2968023a5c76282e8b42ec488653c70",
+      "resource_model.go": "9a480c785535e3b485fefe5ddfaa4d6a1d276b22b267536e0051d6a2f799c6ed",
       "resource_model_validation.go": "5fc795950cc92aa29db822a0a6850bd11fe1abf78e991c79e137b281c15251d5",
       "resource_policy_editor.go": "6f3a00bf5ac0751a133fe121e727f5aa2671489dfb07b98a29314cc7a380b8c2",
       "result_preview.go": "bd913237174dc663cf40a5cd30bf5e835ec077930e7f0916f7ce906671f3dbff",
