@@ -536,3 +536,24 @@ it('publishes current report view context without copying report rows',async()=>
  const view=await mount(run,{executeOnOpen:true},{},value=>states.push(value));
  try {expect(states.at(-1)).toMatchObject({title:'Current report',status:'ready',activeSectionId:'summary'});await act(async()=>button(view,'Detail').click());expect(states.at(-1).activeSectionId).toBe('detail');expect(run).toHaveBeenCalledOnce();expect(JSON.stringify(states)).not.toContain('privateField');}finally{await view.close();}
 });
+
+it.each([{status:400}, {status:422}, {data:{statusCode:400}}, {details:{statusCode:422}}])('shows input guidance for producer validation status %j without raw payload', async statusFields => {
+    const failure = Object.assign(new Error('PRIVATE_UPSTREAM_PAYLOAD'), {...statusFields, responseEnvelope:{error:'PRIVATE_UPSTREAM_PAYLOAD'}});
+    const view = await mount(vi.fn().mockRejectedValue(failure), {executeOnOpen:true});
+    try {
+        expect(view.host.textContent).toContain('The data source rejected the report inputs.');
+        expect(view.host.textContent).toContain('Check the selected values and required fields');
+        expect(view.host.textContent).not.toContain('PRIVATE_UPSTREAM_PAYLOAD');
+        expect(view.host.querySelector('output')).toBeNull();
+    } finally { await view.close(); }
+});
+
+it('keeps authorization failures separate from producer input hints', async () => {
+    const failure=Object.assign(new Error('PRIVATE_UPSTREAM_PAYLOAD'), {status:403,data:{statusCode:400}});
+    const view=await mount(vi.fn().mockRejectedValue(failure),{executeOnOpen:true});
+    try {
+        expect(view.host.textContent).toContain('This report could not be run. Please try again.');
+        expect(view.host.textContent).not.toContain('Check the selected values');
+        expect(view.host.textContent).not.toContain('PRIVATE_UPSTREAM_PAYLOAD');
+    } finally {await view.close();}
+});
