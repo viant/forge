@@ -107,3 +107,42 @@ independently authored corpus and native metadata checks. Existing resource mode
 and display formatter tests cover compatibility. This capability can replace
 repeated supported field checks and instant-display formatting in window code;
 it does not establish removal of any entire application's validation module.
+
+## Declarative draft form binding
+
+Bind a frontend draft schema to a `draftForm` to validate before Save becomes
+available, without writing a window handler:
+
+```yaml
+schemas:
+  editorDraft:
+    type: object
+    required: [title, enabled]
+    properties:
+      title: {type: string, minLength: 1, maxLength: 64}
+      enabled: {type: boolean}
+view:
+  content:
+    id: editor
+    draftForm:
+      validation: {schemaRef: editorDraft}
+      submit: {dataSourceRef: recordPatch}
+```
+
+The existing DraftForm reads its current form and uses the shared local
+`validateResource` implementation with `context.metadata.schemas`. Basic errors
+feed its existing validation message and disabled Save state. Missing/empty
+references and non-object schemas fail closed; native authored-window validation
+also rejects missing references. The same typed binding is available on the
+embedded `parameterEditor.draft` contract.
+
+When `validate` is also supplied, the existing synchronous caller hook runs only
+after the schema checks pass, so it can retain cross-field or business checks.
+When `validation` is absent, the legacy hook/availability path is unchanged.
+No payload model is inferred or prepared, no datasource fetch occurs for
+validation, and no lifecycle/reset policy changes. The schema describes the
+frontend draft, including UI-only state when appropriate; it need not match a
+writer's wire payload. Ordinary extra fields remain allowed unless
+`additionalProperties: false` is authored. Choose `required` lists for their
+legacy zero/false semantics, or explicit normalized `validation` checks for the
+native scalar/pointer/marker semantics described above.
