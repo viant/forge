@@ -105,6 +105,10 @@ func validateSVGAttribute(attr xml.Attr) error {
 		valid = colorPattern.MatchString(value)
 	case "text-anchor":
 		valid = value == "start" || value == "middle" || value == "end"
+	case "data-report-print-axis":
+		// The canonical chart lowerer marks secondary-axis tick labels.
+		// Admit its single inert value without accepting arbitrary data-*.
+		valid = value == "right"
 	case "font-weight":
 		valid = value == "normal" || value == "bold" || value == "400" || value == "600" || value == "700"
 	case "font-family":
