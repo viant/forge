@@ -285,6 +285,16 @@ const reportPrint = buildReportPrintArtifact({
   diagnostics: [],
 });
 
+assert.ok(!Object.hasOwn(reportPrint, "visibleBlockIds"), "Legacy absence is preserved");
+const membershipInput={reportSpec,reportFill,pages:[page]};
+const emptyMembership=buildReportPrintArtifact({...membershipInput,visibleBlockIds:[]});
+assert.deepEqual(emptyMembership.visibleBlockIds,[],"Explicit empty membership is preserved");
+assert.ok(validateReportPrint(emptyMembership).valid);
+assert.equal(validateReportPrint({...emptyMembership,visibleBlockIds:["duplicate","duplicate"]}).valid,false);
+assert.equal(validateReportPrint({...emptyMembership,visibleBlockIds:[" "]}).valid,false);
+for(const visibleBlockIds of [null,["unknown"],[reportFill.blocks[0].id,reportFill.blocks[0].id],[""]]) {
+ assert.equal(buildReportPrintArtifact({...membershipInput,visibleBlockIds}),null);
+}
 assert.equal(reportPrint.kind, "reportPrint");
 assert.equal(reportPrint.version, 1);
 assert.equal(reportPrint.specVersion, reportSpec.version);

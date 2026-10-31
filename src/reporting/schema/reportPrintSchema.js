@@ -27,6 +27,7 @@ export const reportPrintSchema = {
     source: { $ref: "#/$defs/source" },
     title: { type: "string" },
     subtitle: { type: "string" },
+    visibleBlockIds: { type: "array", uniqueItems: true, items: { type: "string", minLength: 1 } },
     pageGeometry: { $ref: "#/$defs/pageGeometry" },
     pages: {
       type: "array",

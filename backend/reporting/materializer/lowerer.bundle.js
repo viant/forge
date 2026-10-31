@@ -69336,6 +69336,7 @@ ${indent}${end}`;
       reportTheme: resolveReportPrintTheme(reportSpec),
       blocksById,
       visibleBlockIds: buildReportPrintVisibleBlockIds(reportSpec, reportFill),
+      renderedBlockIds: /* @__PURE__ */ new Set(),
       layoutSpanByBlockId: buildLayoutSpanByBlockId(reportSpec),
       geometry: normalizedGeometry,
       contentLeft,
@@ -70978,6 +70979,8 @@ ${indent}${end}`;
     finishReportPrintBlock(state);
   }
   function renderReportPrintBlock(state = {}, block = {}, options = {}) {
+    var _a5;
+    (_a5 = state.renderedBlockIds) == null ? void 0 : _a5.add(normalizeString41(block == null ? void 0 : block.id));
     const kind = normalizeString41(block == null ? void 0 : block.kind);
     switch (kind) {
       case "markdownBlock":
@@ -71140,7 +71143,8 @@ ${indent}${end}`;
       pageGeometry: state.geometry,
       pages: state.pages,
       bookmarks: state.bookmarks,
-      diagnostics: state.diagnostics
+      diagnostics: state.diagnostics,
+      visibleBlockIds: [...state.renderedBlockIds]
     });
   }
   function buildReportPrintArtifact({
@@ -71150,10 +71154,15 @@ ${indent}${end}`;
     pageGeometry = DEFAULT_REPORT_PRINT_PAGE_GEOMETRY,
     pages = [],
     bookmarks = [],
-    diagnostics = []
+    diagnostics = [],
+    visibleBlockIds = void 0
   } = {}) {
     if (!isPlainObject9(reportSpec) || !isPlainObject9(reportFill) || normalizeString41(reportSpec.kind) !== "reportSpec" || normalizeString41(reportFill.kind) !== "reportFill") {
       return null;
+    }
+    if (visibleBlockIds !== void 0) {
+      const known = new Set((reportFill.blocks || []).map((block) => block.id));
+      if (!Array.isArray(visibleBlockIds) || new Set(visibleBlockIds).size !== visibleBlockIds.length || visibleBlockIds.some((id) => typeof id !== "string" || !id.trim() || !known.has(id))) return null;
     }
     const specVersion = normalizePositiveInteger(reportSpec.version);
     const fillVersion = normalizePositiveInteger(reportFill.version);
@@ -71184,6 +71193,7 @@ ${indent}${end}`;
       fillHash,
       source: cloneValue27(normalizedSource),
       title: normalizedTitle,
+      ...visibleBlockIds !== void 0 ? { visibleBlockIds: [...visibleBlockIds] } : {},
       pageGeometry: normalizedGeometry,
       pages: normalizedPages.map((page) => cloneValue27(page)),
       bookmarks: normalizedBookmarks.map((bookmark) => cloneValue27(bookmark)),

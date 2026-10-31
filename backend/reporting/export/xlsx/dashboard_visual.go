@@ -28,13 +28,19 @@ func renderDashboardWorkbook(report *reportfill.ReportFill) ([]byte, error) {
 }
 
 func renderDashboardWorkbookPrint(report *reportfill.ReportFill, print *reportprint.ReportPrint) ([]byte, error) {
+	// Use the canonical presentation membership for supporting sheets as well as
+	// visual groups. Keep every admitted raw dataset, including nonvisible rows.
+	presentation, err := dashboardPresentationReport(report, print)
+	if err != nil {
+		return nil, err
+	}
 	f := excelize.NewFile()
 	defer f.Close()
 	if err := f.SetSheetName("Sheet1", "Dashboard"); err != nil {
 		return nil, err
 	}
 	w := &visualDashboardWriter{dashboardWriter: dashboardWriter{file: f, names: map[string]bool{"dashboard": true}}}
-	for _, block := range report.Blocks {
+	for _, block := range presentation.Blocks {
 		w.ownerIDs = append(w.ownerIDs, block.ID)
 	}
 	sort.Slice(w.ownerIDs, func(i, j int) bool { return len(w.ownerIDs[i]) > len(w.ownerIDs[j]) })
@@ -54,7 +60,7 @@ func renderDashboardWorkbookPrint(report *reportfill.ReportFill, print *reportpr
 			return nil, err
 		}
 	}
-	groups := dashboardGroups(report.Blocks)
+	groups := dashboardGroups(presentation.Blocks)
 	visualSheets := make([]string, len(groups))
 	// Reserve and create every visual sheet first, in authored order.
 	for i, group := range groups {
@@ -114,7 +120,7 @@ func renderDashboardWorkbookPrint(report *reportfill.ReportFill, print *reportpr
 		}
 		row += 3
 	}
-	metricSheet, err := w.metricValues(report)
+	metricSheet, err := w.metricValues(presentation)
 	if err != nil {
 		return nil, err
 	}
@@ -139,6 +145,39 @@ func renderDashboardWorkbookPrint(report *reportfill.ReportFill, print *reportpr
 		return nil, err
 	}
 	return visibleChartRows(buffer.Bytes(), w.chartDecorations...)
+}
+
+// Runtime conditions are evaluated once by the canonical print builder. Older
+// unconditional artifacts remain supported; conditional fill-only exports need
+// a canonical print rather than a second visibility implementation.
+func dashboardPresentationReport(report *reportfill.ReportFill, print *reportprint.ReportPrint) (*reportfill.ReportFill, error) {
+	if print == nil || print.VisibleBlockIDs == nil {
+		for _, block := range report.Blocks {
+			if block.Runtime["visibleWhen"] != nil {
+				return nil, fmt.Errorf("xlsx conditional blocks require canonical reportPrint.visibleBlockIds; regenerate matched fill and print artifacts with the current Forge runtime")
+			}
+		}
+		return report, nil
+	}
+	known := map[string]bool{}
+	for _, block := range report.Blocks {
+		known[block.ID] = true
+	}
+	visible := map[string]bool{}
+	for _, id := range *print.VisibleBlockIDs {
+		if !known[id] {
+			return nil, fmt.Errorf("xlsx reportPrint.visibleBlockIds references unknown block %q", id)
+		}
+		visible[id] = true
+	}
+	presentation := *report
+	presentation.Blocks = nil
+	for _, block := range report.Blocks {
+		if visible[block.ID] {
+			presentation.Blocks = append(presentation.Blocks, block)
+		}
+	}
+	return &presentation, nil
 }
 
 func contextValue(value any) string {

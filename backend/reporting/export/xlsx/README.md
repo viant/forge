@@ -47,6 +47,16 @@ references, non-finite values, and Excel row/column/text limits fail the export
 without returning a partial workbook. Long integer identifiers remain text to
 avoid Excel precision loss. Untrusted strings are always text, never formulas.
 
+Canonical print artifacts carry optional `visibleBlockIds` membership evaluated
+by the shared runtime visibility and container traversal. Visual, chart, table,
+and KPI supporting sheets follow that membership, including inactive ancestors;
+all admitted raw `Data` worksheets remain complete. An explicit empty list means
+no presentation blocks. Older unconditional artifacts remain supported. A
+conditional fill-only export, or an older conditional print without membership,
+returns an error requesting a freshly generated canonical print rather than
+exporting inactive variants under incorrect labels. Hosts that generate matched
+fill/print artifacts locally obtain this metadata from the same Forge runtime.
+
 ## PDF-to-XLSX feature matrix
 
 | Canonical report feature | XLSX representation | Interaction / fidelity boundary |

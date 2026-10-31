@@ -107,10 +107,17 @@ func TestSyntheticFifteenTablePrintProfile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Exact pre-optimization baseline bundle produced this complete fill/print
+	projected := *artifacts
+	projected.ReportPrint = printContentWithoutMembership(t, artifacts.ReportPrint)
+	baselineEncoded, err := json.Marshal(&projected)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Exclude only additive canonical membership metadata. Exact pre-optimization
+	// baseline bundle produced this complete fill/print
 	// artifact digest for all fifteen tables. This guards layout and cell parity.
 	const baseline = "4b68b95c031e34fe998fc8ce38f54f4d5e438247dd9c61eb1cb5dd365a9f451f"
-	if got := fmt.Sprintf("%x", sha256.Sum256(encoded)); got != baseline {
+	if got := fmt.Sprintf("%x", sha256.Sum256(baselineEncoded)); got != baseline {
 		t.Fatalf("complete artifact changed: got %s, want %s", got, baseline)
 	}
 	t.Logf("all-artifact sha256=%s pages=%d", baseline, len(print.Pages))
