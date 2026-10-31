@@ -20,7 +20,8 @@ export function formatResourceTime(value, metadata = {}) {
  const timeZone = fixed ? 'UTC' : zone === 'utc' ? 'UTC' : zone;
  const formatter = new Intl.DateTimeFormat('en-US', {timeZone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
  const parts = Object.fromEntries(formatter.formatToParts(displayDate).map(part=>[part.type,part.value]));
- const day = `${parts.year}-${parts.month}-${parts.day}`, clock=`${parts.hour}:${parts.minute}`;
+ if (Number(parts.year) < 100 || Number(parts.year) > 9999) throw new Error('Unsupported presentation year outside 0100 through 9999.');
+ const day = `${parts.year.padStart(4,'0')}-${parts.month}-${parts.day}`, clock=`${parts.hour}:${parts.minute}`;
  if (layout === '2006-01-02') return day;
  if (layout === '2006-01-02 15:04') return `${day} ${clock}`;
  if (layout === '2006-01-02 15:04:05') return `${day} ${clock}:${parts.second}`;
