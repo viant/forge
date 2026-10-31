@@ -9,19 +9,22 @@ import (
 )
 
 type ReportPrint struct {
-	Version      int          `json:"version"`
-	Kind         string       `json:"kind"`
-	SpecVersion  int          `json:"specVersion"`
-	SpecHash     string       `json:"specHash"`
-	FillVersion  int          `json:"fillVersion"`
-	FillHash     string       `json:"fillHash"`
-	Source       Source       `json:"source"`
-	Title        string       `json:"title"`
-	Subtitle     string       `json:"subtitle,omitempty"`
-	PageGeometry PageGeometry `json:"pageGeometry"`
-	Pages        []Page       `json:"pages"`
-	Bookmarks    []Bookmark   `json:"bookmarks"`
-	Diagnostics  []Diagnostic `json:"diagnostics"`
+	// VisibleBlockIDs records canonical runtime visibility and ancestor traversal.
+	// Nil denotes an older print without explicit presentation membership.
+	VisibleBlockIDs *[]string    `json:"visibleBlockIds,omitempty"`
+	Version         int          `json:"version"`
+	Kind            string       `json:"kind"`
+	SpecVersion     int          `json:"specVersion"`
+	SpecHash        string       `json:"specHash"`
+	FillVersion     int          `json:"fillVersion"`
+	FillHash        string       `json:"fillHash"`
+	Source          Source       `json:"source"`
+	Title           string       `json:"title"`
+	Subtitle        string       `json:"subtitle,omitempty"`
+	PageGeometry    PageGeometry `json:"pageGeometry"`
+	Pages           []Page       `json:"pages"`
+	Bookmarks       []Bookmark   `json:"bookmarks"`
+	Diagnostics     []Diagnostic `json:"diagnostics"`
 }
 
 type Source struct {
@@ -152,6 +155,15 @@ func DecodeJSON(data []byte) (*ReportPrint, error) {
 func (r *ReportPrint) Validate() error {
 	if r == nil {
 		return fmt.Errorf("reportPrint is required")
+	}
+	if r.VisibleBlockIDs != nil {
+		seen := map[string]bool{}
+		for _, id := range *r.VisibleBlockIDs {
+			if strings.TrimSpace(id) == "" || seen[id] {
+				return fmt.Errorf("reportPrint.visibleBlockIds must contain unique nonempty block IDs")
+			}
+			seen[id] = true
+		}
 	}
 	if r.Version < 1 {
 		return fmt.Errorf("reportPrint.version must be >= 1")

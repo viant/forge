@@ -324,6 +324,10 @@ export function validateReportFill(value = null) {
 export function validateReportPrint(value = null) {
   const result=validateReportSchema(reportPrintSchema,value);
   const errors=[...result.errors];
+  if (Array.isArray(value?.visibleBlockIds) && (new Set(value.visibleBlockIds).size !== value.visibleBlockIds.length
+    || value.visibleBlockIds.some(id => typeof id !== "string" || !id.trim()))) {
+    errors.push({path:"$.visibleBlockIds",code:"invalidContract",message:"Print membership must contain unique nonempty block IDs."});
+  }
   for(const [pageIndex,page] of (Array.isArray(value?.pages)?value.pages:[]).entries())for(const region of ['elements','headerElements','footerElements'])for(const [index,element] of (Array.isArray(page?.[region])?page[region]:[]).entries()){
     if(Array.isArray(element?.textRuns)&&element.textRuns.every(run=>run&&typeof run.text==='string')&&element.textRuns.map(run=>run.text).join('')!==element.text)errors.push({path:`$.pages[${pageIndex}].${region}[${index}].textRuns`,message:'Text runs must concatenate to text.'});
   }

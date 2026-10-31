@@ -931,6 +931,7 @@ function buildReportPrintLayoutState(reportSpec = {}, reportFill = {}, geometry 
     reportTheme: resolveReportPrintTheme(reportSpec),
     blocksById,
     visibleBlockIds: buildReportPrintVisibleBlockIds(reportSpec, reportFill),
+    renderedBlockIds: new Set(),
     layoutSpanByBlockId: buildLayoutSpanByBlockId(reportSpec),
     geometry: normalizedGeometry,
     contentLeft,
@@ -2693,6 +2694,7 @@ function renderUnsupportedReportPrintBlock(state = {}, block = {}, {
 }
 
 function renderReportPrintBlock(state = {}, block = {}, options = {}) {
+  state.renderedBlockIds?.add(normalizeString(block?.id));
   const kind = normalizeString(block?.kind);
   switch (kind) {
     case "markdownBlock":
@@ -2863,6 +2865,7 @@ export function buildReportPrintFromReportFill({
     pages: state.pages,
     bookmarks: state.bookmarks,
     diagnostics: state.diagnostics,
+    visibleBlockIds: [...state.renderedBlockIds],
   });
 }
 
@@ -2874,6 +2877,7 @@ export function buildReportPrintArtifact({
   pages = [],
   bookmarks = [],
   diagnostics = [],
+  visibleBlockIds = undefined,
 } = {}) {
   if (
     !isPlainObject(reportSpec)
@@ -2882,6 +2886,11 @@ export function buildReportPrintArtifact({
     || normalizeString(reportFill.kind) !== "reportFill"
   ) {
     return null;
+  }
+  if (visibleBlockIds !== undefined) {
+    const known = new Set((reportFill.blocks || []).map(block => block.id));
+    if (!Array.isArray(visibleBlockIds) || new Set(visibleBlockIds).size !== visibleBlockIds.length
+      || visibleBlockIds.some(id => typeof id !== "string" || !id.trim() || !known.has(id))) return null;
   }
   const specVersion = normalizePositiveInteger(reportSpec.version);
   const fillVersion = normalizePositiveInteger(reportFill.version);
@@ -2934,6 +2943,7 @@ export function buildReportPrintArtifact({
     fillHash,
     source: cloneValue(normalizedSource),
     title: normalizedTitle,
+    ...(visibleBlockIds !== undefined ? {visibleBlockIds: [...visibleBlockIds]} : {}),
     pageGeometry: normalizedGeometry,
     pages: normalizedPages.map((page) => cloneValue(page)),
     bookmarks: normalizedBookmarks.map((bookmark) => cloneValue(bookmark)),

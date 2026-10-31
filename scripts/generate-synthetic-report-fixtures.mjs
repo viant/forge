@@ -29,7 +29,8 @@ for(let n=0;n<cases.length;n++){
  const datasets=Object.fromEntries(spec.datasets.map(d=>[d.id,{rows}]));
  emit(path.join(out,name+'.json'),JSON.stringify(envelope)+'\n');emit(path.join(data,name+'.json'),JSON.stringify(datasets,null,2)+'\n');
  const result=JSON.parse(api.materialize(JSON.stringify({reportSpec:spec,datasets})));if(!result.reportFill)throw Error('Missing synthetic fill');
- golden[name+'.json']={reportSpec:digest(canonical(spec)),reportFill:digest(canonical(result.reportFill)),reportPrint:digest(JSON.stringify(result.reportPrint))};
+ const {visibleBlockIds, ...legacyPrint} = result.reportPrint;
+ golden[name+'.json']={reportSpec:digest(canonical(spec)),reportFill:digest(canonical(result.reportFill)),reportPrint:digest(JSON.stringify(legacyPrint))};
 }
 emit(path.join(data,'expected.json'),JSON.stringify(golden,null,2)+'\n');
 const spec=structuredClone(firstSpec);spec.datasets=Array.from({length:9},(_,i)=>({...structuredClone(firstSpec.datasets[0]),id:'sample'+i,request:{...firstSpec.datasets[0].request,filters:{sample:true}},scope:{mode:'inherit'},capabilities:{backendRefetch:true}}));spec.blocks=spec.datasets.map((d,i)=>({id:'summary'+i,kind:'markdownBlock',title:'Example summary',datasetRef:d.id,markdown:'Synthetic sample '+i}));spec.layoutIntent.blockOrder=spec.blocks.map(b=>b.id);

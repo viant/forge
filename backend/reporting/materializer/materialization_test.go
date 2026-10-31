@@ -109,7 +109,7 @@ func TestSyntheticGojaMaterializationMatchesOfficialNodeOutput(t *testing.T) {
 			if got := canonicalJSONSHA256(artifacts.ReportFill); got != golden.ReportFill {
 				t.Fatalf("ReportFill parity mismatch: got=%s want=%s", got, golden.ReportFill)
 			}
-			if got := rawJSONSHA256(artifacts.ReportPrint); got != golden.ReportPrint {
+			if got := rawJSONSHA256(printContentWithoutMembership(t, artifacts.ReportPrint)); got != golden.ReportPrint {
 				t.Fatalf("ReportPrint parity mismatch: got=%s want=%s", got, golden.ReportPrint)
 			}
 		})
@@ -178,4 +178,19 @@ func canonicalJSONSHA256(raw []byte) string {
 	}
 	digest := sha256.Sum256(canonical)
 	return hex.EncodeToString(digest[:])
+}
+
+// Keep the pre-membership print-content golden byte-for-byte, projecting only
+// the additive metadata. Object key order and all visual/cell bytes survive.
+func printContentWithoutMembership(t *testing.T, raw json.RawMessage) json.RawMessage {
+	t.Helper()
+	runtime := goja.New()
+	if err := runtime.Set("printJSON", string(raw)); err != nil {
+		t.Fatal(err)
+	}
+	projected, err := runtime.RunString("var printArtifact = JSON.parse(printJSON); if (!Array.isArray(printArtifact.visibleBlockIds)) throw Error('missing visibility membership'); delete printArtifact.visibleBlockIds; JSON.stringify(printArtifact)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return []byte(projected.String())
 }
