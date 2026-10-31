@@ -6,7 +6,7 @@ import {resolveCategoryColor,resolveChartCategoryColor} from '../components/char
 import { compactReportPrintSequence, wrapReportPrintLabel } from "./reportPrintLabels.js";
 import { formatExportNumericValue } from "./reportExportValueFormatter.js";
 import { normalizeChartAnnotations, resolveChartAnnotationStrokeDasharray } from "./reportChartAnnotations.js";
-import { formatChartXAxisValue, readChartDataValue, isChartNumericValue, buildChartBarPath, applyChartRowLimit } from "../components/chartData.js";
+import { formatChartXAxisValue, readChartDataValue, isChartNumericValue, buildChartBarPath, applyChartRowLimit, orderHorizontalChartRows } from "../components/chartData.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -1248,6 +1248,16 @@ function renderHorizontalBarChartSvg({
   };
 }
 
+// Screen charts limit the aggregated cohort before ordering horizontal bars.
+// Do the same before pagination so native workbook ranges and print pages agree.
+function resolvePrintDisplayRows(chartModel, resolvedChart, rowLimit) {
+  const rows = applyChartRowLimit(resolvedChart?.rows, rowLimit);
+  const type = normalizeString(chartModel?.type || resolvedChart?.type).toLowerCase();
+  return ["horizontal_bar", "funnel_bar"].includes(type)
+    ? orderHorizontalChartRows(rows, resolvedChart?.seriesKeys?.[0], chartModel?.preserveCategoryOrder === true)
+    : rows;
+}
+
 export function buildReportPrintChartSvg({
   chartModel = {},
   resolvedChart = {},
@@ -1259,7 +1269,7 @@ export function buildReportPrintChartSvg({
   if(resolvedChart?.kind === "heatmap") return heatmapSvg(buildHeatmap(chartModel.heatmap,resolvedChart.rows),width);
   // Resolved rows already contain complete category aggregations. Limit marks,
   // never source rows, so duplicate categories retain their complete values.
-  resolvedChart = { ...resolvedChart, rows: applyChartRowLimit(resolvedChart?.rows, rowLimit) };
+  resolvedChart = { ...resolvedChart, rows: resolvePrintDisplayRows(chartModel, resolvedChart, rowLimit) };
   const kind = normalizeString(resolvedChart?.kind);
   if (kind === "category") {
     return renderCategoryChartSvg({ chartModel, resolvedChart, width });
@@ -1287,7 +1297,7 @@ export function buildReportPrintChartPages({ chartModel = {}, resolvedChart = {}
   if(isScenarioType(resolvedChart?.kind)) return scenarioPrintPages(chartModel,resolvedChart,{width,maxHeight,firstMaxHeight});
   if(resolvedChart?.kind === "category-range") return categoryRangePrintPages(buildCategoryRange(chartModel.categoryRange,resolvedChart.rows),{width,maxHeight,firstMaxHeight});
   if(resolvedChart?.kind === "heatmap") return heatmapPrintPages(buildHeatmap(chartModel.heatmap,resolvedChart.rows),{width,maxHeight,firstMaxHeight});
-  resolvedChart = { ...resolvedChart, rows: applyChartRowLimit(resolvedChart?.rows, rowLimit) };
+  resolvedChart = { ...resolvedChart, rows: resolvePrintDisplayRows(chartModel, resolvedChart, rowLimit) };
   const type = normalizeString(chartModel?.type || resolvedChart?.type).toLowerCase();
   if (!["horizontal_bar", "funnel_bar"].includes(type) || !["directSeries", "groupedSeries"].includes(resolvedChart?.kind)) {
     const result = buildReportPrintChartSvg({ chartModel, resolvedChart, width });

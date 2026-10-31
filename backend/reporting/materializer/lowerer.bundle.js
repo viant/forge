@@ -47523,6 +47523,11 @@ Please __addLocaleData before adding additional unit data`);
     }
     return formatTimestamp(value, normalizedTickFormat, valueMode);
   }
+  function orderHorizontalChartRows(rows = [], primaryKey, preserveSourceOrder = false) {
+    const ordered = [...rows];
+    if (preserveSourceOrder) return ordered;
+    return ordered.sort((a4, b3) => Number((b3 == null ? void 0 : b3[primaryKey]) || 0) - Number((a4 == null ? void 0 : a4[primaryKey]) || 0));
+  }
   var CHART_BAR_END_RADIUS = 6;
   function resolveChartBarRadius(width, height) {
     const w2 = Math.abs(Number(width)), h4 = Math.abs(Number(height));
@@ -62708,6 +62713,12 @@ ${indent}${end}`;
       labelDetails
     };
   }
+  function resolvePrintDisplayRows(chartModel, resolvedChart, rowLimit) {
+    var _a5;
+    const rows = applyChartRowLimit(resolvedChart == null ? void 0 : resolvedChart.rows, rowLimit);
+    const type = normalizeString39((chartModel == null ? void 0 : chartModel.type) || (resolvedChart == null ? void 0 : resolvedChart.type)).toLowerCase();
+    return ["horizontal_bar", "funnel_bar"].includes(type) ? orderHorizontalChartRows(rows, (_a5 = resolvedChart == null ? void 0 : resolvedChart.seriesKeys) == null ? void 0 : _a5[0], (chartModel == null ? void 0 : chartModel.preserveCategoryOrder) === true) : rows;
+  }
   function buildReportPrintChartSvg({
     chartModel = {},
     resolvedChart = {},
@@ -62717,7 +62728,7 @@ ${indent}${end}`;
     if (isScenarioType(resolvedChart == null ? void 0 : resolvedChart.kind)) return scenarioPrintSvg(chartModel, resolvedChart, width);
     if ((resolvedChart == null ? void 0 : resolvedChart.kind) === "category-range") return categoryRangeSvg(buildCategoryRange(chartModel.categoryRange, resolvedChart.rows), width);
     if ((resolvedChart == null ? void 0 : resolvedChart.kind) === "heatmap") return heatmapSvg(buildHeatmap(chartModel.heatmap, resolvedChart.rows), width);
-    resolvedChart = { ...resolvedChart, rows: applyChartRowLimit(resolvedChart == null ? void 0 : resolvedChart.rows, rowLimit) };
+    resolvedChart = { ...resolvedChart, rows: resolvePrintDisplayRows(chartModel, resolvedChart, rowLimit) };
     const kind = normalizeString39(resolvedChart == null ? void 0 : resolvedChart.kind);
     if (kind === "category") {
       return renderCategoryChartSvg({ chartModel, resolvedChart, width });
@@ -62744,7 +62755,7 @@ ${indent}${end}`;
     if (isScenarioType(resolvedChart == null ? void 0 : resolvedChart.kind)) return scenarioPrintPages(chartModel, resolvedChart, { width, maxHeight, firstMaxHeight });
     if ((resolvedChart == null ? void 0 : resolvedChart.kind) === "category-range") return categoryRangePrintPages(buildCategoryRange(chartModel.categoryRange, resolvedChart.rows), { width, maxHeight, firstMaxHeight });
     if ((resolvedChart == null ? void 0 : resolvedChart.kind) === "heatmap") return heatmapPrintPages(buildHeatmap(chartModel.heatmap, resolvedChart.rows), { width, maxHeight, firstMaxHeight });
-    resolvedChart = { ...resolvedChart, rows: applyChartRowLimit(resolvedChart == null ? void 0 : resolvedChart.rows, rowLimit) };
+    resolvedChart = { ...resolvedChart, rows: resolvePrintDisplayRows(chartModel, resolvedChart, rowLimit) };
     const type = normalizeString39((chartModel == null ? void 0 : chartModel.type) || (resolvedChart == null ? void 0 : resolvedChart.type)).toLowerCase();
     if (!["horizontal_bar", "funnel_bar"].includes(type) || !["directSeries", "groupedSeries"].includes(resolvedChart == null ? void 0 : resolvedChart.kind)) {
       const result = buildReportPrintChartSvg({ chartModel, resolvedChart, width });
