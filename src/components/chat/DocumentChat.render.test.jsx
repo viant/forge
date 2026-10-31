@@ -121,12 +121,19 @@ describe('document composer and task discovery', () => {
         await render(<Composer appearance="document" draftKey="a" commandCenter showAbort onAbort={abort}
             queueRunning queuedTurns={[queued]} onQueueSteer={steer} onQueueCancel={cancel}
             attachments={[{name: 'example.csv'}]} onRemoveAttachment={remove}/>);
-        await click(host.querySelector('[data-testid=chat-composer-abort]')); expect(abort).toHaveBeenCalledOnce();
+        const stop=host.querySelector('[data-testid=chat-composer-abort]');
+        expect(host.querySelector('[data-testid=chat-composer-send]')).toBeNull();
+        expect(stop.classList.contains('forge-document-send')).toBe(true);
+        await click(stop); expect(abort).toHaveBeenCalledOnce();
         await click(host.querySelector('[aria-label="Remove example.csv"]')); expect(remove).toHaveBeenCalledWith(0);
         await click([...host.querySelectorAll('button')].find(button => button.textContent === 'Steer'));
         expect(steer).toHaveBeenCalledWith(queued);
         await click(host.querySelector('[aria-label="Remove queued request"]')); expect(cancel).toHaveBeenCalledWith(queued);
         await change(host.querySelector('textarea'), 'Next question'); expect(host.querySelector('textarea').value).toBe('Next question');
+        await render(<Composer appearance="document" draftKey="a" commandCenter showAbort={false} onAbort={abort}/>);
+        expect(host.querySelector('[data-testid=chat-composer-abort]')).toBeNull();
+        expect(host.querySelector('[data-testid=chat-composer-send]').disabled).toBe(false);
+        expect(host.querySelector('textarea').value).toBe('Next question');
     });
 
     it('shows every authored task, counts/search/recovery and fills without sending', async () => {
