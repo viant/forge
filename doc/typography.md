@@ -17,6 +17,13 @@ content and variant selection. Customer styling never belongs in shared code.
 
 ## Foundation map
 
+The document Composer reuses its existing showAbort/onAbort action in the Send
+position. While showAbort is true, only Stop response is rendered there, using
+the same primary button class, dimensions, focus and touch target. Otherwise Send
+returns. Draft entry, attachments, queue/steering and the abort callback retain
+their existing behavior. DocumentChat.render.test.jsx checks the exclusive action,
+callback and retained draft; host browser proof exercises the real specimen.
+
 | Foundation | Existing contract and use |
 | --- | --- |
 | Colors | Core's surface, text, border, interaction, disabled, validation, status and data roles. Use meaning rather than a palette color name. |
