@@ -2713,8 +2713,20 @@
         "validate": {
           "type": "string"
         },
+        "validation": {
+          "$ref": "#/$defs/DraftFormValidation"
+        },
         "wrapContent": {
           "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "DraftFormValidation": {
+      "additionalProperties": true,
+      "properties": {
+        "schemaRef": {
+          "type": "string"
         }
       },
       "type": "object"
@@ -7523,13 +7535,13 @@
   "$ref": "#/$defs/Window",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "x-forge-provenance": {
-    "baseCommit": "989229b6a703790390af8d1b45b9a500c73f05c4",
+    "baseCommit": "719fc3b021cb4d646db5f10823ab6a3a2ad5ba5c",
     "generator": "scripts/window-schema/main.go",
     "sha256": {
       "choice_browser.go": "935cbeddb231dd329374114c5f38454dc7c44c2ab70a45ea3c0f37ce7f3aee26",
       "datasource_projection.go": "87f165b7c9558d0c43fadc6b006bb0f110bd905226b5301dcb5d8a06eb2a692e",
       "dialog_resource.go": "36dbaee1db9c979ba32359f29d61af006ae9bcb32e8b35e74c6fa0a4243466e8",
-      "draft_lifecycle.go": "ea0a0ab48cfb01645a019907c3b5ffc19e1bf0e273046ce98f1d67b08f5699b7",
+      "draft_lifecycle.go": "fc0cf313d1cc970e0401f211eaf6772a726419c90950ac6117f85a326b998692",
       "form.go": "aa2114822f1e688942aa4b63ec51c4b4c0f728b44b6d82b8b04fbf95efa807f0",
       "gate_requirements_editor.go": "94b32304fae82298136f1b9ed5f6d440e427ab74aaccfafca0382721e3edc0a9",
       "github.com/viant/forge/backend/datasource/contract.argument_projection.go": "d516237702990088462ce88689ed3056f8129369354d44e70e6116baaa2c644d",
@@ -7566,7 +7578,7 @@
       "model.go": "dcf76f651cb09b19b5ea5447336cb57db3552a6ec708ce9f05ad0c551a17368f",
       "parameter_editor.go": "a176f3b63d74714d216daf57ba5c3c3ee8e12aaf8ccf2c0ee1b663c95a657bf6",
       "predicate_composition_editor.go": "881bcf68a5f5e16cae2f58ef7495ac14582398236cfd263cc8585e89f97cab4b",
-      "presentation_primitives.go": "49535f1c03a88c1a7960f17233f6491b611b1252b5b168e44227c0c97ab1bfcb",
+      "presentation_primitives.go": "4b2fdcf0fffb902dd8a8dee7c17d1075faa5d62ab74e1d2551f29935215905aa",
       "preview_workbench.go": "eccac81a142c97d69c2e86be4443a4c79719f57a195ca4270540baa1c15636d6",
       "reader_workbench.go": "4c41b6e595a1152d9dd002144bb974057616338c1bf813a053d0dcb64e7895c0",
       "resource_assignment.go": "80ad53f8050041d9e652f3954084f6148fc8e53c324510126904a5ab35e3507e",
