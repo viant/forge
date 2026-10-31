@@ -66,3 +66,60 @@ it('loads a declared source through the mounted native datasource transport and 
   expect(calls).toHaveLength(1);expect(calls[0].dataSourceRef).toBe('settings');
  }finally{await settle(()=>root.unmount());host.remove();removeSignalsForKey(windowId)}
 });
+
+it('samples source parameters per opening; only an explicit opening key change reseeds the form',async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ const f=fixture('draft-context-audit',11),host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ f.lifecycle.key=[];
+ const render=()=>root.render(<DraftForm context={f.context} container={{id:'audit',draftForm:{lifecycle:f.lifecycle}}}/>);
+ try {
+  await settle(render);
+  await settle(()=>{f.edit({name:'Typed before parent selection'});f.window({parentId:22});});
+  expect(f.requests).toHaveLength(1);
+  expect(f.requests[0].parameters).toEqual({id:11});
+  expect(f.form().name).toBe('Typed before parent selection');
+  // Current contract has no separate refresh-context trigger: the outstanding
+  // opening remains current despite source parameter values having changed.
+  await settle(()=>f.requests[0].resolve([{currency:'OLD'}]));
+  expect(f.form().currency).toBe('OLD');
+  f.lifecycle={...f.lifecycle,key:[{name:'parentId',in:'windowForm',location:'parentId'}]};
+  await settle(render);
+  expect(f.requests).toHaveLength(2);
+  expect(f.requests[1].parameters).toEqual({id:22});
+  expect(f.form().name).toBe('');
+ } finally {await settle(()=>root.unmount());host.remove()}
+});
+
+it('watches defaults context without reseeding edits and gates unresolved or denied reads',async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ const f=fixture('draft-watch',0),host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ f.window({allowed:true});
+ f.lifecycle={...f.lifecycle,key:[],source:{...f.lifecycle.source,
+  watch:[{name:'parentId',in:'windowForm',location:'parentId'}],
+  when:{all:[{source:'windowForm',field:'parentId',gt:0},{source:'windowForm',field:'allowed',equals:true}]},
+ }};
+ try {
+  await settle(()=>root.render(<DraftForm context={f.context} container={{id:'watch',draftForm:{lifecycle:f.lifecycle}}}/>));
+  expect(f.requests).toHaveLength(0);expect(host.textContent).toContain('Waiting for defaults context');
+  await settle(()=>{f.edit({name:'Keep typed name'});f.window({parentId:11});});
+  expect(f.requests).toHaveLength(1);expect(f.requests[0].parameters).toEqual({id:11});
+  await settle(()=>f.window({parentId:22}));expect(f.requests).toHaveLength(2);
+  await settle(()=>f.requests[0].resolve([{name:'Old name',currency:'OLD'}]));
+  expect(f.form().name).toBe('Keep typed name');expect(f.form().currency).toBeUndefined();
+  await settle(()=>f.requests[1].resolve([{name:'Current name',currency:'EUR'}]));
+  expect(f.form().name).toBe('Keep typed name');expect(f.form().currency).toBe('EUR');
+  await settle(()=>f.window({parentId:33}));expect(f.requests).toHaveLength(3);
+  await settle(()=>f.window({allowed:false}));
+  await settle(()=>f.requests[2].resolve([{currency:'DENIED'}]));
+  expect(f.form().currency).toBe('EUR');expect(host.textContent).toContain('Waiting for defaults context');
+  await settle(()=>f.window({parentId:44}));expect(f.requests).toHaveLength(3);
+  await settle(()=>f.window({allowed:true}));expect(f.requests).toHaveLength(4);
+  await settle(()=>f.requests[3].resolve([{name:'Latest baseline',currency:'GBP'}]));
+  expect(f.form()).toMatchObject({name:'Keep typed name',currency:'GBP'});
+  await settle(()=>[...host.querySelectorAll('button')].find(el=>el.textContent==='Reset').click());
+  expect(f.form().name).toBe('Latest baseline');expect(f.context.signals.formStatus.peek().dirty).toBe(false);
+  await settle(()=>{f.edit({name:'Discard on reopen'});f.window({open:false});});
+  await settle(()=>f.window({open:true}));
+  expect(f.form().name).toBe('');expect(f.requests).toHaveLength(5);
+ }finally{await settle(()=>root.unmount());host.remove()}
+});

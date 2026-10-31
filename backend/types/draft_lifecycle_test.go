@@ -11,7 +11,7 @@ import (
 
 func TestDraftLifecycleRoundTrip(t *testing.T) {
 	// Independently authored neutral metadata, with two different opening contexts.
-	source := `{"dataSourceRef":"draft","lifecycle":{"openWhen":{"source":"windowForm","field":"open","equals":true},"key":[{"name":"parentId","in":"windowForm","location":"parentId"}],"defaults":[{"name":"enabled","default":false},{"name":"count","default":0},{"name":"nullable","default":null},{"name":"name","default":""},{"name":"omitted"}],"source":{"dataSourceRef":"settings","parameters":[{"name":"id","in":"windowForm","location":"parentId"}],"defaults":[{"name":"currency","in":"form","location":"settings.currency","default":"USD"}]},"load":"Host.prepareDefaults"},"validate":"Host.validate","submit":{"dataSourceRef":"writer","prepare":"Host.prepare"}}`
+	source := `{"dataSourceRef":"draft","lifecycle":{"openWhen":{"source":"windowForm","field":"open","equals":true},"key":[{"name":"parentId","in":"windowForm","location":"parentId"}],"defaults":[{"name":"enabled","default":false},{"name":"count","default":0},{"name":"nullable","default":null},{"name":"name","default":""},{"name":"omitted"}],"source":{"dataSourceRef":"settings","watch":[{"name":"parentId","in":"windowForm","location":"parentId"}],"when":{"source":"windowForm","field":"parentId","gt":0},"parameters":[{"name":"id","in":"windowForm","location":"parentId"}],"defaults":[{"name":"currency","in":"form","location":"settings.currency","default":"USD"}]},"load":"Host.prepareDefaults"},"validate":"Host.validate","submit":{"dataSourceRef":"writer","prepare":"Host.prepare"}}`
 	var input DraftFormSpec
 	if err := json.Unmarshal([]byte(source), &input); err != nil {
 		t.Fatal(err)
@@ -59,5 +59,12 @@ func TestDraftLifecycleValidation(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), tc.want) {
 			t.Fatalf("%s: got %v, want %s", tc.source, err, tc.want)
 		}
+	}
+}
+
+func TestDraftLifecycleWatchValidation(t *testing.T) {
+	draft := &DraftFormSpec{Lifecycle: &DraftLifecycleSpec{Source: &DraftLifecycleSource{DataSourceRef: "settings", Watch: []map[string]interface{}{{"default": 0}}}}}
+	if err := validateDraftLifecycle(&Window{}, draft, "draft", false); err == nil || !strings.Contains(err.Error(), "requires name") {
+		t.Fatalf("invalid watch row accepted: %v", err)
 	}
 }

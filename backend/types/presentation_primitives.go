@@ -3,6 +3,8 @@ package types
 // DraftLifecycleSpec opts a draft into a fresh baseline per opening/context key.
 // Load names a caller-owned handler returning a defaults map; business policy stays there.
 type DraftLifecycleSource struct {
+	Watch         []map[string]interface{} `json:"watch,omitempty" yaml:"watch,omitempty"`
+	When          map[string]interface{}   `json:"when,omitempty" yaml:"when,omitempty"`
 	DataSourceRef string                   `json:"dataSourceRef" yaml:"dataSourceRef"`
 	Parameters    []map[string]interface{} `json:"parameters,omitempty" yaml:"parameters,omitempty"`
 	Defaults      []map[string]interface{} `json:"defaults,omitempty" yaml:"defaults,omitempty"`

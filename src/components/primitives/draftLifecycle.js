@@ -57,11 +57,21 @@ export function createDraftLifecycle(context, notify = () => {}) {
       if (active && revision === generation) notify({status: 'failed', error: error?.message || 'Draft defaults could not be loaded.'});
     }
   }
+  function suspend() {
+    generation++; controller?.abort(); notify({status: 'waiting'});
+  }
   return {
-    open({defaults = {}, key = {}, load: nextLoader} = {}) {
+    open({defaults = {}, key = {}, load: nextLoader, enabled = true} = {}) {
       controller?.abort(); generation++;
       active = true; loader = nextLoader; parameters = defaultsMap(key);
       publish(defaultsMap(defaults));
+      if (!enabled) { suspend(); return; }
+      return load();
+    },
+    refresh(nextLoader, enabled = true) {
+      if (!active) return;
+      loader = nextLoader;
+      if (!enabled) { suspend(); return; }
       return load();
     },
     retry() { if (active) return load(); },
