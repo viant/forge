@@ -927,6 +927,34 @@ assert.equal(
   }),
   "Display, CTV",
 );
+// Independent neutral metadata; numeric and string IDs must remain distinct.
+const scopeChoiceOptions = [
+  { value: 1, label: "Numeric mode" },
+  { value: "1", label: "Text mode" },
+  { value: 0, label: "Zero mode" },
+  { value: false, label: "Disabled mode" },
+  { value: 2, label: "" },
+];
+for (const [value, expected] of [
+  [1, "Numeric mode"], ["1", "Text mode"], [0, "Zero mode"], [false, "Disabled mode"],
+  [["1", 1, false, 0, 99], "Text mode, Numeric mode, Disabled mode, Zero mode, 99"],
+  [99, "99"], ["unknown", "unknown"], [2, "2"], [null, "Not set"],
+  [undefined, "Not set"], [[], "None"], ["", ""],
+  [{ start: "2026-01-01" }, "2026-01-01 to open"],
+]) {
+  const param = { options: scopeChoiceOptions, value };
+  const before = JSON.stringify(param);
+  assert.equal(formatReportRuntimeScopeValue(param), expected);
+  assert.equal(JSON.stringify(param), before);
+}
+assert.equal(formatReportRuntimeScopeValue({ value: [0, false, "unknown"] }), "0, false, unknown");
+const choiceScopeSpec = { scope: { params: [{ id: "mode", label: "Mode", options: scopeChoiceOptions, value: 1 }] } };
+const choiceScopeBefore = JSON.stringify(choiceScopeSpec);
+const choiceScopeSummary = resolveReportRuntimeScopeSummary(choiceScopeSpec);
+assert.deepEqual(choiceScopeSummary.params[0].options, scopeChoiceOptions);
+assert.notEqual(choiceScopeSummary.params[0].options, scopeChoiceOptions);
+assert.equal(formatReportRuntimeScopeValue(choiceScopeSummary.params[0]), "Numeric mode");
+assert.equal(JSON.stringify(choiceScopeSpec), choiceScopeBefore);
 assert.equal(
   formatReportRuntimeRefinement({
     op: "drill",

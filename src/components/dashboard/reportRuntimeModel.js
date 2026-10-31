@@ -1,5 +1,6 @@
 import { resolveNormalizedReportSpecDocumentContext } from "./reportBuilderSavedRecordMetadataContext.js";
 import { buildReportLayoutItem } from "../../reporting/reportLayoutModel.js";
+import { reportBuilderOptionValueKey } from "./reportBuilderOptions.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -167,6 +168,7 @@ function normalizeScopeParams(params = []) {
         id,
         label,
         ...(description ? { description } : {}),
+        ...(Array.isArray(param?.options) ? { options: cloneValue(param.options) } : {}),
         value: cloneValue(param?.value),
       };
     })
@@ -576,11 +578,16 @@ export function formatReportRuntimeScopeValue(param = {}) {
     const end = normalizeString(value?.end);
     return [start || "open", end || "open"].join(" to ");
   }
+  const options = Array.isArray(param?.options) ? param.options : [];
+  const formatChoice = (selected) => {
+    const option = options.find((entry) => reportBuilderOptionValueKey(entry?.value) === reportBuilderOptionValueKey(selected));
+    return normalizeString(option?.label) || formatValue(selected);
+  };
   if (Array.isArray(value)) {
-    return formatList(value) || "None";
+    return value.map(formatChoice).filter(Boolean).join(", ") || "None";
   }
-  const normalized = normalizeString(value);
-  return normalized || (value == null ? "Not set" : String(value));
+  if (value != null) return formatChoice(value);
+  return "Not set";
 }
 
 export function formatReportRuntimeRefinement(refinement = {}) {
