@@ -419,7 +419,11 @@ func (s *resourceReadSequence) AfterDispatch(ctx context.Context) error {
 		return nil
 	}
 	s.mu.Unlock()
-	err := s.startPhase(ctx)
+	// The last producer resumes the shared operation's POST phase. A worker
+	// may have been cancelled because another producer failed; that local
+	// cancellation must not poison the still-live owner's authority checks.
+	// Retain its values so credential and resource-pin changes remain visible.
+	err := s.startPhase(dispatchCompletionContext{Context: context.WithoutCancel(ctx), owner: s.base})
 	if err != nil {
 		s.mu.Lock()
 		s.failed = err
@@ -427,6 +431,15 @@ func (s *resourceReadSequence) AfterDispatch(ctx context.Context) error {
 	}
 	return err
 }
+
+type dispatchCompletionContext struct {
+	context.Context
+	owner context.Context
+}
+
+func (c dispatchCompletionContext) Deadline() (time.Time, bool) { return c.owner.Deadline() }
+func (c dispatchCompletionContext) Done() <-chan struct{}       { return c.owner.Done() }
+func (c dispatchCompletionContext) Err() error                  { return c.owner.Err() }
 
 func (s *resourceReadSequence) BeforeRelease(ctx context.Context) error {
 	s.transition.Lock()
