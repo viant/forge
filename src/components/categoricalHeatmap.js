@@ -1,4 +1,5 @@
 import {measureChartText} from './chartTextMeasure.js';
+import {numericDisplayFormatSchema,validateNumericDisplayFormat,formatRangeValue} from './categoryRange.js';
 // Generic categorical matrix contract. No producer or business-field inference.
 const hex = /^#[0-9a-f]{6}$/i;
 export const heatmapSchema = {
@@ -9,7 +10,7 @@ export const heatmapSchema = {
     ...Object.fromEntries(['rowCategories','columnCategories'].map(key=>[key,{type:'array',minItems:1,uniqueItems:true,items:{type:'string',minLength:1}}])),
     colorScale:{type:'object',additionalProperties:false,required:['type','domain','colors'],properties:{type:{enum:['sequential','diverging']},domain:{oneOf:[{const:'auto'},{type:'array',minItems:2,maxItems:3,items:{type:'number'}}]},colors:{type:'array',minItems:2,maxItems:3,items:{type:'string',pattern:'^#[0-9a-fA-F]{6}$'}}}},
     noData:{type:'object',additionalProperties:false,properties:{color:{type:'string',pattern:'^#[0-9a-fA-F]{6}$'},label:{type:'string',minLength:1}}},
-    cellLabels:{type:'boolean'},legend:{type:'boolean'},
+    cellLabels:{type:'boolean'},legend:{type:'boolean'},format:numericDisplayFormatSchema,
   },
 };
 export function normalizeHeatmap(input) {
@@ -31,6 +32,7 @@ export function normalizeHeatmap(input) {
   if (input.noData?.color!==undefined&&!hex.test(input.noData.color)) throw new Error('Heatmap no-data color must be a six-digit hex color.');
   if (input.noData?.label!==undefined&&(typeof input.noData.label!=='string'||!input.noData.label)) throw new Error('Heatmap no-data label must be nonempty.');
   for(const field of ['cellLabels','legend']) if(input[field]!==undefined&&typeof input[field]!=='boolean') throw new Error(`Heatmap ${field} must be boolean.`);
+  validateNumericDisplayFormat(input.format);
   return JSON.parse(JSON.stringify({...input,noData:{color:'#eeeeee',label:'No data',...input.noData},cellLabels:input.cellLabels??true,legend:input.legend??true}));
 }
 function colorAt(value,{domain,colors}) {
@@ -44,6 +46,8 @@ function colorAt(value,{domain,colors}) {
   const a=channels(colors[index]),b=channels(colors[index+1]);
   return '#'+a.map((v,i)=>Math.round(v+(b[i]-v)*t).toString(16).padStart(2,'0')).join('');
 }
+// Presentation alone consumes format; domains, colors and source rows stay raw.
+const heatmapDisplayValue=(value,config)=>config.format===undefined?String(value):formatRangeValue(value,config);
 export function buildHeatmap(input,rows=[]) {return buildHeatmapModel(input,rows);}
 function buildHeatmapModel(input,rows=[],resolvedScale) {
   const config=normalizeHeatmap(input), pairs=new Map();
@@ -67,15 +71,15 @@ function buildHeatmapModel(input,rows=[],resolvedScale) {
   }
   const cells=config.rowCategories.flatMap((rowValue,r)=>config.columnCategories.map((columnValue,c)=>{
     const row=pairs.get(`${r}:${c}`), value=row?.[config.valueField]??null;
-    return {r,c,rowValue,columnValue,row:row??null,value,state:!row?'absent':value===null?'null':'value',color:value===null?config.noData.color:colorAt(value,scale),label:value===null?config.noData.label:String(value)};
+    return {r,c,rowValue,columnValue,row:row??null,value,state:!row?'absent':value===null?'null':'value',color:value===null?config.noData.color:colorAt(value,scale),label:value===null?config.noData.label:heatmapDisplayValue(value,config)};
   }));
   return {config,cells,scale};
 }
 function heatmapLegend({config,scale=config.colorScale}) {
   if(!config.legend)return [];
   const stops=scale.domain.length===2&&scale.domain[0]===scale.domain[1]
-    ? [{label:String(scale.domain[0]),color:colorAt(scale.domain[0],scale)}]
-    : scale.domain.map((value,i)=>({label:String(value),color:scale.colors[i]}));
+    ? [{label:heatmapDisplayValue(scale.domain[0],config),color:colorAt(scale.domain[0],scale)}]
+    : scale.domain.map((value,i)=>({label:heatmapDisplayValue(value,config),color:scale.colors[i]}));
   return [...stops,{label:config.noData.label,color:config.noData.color}];
 }
 export function heatmapSelection(config,cell) {

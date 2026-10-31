@@ -47681,7 +47681,8 @@ Please __addLocaleData before adding additional unit data`);
       colorScale: { type: "object", additionalProperties: false, required: ["type", "domain", "colors"], properties: { type: { enum: ["sequential", "diverging"] }, domain: { oneOf: [{ const: "auto" }, { type: "array", minItems: 2, maxItems: 3, items: { type: "number" } }] }, colors: { type: "array", minItems: 2, maxItems: 3, items: { type: "string", pattern: "^#[0-9a-fA-F]{6}$" } } } },
       noData: { type: "object", additionalProperties: false, properties: { color: { type: "string", pattern: "^#[0-9a-fA-F]{6}$" }, label: { type: "string", minLength: 1 } } },
       cellLabels: { type: "boolean" },
-      legend: { type: "boolean" }
+      legend: { type: "boolean" },
+      format: numericDisplayFormatSchema
     }
   };
   function normalizeHeatmap(input) {
@@ -47704,6 +47705,7 @@ Please __addLocaleData before adding additional unit data`);
     if (((_a5 = input.noData) == null ? void 0 : _a5.color) !== void 0 && !hex.test(input.noData.color)) throw new Error("Heatmap no-data color must be a six-digit hex color.");
     if (((_b = input.noData) == null ? void 0 : _b.label) !== void 0 && (typeof input.noData.label !== "string" || !input.noData.label)) throw new Error("Heatmap no-data label must be nonempty.");
     for (const field2 of ["cellLabels", "legend"]) if (input[field2] !== void 0 && typeof input[field2] !== "boolean") throw new Error(`Heatmap ${field2} must be boolean.`);
+    validateNumericDisplayFormat(input.format);
     return JSON.parse(JSON.stringify({ ...input, noData: { color: "#eeeeee", label: "No data", ...input.noData }, cellLabels: (_c = input.cellLabels) != null ? _c : true, legend: (_d = input.legend) != null ? _d : true }));
   }
   function colorAt(value, { domain, colors }) {
@@ -47715,6 +47717,7 @@ Please __addLocaleData before adding additional unit data`);
     const a4 = channels(colors[index]), b3 = channels(colors[index + 1]);
     return "#" + a4.map((v3, i3) => Math.round(v3 + (b3[i3] - v3) * t3).toString(16).padStart(2, "0")).join("");
   }
+  var heatmapDisplayValue = (value, config) => config.format === void 0 ? String(value) : formatRangeValue(value, config);
   function buildHeatmap(input, rows = []) {
     return buildHeatmapModel(input, rows);
   }
@@ -47744,13 +47747,13 @@ Please __addLocaleData before adding additional unit data`);
     const cells = config.rowCategories.flatMap((rowValue, r2) => config.columnCategories.map((columnValue, c3) => {
       var _a5;
       const row = pairs2.get(`${r2}:${c3}`), value = (_a5 = row == null ? void 0 : row[config.valueField]) != null ? _a5 : null;
-      return { r: r2, c: c3, rowValue, columnValue, row: row != null ? row : null, value, state: !row ? "absent" : value === null ? "null" : "value", color: value === null ? config.noData.color : colorAt(value, scale), label: value === null ? config.noData.label : String(value) };
+      return { r: r2, c: c3, rowValue, columnValue, row: row != null ? row : null, value, state: !row ? "absent" : value === null ? "null" : "value", color: value === null ? config.noData.color : colorAt(value, scale), label: value === null ? config.noData.label : heatmapDisplayValue(value, config) };
     }));
     return { config, cells, scale };
   }
   function heatmapLegend({ config, scale = config.colorScale }) {
     if (!config.legend) return [];
-    const stops = scale.domain.length === 2 && scale.domain[0] === scale.domain[1] ? [{ label: String(scale.domain[0]), color: colorAt(scale.domain[0], scale) }] : scale.domain.map((value, i3) => ({ label: String(value), color: scale.colors[i3] }));
+    const stops = scale.domain.length === 2 && scale.domain[0] === scale.domain[1] ? [{ label: heatmapDisplayValue(scale.domain[0], config), color: colorAt(scale.domain[0], scale) }] : scale.domain.map((value, i3) => ({ label: heatmapDisplayValue(value, config), color: scale.colors[i3] }));
     return [...stops, { label: config.noData.label, color: config.noData.color }];
   }
   var escape4 = (value) => String(value).replace(/[&<>"']/g, (c3) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c3]);
@@ -50600,11 +50603,100 @@ Please __addLocaleData before adding additional unit data`);
     return prefix ? normalizedTarget.slice(prefix.length).trim() : "";
   }
 
-  // src/components/dashboard/reportBuilderExplorationSession.js
+  // src/components/dashboard/reportBuilderOptions.js
+  function cloneValue8(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+  }
   function normalizeString13(value = "") {
     return String(value || "").trim();
   }
-  function cloneValue8(value) {
+  function isEntityOptionName(name = "") {
+    const normalized = normalizeString13(name).replace(/[^a-zA-Z0-9]/g, "");
+    return /^(account|agency|advertiser|campaign|order|line(item)?|audience|creative|pixel)(id|ids)?$/i.test(normalized);
+  }
+  function normalizedType(value = "") {
+    const type = normalizeString13(value).toLowerCase();
+    if (["bool", "boolean"].includes(type)) return "boolean";
+    if (["int", "integer"].includes(type)) return "integer";
+    if (["number", "float", "double"].includes(type)) return "number";
+    return "string";
+  }
+  function coerceValue(value, type) {
+    if (type === "boolean") {
+      if (value === true || value === false) return value;
+      if (value === "true" || value === 1 || value === "1") return true;
+      if (value === "false" || value === 0 || value === "0") return false;
+      return void 0;
+    }
+    if (type === "integer") {
+      const numeric = Number(value);
+      return Number.isInteger(numeric) ? numeric : void 0;
+    }
+    if (type === "number") {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric : void 0;
+    }
+    if (value === void 0 || value === null) return void 0;
+    return String(value);
+  }
+  function reportBuilderOptionValueKey(value) {
+    return `${typeof value}:${JSON.stringify(value)}`;
+  }
+  function normalizeValueEntry(entry, type) {
+    const rawValue = entry && typeof entry === "object" && !Array.isArray(entry) ? entry.value : entry;
+    const value = coerceValue(rawValue, type);
+    if (value === void 0) return null;
+    const label = entry && typeof entry === "object" && !Array.isArray(entry) ? normalizeString13(entry.label) : "";
+    return {
+      value,
+      label: label || String(value)
+    };
+  }
+  function normalizeReportBuilderOptionDefinitions(values = []) {
+    const seen = /* @__PURE__ */ new Set();
+    return (Array.isArray(values) ? values : []).map((entry) => {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
+      const name = normalizeString13(entry.name);
+      if (!name || seen.has(name) || isEntityOptionName(name)) return null;
+      seen.add(name);
+      const type = normalizedType(entry.type);
+      const optionValues = (Array.isArray(entry.values) ? entry.values : []).map((value) => normalizeValueEntry(value, type)).filter(Boolean);
+      const allowedKeys = new Set(optionValues.map((value) => reportBuilderOptionValueKey(value.value)));
+      const coercedDefault = coerceValue(entry.default, type);
+      const defaultValue = coercedDefault !== void 0 && (allowedKeys.size === 0 || allowedKeys.has(reportBuilderOptionValueKey(coercedDefault))) ? coercedDefault : void 0;
+      const presentation = entry.presentation;
+      const anchorBlockId = typeof (presentation == null ? void 0 : presentation.anchorBlockId) === "string" ? presentation.anchorBlockId.trim() : "";
+      return {
+        ...anchorBlockId && (presentation == null ? void 0 : presentation.placement) === "header" ? { presentation: { anchorBlockId, placement: "header" } } : {},
+        name,
+        label: normalizeString13(entry.label) || name,
+        type,
+        description: normalizeString13(entry.description),
+        values: optionValues,
+        ...defaultValue !== void 0 ? { default: defaultValue } : {}
+      };
+    }).filter(Boolean);
+  }
+  function resolveEffectiveReportBuilderOptions(definitions = [], selected = {}) {
+    const source = selected && typeof selected === "object" && !Array.isArray(selected) ? selected : {};
+    return normalizeReportBuilderOptionDefinitions(definitions).reduce((result, definition) => {
+      const allowed = new Set(definition.values.map((entry) => reportBuilderOptionValueKey(entry.value)));
+      const selectedValue = coerceValue(source[definition.name], definition.type);
+      const selectedValid = selectedValue !== void 0 && (allowed.size === 0 || allowed.has(reportBuilderOptionValueKey(selectedValue)));
+      if (selectedValid) {
+        result[definition.name] = selectedValue;
+      } else if (Object.prototype.hasOwnProperty.call(definition, "default")) {
+        result[definition.name] = cloneValue8(definition.default);
+      }
+      return result;
+    }, {});
+  }
+
+  // src/components/dashboard/reportBuilderExplorationSession.js
+  function normalizeString14(value = "") {
+    return String(value || "").trim();
+  }
+  function cloneValue9(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
   }
   function stableSerialize(value) {
@@ -50625,7 +50717,7 @@ Please __addLocaleData before adding additional unit data`);
     return 1e3 * 60 * 60;
   }
   function snapshotExplorationState(state = {}) {
-    const snapshot = cloneValue8(state && typeof state === "object" && !Array.isArray(state) ? state : {});
+    const snapshot = cloneValue9(state && typeof state === "object" && !Array.isArray(state) ? state : {});
     delete snapshot.explorationSession;
     return snapshot;
   }
@@ -50636,9 +50728,9 @@ Please __addLocaleData before adding additional unit data`);
     if (!session || typeof session !== "object" || Array.isArray(session)) {
       return null;
     }
-    const sessionId = normalizeString13(session == null ? void 0 : session.sessionId);
-    const sourceRef = (session == null ? void 0 : session.sourceRef) && typeof session.sourceRef === "object" && !Array.isArray(session.sourceRef) ? cloneValue8(session.sourceRef) : null;
-    const baseSnapshot = (session == null ? void 0 : session.baseSnapshot) && typeof session.baseSnapshot === "object" && !Array.isArray(session.baseSnapshot) ? cloneValue8(session.baseSnapshot) : null;
+    const sessionId = normalizeString14(session == null ? void 0 : session.sessionId);
+    const sourceRef = (session == null ? void 0 : session.sourceRef) && typeof session.sourceRef === "object" && !Array.isArray(session.sourceRef) ? cloneValue9(session.sourceRef) : null;
+    const baseSnapshot = (session == null ? void 0 : session.baseSnapshot) && typeof session.baseSnapshot === "object" && !Array.isArray(session.baseSnapshot) ? cloneValue9(session.baseSnapshot) : null;
     const history = (Array.isArray(session == null ? void 0 : session.history) ? session.history : []).filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry)).map((entry) => ({
       snapshot: snapshotExplorationState(entry.snapshot || {}),
       timestamp: normalizeTimestamp(entry.timestamp, normalizeTimestamp(session == null ? void 0 : session.startedAt, nowMs))
@@ -50667,13 +50759,13 @@ Please __addLocaleData before adding additional unit data`);
   function normalizeReportBuilderExplorationState(state = {}, options = {}) {
     const session = normalizeReportBuilderExplorationSession(state == null ? void 0 : state.explorationSession, options);
     if (!session) {
-      const next = cloneValue8(state && typeof state === "object" && !Array.isArray(state) ? state : {});
+      const next = cloneValue9(state && typeof state === "object" && !Array.isArray(state) ? state : {});
       delete next.explorationSession;
       return next;
     }
     const nowMs = resolveExplorationNow(options);
     if (session.expiresAt <= nowMs) {
-      return cloneValue8(session.baseSnapshot);
+      return cloneValue9(session.baseSnapshot);
     }
     return {
       ...snapshotExplorationState(state),
@@ -50683,10 +50775,10 @@ Please __addLocaleData before adding additional unit data`);
 
   // src/reporting/drillMetadataProvider.js
   var SUPPORTED_REFINEMENT_ACTION_KINDS = /* @__PURE__ */ new Set(["keep", "exclude", "drill", "detail"]);
-  function normalizeString14(value = "") {
+  function normalizeString15(value = "") {
     return String(value || "").trim();
   }
-  function cloneValue9(value) {
+  function cloneValue10(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
   }
   function unwrapPayload(payload = {}, key2 = "") {
@@ -50700,17 +50792,17 @@ Please __addLocaleData before adding additional unit data`);
     if (!detailTarget || typeof detailTarget !== "object" || Array.isArray(detailTarget)) {
       return null;
     }
-    const targetRef = normalizeString14(detailTarget.targetRef);
-    const navigationMode = normalizeString14(detailTarget.navigationMode);
+    const targetRef = normalizeString15(detailTarget.targetRef);
+    const navigationMode = normalizeString15(detailTarget.navigationMode);
     if (!targetRef || !navigationMode) {
       return null;
     }
     return {
       targetRef,
       navigationMode,
-      parameters: detailTarget.parameters && typeof detailTarget.parameters === "object" && !Array.isArray(detailTarget.parameters) ? cloneValue9(detailTarget.parameters) : {},
-      ...normalizeString14(detailTarget.title) ? { title: normalizeString14(detailTarget.title) } : {},
-      ...normalizeString14(detailTarget.description) ? { description: normalizeString14(detailTarget.description) } : {}
+      parameters: detailTarget.parameters && typeof detailTarget.parameters === "object" && !Array.isArray(detailTarget.parameters) ? cloneValue10(detailTarget.parameters) : {},
+      ...normalizeString15(detailTarget.title) ? { title: normalizeString15(detailTarget.title) } : {},
+      ...normalizeString15(detailTarget.description) ? { description: normalizeString15(detailTarget.description) } : {}
     };
   }
   function normalizeRefinementActions(payload = {}) {
@@ -50719,9 +50811,9 @@ Please __addLocaleData before adding additional unit data`);
       if (!action || typeof action !== "object" || Array.isArray(action)) {
         return null;
       }
-      const id = normalizeString14(action.id);
-      const label = normalizeString14(action.label);
-      const kind = normalizeString14(action.kind).toLowerCase();
+      const id = normalizeString15(action.id);
+      const label = normalizeString15(action.label);
+      const kind = normalizeString15(action.kind).toLowerCase();
       if (!id || !label || !SUPPORTED_REFINEMENT_ACTION_KINDS.has(kind)) {
         return null;
       }
@@ -50729,23 +50821,23 @@ Please __addLocaleData before adding additional unit data`);
         id,
         label,
         kind,
-        ...normalizeString14(action.targetRef) ? { targetRef: normalizeString14(action.targetRef) } : {},
-        ...normalizeString14(action.nextFieldRef) ? { nextFieldRef: normalizeString14(action.nextFieldRef) } : {}
+        ...normalizeString15(action.targetRef) ? { targetRef: normalizeString15(action.targetRef) } : {},
+        ...normalizeString15(action.nextFieldRef) ? { nextFieldRef: normalizeString15(action.nextFieldRef) } : {}
       };
     }).filter(Boolean);
   }
 
   // src/reporting/reportBuilderDrillHierarchy.js
-  function normalizeString15(value = "") {
+  function normalizeString16(value = "") {
     return String(value || "").trim();
   }
   function normalizeReportBuilderDrillLevel(level = {}, index = 0) {
     if (!level || typeof level !== "object" || Array.isArray(level)) {
       return null;
     }
-    const field2 = normalizeString15(level.field || level.fieldRef || level.id);
-    const label = normalizeString15(level.label || field2);
-    const id = normalizeString15(level.id || field2 || `level_${index + 1}`);
+    const field2 = normalizeString16(level.field || level.fieldRef || level.id);
+    const label = normalizeString16(level.label || field2);
+    const id = normalizeString16(level.id || field2 || `level_${index + 1}`);
     if (!field2 || !label || !id) {
       return null;
     }
@@ -50764,13 +50856,13 @@ Please __addLocaleData before adding additional unit data`);
     if (levels.length < 2) {
       return null;
     }
-    const id = normalizeString15(hierarchy.id || hierarchy.fieldRef || ((_a5 = levels[0]) == null ? void 0 : _a5.field));
+    const id = normalizeString16(hierarchy.id || hierarchy.fieldRef || ((_a5 = levels[0]) == null ? void 0 : _a5.field));
     if (!id) {
       return null;
     }
     return {
       id,
-      ...normalizeString15(hierarchy.label) ? { label: normalizeString15(hierarchy.label) } : {},
+      ...normalizeString16(hierarchy.label) ? { label: normalizeString16(hierarchy.label) } : {},
       levels
     };
   }
@@ -50779,7 +50871,7 @@ Please __addLocaleData before adding additional unit data`);
   }
 
   // src/reporting/reportBuilderDrillMetadata.js
-  function normalizeString16(value = "") {
+  function normalizeString17(value = "") {
     return String(value || "").trim();
   }
   function resolveDrillMetadataSource(config = {}) {
@@ -50794,7 +50886,7 @@ Please __addLocaleData before adding additional unit data`);
       if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
         return null;
       }
-      const fieldRef = normalizeString16(entry.fieldRef || entry.field || entry.id);
+      const fieldRef = normalizeString17(entry.fieldRef || entry.field || entry.id);
       if (!fieldRef) {
         return null;
       }
@@ -50867,95 +50959,6 @@ Please __addLocaleData before adding additional unit data`);
       return effectiveType === "bar" || effectiveType === "area";
     }
     return baseType === "horizontal_bar";
-  }
-
-  // src/components/dashboard/reportBuilderOptions.js
-  function cloneValue10(value) {
-    return value == null ? value : JSON.parse(JSON.stringify(value));
-  }
-  function normalizeString17(value = "") {
-    return String(value || "").trim();
-  }
-  function isEntityOptionName(name = "") {
-    const normalized = normalizeString17(name).replace(/[^a-zA-Z0-9]/g, "");
-    return /^(account|agency|advertiser|campaign|order|line(item)?|audience|creative|pixel)(id|ids)?$/i.test(normalized);
-  }
-  function normalizedType(value = "") {
-    const type = normalizeString17(value).toLowerCase();
-    if (["bool", "boolean"].includes(type)) return "boolean";
-    if (["int", "integer"].includes(type)) return "integer";
-    if (["number", "float", "double"].includes(type)) return "number";
-    return "string";
-  }
-  function coerceValue(value, type) {
-    if (type === "boolean") {
-      if (value === true || value === false) return value;
-      if (value === "true" || value === 1 || value === "1") return true;
-      if (value === "false" || value === 0 || value === "0") return false;
-      return void 0;
-    }
-    if (type === "integer") {
-      const numeric = Number(value);
-      return Number.isInteger(numeric) ? numeric : void 0;
-    }
-    if (type === "number") {
-      const numeric = Number(value);
-      return Number.isFinite(numeric) ? numeric : void 0;
-    }
-    if (value === void 0 || value === null) return void 0;
-    return String(value);
-  }
-  function reportBuilderOptionValueKey(value) {
-    return `${typeof value}:${JSON.stringify(value)}`;
-  }
-  function normalizeValueEntry(entry, type) {
-    const rawValue = entry && typeof entry === "object" && !Array.isArray(entry) ? entry.value : entry;
-    const value = coerceValue(rawValue, type);
-    if (value === void 0) return null;
-    const label = entry && typeof entry === "object" && !Array.isArray(entry) ? normalizeString17(entry.label) : "";
-    return {
-      value,
-      label: label || String(value)
-    };
-  }
-  function normalizeReportBuilderOptionDefinitions(values = []) {
-    const seen = /* @__PURE__ */ new Set();
-    return (Array.isArray(values) ? values : []).map((entry) => {
-      if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
-      const name = normalizeString17(entry.name);
-      if (!name || seen.has(name) || isEntityOptionName(name)) return null;
-      seen.add(name);
-      const type = normalizedType(entry.type);
-      const optionValues = (Array.isArray(entry.values) ? entry.values : []).map((value) => normalizeValueEntry(value, type)).filter(Boolean);
-      const allowedKeys = new Set(optionValues.map((value) => reportBuilderOptionValueKey(value.value)));
-      const coercedDefault = coerceValue(entry.default, type);
-      const defaultValue = coercedDefault !== void 0 && (allowedKeys.size === 0 || allowedKeys.has(reportBuilderOptionValueKey(coercedDefault))) ? coercedDefault : void 0;
-      const presentation = entry.presentation;
-      const anchorBlockId = typeof (presentation == null ? void 0 : presentation.anchorBlockId) === "string" ? presentation.anchorBlockId.trim() : "";
-      return {
-        ...anchorBlockId && (presentation == null ? void 0 : presentation.placement) === "header" ? { presentation: { anchorBlockId, placement: "header" } } : {},
-        name,
-        label: normalizeString17(entry.label) || name,
-        type,
-        description: normalizeString17(entry.description),
-        values: optionValues,
-        ...defaultValue !== void 0 ? { default: defaultValue } : {}
-      };
-    }).filter(Boolean);
-  }
-  function resolveEffectiveReportBuilderOptions(definitions = [], selected = {}) {
-    const source = selected && typeof selected === "object" && !Array.isArray(selected) ? selected : {};
-    return normalizeReportBuilderOptionDefinitions(definitions).reduce((result, definition) => {
-      const allowed = new Set(definition.values.map((entry) => reportBuilderOptionValueKey(entry.value)));
-      const selectedValue = coerceValue(source[definition.name], definition.type);
-      const selectedValid = selectedValue !== void 0 && (allowed.size === 0 || allowed.has(reportBuilderOptionValueKey(selectedValue)));
-      if (selectedValid) {
-        result[definition.name] = selectedValue;
-      } else if (Object.prototype.hasOwnProperty.call(definition, "default")) {
-        result[definition.name] = cloneValue10(definition.default);
-      }
-      return result;
-    }, {});
   }
 
   // src/reporting/reportRefinementModel.js

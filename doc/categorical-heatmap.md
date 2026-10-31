@@ -52,7 +52,18 @@ colors. A diverging scale has three stops and three colors; the middle stop is
 its explicit neutral value (for example `[-5,0,5]`). Colors interpolate linearly
 in RGB between stops and clamp outside the domain. The legend shows each declared stop and
 the no-data key. `cellLabels` and `legend` default to true; `noData` defaults to
-the values above. Labels show exact numeric values with no inferred units.
+the values above. Labels show exact numeric values with no inferred units when
+`format` is omitted. Optional `heatmap.format` reuses the category-range numeric
+display contract: `decimals` (integer 0–10), finite `scale`, string `prefix` and
+`suffix`, boolean `grouping` (en-US), and `negativeStyle` (`minus` or
+`parentheses`). For example, `"format": {"decimals": 2}` shows both 8/3 and
+2.671 as 2.67; `{"scale":100,"decimals":2,"suffix":"%"}` displays a
+fraction as a percent, and `{"prefix":"$","decimals":2,"grouping":true}`
+displays currency. The format applies to cell/legend labels and accessible text
+in the browser and native PDF. It preserves raw quantities, color interpolation,
+automatic/fixed domains, selection rows and table/CSV evidence. Null and absent
+cells retain the authored no-data label. Formatting never infers units or
+changes queries. Every print tile uses the same format and full raw domain.
 
 For a sequential scale, opt in to `"domain": "auto"` to derive low/high stops from
 the finite values in the complete resolved matrix. For example, use

@@ -81,3 +81,21 @@ it('keeps a compact seven by four matrix readable with all keyboard/click coordi
   }
  } finally {await act(async()=>root.unmount());host.remove();}
 });
+it('formats measured labels and legend while UI selection retains precise quantities',async()=>{
+ const {default:CategoricalHeatmap}=await import('./CategoricalHeatmap.jsx');
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host),onSelect=vi.fn();
+ const config={rowField:'row',columnField:'column',valueField:'value',rowCategories:['A'],columnCategories:['X','Y'],colorScale:{type:'sequential',domain:'auto',colors:['#000000','#ffffff']},format:{decimals:2}};
+ const rows=[{row:'A',column:'X',value:8/3},{row:'A',column:'Y',value:2.671}];
+ try {
+  await act(async()=>root.render(<CategoricalHeatmap config={config} rows={rows} width={390} onSelect={onSelect}/>));
+  const cells=[...host.querySelectorAll('[data-cell]')];
+  expect(cells.map(cell=>cell.getAttribute('aria-label'))).toEqual(['A, X: 2.67','A, Y: 2.67']);
+  expect(cells.map(cell=>cell.querySelector('rect').getAttribute('fill'))).toEqual(['#000000','#ffffff']);
+  expect([...host.querySelectorAll('text')].filter(text=>text.textContent==='2.67')).toHaveLength(4);
+  await act(async()=>cells[0].dispatchEvent(new MouseEvent('click',{bubbles:true})));
+  await act(async()=>cells[1].dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true})));
+  expect(onSelect.mock.calls.map(call=>call[0].row)).toEqual(rows);
+  expect(onSelect.mock.calls.map(call=>call[0].selectionRows)).toEqual(rows.map(row=>[row]));
+ } finally {await act(async()=>root.unmount());host.remove();}
+});
