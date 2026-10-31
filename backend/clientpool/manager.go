@@ -519,6 +519,14 @@ func (m *Manager) Get(ctx context.Context, convID, serverName string) (result mc
 	// This lock must be released before client creation/network setup
 	// (provider options, transport init) to prevent global manager stalls.
 	// Maintain per-conversation client to correlate elicitation correctly.
+	// A request can arrive before the periodic reaper. Do not renew an idle
+	// expired session merely by looking it up; active operations retain it.
+	if e := m.pool[key][serverName]; e != nil && e.client != nil && e.active == 0 && m.ttl > 0 && time.Since(e.usedAt) >= m.ttl {
+		stale := m.evictEntryLocked(key, serverName, e, ClientIdleEvicted)
+		m.mu.Unlock()
+		closeClientBestEffort(stale)
+		m.mu.Lock()
+	}
 	if e := m.pool[key][serverName]; e != nil && e.client != nil && e.configFingerprint != fingerprint {
 		stale := m.evictEntryLocked(key, serverName, e)
 		m.mu.Unlock()
