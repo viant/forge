@@ -69,6 +69,7 @@ export default function DraftForm({container, context, children}) {
       <span className="forge-draft-form__status" aria-live="polite">{dirty ? 'Unsaved changes' : 'No unsaved changes'}</span>
       {dirty && validationMessage ? <span data-forge-part="validation-message" role="status">{validationMessage}</span> : null}
     </div>
+    {spec.lifecycle && lifecycle.status === 'waiting' ? <span role="status">Waiting for defaults context</span> : null}
     {spec.lifecycle && lifecycle.status === 'loading' ? <span role="status">Loading defaults…</span> : null}
     {spec.lifecycle && lifecycle.status === 'failed' ? <div role="alert">{lifecycle.error}<Button disabled={busy} onClick={lifecycle.retry}>Retry</Button></div> : null}
     {body}

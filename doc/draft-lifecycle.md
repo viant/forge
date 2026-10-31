@@ -60,6 +60,30 @@ its actual open state; unmount/close invalidates in-flight results. Reopening
 starts fresh even with the same parent. Two instances require independently
 scoped draft datasources, as with ordinary native forms.
 
+For a parent selector that should refresh defaults **without resetting edits**,
+keep the opening key stable and opt into a separate defaults context:
+
+```yaml
+source:
+  dataSourceRef: parentDefaults
+  watch: [{name: parentId, in: windowForm, location: selectedParentId}]
+  when: {source: windowForm, field: selectedParentId, gt: 0}
+  parameters: [{name: id, in: windowForm, location: selectedParentId}]
+  defaults: [{name: currency, in: form, location: parentDefaults.currency}]
+```
+
+`source.watch` uses existing Parameter rows. A resolved-value change invalidates
+pending defaults and reloads using the current source parameters, preserving
+edits relative to the current baseline. `source.when` uses the existing predicate
+contract. False invalidates pending defaults, makes no read, retains current
+values/baseline, and shows Waiting for defaults context; submission waits until
+the predicate becomes true and the new read succeeds. This is only a load guard,
+not authorization. A caller may include its presentation readiness predicate;
+the native source/backend still authorizes the read. Clearing a parent does not
+implicitly clear fields: declare an opening key change when a fresh form is the
+intended behavior. Both fields are optional. Without them, parameter value
+changes alone do not refresh defaults or invalidate the current opening.
+
 Source defaults merge recursively into the accepted baseline. Values differing
 from that baseline remain edits, including removed properties, null, false,
 zero, empty strings and empty arrays. Omitted/undefined fields do not overwrite;

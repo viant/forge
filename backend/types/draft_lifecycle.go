@@ -29,7 +29,7 @@ func validateDraftLifecycle(window *Window, draft *DraftFormSpec, fallback strin
 				return fmt.Errorf("draft lifecycle references unknown datasource %s", ref)
 			}
 		}
-		groups = append(groups, source.Parameters, source.Defaults)
+		groups = append(groups, source.Parameters, source.Defaults, source.Watch)
 	}
 	for _, rows := range groups {
 		for _, row := range rows {

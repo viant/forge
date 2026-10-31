@@ -34,6 +34,8 @@ view:
           - {name: absent}
         source:
           dataSourceRef: settings
+          watch: [{name: parentId, in: windowForm, location: parentId}]
+          when: {source: windowForm, field: parentId, gt: 0}
           parameters: [{name: id, in: windowForm, location: parentId}]
           defaults: [{name: currency, in: form, location: settings.currency}]
         load: Host.prepareDefaults
@@ -91,6 +93,9 @@ view:
 		expected := []interface{}{map[string]interface{}{"name": "enabled", "default": false}, map[string]interface{}{"name": "count", "default": float64(0)}, map[string]interface{}{"name": "nullable", "default": nil}, map[string]interface{}{"name": "name", "default": ""}, map[string]interface{}{"name": "absent"}}
 		if !reflect.DeepEqual(lifecycle["defaults"], expected) {
 			t.Fatalf("lost default semantics: %s", raw)
+		}
+		if lifecycle["source"].(map[string]interface{})["watch"] == nil || lifecycle["source"].(map[string]interface{})["when"] == nil {
+			t.Fatal("source refresh context lost")
 		}
 		if lifecycle["load"] != "Host.prepareDefaults" || draft["validate"] != "Host.validate" || lifecycle["source"].(map[string]interface{})["dataSourceRef"] != "settings" {
 			t.Fatalf("lost lifecycle contract: %s", raw)
