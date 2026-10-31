@@ -80,19 +80,30 @@ func TestPrintSupportingSheetsHonorRuntimeVisibility(t *testing.T) {
 					}
 				}
 			}
-			// A legacy conditional fill/print must not guess visibility or expose the
-			// wrong presentation. The caller can regenerate a canonical matched print.
+			// Legacy matched print recovers rendered membership without requiring
+			// new metadata or requerying a data producer.
 			var legacy map[string]json.RawMessage
 			require.NoError(t, json.Unmarshal(artifacts.ReportPrint, &legacy))
 			delete(legacy, "visibleBlockIds")
 			legacyPrint, err := json.Marshal(legacy)
 			require.NoError(t, err)
-			_, err = RenderDashboardWithPrint(artifacts.ReportFill, legacyPrint)
-			require.ErrorContains(t, err, "require canonical reportPrint.visibleBlockIds")
+			legacyData, err := RenderDashboardWithPrint(artifacts.ReportFill, legacyPrint)
+			require.NoError(t, err)
+			legacyBook, err := excelize.OpenReader(bytes.NewReader(legacyData))
+			require.NoError(t, err)
+			for _, mode := range []string{"count", "area"} {
+				if mode == selected {
+					require.Contains(t, legacyBook.GetSheetList(), "Table "+mode+" table")
+				} else {
+					require.NotContains(t, legacyBook.GetSheetList(), "Table "+mode+" table")
+				}
+			}
+			require.NotContains(t, legacyBook.GetSheetList(), "Table Excluded child table")
+			require.NoError(t, legacyBook.Close())
 			fill, err := reportfill.DecodeJSON(artifacts.ReportFill)
 			require.NoError(t, err)
 			_, err = RenderDashboard(fill)
-			require.ErrorContains(t, err, "require canonical reportPrint.visibleBlockIds")
+			require.NoError(t, err)
 			for _, ids := range [][]string{{"unknown"}, {"chart_count", "chart_count"}, {""}} {
 				raw, err := json.Marshal(ids)
 				require.NoError(t, err)

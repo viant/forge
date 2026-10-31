@@ -147,24 +147,69 @@ func renderDashboardWorkbookPrint(report *reportfill.ReportFill, print *reportpr
 	return visibleChartRows(buffer.Bytes(), w.chartDecorations...)
 }
 
-// Runtime conditions are evaluated once by the canonical print builder. Older
-// unconditional artifacts remain supported; conditional fill-only exports need
-// a canonical print rather than a second visibility implementation.
+// New prints carry explicit membership. Older matched prints retain their
+// rendered block ownership in element IDs; use that existing rendering contract.
+// Fill-only callers keep the legacy workbook API without a new required field.
 func dashboardPresentationReport(report *reportfill.ReportFill, print *reportprint.ReportPrint) (*reportfill.ReportFill, error) {
-	if print == nil || print.VisibleBlockIDs == nil {
-		for _, block := range report.Blocks {
-			if block.Runtime["visibleWhen"] != nil {
-				return nil, fmt.Errorf("xlsx conditional blocks require canonical reportPrint.visibleBlockIds; regenerate matched fill and print artifacts with the current Forge runtime")
-			}
-		}
+	if print == nil {
 		return report, nil
 	}
+	ids := print.VisibleBlockIDs
+	if ids == nil {
+		owners := make([]string, 0, len(report.Blocks))
+		for _, block := range report.Blocks {
+			owners = append(owners, block.ID)
+		}
+		sort.Slice(owners, func(i, j int) bool { return len(owners[i]) > len(owners[j]) })
+		visible := map[string]bool{}
+		for _, page := range print.Pages {
+			for _, element := range page.Elements {
+				if owner := reportPrintElementOwner(owners, element.ID); owner != "" {
+					visible[owner] = true
+				}
+			}
+		}
+		// Preserve containers for grouping only when they own rendered descendants.
+		for changed := true; changed; {
+			changed = false
+			for _, block := range report.Blocks {
+				if visible[block.ID] {
+					continue
+				}
+				children := append([]string{}, block.ChildBlockIDs...)
+				if block.SectionContent != nil {
+					children = append(children, block.SectionContent.BlockIDs...)
+				}
+				if block.CompositeContent != nil {
+					children = append(children, block.CompositeContent.ChildBlockIDs...)
+				}
+				if block.TabGroupContent != nil {
+					children = append(children, block.TabGroupContent.SectionIDs...)
+				}
+				for _, child := range children {
+					if visible[child] {
+						visible[block.ID] = true
+						changed = true
+						break
+					}
+				}
+			}
+		}
+		selected := []string{}
+		for _, block := range report.Blocks {
+			if visible[block.ID] {
+				selected = append(selected, block.ID)
+			}
+		}
+		ids = &selected
+	}
+
 	known := map[string]bool{}
 	for _, block := range report.Blocks {
 		known[block.ID] = true
 	}
 	visible := map[string]bool{}
-	for _, id := range *print.VisibleBlockIDs {
+	for _, id := range *ids {
 		if !known[id] {
 			return nil, fmt.Errorf("xlsx reportPrint.visibleBlockIds references unknown block %q", id)
 		}

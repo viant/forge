@@ -51,11 +51,13 @@ Canonical print artifacts carry optional `visibleBlockIds` membership evaluated
 by the shared runtime visibility and container traversal. Visual, chart, table,
 and KPI supporting sheets follow that membership, including inactive ancestors;
 all admitted raw `Data` worksheets remain complete. An explicit empty list means
-no presentation blocks. Older unconditional artifacts remain supported. A
-conditional fill-only export, or an older conditional print without membership,
-returns an error requesting a freshly generated canonical print rather than
-exporting inactive variants under incorrect labels. Hosts that generate matched
-fill/print artifacts locally obtain this metadata from the same Forge runtime.
+no presentation blocks. Older matched prints without that field use their
+existing rendered element ownership to recover presentation membership, without
+re-evaluating conditions or fetching data. Legacy fill-only callers keep their
+existing presentation behavior; supplying the matched print enables canonical
+visibility and print geometry. New fields are not required to export old
+artifacts. Matched fill/print hashes and source identity remain checked.
+
 
 ## PDF-to-XLSX feature matrix
 
