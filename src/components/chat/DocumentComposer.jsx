@@ -117,8 +117,8 @@ export default function DocumentComposer({renderInput, onSubmit, inputHostRef, d
                 {showTools ? <Disclosure label="Tools" icon="lucide:sliders-horizontal" disabled={disabled} placementGroup={placementGroup}>{toolsContent}</Disclosure> : null}
                 <div className="forge-document-submit">
                     {showMic ? <Button variant="ghost" icon={micOn ? 'lucide:square' : 'lucide:mic'} hideLabel aria-label={micOn ? 'Disable mic' : 'Enable mic'} aria-pressed={micOn} disabled={disabled} data-testid="chat-composer-mic" onClick={toggleMic}/> : null}
-                    {showAbort ? <Button variant="ghost" icon="lucide:square" hideLabel aria-label="Stop response" data-testid="chat-composer-abort" onClick={onAbort}/> : null}
-                    <Button variant="primary" icon="lucide:arrow-up" hideLabel className="forge-document-send" type="submit" aria-label={submitText} title={submitText} disabled={!canSend} data-testid="chat-composer-send"/>
+                    {showAbort ? <Button variant="primary" icon="lucide:square" hideLabel className="forge-document-send" aria-label="Stop response" title="Stop response" data-testid="chat-composer-abort" onClick={onAbort}/>
+                        : <Button variant="primary" icon="lucide:arrow-up" hideLabel className="forge-document-send" type="submit" aria-label={submitText} title={submitText} disabled={!canSend} data-testid="chat-composer-send"/>}
                 </div>
             </div>
         </div>
