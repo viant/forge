@@ -266,3 +266,44 @@ it('reports the actually displayed section on initial render and selection',asyn
  await act(async()=>tab.click());expect(changed).toHaveBeenLastCalledWith('detail');expect(host.textContent).toContain('Detail body');
  }finally{await act(async()=>root.unmount());host.remove();}
 });
+
+it.each(['removed','hidden'])('resolves a %s controlled section against visible Forge sections',async state=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);const changed=vi.fn();
+ const blocks=[
+  {id:'tabs',kind:'tabGroupBlock',sectionIds:['summary','detail'],defaultSectionId:'detail',includeUnlistedSections:true},
+  {id:'intro',kind:'markdownBlock',markdown:'Introduction'},
+  {id:'summary',kind:'sectionBlock',title:'Summary'},
+  {id:'summaryBody',kind:'markdownBlock',markdown:'Summary body'},
+  {id:'detail',kind:'sectionBlock',title:'Detail',runtime:{visibleWhen:{source:'filters',field:'showDetails',equals:true}}},
+  {id:'detailBody',kind:'markdownBlock',markdown:'Detail body'},
+ ];
+ const render=(nextBlocks,showDetails)=>{
+  const reportSpec={title:'Example',blocks:nextBlocks};
+  root.render(<ReportRuntime reportSpec={reportSpec} reportFill={buildReportFillFromReportSpec(reportSpec,{})} selectedSectionId="detail" conditionValues={{showDetails}} onActiveSectionChange={changed}/>);
+ };
+ try{
+  await act(async()=>render(blocks,true));expect(changed).toHaveBeenLastCalledWith('detail');
+  expect(host.querySelector('[role="tab"][aria-selected="true"]').textContent).toBe('Detail');
+  await act(async()=>render(state==='removed'?blocks.filter(block=>!['detail','detailBody'].includes(block.id)):blocks,false));
+  expect(changed).toHaveBeenLastCalledWith('summary');
+  expect(host.querySelector('[role="tab"][aria-selected="true"]').textContent).toBe('Summary');
+  expect(host.textContent).toContain('Summary body');
+  expect(host.querySelector('[role="tab"][data-section-id="detail"]')).toBeNull();
+ }finally{await act(async()=>root.unmount());host.remove();}
+});
+
+it('does not resurrect an uncontrolled clicked section after hide and restore',async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);const changed=vi.fn();
+ const blocks=[{id:'tabs',kind:'tabGroupBlock',sectionIds:['summary','detail'],defaultSectionId:'summary',includeUnlistedSections:false},{id:'summary',kind:'sectionBlock',title:'Summary'},{id:'summaryBody',kind:'markdownBlock',markdown:'Summary body'},{id:'detail',kind:'sectionBlock',title:'Detail',runtime:{visibleWhen:{source:'filters',field:'showDetails',equals:true}}},{id:'detailBody',kind:'markdownBlock',markdown:'Detail body'}];
+ const reportSpec={title:'Example',blocks};const reportFill=buildReportFillFromReportSpec(reportSpec,{});
+ const render=showDetails=>root.render(<ReportRuntime reportSpec={reportSpec} reportFill={reportFill} conditionValues={{showDetails}} onActiveSectionChange={changed}/>);
+ try{
+ await act(async()=>render(true));
+ await act(async()=>host.querySelector('[role="tab"][data-section-id="detail"]').click());
+ expect(changed).toHaveBeenLastCalledWith('detail');
+ await act(async()=>render(false));expect(changed).toHaveBeenLastCalledWith('summary');
+ await act(async()=>render(true));expect(changed).toHaveBeenLastCalledWith('summary');
+ }finally{await act(async()=>root.unmount());host.remove();}
+});
