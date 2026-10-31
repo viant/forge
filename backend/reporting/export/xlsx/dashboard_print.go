@@ -19,17 +19,27 @@ import (
 // artifacts, not a re-marshaled ReportFill (which omits some print-only metadata).
 // The print's fill hash is checked before any content is rendered.
 func RenderDashboardWithPrint(fillJSON, printJSON json.RawMessage) ([]byte, error) {
-	return renderDashboardWithPrint(fillJSON, printJSON, reportfill.DecodeJSON)
+	return renderDashboardWithPrint(fillJSON, printJSON, reportfill.DecodeJSON, true)
 }
 
 // RenderDatasourceDashboardWithPrint renders server-materialized datasource
 // results with opaque producer requests. Hosts remain responsible for datasource
 // authorization. The original matched artifacts retain their canonical fill hash.
 func RenderDatasourceDashboardWithPrint(fillJSON, printJSON json.RawMessage) ([]byte, error) {
-	return renderDashboardWithPrint(fillJSON, printJSON, reportfill.DecodeDatasourceJSON)
+	return renderDashboardWithPrint(fillJSON, printJSON, reportfill.DecodeDatasourceJSON, true)
 }
 
-func renderDashboardWithPrint(fillJSON, printJSON json.RawMessage, decodeFill func([]byte) (*reportfill.ReportFill, error)) ([]byte, error) {
+// RenderDashboardWithVisibility preserves compact native worksheet geometry
+// while applying the visibility from matched canonical print artifacts.
+func RenderDashboardWithVisibility(fillJSON, printJSON json.RawMessage) ([]byte, error) {
+	return renderDashboardWithPrint(fillJSON, printJSON, reportfill.DecodeJSON, false)
+}
+
+// RenderDatasourceDashboardWithVisibility accepts opaque server datasource requests.
+func RenderDatasourceDashboardWithVisibility(fillJSON, printJSON json.RawMessage) ([]byte, error) {
+	return renderDashboardWithPrint(fillJSON, printJSON, reportfill.DecodeDatasourceJSON, false)
+}
+func renderDashboardWithPrint(fillJSON, printJSON json.RawMessage, decodeFill func([]byte) (*reportfill.ReportFill, error), printGeometry bool) ([]byte, error) {
 	fill, err := decodeFill(fillJSON)
 	if err != nil {
 		return nil, err
@@ -72,6 +82,13 @@ func renderDashboardWithPrint(fillJSON, printJSON json.RawMessage, decodeFill fu
 	}
 	if err = validatePrintBindings(fill, print); err != nil {
 		return nil, err
+	}
+	if !printGeometry {
+		presentation, err := dashboardPresentationReport(fill, print)
+		if err != nil {
+			return nil, err
+		}
+		return renderDashboardWorkbook(presentation)
 	}
 	return renderDashboardWorkbookPrint(fill, print)
 }

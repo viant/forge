@@ -134,3 +134,8 @@ bounds, fingerprint mismatches, and text/formula safety. Excelize 2.10 and 2.11
 are supported without changing the host dependency version. Native Excel
 verification additionally exercises filters and source edits, inspects visual
 pages, and checks print preview: ZIP structure alone is not interaction proof.
+
+`RenderDashboardWithVisibility` and `RenderDatasourceDashboardWithVisibility`
+retain the compact native workbook layout while applying matched print visibility.
+Use these when upgrading fill-only integrations. The existing `WithPrint` APIs
+remain available for callers that explicitly want print-page geometry in Excel.
