@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"regexp"
 	"sort"
 	"strconv"
@@ -85,7 +86,7 @@ func nativeChartDiagnostic(content *reportfill.ChartContent) string {
 func (w *visualDashboardWriter) chartSource(block reportfill.Block) (string, string, error) {
 	content := block.ChartContent
 	diagnostic := nativeChartDiagnostic(content)
-	columns, rows, err := chartTable(content.ResolvedChart)
+	columns, rows, err := chartDisplayTable(block)
 	if err != nil {
 		return "", "", err
 	}
@@ -169,6 +170,42 @@ func (w *visualDashboardWriter) chartSource(block reportfill.Block) (string, str
 	return sheet, diagnostic, nil
 }
 
+// chartDisplayTable follows the screen/print display order while retaining all
+// resolved rows in the source sheet. A row limit selects the cohort before sort.
+func chartDisplayTable(block reportfill.Block) ([]reportfill.TableColumn, [][]any, error) {
+	resolved := block.ChartContent.ResolvedChart
+	columns, rows, err := chartTable(resolved)
+	if err != nil || len(columns) < 2 || (resolved.Type != "horizontal_bar" && resolved.Type != "funnel_bar") || block.ChartContent.ChartModel["preserveCategoryOrder"] == true {
+		return columns, rows, err
+	}
+	count := len(rows)
+	if block.RowLimit != nil && *block.RowLimit > 0 && *block.RowLimit < count {
+		count = *block.RowLimit
+	}
+	sort.SliceStable(rows[:count], func(i, j int) bool { return horizontalOrderValue(rows[i][1]) > horizontalOrderValue(rows[j][1]) })
+	return columns, rows, nil
+}
+
+// Match Number(value || 0) in the shared horizontal chart ordering helper.
+// Invalid metrics compare as NaN and keep the existing stable order.
+func horizontalOrderValue(value any) float64 {
+	if value == nil || value == false {
+		return 0
+	}
+	if value == true {
+		return 1
+	}
+	text := strings.TrimSpace(fmt.Sprint(value))
+	if text == "" {
+		return 0
+	}
+	number, err := strconv.ParseFloat(text, 64)
+	if err != nil {
+		return math.NaN()
+	}
+	return number
+}
+
 func resolvedType(content *reportfill.ChartContent) string {
 	return strings.ToLower(content.ResolvedChart.Type)
 }
@@ -191,7 +228,7 @@ func nativePointColors(block reportfill.Block) []string {
 	if resolved.Kind != "category" && ((resolved.Type != "horizontal_bar" && resolved.Type != "funnel_bar") || len(categoryColors) == 0) {
 		return nil
 	}
-	_, rows, err := chartTable(resolved)
+	_, rows, err := chartDisplayTable(block)
 	if err != nil {
 		return nil
 	}
@@ -350,7 +387,7 @@ func nativeDataLabels(mode, kind string, rows int) bool {
 
 func dashboardNativeChart(source string, block reportfill.Block) (*excelize.Chart, error) {
 	resolved := block.ChartContent.ResolvedChart
-	columns, rows, err := chartTable(resolved)
+	columns, rows, err := chartDisplayTable(block)
 	if err != nil {
 		return nil, err
 	}

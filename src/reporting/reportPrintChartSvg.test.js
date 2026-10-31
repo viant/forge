@@ -512,7 +512,7 @@ const longPageRows=pageRows.map((row,index)=>({...row,category:`Synthetic except
 const longPages=buildReportPrintChartPages({...pageInput,resolvedChart:{...pageInput.resolvedChart,rows:longPageRows}});
 assert.deepEqual(longPages.map(page=>page.height),paginated.map(page=>page.height));
 assert.equal(longPages.reduce((count,page)=>count+page.labelDetails.length,0),37);
-for(const [index,row] of longPageRows.entries())assert.ok(longPages.some(page=>page.labelDetails.includes(`Category ${index+1}: ${row.category}`)));
+for(const [index,row] of [...longPageRows].sort((a,b)=>b.amount-a.amount).entries())assert.ok(longPages.some(page=>page.labelDetails.includes(`Category ${index+1}: ${row.category}`)));
 const tinyFirst=buildReportPrintChartPages({...pageInput,firstMaxHeight:1});
 assert.deepEqual(tinyFirst.map(page=>page.height),[164,428,428,428,172]);
 for(const height of [1,-1,NaN]) {

@@ -91,7 +91,7 @@ func validatePrintBindings(fill *reportfill.ReportFill, print *reportprint.Repor
 			if !ok || block.ChartContent == nil || block.ChartContent.ResolvedChart == nil || !strings.HasPrefix(element.ID, binding.BlockID+"__") {
 				return fmt.Errorf("xlsx chart source references unknown or mismatched block %q", binding.BlockID)
 			}
-			_, rows, err := chartTable(block.ChartContent.ResolvedChart)
+			_, rows, err := chartDisplayTable(block)
 			if err != nil {
 				return err
 			}
@@ -310,7 +310,7 @@ func (w *visualDashboardWriter) printGroup(sheet string, group dashboardGroup, p
 					source.fidelityReason = nativePrintFidelityReason(source.block, element.SVG)
 				}
 				if source != nil && source.diagnostic == "" && source.fidelityReason == "" && (element.ChartSource != nil || (source.occurrences == 1 && (source.block.RowLimit == nil || *source.block.RowLimit == 0 || *source.block.RowLimit >= len(source.block.ChartContent.ResolvedChart.Rows)))) {
-					_, sourceRows, err := chartTable(source.block.ChartContent.ResolvedChart)
+					_, sourceRows, err := chartDisplayTable(source.block)
 					if err != nil {
 						return err
 					}
@@ -432,7 +432,7 @@ func (w *visualDashboardWriter) printGroup(sheet string, group dashboardGroup, p
 			// Native equivalents remain available for paginated/limited views, but
 			// use a separate full-data view instead of silently changing print scope.
 			if source.diagnostic == "" {
-				_, rows, _ := chartTable(source.block.ChartContent.ResolvedChart)
+				_, rows, _ := chartDisplayTable(source.block)
 				if err = w.nativeChart(source.sheet, source.sheet, len(rows)+12, source.block); err != nil {
 					return err
 				}
