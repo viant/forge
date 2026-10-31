@@ -105,3 +105,26 @@ it('previews complete root subtrees and reports truthful root and visible-row co
   expect(fill.blocks[0].content.resolvedRows.length).toBe(16);
  }finally{await act(async()=>root.unmount());host.remove();}
 });
+
+// Independently authored synthetic fixture: producer object insertion order differs
+// from the presentation metadata, as with canonical map serialization.
+it.each([false,true])('honors authored table columns regardless of row key order (fill content: %s)',async(withContent)=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ const columns=[{key:'prompt',label:'Prompt'},{key:'west',label:'West'},{key:'fluid',label:'Fluid'}];
+ const block={id:'readings',kind:'tableBlock',title:'Readings',datasetRef:'records',columns};
+ const reportSpec={title:'Readings',datasets:[{id:'records'}],blocks:[block]};
+ const reportFill={datasets:[{id:'records',rows:[{fluid:'F',prompt:'P',west:'W'}],provenance:{hasMore:false}}],blocks:[{...block,...(withContent?{content:{columns}}:{})}]};
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ try{
+  await act(async()=>root.render(<ReportRuntime reportSpec={reportSpec} reportFill={reportFill}/>));
+  expect([...host.querySelectorAll('thead th')].map(th=>th.textContent.trim())).toEqual(['Prompt','West','Fluid']);
+  expect([...host.querySelectorAll('tbody tr:first-child td')].map(td=>td.textContent.trim())).toEqual(['P','W','F']);
+  // A user edit becomes the next authored order and remains authoritative.
+  const reordered=[columns[2],columns[0],columns[1]];
+  const nextSpec={...reportSpec,blocks:[{...block,columns:reordered}]};
+  const nextFill={...reportFill,blocks:[{...block,columns:reordered,...(withContent?{content:{columns:reordered}}:{})}]};
+  await act(async()=>root.render(<ReportRuntime reportSpec={nextSpec} reportFill={nextFill}/>));
+  expect([...host.querySelectorAll('thead th')].map(th=>th.textContent.trim())).toEqual(['Fluid','Prompt','West']);
+  expect([...host.querySelectorAll('tbody tr:first-child td')].map(td=>td.textContent.trim())).toEqual(['F','P','W']);
+ }finally{await act(async()=>root.unmount());host.remove();}
+});
