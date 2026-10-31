@@ -3725,7 +3725,9 @@ export default function ReportRuntime({
   const visibleRuntimeBlocks = runtimeSections.flatMap((section) => (
     section.block ? [section.block, ...section.items] : section.items
   ));
-  const resolvedActiveSectionId = normalizeString(selectedSectionId || activeSectionId || runtimeTabGroup?.defaultSectionId || runtimeSections[0]?.id);
+  const resolvedActiveSectionId = [selectedSectionId, activeSectionId, runtimeTabGroup?.defaultSectionId, runtimeSections[0]?.id]
+    .map(normalizeString)
+    .find(id => runtimeSections.some(section => normalizeString(section?.id) === id)) || "";
   useEffect(()=>{onActiveSectionChange?.(resolvedActiveSectionId);},[onActiveSectionChange,resolvedActiveSectionId]);
   const changeSection = useCallback((sectionId) => {
     const selected = normalizeString(sectionId);
@@ -3738,11 +3740,11 @@ export default function ReportRuntime({
       setActiveSectionId("");
       return;
     }
-    if (runtimeSections.some((section) => normalizeString(section?.id) === resolvedActiveSectionId)) {
+    if (!normalizeString(activeSectionId) || runtimeSections.some((section) => normalizeString(section?.id) === normalizeString(activeSectionId))) {
       return;
     }
-    setActiveSectionId(normalizeString(runtimeSections[0]?.id));
-  }, [runtimeSections, resolvedActiveSectionId]);
+    setActiveSectionId(resolvedActiveSectionId);
+  }, [runtimeSections, resolvedActiveSectionId, activeSectionId]);
 
   const renderLayoutBlockGrid = (blocks = [], keyPrefix = "runtime") => {
     if (!Array.isArray(blocks) || blocks.length === 0) {
