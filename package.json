@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "exports": {
+    "./validation": "./src/validation/index.js",
     "./core": "./src/core/index.js",
     "./hooks": "./src/hooks/index.js",
     "./components": "./src/components/index.js",
