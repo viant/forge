@@ -19,6 +19,7 @@ type DraftLifecycleSpec struct {
 }
 
 type DraftFormSpec struct {
+	Validation     *DraftFormValidation   `json:"validation,omitempty" yaml:"validation,omitempty"`
 	Lifecycle      *DraftLifecycleSpec    `json:"lifecycle,omitempty" yaml:"lifecycle,omitempty"`
 	SubmitWhen     map[string]interface{} `json:"submitWhen,omitempty" yaml:"submitWhen,omitempty"`
 	WrapContent    bool                   `json:"wrapContent,omitempty" yaml:"wrapContent,omitempty"`
@@ -31,6 +32,11 @@ type DraftFormSpec struct {
 	ConfirmDiscard string                 `json:"confirmDiscard,omitempty" yaml:"confirmDiscard,omitempty"`
 	OnReset        string                 `json:"onReset,omitempty" yaml:"onReset,omitempty"`
 	Submit         *MutationCommand       `json:"submit,omitempty" yaml:"submit,omitempty"`
+}
+
+// DraftFormValidation references the frontend draft shape, independently of a writer payload model.
+type DraftFormValidation struct {
+	SchemaRef string `json:"schemaRef" yaml:"schemaRef"`
 }
 
 type QueryToolbarSpec struct {

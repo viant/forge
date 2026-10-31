@@ -6,7 +6,23 @@ import (
 )
 
 func validateDraftLifecycle(window *Window, draft *DraftFormSpec, fallback string, validateDataSources bool) error {
-	if draft == nil || draft.Lifecycle == nil {
+	if draft == nil {
+		return nil
+	}
+	if draft.Validation != nil {
+		ref := strings.TrimSpace(draft.Validation.SchemaRef)
+		if ref == "" {
+			return fmt.Errorf("draft validation requires schemaRef")
+		}
+		schema, ok := window.Schemas[ref]
+		if !ok {
+			return fmt.Errorf("draft validation references unknown schema %s", ref)
+		}
+		if strings.ToLower(schema.Type) != "object" {
+			return fmt.Errorf("draft validation schema %s must be an object", ref)
+		}
+	}
+	if draft.Lifecycle == nil {
 		return nil
 	}
 	lifecycle := draft.Lifecycle
