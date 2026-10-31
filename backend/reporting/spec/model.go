@@ -144,6 +144,8 @@ type RequestPayload struct {
 	Dimensions        map[string]bool    `json:"dimensions,omitempty"`
 	Filters           map[string]any     `json:"filters,omitempty"`
 	Options           map[string]any     `json:"options,omitempty"`
+	Summary           *bool              `json:"summary,omitempty"`
+	ResultSet         string             `json:"resultSet,omitempty"`
 	SemanticSelection *SemanticSelection `json:"semanticSelection,omitempty"`
 	Refinements       []map[string]any   `json:"refinements,omitempty"`
 	Limit             *int               `json:"limit"`
