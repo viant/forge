@@ -569,3 +569,19 @@ func TestToolCatalogRoutingCookieRotationPreservesOperationSnapshot(t *testing.T
 	require.NoError(t, err)
 	require.EqualValues(t, 2, client.calls.Load(), "authentication cookie rotation still requires fresh discovery")
 }
+
+func TestToolCatalogSnapshotDoesNotInitializeMissingConnection(t *testing.T) {
+	m, provider, _, _, _ := catalogSetup(t, false)
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+	provider.cfg.Transport.URL = server.URL
+	identity, tools, err := m.ToolCatalogSnapshot(context.Background(), "fresh", "server")
+	require.NoError(t, err)
+	require.Empty(t, identity)
+	require.Empty(t, tools)
+	require.Zero(t, requests.Load(), "cache-only reads must never initialize a transport")
+}

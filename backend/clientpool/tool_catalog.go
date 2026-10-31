@@ -484,33 +484,30 @@ func (c *managedClient) toolCatalogScopeWithSnapshotMode(ctx context.Context, al
 // publication, connection/configuration changes or invalidation. It never lists
 // tools or stores a parallel catalog.
 func (m *Manager) ToolCatalogSnapshot(ctx context.Context, conversation, server string, options ...mcpclient.RequestOption) (string, []mcpschema.Tool, error) {
-	client, err := m.Get(ctx, conversation, server)
-	if err != nil {
-		return "", nil, err
-	}
-	managed, ok := client.(*managedClient)
-	if !ok {
-		return "", nil, nil
-	}
-	return managed.toolCatalogSnapshot(ctx, options...)
+	return m.cachedToolCatalogState(ctx, conversation, server, true, options...)
 }
 
-// ToolCatalogIdentity returns the same opaque identity as a complete cached
-// snapshot without decoding tool schemas or initializing a missing connection.
+// ToolCatalogIdentity returns the same opaque identity without decoding schemas
+// or initializing a missing connection.
 func (m *Manager) ToolCatalogIdentity(ctx context.Context, conversation, server string, options ...mcpclient.RequestOption) (string, error) {
+	identity, _, err := m.cachedToolCatalogState(ctx, conversation, server, false, options...)
+	return identity, err
+}
+
+func (m *Manager) cachedToolCatalogState(ctx context.Context, conversation, server string, includeTools bool, options ...mcpclient.RequestOption) (string, []mcpschema.Tool, error) {
 	if m == nil || ctx == nil {
-		return "", nil
+		return "", nil, nil
 	}
 	if err := ctx.Err(); err != nil {
-		return "", err
+		return "", nil, err
 	}
 	configured, err := m.Options(ctx, server)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	fingerprint, err := effectiveConfigFingerprint(configured)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	key, service := m.poolKey(ctx, conversation), resolvedServiceName(configured, server)
 	m.mu.Lock()
@@ -521,16 +518,16 @@ func (m *Manager) ToolCatalogIdentity(ctx context.Context, conversation, server 
 	}
 	m.mu.Unlock()
 	if managed == nil {
-		return "", nil
+		return "", nil, nil
 	}
-	identity, _, err := managed.toolCatalogState(ctx, false, options...)
+	identity, tools, err := managed.toolCatalogState(ctx, includeTools, options...)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	if !m.IsCurrentClient(ctx, conversation, server, managed) {
-		return "", nil
+		return "", nil, nil
 	}
-	return identity, nil
+	return identity, tools, nil
 }
 
 func (c *managedClient) toolCatalogSnapshot(ctx context.Context, options ...mcpclient.RequestOption) (string, []mcpschema.Tool, error) {
