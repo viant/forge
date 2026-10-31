@@ -100,6 +100,32 @@ func TestPrintSupportingSheetsHonorRuntimeVisibility(t *testing.T) {
 			}
 			require.NotContains(t, legacyBook.GetSheetList(), "Table Excluded child table")
 			require.NoError(t, legacyBook.Close())
+			for _, compactPrint := range []json.RawMessage{artifacts.ReportPrint, legacyPrint} {
+				compactData, err := RenderDashboardWithVisibility(artifacts.ReportFill, compactPrint)
+				require.NoError(t, err)
+				compactBook, err := excelize.OpenReader(bytes.NewReader(compactData))
+				require.NoError(t, err)
+				var reportRows [][]string
+				if selected != "none" {
+					reportRows, err = compactBook.GetRows("Report")
+					require.NoError(t, err)
+				}
+				reportText, err := json.Marshal(reportRows)
+				require.NoError(t, err)
+				for _, mode := range []string{"count", "area"} {
+					if mode == selected {
+						require.Contains(t, string(reportText), mode+" table")
+					} else {
+						require.NotContains(t, string(reportText), mode+" table")
+					}
+				}
+				require.NotContains(t, string(reportText), "Excluded child table")
+				rawRows, err := compactBook.GetRows("Data primary")
+				require.NoError(t, err)
+				require.Len(t, rawRows, 8)
+				require.NoError(t, compactBook.Close())
+			}
+
 			fill, err := reportfill.DecodeJSON(artifacts.ReportFill)
 			require.NoError(t, err)
 			_, err = RenderDashboard(fill)
@@ -165,4 +191,28 @@ func TestLegacyUnconditionalPrintMembershipRemainsOptional(t *testing.T) {
 	require.NotContains(t, string(encoded), "visibleBlockIds")
 	_, err = RenderDashboardWithPrint(artifacts.ReportFill, raw)
 	require.NoError(t, err)
+}
+
+func TestCompactDashboardKeepsMatchedVisibilityWithoutPrintGrid(t *testing.T) {
+	artifacts := printExample(t)
+	data, err := RenderDashboardWithVisibility(artifacts.ReportFill, artifacts.ReportPrint)
+	require.NoError(t, err)
+	book, err := excelize.OpenReader(bytes.NewReader(data))
+	require.NoError(t, err)
+	defer book.Close()
+	fill, err := reportfill.DecodeJSON(artifacts.ReportFill)
+	require.NoError(t, err)
+	legacy, err := RenderDashboard(fill)
+	require.NoError(t, err)
+	old, err := excelize.OpenReader(bytes.NewReader(legacy))
+	require.NoError(t, err)
+	defer old.Close()
+	require.Equal(t, old.GetSheetList(), book.GetSheetList())
+	for _, name := range old.GetSheetList() {
+		a, err := old.GetRows(name)
+		require.NoError(t, err)
+		b, err := book.GetRows(name)
+		require.NoError(t, err)
+		require.Equal(t, a, b)
+	}
 }
