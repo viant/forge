@@ -1,3 +1,4 @@
+import {routingImpactSchema,stageAllocationSchema} from '../../components/scenarios/scenarioContract.js';
 import {windowCalculationDefinitions} from "./windowCalculationSchema.js";
 import {numericDisplayFormatSchema} from '../../components/categoryRange.js';
 import {templateRequestInputsSchema} from '../reportTemplateRequestInputs.js';
@@ -807,6 +808,8 @@ export const reportSpecSchema = {
           items: { type: "string" },
         },
         type: { type: "string" },
+        routingImpact: routingImpactSchema,
+        stageAllocation: stageAllocationSchema,
         heatmap: heatmapSchema,
         categoryRange: categoryRangeSchema,
         paletteMode:{enum:["declared"]},
@@ -1066,6 +1069,8 @@ export const reportSpecSchema = {
       properties: {
         tooltip: chartTooltipSchema,
         type: { type: "string" },
+        routingImpact: routingImpactSchema,
+        stageAllocation: stageAllocationSchema,
         heatmap: heatmapSchema,
         categoryRange: categoryRangeSchema,
         paletteMode: {enum:["declared"]},

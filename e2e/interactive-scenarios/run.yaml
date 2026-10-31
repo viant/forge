@@ -1,0 +1,45 @@
+# Synthetic fixtures only. Supply owned previewURL and Chrome debuggerAddress.
+pipeline:
+  open:
+    action: webdriver:open
+    sessionID: interactive-scenarios
+    debuggerAddress: $debuggerAddress
+    directCDP: true
+    browser: chrome
+  routing:
+    action: webdriver:run
+    sessionID: interactive-scenarios
+    autoStart: false
+    commands:
+      - "get(about:blank)"
+      - "get($previewURL/interactive-scenarios-preview.html)"
+      - "expect(\"main > h1\").toHaveText(\"Interactive report scenarios\", 20000)"
+      - "expect(\"#routing-impact\").toContainText(\"Projected delivery: 890.25\")"
+      - "(xpath://button[normalize-space(.)='Direct first']).click"
+      - "expect(\"#routing-impact\").toContainText(\"Projected delivery: 969\")"
+      - "page.locator(\"#routing-impact input[type=range]\").press(\"Home\")"
+      - "expect(\"#routing-impact\").toContainText(\"Projected delivery: 864\")"
+      - "page.locator(\"#routing-impact input[type=range]\").press(\"ArrowRight\")"
+      - "expect(\"#routing-impact\").toContainText(\"Projected delivery: 865.05\")"
+      - "(xpath://button[normalize-space(.)='Ambient']).click"
+      - "expect(\"#routing-impact .forge-scenario tbody tr\").toHaveCount(\"1\")"
+      - "page.locator(\"#routing-impact summary\").click()"
+      - "expect(\"#routing-impact details\").toContainText('\"share\":0.01')"
+      - "expect(\"#routing-impact details\").toContainText(\"Projected delivery: 246.45\")"
+  staging:
+    action: webdriver:run
+    sessionID: interactive-scenarios
+    autoStart: false
+    commands:
+      - "(xpath://button[normalize-space(.)='Simulate adding Hydro']).click"
+      - "expect(\"#stage-allocation\").toContainText(\"Projected addition 105\")"
+      - "page.locator(\"#stage-allocation label:first-child select\").selectOption(\"value\")"
+      - "expect(\"#stage-allocation\").toContainText(\"Value (credits)\")"
+      - "page.locator(\"#stage-allocation label:nth-child(2) select\").selectOption(\"summer\")"
+      - "expect(\"#stage-allocation\").toContainText(\"Summer\")"
+      - "page.locator(\"#stage-allocation label:first-child select\").selectOption(\"efficiency\")"
+      - "expect(\"#stage-allocation\").toContainText(\"Efficiency: 2.7\")"
+      - "expect(\"#stage-allocation [data-category='hydro'] [data-stage-legend]\").toHaveCount(\"3\")"
+      - "page.locator(\"#stage-allocation summary\").click()"
+      - "expect(\"#stage-allocation details\").toContainText('\"activeCategories\":[\"hydro\"]')"
+      - "expect(\"#stage-allocation details\").toContainText(\"Projected addition 420\")"

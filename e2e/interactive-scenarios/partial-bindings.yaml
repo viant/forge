@@ -1,0 +1,25 @@
+# Optional scenario state defaults do not imply permission to edit that control.
+pipeline:
+  open:
+    action: webdriver:open
+    sessionID: interactive-scenarios-partial
+    debuggerAddress: $debuggerAddress
+    directCDP: true
+    browser: chrome
+  controls:
+    action: webdriver:run
+    sessionID: interactive-scenarios-partial
+    autoStart: false
+    commands:
+      - "get(about:blank)"
+      - "get($previewURL/interactive-scenarios-preview.html?partial)"
+      - "expect(\"#routing-impact [aria-label='Routing categories'] button[disabled]\").toHaveCount(\"2\")"
+      - "expect(\"#routing-impact\").toContainText(\"Editing routing categories is unavailable\")"
+      - "expect(\"#routing-impact input[type=range][disabled]\").toHaveCount(\"0\")"
+      - "(xpath://button[normalize-space(.)='Direct first']).click"
+      - "expect(\"#routing-impact\").toContainText(\"Projected delivery: 969\")"
+      - "expect(\"#stage-allocation [aria-label='Simulated additions'] button[disabled]\").toHaveCount(\"1\")"
+      - "expect(\"#stage-allocation\").toContainText(\"Editing simulated additions is unavailable\")"
+      - "expect(\"#stage-allocation select[disabled]\").toHaveCount(\"0\")"
+      - "page.locator(\"#stage-allocation label:first-child select\").selectOption(\"efficiency\")"
+      - "expect(\"#stage-allocation\").toContainText(\"Efficiency (credits/MWh)\")"

@@ -123,7 +123,7 @@ var ForgeAuthoredLowerer = (() => {
       const block = blocks.get(id);
       if (!block || block.kind !== "chartBlock" || !((_a5 = block.chartSpec) == null ? void 0 : _a5.metricSelection) || !((_b = block.chartModel) == null ? void 0 : _b.metricSelection)) throw Error(`Chart '${id}' does not admit metric selection.`);
       if (!selection || typeof selection !== "object" || Array.isArray(selection) || Object.keys(selection).some((key2) => !["primaryField", "secondaryField"].includes(key2))) throw Error("Only primary and secondary metric fields are admitted.");
-      const allowed = block.chartModel.metricSelection.options.map((option) => option.value).filter((field) => block.chartSpec.yFields.includes(field));
+      const allowed = block.chartModel.metricSelection.options.map((option) => option.value).filter((field2) => block.chartSpec.yFields.includes(field2));
       const normalized = normalizeChartMetricSelection(selection, allowed);
       block.chartSpec.metricSelection = normalized;
       block.chartModel = applyChartMetricSelection(block.chartModel, normalized);
@@ -28159,9 +28159,9 @@ var ForgeAuthoredLowerer = (() => {
       const minE = Math.min(e1, e22);
       if (e1 > minE) m1 *= bigintPow10(e1 - minE);
       if (e22 > minE) m22 *= bigintPow10(e22 - minE);
-      const sum2 = m1 + m22;
-      if (sum2 === /* @__PURE__ */ BigInt("0")) return BigDecimal2._create(/* @__PURE__ */ BigInt("0"), 0, 0, false);
-      const [nm, ne] = removeTrailingZeros(sum2, minE);
+      const sum3 = m1 + m22;
+      if (sum3 === /* @__PURE__ */ BigInt("0")) return BigDecimal2._create(/* @__PURE__ */ BigInt("0"), 0, 0, false);
+      const [nm, ne] = removeTrailingZeros(sum3, minE);
       return BigDecimal2._create(nm, ne, 0, false);
     }
     minus(y4) {
@@ -29563,9 +29563,9 @@ Valid values are ${Array.from(VALID_ROUNDING_INCREMENTS).join(", ")}.`, RangeErr
         "maximumFractionDigits",
         "minimumSignificantDigits",
         "maximumSignificantDigits"
-      ].forEach((field) => {
-        const val = internalSlots[field];
-        if (val !== void 0) opts[field] = val;
+      ].forEach((field2) => {
+        const val = internalSlots[field2];
+        if (val !== void 0) opts[field2] = val;
       });
       const categories = _a4.localeData[internalSlots.locale].categories[internalSlots.type];
       opts.pluralCategories = [
@@ -29576,12 +29576,12 @@ Valid values are ${Array.from(VALID_ROUNDING_INCREMENTS).join(", ")}.`, RangeErr
         "many",
         "other"
       ].filter((category) => categories.includes(category));
-      for (const field of [
+      for (const field2 of [
         "roundingIncrement",
         "roundingMode",
         "roundingPriority",
         "trailingZeroDisplay"
-      ]) opts[field] = internalSlots[field];
+      ]) opts[field2] = internalSlots[field2];
       return opts;
     }
     select(val) {
@@ -40888,10 +40888,10 @@ Please __addLocaleData before adding additional unit data`);
       } catch (e3) {
       }
       if (isDate2) return ToNumber(value);
-      for (const { kind, read: read2 } of readers) {
+      for (const { kind, read: read3 } of readers) {
         let result;
         try {
-          result = read2.call(value, stringOptions);
+          result = read3.call(value, stringOptions);
         } catch (e3) {
           continue;
         }
@@ -40899,10 +40899,10 @@ Please __addLocaleData before adding additional unit data`);
           kind,
           epochNanoseconds: BigInt(result)
         };
-        const text3 = String(result);
-        const calendar = (_a5 = CALENDAR_ANNOTATION.exec(text3)) == null ? void 0 : _a5[1];
-        const date = ISO_DATE.exec(text3);
-        const time = ISO_TIME.exec(text3);
+        const text4 = String(result);
+        const calendar = (_a5 = CALENDAR_ANNOTATION.exec(text4)) == null ? void 0 : _a5[1];
+        const date = ISO_DATE.exec(text4);
+        const time = ISO_TIME.exec(text4);
         let epochNanoseconds = BigInt(0);
         if (date) {
           const year = Number(date[1]);
@@ -41046,11 +41046,11 @@ Please __addLocaleData before adding additional unit data`);
   }
   var ZERO3 = new BigDecimal(0);
   function ToInteger(n2) {
-    const number2 = ToNumber(n2);
-    if (number2.isNaN() || number2.isZero()) return ZERO3;
-    if (!number2.isFinite()) return number2;
-    let integer = number2.abs().floor();
-    if (number2.isNegative()) integer = integer.negated();
+    const number3 = ToNumber(n2);
+    if (number3.isNaN() || number3.isZero()) return ZERO3;
+    if (!number3.isFinite()) return number3;
+    let integer = number3.abs().floor();
+    if (number3.isNegative()) integer = integer.negated();
     return integer.isZero() ? ZERO3 : integer;
   }
   function TimeClip(time) {
@@ -41367,8 +41367,8 @@ Please __addLocaleData before adding additional unit data`);
     const parts = PartitionPattern(pattern);
     let lastField = -1;
     for (const part of parts) {
-      const field = part.type === "weekday" ? "day" : part.type === "relatedYear" || part.type === "yearName" ? "year" : part.type;
-      lastField = Math.max(lastField, TABLE_2_FIELDS.indexOf(field));
+      const field2 = part.type === "weekday" ? "day" : part.type === "relatedYear" || part.type === "yearName" ? "year" : part.type;
+      lastField = Math.max(lastField, TABLE_2_FIELDS.indexOf(field2));
     }
     const fallback = rangePatterns.default || { patternParts: PartitionPattern(dataLocaleData.intervalFormatFallback).map((part) => ({
       source: part.type === "literal" ? RangePatternType.shared : part.type === "0" ? RangePatternType.startRange : RangePatternType.endRange,
@@ -41376,16 +41376,16 @@ Please __addLocaleData before adding additional unit data`);
     })) };
     let rangePattern;
     for (let index = 0; index <= lastField; index++) {
-      const field = TABLE_2_FIELDS[index];
+      const field2 = TABLE_2_FIELDS[index];
       let equal2;
-      if (field === "ampm") equal2 = tm1.hour < 12 === tm2.hour < 12;
-      else if (field === "dayPeriod") equal2 = getDayPeriodName(dataLocaleData, tm1, internalSlots.dayPeriod) === getDayPeriodName(dataLocaleData, tm2, internalSlots.dayPeriod);
-      else if (field === "fractionalSecondDigits") {
+      if (field2 === "ampm") equal2 = tm1.hour < 12 === tm2.hour < 12;
+      else if (field2 === "dayPeriod") equal2 = getDayPeriodName(dataLocaleData, tm1, internalSlots.dayPeriod) === getDayPeriodName(dataLocaleData, tm2, internalSlots.dayPeriod);
+      else if (field2 === "fractionalSecondDigits") {
         const digits = (_c = internalSlots.fractionalSecondDigits) != null ? _c : 3;
         equal2 = Math.floor(tm1.millisecond * 10 ** (digits - 3)) === Math.floor(tm2.millisecond * 10 ** (digits - 3));
-      } else equal2 = SameValue2(tm1[field], tm2[field]);
+      } else equal2 = SameValue2(tm1[field2], tm2[field2]);
       if (!equal2) {
-        rangePattern = rangePatterns[field] || (field === "ampm" ? rangePatterns.hour : void 0) || fallback;
+        rangePattern = rangePatterns[field2] || (field2 === "ampm" ? rangePatterns.hour : void 0) || fallback;
         break;
       }
     }
@@ -41508,11 +41508,11 @@ Please __addLocaleData before adding additional unit data`);
           ];
           const optionsPropIndex = values.indexOf(optionsProp);
           const formatPropIndex = values.indexOf(formatProp);
-          const delta = Math.max(-2, Math.min(formatPropIndex - optionsPropIndex, 2));
-          if (delta === 2) score -= 6;
-          else if (delta === 1) score -= 3;
-          else if (delta === -1) score -= 6;
-          else if (delta === -2) score -= 8;
+          const delta2 = Math.max(-2, Math.min(formatPropIndex - optionsPropIndex, 2));
+          if (delta2 === 2) score -= 6;
+          else if (delta2 === 1) score -= 3;
+          else if (delta2 === -1) score -= 6;
+          else if (delta2 === -2) score -= 8;
         }
       }
       if (score > bestScore) {
@@ -41753,11 +41753,11 @@ Please __addLocaleData before adding additional unit data`);
     patternFields.set(result, fields2);
     result.pattern = pattern;
     result.pattern12 = pattern12;
-    const yearFields = ["{relatedYear}", "{yearName}"].filter((field) => pattern.includes(field));
-    if (yearFields.length) for (const patterns of [result.rangePatterns, result.rangePatterns12]) for (const field of Object.keys(patterns)) {
-      if (field === "default") continue;
-      const range = patterns[field].patternParts.map((part) => part.pattern).join("");
-      if (yearFields.some((yearField) => !range.includes(yearField))) delete patterns[field];
+    const yearFields = ["{relatedYear}", "{yearName}"].filter((field2) => pattern.includes(field2));
+    if (yearFields.length) for (const patterns of [result.rangePatterns, result.rangePatterns12]) for (const field2 of Object.keys(patterns)) {
+      if (field2 === "default") continue;
+      const range = patterns[field2].patternParts.map((part) => part.pattern).join("");
+      if (yearFields.some((yearField) => !range.includes(yearField))) delete patterns[field2];
     }
     return result;
   }
@@ -41851,11 +41851,11 @@ Please __addLocaleData before adding additional unit data`);
           ];
           const optionsPropIndex = values.indexOf(optionsProp);
           const formatPropIndex = values.indexOf(formatProp);
-          const delta = Math.max(-2, Math.min(formatPropIndex - optionsPropIndex, 2));
-          if (delta === 2) score -= 6;
-          else if (delta === 1) score -= 3;
-          else if (delta === -1) score -= 6;
-          else if (delta === -2) score -= 8;
+          const delta2 = Math.max(-2, Math.min(formatPropIndex - optionsPropIndex, 2));
+          if (delta2 === 2) score -= 6;
+          else if (delta2 === 1) score -= 3;
+          else if (delta2 === -1) score -= 6;
+          else if (delta2 === -2) score -= 8;
         }
       }
     }
@@ -41916,8 +41916,8 @@ Please __addLocaleData before adding additional unit data`);
     }
     if (dateStyle !== void 0 && timeStyle !== void 0) {
       const format2 = {};
-      for (const field in dateFormat) if (field !== "pattern" && field !== "rangePatterns" && field !== "rangePatterns12") format2[field] = dateFormat[field];
-      for (const field in timeFormat) if (field !== "pattern" && field !== "pattern12" && field !== "rangePatterns" && field !== "rangePatterns12") format2[field] = timeFormat[field];
+      for (const field2 in dateFormat) if (field2 !== "pattern" && field2 !== "rangePatterns" && field2 !== "rangePatterns12") format2[field2] = dateFormat[field2];
+      for (const field2 in timeFormat) if (field2 !== "pattern" && field2 !== "pattern12" && field2 !== "rangePatterns" && field2 !== "rangePatterns12") format2[field2] = timeFormat[field2];
       const connector = dataLocaleData.dateTimeFormat[dateStyle];
       format2.pattern = connector.replace("{0}", timeFormat.pattern).replace("{1}", dateFormat.pattern);
       if ("pattern12" in timeFormat) format2.pattern12 = connector.replace("{0}", timeFormat.pattern12).replace("{1}", dateFormat.pattern);
@@ -42655,7 +42655,7 @@ Please __addLocaleData before adding additional unit data`);
       const candidate = parseDateTimeSkeleton(key2);
       const numericMonth = (month) => month === "numeric" || month === "2-digit";
       if (numericMonth(target.month) !== numericMonth(candidate.month)) continue;
-      if (DATE_TIME_PROPS.every((field) => target[field] !== void 0 === (candidate[field] !== void 0))) return intervalFormats[key2];
+      if (DATE_TIME_PROPS.every((field2) => target[field2] !== void 0 === (candidate[field2] !== void 0))) return intervalFormats[key2];
     }
   }
   function parseDateTimeStyles({ dateFormat, timeFormat, dateTimeFormat, intervalFormats }) {
@@ -43362,6 +43362,1695 @@ Please __addLocaleData before adding additional unit data`);
     });
   }
 
+  // src/utils/selector.js
+  var resolveKey = (object5, path) => {
+    try {
+      return path.split(".").reduce((acc, part) => acc && acc[part], object5);
+    } catch (e3) {
+      return void 0;
+    }
+  };
+  function assertSafeAssignmentPath(path) {
+    if (typeof path !== "string") return;
+    for (const raw of path.split(/[.:/]/)) {
+      const key2 = raw.startsWith("[]") ? raw.slice(2) : raw;
+      if (key2 === "__proto__" || key2 === "constructor" || key2 === "prototype") {
+        throw new Error(`Unsafe assignment path: ${path}`);
+      }
+    }
+  }
+  var setSelector = (holder, path, value) => {
+    assertSafeAssignmentPath(path);
+    if (!path || typeof path !== "string" || path.indexOf(".") === -1) {
+      return {
+        ...holder || {},
+        [path]: value
+      };
+    }
+    const keys3 = path.split(".");
+    const [head, ...tail] = keys3;
+    const existing = holder && typeof holder === "object" ? holder[head] : void 0;
+    return {
+      ...holder || {},
+      [head]: setSelector(existing || {}, tail.join("."), value)
+    };
+  };
+
+  // src/components/scenarios/scenarioShared.js
+  function number(value, label, { nullable = true, max = Infinity } = {}) {
+    if (nullable && value == null) return null;
+    if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > max) throw new Error(`${label} must be a finite number between 0 and ${max}.`);
+    return value;
+  }
+  function field(value, label) {
+    if (typeof value !== "string" || !/^[A-Za-z_][\w]*(\.[A-Za-z_][\w]*)*$/.test(value)) throw new Error(`${label} requires a field path.`);
+    return value;
+  }
+  function entries(values, label) {
+    if (!Array.isArray(values) || !values.length || values.length > 100) throw new Error(`${label} requires 1\u2013100 entries.`);
+    const ids = /* @__PURE__ */ new Set();
+    return values.map((value) => {
+      if (!value || typeof value.id !== "string" || !value.id || ids.has(value.id) || typeof value.label !== "string" || !value.label) throw new Error(`${label} requires unique IDs and labels.`);
+      ids.add(value.id);
+      return { ...value };
+    });
+  }
+  function sum(values) {
+    return values.some((value) => value == null) ? null : values.reduce((a4, b3) => {
+      const result = a4 + b3;
+      if (!Number.isFinite(result)) throw new Error("Scenario total exceeds finite range.");
+      return result;
+    }, 0);
+  }
+  var delta = (value, baseline) => value == null || baseline == null ? null : value - baseline;
+  var ratio = (value, total) => value == null || total == null || total === 0 ? null : value / total;
+  var read = (row, key2) => resolveKey(row, key2);
+  var escape = (value) => String(value != null ? value : "").replace(/[&<>"']/g, (c3) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c3]);
+  var display = (value) => value == null ? "No data" : new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value);
+  function scenarioState(config, filters = {}, supplied) {
+    const result = { ...config.state, ...supplied };
+    for (const [key2, binding] of Object.entries(config.stateBindings || {})) {
+      field(binding.path, "Scenario state binding");
+      const value = read(filters, binding.path);
+      if (value !== void 0) result[key2] = value;
+    }
+    return result;
+  }
+  function validateBindings(bindings2 = {}) {
+    for (const binding of Object.values(bindings2)) {
+      if (!binding || typeof binding.paramId !== "string" || !binding.paramId) throw new Error("State bindings require a scope paramId.");
+      field(binding.path, "State binding");
+    }
+    return bindings2;
+  }
+  function checkedRows(rows) {
+    if (!Array.isArray(rows) || rows.length > 1e4) throw new Error("Scenario requires at most 10000 rows.");
+    return rows;
+  }
+  function graphic(body, width, height, title) {
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) throw new Error("Scenario graphic requires finite positive dimensions.");
+    return { svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escape(title)}"><style>text{font-family:var(--forge-type-small-family,Arial,sans-serif);font-size:var(--forge-type-small-size,12px);font-weight:var(--forge-type-small-weight,400);line-height:var(--forge-type-small-line-height,1.5);letter-spacing:var(--forge-type-small-letter-spacing,normal);fill:currentColor} .scenario-muted{opacity:.25}</style>${body}</svg>`, height, diagnostics: [] };
+  }
+
+  // src/reporting/calculationContracts.js
+  function cloneValue(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+  }
+  function normalizeString(value = "") {
+    return String(value || "").trim();
+  }
+  var REPORT_CALCULATED_FIELD_FUNCTION_SPECS = Object.freeze({
+    if: { minArgs: 3, maxArgs: 3 },
+    case: { minArgs: 3 },
+    coalesce: { minArgs: 1 },
+    isnull: { minArgs: 1, maxArgs: 1 },
+    nullif: { minArgs: 2, maxArgs: 2 },
+    abs: { minArgs: 1, maxArgs: 1 },
+    round: { minArgs: 1, maxArgs: 2 },
+    floor: { minArgs: 1, maxArgs: 1 },
+    ceil: { minArgs: 1, maxArgs: 1 },
+    min: { minArgs: 1 },
+    max: { minArgs: 1 },
+    least: { minArgs: 1 },
+    greatest: { minArgs: 1 },
+    concat: { minArgs: 1 },
+    lower: { minArgs: 1, maxArgs: 1 },
+    upper: { minArgs: 1, maxArgs: 1 }
+  });
+  var REPORT_CALCULATED_FIELD_TABLE_CALC_SPECS = Object.freeze([
+    {
+      name: "percentOfTotal",
+      label: "Percent of Total",
+      supportsPartition: true,
+      supportsDecimals: true,
+      usesFilteredScopeTotal: true,
+      nullBehavior: "nonFiniteValuesYieldZeroAndAreExcludedFromTotals",
+      defaultFormat: "percent"
+    },
+    {
+      name: "deltaFromPrevious",
+      label: "Delta From Previous",
+      supportsPartition: true,
+      requiresOrder: true,
+      nullBehavior: "nonFiniteValuesYieldZeroAndDoNotAdvancePreviousFiniteValue",
+      defaultFormat: "number"
+    },
+    {
+      name: "lag",
+      label: "Lag",
+      supportsPartition: true,
+      requiresOrder: true,
+      supportsOffset: true,
+      nullBehavior: "missingOrNullPriorRowYieldsNullWithoutSkippingRows",
+      defaultFormat: "number"
+    },
+    {
+      name: "windowMax",
+      label: "Window Maximum",
+      supportsPartition: true,
+      requiresExplicitFrame: true,
+      boundedFrameRequiresOrder: true,
+      nullBehavior: "ignoresNonFiniteValuesAndReturnsNullForAnEmptyNumericWindow",
+      defaultFormat: "number"
+    },
+    {
+      name: "runningTotal",
+      label: "Running Total",
+      supportsPartition: true,
+      requiresOrder: true,
+      nullBehavior: "nonFiniteValuesDoNotAdvanceRunningTotal",
+      defaultFormat: "number"
+    },
+    {
+      name: "movingAverage",
+      label: "Moving Average",
+      supportsPartition: true,
+      requiresOrder: true,
+      requiresWindowSize: true,
+      supportsDecimals: true,
+      nullBehavior: "windowAveragesIgnoreNonFiniteValues",
+      defaultFormat: "number"
+    },
+    {
+      name: "rank",
+      label: "Rank",
+      supportsPartition: true,
+      requiresOrder: true,
+      supportsRankDirection: true,
+      supportsTieBreaker: true,
+      tieMode: "dense",
+      nullBehavior: "nonFiniteValuesYieldNullAndDoNotAdvanceRank",
+      defaultFormat: "number"
+    }
+  ]);
+  function listReportCalculatedFieldTableCalculationSpecs() {
+    return REPORT_CALCULATED_FIELD_TABLE_CALC_SPECS.map((entry) => cloneValue(entry)).sort((left, right) => normalizeString(left.name).localeCompare(normalizeString(right.name)));
+  }
+
+  // src/reporting/calculatedFieldModel.js
+  function normalizeString2(value = "") {
+    return String(value || "").trim();
+  }
+  function cloneValue2(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+  }
+  function normalizeStringArray(values = []) {
+    return (Array.isArray(values) ? values : []).map((value) => normalizeString2(value)).filter(Boolean);
+  }
+  function normalizeOrderBy(orderBy = []) {
+    return (Array.isArray(orderBy) ? orderBy : []).map((entry) => {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+        return null;
+      }
+      const field2 = normalizeString2(entry.field);
+      if (!field2) {
+        return null;
+      }
+      return {
+        field: field2,
+        direction: normalizeString2(entry.direction).toLowerCase() === "desc" ? "desc" : "asc"
+      };
+    }).filter(Boolean);
+  }
+  function normalizePartitionBy(partitionBy = []) {
+    return normalizeStringArray(partitionBy);
+  }
+  function buildExpressionError(message = "", index = 0) {
+    return new Error(`Invalid calculated field expression at ${Math.max(0, Number(index) || 0)}: ${message}`);
+  }
+  function tokenizeReportCalculatedFieldExpression(expression = "") {
+    const input = String(expression || "");
+    const tokens = [];
+    let index = 0;
+    while (index < input.length) {
+      const char = input[index];
+      if (/\s/.test(char)) {
+        index += 1;
+        continue;
+      }
+      if (char === "(" || char === ")") {
+        tokens.push({ type: "paren", value: char, index });
+        index += 1;
+        continue;
+      }
+      if (char === ",") {
+        tokens.push({ type: "comma", value: char, index });
+        index += 1;
+        continue;
+      }
+      if ((char === "!" || char === ">" || char === "<") && input[index + 1] === "=") {
+        tokens.push({ type: "operator", value: `${char}=`, index });
+        index += 2;
+        continue;
+      }
+      if (char === "=" || char === "+" || char === "-" || char === "*" || char === "/" || char === "%" || char === ">" || char === "<") {
+        tokens.push({ type: "operator", value: char, index });
+        index += 1;
+        continue;
+      }
+      if (char === "'" || char === '"') {
+        const quote = char;
+        let cursor = index + 1;
+        let value = "";
+        while (cursor < input.length) {
+          const current = input[cursor];
+          if (current === "\\") {
+            const next = input[cursor + 1];
+            if (next == null) {
+              throw buildExpressionError("unterminated escape sequence", cursor);
+            }
+            value += next;
+            cursor += 2;
+            continue;
+          }
+          if (current === quote) {
+            tokens.push({ type: "string", value, index });
+            index = cursor + 1;
+            value = null;
+            break;
+          }
+          value += current;
+          cursor += 1;
+        }
+        if (value != null) {
+          throw buildExpressionError("unterminated string literal", index);
+        }
+        continue;
+      }
+      if (/[0-9]/.test(char) || char === "." && /[0-9]/.test(input[index + 1] || "")) {
+        let cursor = index + 1;
+        while (cursor < input.length && /[0-9.]/.test(input[cursor])) {
+          cursor += 1;
+        }
+        const rawNumber = input.slice(index, cursor);
+        const numericValue = Number(rawNumber);
+        if (!Number.isFinite(numericValue)) {
+          throw buildExpressionError(`invalid number literal "${rawNumber}"`, index);
+        }
+        tokens.push({ type: "number", value: numericValue, index });
+        index = cursor;
+        continue;
+      }
+      if (/[A-Za-z_]/.test(char)) {
+        let cursor = index + 1;
+        while (cursor < input.length && /[A-Za-z0-9_.]/.test(input[cursor])) {
+          cursor += 1;
+        }
+        const rawIdentifier = input.slice(index, cursor);
+        const lowered = rawIdentifier.toLowerCase();
+        if (lowered === "and" || lowered === "or" || lowered === "not") {
+          tokens.push({ type: "operator", value: lowered, index });
+        } else if (lowered === "null") {
+          tokens.push({ type: "literal", value: null, index });
+        } else if (lowered === "true") {
+          tokens.push({ type: "literal", value: true, index });
+        } else if (lowered === "false") {
+          tokens.push({ type: "literal", value: false, index });
+        } else {
+          tokens.push({ type: "identifier", value: rawIdentifier, index });
+        }
+        index = cursor;
+        continue;
+      }
+      throw buildExpressionError(`unexpected character "${char}"`, index);
+    }
+    return tokens;
+  }
+  function parseReportCalculatedFieldExpressionTokens(tokens = []) {
+    let position = 0;
+    function current() {
+      return tokens[position] || null;
+    }
+    function consume() {
+      const token = current();
+      position += 1;
+      return token;
+    }
+    function match2(type, value = void 0) {
+      const token = current();
+      if (!token || token.type !== type) {
+        return false;
+      }
+      if (value !== void 0 && token.value !== value) {
+        return false;
+      }
+      return true;
+    }
+    function expect(type, value = void 0) {
+      var _a5, _b, _c;
+      const token = current();
+      if (!match2(type, value)) {
+        throw buildExpressionError(`expected ${value != null ? value : type}`, (_c = (_b = token == null ? void 0 : token.index) != null ? _b : (_a5 = tokens[tokens.length - 1]) == null ? void 0 : _a5.index) != null ? _c : 0);
+      }
+      return consume();
+    }
+    function parsePrimary() {
+      var _a5, _b;
+      const token = current();
+      if (!token) {
+        throw buildExpressionError("unexpected end of expression", (_b = (_a5 = tokens[tokens.length - 1]) == null ? void 0 : _a5.index) != null ? _b : 0);
+      }
+      if (token.type === "number" || token.type === "string" || token.type === "literal") {
+        consume();
+        return { type: "literal", value: token.value };
+      }
+      if (token.type === "identifier") {
+        consume();
+        if (match2("paren", "(")) {
+          consume();
+          const args = [];
+          if (!match2("paren", ")")) {
+            while (true) {
+              args.push(parseOr());
+              if (match2("comma")) {
+                consume();
+                continue;
+              }
+              break;
+            }
+          }
+          expect("paren", ")");
+          return {
+            type: "call",
+            callee: token.value,
+            args
+          };
+        }
+        return {
+          type: "identifier",
+          name: token.value
+        };
+      }
+      if (match2("paren", "(")) {
+        consume();
+        const node = parseOr();
+        expect("paren", ")");
+        return node;
+      }
+      throw buildExpressionError(`unexpected token "${token.value}"`, token.index);
+    }
+    function parseUnary() {
+      if (match2("operator", "-") || match2("operator", "not")) {
+        const token = consume();
+        return {
+          type: "unary",
+          operator: token.value,
+          argument: parseUnary()
+        };
+      }
+      return parsePrimary();
+    }
+    function parseMultiplicative() {
+      let node = parseUnary();
+      while (match2("operator", "*") || match2("operator", "/") || match2("operator", "%")) {
+        const token = consume();
+        node = {
+          type: "binary",
+          operator: token.value,
+          left: node,
+          right: parseUnary()
+        };
+      }
+      return node;
+    }
+    function parseAdditive() {
+      let node = parseMultiplicative();
+      while (match2("operator", "+") || match2("operator", "-")) {
+        const token = consume();
+        node = {
+          type: "binary",
+          operator: token.value,
+          left: node,
+          right: parseMultiplicative()
+        };
+      }
+      return node;
+    }
+    function parseComparison() {
+      let node = parseAdditive();
+      if (match2("operator", "=") || match2("operator", "!=") || match2("operator", ">") || match2("operator", ">=") || match2("operator", "<") || match2("operator", "<=")) {
+        const token = consume();
+        node = {
+          type: "binary",
+          operator: token.value,
+          left: node,
+          right: parseAdditive()
+        };
+      }
+      return node;
+    }
+    function parseAnd() {
+      let node = parseComparison();
+      while (match2("operator", "and")) {
+        consume();
+        node = {
+          type: "binary",
+          operator: "and",
+          left: node,
+          right: parseComparison()
+        };
+      }
+      return node;
+    }
+    function parseOr() {
+      let node = parseAnd();
+      while (match2("operator", "or")) {
+        consume();
+        node = {
+          type: "binary",
+          operator: "or",
+          left: node,
+          right: parseAnd()
+        };
+      }
+      return node;
+    }
+    const ast = parseOr();
+    if (position < tokens.length) {
+      throw buildExpressionError(`unexpected token "${tokens[position].value}"`, tokens[position].index);
+    }
+    return ast;
+  }
+  function collectReportCalculatedFieldExpressionDependencies(node = null, dependencies = /* @__PURE__ */ new Set()) {
+    if (!node || typeof node !== "object") {
+      return dependencies;
+    }
+    if (node.type === "identifier") {
+      dependencies.add(normalizeString2(node.name));
+      return dependencies;
+    }
+    if (node.type === "unary") {
+      return collectReportCalculatedFieldExpressionDependencies(node.argument, dependencies);
+    }
+    if (node.type === "binary") {
+      collectReportCalculatedFieldExpressionDependencies(node.left, dependencies);
+      collectReportCalculatedFieldExpressionDependencies(node.right, dependencies);
+      return dependencies;
+    }
+    if (node.type === "call") {
+      (Array.isArray(node.args) ? node.args : []).forEach((arg) => {
+        collectReportCalculatedFieldExpressionDependencies(arg, dependencies);
+      });
+    }
+    return dependencies;
+  }
+  function validateReportCalculatedFieldExpressionAst(node = null) {
+    if (!node || typeof node !== "object") {
+      return;
+    }
+    if (node.type === "literal" || node.type === "identifier") {
+      return;
+    }
+    if (node.type === "unary") {
+      validateReportCalculatedFieldExpressionAst(node.argument);
+      return;
+    }
+    if (node.type === "binary") {
+      validateReportCalculatedFieldExpressionAst(node.left);
+      validateReportCalculatedFieldExpressionAst(node.right);
+      return;
+    }
+    if (node.type === "call") {
+      const normalizedCallee = normalizeString2(node.callee).toLowerCase();
+      const spec = REPORT_CALCULATED_FIELD_FUNCTION_SPECS[normalizedCallee];
+      if (!spec) {
+        throw buildExpressionError(`unsupported function "${node.callee}"`);
+      }
+      const argCount = Array.isArray(node.args) ? node.args.length : 0;
+      if (Number.isFinite(spec.minArgs) && argCount < spec.minArgs) {
+        throw buildExpressionError(`function "${node.callee}" requires at least ${spec.minArgs} argument${spec.minArgs === 1 ? "" : "s"}`);
+      }
+      if (Number.isFinite(spec.maxArgs) && argCount > spec.maxArgs) {
+        throw buildExpressionError(`function "${node.callee}" accepts at most ${spec.maxArgs} argument${spec.maxArgs === 1 ? "" : "s"}`);
+      }
+      (Array.isArray(node.args) ? node.args : []).forEach((arg) => {
+        validateReportCalculatedFieldExpressionAst(arg);
+      });
+      return;
+    }
+    throw buildExpressionError(`unsupported expression node "${String(node.type || "unknown")}"`);
+  }
+  function parseReportCalculatedFieldExpression(expression = "") {
+    const normalizedExpression = normalizeString2(expression);
+    if (!normalizedExpression) {
+      return null;
+    }
+    const tokens = tokenizeReportCalculatedFieldExpression(normalizedExpression);
+    const ast = parseReportCalculatedFieldExpressionTokens(tokens);
+    validateReportCalculatedFieldExpressionAst(ast);
+    return {
+      expr: normalizedExpression,
+      ast,
+      dependencies: Array.from(collectReportCalculatedFieldExpressionDependencies(ast))
+    };
+  }
+  function isNullishValue(value) {
+    return value === void 0 || value === null;
+  }
+  function toFiniteNumber(value) {
+    if (isNullishValue(value) || value === "") {
+      return null;
+    }
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) ? numericValue : null;
+  }
+  function coerceBoolean(value) {
+    if (typeof value === "boolean") {
+      return value;
+    }
+    if (isNullishValue(value) || value === "") {
+      return false;
+    }
+    if (typeof value === "number") {
+      return value !== 0;
+    }
+    const trimmed = normalizeString2(value);
+    if (!trimmed) {
+      return false;
+    }
+    if (trimmed.toLowerCase() === "true") {
+      return true;
+    }
+    if (trimmed.toLowerCase() === "false") {
+      return false;
+    }
+    const numericValue = toFiniteNumber(trimmed);
+    if (numericValue != null) {
+      return numericValue !== 0;
+    }
+    return true;
+  }
+  function compareValues(left, right, operator = "=") {
+    if (isNullishValue(left) || isNullishValue(right)) {
+      return false;
+    }
+    const leftNumber = toFiniteNumber(left);
+    const rightNumber = toFiniteNumber(right);
+    if (leftNumber != null && rightNumber != null) {
+      switch (operator) {
+        case "=":
+          return leftNumber === rightNumber;
+        case "!=":
+          return leftNumber !== rightNumber;
+        case ">":
+          return leftNumber > rightNumber;
+        case ">=":
+          return leftNumber >= rightNumber;
+        case "<":
+          return leftNumber < rightNumber;
+        case "<=":
+          return leftNumber <= rightNumber;
+        default:
+          return false;
+      }
+    }
+    const leftValue = typeof left === "boolean" ? String(left) : String(left);
+    const rightValue = typeof right === "boolean" ? String(right) : String(right);
+    switch (operator) {
+      case "=":
+        return leftValue === rightValue;
+      case "!=":
+        return leftValue !== rightValue;
+      case ">":
+        return leftValue > rightValue;
+      case ">=":
+        return leftValue >= rightValue;
+      case "<":
+        return leftValue < rightValue;
+      case "<=":
+        return leftValue <= rightValue;
+      default:
+        return false;
+    }
+  }
+  function evaluateReportCalculatedFieldFunction(node = {}, row = {}) {
+    const callee = normalizeString2(node == null ? void 0 : node.callee).toLowerCase();
+    const args = Array.isArray(node == null ? void 0 : node.args) ? node.args : [];
+    switch (callee) {
+      case "if": {
+        if (args.length !== 3) {
+          return null;
+        }
+        return coerceBoolean(evaluateReportCalculatedFieldExpression(args[0], row)) ? evaluateReportCalculatedFieldExpression(args[1], row) : evaluateReportCalculatedFieldExpression(args[2], row);
+      }
+      case "case": {
+        if (args.length < 3) {
+          return null;
+        }
+        const hasElseValue = args.length % 2 === 1;
+        const pairLimit = hasElseValue ? args.length - 1 : args.length;
+        for (let index = 0; index < pairLimit; index += 2) {
+          if (coerceBoolean(evaluateReportCalculatedFieldExpression(args[index], row))) {
+            return evaluateReportCalculatedFieldExpression(args[index + 1], row);
+          }
+        }
+        return hasElseValue ? evaluateReportCalculatedFieldExpression(args[args.length - 1], row) : null;
+      }
+      case "coalesce": {
+        for (const arg of args) {
+          const value = evaluateReportCalculatedFieldExpression(arg, row);
+          if (!isNullishValue(value)) {
+            return value;
+          }
+        }
+        return null;
+      }
+      case "isnull": {
+        if (args.length !== 1) {
+          return null;
+        }
+        return isNullishValue(evaluateReportCalculatedFieldExpression(args[0], row));
+      }
+      case "nullif": {
+        if (args.length !== 2) {
+          return null;
+        }
+        const left = evaluateReportCalculatedFieldExpression(args[0], row);
+        const right = evaluateReportCalculatedFieldExpression(args[1], row);
+        return compareValues(left, right, "=") ? null : left;
+      }
+      default:
+        break;
+    }
+    const values = args.map((arg) => evaluateReportCalculatedFieldExpression(arg, row));
+    switch (callee) {
+      case "abs": {
+        const numericValue = toFiniteNumber(values[0]);
+        return numericValue == null ? null : Math.abs(numericValue);
+      }
+      case "round": {
+        const numericValue = toFiniteNumber(values[0]);
+        if (numericValue == null) {
+          return null;
+        }
+        const decimals = values.length > 1 ? toFiniteNumber(values[1]) : 0;
+        if (decimals == null) {
+          return null;
+        }
+        const factor = 10 ** Math.max(0, Math.trunc(decimals));
+        return Math.round(numericValue * factor) / factor;
+      }
+      case "floor": {
+        const numericValue = toFiniteNumber(values[0]);
+        return numericValue == null ? null : Math.floor(numericValue);
+      }
+      case "ceil": {
+        const numericValue = toFiniteNumber(values[0]);
+        return numericValue == null ? null : Math.ceil(numericValue);
+      }
+      case "min":
+      case "least": {
+        if (values.length === 0 || values.some((value) => toFiniteNumber(value) == null)) {
+          return null;
+        }
+        return Math.min(...values.map((value) => toFiniteNumber(value)));
+      }
+      case "max":
+      case "greatest": {
+        if (values.length === 0 || values.some((value) => toFiniteNumber(value) == null)) {
+          return null;
+        }
+        return Math.max(...values.map((value) => toFiniteNumber(value)));
+      }
+      case "concat": {
+        if (values.some((value) => isNullishValue(value))) {
+          return null;
+        }
+        return values.map((value) => String(value)).join("");
+      }
+      case "lower": {
+        if (isNullishValue(values[0])) {
+          return null;
+        }
+        return String(values[0]).toLowerCase();
+      }
+      case "upper": {
+        if (isNullishValue(values[0])) {
+          return null;
+        }
+        return String(values[0]).toUpperCase();
+      }
+      default:
+        return null;
+    }
+  }
+  function evaluateReportCalculatedFieldExpression(expressionOrNode = null, row = {}) {
+    var _a5;
+    const node = typeof expressionOrNode === "string" ? (_a5 = parseReportCalculatedFieldExpression(expressionOrNode)) == null ? void 0 : _a5.ast : expressionOrNode;
+    if (!node || typeof node !== "object") {
+      return null;
+    }
+    switch (node.type) {
+      case "literal":
+        return cloneValue2(node.value);
+      case "identifier": {
+        const value = resolveKey(row, node.name);
+        return value === void 0 ? null : cloneValue2(value);
+      }
+      case "unary": {
+        const value = evaluateReportCalculatedFieldExpression(node.argument, row);
+        if (node.operator === "not") {
+          return !coerceBoolean(value);
+        }
+        if (node.operator === "-") {
+          const numericValue = toFiniteNumber(value);
+          return numericValue == null ? null : -numericValue;
+        }
+        return null;
+      }
+      case "binary": {
+        if (node.operator === "and") {
+          return coerceBoolean(evaluateReportCalculatedFieldExpression(node.left, row)) && coerceBoolean(evaluateReportCalculatedFieldExpression(node.right, row));
+        }
+        if (node.operator === "or") {
+          return coerceBoolean(evaluateReportCalculatedFieldExpression(node.left, row)) || coerceBoolean(evaluateReportCalculatedFieldExpression(node.right, row));
+        }
+        const left = evaluateReportCalculatedFieldExpression(node.left, row);
+        const right = evaluateReportCalculatedFieldExpression(node.right, row);
+        if (node.operator === "+" || node.operator === "-" || node.operator === "*" || node.operator === "/" || node.operator === "%") {
+          const leftNumber = toFiniteNumber(left);
+          const rightNumber = toFiniteNumber(right);
+          if (leftNumber == null || rightNumber == null) {
+            return null;
+          }
+          if ((node.operator === "/" || node.operator === "%") && rightNumber === 0) {
+            return null;
+          }
+          switch (node.operator) {
+            case "+":
+              return leftNumber + rightNumber;
+            case "-":
+              return leftNumber - rightNumber;
+            case "*":
+              return leftNumber * rightNumber;
+            case "/":
+              return leftNumber / rightNumber;
+            case "%":
+              return leftNumber % rightNumber;
+            default:
+              return null;
+          }
+        }
+        return compareValues(left, right, node.operator);
+      }
+      case "call":
+        return evaluateReportCalculatedFieldFunction(node, row);
+      default:
+        return null;
+    }
+  }
+  function normalizeRatioCalculation(compute = {}) {
+    const numerator = normalizeString2(compute == null ? void 0 : compute.numerator);
+    const denominator = normalizeString2(compute == null ? void 0 : compute.denominator);
+    if (!numerator || !denominator) {
+      return null;
+    }
+    const next = {
+      type: "ratio",
+      numerator,
+      denominator
+    };
+    if (Number.isFinite(Number(compute == null ? void 0 : compute.scale))) {
+      next.scale = Number(compute.scale);
+    }
+    if (Number.isFinite(Number(compute == null ? void 0 : compute.decimals))) {
+      next.decimals = Number(compute.decimals);
+    }
+    return next;
+  }
+  function normalizePercentOfTotalCalculation(compute = {}) {
+    const sourceField = normalizeString2(compute == null ? void 0 : compute.sourceField);
+    if (!sourceField) {
+      return null;
+    }
+    const next = {
+      type: "percentOfTotal",
+      sourceField
+    };
+    if (compute.nullPolicy !== void 0) {
+      if (!["zero", "null"].includes(compute.nullPolicy)) throw Error("percentOfTotal nullPolicy must be zero or null");
+      next.nullPolicy = compute.nullPolicy;
+    }
+    if (compute.requireComplete !== void 0) {
+      if (typeof compute.requireComplete !== "boolean") throw Error("percentOfTotal requireComplete must be boolean");
+      next.requireComplete = compute.requireComplete;
+    }
+    const partitionBy = normalizePartitionBy(compute == null ? void 0 : compute.partitionBy);
+    if (partitionBy.length > 0) {
+      next.partitionBy = partitionBy;
+    }
+    if (Number.isFinite(Number(compute == null ? void 0 : compute.scale))) {
+      next.scale = Number(compute.scale);
+    }
+    if (Number.isFinite(Number(compute == null ? void 0 : compute.decimals))) {
+      next.decimals = Number(compute.decimals);
+    }
+    return next;
+  }
+  function normalizeDeltaFromPreviousCalculation(compute = {}) {
+    const sourceField = normalizeString2(compute == null ? void 0 : compute.sourceField);
+    const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
+    if (!sourceField || orderBy.length === 0) {
+      return null;
+    }
+    const next = {
+      type: "deltaFromPrevious",
+      sourceField,
+      orderBy
+    };
+    const partitionBy = normalizePartitionBy(compute == null ? void 0 : compute.partitionBy);
+    if (partitionBy.length > 0) {
+      next.partitionBy = partitionBy;
+    }
+    return next;
+  }
+  function normalizeLagCalculation(compute = {}) {
+    const sourceField = normalizeString2(compute == null ? void 0 : compute.sourceField);
+    const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
+    const offset = (compute == null ? void 0 : compute.offset) == null ? 1 : Number(compute.offset);
+    if (!sourceField || !orderBy.length || !Number.isSafeInteger(offset) || offset < 1 || offset > 1e4) return null;
+    const partitionBy = normalizePartitionBy(compute == null ? void 0 : compute.partitionBy);
+    return { type: "lag", sourceField, orderBy, offset, ...partitionBy.length ? { partitionBy } : {} };
+  }
+  function normalizeWindowMaxCalculation(compute = {}) {
+    var _a5;
+    const sourceField = normalizeString2(compute == null ? void 0 : compute.sourceField);
+    const partitionBy = normalizePartitionBy(compute == null ? void 0 : compute.partitionBy);
+    const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
+    const type = normalizeString2((_a5 = compute == null ? void 0 : compute.frame) == null ? void 0 : _a5.type);
+    if (!sourceField || !["full", "rows"].includes(type)) return null;
+    let frame = { type };
+    if (type === "rows") {
+      const preceding = Number(compute.frame.preceding), following = Number(compute.frame.following);
+      if (!orderBy.length || !Number.isSafeInteger(preceding) || !Number.isSafeInteger(following) || preceding < 0 || following < 0 || preceding > 1e4 || following > 1e4) return null;
+      frame = { type, preceding, following };
+    } else if (compute.frame.preceding != null || compute.frame.following != null) return null;
+    return { type: "windowMax", sourceField, frame, ...partitionBy.length ? { partitionBy } : {}, ...orderBy.length ? { orderBy } : {} };
+  }
+  function normalizeRunningTotalCalculation(compute = {}) {
+    const sourceField = normalizeString2(compute == null ? void 0 : compute.sourceField);
+    const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
+    if (!sourceField || orderBy.length === 0) {
+      return null;
+    }
+    const next = {
+      type: "runningTotal",
+      sourceField,
+      orderBy
+    };
+    const partitionBy = normalizePartitionBy(compute == null ? void 0 : compute.partitionBy);
+    if (partitionBy.length > 0) {
+      next.partitionBy = partitionBy;
+    }
+    return next;
+  }
+  function normalizeMovingAverageCalculation(compute = {}) {
+    const sourceField = normalizeString2(compute == null ? void 0 : compute.sourceField);
+    const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
+    const windowSize = Math.max(1, Number((compute == null ? void 0 : compute.windowSize) || 0) || 0);
+    if (!sourceField || orderBy.length === 0 || !windowSize) {
+      return null;
+    }
+    const next = {
+      type: "movingAverage",
+      sourceField,
+      orderBy,
+      windowSize
+    };
+    if (Number.isFinite(Number(compute == null ? void 0 : compute.decimals))) {
+      next.decimals = Number(compute.decimals);
+    }
+    const partitionBy = normalizePartitionBy(compute == null ? void 0 : compute.partitionBy);
+    if (partitionBy.length > 0) {
+      next.partitionBy = partitionBy;
+    }
+    return next;
+  }
+  function normalizeRankCalculation(compute = {}) {
+    var _a5;
+    const sourceField = normalizeString2(compute == null ? void 0 : compute.sourceField);
+    const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
+    const tieMode = normalizeString2(compute == null ? void 0 : compute.tieMode).toLowerCase();
+    if (!sourceField || orderBy.length === 0 || ((_a5 = orderBy[0]) == null ? void 0 : _a5.field) !== sourceField) {
+      return null;
+    }
+    if (tieMode && tieMode !== "dense") {
+      return null;
+    }
+    const next = {
+      type: "rank",
+      sourceField,
+      orderBy,
+      tieMode: "dense"
+    };
+    const partitionBy = normalizePartitionBy(compute == null ? void 0 : compute.partitionBy);
+    if (partitionBy.length > 0) {
+      next.partitionBy = partitionBy;
+    }
+    return next;
+  }
+  function buildCalculatedFieldDependencies(definition = {}, inferredDependencies = []) {
+    return Array.from(/* @__PURE__ */ new Set([
+      ...normalizeStringArray(definition == null ? void 0 : definition.dependencies),
+      ...normalizeStringArray(inferredDependencies)
+    ]));
+  }
+  function normalizeReportCalculatedFieldExpressionDefinition(definition = {}) {
+    const expr = normalizeString2(definition == null ? void 0 : definition.expr);
+    if (!expr) {
+      return null;
+    }
+    const parsed = parseReportCalculatedFieldExpression(expr);
+    if (!(parsed == null ? void 0 : parsed.ast)) {
+      return null;
+    }
+    return {
+      expr,
+      dependencies: buildCalculatedFieldDependencies(definition, parsed.dependencies)
+    };
+  }
+  function normalizeReportCalculatedFieldCompute(definition = {}) {
+    var _a5;
+    const computeType = normalizeString2((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type).toLowerCase();
+    let compute = null;
+    if (computeType === "ratio") {
+      compute = normalizeRatioCalculation(definition.compute);
+    } else if (computeType === "percentoftotal") {
+      compute = normalizePercentOfTotalCalculation(definition.compute);
+    } else if (computeType === "deltafromprevious") {
+      compute = normalizeDeltaFromPreviousCalculation(definition.compute);
+    } else if (computeType === "lag") {
+      compute = normalizeLagCalculation(definition.compute);
+    } else if (computeType === "windowmax") {
+      compute = normalizeWindowMaxCalculation(definition.compute);
+    } else if (computeType === "runningtotal") {
+      compute = normalizeRunningTotalCalculation(definition.compute);
+    } else if (computeType === "movingaverage") {
+      compute = normalizeMovingAverageCalculation(definition.compute);
+    } else if (computeType === "rank") {
+      compute = normalizeRankCalculation(definition.compute);
+    }
+    if (!compute) {
+      return null;
+    }
+    const inferredDependencies = computeType === "percentoftotal" ? [compute.sourceField, ...normalizePartitionBy(compute.partitionBy)] : computeType === "deltafromprevious" || computeType === "runningtotal" || computeType === "movingaverage" || computeType === "rank" || computeType === "lag" || computeType === "windowmax" ? [compute.sourceField, ...(compute.orderBy || []).map((entry) => entry.field), ...normalizePartitionBy(compute.partitionBy)] : [compute.numerator, compute.denominator];
+    return {
+      compute,
+      dependencies: buildCalculatedFieldDependencies(definition, inferredDependencies)
+    };
+  }
+  function normalizeReportCalculatedField(definition = {}, {
+    datasetRef = ""
+  } = {}) {
+    var _a5, _b, _c, _d, _e, _f, _g;
+    if (!definition || typeof definition !== "object" || Array.isArray(definition)) {
+      return null;
+    }
+    const id = normalizeString2((definition == null ? void 0 : definition.id) || (definition == null ? void 0 : definition.key));
+    if (!id) {
+      return null;
+    }
+    const normalizedExpression = normalizeReportCalculatedFieldExpressionDefinition(definition);
+    const normalizedCompute = normalizedExpression ? null : normalizeReportCalculatedFieldCompute(definition);
+    if (!normalizedExpression && !normalizedCompute) {
+      return null;
+    }
+    const kind = normalizedExpression ? "rowCalc" : normalizeString2((_a5 = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _a5.type).toLowerCase() === "percentoftotal" || normalizeString2((_b = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _b.type).toLowerCase() === "deltafromprevious" || normalizeString2((_c = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _c.type).toLowerCase() === "runningtotal" || normalizeString2((_d = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _d.type).toLowerCase() === "movingaverage" || normalizeString2((_e = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _e.type).toLowerCase() === "rank" || normalizeString2((_f = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _f.type).toLowerCase() === "lag" || normalizeString2((_g = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _g.type).toLowerCase() === "windowmax" ? "tableCalc" : "rowCalc";
+    if (normalizedExpression && normalizeString2(definition == null ? void 0 : definition.kind) && normalizeString2(definition.kind) !== "rowCalc") {
+      return null;
+    }
+    return {
+      id,
+      key: normalizeString2((definition == null ? void 0 : definition.key) || id),
+      kind,
+      label: normalizeString2((definition == null ? void 0 : definition.label) || id),
+      dataType: normalizeString2((definition == null ? void 0 : definition.dataType) || "number") || "number",
+      ...normalizeString2(definition == null ? void 0 : definition.format) ? { format: normalizeString2(definition.format) } : {},
+      ...normalizeString2((definition == null ? void 0 : definition.datasetRef) || datasetRef) ? { datasetRef: normalizeString2((definition == null ? void 0 : definition.datasetRef) || datasetRef) } : {},
+      dependencies: (normalizedExpression == null ? void 0 : normalizedExpression.dependencies) || (normalizedCompute == null ? void 0 : normalizedCompute.dependencies) || [],
+      ...normalizedExpression ? { expr: normalizedExpression.expr } : { compute: normalizedCompute.compute }
+    };
+  }
+  function normalizeReportCalculatedFields(definitions = [], options = {}) {
+    return (Array.isArray(definitions) ? definitions : []).map((definition) => normalizeReportCalculatedField(definition, options)).filter(Boolean);
+  }
+  function buildPartitionGroups(rowsToPartition = [], partitionBy = []) {
+    const normalizedPartitionBy = normalizePartitionBy(partitionBy);
+    if (normalizedPartitionBy.length === 0) {
+      return [[...rowsToPartition]];
+    }
+    const groups = /* @__PURE__ */ new Map();
+    rowsToPartition.forEach((row) => {
+      const key2 = JSON.stringify(normalizedPartitionBy.map((field2) => resolveKey(row, field2)));
+      const current = groups.get(key2) || [];
+      current.push(row);
+      groups.set(key2, current);
+    });
+    return Array.from(groups.values());
+  }
+  function sortRowsByOrder(rowsToSort = [], orderBy = []) {
+    return [...rowsToSort].sort((left, right) => {
+      for (const order of normalizeOrderBy(orderBy)) {
+        const leftValue = resolveKey(left, order.field);
+        const rightValue = resolveKey(right, order.field);
+        if (leftValue === rightValue) {
+          continue;
+        }
+        const comparison = typeof leftValue === "number" && typeof rightValue === "number" && Number.isFinite(leftValue) && Number.isFinite(rightValue) ? leftValue < rightValue ? -1 : 1 : String(leftValue != null ? leftValue : "").localeCompare(String(rightValue != null ? rightValue : ""), void 0, { numeric: true });
+        return order.direction === "desc" ? -comparison : comparison;
+      }
+      return 0;
+    });
+  }
+  function resolveReportCalculatedFieldReference(definitions, reference, { datasetRef } = {}) {
+    const candidates = definitions.filter((definition) => (datasetRef === void 0 || !definition.datasetRef || definition.datasetRef === datasetRef) && [definition.id, definition.key].includes(normalizeString2(reference)));
+    if (candidates.length > 1) throw new Error(`Ambiguous calculated field reference '${reference}' in dataset '${datasetRef != null ? datasetRef : "unspecified"}'. Use a unique id or declare datasetRef.`);
+    return candidates[0] || null;
+  }
+  function validateCalculatedFieldAliases(definitions) {
+    definitions.forEach((definition, index) => {
+      definitions.slice(0, index).forEach((previous) => {
+        if (definition.datasetRef && previous.datasetRef && definition.datasetRef !== previous.datasetRef) return;
+        const alias = [definition.id, definition.key].find((value) => [previous.id, previous.key].includes(value));
+        if (alias) throw new Error(`Ambiguous calculated field alias '${alias}' in dataset '${definition.datasetRef || previous.datasetRef || "all"}': '${previous.id}' and '${definition.id}'. Use unique ids and keys within each dataset.`);
+      });
+    });
+  }
+  function topologicallySortCalculatedFields(definitions = []) {
+    validateCalculatedFieldAliases(definitions);
+    const byKey = new Map(
+      definitions.map((definition) => [normalizeString2((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id)), definition]).filter(([key2]) => !!key2)
+    );
+    const aliases2 = new Map([...byKey].map(([key2, definition]) => [normalizeString2(definition.id), key2]));
+    const pending = new Set(byKey.keys());
+    const sorted = [];
+    let progressed = true;
+    while (pending.size > 0 && progressed) {
+      progressed = false;
+      Array.from(pending).forEach((key2) => {
+        const definition = byKey.get(key2);
+        const unresolved = normalizeStringArray(definition == null ? void 0 : definition.dependencies).map((dependency) => byKey.has(dependency) ? dependency : aliases2.get(dependency) || dependency).filter((dependencyKey) => {
+          if (dependencyKey === key2 || !byKey.has(dependencyKey)) {
+            return false;
+          }
+          return pending.has(dependencyKey);
+        });
+        if (unresolved.length > 0) {
+          return;
+        }
+        sorted.push(definition);
+        pending.delete(key2);
+        progressed = true;
+      });
+    }
+    if (pending.size) throw new Error("Calculated field dependencies contain a cycle: " + [...pending].map((key2) => {
+      var _a5;
+      return ((_a5 = byKey.get(key2)) == null ? void 0 : _a5.id) || key2;
+    }).join(", "));
+    return sorted;
+  }
+  function validateReportCalculatedFieldDependencies(definitions = []) {
+    const normalized = normalizeReportCalculatedFields(definitions);
+    validateCalculatedFieldAliases(normalized);
+    const scopes = new Set(normalized.map((definition) => definition.datasetRef || ""));
+    scopes.forEach((datasetRef) => topologicallySortCalculatedFields(normalized.filter((definition) => !definition.datasetRef || definition.datasetRef === datasetRef)));
+  }
+  function applyReportCalculatedFields(rows = [], calculatedFields = [], {
+    datasetRef = ""
+  } = {}) {
+    const applicableFields = normalizeReportCalculatedFields(calculatedFields).filter((definition) => {
+      const targetDatasetRef = normalizeString2(definition == null ? void 0 : definition.datasetRef);
+      if (!targetDatasetRef) {
+        return true;
+      }
+      return targetDatasetRef === normalizeString2(datasetRef);
+    });
+    if (applicableFields.length === 0) {
+      return Array.isArray(rows) ? rows : [];
+    }
+    const ordered = topologicallySortCalculatedFields(applicableFields);
+    const result = (Array.isArray(rows) ? rows : []).map((row) => ({ ...row || {} }));
+    for (const definition of ordered) applyReportCalculatedField(result, definition);
+    return result;
+  }
+  function applyReportCalculatedField(rows, definition) {
+    var _a5, _b;
+    const applicableFields = [definition];
+    const compiledExpressions = new Map(
+      applicableFields.filter((definition2) => normalizeString2(definition2 == null ? void 0 : definition2.expr)).map((definition2) => {
+        var _a6;
+        return [normalizeString2((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id)), ((_a6 = parseReportCalculatedFieldExpression(definition2.expr)) == null ? void 0 : _a6.ast) || null];
+      })
+    );
+    rows.forEach((next) => {
+      applicableFields.filter((definition2) => definition2.kind === "rowCalc").forEach((definition2) => {
+        var _a6, _b2, _c;
+        const outputKey = normalizeString2((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
+        if (!outputKey) {
+          return;
+        }
+        if (normalizeString2(definition2 == null ? void 0 : definition2.expr)) {
+          next[outputKey] = evaluateReportCalculatedFieldExpression(compiledExpressions.get(outputKey), next);
+          return;
+        }
+        if (normalizeString2((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "ratio") {
+          const numerator = Number(resolveKey(next, definition2.compute.numerator));
+          const denominator = Number(resolveKey(next, definition2.compute.denominator));
+          const scale = Number.isFinite(Number((_b2 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _b2.scale)) ? Number(definition2.compute.scale) : 1;
+          const decimals = Number.isFinite(Number((_c = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _c.decimals)) ? Number(definition2.compute.decimals) : null;
+          let value = 0;
+          if (Number.isFinite(numerator) && Number.isFinite(denominator) && denominator !== 0) {
+            value = numerator / denominator * scale;
+          }
+          if (decimals != null) {
+            value = Number(value.toFixed(decimals));
+          }
+          next[outputKey] = value;
+        }
+      });
+    });
+    const withTableCalcs = rows;
+    applicableFields.filter((definition2) => {
+      var _a6;
+      return normalizeString2((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "percentOfTotal";
+    }).forEach((definition2) => {
+      var _a6, _b2, _c, _d;
+      const outputKey = normalizeString2((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
+      const sourceField = normalizeString2((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.sourceField);
+      if (!outputKey || !sourceField) {
+        return;
+      }
+      const scale = Number.isFinite(Number((_b2 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _b2.scale)) ? Number(definition2.compute.scale) : 100;
+      const decimals = Number.isFinite(Number((_c = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _c.decimals)) ? Number(definition2.compute.decimals) : null;
+      buildPartitionGroups(withTableCalcs, (_d = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _d.partitionBy).forEach((groupRows) => {
+        const total = groupRows.reduce((sum3, row) => {
+          const value = toFiniteNumber(resolveKey(row, sourceField));
+          return value != null ? sum3 + value : sum3;
+        }, 0);
+        groupRows.forEach((row) => {
+          const sourceValue = toFiniteNumber(resolveKey(row, sourceField));
+          let value = definition2.compute.nullPolicy === "null" ? null : 0;
+          if (sourceValue != null && total !== 0) {
+            value = sourceValue / total * scale;
+          }
+          if (decimals != null && value != null) {
+            value = Number(value.toFixed(decimals));
+          }
+          row[outputKey] = value;
+        });
+      });
+    });
+    applicableFields.filter((definition2) => {
+      var _a6;
+      return normalizeString2((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "deltaFromPrevious";
+    }).forEach((definition2) => {
+      var _a6, _b2, _c;
+      const outputKey = normalizeString2((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
+      const sourceField = normalizeString2((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.sourceField);
+      const orderBy = normalizeOrderBy((_b2 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _b2.orderBy);
+      if (!outputKey || !sourceField || orderBy.length === 0) {
+        return;
+      }
+      buildPartitionGroups(withTableCalcs, (_c = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _c.partitionBy).forEach((groupRows) => {
+        const sortedRows = sortRowsByOrder(groupRows, orderBy);
+        let previousValue = null;
+        sortedRows.forEach((row) => {
+          const sourceValue = toFiniteNumber(resolveKey(row, sourceField));
+          let value = 0;
+          if (sourceValue != null && previousValue != null) {
+            value = sourceValue - previousValue;
+          }
+          row[outputKey] = value;
+          previousValue = sourceValue != null ? sourceValue : previousValue;
+        });
+      });
+    });
+    applicableFields.filter((definition2) => {
+      var _a6;
+      return normalizeString2((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "runningTotal";
+    }).forEach((definition2) => {
+      var _a6, _b2, _c;
+      const outputKey = normalizeString2((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
+      const sourceField = normalizeString2((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.sourceField);
+      const orderBy = normalizeOrderBy((_b2 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _b2.orderBy);
+      if (!outputKey || !sourceField || orderBy.length === 0) {
+        return;
+      }
+      buildPartitionGroups(withTableCalcs, (_c = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _c.partitionBy).forEach((groupRows) => {
+        const sortedRows = sortRowsByOrder(groupRows, orderBy);
+        let runningValue = 0;
+        sortedRows.forEach((row) => {
+          const sourceValue = toFiniteNumber(resolveKey(row, sourceField));
+          if (sourceValue != null) {
+            runningValue += sourceValue;
+          }
+          row[outputKey] = runningValue;
+        });
+      });
+    });
+    applicableFields.filter((definition2) => {
+      var _a6;
+      return normalizeString2((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "movingAverage";
+    }).forEach((definition2) => {
+      var _a6, _b2, _c, _d;
+      const outputKey = normalizeString2((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
+      const sourceField = normalizeString2((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.sourceField);
+      const orderBy = normalizeOrderBy((_b2 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _b2.orderBy);
+      const windowSize = Math.max(1, Number(((_c = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _c.windowSize) || 0) || 0);
+      if (!outputKey || !sourceField || orderBy.length === 0 || !windowSize) {
+        return;
+      }
+      buildPartitionGroups(withTableCalcs, (_d = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _d.partitionBy).forEach((groupRows) => {
+        const sortedRows = sortRowsByOrder(groupRows, orderBy);
+        sortedRows.forEach((row, index) => {
+          var _a7;
+          const windowRows = sortedRows.slice(Math.max(0, index - windowSize + 1), index + 1);
+          const numericValues = windowRows.map((entry) => toFiniteNumber(resolveKey(entry, sourceField))).filter((value2) => value2 != null);
+          let value = 0;
+          if (numericValues.length > 0) {
+            value = numericValues.reduce((sum3, entry) => sum3 + entry, 0) / numericValues.length;
+          }
+          const decimals = Number.isFinite(Number((_a7 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a7.decimals)) ? Number(definition2.compute.decimals) : null;
+          if (decimals != null) {
+            value = Number(value.toFixed(decimals));
+          }
+          row[outputKey] = value;
+        });
+      });
+    });
+    applicableFields.filter((definition2) => {
+      var _a6;
+      return normalizeString2((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "rank";
+    }).forEach((definition2) => {
+      var _a6, _b2, _c, _d, _e;
+      const outputKey = normalizeString2((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
+      const sourceField = normalizeString2((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.sourceField);
+      const orderBy = normalizeOrderBy((_b2 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _b2.orderBy);
+      const tieMode = normalizeString2((_c = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _c.tieMode).toLowerCase();
+      if (!outputKey || !sourceField || orderBy.length === 0 || ((_d = orderBy[0]) == null ? void 0 : _d.field) !== sourceField) {
+        return;
+      }
+      if (tieMode && tieMode !== "dense") {
+        return;
+      }
+      buildPartitionGroups(withTableCalcs, (_e = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _e.partitionBy).forEach((groupRows) => {
+        const sortedRows = sortRowsByOrder(groupRows, orderBy);
+        let rank = 0;
+        let previousValue;
+        let hasPreviousValue = false;
+        sortedRows.forEach((row) => {
+          const sourceValue = resolveKey(row, sourceField);
+          if (sourceValue === void 0 || sourceValue === null || sourceValue === "") {
+            row[outputKey] = null;
+            return;
+          }
+          const normalizedValue = String(sourceValue);
+          if (!hasPreviousValue || normalizedValue !== previousValue) {
+            rank += 1;
+            previousValue = normalizedValue;
+            hasPreviousValue = true;
+          }
+          row[outputKey] = rank;
+        });
+      });
+    });
+    if (((_a5 = definition.compute) == null ? void 0 : _a5.type) === "lag") {
+      const { sourceField, orderBy, partitionBy, offset } = definition.compute;
+      buildPartitionGroups(withTableCalcs, partitionBy).forEach((groupRows) => {
+        const sorted = sortRowsByOrder(groupRows, orderBy);
+        const values = sorted.map((row) => resolveKey(row, sourceField));
+        sorted.forEach((row, index) => {
+          const previous = index >= offset ? values[index - offset] : null;
+          row[definition.key] = previous == null ? null : cloneValue2(previous);
+        });
+      });
+    }
+    if (((_b = definition.compute) == null ? void 0 : _b.type) === "windowMax") {
+      const { sourceField, orderBy, partitionBy, frame } = definition.compute;
+      buildPartitionGroups(withTableCalcs, partitionBy).forEach((groupRows) => {
+        const sorted = frame.type === "rows" ? sortRowsByOrder(groupRows, orderBy) : groupRows;
+        const values = sorted.map((row) => toFiniteNumber(resolveKey(row, sourceField)));
+        sorted.forEach((row, index) => {
+          const selected = frame.type === "full" ? values : values.slice(Math.max(0, index - frame.preceding), index + frame.following + 1);
+          const finite = selected.filter((value) => value != null);
+          row[definition.key] = finite.length ? Math.max(...finite) : null;
+        });
+      });
+    }
+    return withTableCalcs;
+  }
+  function cloneReportCalculatedFields(calculatedFields = []) {
+    return normalizeReportCalculatedFields(calculatedFields).map((definition) => cloneValue2(definition));
+  }
+
+  // src/components/scenarios/routingImpact.js
+  function normalizeRoutingImpact(input) {
+    if (!input || typeof input !== "object") throw new Error("routingImpact configuration is required.");
+    const config = { ...input };
+    for (const key2 of ["idField", "sourceField", "destinationField", "categoryField", "routeField", "amountField", "eligibleField", "baselineShareField", "directLossField", "indirectLossField"]) field(config[key2], key2);
+    config.categories = entries(config.categories, "Routing categories");
+    config.presets = entries(config.presets, "Routing presets").map((p4) => ({ ...p4, share: number(p4.share, "Preset share", { nullable: false, max: 1 }) }));
+    if (typeof config.unit !== "string" || typeof config.outcomeLabel !== "string" || typeof config.outcomeUnit !== "string") throw new Error("Routing units and outcomeLabel are required.");
+    if (typeof config.outcomeExpression !== "string" || !config.outcomeExpression || config.outcomeExpression.length > 4e3) throw new Error("Routing requires a bounded authored outcomeExpression.");
+    (config.expressionFields || []).forEach((key2) => field(key2, "Expression field"));
+    const reserved = ["scenarioAmount", "scenarioShare", "scenarioDirect", "scenarioIndirect", "scenarioLoss", "scenarioDelivered"];
+    const mapped = Object.keys(config).filter((key2) => key2.endsWith("Field")).map((key2) => config[key2]);
+    for (const dependency of parseReportCalculatedFieldExpression(config.outcomeExpression).dependencies) if (!reserved.includes(dependency) && !mapped.includes(dependency) && !(config.expressionFields || []).includes(dependency)) throw new Error(`Undeclared outcome expression field: ${dependency}`);
+    validateBindings(config.stateBindings);
+    return config;
+  }
+  function buildRoutingImpact(input, rows = [], suppliedState, filters = {}) {
+    var _a5;
+    const config = normalizeRoutingImpact(input), state = scenarioState(config, filters, suppliedState);
+    const outcomeAst = parseReportCalculatedFieldExpression(config.outcomeExpression).ast;
+    state.share = number(state.share, "Eligible routed share", { nullable: false, max: 1 });
+    const categories = (_a5 = state.categories) != null ? _a5 : config.categories.map((c3) => c3.id);
+    if (!Array.isArray(categories) || categories.some((id) => !config.categories.some((c3) => c3.id === id))) throw new Error("Unknown routing category.");
+    state.categories = [...new Set(categories)];
+    const ids = /* @__PURE__ */ new Set();
+    const selected = checkedRows(rows).filter((row) => {
+      const id = read(row, config.idField);
+      if (typeof id !== "string" || !id || ids.has(id)) throw new Error("Routing rows require unique stable IDs.");
+      ids.add(id);
+      if (!config.categories.some((c3) => c3.id === read(row, config.categoryField))) throw new Error("Undeclared routing category.");
+      for (const key2 of ["sourceField", "destinationField", "routeField"]) if (typeof read(row, config[key2]) !== "string" || !read(row, config[key2])) throw new Error(`Missing ${key2}.`);
+      if (read(row, config.routeField) === (config.directLabel || "Direct") || read(row, config.destinationField) === "__loss") throw new Error("Routing label collides with a reserved node identity.");
+      return categories.includes(read(row, config.categoryField));
+    });
+    const project = (row, share) => {
+      const amount = number(read(row, config.amountField), "Routing amount");
+      const eligible = read(row, config.eligibleField);
+      if (typeof eligible !== "boolean") throw new Error("Routing eligibility must be boolean.");
+      const directRate = number(read(row, config.directLossField), "Direct loss coefficient", { max: 1 });
+      const indirectRate = number(read(row, config.indirectLossField), "Indirect loss coefficient", { max: 1 });
+      const routedShare = eligible ? share : 0;
+      const direct = amount == null ? null : amount * routedShare, indirect = amount == null ? null : amount - direct;
+      const directLoss = direct === 0 ? 0 : direct == null || directRate == null ? null : direct * directRate;
+      const indirectLoss = indirect === 0 ? 0 : indirect == null || indirectRate == null ? null : indirect * indirectRate;
+      const loss = sum([directLoss, indirectLoss]), delivered = amount == null || loss == null ? null : amount - loss;
+      const outcome = number(evaluateReportCalculatedFieldExpression(outcomeAst, { ...row, scenarioAmount: amount, scenarioShare: routedShare, scenarioDirect: direct, scenarioIndirect: indirect, scenarioLoss: loss, scenarioDelivered: delivered }), "Projected outcome");
+      return { amount, direct, indirect, directLoss, indirectLoss, loss, delivered, outcome };
+    };
+    const paths = selected.map((row) => {
+      const eligible = read(row, config.eligibleField), baselineShare = number(read(row, config.baselineShareField), "Baseline share", { nullable: false, max: 1 });
+      if (!eligible && baselineShare !== 0) throw new Error("Ineligible routing row has a nonzero baseline share.");
+      return { id: read(row, config.idField), source: read(row, config.sourceField), destination: read(row, config.destinationField), route: read(row, config.routeField), category: read(row, config.categoryField), eligible, row, projected: project(row, state.share), baseline: project(row, baselineShare) };
+    });
+    const aggregate = (paths2) => Object.fromEntries(["amount", "direct", "indirect", "loss", "delivered", "outcome"].map((key2) => [key2, sum(paths2.map((p4) => p4[key2]))]));
+    const projected = aggregate(paths.map((p4) => p4.projected)), baseline = aggregate(paths.map((p4) => p4.baseline));
+    const destinations = [...new Set(paths.map((p4) => p4.destination))].map((id) => {
+      const values = paths.filter((p4) => p4.destination === id);
+      const metrics = aggregate(values.map((p4) => p4.projected));
+      return { id, ...metrics, share: ratio(metrics.delivered, projected.delivered), directShare: ratio(metrics.direct, metrics.amount), eligible: values.some((p4) => p4.eligible) };
+    });
+    return { kind: "routing-impact", config, state, paths, destinations, projected, baseline, outcomeDelta: delta(projected.outcome, baseline.outcome) };
+  }
+
+  // src/components/scenarios/stageAllocation.js
+  var ratioAst = parseReportCalculatedFieldExpression("numerator / denominator").ast;
+  var quotient = (inputs) => number(evaluateReportCalculatedFieldExpression(ratioAst, inputs), "Ratio metric");
+  var stageMetricFields = (metric) => metric.type === "ratio" ? [metric.numeratorField, metric.denominatorField, metric.additionNumeratorField, metric.additionDenominatorField].filter(Boolean) : [metric.field, metric.additionField].filter(Boolean);
+  function normalizeStageAllocation(input) {
+    if (!input || typeof input !== "object") throw new Error("stageAllocation configuration is required.");
+    const config = { ...input };
+    for (const key2 of ["periodField", "stageField", "categoryField"]) field(config[key2], key2);
+    for (const key2 of ["periods", "stages", "categories", "metrics"]) config[key2] = entries(config[key2], key2);
+    config.metrics.forEach((metric) => {
+      if (metric.type != null && !["additive", "ratio"].includes(metric.type)) throw new Error("Unknown stage metric type.");
+      if (metric.type === "ratio") {
+        field(metric.numeratorField, "Ratio numerator field");
+        field(metric.denominatorField, "Ratio denominator field");
+        if (metric.field != null || metric.additionField != null) throw new Error("Ratio metrics require separate numerator and denominator inputs.");
+        for (const key2 of ["additionNumeratorField", "additionDenominatorField"]) if (metric[key2] != null) field(metric[key2], key2);
+      } else {
+        field(metric.field, "Metric field");
+        if (metric.additionField) field(metric.additionField, "Metric addition field");
+        if (["numeratorField", "denominatorField", "additionNumeratorField", "additionDenominatorField"].some((key2) => metric[key2] != null)) throw new Error("Ratio inputs require metric type ratio.");
+      }
+      if (typeof metric.unit !== "string") throw new Error("Metric unit is required.");
+    });
+    if (!config.periods.some((p4) => p4.id === config.baselinePeriod)) throw new Error("Unknown baseline period.");
+    validateBindings(config.stateBindings);
+    return config;
+  }
+  function buildStageAllocation(input, rows = [], suppliedState, filters = {}) {
+    var _a5;
+    const config = normalizeStageAllocation(input), state = scenarioState(config, filters, suppliedState);
+    if (!config.periods.some((p4) => p4.id === state.period) || !config.metrics.some((m3) => m3.id === state.metric)) throw new Error("Unknown stage period or metric.");
+    state.activeCategories = (_a5 = state.activeCategories) != null ? _a5 : [];
+    if (!Array.isArray(state.activeCategories) || state.activeCategories.some((id) => !config.categories.some((c3) => c3.id === id && c3.inactive === true))) throw new Error("Only declared inactive categories may be added.");
+    state.activeCategories = [...new Set(state.activeCategories)];
+    const indexed = /* @__PURE__ */ new Map();
+    checkedRows(rows).forEach((row) => {
+      const coordinates = ["period", "stage", "category"].map((key3) => read(row, config[`${key3}Field`]));
+      for (let i3 = 0; i3 < 3; i3++) if (!config[["periods", "stages", "categories"][i3]].some((v2) => v2.id === coordinates[i3])) throw new Error("Undeclared stage coordinate.");
+      const key2 = JSON.stringify(coordinates);
+      if (indexed.has(key2)) throw new Error("Duplicate stage coordinate.");
+      indexed.set(key2, row);
+      config.metrics.forEach((metric2) => {
+        stageMetricFields(metric2).forEach((key3) => number(read(row, key3), "Stage metric input"));
+        const measuredFields = metric2.type === "ratio" ? [metric2.numeratorField, metric2.denominatorField] : [metric2.field];
+        if (config.categories.find((c3) => c3.id === coordinates[2]).inactive && measuredFields.some((key3) => read(row, key3) != null && read(row, key3) !== 0)) throw new Error("Inactive category must have zero measured inputs.");
+      });
+    });
+    const metric = config.metrics.find((m3) => m3.id === state.metric);
+    const cellsFor = (stage, selectedMetric) => config.categories.map((category) => {
+      const row = indexed.get(JSON.stringify([state.period, stage.id, category.id]));
+      const baselineRow = indexed.get(JSON.stringify([config.baselinePeriod, stage.id, category.id]));
+      const active = state.activeCategories.includes(category.id);
+      const get = (row2, key2) => row2 && key2 ? number(read(row2, key2), "Stage metric input") : null;
+      let measured, baseline, value, addition, inputs;
+      if (selectedMetric.type === "ratio") {
+        const measuredInputs = { numerator: get(row, selectedMetric.numeratorField), denominator: get(row, selectedMetric.denominatorField) };
+        const baselineInputs = { numerator: get(baselineRow, selectedMetric.numeratorField), denominator: get(baselineRow, selectedMetric.denominatorField) };
+        const additions = { numerator: get(row, selectedMetric.additionNumeratorField), denominator: get(row, selectedMetric.additionDenominatorField) };
+        const projectedInputs = active ? { numerator: sum([measuredInputs.numerator, additions.numerator]), denominator: sum([measuredInputs.denominator, additions.denominator]) } : measuredInputs;
+        measured = quotient(measuredInputs);
+        baseline = quotient(baselineInputs);
+        value = quotient(projectedInputs);
+        addition = delta(value, measured);
+        inputs = { measured: measuredInputs, baseline: baselineInputs, projected: projectedInputs, additions };
+      } else {
+        measured = get(row, selectedMetric.field);
+        baseline = get(baselineRow, selectedMetric.field);
+        addition = get(row, selectedMetric.additionField);
+        value = active ? sum([measured, addition]) : measured;
+      }
+      return { id: category.id, label: category.label, inactive: category.inactive === true && !active, active, measured, baseline, value, addition, delta: delta(value, baseline), missing: !row, ...inputs ? { inputs } : {} };
+    });
+    const aggregate = (cells, selectedMetric, kind) => selectedMetric.type === "ratio" ? quotient({ numerator: sum(cells.map((c3) => c3.inputs[kind].numerator)), denominator: sum(cells.map((c3) => c3.inputs[kind].denominator)) }) : sum(cells.map((c3) => c3[kind === "projected" ? "value" : kind]));
+    const stages = config.stages.map((stage) => {
+      const cells = cellsFor(stage, metric), total = aggregate(cells, metric, "projected"), baseline = aggregate(cells, metric, "baseline");
+      const sizeTotal = metric.type === "ratio" ? sum(cells.filter((c3) => c3.value != null).map((c3) => c3.value)) : total;
+      return { ...stage, total, baseline, delta: delta(total, baseline), sizeTotal, cells: cells.map((c3) => ({ ...c3, share: ratio(c3.value, sizeTotal) })) };
+    });
+    const totals = config.metrics.map((m3) => {
+      const cells = config.stages.flatMap((s4) => cellsFor(s4, m3)), value = aggregate(cells, m3, "projected"), measured = aggregate(cells, m3, "measured"), baseline = aggregate(cells, m3, "baseline");
+      return { ...m3, value, measured, baseline, delta: delta(value, baseline), increment: delta(value, measured) };
+    });
+    return { kind: "stage-allocation", config, state, metric, stages, totals, projected: state.activeCategories.length > 0 };
+  }
+
+  // src/components/scenarios/scenarioSvg.js
+  var ink = "var(--forge-text-color, #25313c)";
+  var accent = "var(--forge-chart-color-1, #257c83)";
+  var muted = "var(--forge-chart-color-2, #9cabb8)";
+  var text = (x2, y4, value, extra = "") => `<text x="${x2}" y="${y4}" ${extra}>${escape(value)}</text>`;
+  function routingImpactSvg(model, width = 900, { interactive = false, highlight = null, compact = false } = {}) {
+    width = Math.max(680, width);
+    const { paths, projected, baseline, config } = model;
+    const height = Math.max(compact ? 340 : 600, paths.length * 60 + 250), top = 130, bottom = height - 55, plotHeight = bottom - top;
+    const sourceIds = [...new Set(paths.map((p4) => p4.source))], routeIds = [config.directLabel || "Direct", ...new Set(paths.map((p4) => p4.route))], destinationIds = [...new Set(paths.map((p4) => p4.destination)), "__loss"];
+    const available = plotHeight - 40 * Math.max(sourceIds.length, routeIds.length, destinationIds.length);
+    const size = (value) => projected.amount > 0 ? value / projected.amount * available : 0;
+    const branches = paths.flatMap((p4) => [
+      { path: p4, route: routeIds[0], amount: p4.projected.direct, loss: p4.projected.directLoss, direct: true },
+      { path: p4, route: p4.route, amount: p4.projected.indirect, loss: p4.projected.indirectLoss, direct: false }
+    ]);
+    const layout = (ids, total) => {
+      let y4 = top;
+      return new Map(ids.map((id) => {
+        const amount = total(id), node = { id, y: y4, height: size(amount != null ? amount : 0), offset: 0 };
+        y4 += node.height + 40;
+        return [id, node];
+      }));
+    };
+    const sources = layout(sourceIds, (id) => sum(paths.filter((p4) => p4.source === id).map((p4) => p4.projected.amount)));
+    const routes = layout(routeIds, (id) => sum(branches.filter((b3) => b3.route === id).map((b3) => b3.amount)));
+    const targets = layout(destinationIds, (id) => id === "__loss" ? projected.loss : sum(paths.filter((p4) => p4.destination === id).map((p4) => p4.projected.delivered)));
+    const x2 = [130, width * 0.43, width * 0.7], curve = (a4, b3, y1, y22, w2, color) => w2 > 0 ? `<path d="M${a4},${y1} C${(a4 + b3) / 2},${y1} ${(a4 + b3) / 2},${y22} ${b3},${y22}" fill="none" stroke="${color}" stroke-width="${w2}" opacity=".55"/>` : "";
+    let body = text(10, 22, `Projected delivery: ${display(projected.delivered)} ${config.unit} \xB7 Loss: ${display(projected.loss)} ${config.unit}`) + text(10, 44, `${config.outcomeLabel}: ${display(projected.outcome)} ${config.outcomeUnit} \xB7 Change: ${display(model.outcomeDelta)}`) + text(10, 66, `Baseline modeled delivery: ${display(baseline.delivered)} ${config.unit} \xB7 Baseline modeled outcome: ${display(baseline.outcome)}`) + text(10, 88, `Eligible share: ${display(model.state.share * 100)}% \xB7 Categories: ${model.state.categories.join(", ")}`);
+    body += text(10, 110, `Measured input: ${display(projected.amount)} ${config.unit}`);
+    for (const branch of branches) {
+      const { path, amount, loss, direct, route } = branch;
+      if (amount == null || loss == null) continue;
+      const a4 = sources.get(path.source), b3 = routes.get(route), c3 = targets.get(path.destination), d4 = targets.get("__loss");
+      const w2 = size(amount), l2 = size(loss), delivered = Math.max(0, w2 - l2), sy = a4.y + a4.offset + w2 / 2, ry = b3.y + b3.offset + w2 / 2;
+      const content = curve(x2[0], x2[1], sy, ry, w2, direct ? accent : muted) + curve(x2[1] + 8, x2[2], b3.y + b3.offset + delivered / 2, c3.y + c3.offset + delivered / 2, delivered, direct ? accent : muted) + curve(x2[1] + 8, x2[2], b3.y + b3.offset + delivered + l2 / 2, d4.y + d4.offset + l2 / 2, l2, muted);
+      const label = `${path.source} via ${route} to ${path.destination}: ${display(amount)} ${config.unit}, loss ${display(loss)}`;
+      body += `<g data-path="${escape(path.id)}" ${interactive ? 'tabindex="0" role="img"' : ""} aria-label="${escape(label)}" class="${highlight && highlight !== path.id ? "scenario-muted" : ""}"><title>${escape(label)}</title>${content}</g>`;
+      a4.offset += w2;
+      b3.offset += w2;
+      c3.offset += delivered;
+      d4.offset += l2;
+    }
+    for (const [column, nodes] of [[0, sources], [1, routes], [2, targets]]) for (const node of nodes.values()) {
+      body += `<rect x="${x2[column] - 4}" y="${node.y}" width="8" height="${Math.max(0, node.height)}" fill="${ink}"/>`;
+      const label = node.id === "__loss" ? config.lossLabel || "Loss" : node.id;
+      body += text(column === 0 ? x2[0] - 10 : x2[column] + 12, node.y + 10, label, column === 0 ? 'text-anchor="end"' : "");
+      if (column < 2) {
+        const amount = column === 0 ? sum(paths.filter((p4) => p4.source === node.id).map((p4) => p4.projected.amount)) : sum(branches.filter((b3) => b3.route === node.id).map((b3) => b3.amount));
+        body += text(column === 0 ? x2[0] - 10 : x2[column] + 12, node.y + 25, `${display(amount)} ${config.unit}`, column === 0 ? 'text-anchor="end"' : "");
+      }
+      if (column === 2 && node.id !== "__loss") {
+        const dest = model.destinations.find((d4) => d4.id === node.id);
+        body += text(x2[2] + 12, node.y + 25, `${display(dest.delivered)} ${config.unit} \xB7 ${dest.directShare == null ? "No data" : display(dest.directShare * 100) + "% direct"}`);
+      }
+    }
+    if (paths.some((p4) => p4.projected.amount == null || p4.projected.loss == null)) body += text(10, height - 15, "No data: one or more paths are incomplete; unknown widths are not drawn.");
+    else if (projected.amount === 0) body += text(10, height - 15, "Zero allocation");
+    return graphic(body, width, height, "Routing impact \u2014 current scenario");
+  }
+  function stageAllocationSvg(model, width = 900, { interactive = false, highlight = null } = {}) {
+    width = Math.max(680, width);
+    const { config, stages, metric } = model, barX = 170, barWidth = width - 330;
+    let body = text(10, 22, `${model.projected ? "Projected" : "Measured"} \xB7 ${config.periods.find((p4) => p4.id === model.state.period).label} \xB7 ${metric.label} (${metric.unit})`);
+    model.totals.forEach((m3, i3) => {
+      body += text(10, 45 + i3 * 20, `${m3.label}: ${display(m3.value)} ${m3.unit} \xB7 Baseline change ${display(m3.delta)} \xB7 Projected ${m3.type === "ratio" ? "change" : "addition"} ${display(m3.increment)}`);
+    });
+    let y4 = Math.max(110, 60 + model.totals.length * 20);
+    if (metric.type === "ratio") {
+      body += text(10, y4, "Block size compares finite category ratios; totals use pooled numerator / denominator.");
+      y4 += 30;
+    }
+    const wrap2 = (value) => {
+      const chars = Array.from(value), limit = Math.max(20, Math.floor((width - barX - 15) / 7));
+      return Array.from({ length: Math.ceil(chars.length / limit) }, (_2, i3) => chars.slice(i3 * limit, (i3 + 1) * limit).join(""));
+    };
+    stages.forEach((stage) => {
+      body += text(10, y4 + 20, stage.label) + text(10, y4 + 42, `${display(stage.total)} ${metric.unit}`) + text(10, y4 + 62, `Change ${display(stage.delta)}`);
+      let x2 = barX, legendY = y4 + 105;
+      stage.cells.forEach((cell, i3) => {
+        const w2 = cell.share == null ? 0 : barWidth * cell.share;
+        const label = `${stage.label}, ${cell.label}: ${display(cell.value)} ${metric.unit}; baseline change ${display(cell.delta)}${cell.inactive ? "; inactive" : ""}`;
+        body += `<g data-category="${escape(cell.id)}" ${interactive ? 'tabindex="0" role="img"' : ""} aria-label="${escape(label)}" class="${highlight && highlight !== cell.id ? "scenario-muted" : ""}"><title>${escape(label)}</title>`;
+        if (w2 > 0) body += `<rect x="${x2}" y="${y4}" width="${w2}" height="80" fill="${i3 % 2 ? muted : accent}" fill-opacity=".35" stroke="${ink}"/>`;
+        const fits = Math.max(Array.from(cell.label).length, Array.from(display(cell.value)).length) * 7 + 10 <= w2;
+        if (fits) body += text(x2 + 5, y4 + 23, cell.label) + text(x2 + 5, y4 + 46, display(cell.value));
+        else if (w2 >= 16) body += text(x2 + w2 / 2, y4 + 23, String(i3 + 1), 'text-anchor="middle"');
+        for (const line of wrap2(`${i3 + 1}. ${cell.label}: ${display(cell.value)} ${metric.unit}${cell.inactive ? " (inactive; zero width)" : ""}`)) {
+          body += text(barX, legendY, line, 'data-stage-legend="true"');
+          legendY += 18;
+        }
+        body += "</g>";
+        x2 += w2;
+      });
+      if (metric.type !== "ratio" && stage.total == null) body += text(barX, y4 + 35, "Incomplete data \u2014 proportional widths unavailable");
+      if (stage.sizeTotal === 0) body += text(barX, y4 + 35, metric.type === "ratio" ? "No positive defined ratios" : "Zero allocation");
+      if (highlight) {
+        const cell = stage.cells.find((c3) => c3.id === highlight);
+        if (cell) body += text(width - 145, y4 + 35, `${cell.label}: ${cell.share == null ? "No data" : display(cell.share * 100) + "%"}`);
+      }
+      y4 = Math.max(y4 + 135, legendY + 25);
+    });
+    return graphic(body, width, y4 + 20, "Stage allocation \u2014 current scenario");
+  }
+
+  // src/components/scenarios/scenarioContract.js
+  var isScenarioType = (type) => ["routing-impact", "stage-allocation"].includes(type);
+  var scenarioKey = (type) => type === "routing-impact" ? "routingImpact" : "stageAllocation";
+  var normalizeScenario = (type, config) => type === "routing-impact" ? normalizeRoutingImpact(config) : normalizeStageAllocation(config);
+  function scenarioFields(type, config) {
+    return type === "routing-impact" ? [config.idField, config.sourceField, config.destinationField, config.categoryField, config.routeField, config.amountField, config.eligibleField, config.baselineShareField, config.directLossField, config.indirectLossField, ...config.expressionFields || []] : [config.periodField, config.stageField, config.categoryField, ...config.metrics.flatMap(stageMetricFields)];
+  }
+  function buildScenario(type, config, rows, state, filters) {
+    return type === "routing-impact" ? buildRoutingImpact(config, rows, state, filters) : buildStageAllocation(config, rows, state, filters);
+  }
+  function freezeScenario(chart, rows, filters) {
+    const type = chart.type, model = buildScenario(type, chart[scenarioKey(type)], rows, void 0, filters);
+    return { kind: type, type, seriesKeys: scenarioFields(type, model.config), rows: JSON.parse(JSON.stringify(rows)), scenarioState: JSON.parse(JSON.stringify(model.state)) };
+  }
+  function scenarioPrintSvg(chart, resolved, width) {
+    const model = buildScenario(chart.type, chart[scenarioKey(chart.type)], resolved.rows, resolved.scenarioState);
+    return renderScenarioPrintModel(model, width);
+  }
+  function renderScenarioPrintModel(model, width, compact = false) {
+    const rendered = model.kind === "routing-impact" ? routingImpactSvg(model, width, { compact }) : stageAllocationSvg(model, width);
+    return flattenScenarioGraphic(rendered);
+  }
+  function flattenScenarioGraphic(rendered) {
+    const svg = rendered.svg.replace(/<style>[\s\S]*?<\/style>/g, "").replace(/<title>[\s\S]*?<\/title>/g, "").replace(/<\/?g\b[^>]*>/g, "").replace(/var\(--[^,]+,\s*(#[0-9a-fA-F]{6})\)/g, "$1").replace(/currentColor/g, "#25313c").replace(/<text /g, '<text font-family="sans-serif" font-size="12" fill="#25313c" ');
+    return { ...rendered, svg };
+  }
+  var namedEntries = { type: "array", minItems: 1, maxItems: 100, items: { type: "object", required: ["id", "label"], properties: { id: { type: "string", minLength: 1 }, label: { type: "string", minLength: 1 } } } };
+  var bindings = { type: "object", additionalProperties: { type: "object", additionalProperties: false, required: ["paramId", "path"], properties: { paramId: { type: "string", minLength: 1 }, path: { type: "string", minLength: 1 } } } };
+  var routingImpactSchema = { type: "object", additionalProperties: false, required: ["idField", "sourceField", "destinationField", "categoryField", "routeField", "amountField", "eligibleField", "baselineShareField", "directLossField", "indirectLossField", "categories", "presets", "unit", "outcomeLabel", "outcomeUnit", "outcomeExpression", "state"], properties: { ...Object.fromEntries(["idField", "sourceField", "destinationField", "categoryField", "routeField", "amountField", "eligibleField", "baselineShareField", "directLossField", "indirectLossField", "unit", "outcomeLabel", "outcomeUnit", "directLabel", "lossLabel"].map((k2) => [k2, { type: "string" }])), categories: namedEntries, presets: namedEntries, outcomeExpression: { type: "string", minLength: 1, maxLength: 4e3 }, expressionFields: { type: "array", items: { type: "string" } }, state: { type: "object" }, stateBindings: bindings } };
+  var metricBase = { id: { type: "string", minLength: 1 }, label: { type: "string", minLength: 1 }, unit: { type: "string" } };
+  var stageMetricsSchema = { type: "array", minItems: 1, maxItems: 100, items: { oneOf: [
+    { type: "object", additionalProperties: false, required: ["id", "label", "field", "unit"], properties: { ...metricBase, type: { const: "additive" }, field: { type: "string", minLength: 1 }, additionField: { type: "string", minLength: 1 } } },
+    { type: "object", additionalProperties: false, required: ["id", "label", "type", "numeratorField", "denominatorField", "unit"], properties: { ...metricBase, type: { const: "ratio" }, numeratorField: { type: "string", minLength: 1 }, denominatorField: { type: "string", minLength: 1 }, additionNumeratorField: { type: "string", minLength: 1 }, additionDenominatorField: { type: "string", minLength: 1 } } }
+  ] } };
+  var stageAllocationSchema = { type: "object", additionalProperties: false, required: ["periodField", "stageField", "categoryField", "periods", "stages", "categories", "metrics", "baselinePeriod", "state"], properties: { ...Object.fromEntries(["periodField", "stageField", "categoryField", "baselinePeriod"].map((k2) => [k2, { type: "string" }])), periods: namedEntries, stages: namedEntries, categories: namedEntries, metrics: stageMetricsSchema, state: { type: "object" }, stateBindings: bindings } };
+  function scenarioPrintPages(chart, resolved, { width = 680, maxHeight = 620, firstMaxHeight = maxHeight } = {}) {
+    if (!Number.isFinite(maxHeight) || maxHeight <= 0 || !Number.isFinite(firstMaxHeight) || firstMaxHeight <= 0) throw new Error("Scenario print page requires positive finite heights.");
+    const model = buildScenario(chart.type, chart[scenarioKey(chart.type)], resolved.rows, resolved.scenarioState), pages = [];
+    const units2 = model.kind === "routing-impact" ? model.destinations : model.stages;
+    const fragment = (values) => model.kind === "routing-impact" ? { ...model, destinations: values, paths: model.paths.filter((p4) => values.some((d4) => d4.id === p4.destination)) } : { ...model, stages: values };
+    let offset = 0;
+    while (offset < Math.max(1, units2.length)) {
+      const budget = pages.length ? maxHeight : firstMaxHeight;
+      let accepted = null, count = 0;
+      for (let end = offset + 1; end <= Math.max(1, units2.length); end++) {
+        const candidate = renderScenarioPrintModel(fragment(units2.slice(offset, end)), width, true);
+        if (candidate.height > budget) break;
+        accepted = candidate;
+        count = end - offset;
+      }
+      if (!accepted && pages.length === 0 && budget < maxHeight) {
+        const candidate = renderScenarioPrintModel(fragment(units2.slice(offset, offset + 1)), width, true);
+        if (candidate.height <= maxHeight) {
+          accepted = { ...candidate, startNewPage: true };
+          count = 1;
+        }
+      }
+      if (!accepted) return [{ svg: "", height: 0, diagnostics: [{ code: "scenarioPrintLayoutDoesNotFit", severity: "warning", message: "Scenario print page cannot fit one complete destination flow or stage. Aggregate source paths or increase the page dimensions." }] }];
+      if (units2.length > count) {
+        const label = `${model.kind === "routing-impact" ? "Destination flows" : "Stages"} ${offset + 1}\u2013${offset + count} of ${units2.length}; headline totals cover the complete scenario.`;
+        accepted.svg = accepted.svg.replace("</svg>", `<text x="10" y="${accepted.height - 12}" font-size="12" fill="#25313c">${escape(label)}</text></svg>`);
+      }
+      pages.push(accepted);
+      offset += count;
+    }
+    const percent = (value) => value == null ? "No data" : `${display(value * 100)}%`;
+    const lines2 = model.kind === "routing-impact" ? model.destinations.map((d4) => `${d4.id}: delivered ${display(d4.delivered)} ${model.config.unit}; share ${percent(d4.share)}; direct ${d4.eligible ? percent(d4.directShare) : "ineligible"}; ${model.config.outcomeLabel} ${display(d4.outcome)} ${model.config.outcomeUnit}`) : model.stages.flatMap((stage) => stage.cells.map((c3) => `${stage.label} / ${c3.label}${c3.inactive ? " (inactive)" : ""}: ${display(c3.value)} ${model.metric.unit}; ${model.metric.type === "ratio" ? "relative ratio size" : "share"} ${percent(c3.share)}; baseline ${display(c3.baseline)}; change ${display(c3.delta)}`));
+    const wrapped = lines2.flatMap((line) => {
+      const result = [];
+      let current = "";
+      for (const word of line.split(/\s+/)) {
+        if (current && current.length + word.length + 1 > 85) {
+          result.push(current);
+          current = "";
+        }
+        const chunks = Array.from(word).reduce((parts, char, index) => {
+          const key2 = Math.floor(index / 85);
+          parts[key2] = (parts[key2] || "") + char;
+          return parts;
+        }, []);
+        while (chunks.length > 1) result.push(chunks.shift());
+        current = current ? `${current} ${chunks[0] || ""}` : chunks[0] || "";
+      }
+      if (current) result.push(current);
+      return result;
+    });
+    const capacity = Math.floor((maxHeight - 65) / 20);
+    if (wrapped.length && capacity < 1) return [{ svg: "", height: 0, diagnostics: [{ code: "scenarioPrintLayoutDoesNotFit", severity: "warning", message: "Scenario print page cannot fit evidence text." }] }];
+    for (let start = 0; start < wrapped.length; start += capacity) {
+      const current = wrapped.slice(start, start + capacity), body = `<text x="10" y="22">Frozen scenario evidence</text>` + current.map((line, index) => `<text x="10" y="${50 + index * 20}">${escape(line)}</text>`).join("");
+      pages.push(flattenScenarioGraphic(graphic(body, Math.max(680, width), 65 + current.length * 20, "Frozen scenario evidence")));
+    }
+    return pages;
+  }
+
   // src/components/requestLabelInput.js
   var requestLabelInputSchema = { type: "object", additionalProperties: false, required: ["path", "labels"], properties: { path: { type: "string", minLength: 1 }, labels: { type: "array", minItems: 1, items: { type: "object", additionalProperties: false, required: ["value", "label"], properties: { value: { type: ["string", "number", "boolean"] }, label: { type: "string", minLength: 1 } } } } } };
   function normalizeRequestLabelInput(selector) {
@@ -43409,7 +45098,7 @@ Please __addLocaleData before adding additional unit data`);
   }
 
   // src/components/chartTextMeasure.js
-  var measureChartText = (text3, size, role, emphasis) => [...text3].reduce((sum2, char) => sum2 + size * (/[WM@%]|[^\x00-\x7F]/u.test(char) ? 1 : 0.65), 0) * ((emphasis == null ? void 0 : emphasis.includes("bold")) ? 1.1 : 1);
+  var measureChartText = (text4, size, role, emphasis) => [...text4].reduce((sum3, char) => sum3 + size * (/[WM@%]|[^\x00-\x7F]/u.test(char) ? 1 : 0.65), 0) * ((emphasis == null ? void 0 : emphasis.includes("bold")) ? 1.1 : 1);
 
   // src/components/categoryRange.js
   var string = { type: "string", minLength: 1 };
@@ -43447,8 +45136,8 @@ Please __addLocaleData before adding additional unit data`);
     if (!Number.isFinite(scaled)) throw new Error("Category range formatted value overflowed.");
     const absolute = Math.abs(scaled), digits = format2.decimals;
     const numeric = format2.grouping ? new Intl.NumberFormat("en-US", { minimumFractionDigits: digits != null ? digits : 0, maximumFractionDigits: digits != null ? digits : 10, useGrouping: true }).format(absolute) : digits === void 0 ? String(absolute) : absolute.toFixed(digits);
-    const text3 = `${format2.prefix || ""}${numeric}${format2.suffix || ""}`;
-    return scaled < 0 ? format2.negativeStyle === "parentheses" ? `(${text3})` : `-${text3}` : text3;
+    const text4 = `${format2.prefix || ""}${numeric}${format2.suffix || ""}`;
+    return scaled < 0 ? format2.negativeStyle === "parentheses" ? `(${text4})` : `-${text4}` : text4;
   }
   function buildCategoryRange(input, rows = []) {
     const config = normalizeCategoryRange(input), seen = /* @__PURE__ */ new Set(), bounds = [0];
@@ -43458,9 +45147,9 @@ Please __addLocaleData before adding additional unit data`);
       seen.add(category);
       const marks = config.series.map((series, seriesIndex) => {
         const fields2 = series.kind === "range" ? [series.startField, series.endField] : [series.field];
-        const values = fields2.map((field) => {
+        const values = fields2.map((field2) => {
           var _a5;
-          return (_a5 = row[field]) != null ? _a5 : null;
+          return (_a5 = row[field2]) != null ? _a5 : null;
         });
         if (values.some((v2) => v2 !== null && (typeof v2 !== "number" || !Number.isFinite(v2)))) throw new Error("Category range values must be finite numbers or null.");
         bounds.push(...values.filter((v2) => v2 !== null));
@@ -43476,10 +45165,10 @@ Please __addLocaleData before adding additional unit data`);
     }
     return { config, categories, domain: [min, max] };
   }
-  var escape = (value) => String(value).replace(/[&<>"']/g, (c3) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c3]);
+  var escape2 = (value) => String(value).replace(/[&<>"']/g, (c3) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c3]);
   var wrap = (value, size = 22) => String(value).match(new RegExp(`.{1,${size}}`, "gu")) || [""];
-  var textLines = (lines2, x2, y4, anchor = "start") => lines2.map((line, i3) => `<text x="${x2}" y="${y4 + i3 * 16}" text-anchor="${anchor}">${escape(line)}</text>`).join("");
-  var text = (value, x2, y4, anchor = "start", size = 22) => textLines(wrap(value, size), x2, y4, anchor);
+  var textLines = (lines2, x2, y4, anchor = "start") => lines2.map((line, i3) => `<text x="${x2}" y="${y4 + i3 * 16}" text-anchor="${anchor}">${escape2(line)}</text>`).join("");
+  var text2 = (value, x2, y4, anchor = "start", size = 22) => textLines(wrap(value, size), x2, y4, anchor);
   function categoryRangeSvg(model, width = 680, { interactive = false, selectable = false, print = false } = {}) {
     const { config, categories, domain } = model, vertical = config.orientation === "vertical";
     width = print ? width : Math.max(640, width, vertical ? categories.length * Math.max(180, config.series.length * 44) : 0);
@@ -43490,32 +45179,32 @@ Please __addLocaleData before adding additional unit data`);
     const categoryLines = categories.map((c3) => wrap(c3.category, categoryWrap));
     const valueLines = categories.map((c3) => c3.marks.map((mark) => wrap(mark.values.map((v2) => formatRangeValue(v2, mark.series)).join(" to "), valueWrap)));
     const laneHeights = valueLines.map((values) => values.map((lines2) => Math.max(44, lines2.length * 16 + 12)));
-    const rowHeights = categories.map((c3, i3) => Math.max(72, laneHeights[i3].reduce((sum2, h4) => sum2 + h4, 0) + 12, categoryLines[i3].length * 16 + 16));
+    const rowHeights = categories.map((c3, i3) => Math.max(72, laneHeights[i3].reduce((sum3, h4) => sum3 + h4, 0) + 12, categoryLines[i3].length * 16 + 16));
     const valueRowHeights = config.series.map((s4, i3) => Math.max(24, ...valueLines.map((values) => values[i3].length * 16 + 8)));
     const valuesTop = top + plotHeight + Math.max(1, ...categoryLines.map((lines2) => lines2.length)) * 16 + 32;
-    const categoryBottom = vertical ? valuesTop + valueRowHeights.reduce((sum2, h4) => sum2 + h4, 0) : top + rowHeights.reduce((a4, b3) => a4 + b3, 0);
+    const categoryBottom = vertical ? valuesTop + valueRowHeights.reduce((sum3, h4) => sum3 + h4, 0) : top + rowHeights.reduce((a4, b3) => a4 + b3, 0);
     const legendEntries = config.series.map((series) => {
       const lines2 = wrap(`${series.label} (${series.kind})`, legendWrap);
       return { series, lines: lines2, height: Math.max(24, lines2.length * 16 + 8) };
     });
-    const legendHeight = legendEntries.reduce((sum2, entry) => sum2 + entry.height, 0);
+    const legendHeight = legendEntries.reduce((sum3, entry) => sum3 + entry.height, 0);
     const height = Math.max(120, categoryBottom + legendHeight + 32);
-    const ratio = (v2) => Number.isFinite(domain[1] - domain[0]) ? (v2 - domain[0]) / (domain[1] - domain[0]) : (v2 / 2 - domain[0] / 2) / (domain[1] / 2 - domain[0] / 2);
-    const scale = (v2) => vertical ? top + plotHeight - ratio(v2) * plotHeight : left + ratio(v2) * (width - left - right);
+    const ratio2 = (v2) => Number.isFinite(domain[1] - domain[0]) ? (v2 - domain[0]) / (domain[1] - domain[0]) : (v2 / 2 - domain[0] / 2) / (domain[1] / 2 - domain[0] / 2);
+    const scale = (v2) => vertical ? top + plotHeight - ratio2(v2) * plotHeight : left + ratio2(v2) * (width - left - right);
     const color = (s4) => s4.color || "#526c80";
     const axis = vertical ? `<line x1="${left}" x2="${width - right}" y1="${scale(0)}" y2="${scale(0)}" stroke="#a0a0a0"/>` : `<line x1="${scale(0)}" x2="${scale(0)}" y1="${top}" y2="${categoryBottom}" stroke="#a0a0a0"/>`;
     const axisSeries = config.series.every((series) => {
       var _a5;
       return JSON.stringify(series.format || {}) === JSON.stringify(((_a5 = config.series[0]) == null ? void 0 : _a5.format) || {});
     }) ? config.series[0] : {};
-    const ticks = [domain[0], domain[1]].map((v2) => vertical ? text(formatRangeValue(v2, axisSeries), left - 8, scale(v2), "end") : text(formatRangeValue(v2, axisSeries), scale(v2), 18, "middle")).join("");
+    const ticks = [domain[0], domain[1]].map((v2) => vertical ? text2(formatRangeValue(v2, axisSeries), left - 8, scale(v2), "end") : text2(formatRangeValue(v2, axisSeries), scale(v2), 18, "middle")).join("");
     const marks = categories.map((category, index) => {
       const band = (width - left - right) / Math.max(1, categories.length), center = left + (index + 0.5) * band;
       const y4 = top + rowHeights.slice(0, index).reduce((a4, b3) => a4 + b3, 0);
       const label = vertical ? textLines(categoryLines[index], center, top + plotHeight + 20, "middle") : textLines(categoryLines[index], left - 12, y4 + 20, "end");
       return label + category.marks.map((mark) => {
         const { series, seriesIndex, available } = mark;
-        const laneOffset = laneHeights[index].slice(0, seriesIndex).reduce((sum2, h4) => sum2 + h4, 0);
+        const laneOffset = laneHeights[index].slice(0, seriesIndex).reduce((sum3, h4) => sum3 + h4, 0);
         const lane = config.arrangement === "overlay" ? vertical ? center : y4 + 24 : vertical ? center + (seriesIndex - (config.series.length - 1) / 2) * 44 : y4 + 24 + laneOffset;
         const description = `${category.category}, ${mark.label}`;
         let shape = "";
@@ -43524,15 +45213,15 @@ Please __addLocaleData before adding additional unit data`);
           if (series.kind === "marker" || length === 0) shape = vertical ? `<line x1="${lane - 8}" x2="${lane + 8}" y1="${a4}" y2="${a4}" stroke="${color(series)}" stroke-width="3"/>` : `<line x1="${a4}" x2="${a4}" y1="${lane - 8}" y2="${lane + 8}" stroke="${color(series)}" stroke-width="3"/>`;
           else shape = vertical ? `<rect x="${lane - thickness / 2}" y="${lo}" width="${thickness}" height="${length}" fill="${color(series)}"/>` : `<rect x="${lo}" y="${lane - thickness / 2}" width="${length}" height="${thickness}" fill="${color(series)}"/>`;
         }
-        const valueY = vertical ? valuesTop + valueRowHeights.slice(0, seriesIndex).reduce((sum2, h4) => sum2 + h4, 0) : y4 + 28 + laneOffset;
+        const valueY = vertical ? valuesTop + valueRowHeights.slice(0, seriesIndex).reduce((sum3, h4) => sum3 + h4, 0) : y4 + 28 + laneOffset;
         const quantity = textLines(valueLines[index][seriesIndex], vertical ? center : width - 16, valueY, vertical ? "middle" : "end");
-        const attrs = interactive ? ` data-category="${index}" data-series="${seriesIndex}" tabindex="0" role="${selectable && available ? "button" : "img"}" aria-label="${escape(description)}"` : "";
+        const attrs = interactive ? ` data-category="${index}" data-series="${seriesIndex}" tabindex="0" role="${selectable && available ? "button" : "img"}" aria-label="${escape2(description)}"` : "";
         let hit = "";
         if (interactive && config.arrangement === "overlay" && available) {
           const start = scale(mark.start), end = scale(mark.end), length = Math.abs(end - start), origin = Math.min(start, end);
           hit = vertical ? `<rect x="${lane - 14}" y="${length ? origin : start - 8}" width="28" height="${Math.max(16, length)}" fill="transparent"/>` : `<rect x="${length ? origin : start - 8}" y="${lane - 14}" width="${Math.max(16, length)}" height="28" fill="transparent"/>`;
         } else if (interactive && config.arrangement !== "overlay") hit = `<rect x="${vertical ? lane - 22 : left}" y="${vertical ? top : lane - 22}" width="${vertical ? 44 : width - left}" height="${vertical ? plotHeight : laneHeights[index][seriesIndex]}" fill="transparent"/>`;
-        return `<g${attrs}>${interactive ? `<title>${escape(description)}</title>` : ""}${hit}${shape}${quantity}</g>`;
+        return `<g${attrs}>${interactive ? `<title>${escape2(description)}</title>` : ""}${hit}${shape}${quantity}</g>`;
       }).join("");
     }).join("");
     let legendY = categoryBottom + 24;
@@ -43593,7 +45282,7 @@ Please __addLocaleData before adding additional unit data`);
   }
 
   // src/reporting/reportExportValueFormatter.js
-  function normalizeString(value = "") {
+  function normalizeString3(value = "") {
     return String(value || "").trim();
   }
   function isPlainObject(value) {
@@ -43645,7 +45334,7 @@ Please __addLocaleData before adding additional unit data`);
   } = {}) {
     const numeric = normalizeFiniteNumber(value);
     if (numeric == null) {
-      return normalizeString(value);
+      return normalizeString3(value);
     }
     return formatExportDecimal(numeric, {
       minimumFractionDigits,
@@ -43656,11 +45345,11 @@ Please __addLocaleData before adding additional unit data`);
   function formatExportNumericValue(value, format2 = "", {
     axis = false
   } = {}) {
-    const normalizedFormat = normalizeString(format2).toLowerCase();
+    const normalizedFormat = normalizeString3(format2).toLowerCase();
     if (["id", "raw", "plain", "text"].includes(normalizedFormat)) return String(value);
     const numeric = normalizeFiniteNumber(value);
     if (numeric == null) {
-      return normalizeString(value);
+      return normalizeString3(value);
     }
     switch (normalizedFormat) {
       case "currency":
@@ -43738,8 +45427,8 @@ Please __addLocaleData before adding additional unit data`);
       return value.map((entry) => formatExportValue(entry, format2, options)).join(", ");
     }
     if (isPlainObject(value)) {
-      const start = normalizeString(value == null ? void 0 : value.start);
-      const end = normalizeString(value == null ? void 0 : value.end);
+      const start = normalizeString3(value == null ? void 0 : value.start);
+      const end = normalizeString3(value == null ? void 0 : value.end);
       if (start || end) {
         if (start && end) {
           return `${start} to ${end}`;
@@ -43748,7 +45437,7 @@ Please __addLocaleData before adding additional unit data`);
       }
       return JSON.stringify(value);
     }
-    const normalizedFormat = normalizeString(format2).toLowerCase();
+    const normalizedFormat = normalizeString3(format2).toLowerCase();
     if (["id", "raw", "plain", "text"].includes(normalizedFormat)) return String(value);
     if (normalizedFormat === "date" || normalizedFormat === "datetime") {
       return formatExportDateValue(value, { includeTime: normalizedFormat === "datetime" });
@@ -43775,11 +45464,11 @@ Please __addLocaleData before adding additional unit data`);
     if (dirtyNumber === null || dirtyNumber === true || dirtyNumber === false) {
       return NaN;
     }
-    var number2 = Number(dirtyNumber);
-    if (isNaN(number2)) {
-      return number2;
+    var number3 = Number(dirtyNumber);
+    if (isNaN(number3)) {
+      return number3;
     }
-    return number2 < 0 ? Math.ceil(number2) : Math.floor(number2);
+    return number3 < 0 ? Math.ceil(number3) : Math.floor(number3);
   }
 
   // node_modules/date-fns/esm/_lib/requiredArgs/index.js
@@ -43986,9 +45675,9 @@ Please __addLocaleData before adding additional unit data`);
   }
 
   // node_modules/date-fns/esm/_lib/addLeadingZeros/index.js
-  function addLeadingZeros(number2, targetLength) {
-    var sign = number2 < 0 ? "-" : "";
-    var output = Math.abs(number2).toString();
+  function addLeadingZeros(number3, targetLength) {
+    var sign = number3 < 0 ? "-" : "";
+    var output = Math.abs(number3).toString();
     while (output.length < targetLength) {
       output = "0" + output;
     }
@@ -45113,19 +46802,19 @@ Please __addLocaleData before adding additional unit data`);
     }
   };
   var ordinalNumber = function ordinalNumber2(dirtyNumber, _options) {
-    var number2 = Number(dirtyNumber);
-    var rem100 = number2 % 100;
+    var number3 = Number(dirtyNumber);
+    var rem100 = number3 % 100;
     if (rem100 > 20 || rem100 < 10) {
       switch (rem100 % 10) {
         case 1:
-          return number2 + "st";
+          return number3 + "st";
         case 2:
-          return number2 + "nd";
+          return number3 + "nd";
         case 3:
-          return number2 + "rd";
+          return number3 + "rd";
       }
     }
-    return number2 + "th";
+    return number3 + "th";
   };
   var localize = {
     ordinalNumber,
@@ -45414,6 +47103,39 @@ Please __addLocaleData before adding additional unit data`);
     return matched[1].replace(doubleQuoteRegExp, "'");
   }
 
+  // src/utils/resourceTimeFormat.js
+  var layouts = /* @__PURE__ */ new Set(["2006-01-02", "2006-01-02 15:04", "2006-01-02 15:04:05", "2006-01-02T15:04:05Z07:00"]);
+  function formatResourceTime(value, metadata = {}) {
+    var _a5;
+    const layout = metadata.timeLayout || "2006-01-02T15:04:05Z07:00";
+    if (!layouts.has(layout)) throw new Error(`Unsupported time layout: ${layout}`);
+    if (value == null) return metadata.nullable ? "null" : "";
+    if (metadata.omitEmpty && value === "") return "";
+    if (!(value instanceof Date) && typeof value !== "number" && !(typeof value === "string" && /T.*(?:Z|[+-]\d\d:\d\d)$/.test(value))) throw new Error("Time formatting requires an explicit instant; wall-clock parsing needs an explicit caller policy.");
+    if (typeof value === "string" && /\.\d{4,}/.test(value)) throw new Error("Sub-millisecond time precision requires an explicit formatting hook.");
+    const date = value instanceof Date ? value : new Date(value);
+    if (!Number.isFinite(date.getTime())) throw new Error("Invalid time instant.");
+    if (date.getUTCFullYear() < 100 || date.getUTCFullYear() > 9999) throw new Error("Unsupported time year outside 0100 through 9999.");
+    const zone = metadata.timeZone || (typeof value === "string" ? (_a5 = value.match(/([+-]\d\d:\d\d)$/)) == null ? void 0 : _a5[1] : "") || "UTC";
+    const fixed = /^([+-])(\d\d):(\d\d)$/.exec(zone);
+    const minutes = fixed ? (fixed[1] === "-" ? -1 : 1) * (Number(fixed[2]) * 60 + Number(fixed[3])) : 0;
+    const displayDate = fixed ? new Date(date.getTime() + minutes * 6e4) : date;
+    const timeZone = fixed ? "UTC" : zone === "utc" ? "UTC" : zone;
+    const formatter = new Intl.DateTimeFormat("en-US", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
+    const parts = Object.fromEntries(formatter.formatToParts(displayDate).map((part) => [part.type, part.value]));
+    if (Number(parts.year) < 100 || Number(parts.year) > 9999) throw new Error("Unsupported presentation year outside 0100 through 9999.");
+    const day = `${parts.year.padStart(4, "0")}-${parts.month}-${parts.day}`, clock = `${parts.hour}:${parts.minute}`;
+    if (layout === "2006-01-02") return day;
+    if (layout === "2006-01-02 15:04") return `${day} ${clock}`;
+    if (layout === "2006-01-02 15:04:05") return `${day} ${clock}:${parts.second}`;
+    const wall = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), Number(parts.hour), Number(parts.minute), Number(parts.second));
+    const exactOffset = (wall - Math.floor(date.getTime() / 1e3) * 1e3) / 6e4;
+    if (!fixed && !Number.isInteger(exactOffset)) throw new Error("Sub-minute historical timezone offsets require an explicit formatting hook.");
+    const offset = fixed ? minutes : exactOffset;
+    const suffix = offset === 0 ? "Z" : `${offset < 0 ? "-" : "+"}${String(Math.floor(Math.abs(offset) / 60)).padStart(2, "0")}:${String(Math.abs(offset) % 60).padStart(2, "0")}`;
+    return `${day}T${clock}:${parts.second}${suffix}`;
+  }
+
   // src/utils/formatValue.js
   var formatUtcWallClock = (date, locale2, kind) => {
     const year = date.getUTCFullYear();
@@ -45433,6 +47155,7 @@ Please __addLocaleData before adding additional unit data`);
   };
   var formatDisplayValue = (value, format2, locale2 = "en-US", options = {}) => {
     var _a5;
+    if (options == null ? void 0 : options.timeFormat) return formatResourceTime(value, options.timeFormat);
     if (value == null) return "-";
     if (typeof value === "string" && value.trim() === "") return "";
     if (format2 === "raw" || format2 === "plain" || format2 === "id" || format2 === "text") {
@@ -45536,45 +47259,11 @@ Please __addLocaleData before adding additional unit data`);
     }
   };
 
-  // src/utils/selector.js
-  var resolveKey = (object5, path) => {
-    try {
-      return path.split(".").reduce((acc, part) => acc && acc[part], object5);
-    } catch (e3) {
-      return void 0;
-    }
-  };
-  function assertSafeAssignmentPath(path) {
-    if (typeof path !== "string") return;
-    for (const raw of path.split(/[.:/]/)) {
-      const key2 = raw.startsWith("[]") ? raw.slice(2) : raw;
-      if (key2 === "__proto__" || key2 === "constructor" || key2 === "prototype") {
-        throw new Error(`Unsafe assignment path: ${path}`);
-      }
-    }
-  }
-  var setSelector = (holder, path, value) => {
-    assertSafeAssignmentPath(path);
-    if (!path || typeof path !== "string" || path.indexOf(".") === -1) {
-      return {
-        ...holder || {},
-        [path]: value
-      };
-    }
-    const keys3 = path.split(".");
-    const [head, ...tail] = keys3;
-    const existing = holder && typeof holder === "object" ? holder[head] : void 0;
-    return {
-      ...holder || {},
-      [head]: setSelector(existing || {}, tail.join("."), value)
-    };
-  };
-
   // src/components/chartData.js
   function normalizeChartKey(key2 = "") {
     return String(key2 || "").trim();
   }
-  function cloneValue(value) {
+  function cloneValue3(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
   }
   function formatChartNumber(value) {
@@ -45685,11 +47374,11 @@ Please __addLocaleData before adding additional unit data`);
     const shouldMaterializeXAxis = xAxisDisplayKey && xAxisSourceKey && (xAxisDisplayKey !== xAxisSourceKey || xAxisDisplayValueMap && typeof xAxisDisplayValueMap === "object" && !Array.isArray(xAxisDisplayValueMap));
     const shouldMaterializeSeries = seriesDisplayKey && seriesSourceKey && (seriesDisplayKey !== seriesSourceKey || seriesDisplayValueMap && typeof seriesDisplayValueMap === "object" && !Array.isArray(seriesDisplayValueMap));
     if (!shouldMaterializeXAxis && !shouldMaterializeSeries) {
-      return normalizedRows.map((row) => row && typeof row === "object" ? attachChartSelectionRowsMetadata(cloneValue(row), row == null ? void 0 : row.__chartSelectionRows) : row);
+      return normalizedRows.map((row) => row && typeof row === "object" ? attachChartSelectionRowsMetadata(cloneValue3(row), row == null ? void 0 : row.__chartSelectionRows) : row);
     }
     return normalizedRows.map((row) => {
       const selectionRows = row == null ? void 0 : row.__chartSelectionRows;
-      let nextRow = row && typeof row === "object" && !Array.isArray(row) ? attachChartSelectionRowsMetadata(cloneValue(row), selectionRows) : row;
+      let nextRow = row && typeof row === "object" && !Array.isArray(row) ? attachChartSelectionRowsMetadata(cloneValue3(row), selectionRows) : row;
       if (!nextRow || typeof nextRow !== "object" || Array.isArray(nextRow)) {
         return nextRow;
       }
@@ -45908,7 +47597,7 @@ Please __addLocaleData before adding additional unit data`);
       if (!Array.isArray(centerRows)) throw new Error("Donut center dataset is unavailable.");
       rows = centerRows;
       if (rows.length > 1) throw new Error("Independent donut center requires at most one scalar row.");
-      for (const row of rows) for (const field of donutCenterFields(config)) if (readChartDataValue(row, field) === void 0) throw new Error(`Donut center field '${field}' is absent from its dataset.`);
+      for (const row of rows) for (const field2 of donutCenterFields(config)) if (readChartDataValue(row, field2) === void 0) throw new Error(`Donut center field '${field2}' is absent from its dataset.`);
     }
     const resolve = (binding) => {
       var _a6;
@@ -45923,9 +47612,9 @@ Please __addLocaleData before adding additional unit data`);
       }
       const present2 = values.filter((v2) => v2 !== null);
       if (!present2.length) return null;
-      const sum2 = present2.reduce((total, v2) => total + v2, 0);
-      if (!Number.isFinite(sum2)) throw new Error("Donut center sum exceeds the finite numeric range.");
-      return sum2;
+      const sum3 = present2.reduce((total, v2) => total + v2, 0);
+      if (!Number.isFinite(sum3)) throw new Error("Donut center sum exceeds the finite numeric range.");
+      return sum3;
     };
     const alternatives = (config.alternatives || [{ ...config.value, format: config.format }]).map((binding) => ({ value: resolve(binding), format: binding.format, label: binding.label }));
     const active = alternatives.filter((item) => item.value !== null);
@@ -45959,11 +47648,11 @@ Please __addLocaleData before adding additional unit data`);
     const fits = wordsFit && valueFits && valueSize + 6 + lines2.length * lineHeight <= height;
     return { value: valueFits ? center.formattedValue : "\u2026", labelLines: fits ? lines2 : [], needsDetails: !fits, valueSize, labelSize, lineHeight, height: fits ? valueSize + 6 + lines2.length * lineHeight : valueSize };
   }
-  var escape2 = (value) => String(value).replace(/[&<>"']/g, (c3) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c3]);
+  var escape3 = (value) => String(value).replace(/[&<>"']/g, (c3) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c3]);
   function donutCenterPrintDescription(center) {
     if (!center.valueEmphasis && !center.labelEmphasis) return donutCenterDescription(center);
-    const text3 = donutCenterDescription(center);
-    return { text: text3, textRuns: [{ text: center.label, fontWeight: center.labelEmphasis || "normal" }, { text: ": ", fontWeight: "normal" }, { text: center.formattedValue, fontWeight: center.valueEmphasis || "normal" }, { text: ". Dataset value; slice selection does not change it.", fontWeight: "normal" }] };
+    const text4 = donutCenterDescription(center);
+    return { text: text4, textRuns: [{ text: center.label, fontWeight: center.labelEmphasis || "normal" }, { text: ": ", fontWeight: "normal" }, { text: center.formattedValue, fontWeight: center.valueEmphasis || "normal" }, { text: ". Dataset value; slice selection does not change it.", fontWeight: "normal" }] };
   }
   function donutCenterSvg(center, cx, cy, radius) {
     const layout = layoutDonutCenter(center, radius);
@@ -45972,7 +47661,7 @@ Please __addLocaleData before adding additional unit data`);
       var _a5, _b;
       return `${((_a5 = center[part + "Emphasis"]) == null ? void 0 : _a5.includes("bold")) ? ' font-weight="bold"' : ""}${((_b = center[part + "Emphasis"]) == null ? void 0 : _b.includes("italic")) ? ' font-style="italic"' : ""}`;
     };
-    return { svg: `<text x="${cx}" y="${y4}" text-anchor="middle" font-size="${layout.valueSize}"${emphasis("value")} fill="#344054">${escape2(layout.value)}</text>` + layout.labelLines.map((line, i3) => `<text x="${cx}" y="${y4 + layout.valueSize + 4 + i3 * layout.lineHeight}" text-anchor="middle" font-size="${layout.labelSize}"${emphasis("label")} fill="#344054">${escape2(line)}</text>`).join(""), needsDetails: layout.needsDetails };
+    return { svg: `<text x="${cx}" y="${y4}" text-anchor="middle" font-size="${layout.valueSize}"${emphasis("value")} fill="#344054">${escape3(layout.value)}</text>` + layout.labelLines.map((line, i3) => `<text x="${cx}" y="${y4 + layout.valueSize + 4 + i3 * layout.lineHeight}" text-anchor="middle" font-size="${layout.labelSize}"${emphasis("label")} fill="#344054">${escape3(line)}</text>`).join(""), needsDetails: layout.needsDetails };
   }
 
   // src/components/categoricalHeatmap.js
@@ -45984,7 +47673,7 @@ Please __addLocaleData before adding additional unit data`);
     properties: {
       ...Object.fromEntries(["rowField", "columnField", "valueField"].map((key2) => [key2, { type: "string", minLength: 1 }])),
       ...Object.fromEntries(["rowCategories", "columnCategories"].map((key2) => [key2, { type: "array", minItems: 1, uniqueItems: true, items: { type: "string", minLength: 1 } }])),
-      colorScale: { type: "object", additionalProperties: false, required: ["type", "domain", "colors"], properties: { type: { enum: ["sequential", "diverging"] }, domain: { type: "array", minItems: 2, maxItems: 3, items: { type: "number" } }, colors: { type: "array", minItems: 2, maxItems: 3, items: { type: "string", pattern: "^#[0-9a-fA-F]{6}$" } } } },
+      colorScale: { type: "object", additionalProperties: false, required: ["type", "domain", "colors"], properties: { type: { enum: ["sequential", "diverging"] }, domain: { oneOf: [{ const: "auto" }, { type: "array", minItems: 2, maxItems: 3, items: { type: "number" } }] }, colors: { type: "array", minItems: 2, maxItems: 3, items: { type: "string", pattern: "^#[0-9a-fA-F]{6}$" } } } },
       noData: { type: "object", additionalProperties: false, properties: { color: { type: "string", pattern: "^#[0-9a-fA-F]{6}$" }, label: { type: "string", minLength: 1 } } },
       cellLabels: { type: "boolean" },
       legend: { type: "boolean" }
@@ -45994,33 +47683,37 @@ Please __addLocaleData before adding additional unit data`);
     var _a5, _b, _c, _d;
     if (!input || typeof input !== "object") throw new Error("Heatmap configuration is required.");
     for (const key2 of Object.keys(input)) if (!Object.hasOwn(heatmapSchema.properties, key2)) throw new Error(`Unknown heatmap option: ${key2}`);
-    for (const field of ["rowField", "columnField", "valueField"]) if (typeof input[field] !== "string" || !input[field].trim()) throw new Error(`Heatmap ${field} is required.`);
+    for (const field2 of ["rowField", "columnField", "valueField"]) if (typeof input[field2] !== "string" || !input[field2].trim()) throw new Error(`Heatmap ${field2} is required.`);
     if ((/* @__PURE__ */ new Set([input.rowField, input.columnField, input.valueField])).size !== 3) throw new Error("Heatmap fields must be distinct.");
-    for (const field of ["rowCategories", "columnCategories"]) {
-      const values = input[field];
-      if (!Array.isArray(values) || !values.length || values.some((value) => typeof value !== "string" || !value) || new Set(values).size !== values.length) throw new Error(`Heatmap ${field} requires unique ordered strings.`);
+    for (const field2 of ["rowCategories", "columnCategories"]) {
+      const values = input[field2];
+      if (!Array.isArray(values) || !values.length || values.some((value) => typeof value !== "string" || !value) || new Set(values).size !== values.length) throw new Error(`Heatmap ${field2} requires unique ordered strings.`);
     }
     for (const [key2, allowed] of [["colorScale", ["type", "domain", "colors"]], ["noData", ["color", "label"]]]) {
       const value = input[key2];
       if (value !== void 0 && (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some((k2) => !allowed.includes(k2)))) throw new Error(`Invalid heatmap ${key2} options.`);
     }
     const scale = input.colorScale, size = (scale == null ? void 0 : scale.type) === "diverging" ? 3 : 2;
-    if (!["sequential", "diverging"].includes(scale == null ? void 0 : scale.type) || !Array.isArray(scale.domain) || scale.domain.length !== size || scale.domain.some((v2, i3) => !Number.isFinite(v2) || i3 > 0 && v2 <= scale.domain[i3 - 1]) || !Array.isArray(scale.colors) || scale.colors.length !== size || scale.colors.some((c3) => !hex.test(c3))) throw new Error("Heatmap scale requires ordered finite domain stops and matching hex colors.");
+    const automatic = (scale == null ? void 0 : scale.domain) === "auto" && (scale == null ? void 0 : scale.type) === "sequential";
+    if (!["sequential", "diverging"].includes(scale == null ? void 0 : scale.type) || !automatic && (!Array.isArray(scale.domain) || scale.domain.length !== size || scale.domain.some((v2, i3) => !Number.isFinite(v2) || i3 > 0 && v2 <= scale.domain[i3 - 1])) || !Array.isArray(scale.colors) || scale.colors.length !== size || scale.colors.some((c3) => !hex.test(c3))) throw new Error("Heatmap scale requires ordered finite domain stops and matching hex colors; auto requires a sequential scale.");
     if (((_a5 = input.noData) == null ? void 0 : _a5.color) !== void 0 && !hex.test(input.noData.color)) throw new Error("Heatmap no-data color must be a six-digit hex color.");
     if (((_b = input.noData) == null ? void 0 : _b.label) !== void 0 && (typeof input.noData.label !== "string" || !input.noData.label)) throw new Error("Heatmap no-data label must be nonempty.");
-    for (const field of ["cellLabels", "legend"]) if (input[field] !== void 0 && typeof input[field] !== "boolean") throw new Error(`Heatmap ${field} must be boolean.`);
+    for (const field2 of ["cellLabels", "legend"]) if (input[field2] !== void 0 && typeof input[field2] !== "boolean") throw new Error(`Heatmap ${field2} must be boolean.`);
     return JSON.parse(JSON.stringify({ ...input, noData: { color: "#eeeeee", label: "No data", ...input.noData }, cellLabels: (_c = input.cellLabels) != null ? _c : true, legend: (_d = input.legend) != null ? _d : true }));
   }
   function colorAt(value, { domain, colors }) {
     const v2 = Math.max(domain[0], Math.min(domain.at(-1), value));
     const index = domain.length === 3 && v2 > domain[1] ? 1 : 0;
     const start = domain[index], end = domain[index + 1], span = end - start;
-    const t3 = Number.isFinite(span) ? (v2 - start) / span : (v2 / 2 - start / 2) / (end / 2 - start / 2);
+    const t3 = span === 0 ? 0.5 : Number.isFinite(span) ? (v2 - start) / span : (v2 / 2 - start / 2) / (end / 2 - start / 2);
     const channels = (c3) => [1, 3, 5].map((i3) => parseInt(c3.slice(i3, i3 + 2), 16));
     const a4 = channels(colors[index]), b3 = channels(colors[index + 1]);
     return "#" + a4.map((v3, i3) => Math.round(v3 + (b3[i3] - v3) * t3).toString(16).padStart(2, "0")).join("");
   }
   function buildHeatmap(input, rows = []) {
+    return buildHeatmapModel(input, rows);
+  }
+  function buildHeatmapModel(input, rows = [], resolvedScale) {
     const config = normalizeHeatmap(input), pairs2 = /* @__PURE__ */ new Map();
     for (const row of rows) {
       const r2 = config.rowCategories.indexOf(row == null ? void 0 : row[config.rowField]), c3 = config.columnCategories.indexOf(row == null ? void 0 : row[config.columnField]);
@@ -46031,17 +47724,34 @@ Please __addLocaleData before adding additional unit data`);
       if (value !== null && value !== void 0 && (typeof value !== "number" || !Number.isFinite(value))) throw new Error("Heatmap values must be finite numbers or null.");
       pairs2.set(key2, row);
     }
+    let scale = resolvedScale || config.colorScale;
+    if (scale.domain === "auto") {
+      let low = Infinity, high = -Infinity;
+      for (const row of pairs2.values()) {
+        const value = row[config.valueField];
+        if (value !== null && value !== void 0) {
+          low = Math.min(low, value);
+          high = Math.max(high, value);
+        }
+      }
+      scale = { ...scale, domain: low === Infinity ? [] : [low, high] };
+    }
     const cells = config.rowCategories.flatMap((rowValue, r2) => config.columnCategories.map((columnValue, c3) => {
       var _a5;
       const row = pairs2.get(`${r2}:${c3}`), value = (_a5 = row == null ? void 0 : row[config.valueField]) != null ? _a5 : null;
-      return { r: r2, c: c3, rowValue, columnValue, row: row != null ? row : null, value, state: !row ? "absent" : value === null ? "null" : "value", color: value === null ? config.noData.color : colorAt(value, config.colorScale), label: value === null ? config.noData.label : String(value) };
+      return { r: r2, c: c3, rowValue, columnValue, row: row != null ? row : null, value, state: !row ? "absent" : value === null ? "null" : "value", color: value === null ? config.noData.color : colorAt(value, scale), label: value === null ? config.noData.label : String(value) };
     }));
-    return { config, cells };
+    return { config, cells, scale };
   }
-  var escape3 = (value) => String(value).replace(/[&<>"']/g, (c3) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c3]);
+  function heatmapLegend({ config, scale = config.colorScale }) {
+    if (!config.legend) return [];
+    const stops = scale.domain.length === 2 && scale.domain[0] === scale.domain[1] ? [{ label: String(scale.domain[0]), color: colorAt(scale.domain[0], scale) }] : scale.domain.map((value, i3) => ({ label: String(value), color: scale.colors[i3] }));
+    return [...stops, { label: config.noData.label, color: config.noData.color }];
+  }
+  var escape4 = (value) => String(value).replace(/[&<>"']/g, (c3) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c3]);
   var lines = (value) => String(value).split(/\r?\n/u).flatMap((line) => line.match(/.{1,12}/gu) || [""]);
-  function text2(value, x2, y4, anchor = "middle") {
-    return lines(value).map((line, i3) => `<text x="${x2}" y="${y4 + i3 * 16}" text-anchor="${anchor}">${escape3(line)}</text>`).join("");
+  function text3(value, x2, y4, anchor = "middle") {
+    return lines(value).map((line, i3) => `<text x="${x2}" y="${y4 + i3 * 16}" text-anchor="${anchor}">${escape4(line)}</text>`).join("");
   }
   var labelWidth = (value) => Math.max(...lines(value).map((line) => measureChartText(line, 12)));
   function heatmapWidths({ config, cells }) {
@@ -46051,7 +47761,7 @@ Please __addLocaleData before adding additional unit data`);
   }
   function heatmapSvg(model, width = 680, { interactive = false, selectable = false, print = false, title = "Categorical heatmap" } = {}) {
     const { config, cells } = model, { left, cellWidth: minimumCellWidth } = heatmapWidths(model), top = 20 + Math.max(...config.columnCategories.map((v2) => lines(v2).length)) * 16;
-    const legendEntries = config.legend ? [...config.colorScale.domain.map((value, i3) => ({ label: String(value), color: config.colorScale.colors[i3] })), { label: config.noData.label, color: config.noData.color }] : [];
+    const legendEntries = heatmapLegend(model);
     const legendWidth = Math.max(44, ...legendEntries.map((entry) => labelWidth(entry.label) + 36));
     if (!print) width = Math.max(width, left + 12 + Math.max(config.columnCategories.length * minimumCellWidth, legendEntries.length ? legendWidth : 0));
     const cellWidth = (width - left - 12) / config.columnCategories.length;
@@ -46061,25 +47771,25 @@ Please __addLocaleData before adding additional unit data`);
     const legendColumns = Math.max(1, Math.floor((width - left - 12) / legendWidth));
     const legendRowHeight = Math.max(26, ...legendEntries.map((entry) => lines(entry.label).length * 16 + 10));
     const height = Math.max(120, bottom + (legendEntries.length ? Math.ceil(legendEntries.length / legendColumns) * legendRowHeight + 20 : 12));
-    const labels = config.columnCategories.map((v2, c3) => text2(v2, left + (c3 + 0.5) * cellWidth, 20)).join("") + config.rowCategories.map((v2, r2) => text2(v2, left - 10, y4(r2) + 22, "end")).join("");
+    const labels = config.columnCategories.map((v2, c3) => text3(v2, left + (c3 + 0.5) * cellWidth, 20)).join("") + config.rowCategories.map((v2, r2) => text3(v2, left - 10, y4(r2) + 22, "end")).join("");
     const marks = cells.map((cell, index) => {
       const description = `${cell.rowValue}, ${cell.columnValue}: ${cell.label}`;
       const rgb = [1, 3, 5].map((i3) => parseInt(cell.color.slice(i3, i3 + 2), 16));
       const foreground = (rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1e3 < 140 ? "#ffffff" : "#111111";
-      return `<g${interactive ? ` data-cell="${index}" tabindex="${index === 0 ? 0 : -1}" role="${selectable && cell.value !== null ? "button" : "img"}" aria-label="${escape3(description)}"` : ""}>${interactive ? `<title>${escape3(description)}</title>` : ""}<rect x="${left + cell.c * cellWidth}" y="${y4(cell.r)}" width="${cellWidth}" height="${heights[cell.r]}" fill="${cell.color}" stroke="#ffffff"/>${config.cellLabels ? `<g fill="${foreground}">${text2(cell.label, left + (cell.c + 0.5) * cellWidth, y4(cell.r) + (heights[cell.r] - lines(cell.label).length * 16) / 2 + 12)}</g>` : ""}</g>`;
+      return `<g${interactive ? ` data-cell="${index}" tabindex="${index === 0 ? 0 : -1}" role="${selectable && cell.value !== null ? "button" : "img"}" aria-label="${escape4(description)}"` : ""}>${interactive ? `<title>${escape4(description)}</title>` : ""}<rect x="${left + cell.c * cellWidth}" y="${y4(cell.r)}" width="${cellWidth}" height="${heights[cell.r]}" fill="${cell.color}" stroke="#ffffff"/>${config.cellLabels ? `<g fill="${foreground}">${text3(cell.label, left + (cell.c + 0.5) * cellWidth, y4(cell.r) + (heights[cell.r] - lines(cell.label).length * 16) / 2 + 12)}</g>` : ""}</g>`;
     }).join("");
     const legend = legendEntries.map((entry, i3) => {
       const x2 = left + i3 % legendColumns * legendWidth, top2 = bottom + 16 + Math.floor(i3 / legendColumns) * legendRowHeight;
-      return `<rect x="${x2}" y="${top2}" width="18" height="18" fill="${entry.color}"/>${text2(entry.label, x2 + 24, top2 + 14, "start")}`;
+      return `<rect x="${x2}" y="${top2}" width="18" height="18" fill="${entry.color}"/>${text3(entry.label, x2 + 24, top2 + 14, "start")}`;
     }).join("");
-    return { svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" ${interactive ? `role="group" aria-label="${escape3(title)}"` : ""} font-family="sans-serif" font-size="12" fill="#263238"><g font-size="12" fill="#263238">${labels}${marks}${legend}</g></svg>`, height, width, diagnostics: [] };
+    return { svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" ${interactive ? `role="group" aria-label="${escape4(title)}"` : ""} font-family="sans-serif" font-size="12" fill="#263238"><g font-size="12" fill="#263238">${labels}${marks}${legend}</g></svg>`, height, width, diagnostics: [] };
   }
   function heatmapPrintPages(model, { width = 680, maxHeight = 620, firstMaxHeight = maxHeight } = {}) {
     const { config, cells } = model;
     const { left, cellWidth } = heatmapWidths(model);
     const columnCount = Math.floor((width - left - 12) / cellWidth);
     const noFit = (message) => [{ svg: "", height: 0, diagnostics: [{ code: "heatmapPrintLayoutDoesNotFit", severity: "warning", message, suggestedFix: "Increase page dimensions or shorten category/no-data labels." }] }];
-    const legendWidth = config.legend ? Math.max(...[...config.colorScale.domain.map(String), config.noData.label].map((value) => labelWidth(value) + 36)) : 0;
+    const legendWidth = config.legend ? Math.max(...heatmapLegend(model).map((entry) => labelWidth(entry.label) + 36)) : 0;
     if (columnCount < 1 || width - left - 12 < legendWidth) return noFit("Heatmap print width cannot fit one readable column, its row labels and legend.");
     const pages = [];
     for (let columnStart = 0; columnStart < config.columnCategories.length; columnStart += columnCount) {
@@ -46091,7 +47801,7 @@ Please __addLocaleData before adding additional unit data`);
         for (let end = rowStart + 1; end <= config.rowCategories.length; end++) {
           const rowCategories = config.rowCategories.slice(rowStart, end);
           const rows = cells.filter((cell) => cell.row && rowCategories.includes(cell.rowValue) && columnCategories.includes(cell.columnValue)).map((cell) => cell.row);
-          const candidate = heatmapSvg(buildHeatmap({ ...config, rowCategories, columnCategories }, rows), width, { print: true });
+          const candidate = heatmapSvg(buildHeatmapModel({ ...config, rowCategories, columnCategories }, rows, model.scale), width, { print: true });
           if (candidate.height > budget) break;
           accepted = candidate;
           count = end - rowStart;
@@ -46099,7 +47809,7 @@ Please __addLocaleData before adding additional unit data`);
         if (!accepted && pages.length === 0 && budget < maxHeight) {
           const rowCategories = [config.rowCategories[rowStart]];
           const rows = cells.filter((cell) => cell.row && cell.rowValue === rowCategories[0] && columnCategories.includes(cell.columnValue)).map((cell) => cell.row);
-          const candidate = heatmapSvg(buildHeatmap({ ...config, rowCategories, columnCategories }, rows), width, { print: true });
+          const candidate = heatmapSvg(buildHeatmapModel({ ...config, rowCategories, columnCategories }, rows, model.scale), width, { print: true });
           if (candidate.height <= maxHeight) {
             accepted = { ...candidate, startNewPage: true };
             count = 1;
@@ -46125,16 +47835,16 @@ Please __addLocaleData before adding additional unit data`);
     if (typeof value !== "object" || Array.isArray(value) || Object.keys(value).some((key2) => !["fields", "print", "lines"].includes(key2))) fail("expected fields, optional template lines and print policy");
     if (!Array.isArray(value.fields) || !value.fields.length && !value.lines || value.fields.length > 16) fail("fields must contain 1\u201316 explicit fields unless template lines are supplied");
     const seen = /* @__PURE__ */ new Set();
-    const fields2 = value.fields.map((field, index) => {
-      if (!field || typeof field !== "object" || Array.isArray(field) || Object.keys(field).some((key2) => !["field", "label", "format", "unit", "aggregate"].includes(key2))) fail(`field ${index} has unsupported properties`);
-      for (const name of ["field", "label"]) if (typeof field[name] !== "string" || !field[name].trim() || field[name] !== field[name].trim()) fail(`field ${index} requires an unpadded ${name}`);
-      if (seen.has(field.field)) fail(`duplicate field ${field.field}`);
-      seen.add(field.field);
-      const format2 = field.format === void 0 ? "text" : field.format, aggregate = field.aggregate === void 0 ? "unique" : field.aggregate;
-      if (!formats.includes(format2) || !aggregates.includes(aggregate)) fail(`unsupported format or aggregate for ${field.field}`);
-      if (aggregate !== "unique" && ["text", "date"].includes(format2)) fail(`numeric aggregation requires numeric format for ${field.field}`);
-      if (field.unit !== void 0 && typeof field.unit !== "string") fail(`unit for ${field.field} must be text`);
-      return { ...field, format: format2, aggregate };
+    const fields2 = value.fields.map((field2, index) => {
+      if (!field2 || typeof field2 !== "object" || Array.isArray(field2) || Object.keys(field2).some((key2) => !["field", "label", "format", "unit", "aggregate"].includes(key2))) fail(`field ${index} has unsupported properties`);
+      for (const name of ["field", "label"]) if (typeof field2[name] !== "string" || !field2[name].trim() || field2[name] !== field2[name].trim()) fail(`field ${index} requires an unpadded ${name}`);
+      if (seen.has(field2.field)) fail(`duplicate field ${field2.field}`);
+      seen.add(field2.field);
+      const format2 = field2.format === void 0 ? "text" : field2.format, aggregate = field2.aggregate === void 0 ? "unique" : field2.aggregate;
+      if (!formats.includes(format2) || !aggregates.includes(aggregate)) fail(`unsupported format or aggregate for ${field2.field}`);
+      if (aggregate !== "unique" && ["text", "date"].includes(format2)) fail(`numeric aggregation requires numeric format for ${field2.field}`);
+      if (field2.unit !== void 0 && typeof field2.unit !== "string") fail(`unit for ${field2.field} must be text`);
+      return { ...field2, format: format2, aggregate };
     });
     const print = value.print === void 0 ? "details" : value.print;
     if (!["details", "omit"].includes(print)) fail("print must be details or omit");
@@ -46156,46 +47866,46 @@ Please __addLocaleData before adding additional unit data`);
   }
   var chartTooltipFields = (value) => {
     var _a5;
-    return ((_a5 = normalizeChartTooltip(value)) == null ? void 0 : _a5.fields.map((field) => field.field)) || [];
+    return ((_a5 = normalizeChartTooltip(value)) == null ? void 0 : _a5.fields.map((field2) => field2.field)) || [];
   };
   var chartTooltipEntryId = (category, seriesKey) => JSON.stringify([category, String(seriesKey)]);
   var chartTooltipPieFields = (chart) => {
     var _a5, _b, _c, _d, _e;
     return { nameKey: ((_a5 = chart.series) == null ? void 0 : _a5.nameKey) || "name", valueKey: ((_b = chart.series) == null ? void 0 : _b.valueKey) || ((_e = (_d = (_c = chart.series) == null ? void 0 : _c.values) == null ? void 0 : _d[0]) == null ? void 0 : _e.value) || "value" };
   };
-  function fieldValue(rows, field) {
-    const values = rows.map((row) => readChartDataValue(row, field.field));
+  function fieldValue(rows, field2) {
+    const values = rows.map((row) => readChartDataValue(row, field2.field));
     let state = "value", value;
     if (!values.length || values.every((v2) => v2 === void 0)) state = "missing";
     else if (values.every((v2) => v2 === null)) state = "null";
-    else if (field.aggregate === "unique") {
+    else if (field2.aggregate === "unique") {
       if (values.some((v2) => !Object.is(v2, values[0]))) state = "mixed";
       else value = values[0];
     } else {
       const numeric = values.filter((v2) => v2 != null);
-      if (numeric.some((v2) => typeof v2 !== "number" || !Number.isFinite(v2))) fail(`${field.field} contains a nonfinite or nonnumeric aggregate value`);
+      if (numeric.some((v2) => typeof v2 !== "number" || !Number.isFinite(v2))) fail(`${field2.field} contains a nonfinite or nonnumeric aggregate value`);
       if (!numeric.length) state = values.some((v2) => v2 === null) ? "null" : "missing";
       else {
         const scale = numeric.reduce((maximum, v2) => Math.max(maximum, Math.abs(v2)), 0) || 1;
-        value = field.aggregate === "min" ? numeric.reduce((a4, b3) => Math.min(a4, b3), Infinity) : field.aggregate === "max" ? numeric.reduce((a4, b3) => Math.max(a4, b3), -Infinity) : field.aggregate === "avg" ? numeric.reduce((sum2, v2) => sum2 + v2 / scale / numeric.length, 0) * scale : numeric.reduce((a4, b3) => a4 + b3, 0);
-        if (!Number.isFinite(value)) fail(`${field.field} aggregate overflowed`);
+        value = field2.aggregate === "min" ? numeric.reduce((a4, b3) => Math.min(a4, b3), Infinity) : field2.aggregate === "max" ? numeric.reduce((a4, b3) => Math.max(a4, b3), -Infinity) : field2.aggregate === "avg" ? numeric.reduce((sum3, v2) => sum3 + v2 / scale / numeric.length, 0) * scale : numeric.reduce((a4, b3) => a4 + b3, 0);
+        if (!Number.isFinite(value)) fail(`${field2.field} aggregate overflowed`);
       }
     }
     let displayValue = { missing: "Missing field", null: "No value", mixed: "Multiple values" }[state];
     if (state === "value") {
-      if (value != null && typeof value === "object") fail(`${field.field} must be a scalar`);
-      if (field.format === "text") displayValue = String(value != null ? value : "");
-      else if (field.format === "date") {
+      if (value != null && typeof value === "object") fail(`${field2.field} must be a scalar`);
+      if (field2.format === "text") displayValue = String(value != null ? value : "");
+      else if (field2.format === "date") {
         const date = typeof value === "string" ? /* @__PURE__ */ new Date(`${value}T00:00:00Z`) : null;
-        if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(date == null ? void 0 : date.getTime()) || date.toISOString().slice(0, 10) !== value) fail(`${field.field} requires a YYYY-MM-DD civil date`);
+        if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(date == null ? void 0 : date.getTime()) || date.toISOString().slice(0, 10) !== value) fail(`${field2.field} requires a YYYY-MM-DD civil date`);
         displayValue = value;
       } else {
-        if (typeof value !== "number" || !Number.isFinite(value)) fail(`${field.field} requires a finite numeric value`);
-        displayValue = String(formatChartDisplayValue(value, field.format));
+        if (typeof value !== "number" || !Number.isFinite(value)) fail(`${field2.field} requires a finite numeric value`);
+        displayValue = String(formatChartDisplayValue(value, field2.format));
       }
-      if (field.unit) displayValue += ` ${field.unit}`;
+      if (field2.unit) displayValue += ` ${field2.unit}`;
     }
-    return { field: field.field, label: field.label, displayValue, aggregate: field.aggregate, state };
+    return { field: field2.field, label: field2.label, displayValue, aggregate: field2.aggregate, state };
   }
   function sourceRows(row, seriesKey) {
     const source = row == null ? void 0 : row.__chartSelectionRows;
@@ -46208,17 +47918,17 @@ Please __addLocaleData before adding additional unit data`);
     if (!config) return [];
     const type = chart.type;
     if (!["line", "area", "bar", "horizontal_bar", "funnel_bar", "composed", "combo", "pie", "donut", "heatmap", "category-range"].includes(type)) fail(`unsupported chart type ${type}`);
-    const entries = [];
+    const entries2 = [];
     const add = (category, seriesKey, seriesLabel, rows, identity) => {
       var _a6;
       if (!["string", "number", "boolean"].includes(typeof category) || typeof category === "number" && !Number.isFinite(category)) fail("category keys must be scalar strings, finite numbers or booleans");
-      const fields2 = config.fields.map((field) => fieldValue(rows, field));
-      const values = new Map(fields2.map((field) => [field.field, field.displayValue]));
+      const fields2 = config.fields.map((field2) => fieldValue(rows, field2));
+      const values = new Map(fields2.map((field2) => [field2.field, field2.displayValue]));
       const lines2 = (_a6 = config.lines) == null ? void 0 : _a6.map((line) => line.map((segment) => {
         var _a7;
         return segment.input ? resolveRequestLabelInput(segment.input, requestFilters) : (_a7 = segment.text) != null ? _a7 : values.get(segment.field);
       }).join(""));
-      entries.push({ id: identity ? JSON.stringify(identity) : chartTooltipEntryId(category, seriesKey), category: String(category), seriesKey: String(seriesKey), seriesLabel: String(seriesLabel), rowCount: rows.length, fields: fields2, ...lines2 ? { lines: lines2 } : {} });
+      entries2.push({ id: identity ? JSON.stringify(identity) : chartTooltipEntryId(category, seriesKey), category: String(category), seriesKey: String(seriesKey), seriesLabel: String(seriesLabel), rowCount: rows.length, fields: fields2, ...lines2 ? { lines: lines2 } : {} });
     };
     if (type === "heatmap") {
       const model = buildHeatmap(chart.heatmap, source);
@@ -46247,12 +47957,12 @@ Please __addLocaleData before adding additional unit data`);
         }));
       }
     }
-    if (!entries.length && ((_e = config.lines) == null ? void 0 : _e.some((line) => line.some((segment) => segment.input)))) add("Dataset", "details", "Details", []);
-    return entries;
+    if (!entries2.length && ((_e = config.lines) == null ? void 0 : _e.some((line) => line.some((segment) => segment.input)))) add("Dataset", "details", "Details", []);
+    return entries2;
   }
-  function chartTooltipPrintLines(config, entries = []) {
+  function chartTooltipPrintLines(config, entries2 = []) {
     if (!normalizeChartTooltip(config) || normalizeChartTooltip(config).print === "omit") return [];
-    return entries.flatMap((entry) => [`${entry.category} / ${entry.seriesLabel} (${entry.rowCount} source ${entry.rowCount === 1 ? "row" : "rows"})`, ...entry.lines || entry.fields.map((field) => `${field.label}${field.aggregate === "unique" ? "" : ` [${field.aggregate}]`}: ${field.displayValue}`)]);
+    return entries2.flatMap((entry) => [`${entry.category} / ${entry.seriesLabel} (${entry.rowCount} source ${entry.rowCount === 1 ? "row" : "rows"})`, ...entry.lines || entry.fields.map((field2) => `${field2.label}${field2.aggregate === "unique" ? "" : ` [${field2.aggregate}]`}: ${field2.displayValue}`)]);
   }
 
   // src/reporting/reportTableAnalytics.js
@@ -46264,13 +47974,13 @@ Please __addLocaleData before adding additional unit data`);
   var object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
   var key = (value) => typeof value === "string" && value.trim().length > 0;
   function exact(value, fields2, name) {
-    if (!object(value) || Object.keys(value).some((field) => !fields2.includes(field))) throw Error(`Invalid ${name} configuration.`);
+    if (!object(value) || Object.keys(value).some((field2) => !fields2.includes(field2))) throw Error(`Invalid ${name} configuration.`);
   }
   function keys(values, name) {
     if (!Array.isArray(values) || !values.length || values.some((value) => !key(value)) || new Set(values).size !== values.length) throw Error(`${name} requires unique nonempty field names.`);
     return values;
   }
-  var hierarchySchema = { type: "object", additionalProperties: false, required: ["keyField", "parentField", "labelField", "totals"], properties: { ...Object.fromEntries(["keyField", "parentField", "labelField"].map((field) => [field, { type: "string", minLength: 1 }])), defaultExpandedKeys: { type: "array", uniqueItems: true, items: { type: "string", minLength: 1 } }, totals: { type: "object", additionalProperties: false, required: ["mode"], properties: { mode: { enum: ["producer", "sum-leaves"] }, fields: { type: "array", minItems: 1, uniqueItems: true, items: { type: "string", minLength: 1 } } } } } };
+  var hierarchySchema = { type: "object", additionalProperties: false, required: ["keyField", "parentField", "labelField", "totals"], properties: { ...Object.fromEntries(["keyField", "parentField", "labelField"].map((field2) => [field2, { type: "string", minLength: 1 }])), defaultExpandedKeys: { type: "array", uniqueItems: true, items: { type: "string", minLength: 1 } }, totals: { type: "object", additionalProperties: false, required: ["mode"], properties: { mode: { enum: ["producer", "sum-leaves"] }, fields: { type: "array", minItems: 1, uniqueItems: true, items: { type: "string", minLength: 1 } } } } } };
   function normalizeTableAnalytics(block) {
     const { hierarchy, pivot, columnGroups } = block;
     if (hierarchy && pivot) throw Error("Table hierarchy and pivot must be separate blocks.");
@@ -46280,7 +47990,7 @@ Please __addLocaleData before adding additional unit data`);
     const columns = block.columns || [], known = new Set(columns.map((column) => column.key));
     if (hierarchy != null) {
       exact(hierarchy, ["keyField", "parentField", "labelField", "defaultExpandedKeys", "totals"], "table hierarchy");
-      for (const field of ["keyField", "parentField", "labelField"]) if (!key(hierarchy[field])) throw Error(`Hierarchy ${field} is required.`);
+      for (const field2 of ["keyField", "parentField", "labelField"]) if (!key(hierarchy[field2])) throw Error(`Hierarchy ${field2} is required.`);
       if ((/* @__PURE__ */ new Set([hierarchy.keyField, hierarchy.parentField, hierarchy.labelField])).size !== 3) throw Error("Hierarchy fields must be distinct.");
       if (!known.has(hierarchy.labelField)) throw Error("Hierarchy labelField must be a displayed column.");
       if (hierarchy.defaultExpandedKeys !== void 0 && (!Array.isArray(hierarchy.defaultExpandedKeys) || hierarchy.defaultExpandedKeys.some((v2) => !key(v2)) || new Set(hierarchy.defaultExpandedKeys).size !== hierarchy.defaultExpandedKeys.length)) throw Error("Hierarchy expanded keys must be unique strings.");
@@ -46288,7 +47998,7 @@ Please __addLocaleData before adding additional unit data`);
       if (!["producer", "sum-leaves"].includes(hierarchy.totals.mode)) throw Error("Declare producer totals or explicit sum-leaves totals.");
       if (hierarchy.totals.mode === "sum-leaves") {
         keys(hierarchy.totals.fields, "Hierarchy sum fields");
-        for (const field of hierarchy.totals.fields) if (!known.has(field)) throw Error("Hierarchy sum fields must be displayed columns.");
+        for (const field2 of hierarchy.totals.fields) if (!known.has(field2)) throw Error("Hierarchy sum fields must be displayed columns.");
       } else if (hierarchy.totals.fields !== void 0) throw Error("Producer totals do not declare computed fields.");
     }
     if (pivot != null) {
@@ -46303,8 +48013,8 @@ Please __addLocaleData before adding additional unit data`);
         if (!key(value.field) || !key(value.label) || !["none", "sum"].includes(value.aggregate)) throw Error("Pivot values require field, label and explicit none/sum aggregation.");
         measures.push(value.field);
       }
-      if (new Set(measures).size !== measures.length || measures.some((field) => pivot.rowFields.includes(field) || field === pivot.columnField)) throw Error("Pivot value fields must be unique and distinct.");
-      for (const field of [...pivot.rowFields, pivot.columnField, ...measures]) if (!known.has(field)) throw Error(`Pivot field ${field} must be declared in source columns.`);
+      if (new Set(measures).size !== measures.length || measures.some((field2) => pivot.rowFields.includes(field2) || field2 === pivot.columnField)) throw Error("Pivot value fields must be unique and distinct.");
+      for (const field2 of [...pivot.rowFields, pivot.columnField, ...measures]) if (!known.has(field2)) throw Error(`Pivot field ${field2} must be declared in source columns.`);
     }
     if (columnGroups != null) {
       if (!Array.isArray(columnGroups)) throw Error("Table columnGroups must be an array.");
@@ -46313,11 +48023,11 @@ Please __addLocaleData before adding additional unit data`);
         exact(group, ["label", "columns"], "column group");
         if (!key(group.label)) throw Error("Column group label is required.");
         keys(group.columns, "Grouped columns");
-        const positions = group.columns.map((field) => columns.findIndex((column) => column.key === field));
+        const positions = group.columns.map((field2) => columns.findIndex((column) => column.key === field2));
         if (positions.some((position, i3) => position < 0 || i3 > 0 && position !== positions[i3 - 1] + 1)) throw Error("Column groups must name contiguous displayed columns in order.");
-        for (const field of group.columns) {
-          if (seen.has(field)) throw Error("Column groups cannot overlap.");
-          seen.add(field);
+        for (const field2 of group.columns) {
+          if (seen.has(field2)) throw Error("Column groups cannot overlap.");
+          seen.add(field2);
         }
       }
     }
@@ -46327,13 +48037,13 @@ Please __addLocaleData before adding additional unit data`);
     var _a5;
     return block.hierarchy ? [block.hierarchy.keyField, block.hierarchy.parentField, block.hierarchy.labelField, ...((_a5 = block.hierarchy.totals) == null ? void 0 : _a5.fields) || []] : block.pivot ? [...block.pivot.rowFields, block.pivot.columnField, ...block.pivot.values.map((value) => value.field)] : [];
   }
-  var number = (value) => {
+  var number2 = (value) => {
     if (value == null) return null;
     if (typeof value !== "number" || !Number.isFinite(value)) throw Error("Table aggregate values must be finite numbers or null.");
     return value;
   };
-  function sum(values) {
-    const present2 = values.map(number).filter((value) => value !== null);
+  function sum2(values) {
+    const present2 = values.map(number2).filter((value) => value !== null);
     if (!present2.length) return null;
     const total = present2.reduce((a4, b3) => a4 + b3, 0);
     if (!Number.isFinite(total)) throw Error("Table aggregate overflowed its finite numeric range.");
@@ -46374,13 +48084,13 @@ Please __addLocaleData before adding additional unit data`);
     if (config.totals.mode === "sum-leaves") {
       let total2 = function(node) {
         if (!node.children.length) {
-          fields2.forEach((field) => number(node.row[field]));
+          fields2.forEach((field2) => number2(node.row[field2]));
           return [node];
         }
-        for (const field of fields2) if (node.row[field] != null) throw Error("Computed hierarchy parents must not also contain producer totals.");
+        for (const field2 of fields2) if (node.row[field2] != null) throw Error("Computed hierarchy parents must not also contain producer totals.");
         const leaves = node.children.flatMap(total2);
         node.row = { ...node.row };
-        for (const field of fields2) node.row[field] = sum(leaves.map((leaf) => leaf.row[field]));
+        for (const field2 of fields2) node.row[field2] = sum2(leaves.map((leaf) => leaf.row[field2]));
         return leaves;
       };
       var total = total2;
@@ -46434,29 +48144,29 @@ Please __addLocaleData before adding additional unit data`);
     const pivot = normalized.pivot, tuples = /* @__PURE__ */ new Map();
     for (const row of rows) {
       if (!object(row)) throw Error("Pivot rows must be objects.");
-      const values = pivot.rowFields.map((field) => row[field]);
+      const values = pivot.rowFields.map((field2) => row[field2]);
       if (values.some((value) => !key(value))) throw Error("Pivot row dimensions require nonempty string keys.");
       const category = pivot.columnCategories.indexOf(row[pivot.columnField]);
       if (category < 0) throw Error("Pivot category is outside its declared ordered domain.");
       const identity = JSON.stringify(values);
       let target = tuples.get(identity);
       if (!target) {
-        target = { row: Object.fromEntries(pivot.rowFields.map((field, i3) => [field, values[i3]])), cells: /* @__PURE__ */ new Map() };
+        target = { row: Object.fromEntries(pivot.rowFields.map((field2, i3) => [field2, values[i3]])), cells: /* @__PURE__ */ new Map() };
         tuples.set(identity, target);
       }
       const observations = target.cells.get(category) || [];
       observations.push(row);
       target.cells.set(category, observations);
     }
-    const columns = pivot.rowFields.map((field) => ({ ...block.columns.find((column) => column.key === field), rowIdentity: true }));
+    const columns = pivot.rowFields.map((field2) => ({ ...block.columns.find((column) => column.key === field2), rowIdentity: true }));
     const columnGroups = [{ label: "Rows", columns: [...pivot.rowFields] }];
     pivot.columnCategories.forEach((category, c3) => {
       const group = { label: category, columns: [] };
       pivot.values.forEach((value, m3) => {
-        const field = `__forge_pivot_${c3}_${m3}`;
-        if (pivot.rowFields.includes(field)) throw Error("Pivot source key collides with a generated column.");
-        group.columns.push(field);
-        columns.push({ key: field, label: value.label, format: value.format || "number", align: "right" });
+        const field2 = `__forge_pivot_${c3}_${m3}`;
+        if (pivot.rowFields.includes(field2)) throw Error("Pivot source key collides with a generated column.");
+        group.columns.push(field2);
+        columns.push({ key: field2, label: value.label, format: value.format || "number", align: "right" });
       });
       columnGroups.push(group);
     });
@@ -46465,7 +48175,7 @@ Please __addLocaleData before adding additional unit data`);
         var _a5;
         const observations = cells.get(c3) || [];
         if (value.aggregate === "none" && observations.length > 1) throw Error("Pivot duplicate coordinates require explicit sum aggregation.");
-        row[`__forge_pivot_${c3}_${m3}`] = value.aggregate === "sum" ? sum(observations.map((source) => source[value.field])) : number((_a5 = observations[0]) == null ? void 0 : _a5[value.field]);
+        row[`__forge_pivot_${c3}_${m3}`] = value.aggregate === "sum" ? sum2(observations.map((source) => source[value.field])) : number2((_a5 = observations[0]) == null ? void 0 : _a5[value.field]);
       }));
       return row;
     });
@@ -46483,7 +48193,7 @@ Please __addLocaleData before adding additional unit data`);
   };
   var area = (ring) => {
     const [originX, originY] = ring[0];
-    return ring.slice(1).reduce((sum2, point, i3) => sum2 + (ring[i3][0] - originX) * (point[1] - originY) - (point[0] - originX) * (ring[i3][1] - originY), 0);
+    return ring.slice(1).reduce((sum3, point, i3) => sum3 + (ring[i3][0] - originX) * (point[1] - originY) - (point[0] - originX) * (ring[i3][1] - originY), 0);
   };
   function buildGeoGeometry(geo = {}) {
     if (geo.projection !== "planar") fail2('projection must be "planar" (x right, y up)');
@@ -46528,11 +48238,11 @@ Please __addLocaleData before adding additional unit data`);
     if (!Number.isFinite(scale) || scale <= 0) fail2("bounds must have positive width and height");
     const xOffset = (960 - (maxX - minX) * scale) / 2;
     const yOffset = (500 - (maxY - minY) * scale) / 2;
-    const number2 = (value) => String(Number(value.toFixed(8)));
+    const number3 = (value) => String(Number(value.toFixed(8)));
     return { viewBox: [...GEO_VIEWBOX], features: features.map(({ key: key2, label, rings }) => ({
       key: key2,
       label,
-      path: rings.map((ring) => ring.map(([x2, y4], i3) => `${i3 ? "L" : "M"}${number2(xOffset + (x2 - minX) * scale)},${number2(yOffset + (maxY - y4) * scale)}`).join(" ") + " Z").join(" ")
+      path: rings.map((ring) => ring.map(([x2, y4], i3) => `${i3 ? "L" : "M"}${number3(xOffset + (x2 - minX) * scale)},${number3(yOffset + (maxY - y4) * scale)}`).join(" ") + " Z").join(" ")
     })) };
   }
 
@@ -46547,12 +48257,12 @@ Please __addLocaleData before adding additional unit data`);
   }
 
   // src/reporting/reportDatasetRefModel.js
-  function normalizeString2(value = "") {
+  function normalizeString4(value = "") {
     return String(value || "").trim();
   }
   function normalizeDatasetRefs(datasetRefs = []) {
     const seen = /* @__PURE__ */ new Set();
-    return (Array.isArray(datasetRefs) ? datasetRefs : []).map((entry) => normalizeString2(entry)).filter((entry) => {
+    return (Array.isArray(datasetRefs) ? datasetRefs : []).map((entry) => normalizeString4(entry)).filter((entry) => {
       if (!entry || seen.has(entry)) {
         return false;
       }
@@ -46591,7 +48301,7 @@ Please __addLocaleData before adding additional unit data`);
     availableDatasetRefs = [],
     fallbackDatasetRef = "primary"
   } = {}) {
-    const explicitDatasetRef = normalizeString2(preferredDatasetRef);
+    const explicitDatasetRef = normalizeString4(preferredDatasetRef);
     if (explicitDatasetRef) {
       return {
         datasetRef: explicitDatasetRef,
@@ -46606,7 +48316,7 @@ Please __addLocaleData before adding additional unit data`);
       };
     }
     return {
-      datasetRef: normalizeString2(fallbackDatasetRef || "primary") || "primary",
+      datasetRef: normalizeString4(fallbackDatasetRef || "primary") || "primary",
       source: "fallback"
     };
   }
@@ -46732,7 +48442,7 @@ Please __addLocaleData before adding additional unit data`);
     var _a5, _b, _c, _d;
     const config = normalizeKpiSparkline(declaration);
     if (!config) return null;
-    const read2 = (ref) => {
+    const read3 = (ref) => {
       const dataset = resolveDataset(ref);
       if (!dataset) throw Error("KPI sparkline dataset '" + ref + "' is unavailable.");
       const rows = [...dataset.rows || []].sort((a4, b3) => {
@@ -46747,10 +48457,10 @@ Please __addLocaleData before adding additional unit data`);
       if (config.periodStartPath) {
         const readPath = (path) => path.split(".").reduce((value, key2) => value == null ? void 0 : value[key2], dataset.request);
         const civil = (value) => {
-          const text3 = String(value != null ? value : "").slice(0, 10);
-          if (!/^\d{4}-\d{2}-\d{2}$/.test(text3)) throw Error("KPI sparkline requires valid civil dates.");
-          const date = /* @__PURE__ */ new Date(text3 + "T00:00:00Z");
-          if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== text3) throw Error("KPI sparkline requires valid civil dates.");
+          const text4 = String(value != null ? value : "").slice(0, 10);
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(text4)) throw Error("KPI sparkline requires valid civil dates.");
+          const date = /* @__PURE__ */ new Date(text4 + "T00:00:00Z");
+          if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== text4) throw Error("KPI sparkline requires valid civil dates.");
           return date.getTime();
         };
         const start = civil(readPath(config.periodStartPath)), end = civil(readPath(config.periodEndPath)), days = (end - start) / 864e5 + 1;
@@ -46766,14 +48476,14 @@ Please __addLocaleData before adding additional unit data`);
       }
       return { labels, values: rows.map((row) => isNumericValue(row[config.valueField]) ? Number(row[config.valueField]) : null) };
     };
-    const current = read2(config.datasetRef);
+    const current = read3(config.datasetRef);
     let valueColor;
     if (config.valueColor) {
       const dataset = resolveDataset(config.datasetRef);
       if (((_b = (_a5 = dataset.provenance) == null ? void 0 : _a5.hasMore) != null ? _b : dataset.hasMore) !== false || ((_c = dataset.provenance) == null ? void 0 : _c.truncated) || dataset.truncated || Number((_d = dataset.request) == null ? void 0 : _d.offset) > 0) throw Error("KPI value color requires a complete dataset.");
       valueColor = resolveValueColor(config.valueColor, current.values.map((value) => ({ [config.valueField]: value })));
     }
-    const comparison = config.comparisonDatasetRef ? read2(config.comparisonDatasetRef) : null;
+    const comparison = config.comparisonDatasetRef ? read3(config.comparisonDatasetRef) : null;
     if (config.periodStartPath && comparison && comparison.values.length !== current.values.length) throw Error("KPI sparkline comparison periods must have equal length.");
     const details = materializeSparklineDetails(config.details, current, comparison);
     return { ...current, ...details ? { details } : {}, ...comparison ? { comparisonValues: comparison.values } : {}, ...valueColor ? { valueColor } : {} };
@@ -46845,9 +48555,9 @@ Please __addLocaleData before adding additional unit data`);
     const config = normalizeReportRowVisibility(input);
     if (!config) return rows;
     return rows.filter((row) => {
-      for (const { field, values } of config.exclude) {
-        if (!Object.hasOwn(row || {}, field)) throw new Error(`Row visibility field '${field}' is missing.`);
-        if (values.some((value) => value === row[field])) return false;
+      for (const { field: field2, values } of config.exclude) {
+        if (!Object.hasOwn(row || {}, field2)) throw new Error(`Row visibility field '${field2}' is missing.`);
+        if (values.some((value) => value === row[field2])) return false;
       }
       return true;
     });
@@ -47000,8 +48710,8 @@ Please __addLocaleData before adding additional unit data`);
   }
 
   // src/semantic/modelValidation.js
-  function pushError(errors, field, code, message) {
-    errors.push({ field, code, message });
+  function pushError(errors, field2, code, message) {
+    errors.push({ field: field2, code, message });
   }
   function isPlainObject2(value) {
     return !!value && typeof value === "object" && !Array.isArray(value);
@@ -47034,27 +48744,27 @@ Please __addLocaleData before adding additional unit data`);
     }
     return "";
   }
-  function normalizeSemanticField(field = {}, defaults = {}) {
-    if (!isPlainObject2(field)) {
+  function normalizeSemanticField(field2 = {}, defaults = {}) {
+    if (!isPlainObject2(field2)) {
       return null;
     }
-    const id = normalizeSemanticString(field.id || field.key);
+    const id = normalizeSemanticString(field2.id || field2.key);
     if (!id) {
       return null;
     }
-    const key2 = normalizeSemanticString(field.key || id);
-    const label = normalizeSemanticString(field.label || id);
-    const dataType = normalizeSemanticString(field.dataType || defaults.dataType).toLowerCase();
-    const format2 = normalizeSemanticString(field.format);
-    const aggregation = normalizeSemanticString(field.aggregation || defaults.aggregation).toLowerCase();
-    const timeGrainSupport = normalizeSemanticArray(field.timeGrainSupport).map((entry) => entry.toLowerCase());
-    const category = normalizeSemanticString(field.category);
-    const description = normalizeSemanticString(field.description);
-    const definitionRef = normalizeSemanticString(field.definitionRef);
-    const sourceRef = normalizeSemanticString(field.sourceRef);
-    const relationshipRef = normalizeSemanticString(field.relationshipRef);
-    const governance = normalizeGovernance(field.governance);
-    const featureType = normalizeSemanticFeatureType(field.featureType, defaults.featureType);
+    const key2 = normalizeSemanticString(field2.key || id);
+    const label = normalizeSemanticString(field2.label || id);
+    const dataType = normalizeSemanticString(field2.dataType || defaults.dataType).toLowerCase();
+    const format2 = normalizeSemanticString(field2.format);
+    const aggregation = normalizeSemanticString(field2.aggregation || defaults.aggregation).toLowerCase();
+    const timeGrainSupport = normalizeSemanticArray(field2.timeGrainSupport).map((entry) => entry.toLowerCase());
+    const category = normalizeSemanticString(field2.category);
+    const description = normalizeSemanticString(field2.description);
+    const definitionRef = normalizeSemanticString(field2.definitionRef);
+    const sourceRef = normalizeSemanticString(field2.sourceRef);
+    const relationshipRef = normalizeSemanticString(field2.relationshipRef);
+    const governance = normalizeGovernance(field2.governance);
+    const featureType = normalizeSemanticFeatureType(field2.featureType, defaults.featureType);
     return {
       id,
       key: key2,
@@ -47156,9 +48866,9 @@ Please __addLocaleData before adding additional unit data`);
     const entityIds = /* @__PURE__ */ new Set();
     (normalized.entities || []).forEach((entity, entityIndex) => {
       const rawEntity = Array.isArray(model == null ? void 0 : model.entities) ? model.entities[entityIndex] : null;
-      (Array.isArray(rawEntity == null ? void 0 : rawEntity.fields) ? rawEntity.fields : []).forEach((field, fieldIndex) => {
-        const featureType = normalizeSemanticFeatureType(field == null ? void 0 : field.featureType);
-        if (!normalizeSemanticString(field == null ? void 0 : field.featureType)) {
+      (Array.isArray(rawEntity == null ? void 0 : rawEntity.fields) ? rawEntity.fields : []).forEach((field2, fieldIndex) => {
+        const featureType = normalizeSemanticFeatureType(field2 == null ? void 0 : field2.featureType);
+        if (!normalizeSemanticString(field2 == null ? void 0 : field2.featureType)) {
           pushError(
             errors,
             `entities[${entityIndex}].fields[${fieldIndex}].featureType`,
@@ -47172,7 +48882,7 @@ Please __addLocaleData before adding additional unit data`);
             errors,
             `entities[${entityIndex}].fields[${fieldIndex}].featureType`,
             "invalid",
-            `Unsupported semantic featureType '${field == null ? void 0 : field.featureType}'.`
+            `Unsupported semantic featureType '${field2 == null ? void 0 : field2.featureType}'.`
           );
         }
       });
@@ -47182,28 +48892,28 @@ Please __addLocaleData before adding additional unit data`);
         entityIds.add(entity.id);
       }
       const fieldIds = /* @__PURE__ */ new Set();
-      const checkField = (field, fieldPath) => {
-        if (!(field == null ? void 0 : field.id)) {
+      const checkField = (field2, fieldPath) => {
+        if (!(field2 == null ? void 0 : field2.id)) {
           pushError(errors, `${fieldPath}.id`, "required", "Semantic field requires an id.");
           return;
         }
-        if (fieldIds.has(field.id)) {
-          pushError(errors, `${fieldPath}.id`, "duplicate", `Duplicate field id '${field.id}' in entity '${entity.id}'.`);
+        if (fieldIds.has(field2.id)) {
+          pushError(errors, `${fieldPath}.id`, "duplicate", `Duplicate field id '${field2.id}' in entity '${entity.id}'.`);
         } else {
-          fieldIds.add(field.id);
+          fieldIds.add(field2.id);
         }
-        if (field.dataType && !SEMANTIC_DATA_TYPES.includes(field.dataType)) {
-          pushError(errors, `${fieldPath}.dataType`, "invalid", `Unsupported semantic dataType '${field.dataType}'.`);
+        if (field2.dataType && !SEMANTIC_DATA_TYPES.includes(field2.dataType)) {
+          pushError(errors, `${fieldPath}.dataType`, "invalid", `Unsupported semantic dataType '${field2.dataType}'.`);
         }
-        if (field.aggregation && !SEMANTIC_AGGREGATIONS.includes(field.aggregation)) {
-          pushError(errors, `${fieldPath}.aggregation`, "invalid", `Unsupported aggregation '${field.aggregation}'.`);
+        if (field2.aggregation && !SEMANTIC_AGGREGATIONS.includes(field2.aggregation)) {
+          pushError(errors, `${fieldPath}.aggregation`, "invalid", `Unsupported aggregation '${field2.aggregation}'.`);
         }
-        (field.timeGrainSupport || []).forEach((grain, grainIndex) => {
+        (field2.timeGrainSupport || []).forEach((grain, grainIndex) => {
           if (!SEMANTIC_TIME_GRAINS.includes(grain)) {
             pushError(errors, `${fieldPath}.timeGrainSupport[${grainIndex}]`, "invalid", `Unsupported time grain '${grain}'.`);
           }
         });
-        const governance = field.governance || {};
+        const governance = field2.governance || {};
         if (governance.status && !SEMANTIC_GOVERNANCE_STATUSES.includes(governance.status)) {
           pushError(errors, `${fieldPath}.governance.status`, "invalid", `Unsupported governance status '${governance.status}'.`);
         }
@@ -47211,9 +48921,9 @@ Please __addLocaleData before adding additional unit data`);
           pushError(errors, `${fieldPath}.governance.certification`, "invalid", `Unsupported certification '${governance.certification}'.`);
         }
       };
-      (entity.dimensions || []).forEach((field, index) => checkField(field, `entities[${entityIndex}].dimensions[${index}]`));
-      (entity.measures || []).forEach((field, index) => checkField(field, `entities[${entityIndex}].measures[${index}]`));
-      (entity.parameters || []).forEach((field, index) => checkField(field, `entities[${entityIndex}].parameters[${index}]`));
+      (entity.dimensions || []).forEach((field2, index) => checkField(field2, `entities[${entityIndex}].dimensions[${index}]`));
+      (entity.measures || []).forEach((field2, index) => checkField(field2, `entities[${entityIndex}].measures[${index}]`));
+      (entity.parameters || []).forEach((field2, index) => checkField(field2, `entities[${entityIndex}].parameters[${index}]`));
     });
     return {
       valid: errors.length === 0,
@@ -47288,1267 +48998,16 @@ Please __addLocaleData before adding additional unit data`);
     };
   }
 
-  // src/reporting/calculationContracts.js
-  function cloneValue2(value) {
-    return value == null ? value : JSON.parse(JSON.stringify(value));
-  }
-  function normalizeString3(value = "") {
-    return String(value || "").trim();
-  }
-  var REPORT_CALCULATED_FIELD_FUNCTION_SPECS = Object.freeze({
-    if: { minArgs: 3, maxArgs: 3 },
-    case: { minArgs: 3 },
-    coalesce: { minArgs: 1 },
-    isnull: { minArgs: 1, maxArgs: 1 },
-    nullif: { minArgs: 2, maxArgs: 2 },
-    abs: { minArgs: 1, maxArgs: 1 },
-    round: { minArgs: 1, maxArgs: 2 },
-    floor: { minArgs: 1, maxArgs: 1 },
-    ceil: { minArgs: 1, maxArgs: 1 },
-    min: { minArgs: 1 },
-    max: { minArgs: 1 },
-    least: { minArgs: 1 },
-    greatest: { minArgs: 1 },
-    concat: { minArgs: 1 },
-    lower: { minArgs: 1, maxArgs: 1 },
-    upper: { minArgs: 1, maxArgs: 1 }
-  });
-  var REPORT_CALCULATED_FIELD_TABLE_CALC_SPECS = Object.freeze([
-    {
-      name: "percentOfTotal",
-      label: "Percent of Total",
-      supportsPartition: true,
-      supportsDecimals: true,
-      usesFilteredScopeTotal: true,
-      nullBehavior: "nonFiniteValuesYieldZeroAndAreExcludedFromTotals",
-      defaultFormat: "percent"
-    },
-    {
-      name: "deltaFromPrevious",
-      label: "Delta From Previous",
-      supportsPartition: true,
-      requiresOrder: true,
-      nullBehavior: "nonFiniteValuesYieldZeroAndDoNotAdvancePreviousFiniteValue",
-      defaultFormat: "number"
-    },
-    {
-      name: "lag",
-      label: "Lag",
-      supportsPartition: true,
-      requiresOrder: true,
-      supportsOffset: true,
-      nullBehavior: "missingOrNullPriorRowYieldsNullWithoutSkippingRows",
-      defaultFormat: "number"
-    },
-    {
-      name: "windowMax",
-      label: "Window Maximum",
-      supportsPartition: true,
-      requiresExplicitFrame: true,
-      boundedFrameRequiresOrder: true,
-      nullBehavior: "ignoresNonFiniteValuesAndReturnsNullForAnEmptyNumericWindow",
-      defaultFormat: "number"
-    },
-    {
-      name: "runningTotal",
-      label: "Running Total",
-      supportsPartition: true,
-      requiresOrder: true,
-      nullBehavior: "nonFiniteValuesDoNotAdvanceRunningTotal",
-      defaultFormat: "number"
-    },
-    {
-      name: "movingAverage",
-      label: "Moving Average",
-      supportsPartition: true,
-      requiresOrder: true,
-      requiresWindowSize: true,
-      supportsDecimals: true,
-      nullBehavior: "windowAveragesIgnoreNonFiniteValues",
-      defaultFormat: "number"
-    },
-    {
-      name: "rank",
-      label: "Rank",
-      supportsPartition: true,
-      requiresOrder: true,
-      supportsRankDirection: true,
-      supportsTieBreaker: true,
-      tieMode: "dense",
-      nullBehavior: "nonFiniteValuesYieldNullAndDoNotAdvanceRank",
-      defaultFormat: "number"
-    }
-  ]);
-  function listReportCalculatedFieldTableCalculationSpecs() {
-    return REPORT_CALCULATED_FIELD_TABLE_CALC_SPECS.map((entry) => cloneValue2(entry)).sort((left, right) => normalizeString3(left.name).localeCompare(normalizeString3(right.name)));
-  }
-
-  // src/reporting/calculatedFieldModel.js
-  function normalizeString4(value = "") {
-    return String(value || "").trim();
-  }
-  function cloneValue3(value) {
-    return value == null ? value : JSON.parse(JSON.stringify(value));
-  }
-  function normalizeStringArray(values = []) {
-    return (Array.isArray(values) ? values : []).map((value) => normalizeString4(value)).filter(Boolean);
-  }
-  function normalizeOrderBy(orderBy = []) {
-    return (Array.isArray(orderBy) ? orderBy : []).map((entry) => {
-      if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
-        return null;
-      }
-      const field = normalizeString4(entry.field);
-      if (!field) {
-        return null;
-      }
-      return {
-        field,
-        direction: normalizeString4(entry.direction).toLowerCase() === "desc" ? "desc" : "asc"
-      };
-    }).filter(Boolean);
-  }
-  function normalizePartitionBy(partitionBy = []) {
-    return normalizeStringArray(partitionBy);
-  }
-  function buildExpressionError(message = "", index = 0) {
-    return new Error(`Invalid calculated field expression at ${Math.max(0, Number(index) || 0)}: ${message}`);
-  }
-  function tokenizeReportCalculatedFieldExpression(expression = "") {
-    const input = String(expression || "");
-    const tokens = [];
-    let index = 0;
-    while (index < input.length) {
-      const char = input[index];
-      if (/\s/.test(char)) {
-        index += 1;
-        continue;
-      }
-      if (char === "(" || char === ")") {
-        tokens.push({ type: "paren", value: char, index });
-        index += 1;
-        continue;
-      }
-      if (char === ",") {
-        tokens.push({ type: "comma", value: char, index });
-        index += 1;
-        continue;
-      }
-      if ((char === "!" || char === ">" || char === "<") && input[index + 1] === "=") {
-        tokens.push({ type: "operator", value: `${char}=`, index });
-        index += 2;
-        continue;
-      }
-      if (char === "=" || char === "+" || char === "-" || char === "*" || char === "/" || char === "%" || char === ">" || char === "<") {
-        tokens.push({ type: "operator", value: char, index });
-        index += 1;
-        continue;
-      }
-      if (char === "'" || char === '"') {
-        const quote = char;
-        let cursor = index + 1;
-        let value = "";
-        while (cursor < input.length) {
-          const current = input[cursor];
-          if (current === "\\") {
-            const next = input[cursor + 1];
-            if (next == null) {
-              throw buildExpressionError("unterminated escape sequence", cursor);
-            }
-            value += next;
-            cursor += 2;
-            continue;
-          }
-          if (current === quote) {
-            tokens.push({ type: "string", value, index });
-            index = cursor + 1;
-            value = null;
-            break;
-          }
-          value += current;
-          cursor += 1;
-        }
-        if (value != null) {
-          throw buildExpressionError("unterminated string literal", index);
-        }
-        continue;
-      }
-      if (/[0-9]/.test(char) || char === "." && /[0-9]/.test(input[index + 1] || "")) {
-        let cursor = index + 1;
-        while (cursor < input.length && /[0-9.]/.test(input[cursor])) {
-          cursor += 1;
-        }
-        const rawNumber = input.slice(index, cursor);
-        const numericValue = Number(rawNumber);
-        if (!Number.isFinite(numericValue)) {
-          throw buildExpressionError(`invalid number literal "${rawNumber}"`, index);
-        }
-        tokens.push({ type: "number", value: numericValue, index });
-        index = cursor;
-        continue;
-      }
-      if (/[A-Za-z_]/.test(char)) {
-        let cursor = index + 1;
-        while (cursor < input.length && /[A-Za-z0-9_.]/.test(input[cursor])) {
-          cursor += 1;
-        }
-        const rawIdentifier = input.slice(index, cursor);
-        const lowered = rawIdentifier.toLowerCase();
-        if (lowered === "and" || lowered === "or" || lowered === "not") {
-          tokens.push({ type: "operator", value: lowered, index });
-        } else if (lowered === "null") {
-          tokens.push({ type: "literal", value: null, index });
-        } else if (lowered === "true") {
-          tokens.push({ type: "literal", value: true, index });
-        } else if (lowered === "false") {
-          tokens.push({ type: "literal", value: false, index });
-        } else {
-          tokens.push({ type: "identifier", value: rawIdentifier, index });
-        }
-        index = cursor;
-        continue;
-      }
-      throw buildExpressionError(`unexpected character "${char}"`, index);
-    }
-    return tokens;
-  }
-  function parseReportCalculatedFieldExpressionTokens(tokens = []) {
-    let position = 0;
-    function current() {
-      return tokens[position] || null;
-    }
-    function consume() {
-      const token = current();
-      position += 1;
-      return token;
-    }
-    function match2(type, value = void 0) {
-      const token = current();
-      if (!token || token.type !== type) {
-        return false;
-      }
-      if (value !== void 0 && token.value !== value) {
-        return false;
-      }
-      return true;
-    }
-    function expect(type, value = void 0) {
-      var _a5, _b, _c;
-      const token = current();
-      if (!match2(type, value)) {
-        throw buildExpressionError(`expected ${value != null ? value : type}`, (_c = (_b = token == null ? void 0 : token.index) != null ? _b : (_a5 = tokens[tokens.length - 1]) == null ? void 0 : _a5.index) != null ? _c : 0);
-      }
-      return consume();
-    }
-    function parsePrimary() {
-      var _a5, _b;
-      const token = current();
-      if (!token) {
-        throw buildExpressionError("unexpected end of expression", (_b = (_a5 = tokens[tokens.length - 1]) == null ? void 0 : _a5.index) != null ? _b : 0);
-      }
-      if (token.type === "number" || token.type === "string" || token.type === "literal") {
-        consume();
-        return { type: "literal", value: token.value };
-      }
-      if (token.type === "identifier") {
-        consume();
-        if (match2("paren", "(")) {
-          consume();
-          const args = [];
-          if (!match2("paren", ")")) {
-            while (true) {
-              args.push(parseOr());
-              if (match2("comma")) {
-                consume();
-                continue;
-              }
-              break;
-            }
-          }
-          expect("paren", ")");
-          return {
-            type: "call",
-            callee: token.value,
-            args
-          };
-        }
-        return {
-          type: "identifier",
-          name: token.value
-        };
-      }
-      if (match2("paren", "(")) {
-        consume();
-        const node = parseOr();
-        expect("paren", ")");
-        return node;
-      }
-      throw buildExpressionError(`unexpected token "${token.value}"`, token.index);
-    }
-    function parseUnary() {
-      if (match2("operator", "-") || match2("operator", "not")) {
-        const token = consume();
-        return {
-          type: "unary",
-          operator: token.value,
-          argument: parseUnary()
-        };
-      }
-      return parsePrimary();
-    }
-    function parseMultiplicative() {
-      let node = parseUnary();
-      while (match2("operator", "*") || match2("operator", "/") || match2("operator", "%")) {
-        const token = consume();
-        node = {
-          type: "binary",
-          operator: token.value,
-          left: node,
-          right: parseUnary()
-        };
-      }
-      return node;
-    }
-    function parseAdditive() {
-      let node = parseMultiplicative();
-      while (match2("operator", "+") || match2("operator", "-")) {
-        const token = consume();
-        node = {
-          type: "binary",
-          operator: token.value,
-          left: node,
-          right: parseMultiplicative()
-        };
-      }
-      return node;
-    }
-    function parseComparison() {
-      let node = parseAdditive();
-      if (match2("operator", "=") || match2("operator", "!=") || match2("operator", ">") || match2("operator", ">=") || match2("operator", "<") || match2("operator", "<=")) {
-        const token = consume();
-        node = {
-          type: "binary",
-          operator: token.value,
-          left: node,
-          right: parseAdditive()
-        };
-      }
-      return node;
-    }
-    function parseAnd() {
-      let node = parseComparison();
-      while (match2("operator", "and")) {
-        consume();
-        node = {
-          type: "binary",
-          operator: "and",
-          left: node,
-          right: parseComparison()
-        };
-      }
-      return node;
-    }
-    function parseOr() {
-      let node = parseAnd();
-      while (match2("operator", "or")) {
-        consume();
-        node = {
-          type: "binary",
-          operator: "or",
-          left: node,
-          right: parseAnd()
-        };
-      }
-      return node;
-    }
-    const ast = parseOr();
-    if (position < tokens.length) {
-      throw buildExpressionError(`unexpected token "${tokens[position].value}"`, tokens[position].index);
-    }
-    return ast;
-  }
-  function collectReportCalculatedFieldExpressionDependencies(node = null, dependencies = /* @__PURE__ */ new Set()) {
-    if (!node || typeof node !== "object") {
-      return dependencies;
-    }
-    if (node.type === "identifier") {
-      dependencies.add(normalizeString4(node.name));
-      return dependencies;
-    }
-    if (node.type === "unary") {
-      return collectReportCalculatedFieldExpressionDependencies(node.argument, dependencies);
-    }
-    if (node.type === "binary") {
-      collectReportCalculatedFieldExpressionDependencies(node.left, dependencies);
-      collectReportCalculatedFieldExpressionDependencies(node.right, dependencies);
-      return dependencies;
-    }
-    if (node.type === "call") {
-      (Array.isArray(node.args) ? node.args : []).forEach((arg) => {
-        collectReportCalculatedFieldExpressionDependencies(arg, dependencies);
-      });
-    }
-    return dependencies;
-  }
-  function validateReportCalculatedFieldExpressionAst(node = null) {
-    if (!node || typeof node !== "object") {
-      return;
-    }
-    if (node.type === "literal" || node.type === "identifier") {
-      return;
-    }
-    if (node.type === "unary") {
-      validateReportCalculatedFieldExpressionAst(node.argument);
-      return;
-    }
-    if (node.type === "binary") {
-      validateReportCalculatedFieldExpressionAst(node.left);
-      validateReportCalculatedFieldExpressionAst(node.right);
-      return;
-    }
-    if (node.type === "call") {
-      const normalizedCallee = normalizeString4(node.callee).toLowerCase();
-      const spec = REPORT_CALCULATED_FIELD_FUNCTION_SPECS[normalizedCallee];
-      if (!spec) {
-        throw buildExpressionError(`unsupported function "${node.callee}"`);
-      }
-      const argCount = Array.isArray(node.args) ? node.args.length : 0;
-      if (Number.isFinite(spec.minArgs) && argCount < spec.minArgs) {
-        throw buildExpressionError(`function "${node.callee}" requires at least ${spec.minArgs} argument${spec.minArgs === 1 ? "" : "s"}`);
-      }
-      if (Number.isFinite(spec.maxArgs) && argCount > spec.maxArgs) {
-        throw buildExpressionError(`function "${node.callee}" accepts at most ${spec.maxArgs} argument${spec.maxArgs === 1 ? "" : "s"}`);
-      }
-      (Array.isArray(node.args) ? node.args : []).forEach((arg) => {
-        validateReportCalculatedFieldExpressionAst(arg);
-      });
-      return;
-    }
-    throw buildExpressionError(`unsupported expression node "${String(node.type || "unknown")}"`);
-  }
-  function parseReportCalculatedFieldExpression(expression = "") {
-    const normalizedExpression = normalizeString4(expression);
-    if (!normalizedExpression) {
-      return null;
-    }
-    const tokens = tokenizeReportCalculatedFieldExpression(normalizedExpression);
-    const ast = parseReportCalculatedFieldExpressionTokens(tokens);
-    validateReportCalculatedFieldExpressionAst(ast);
-    return {
-      expr: normalizedExpression,
-      ast,
-      dependencies: Array.from(collectReportCalculatedFieldExpressionDependencies(ast))
-    };
-  }
-  function isNullishValue(value) {
-    return value === void 0 || value === null;
-  }
-  function toFiniteNumber(value) {
-    if (isNullishValue(value) || value === "") {
-      return null;
-    }
-    const numericValue = Number(value);
-    return Number.isFinite(numericValue) ? numericValue : null;
-  }
-  function coerceBoolean(value) {
-    if (typeof value === "boolean") {
-      return value;
-    }
-    if (isNullishValue(value) || value === "") {
-      return false;
-    }
-    if (typeof value === "number") {
-      return value !== 0;
-    }
-    const trimmed = normalizeString4(value);
-    if (!trimmed) {
-      return false;
-    }
-    if (trimmed.toLowerCase() === "true") {
-      return true;
-    }
-    if (trimmed.toLowerCase() === "false") {
-      return false;
-    }
-    const numericValue = toFiniteNumber(trimmed);
-    if (numericValue != null) {
-      return numericValue !== 0;
-    }
-    return true;
-  }
-  function compareValues(left, right, operator = "=") {
-    if (isNullishValue(left) || isNullishValue(right)) {
-      return false;
-    }
-    const leftNumber = toFiniteNumber(left);
-    const rightNumber = toFiniteNumber(right);
-    if (leftNumber != null && rightNumber != null) {
-      switch (operator) {
-        case "=":
-          return leftNumber === rightNumber;
-        case "!=":
-          return leftNumber !== rightNumber;
-        case ">":
-          return leftNumber > rightNumber;
-        case ">=":
-          return leftNumber >= rightNumber;
-        case "<":
-          return leftNumber < rightNumber;
-        case "<=":
-          return leftNumber <= rightNumber;
-        default:
-          return false;
-      }
-    }
-    const leftValue = typeof left === "boolean" ? String(left) : String(left);
-    const rightValue = typeof right === "boolean" ? String(right) : String(right);
-    switch (operator) {
-      case "=":
-        return leftValue === rightValue;
-      case "!=":
-        return leftValue !== rightValue;
-      case ">":
-        return leftValue > rightValue;
-      case ">=":
-        return leftValue >= rightValue;
-      case "<":
-        return leftValue < rightValue;
-      case "<=":
-        return leftValue <= rightValue;
-      default:
-        return false;
-    }
-  }
-  function evaluateReportCalculatedFieldFunction(node = {}, row = {}) {
-    const callee = normalizeString4(node == null ? void 0 : node.callee).toLowerCase();
-    const args = Array.isArray(node == null ? void 0 : node.args) ? node.args : [];
-    switch (callee) {
-      case "if": {
-        if (args.length !== 3) {
-          return null;
-        }
-        return coerceBoolean(evaluateReportCalculatedFieldExpression(args[0], row)) ? evaluateReportCalculatedFieldExpression(args[1], row) : evaluateReportCalculatedFieldExpression(args[2], row);
-      }
-      case "case": {
-        if (args.length < 3) {
-          return null;
-        }
-        const hasElseValue = args.length % 2 === 1;
-        const pairLimit = hasElseValue ? args.length - 1 : args.length;
-        for (let index = 0; index < pairLimit; index += 2) {
-          if (coerceBoolean(evaluateReportCalculatedFieldExpression(args[index], row))) {
-            return evaluateReportCalculatedFieldExpression(args[index + 1], row);
-          }
-        }
-        return hasElseValue ? evaluateReportCalculatedFieldExpression(args[args.length - 1], row) : null;
-      }
-      case "coalesce": {
-        for (const arg of args) {
-          const value = evaluateReportCalculatedFieldExpression(arg, row);
-          if (!isNullishValue(value)) {
-            return value;
-          }
-        }
-        return null;
-      }
-      case "isnull": {
-        if (args.length !== 1) {
-          return null;
-        }
-        return isNullishValue(evaluateReportCalculatedFieldExpression(args[0], row));
-      }
-      case "nullif": {
-        if (args.length !== 2) {
-          return null;
-        }
-        const left = evaluateReportCalculatedFieldExpression(args[0], row);
-        const right = evaluateReportCalculatedFieldExpression(args[1], row);
-        return compareValues(left, right, "=") ? null : left;
-      }
-      default:
-        break;
-    }
-    const values = args.map((arg) => evaluateReportCalculatedFieldExpression(arg, row));
-    switch (callee) {
-      case "abs": {
-        const numericValue = toFiniteNumber(values[0]);
-        return numericValue == null ? null : Math.abs(numericValue);
-      }
-      case "round": {
-        const numericValue = toFiniteNumber(values[0]);
-        if (numericValue == null) {
-          return null;
-        }
-        const decimals = values.length > 1 ? toFiniteNumber(values[1]) : 0;
-        if (decimals == null) {
-          return null;
-        }
-        const factor = 10 ** Math.max(0, Math.trunc(decimals));
-        return Math.round(numericValue * factor) / factor;
-      }
-      case "floor": {
-        const numericValue = toFiniteNumber(values[0]);
-        return numericValue == null ? null : Math.floor(numericValue);
-      }
-      case "ceil": {
-        const numericValue = toFiniteNumber(values[0]);
-        return numericValue == null ? null : Math.ceil(numericValue);
-      }
-      case "min":
-      case "least": {
-        if (values.length === 0 || values.some((value) => toFiniteNumber(value) == null)) {
-          return null;
-        }
-        return Math.min(...values.map((value) => toFiniteNumber(value)));
-      }
-      case "max":
-      case "greatest": {
-        if (values.length === 0 || values.some((value) => toFiniteNumber(value) == null)) {
-          return null;
-        }
-        return Math.max(...values.map((value) => toFiniteNumber(value)));
-      }
-      case "concat": {
-        if (values.some((value) => isNullishValue(value))) {
-          return null;
-        }
-        return values.map((value) => String(value)).join("");
-      }
-      case "lower": {
-        if (isNullishValue(values[0])) {
-          return null;
-        }
-        return String(values[0]).toLowerCase();
-      }
-      case "upper": {
-        if (isNullishValue(values[0])) {
-          return null;
-        }
-        return String(values[0]).toUpperCase();
-      }
-      default:
-        return null;
-    }
-  }
-  function evaluateReportCalculatedFieldExpression(expressionOrNode = null, row = {}) {
-    var _a5;
-    const node = typeof expressionOrNode === "string" ? (_a5 = parseReportCalculatedFieldExpression(expressionOrNode)) == null ? void 0 : _a5.ast : expressionOrNode;
-    if (!node || typeof node !== "object") {
-      return null;
-    }
-    switch (node.type) {
-      case "literal":
-        return cloneValue3(node.value);
-      case "identifier": {
-        const value = resolveKey(row, node.name);
-        return value === void 0 ? null : cloneValue3(value);
-      }
-      case "unary": {
-        const value = evaluateReportCalculatedFieldExpression(node.argument, row);
-        if (node.operator === "not") {
-          return !coerceBoolean(value);
-        }
-        if (node.operator === "-") {
-          const numericValue = toFiniteNumber(value);
-          return numericValue == null ? null : -numericValue;
-        }
-        return null;
-      }
-      case "binary": {
-        if (node.operator === "and") {
-          return coerceBoolean(evaluateReportCalculatedFieldExpression(node.left, row)) && coerceBoolean(evaluateReportCalculatedFieldExpression(node.right, row));
-        }
-        if (node.operator === "or") {
-          return coerceBoolean(evaluateReportCalculatedFieldExpression(node.left, row)) || coerceBoolean(evaluateReportCalculatedFieldExpression(node.right, row));
-        }
-        const left = evaluateReportCalculatedFieldExpression(node.left, row);
-        const right = evaluateReportCalculatedFieldExpression(node.right, row);
-        if (node.operator === "+" || node.operator === "-" || node.operator === "*" || node.operator === "/" || node.operator === "%") {
-          const leftNumber = toFiniteNumber(left);
-          const rightNumber = toFiniteNumber(right);
-          if (leftNumber == null || rightNumber == null) {
-            return null;
-          }
-          if ((node.operator === "/" || node.operator === "%") && rightNumber === 0) {
-            return null;
-          }
-          switch (node.operator) {
-            case "+":
-              return leftNumber + rightNumber;
-            case "-":
-              return leftNumber - rightNumber;
-            case "*":
-              return leftNumber * rightNumber;
-            case "/":
-              return leftNumber / rightNumber;
-            case "%":
-              return leftNumber % rightNumber;
-            default:
-              return null;
-          }
-        }
-        return compareValues(left, right, node.operator);
-      }
-      case "call":
-        return evaluateReportCalculatedFieldFunction(node, row);
-      default:
-        return null;
-    }
-  }
-  function normalizeRatioCalculation(compute = {}) {
-    const numerator = normalizeString4(compute == null ? void 0 : compute.numerator);
-    const denominator = normalizeString4(compute == null ? void 0 : compute.denominator);
-    if (!numerator || !denominator) {
-      return null;
-    }
-    const next = {
-      type: "ratio",
-      numerator,
-      denominator
-    };
-    if (Number.isFinite(Number(compute == null ? void 0 : compute.scale))) {
-      next.scale = Number(compute.scale);
-    }
-    if (Number.isFinite(Number(compute == null ? void 0 : compute.decimals))) {
-      next.decimals = Number(compute.decimals);
-    }
-    return next;
-  }
-  function normalizePercentOfTotalCalculation(compute = {}) {
-    const sourceField = normalizeString4(compute == null ? void 0 : compute.sourceField);
-    if (!sourceField) {
-      return null;
-    }
-    const next = {
-      type: "percentOfTotal",
-      sourceField
-    };
-    if (compute.nullPolicy !== void 0) {
-      if (!["zero", "null"].includes(compute.nullPolicy)) throw Error("percentOfTotal nullPolicy must be zero or null");
-      next.nullPolicy = compute.nullPolicy;
-    }
-    if (compute.requireComplete !== void 0) {
-      if (typeof compute.requireComplete !== "boolean") throw Error("percentOfTotal requireComplete must be boolean");
-      next.requireComplete = compute.requireComplete;
-    }
-    const partitionBy = normalizePartitionBy(compute == null ? void 0 : compute.partitionBy);
-    if (partitionBy.length > 0) {
-      next.partitionBy = partitionBy;
-    }
-    if (Number.isFinite(Number(compute == null ? void 0 : compute.scale))) {
-      next.scale = Number(compute.scale);
-    }
-    if (Number.isFinite(Number(compute == null ? void 0 : compute.decimals))) {
-      next.decimals = Number(compute.decimals);
-    }
-    return next;
-  }
-  function normalizeDeltaFromPreviousCalculation(compute = {}) {
-    const sourceField = normalizeString4(compute == null ? void 0 : compute.sourceField);
-    const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
-    if (!sourceField || orderBy.length === 0) {
-      return null;
-    }
-    const next = {
-      type: "deltaFromPrevious",
-      sourceField,
-      orderBy
-    };
-    const partitionBy = normalizePartitionBy(compute == null ? void 0 : compute.partitionBy);
-    if (partitionBy.length > 0) {
-      next.partitionBy = partitionBy;
-    }
-    return next;
-  }
-  function normalizeLagCalculation(compute = {}) {
-    const sourceField = normalizeString4(compute == null ? void 0 : compute.sourceField);
-    const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
-    const offset = (compute == null ? void 0 : compute.offset) == null ? 1 : Number(compute.offset);
-    if (!sourceField || !orderBy.length || !Number.isSafeInteger(offset) || offset < 1 || offset > 1e4) return null;
-    const partitionBy = normalizePartitionBy(compute == null ? void 0 : compute.partitionBy);
-    return { type: "lag", sourceField, orderBy, offset, ...partitionBy.length ? { partitionBy } : {} };
-  }
-  function normalizeWindowMaxCalculation(compute = {}) {
-    var _a5;
-    const sourceField = normalizeString4(compute == null ? void 0 : compute.sourceField);
-    const partitionBy = normalizePartitionBy(compute == null ? void 0 : compute.partitionBy);
-    const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
-    const type = normalizeString4((_a5 = compute == null ? void 0 : compute.frame) == null ? void 0 : _a5.type);
-    if (!sourceField || !["full", "rows"].includes(type)) return null;
-    let frame = { type };
-    if (type === "rows") {
-      const preceding = Number(compute.frame.preceding), following = Number(compute.frame.following);
-      if (!orderBy.length || !Number.isSafeInteger(preceding) || !Number.isSafeInteger(following) || preceding < 0 || following < 0 || preceding > 1e4 || following > 1e4) return null;
-      frame = { type, preceding, following };
-    } else if (compute.frame.preceding != null || compute.frame.following != null) return null;
-    return { type: "windowMax", sourceField, frame, ...partitionBy.length ? { partitionBy } : {}, ...orderBy.length ? { orderBy } : {} };
-  }
-  function normalizeRunningTotalCalculation(compute = {}) {
-    const sourceField = normalizeString4(compute == null ? void 0 : compute.sourceField);
-    const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
-    if (!sourceField || orderBy.length === 0) {
-      return null;
-    }
-    const next = {
-      type: "runningTotal",
-      sourceField,
-      orderBy
-    };
-    const partitionBy = normalizePartitionBy(compute == null ? void 0 : compute.partitionBy);
-    if (partitionBy.length > 0) {
-      next.partitionBy = partitionBy;
-    }
-    return next;
-  }
-  function normalizeMovingAverageCalculation(compute = {}) {
-    const sourceField = normalizeString4(compute == null ? void 0 : compute.sourceField);
-    const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
-    const windowSize = Math.max(1, Number((compute == null ? void 0 : compute.windowSize) || 0) || 0);
-    if (!sourceField || orderBy.length === 0 || !windowSize) {
-      return null;
-    }
-    const next = {
-      type: "movingAverage",
-      sourceField,
-      orderBy,
-      windowSize
-    };
-    if (Number.isFinite(Number(compute == null ? void 0 : compute.decimals))) {
-      next.decimals = Number(compute.decimals);
-    }
-    const partitionBy = normalizePartitionBy(compute == null ? void 0 : compute.partitionBy);
-    if (partitionBy.length > 0) {
-      next.partitionBy = partitionBy;
-    }
-    return next;
-  }
-  function normalizeRankCalculation(compute = {}) {
-    var _a5;
-    const sourceField = normalizeString4(compute == null ? void 0 : compute.sourceField);
-    const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
-    const tieMode = normalizeString4(compute == null ? void 0 : compute.tieMode).toLowerCase();
-    if (!sourceField || orderBy.length === 0 || ((_a5 = orderBy[0]) == null ? void 0 : _a5.field) !== sourceField) {
-      return null;
-    }
-    if (tieMode && tieMode !== "dense") {
-      return null;
-    }
-    const next = {
-      type: "rank",
-      sourceField,
-      orderBy,
-      tieMode: "dense"
-    };
-    const partitionBy = normalizePartitionBy(compute == null ? void 0 : compute.partitionBy);
-    if (partitionBy.length > 0) {
-      next.partitionBy = partitionBy;
-    }
-    return next;
-  }
-  function buildCalculatedFieldDependencies(definition = {}, inferredDependencies = []) {
-    return Array.from(/* @__PURE__ */ new Set([
-      ...normalizeStringArray(definition == null ? void 0 : definition.dependencies),
-      ...normalizeStringArray(inferredDependencies)
-    ]));
-  }
-  function normalizeReportCalculatedFieldExpressionDefinition(definition = {}) {
-    const expr = normalizeString4(definition == null ? void 0 : definition.expr);
-    if (!expr) {
-      return null;
-    }
-    const parsed = parseReportCalculatedFieldExpression(expr);
-    if (!(parsed == null ? void 0 : parsed.ast)) {
-      return null;
-    }
-    return {
-      expr,
-      dependencies: buildCalculatedFieldDependencies(definition, parsed.dependencies)
-    };
-  }
-  function normalizeReportCalculatedFieldCompute(definition = {}) {
-    var _a5;
-    const computeType = normalizeString4((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type).toLowerCase();
-    let compute = null;
-    if (computeType === "ratio") {
-      compute = normalizeRatioCalculation(definition.compute);
-    } else if (computeType === "percentoftotal") {
-      compute = normalizePercentOfTotalCalculation(definition.compute);
-    } else if (computeType === "deltafromprevious") {
-      compute = normalizeDeltaFromPreviousCalculation(definition.compute);
-    } else if (computeType === "lag") {
-      compute = normalizeLagCalculation(definition.compute);
-    } else if (computeType === "windowmax") {
-      compute = normalizeWindowMaxCalculation(definition.compute);
-    } else if (computeType === "runningtotal") {
-      compute = normalizeRunningTotalCalculation(definition.compute);
-    } else if (computeType === "movingaverage") {
-      compute = normalizeMovingAverageCalculation(definition.compute);
-    } else if (computeType === "rank") {
-      compute = normalizeRankCalculation(definition.compute);
-    }
-    if (!compute) {
-      return null;
-    }
-    const inferredDependencies = computeType === "percentoftotal" ? [compute.sourceField, ...normalizePartitionBy(compute.partitionBy)] : computeType === "deltafromprevious" || computeType === "runningtotal" || computeType === "movingaverage" || computeType === "rank" || computeType === "lag" || computeType === "windowmax" ? [compute.sourceField, ...(compute.orderBy || []).map((entry) => entry.field), ...normalizePartitionBy(compute.partitionBy)] : [compute.numerator, compute.denominator];
-    return {
-      compute,
-      dependencies: buildCalculatedFieldDependencies(definition, inferredDependencies)
-    };
-  }
-  function normalizeReportCalculatedField(definition = {}, {
-    datasetRef = ""
-  } = {}) {
-    var _a5, _b, _c, _d, _e, _f, _g;
-    if (!definition || typeof definition !== "object" || Array.isArray(definition)) {
-      return null;
-    }
-    const id = normalizeString4((definition == null ? void 0 : definition.id) || (definition == null ? void 0 : definition.key));
-    if (!id) {
-      return null;
-    }
-    const normalizedExpression = normalizeReportCalculatedFieldExpressionDefinition(definition);
-    const normalizedCompute = normalizedExpression ? null : normalizeReportCalculatedFieldCompute(definition);
-    if (!normalizedExpression && !normalizedCompute) {
-      return null;
-    }
-    const kind = normalizedExpression ? "rowCalc" : normalizeString4((_a5 = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _a5.type).toLowerCase() === "percentoftotal" || normalizeString4((_b = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _b.type).toLowerCase() === "deltafromprevious" || normalizeString4((_c = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _c.type).toLowerCase() === "runningtotal" || normalizeString4((_d = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _d.type).toLowerCase() === "movingaverage" || normalizeString4((_e = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _e.type).toLowerCase() === "rank" || normalizeString4((_f = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _f.type).toLowerCase() === "lag" || normalizeString4((_g = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _g.type).toLowerCase() === "windowmax" ? "tableCalc" : "rowCalc";
-    if (normalizedExpression && normalizeString4(definition == null ? void 0 : definition.kind) && normalizeString4(definition.kind) !== "rowCalc") {
-      return null;
-    }
-    return {
-      id,
-      key: normalizeString4((definition == null ? void 0 : definition.key) || id),
-      kind,
-      label: normalizeString4((definition == null ? void 0 : definition.label) || id),
-      dataType: normalizeString4((definition == null ? void 0 : definition.dataType) || "number") || "number",
-      ...normalizeString4(definition == null ? void 0 : definition.format) ? { format: normalizeString4(definition.format) } : {},
-      ...normalizeString4((definition == null ? void 0 : definition.datasetRef) || datasetRef) ? { datasetRef: normalizeString4((definition == null ? void 0 : definition.datasetRef) || datasetRef) } : {},
-      dependencies: (normalizedExpression == null ? void 0 : normalizedExpression.dependencies) || (normalizedCompute == null ? void 0 : normalizedCompute.dependencies) || [],
-      ...normalizedExpression ? { expr: normalizedExpression.expr } : { compute: normalizedCompute.compute }
-    };
-  }
-  function normalizeReportCalculatedFields(definitions = [], options = {}) {
-    return (Array.isArray(definitions) ? definitions : []).map((definition) => normalizeReportCalculatedField(definition, options)).filter(Boolean);
-  }
-  function buildPartitionGroups(rowsToPartition = [], partitionBy = []) {
-    const normalizedPartitionBy = normalizePartitionBy(partitionBy);
-    if (normalizedPartitionBy.length === 0) {
-      return [[...rowsToPartition]];
-    }
-    const groups = /* @__PURE__ */ new Map();
-    rowsToPartition.forEach((row) => {
-      const key2 = JSON.stringify(normalizedPartitionBy.map((field) => resolveKey(row, field)));
-      const current = groups.get(key2) || [];
-      current.push(row);
-      groups.set(key2, current);
-    });
-    return Array.from(groups.values());
-  }
-  function sortRowsByOrder(rowsToSort = [], orderBy = []) {
-    return [...rowsToSort].sort((left, right) => {
-      for (const order of normalizeOrderBy(orderBy)) {
-        const leftValue = resolveKey(left, order.field);
-        const rightValue = resolveKey(right, order.field);
-        if (leftValue === rightValue) {
-          continue;
-        }
-        const comparison = typeof leftValue === "number" && typeof rightValue === "number" && Number.isFinite(leftValue) && Number.isFinite(rightValue) ? leftValue < rightValue ? -1 : 1 : String(leftValue != null ? leftValue : "").localeCompare(String(rightValue != null ? rightValue : ""), void 0, { numeric: true });
-        return order.direction === "desc" ? -comparison : comparison;
-      }
-      return 0;
-    });
-  }
-  function resolveReportCalculatedFieldReference(definitions, reference, { datasetRef } = {}) {
-    const candidates = definitions.filter((definition) => (datasetRef === void 0 || !definition.datasetRef || definition.datasetRef === datasetRef) && [definition.id, definition.key].includes(normalizeString4(reference)));
-    if (candidates.length > 1) throw new Error(`Ambiguous calculated field reference '${reference}' in dataset '${datasetRef != null ? datasetRef : "unspecified"}'. Use a unique id or declare datasetRef.`);
-    return candidates[0] || null;
-  }
-  function validateCalculatedFieldAliases(definitions) {
-    definitions.forEach((definition, index) => {
-      definitions.slice(0, index).forEach((previous) => {
-        if (definition.datasetRef && previous.datasetRef && definition.datasetRef !== previous.datasetRef) return;
-        const alias = [definition.id, definition.key].find((value) => [previous.id, previous.key].includes(value));
-        if (alias) throw new Error(`Ambiguous calculated field alias '${alias}' in dataset '${definition.datasetRef || previous.datasetRef || "all"}': '${previous.id}' and '${definition.id}'. Use unique ids and keys within each dataset.`);
-      });
-    });
-  }
-  function topologicallySortCalculatedFields(definitions = []) {
-    validateCalculatedFieldAliases(definitions);
-    const byKey = new Map(
-      definitions.map((definition) => [normalizeString4((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id)), definition]).filter(([key2]) => !!key2)
-    );
-    const aliases2 = new Map([...byKey].map(([key2, definition]) => [normalizeString4(definition.id), key2]));
-    const pending = new Set(byKey.keys());
-    const sorted = [];
-    let progressed = true;
-    while (pending.size > 0 && progressed) {
-      progressed = false;
-      Array.from(pending).forEach((key2) => {
-        const definition = byKey.get(key2);
-        const unresolved = normalizeStringArray(definition == null ? void 0 : definition.dependencies).map((dependency) => byKey.has(dependency) ? dependency : aliases2.get(dependency) || dependency).filter((dependencyKey) => {
-          if (dependencyKey === key2 || !byKey.has(dependencyKey)) {
-            return false;
-          }
-          return pending.has(dependencyKey);
-        });
-        if (unresolved.length > 0) {
-          return;
-        }
-        sorted.push(definition);
-        pending.delete(key2);
-        progressed = true;
-      });
-    }
-    if (pending.size) throw new Error("Calculated field dependencies contain a cycle: " + [...pending].map((key2) => {
-      var _a5;
-      return ((_a5 = byKey.get(key2)) == null ? void 0 : _a5.id) || key2;
-    }).join(", "));
-    return sorted;
-  }
-  function validateReportCalculatedFieldDependencies(definitions = []) {
-    const normalized = normalizeReportCalculatedFields(definitions);
-    validateCalculatedFieldAliases(normalized);
-    const scopes = new Set(normalized.map((definition) => definition.datasetRef || ""));
-    scopes.forEach((datasetRef) => topologicallySortCalculatedFields(normalized.filter((definition) => !definition.datasetRef || definition.datasetRef === datasetRef)));
-  }
-  function applyReportCalculatedFields(rows = [], calculatedFields = [], {
-    datasetRef = ""
-  } = {}) {
-    const applicableFields = normalizeReportCalculatedFields(calculatedFields).filter((definition) => {
-      const targetDatasetRef = normalizeString4(definition == null ? void 0 : definition.datasetRef);
-      if (!targetDatasetRef) {
-        return true;
-      }
-      return targetDatasetRef === normalizeString4(datasetRef);
-    });
-    if (applicableFields.length === 0) {
-      return Array.isArray(rows) ? rows : [];
-    }
-    const ordered = topologicallySortCalculatedFields(applicableFields);
-    const result = (Array.isArray(rows) ? rows : []).map((row) => ({ ...row || {} }));
-    for (const definition of ordered) applyReportCalculatedField(result, definition);
-    return result;
-  }
-  function applyReportCalculatedField(rows, definition) {
-    var _a5, _b;
-    const applicableFields = [definition];
-    const compiledExpressions = new Map(
-      applicableFields.filter((definition2) => normalizeString4(definition2 == null ? void 0 : definition2.expr)).map((definition2) => {
-        var _a6;
-        return [normalizeString4((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id)), ((_a6 = parseReportCalculatedFieldExpression(definition2.expr)) == null ? void 0 : _a6.ast) || null];
-      })
-    );
-    rows.forEach((next) => {
-      applicableFields.filter((definition2) => definition2.kind === "rowCalc").forEach((definition2) => {
-        var _a6, _b2, _c;
-        const outputKey = normalizeString4((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
-        if (!outputKey) {
-          return;
-        }
-        if (normalizeString4(definition2 == null ? void 0 : definition2.expr)) {
-          next[outputKey] = evaluateReportCalculatedFieldExpression(compiledExpressions.get(outputKey), next);
-          return;
-        }
-        if (normalizeString4((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "ratio") {
-          const numerator = Number(resolveKey(next, definition2.compute.numerator));
-          const denominator = Number(resolveKey(next, definition2.compute.denominator));
-          const scale = Number.isFinite(Number((_b2 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _b2.scale)) ? Number(definition2.compute.scale) : 1;
-          const decimals = Number.isFinite(Number((_c = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _c.decimals)) ? Number(definition2.compute.decimals) : null;
-          let value = 0;
-          if (Number.isFinite(numerator) && Number.isFinite(denominator) && denominator !== 0) {
-            value = numerator / denominator * scale;
-          }
-          if (decimals != null) {
-            value = Number(value.toFixed(decimals));
-          }
-          next[outputKey] = value;
-        }
-      });
-    });
-    const withTableCalcs = rows;
-    applicableFields.filter((definition2) => {
-      var _a6;
-      return normalizeString4((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "percentOfTotal";
-    }).forEach((definition2) => {
-      var _a6, _b2, _c, _d;
-      const outputKey = normalizeString4((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
-      const sourceField = normalizeString4((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.sourceField);
-      if (!outputKey || !sourceField) {
-        return;
-      }
-      const scale = Number.isFinite(Number((_b2 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _b2.scale)) ? Number(definition2.compute.scale) : 100;
-      const decimals = Number.isFinite(Number((_c = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _c.decimals)) ? Number(definition2.compute.decimals) : null;
-      buildPartitionGroups(withTableCalcs, (_d = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _d.partitionBy).forEach((groupRows) => {
-        const total = groupRows.reduce((sum2, row) => {
-          const value = toFiniteNumber(resolveKey(row, sourceField));
-          return value != null ? sum2 + value : sum2;
-        }, 0);
-        groupRows.forEach((row) => {
-          const sourceValue = toFiniteNumber(resolveKey(row, sourceField));
-          let value = definition2.compute.nullPolicy === "null" ? null : 0;
-          if (sourceValue != null && total !== 0) {
-            value = sourceValue / total * scale;
-          }
-          if (decimals != null && value != null) {
-            value = Number(value.toFixed(decimals));
-          }
-          row[outputKey] = value;
-        });
-      });
-    });
-    applicableFields.filter((definition2) => {
-      var _a6;
-      return normalizeString4((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "deltaFromPrevious";
-    }).forEach((definition2) => {
-      var _a6, _b2, _c;
-      const outputKey = normalizeString4((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
-      const sourceField = normalizeString4((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.sourceField);
-      const orderBy = normalizeOrderBy((_b2 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _b2.orderBy);
-      if (!outputKey || !sourceField || orderBy.length === 0) {
-        return;
-      }
-      buildPartitionGroups(withTableCalcs, (_c = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _c.partitionBy).forEach((groupRows) => {
-        const sortedRows = sortRowsByOrder(groupRows, orderBy);
-        let previousValue = null;
-        sortedRows.forEach((row) => {
-          const sourceValue = toFiniteNumber(resolveKey(row, sourceField));
-          let value = 0;
-          if (sourceValue != null && previousValue != null) {
-            value = sourceValue - previousValue;
-          }
-          row[outputKey] = value;
-          previousValue = sourceValue != null ? sourceValue : previousValue;
-        });
-      });
-    });
-    applicableFields.filter((definition2) => {
-      var _a6;
-      return normalizeString4((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "runningTotal";
-    }).forEach((definition2) => {
-      var _a6, _b2, _c;
-      const outputKey = normalizeString4((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
-      const sourceField = normalizeString4((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.sourceField);
-      const orderBy = normalizeOrderBy((_b2 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _b2.orderBy);
-      if (!outputKey || !sourceField || orderBy.length === 0) {
-        return;
-      }
-      buildPartitionGroups(withTableCalcs, (_c = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _c.partitionBy).forEach((groupRows) => {
-        const sortedRows = sortRowsByOrder(groupRows, orderBy);
-        let runningValue = 0;
-        sortedRows.forEach((row) => {
-          const sourceValue = toFiniteNumber(resolveKey(row, sourceField));
-          if (sourceValue != null) {
-            runningValue += sourceValue;
-          }
-          row[outputKey] = runningValue;
-        });
-      });
-    });
-    applicableFields.filter((definition2) => {
-      var _a6;
-      return normalizeString4((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "movingAverage";
-    }).forEach((definition2) => {
-      var _a6, _b2, _c, _d;
-      const outputKey = normalizeString4((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
-      const sourceField = normalizeString4((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.sourceField);
-      const orderBy = normalizeOrderBy((_b2 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _b2.orderBy);
-      const windowSize = Math.max(1, Number(((_c = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _c.windowSize) || 0) || 0);
-      if (!outputKey || !sourceField || orderBy.length === 0 || !windowSize) {
-        return;
-      }
-      buildPartitionGroups(withTableCalcs, (_d = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _d.partitionBy).forEach((groupRows) => {
-        const sortedRows = sortRowsByOrder(groupRows, orderBy);
-        sortedRows.forEach((row, index) => {
-          var _a7;
-          const windowRows = sortedRows.slice(Math.max(0, index - windowSize + 1), index + 1);
-          const numericValues = windowRows.map((entry) => toFiniteNumber(resolveKey(entry, sourceField))).filter((value2) => value2 != null);
-          let value = 0;
-          if (numericValues.length > 0) {
-            value = numericValues.reduce((sum2, entry) => sum2 + entry, 0) / numericValues.length;
-          }
-          const decimals = Number.isFinite(Number((_a7 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a7.decimals)) ? Number(definition2.compute.decimals) : null;
-          if (decimals != null) {
-            value = Number(value.toFixed(decimals));
-          }
-          row[outputKey] = value;
-        });
-      });
-    });
-    applicableFields.filter((definition2) => {
-      var _a6;
-      return normalizeString4((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "rank";
-    }).forEach((definition2) => {
-      var _a6, _b2, _c, _d, _e;
-      const outputKey = normalizeString4((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
-      const sourceField = normalizeString4((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.sourceField);
-      const orderBy = normalizeOrderBy((_b2 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _b2.orderBy);
-      const tieMode = normalizeString4((_c = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _c.tieMode).toLowerCase();
-      if (!outputKey || !sourceField || orderBy.length === 0 || ((_d = orderBy[0]) == null ? void 0 : _d.field) !== sourceField) {
-        return;
-      }
-      if (tieMode && tieMode !== "dense") {
-        return;
-      }
-      buildPartitionGroups(withTableCalcs, (_e = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _e.partitionBy).forEach((groupRows) => {
-        const sortedRows = sortRowsByOrder(groupRows, orderBy);
-        let rank = 0;
-        let previousValue;
-        let hasPreviousValue = false;
-        sortedRows.forEach((row) => {
-          const sourceValue = resolveKey(row, sourceField);
-          if (sourceValue === void 0 || sourceValue === null || sourceValue === "") {
-            row[outputKey] = null;
-            return;
-          }
-          const normalizedValue = String(sourceValue);
-          if (!hasPreviousValue || normalizedValue !== previousValue) {
-            rank += 1;
-            previousValue = normalizedValue;
-            hasPreviousValue = true;
-          }
-          row[outputKey] = rank;
-        });
-      });
-    });
-    if (((_a5 = definition.compute) == null ? void 0 : _a5.type) === "lag") {
-      const { sourceField, orderBy, partitionBy, offset } = definition.compute;
-      buildPartitionGroups(withTableCalcs, partitionBy).forEach((groupRows) => {
-        const sorted = sortRowsByOrder(groupRows, orderBy);
-        const values = sorted.map((row) => resolveKey(row, sourceField));
-        sorted.forEach((row, index) => {
-          const previous = index >= offset ? values[index - offset] : null;
-          row[definition.key] = previous == null ? null : cloneValue3(previous);
-        });
-      });
-    }
-    if (((_b = definition.compute) == null ? void 0 : _b.type) === "windowMax") {
-      const { sourceField, orderBy, partitionBy, frame } = definition.compute;
-      buildPartitionGroups(withTableCalcs, partitionBy).forEach((groupRows) => {
-        const sorted = frame.type === "rows" ? sortRowsByOrder(groupRows, orderBy) : groupRows;
-        const values = sorted.map((row) => toFiniteNumber(resolveKey(row, sourceField)));
-        sorted.forEach((row, index) => {
-          const selected = frame.type === "full" ? values : values.slice(Math.max(0, index - frame.preceding), index + frame.following + 1);
-          const finite = selected.filter((value) => value != null);
-          row[definition.key] = finite.length ? Math.max(...finite) : null;
-        });
-      });
-    }
-    return withTableCalcs;
-  }
-  function cloneReportCalculatedFields(calculatedFields = []) {
-    return normalizeReportCalculatedFields(calculatedFields).map((definition) => cloneValue3(definition));
-  }
-
   // src/utils/presentationText.js
   var CONTROL_CHARACTERS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g;
   var UNICODE_REPLACEMENT_RUN = /\uFFFD+/g;
   function normalizePresentationText(value = "", { replacement = "?" } = {}) {
-    let text3 = String(value != null ? value : "").replace(CONTROL_CHARACTERS, "").replace(UNICODE_REPLACEMENT_RUN, replacement);
+    let text4 = String(value != null ? value : "").replace(CONTROL_CHARACTERS, "").replace(UNICODE_REPLACEMENT_RUN, replacement);
     try {
-      text3 = text3.normalize("NFC");
+      text4 = text4.normalize("NFC");
     } catch (_2) {
     }
-    return text3.replace(/\s+/g, " ").trim();
+    return text4.replace(/\s+/g, " ").trim();
   }
   function normalizePresentationClampConfig(value = null) {
     if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -48698,13 +49157,13 @@ Please __addLocaleData before adding additional unit data`);
     if (!selection || selection.mode !== "checkbox" || typeof selection.field !== "string" || !selection.field.trim() || Object.keys(selection).some((key2) => !["mode", "field", "labelFields"].includes(key2))) {
       throw new Error("Table selection requires checkbox mode and a non-empty field");
     }
-    if (selection.labelFields !== void 0 && (!Array.isArray(selection.labelFields) || !selection.labelFields.length || selection.labelFields.some((field) => typeof field !== "string" || !field.trim()) || new Set(selection.labelFields.map((field) => field.trim())).size !== selection.labelFields.length)) {
+    if (selection.labelFields !== void 0 && (!Array.isArray(selection.labelFields) || !selection.labelFields.length || selection.labelFields.some((field2) => typeof field2 !== "string" || !field2.trim()) || new Set(selection.labelFields.map((field2) => field2.trim())).size !== selection.labelFields.length)) {
       throw new Error("Selection labelFields requires unique, non-empty field names");
     }
     return {
       mode: "checkbox",
       field: selection.field.trim(),
-      ...selection.labelFields ? { labelFields: selection.labelFields.map((field) => field.trim()) } : {}
+      ...selection.labelFields ? { labelFields: selection.labelFields.map((field2) => field2.trim()) } : {}
     };
   }
   function normalizeReportDocumentTableBlock(block = {}) {
@@ -48775,10 +49234,10 @@ Please __addLocaleData before adding additional unit data`);
     ];
   }
   function normalizeReportBuilderLocalCalculatedFields(calculatedFields = []) {
-    return normalizeReportCalculatedFields(calculatedFields).filter((field) => (field == null ? void 0 : field.kind) === "rowCalc" && normalizeString7(field == null ? void 0 : field.expr)).map((field) => cloneValue5(field));
+    return normalizeReportCalculatedFields(calculatedFields).filter((field2) => (field2 == null ? void 0 : field2.kind) === "rowCalc" && normalizeString7(field2 == null ? void 0 : field2.expr)).map((field2) => cloneValue5(field2));
   }
   function normalizeReportBuilderLocalTableCalculations(calculatedFields = []) {
-    return normalizeReportCalculatedFields(calculatedFields).filter((field) => (field == null ? void 0 : field.kind) === "tableCalc" && (field == null ? void 0 : field.compute)).map((field) => cloneValue5(field));
+    return normalizeReportCalculatedFields(calculatedFields).filter((field2) => (field2 == null ? void 0 : field2.kind) === "tableCalc" && (field2 == null ? void 0 : field2.compute)).map((field2) => cloneValue5(field2));
   }
   function mergeAuthoringFieldSets(baseFields = [], localFields = [], {
     authoringScope = "",
@@ -48786,12 +49245,12 @@ Please __addLocaleData before adding additional unit data`);
     defaultSection = "calculated"
   } = {}) {
     const localById = new Map(
-      (Array.isArray(localFields) ? localFields : []).map((field) => [normalizeString7((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key)), field]).filter(([id, field]) => !!id && !!field)
+      (Array.isArray(localFields) ? localFields : []).map((field2) => [normalizeString7((field2 == null ? void 0 : field2.id) || (field2 == null ? void 0 : field2.key)), field2]).filter(([id, field2]) => !!id && !!field2)
     );
     const merged = [];
     const seen = /* @__PURE__ */ new Set();
-    (Array.isArray(baseFields) ? baseFields : []).forEach((field) => {
-      const fieldId = normalizeString7((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key));
+    (Array.isArray(baseFields) ? baseFields : []).forEach((field2) => {
+      const fieldId = normalizeString7((field2 == null ? void 0 : field2.id) || (field2 == null ? void 0 : field2.key));
       if (!fieldId || seen.has(fieldId)) {
         return;
       }
@@ -48805,18 +49264,18 @@ Please __addLocaleData before adding additional unit data`);
           ...authoringKind ? { authoringKind } : {}
         });
       } else {
-        merged.push(field);
+        merged.push(field2);
       }
       seen.add(fieldId);
     });
-    (Array.isArray(localFields) ? localFields : []).forEach((field) => {
-      const fieldId = normalizeString7((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key));
+    (Array.isArray(localFields) ? localFields : []).forEach((field2) => {
+      const fieldId = normalizeString7((field2 == null ? void 0 : field2.id) || (field2 == null ? void 0 : field2.key));
       if (!fieldId || seen.has(fieldId)) {
         return;
       }
       merged.push({
-        ...field,
-        section: normalizeString7(field == null ? void 0 : field.section) || defaultSection,
+        ...field2,
+        section: normalizeString7(field2 == null ? void 0 : field2.section) || defaultSection,
         authoringScope,
         authoringEditable: true,
         ...authoringKind ? { authoringKind } : {}
@@ -49414,10 +49873,10 @@ Please __addLocaleData before adding additional unit data`);
       label: String(overrides.label || predicate.label || filterId).trim(),
       paramPath
     };
-    DIRECTION_FILTER_FIELDS.forEach((field) => {
-      const value = overrides[field] !== void 0 ? overrides[field] : entry == null ? void 0 : entry[field];
+    DIRECTION_FILTER_FIELDS.forEach((field2) => {
+      const value = overrides[field2] !== void 0 ? overrides[field2] : entry == null ? void 0 : entry[field2];
       if (value !== void 0) {
-        filter[field] = clone3(value);
+        filter[field2] = clone3(value);
       }
     });
     if (filter.multiple === void 0) {
@@ -49558,8 +50017,8 @@ Please __addLocaleData before adding additional unit data`);
     if (predicate.options !== void 0) {
       filter.options = clone3(predicate.options);
     }
-    for (const field of ["optionsDataSourceRef", "optionsFetchMode", "optionValueField", "optionLabelField"]) {
-      if (predicate[field]) filter[field] = predicate[field];
+    for (const field2 of ["optionsDataSourceRef", "optionsFetchMode", "optionValueField", "optionLabelField"]) {
+      if (predicate[field2]) filter[field2] = predicate[field2];
     }
     if (predicate.default !== void 0) {
       filter.default = clone3(predicate.default);
@@ -49847,40 +50306,40 @@ Please __addLocaleData before adding additional unit data`);
   function normalizeString12(value = "") {
     return String(value || "").trim();
   }
-  function semanticLookupKeys(field = {}) {
+  function semanticLookupKeys(field2 = {}) {
     const keys3 = [
-      normalizeString12(field == null ? void 0 : field.semanticRef),
-      normalizeString12(field == null ? void 0 : field.id),
-      normalizeString12(field == null ? void 0 : field.key)
+      normalizeString12(field2 == null ? void 0 : field2.semanticRef),
+      normalizeString12(field2 == null ? void 0 : field2.id),
+      normalizeString12(field2 == null ? void 0 : field2.key)
     ].filter(Boolean);
     return Array.from(new Set(keys3));
   }
-  function semanticFieldId(field = {}) {
-    return normalizeString12(field == null ? void 0 : field.semanticRef);
+  function semanticFieldId(field2 = {}) {
+    return normalizeString12(field2 == null ? void 0 : field2.semanticRef);
   }
-  function isLocalComputedMeasure(field = {}) {
-    return !!field && typeof field === "object" && !Array.isArray(field) && (!!field.compute && typeof field.compute === "object" && !Array.isArray(field.compute) || normalizeString12(field == null ? void 0 : field.expr)) && !semanticFieldId(field);
+  function isLocalComputedMeasure(field2 = {}) {
+    return !!field2 && typeof field2 === "object" && !Array.isArray(field2) && (!!field2.compute && typeof field2.compute === "object" && !Array.isArray(field2.compute) || normalizeString12(field2 == null ? void 0 : field2.expr)) && !semanticFieldId(field2);
   }
   function semanticSelectableMeasureFields(config = {}) {
     return [
       ...Array.isArray(config == null ? void 0 : config.measures) ? config.measures : [],
-      ...(Array.isArray(config == null ? void 0 : config.calculatedFields) ? config.calculatedFields : []).filter((field) => !isLocalComputedMeasure(field)),
-      ...(Array.isArray(config == null ? void 0 : config.computedMeasures) ? config.computedMeasures : []).filter((field) => !isLocalComputedMeasure(field)),
-      ...(Array.isArray(config == null ? void 0 : config.tableCalculations) ? config.tableCalculations : []).filter((field) => !isLocalComputedMeasure(field))
+      ...(Array.isArray(config == null ? void 0 : config.calculatedFields) ? config.calculatedFields : []).filter((field2) => !isLocalComputedMeasure(field2)),
+      ...(Array.isArray(config == null ? void 0 : config.computedMeasures) ? config.computedMeasures : []).filter((field2) => !isLocalComputedMeasure(field2)),
+      ...(Array.isArray(config == null ? void 0 : config.tableCalculations) ? config.tableCalculations : []).filter((field2) => !isLocalComputedMeasure(field2))
     ];
   }
   function semanticSelectableParameterFields(config = {}) {
-    return resolveReportBuilderScopeParamFilters(config).filter((field) => !!semanticFieldId(field));
+    return resolveReportBuilderScopeParamFilters(config).filter((field2) => !!semanticFieldId(field2));
   }
   function semanticDiagnosableParameterFields(config = {}) {
-    return resolveReportBuilderScopeParamFilters(config).filter((field) => !!field && typeof field === "object" && !Array.isArray(field)).filter((field) => Object.prototype.hasOwnProperty.call(field, "semanticRef"));
+    return resolveReportBuilderScopeParamFilters(config).filter((field2) => !!field2 && typeof field2 === "object" && !Array.isArray(field2)).filter((field2) => Object.prototype.hasOwnProperty.call(field2, "semanticRef"));
   }
   function buildSemanticSelectionIds(fields2 = [], selectedIds = []) {
     const fieldIndex = new Map(
-      (Array.isArray(fields2) ? fields2 : []).map((field) => [normalizeString12((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key)), field]).filter(([, field]) => !!field)
+      (Array.isArray(fields2) ? fields2 : []).map((field2) => [normalizeString12((field2 == null ? void 0 : field2.id) || (field2 == null ? void 0 : field2.key)), field2]).filter(([, field2]) => !!field2)
     );
     return Array.from(new Set(
-      (Array.isArray(selectedIds) ? selectedIds : []).map((id) => fieldIndex.get(normalizeString12(id))).map((field) => semanticFieldId(field)).filter(Boolean)
+      (Array.isArray(selectedIds) ? selectedIds : []).map((id) => fieldIndex.get(normalizeString12(id))).map((field2) => semanticFieldId(field2)).filter(Boolean)
     ));
   }
   function normalizeFieldSelectionIds(selectedIds = []) {
@@ -49888,8 +50347,8 @@ Please __addLocaleData before adding additional unit data`);
       (Array.isArray(selectedIds) ? selectedIds : []).map((id) => normalizeString12(id)).filter(Boolean)
     ));
   }
-  function hasConfiguredSemanticParameterValue(field = {}, value = null) {
-    if ((field == null ? void 0 : field.type) === "dateRange") {
+  function hasConfiguredSemanticParameterValue(field2 = {}, value = null) {
+    if ((field2 == null ? void 0 : field2.type) === "dateRange") {
       return !!normalizeString12(value == null ? void 0 : value.start) || !!normalizeString12(value == null ? void 0 : value.end);
     }
     if (Array.isArray(value)) {
@@ -49905,14 +50364,14 @@ Please __addLocaleData before adding additional unit data`);
   }
   function buildSemanticSelectionParameters(config = {}, state = {}) {
     const next = {};
-    semanticSelectableParameterFields(config).forEach((field) => {
-      const rawId = resolveScopeParamId(field);
-      const semanticRef = semanticFieldId(field);
+    semanticSelectableParameterFields(config).forEach((field2) => {
+      const rawId = resolveScopeParamId(field2);
+      const semanticRef = semanticFieldId(field2);
       if (!rawId || !semanticRef) {
         return;
       }
       const value = getScopeParamValue(state, rawId);
-      if (!hasConfiguredSemanticParameterValue(field, value)) {
+      if (!hasConfiguredSemanticParameterValue(field2, value)) {
         return;
       }
       next[semanticRef] = cloneValue7(value);
@@ -49920,13 +50379,13 @@ Please __addLocaleData before adding additional unit data`);
     return next;
   }
   function resolveSelectedSemanticParameterIds(config = {}, state = {}) {
-    return semanticDiagnosableParameterFields(config).filter((field) => {
-      const rawId = resolveScopeParamId(field);
+    return semanticDiagnosableParameterFields(config).filter((field2) => {
+      const rawId = resolveScopeParamId(field2);
       if (!rawId) {
         return false;
       }
-      return hasConfiguredSemanticParameterValue(field, getScopeParamValue(state, rawId));
-    }).map((field) => resolveScopeParamId(field)).filter(Boolean);
+      return hasConfiguredSemanticParameterValue(field2, getScopeParamValue(state, rawId));
+    }).map((field2) => resolveScopeParamId(field2)).filter(Boolean);
   }
   function resolveGroupByDimensionId(config = {}, state = {}) {
     var _a5;
@@ -49943,10 +50402,10 @@ Please __addLocaleData before adding additional unit data`);
       ...Array.isArray(config == null ? void 0 : config.calculatedFields) ? config.calculatedFields : [],
       ...Array.isArray(config == null ? void 0 : config.computedMeasures) ? config.computedMeasures : [],
       ...Array.isArray(config == null ? void 0 : config.tableCalculations) ? config.tableCalculations : []
-    ].filter((field) => selectedMeasureIds.has(normalizeString12((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key))));
+    ].filter((field2) => selectedMeasureIds.has(normalizeString12((field2 == null ? void 0 : field2.id) || (field2 == null ? void 0 : field2.key))));
     const next = [];
-    calculations.forEach((field) => {
-      const compute = (field == null ? void 0 : field.compute) && typeof field.compute === "object" ? field.compute : {};
+    calculations.forEach((field2) => {
+      const compute = (field2 == null ? void 0 : field2.compute) && typeof field2.compute === "object" ? field2.compute : {};
       [
         ...Array.isArray(compute.partitionBy) ? compute.partitionBy : [],
         ...Array.isArray(compute.orderBy) ? compute.orderBy.map((entry) => entry == null ? void 0 : entry.field) : []
@@ -49970,12 +50429,12 @@ Please __addLocaleData before adding additional unit data`);
       ...Array.isArray(config == null ? void 0 : config.calculatedFields) ? config.calculatedFields : [],
       ...Array.isArray(config == null ? void 0 : config.computedMeasures) ? config.computedMeasures : [],
       ...Array.isArray(config == null ? void 0 : config.tableCalculations) ? config.tableCalculations : []
-    ]).filter((field) => isLocalComputedMeasure(field));
+    ]).filter((field2) => isLocalComputedMeasure(field2));
     const calculatedFieldIndex = /* @__PURE__ */ new Map();
-    localCalculatedFields.forEach((field) => {
-      [normalizeString12(field == null ? void 0 : field.id), normalizeString12(field == null ? void 0 : field.key)].filter(Boolean).forEach((alias) => {
+    localCalculatedFields.forEach((field2) => {
+      [normalizeString12(field2 == null ? void 0 : field2.id), normalizeString12(field2 == null ? void 0 : field2.key)].filter(Boolean).forEach((alias) => {
         if (!calculatedFieldIndex.has(alias)) {
-          calculatedFieldIndex.set(alias, field);
+          calculatedFieldIndex.set(alias, field2);
         }
       });
     });
@@ -50011,8 +50470,8 @@ Please __addLocaleData before adding additional unit data`);
         });
       }
     };
-    localCalculatedFields.filter((field) => selectedMeasureIds.has(normalizeString12((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key)))).forEach((field) => {
-      (field.dependencies || []).forEach((dependencyId) => {
+    localCalculatedFields.filter((field2) => selectedMeasureIds.has(normalizeString12((field2 == null ? void 0 : field2.id) || (field2 == null ? void 0 : field2.key)))).forEach((field2) => {
+      (field2.dependencies || []).forEach((dependencyId) => {
         resolveDependency(dependencyId);
       });
     });
@@ -50043,7 +50502,7 @@ Please __addLocaleData before adding additional unit data`);
     ignoreIds = []
   } = {}) {
     const fieldIndex = new Map(
-      (Array.isArray(fields2) ? fields2 : []).map((field) => [normalizeString12((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key)), field]).filter(([, field]) => !!field)
+      (Array.isArray(fields2) ? fields2 : []).map((field2) => [normalizeString12((field2 == null ? void 0 : field2.id) || (field2 == null ? void 0 : field2.key)), field2]).filter(([, field2]) => !!field2)
     );
     const ignored = new Set(
       (Array.isArray(ignoreIds) ? ignoreIds : []).map((id) => normalizeString12(id)).filter(Boolean)
@@ -50054,9 +50513,9 @@ Please __addLocaleData before adding additional unit data`);
   }
   function buildRawFieldSelection(fields2 = [], semanticIds = []) {
     const rawIndex = /* @__PURE__ */ new Map();
-    (Array.isArray(fields2) ? fields2 : []).forEach((field) => {
-      const rawId = normalizeString12((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key));
-      const semanticRef = semanticFieldId(field);
+    (Array.isArray(fields2) ? fields2 : []).forEach((field2) => {
+      const rawId = normalizeString12((field2 == null ? void 0 : field2.id) || (field2 == null ? void 0 : field2.key));
+      const semanticRef = semanticFieldId(field2);
       if (!rawId) {
         return;
       }
@@ -50087,7 +50546,7 @@ Please __addLocaleData before adding additional unit data`);
     if (!normalizedBinding || normalizedBinding.mode !== "semantic") {
       return null;
     }
-    const localComputedMeasureIds = (Array.isArray(config == null ? void 0 : config.computedMeasures) ? config.computedMeasures : []).concat(Array.isArray(config == null ? void 0 : config.calculatedFields) ? config.calculatedFields : []).concat(Array.isArray(config == null ? void 0 : config.tableCalculations) ? config.tableCalculations : []).filter((field) => isLocalComputedMeasure(field)).map((field) => normalizeString12((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key))).filter(Boolean);
+    const localComputedMeasureIds = (Array.isArray(config == null ? void 0 : config.computedMeasures) ? config.computedMeasures : []).concat(Array.isArray(config == null ? void 0 : config.calculatedFields) ? config.calculatedFields : []).concat(Array.isArray(config == null ? void 0 : config.tableCalculations) ? config.tableCalculations : []).filter((field2) => isLocalComputedMeasure(field2)).map((field2) => normalizeString12((field2 == null ? void 0 : field2.id) || (field2 == null ? void 0 : field2.key))).filter(Boolean);
     const localCalculatedDependencies = resolveLocalCalculatedFieldDependencies(config, state);
     const selectedDimensionIds = resolveSemanticSelectedDimensions(config, state);
     const selectedDimensions = buildSemanticSelectionIds(config.dimensions, selectedDimensionIds);
@@ -50279,15 +50738,15 @@ Please __addLocaleData before adding additional unit data`);
     if (!level || typeof level !== "object" || Array.isArray(level)) {
       return null;
     }
-    const field = normalizeString15(level.field || level.fieldRef || level.id);
-    const label = normalizeString15(level.label || field);
-    const id = normalizeString15(level.id || field || `level_${index + 1}`);
-    if (!field || !label || !id) {
+    const field2 = normalizeString15(level.field || level.fieldRef || level.id);
+    const label = normalizeString15(level.label || field2);
+    const id = normalizeString15(level.id || field2 || `level_${index + 1}`);
+    if (!field2 || !label || !id) {
       return null;
     }
     return {
       id,
-      field,
+      field: field2,
       label
     };
   }
@@ -50370,7 +50829,7 @@ Please __addLocaleData before adding additional unit data`);
   // src/components/dashboard/reportBuilderChartRules.js
   var CARTESIAN_CHART_TYPES = ["line", "bar", "area"];
   var CATEGORY_CHART_TYPES = ["pie", "donut", "horizontal_bar", "funnel_bar"];
-  var ALL_SUPPORTED_CHART_TYPES = [...CARTESIAN_CHART_TYPES, ...CATEGORY_CHART_TYPES, "heatmap", "category-range"];
+  var ALL_SUPPORTED_CHART_TYPES = [...CARTESIAN_CHART_TYPES, ...CATEGORY_CHART_TYPES, "heatmap", "category-range", "routing-impact", "stage-allocation"];
   var SINGLE_MEASURE_CATEGORY_TYPES = /* @__PURE__ */ new Set(["pie", "donut", "funnel_bar"]);
   function chartFamilyForType(type = "") {
     const normalized = String(type || "").trim().toLowerCase();
@@ -50502,10 +50961,10 @@ Please __addLocaleData before adding additional unit data`);
     return value == null ? value : JSON.parse(JSON.stringify(value));
   }
   var SUPPORTED_REFINEMENT_OPS = /* @__PURE__ */ new Set(["keep", "exclude", "drill", "detail"]);
-  function resolveDefaultRefinementId({ op = "", field = "", sourceBlockId = "" } = {}) {
+  function resolveDefaultRefinementId({ op = "", field: field2 = "", sourceBlockId = "" } = {}) {
     return [
       normalizeString18(op),
-      normalizeString18(field),
+      normalizeString18(field2),
       normalizeString18(sourceBlockId)
     ].filter(Boolean).join(":");
   }
@@ -50517,19 +50976,19 @@ Please __addLocaleData before adding additional unit data`);
     if (!SUPPORTED_REFINEMENT_OPS.has(op)) {
       return null;
     }
-    const field = normalizeString18(refinement.field);
-    if (!field) {
+    const field2 = normalizeString18(refinement.field);
+    if (!field2) {
       return null;
     }
     const sourceBlockId = normalizeString18(refinement.sourceBlockId);
-    const id = normalizeString18(refinement.id || resolveDefaultRefinementId({ op, field, sourceBlockId }));
+    const id = normalizeString18(refinement.id || resolveDefaultRefinementId({ op, field: field2, sourceBlockId }));
     if (!id) {
       return null;
     }
     return {
       id,
       op,
-      field,
+      field: field2,
       values: Array.isArray(refinement.values) ? refinement.values.map((value) => cloneValue11(value)) : [],
       ...sourceBlockId ? { sourceBlockId } : {},
       ...normalizeString18(refinement.label) ? { label: normalizeString18(refinement.label) } : {},
@@ -50730,7 +51189,7 @@ Please __addLocaleData before adding additional unit data`);
       normalizeReportCalculatedFields([
         ...localCalculatedFields,
         ...localTableCalculations
-      ]).map((field) => String((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key) || "").trim()).filter(Boolean)
+      ]).map((field2) => String((field2 == null ? void 0 : field2.id) || (field2 == null ? void 0 : field2.key) || "").trim()).filter(Boolean)
     );
     return currentMeasures.filter((id) => derivedMeasureIds.has(id));
   }
@@ -50969,8 +51428,10 @@ Please __addLocaleData before adding additional unit data`);
     const categoryRange = type === "category-range" ? normalizeCategoryRange(chartSpec.categoryRange) : null;
     if (type === "heatmap" && ["seriesField", "seriesOptions", "metricSelection", "layout", "stacked"].some((key2) => chartSpec[key2] != null)) throw new Error("Heatmap uses its own declared fields, color scale and category order; seriesField, seriesOptions, metricSelection, layout and stacked are unsupported.");
     const heatmap = type === "heatmap" ? normalizeHeatmap(chartSpec.heatmap) : null;
-    const xField = (categoryRange == null ? void 0 : categoryRange.categoryField) || (heatmap == null ? void 0 : heatmap.rowField) || normalizeChartSpecValue(chartSpec.xField);
-    const yFields = categoryRange ? categoryRangeFields(categoryRange) : heatmap ? [heatmap.valueField] : normalizeStringArray3(chartSpec.yFields || chartSpec.yField).filter(Boolean);
+    if (isScenarioType(type) && ["seriesField", "seriesOptions", "metricSelection", "layout", "stacked", "tooltip", "center", "sliceLabel"].some((key2) => chartSpec[key2] != null)) throw new Error("Scenario charts use their own declared state, fields and metric contracts.");
+    const scenario = isScenarioType(type) ? normalizeScenario(type, chartSpec[scenarioKey(type)]) : null;
+    const xField = (scenario ? scenarioFields(type, scenario)[0] : null) || (categoryRange == null ? void 0 : categoryRange.categoryField) || (heatmap == null ? void 0 : heatmap.rowField) || normalizeChartSpecValue(chartSpec.xField);
+    const yFields = scenario ? [type === "routing-impact" ? scenario.amountField : scenario.metrics[0].field || scenario.metrics[0].numeratorField] : categoryRange ? categoryRangeFields(categoryRange) : heatmap ? [heatmap.valueField] : normalizeStringArray3(chartSpec.yFields || chartSpec.yField).filter(Boolean);
     const seriesField = normalizeChartSpecValue(chartSpec.seriesField);
     const seriesOptions = normalizeChartSeriesOptions(chartSpec.seriesOptions);
     const categoryLabel = normalizeChartCategoryLabel(chartSpec.categoryLabel);
@@ -50986,6 +51447,7 @@ Please __addLocaleData before adding additional unit data`);
       ...accentTone ? { accentTone } : {},
       ...highlights.length > 0 ? { highlights } : {},
       type,
+      ...scenario ? { [scenarioKey(type)]: scenario } : {},
       ...heatmap ? { heatmap } : {},
       ...categoryRange ? { categoryRange } : {},
       ...chartSpec.paletteMode ? { paletteMode: chartSpec.paletteMode, palette: [...chartSpec.palette] } : {},
@@ -51041,7 +51503,7 @@ Please __addLocaleData before adding additional unit data`);
       return null;
     }
     const universe = chartConfigUniverse(config);
-    if (chartTooltipFields(normalized.tooltip).some((field) => !universe.has(field))) return null;
+    if (chartTooltipFields(normalized.tooltip).some((field2) => !universe.has(field2))) return null;
     if (!normalized.xField || !universe.has(normalized.xField)) {
       return null;
     }
@@ -51052,8 +51514,9 @@ Please __addLocaleData before adding additional unit data`);
       return null;
     }
     if (normalized.sliceLabel && !universe.has(normalized.sliceLabel.field)) return null;
-    if (normalized.center && !normalized.center.datasetRef && donutCenterFields(normalized.center).some((field) => !universe.has(field))) return null;
+    if (normalized.center && !normalized.center.datasetRef && donutCenterFields(normalized.center).some((field2) => !universe.has(field2))) return null;
     if (normalized.type === "heatmap") return universe.has(normalized.heatmap.columnField) ? normalized : null;
+    if (isScenarioType(normalized.type)) return scenarioFields(normalized.type, normalized[scenarioKey(normalized.type)]).every((key2) => universe.has(key2)) ? normalized : null;
     if (normalized.type === "category-range") return normalized;
     const family = chartFamilyForType(normalized.type);
     if (SINGLE_MEASURE_CATEGORY_TYPES.has(normalized.type) && normalized.yFields.length > 1) {
@@ -51261,8 +51724,8 @@ Please __addLocaleData before adding additional unit data`);
       errors.push({ field: "type", code: "unsupportedType" });
     }
     const fields2 = chartFieldIndex(columns);
-    chartTooltipFields(normalized.tooltip).forEach((field, index) => {
-      if (!fields2.has(field)) errors.push({ field: `tooltip.fields.${index}.field`, code: "missingField" });
+    chartTooltipFields(normalized.tooltip).forEach((field2, index) => {
+      if (!fields2.has(field2)) errors.push({ field: `tooltip.fields.${index}.field`, code: "missingField" });
     });
     const xField = normalized.xField ? fields2.get(normalized.xField) : null;
     if (!xField) {
@@ -51274,12 +51737,12 @@ Please __addLocaleData before adding additional unit data`);
       errors.push({ field: "yFields", code: "empty" });
     } else {
       normalized.yFields.forEach((fieldKey, index) => {
-        const field = fields2.get(fieldKey);
-        if (!field) {
+        const field2 = fields2.get(fieldKey);
+        if (!field2) {
           errors.push({ field: `yFields.${index}`, code: "missingField" });
           return;
         }
-        if (field.kind !== "measure") {
+        if (field2.kind !== "measure") {
           errors.push({ field: `yFields.${index}`, code: "wrongKind" });
         }
       });
@@ -51289,10 +51752,14 @@ Please __addLocaleData before adding additional unit data`);
       if (!column || column.kind !== "dimension") errors.push({ field: "heatmap.columnField", code: !column ? "missingField" : "wrongKind" });
       return { valid: errors.length === 0, errors };
     }
+    if (isScenarioType(normalized.type)) {
+      for (const key2 of scenarioFields(normalized.type, normalized[scenarioKey(normalized.type)])) if (!fields2.has(key2)) errors.push({ field: key2, code: "missingField" });
+      return { valid: errors.length === 0, errors };
+    }
     if (normalized.type === "category-range") return { valid: errors.length === 0, errors };
     if (normalized.sliceLabel) {
-      const field = fields2.get(normalized.sliceLabel.field);
-      if (!field || field.kind !== "measure") errors.push({ field: "sliceLabel.field", code: !field ? "missingField" : "wrongKind" });
+      const field2 = fields2.get(normalized.sliceLabel.field);
+      if (!field2 || field2.kind !== "measure") errors.push({ field: "sliceLabel.field", code: !field2 ? "missingField" : "wrongKind" });
     }
     if (normalized.center && !normalized.center.datasetRef) for (const key2 of donutCenterFields(normalized.center)) {
       const centerField = fields2.get(key2);
@@ -51957,9 +52424,9 @@ Please __addLocaleData before adding additional unit data`);
       } else if (selectedOrder.orderByAsc && dir === "asc") {
         request.orderBy = [selectedOrder.orderByAsc];
       } else {
-        const field = String(selectedOrder.field || selectedOrder.value || "").trim();
-        if (field) {
-          request.orderBy = [`${field} ${dir}`];
+        const field2 = String(selectedOrder.field || selectedOrder.value || "").trim();
+        if (field2) {
+          request.orderBy = [`${field2} ${dir}`];
         }
       }
     } else if (requestConfig.orderBy) {
@@ -52017,6 +52484,7 @@ Please __addLocaleData before adding additional unit data`);
     if (!normalized) {
       return container;
     }
+    if (isScenarioType(normalized.type)) return { ...container, chart: { type: normalized.type, ...normalized.appearance ? { appearance: normalized.appearance } : {}, ...typeof normalized.allowTableSwitch === "boolean" ? { allowTableSwitch: normalized.allowTableSwitch } : {}, [scenarioKey(normalized.type)]: normalized[scenarioKey(normalized.type)], xAxis: { dataKey: normalized.xField }, series: { valueKey: normalized.yFields[0], values: normalized.yFields.map((value) => ({ value, label: value, type: "bar" })) } } };
     if (normalized.type === "category-range") return { ...container, chart: { type: "category-range", categoryRange: normalized.categoryRange, ...normalized.appearance ? { appearance: normalized.appearance } : {}, ...normalized.tooltip ? { tooltip: normalized.tooltip } : {}, ...typeof normalized.allowTableSwitch === "boolean" ? { allowTableSwitch: normalized.allowTableSwitch } : {}, xAxis: { dataKey: normalized.xField }, series: { valueKey: normalized.yFields[0], values: normalized.yFields.map((value) => ({ value, label: value, type: "bar" })) } } };
     if (normalized.type === "heatmap") return { ...container, chart: { type: "heatmap", heatmap: normalized.heatmap, ...normalized.appearance ? { appearance: normalized.appearance } : {}, ...normalized.tooltip ? { tooltip: normalized.tooltip } : {}, ...typeof normalized.allowTableSwitch === "boolean" ? { allowTableSwitch: normalized.allowTableSwitch } : {}, series: { valueKey: normalized.heatmap.valueField, values: [{ value: normalized.heatmap.valueField, label: normalized.heatmap.valueField, type: "heatmap" }] } } };
     const measures = getSelectableReportBuilderMeasures(config);
@@ -52999,7 +53467,7 @@ Please __addLocaleData before adding additional unit data`);
       return baseConfig;
     }
     const fieldOptions = (() => {
-      const entries = [];
+      const entries2 = [];
       const seen = /* @__PURE__ */ new Set();
       [
         ...Array.isArray(normalizedSource == null ? void 0 : normalizedSource.columnOptions) ? normalizedSource.columnOptions : [],
@@ -53018,9 +53486,9 @@ Please __addLocaleData before adding additional unit data`);
           return;
         }
         seen.add(identity);
-        entries.push(cloneValue18(option));
+        entries2.push(cloneValue18(option));
       });
-      return entries;
+      return entries2;
     })();
     const inheritRuntimeFieldCatalog = ((_a5 = normalizedSource == null ? void 0 : normalizedSource.capabilities) == null ? void 0 : _a5.inheritRuntimeFieldCatalog) === true && fieldOptions.length === 0;
     const dimensions = inheritRuntimeFieldCatalog ? cloneValue18((baseConfig == null ? void 0 : baseConfig.dimensions) || []) : fieldOptions.filter((column) => normalizeString28(column == null ? void 0 : column.kind) === "dimension").map((column) => ({
@@ -53292,21 +53760,21 @@ Please __addLocaleData before adding additional unit data`);
     }
     return Object.keys(next).length > 0 ? next : null;
   }
-  function normalizeSemanticSummaryField(field = {}) {
-    if (!field || typeof field !== "object" || Array.isArray(field)) {
+  function normalizeSemanticSummaryField(field2 = {}) {
+    if (!field2 || typeof field2 !== "object" || Array.isArray(field2)) {
       return null;
     }
-    const id = normalizeString28(field == null ? void 0 : field.id);
-    const label = normalizeString28((field == null ? void 0 : field.label) || id);
+    const id = normalizeString28(field2 == null ? void 0 : field2.id);
+    const label = normalizeString28((field2 == null ? void 0 : field2.label) || id);
     if (!id || !label) {
       return null;
     }
-    const rawId = normalizeString28(field == null ? void 0 : field.rawId);
-    const description = normalizeString28(field == null ? void 0 : field.description);
-    const format2 = normalizeString28(field == null ? void 0 : field.format);
-    const category = normalizeString28(field == null ? void 0 : field.category);
-    const definitionRef = normalizeString28(field == null ? void 0 : field.definitionRef);
-    const governance = normalizeSemanticSummaryGovernance(field == null ? void 0 : field.governance);
+    const rawId = normalizeString28(field2 == null ? void 0 : field2.rawId);
+    const description = normalizeString28(field2 == null ? void 0 : field2.description);
+    const format2 = normalizeString28(field2 == null ? void 0 : field2.format);
+    const category = normalizeString28(field2 == null ? void 0 : field2.category);
+    const definitionRef = normalizeString28(field2 == null ? void 0 : field2.definitionRef);
+    const governance = normalizeSemanticSummaryGovernance(field2 == null ? void 0 : field2.governance);
     return {
       id,
       ...rawId ? { rawId } : {},
@@ -53331,7 +53799,7 @@ Please __addLocaleData before adding additional unit data`);
     if (!modelRef || !entity) {
       return null;
     }
-    const selectedParameters = (Array.isArray(summary.selectedParameters) ? summary.selectedParameters : []).map((field) => normalizeSemanticSummaryField(field)).filter(Boolean);
+    const selectedParameters = (Array.isArray(summary.selectedParameters) ? summary.selectedParameters : []).map((field2) => normalizeSemanticSummaryField(field2)).filter(Boolean);
     return {
       kind: "semantic",
       modelRef,
@@ -53340,8 +53808,8 @@ Please __addLocaleData before adding additional unit data`);
       entity,
       ...normalizeString28(summary.entityLabel) ? { entityLabel: normalizeString28(summary.entityLabel) } : {},
       ...normalizeString28(summary.entityDescription) ? { entityDescription: normalizeString28(summary.entityDescription) } : {},
-      selectedDimensions: (Array.isArray(summary.selectedDimensions) ? summary.selectedDimensions : []).map((field) => normalizeSemanticSummaryField(field)).filter(Boolean),
-      selectedMeasures: (Array.isArray(summary.selectedMeasures) ? summary.selectedMeasures : []).map((field) => normalizeSemanticSummaryField(field)).filter(Boolean),
+      selectedDimensions: (Array.isArray(summary.selectedDimensions) ? summary.selectedDimensions : []).map((field2) => normalizeSemanticSummaryField(field2)).filter(Boolean),
+      selectedMeasures: (Array.isArray(summary.selectedMeasures) ? summary.selectedMeasures : []).map((field2) => normalizeSemanticSummaryField(field2)).filter(Boolean),
       ...selectedParameters.length > 0 ? { selectedParameters } : {}
     };
   }
@@ -53560,9 +54028,9 @@ Please __addLocaleData before adding additional unit data`);
     }
     cursor[segments[segments.length - 1]] = value;
   }
-  function buildReportBuilderFieldLookup(entries = []) {
+  function buildReportBuilderFieldLookup(entries2 = []) {
     const result = /* @__PURE__ */ new Map();
-    (Array.isArray(entries) ? entries : []).forEach((entry) => {
+    (Array.isArray(entries2) ? entries2 : []).forEach((entry) => {
       const normalizedEntry = entry && typeof entry === "object" && !Array.isArray(entry) ? entry : null;
       if (!normalizedEntry) {
         return;
@@ -53587,8 +54055,8 @@ Please __addLocaleData before adding additional unit data`);
   }
   function buildReportBuilderFieldCatalog(config = {}, datasetRef = "primary") {
     const lookup = /* @__PURE__ */ new Map();
-    const addEntries = (entries = [], kind = "") => {
-      buildReportBuilderFieldLookup(entries).forEach((entry, alias) => {
+    const addEntries = (entries2 = [], kind = "") => {
+      buildReportBuilderFieldLookup(entries2).forEach((entry, alias) => {
         if (!lookup.has(alias)) {
           lookup.set(alias, { kind, entry });
         }
@@ -53600,7 +54068,7 @@ Please __addLocaleData before adding additional unit data`);
       ...Array.isArray(config == null ? void 0 : config.calculatedFields) ? config.calculatedFields : [],
       ...Array.isArray(config == null ? void 0 : config.computedMeasures) ? config.computedMeasures : [],
       ...Array.isArray(config == null ? void 0 : config.tableCalculations) ? config.tableCalculations : []
-    ], { datasetRef }).filter((field) => field.datasetRef === datasetRef);
+    ], { datasetRef }).filter((field2) => field2.datasetRef === datasetRef);
     validateReportCalculatedFieldDependencies(calculatedFields);
     addEntries(calculatedFields, "calculated");
     return { lookup };
@@ -53638,6 +54106,7 @@ Please __addLocaleData before adding additional unit data`);
       categoryRangeFields(chartSpec.categoryRange).forEach(addSelection);
     }
     chartTooltipFields(chartSpec == null ? void 0 : chartSpec.tooltip).forEach(addSelection);
+    if (isScenarioType(chartSpec == null ? void 0 : chartSpec.type)) scenarioFields(chartSpec.type, chartSpec[scenarioKey(chartSpec.type)]).forEach(addSelection);
     addSelection((_a5 = chartSpec == null ? void 0 : chartSpec.heatmap) == null ? void 0 : _a5.rowField);
     addSelection((_b = chartSpec == null ? void 0 : chartSpec.heatmap) == null ? void 0 : _b.columnField);
     addSelection((_c = chartSpec == null ? void 0 : chartSpec.heatmap) == null ? void 0 : _c.valueField);
@@ -53655,7 +54124,7 @@ Please __addLocaleData before adding additional unit data`);
     if (!normalizedBlock) {
       return null;
     }
-    for (const field of tableAnalyticsFields(normalizedBlock)) if (!resolveReportBuilderCatalogEntry(fieldCatalog, field)) throw new Error(`Analytical table field ${field} must be declared by its dataset catalog.`);
+    for (const field2 of tableAnalyticsFields(normalizedBlock)) if (!resolveReportBuilderCatalogEntry(fieldCatalog, field2)) throw new Error(`Analytical table field ${field2} must be declared by its dataset catalog.`);
     const columns = Array.isArray(normalizedBlock == null ? void 0 : normalizedBlock.columns) ? normalizedBlock.columns : [];
     normalizedBlock.columns = columns.map((column) => {
       var _a5, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
@@ -53733,8 +54202,8 @@ Please __addLocaleData before adding additional unit data`);
     }
     return nextBlock;
   }
-  function resolveAuthoredFieldDisplayDescriptor(fieldCatalog = {}, field = "") {
-    const catalogEntry = resolveReportBuilderCatalogEntry(fieldCatalog, field);
+  function resolveAuthoredFieldDisplayDescriptor(fieldCatalog = {}, field2 = "") {
+    const catalogEntry = resolveReportBuilderCatalogEntry(fieldCatalog, field2);
     const fieldId = resolveReportBuilderFieldId(catalogEntry == null ? void 0 : catalogEntry.entry);
     if (!(catalogEntry == null ? void 0 : catalogEntry.entry) || !fieldId) {
       return null;
@@ -53757,10 +54226,10 @@ Please __addLocaleData before adding additional unit data`);
     const mappings = cloneValue19(authored || {});
     const matches = String(template || "").matchAll(/\brow\.([A-Za-z_][A-Za-z0-9_.]*)/g);
     for (const match2 of matches) {
-      const field = normalizeString30(match2 == null ? void 0 : match2[1]);
-      const descriptor = resolveAuthoredFieldDisplayDescriptor(fieldCatalog, field);
-      if (field && descriptor) {
-        mappings[field] = { ...mappings[field], ...descriptor };
+      const field2 = normalizeString30(match2 == null ? void 0 : match2[1]);
+      const descriptor = resolveAuthoredFieldDisplayDescriptor(fieldCatalog, field2);
+      if (field2 && descriptor) {
+        mappings[field2] = { ...mappings[field2], ...descriptor };
       }
     }
     return Object.keys(mappings).length > 0 ? mappings : null;
@@ -53868,9 +54337,9 @@ Please __addLocaleData before adding additional unit data`);
     const calculatedFields = Array.isArray(nextSpec == null ? void 0 : nextSpec.calculatedFields) ? nextSpec.calculatedFields : [];
     nextSpec.calculatedFields = calculatedFields;
     const calculatedFieldIds = new Set(
-      calculatedFields.map((field) => {
-        const fieldId = resolveReportBuilderFieldId(field);
-        return fieldId ? JSON.stringify([normalizeString30((field == null ? void 0 : field.datasetRef) || "primary") || "primary", fieldId]) : "";
+      calculatedFields.map((field2) => {
+        const fieldId = resolveReportBuilderFieldId(field2);
+        return fieldId ? JSON.stringify([normalizeString30((field2 == null ? void 0 : field2.datasetRef) || "primary") || "primary", fieldId]) : "";
       }).filter(Boolean)
     );
     const visitingCalculatedFields = /* @__PURE__ */ new Set();
@@ -53919,7 +54388,7 @@ Please __addLocaleData before adding additional unit data`);
       return true;
     };
     (Array.isArray(blocks) ? blocks : []).forEach((block) => {
-      var _a5, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q;
+      var _a5, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r;
       const normalizedBlock = block && typeof block === "object" && !Array.isArray(block) ? block : null;
       if (!normalizedBlock) {
         return;
@@ -53932,22 +54401,23 @@ Please __addLocaleData before adding additional unit data`);
       }
       switch (normalizeString30(normalizedBlock == null ? void 0 : normalizedBlock.kind)) {
         case "chartBlock":
-          for (const field of chartTooltipFields((_a5 = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _a5.tooltip)) enableField(field, normalizedDatasetRef, request);
-          if ((_b = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _b.categoryRange) for (const field of [normalizedBlock.chartSpec.categoryRange.categoryField, ...categoryRangeFields(normalizedBlock.chartSpec.categoryRange)]) enableField(field, normalizedDatasetRef, request);
+          for (const field2 of chartTooltipFields((_a5 = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _a5.tooltip)) enableField(field2, normalizedDatasetRef, request);
+          if ((_b = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _b.categoryRange) for (const field2 of [normalizedBlock.chartSpec.categoryRange.categoryField, ...categoryRangeFields(normalizedBlock.chartSpec.categoryRange)]) enableField(field2, normalizedDatasetRef, request);
           if ((_c = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _c.center) {
             const center = normalizedBlock.chartSpec.center, ref = center.datasetRef || normalizedDatasetRef;
             const target = nextSpec.datasets.find((entry) => normalizeString30(entry.id) === ref);
             if (!target) throw new Error(`Donut center dataset '${ref}' is unavailable.`);
-            for (const field of donutCenterFields(center)) {
-              const catalog = resolveReportBuilderCatalogEntry(datasetFieldCatalogs.get(ref) || fieldCatalog, field);
-              if (!catalog || !["measure", "calculated"].includes(catalog.kind) || !enableField(field, ref, target.request)) throw new Error("Donut center fields must be declared measures of their dataset.");
+            for (const field2 of donutCenterFields(center)) {
+              const catalog = resolveReportBuilderCatalogEntry(datasetFieldCatalogs.get(ref) || fieldCatalog, field2);
+              if (!catalog || !["measure", "calculated"].includes(catalog.kind) || !enableField(field2, ref, target.request)) throw new Error("Donut center fields must be declared measures of their dataset.");
             }
           }
-          for (const key2 of ["rowField", "columnField", "valueField"]) enableField((_e = (_d = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _d.heatmap) == null ? void 0 : _e[key2], normalizedDatasetRef, request);
-          enableField((_g = (_f = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _f.sliceLabel) == null ? void 0 : _g.field, normalizedDatasetRef, request);
-          enableField((_h = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _h.xField, normalizedDatasetRef, request);
-          normalizeString30((_i = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _i.seriesField) && enableField(normalizedBlock.chartSpec.seriesField, normalizedDatasetRef, request);
-          (Array.isArray((_j = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _j.yFields) ? normalizedBlock.chartSpec.yFields : []).forEach((fieldKey) => enableField(fieldKey, normalizedDatasetRef, request));
+          if (isScenarioType((_d = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _d.type)) for (const key2 of scenarioFields(normalizedBlock.chartSpec.type, normalizedBlock.chartSpec[scenarioKey(normalizedBlock.chartSpec.type)])) enableField(key2, normalizedDatasetRef, request);
+          for (const key2 of ["rowField", "columnField", "valueField"]) enableField((_f = (_e = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _e.heatmap) == null ? void 0 : _f[key2], normalizedDatasetRef, request);
+          enableField((_h = (_g = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _g.sliceLabel) == null ? void 0 : _h.field, normalizedDatasetRef, request);
+          enableField((_i = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _i.xField, normalizedDatasetRef, request);
+          normalizeString30((_j = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _j.seriesField) && enableField(normalizedBlock.chartSpec.seriesField, normalizedDatasetRef, request);
+          (Array.isArray((_k = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _k.yFields) ? normalizedBlock.chartSpec.yFields : []).forEach((fieldKey) => enableField(fieldKey, normalizedDatasetRef, request));
           break;
         case "kpiBlock":
           enableField(normalizedBlock == null ? void 0 : normalizedBlock.valueField, normalizedDatasetRef, request);
@@ -53962,7 +54432,7 @@ Please __addLocaleData before adding additional unit data`);
           }
           {
             const secondaryRef = normalizeString30(normalizedBlock == null ? void 0 : normalizedBlock.secondaryDatasetRef) || normalizedDatasetRef;
-            const secondaryRequest = (_k = nextSpec.datasets.find((entry) => normalizeString30(entry == null ? void 0 : entry.id) === secondaryRef)) == null ? void 0 : _k.request;
+            const secondaryRequest = (_l = nextSpec.datasets.find((entry) => normalizeString30(entry == null ? void 0 : entry.id) === secondaryRef)) == null ? void 0 : _l.request;
             if (secondaryRequest) enableField(normalizedBlock == null ? void 0 : normalizedBlock.secondaryField, secondaryRef, secondaryRequest);
           }
           break;
@@ -53972,7 +54442,7 @@ Please __addLocaleData before adding additional unit data`);
           });
           break;
         case "tableBlock":
-          tableAnalyticsFields(normalizedBlock).forEach((field) => enableField(field, normalizedDatasetRef, request));
+          tableAnalyticsFields(normalizedBlock).forEach((field2) => enableField(field2, normalizedDatasetRef, request));
           (Array.isArray(normalizedBlock == null ? void 0 : normalizedBlock.columns) ? normalizedBlock.columns : []).forEach((column) => {
             var _a6, _b2, _c2;
             enableField(column == null ? void 0 : column.key, normalizedDatasetRef, request);
@@ -53982,10 +54452,10 @@ Please __addLocaleData before adding additional unit data`);
           });
           break;
         case "geoMapBlock":
-          enableField((_l = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _l.key, normalizedDatasetRef, request);
-          enableField((_m = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _m.labelKey, normalizedDatasetRef, request);
-          enableField((_o = (_n = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _n.metric) == null ? void 0 : _o.key, normalizedDatasetRef, request);
-          enableField((_q = (_p = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _p.color) == null ? void 0 : _q.field, normalizedDatasetRef, request);
+          enableField((_m = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _m.key, normalizedDatasetRef, request);
+          enableField((_n = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _n.labelKey, normalizedDatasetRef, request);
+          enableField((_p = (_o = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _o.metric) == null ? void 0 : _p.key, normalizedDatasetRef, request);
+          enableField((_r = (_q = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _q.color) == null ? void 0 : _r.field, normalizedDatasetRef, request);
           break;
         default:
           break;
@@ -54491,12 +54961,12 @@ Please __addLocaleData before adding additional unit data`);
       ...(Array.isArray(primaryDataset == null ? void 0 : primaryDataset.chartFieldOptions) ? primaryDataset.chartFieldOptions : []).filter((entry) => normalizeString30(entry == null ? void 0 : entry.kind) === "measure")
     ];
   }
-  function mergePrimaryDatasetCatalogEntries(entries = [], persistedEntries = []) {
+  function mergePrimaryDatasetCatalogEntries(entries2 = [], persistedEntries = []) {
     const persistedByAlias = /* @__PURE__ */ new Map();
     (Array.isArray(persistedEntries) ? persistedEntries : []).forEach((entry) => {
       [entry == null ? void 0 : entry.id, entry == null ? void 0 : entry.key, entry == null ? void 0 : entry.sourceKey, entry == null ? void 0 : entry.value, entry == null ? void 0 : entry.rawId].map((value) => normalizeString30(value)).filter(Boolean).forEach((alias) => persistedByAlias.set(alias, entry));
     });
-    return (Array.isArray(entries) ? entries : []).map((entry) => {
+    return (Array.isArray(entries2) ? entries2 : []).map((entry) => {
       const persisted = [entry == null ? void 0 : entry.id, entry == null ? void 0 : entry.key, entry == null ? void 0 : entry.sourceKey, entry == null ? void 0 : entry.value, entry == null ? void 0 : entry.rawId].map((value) => normalizeString30(value)).filter(Boolean).map((alias) => persistedByAlias.get(alias)).find(Boolean);
       return persisted ? { ...cloneValue19(persisted), ...entry } : entry;
     });
@@ -55730,8 +56200,8 @@ Please __addLocaleData before adding additional unit data`);
       ...mergedDatasets.filter((dataset) => normalizeString30(dataset == null ? void 0 : dataset.id) !== "primary")
     ];
     const nextDatasetIds = new Set(nextDatasets.map((dataset) => normalizeString30(dataset == null ? void 0 : dataset.id)).filter(Boolean));
-    const nextCalculatedFields = (Array.isArray(baseSpec == null ? void 0 : baseSpec.calculatedFields) ? baseSpec.calculatedFields : []).filter((field) => {
-      const datasetRef = normalizeString30((field == null ? void 0 : field.datasetRef) || "primary") || "primary";
+    const nextCalculatedFields = (Array.isArray(baseSpec == null ? void 0 : baseSpec.calculatedFields) ? baseSpec.calculatedFields : []).filter((field2) => {
+      const datasetRef = normalizeString30((field2 == null ? void 0 : field2.datasetRef) || "primary") || "primary";
       return nextDatasetIds.has(datasetRef);
     });
     const loweredScopeParams = enrichLoweredScopeParams(
@@ -55771,14 +56241,14 @@ Please __addLocaleData before adding additional unit data`);
     }
   };
   var bounded = (value) => typeof value === "string" && value.length <= 128 ? value : "";
-  function selectedField(chartSpec, field) {
+  function selectedField(chartSpec, field2) {
     var _a5, _b, _c, _d, _e, _f, _g;
-    if (field === "center.value.field") return bounded((_b = (_a5 = chartSpec == null ? void 0 : chartSpec.center) == null ? void 0 : _a5.value) == null ? void 0 : _b.field);
-    if (field.startsWith("heatmap.")) return bounded((_c = chartSpec == null ? void 0 : chartSpec.heatmap) == null ? void 0 : _c[field.slice(8)]);
-    if (field === "xField" || field === "seriesField") return bounded(chartSpec == null ? void 0 : chartSpec[field]);
-    const tooltipIndex = /^tooltip\.fields\.([0-9]+)\.field$/.exec(field);
+    if (field2 === "center.value.field") return bounded((_b = (_a5 = chartSpec == null ? void 0 : chartSpec.center) == null ? void 0 : _a5.value) == null ? void 0 : _b.field);
+    if (field2.startsWith("heatmap.")) return bounded((_c = chartSpec == null ? void 0 : chartSpec.heatmap) == null ? void 0 : _c[field2.slice(8)]);
+    if (field2 === "xField" || field2 === "seriesField") return bounded(chartSpec == null ? void 0 : chartSpec[field2]);
+    const tooltipIndex = /^tooltip\.fields\.([0-9]+)\.field$/.exec(field2);
     if (tooltipIndex) return bounded((_f = (_e = (_d = chartSpec == null ? void 0 : chartSpec.tooltip) == null ? void 0 : _d.fields) == null ? void 0 : _e[Number(tooltipIndex[1])]) == null ? void 0 : _f.field);
-    const index = /^yFields\.([0-9]+)$/.exec(field);
+    const index = /^yFields\.([0-9]+)$/.exec(field2);
     return index ? bounded((_g = chartSpec == null ? void 0 : chartSpec.yFields) == null ? void 0 : _g[Number(index[1])]) : "";
   }
   function lowerValidatedReportDocument(document, options = {}) {
@@ -55789,12 +56259,12 @@ Please __addLocaleData before adding additional unit data`);
         if (validation == null ? void 0 : validation.valid) return;
         for (const error of Array.isArray(validation == null ? void 0 : validation.errors) ? validation.errors : []) {
           if (diagnostics.length >= 64) break;
-          const field = bounded(error == null ? void 0 : error.field);
+          const field2 = bounded(error == null ? void 0 : error.field);
           diagnostics.push({
             blockId: bounded(blockId),
             datasetRef: bounded(datasetRef),
-            field,
-            fieldRef: selectedField(chartSpec, field),
+            field: field2,
+            fieldRef: selectedField(chartSpec, field2),
             validationCode: bounded(error == null ? void 0 : error.code)
           });
         }
@@ -55819,8 +56289,8 @@ Please __addLocaleData before adding additional unit data`);
       return fallbackText;
     }
     if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-      const text3 = String(value);
-      return text3 || fallbackText;
+      const text4 = String(value);
+      return text4 || fallbackText;
     }
     return fallbackText;
   }
@@ -55972,7 +56442,7 @@ Please __addLocaleData before adding additional unit data`);
         row,
         value
       }) : linkConfig.label ? resolveKey(row || {}, linkConfig.label) : (_c = linkConfig.text) != null ? _c : value;
-      const text4 = normalizeLinkText(textSource2, normalizeString31(linkConfig.windowTitle) || windowKey);
+      const text5 = normalizeLinkText(textSource2, normalizeString31(linkConfig.windowTitle) || windowKey);
       const hasDynamicWindowTitleSource = Boolean(linkConfig.windowTitleSelector) || Boolean(linkConfig.windowTitleSource);
       const titleSource = hasDynamicWindowTitleSource ? resolveContextSourceValue({
         source: linkConfig.windowTitleSource || "row",
@@ -55992,7 +56462,7 @@ Please __addLocaleData before adding additional unit data`);
       const windowTitle = titleTemplate ? resolveTemplateText(titleTemplate, titleTemplateSource) : normalizeLinkText(titleSource, "");
       return {
         kind: "window",
-        text: text4,
+        text: text5,
         title: normalizeString31(linkConfig.title),
         windowKey,
         ...normalizeString31(linkConfig.revision) ? { revision: normalizeString31(linkConfig.revision) } : {},
@@ -56029,11 +56499,11 @@ Please __addLocaleData before adding additional unit data`);
       }
     }
     const textSource = (linkConfig == null ? void 0 : linkConfig.label) ? resolveKey(row || {}, linkConfig.label) : (_g = (_f = (_e = linkConfig == null ? void 0 : linkConfig.text) != null ? _e : objectValue == null ? void 0 : objectValue.label) != null ? _f : objectValue == null ? void 0 : objectValue.text) != null ? _g : value;
-    const text3 = normalizeLinkText(textSource, href);
+    const text4 = normalizeLinkText(textSource, href);
     const target = normalizeString31((objectValue == null ? void 0 : objectValue.target) || (linkConfig == null ? void 0 : linkConfig.target)) || "_blank";
     const rel = normalizeString31((objectValue == null ? void 0 : objectValue.rel) || (linkConfig == null ? void 0 : linkConfig.rel)) || "noopener noreferrer";
     const title = normalizeString31(objectValue == null ? void 0 : objectValue.title);
-    return { kind: "external", href, text: text3, target, rel, title };
+    return { kind: "external", href, text: text4, target, rel, title };
   }
 
   // src/utils/tableLink.js
@@ -56084,10 +56554,10 @@ Please __addLocaleData before adding additional unit data`);
   var integerText = (value) => {
     if (typeof value === "number" && !Number.isSafeInteger(value)) return null;
     if (typeof value !== "string" && typeof value !== "number") return null;
-    const text3 = String(value).trim();
-    if (!/^[+-]?\d+$/.test(text3)) return null;
-    const digits = text3.replace(/^[+-]/, "").replace(/^0+(?=\d)/, "");
-    return { digits, negative: text3[0] === "-" && digits !== "0" };
+    const text4 = String(value).trim();
+    if (!/^[+-]?\d+$/.test(text4)) return null;
+    const digits = text4.replace(/^[+-]/, "").replace(/^0+(?=\d)/, "");
+    return { digits, negative: text4[0] === "-" && digits !== "0" };
   };
   function compareIntegers(a4, b3) {
     if (a4.negative !== b3.negative) return a4.negative ? -1 : 1;
@@ -56188,6 +56658,7 @@ Please __addLocaleData before adding additional unit data`);
   function buildBaseReportFillChartPayload(chart = {}, rows = [], centerRows, centerInputs, requestFilters) {
     var _a5, _b, _c, _d, _e, _f, _g;
     const type = normalizeString33(chart == null ? void 0 : chart.type).toLowerCase();
+    if (isScenarioType(type)) return freezeScenario(chart, rows, requestFilters);
     if (type === "category-range") {
       const model = buildCategoryRange(chart.categoryRange, rows);
       return { kind: "category-range", type, seriesKeys: categoryRangeFields(model.config), rows: cloneChartRows(rows) };
@@ -57417,14 +57888,14 @@ Please __addLocaleData before adding additional unit data`);
   var FOLD_FLOW = "flow";
   var FOLD_BLOCK = "block";
   var FOLD_QUOTED = "quoted";
-  function foldFlowLines(text3, indent, mode = "flow", { indentAtStart, lineWidth = 80, minContentWidth = 20, onFold, onOverflow } = {}) {
+  function foldFlowLines(text4, indent, mode = "flow", { indentAtStart, lineWidth = 80, minContentWidth = 20, onFold, onOverflow } = {}) {
     if (!lineWidth || lineWidth < 0)
-      return text3;
+      return text4;
     if (lineWidth < minContentWidth)
       minContentWidth = 0;
     const endStep = Math.max(1 + minContentWidth, 1 + lineWidth - indent.length);
-    if (text3.length <= endStep)
-      return text3;
+    if (text4.length <= endStep)
+      return text4;
     const folds = [];
     const escapedFolds = {};
     let end = lineWidth - indent.length;
@@ -57441,14 +57912,14 @@ Please __addLocaleData before adding additional unit data`);
     let escStart = -1;
     let escEnd = -1;
     if (mode === FOLD_BLOCK) {
-      i3 = consumeMoreIndentedLines(text3, i3, indent.length);
+      i3 = consumeMoreIndentedLines(text4, i3, indent.length);
       if (i3 !== -1)
         end = i3 + endStep;
     }
-    for (let ch; ch = text3[i3 += 1]; ) {
+    for (let ch; ch = text4[i3 += 1]; ) {
       if (mode === FOLD_QUOTED && ch === "\\") {
         escStart = i3;
-        switch (text3[i3 + 1]) {
+        switch (text4[i3 + 1]) {
           case "x":
             i3 += 3;
             break;
@@ -57465,12 +57936,12 @@ Please __addLocaleData before adding additional unit data`);
       }
       if (ch === "\n") {
         if (mode === FOLD_BLOCK)
-          i3 = consumeMoreIndentedLines(text3, i3, indent.length);
+          i3 = consumeMoreIndentedLines(text4, i3, indent.length);
         end = i3 + indent.length + endStep;
         split = void 0;
       } else {
         if (ch === " " && prev && prev !== " " && prev !== "\n" && prev !== "	") {
-          const next = text3[i3 + 1];
+          const next = text4[i3 + 1];
           if (next && next !== " " && next !== "\n" && next !== "	")
             split = i3;
         }
@@ -57482,12 +57953,12 @@ Please __addLocaleData before adding additional unit data`);
           } else if (mode === FOLD_QUOTED) {
             while (prev === " " || prev === "	") {
               prev = ch;
-              ch = text3[i3 += 1];
+              ch = text4[i3 += 1];
               overflow = true;
             }
             const j = i3 > escEnd + 1 ? i3 - 2 : escStart - 1;
             if (escapedFolds[j])
-              return text3;
+              return text4;
             folds.push(j);
             escapedFolds[j] = true;
             end = j + endStep;
@@ -57502,39 +57973,39 @@ Please __addLocaleData before adding additional unit data`);
     if (overflow && onOverflow)
       onOverflow();
     if (folds.length === 0)
-      return text3;
+      return text4;
     if (onFold)
       onFold();
-    let res = text3.slice(0, folds[0]);
+    let res = text4.slice(0, folds[0]);
     for (let i4 = 0; i4 < folds.length; ++i4) {
       const fold = folds[i4];
-      const end2 = folds[i4 + 1] || text3.length;
+      const end2 = folds[i4 + 1] || text4.length;
       if (fold === 0)
         res = `
-${indent}${text3.slice(0, end2)}`;
+${indent}${text4.slice(0, end2)}`;
       else {
         if (mode === FOLD_QUOTED && escapedFolds[fold])
-          res += `${text3[fold]}\\`;
+          res += `${text4[fold]}\\`;
         res += `
-${indent}${text3.slice(fold + 1, end2)}`;
+${indent}${text4.slice(fold + 1, end2)}`;
       }
     }
     return res;
   }
-  function consumeMoreIndentedLines(text3, i3, indent) {
+  function consumeMoreIndentedLines(text4, i3, indent) {
     let end = i3;
     let start = i3 + 1;
-    let ch = text3[start];
+    let ch = text4[start];
     while (ch === " " || ch === "	") {
       if (i3 < start + indent) {
-        ch = text3[++i3];
+        ch = text4[++i3];
       } else {
         do {
-          ch = text3[++i3];
+          ch = text4[++i3];
         } while (ch && ch !== "\n");
         end = i3;
         start = i3 + 1;
-        ch = text3[start];
+        ch = text4[start];
       }
     }
     return end;
@@ -58303,7 +58774,7 @@ ${indent}${line}` : "\n";
         str += ",";
       } else if (ctx.options.trailingComma) {
         if (ctx.options.lineWidth > 0) {
-          reqNewline || (reqNewline = lines2.reduce((sum2, line) => sum2 + line.length + 2, 2) + (str.length + 2) > ctx.options.lineWidth);
+          reqNewline || (reqNewline = lines2.reduce((sum3, line) => sum3 + line.length + 2, 2) + (str.length + 2) > ctx.options.lineWidth);
         }
         if (reqNewline) {
           str += ",";
@@ -58319,7 +58790,7 @@ ${indent}${line}` : "\n";
       return start + end;
     } else {
       if (!reqNewline) {
-        const len = lines2.reduce((sum2, line) => sum2 + line.length + 2, 2);
+        const len = lines2.reduce((sum3, line) => sum3 + line.length + 2, 2);
         reqNewline = ctx.options.lineWidth > 0 && len > ctx.options.lineWidth;
       }
       if (reqNewline) {
@@ -58856,8 +59327,8 @@ ${indent}${end}`;
   visit2.REMOVE = REMOVE2;
   visit2.itemAtPath = (cst, path) => {
     let item = cst;
-    for (const [field, index] of path) {
-      const tok = item == null ? void 0 : item[field];
+    for (const [field2, index] of path) {
+      const tok = item == null ? void 0 : item[field2];
       if (tok && "items" in tok) {
         item = tok.items[index];
       } else
@@ -58867,8 +59338,8 @@ ${indent}${end}`;
   };
   visit2.parentCollection = (cst, path) => {
     const parent = visit2.itemAtPath(cst, path.slice(0, -1));
-    const field = path[path.length - 1][0];
-    const coll = parent == null ? void 0 : parent[field];
+    const field2 = path[path.length - 1][0];
+    const coll = parent == null ? void 0 : parent[field2];
     if (coll && "items" in coll)
       return coll;
     throw new Error("Parent collection not found");
@@ -58877,11 +59348,11 @@ ${indent}${end}`;
     let ctrl = visitor(item, path);
     if (typeof ctrl === "symbol")
       return ctrl;
-    for (const field of ["key", "value"]) {
-      const token = item[field];
+    for (const field2 of ["key", "value"]) {
+      const token = item[field2];
       if (token && "items" in token) {
         for (let i3 = 0; i3 < token.items.length; ++i3) {
-          const ci = _visit(Object.freeze(path.concat([[field, i3]])), token.items[i3], visitor);
+          const ci = _visit(Object.freeze(path.concat([[field2, i3]])), token.items[i3], visitor);
           if (typeof ci === "number")
             i3 = ci - 1;
           else if (ci === BREAK2)
@@ -58891,7 +59362,7 @@ ${indent}${end}`;
             i3 -= 1;
           }
         }
-        if (typeof ctrl === "function" && field === "key")
+        if (typeof ctrl === "function" && field2 === "key")
           ctrl = ctrl(item, path);
       }
     }
@@ -58941,12 +59412,12 @@ ${indent}${end}`;
     return String(rowValue).toLowerCase() === String(filterValue).toLowerCase();
   };
   var applyDashboardFiltersToCollection = (collection = [], filterBindings = {}, dashboardFilters = {}) => {
-    const entries = Object.entries(filterBindings || {}).filter(([, rowField]) => rowField);
-    if (!entries.length) {
+    const entries2 = Object.entries(filterBindings || {}).filter(([, rowField]) => rowField);
+    if (!entries2.length) {
       return collection || [];
     }
     return (collection || []).filter((row) => {
-      return entries.every(([filterField, rowField]) => {
+      return entries2.every(([filterField, rowField]) => {
         const activeValue = dashboardFilters == null ? void 0 : dashboardFilters[filterField];
         if (activeValue == null || activeValue === "" || Array.isArray(activeValue) && activeValue.length === 0) {
           return true;
@@ -58966,11 +59437,11 @@ ${indent}${end}`;
     });
   };
   var applyDashboardSelectionToCollection = (collection = [], selectionBindings = {}, dashboardSelection = {}) => {
-    const entries = Object.entries(selectionBindings || {}).filter(([, rowField]) => rowField);
-    if (!entries.length) {
+    const entries2 = Object.entries(selectionBindings || {}).filter(([, rowField]) => rowField);
+    if (!entries2.length) {
       return collection || [];
     }
-    const activeEntries = entries.map(([selectionField, rowField]) => ({
+    const activeEntries = entries2.map(([selectionField, rowField]) => ({
       selectionField,
       rowField,
       value: resolveKey(dashboardSelection || {}, selectionField)
@@ -58999,21 +59470,21 @@ ${indent}${end}`;
   };
   var formatDashboardValue = (value, format2, locale2 = "en-US", options = {}) => formatDisplayValue(value, format2, locale2, options);
   var pickConditionValue = (condition, snapshot) => {
-    const field = (condition == null ? void 0 : condition.field) || (condition == null ? void 0 : condition.selector) || (condition == null ? void 0 : condition.key);
+    const field2 = (condition == null ? void 0 : condition.field) || (condition == null ? void 0 : condition.selector) || (condition == null ? void 0 : condition.key);
     const source = (condition == null ? void 0 : condition.source) || "metrics";
     const { context, dashboardKey } = snapshot || {};
     switch (source) {
       case "selection":
-        return field ? resolveKey((snapshot == null ? void 0 : snapshot.dashboardSelection) || {}, field) : (snapshot == null ? void 0 : snapshot.dashboardSelection) || {};
+        return field2 ? resolveKey((snapshot == null ? void 0 : snapshot.dashboardSelection) || {}, field2) : (snapshot == null ? void 0 : snapshot.dashboardSelection) || {};
       case "filters":
       case "filter":
-        return field ? resolveKey((snapshot == null ? void 0 : snapshot.dashboardFilters) || {}, field) : (snapshot == null ? void 0 : snapshot.dashboardFilters) || {};
+        return field2 ? resolveKey((snapshot == null ? void 0 : snapshot.dashboardFilters) || {}, field2) : (snapshot == null ? void 0 : snapshot.dashboardFilters) || {};
       case "context":
-        return field ? resolveKey(context, field) : context;
+        return field2 ? resolveKey(context, field2) : context;
       case "metrics":
       default: {
         const metrics = (snapshot == null ? void 0 : snapshot.metrics) || {};
-        return field ? resolveKey(metrics, field) : metrics;
+        return field2 ? resolveKey(metrics, field2) : metrics;
       }
     }
   };
@@ -59136,8 +59607,8 @@ ${indent}${end}`;
     }
     const span = maxValue - minValue;
     const scale = Number.isFinite(span) ? 1 : Math.max(Math.abs(minValue), Math.abs(maxValue));
-    const ratio = Math.max(0, Math.min(1, scale === 1 ? (numeric - minValue) / span : (numeric / scale - minValue / scale) / (maxValue / scale - minValue / scale)));
-    const index = Math.min(colors.length - 1, Math.floor(ratio * colors.length));
+    const ratio2 = Math.max(0, Math.min(1, scale === 1 ? (numeric - minValue) / span : (numeric / scale - minValue / scale) / (maxValue / scale - minValue / scale)));
+    const index = Math.min(colors.length - 1, Math.floor(ratio2 * colors.length));
     return colors[index];
   }
   function findGeoColorRule(row, colorConfig = {}) {
@@ -59342,7 +59813,7 @@ ${indent}${end}`;
       }
       return String(left.key || "").localeCompare(String(right.key || ""));
     });
-    const totalValue = regions2.reduce((sum2, region) => sum2 + (Number(region.rawValue || 0) || 0), 0);
+    const totalValue = regions2.reduce((sum3, region) => sum3 + (Number(region.rawValue || 0) || 0), 0);
     const activeRegion = ranking[0] || regions2[0] || null;
     return {
       shape: normalizeString34(config.shape || "us-states"),
@@ -59375,9 +59846,9 @@ ${indent}${end}`;
     if (!hex3) {
       return "";
     }
-    const ratio = Math.max(0, Math.min(1, Number(amount) || 0));
+    const ratio2 = Math.max(0, Math.min(1, Number(amount) || 0));
     const channels = [0, 2, 4].map((offset) => Number.parseInt(hex3.slice(offset, offset + 2), 16));
-    const tinted = channels.map((channel) => Math.round(channel + (255 - channel) * ratio).toString(16).padStart(2, "0")).join("");
+    const tinted = channels.map((channel) => Math.round(channel + (255 - channel) * ratio2).toString(16).padStart(2, "0")).join("");
     return `#${tinted}`;
   }
 
@@ -59562,7 +60033,7 @@ ${indent}${end}`;
       if (segments.length === 0) {
         return null;
       }
-      const total = segments.reduce((sum2, segment) => sum2 + segment.value, 0);
+      const total = segments.reduce((sum3, segment) => sum3 + segment.value, 0);
       return {
         kind,
         segments: segments.map((segment) => ({
@@ -59676,9 +60147,9 @@ ${indent}${end}`;
   }
   function buildReportFillDataset(dataset = {}, payload = {}, calculatedFields = []) {
     var _a5, _b, _c, _d, _e;
-    if (calculatedFields.some((field) => {
+    if (calculatedFields.some((field2) => {
       var _a6;
-      return field.datasetRef === dataset.id && ((_a6 = field.compute) == null ? void 0 : _a6.requireComplete) === true;
+      return field2.datasetRef === dataset.id && ((_a6 = field2.compute) == null ? void 0 : _a6.requireComplete) === true;
     }) && (payload.hasMore !== false || payload.truncated === true || ((_a5 = payload.provenance) == null ? void 0 : _a5.hasMore) === true || ((_b = payload.provenance) == null ? void 0 : _b.truncated) === true)) throw Error(`Dataset ${dataset.id} requires explicitly complete input for table calculations`);
     const rawRows = Array.isArray(payload == null ? void 0 : payload.rows) ? payload.rows.map((row) => cloneValue24(row)) : [];
     const rows = applyReportCalculatedFields(rawRows, calculatedFields, {
@@ -59878,12 +60349,12 @@ ${indent}${end}`;
       return content == null ? void 0 : content.secondaryValue;
     }
     if (normalizedToken.startsWith("row.")) {
-      const field = normalizedToken.slice(4);
-      const display = fieldDisplayMap == null ? void 0 : fieldDisplayMap[field];
+      const field2 = normalizedToken.slice(4);
+      const display2 = fieldDisplayMap == null ? void 0 : fieldDisplayMap[field2];
       return row && typeof row === "object" && !Array.isArray(row) ? resolveReportFillFieldDisplayValue(row, {
-        sourceField: (display == null ? void 0 : display.sourceKey) || field,
-        displayKey: display == null ? void 0 : display.displayKey,
-        displayValueMap: display == null ? void 0 : display.displayValueMap
+        sourceField: (display2 == null ? void 0 : display2.sourceKey) || field2,
+        displayKey: display2 == null ? void 0 : display2.displayKey,
+        displayValueMap: display2 == null ? void 0 : display2.displayValueMap
       }) : void 0;
     }
     if (normalizedToken === "dataset.id") {
@@ -60454,8 +60925,8 @@ ${indent}${end}`;
       collapsedGroups
     };
   }
-  function orderFilterBarEntries(entries = [], ordering = {}) {
-    const normalizedEntries = Array.isArray(entries) ? entries : [];
+  function orderFilterBarEntries(entries2 = [], ordering = {}) {
+    const normalizedEntries = Array.isArray(entries2) ? entries2 : [];
     const visibleGroups = Array.isArray(ordering == null ? void 0 : ordering.visibleGroups) ? ordering.visibleGroups : [];
     const groupOrder = Array.isArray(ordering == null ? void 0 : ordering.groupOrder) ? ordering.groupOrder : [];
     if (visibleGroups.length === 0 && groupOrder.length === 0) {
@@ -60774,9 +61245,9 @@ ${indent}${end}`;
     let marker = "\uE000";
     while (source.includes(marker)) marker += "\uE000";
     const literals = [];
-    const text3 = source.replace(/(`+)([^`]*?)\1|\\([\\`*_{}\[\]()#+\-!|<>.~])/g, (whole, codeMarker, code, literal) => codeMarker ? whole : `${marker}${literals.push(literal) - 1}\uE001`);
+    const text4 = source.replace(/(`+)([^`]*?)\1|\\([\\`*_{}\[\]()#+\-!|<>.~])/g, (whole, codeMarker, code, literal) => codeMarker ? whole : `${marker}${literals.push(literal) - 1}\uE001`);
     const restore = (value2) => String(value2).replace(new RegExp(`${marker}(\\d+)\\uE001`, "g"), (_2, index) => literals[Number(index)]);
-    return { text: text3, restore };
+    return { text: text4, restore };
   }
 
   // src/reporting/reportMarkdownInline.js
@@ -60801,7 +61272,7 @@ ${indent}${end}`;
     if (Object.keys(runtime.childWeights).length !== declared.length || declared.some((id) => !Number.isFinite(runtime.childWeights[id]) || runtime.childWeights[id] <= 0)) throw Error("Composite childWeights must provide a positive finite weight for every child");
     const weights = children.map((child) => runtime.childWeights[child.id]);
     if (weights.some((weight) => !Number.isFinite(weight))) throw Error("Composite child is missing a weight");
-    const total = weights.reduce((sum2, value) => sum2 + value, 0);
+    const total = weights.reduce((sum3, value) => sum3 + value, 0);
     if (!Number.isFinite(total)) throw Error("Composite childWeights total is invalid");
     return weights.map((weight) => weight / total);
   }
@@ -60837,16 +61308,16 @@ ${indent}${end}`;
 
   // src/reporting/reportPrintLabels.js
   function compactReportPrintSequence(value = "") {
-    const text3 = String(value != null ? value : "").replace(/\s*(?:→|â†’|->)\s*/g, " -> ");
-    const members = text3.split(" -> ");
-    if (members.length < 3) return text3;
+    const text4 = String(value != null ? value : "").replace(/\s*(?:→|â†’|->)\s*/g, " -> ");
+    const members = text4.split(" -> ");
+    if (members.length < 3) return text4;
     const runs = [];
     for (const member of members) {
       const last = runs[runs.length - 1];
       if ((last == null ? void 0 : last.member) === member) last.count += 1;
       else runs.push({ member, count: 1 });
     }
-    if (runs.length === members.length) return text3;
+    if (runs.length === members.length) return text4;
     return `${runs.map(({ member, count }) => count > 1 ? `${member} [x${count}]` : member).join(" -> ")} (${members.length} touchpoints)`;
   }
   function wrapReportPrintLabel(value, maxCharacters) {
@@ -60895,8 +61366,8 @@ ${indent}${end}`;
     return normalized;
   }
   function resolveReportRuntimeFilterValues(scopeParams = []) {
-    const entries = scopeParams instanceof Map ? Array.from(scopeParams.entries()).map(([id, entry]) => ({ id, ...entry || {} })) : Array.isArray(scopeParams) ? scopeParams : [];
-    return entries.reduce((result, entry) => {
+    const entries2 = scopeParams instanceof Map ? Array.from(scopeParams.entries()).map(([id, entry]) => ({ id, ...entry || {} })) : Array.isArray(scopeParams) ? scopeParams : [];
+    return entries2.reduce((result, entry) => {
       const id = normalizeString37((entry == null ? void 0 : entry.id) || (entry == null ? void 0 : entry.field));
       if (id) {
         result[id] = cloneValue25(entry == null ? void 0 : entry.value);
@@ -61635,9 +62106,9 @@ ${indent}${end}`;
     const perRow = Math.max(1, Math.min(seriesDescriptors.length, Math.floor(availableWidth / 160)));
     const itemWidth = availableWidth / perRow;
     const maxCharacters = Math.max(1, Math.floor((itemWidth - 30) / 11));
-    const entries = seriesDescriptors.map((series) => ({ series, lines: wrapReportPrintLabel(series.label, maxCharacters) }));
+    const entries2 = seriesDescriptors.map((series) => ({ series, lines: wrapReportPrintLabel(series.label, maxCharacters) }));
     const rowHeights = [];
-    entries.forEach((entry, index) => {
+    entries2.forEach((entry, index) => {
       const row = Math.floor(index / perRow);
       rowHeights[row] = Math.max(rowHeights[row] || 18, entry.lines.length * 14 + 4);
     });
@@ -61647,7 +62118,7 @@ ${indent}${end}`;
       rowY += height;
       return offset;
     });
-    const items = entries.map(({ series, lines: lines2 }, index) => {
+    const items = entries2.map(({ series, lines: lines2 }, index) => {
       const column = index % perRow;
       const row = Math.floor(index / perRow);
       const itemX = 12 + column * itemWidth;
@@ -61795,7 +62266,7 @@ ${indent}${end}`;
         ].filter(Boolean)
       };
     }
-    const total = slices.reduce((sum2, slice) => sum2 + slice.value, 0);
+    const total = slices.reduce((sum3, slice) => sum3 + slice.value, 0);
     if (total <= 0 && !center) {
       return {
         svg: "",
@@ -62243,6 +62714,7 @@ ${indent}${end}`;
     width = 680,
     rowLimit = 0
   } = {}) {
+    if (isScenarioType(resolvedChart == null ? void 0 : resolvedChart.kind)) return scenarioPrintSvg(chartModel, resolvedChart, width);
     if ((resolvedChart == null ? void 0 : resolvedChart.kind) === "category-range") return categoryRangeSvg(buildCategoryRange(chartModel.categoryRange, resolvedChart.rows), width);
     if ((resolvedChart == null ? void 0 : resolvedChart.kind) === "heatmap") return heatmapSvg(buildHeatmap(chartModel.heatmap, resolvedChart.rows), width);
     resolvedChart = { ...resolvedChart, rows: applyChartRowLimit(resolvedChart == null ? void 0 : resolvedChart.rows, rowLimit) };
@@ -62269,6 +62741,7 @@ ${indent}${end}`;
     };
   }
   function buildReportPrintChartPages({ chartModel = {}, resolvedChart = {}, width = 680, maxHeight = 620, firstMaxHeight = maxHeight, rowLimit = 0 } = {}) {
+    if (isScenarioType(resolvedChart == null ? void 0 : resolvedChart.kind)) return scenarioPrintPages(chartModel, resolvedChart, { width, maxHeight, firstMaxHeight });
     if ((resolvedChart == null ? void 0 : resolvedChart.kind) === "category-range") return categoryRangePrintPages(buildCategoryRange(chartModel.categoryRange, resolvedChart.rows), { width, maxHeight, firstMaxHeight });
     if ((resolvedChart == null ? void 0 : resolvedChart.kind) === "heatmap") return heatmapPrintPages(buildHeatmap(chartModel.heatmap, resolvedChart.rows), { width, maxHeight, firstMaxHeight });
     resolvedChart = { ...resolvedChart, rows: applyChartRowLimit(resolvedChart == null ? void 0 : resolvedChart.rows, rowLimit) };
@@ -68165,19 +68638,19 @@ ${indent}${end}`;
       ...element,
       kind: "text"
     }, "text");
-    const text3 = normalizeReportPrintText(element == null ? void 0 : element.text);
-    if (!next || !text3) {
+    const text4 = normalizeReportPrintText(element == null ? void 0 : element.text);
+    if (!next || !text4) {
       return null;
     }
     const result = {
       ...next,
-      text: text3
+      text: text4
     };
     if (Object.hasOwn(element, "textRuns")) {
       if (!Array.isArray(element.textRuns) || !element.textRuns.length || element.textRuns.some((run) => !run || typeof run !== "object" || Array.isArray(run) || typeof run.text !== "string" || !run.text || run.text.includes("\r") || Object.keys(run).some((key2) => !["text", "fontWeight"].includes(key2)) || run.fontWeight !== void 0 && typeof run.fontWeight !== "string")) throw new Error("Invalid print text runs.");
       if (element.textRuns.map((run) => run.text).join("") !== String(element.text)) throw new Error("Print text runs must concatenate to text.");
       result.textRuns = element.textRuns.map((run) => ({ text: normalizeReportPrintText(run.text), ...run.fontWeight ? { fontWeight: run.fontWeight } : {} }));
-      if (result.textRuns.map((run) => run.text).join("") !== text3) throw new Error("Print text normalization crosses run boundaries.");
+      if (result.textRuns.map((run) => run.text).join("") !== text4) throw new Error("Print text normalization crosses run boundaries.");
     }
     const fontFamily = normalizeString41(element == null ? void 0 : element.fontFamily);
     const fontWeight = normalizeString41(element == null ? void 0 : element.fontWeight);
@@ -68310,8 +68783,8 @@ ${indent}${end}`;
   }
   function buildReportPrintTableCellTextElement(element = {}) {
     const next = buildReportPrintTableCellElementBase(element, "tableCellText");
-    const text3 = String((element == null ? void 0 : element.text) || "");
-    if (!next || !text3) {
+    const text4 = String((element == null ? void 0 : element.text) || "");
+    if (!next || !text4) {
       return null;
     }
     const format2 = normalizeString41(element == null ? void 0 : element.format);
@@ -68320,7 +68793,7 @@ ${indent}${end}`;
     const color = normalizeString41(element == null ? void 0 : element.color);
     return {
       ...next,
-      text: text3,
+      text: text4,
       ...format2 ? { format: format2 } : {},
       ...align ? { align } : {},
       ...fontSize != null ? { fontSize } : {},
@@ -68421,15 +68894,15 @@ ${indent}${end}`;
     if (!isPlainObject9(page)) {
       return null;
     }
-    const number2 = normalizePositiveInteger(page.number);
+    const number3 = normalizePositiveInteger(page.number);
     const elements = normalizeReportPrintElementList(page.elements || []);
     const headerElements = normalizeReportPrintElementList(page.headerElements || []);
     const footerElements = normalizeReportPrintElementList(page.footerElements || []);
-    if (number2 == null || !elements || !headerElements || !footerElements) {
+    if (number3 == null || !elements || !headerElements || !footerElements) {
       return null;
     }
     return {
-      number: number2,
+      number: number3,
       elements,
       headerElements,
       footerElements
@@ -68680,8 +69153,8 @@ ${indent}${end}`;
     }
     return "";
   }
-  function wrapReportPrintText(text3 = "", width = 0, fontSize = REPORT_PRINT_THEME.bodyFontSize) {
-    const normalized = String(text3 || "");
+  function wrapReportPrintText(text4 = "", width = 0, fontSize = REPORT_PRINT_THEME.bodyFontSize) {
+    const normalized = String(text4 || "");
     if (!normalized) {
       return [];
     }
@@ -69077,8 +69550,8 @@ ${indent}${end}`;
     }
     return span;
   }
-  function renderReportPrintGridRow(state = {}, entries = []) {
-    const rowEntries = (Array.isArray(entries) ? entries : []).filter((entry) => !!(entry == null ? void 0 : entry.block) && Number.isFinite(entry == null ? void 0 : entry.span) && entry.span > 0).map((entry) => ({
+  function renderReportPrintGridRow(state = {}, entries2 = []) {
+    const rowEntries = (Array.isArray(entries2) ? entries2 : []).filter((entry) => !!(entry == null ? void 0 : entry.block) && Number.isFinite(entry == null ? void 0 : entry.span) && entry.span > 0).map((entry) => ({
       block: entry.block,
       span: Math.max(1, Math.min(REPORT_LAYOUT_GRID_COLUMNS, Math.trunc(entry.span))),
       fraction: entry.fraction
@@ -69180,9 +69653,9 @@ ${indent}${end}`;
         return label;
       }
       const op = normalizeString41(refinement == null ? void 0 : refinement.op);
-      const field = normalizeString41(refinement == null ? void 0 : refinement.field);
+      const field2 = normalizeString41(refinement == null ? void 0 : refinement.field);
       const values = Array.isArray(refinement == null ? void 0 : refinement.values) ? refinement.values.map((value) => formatReportPrintValue(value)).join(", ") : "";
-      return `${op || "refinement"} ${field || "field"}: ${values || "\u2014"}`;
+      return `${op || "refinement"} ${field2 || "field"}: ${values || "\u2014"}`;
     });
   }
   function renderReportPrintTextSectionBlock(state = {}, block = {}, lines2 = [], {
@@ -69686,7 +70159,7 @@ ${indent}${end}`;
       rows.push(items.slice(index, index + columns));
     }
     rows.forEach((rowItems, rowIndex) => {
-      const layouts = rowItems.map((item, columnIndex) => {
+      const layouts2 = rowItems.map((item, columnIndex) => {
         const innerWidth = Math.max(1, cardWidth - padding * 2);
         const toneLabel = normalizeString41((item == null ? void 0 : item.toneLabel) || (item == null ? void 0 : item.tone)).toUpperCase();
         const titleWidth = Math.max(80, innerWidth - (toneLabel ? 58 : 0) - (item.markerColor ? 16 : 0));
@@ -69699,7 +70172,7 @@ ${indent}${end}`;
           detailLines.push(`${normalizeString41((item == null ? void 0 : item.secondaryLabel) || (item == null ? void 0 : item.secondaryField))}: ${formatReportPrintValue(item == null ? void 0 : item.secondaryValue, normalizeString41(item == null ? void 0 : item.secondaryFormat))}`);
         }
         const bodyLines = [
-          ...detailLines.flatMap((line) => wrapReportPrintText(line, innerWidth, 9).map((text3) => ({ text: text3 }))),
+          ...detailLines.flatMap((line) => wrapReportPrintText(line, innerWidth, 9).map((text4) => ({ text: text4 }))),
           ...String((item == null ? void 0 : item.bodyMarkdown) || "").trim() ? buildReportPrintMarkdownLines(item.bodyMarkdown, innerWidth, 9) : []
         ];
         return {
@@ -69710,10 +70183,10 @@ ${indent}${end}`;
           height: Math.max(70, padding * 2 + titleLines.length * 14 + 5 + bodyLines.length * 13)
         };
       });
-      const rowHeight = Math.max(...layouts.map((layout) => layout.height));
+      const rowHeight = Math.max(...layouts2.map((layout) => layout.height));
       ensureReportPrintSpace(state, rowHeight);
       const rowY = state.cursorY;
-      layouts.forEach((layout, columnIndex) => {
+      layouts2.forEach((layout, columnIndex) => {
         const item = layout.item;
         const cardX = state.contentLeft + columnIndex * (cardWidth + gap);
         const backgroundColor = normalizeString41(item == null ? void 0 : item.backgroundColor) || REPORT_PRINT_THEME.cardBackground;
@@ -69895,9 +70368,9 @@ ${indent}${end}`;
       });
       return Math.max(7, Math.min(numeric ? 18 : 30, longest));
     });
-    const totalWeight = Math.max(1, weights.reduce((sum2, weight) => sum2 + weight, 0));
+    const totalWeight = Math.max(1, weights.reduce((sum3, weight) => sum3 + weight, 0));
     const minimumWidths = minimumReportPrintColumnWidths(state, block, columns, resolveText);
-    const minimumTotal = minimumWidths.reduce((sum2, width) => sum2 + width, 0);
+    const minimumTotal = minimumWidths.reduce((sum3, width) => sum3 + width, 0);
     const scale = Math.min(1, state.contentWidth / Math.max(1, minimumTotal));
     const flexibleWidth = Math.max(0, state.contentWidth - minimumTotal);
     const widths = weights.map((weight, index) => minimumWidths[index] * scale + flexibleWidth * (weight / totalWeight));
@@ -69921,9 +70394,9 @@ ${indent}${end}`;
     return Math.max(
       REPORT_PRINT_THEME.tableRowHeight,
       ...columns.map((column, index) => {
-        const text3 = resolveText(column, cells.get(normalizeString41(column == null ? void 0 : column.key)));
+        const text4 = resolveText(column, cells.get(normalizeString41(column == null ? void 0 : column.key)));
         const lines2 = wrapReportPrintText(
-          text3,
+          text4,
           Math.max(1, (widths[index] || 1) - REPORT_PRINT_THEME.tableCellPaddingX * 2),
           9
         );
@@ -70195,7 +70668,7 @@ ${indent}${end}`;
     const identities = new Set(identityIndexes);
     const payloadIndexes = columns.map((_2, index) => index).filter((index) => !identities.has(index));
     if (payloadIndexes.length === 0) return [columns];
-    const anchorWidth = identityIndexes.reduce((sum2, index) => sum2 + minimumWidths[index], 0);
+    const anchorWidth = identityIndexes.reduce((sum3, index) => sum3 + minimumWidths[index], 0);
     const groups = [];
     let payload = [];
     let width = anchorWidth;
@@ -70234,7 +70707,7 @@ ${indent}${end}`;
     }
     const resolveText = state.resolveTableCellText;
     const minimumWidths = minimumReportPrintColumnWidths(state, block, columns, resolveText);
-    if (!columnBand && rows.length > 0 && columns.length > 2 && minimumWidths.reduce((sum2, width) => sum2 + width, 0) > state.contentWidth) {
+    if (!columnBand && rows.length > 0 && columns.length > 2 && minimumWidths.reduce((sum3, width) => sum3 + width, 0) > state.contentWidth) {
       const groups = partitionReportPrintTableColumns(columns, minimumWidths, state.contentWidth);
       if (groups.length > 1) {
         groups.forEach((groupColumns, index) => {
@@ -70256,10 +70729,10 @@ ${indent}${end}`;
       cells: (row.cells || []).map((cell) => {
         const column = columns.find((entry) => entry.key === cell.key);
         if (!column) return cell;
-        const text3 = resolveText(column, cell);
-        if (!text3.includes(" -> ") || text3.length <= 110) return cell;
+        const text4 = resolveText(column, cell);
+        if (!text4.includes(" -> ") || text4.length <= 110) return cell;
         const key2 = `Pathway ${rowIndex2 + 1}`;
-        pathwayDetails.push(`${key2}: ${text3}`);
+        pathwayDetails.push(`${key2}: ${text4}`);
         return { ...cell, displayValue: `${key2} (${String(cell.displayValue || cell.value).split(/->|→|â†’/).length} touchpoints; see details)` };
       })
     }));
@@ -70709,7 +71182,7 @@ ${indent}${end}`;
     if (!parts.length || parts.length > 8 || parts.some((part) => !/^[A-Za-z][A-Za-z0-9_]*$/.test(part) || forbidden.has(part))) throw new Error("Invalid report request binding path.");
     return parts;
   }
-  function read(value, path) {
+  function read2(value, path) {
     for (const part of pathParts(path)) {
       if (!object3(value) || !Object.hasOwn(value, part)) return void 0;
       value = value[part];
@@ -70737,7 +71210,7 @@ ${indent}${end}`;
     return [...new Set(result)];
   }
   function declaredReportRequestFields(config) {
-    return new Set([config, ...config.dataSources || []].flatMap((source) => [...source.dimensions || [], ...source.measures || []]).flatMap((field) => [field.id, field.key, field.value]).filter((value) => typeof value === "string" && value));
+    return new Set([config, ...config.dataSources || []].flatMap((source) => [...source.dimensions || [], ...source.measures || []]).flatMap((field2) => [field2.id, field2.key, field2.value]).filter((value) => typeof value === "string" && value));
   }
   function typed(value, type, config) {
     var _a5, _b;
@@ -70802,15 +71275,15 @@ ${indent}${end}`;
     const declaration = (_a5 = config.request) == null ? void 0 : _a5.definitionIdentity;
     if (!object3(declaration) || Object.keys(declaration).some((key2) => !["fields", "catalog"].includes(key2)) || !object3(declaration.fields) || !Object.keys(declaration.fields).length || Object.keys(declaration.fields).length > 8) throw new Error("A declarative report definition identity is required.");
     const result = {};
-    for (const [name, field] of Object.entries(declaration.fields)) {
+    for (const [name, field2] of Object.entries(declaration.fields)) {
       pathParts(name);
-      if (!object3(field) || Object.keys(field).some((key2) => !["path", "type", "resolveWhenAbsent"].includes(key2))) throw new Error("Invalid report definition identity declaration.");
-      pathParts(field.path);
-      if (!["positiveInteger", "singlePositiveInteger", "boolean", "string"].includes(field.type)) throw new Error("Invalid report definition identity type.");
-      const value = read(windowParameters, name);
-      if (value === void 0 && field.resolveWhenAbsent === true) continue;
+      if (!object3(field2) || Object.keys(field2).some((key2) => !["path", "type", "resolveWhenAbsent"].includes(key2))) throw new Error("Invalid report definition identity declaration.");
+      pathParts(field2.path);
+      if (!["positiveInteger", "singlePositiveInteger", "boolean", "string"].includes(field2.type)) throw new Error("Invalid report definition identity type.");
+      const value = read2(windowParameters, name);
+      if (value === void 0 && field2.resolveWhenAbsent === true) continue;
       if (value === void 0) throw new Error("A declared report identity parameter is missing.");
-      result[name] = typed(value, field.type, config);
+      result[name] = typed(value, field2.type, config);
     }
     return result;
   }
@@ -70818,8 +71291,8 @@ ${indent}${end}`;
     var _a5;
     if (!((_a5 = config.request) == null ? void 0 : _a5.envelope)) return clone5(config);
     const next = clone5(config), identity = reportRequestWindowIdentity(config, windowParameters);
-    for (const [name, field] of Object.entries(config.request.definitionIdentity.fields)) {
-      const returned = typed(read(definition, field.path), field.type, config);
+    for (const [name, field2] of Object.entries(config.request.definitionIdentity.fields)) {
+      const returned = typed(read2(definition, field2.path), field2.type, config);
       if (Object.hasOwn(identity, name) && identity[name] !== returned) throw new Error("The current report definition identity does not match the selected scope.");
       identity[name] = returned;
     }
@@ -70827,13 +71300,13 @@ ${indent}${end}`;
     if (catalog) {
       if (!object3(catalog) || Object.keys(catalog).some((key2) => !["path", "prefix", "separator", "fields"].includes(key2)) || typeof catalog.prefix !== "string" || typeof catalog.separator !== "string" || !Array.isArray(catalog.fields) || catalog.fields.length > 8 || catalog.fields.some((name) => !Object.hasOwn(identity, name))) throw new Error("Invalid report catalog identity declaration.");
       const expected = catalog.prefix + catalog.fields.map((name) => String(identity[name])).join(catalog.separator);
-      if (read(definition, catalog.path) !== expected) throw new Error("The current report field catalog identity does not match the selected scope.");
+      if (read2(definition, catalog.path) !== expected) throw new Error("The current report field catalog identity does not match the selected scope.");
     }
     const defaults = { global: {}, datasets: {} };
     const profiles = config.request.profileQueryDefaults;
     if (profiles) {
       if (!object3(profiles) || Object.keys(profiles).some((key2) => !["path", "values"].includes(key2)) || !object3(profiles.values) || Object.keys(profiles.values).length > 32) throw new Error("Invalid report profile query defaults.");
-      const profile = read(definition, profiles.path);
+      const profile = read2(definition, profiles.path);
       if (profile !== void 0 && typeof profile !== "string") throw new Error("The current report profile is unavailable.");
       if (Object.hasOwn(profiles.values, profile)) defaults.global = clone5(profiles.values[profile]);
     }
@@ -70847,11 +71320,11 @@ ${indent}${end}`;
       for (const [name, binding] of Object.entries(source.queryDefaultsFromDefinition)) {
         pathParts(name);
         if (!object3(binding) || Object.keys(binding).some((key2) => !["path", "type"].includes(key2)) || binding.type !== "enabledNames") throw new Error("Invalid dataset default binding.");
-        const raw = read(definition, binding.path);
+        const raw = read2(definition, binding.path);
         if (raw === void 0) continue;
         const selected = names(raw);
-        if (selected.some((field) => !declaredReportRequestFields(next).has(field))) throw new Error("A dataset default references an undeclared field.");
-        dataset[name] = Object.fromEntries(selected.map((field) => [field, true]));
+        if (selected.some((field2) => !declaredReportRequestFields(next).has(field2))) throw new Error("A dataset default references an undeclared field.");
+        dataset[name] = Object.fromEntries(selected.map((field2) => [field2, true]));
       }
       defaults.datasets[source.id] = dataset;
     }
@@ -70879,13 +71352,13 @@ ${indent}${end}`;
     }
     if (Number.isSafeInteger(config.request.maxRows) && config.request.maxRows > 0 && Number.isSafeInteger(effective.limit) && effective.limit > config.request.maxRows) effective.limit = config.request.maxRows;
     const result = {};
-    for (const [destination, field] of Object.entries(declaration.fields)) {
+    for (const [destination, field2] of Object.entries(declaration.fields)) {
       pathParts(destination);
-      if (!object3(field) || Object.keys(field).some((key2) => !["literal", "window", "query", "type", "optional", "omitEmpty"].includes(key2)) || ["literal", "window", "query"].filter((key2) => Object.hasOwn(field, key2)).length !== 1 || field.optional !== void 0 && typeof field.optional !== "boolean" || field.omitEmpty !== void 0 && typeof field.omitEmpty !== "boolean") throw new Error("Invalid report request envelope field.");
-      let value = Object.hasOwn(field, "literal") ? field.literal : Object.hasOwn(field, "window") ? read(context.identity, field.window) : read(effective, field.query);
-      if (value === void 0 && field.optional === true) continue;
-      value = typed(value, field.type, config);
-      if (field.omitEmpty === true && (Array.isArray(value) && !value.length || object3(value) && !Object.keys(value).length || value === "")) continue;
+      if (!object3(field2) || Object.keys(field2).some((key2) => !["literal", "window", "query", "type", "optional", "omitEmpty"].includes(key2)) || ["literal", "window", "query"].filter((key2) => Object.hasOwn(field2, key2)).length !== 1 || field2.optional !== void 0 && typeof field2.optional !== "boolean" || field2.omitEmpty !== void 0 && typeof field2.omitEmpty !== "boolean") throw new Error("Invalid report request envelope field.");
+      let value = Object.hasOwn(field2, "literal") ? field2.literal : Object.hasOwn(field2, "window") ? read2(context.identity, field2.window) : read2(effective, field2.query);
+      if (value === void 0 && field2.optional === true) continue;
+      value = typed(value, field2.type, config);
+      if (field2.omitEmpty === true && (Array.isArray(value) && !value.length || object3(value) && !Object.keys(value).length || value === "")) continue;
       write(result, destination, value);
     }
     if (JSON.stringify(result).length > 256 * 1024) throw new Error("The report request envelope exceeds the size limit.");
@@ -71135,9 +71608,9 @@ ${indent}${end}`;
         if (fieldKeys.has(key2)) requireField(item);
         if (fieldLists.has(key2)) {
           if (!Array.isArray(item)) throw new Error("Selected export fields must be arrays.");
-          item.forEach((field) => {
-            if (typeof field !== "string" || !field) throw new Error("Selected export fields must contain declared field names.");
-            requireField(field);
+          item.forEach((field2) => {
+            if (typeof field2 !== "string" || !field2) throw new Error("Selected export fields must contain declared field names.");
+            requireField(field2);
           });
         }
         if (parent === "columns" && key2 === "key") requireField(item);
@@ -71204,7 +71677,7 @@ ${indent}${end}`;
   function bindInvocationScope(config, state, request) {
     if (!request) return state;
     const safe = (name) => typeof name === "string" && /^[A-Za-z][A-Za-z0-9_]*$/.test(name) && !["constructor", "prototype", "__proto__"].includes(name);
-    const read2 = (path) => {
+    const read3 = (path) => {
       const parts = typeof path === "string" ? path.split(".") : [];
       if (!parts.length || !["filters", "options"].includes(parts[0]) || !parts.every(safe)) return void 0;
       return parts.reduce((value, key2) => isObject(value) && Object.prototype.hasOwnProperty.call(value, key2) ? value[key2] : void 0, request);
@@ -71213,7 +71686,7 @@ ${indent}${end}`;
     for (const predicate of normalizeReportBuilderPredicates(config)) {
       if (!safe(predicate == null ? void 0 : predicate.id)) continue;
       if (predicate.kind === "dateRange") {
-        const start = read2(predicate.startParamPath), end = read2(predicate.endParamPath);
+        const start = read3(predicate.startParamPath), end = read3(predicate.endParamPath);
         if (start !== void 0 || end !== void 0) {
           let range = isObject(params[predicate.id]) ? clone7(params[predicate.id]) : {};
           if (start !== void 0) range = updateReportDateRangeValue(range, "start", start);
@@ -71221,7 +71694,7 @@ ${indent}${end}`;
           params[predicate.id] = range;
         }
       } else {
-        const value = read2(predicate.paramPath);
+        const value = read3(predicate.paramPath);
         if (value !== void 0) params[predicate.id] = clone7(value);
       }
     }

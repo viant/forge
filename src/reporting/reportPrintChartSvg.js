@@ -1,3 +1,4 @@
+import {isScenarioType,scenarioPrintSvg,scenarioPrintPages} from '../components/scenarios/scenarioContract.js';
 import {donutCenterSvg,donutCenterDescription,donutCenterPrintDescription} from '../components/donutCenter.js';
 import {buildCategoryRange,categoryRangeSvg,categoryRangePrintPages} from '../components/categoryRange.js';
 import {buildHeatmap,heatmapSvg,heatmapPrintPages} from '../components/categoricalHeatmap.js';
@@ -1253,6 +1254,7 @@ export function buildReportPrintChartSvg({
   width = 680,
   rowLimit = 0,
 } = {}) {
+  if(isScenarioType(resolvedChart?.kind)) return scenarioPrintSvg(chartModel,resolvedChart,width);
   if(resolvedChart?.kind === "category-range") return categoryRangeSvg(buildCategoryRange(chartModel.categoryRange,resolvedChart.rows),width);
   if(resolvedChart?.kind === "heatmap") return heatmapSvg(buildHeatmap(chartModel.heatmap,resolvedChart.rows),width);
   // Resolved rows already contain complete category aggregations. Limit marks,
@@ -1282,6 +1284,7 @@ export function buildReportPrintChartSvg({
 }
 
 export function buildReportPrintChartPages({ chartModel = {}, resolvedChart = {}, width = 680, maxHeight = 620, firstMaxHeight = maxHeight, rowLimit = 0 } = {}) {
+  if(isScenarioType(resolvedChart?.kind)) return scenarioPrintPages(chartModel,resolvedChart,{width,maxHeight,firstMaxHeight});
   if(resolvedChart?.kind === "category-range") return categoryRangePrintPages(buildCategoryRange(chartModel.categoryRange,resolvedChart.rows),{width,maxHeight,firstMaxHeight});
   if(resolvedChart?.kind === "heatmap") return heatmapPrintPages(buildHeatmap(chartModel.heatmap,resolvedChart.rows),{width,maxHeight,firstMaxHeight});
   resolvedChart = { ...resolvedChart, rows: applyChartRowLimit(resolvedChart?.rows, rowLimit) };

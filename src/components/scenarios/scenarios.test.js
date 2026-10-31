@@ -1,0 +1,113 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {buildRoutingImpact} from './routingImpact.js';
+import {buildStageAllocation} from './stageAllocation.js';
+import {scenarioScopeChange} from './scenarioContract.js';
+import {normalizeReportBuilderChartSpec,buildExplicitReportBuilderChartContainer} from '../dashboard/reportBuilderUtils.js';
+import {buildReportFillChartPayload} from '../../reporting/reportFillChartPayload.js';
+import {buildReportPrintChartSvg} from '../../reporting/reportPrintChartSvg.js';
+import {reportSpecSchema,reportFillSchema} from '../../reporting/schema/reportSchemas.js';
+import {validateReportSchema} from '../../reporting/schema/reportSchemaValidator.js';
+const fixture=name=>JSON.parse(fs.readFileSync(new URL(`../../../doc/examples/${name}.json`,import.meta.url)));
+const routing=fixture('routing-impact'),staging=fixture('stage-allocation');
+const config=routing.chartSpec.routingImpact,rows=routing.rows;
+for(const share of [0,.1,.25,.5,1]) {
+ const m=buildRoutingImpact(config,rows,{share});
+ assert.equal(m.projected.amount,1000);
+ assert.ok(Math.abs(m.projected.delivered+m.projected.loss-1000)<1e-9);
+ assert.equal(m.paths[2].projected.direct,0);
+ for(const p of m.paths)assert.ok(p.projected.direct>=0&&p.projected.indirect>=0&&p.projected.delivered>=0);
+}
+const low=buildRoutingImpact(config,rows,{share:0}),high=buildRoutingImpact(config,rows,{share:1});
+assert.equal(low.projected.loss,136);assert.equal(high.projected.loss,31);assert.equal(high.projected.delivered,969);
+assert.equal(high.projected.outcome,3579);assert.equal(low.projected.outcome,3174);
+assert.equal(buildRoutingImpact(config,rows,{share:1,categories:['chilled']}).projected.amount,300);
+assert.equal(buildRoutingImpact(config,rows,{categories:[]}).projected.amount,0);
+assert.equal(buildRoutingImpact(config,[{...rows[0],amount:0}]).projected.delivered,0);
+assert.equal(buildRoutingImpact(config,[{...rows[0],amount:null}]).projected.delivered,null);
+assert.throws(()=>buildRoutingImpact(config,rows,{share:1.1}),/finite/);
+assert.throws(()=>buildRoutingImpact(config,[rows[0],rows[0]]),/unique/);
+assert.throws(()=>buildRoutingImpact(config,[{...rows[2],baselineShare:.1}]),/Ineligible/);
+const sc=staging.chartSpec.stageAllocation,sr=staging.rows;
+const measured=buildStageAllocation(sc,sr),added=buildStageAllocation(sc,sr,{activeCategories:['hydro']});
+assert.equal(added.totals[0].increment,105);assert.equal(added.totals[1].increment,420);
+assert.ok(added.stages.every(s=>Math.abs(s.cells.reduce((a,c)=>a+c.share,0)-1)<1e-9));
+assert.notDeepEqual(buildStageAllocation(sc,sr,{metric:'value'}).stages[0].cells.map(c=>c.share),measured.stages[0].cells.map(c=>c.share));
+assert.notEqual(buildStageAllocation(sc,sr,{period:'summer'}).stages[0].total,measured.stages[0].total);
+assert.deepEqual(buildStageAllocation(sc,sr,{period:'summer'}).stages[0].cells.map(c=>c.id),measured.stages[0].cells.map(c=>c.id));
+assert.equal(buildStageAllocation(sc,[]).stages[0].total,null);
+assert.throws(()=>buildStageAllocation(sc,[sr[0],sr[0]]),/Duplicate/);
+assert.throws(()=>buildStageAllocation(sc,sr,{activeCategories:['solar']}),/inactive/);
+for(const fixture of [routing,staging]) {
+ const spec=normalizeReportBuilderChartSpec(fixture.chartSpec),chart=buildExplicitReportBuilderChartContainer({}, {}, {},spec).chart;
+ const filters=chart.type==='routing-impact'?{share:1,categories:['chilled']}:{period:'summer',metric:'value',activeCategories:['hydro']};
+ const payload=buildReportFillChartPayload(chart,fixture.rows,undefined,undefined,filters);
+ assert.deepEqual(payload.scenarioState,filters);
+ const print=buildReportPrintChartSvg({chartModel:chart,resolvedChart:payload});assert.ok(print.svg);assert.ok(!print.svg.includes('tabindex'));
+ for(const [schema,name,value] of [[reportSpecSchema,'chartSpec',spec],[reportSpecSchema,'chartModel',chart],[reportFillSchema,'resolvedChart',payload]]) {
+  const result=validateReportSchema({...schema,$ref:`#/$defs/${name}`},JSON.parse(JSON.stringify(value)));assert.equal(result.valid,true,JSON.stringify(result));
+ }
+ filters.share=0;assert.notEqual(payload.scenarioState.share,0);
+}
+let calls=[];const params=new Map([['share',{id:'share',kind:'number',value:.25}],['categories',{id:'categories',kind:'select',multiple:true,value:['ambient','chilled']}]]),handlers={canEditScopeParam:()=>true,setScopeParamValue:(param,value)=>calls.push([param.id,value]),toggleScopeParamOption:(param,value)=>calls.push([param.id,value])};
+scenarioScopeChange(config,params,handlers,'share',.5);scenarioScopeChange(config,params,handlers,'categories',['ambient']);assert.deepEqual(calls,[['share',.5],['categories','chilled']]);
+console.log('Two independent scenario contracts: numerical constraints, state binding, canonical print and schemas passed.');
+const {buildReportBuilderReportDocument,lowerReportDocumentToReportSpec}=await import('../../reporting/reportDocumentModel.js');
+const {buildReportFillFromReportSpec}=await import('../../reporting/reportFillModel.js');
+const {buildReportPrintFromReportFill}=await import('../../reporting/reportPrintModel.js');
+const {validateReportSpec,validateReportFill,validateReportPrint}=await import('../../reporting/schema/reportSchemas.js');
+for(const fixture of [routing,staging]) {
+ const numeric=Object.keys(fixture.rows[0]).filter(key=>typeof fixture.rows[0][key]==='number'),dimensions=Object.keys(fixture.rows[0]).filter(key=>!numeric.includes(key));
+ const config={dataSourceRef:'synthetic',dimensions:dimensions.map(id=>({id,key:id,label:id,paramPath:`dimensions.${id}`})),measures:numeric.map(id=>({id,key:id,label:id,paramPath:`measures.${id}`}))};
+ const block={id:'scenario',kind:'chartBlock',datasetRef:'primary',chartSpec:fixture.chartSpec};
+ const document=buildReportBuilderReportDocument({container:{id:'synthetic-scenario',dataSourceRef:'synthetic'},config,state:{selectedDimensions:dimensions,selectedMeasures:numeric,reportDocumentBlocks:[block]}});
+ const spec=lowerReportDocumentToReportSpec(JSON.parse(JSON.stringify(document)));
+ assert.equal(validateReportSpec(spec).valid,true,JSON.stringify(validateReportSpec(spec)));
+ const fill=buildReportFillFromReportSpec(spec,{primary:{rows:fixture.rows}});
+ assert.equal(validateReportFill(fill).valid,true,JSON.stringify(validateReportFill(fill)));
+ assert.equal(fill.blocks.find(b=>b.id==='scenario').content.resolvedChart.kind,fixture.chartSpec.type);
+ const print=buildReportPrintFromReportFill({reportSpec:spec,reportFill:fill});assert.equal(validateReportPrint(print).valid,true,JSON.stringify(validateReportPrint(print)));
+ assert.match(JSON.stringify(print),/current scenario/);
+}
+console.log('Authored report document → spec → fill → canonical print passed for both primitives.');
+const {scenarioPrintPages,scenarioScopeHandler}=await import('./scenarioContract.js');
+const routeChart=buildExplicitReportBuilderChartContainer({}, {}, {},routing.chartSpec).chart;
+const routePayload=buildReportFillChartPayload(routeChart,rows);
+const fullGraphic=buildReportPrintChartSvg({chartModel:routeChart,resolvedChart:routePayload});
+const pages=scenarioPrintPages(routeChart,routePayload,{width:680,maxHeight:620,firstMaxHeight:125});
+assert.equal(pages[0].startNewPage,true);assert.ok(pages.every(page=>page.height<=620));
+assert.ok(pages.every(page=>page.svg.includes('viewBox="0 0')));assert.ok(pages.some(page=>page.svg.includes('Frozen scenario evidence')));
+assert.equal(scenarioScopeHandler(config,[],new Map(),handlers),null);
+assert.throws(()=>buildRoutingImpact({...config,outcomeExpression:'undeclared * scenarioDelivered'},rows),/Undeclared/);
+const tiny=buildRoutingImpact(config,[{...rows[0],amount:1e-320}]);
+const {routingImpactSvg}=await import('./scenarioSvg.js');assert.doesNotMatch(routingImpactSvg(tiny).svg,/NaN|Infinity/);
+assert.equal(buildRoutingImpact(config,[{...rows[0],directLoss:null}],{share:0}).projected.loss,72);
+assert.equal(buildRoutingImpact(config,[{...rows[0],directLoss:null}],{share:1}).projected.loss,null);
+assert.throws(()=>buildStageAllocation(sc,[{...sr[0],energy:-1}]),/finite/);
+// Nonadditive metric: unequal denominator weights must never sum/average ratios.
+const ratioConfig={periodField:'period',stageField:'stage',categoryField:'category',periods:[{id:'base',label:'Base'},{id:'now',label:'Now'}],baselinePeriod:'base',stages:[{id:'one',label:'First'},{id:'two',label:'Second'}],categories:[{id:'a',label:'Alpha'},{id:'b',label:'Beta'},{id:'c',label:'Extra',inactive:true}],metrics:[{id:'efficiency',label:'Efficiency',type:'ratio',numeratorField:'output',denominatorField:'input',additionNumeratorField:'addedOutput',additionDenominatorField:'addedInput',unit:'units/input'}],state:{period:'now',metric:'efficiency',activeCategories:[]}};
+const ratioRows=[];
+for(const [stage,multiplier] of [['one',1],['two',2]])for(const period of ['base','now'])for(const [category,output,input] of [['a',period==='base'?8:10,2],['b',period==='base'?60:90,period==='base'?20:30],['c',0,0]])ratioRows.push({stage,period,category,output:output*multiplier,input:input*multiplier,addedOutput:category==='c'?12*multiplier:0,addedInput:category==='c'?multiplier:0});
+const ratioMeasured=buildStageAllocation(ratioConfig,ratioRows),ratioProjected=buildStageAllocation(ratioConfig,ratioRows,{activeCategories:['c']});
+assert.equal(ratioMeasured.stages[0].cells[0].value,5);assert.equal(ratioMeasured.stages[0].cells[1].value,3);assert.equal(ratioMeasured.stages[0].cells[2].value,null);
+assert.equal(ratioMeasured.stages[0].cells[0].share,5/8);assert.equal(ratioMeasured.stages[0].total,100/32);assert.equal(ratioMeasured.totals[0].value,300/96);
+assert.equal(ratioProjected.stages[0].total,112/33);assert.equal(ratioProjected.totals[0].value,336/99);
+assert.equal(ratioProjected.totals[0].baseline,204/66);assert.equal(ratioProjected.totals[0].delta,336/99-204/66);assert.equal(ratioProjected.totals[0].increment,336/99-300/96);
+assert.equal(buildStageAllocation(ratioConfig,ratioRows,{period:'base'}).totals[0].value,204/66);
+const zeroDenominators=ratioRows.map(row=>({...row,input:0}));assert.equal(buildStageAllocation(ratioConfig,zeroDenominators).totals[0].value,null);
+assert.equal(buildStageAllocation(ratioConfig,ratioRows.map(row=>row.period==='now'&&row.category==='a'?{...row,input:null}:row)).totals[0].value,null);
+assert.equal(buildStageAllocation(ratioConfig,ratioRows.map(row=>({...row,addedInput:undefined})),{activeCategories:['c']}).totals[0].value,null);
+assert.throws(()=>buildStageAllocation({...ratioConfig,metrics:[{...ratioConfig.metrics[0],field:'output'}]},ratioRows),/separate/);
+const ratioSpec=normalizeReportBuilderChartSpec({type:'stage-allocation',stageAllocation:ratioConfig});assert.deepEqual(ratioSpec.yFields,['output']);
+const ratioChart=buildExplicitReportBuilderChartContainer({}, {}, {},ratioSpec).chart;
+const ratioPayload=buildReportFillChartPayload({...ratioChart,stageAllocation:{...ratioConfig,state:{...ratioConfig.state,activeCategories:['c']}}},ratioRows);
+assert.equal(ratioPayload.scenarioState.metric,'efficiency');assert.ok(ratioPayload.seriesKeys.includes('addedInput'));
+assert.match(buildReportPrintChartSvg({chartModel:ratioChart,resolvedChart:ratioPayload}).svg,/Efficiency: 3.39/);
+const {stageAllocationSvg}=await import('./scenarioSvg.js');
+const stageGraphic=stageAllocationSvg(buildStageAllocation(sc,sr,{period:'summer',metric:'value',activeCategories:['hydro']}),680).svg;
+assert.match(stageGraphic,/3\. Hydro: 160 credits/);assert.match(stageGraphic,/3\. Hydro: 140 credits/);assert.match(stageGraphic,/3\. Hydro: 120 credits/);
+for(const value of [ratioSpec,ratioChart]){const schema=validateReportSchema({...reportSpecSchema,$ref:`#/$defs/${value===ratioSpec?'chartSpec':'chartModel'}`},value);assert.equal(schema.valid,true,JSON.stringify(schema));}
+const partialRouting={...config,state:{share:.25},stateBindings:{share:config.stateBindings.share}};
+const partialHandler=scenarioScopeHandler(partialRouting,[...params.values()],new Map(),handlers);
+assert.equal(typeof partialHandler,'function');assert.equal(partialHandler.canChange('share'),true);assert.equal(partialHandler.canChange('categories'),false);
+assert.equal(partialHandler('categories',['chilled']),false);

@@ -1,3 +1,4 @@
+import {isScenarioType,scenarioFields,scenarioKey} from '../components/scenarios/scenarioContract.js';
 import {normalizeTemplateRequestInputs} from './reportTemplateRequestInputs.js';
 import {donutCenterFields} from '../components/donutCenter.js';
 import {chartTooltipFields} from '../components/chartTooltip.js';
@@ -234,6 +235,7 @@ function buildAuthoredChartBlockState(baseState = {}, chartSpec = {}, fieldCatal
   };
   if(chartSpec?.categoryRange) {addSelection(chartSpec.categoryRange.categoryField);categoryRangeFields(chartSpec.categoryRange).forEach(addSelection);}
   chartTooltipFields(chartSpec?.tooltip).forEach(addSelection);
+  if(isScenarioType(chartSpec?.type)) scenarioFields(chartSpec.type,chartSpec[scenarioKey(chartSpec.type)]).forEach(addSelection);
   addSelection(chartSpec?.heatmap?.rowField);
   addSelection(chartSpec?.heatmap?.columnField);
   addSelection(chartSpec?.heatmap?.valueField);
@@ -615,6 +617,7 @@ function augmentReportRequestForAuthoredBlocks(baseSpec = {}, blocks = [], confi
             if(!catalog||!['measure','calculated'].includes(catalog.kind)||!enableField(field,ref,target.request))throw new Error('Donut center fields must be declared measures of their dataset.');
           }
         }
+        if(isScenarioType(normalizedBlock?.chartSpec?.type)) for(const key of scenarioFields(normalizedBlock.chartSpec.type,normalizedBlock.chartSpec[scenarioKey(normalizedBlock.chartSpec.type)])) enableField(key,normalizedDatasetRef,request);
         for (const key of ["rowField","columnField","valueField"]) enableField(normalizedBlock?.chartSpec?.heatmap?.[key], normalizedDatasetRef, request);
         enableField(normalizedBlock?.chartSpec?.sliceLabel?.field, normalizedDatasetRef, request);
         enableField(normalizedBlock?.chartSpec?.xField, normalizedDatasetRef, request);

@@ -1,3 +1,5 @@
+import ScenarioView from './scenarios/ScenarioViews.jsx';
+import {isScenarioType,scenarioKey} from './scenarios/scenarioContract.js';
 import {resolvePieSliceLabel} from './pieSliceLabel.js';
 import {resolveDonutCenter} from './donutCenter.js';
 import {DonutCenterLabel,DonutCenterDetails,EmptyDonutCenter} from './DonutCenter.jsx';
@@ -540,7 +542,7 @@ export function resolveEmptyChartMessage(metrics = {}) {
     return 'No data for the selected period.';
 }
 
-const Chart = ({container, context, isActive = true, embedded = false, onDatumSelect = null, onLegendItemSelect = null, showControls = true, allowTableSwitch = undefined, onMetricSelectionChange = null, tooltipEntriesOverride = null, showTooltipInspector = true, onTooltipInspect = null}) => {
+const Chart = ({container, context, isActive = true, embedded = false, onDatumSelect = null, onLegendItemSelect = null, showControls = true, allowTableSwitch = undefined, onMetricSelectionChange = null, onScenarioStateChange = null, tooltipEntriesOverride = null, showTooltipInspector = true, onTooltipInspect = null}) => {
     const viewSwitchEnabled = typeof allowTableSwitch === "boolean" ? allowTableSwitch : (typeof container?.chart?.allowTableSwitch === "boolean" ? container.chart.allowTableSwitch : showControls !== false);
     const controlsVisible = container?.chart?.showControls !== false && showControls !== false;
     useSignals();
@@ -656,7 +658,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     const isPieChart = responsiveChartType === "pie" || responsiveChartType === "donut";
     const isHorizontalBar = isHorizontalBarType(responsiveChartType);
     const prepared = useMemo(() => {
-        if(type === "category-range" || type === "heatmap") return {chartData:effectiveCollection || [],availableDataKeys:[],yAxisLabel:""};
+        if(isScenarioType(type) || type === "category-range" || type === "heatmap") return {chartData:effectiveCollection || [],availableDataKeys:[],yAxisLabel:""};
         const chartRows = materializeChartDisplayRows(chart, effectiveCollection || []);
         if (isPieChart) {
             const nameKey = chart.tooltip ? chartTooltipPieFields(chart).nameKey : series.nameKey || "name";
@@ -774,7 +776,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     }, [isPieChart, seriesDefinitions, series.valueKey, selectedValueKey]);
 
     const allTableColumns = useMemo(
-        () => type === 'category-range' ? Array.from(new Set([chart.categoryRange?.categoryField,...chartData.flatMap(row=>Object.keys(row))].filter(Boolean))) : type === 'heatmap' ? Array.from(new Set([chart.heatmap?.rowField,chart.heatmap?.columnField,chart.heatmap?.valueField,...chartData.flatMap(row=>Object.keys(row))].filter(Boolean))) : isPieChart ? ['name', 'value'] : [xAxis?.dataKey, ...stableAvailableDataKeys].filter(Boolean),
+        () => isScenarioType(type) ? Array.from(new Set(chartData.flatMap(row=>Object.keys(row)))) : type === 'category-range' ? Array.from(new Set([chart.categoryRange?.categoryField,...chartData.flatMap(row=>Object.keys(row))].filter(Boolean))) : type === 'heatmap' ? Array.from(new Set([chart.heatmap?.rowField,chart.heatmap?.columnField,chart.heatmap?.valueField,...chartData.flatMap(row=>Object.keys(row))].filter(Boolean))) : isPieChart ? ['name', 'value'] : [xAxis?.dataKey, ...stableAvailableDataKeys].filter(Boolean),
         [type, chart.categoryRange, chart.heatmap, chartData, isPieChart, xAxis?.dataKey, stableAvailableDataKeys],
     );
     const [visibleColumns, setVisibleColumns] = useState(allTableColumns);
@@ -1524,8 +1526,8 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     })();
     const chartViewportStyle = {
         width: "100%",
-        height: (centerState.resolved && (showZeroDataMessage||showEmptyDataMessage||showSelectionMessage)) || type === "category-range" || type === "heatmap" || smallMultiples || (documentAppearance && isHorizontalBar && renderableSeriesDefinitions.length === 1) ? 'auto' : effectiveViewportHeight,
-        minHeight: (centerState.resolved && (showZeroDataMessage||showEmptyDataMessage||showSelectionMessage)) || type === "category-range" || type === "heatmap" || smallMultiples || (documentAppearance && isHorizontalBar && renderableSeriesDefinitions.length === 1) ? undefined : resolvedMinHeight || undefined,
+        height: (centerState.resolved && (showZeroDataMessage||showEmptyDataMessage||showSelectionMessage)) || isScenarioType(type) || type === "category-range" || type === "heatmap" || smallMultiples || (documentAppearance && isHorizontalBar && renderableSeriesDefinitions.length === 1) ? 'auto' : effectiveViewportHeight,
+        minHeight: (centerState.resolved && (showZeroDataMessage||showEmptyDataMessage||showSelectionMessage)) || isScenarioType(type) || type === "category-range" || type === "heatmap" || smallMultiples || (documentAppearance && isHorizontalBar && renderableSeriesDefinitions.length === 1) ? undefined : resolvedMinHeight || undefined,
         minWidth: 0,
         flex: "0 0 auto",
         margin: isHorizontalBar ? "0 auto" : undefined,
@@ -1701,6 +1703,8 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                         <EmptyDonutCenter center={centerState.resolved} typography={chartTypography} message={showSelectionMessage?"No slices selected.":showZeroDataMessage?"All slice values are zero.":"No slice data."}/>
                     ) : type === "category-range" ? (
                         <CategoryRange onInspect={chart.tooltip?(rowIndex,seriesIndex)=>inspectTooltip(readChartDataValue(chartData[rowIndex],chart.categoryRange.categoryField),seriesIndex):undefined} config={chart.categoryRange} rows={chartData} width={chartSize.width || 680} onSelect={interactiveDatumSelection?onDatumSelect:undefined}/>
+                    ) : isScenarioType(type) ? (
+                        <ScenarioView type={type} config={chart[scenarioKey(type)]} rows={chartData} filters={container.requestFilters} onChange={onScenarioStateChange} width={chartSize.width || 900}/>
                     ) : type === "heatmap" ? (
                         <CategoricalHeatmap onInspect={chart.tooltip?index=>setTooltipActiveId(tooltipEntries[index]?.id):undefined} title={container.title || chart.title || "Categorical heatmap"} config={chart.heatmap} rows={chartData} width={chartSize.width || 680} onSelect={interactiveDatumSelection?onDatumSelect:undefined}/>
                     ) : showZeroDataMessage ? (
