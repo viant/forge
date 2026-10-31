@@ -2411,6 +2411,7 @@ function partitionReportPrintTableColumns(columns, minimumWidths, contentWidth) 
 function renderReportPrintTableBlock(state = {}, block = {}, {
   layoutNote = "",
   columnBand = false,
+  firstRowProbe = false,
 } = {}) {
   const description = normalizeString(block?.description);
   if (description && !layoutNote.includes(description)) layoutNote = [description, layoutNote].filter(Boolean).join("\n");
@@ -2430,7 +2431,8 @@ function renderReportPrintTableBlock(state = {}, block = {}, {
   if (!columnBand && rows.length > 0 && columns.length > 2 && minimumWidths.reduce((sum, width) => sum + width, 0) > state.contentWidth) {
     const groups = partitionReportPrintTableColumns(columns, minimumWidths, state.contentWidth);
     if (groups.length > 1) {
-      groups.forEach((groupColumns, index) => {
+      const renderedGroups = firstRowProbe ? groups.slice(0, 1) : groups;
+      renderedGroups.forEach((groupColumns, index) => {
         const title = `${resolveReportPrintBlockTitle(block)} (${index + 1}/${groups.length})`;
         renderReportPrintTableBlock(state, {
           ...block,
@@ -2438,7 +2440,7 @@ function renderReportPrintTableBlock(state = {}, block = {}, {
           selection: undefined,
           title,
           content: { ...block.content, title, columns: groupColumns },
-        }, { layoutNote, columnBand: true });
+        }, { layoutNote, columnBand: true, firstRowProbe });
       });
       return;
     }
@@ -2511,6 +2513,9 @@ function renderReportPrintTableBlock(state = {}, block = {}, {
       );
       state.cursorY += rowHeight;
       rowIndex += 1;
+      // Section pairing consumes only the first row rule. Widths and ranges
+      // still use every row, exactly as the complete table does.
+      if (firstRowProbe) return;
     }
   }
   if (pathwayDetails.length) {
@@ -2772,7 +2777,11 @@ function keepReportPrintSectionWithNext(state, blocks, index) {
   state.sectionHeadingHeight = Math.max(state.sectionHeadingHeight || 0, headingHeight);
   if (!blocks[next]) return;
   const contentProbe = { ...probe, sectionHeadingHeight: headingHeight, pages: [], bookmarks: [], diagnostics: [], currentPage: null, currentPageIndex: null, cursorY: state.contentTop };
-  renderReportPrintBlock(contentProbe, blocks[next], {});
+  if (blocks[next].kind === "tableBlock") {
+    renderReportPrintTableBlock(contentProbe, blocks[next], { firstRowProbe: true });
+  } else {
+    renderReportPrintBlock(contentProbe, blocks[next], {});
+  }
   const firstPageElements = contentProbe.pages[0]?.elements || [];
   const firstContentHeight = Math.max(0, ...firstPageElements.map((element) => element.box.y + element.box.height - state.contentTop));
   const firstRowRule = firstPageElements.find(element => element.id.includes("__row_rule_0"));

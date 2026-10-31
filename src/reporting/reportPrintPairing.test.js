@@ -98,7 +98,13 @@ assert.doesNotMatch(labelOutput, /…/);
 assert.match(labelOutput, /Tablet/);
 assert.match(labelOutput, /Connected TV/);
 assert.match(labelOutput, /Distinct final touchpoint/);
-assert.match(labelOutput, /Category 3/);
+const longPath = "A very long first member -> A very long second member -> Distinct final touchpoint";
+assert.deepEqual(labelPages.flatMap(page => page.labelDetails || []), [`Category 1: ${longPath}`],
+  "The long path has the first displayed category reference after descending revenue ordering");
+assert.match(labelPages[0].svg, /<tspan>Category 1<\/tspan>/,
+  "The plotted label uses the same reference as its full detail");
+assert.ok(labelPages[0].svg.indexOf("Category 1") < labelPages[0].svg.indexOf("Tablet"),
+  "The largest revenue category appears before the lower revenue pathways");
 // Explicit line positions survive the backend's SVG subset, unlike relative dy.
 assert.doesNotMatch(labelOutput, /dy=/);
 
