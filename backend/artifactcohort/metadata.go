@@ -16,6 +16,9 @@ import (
 // The immutable payload is authoritative; no revision is selected or retrieved
 // here. All methods are local and errors never initiate synchronization.
 type MetadataSource struct {
+	headerMu     sync.Mutex
+	headers      map[string]metadataHeader
+	headerBytes  int
 	replica      *Replica
 	namespaces   []string
 	menuMu       sync.Mutex
@@ -123,9 +126,21 @@ func (s *MetadataSource) List(ctx context.Context, kind, namespace string) (resu
 		if root.Kind != kind || namespace != "" && namespace != uri.Namespace {
 			continue
 		}
-		// Listing needs identity only. Opening below supplies the exact bytes and
-		// declared envelope version without enumerating unrelated artifact bodies.
-		result = append(result, primitive.ResourceState{URI: root.URI, Kind: root.Kind, Namespace: uri.Namespace, Name: uri.Name, Title: uri.Name, Lifecycle: identity.PublishedCandidate, ContentFingerprint: root.Hash})
+		header, ok := s.cachedHeader(root.Kind, root.Hash)
+		if !ok {
+			view, err := s.replica.Open(ctx, root.URI)
+			if err != nil {
+				return nil, err
+			}
+			if view.ETag() != root.Hash {
+				return nil, ErrConflict
+			}
+			header, err = s.decodeHeader(root.Kind, root.Hash, view.Payload())
+			if err != nil {
+				return nil, err
+			}
+		}
+		result = append(result, primitive.ResourceState{URI: root.URI, Kind: root.Kind, Namespace: uri.Namespace, Name: uri.Name, Title: header.title(uri.Name), Description: header.Description, Lifecycle: identity.PublishedCandidate, ContentFingerprint: root.Hash})
 	}
 	return result, nil
 }
@@ -151,22 +166,16 @@ func (s *MetadataSource) Get(ctx context.Context, uriText string) (result *primi
 	// Version one is the native primitive format (including MCP definitions).
 	// Versioned envelopes carry their own schemaVersion, already checked by the
 	// producer at publication. This is projection, not schema revalidation.
-	header := struct {
-		SchemaVersion int64  `json:"schemaVersion"`
-		Title         string `json:"title"`
-	}{}
-	if err = json.Unmarshal(payload, &header); err != nil {
-		return nil, ErrInvalid
+	header, err := s.decodeHeader(uri.Kind, view.ETag(), payload)
+	if err != nil {
+		return nil, err
 	}
 	version := header.SchemaVersion
 	if version == 0 {
 		version = 1
 	}
-	title := header.Title
-	if title == "" {
-		title = uri.Name
-	}
-	return &primitive.ResourceState{URI: uriText, Kind: uri.Kind, Namespace: uri.Namespace, Name: uri.Name, Title: title, Lifecycle: identity.PublishedCandidate, FormatVersion: version, ContentFingerprint: view.ETag(), DefinitionBytes: payload, Definition: json.RawMessage(payload)}, nil
+	title := header.title(uri.Name)
+	return &primitive.ResourceState{URI: uriText, Kind: uri.Kind, Namespace: uri.Namespace, Name: uri.Name, Title: title, Description: header.Description, Lifecycle: identity.PublishedCandidate, FormatVersion: version, ContentFingerprint: view.ETag(), DefinitionBytes: payload, Definition: json.RawMessage(payload)}, nil
 }
 
 // AdmissionKey identifies the locally established session/policy snapshot. It

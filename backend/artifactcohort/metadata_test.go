@@ -16,7 +16,7 @@ func TestMetadataSourceAllKindsStayLocalAndSelectOneHash(t *testing.T) {
 	// metadata_menu_test.go; ordinary kinds retain exact source-byte delivery.
 	kinds := []string{"window", "report", "mcp", "skill", "playbook", "toolfeed", "eval", "agent", "prompt"}
 	for _, kind := range kinds {
-		a, _, err := publisher.Publish(ctx, RootRef{URI: kind + "://example/sample", Kind: kind, Version: 7}, json.RawMessage(`{"schemaVersion":1,"title":"Synthetic fixture"}`), allowPublished)
+		a, _, err := publisher.Publish(ctx, RootRef{URI: kind + "://example/sample", Kind: kind, Version: 7}, json.RawMessage(`{"schemaVersion":1,"title":"Synthetic fixture","description":"Synthetic discovery guidance"}`), allowPublished)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -49,6 +49,9 @@ func TestMetadataSourceAllKindsStayLocalAndSelectOneHash(t *testing.T) {
 			rows, err := source.List(ctx, root.Kind, "example")
 			if err != nil || len(rows) != 1 {
 				t.Fatalf("list %s: %v", root.Kind, err)
+			}
+			if rows[0].Title != "Synthetic fixture" || rows[0].Description != "Synthetic discovery guidance" {
+				t.Fatalf("published discovery metadata missing for %s", root.Kind)
 			}
 			got, err := source.Get(ctx, root.URI)
 			if err != nil {
