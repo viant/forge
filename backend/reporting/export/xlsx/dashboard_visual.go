@@ -144,7 +144,7 @@ func renderDashboardWorkbookPrint(report *reportfill.ReportFill, print *reportpr
 	if err != nil {
 		return nil, err
 	}
-	return visibleChartRows(buffer.Bytes(), w.chartDecorations...)
+	return visibleChartRows(buffer.Bytes(), w.file, w.chartDecorations...)
 }
 
 // New prints carry explicit membership. Older matched prints retain their

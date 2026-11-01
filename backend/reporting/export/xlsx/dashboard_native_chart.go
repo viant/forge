@@ -4,8 +4,10 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io"
+	"maps"
 	"math"
 	"regexp"
 	"sort"
@@ -13,6 +15,7 @@ import (
 	"strings"
 
 	reportfill "github.com/viant/forge/backend/reporting/fill"
+	"github.com/viant/toolbox/data"
 	"github.com/xuri/excelize/v2"
 )
 
@@ -174,7 +177,9 @@ func (w *visualDashboardWriter) chartSource(block reportfill.Block) (string, str
 // resolved rows in the source sheet. A row limit selects the cohort before sort.
 func chartDisplayTable(block reportfill.Block) ([]reportfill.TableColumn, [][]any, error) {
 	resolved := block.ChartContent.ResolvedChart
-	columns, rows, err := chartTable(resolved)
+	chart := *resolved
+	chart.Rows = nativeCategoryRows(resolved)
+	columns, rows, err := chartTable(&chart)
 	if err != nil || len(columns) < 2 || (resolved.Type != "horizontal_bar" && resolved.Type != "funnel_bar") || block.ChartContent.ChartModel["preserveCategoryOrder"] == true {
 		return columns, rows, err
 	}
@@ -184,6 +189,50 @@ func chartDisplayTable(block reportfill.Block) ([]reportfill.TableColumn, [][]an
 	}
 	sort.SliceStable(rows[:count], func(i, j int) bool { return horizontalOrderValue(rows[i][1]) > horizontalOrderValue(rows[j][1]) })
 	return columns, rows, nil
+}
+
+var nativeCategoryPath = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_-]*)+$`)
+var nativeUnsafeCategoryPath = regexp.MustCompile(`(^|\.)(__proto__|prototype|constructor)(\.|$)`)
+
+func nativeCategoryValue(record map[string]any, key string) (any, bool) {
+	if value, exists := record[key]; exists {
+		return value, true
+	}
+	if !nativeCategoryPath.MatchString(key) || nativeUnsafeCategoryPath.MatchString(key) {
+		return nil, false
+	}
+	values := data.Map(record)
+	return values.GetValue(key)
+}
+
+func nativeCategoryRows(chart *reportfill.ResolvedChart) []map[string]any {
+	key := chart.XAxisKey
+	if chart.Kind == "category" {
+		key = chart.NameKey
+		hasDeclaredCategory := false
+		for _, record := range chart.Rows {
+			if _, exists := nativeCategoryValue(record, key); exists {
+				hasDeclaredCategory = true
+				break
+			}
+		}
+		if !hasDeclaredCategory {
+			return chart.Rows
+		}
+	}
+	rows := make([]map[string]any, len(chart.Rows))
+	for index, record := range chart.Rows {
+		rows[index] = record
+		if _, exists := record[key]; exists {
+			continue
+		}
+		rows[index] = maps.Clone(record)
+		if rows[index] == nil {
+			rows[index] = make(map[string]any)
+		}
+		rows[index][key], _ = nativeCategoryValue(record, key)
+	}
+	return rows
 }
 
 // Match Number(value || 0) in the shared horizontal chart ordering helper.
@@ -501,7 +550,7 @@ func excelChartColor(value string) string {
 // Excelize 2.10/2.11 always emit plotVisOnly=false without a public option.
 // Change only that known generated element. Fail closed if its representation
 // changes, so a future dependency update cannot silently break filter behavior.
-func visibleChartRows(data []byte, decorations ...nativeChartDecoration) ([]byte, error) {
+func visibleChartRows(data []byte, workbook *excelize.File, decorations ...nativeChartDecoration) ([]byte, error) {
 	reader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
 		return nil, err
@@ -532,6 +581,10 @@ func visibleChartRows(data []byte, decorations ...nativeChartDecoration) ([]byte
 			return nil, fmt.Errorf("xlsx chart %s has an unexpected visibility element", entry.Name)
 		}
 		content = bytes.Replace(content, old, []byte(`<plotVisOnly val="1"></plotVisOnly>`), 1)
+		content, err = nativeCategoryCaches(content, workbook)
+		if err != nil {
+			return nil, err
+		}
 		number, err := strconv.Atoi(strings.TrimSuffix(strings.TrimPrefix(entry.Name, "xl/charts/chart"), ".xml"))
 		if err != nil {
 			return nil, err
@@ -566,6 +619,62 @@ func visibleChartRows(data []byte, decorations ...nativeChartDecoration) ([]byte
 
 var nativeSeriesXML = regexp.MustCompile(`(?s)<ser>.*?</ser>`)
 var nativePointXML = regexp.MustCompile(`(?s)<dPt>.*?</dPt>`)
+
+var nativeCategoryReferenceXML = regexp.MustCompile(`(?s)<cat><strRef>.*?</strRef></cat>`)
+var nativeCategoryRange = regexp.MustCompile(`^'((?:[^']|'')+)'!\$([A-Z]+)\$([0-9]+):\$([A-Z]+)\$([0-9]+)$`)
+
+func nativeCategoryCaches(content []byte, workbook *excelize.File) ([]byte, error) {
+	var failure error
+	result := nativeCategoryReferenceXML.ReplaceAllFunc(content, func(reference []byte) []byte {
+		if failure != nil {
+			return reference
+		}
+		var category struct {
+			Formula string `xml:"strRef>f"`
+		}
+		if failure = xml.Unmarshal(reference, &category); failure != nil {
+			return reference
+		}
+		parts := nativeCategoryRange.FindStringSubmatch(category.Formula)
+		if len(parts) == 0 || parts[2] != parts[4] {
+			failure = fmt.Errorf("xlsx native category chart has an unexpected source range")
+			return reference
+		}
+		first, _ := strconv.Atoi(parts[3])
+		last, _ := strconv.Atoi(parts[5])
+		if first < 1 || last < first || last > excelize.TotalRows {
+			failure = fmt.Errorf("xlsx native category chart has an invalid source range")
+			return reference
+		}
+		sheet := strings.ReplaceAll(parts[1], "''", "'")
+		var cache bytes.Buffer
+		fmt.Fprintf(&cache, `<strCache><ptCount val="%d"></ptCount>`, last-first+1)
+		for row := first; row <= last; row++ {
+			value, err := workbook.GetCellValue(sheet, fmt.Sprintf("%s%d", parts[2], row))
+			if err != nil {
+				failure = err
+				return reference
+			}
+			fmt.Fprintf(&cache, `<pt idx="%d"><v>`, row-first)
+			if failure = xml.EscapeText(&cache, []byte(value)); failure != nil {
+				return reference
+			}
+			cache.WriteString(`</v></pt>`)
+		}
+		cache.WriteString(`</strCache>`)
+		start := bytes.Index(reference, []byte("<strCache>"))
+		if start >= 0 {
+			end := bytes.Index(reference[start:], []byte("</strCache>"))
+			if end < 0 {
+				failure = fmt.Errorf("xlsx native category chart has an unexpected cache")
+				return reference
+			}
+			return bytes.Replace(reference, reference[start:start+end+len("</strCache>")], cache.Bytes(), 1)
+		}
+		return bytes.Replace(reference, []byte("</strRef>"), append(cache.Bytes(), []byte("</strRef>")...), 1)
+	})
+	return result, failure
+}
 
 func applyPointColors(content []byte, colors []string) ([]byte, error) {
 	var points strings.Builder
