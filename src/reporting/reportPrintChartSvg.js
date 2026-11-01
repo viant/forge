@@ -1338,6 +1338,16 @@ export function buildReportPrintChartPages({ chartModel = {}, resolvedChart = {}
   const minimumPlotHeight = horizontalBarChartMetrics(1, descriptors.length).height;
   const omitLegend = hasLayout && maxHeight >= 120 && minimumPlotHeight <= maxHeight && minimumPlotHeight + fullLegendHeight > maxHeight;
   const legendHeight = omitLegend ? 0 : fullLegendHeight;
+  // A chart that fits on one complete page should not leave an orphaned
+  // continuation merely because preceding content reduced the first allocation.
+  // Oversized charts retain the existing complete, shared-axis pagination.
+  if (hasLayout) {
+    const completeHeight = horizontalBarChartMetrics(rows.length, descriptors.length).height + fullLegendHeight;
+    if (completeHeight <= maxHeight && completeHeight > firstMaxHeight) {
+      return [{...renderHorizontalBarChartSvg({chartModel, resolvedChart, width, valueBounds}),
+        sourceRowOffset: 0, sourceRowCount: rows.length, sourceValueBounds: valueBounds, startNewPage: true}];
+    }
+  }
   const pages = [];
   let offset = 0;
   while (offset < rows.length) {
