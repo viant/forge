@@ -968,6 +968,8 @@ export const reportFillSchema = {
         layout: {enum:["small-multiples"]},
         stacked: {type:"boolean"},
         xField: { type: "string" },
+        xAxis: { $ref: "#/$defs/authoredChartAxis" },
+        yAxis: { $ref: "#/$defs/authoredChartAxis" },
         yFields: {
           type: "array",
           minItems: 1,
@@ -992,6 +994,14 @@ export const reportFillSchema = {
             },
           },
         },
+      },
+    },
+    authoredChartAxis: {
+      type: "object",
+      additionalProperties: false,
+      required: ["label"],
+      properties: {
+        label: { type: "string" },
       },
     },
     chartAxis: {

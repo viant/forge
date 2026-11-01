@@ -1,0 +1,26 @@
+{
+  "provenance": "Independently authored synthetic inventory changes; no application captures or source data.",
+  "config": {
+    "title": "Inventory changes",
+    "dataSourceRef": "inventoryRows",
+    "dimensions": [
+      { "id": "item", "key": "item", "label": "Stock item", "paramPath": "dimensions.item", "default": true, "chartAxis": true }
+    ],
+    "measures": [
+      { "id": "netChange", "key": "netChange", "label": "Quantity added", "paramPath": "measures.netChange", "format": "number", "default": true }
+    ],
+    "result": { "defaultMode": "chart", "chartCreationMode": "explicit", "supportedChartTypes": ["bar", "horizontal_bar", "line", "area"], "pageSize": 50 }
+  },
+  "chartSpec": {
+    "title": "Inventory changes",
+    "type": "horizontal_bar",
+    "xField": "item",
+    "yFields": ["netChange"],
+    "xAxis": { "label": "Item" },
+    "yAxis": { "label": "Net quantity change" }
+  },
+  "cases": [
+    { "id": "mixed", "rows": [{ "item": "Bracket", "netChange": 7 }, { "item": "Washer", "netChange": -4 }] },
+    { "id": "negative-only", "rows": [{ "item": "Bracket", "netChange": -2 }, { "item": "Washer", "netChange": -8 }] }
+  ]
+}

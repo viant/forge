@@ -484,6 +484,12 @@ function normalizeChartCategoryLabel(value = null) {
     };
 }
 
+function normalizeChartAxisLabel(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value) || typeof value.label !== "string") return null;
+    const label = value.label.trim();
+    return label ? { label } : null;
+}
+
 export function normalizeReportBuilderChartSpec(chartSpec = {}) {
     if (!chartSpec || typeof chartSpec !== "object" || Array.isArray(chartSpec)) {
         return null;
@@ -513,6 +519,8 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
     const seriesField = normalizeChartSpecValue(chartSpec.seriesField);
     const seriesOptions = normalizeChartSeriesOptions(chartSpec.seriesOptions);
     const categoryLabel = normalizeChartCategoryLabel(chartSpec.categoryLabel);
+    const xAxis = normalizeChartAxisLabel(chartSpec.xAxis);
+    const yAxis = normalizeChartAxisLabel(chartSpec.yAxis);
     const metricSelection = normalizeChartMetricSelection(chartSpec.metricSelection, yFields);
     if (metricSelection && (seriesField || !["line", "area", "bar", "horizontal_bar", "combo"].includes(type))) throw new Error("Metric selection requires a direct cartesian chart.");
     if (metricSelection && type === "horizontal_bar") {
@@ -525,6 +533,8 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
         ...(accentTone ? { accentTone } : {}),
         ...(highlights.length > 0 ? { highlights } : {}),
         type,
+        ...(xAxis ? { xAxis } : {}),
+        ...(yAxis ? { yAxis } : {}),
         ...(scenario ? {[scenarioKey(type)]:scenario} : {}),
         ...(heatmap ? {heatmap} : {}),
         ...(categoryRange ? {categoryRange} : {}),
@@ -2414,7 +2424,7 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
         ...(normalized.preserveCategoryOrder === true ? {preserveCategoryOrder:true} : {}),
         xAxis: {
             dataKey: xDisplayKey || xSourceKey,
-            label: xField?.label || xField?.id || xSourceKey,
+            label: normalized.xAxis?.label || xField?.label || xField?.id || xSourceKey,
             ...(xSourceKey && ((xDisplayKey && xDisplayKey !== xSourceKey) || hasXDisplayValueMap) ? { sourceDataKey: xSourceKey } : {}),
             ...(hasXDisplayValueMap
                 ? { displayValueMap: clone(xField.displayValueMap) }
@@ -2427,6 +2437,7 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
         },
         yAxis: {
             format: yMeasures[0]?.format,
+            ...(normalized.yAxis ? { label: normalized.yAxis.label } : {}),
         },
     };
 

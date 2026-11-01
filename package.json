@@ -56,6 +56,7 @@
     "./reporting/section-datasets": "./src/reporting/reportSectionDatasets.js"
   },
   "scripts": {
+    "test:chart-axis-labels": "node --no-warnings src/reporting/reportChartAxisLabels.test.js && vitest run --config vitest.runtime.config.mjs src/components/Chart.axisLabels.render.test.jsx",
     "test:interactive-scenarios": "node --no-warnings src/components/scenarios/scenarios.test.js && vitest run --config vitest.scenarios.config.mjs",
     "test:report-scope-controls": "node --no-warnings src/components/dashboard/reportRuntimeScopeControls.test.mjs && node --no-warnings src/components/dashboard/reportRuntimeBindings.test.mjs && vite-node src/components/dashboard/portableNativeReport.render.test.mjs && vitest run --config vitest.runtime.config.mjs src/components/dashboard/ReportRuntime.scopeControls.render.test.jsx",
     "test:table-preferences": "node --no-warnings src/core/preferences/tablePreferences.test.js && node --no-warnings src/core/preferences/tableViews.test.js",

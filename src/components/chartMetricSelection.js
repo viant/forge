@@ -20,5 +20,5 @@ export function applyChartMetricSelection(chart, selection = null) {
  const primary=options.find(option=>option.value===selected.primaryField);
  const secondary=options.find(option=>option.value===selected.secondaryField);
  const values=[{...primary,axis:'left'},...(secondary?[{...secondary,axis:'right'}]:[])];
- return {...chart,metricSelection:{...selected,options},series:{...chart.series,values},yAxis:{...chart.yAxis,format:primary.format},axes:{left:{format:primary.format,label:primary.label},...(secondary?{right:{format:secondary.format,label:secondary.label}}:{})}};
+ return {...chart,metricSelection:{...selected,options},series:{...chart.series,values},yAxis:{...chart.yAxis,format:primary.format},axes:{left:{format:primary.format,label:chart.yAxis?.label || primary.label},...(secondary?{right:{format:secondary.format,label:secondary.label}}:{})}};
 }

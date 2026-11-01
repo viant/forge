@@ -88,7 +88,7 @@ var ForgeAuthoredLowerer = (() => {
     return { primaryField, secondaryField };
   }
   function applyChartMetricSelection(chart, selection = null) {
-    var _a5, _b;
+    var _a5, _b, _c;
     if (!(chart == null ? void 0 : chart.metricSelection)) return chart;
     if (((_a5 = chart.series) == null ? void 0 : _a5.nameKey) || !["line", "area", "bar", "horizontal_bar", "combo", "composed"].includes(chart.type)) throw Error("Metric selection requires a direct cartesian chart.");
     const options = chart.metricSelection.options || ((_b = chart.series) == null ? void 0 : _b.values) || [];
@@ -108,7 +108,7 @@ var ForgeAuthoredLowerer = (() => {
     const primary = options.find((option) => option.value === selected.primaryField);
     const secondary = options.find((option) => option.value === selected.secondaryField);
     const values = [{ ...primary, axis: "left" }, ...secondary ? [{ ...secondary, axis: "right" }] : []];
-    return { ...chart, metricSelection: { ...selected, options }, series: { ...chart.series, values }, yAxis: { ...chart.yAxis, format: primary.format }, axes: { left: { format: primary.format, label: primary.label }, ...secondary ? { right: { format: secondary.format, label: secondary.label } } : {} } };
+    return { ...chart, metricSelection: { ...selected, options }, series: { ...chart.series, values }, yAxis: { ...chart.yAxis, format: primary.format }, axes: { left: { format: primary.format, label: ((_c = chart.yAxis) == null ? void 0 : _c.label) || primary.label }, ...secondary ? { right: { format: secondary.format, label: secondary.label } } : {} } };
   }
 
   // src/reporting/reportPresentationModel.js
@@ -51414,6 +51414,11 @@ Please __addLocaleData before adding additional unit data`);
       maxCharacters: Math.max(4, Math.min(120, Number(value.maxCharacters) || 28))
     };
   }
+  function normalizeChartAxisLabel(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value) || typeof value.label !== "string") return null;
+    const label = value.label.trim();
+    return label ? { label } : null;
+  }
   function normalizeReportBuilderChartSpec(chartSpec = {}) {
     if (!chartSpec || typeof chartSpec !== "object" || Array.isArray(chartSpec)) {
       return null;
@@ -51443,6 +51448,8 @@ Please __addLocaleData before adding additional unit data`);
     const seriesField = normalizeChartSpecValue(chartSpec.seriesField);
     const seriesOptions = normalizeChartSeriesOptions(chartSpec.seriesOptions);
     const categoryLabel = normalizeChartCategoryLabel(chartSpec.categoryLabel);
+    const xAxis = normalizeChartAxisLabel(chartSpec.xAxis);
+    const yAxis = normalizeChartAxisLabel(chartSpec.yAxis);
     const metricSelection = normalizeChartMetricSelection(chartSpec.metricSelection, yFields);
     if (metricSelection && (seriesField || !["line", "area", "bar", "horizontal_bar", "combo"].includes(type))) throw new Error("Metric selection requires a direct cartesian chart.");
     if (metricSelection && type === "horizontal_bar") {
@@ -51455,6 +51462,8 @@ Please __addLocaleData before adding additional unit data`);
       ...accentTone ? { accentTone } : {},
       ...highlights.length > 0 ? { highlights } : {},
       type,
+      ...xAxis ? { xAxis } : {},
+      ...yAxis ? { yAxis } : {},
       ...scenario ? { [scenarioKey(type)]: scenario } : {},
       ...heatmap ? { heatmap } : {},
       ...categoryRange ? { categoryRange } : {},
@@ -52487,7 +52496,7 @@ Please __addLocaleData before adding additional unit data`);
     return [...selectedDimensions, ...selectedMeasures];
   }
   function buildExplicitReportBuilderChartContainer(container = {}, config = {}, state = {}, chartSpec = null) {
-    var _a5, _b;
+    var _a5, _b, _c;
     const normalized = normalizeReportBuilderChartSpec(chartSpec);
     if (!normalized) {
       return container;
@@ -52544,7 +52553,7 @@ Please __addLocaleData before adding additional unit data`);
       ...normalized.preserveCategoryOrder === true ? { preserveCategoryOrder: true } : {},
       xAxis: {
         dataKey: xDisplayKey || xSourceKey,
-        label: (xField == null ? void 0 : xField.label) || (xField == null ? void 0 : xField.id) || xSourceKey,
+        label: ((_b = normalized.xAxis) == null ? void 0 : _b.label) || (xField == null ? void 0 : xField.label) || (xField == null ? void 0 : xField.id) || xSourceKey,
         ...xSourceKey && (xDisplayKey && xDisplayKey !== xSourceKey || hasXDisplayValueMap) ? { sourceDataKey: xSourceKey } : {},
         ...hasXDisplayValueMap ? { displayValueMap: clone4(xField.displayValueMap) } : {},
         tickFormat: xField == null ? void 0 : xField.tickFormat,
@@ -52552,7 +52561,8 @@ Please __addLocaleData before adding additional unit data`);
         ...normalized.categoryLabel ? { categoryLabel: clone4(normalized.categoryLabel) } : {}
       },
       yAxis: {
-        format: (_b = yMeasures[0]) == null ? void 0 : _b.format
+        format: (_c = yMeasures[0]) == null ? void 0 : _c.format,
+        ...normalized.yAxis ? { label: normalized.yAxis.label } : {}
       }
     };
     if (chartFamilyAllowsSeriesDimension(seriesType) && normalized.seriesField && yMeasures.length === 1) {
