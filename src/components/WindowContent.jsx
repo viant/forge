@@ -1258,6 +1258,7 @@ function WindowContentInner({window, metadata, services}) {
                                     selectionMode ? { selectionMode } : {},
                                 )}
                                 dialog={dialog}
+                                mountedDataSourceRefs={requiredDataSourceRefs}
                                 focusRequest={Number(dialogSignal?.focusRequest || 0)}
                             />
                         );

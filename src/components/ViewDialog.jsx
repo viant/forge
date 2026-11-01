@@ -245,7 +245,7 @@ export function resolveDialogSelectionMode(dialog = {}, callerProps = {}) {
     return "";
 }
 
-const ViewDialog = ({context, dialog, focusRequest = 0}) => {
+const ViewDialog = ({context, dialog, focusRequest = 0, mountedDataSourceRefs = []}) => {
     useSignals();
     const log = getLogger('dialog');
     const {handlers} = context
@@ -575,7 +575,7 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
                 {dsCtx ? (<>
                     <DataSource context={dsCtx} />
                     <MessageBus context={dsCtx} />
-                    {dialogDataSourceRefs(dialog, context?.metadata?.dataSource, resolvedDataSourceRef).map(ref => (
+                    {dialogDataSourceRefs(dialog, context?.metadata?.dataSource, resolvedDataSourceRef, mountedDataSourceRefs).map(ref => (
                         <DataSourceContainer key={ref} windowContext={dsCtx} dsKey={ref} suppressAutomaticFetch />
                     ))}
                 </>) : null}
