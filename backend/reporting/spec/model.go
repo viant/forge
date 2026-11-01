@@ -268,6 +268,8 @@ type Block struct {
 	ValueLabel               string                          `json:"valueLabel,omitempty"`
 	ValueFormat              string                          `json:"valueFormat,omitempty"`
 	Suffix                   string                          `json:"suffix,omitempty"`
+	SecondaryDatasetRef      string                          `json:"secondaryDatasetRef,omitempty"`
+	SecondaryCalculation     string                          `json:"secondaryCalculation,omitempty"`
 	SecondaryField           string                          `json:"secondaryField,omitempty"`
 	SecondaryLabel           string                          `json:"secondaryLabel,omitempty"`
 	SecondaryFormat          string                          `json:"secondaryFormat,omitempty"`
@@ -395,6 +397,8 @@ type rawKPIBlock struct {
 	ValueLabel               string            `json:"valueLabel"`
 	ValueFormat              string            `json:"valueFormat,omitempty"`
 	Suffix                   string            `json:"suffix,omitempty"`
+	SecondaryDatasetRef      json.RawMessage   `json:"secondaryDatasetRef,omitempty"`
+	SecondaryCalculation     json.RawMessage   `json:"secondaryCalculation,omitempty"`
 	SecondaryField           string            `json:"secondaryField,omitempty"`
 	SecondaryLabel           string            `json:"secondaryLabel,omitempty"`
 	SecondaryFormat          string            `json:"secondaryFormat,omitempty"`
@@ -851,6 +855,12 @@ func (r *ReportSpec) Validate() error {
 			if !isAllowedReportValueFormat(block.ValueFormat) {
 				return fmt.Errorf("reportSpec.blocks[%d].valueFormat %q is not supported for kpiBlock", index, block.ValueFormat)
 			}
+			switch block.SecondaryCalculation {
+			case "", "value", "difference", "relativeChange":
+			default:
+				return fmt.Errorf("reportSpec.blocks[%d].secondaryCalculation %q is not supported for kpiBlock", index, block.SecondaryCalculation)
+			}
+
 			if !isAllowedReportValueFormat(block.SecondaryFormat) {
 				return fmt.Errorf("reportSpec.blocks[%d].secondaryFormat %q is not supported for kpiBlock", index, block.SecondaryFormat)
 			}
@@ -1116,6 +1126,24 @@ func decodeBlock(payload json.RawMessage, index int) (result Block, resultErr er
 		if err := decodeStrictJSON(payload, &block, fmt.Sprintf("reportSpec.blocks[%d] kpiBlock", index)); err != nil {
 			return Block{}, err
 		}
+		secondaryDatasetRef, secondaryCalculation := "", ""
+		if len(block.SecondaryDatasetRef) > 0 {
+			if bytes.Equal(bytes.TrimSpace(block.SecondaryDatasetRef), []byte("null")) || json.Unmarshal(block.SecondaryDatasetRef, &secondaryDatasetRef) != nil {
+				return Block{}, fmt.Errorf("reportSpec.blocks[%d].secondaryDatasetRef must be a string", index)
+			}
+			if strings.TrimSpace(secondaryDatasetRef) == "" {
+				return Block{}, fmt.Errorf("reportSpec.blocks[%d].secondaryDatasetRef must not be empty", index)
+			}
+		}
+		if len(block.SecondaryCalculation) > 0 {
+			if bytes.Equal(bytes.TrimSpace(block.SecondaryCalculation), []byte("null")) || json.Unmarshal(block.SecondaryCalculation, &secondaryCalculation) != nil {
+				return Block{}, fmt.Errorf("reportSpec.blocks[%d].secondaryCalculation must be a string", index)
+			}
+			if secondaryCalculation == "" {
+				return Block{}, fmt.Errorf("reportSpec.blocks[%d].secondaryCalculation must be value, difference or relativeChange", index)
+			}
+		}
+
 		return Block{
 			Sparkline:                block.Sparkline,
 			ID:                       block.ID,
@@ -1126,6 +1154,8 @@ func decodeBlock(payload json.RawMessage, index int) (result Block, resultErr er
 			ValueLabel:               block.ValueLabel,
 			ValueFormat:              block.ValueFormat,
 			Suffix:                   block.Suffix,
+			SecondaryDatasetRef:      secondaryDatasetRef,
+			SecondaryCalculation:     secondaryCalculation,
 			SecondaryField:           block.SecondaryField,
 			SecondaryLabel:           block.SecondaryLabel,
 			SecondaryFormat:          block.SecondaryFormat,

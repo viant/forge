@@ -134,6 +134,8 @@ type Block struct {
 	ValueLabel               string                `json:"valueLabel,omitempty"`
 	ValueFormat              string                `json:"valueFormat,omitempty"`
 	Suffix                   string                `json:"suffix,omitempty"`
+	SecondaryDatasetRef      string                `json:"secondaryDatasetRef,omitempty"`
+	SecondaryCalculation     string                `json:"secondaryCalculation,omitempty"`
 	SecondaryField           string                `json:"secondaryField,omitempty"`
 	SecondaryLabel           string                `json:"secondaryLabel,omitempty"`
 	SecondaryFormat          string                `json:"secondaryFormat,omitempty"`
@@ -647,6 +649,8 @@ type rawKPIBlock struct {
 	ValueLabel               string            `json:"valueLabel"`
 	ValueFormat              string            `json:"valueFormat,omitempty"`
 	Suffix                   string            `json:"suffix,omitempty"`
+	SecondaryDatasetRef      json.RawMessage   `json:"secondaryDatasetRef,omitempty"`
+	SecondaryCalculation     json.RawMessage   `json:"secondaryCalculation,omitempty"`
 	SecondaryField           string            `json:"secondaryField,omitempty"`
 	SecondaryLabel           string            `json:"secondaryLabel,omitempty"`
 	SecondaryFormat          string            `json:"secondaryFormat,omitempty"`
@@ -967,6 +971,24 @@ func decodeJSON(data []byte, datasourceRequests bool) (*ReportFill, error) {
 			if err := decoder.Decode(&kpiBlock); err != nil {
 				return nil, fmt.Errorf("decode reportFill.blocks[%d] kpiBlock: %w", index, err)
 			}
+			secondaryDatasetRef, secondaryCalculation := "", ""
+			if len(kpiBlock.SecondaryDatasetRef) > 0 {
+				if bytes.Equal(bytes.TrimSpace(kpiBlock.SecondaryDatasetRef), []byte("null")) || json.Unmarshal(kpiBlock.SecondaryDatasetRef, &secondaryDatasetRef) != nil {
+					return nil, fmt.Errorf("reportFill.blocks[%d].secondaryDatasetRef must be a string", index)
+				}
+				if strings.TrimSpace(secondaryDatasetRef) == "" {
+					return nil, fmt.Errorf("reportFill.blocks[%d].secondaryDatasetRef must not be empty", index)
+				}
+			}
+			if len(kpiBlock.SecondaryCalculation) > 0 {
+				if bytes.Equal(bytes.TrimSpace(kpiBlock.SecondaryCalculation), []byte("null")) || json.Unmarshal(kpiBlock.SecondaryCalculation, &secondaryCalculation) != nil {
+					return nil, fmt.Errorf("reportFill.blocks[%d].secondaryCalculation must be a string", index)
+				}
+				if secondaryCalculation == "" {
+					return nil, fmt.Errorf("reportFill.blocks[%d].secondaryCalculation must be value, difference or relativeChange", index)
+				}
+			}
+
 			fill.Blocks = append(fill.Blocks, Block{
 				ID:                       kpiBlock.ID,
 				Kind:                     kpiBlock.Kind,
@@ -976,6 +998,8 @@ func decodeJSON(data []byte, datasourceRequests bool) (*ReportFill, error) {
 				ValueLabel:               kpiBlock.ValueLabel,
 				ValueFormat:              kpiBlock.ValueFormat,
 				Suffix:                   kpiBlock.Suffix,
+				SecondaryDatasetRef:      secondaryDatasetRef,
+				SecondaryCalculation:     secondaryCalculation,
 				SecondaryField:           kpiBlock.SecondaryField,
 				SecondaryLabel:           kpiBlock.SecondaryLabel,
 				SecondaryFormat:          kpiBlock.SecondaryFormat,
@@ -1608,6 +1632,12 @@ func (r *ReportFill) Validate() error {
 			if !isAllowedReportValueFormat(block.ValueFormat) {
 				return fmt.Errorf("reportFill.blocks[%d].valueFormat %q is not supported for kpiBlock", index, block.ValueFormat)
 			}
+			switch block.SecondaryCalculation {
+			case "", "value", "difference", "relativeChange":
+			default:
+				return fmt.Errorf("reportFill.blocks[%d].secondaryCalculation %q is not supported for kpiBlock", index, block.SecondaryCalculation)
+			}
+
 			if !isAllowedReportValueFormat(block.SecondaryFormat) {
 				return fmt.Errorf("reportFill.blocks[%d].secondaryFormat %q is not supported for kpiBlock", index, block.SecondaryFormat)
 			}
