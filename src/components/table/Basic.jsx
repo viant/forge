@@ -323,9 +323,10 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
         }
     }, []);
 
-    // Apply sorting to collection when it changes or when sort parameters change
+    // A server-sorted page retains producer order, including while its
+    // replacement is pending. Client sorting applies only to client sources.
     const sortedCollection = useMemo(() => {
-        if (!sortColumnId || !displayedCollection?.length) {
+        if (String(dataSource?.sortMode || '').toLowerCase() === 'server' || !sortColumnId || !displayedCollection?.length) {
             return displayedCollection;
         }
 
@@ -354,7 +355,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
             if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
             return 0;
         });
-    }, [displayedCollection, sortColumnId, sortDirection]);
+    }, [displayedCollection, sortColumnId, sortDirection, dataSource?.sortMode]);
 
     const renderedCollection = useMemo(() => {
         return resolveClientPagination(sortedCollection, clientPage, pagingSize, clientPagination).rows;
