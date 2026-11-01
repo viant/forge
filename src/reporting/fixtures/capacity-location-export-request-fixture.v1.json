@@ -751,6 +751,14 @@
       "dataSourceRef": "demoReportSource"
     },
     "title": "Capacity Locations Top Markets Q3",
+    "visibleBlockIds": [
+      "scopeFilters",
+      "activeDrillPath",
+      "primaryTable",
+      "primaryChart",
+      "narrativeIntro",
+      "headlineKpi"
+    ],
     "pageGeometry": {
       "width": 792,
       "height": 612,
@@ -825,7 +833,7 @@
             "box": {
               "x": 42,
               "y": 168,
-              "width": 270.1052631578947,
+              "width": 256.20631578947365,
               "height": 16
             },
             "text": "Market",
@@ -839,9 +847,9 @@
             "id": "primaryTable__header__avails__page_1",
             "kind": "text",
             "box": {
-              "x": 324.1052631578947,
+              "x": 310.20631578947365,
               "y": 168,
-              "width": 425.89473684210526,
+              "width": 439.79368421052624,
               "height": 16
             },
             "text": "Available Impressions",
@@ -869,7 +877,7 @@
             "box": {
               "x": 42,
               "y": 192,
-              "width": 270.1052631578947,
+              "width": 256.20631578947365,
               "height": 16
             },
             "rowKey": "row_1",
@@ -883,9 +891,9 @@
             "id": "primaryTable__row_1__avails__text",
             "kind": "tableCellText",
             "box": {
-              "x": 324.1052631578947,
+              "x": 310.20631578947365,
               "y": 192,
-              "width": 425.89473684210526,
+              "width": 439.79368421052624,
               "height": 16
             },
             "rowKey": "row_1",
@@ -914,7 +922,7 @@
             "box": {
               "x": 42,
               "y": 216,
-              "width": 270.1052631578947,
+              "width": 256.20631578947365,
               "height": 16
             },
             "rowKey": "row_2",
@@ -928,9 +936,9 @@
             "id": "primaryTable__row_2__avails__text",
             "kind": "tableCellText",
             "box": {
-              "x": 324.1052631578947,
+              "x": 310.20631578947365,
               "y": 216,
-              "width": 425.89473684210526,
+              "width": 439.79368421052624,
               "height": 16
             },
             "rowKey": "row_2",
@@ -964,7 +972,7 @@
               "width": 720,
               "height": 164
             },
-            "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 164\" width=\"720\" height=\"164\">\n      \n    <line x1=\"116\" y1=\"16\" x2=\"116\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"116\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n\n    <line x1=\"295.3333333333333\" y1=\"16\" x2=\"295.3333333333333\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"295.3333333333333\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">51K</text>\n  \n\n    <line x1=\"474.66666666666663\" y1=\"16\" x2=\"474.66666666666663\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"474.66666666666663\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">102.1K</text>\n  \n\n    <line x1=\"654\" y1=\"16\" x2=\"654\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"654\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">153.1K</text>\n  \n      \n      <line x1=\"116\" y1=\"16\" x2=\"116\" y2=\"96\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      <text x=\"108\" y=\"32\" text-anchor=\"end\" font-size=\"10\" fill=\"#344054\"><tspan>US</tspan></text>\n<text x=\"108\" y=\"64\" text-anchor=\"end\" font-size=\"10\" fill=\"#344054\"><tspan>CA</tspan></text>\n      \n        <rect x=\"116\" y=\"16\" width=\"538\" height=\"24\" rx=\"2\" fill=\"#1f77b4\" />\n        \n      \n\n        <rect x=\"116\" y=\"48\" width=\"504.26518615284124\" height=\"24\" rx=\"2\" fill=\"#1f77b4\" />\n        \n      \n      \n      \n      <rect x=\"12\" y=\"137\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"148\" font-size=\"11\" fill=\"#344054\">Available Impressions</text>\n    \n    </svg>"
+            "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 164\" width=\"720\" height=\"164\">\n      \n    <line x1=\"116\" y1=\"16\" x2=\"116\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"116\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n\n    <line x1=\"295.3333333333333\" y1=\"16\" x2=\"295.3333333333333\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"295.3333333333333\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">51K</text>\n  \n\n    <line x1=\"474.66666666666663\" y1=\"16\" x2=\"474.66666666666663\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"474.66666666666663\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">102.1K</text>\n  \n\n    <line x1=\"654\" y1=\"16\" x2=\"654\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"654\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">153.1K</text>\n  \n      \n      <line x1=\"116\" y1=\"16\" x2=\"116\" y2=\"96\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      <text x=\"108\" y=\"32\" text-anchor=\"end\" font-size=\"10\" fill=\"#344054\"><tspan>US</tspan></text>\n<text x=\"108\" y=\"64\" text-anchor=\"end\" font-size=\"10\" fill=\"#344054\"><tspan>CA</tspan></text>\n      \n        <path class=\"forge-chart-bar\" d=\"M 116 16 L 648 16 C 651.3137084989847 16 654 18.68629150101524 654 22 L 654 34 C 654 37.31370849898476 651.3137084989847 40 648 40 L 116 40 C 116 40 116 40 116 40 L 116 16 C 116 16 116 16 116 16 Z\" fill=\"#1f77b4\" />\n        \n      \n\n        <path class=\"forge-chart-bar\" d=\"M 116 48 L 614.2651861528412 48 C 617.578894651826 48 620.2651861528412 50.68629150101524 620.2651861528412 54 L 620.2651861528412 66 C 620.2651861528412 69.31370849898477 617.578894651826 72 614.2651861528412 72 L 116 72 C 116 72 116 72 116 72 L 116 48 C 116 48 116 48 116 48 Z\" fill=\"#1f77b4\" />\n        \n      \n      \n      \n      <rect x=\"12\" y=\"137\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"148\" font-size=\"11\" fill=\"#344054\">Available Impressions</text>\n    \n    </svg>"
           }
         ],
         "headerElements": [

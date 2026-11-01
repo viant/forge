@@ -12,6 +12,10 @@
     "dataSourceRef": "demoReportSource"
   },
   "title": "Authored Landscape Geo Report",
+  "visibleBlockIds": [
+    "primaryTable",
+    "stateGeo"
+  ],
   "pageGeometry": {
     "width": 792,
     "height": 612,
@@ -59,7 +63,7 @@
           "box": {
             "x": 42,
             "y": 112,
-            "width": 259.2,
+            "width": 241.468,
             "height": 16
           },
           "text": "State",
@@ -73,9 +77,9 @@
           "id": "primaryTable__header__spend__page_1",
           "kind": "text",
           "box": {
-            "x": 313.2,
+            "x": 295.46799999999996,
             "y": 112,
-            "width": 436.8,
+            "width": 454.53200000000004,
             "height": 16
           },
           "text": "Spend",
@@ -103,7 +107,7 @@
           "box": {
             "x": 42,
             "y": 136,
-            "width": 259.2,
+            "width": 241.468,
             "height": 16
           },
           "rowKey": "row_1",
@@ -117,9 +121,9 @@
           "id": "primaryTable__row_1__spend__text",
           "kind": "tableCellText",
           "box": {
-            "x": 313.2,
+            "x": 295.46799999999996,
             "y": 136,
-            "width": 436.8,
+            "width": 454.53200000000004,
             "height": 16
           },
           "rowKey": "row_1",
@@ -148,7 +152,7 @@
           "box": {
             "x": 42,
             "y": 160,
-            "width": 259.2,
+            "width": 241.468,
             "height": 16
           },
           "rowKey": "row_2",
@@ -162,9 +166,9 @@
           "id": "primaryTable__row_2__spend__text",
           "kind": "tableCellText",
           "box": {
-            "x": 313.2,
+            "x": 295.46799999999996,
             "y": 160,
-            "width": 436.8,
+            "width": 454.53200000000004,
             "height": 16
           },
           "rowKey": "row_2",

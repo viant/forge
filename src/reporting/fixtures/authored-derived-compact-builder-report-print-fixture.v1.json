@@ -12,6 +12,11 @@
     "dataSourceRef": "demoReportSource"
   },
   "title": "Authored Derived Compact Report",
+  "visibleBlockIds": [
+    "primaryTable",
+    "reachRateTrend",
+    "reachRateTable"
+  ],
   "pageGeometry": {
     "width": 792,
     "height": 612,
@@ -59,7 +64,7 @@
           "box": {
             "x": 42,
             "y": 112,
-            "width": 295.7647058823529,
+            "width": 284.65882352941173,
             "height": 16
           },
           "text": "Market",
@@ -73,9 +78,9 @@
           "id": "primaryTable__header__totalSpend__page_1",
           "kind": "text",
           "box": {
-            "x": 349.7647058823529,
+            "x": 338.65882352941173,
             "y": 112,
-            "width": 400.2352941176471,
+            "width": 411.34117647058827,
             "height": 16
           },
           "text": "Spend",
@@ -103,7 +108,7 @@
           "box": {
             "x": 42,
             "y": 136,
-            "width": 295.7647058823529,
+            "width": 284.65882352941173,
             "height": 16
           },
           "rowKey": "row_1",
@@ -117,9 +122,9 @@
           "id": "primaryTable__row_1__totalSpend__text",
           "kind": "tableCellText",
           "box": {
-            "x": 349.7647058823529,
+            "x": 338.65882352941173,
             "y": 136,
-            "width": 400.2352941176471,
+            "width": 411.34117647058827,
             "height": 16
           },
           "rowKey": "row_1",
@@ -148,7 +153,7 @@
           "box": {
             "x": 42,
             "y": 160,
-            "width": 295.7647058823529,
+            "width": 284.65882352941173,
             "height": 16
           },
           "rowKey": "row_2",
@@ -162,9 +167,9 @@
           "id": "primaryTable__row_2__totalSpend__text",
           "kind": "tableCellText",
           "box": {
-            "x": 349.7647058823529,
+            "x": 338.65882352941173,
             "y": 160,
-            "width": 400.2352941176471,
+            "width": 411.34117647058827,
             "height": 16
           },
           "rowKey": "row_2",
@@ -193,7 +198,7 @@
           "box": {
             "x": 42,
             "y": 184,
-            "width": 295.7647058823529,
+            "width": 284.65882352941173,
             "height": 16
           },
           "rowKey": "row_3",
@@ -207,9 +212,9 @@
           "id": "primaryTable__row_3__totalSpend__text",
           "kind": "tableCellText",
           "box": {
-            "x": 349.7647058823529,
+            "x": 338.65882352941173,
             "y": 184,
-            "width": 400.2352941176471,
+            "width": 411.34117647058827,
             "height": 16
           },
           "rowKey": "row_3",
@@ -238,7 +243,7 @@
           "box": {
             "x": 42,
             "y": 208,
-            "width": 295.7647058823529,
+            "width": 284.65882352941173,
             "height": 16
           },
           "rowKey": "row_4",
@@ -252,9 +257,9 @@
           "id": "primaryTable__row_4__totalSpend__text",
           "kind": "tableCellText",
           "box": {
-            "x": 349.7647058823529,
+            "x": 338.65882352941173,
             "y": 208,
-            "width": 400.2352941176471,
+            "width": 411.34117647058827,
             "height": 16
           },
           "rowKey": "row_4",
@@ -349,7 +354,7 @@
             "width": 720,
             "height": 280
           },
-          "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 280\" width=\"720\" height=\"280\">\n      \n    <line x1=\"52\" y1=\"16\" x2=\"704\" y2=\"16\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"20\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">42.82</text>\n  \n\n    <line x1=\"52\" y1=\"76\" x2=\"704\" y2=\"76\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"80\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">28.55</text>\n  \n\n    <line x1=\"52\" y1=\"136\" x2=\"704\" y2=\"136\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"140\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">14.27</text>\n  \n\n    <line x1=\"52\" y1=\"196\" x2=\"704\" y2=\"196\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"200\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n      \n      <line x1=\"52\" y1=\"196\" x2=\"704\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      <line x1=\"52\" y1=\"16\" x2=\"52\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <path d=\"M52,24.407286314806164 L704,23.524521251751516\" fill=\"none\" stroke=\"#1f77b4\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" />\n      \n      <circle cx=\"52\" cy=\"24.407286314806164\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"704\" cy=\"23.524521251751516\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n      \n    \n\n      <path d=\"M52,16 L704,20.28771602055116\" fill=\"none\" stroke=\"#ff7f0e\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" />\n      \n      <circle cx=\"52\" cy=\"16\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"704\" cy=\"20.28771602055116\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n      \n    \n      \n      <text x=\"52\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\"><tspan>US</tspan></text>\n<text x=\"704\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\"><tspan>CA</tspan></text>\n      <text x=\"378\" y=\"232\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"600\" fill=\"#475467\">Market</text>\n      \n      <rect x=\"12\" y=\"237\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"248\" font-size=\"11\" fill=\"#344054\">Display</text>\n    \n\n      <rect x=\"172\" y=\"237\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#ff7f0e\" />\n      <text x=\"190\" y=\"248\" font-size=\"11\" fill=\"#344054\">CTV</text>\n    \n    </svg>"
+          "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 280\" width=\"720\" height=\"280\">\n      \n    <line x1=\"52\" y1=\"16\" x2=\"704\" y2=\"16\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"20\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">42.8%</text>\n  \n\n    <line x1=\"52\" y1=\"76\" x2=\"704\" y2=\"76\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"80\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">28.5%</text>\n  \n\n    <line x1=\"52\" y1=\"136\" x2=\"704\" y2=\"136\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"140\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">14.3%</text>\n  \n\n    <line x1=\"52\" y1=\"196\" x2=\"704\" y2=\"196\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"200\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">0.0%</text>\n  \n      \n      <line x1=\"52\" y1=\"196\" x2=\"704\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      <line x1=\"52\" y1=\"16\" x2=\"52\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <path d=\"M52,24.407286314806164 L704,23.524521251751516\" fill=\"none\" stroke=\"#1f77b4\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" />\n      \n      <circle cx=\"52\" cy=\"24.407286314806164\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"704\" cy=\"23.524521251751516\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n      \n    \n\n      <path d=\"M52,16 L704,20.28771602055116\" fill=\"none\" stroke=\"#ff7f0e\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" />\n      \n      <circle cx=\"52\" cy=\"16\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"704\" cy=\"20.28771602055116\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n      \n    \n      \n      <text x=\"52\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\"><tspan>US</tspan></text>\n<text x=\"704\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\"><tspan>CA</tspan></text>\n      <text x=\"378\" y=\"232\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"600\" fill=\"#475467\">Market</text>\n      \n      <rect x=\"12\" y=\"237\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"248\" font-size=\"11\" fill=\"#344054\">Display</text>\n    \n\n      <rect x=\"360\" y=\"237\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#ff7f0e\" />\n      <text x=\"378\" y=\"248\" font-size=\"11\" fill=\"#344054\">CTV</text>\n    \n    </svg>"
         },
         {
           "id": "reachRateTable__title_0",
@@ -384,7 +389,7 @@
           "box": {
             "x": 42,
             "y": 432,
-            "width": 206,
+            "width": 202.54333333333335,
             "height": 16
           },
           "text": "Market",
@@ -398,9 +403,9 @@
           "id": "reachRateTable__header__channelId__page_2",
           "kind": "text",
           "box": {
-            "x": 260,
+            "x": 256.54333333333335,
             "y": 432,
-            "width": 206,
+            "width": 205.82333333333335,
             "height": 16
           },
           "text": "Channel",
@@ -414,9 +419,9 @@
           "id": "reachRateTable__header__reachRate__page_2",
           "kind": "text",
           "box": {
-            "x": 478,
+            "x": 474.3666666666667,
             "y": 432,
-            "width": 272,
+            "width": 275.6333333333333,
             "height": 16
           },
           "text": "Reach Rate",
@@ -444,7 +449,7 @@
           "box": {
             "x": 42,
             "y": 456,
-            "width": 206,
+            "width": 202.54333333333335,
             "height": 16
           },
           "rowKey": "row_1",
@@ -458,9 +463,9 @@
           "id": "reachRateTable__row_1__channelId__text",
           "kind": "tableCellText",
           "box": {
-            "x": 260,
+            "x": 256.54333333333335,
             "y": 456,
-            "width": 206,
+            "width": 205.82333333333335,
             "height": 16
           },
           "rowKey": "row_1",
@@ -474,9 +479,9 @@
           "id": "reachRateTable__row_1__reachRate__text",
           "kind": "tableCellText",
           "box": {
-            "x": 478,
+            "x": 474.3666666666667,
             "y": 456,
-            "width": 272,
+            "width": 275.6333333333333,
             "height": 16
           },
           "rowKey": "row_1",
@@ -505,7 +510,7 @@
           "box": {
             "x": 42,
             "y": 480,
-            "width": 206,
+            "width": 202.54333333333335,
             "height": 16
           },
           "rowKey": "row_2",
@@ -519,9 +524,9 @@
           "id": "reachRateTable__row_2__channelId__text",
           "kind": "tableCellText",
           "box": {
-            "x": 260,
+            "x": 256.54333333333335,
             "y": 480,
-            "width": 206,
+            "width": 205.82333333333335,
             "height": 16
           },
           "rowKey": "row_2",
@@ -535,9 +540,9 @@
           "id": "reachRateTable__row_2__reachRate__text",
           "kind": "tableCellText",
           "box": {
-            "x": 478,
+            "x": 474.3666666666667,
             "y": 480,
-            "width": 272,
+            "width": 275.6333333333333,
             "height": 16
           },
           "rowKey": "row_2",
@@ -566,7 +571,7 @@
           "box": {
             "x": 42,
             "y": 504,
-            "width": 206,
+            "width": 202.54333333333335,
             "height": 16
           },
           "rowKey": "row_3",
@@ -580,9 +585,9 @@
           "id": "reachRateTable__row_3__channelId__text",
           "kind": "tableCellText",
           "box": {
-            "x": 260,
+            "x": 256.54333333333335,
             "y": 504,
-            "width": 206,
+            "width": 205.82333333333335,
             "height": 16
           },
           "rowKey": "row_3",
@@ -596,9 +601,9 @@
           "id": "reachRateTable__row_3__reachRate__text",
           "kind": "tableCellText",
           "box": {
-            "x": 478,
+            "x": 474.3666666666667,
             "y": 504,
-            "width": 272,
+            "width": 275.6333333333333,
             "height": 16
           },
           "rowKey": "row_3",
@@ -703,7 +708,7 @@
           "box": {
             "x": 42,
             "y": 112,
-            "width": 206,
+            "width": 202.54333333333335,
             "height": 16
           },
           "text": "Market",
@@ -717,9 +722,9 @@
           "id": "reachRateTable__header__channelId__page_3",
           "kind": "text",
           "box": {
-            "x": 260,
+            "x": 256.54333333333335,
             "y": 112,
-            "width": 206,
+            "width": 205.82333333333335,
             "height": 16
           },
           "text": "Channel",
@@ -733,9 +738,9 @@
           "id": "reachRateTable__header__reachRate__page_3",
           "kind": "text",
           "box": {
-            "x": 478,
+            "x": 474.3666666666667,
             "y": 112,
-            "width": 272,
+            "width": 275.6333333333333,
             "height": 16
           },
           "text": "Reach Rate",
@@ -763,7 +768,7 @@
           "box": {
             "x": 42,
             "y": 136,
-            "width": 206,
+            "width": 202.54333333333335,
             "height": 16
           },
           "rowKey": "row_4",
@@ -777,9 +782,9 @@
           "id": "reachRateTable__row_4__channelId__text",
           "kind": "tableCellText",
           "box": {
-            "x": 260,
+            "x": 256.54333333333335,
             "y": 136,
-            "width": 206,
+            "width": 205.82333333333335,
             "height": 16
           },
           "rowKey": "row_4",
@@ -793,9 +798,9 @@
           "id": "reachRateTable__row_4__reachRate__text",
           "kind": "tableCellText",
           "box": {
-            "x": 478,
+            "x": 474.3666666666667,
             "y": 136,
-            "width": 272,
+            "width": 275.6333333333333,
             "height": 16
           },
           "rowKey": "row_4",

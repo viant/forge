@@ -93,8 +93,10 @@ assert.deepEqual(normalizeReportBuilderDocumentBlocks([
     title: "Headline",
     datasetRef: "primary",
     valueField: "totalSpend",
-    valueLabel: "totalSpend",
+    valueLabel: "Headline",
   },
 ]);
+
+assert.equal(normalizeReportBuilderDocumentBlocks([{id:"explicit",kind:"kpiBlock",title:"Headline",valueField:"totalSpend",valueLabel:"Spend"}])[0].valueLabel,"Spend","an explicit metric label takes precedence over the title");
 
 console.log("reportDocumentTruncationNormalization ✓ strips truncated placeholders from authored document blocks");

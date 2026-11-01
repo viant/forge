@@ -610,3 +610,16 @@ for (const width of [220, 640]) {
     }));
   }
 }
+
+// Tick labels reserve space on both sides without expanding the SVG allocation.
+for(const width of [140,170,270,540]) for(const negative of [false,true]) {
+  const sign=negative?-1:1;
+  const result=buildReportPrintChartSvg({width,chartModel:{type:'line',series:{values:[{value:'right',label:'Right',format:'percentFraction2',axis:'right'},{value:'left',label:'Left',format:'currency2'}]}},resolvedChart:{kind:'directSeries',seriesKeys:['right','left'],rows:[{right:.25*sign,left:81250*sign},{right:.5*sign,left:20000*sign}]}});
+  assert.deepEqual(result.diagnostics,[]);
+  assert.match(result.svg,negative?/-\$81,250\.00/:/\$81,250\.00/);
+  assert.match(result.svg,/data-report-print-axis="right"[^>]*>[^<]*50\.00%/);
+  const grid=[...result.svg.matchAll(/<line x1="([\d.-]+)" y1="16" x2="([\d.-]+)"/g)][0];
+  assert.ok(grid);
+  assert.ok(Number(grid[1])>=0&&Number(grid[2])<=width);
+  assert.ok(Number(grid[2])-Number(grid[1])>=24-1e-8,'Keep a plotting area when reserving axis labels');
+}

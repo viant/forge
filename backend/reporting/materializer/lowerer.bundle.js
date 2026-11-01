@@ -44315,18 +44315,23 @@ Please __addLocaleData before adding additional unit data`);
       ...normalizeStringArray(inferredDependencies)
     ]));
   }
-  function normalizeReportCalculatedFieldExpressionDefinition(definition = {}) {
+  function normalizeReportCalculatedFieldExpressionDefinition(definition = {}, expressionDependencies = null) {
     const expr = normalizeString2(definition == null ? void 0 : definition.expr);
     if (!expr) {
       return null;
     }
-    const parsed = parseReportCalculatedFieldExpression(expr);
-    if (!(parsed == null ? void 0 : parsed.ast)) {
-      return null;
+    let dependencies = expressionDependencies == null ? void 0 : expressionDependencies.get(expr);
+    if (!dependencies) {
+      const parsed = parseReportCalculatedFieldExpression(expr);
+      if (!(parsed == null ? void 0 : parsed.ast)) {
+        return null;
+      }
+      dependencies = parsed.dependencies;
+      expressionDependencies == null ? void 0 : expressionDependencies.set(expr, dependencies);
     }
     return {
       expr,
-      dependencies: buildCalculatedFieldDependencies(definition, parsed.dependencies)
+      dependencies: buildCalculatedFieldDependencies(definition, dependencies)
     };
   }
   function normalizeReportCalculatedFieldCompute(definition = {}) {
@@ -44359,9 +44364,9 @@ Please __addLocaleData before adding additional unit data`);
       dependencies: buildCalculatedFieldDependencies(definition, inferredDependencies)
     };
   }
-  function normalizeReportCalculatedField(definition = {}, {
+  function normalizeCalculatedField(definition = {}, {
     datasetRef = ""
-  } = {}) {
+  } = {}, expressionDependencies = null) {
     var _a5, _b, _c, _d, _e, _f, _g;
     if (!definition || typeof definition !== "object" || Array.isArray(definition)) {
       return null;
@@ -44370,7 +44375,7 @@ Please __addLocaleData before adding additional unit data`);
     if (!id) {
       return null;
     }
-    const normalizedExpression = normalizeReportCalculatedFieldExpressionDefinition(definition);
+    const normalizedExpression = normalizeReportCalculatedFieldExpressionDefinition(definition, expressionDependencies);
     const normalizedCompute = normalizedExpression ? null : normalizeReportCalculatedFieldCompute(definition);
     if (!normalizedExpression && !normalizedCompute) {
       return null;
@@ -44392,7 +44397,8 @@ Please __addLocaleData before adding additional unit data`);
     };
   }
   function normalizeReportCalculatedFields(definitions = [], options = {}) {
-    return (Array.isArray(definitions) ? definitions : []).map((definition) => normalizeReportCalculatedField(definition, options)).filter(Boolean);
+    const expressionDependencies = /* @__PURE__ */ new Map();
+    return (Array.isArray(definitions) ? definitions : []).map((definition) => normalizeCalculatedField(definition, options, expressionDependencies)).filter(Boolean);
   }
   function buildPartitionGroups(rowsToPartition = [], partitionBy = []) {
     const normalizedPartitionBy = normalizePartitionBy(partitionBy);
@@ -61735,6 +61741,21 @@ ${indent}${end}`;
     const effectiveFormat = !normalizedFormat && numeric != null && Math.abs(numeric) >= 1e3 ? "compactNumber" : normalizedFormat;
     return formatExportNumericValue(value, effectiveFormat, { axis: true });
   }
+  function fitCartesianAxisTicks(width, leftLabels, rightLabels) {
+    const labelWidth2 = (labels) => Math.max(0, ...labels.map((label) => Array.from(label).length * 6));
+    let leftPad = Math.max(52, labelWidth2(leftLabels) + 12);
+    let rightPad = rightLabels.length ? Math.max(58, labelWidth2(rightLabels) + 12) : 16;
+    let scale = 1;
+    const plotBudget = Math.max(1, width - Math.min(24, width * 0.2));
+    if (leftPad + rightPad > plotBudget) {
+      leftPad = labelWidth2(leftLabels) + 12;
+      rightPad = rightLabels.length ? labelWidth2(rightLabels) + 12 : 16;
+      scale = Math.min(1, plotBudget / (leftPad + rightPad));
+      leftPad *= scale;
+      rightPad *= scale;
+    }
+    return { leftPad, rightPad, tickGap: 8 * scale, tickFontSize: 10 * scale };
+  }
   function formatSeriesDataLabel(value, format2 = "") {
     const normalizedFormat = normalizeString39(format2);
     if (!normalizedFormat) {
@@ -62409,17 +62430,34 @@ ${indent}${end}`;
         ].filter(Boolean)
       };
     }
-    const leftPad = 52;
-    const rightPad = rightBounds ? 58 : 16;
     const topPad = 16;
+    const plotHeight = 180;
+    const valueRange = bounds.maxValue - bounds.minValue || 1;
+    const yTicks = Array.from({ length: 4 }, (_2, index) => ({
+      value: bounds.maxValue - index / 3 * valueRange,
+      y: topPad + index / 3 * plotHeight
+    })).map((tick) => {
+      var _a6;
+      return { ...tick, label: formatAxisTick(tick.value, (_a6 = leftSeries[0] || seriesDescriptors[0]) == null ? void 0 : _a6.format) };
+    });
+    const rightAxisTicks = rightBounds ? Array.from({ length: 4 }, (_2, index) => ({
+      value: rightBounds.maxValue - index / 3 * (rightBounds.maxValue - rightBounds.minValue),
+      y: topPad + index / 3 * plotHeight
+    })).map((tick) => {
+      var _a6;
+      return { ...tick, label: formatAxisTick(tick.value, (_a6 = rightSeries[0]) == null ? void 0 : _a6.format) };
+    }) : [];
+    const { leftPad, rightPad, tickGap, tickFontSize } = fitCartesianAxisTicks(
+      width,
+      yTicks.map((tick) => tick.label),
+      rightAxisTicks.map((tick) => tick.label)
+    );
     const xAxisLabel = normalizeString39(
       ((_a5 = chartModel == null ? void 0 : chartModel.xAxis) == null ? void 0 : _a5.label) || ((_b = chartModel == null ? void 0 : chartModel.xAxis) == null ? void 0 : _b.sourceDataKey) || ((_c = chartModel == null ? void 0 : chartModel.xAxis) == null ? void 0 : _c.dataKey) || (resolvedChart == null ? void 0 : resolvedChart.xAxisKey)
     );
     const bottomPad = xAxisLabel ? 50 : 34;
-    const plotHeight = 180;
     const plotWidth = Math.max(1, width - leftPad - rightPad);
     const xAxisKey = normalizeString39(resolvedChart == null ? void 0 : resolvedChart.xAxisKey);
-    const valueRange = bounds.maxValue - bounds.minValue || 1;
     const baselineY = topPad + (bounds.maxValue - 0) / valueRange * plotHeight;
     const barSeries = seriesDescriptors.filter((series) => resolveChartSupportedSeriesType(series.type) === "bar");
     const categoryWidth = plotWidth / Math.max(rows.length, 1);
@@ -62446,28 +62484,13 @@ ${indent}${end}`;
       plotHeight,
       bounds
     });
-    const yTicks = Array.from({ length: 4 }, (_2, index) => {
-      const fraction2 = index / 3;
-      const value = bounds.maxValue - fraction2 * valueRange;
-      const y4 = topPad + fraction2 * plotHeight;
-      return {
-        value,
-        y: y4
-      };
-    });
-    const gridLines = yTicks.map((tick) => {
-      var _a6;
-      return `
+    const gridLines = yTicks.map((tick) => `
     <line x1="${leftPad}" y1="${tick.y}" x2="${leftPad + plotWidth}" y2="${tick.y}" stroke="#eaecf0" stroke-width="1" />
-    <text x="${leftPad - 8}" y="${tick.y + 4}" text-anchor="end" font-size="10" fill="#667085">${escapeXml(formatAxisTick(tick.value, (_a6 = seriesDescriptors[0]) == null ? void 0 : _a6.format))}</text>
-  `;
+    <text x="${leftPad - tickGap}" y="${tick.y + 4}" text-anchor="end" font-size="${tickFontSize}" fill="#667085">${escapeXml(tick.label)}</text>
+  `).join("\n");
+    const rightTicks = rightAxisTicks.map((tick) => {
+      return `<text data-report-print-axis="right" x="${leftPad + plotWidth + tickGap}" y="${tick.y + 4}" text-anchor="start" font-size="${tickFontSize}" fill="#667085">${escapeXml(tick.label)}</text>`;
     }).join("\n");
-    const rightTicks = rightBounds ? Array.from({ length: 4 }, (_2, index) => {
-      var _a6;
-      const value = rightBounds.maxValue - index / 3 * (rightBounds.maxValue - rightBounds.minValue);
-      const y4 = topPad + index / 3 * plotHeight;
-      return `<text data-report-print-axis="right" x="${leftPad + plotWidth + 8}" y="${y4 + 4}" text-anchor="start" font-size="10" fill="#667085">${escapeXml(formatAxisTick(value, (_a6 = rightSeries[0]) == null ? void 0 : _a6.format))}</text>`;
-    }).join("\n") : "";
     const xTicks = rows.flatMap((row, index) => {
       var _a6, _b2, _c2;
       if (index % labelStep !== 0 && index !== rows.length - 1) return [];

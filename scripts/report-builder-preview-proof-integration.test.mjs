@@ -64,18 +64,14 @@ assert.equal(
   true,
   "authored-runtime runner should still execute reportBuilderRuntimePreviewSection.test.js",
 );
-assert.equal(
-  authoredRuntimeRunner.includes('const runtimeJSXUnitTests = ['),
-  true,
-  "authored-runtime runner should keep a JSX/Vite lane",
+assert.ok(
+  authoredRuntimeRunner.includes('["--no-warnings", viteNodePath, relativePath]'),
+  "every authored-runtime test should use the shared Vite loader",
 );
-
-const jsxLaneIndex = authoredRuntimeRunner.indexOf('"src/components/dashboard/reportBuilderRuntimePreviewSection.test.js"');
-const jsxLaneBlockIndex = authoredRuntimeRunner.indexOf("const runtimeJSXUnitTests = [");
 assert.equal(
-  jsxLaneIndex > jsxLaneBlockIndex,
-  true,
-  "reportBuilderRuntimePreviewSection.test.js should live in the JSX/Vite runner lane",
+  authoredRuntimeRunner.includes('const runtimeJSXUnitTests'),
+  false,
+  "plain JavaScript and JSX must not have separate runner lanes",
 );
 
 assert.equal(
@@ -102,4 +98,4 @@ assert.equal(
   "node --no-warnings scripts/smoke-report-builder-preview.mjs semantic-left-rail",
 );
 
-console.log("report-builder-preview-proof-integration ✓ authored-runtime and Phase 1 verification paths include the semantic left-rail proof family and the corrected JSX runner lane");
+console.log("report-builder-preview-proof-integration ✓ authored-runtime and Phase 1 verification paths include the semantic left-rail proof family and the shared Vite loader");

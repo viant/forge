@@ -10389,7 +10389,10 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     );
     const runtimePreviewArtifact = useMemo(() => {
         if (frozenRestore) return frozenRestore.artifact;
-        if (!authoredRuntimePreviewModel) {
+        // Not-ready or invalid authoring state belongs in the existing
+        // diagnostics surface, not in an empty executable dataset.
+        if (!authoredRuntimePreviewModel || !canRunReport || !authoredDocumentCompileValidation.valid
+            || runtimePreviewArtifactDiagnostics.some(diagnostic => diagnostic?.severity === "error")) {
             return null;
         }
         const primaryRows = Array.isArray(runtimePreviewPrimaryDatasetPayload?.rows)
@@ -10421,7 +10424,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                 || (reportWorkspaceMode ? "" : "Compiled from the current builder state using the generic Forge runtime contract."),
             hostIntent: runtimePreviewHostIntent,
         });
-    }, [frozenRestore, authoredDocumentBlockDiagnostics, authoredRuntimePreviewModel, container, displayConfig, reportWorkspaceMode, runtimePreviewDatasetPayloadState.payloads, runtimePreviewArtifactDiagnostics, runtimePreviewConfig?.subtitle, runtimePreviewConfig?.title, runtimePreviewDetailDiagnostic, runtimePreviewHostIntent, runtimePreviewPrimaryDatasetPayload?.diagnostics, runtimePreviewPrimaryDatasetPayload?.hasMore, runtimePreviewPrimaryDatasetPayload?.rows, runtimePreviewRowsSource.error, runtimePreviewRowsSource.hasMore, runtimePreviewRowsSource.rows, state]);
+    }, [frozenRestore, canRunReport, authoredDocumentCompileValidation.valid, authoredDocumentBlockDiagnostics, authoredRuntimePreviewModel, container, displayConfig, reportWorkspaceMode, runtimePreviewDatasetPayloadState.payloads, runtimePreviewArtifactDiagnostics, runtimePreviewConfig?.subtitle, runtimePreviewConfig?.title, runtimePreviewDetailDiagnostic, runtimePreviewHostIntent, runtimePreviewPrimaryDatasetPayload?.diagnostics, runtimePreviewPrimaryDatasetPayload?.hasMore, runtimePreviewPrimaryDatasetPayload?.rows, runtimePreviewRowsSource.error, runtimePreviewRowsSource.hasMore, runtimePreviewRowsSource.rows, state]);
     const runtimeExportMetadata = useMemo(() => ({
         ...(reportOptionDefinitions.length ? { reportOptions: reportOptionDefinitions } : {}),
         conversationId: String(container?.conversationId || builderContext?.conversationId || builderContext?.windowState?.conversationId || "").trim(),

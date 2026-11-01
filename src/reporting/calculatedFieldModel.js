@@ -818,18 +818,23 @@ function buildCalculatedFieldDependencies(definition = {}, inferredDependencies 
   ]));
 }
 
-function normalizeReportCalculatedFieldExpressionDefinition(definition = {}) {
+function normalizeReportCalculatedFieldExpressionDefinition(definition = {}, expressionDependencies = null) {
   const expr = normalizeString(definition?.expr);
   if (!expr) {
     return null;
   }
-  const parsed = parseReportCalculatedFieldExpression(expr);
-  if (!parsed?.ast) {
-    return null;
+  let dependencies = expressionDependencies?.get(expr);
+  if (!dependencies) {
+    const parsed = parseReportCalculatedFieldExpression(expr);
+    if (!parsed?.ast) {
+      return null;
+    }
+    dependencies = parsed.dependencies;
+    expressionDependencies?.set(expr, dependencies);
   }
   return {
     expr,
-    dependencies: buildCalculatedFieldDependencies(definition, parsed.dependencies),
+    dependencies: buildCalculatedFieldDependencies(definition, dependencies),
   };
 }
 
@@ -867,9 +872,13 @@ function normalizeReportCalculatedFieldCompute(definition = {}) {
   };
 }
 
-export function normalizeReportCalculatedField(definition = {}, {
+export function normalizeReportCalculatedField(definition = {}, options = {}) {
+  return normalizeCalculatedField(definition, options);
+}
+
+function normalizeCalculatedField(definition = {}, {
   datasetRef = "",
-} = {}) {
+} = {}, expressionDependencies = null) {
   if (!definition || typeof definition !== "object" || Array.isArray(definition)) {
     return null;
   }
@@ -877,7 +886,7 @@ export function normalizeReportCalculatedField(definition = {}, {
   if (!id) {
     return null;
   }
-  const normalizedExpression = normalizeReportCalculatedFieldExpressionDefinition(definition);
+  const normalizedExpression = normalizeReportCalculatedFieldExpressionDefinition(definition, expressionDependencies);
   const normalizedCompute = normalizedExpression ? null : normalizeReportCalculatedFieldCompute(definition);
   if (!normalizedExpression && !normalizedCompute) {
     return null;
@@ -910,8 +919,12 @@ export function normalizeReportCalculatedField(definition = {}, {
 }
 
 export function normalizeReportCalculatedFields(definitions = [], options = {}) {
+  // Dataset-scoped fields often repeat the same formula. Parse its dependency
+  // facts once for this array only; each definition still owns its metadata and
+  // merged dependency array. Nothing survives the normalization call.
+  const expressionDependencies = new Map();
   return (Array.isArray(definitions) ? definitions : [])
-    .map((definition) => normalizeReportCalculatedField(definition, options))
+    .map((definition) => normalizeCalculatedField(definition, options, expressionDependencies))
     .filter(Boolean);
 }
 

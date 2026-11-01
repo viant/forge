@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -259,6 +260,8 @@ const runtimeUnitTests = [
   "scripts/report-builder-preview-reopen-report-document-location-actionable-diagnostics-left-rail-layout-scenario-assets.test.mjs",
   "scripts/report-builder-preview-reopen-report-document-location-chart-actionable-diagnostics-left-rail-layout-scenario-assets.test.mjs",
   "src/reporting/calculatedFieldModel.test.js",
+  "src/reporting/calculatedFieldNormalization.test.js",
+  "src/reporting/reportPrintChartSvg.bounds.test.mjs",
   "src/reporting/windowCalculationContract.test.js",
   "src/reporting/reportHorizontalMetricSelection.test.js",
   "src/reporting/reportSpecModel.test.js",
@@ -422,9 +425,9 @@ const runtimeUnitTests = [
   "src/reporting/fixtures/capacityDirectSeriesStaleExportRequestFixture.test.js",
   "src/reporting/fixtures/capacityLocationExportRequestFixture.test.js",
   "src/reporting/fixtures/capacityLocationStaleExportRequestFixture.test.js",
-];
 
-const runtimeJSXUnitTests = [
+  "src/reporting/kpiSparklineDetails.test.mjs",
+  "src/reporting/reportTemplateRequestInputs.render.test.mjs",
   "src/components/dashboard/DashboardReportRuntime.test.js",
   "src/components/dashboard/ReportRuntime.test.js",
   "src/components/dashboard/dashboardVisualUtils.test.jsx",
@@ -435,34 +438,52 @@ const runtimeJSXUnitTests = [
   "src/components/dashboard/reportBuilderRuntimePreviewSection.test.js",
 ];
 
-for (const relativePath of runtimeUnitTests) {
-  const result = spawnSync(
-    process.execPath,
-    ["--no-warnings", relativePath],
-    {
-      cwd: repoRoot,
-      stdio: "inherit",
-      env: process.env,
-    },
-  );
-  if (result.status !== 0) {
-    process.exit(result.status ?? 1);
-  }
+function discoverReportingTests(directory) {
+  return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
+    const filename = path.join(directory, entry.name);
+    if (entry.isDirectory()) return discoverReportingTests(filename);
+    return /\.test\.(?:js|mjs)$/.test(entry.name)
+      ? [path.relative(repoRoot, filename).split(path.sep).join("/")]
+      : [];
+  }).sort();
 }
 
-for (const relativePath of runtimeJSXUnitTests) {
-  const result = spawnSync(
-    process.execPath,
-    [viteNodePath, relativePath],
-    {
-      cwd: repoRoot,
-      stdio: "inherit",
-      env: process.env,
-    },
-  );
-  if (result.status !== 0) {
-    process.exit(result.status ?? 1);
+// Use the same Vite module graph for every test, including plain JavaScript,
+// JSX and JSON imports. File extensions must not select different semantics.
+const reportingOnly = process.argv.includes("--reporting-only");
+let selectedTests = reportingOnly
+  ? discoverReportingTests(path.join(repoRoot, "src", "reporting"))
+  : [...new Set(runtimeUnitTests)];
+
+const fromArgument = process.argv.findIndex(argument => argument === "--from" || argument.startsWith("--from="));
+if (fromArgument >= 0) {
+  const fromTest = process.argv[fromArgument].startsWith("--from=")
+    ? process.argv[fromArgument].slice("--from=".length)
+    : process.argv[fromArgument + 1];
+  const start = selectedTests.indexOf(fromTest);
+  if (start < 0) {
+    console.error(`Unknown --from test: ${fromTest || "(missing path)"}`);
+    process.exit(1);
   }
+  selectedTests = selectedTests.slice(start);
+  if (!process.argv.includes("--list")) console.log(`Resuming ${selectedTests.length} tests from ${fromTest}`);
 }
 
-console.log("authored-runtime-unit-tests ✓ runtime contract, interaction, and preview helpers pass together");
+if (process.argv.includes("--list")) {
+  for (const test of selectedTests) console.log(`vite-node ${test}`);
+  console.log(`${selectedTests.length} tests`);
+  process.exit(0);
+}
+
+for (const relativePath of selectedTests) {
+  const result = spawnSync(process.execPath, ["--no-warnings", viteNodePath, relativePath], {
+    cwd: repoRoot,
+    stdio: "inherit",
+    env: process.env,
+  });
+  if (result.status !== 0) process.exit(result.status ?? 1);
+}
+
+console.log(reportingOnly
+  ? `authored-runtime-unit-tests ✓ ${selectedTests.length} reporting checks pass with the shared Vite loader`
+  : "authored-runtime-unit-tests ✓ runtime contract, interaction, and preview helpers pass together");

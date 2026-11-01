@@ -36,6 +36,8 @@ for (const variant of ['narrow', 'bands', 'empty', 'wrapped']) {
         `${variant}: retain row ${row}, column ${column.key}`);
     }
   }
-  const digest = createHash('sha256').update(JSON.stringify(print)).digest('hex');
+  const {visibleBlockIds, ...pagination} = print;
+  assert.deepEqual(visibleBlockIds, blocks.map(block => block.id), 'canonical export visibility retains the rendered blocks');
+  const digest = createHash('sha256').update(JSON.stringify(pagination)).digest('hex');
   assert.equal(digest, baseline[variant], `${variant}: complete pagination/element output must stay identical`);
 }

@@ -178,6 +178,26 @@ function formatAxisTick(value, format = "") {
   return formatExportNumericValue(value, effectiveFormat, { axis: true });
 }
 
+function fitCartesianAxisTicks(width, leftLabels, rightLabels) {
+  // Numeric ticks use ten-point print text. Reserve a conservative glyph width
+  // plus the existing axis gap, rather than assuming every format is compact.
+  const labelWidth = labels => Math.max(0, ...labels.map(label => Array.from(label).length * 6));
+  let leftPad = Math.max(52, labelWidth(leftLabels) + 12);
+  let rightPad = rightLabels.length ? Math.max(58, labelWidth(rightLabels) + 12) : 16;
+  let scale = 1;
+  const plotBudget = Math.max(1, width - Math.min(24, width * 0.2));
+  if (leftPad + rightPad > plotBudget) {
+    // Narrow tiles retain every formatted value. Scale tick text and its gaps
+    // together, keeping a plotting area inside the caller's allocation.
+    leftPad = labelWidth(leftLabels) + 12;
+    rightPad = rightLabels.length ? labelWidth(rightLabels) + 12 : 16;
+    scale = Math.min(1, plotBudget / (leftPad + rightPad));
+    leftPad *= scale;
+    rightPad *= scale;
+  }
+  return {leftPad, rightPad, tickGap: 8 * scale, tickFontSize: 10 * scale};
+}
+
 function formatSeriesDataLabel(value, format = "") {
   const normalizedFormat = normalizeString(format);
   if (!normalizedFormat) {
@@ -900,9 +920,20 @@ function renderCartesianChartSvg({
     };
   }
 
-  const leftPad = 52;
-  const rightPad = rightBounds ? 58 : 16;
   const topPad = 16;
+  const plotHeight = 180;
+  const valueRange = bounds.maxValue - bounds.minValue || 1;
+  const yTicks = Array.from({length: 4}, (_, index) => ({
+    value: bounds.maxValue - index / 3 * valueRange,
+    y: topPad + index / 3 * plotHeight,
+  })).map(tick => ({...tick, label: formatAxisTick(tick.value, (leftSeries[0] || seriesDescriptors[0])?.format)}));
+  const rightAxisTicks = rightBounds ? Array.from({length: 4}, (_, index) => ({
+    value: rightBounds.maxValue - index / 3 * (rightBounds.maxValue - rightBounds.minValue),
+    y: topPad + index / 3 * plotHeight,
+  })).map(tick => ({...tick, label: formatAxisTick(tick.value, rightSeries[0]?.format)})) : [];
+  const {leftPad, rightPad, tickGap, tickFontSize} = fitCartesianAxisTicks(
+    width, yTicks.map(tick => tick.label), rightAxisTicks.map(tick => tick.label),
+  );
   const xAxisLabel = normalizeString(
     chartModel?.xAxis?.label
     || chartModel?.xAxis?.sourceDataKey
@@ -910,12 +941,10 @@ function renderCartesianChartSvg({
     || resolvedChart?.xAxisKey,
   );
   const bottomPad = xAxisLabel ? 50 : 34;
-  const plotHeight = 180;
   // The caller owns the grid allocation; a minimum plot width must not
   // extend a narrow dashboard tile into its neighbor or beyond the page.
   const plotWidth = Math.max(1, width - leftPad - rightPad);
   const xAxisKey = normalizeString(resolvedChart?.xAxisKey);
-  const valueRange = bounds.maxValue - bounds.minValue || 1;
   const baselineY = topPad + ((bounds.maxValue - 0) / valueRange) * plotHeight;
   const barSeries = seriesDescriptors.filter((series) => resolveChartSupportedSeriesType(series.type) === "bar");
   const categoryWidth = plotWidth / Math.max(rows.length, 1);
@@ -945,26 +974,14 @@ function renderCartesianChartSvg({
     bounds,
   });
 
-  const yTicks = Array.from({ length: 4 }, (_, index) => {
-    const fraction = index / 3;
-    const value = bounds.maxValue - (fraction * valueRange);
-    const y = topPad + (fraction * plotHeight);
-    return {
-      value,
-      y,
-    };
-  });
-
   const gridLines = yTicks.map((tick) => `
     <line x1="${leftPad}" y1="${tick.y}" x2="${leftPad + plotWidth}" y2="${tick.y}" stroke="#eaecf0" stroke-width="1" />
-    <text x="${leftPad - 8}" y="${tick.y + 4}" text-anchor="end" font-size="10" fill="#667085">${escapeXml(formatAxisTick(tick.value, seriesDescriptors[0]?.format))}</text>
+    <text x="${leftPad - tickGap}" y="${tick.y + 4}" text-anchor="end" font-size="${tickFontSize}" fill="#667085">${escapeXml(tick.label)}</text>
   `).join("\n");
 
-  const rightTicks = rightBounds ? Array.from({length:4},(_,index)=>{
-    const value = rightBounds.maxValue - index/3*(rightBounds.maxValue-rightBounds.minValue);
-    const y=topPad+index/3*plotHeight;
-    return `<text data-report-print-axis="right" x="${leftPad+plotWidth+8}" y="${y+4}" text-anchor="start" font-size="10" fill="#667085">${escapeXml(formatAxisTick(value,rightSeries[0]?.format))}</text>`;
-  }).join("\n") : "";
+  const rightTicks = rightAxisTicks.map(tick=>{
+    return `<text data-report-print-axis="right" x="${leftPad+plotWidth+tickGap}" y="${tick.y+4}" text-anchor="start" font-size="${tickFontSize}" fill="#667085">${escapeXml(tick.label)}</text>`;
+  }).join("\n");
 
   const xTicks = rows.flatMap((row, index) => {
     if (index % labelStep !== 0 && index !== rows.length - 1) return [];

@@ -2,7 +2,7 @@
   "version": 1,
   "kind": "reportFill",
   "specVersion": 1,
-  "specHash": "fnv1a:cd836be2",
+  "specHash": "fnv1a:e985d392",
   "source": {
     "kind": "dashboard.reportBuilder",
     "containerId": "semanticPerformanceBuilder",
@@ -259,7 +259,8 @@
       "chartModel": {
         "type": "line",
         "xAxis": {
-          "dataKey": "eventDate"
+          "dataKey": "eventDate",
+          "label": "Delivery Date"
         },
         "yAxis": {
           "format": "compactNumber"
@@ -300,7 +301,8 @@
         "chartModel": {
           "type": "line",
           "xAxis": {
-            "dataKey": "eventDate"
+            "dataKey": "eventDate",
+            "label": "Delivery Date"
           },
           "yAxis": {
             "format": "compactNumber"

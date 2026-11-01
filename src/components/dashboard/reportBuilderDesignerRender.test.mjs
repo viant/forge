@@ -319,6 +319,10 @@ function extractAuthoredValidationSection(html) {
 
 const html = renderBuilder(state);
 
+// An unavailable semantic provider remains actionable in design mode; it must
+// not be converted into an executable empty chart or crash server rendering.
+assert.ok(html.includes("Semantic model unavailable"));
+
 assert.ok(!html.includes("Report Starters"));
 assert.ok(!html.includes("Choose what to build"));
 assert.ok(html.includes("Data Sources"));

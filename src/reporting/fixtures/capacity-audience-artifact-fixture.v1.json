@@ -12283,6 +12283,13 @@
         "dataSourceRef": "demoReportSource"
       },
       "title": "Capacity Audience Segment Index Q3",
+      "visibleBlockIds": [
+        "sharedFilters",
+        "activeRefinements",
+        "primaryTable",
+        "headlineKpi",
+        "comparisonTable"
+      ],
       "pageGeometry": {
         "width": 792,
         "height": 612,
@@ -12383,7 +12390,7 @@
               "box": {
                 "x": 42,
                 "y": 200,
-                "width": 270.1052631578947,
+                "width": 261.7768421052631,
                 "height": 16
               },
               "text": "Market",
@@ -12397,9 +12404,9 @@
               "id": "primaryTable__header__audienceIndex__page_1",
               "kind": "text",
               "box": {
-                "x": 324.1052631578947,
+                "x": 315.7768421052631,
                 "y": 200,
-                "width": 425.89473684210526,
+                "width": 434.2231578947368,
                 "height": 16
               },
               "text": "Audience Index",
@@ -12427,7 +12434,7 @@
               "box": {
                 "x": 42,
                 "y": 224,
-                "width": 270.1052631578947,
+                "width": 261.7768421052631,
                 "height": 16
               },
               "rowKey": "row_1",
@@ -12441,9 +12448,9 @@
               "id": "primaryTable__row_1__audienceIndex__text",
               "kind": "tableCellText",
               "box": {
-                "x": 324.1052631578947,
+                "x": 315.7768421052631,
                 "y": 224,
-                "width": 425.89473684210526,
+                "width": 434.2231578947368,
                 "height": 16
               },
               "rowKey": "row_1",
@@ -12472,7 +12479,7 @@
               "box": {
                 "x": 42,
                 "y": 248,
-                "width": 270.1052631578947,
+                "width": 261.7768421052631,
                 "height": 16
               },
               "rowKey": "row_2",
@@ -12486,9 +12493,9 @@
               "id": "primaryTable__row_2__audienceIndex__text",
               "kind": "tableCellText",
               "box": {
-                "x": 324.1052631578947,
+                "x": 315.7768421052631,
                 "y": 248,
-                "width": 425.89473684210526,
+                "width": 434.2231578947368,
                 "height": 16
               },
               "rowKey": "row_2",
@@ -12517,7 +12524,7 @@
               "box": {
                 "x": 42,
                 "y": 272,
-                "width": 270.1052631578947,
+                "width": 261.7768421052631,
                 "height": 16
               },
               "rowKey": "row_3",
@@ -12531,9 +12538,9 @@
               "id": "primaryTable__row_3__audienceIndex__text",
               "kind": "tableCellText",
               "box": {
-                "x": 324.1052631578947,
+                "x": 315.7768421052631,
                 "y": 272,
-                "width": 425.89473684210526,
+                "width": 434.2231578947368,
                 "height": 16
               },
               "rowKey": "row_3",
@@ -12562,7 +12569,7 @@
               "box": {
                 "x": 42,
                 "y": 296,
-                "width": 270.1052631578947,
+                "width": 261.7768421052631,
                 "height": 16
               },
               "rowKey": "row_4",
@@ -12576,9 +12583,9 @@
               "id": "primaryTable__row_4__audienceIndex__text",
               "kind": "tableCellText",
               "box": {
-                "x": 324.1052631578947,
+                "x": 315.7768421052631,
                 "y": 296,
-                "width": 425.89473684210526,
+                "width": 434.2231578947368,
                 "height": 16
               },
               "rowKey": "row_4",
@@ -12607,7 +12614,7 @@
               "box": {
                 "x": 42,
                 "y": 320,
-                "width": 270.1052631578947,
+                "width": 261.7768421052631,
                 "height": 16
               },
               "rowKey": "row_5",
@@ -12621,9 +12628,9 @@
               "id": "primaryTable__row_5__audienceIndex__text",
               "kind": "tableCellText",
               "box": {
-                "x": 324.1052631578947,
+                "x": 315.7768421052631,
                 "y": 320,
-                "width": 425.89473684210526,
+                "width": 434.2231578947368,
                 "height": 16
               },
               "rowKey": "row_5",
@@ -12652,7 +12659,7 @@
               "box": {
                 "x": 42,
                 "y": 344,
-                "width": 270.1052631578947,
+                "width": 261.7768421052631,
                 "height": 16
               },
               "rowKey": "row_6",
@@ -12666,9 +12673,9 @@
               "id": "primaryTable__row_6__audienceIndex__text",
               "kind": "tableCellText",
               "box": {
-                "x": 324.1052631578947,
+                "x": 315.7768421052631,
                 "y": 344,
-                "width": 425.89473684210526,
+                "width": 434.2231578947368,
                 "height": 16
               },
               "rowKey": "row_6",
@@ -12697,7 +12704,7 @@
               "box": {
                 "x": 42,
                 "y": 368,
-                "width": 270.1052631578947,
+                "width": 261.7768421052631,
                 "height": 16
               },
               "rowKey": "row_7",
@@ -12711,9 +12718,9 @@
               "id": "primaryTable__row_7__audienceIndex__text",
               "kind": "tableCellText",
               "box": {
-                "x": 324.1052631578947,
+                "x": 315.7768421052631,
                 "y": 368,
-                "width": 425.89473684210526,
+                "width": 434.2231578947368,
                 "height": 16
               },
               "rowKey": "row_7",
@@ -12742,7 +12749,7 @@
               "box": {
                 "x": 42,
                 "y": 392,
-                "width": 270.1052631578947,
+                "width": 261.7768421052631,
                 "height": 16
               },
               "rowKey": "row_8",
@@ -12756,9 +12763,9 @@
               "id": "primaryTable__row_8__audienceIndex__text",
               "kind": "tableCellText",
               "box": {
-                "x": 324.1052631578947,
+                "x": 315.7768421052631,
                 "y": 392,
-                "width": 425.89473684210526,
+                "width": 434.2231578947368,
                 "height": 16
               },
               "rowKey": "row_8",
@@ -12945,7 +12952,7 @@
               "box": {
                 "x": 42,
                 "y": 112,
-                "width": 197.82857142857142,
+                "width": 216.98285714285714,
                 "height": 16
               },
               "text": "Date",
@@ -12959,9 +12966,9 @@
               "id": "comparisonTable__header__channelV2__page_2",
               "kind": "text",
               "box": {
-                "x": 251.82857142857142,
+                "x": 270.98285714285714,
                 "y": 112,
-                "width": 144.8,
+                "width": 138.08,
                 "height": 16
               },
               "text": "Channel",
@@ -12975,9 +12982,9 @@
               "id": "comparisonTable__header__avails__page_2",
               "kind": "text",
               "box": {
-                "x": 408.62857142857143,
+                "x": 421.0628571428572,
                 "y": 112,
-                "width": 144.8,
+                "width": 134.8,
                 "height": 16
               },
               "text": "Avails",
@@ -12991,9 +12998,9 @@
               "id": "comparisonTable__header__hhUniqs__page_2",
               "kind": "text",
               "box": {
-                "x": 565.4285714285714,
+                "x": 567.8628571428571,
                 "y": 112,
-                "width": 184.57142857142856,
+                "width": 182.13714285714286,
                 "height": 16
               },
               "text": "HH Uniques",
@@ -13021,7 +13028,7 @@
               "box": {
                 "x": 42,
                 "y": 136,
-                "width": 197.82857142857142,
+                "width": 216.98285714285714,
                 "height": 16
               },
               "rowKey": "row_1",
@@ -13036,7 +13043,7 @@
               "id": "comparisonTable__row_1__channelV2__badge",
               "kind": "tableCellBadge",
               "box": {
-                "x": 251.82857142857142,
+                "x": 270.98285714285714,
                 "y": 136,
                 "width": 69,
                 "height": 16
@@ -13053,21 +13060,21 @@
               "id": "comparisonTable__row_1__avails__bar_track",
               "kind": "rect",
               "box": {
-                "x": 408.62857142857143,
+                "x": 421.0628571428572,
                 "y": 136,
-                "width": 144.8,
+                "width": 134.8,
                 "height": 16
               },
               "fillColor": "#dbeafe",
-              "radius": 8
+              "radius": 6
             },
             {
               "id": "comparisonTable__row_1__avails__bar",
               "kind": "tableCellDataBar",
               "box": {
-                "x": 408.62857142857143,
+                "x": 421.0628571428572,
                 "y": 136,
-                "width": 113.66021505376345,
+                "width": 105.81075268817204,
                 "height": 16
               },
               "rowKey": "row_1",
@@ -13082,9 +13089,9 @@
               "id": "comparisonTable__row_1__avails__text",
               "kind": "tableCellText",
               "box": {
-                "x": 408.62857142857143,
+                "x": 421.0628571428572,
                 "y": 136,
-                "width": 144.8,
+                "width": 134.8,
                 "height": 16
               },
               "rowKey": "row_1",
@@ -13099,21 +13106,21 @@
               "id": "comparisonTable__row_1__hhUniqs__bar_track",
               "kind": "rect",
               "box": {
-                "x": 565.4285714285714,
+                "x": 567.8628571428571,
                 "y": 136,
-                "width": 184.57142857142856,
+                "width": 182.13714285714286,
                 "height": 16
               },
               "fillColor": "#dcfce7",
-              "radius": 8
+              "radius": 6
             },
             {
               "id": "comparisonTable__row_1__hhUniqs__bar",
               "kind": "tableCellDataBar",
               "box": {
-                "x": 565.4285714285714,
+                "x": 567.8628571428571,
                 "y": 136,
-                "width": 142.38367346938776,
+                "width": 140.50579591836737,
                 "height": 16
               },
               "rowKey": "row_1",
@@ -13128,9 +13135,9 @@
               "id": "comparisonTable__row_1__hhUniqs__text",
               "kind": "tableCellText",
               "box": {
-                "x": 565.4285714285714,
+                "x": 567.8628571428571,
                 "y": 136,
-                "width": 184.57142857142856,
+                "width": 182.13714285714286,
                 "height": 16
               },
               "rowKey": "row_1",
@@ -13159,7 +13166,7 @@
               "box": {
                 "x": 42,
                 "y": 160,
-                "width": 197.82857142857142,
+                "width": 216.98285714285714,
                 "height": 16
               },
               "rowKey": "row_2",
@@ -13174,7 +13181,7 @@
               "id": "comparisonTable__row_2__channelV2__badge",
               "kind": "tableCellBadge",
               "box": {
-                "x": 251.82857142857142,
+                "x": 270.98285714285714,
                 "y": 160,
                 "width": 41,
                 "height": 16
@@ -13191,21 +13198,21 @@
               "id": "comparisonTable__row_2__avails__bar_track",
               "kind": "rect",
               "box": {
-                "x": 408.62857142857143,
+                "x": 421.0628571428572,
                 "y": 160,
-                "width": 144.8,
+                "width": 134.8,
                 "height": 16
               },
               "fillColor": "#dbeafe",
-              "radius": 8
+              "radius": 6
             },
             {
               "id": "comparisonTable__row_2__avails__bar",
               "kind": "tableCellDataBar",
               "box": {
-                "x": 408.62857142857143,
+                "x": 421.0628571428572,
                 "y": 160,
-                "width": 18.683870967741935,
+                "width": 17.393548387096775,
                 "height": 16
               },
               "rowKey": "row_2",
@@ -13220,9 +13227,9 @@
               "id": "comparisonTable__row_2__avails__text",
               "kind": "tableCellText",
               "box": {
-                "x": 408.62857142857143,
+                "x": 421.0628571428572,
                 "y": 160,
-                "width": 144.8,
+                "width": 134.8,
                 "height": 16
               },
               "rowKey": "row_2",
@@ -13237,21 +13244,21 @@
               "id": "comparisonTable__row_2__hhUniqs__bar_track",
               "kind": "rect",
               "box": {
-                "x": 565.4285714285714,
+                "x": 567.8628571428571,
                 "y": 160,
-                "width": 184.57142857142856,
+                "width": 182.13714285714286,
                 "height": 16
               },
               "fillColor": "#dcfce7",
-              "radius": 8
+              "radius": 6
             },
             {
               "id": "comparisonTable__row_2__hhUniqs__bar",
               "kind": "tableCellDataBar",
               "box": {
-                "x": 565.4285714285714,
+                "x": 567.8628571428571,
                 "y": 160,
-                "width": 47.46122448979591,
+                "width": 46.835265306122444,
                 "height": 16
               },
               "rowKey": "row_2",
@@ -13266,9 +13273,9 @@
               "id": "comparisonTable__row_2__hhUniqs__text",
               "kind": "tableCellText",
               "box": {
-                "x": 565.4285714285714,
+                "x": 567.8628571428571,
                 "y": 160,
-                "width": 184.57142857142856,
+                "width": 182.13714285714286,
                 "height": 16
               },
               "rowKey": "row_2",
@@ -13297,7 +13304,7 @@
               "box": {
                 "x": 42,
                 "y": 184,
-                "width": 197.82857142857142,
+                "width": 216.98285714285714,
                 "height": 16
               },
               "rowKey": "row_3",
@@ -13312,7 +13319,7 @@
               "id": "comparisonTable__row_3__channelV2__badge",
               "kind": "tableCellBadge",
               "box": {
-                "x": 251.82857142857142,
+                "x": 270.98285714285714,
                 "y": 184,
                 "width": 69,
                 "height": 16
@@ -13329,21 +13336,21 @@
               "id": "comparisonTable__row_3__avails__bar_track",
               "kind": "rect",
               "box": {
-                "x": 408.62857142857143,
+                "x": 421.0628571428572,
                 "y": 184,
-                "width": 144.8,
+                "width": 134.8,
                 "height": 16
               },
               "fillColor": "#dbeafe",
-              "radius": 8
+              "radius": 6
             },
             {
               "id": "comparisonTable__row_3__avails__bar",
               "kind": "tableCellDataBar",
               "box": {
-                "x": 408.62857142857143,
+                "x": 421.0628571428572,
                 "y": 184,
-                "width": 144.8,
+                "width": 134.8,
                 "height": 16
               },
               "rowKey": "row_3",
@@ -13358,9 +13365,9 @@
               "id": "comparisonTable__row_3__avails__text",
               "kind": "tableCellText",
               "box": {
-                "x": 408.62857142857143,
+                "x": 421.0628571428572,
                 "y": 184,
-                "width": 144.8,
+                "width": 134.8,
                 "height": 16
               },
               "rowKey": "row_3",
@@ -13375,21 +13382,21 @@
               "id": "comparisonTable__row_3__hhUniqs__bar_track",
               "kind": "rect",
               "box": {
-                "x": 565.4285714285714,
+                "x": 567.8628571428571,
                 "y": 184,
-                "width": 184.57142857142856,
+                "width": 182.13714285714286,
                 "height": 16
               },
               "fillColor": "#dcfce7",
-              "radius": 8
+              "radius": 6
             },
             {
               "id": "comparisonTable__row_3__hhUniqs__bar",
               "kind": "tableCellDataBar",
               "box": {
-                "x": 565.4285714285714,
+                "x": 567.8628571428571,
                 "y": 184,
-                "width": 184.57142857142856,
+                "width": 182.13714285714286,
                 "height": 16
               },
               "rowKey": "row_3",
@@ -13404,9 +13411,9 @@
               "id": "comparisonTable__row_3__hhUniqs__text",
               "kind": "tableCellText",
               "box": {
-                "x": 565.4285714285714,
+                "x": 567.8628571428571,
                 "y": 184,
-                "width": 184.57142857142856,
+                "width": 182.13714285714286,
                 "height": 16
               },
               "rowKey": "row_3",
@@ -13435,7 +13442,7 @@
               "box": {
                 "x": 42,
                 "y": 208,
-                "width": 197.82857142857142,
+                "width": 216.98285714285714,
                 "height": 16
               },
               "rowKey": "row_4",
@@ -13450,7 +13457,7 @@
               "id": "comparisonTable__row_4__channelV2__badge",
               "kind": "tableCellBadge",
               "box": {
-                "x": 251.82857142857142,
+                "x": 270.98285714285714,
                 "y": 208,
                 "width": 41,
                 "height": 16
@@ -13467,21 +13474,21 @@
               "id": "comparisonTable__row_4__avails__bar_track",
               "kind": "rect",
               "box": {
-                "x": 408.62857142857143,
+                "x": 421.0628571428572,
                 "y": 208,
-                "width": 144.8,
+                "width": 134.8,
                 "height": 16
               },
               "fillColor": "#dbeafe",
-              "radius": 8
+              "radius": 6
             },
             {
               "id": "comparisonTable__row_4__avails__bar",
               "kind": "tableCellDataBar",
               "box": {
-                "x": 408.62857142857143,
+                "x": 421.0628571428572,
                 "y": 208,
-                "width": 45.152688172043014,
+                "width": 42.03440860215054,
                 "height": 16
               },
               "rowKey": "row_4",
@@ -13496,9 +13503,9 @@
               "id": "comparisonTable__row_4__avails__text",
               "kind": "tableCellText",
               "box": {
-                "x": 408.62857142857143,
+                "x": 421.0628571428572,
                 "y": 208,
-                "width": 144.8,
+                "width": 134.8,
                 "height": 16
               },
               "rowKey": "row_4",
@@ -13513,21 +13520,21 @@
               "id": "comparisonTable__row_4__hhUniqs__bar_track",
               "kind": "rect",
               "box": {
-                "x": 565.4285714285714,
+                "x": 567.8628571428571,
                 "y": 208,
-                "width": 184.57142857142856,
+                "width": 182.13714285714286,
                 "height": 16
               },
               "fillColor": "#dcfce7",
-              "radius": 8
+              "radius": 6
             },
             {
               "id": "comparisonTable__row_4__hhUniqs__bar",
               "kind": "tableCellDataBar",
               "box": {
-                "x": 565.4285714285714,
+                "x": 567.8628571428571,
                 "y": 208,
-                "width": 79.10204081632652,
+                "width": 78.05877551020409,
                 "height": 16
               },
               "rowKey": "row_4",
@@ -13542,9 +13549,9 @@
               "id": "comparisonTable__row_4__hhUniqs__text",
               "kind": "tableCellText",
               "box": {
-                "x": 565.4285714285714,
+                "x": 567.8628571428571,
                 "y": 208,
-                "width": 184.57142857142856,
+                "width": 182.13714285714286,
                 "height": 16
               },
               "rowKey": "row_4",
@@ -13573,7 +13580,7 @@
               "box": {
                 "x": 42,
                 "y": 232,
-                "width": 197.82857142857142,
+                "width": 216.98285714285714,
                 "height": 16
               },
               "rowKey": "row_5",
@@ -13588,7 +13595,7 @@
               "id": "comparisonTable__row_5__channelV2__badge",
               "kind": "tableCellBadge",
               "box": {
-                "x": 251.82857142857142,
+                "x": 270.98285714285714,
                 "y": 232,
                 "width": 69,
                 "height": 16
@@ -13605,21 +13612,21 @@
               "id": "comparisonTable__row_5__avails__bar_track",
               "kind": "rect",
               "box": {
-                "x": 408.62857142857143,
+                "x": 421.0628571428572,
                 "y": 232,
-                "width": 144.8,
+                "width": 134.8,
                 "height": 16
               },
               "fillColor": "#dbeafe",
-              "radius": 8
+              "radius": 6
             },
             {
               "id": "comparisonTable__row_5__avails__bar",
               "kind": "tableCellDataBar",
               "box": {
-                "x": 408.62857142857143,
+                "x": 421.0628571428572,
                 "y": 232,
-                "width": 54.49462365591398,
+                "width": 50.73118279569893,
                 "height": 16
               },
               "rowKey": "row_5",
@@ -13634,9 +13641,9 @@
               "id": "comparisonTable__row_5__avails__text",
               "kind": "tableCellText",
               "box": {
-                "x": 408.62857142857143,
+                "x": 421.0628571428572,
                 "y": 232,
-                "width": 144.8,
+                "width": 134.8,
                 "height": 16
               },
               "rowKey": "row_5",
@@ -13651,21 +13658,21 @@
               "id": "comparisonTable__row_5__hhUniqs__bar_track",
               "kind": "rect",
               "box": {
-                "x": 565.4285714285714,
+                "x": 567.8628571428571,
                 "y": 232,
-                "width": 184.57142857142856,
+                "width": 182.13714285714286,
                 "height": 16
               },
               "fillColor": "#dcfce7",
-              "radius": 8
+              "radius": 6
             },
             {
               "id": "comparisonTable__row_5__hhUniqs__bar",
               "kind": "tableCellDataBar",
               "box": {
-                "x": 565.4285714285714,
+                "x": 567.8628571428571,
                 "y": 232,
-                "width": 73.82857142857142,
+                "width": 72.85485714285714,
                 "height": 16
               },
               "rowKey": "row_5",
@@ -13680,9 +13687,9 @@
               "id": "comparisonTable__row_5__hhUniqs__text",
               "kind": "tableCellText",
               "box": {
-                "x": 565.4285714285714,
+                "x": 567.8628571428571,
                 "y": 232,
-                "width": 184.57142857142856,
+                "width": 182.13714285714286,
                 "height": 16
               },
               "rowKey": "row_5",
@@ -13711,7 +13718,7 @@
               "box": {
                 "x": 42,
                 "y": 256,
-                "width": 197.82857142857142,
+                "width": 216.98285714285714,
                 "height": 16
               },
               "rowKey": "row_6",
@@ -13726,7 +13733,7 @@
               "id": "comparisonTable__row_6__channelV2__badge",
               "kind": "tableCellBadge",
               "box": {
-                "x": 251.82857142857142,
+                "x": 270.98285714285714,
                 "y": 256,
                 "width": 41,
                 "height": 16
@@ -13743,19 +13750,19 @@
               "id": "comparisonTable__row_6__avails__bar_track",
               "kind": "rect",
               "box": {
-                "x": 408.62857142857143,
+                "x": 421.0628571428572,
                 "y": 256,
-                "width": 144.8,
+                "width": 134.8,
                 "height": 16
               },
               "fillColor": "#dbeafe",
-              "radius": 8
+              "radius": 6
             },
             {
               "id": "comparisonTable__row_6__avails__bar",
               "kind": "tableCellDataBar",
               "box": {
-                "x": 408.62857142857143,
+                "x": 421.0628571428572,
                 "y": 256,
                 "width": 0,
                 "height": 16
@@ -13772,9 +13779,9 @@
               "id": "comparisonTable__row_6__avails__text",
               "kind": "tableCellText",
               "box": {
-                "x": 408.62857142857143,
+                "x": 421.0628571428572,
                 "y": 256,
-                "width": 144.8,
+                "width": 134.8,
                 "height": 16
               },
               "rowKey": "row_6",
@@ -13789,19 +13796,19 @@
               "id": "comparisonTable__row_6__hhUniqs__bar_track",
               "kind": "rect",
               "box": {
-                "x": 565.4285714285714,
+                "x": 567.8628571428571,
                 "y": 256,
-                "width": 184.57142857142856,
+                "width": 182.13714285714286,
                 "height": 16
               },
               "fillColor": "#dcfce7",
-              "radius": 8
+              "radius": 6
             },
             {
               "id": "comparisonTable__row_6__hhUniqs__bar",
               "kind": "tableCellDataBar",
               "box": {
-                "x": 565.4285714285714,
+                "x": 567.8628571428571,
                 "y": 256,
                 "width": 0,
                 "height": 16
@@ -13818,9 +13825,9 @@
               "id": "comparisonTable__row_6__hhUniqs__text",
               "kind": "tableCellText",
               "box": {
-                "x": 565.4285714285714,
+                "x": 567.8628571428571,
                 "y": 256,
-                "width": 184.57142857142856,
+                "width": 182.13714285714286,
                 "height": 16
               },
               "rowKey": "row_6",
@@ -13849,7 +13856,7 @@
               "box": {
                 "x": 42,
                 "y": 280,
-                "width": 197.82857142857142,
+                "width": 216.98285714285714,
                 "height": 16
               },
               "rowKey": "row_7",
@@ -13864,7 +13871,7 @@
               "id": "comparisonTable__row_7__channelV2__badge",
               "kind": "tableCellBadge",
               "box": {
-                "x": 251.82857142857142,
+                "x": 270.98285714285714,
                 "y": 280,
                 "width": 69,
                 "height": 16
@@ -13881,21 +13888,21 @@
               "id": "comparisonTable__row_7__avails__bar_track",
               "kind": "rect",
               "box": {
-                "x": 408.62857142857143,
+                "x": 421.0628571428572,
                 "y": 280,
-                "width": 144.8,
+                "width": 134.8,
                 "height": 16
               },
               "fillColor": "#dbeafe",
-              "radius": 8
+              "radius": 6
             },
             {
               "id": "comparisonTable__row_7__avails__bar",
               "kind": "tableCellDataBar",
               "box": {
-                "x": 408.62857142857143,
+                "x": 421.0628571428572,
                 "y": 280,
-                "width": 91.86236559139786,
+                "width": 85.51827956989248,
                 "height": 16
               },
               "rowKey": "row_7",
@@ -13910,9 +13917,9 @@
               "id": "comparisonTable__row_7__avails__text",
               "kind": "tableCellText",
               "box": {
-                "x": 408.62857142857143,
+                "x": 421.0628571428572,
                 "y": 280,
-                "width": 144.8,
+                "width": 134.8,
                 "height": 16
               },
               "rowKey": "row_7",
@@ -13927,21 +13934,21 @@
               "id": "comparisonTable__row_7__hhUniqs__bar_track",
               "kind": "rect",
               "box": {
-                "x": 565.4285714285714,
+                "x": 567.8628571428571,
                 "y": 280,
-                "width": 184.57142857142856,
+                "width": 182.13714285714286,
                 "height": 16
               },
               "fillColor": "#dcfce7",
-              "radius": 8
+              "radius": 6
             },
             {
               "id": "comparisonTable__row_7__hhUniqs__bar",
               "kind": "tableCellDataBar",
               "box": {
-                "x": 565.4285714285714,
+                "x": 567.8628571428571,
                 "y": 280,
-                "width": 110.74285714285713,
+                "width": 109.28228571428572,
                 "height": 16
               },
               "rowKey": "row_7",
@@ -13956,9 +13963,9 @@
               "id": "comparisonTable__row_7__hhUniqs__text",
               "kind": "tableCellText",
               "box": {
-                "x": 565.4285714285714,
+                "x": 567.8628571428571,
                 "y": 280,
-                "width": 184.57142857142856,
+                "width": 182.13714285714286,
                 "height": 16
               },
               "rowKey": "row_7",
@@ -13987,7 +13994,7 @@
               "box": {
                 "x": 42,
                 "y": 304,
-                "width": 197.82857142857142,
+                "width": 216.98285714285714,
                 "height": 16
               },
               "rowKey": "row_8",
@@ -14002,7 +14009,7 @@
               "id": "comparisonTable__row_8__channelV2__badge",
               "kind": "tableCellBadge",
               "box": {
-                "x": 251.82857142857142,
+                "x": 270.98285714285714,
                 "y": 304,
                 "width": 41,
                 "height": 16
@@ -14019,21 +14026,21 @@
               "id": "comparisonTable__row_8__avails__bar_track",
               "kind": "rect",
               "box": {
-                "x": 408.62857142857143,
+                "x": 421.0628571428572,
                 "y": 304,
-                "width": 144.8,
+                "width": 134.8,
                 "height": 16
               },
               "fillColor": "#dbeafe",
-              "radius": 8
+              "radius": 6
             },
             {
               "id": "comparisonTable__row_8__avails__bar",
               "kind": "tableCellDataBar",
               "box": {
-                "x": 408.62857142857143,
+                "x": 421.0628571428572,
                 "y": 304,
-                "width": 26.46881720430108,
+                "width": 24.640860215053767,
                 "height": 16
               },
               "rowKey": "row_8",
@@ -14048,9 +14055,9 @@
               "id": "comparisonTable__row_8__avails__text",
               "kind": "tableCellText",
               "box": {
-                "x": 408.62857142857143,
+                "x": 421.0628571428572,
                 "y": 304,
-                "width": 144.8,
+                "width": 134.8,
                 "height": 16
               },
               "rowKey": "row_8",
@@ -14065,21 +14072,21 @@
               "id": "comparisonTable__row_8__hhUniqs__bar_track",
               "kind": "rect",
               "box": {
-                "x": 565.4285714285714,
+                "x": 567.8628571428571,
                 "y": 304,
-                "width": 184.57142857142856,
+                "width": 182.13714285714286,
                 "height": 16
               },
               "fillColor": "#dcfce7",
-              "radius": 8
+              "radius": 6
             },
             {
               "id": "comparisonTable__row_8__hhUniqs__bar",
               "kind": "tableCellDataBar",
               "box": {
-                "x": 565.4285714285714,
+                "x": 567.8628571428571,
                 "y": 304,
-                "width": 36.91428571428571,
+                "width": 36.42742857142857,
                 "height": 16
               },
               "rowKey": "row_8",
@@ -14094,9 +14101,9 @@
               "id": "comparisonTable__row_8__hhUniqs__text",
               "kind": "tableCellText",
               "box": {
-                "x": 565.4285714285714,
+                "x": 567.8628571428571,
                 "y": 304,
-                "width": 184.57142857142856,
+                "width": 182.13714285714286,
                 "height": 16
               },
               "rowKey": "row_8",
@@ -14217,6 +14224,13 @@
       "dataSourceRef": "demoReportSource"
     },
     "title": "Capacity Audience Segment Index Q3",
+    "visibleBlockIds": [
+      "sharedFilters",
+      "activeRefinements",
+      "primaryTable",
+      "headlineKpi",
+      "comparisonTable"
+    ],
     "pageGeometry": {
       "width": 792,
       "height": 612,
@@ -14317,7 +14331,7 @@
             "box": {
               "x": 42,
               "y": 200,
-              "width": 270.1052631578947,
+              "width": 261.7768421052631,
               "height": 16
             },
             "text": "Market",
@@ -14331,9 +14345,9 @@
             "id": "primaryTable__header__audienceIndex__page_1",
             "kind": "text",
             "box": {
-              "x": 324.1052631578947,
+              "x": 315.7768421052631,
               "y": 200,
-              "width": 425.89473684210526,
+              "width": 434.2231578947368,
               "height": 16
             },
             "text": "Audience Index",
@@ -14361,7 +14375,7 @@
             "box": {
               "x": 42,
               "y": 224,
-              "width": 270.1052631578947,
+              "width": 261.7768421052631,
               "height": 16
             },
             "rowKey": "row_1",
@@ -14375,9 +14389,9 @@
             "id": "primaryTable__row_1__audienceIndex__text",
             "kind": "tableCellText",
             "box": {
-              "x": 324.1052631578947,
+              "x": 315.7768421052631,
               "y": 224,
-              "width": 425.89473684210526,
+              "width": 434.2231578947368,
               "height": 16
             },
             "rowKey": "row_1",
@@ -14406,7 +14420,7 @@
             "box": {
               "x": 42,
               "y": 248,
-              "width": 270.1052631578947,
+              "width": 261.7768421052631,
               "height": 16
             },
             "rowKey": "row_2",
@@ -14420,9 +14434,9 @@
             "id": "primaryTable__row_2__audienceIndex__text",
             "kind": "tableCellText",
             "box": {
-              "x": 324.1052631578947,
+              "x": 315.7768421052631,
               "y": 248,
-              "width": 425.89473684210526,
+              "width": 434.2231578947368,
               "height": 16
             },
             "rowKey": "row_2",
@@ -14451,7 +14465,7 @@
             "box": {
               "x": 42,
               "y": 272,
-              "width": 270.1052631578947,
+              "width": 261.7768421052631,
               "height": 16
             },
             "rowKey": "row_3",
@@ -14465,9 +14479,9 @@
             "id": "primaryTable__row_3__audienceIndex__text",
             "kind": "tableCellText",
             "box": {
-              "x": 324.1052631578947,
+              "x": 315.7768421052631,
               "y": 272,
-              "width": 425.89473684210526,
+              "width": 434.2231578947368,
               "height": 16
             },
             "rowKey": "row_3",
@@ -14496,7 +14510,7 @@
             "box": {
               "x": 42,
               "y": 296,
-              "width": 270.1052631578947,
+              "width": 261.7768421052631,
               "height": 16
             },
             "rowKey": "row_4",
@@ -14510,9 +14524,9 @@
             "id": "primaryTable__row_4__audienceIndex__text",
             "kind": "tableCellText",
             "box": {
-              "x": 324.1052631578947,
+              "x": 315.7768421052631,
               "y": 296,
-              "width": 425.89473684210526,
+              "width": 434.2231578947368,
               "height": 16
             },
             "rowKey": "row_4",
@@ -14541,7 +14555,7 @@
             "box": {
               "x": 42,
               "y": 320,
-              "width": 270.1052631578947,
+              "width": 261.7768421052631,
               "height": 16
             },
             "rowKey": "row_5",
@@ -14555,9 +14569,9 @@
             "id": "primaryTable__row_5__audienceIndex__text",
             "kind": "tableCellText",
             "box": {
-              "x": 324.1052631578947,
+              "x": 315.7768421052631,
               "y": 320,
-              "width": 425.89473684210526,
+              "width": 434.2231578947368,
               "height": 16
             },
             "rowKey": "row_5",
@@ -14586,7 +14600,7 @@
             "box": {
               "x": 42,
               "y": 344,
-              "width": 270.1052631578947,
+              "width": 261.7768421052631,
               "height": 16
             },
             "rowKey": "row_6",
@@ -14600,9 +14614,9 @@
             "id": "primaryTable__row_6__audienceIndex__text",
             "kind": "tableCellText",
             "box": {
-              "x": 324.1052631578947,
+              "x": 315.7768421052631,
               "y": 344,
-              "width": 425.89473684210526,
+              "width": 434.2231578947368,
               "height": 16
             },
             "rowKey": "row_6",
@@ -14631,7 +14645,7 @@
             "box": {
               "x": 42,
               "y": 368,
-              "width": 270.1052631578947,
+              "width": 261.7768421052631,
               "height": 16
             },
             "rowKey": "row_7",
@@ -14645,9 +14659,9 @@
             "id": "primaryTable__row_7__audienceIndex__text",
             "kind": "tableCellText",
             "box": {
-              "x": 324.1052631578947,
+              "x": 315.7768421052631,
               "y": 368,
-              "width": 425.89473684210526,
+              "width": 434.2231578947368,
               "height": 16
             },
             "rowKey": "row_7",
@@ -14676,7 +14690,7 @@
             "box": {
               "x": 42,
               "y": 392,
-              "width": 270.1052631578947,
+              "width": 261.7768421052631,
               "height": 16
             },
             "rowKey": "row_8",
@@ -14690,9 +14704,9 @@
             "id": "primaryTable__row_8__audienceIndex__text",
             "kind": "tableCellText",
             "box": {
-              "x": 324.1052631578947,
+              "x": 315.7768421052631,
               "y": 392,
-              "width": 425.89473684210526,
+              "width": 434.2231578947368,
               "height": 16
             },
             "rowKey": "row_8",
@@ -14879,7 +14893,7 @@
             "box": {
               "x": 42,
               "y": 112,
-              "width": 197.82857142857142,
+              "width": 216.98285714285714,
               "height": 16
             },
             "text": "Date",
@@ -14893,9 +14907,9 @@
             "id": "comparisonTable__header__channelV2__page_2",
             "kind": "text",
             "box": {
-              "x": 251.82857142857142,
+              "x": 270.98285714285714,
               "y": 112,
-              "width": 144.8,
+              "width": 138.08,
               "height": 16
             },
             "text": "Channel",
@@ -14909,9 +14923,9 @@
             "id": "comparisonTable__header__avails__page_2",
             "kind": "text",
             "box": {
-              "x": 408.62857142857143,
+              "x": 421.0628571428572,
               "y": 112,
-              "width": 144.8,
+              "width": 134.8,
               "height": 16
             },
             "text": "Avails",
@@ -14925,9 +14939,9 @@
             "id": "comparisonTable__header__hhUniqs__page_2",
             "kind": "text",
             "box": {
-              "x": 565.4285714285714,
+              "x": 567.8628571428571,
               "y": 112,
-              "width": 184.57142857142856,
+              "width": 182.13714285714286,
               "height": 16
             },
             "text": "HH Uniques",
@@ -14955,7 +14969,7 @@
             "box": {
               "x": 42,
               "y": 136,
-              "width": 197.82857142857142,
+              "width": 216.98285714285714,
               "height": 16
             },
             "rowKey": "row_1",
@@ -14970,7 +14984,7 @@
             "id": "comparisonTable__row_1__channelV2__badge",
             "kind": "tableCellBadge",
             "box": {
-              "x": 251.82857142857142,
+              "x": 270.98285714285714,
               "y": 136,
               "width": 69,
               "height": 16
@@ -14987,21 +15001,21 @@
             "id": "comparisonTable__row_1__avails__bar_track",
             "kind": "rect",
             "box": {
-              "x": 408.62857142857143,
+              "x": 421.0628571428572,
               "y": 136,
-              "width": 144.8,
+              "width": 134.8,
               "height": 16
             },
             "fillColor": "#dbeafe",
-            "radius": 8
+            "radius": 6
           },
           {
             "id": "comparisonTable__row_1__avails__bar",
             "kind": "tableCellDataBar",
             "box": {
-              "x": 408.62857142857143,
+              "x": 421.0628571428572,
               "y": 136,
-              "width": 113.66021505376345,
+              "width": 105.81075268817204,
               "height": 16
             },
             "rowKey": "row_1",
@@ -15016,9 +15030,9 @@
             "id": "comparisonTable__row_1__avails__text",
             "kind": "tableCellText",
             "box": {
-              "x": 408.62857142857143,
+              "x": 421.0628571428572,
               "y": 136,
-              "width": 144.8,
+              "width": 134.8,
               "height": 16
             },
             "rowKey": "row_1",
@@ -15033,21 +15047,21 @@
             "id": "comparisonTable__row_1__hhUniqs__bar_track",
             "kind": "rect",
             "box": {
-              "x": 565.4285714285714,
+              "x": 567.8628571428571,
               "y": 136,
-              "width": 184.57142857142856,
+              "width": 182.13714285714286,
               "height": 16
             },
             "fillColor": "#dcfce7",
-            "radius": 8
+            "radius": 6
           },
           {
             "id": "comparisonTable__row_1__hhUniqs__bar",
             "kind": "tableCellDataBar",
             "box": {
-              "x": 565.4285714285714,
+              "x": 567.8628571428571,
               "y": 136,
-              "width": 142.38367346938776,
+              "width": 140.50579591836737,
               "height": 16
             },
             "rowKey": "row_1",
@@ -15062,9 +15076,9 @@
             "id": "comparisonTable__row_1__hhUniqs__text",
             "kind": "tableCellText",
             "box": {
-              "x": 565.4285714285714,
+              "x": 567.8628571428571,
               "y": 136,
-              "width": 184.57142857142856,
+              "width": 182.13714285714286,
               "height": 16
             },
             "rowKey": "row_1",
@@ -15093,7 +15107,7 @@
             "box": {
               "x": 42,
               "y": 160,
-              "width": 197.82857142857142,
+              "width": 216.98285714285714,
               "height": 16
             },
             "rowKey": "row_2",
@@ -15108,7 +15122,7 @@
             "id": "comparisonTable__row_2__channelV2__badge",
             "kind": "tableCellBadge",
             "box": {
-              "x": 251.82857142857142,
+              "x": 270.98285714285714,
               "y": 160,
               "width": 41,
               "height": 16
@@ -15125,21 +15139,21 @@
             "id": "comparisonTable__row_2__avails__bar_track",
             "kind": "rect",
             "box": {
-              "x": 408.62857142857143,
+              "x": 421.0628571428572,
               "y": 160,
-              "width": 144.8,
+              "width": 134.8,
               "height": 16
             },
             "fillColor": "#dbeafe",
-            "radius": 8
+            "radius": 6
           },
           {
             "id": "comparisonTable__row_2__avails__bar",
             "kind": "tableCellDataBar",
             "box": {
-              "x": 408.62857142857143,
+              "x": 421.0628571428572,
               "y": 160,
-              "width": 18.683870967741935,
+              "width": 17.393548387096775,
               "height": 16
             },
             "rowKey": "row_2",
@@ -15154,9 +15168,9 @@
             "id": "comparisonTable__row_2__avails__text",
             "kind": "tableCellText",
             "box": {
-              "x": 408.62857142857143,
+              "x": 421.0628571428572,
               "y": 160,
-              "width": 144.8,
+              "width": 134.8,
               "height": 16
             },
             "rowKey": "row_2",
@@ -15171,21 +15185,21 @@
             "id": "comparisonTable__row_2__hhUniqs__bar_track",
             "kind": "rect",
             "box": {
-              "x": 565.4285714285714,
+              "x": 567.8628571428571,
               "y": 160,
-              "width": 184.57142857142856,
+              "width": 182.13714285714286,
               "height": 16
             },
             "fillColor": "#dcfce7",
-            "radius": 8
+            "radius": 6
           },
           {
             "id": "comparisonTable__row_2__hhUniqs__bar",
             "kind": "tableCellDataBar",
             "box": {
-              "x": 565.4285714285714,
+              "x": 567.8628571428571,
               "y": 160,
-              "width": 47.46122448979591,
+              "width": 46.835265306122444,
               "height": 16
             },
             "rowKey": "row_2",
@@ -15200,9 +15214,9 @@
             "id": "comparisonTable__row_2__hhUniqs__text",
             "kind": "tableCellText",
             "box": {
-              "x": 565.4285714285714,
+              "x": 567.8628571428571,
               "y": 160,
-              "width": 184.57142857142856,
+              "width": 182.13714285714286,
               "height": 16
             },
             "rowKey": "row_2",
@@ -15231,7 +15245,7 @@
             "box": {
               "x": 42,
               "y": 184,
-              "width": 197.82857142857142,
+              "width": 216.98285714285714,
               "height": 16
             },
             "rowKey": "row_3",
@@ -15246,7 +15260,7 @@
             "id": "comparisonTable__row_3__channelV2__badge",
             "kind": "tableCellBadge",
             "box": {
-              "x": 251.82857142857142,
+              "x": 270.98285714285714,
               "y": 184,
               "width": 69,
               "height": 16
@@ -15263,21 +15277,21 @@
             "id": "comparisonTable__row_3__avails__bar_track",
             "kind": "rect",
             "box": {
-              "x": 408.62857142857143,
+              "x": 421.0628571428572,
               "y": 184,
-              "width": 144.8,
+              "width": 134.8,
               "height": 16
             },
             "fillColor": "#dbeafe",
-            "radius": 8
+            "radius": 6
           },
           {
             "id": "comparisonTable__row_3__avails__bar",
             "kind": "tableCellDataBar",
             "box": {
-              "x": 408.62857142857143,
+              "x": 421.0628571428572,
               "y": 184,
-              "width": 144.8,
+              "width": 134.8,
               "height": 16
             },
             "rowKey": "row_3",
@@ -15292,9 +15306,9 @@
             "id": "comparisonTable__row_3__avails__text",
             "kind": "tableCellText",
             "box": {
-              "x": 408.62857142857143,
+              "x": 421.0628571428572,
               "y": 184,
-              "width": 144.8,
+              "width": 134.8,
               "height": 16
             },
             "rowKey": "row_3",
@@ -15309,21 +15323,21 @@
             "id": "comparisonTable__row_3__hhUniqs__bar_track",
             "kind": "rect",
             "box": {
-              "x": 565.4285714285714,
+              "x": 567.8628571428571,
               "y": 184,
-              "width": 184.57142857142856,
+              "width": 182.13714285714286,
               "height": 16
             },
             "fillColor": "#dcfce7",
-            "radius": 8
+            "radius": 6
           },
           {
             "id": "comparisonTable__row_3__hhUniqs__bar",
             "kind": "tableCellDataBar",
             "box": {
-              "x": 565.4285714285714,
+              "x": 567.8628571428571,
               "y": 184,
-              "width": 184.57142857142856,
+              "width": 182.13714285714286,
               "height": 16
             },
             "rowKey": "row_3",
@@ -15338,9 +15352,9 @@
             "id": "comparisonTable__row_3__hhUniqs__text",
             "kind": "tableCellText",
             "box": {
-              "x": 565.4285714285714,
+              "x": 567.8628571428571,
               "y": 184,
-              "width": 184.57142857142856,
+              "width": 182.13714285714286,
               "height": 16
             },
             "rowKey": "row_3",
@@ -15369,7 +15383,7 @@
             "box": {
               "x": 42,
               "y": 208,
-              "width": 197.82857142857142,
+              "width": 216.98285714285714,
               "height": 16
             },
             "rowKey": "row_4",
@@ -15384,7 +15398,7 @@
             "id": "comparisonTable__row_4__channelV2__badge",
             "kind": "tableCellBadge",
             "box": {
-              "x": 251.82857142857142,
+              "x": 270.98285714285714,
               "y": 208,
               "width": 41,
               "height": 16
@@ -15401,21 +15415,21 @@
             "id": "comparisonTable__row_4__avails__bar_track",
             "kind": "rect",
             "box": {
-              "x": 408.62857142857143,
+              "x": 421.0628571428572,
               "y": 208,
-              "width": 144.8,
+              "width": 134.8,
               "height": 16
             },
             "fillColor": "#dbeafe",
-            "radius": 8
+            "radius": 6
           },
           {
             "id": "comparisonTable__row_4__avails__bar",
             "kind": "tableCellDataBar",
             "box": {
-              "x": 408.62857142857143,
+              "x": 421.0628571428572,
               "y": 208,
-              "width": 45.152688172043014,
+              "width": 42.03440860215054,
               "height": 16
             },
             "rowKey": "row_4",
@@ -15430,9 +15444,9 @@
             "id": "comparisonTable__row_4__avails__text",
             "kind": "tableCellText",
             "box": {
-              "x": 408.62857142857143,
+              "x": 421.0628571428572,
               "y": 208,
-              "width": 144.8,
+              "width": 134.8,
               "height": 16
             },
             "rowKey": "row_4",
@@ -15447,21 +15461,21 @@
             "id": "comparisonTable__row_4__hhUniqs__bar_track",
             "kind": "rect",
             "box": {
-              "x": 565.4285714285714,
+              "x": 567.8628571428571,
               "y": 208,
-              "width": 184.57142857142856,
+              "width": 182.13714285714286,
               "height": 16
             },
             "fillColor": "#dcfce7",
-            "radius": 8
+            "radius": 6
           },
           {
             "id": "comparisonTable__row_4__hhUniqs__bar",
             "kind": "tableCellDataBar",
             "box": {
-              "x": 565.4285714285714,
+              "x": 567.8628571428571,
               "y": 208,
-              "width": 79.10204081632652,
+              "width": 78.05877551020409,
               "height": 16
             },
             "rowKey": "row_4",
@@ -15476,9 +15490,9 @@
             "id": "comparisonTable__row_4__hhUniqs__text",
             "kind": "tableCellText",
             "box": {
-              "x": 565.4285714285714,
+              "x": 567.8628571428571,
               "y": 208,
-              "width": 184.57142857142856,
+              "width": 182.13714285714286,
               "height": 16
             },
             "rowKey": "row_4",
@@ -15507,7 +15521,7 @@
             "box": {
               "x": 42,
               "y": 232,
-              "width": 197.82857142857142,
+              "width": 216.98285714285714,
               "height": 16
             },
             "rowKey": "row_5",
@@ -15522,7 +15536,7 @@
             "id": "comparisonTable__row_5__channelV2__badge",
             "kind": "tableCellBadge",
             "box": {
-              "x": 251.82857142857142,
+              "x": 270.98285714285714,
               "y": 232,
               "width": 69,
               "height": 16
@@ -15539,21 +15553,21 @@
             "id": "comparisonTable__row_5__avails__bar_track",
             "kind": "rect",
             "box": {
-              "x": 408.62857142857143,
+              "x": 421.0628571428572,
               "y": 232,
-              "width": 144.8,
+              "width": 134.8,
               "height": 16
             },
             "fillColor": "#dbeafe",
-            "radius": 8
+            "radius": 6
           },
           {
             "id": "comparisonTable__row_5__avails__bar",
             "kind": "tableCellDataBar",
             "box": {
-              "x": 408.62857142857143,
+              "x": 421.0628571428572,
               "y": 232,
-              "width": 54.49462365591398,
+              "width": 50.73118279569893,
               "height": 16
             },
             "rowKey": "row_5",
@@ -15568,9 +15582,9 @@
             "id": "comparisonTable__row_5__avails__text",
             "kind": "tableCellText",
             "box": {
-              "x": 408.62857142857143,
+              "x": 421.0628571428572,
               "y": 232,
-              "width": 144.8,
+              "width": 134.8,
               "height": 16
             },
             "rowKey": "row_5",
@@ -15585,21 +15599,21 @@
             "id": "comparisonTable__row_5__hhUniqs__bar_track",
             "kind": "rect",
             "box": {
-              "x": 565.4285714285714,
+              "x": 567.8628571428571,
               "y": 232,
-              "width": 184.57142857142856,
+              "width": 182.13714285714286,
               "height": 16
             },
             "fillColor": "#dcfce7",
-            "radius": 8
+            "radius": 6
           },
           {
             "id": "comparisonTable__row_5__hhUniqs__bar",
             "kind": "tableCellDataBar",
             "box": {
-              "x": 565.4285714285714,
+              "x": 567.8628571428571,
               "y": 232,
-              "width": 73.82857142857142,
+              "width": 72.85485714285714,
               "height": 16
             },
             "rowKey": "row_5",
@@ -15614,9 +15628,9 @@
             "id": "comparisonTable__row_5__hhUniqs__text",
             "kind": "tableCellText",
             "box": {
-              "x": 565.4285714285714,
+              "x": 567.8628571428571,
               "y": 232,
-              "width": 184.57142857142856,
+              "width": 182.13714285714286,
               "height": 16
             },
             "rowKey": "row_5",
@@ -15645,7 +15659,7 @@
             "box": {
               "x": 42,
               "y": 256,
-              "width": 197.82857142857142,
+              "width": 216.98285714285714,
               "height": 16
             },
             "rowKey": "row_6",
@@ -15660,7 +15674,7 @@
             "id": "comparisonTable__row_6__channelV2__badge",
             "kind": "tableCellBadge",
             "box": {
-              "x": 251.82857142857142,
+              "x": 270.98285714285714,
               "y": 256,
               "width": 41,
               "height": 16
@@ -15677,19 +15691,19 @@
             "id": "comparisonTable__row_6__avails__bar_track",
             "kind": "rect",
             "box": {
-              "x": 408.62857142857143,
+              "x": 421.0628571428572,
               "y": 256,
-              "width": 144.8,
+              "width": 134.8,
               "height": 16
             },
             "fillColor": "#dbeafe",
-            "radius": 8
+            "radius": 6
           },
           {
             "id": "comparisonTable__row_6__avails__bar",
             "kind": "tableCellDataBar",
             "box": {
-              "x": 408.62857142857143,
+              "x": 421.0628571428572,
               "y": 256,
               "width": 0,
               "height": 16
@@ -15706,9 +15720,9 @@
             "id": "comparisonTable__row_6__avails__text",
             "kind": "tableCellText",
             "box": {
-              "x": 408.62857142857143,
+              "x": 421.0628571428572,
               "y": 256,
-              "width": 144.8,
+              "width": 134.8,
               "height": 16
             },
             "rowKey": "row_6",
@@ -15723,19 +15737,19 @@
             "id": "comparisonTable__row_6__hhUniqs__bar_track",
             "kind": "rect",
             "box": {
-              "x": 565.4285714285714,
+              "x": 567.8628571428571,
               "y": 256,
-              "width": 184.57142857142856,
+              "width": 182.13714285714286,
               "height": 16
             },
             "fillColor": "#dcfce7",
-            "radius": 8
+            "radius": 6
           },
           {
             "id": "comparisonTable__row_6__hhUniqs__bar",
             "kind": "tableCellDataBar",
             "box": {
-              "x": 565.4285714285714,
+              "x": 567.8628571428571,
               "y": 256,
               "width": 0,
               "height": 16
@@ -15752,9 +15766,9 @@
             "id": "comparisonTable__row_6__hhUniqs__text",
             "kind": "tableCellText",
             "box": {
-              "x": 565.4285714285714,
+              "x": 567.8628571428571,
               "y": 256,
-              "width": 184.57142857142856,
+              "width": 182.13714285714286,
               "height": 16
             },
             "rowKey": "row_6",
@@ -15783,7 +15797,7 @@
             "box": {
               "x": 42,
               "y": 280,
-              "width": 197.82857142857142,
+              "width": 216.98285714285714,
               "height": 16
             },
             "rowKey": "row_7",
@@ -15798,7 +15812,7 @@
             "id": "comparisonTable__row_7__channelV2__badge",
             "kind": "tableCellBadge",
             "box": {
-              "x": 251.82857142857142,
+              "x": 270.98285714285714,
               "y": 280,
               "width": 69,
               "height": 16
@@ -15815,21 +15829,21 @@
             "id": "comparisonTable__row_7__avails__bar_track",
             "kind": "rect",
             "box": {
-              "x": 408.62857142857143,
+              "x": 421.0628571428572,
               "y": 280,
-              "width": 144.8,
+              "width": 134.8,
               "height": 16
             },
             "fillColor": "#dbeafe",
-            "radius": 8
+            "radius": 6
           },
           {
             "id": "comparisonTable__row_7__avails__bar",
             "kind": "tableCellDataBar",
             "box": {
-              "x": 408.62857142857143,
+              "x": 421.0628571428572,
               "y": 280,
-              "width": 91.86236559139786,
+              "width": 85.51827956989248,
               "height": 16
             },
             "rowKey": "row_7",
@@ -15844,9 +15858,9 @@
             "id": "comparisonTable__row_7__avails__text",
             "kind": "tableCellText",
             "box": {
-              "x": 408.62857142857143,
+              "x": 421.0628571428572,
               "y": 280,
-              "width": 144.8,
+              "width": 134.8,
               "height": 16
             },
             "rowKey": "row_7",
@@ -15861,21 +15875,21 @@
             "id": "comparisonTable__row_7__hhUniqs__bar_track",
             "kind": "rect",
             "box": {
-              "x": 565.4285714285714,
+              "x": 567.8628571428571,
               "y": 280,
-              "width": 184.57142857142856,
+              "width": 182.13714285714286,
               "height": 16
             },
             "fillColor": "#dcfce7",
-            "radius": 8
+            "radius": 6
           },
           {
             "id": "comparisonTable__row_7__hhUniqs__bar",
             "kind": "tableCellDataBar",
             "box": {
-              "x": 565.4285714285714,
+              "x": 567.8628571428571,
               "y": 280,
-              "width": 110.74285714285713,
+              "width": 109.28228571428572,
               "height": 16
             },
             "rowKey": "row_7",
@@ -15890,9 +15904,9 @@
             "id": "comparisonTable__row_7__hhUniqs__text",
             "kind": "tableCellText",
             "box": {
-              "x": 565.4285714285714,
+              "x": 567.8628571428571,
               "y": 280,
-              "width": 184.57142857142856,
+              "width": 182.13714285714286,
               "height": 16
             },
             "rowKey": "row_7",
@@ -15921,7 +15935,7 @@
             "box": {
               "x": 42,
               "y": 304,
-              "width": 197.82857142857142,
+              "width": 216.98285714285714,
               "height": 16
             },
             "rowKey": "row_8",
@@ -15936,7 +15950,7 @@
             "id": "comparisonTable__row_8__channelV2__badge",
             "kind": "tableCellBadge",
             "box": {
-              "x": 251.82857142857142,
+              "x": 270.98285714285714,
               "y": 304,
               "width": 41,
               "height": 16
@@ -15953,21 +15967,21 @@
             "id": "comparisonTable__row_8__avails__bar_track",
             "kind": "rect",
             "box": {
-              "x": 408.62857142857143,
+              "x": 421.0628571428572,
               "y": 304,
-              "width": 144.8,
+              "width": 134.8,
               "height": 16
             },
             "fillColor": "#dbeafe",
-            "radius": 8
+            "radius": 6
           },
           {
             "id": "comparisonTable__row_8__avails__bar",
             "kind": "tableCellDataBar",
             "box": {
-              "x": 408.62857142857143,
+              "x": 421.0628571428572,
               "y": 304,
-              "width": 26.46881720430108,
+              "width": 24.640860215053767,
               "height": 16
             },
             "rowKey": "row_8",
@@ -15982,9 +15996,9 @@
             "id": "comparisonTable__row_8__avails__text",
             "kind": "tableCellText",
             "box": {
-              "x": 408.62857142857143,
+              "x": 421.0628571428572,
               "y": 304,
-              "width": 144.8,
+              "width": 134.8,
               "height": 16
             },
             "rowKey": "row_8",
@@ -15999,21 +16013,21 @@
             "id": "comparisonTable__row_8__hhUniqs__bar_track",
             "kind": "rect",
             "box": {
-              "x": 565.4285714285714,
+              "x": 567.8628571428571,
               "y": 304,
-              "width": 184.57142857142856,
+              "width": 182.13714285714286,
               "height": 16
             },
             "fillColor": "#dcfce7",
-            "radius": 8
+            "radius": 6
           },
           {
             "id": "comparisonTable__row_8__hhUniqs__bar",
             "kind": "tableCellDataBar",
             "box": {
-              "x": 565.4285714285714,
+              "x": 567.8628571428571,
               "y": 304,
-              "width": 36.91428571428571,
+              "width": 36.42742857142857,
               "height": 16
             },
             "rowKey": "row_8",
@@ -16028,9 +16042,9 @@
             "id": "comparisonTable__row_8__hhUniqs__text",
             "kind": "tableCellText",
             "box": {
-              "x": 565.4285714285714,
+              "x": 567.8628571428571,
               "y": 304,
-              "width": 184.57142857142856,
+              "width": 182.13714285714286,
               "height": 16
             },
             "rowKey": "row_8",
