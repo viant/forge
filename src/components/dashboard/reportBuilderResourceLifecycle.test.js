@@ -41,3 +41,12 @@ for (const envelope of ['data', 'responseEnvelope']) {
  assert.ok(!reportResourceFailureMessage(failure).includes('PRIVATE_VALUE'));
  assert.match(reportResourceFailureMessage({[envelope]:{diagnostics:[{code:'missing_report_parameter'}]}}), /Enter all required/);
 }
+
+for (const envelope of ['data', 'details', 'responseEnvelope']) {
+ const failure = {status:400,[envelope]:{diagnostics:[{code:'report_input_validation',path:'to',message:'End date cannot be in the future.'}]}};
+ assert.equal(reportResourceFailureMessage(failure), 'End date cannot be in the future.');
+ assert.equal(reportResourceFailureMessage({...failure,status:403}), 'This report could not be run. Please try again.');
+ assert.equal(reportResourceFailureMessage({...failure,status:500}), 'This report could not be run. Please try again.');
+}
+assert.ok(!reportResourceFailureMessage({status:400,message:'PRIVATE_SOURCE',diagnostics:[{code:'unknown',message:'PRIVATE_SOURCE'}]}).includes('PRIVATE_SOURCE'));
+console.log('reportBuilderResourceLifecycle ✓ typed producer validation remains actionable');

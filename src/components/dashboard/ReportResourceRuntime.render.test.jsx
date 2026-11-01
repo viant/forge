@@ -557,3 +557,13 @@ it('keeps authorization failures separate from producer input hints', async () =
         expect(view.host.textContent).not.toContain('PRIVATE_UPSTREAM_PAYLOAD');
     } finally {await view.close();}
 });
+
+it('shows the producer input validation message without exposing transport details',async()=>{
+ const failure=Object.assign(new Error('private transport detail'),{status:400,responseEnvelope:{diagnostics:[{code:'report_input_validation',path:'to',message:'End date cannot be in the future.'}]}});
+ const view=await mount(vi.fn().mockRejectedValue(failure),{executeOnOpen:true});
+ try {
+  expect(view.host.textContent).toContain('End date cannot be in the future.');
+  expect(view.host.textContent).not.toContain('private transport detail');
+  expect(view.host.querySelector('output')).toBeNull();
+ } finally {await view.close();}
+});

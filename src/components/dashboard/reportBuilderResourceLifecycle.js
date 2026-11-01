@@ -11,6 +11,9 @@ export function reportResourceFailureMessage(failure) {
     if (envelopes.some(value => Array.isArray(value?.diagnostics) && value.diagnostics.some(diagnostic => diagnostic?.code === "undeclared_report_parameter"))) {
         return "The report received an input its definition does not support. Refresh the report; if this continues, its author needs to update the input mapping.";
     }
+    const validation = envelopes.flatMap(value => Array.isArray(value?.diagnostics) ? value.diagnostics : [])
+        .find(diagnostic => diagnostic?.code === "report_input_validation" && typeof diagnostic.message === "string" && diagnostic.message.trim() && diagnostic.message.length <= 1024);
+    if (validation && statuses.some(status => status === 400 || status === 422)) return validation.message.trim();
     if (statuses.some(status => status === 400 || status === 422)) {
         return "The data source rejected the report inputs. Check the selected values and required fields before running the report again.";
     }
