@@ -30,7 +30,7 @@ const TableBody = ({
             <TableBackfill
                 fixedRowHeight={fixedRowHeight}
                 context={context}
-                rowCount={backfillCount}
+                rowCount={error ? Math.max(1, backfillCount || 0) : backfillCount}
                 colSpan={columns.length + (fillerWidth > 0 ? 1 : 0)}
                 loading={loading}
                 error={error}
