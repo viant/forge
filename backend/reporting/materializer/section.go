@@ -120,6 +120,17 @@ func PlanInitialSection(raw json.RawMessage, requested string) *SectionPlan {
 		}
 		return true
 	}
+	// Explicit section closure owns controls as well as analytical blocks. A bar
+	// shared by sections is emitted once; only unowned bars are common.
+	ownedBlocks := map[string]bool{}
+	for _, b := range blocks {
+		if name(b["kind"]) != "sectionBlock" {
+			continue
+		}
+		if !mark(name(b["id"]), ownedBlocks) {
+			return nil
+		}
+	}
 	selectedBlocks := map[string]bool{}
 	if !mark(selected, selectedBlocks) {
 		return nil
@@ -128,9 +139,8 @@ func PlanInitialSection(raw json.RawMessage, requested string) *SectionPlan {
 	for _, b := range blocks {
 		id := name(b["id"])
 		// Exclusive section membership excludes unlisted analytical blocks.
-		// ReportRuntime deliberately renders filter bars in its global toolbar,
-		// regardless of section membership; only those blocks are common.
-		if name(b["kind"]) == "filterBarBlock" {
+		// Unowned filter bars retain their global toolbar placement.
+		if name(b["kind"]) == "filterBarBlock" && !ownedBlocks[id] {
 			if !mark(id, commonBlocks) {
 				return nil
 			}

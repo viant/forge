@@ -16,14 +16,34 @@ It verifies the KPI belongs to the screen section, prints after the heading,
 retains its sparkline, and excludes an unlisted narrative. All examples use
 independently authored synthetic data. Browser visual acceptance remains separate.
 
+## Filter control ownership
+
+In an exclusive tab group, `sectionBlock.blockIds` owns filter bars as well as
+content, including controls nested in composite blocks. A bar shared by sections
+appears once whenever one of its owners is active. Unowned bars remain global.
+The report toolbar and Builder sidebar use this same membership; sidebar fields
+not curated into any bar remain available. Hiding a control preserves its stored
+value and query bindings when switching tabs. Stacked reports retain bars for
+all visible sections.
+
+Legacy nonexclusive reports retain global filter toolbar placement. Preview mode
+retains its inline section layout. This change adds no schema field and does not
+change canonical print/export selection or report execution inputs.
+
+The independently authored `report-section-filters-preview.html` fixture covers
+Operations, Inventory, Quality and an empty section, a shared control and a global
+date range. The React checks mount actual Runtime and Builder controls; the Go
+projection checks assert both retained bars and their dataset closure.
+
 ## Initial section delivery
 
 The stored report runtime can display one authorized section before the full
 execution completes. This is opt-in intermediate output on the existing tool
 execution stream. `prioritySectionId` is an advisory hint; the admitted server
 spec supplies the complete section dependency closure. Unlisted analytical blocks
-are excluded from the first wave; globally rendered filter bars and root scope
-controls retain their declared dependencies. Shared datasets execute
+are excluded from the first wave; unowned global filter bars and root scope
+controls retain their declared dependencies. Owned bars follow the selected
+section closure. Shared datasets execute
 once. The remaining datasets run after the initial snapshot. Ordinary JSON
 callers retain the complete-result barrier.
 

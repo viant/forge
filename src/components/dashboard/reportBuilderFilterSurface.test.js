@@ -74,3 +74,28 @@ assert.equal(shouldRenderInlineReportFilterSurface({
 }), false, "reports without authored baseline controls render neither duplicate surface");
 
 console.log("reportBuilderFilterSurface ✓ defaults left and renders one toolbar-activated left, right, or top surface");
+
+// Neutral controls use existing section ownership on every sidebar placement.
+const {resolveReportBuilderSectionFilters} = await import('./reportBuilderFilterSurface.js');
+const filters=['date','mode','quality','uncurated'].map(id=>({id,value:id==='mode'?'second':'first'}));
+const blocks=[
+ {id:'tabs',kind:'tabGroupBlock',sectionIds:['operations','inventory','qualitySection','empty'],defaultSectionId:'operations',includeUnlistedSections:false},
+ {id:'dateBar',kind:'filterBarBlock',paramIds:['date']},
+ {id:'modeBar',kind:'filterBarBlock',paramIds:['mode']},
+ {id:'qualityBar',kind:'filterBarBlock',paramIds:['quality']},
+ {id:'operations',kind:'sectionBlock',blockIds:['modeBar']},
+ {id:'inventory',kind:'sectionBlock',blockIds:['modeBar']},
+ {id:'qualitySection',kind:'sectionBlock',blockIds:['qualityBar']},
+ {id:'empty',kind:'sectionBlock',blockIds:[]},
+];
+const before=JSON.stringify(filters);
+for(const placement of ['left','right','top'])for(const compact of [false,true]) {
+ assert.equal(buildReportBuilderFilterSurfaceModel({available:true,open:true,placement,compact}).surfaceCount,1);
+ for(const [section,expected] of [[null,['date','mode','uncurated']],['',['date','uncurated']],['qualitySection',['date','quality','uncurated']],['empty',['date','uncurated']],['inventory',['date','mode','uncurated']]]) {
+  const visible=resolveReportBuilderSectionFilters(filters,blocks,section);
+  assert.deepEqual(visible.map(filter=>filter.id),expected);
+  if(section==='inventory')assert.equal(visible.find(filter=>filter.id==='mode'),filters[1]);
+ }
+}
+assert.equal(JSON.stringify(filters),before);
+assert.deepEqual(resolveReportBuilderSectionFilters(filters,blocks.map(block=>block.id==='tabs'?{...block,includeUnlistedSections:true}:block),'empty'),filters);

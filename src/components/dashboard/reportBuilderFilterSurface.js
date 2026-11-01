@@ -1,3 +1,6 @@
+import {resolveScopeParamId} from '../../reporting/scopeStateModel.js';
+import {buildRuntimeSections, resolveRuntimeSectionFilterBars} from '../../reporting/reportSections.js';
+
 export function normalizeReportBuilderFilterSurfacePlacement(value = "", {
     defaultPlacement = "left",
 } = {}) {
@@ -49,4 +52,22 @@ export function shouldRenderInlineReportFilterSurface({
     return showInlineReportBaselineControls === true
         && showLeftRail !== true
         && hasDedicatedFilterControl !== true;
+}
+
+// Presentation only: hidden controls retain their stored values and bindings.
+export function resolveReportBuilderSectionFilters(filters = [], blocks = [], selectedSectionId = null) {
+    const sections = buildRuntimeSections(blocks);
+    const tabs = blocks.find(block => block?.kind === "tabGroupBlock");
+    // An explicit empty notification means every section is hidden. Do not
+    // fall back to an authored default that the Runtime has already rejected.
+    const activeId = selectedSectionId === "" ? "" : [selectedSectionId, tabs?.content?.defaultSectionId ?? tabs?.defaultSectionId, sections[0]?.id]
+        .find(id => sections.some(section => section.id === id)) || "";
+    const visibleBars = resolveRuntimeSectionFilterBars(blocks, activeId);
+    const ids = bars => new Set(bars.flatMap(bar => bar.content?.paramIds ?? bar.paramIds ?? []));
+    const allIds = ids(blocks.filter(block => block?.kind === "filterBarBlock"));
+    const visibleIds = ids(visibleBars);
+    return filters.filter(filter => {
+        const id = resolveScopeParamId(filter);
+        return !allIds.has(id) || visibleIds.has(id);
+    });
 }

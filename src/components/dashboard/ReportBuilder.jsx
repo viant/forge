@@ -173,6 +173,7 @@ import {
 } from "./reportBuilderRestoreRehydration.js";
 import {
     buildReportBuilderFilterSurfaceModel,
+    resolveReportBuilderSectionFilters,
     normalizeReportBuilderFilterSurfacePlacement,
 } from "./reportBuilderFilterSurface.js";
 import {
@@ -2512,7 +2513,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     const [designRecentlyAddedId, setDesignRecentlyAddedId] = useState("");
     const [designPreviewOpen, setDesignPreviewOpen] = useState(false);
     const [designSectionId, setDesignSectionId] = useState("");
-    const [activeRuntimeSectionId, setActiveRuntimeSectionId] = useState("");
+    // null means the Runtime has not resolved visibility yet; "" means no visible section.
+    const [activeRuntimeSectionId, setActiveRuntimeSectionId] = useState(null);
     useEffect(() => {
         if (embeddedMode && embedded.selectedSectionId) setDesignSectionId(embedded.selectedSectionId);
     }, [embeddedMode, embedded?.selectedSectionId]);
@@ -5071,8 +5073,12 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         state.selectedMeasures,
     ]);
     const hasMore = collectionInfo?.hasMore ?? (Array.isArray(collection) && collection.length >= state.pageSize);
-    const requiredStaticFilters = useMemo(() => staticFilters.filter((filter) => filter?.required), [staticFilters]);
-    const optionalStaticFilters = useMemo(() => staticFilters.filter((filter) => !filter?.required), [staticFilters]);
+    const visibleStaticFilters = useMemo(
+        () => designWorkspaceMode ? staticFilters : resolveReportBuilderSectionFilters(staticFilters, authoredDocumentBlocks, activeRuntimeSectionId),
+        [designWorkspaceMode, staticFilters, authoredDocumentBlocks, activeRuntimeSectionId],
+    );
+    const requiredStaticFilters = useMemo(() => visibleStaticFilters.filter((filter) => filter?.required), [visibleStaticFilters]);
+    const optionalStaticFilters = useMemo(() => visibleStaticFilters.filter((filter) => !filter?.required), [visibleStaticFilters]);
     const preferReportSideRequiredFilters = !compactMode && !designWorkspaceMode && (useFilterRail || useFilterDrawer);
     const inlineToolbarRequiredFilters = useMemo(
         () => (
@@ -5313,7 +5319,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     const totalActiveFilterCount = activeStaticFilterCount + activeDynamicFilterCount;
     const modifiedReportOptionCount = countModifiedReportBuilderOptions(reportOptionDefinitions, effectiveReportOptions);
     const defaultFilterControlState = buildReportBuilderDefaultState(config);
-    const modifiedStaticFilterCount = staticFilters.filter((filter) => {
+    const modifiedStaticFilterCount = visibleStaticFilters.filter((filter) => {
         const key = resolveScopeParamId(filter);
         return key && JSON.stringify(getScopeParamValue(state, key)) !== JSON.stringify(getScopeParamValue(defaultFilterControlState, key));
     }).length;
@@ -5322,7 +5328,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         return key && JSON.stringify(state?.dynamicGroups?.[key]) !== JSON.stringify(defaultFilterControlState?.dynamicGroups?.[key]);
     }).length;
     const reportFilterToolbarModel = buildReportBuilderFilterToolbarModel({
-        allowedFilterCount: staticFilters.length + dynamicFilterGroups.length + dynamicFilterFamilies.length,
+        allowedFilterCount: visibleStaticFilters.length + dynamicFilterGroups.length + dynamicFilterFamilies.length,
         optionDefinitions: reportOptionDefinitions,
         optionValues: effectiveReportOptions,
         modifiedFilterCount: modifiedStaticFilterCount + modifiedDynamicFilterCount,
@@ -20749,8 +20755,9 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                             onTablePresentationChange={onCurrentTablePresentationChange}
                             reportDocument={previewArtifactForDisplay?.document || null}
                             reportFill={previewStateForDisplay.runtimeConfig.reportFill}
-                            selectedSectionId={runtimePreviewSectionSelection?.sectionId || ""}
-                            onSectionChange={runtimePreviewSectionSelection ? setActiveRuntimeSectionId : null}
+                            selectedSectionId={activeRuntimeSectionId ?? runtimePreviewSectionSelection?.sectionId ?? ""}
+                            onSectionChange={setActiveRuntimeSectionId}
+                            onActiveSectionChange={setActiveRuntimeSectionId}
                             title={previewArtifactForDisplay?.runtimeBlock?.title || ""}
                             subtitle={previewArtifactForDisplay?.runtimeBlock?.subtitle || ""}
                             locale={locale}

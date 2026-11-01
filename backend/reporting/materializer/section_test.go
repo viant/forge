@@ -92,7 +92,7 @@ func TestInitialSectionExcludesUnlistedAnalyticalBlocksButRetainsGlobalControls(
 			t.Fatal("unlisted content materialized")
 		}
 	}
-	// ReportRuntime renders filter bars globally even outside section membership.
+	// Unowned filter bars remain global outside explicit section membership.
 	root["blocks"] = append(root["blocks"].([]interface{}), map[string]interface{}{"id": "globalFilters", "kind": "filterBarBlock", "datasetRef": "detail", "filters": []interface{}{}})
 	raw, _ = json.Marshal(root)
 	plan = PlanInitialSection(raw, "")
@@ -106,5 +106,39 @@ func TestInitialSectionExcludesUnlistedAnalyticalBlocksButRetainsGlobalControls(
 	plan = PlanInitialSection(raw, "")
 	if plan == nil || !reflect.DeepEqual(plan.DatasetIDs, []string{"current", "prior", "trend", "detail"}) {
 		t.Fatalf("global scope dependencies lost: %+v", plan)
+	}
+}
+
+func TestInitialSectionScopesOwnedFilterBarsAndRetainsUnownedBars(t *testing.T) {
+	var root map[string]interface{}
+	if err := json.Unmarshal(sectionSpecFixture(), &root); err != nil {
+		t.Fatal(err)
+	}
+	blocks := root["blocks"].([]interface{})
+	// A control owned by Overview depends on an otherwise unused dataset.
+	blocks[1].(map[string]interface{})["blockIds"] = []interface{}{"metric", "modeBar"}
+	blocks = append(blocks,
+		map[string]interface{}{"id": "modeBar", "kind": "filterBarBlock", "paramIds": []interface{}{"mode"}, "datasetRef": "prior"},
+		map[string]interface{}{"id": "dateBar", "kind": "filterBarBlock", "paramIds": []interface{}{"date"}},
+	)
+	root["blocks"] = blocks
+	raw, _ := json.Marshal(root)
+	detail := PlanInitialSection(raw, "detail")
+	if detail == nil || !reflect.DeepEqual(detail.DatasetIDs, []string{"detail"}) {
+		t.Fatalf("inactive control dependency entered projection: %+v", detail)
+	}
+	if strings.Contains(string(detail.Spec), `"id":"modeBar"`) || !strings.Contains(string(detail.Spec), `"id":"dateBar"`) {
+		t.Fatalf("wrong projected controls: %s", detail.Spec)
+	}
+	overview := PlanInitialSection(raw, "overview")
+	if overview == nil || !strings.Contains(string(overview.Spec), `"id":"modeBar"`) {
+		t.Fatalf("active control lost: %+v", overview)
+	}
+	// Sharing the same bar adds its dependency exactly once on either section.
+	blocks[3].(map[string]interface{})["blockIds"] = []interface{}{"table", "modeBar"}
+	raw, _ = json.Marshal(root)
+	detail = PlanInitialSection(raw, "detail")
+	if detail == nil || !reflect.DeepEqual(detail.DatasetIDs, []string{"prior", "detail"}) || strings.Count(string(detail.Spec), `"id":"modeBar"`) != 1 {
+		t.Fatalf("shared control closure wrong: %+v", detail)
 	}
 }

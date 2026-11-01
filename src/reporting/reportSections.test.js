@@ -12,3 +12,26 @@ test('print shares explicit ownership and includes the populated KPI and its spa
  const ids=elements.map(e=>e.id);assert.ok(ids.indexOf('dashboard__title_0')<ids.indexOf('metric__card'));
 });
 
+
+test('exclusive section filter ownership preserves global and legacy bars',async()=>{
+ const {resolveRuntimeSectionFilterBars}=await import('./reportSections.js');
+ const controls=[
+  {id:'tabs',kind:'tabGroupBlock',sectionIds:['operations','quality','empty'],includeUnlistedSections:false},
+  {id:'date',kind:'filterBarBlock'}, {id:'shared',kind:'filterBarBlock'}, {id:'qualityBar',kind:'filterBarBlock'},
+  {id:'operations',kind:'sectionBlock',blockIds:['shared']},
+  {id:'quality',kind:'sectionBlock',blockIds:['shared','qualityBar']},
+  {id:'empty',kind:'sectionBlock',blockIds:[]},
+ ];
+ const ids=(selected,options)=>resolveRuntimeSectionFilterBars(controls,selected,options).map(block=>block.id);
+ assert.deepEqual(ids('operations'),['date','shared']);
+ assert.deepEqual(ids('quality'),['date','shared','qualityBar']);
+ assert.deepEqual(ids('empty'),['date']);
+ assert.deepEqual(ids('empty',{tabbed:false}),['date','shared','qualityBar']);
+ assert.deepEqual(ids('quality',{visibleSectionIds:new Set(['empty'])}),['date']);
+ const legacy=controls.map(block=>block.id==='tabs'?{...block,includeUnlistedSections:true}:block);
+ assert.deepEqual(resolveRuntimeSectionFilterBars(legacy,'empty').map(block=>block.id),['date','shared','qualityBar']);
+ // Recursive ownership matches the existing Go section dependency closure.
+ controls.find(block=>block.id==='operations').blockIds=['group'];
+ controls.push({id:'group',kind:'compositeBlock',childBlockIds:['shared']});
+ assert.deepEqual(ids('operations'),['date','shared']);
+});

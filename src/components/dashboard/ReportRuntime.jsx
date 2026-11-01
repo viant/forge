@@ -15,7 +15,7 @@ import ForgeIcon from '../Icon.jsx';
 import '../documentPresentation.css';
 import './reportDocument.css';
 import KpiSparkline from './KpiSparkline.jsx';
-import { buildRuntimeSections } from "./reportSections.js";
+import { buildRuntimeSections, resolveRuntimeSectionFilterBars } from "./reportSections.js";
 export { buildRuntimeSections } from "./reportSections.js";
 import {WorkspacePresentationProvider, useWorkspacePresentation, distinctWorkspaceTitle} from '../../core/context/WorkspacePresentation.jsx';
 import { resolveReportRuntimeCompositeOwnership } from "./reportRuntimeStructure.js";
@@ -3259,23 +3259,6 @@ export default function ReportRuntime({
     () => allRuntimeBlocks.some((block) => normalizeString(block?.kind) === "filterBarBlock"),
     [allRuntimeBlocks],
   );
-  const topFilterBarBlocks = useMemo(
-    () => reportPresentation
-      ? allRuntimeBlocks.filter((block) => {
-          if (normalizeString(block?.kind) !== "filterBarBlock") {
-            return false;
-          }
-          const normalizedDatasetRef = resolveRuntimeBlockDatasetRef(block, { availableDatasetRefs }).datasetRef;
-          return !suppressedFilterBarDatasetRefs.has(normalizedDatasetRef);
-        })
-      : [],
-    [allRuntimeBlocks, availableDatasetRefs, reportPresentation, suppressedFilterBarDatasetRefs],
-  );
-  const filterToolbarModel = useMemo(
-    () => buildReportRuntimeFilterToolbarModel(topFilterBarBlocks),
-    [topFilterBarBlocks],
-  );
-  const clearableScopeFilters = filterToolbarModel.filters.filter(filter => runtimeHandlers?.canClearScopeParam?.(filter) !== false);
   const hasTopLevelRefinementBarBlock = useMemo(
     () => allRuntimeBlocks.some((block) => normalizeString(block?.kind) === "refinementBarBlock"),
     [allRuntimeBlocks],
@@ -3728,6 +3711,18 @@ export default function ReportRuntime({
   const resolvedActiveSectionId = [selectedSectionId, activeSectionId, runtimeTabGroup?.defaultSectionId, runtimeSections[0]?.id]
     .map(normalizeString)
     .find(id => runtimeSections.some(section => normalizeString(section?.id) === id)) || "";
+  const sectionsAreTabbed = sectionPresentation !== 'stack' && (runtimeSections.length > 1
+    || (runtimeTabGroup?.includeUnlistedSections === false && runtimeSections.length > 0));
+  const topFilterBarBlocks = reportPresentation
+    ? resolveRuntimeSectionFilterBars(allRuntimeBlocks, resolvedActiveSectionId, {
+        tabbed: sectionsAreTabbed,
+        visibleSectionIds: new Set(runtimeSections.map(section => section.id)),
+      }).filter(block => !suppressedFilterBarDatasetRefs.has(
+        resolveRuntimeBlockDatasetRef(block, { availableDatasetRefs }).datasetRef,
+      ))
+    : [];
+  const filterToolbarModel = buildReportRuntimeFilterToolbarModel(topFilterBarBlocks);
+  const clearableScopeFilters = filterToolbarModel.filters.filter(filter => runtimeHandlers?.canClearScopeParam?.(filter) !== false);
   useEffect(()=>{onActiveSectionChange?.(resolvedActiveSectionId);},[onActiveSectionChange,resolvedActiveSectionId]);
   const changeSection = useCallback((sectionId) => {
     const selected = normalizeString(sectionId);
@@ -3872,7 +3867,7 @@ export default function ReportRuntime({
       {!documentPresentation ? renderTopFilters() : null}
       <HostIntentPanel hostIntent={hostIntent} runtimeHandlers={runtimeHandlers} />
       <DiagnosticsPanel diagnostics={visibleRuntimeDiagnostics} developerMode={!reportPresentation || showDeveloperDiagnostics} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />
-      {sectionPresentation !== 'stack' && (runtimeSections.length > 1 || (runtimeTabGroup?.includeUnlistedSections === false && runtimeSections.length > 0)) ? (
+      {sectionsAreTabbed ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {!documentPresentation && distinctWorkspaceTitle(runtimeTabGroup?.title, workspacePresentation?.label) ? (
             <div className="forge-report-runtime-section-label" style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--forge-report-text-muted, #486579)" }}>

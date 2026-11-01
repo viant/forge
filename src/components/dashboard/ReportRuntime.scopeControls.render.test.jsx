@@ -332,3 +332,40 @@ it('does not resurrect an uncontrolled clicked section after hide and restore',a
  await act(async()=>render(true));expect(changed).toHaveBeenLastCalledWith('summary');
  }finally{await act(async()=>root.unmount());host.remove();}
 });
+
+// Independently authored neutral fixture. Membership deliberately differs from
+// flat layout order, and one bar belongs to two sections.
+it.each(['report', 'preview'])('scopes authored filter bars to the active section and retains values in %s', async presentationMode => {
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ const params=['date','mode','quality'].map(id=>({id,kind:'select',label:id,value:1,options:[{label:id+' first',value:1},{label:id+' second',value:2}]}));
+ const reportSpec={title:'Operations report',viewer:{appearance:'document'},scope:{params},blocks:[
+  {id:'tabs',kind:'tabGroupBlock',sectionIds:['operations','inventory','qualitySection','empty'],defaultSectionId:'operations',includeUnlistedSections:false},
+  {id:'dateBar',kind:'filterBarBlock',paramIds:['date']},
+  {id:'modeBar',kind:'filterBarBlock',paramIds:['mode']},
+  {id:'qualityBar',kind:'filterBarBlock',paramIds:['quality']},
+  {id:'operations',kind:'sectionBlock',title:'Operations',blockIds:['modeBar']},
+  {id:'inventory',kind:'sectionBlock',title:'Inventory',blockIds:['modeBar']},
+  {id:'qualitySection',kind:'sectionBlock',title:'Quality',blockIds:['qualityBar']},
+  {id:'empty',kind:'sectionBlock',title:'Empty',blockIds:[]},
+ ]};
+ function Fixture(){
+  const [spec,setSpec]=React.useState(reportSpec);
+  return <ReportRuntime reportSpec={spec} reportFill={buildReportFillFromReportSpec(spec,{})} presentationMode={presentationMode} runtimeHandlers={{canEditScopeParam:()=>true,toggleScopeParamOption:(param,value)=>setSpec(current=>({...current,scope:{params:current.scope.params.map(entry=>entry.id===param.id?{...entry,value}:entry)}}))}}/>;
+ }
+ const bars=()=>[...host.querySelectorAll('[data-report-runtime-block-id]')].map(node=>node.dataset.reportRuntimeBlockId).filter(id=>id.endsWith('Bar'));
+ const globalBars=presentationMode==='report'?['dateBar']:[];
+ const select=async name=>{const tab=[...host.querySelectorAll('[role="tab"]')].find(node=>node.textContent===name);expect(tab).toBeTruthy();await act(async()=>tab.click());};
+ try {
+  await act(async()=>root.render(<Fixture/>));
+  const toggle=host.querySelector('[aria-label="Toggle report filters"]');
+  if(toggle?.getAttribute('aria-pressed')==='false')await act(async()=>toggle.click());
+  expect(bars()).toEqual([...globalBars,'modeBar']);
+  await act(async()=>host.querySelector('button[title="mode second"]').click());
+  await select('Quality');expect(bars()).toEqual([...globalBars,'qualityBar']);
+  await select('Empty');expect(bars()).toEqual(globalBars);
+  await select('Inventory');expect(bars()).toEqual([...globalBars,'modeBar']);
+  expect(host.querySelector('button[title="mode second"]').getAttribute('aria-pressed')).toBe('true');
+  await select('Operations');expect(bars()).toEqual([...globalBars,'modeBar']);
+ } finally {await act(async()=>root.unmount());host.remove();}
+});

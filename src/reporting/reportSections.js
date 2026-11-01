@@ -76,3 +76,43 @@ export function buildRuntimeSections(blocks = [], hiddenBlockIds = new Set()) {
   return includeUnlistedSections === false ? orderedSections : [...orderedSections, ...trailingSections];
 }
 
+// Filter bars share section ownership with content. Unowned bars remain global;
+// exclusive tab groups use declared membership rather than layout position.
+// Legacy nonexclusive bars retain global toolbar placement.
+export function resolveRuntimeSectionFilterBars(blocks = [], activeSectionId = "", {
+  tabbed = true,
+  visibleSectionIds,
+} = {}) {
+  const sections = buildRuntimeSections(blocks);
+  const tabGroup = blocks.find(block => normalizeString(block?.kind) === "tabGroupBlock");
+  const exclusive = (tabGroup?.content?.includeUnlistedSections ?? tabGroup?.includeUnlistedSections) === false;
+  const owners = new Map();
+  const indexed = new Map(blocks.map(block => [normalizeString(block?.id), block]));
+  const addOwner = (blockId, sectionId) => {
+    if (!owners.has(blockId)) owners.set(blockId, new Set());
+    owners.get(blockId).add(sectionId);
+  };
+  if (exclusive) {
+    // Include owners omitted from the visible navigation, so their controls do
+    // not become global merely because that section is hidden/unlisted.
+    for (const section of blocks.filter(block => normalizeString(block?.kind) === "sectionBlock")) {
+      const visited = new Set();
+      const visit = id => {
+        id = normalizeString(id);
+        if (visited.has(id)) return;
+        visited.add(id);
+        addOwner(id, normalizeString(section.id));
+        const child = indexed.get(id);
+        for (const childId of [...(child?.content?.blockIds ?? child?.blockIds ?? []),
+          ...(child?.content?.childBlockIds ?? child?.childBlockIds ?? [])]) visit(childId);
+      };
+      for (const id of section.content?.blockIds ?? section.blockIds ?? []) visit(id);
+    }
+  }
+  const visible = visibleSectionIds ?? new Set(sections.map(section => section.id));
+  return blocks.filter(block => {
+    if (normalizeString(block?.kind) !== "filterBarBlock") return false;
+    const ownedBy = owners.get(normalizeString(block.id));
+    return !ownedBy || [...ownedBy].some(id => visible.has(id) && (!tabbed || id === activeSectionId));
+  });
+}
