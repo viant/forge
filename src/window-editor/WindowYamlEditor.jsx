@@ -983,12 +983,12 @@ function RetainedSourceWindowEditor(props){
  // a hidden instance parses, projects and canonicalizes the entire bundle.
  useEffect(()=>{if(!treeMounted)props.onStateChange?.({...state,readOnly:!!props.readOnly,canCommit:!props.readOnly&&state.canCommit});},[treeMounted,namedState,busy,error,props.readOnly,props.onStateChange]);
  const chooseMode=next=>{if(next==='tree')setTreeMounted(true);setMode(next);};
- return <>
+ return <div className="fwe-retained-source" data-editor-mode={mode}>
   {!treeMounted&&<section className="fwe" aria-label={props.title||'Window editor'}><div className="fwe-header"><div className="fwe-switch" aria-label="Editor mode"><button aria-pressed={false} onClick={()=>chooseMode('tree')}>Tree</button><button aria-pressed={true}>YAML</button></div></div></section>}
   {treeMounted&&<AssembledWindowYamlEditor {...props} editorMode={mode} onEditorModeChange={chooseMode} readOnly={props.readOnly||busy||(namedState?.pendingEdits||0)>0} onChange={applyTree} namedSourceState={state} namedSourceSurface={<></>}/>}
   <div className="fwe-named-source" hidden={mode!=='yaml'}><NamedWindowSourceEditor {...props} onStateChange={setNamedState}/></div>
   {error&&<p role="alert">{error}</p>}
- </>;
+ </div>;
 }
 export function WindowYamlEditor(props) {
   return props.sourceManifest ? <RetainedSourceWindowEditor {...props}/> : <AssembledWindowYamlEditor {...props}/>;

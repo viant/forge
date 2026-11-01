@@ -598,3 +598,8 @@
 .fwe-named-source:not([hidden]) {display:flex; flex:1; min-height:0; min-width:0; overflow:hidden;}
 .fwe-named-source[hidden] {display:none;}
 .fwe-named-source .fwe-source {min-height:0; min-width:0; overflow:hidden;}
+
+/* Retained Tree and named-source surfaces share one bounded editor viewport. */
+.fwe-retained-source {display:flex;flex-direction:column;height:100%;min-height:0;min-width:0;overflow:hidden;}
+.fwe-retained-source > .fwe {flex:1;min-height:0;}
+.fwe-retained-source[data-editor-mode="yaml"] > .fwe {flex:0 0 auto;height:auto;}
