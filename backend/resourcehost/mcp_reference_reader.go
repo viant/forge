@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"sort"
 	"strings"
 	"sync"
@@ -508,7 +509,7 @@ func (r *MCPReferenceReader) Load(ctx context.Context, name string) (*mcpcfg.MCP
 		}
 	}
 	if selected == nil {
-		return nil, fmt.Errorf("MCP definition not found")
+		return nil, fmt.Errorf("MCP definition not found: %w", fs.ErrNotExist)
 	}
 	var result *Result[*mcpcfg.MCPClient]
 	if selected.Connection.Name != r.internal.ConnectionName {
