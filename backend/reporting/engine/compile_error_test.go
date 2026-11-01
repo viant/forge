@@ -38,15 +38,18 @@ func TestCompileStageErrorActualPipeline(t *testing.T) {
 	}
 }
 func TestCompileStageErrorPreservesCauseAndAdmission(t *testing.T) {
-	for _, cause := range []error{context.Canceled, context.DeadlineExceeded, identity.ErrResourceDenied} {
+	for _, cause := range []error{context.Canceled, context.DeadlineExceeded} {
 		err := compileStageError(CompileStageLower, cause)
 		if !errors.Is(err, cause) {
 			t.Fatal("cause lost")
 		}
 		var stage *CompileStageError
-		if errors.As(err, &stage) {
-			t.Fatalf("authority/cancellation mislabeled: %v", err)
+		if !errors.As(err, &stage) || stage.Stage != CompileStageLower {
+			t.Fatalf("cancellation lost compile boundary: %v", err)
 		}
+	}
+	if err := compileStageError(CompileStageLower, identity.ErrResourceDenied); err != identity.ErrResourceDenied {
+		t.Fatalf("admission denial mislabeled: %v", err)
 	}
 	cause := errors.New("private compiler detail")
 	if !errors.Is(compileStageError(CompileStageCompiler, cause), cause) {
@@ -82,5 +85,27 @@ func TestCompileStageErrorPreservesAuthoredFingerprintCause(t *testing.T) {
 	var mismatch *materializer.AuthoredDependencyFingerprintError
 	if !errors.As(err, &stage) || stage.Stage != CompileStageLower || !errors.As(err, &mismatch) || mismatch.AuthoredDependencyKind() != "builder" {
 		t.Fatalf("typed fingerprint cause lost at actual compiler boundary: %v", err)
+	}
+}
+
+func TestPreparedReportCancellationRetainsActualLowerBoundary(t *testing.T) {
+	for _, deadline := range []bool{false, true} {
+		ctx, cancel := context.WithCancel(context.Background())
+		want := context.Canceled
+		if deadline {
+			cancel()
+			ctx, cancel = context.WithDeadline(context.Background(), time.Unix(0, 0))
+			want = context.DeadlineExceeded
+		} else {
+			cancel()
+		}
+		prepared := &PreparedReport{raw: json.RawMessage(`{"schemaVersion":1,"format":"forge.authoredReport","reportDocument":{},"builderDefinition":{}}`)}
+		service := New(Options{Compiler: NewReportSpecCompiler(nil)})
+		_, err := service.compilePreparedReport(ctx, prepared, nil)
+		cancel()
+		var stage *CompileStageError
+		if !errors.Is(err, want) || !errors.As(err, &stage) || stage.Stage != CompileStageLower {
+			t.Fatalf("lower cancellation lost its boundary or cause: %v", err)
+		}
 	}
 }

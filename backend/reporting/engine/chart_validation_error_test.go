@@ -46,7 +46,9 @@ func TestChartValidationCompileStageTypedDiagnostics(t *testing.T) {
 	}
 	for _, cause := range []error{context.Canceled, context.DeadlineExceeded, identity.ErrResourceDenied} {
 		original := &chartValidationFixture{cause: cause, locations: []materializer.ChartValidationDiagnostic{location}}
-		if compileStageError(CompileStageLower, original) != original {
+		wrapped := compileStageError(CompileStageLower, original)
+		var validation *ChartValidationError
+		if !errors.Is(wrapped, original) || errors.As(wrapped, &validation) {
 			t.Fatal("cancellation/denial was reclassified")
 		}
 	}

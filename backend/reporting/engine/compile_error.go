@@ -29,10 +29,13 @@ const (
 )
 
 func compileStageError(stage string, err error) error {
-	if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, identity.ErrResourceDenied) {
+	if err == nil || errors.Is(err, identity.ErrResourceDenied) {
 		return err
 	}
-	if stage == CompileStageLower {
+	// Cancellation retains its actual compile boundary for internal diagnostics,
+	// while callers continue to classify it through errors.Is. Do not turn a
+	// deadline into a chart validation failure, even if the cause has locations.
+	if stage == CompileStageLower && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 		err = chartValidationCompileError(err)
 	}
 	return &CompileStageError{Stage: stage, Cause: err}
