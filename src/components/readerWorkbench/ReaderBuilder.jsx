@@ -31,7 +31,7 @@ import { viewSQLResource } from './viewSQLResource.js';
 
 // ReaderBuilder renders the canonical structure returned by the Studio SDK's
 // Datly reader-builder bridge. It does not parse DQL or invent a browser graph.
-function ReaderWorkbenchView({ api, report, openResources = false, resourceAction = '', onReportUpdated, onResourcesClosed, onBack, onStateChange, defaults = {} }) {
+function ReaderWorkbenchView({ api, report, openResources = false, resourceAction = '', onReportUpdated, onResourcesClosed, onBack, onStateChange, onReleases, defaults = {} }) {
   const mutationState=React.useContext(WorkbenchMutationContext);
   const headingRef = useRef(null);
   const previewTriggerRef = useRef(null);
@@ -391,6 +391,7 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
         <MenuItem text="Composition lab" icon="heatmap" disabled={!canPreview} onClick={()=>runTool(()=>setAnalyticsDialogOpen(true))}/>
         <MenuItem text="Cache & warmup" icon="database" disabled={!canEdit} onClick={()=>runTool(()=>setCacheDialogOpen(true))}/>
         <MenuItem text="Row access scope" icon="filter" disabled={!canEdit||serverScoped} onClick={()=>runTool(()=>setEntityScopeOpen(true))}/>
+        {onReleases&&<MenuItem text="Named release assignments" icon="tag" disabled={!ready||capabilities.canPublish===false} onClick={()=>runTool(()=>onReleases(version))}/>}
         <MenuItem text="Source resources" icon="folder-open" disabled={!ready||capabilities.canView===false} onClick={()=>runTool(()=>{setResourceMode('resources');setResourcesDialogOpen(true);})}/>
         <MenuItem text="Skills" icon="learning" disabled={!ready||capabilities.canView===false} onClick={()=>runTool(()=>{setResourceMode('skills');setResourcesDialogOpen(true);})}/>
         {capabilities.canManageAcl===true&&<MenuItem text="Permissions" icon="lock" disabled={!canPublish} onClick={()=>runTool(()=>setACLDialogOpen(true))}/>}

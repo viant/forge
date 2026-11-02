@@ -26,5 +26,5 @@ export default function ReaderWorkbenchPanel({container,context}) {
  const report=resolveSelector(form,spec.reportField||'report');
  api.namespaceName=report?.namespace||'';
  if(!report)return null;
- return <WorkbenchMutationContext.Provider value={lifecycle}><ReaderBuilder onStateChange={localChanged} api={api} report={report} defaults={spec.defaults} openResources={Boolean(resolveSelector(form,spec.openResourcesField||'openResources'))} resourceAction={resolveSelector(form,spec.resourceActionField||'resourceAction')||''} onBack={()=>invoke('onBack')} onReportUpdated={value=>invoke('onReportUpdated',value)} onResourcesClosed={()=>invoke('onResourcesClosed')}/></WorkbenchMutationContext.Provider>;
+ return <WorkbenchMutationContext.Provider value={lifecycle}><ReaderBuilder onReleases={spec.onReleases?version=>invoke('onReleases',{report,version}):undefined} onStateChange={localChanged} api={api} report={report} defaults={spec.defaults} openResources={Boolean(resolveSelector(form,spec.openResourcesField||'openResources'))} resourceAction={resolveSelector(form,spec.resourceActionField||'resourceAction')||''} onBack={()=>invoke('onBack')} onReportUpdated={value=>invoke('onReportUpdated',value)} onResourcesClosed={()=>invoke('onResourcesClosed')}/></WorkbenchMutationContext.Provider>;
 }

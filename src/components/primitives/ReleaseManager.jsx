@@ -38,6 +38,8 @@ function ScopedReleaseManager({api, channelKey, disabled, onActivated, renderVal
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [roots, setRoots] = useState([]);
+  const [artifactQuery, setArtifactQuery] = useState('');
+  const [artifactPage, setArtifactPage] = useState(0);
   const [policies, setPolicies] = useState([]);
   const [promotionTarget, setPromotionTarget] = useState('');
   const [rollbackHash, setRollbackHash] = useState('');
@@ -186,6 +188,10 @@ function ScopedReleaseManager({api, channelKey, disabled, onActivated, renderVal
   const policyChoices = [...availablePolicies, ...policies.filter(policy => !availablePolicies.some(candidate => policyID(candidate) === policyID(policy)))];
   const policiesAssignable = policies.every(policy => availablePolicies.some(candidate => policyID(candidate) === policyID(policy)));
   const artifactGroups = [...new Set(rootChoices.map(artifactID))].map(id => ({id, choices:rootChoices.filter(root => artifactID(root) === id).sort((a,b) => Number(b.version)-Number(a.version))}));
+  const filteredArtifacts = artifactGroups.filter(group => group.choices.some(root => `${artifactTitle(root)} ${root.kind} ${root.uri}`.toLocaleLowerCase().includes(artifactQuery.trim().toLocaleLowerCase())));
+  const pageCount = Math.max(1, Math.ceil(filteredArtifacts.length / 25));
+  const page = Math.min(artifactPage, pageCount - 1);
+  const pageArtifacts = filteredArtifacts.slice(page * 25, (page + 1) * 25);
   const currentRootsKnown = !current?.activeBundleHash || Array.isArray(current?.bundle?.roots) || history.some(bundle => bundle.hash === current.activeBundleHash && Array.isArray(bundle.roots));
   const priorReleases = history.filter(bundle => bundle.hash !== current?.activeBundleHash);
   const promotionChannels = channels.filter(channel => channelName(channel) !== selected);
@@ -218,7 +224,9 @@ function ScopedReleaseManager({api, channelKey, disabled, onActivated, renderVal
     </fieldset>
     {!policiesAssignable && <Callout intent="warning">Remove unavailable policies before publishing. The server will verify every chosen policy again.</Callout>}
     <fieldset disabled={disabled || pending || loading || !inventoryReady}><legend>Included artifacts</legend>
-      {artifactGroups.length ? artifactGroups.map(({id, choices}, index) => {
+      <FormGroup label="Find artifacts" labelFor="release-artifact-query"><InputGroup id="release-artifact-query" type="search" value={artifactQuery} onChange={event=>{setArtifactQuery(event.target.value);setArtifactPage(0);}} placeholder="Search name, type or URI"/></FormGroup>
+      <p role="status">{filteredArtifacts.length} artifacts · {roots.length} included · Page {page+1} of {pageCount}</p>
+      {pageArtifacts.length ? pageArtifacts.map(({id, choices}, index) => {
         const selectedRoot = roots.find(root => artifactID(root) === id);
         const title = `${choices[0].kind} · ${artifactTitle(choices[0])}`;
         return <FormGroup key={id} label={title} labelFor={`release-artifact-${index}`} className="forge-release-manager-artifact">
@@ -231,7 +239,8 @@ function ScopedReleaseManager({api, channelKey, disabled, onActivated, renderVal
             {choices.map(root => <option key={rootID(root)} value={rootOption(root)}>Revision {root.version}{root.description ? ` · ${root.description}` : ''}</option>)}
           </HTMLSelect>
         </FormGroup>;
-      }) : <p>No artifact revisions are available.</p>}
+      }) : <p>{artifactGroups.length?'No artifacts match your search.':'No artifact revisions are available.'}</p>}
+      <div className="forge-release-manager-actions"><Button disabled={page===0} onClick={()=>setArtifactPage(page-1)}>Previous artifacts</Button><Button disabled={page+1>=pageCount} onClick={()=>setArtifactPage(page+1)}>Next artifacts</Button></div>
     </fieldset>
     {renderValidation?.({roots, disabled:disabled || pending || loading || !inventoryReady || !currentRootsKnown})}
     {!currentRootsKnown && <Callout intent="warning">This server has not supplied the active release’s included artifacts. Refresh its history before changing the bundle.</Callout>}

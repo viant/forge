@@ -281,3 +281,16 @@ it('offers an optional validation slot with the current exact selection without 
     expect(adapter.publish).toHaveBeenCalledOnce();
   } finally {await act(async()=>view.unmount());host.remove();}
 });
+
+it('searches the complete artifact inventory and keeps selections through 25-row pages',async()=>{
+ const many=Array.from({length:123},(_,i)=>({...rootRef,uri:`window://sales/resource-${String(i).padStart(3,'0')}`,title:`Resource ${String(i).padStart(3,'0')}`}));
+ const adapter=api({candidates:vi.fn(async()=>many)}),view=await render(adapter);
+ expect(view.host.querySelectorAll('.forge-release-manager-artifact')).toHaveLength(25);
+ const first=view.host.querySelector('.forge-release-manager-artifact select');await select(first,first.options[1].value);
+ await click(button(view.host,'Next artifacts'));expect(view.host.textContent).toContain('Page 2 of 5');
+ await text(view.host.querySelector('#release-artifact-query'),'Resource 122');
+ expect(view.host.querySelectorAll('.forge-release-manager-artifact')).toHaveLength(1);expect(view.host.textContent).toContain('Resource 122');
+ await text(view.host.querySelector('#release-artifact-query'),'');await click(button(view.host,'Previous artifacts'));
+ expect(view.host.querySelector('.forge-release-manager-artifact select').value).not.toBe('');
+ expect(adapter.publish).not.toHaveBeenCalled();await view.close();
+});

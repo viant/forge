@@ -3,6 +3,7 @@ package types
 // ReaderWorkbenchSpec configures a reusable Datly graph/SQL authoring renderer.
 // Provider endpoints, DTO mappings, lookups and resource namespaces are metadata.
 type ReaderWorkbenchSpec struct {
+	OnReleases          string                            `json:"onReleases,omitempty" yaml:"onReleases,omitempty"`
 	DataSourceRef       string                            `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
 	ReportField         string                            `json:"reportField,omitempty" yaml:"reportField,omitempty"`
 	NamespaceField      string                            `json:"namespaceField,omitempty" yaml:"namespaceField,omitempty"`

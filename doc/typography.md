@@ -960,3 +960,16 @@ keep their semantics. Synthetic mounted tests exercise two independent windows,
 reset/cancel and native read completion. Persistent editors without lifecycle
 metadata retain their existing save synchronization; consumer migrations and
 browser/business persistence qualification remain separate.
+
+### Named release assignment controls
+
+ReleaseManager searches the complete artifact inventory by title, kind or URI and
+pages artifact families at 25 per page, preserving exact selections across searches.
+`forge/release-manager/assignments` accepts a verified adapter and producer-resolved
+exact artifact roots. It reviews then explicitly publishes affected named releases
+with original CAS revisions, policies and unrelated roots. Checkboxes alone never
+publish. Missing roots, incomplete inventories, inactive releases and empty bundles
+fail closed. A multi-release update is sequential; partial success is visible and
+a failure requires reload. Component IDs must not be passed as artifact identities.
+Reader workbenches may opt into the host-owned `onReleases` action; the framework
+does not map native component versions to managed resource roots.
