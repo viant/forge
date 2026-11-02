@@ -1,0 +1,134 @@
+import {useEffect,useRef,useState} from 'react';
+import {reportDatePresetInputs,decodeReportDateCalendar,resolveDeclaredDateRangePreset} from './reportDatePresets.js';
+
+const own=(value,key)=>Object.prototype.hasOwnProperty.call(value,key);
+const validDate=value=>typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value)&&!Number.isNaN(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value;
+const identity=value=>({...value});
+
+// Shared calendar/default lifecycle. Hosts supply only their ordinary metadata
+// loader, parameter initialization and commit callback. Calendar zones and range
+// policy come from validated declarations, never browser timezone or host IDs.
+export function useReportDatePresetDraft({ranges=[],parameters={},resetParameters,initialize=identity,contextKey='',loadCalendar,onDefaultsReady,defaultsReadyKey=''}) {
+ const initialResetParameters=useRef(structuredClone(resetParameters??parameters));
+ const [draft,setDraft]=useState(()=>initialize(parameters));
+ const draftRef=useRef(draft);draftRef.current=draft;
+ const writeDraft=next=>{draftRef.current=next;setDraft(next);};
+ const parametersKey=JSON.stringify(parameters),authoredDatesKey=JSON.stringify(initialize({}));
+ const parameterEpoch=useRef({key:parametersKey,changed:false});
+ const [dateState,setDateState]=useState({});
+ const generation=useRef(0),requests=useRef([]),dirty=useRef(false),initialAttempted=useRef(false),initialCommitted=useRef(false),autoReady=useRef(false),expectedParameters=useRef('');
+ const calendarDefinitionKey=JSON.stringify(ranges.map(range=>[range.id,range.start,range.end,range.required,range.datePresets,range.datePresetError]));
+ const calendarScope=useRef({key:'',loader:null,version:0});
+ const scopeKey=JSON.stringify([contextKey,calendarDefinitionKey]);
+ const invalidate=()=>{generation.current++;requests.current.forEach(controller=>controller.abort());requests.current=[];};
+ // Loader identity includes the authenticated preview session. Invalidate in
+ // render too, so a late reply cannot win before the scope effect runs.
+ if(calendarScope.current.key!==scopeKey||calendarScope.current.loader!==loadCalendar){
+  invalidate();autoReady.current=false;
+  if(!initialCommitted.current&&!dirty.current)initialAttempted.current=false;
+  calendarScope.current={key:scopeKey,loader:loadCalendar,version:calendarScope.current.version+1};
+ }
+ const scopeVersion=calendarScope.current.version;
+ const stateFor=range=>{
+  const state=dateState[range.id]||{mode:'manual',value:'custom'};
+  let identity;try{identity=reportDatePresetInputs(range.datePresets,draft).identity;}catch{/* manual dates do not need calendar metadata */}
+  return {...state,pending:state.scope===scopeVersion&&state.pending===true,
+   stale:state.mode==='relative'&&(state.stale||state.scope!==scopeVersion||state.identity!==identity)};
+ };
+ const dateBlocked=ranges.some(range=>{const state=stateFor(range);return state.pending||state.stale||((range.datePresets||range.datePresetError||range.required)&&(!validDate(draft[range.start])||!validDate(draft[range.end])||draft[range.start]>draft[range.end]));});
+ const cancelDraftRequests=()=>{
+  invalidate();autoReady.current=false;dirty.current=true;
+  setDateState(previous=>Object.fromEntries(Object.entries(previous).map(([id,state])=>[id,{...state,pending:false}])));
+ };
+ const resolveRanges=async(items,base,{automatic=false}={})=>{
+  invalidate();const ticket=generation.current,version=calendarScope.current.version;
+  const valid=()=>ticket===generation.current&&version===calendarScope.current.version;
+  setDateState(previous=>({...previous,...Object.fromEntries(items.map(({range,value})=>[range.id,{...previous[range.id],pending:true,scope:version,requestedValue:value,error:''}]))}));
+  const patch={},resolvedStates={},contexts=[];
+  try{
+   for(const {range,value}of items){
+    const declaration=range.datePresets,option=declaration.options.find(option=>option.value===value);
+    if(!option||value==='custom')throw Error('Choose an available date preset.');
+    const {identity,inputs}=reportDatePresetInputs(declaration,base),controller=new AbortController();requests.current.push(controller);
+    if(typeof loadCalendar!=='function')throw Error('Calendar metadata is unavailable.');
+    const response=await loadCalendar(declaration.calendar.dataSourceRef,inputs,controller.signal);
+    if(!valid())return false;
+    const context=decodeReportDateCalendar(declaration,identity,response);
+    contexts.push({range,value,option,identity,context});
+   }
+   // One instant follows all metadata for this operation, including an initial
+   // default operation with several independently declared date controls.
+   const instant=new Date();
+   for(const {range,value,option,identity,context}of contexts){
+    const pair=resolveDeclaredDateRangePreset(option,instant,context.timeZone);
+    patch[range.start]=pair.start;patch[range.end]=pair.end;
+    resolvedStates[range.id]={mode:'relative',value,requestedValue:value,scope:version,identity,pending:false,stale:false,automatic,error:''};
+   }
+   if(!valid())return false;
+   writeDraft({...draftRef.current,...patch});setDateState(previous=>({...previous,...resolvedStates}));
+   if(automatic)autoReady.current=true;
+   return true;
+  }catch{
+   if(valid())setDateState(previous=>({...previous,...Object.fromEntries(items.map(({range,value})=>[range.id,{...previous[range.id],scope:version,pending:false,requestedValue:value,stale:previous[range.id]?.mode==='relative',error:'Calendar timezone is unavailable.'}]))}));
+   return false;
+  }
+ };
+ const requestPreset=(id,value)=>{
+  cancelDraftRequests();
+  const range=ranges.find(range=>range.id===id&&range.datePresets);
+  return range?resolveRanges([{range,value}],draftRef.current):Promise.resolve(false);
+ };
+ const manualRange=(id,pair)=>{
+  cancelDraftRequests();const range=ranges.find(range=>range.id===id);if(!range)return;
+  writeDraft({...draftRef.current,[range.start]:pair.start,[range.end]:pair.end});
+  setDateState(previous=>({...previous,[id]:{mode:'manual',value:'custom',scope:calendarScope.current.version}}));
+ };
+ // Existing absolute defaults and explicit caller edits retain their semantics.
+ useEffect(()=>{
+  if(parameterEpoch.current.key!==parametersKey){
+   const expected=expectedParameters.current===parametersKey;expectedParameters.current='';
+   parameterEpoch.current={key:parametersKey,changed:true};
+   invalidate();writeDraft(JSON.parse(parametersKey));
+   if(!expected){dirty.current=false;initialAttempted.current=false;initialCommitted.current=false;autoReady.current=false;setDateState({});}
+  }else if(!parameterEpoch.current.changed){writeDraft(initialize(draftRef.current));}
+ },[parametersKey,authoredDatesKey]);
+ useEffect(()=>()=>{
+  invalidate();autoReady.current=false;
+  if(!initialCommitted.current&&!dirty.current)initialAttempted.current=false;
+ },[]);
+ // Opt-in defaults are resolved before the first report request. Manual input,
+ // Reset and external updates invalidate this operation instead of being lost.
+ useEffect(()=>{
+  if(initialAttempted.current||initialCommitted.current||dirty.current)return;
+  const needed=ranges.filter(range=>range.datePresets&&(!own(draft,range.start)&&!own(draft,range.end)
+   ||dateState[range.id]?.automatic&&dateState[range.id]?.scope!==scopeVersion));
+  if(!needed.length)return;
+  try{needed.forEach(range=>reportDatePresetInputs(range.datePresets,draft));}catch{return;}
+  initialAttempted.current=true;
+  void resolveRanges(needed.map(range=>({range,value:range.datePresets.default})),draft,{automatic:true});
+ },[scopeVersion,calendarDefinitionKey,JSON.stringify(draft)]);
+ useEffect(()=>{
+  if(!autoReady.current||dirty.current||initialCommitted.current||dateBlocked)return;
+  try{
+   const next=onDefaultsReady?.(draft);
+   if(next===false)return;
+   initialCommitted.current=true;autoReady.current=false;
+   if(next)expectedParameters.current=JSON.stringify(next);
+  }catch{/* Host-owned required inputs or choice domains may still be loading. */}
+ },[JSON.stringify(draft),dateState,defaultsReadyKey]);
+ const expectParameters=next=>{expectedParameters.current=JSON.stringify(next);};
+ const reset=()=>{
+  cancelDraftRequests();parameterEpoch.current.changed=true;initialAttempted.current=true;
+  const next=initialize(structuredClone(resetParameters??initialResetParameters.current));writeDraft(next);setDateState({});
+  const needed=ranges.filter(range=>range.datePresets&&!own(next,range.start)&&!own(next,range.end));
+  if(needed.length)void resolveRanges(needed.map(range=>({range,value:range.datePresets.default})),next);
+ };
+ const editField=(id)=>{
+  cancelDraftRequests();
+  setDateState(previous=>({...previous,...Object.fromEntries(ranges.flatMap(range=>id===range.start||id===range.end?[[range.id,{mode:'manual',value:'custom',scope:scopeVersion}]]
+   :range.datePresets?.calendar.input.parameter===id&&previous[range.id]?.mode==='relative'?[[range.id,{...previous[range.id],pending:false,stale:true}]]:[]))}));
+ };
+ const controls=ranges.map(range=>{const state=range.datePresets?stateFor(range):{};return {...range,kind:'dateRange',presetValue:state.value,presetRequestedValue:state.requestedValue,presetPending:state.pending,
+  presetError:range.datePresetError||state.error||(state.stale?'The calendar context changed. Choose the preset again or use manual dates.':'')};});
+ return {draft,draftRef,writeDraft,controls,dateBlocked,requestPreset,manualRange,cancelDraftRequests,editField,reset,expectParameters};
+}
