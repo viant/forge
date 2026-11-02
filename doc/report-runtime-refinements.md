@@ -37,3 +37,33 @@ These bindings describe selection capability, not business authorization. A host
 still forwards only producer-admitted inputs through its existing execution
 contract. The producer validates every request. Selecting a mark displays the
 available authored actions; it does not automatically apply a Keep or Exclude.
+
+### External chart destinations
+
+A chart block may declare one browser destination through its existing runtime
+selection actions. URLs belong to producer rows; field names and routes stay in
+report metadata:
+
+```yaml
+runtime:
+  actions:
+    - kind: external
+      event: onSelect
+      urlField: detailUrl
+      label: Open details
+```
+
+The chart's existing mark selection opens the admitted URL in a new browsing
+context with `noopener,noreferrer`, using the same HTTP/HTTPS URL policy as
+report table links. Rendering, hovering, legends, filtering, and exports do not
+execute this action. Existing select/refine actions continue to run. Destination
+selection remains available in report presentation without requiring a producer
+refinement callback. Static print/export renderers do not execute browser actions.
+
+An aggregate mark opens a destination only when every contributing row belongs
+to that chart's active dataset and all rows resolve to the same URL. Missing,
+unsafe, mixed, or foreign-dataset destinations produce no navigation. Multiple
+external actions on one block are ambiguous and produce no navigation. Existing
+mark keyboard activation uses the same selection path. The destination always
+uses the table link policy's `_blank` target; mark controls do not expose native
+anchor context-menu or modifier-click semantics.

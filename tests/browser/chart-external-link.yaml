@@ -1,0 +1,27 @@
+# Requires an owned Chrome debug endpoint and Forge Vite server.
+# Uses invented URLs and records window.open intent without external navigation.
+init:
+  - {name: pageURL, from: params.pageURL, required: true}
+  - {name: debuggerAddress, from: params.debuggerAddress, required: true}
+pipeline:
+  attach:
+    action: webdriver:open
+    sessionID: neutral-chart-links
+    browser: chrome
+    directCDP: true
+    debuggerAddress: $debuggerAddress
+  selection:
+    action: webdriver:run
+    sessionID: neutral-chart-links
+    autoStart: false
+    commands:
+      - page.goto('$pageURL/tests/browser/chart-external-link.html')
+      - expect(page.getByRole('status')).toHaveText('[]')
+      - page.getByRole('button','Safe4').click()
+      - expect(page.getByRole('status')).toHaveText('[["https://example.invalid/records/17","_blank","noopener,noreferrer"]]')
+      - page.getByRole('button','Unsafe3').click()
+      - page.getByRole('button','Missing2').click()
+      - page.getByRole('button','Ambiguous2').click()
+      - expect(page.getByRole('status')).toHaveText('[["https://example.invalid/records/17","_blank","noopener,noreferrer"]]')
+      - page.getByRole('button','Safe4').press('Enter')
+      - expect(page.getByRole('status')).toHaveText('[["https://example.invalid/records/17","_blank","noopener,noreferrer"],["https://example.invalid/records/17","_blank","noopener,noreferrer"]]')

@@ -8,6 +8,7 @@ import {
   resolveReportRuntimeBlockRows,
   resolveReportRuntimeFilterValues,
   resolveReportRuntimeHostActions,
+  resolveReportRuntimeExternalSelectionLink,
   resolveReportRuntimeSelectionActions,
 } from "./reportBlockRuntimeModel.js";
 import { normalizeReportBuilderDocumentBlocks } from "./reportDocumentModel.js";
@@ -121,3 +122,20 @@ assert.equal(selectedReportFill.blocks[0].content.resolvedRows[0].cells[0].value
 assert.equal(selectedReportFill.blocks[1].content.value, 5);
 
 console.log("reportBlockRuntimeModel ✓ executes adapted visibility, filter, selection, and selection-action contracts");
+
+// URL selection follows the report table policy and the originating dataset.
+const linkBlock = {runtime:{actions:[{kind:'external',urlField:'detailUrl'}]}};
+const safe = {category:'Alpha',amount:4,detailUrl:'https://example.invalid/records/17'};
+const safeOther = {...safe,category:'Beta',detailUrl:'https://example.invalid/records/18'};
+const selectedLink = (selectedRows, rows=selectedRows, block=linkBlock) => resolveReportRuntimeExternalSelectionLink({block,rows,selection:{source:'cartesian',selectionRows:selectedRows}});
+assert.equal(selectedLink([safe]).href, safe.detailUrl);
+assert.equal(selectedLink([safe,{...safe,amount:7}]).href, safe.detailUrl);
+assert.equal(selectedLink([safe,safeOther]), null, 'aggregated mark with different targets is ambiguous');
+assert.equal(selectedLink([safe], [safeOther]), null, 'a different dataset cannot supply the selected row');
+for (const detailUrl of [null, undefined, '', 'javascript:alert(1)', 'data:text/html,<b>x</b>', '/relative', 'file:///tmp/record']) {
+  assert.equal(selectedLink([{...safe,detailUrl}]), null);
+}
+assert.equal(selectedLink([safe], [safe], {runtime:{actions:[{kind:'external',urlField:'missing'}]}}), null);
+assert.equal(selectedLink([safe], [safe], {runtime:{actions:[{kind:'external',urlField:'detailUrl',event:'onHover'}]}}), null);
+assert.equal(resolveReportRuntimeExternalSelectionLink({block:linkBlock,rows:[safe],selection:{source:'legend',selectionRows:[safe]}}), null);
+assert.equal(selectedLink([safe], [safe], {runtime:{actions:[...linkBlock.runtime.actions,...linkBlock.runtime.actions]}}), null);

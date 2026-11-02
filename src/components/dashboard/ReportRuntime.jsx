@@ -93,6 +93,8 @@ import {
   resolveReportRuntimeBlockRows,
   resolveReportRuntimeFilterValues,
   resolveReportRuntimeHostActions,
+  resolveReportRuntimeExternalActions,
+  resolveReportRuntimeExternalSelectionLink,
   resolveReportRuntimeSelectionActions,
 } from "../../reporting/reportBlockRuntimeModel.js";
 import { buildReportRuntimeFilterToolbarModel } from "./reportRuntimeFilterToolbarModel.js";
@@ -3567,7 +3569,8 @@ export default function ReportRuntime({
           legendEnabled: false,
         }
         : chartInteractionSupport;
-      const chartInteractionEnabled = effectiveChartInteractionSupport.enabled || authoredSelectionActions.length > 0;
+      const chartExternalActions = resolveReportRuntimeExternalActions(block);
+      const chartInteractionEnabled = effectiveChartInteractionSupport.enabled || authoredSelectionActions.length > 0 || chartExternalActions.length > 0;
       const supportedChartActions = supportedChartExecutions.map((execution) => ({
         id: execution.id,
         label: execution.label,
@@ -3615,6 +3618,8 @@ export default function ReportRuntime({
               onDatumSelect={chartInteractionEnabled ? ((selection) => {
                 setSelectedChartSelection(block.id, selection);
                 applyAuthoredSelectionActions(block, selection);
+                const link = resolveReportRuntimeExternalSelectionLink({block, selection, rows:dataset?.rows || []});
+                if (link) window.open(link.href, link.target, 'noopener,noreferrer');
               }) : null}
               onLegendItemSelect={!reportPresentation && chartInteractionSupport.legendEnabled ? ((selection) => setSelectedChartSelection(block.id, selection)) : null}
             />

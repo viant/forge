@@ -3029,3 +3029,26 @@ for (const allowChartTableSwitch of [false,true]) {
 }
 const documentViewer=buildReportBuilderReportDocument({container,config,state:{...state,reportDocumentViewer:{appearance:'document',allowChartTableSwitch:false}}});
 assert.deepEqual(lowerReportDocumentToReportSpec(JSON.parse(JSON.stringify(documentViewer))).viewer,{appearance:'document',allowChartTableSwitch:false});
+
+// Hidden navigation dependencies must be materialized for a chart's own dataset.
+const externalChartDocument = buildReportBuilderReportDocument({
+  container,
+  config:{...config,calculatedFields:[{id:'detailUrl',key:'detailUrl',kind:'rowCalc',dataType:'string',dependencies:['eventDate'],expr:"concat('https://example.invalid/records/', eventDate)"}]},
+  state:{...state,selectedMeasures:['totalSpend'],selectedDimensions:['eventDate'],viewMode:'table',chartSpec:null},
+  additionalBlocks:[{...buildReportDocumentChartBlock({id:'externalTrend',datasetRef:'primary',chartSpec:{type:'bar',xField:'eventDate',yFields:['totalSpend']}}),runtime:{actions:[{kind:'external',urlField:'detailUrl'}]}}],
+});
+assert.equal(lowerReportDocumentToReportSpec(externalChartDocument).calculatedFields.some(field => field.key === 'detailUrl'), true);
+
+const loweredExternalChart = lowerReportDocumentToReportSpec(externalChartDocument);
+assert.equal(loweredExternalChart.datasets[0].request.dimensions.detailUrl, undefined, 'local URL calculation is not a producer query dimension');
+assert.equal(loweredExternalChart.datasets[0].request.measures.detailUrl, undefined);
+const unknownExternalChartDocument = structuredClone(externalChartDocument);
+unknownExternalChartDocument.blocks.find(block => block.id === 'externalTrend').runtime.actions[0].urlField = 'unavailableDestination';
+assert.throws(() => lowerReportDocumentToReportSpec(unknownExternalChartDocument), /destination field must be declared by its dataset/);
+const foreignExternalChartDocument = buildReportBuilderReportDocument({
+  container,
+  config:{...config,calculatedFields:[{id:'detailUrl',key:'detailUrl',datasetRef:'primary',kind:'rowCalc',dataType:'string',dependencies:['eventDate'],expr:"concat('https://example.invalid/records/', eventDate)"}],dataSources:[{id:'other',dataSourceRef:'other',request:{dimensions:{},measures:{}},columnOptions:[{key:'eventDate',kind:'dimension'},{key:'totalSpend',kind:'measure'}]}]},
+  state:{...state,selectedMeasures:['totalSpend'],selectedDimensions:['eventDate'],viewMode:'table',chartSpec:null},
+  additionalBlocks:[{...buildReportDocumentChartBlock({id:'externalOtherTrend',datasetRef:'other',chartSpec:{type:'bar',xField:'eventDate',yFields:['totalSpend']}}),runtime:{actions:[{kind:'external',urlField:'detailUrl'}]}}],
+});
+assert.throws(() => lowerReportDocumentToReportSpec(foreignExternalChartDocument), /destination field must be declared by its dataset/, 'another dataset cannot borrow the primary URL calculation');

@@ -25,6 +25,7 @@ export default defineConfig({
       'src/components/table/basic/QuickSearch.clientPaging.render.test.jsx',
       'src/components/dashboard/TableAnalytics.render.test.jsx',
       'src/components/dashboard/ReportRuntime.legend.render.test.jsx',
+      'src/components/dashboard/ReportRuntime.externalLink.render.test.jsx',
       'src/components/dashboard/DashboardTableContentSort.render.test.jsx',
       'src/components/Chart.heatmap.render.test.jsx',
       'src/components/Chart.tooltip.render.test.jsx',

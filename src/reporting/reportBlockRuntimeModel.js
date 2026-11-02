@@ -1,3 +1,4 @@
+import { resolveReportTableLink } from "./reportTableLink.js";
 import {applyReportRowVisibility,validateReportRowVisibilityBlock} from './reportRowVisibility.js';
 import { resolveKey } from "../utils/selector.js";
 import {
@@ -121,4 +122,27 @@ export function buildReportRuntimeSelection(action = {}, item = null, sourceBloc
     selected: cloneValue(row),
     sourceBlockId: normalizeString(sourceBlockId) || null,
   };
+}
+
+// Reuse report table URL admission. Aggregated marks may open a destination only
+// when every contributing source row belongs to this dataset and agrees on it.
+export function resolveReportRuntimeExternalActions(block = {}, event = "onSelect") {
+  return (Array.isArray(block?.runtime?.actions) ? block.runtime.actions : [])
+    .filter(action => action?.kind === "external" && (action.event || "onSelect") === event
+      && typeof action.urlField === "string" && action.urlField.trim());
+}
+
+export function resolveReportRuntimeExternalSelectionLink({block, selection, rows = []} = {}) {
+  if (selection?.source === "legend") return null;
+  const selectedRows = selection?.selectionRows?.length ? selection.selectionRows
+    : selection?.row ? [selection.row] : [];
+  if (!selectedRows.length) return null;
+  const sourceRows = new Set(rows.map(row => JSON.stringify(row)));
+  if (selectedRows.some(row => !sourceRows.has(JSON.stringify(row)))) return null;
+  const actions = resolveReportRuntimeExternalActions(block);
+  // One explicit selection opens at most one browser destination.
+  if (actions.length !== 1) return null;
+  const links = selectedRows.map(row => resolveReportTableLink({row,
+    column:{link:{kind:"external",urlField:actions[0].urlField}}, value:actions[0].label || "Open details"}));
+  return links.every(link => link && link.href === links[0]?.href) ? links[0] : null;
 }

@@ -1,3 +1,4 @@
+import {resolveReportRuntimeExternalActions} from "./reportBlockRuntimeModel.js";
 import {isScenarioType,scenarioFields,scenarioKey} from '../components/scenarios/scenarioContract.js';
 import {normalizeReportRuntimeRefinementFields,validateReportRuntimeRefinementFields} from './reportRuntimeRefinementFields.js';
 import {normalizeTemplateRequestInputs} from './reportTemplateRequestInputs.js';
@@ -648,6 +649,11 @@ function augmentReportRequestForAuthoredBlocks(baseSpec = {}, blocks = [], confi
     }
     switch (normalizeString(normalizedBlock?.kind)) {
       case "chartBlock":
+        for (const action of resolveReportRuntimeExternalActions(normalizedBlock)) {
+          if (!enableField(action.urlField, normalizedDatasetRef, request)) {
+            throw new Error('External chart destination field must be declared by its dataset.');
+          }
+        }
         for(const field of chartTooltipFields(normalizedBlock?.chartSpec?.tooltip)) enableField(field,normalizedDatasetRef,request);
         if(normalizedBlock?.chartSpec?.categoryRange) for(const field of [normalizedBlock.chartSpec.categoryRange.categoryField,...categoryRangeFields(normalizedBlock.chartSpec.categoryRange)]) enableField(field,normalizedDatasetRef,request);
         if(normalizedBlock?.chartSpec?.center){
