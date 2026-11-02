@@ -17,7 +17,7 @@ func TestBuildTableSnapshotProjectsDisplayedFieldsAndRendersCSV(t *testing.T) {
 		LayoutIntent: &reportspec.LayoutIntent{Kind: "blocks", ResultPanePosition: "main", BlockOrder: []string{"detail"}},
 		Refinements:  []map[string]any{}, CalculatedFields: []map[string]any{},
 		Datasets: []reportspec.Dataset{{ID: "data", DataSourceRef: "query", Request: reportspec.RequestPayload{Kind: "query", Limit: &limit, Offset: &offset}}},
-		Blocks:   []reportspec.Block{{ID: "detail", Kind: "tableBlock", DatasetRef: "data", Columns: []reportspec.TableColumn{{Key: "name", DisplayKey: "displayName", Label: "Name"}}}},
+		Blocks:   []reportspec.Block{{ID: "detail", Kind: "tableBlock", Description: "All selected observations.", DatasetRef: "data", Columns: []reportspec.TableColumn{{Key: "name", DisplayKey: "displayName", Label: "Name"}}}},
 	}
 	encoded, err := json.Marshal(spec)
 	if err != nil {
@@ -40,6 +40,9 @@ func TestBuildTableSnapshotProjectsDisplayedFieldsAndRendersCSV(t *testing.T) {
 	loaded, err := reportfill.DecodeJSON(fillJSON)
 	if err != nil {
 		t.Fatalf("Forge cannot reload table fill: %v", err)
+	}
+	if loaded.Blocks[0].Description != "All selected observations." {
+		t.Fatalf("authored table description was not preserved: %q", loaded.Blocks[0].Description)
 	}
 	csvBytes, err := csv.Render(loaded)
 	if err != nil || string(csvBytes) != "Name\nVisible\n" {

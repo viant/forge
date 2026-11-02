@@ -622,6 +622,7 @@ type rawTableBlock struct {
 	ID               string        `json:"id"`
 	Kind             string        `json:"kind"`
 	Title            string        `json:"title,omitempty"`
+	Description      string        `json:"description,omitempty"`
 	AccentTone       string        `json:"accentTone,omitempty"`
 	Collapsible      bool          `json:"collapsible,omitempty"`
 	DefaultCollapsed *bool         `json:"defaultCollapsed,omitempty"`
@@ -942,6 +943,7 @@ func decodeJSON(data []byte, datasourceRequests bool) (*ReportFill, error) {
 				Hierarchy: tableBlock.Hierarchy, Pivot: tableBlock.Pivot, ColumnGroups: tableBlock.ColumnGroups,
 				Kind:             tableBlock.Kind,
 				Title:            tableBlock.Title,
+				Description:      tableBlock.Description,
 				AccentTone:       tableBlock.AccentTone,
 				Collapsible:      tableBlock.Collapsible,
 				DefaultCollapsed: tableDefaultCollapsed(tableBlock.Collapsible, tableBlock.DefaultCollapsed),

@@ -104,7 +104,7 @@ func BuildTableSnapshot(specJSON json.RawMessage, blockID string, rows []map[str
 		Datasets: []Dataset{{ID: dataset.ID, DataSourceRef: dataset.DataSourceRef, Request: request,
 			Provenance: Provenance{RequestHash: requestHash, RowCount: len(filteredRows), Truncated: truncated,
 				HasMore: false, Diagnostics: []Diagnostic{}}, Rows: filteredRows}},
-		Blocks: []Block{{ID: selected.ID, Kind: "tableBlock", Title: selected.Title, DatasetRef: selected.DatasetRef,
+		Blocks: []Block{{ID: selected.ID, Kind: "tableBlock", Title: selected.Title, Description: selected.Description, DatasetRef: selected.DatasetRef,
 			Columns: columns, Content: &TableContent{Columns: append([]TableColumn(nil), columns...), RowCount: len(rows), ResolvedRows: contents}}},
 		Diagnostics: []Diagnostic{},
 	}
