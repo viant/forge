@@ -46,7 +46,7 @@ assert.throws(()=>buildReportFillGeoPayload(fixture.block,[{zoneId:'north',utili
 assert.throws(()=>buildReportFillGeoPayload(fixture.block,[{zoneId:'North',utilization:Infinity}]),/finite number/);
 for (const [mutate, message] of [
   [g=>g.geometry.features.push(g.geometry.features[0]), /duplicate/],
-  [g=>g.geometry.features[0].geometry.type='Point', /Polygon/],
+  [g=>g.geometry.features[0].geometry.type='LineString', /Polygon/],
   [g=>g.geometry.features[0].geometry.coordinates[0][0][0]=NaN, /finite/],
   [g=>g.geometry.features[0].geometry.coordinates[0].pop(), /closed/],
   [g=>g.projection='mercator', /planar/],
@@ -90,3 +90,60 @@ for (const [shape,keys] of [['geojson',['North','East']],['world',['US','CA']],[
   assert.ok(!svg.includes('undefined'));assert.ok(!svg.includes('NaN'));
 }
 console.log('GeoJSON geometry model/fill/print tests passed');
+
+const points = JSON.parse(fs.readFileSync(new URL('../../doc/examples/sensor-point-geometry.json', import.meta.url)));
+const pointGeo = buildReportFillGeoPayload(points.block, points.rows);
+assert.deepEqual(buildReportDocumentGeoMapBlock(points.block).geo, points.block.geo);
+for (const schema of [reportSpecSchema, reportFillSchema]) {
+  const configSchema = {...schema.$defs.geoConfig, $defs:schema.$defs};
+  assert.deepEqual(validateReportSchema(configSchema, points.block.geo).errors, []);
+  for (const mutate of [g=>delete g.symbolSize,g=>g.geometry.features=g.geometry.features.filter(f=>f.geometry.type!=='Point'),g=>g.symbolSize.extra=1,g=>g.symbolSize.maxRadius=65,g=>g.geometry.features[1].geometry.extra=1,g=>g.geometry.features[1].geometry.coordinates=[1,2,3],g=>g.shape='world']) {
+    const invalid = structuredClone(points.block.geo); mutate(invalid);
+    assert.equal(validateReportSchema(configSchema, invalid).valid, false);
+  }
+}
+assert.deepEqual(validateReportSchema({...reportFillSchema.$defs.resolvedGeo,$defs:reportFillSchema.$defs},pointGeo).errors, []);
+assert.deepEqual(pointGeo.regions.slice(1).map(r=>[r.symbol.rawValue,r.symbol.radius,r.symbol.displayValue]), [[25,16,'25'],[100,32,'100'],[0,0,'0'],[null,0,'No value'],[null,0,'No row'],[9,9.6,'9']]);
+assert.equal(pointGeo.regions[1].rawValue,-3);
+assert.equal(pointGeo.regions[3].rawValue,0);
+assert.equal(pointGeo.regions[6].rawValue,null);
+const extremeSize = buildReportFillGeoPayload(points.block,[{sensorId:'A',observations:1e-308},{sensorId:'B',observations:1e308}]);
+assert.ok(extremeSize.regions[1].symbol.radius>0, 'finite positive sizes must not underflow to a zero-size cross');
+assert.equal(extremeSize.regions[2].symbol.radius,32);
+for (const aggregate of ['sum','avg','min','max','first']) {
+  const block=structuredClone(points.block);block.geo.symbolSize.aggregate=aggregate;
+  const rows=[{sensorId:'A',reading:1,observations:-0}];
+  const zero=buildReportFillGeoPayload(block,rows).regions[1].symbol;
+  assert.equal(zero.displayValue,'0', `${aggregate} must present negative zero consistently`);
+  assert.equal(zero.radius,0);
+  assert.ok(Object.is(rows[0].observations,-0),'source measurement remains unchanged');
+  if (aggregate==='first') assert.ok(Object.is(zero.rawValue,-0),'formatting must not change the aggregated raw value');
+}
+assert.deepEqual(pointGeo.geometry.features[1].point,[296,158]);
+assert.deepEqual(pointGeo.geometry.features[2].point,[480,158]);
+const pointPrint=buildReportPrintGeoSvg({resolvedGeo:pointGeo});
+assert.ok(pointPrint.svg.includes('<circle cx="296" cy="158" r="16"'));
+assert.ok(pointPrint.svg.includes('<circle cx="480" cy="158" r="32"'));
+assert.ok(pointPrint.svg.includes('M661,158 L667,158 M664,155 L664,161'));
+assert.ok(pointPrint.labelDetails.includes('Sensor C: 0; Observations: 0'));
+assert.ok(pointPrint.labelDetails.includes('Sensor D: 4; Observations: No value'));
+assert.ok(pointPrint.labelDetails.includes('Sensor E: No row; Observations: No row'));
+for (const value of [-1,Infinity,NaN,'10']) assert.throws(()=>buildReportFillGeoPayload(points.block,[{sensorId:'A',reading:1,observations:value}]), /nonnegative finite/);
+const withoutSize=structuredClone(points.block);delete withoutSize.geo.symbolSize;
+assert.throws(()=>buildReportFillGeoPayload(withoutSize,[]),/symbolSize/);
+assert.throws(()=>buildReportDocumentGeoMapBlock(withoutSize),/symbolSize/);
+const polygonWithSize=structuredClone(fixture.block);polygonWithSize.geo.symbolSize={key:'count'};
+assert.throws(()=>buildReportDocumentGeoMapBlock(polygonWithSize),/symbolSize/);
+assert.ok(buildReportFillGeoPayload(points.block,[]).regions.slice(1).every(r=>r.symbol.radius===0 && r.symbol.displayValue==='No row'));
+for (const [aggregate,value] of [['sum',12],['avg',6],['min',4],['max',8],['first',4]]) {
+  const block=structuredClone(points.block);block.geo.symbolSize.aggregate=aggregate;
+  const result=buildReportFillGeoPayload(block,[{sensorId:'A',observations:null},{sensorId:'A',observations:4},{sensorId:'A',observations:8}]);
+  assert.equal(result.regions[1].symbol.rawValue,value);
+}
+for (const coordinates of [[[7,9]],[[7,9],[7,9]],[[0,1],[2,1]],[[1,0],[1,2]]]) {
+  const geo={projection:'planar',symbolSize:{key:'count'},geometry:{type:'FeatureCollection',features:coordinates.map((point,i)=>({type:'Feature',id:String(i),geometry:{type:'Point',coordinates:point}}))}};
+  const result=buildGeoGeometry(geo);
+  assert.ok(result.features.every(f=>f.point.every(Number.isFinite)));
+  if(coordinates.every(p=>p[0]===7)) assert.deepEqual(result.features[0].point,[480,250]);
+}
+console.log('GeoJSON Point area, states, schema, bounds and print tests passed');

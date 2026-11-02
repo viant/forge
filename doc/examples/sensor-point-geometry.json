@@ -1,0 +1,27 @@
+{
+  "provenance": "Independently invented planar site, sensor locations and readings; no external map assets or real observations.",
+  "block": {
+    "id": "sensors", "kind": "geoMapBlock", "title": "Site observations", "datasetRef": "primary",
+    "geo": {
+      "shape": "geojson", "projection": "planar", "key": "sensorId",
+      "metric": {"key": "reading", "label": "Reading", "format": "number"},
+      "symbolSize": {"key": "observations", "label": "Observations", "aggregate": "sum", "maxRadius": 32},
+      "geometry": {"type": "FeatureCollection", "features": [
+        {"type":"Feature","id":"plan","properties":{"label":"Site boundary"},"geometry":{"type":"Polygon","coordinates":[[[0,0],[12,0],[12,8],[0,8],[0,0]]]}},
+        {"type":"Feature","id":"A","properties":{"label":"Sensor A"},"geometry":{"type":"Point","coordinates":[2,6]}},
+        {"type":"Feature","id":"B","properties":{"label":"Sensor B"},"geometry":{"type":"Point","coordinates":[6,6]}},
+        {"type":"Feature","id":"C","properties":{"label":"Sensor C"},"geometry":{"type":"Point","coordinates":[10,6]}},
+        {"type":"Feature","id":"D","properties":{"label":"Sensor D"},"geometry":{"type":"Point","coordinates":[2,2]}},
+        {"type":"Feature","id":"E","properties":{"label":"Sensor E"},"geometry":{"type":"Point","coordinates":[6,2]}},
+        {"type":"Feature","id":"F","properties":{"label":"Sensor F"},"geometry":{"type":"Point","coordinates":[10,2]}}
+      ]}
+    }
+  },
+  "rows": [
+    {"sensorId":"A","reading":-3,"observations":25},
+    {"sensorId":"B","reading":8,"observations":100},
+    {"sensorId":"C","reading":0,"observations":0},
+    {"sensorId":"D","reading":4,"observations":null},
+    {"sensorId":"F","reading":null,"observations":9}
+  ]
+}

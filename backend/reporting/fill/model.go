@@ -320,20 +320,29 @@ type ResolvedGeoGeometry struct {
 }
 
 type ResolvedGeoFeature struct {
-	Key   string `json:"key"`
-	Label string `json:"label"`
-	Path  string `json:"path"`
+	Key   string    `json:"key"`
+	Label string    `json:"label"`
+	Path  string    `json:"path,omitempty"`
+	Point []float64 `json:"point,omitempty"`
 }
 
 type ResolvedGeoRegion struct {
-	Key          string `json:"key"`
-	Label        string `json:"label"`
-	RawValue     any    `json:"rawValue"`
-	DisplayValue string `json:"displayValue"`
-	Color        string `json:"color"`
-	StatusColor  string `json:"statusColor"`
-	StatusLabel  string `json:"statusLabel"`
-	RowCount     *int   `json:"rowCount"`
+	Symbol       *ResolvedGeoSymbol `json:"symbol,omitempty"`
+	Key          string             `json:"key"`
+	Label        string             `json:"label"`
+	RawValue     any                `json:"rawValue"`
+	DisplayValue string             `json:"displayValue"`
+	Color        string             `json:"color"`
+	StatusColor  string             `json:"statusColor"`
+	StatusLabel  string             `json:"statusLabel"`
+	RowCount     *int               `json:"rowCount"`
+}
+
+type ResolvedGeoSymbol struct {
+	RawValue     *float64 `json:"rawValue"`
+	DisplayValue string   `json:"displayValue"`
+	Label        string   `json:"label"`
+	Radius       float64  `json:"radius"`
 }
 
 type ResolvedGeoSummary struct {
@@ -2012,7 +2021,7 @@ func (r *ReportFill) Validate() error {
 			if strings.TrimSpace(block.GeoContent.ResolvedGeo.Summary.TotalValue) == "" {
 				return fmt.Errorf("reportFill.blocks[%d].content.resolvedGeo.summary.totalValue is required for geoMapBlock", index)
 			}
-			if strings.TrimSpace(block.GeoContent.ResolvedGeo.Summary.TopKey) == "" {
+			if strings.TrimSpace(block.GeoContent.ResolvedGeo.Summary.TopKey) == "" && !(block.GeoContent.ResolvedGeo.Shape == "geojson" && len(block.GeoContent.ResolvedGeo.Ranking) == 0) {
 				return fmt.Errorf("reportFill.blocks[%d].content.resolvedGeo.summary.topKey is required for geoMapBlock", index)
 			}
 			if block.GeoContent.ResolvedGeo.Legend != nil {
@@ -2052,6 +2061,9 @@ func (r *ReportFill) Validate() error {
 }
 
 func validateResolvedGeoRegion(region ResolvedGeoRegion, path string) error {
+	if err := validateGeoSymbol(region.Symbol); err != nil {
+		return fmt.Errorf("%s: %w", path, err)
+	}
 	if strings.TrimSpace(region.Key) == "" {
 		return fmt.Errorf("%s.key is required for geoMapBlock", path)
 	}

@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-
+import { readFileSync, writeFileSync } from "node:fs";
+import {validateReportSchema} from './reportSchemaValidator.js';
+import {geoPointSizeRequirement} from './geoGeometrySchema.js';
+import {reportSpecSchema} from './reportSpecSchema.js';
+import {reportFillSchema} from './reportFillSchema.js';
 import {
   buildDraftReportExportRequest,
   buildReportExportRequest,
@@ -13,6 +16,30 @@ import { buildReportFillFromReportSpec } from "../reportFillModel.js";
 import { buildReportPrintFromReportFill } from "../reportPrintModel.js";
 import { validateReportExportRequest, validateReportFill, validateReportPrint, validateReportSpec } from "./reportSchemas.js";
 import { buildAuthoredDerivedCompactArtifacts } from "../fixtures/authoredDerivedCompactArtifactBuilder.js";
+
+// Boolean schemas are valid Draft 7 schemas at every supported schema position.
+for (const value of [null, false, 0, '', [], {}]) {
+  assert.equal(validateReportSchema(true,value).valid,true);
+  assert.equal(validateReportSchema(false,value).valid,false);
+}
+assert.equal(validateReportSchema({type:'object',properties:{forbidden:false}},{}).valid,true);
+assert.equal(validateReportSchema({type:'object',properties:{forbidden:false}},{forbidden:null}).errors[0].path,'$.forbidden');
+for (const [schema,valid] of [
+  [{anyOf:[false,true]},true], [{allOf:[true,false]},false], [{oneOf:[true,false]},true],
+  [{if:false,then:false,else:true},true], [{if:true,then:false},false], [{if:false,else:false},false],
+  [{$defs:{blocked:false},$ref:'#/$defs/blocked'},false],
+]) assert.equal(validateReportSchema(schema,0).valid,valid);
+assert.equal(validateReportSchema({type:'array',items:false},[]).valid,true);
+assert.equal(validateReportSchema({type:'array',items:false},[0]).valid,false);
+assert.equal(geoPointSizeRequirement.then.properties.symbolSize,false);
+const checkMetaContract = schema => {
+  if (!schema || typeof schema !== 'object') return;
+  if (Array.isArray(schema.enum)) assert.ok(schema.enum.length>0,'Draft 7 enum requires at least one entry');
+  Object.values(schema).forEach(checkMetaContract);
+};
+for (const schema of [reportSpecSchema,reportFillSchema]) checkMetaContract(schema);
+// Optional proof input for an independently installed standards validator.
+if (process.env.FORGE_GEO_SCHEMA_PROOF) writeFileSync(process.env.FORGE_GEO_SCHEMA_PROOF,JSON.stringify([reportSpecSchema,reportFillSchema]));
 
 const fixtureUrl = new URL("../fixtures/performance-report-fixtures.v1.json", import.meta.url);
 const fixtures = JSON.parse(readFileSync(fixtureUrl, "utf8"));

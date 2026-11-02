@@ -776,6 +776,10 @@ export const reportFillSchema = {
       additionalProperties: false,
       required: ["key", "label", "rawValue", "displayValue", "color", "statusColor", "statusLabel", "rowCount"],
       properties: {
+        symbol: {type: 'object', additionalProperties: false, required: ['rawValue', 'displayValue', 'label', 'radius'], properties: {
+          rawValue: {anyOf: [{type: 'null'}, {type: 'number', minimum: 0}]}, displayValue: {type: 'string'}, label: {type: 'string'},
+          radius: {type: 'number', minimum: 0, maximum: 64},
+        }},
         key: { type: "string" },
         label: { type: "string" },
         rawValue: { anyOf: [{ type: "null" }, { type: "number" }] },

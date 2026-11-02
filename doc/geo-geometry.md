@@ -12,12 +12,12 @@ numbers per position, x increasing right and y increasing up. This is Cartesian
 geometry, **not** WGS84 longitude/latitude or a geographic projection. The model
 fits all coordinates into a 960 × 500 viewport with 16 units of padding and
 preserves aspect ratio. Browser sizing is responsive and print uses the same
-paths, keys, fills and legend. There is no tile service, pan/zoom, point layer,
+paths, keys, fills and legend. There is no tile service, pan/zoom,
 automatic DMA/ZIP dataset, spherical projection or antimeridian handling.
 
 Each Feature has a unique, unpadded string `id`. `geo.key` declares the row field
 joining that id exactly and case-sensitively. `properties.label` optionally
-provides the complete display name. Only Polygon and MultiPolygon are supported;
+provides the complete display name. Point, Polygon and MultiPolygon are supported;
 rings must be closed, nondegenerate, and contain at least four [x,y] positions.
 The first ring is the exterior, later rings are holes. Disconnected polygons
 are supported. Producers are responsible for valid non-self-intersecting topology
@@ -31,6 +31,8 @@ or null; numeric strings are rejected. Zero remains numeric. A matched region
 with only null values says **No value**; a region without a row says **No row**.
 Both use `geo.color.empty`, distinct from the default numeric palette. Original
 dataset rows are retained in ReportFill and exports.
+For a valueless GeoJSON map, the ranking is empty and `summary.topKey` is empty;
+native validation accepts this for polygon and point collections alike.
 
 Color uses the existing geo palette and rules contract. Signed values are
 supported by the observed min/max range; this is not a centered diverging scale.
@@ -42,6 +44,44 @@ map and color swatches at a fixed height, then wraps and paginates the complete
 legend text and region descriptions through the canonical report text layout.
 Selection is
 local inspection; it does not infer report filter bindings.
+
+## Explicit points and bubble area
+
+A Point supplies exactly one `[x,y]` position; positions are never inferred from
+labels, addresses or polygon centroids. Mixed collections draw polygons first
+as context and points above them. Positive bubbles draw largest first, followed
+by zero/missing crosses; ties retain feature order. This keeps smaller colocated
+marks visible. All features retain the same explicit row join.
+Collections containing points use 66 viewport units of padding, sufficient for
+the maximum radius and selection outline. Single, coincident and collinear points
+remain valid; a single location is centered. Polygon-only fitting is unchanged.
+
+Points require `geo.symbolSize: {key, label?, aggregate?, format?, maxRadius?}`.
+`key` explicitly selects the dataset field; aggregate defaults to `sum` and
+accepts the same five operations as color, independently. Format is `number`
+(default) or `compact`. `maxRadius` defaults to 24 and accepts 1–64 viewport units.
+For positive sizes, radius is `maxRadius * sqrt(size / largestSize)`: area is
+proportional, with no minimum radius or positive baseline. The scale is local to
+this map's observed aggregated values, not comparable across independently filled
+maps. The visible legend states this. There is no additional query or data reader.
+
+Negative source sizes, numeric strings and nonfinite values reject the fill;
+negatives are not made positive or hidden by aggregation. Nulls are ignored by
+aggregation. Size zero has zero bubble area; null/missing sizes also have no
+bubble area. A small cross locates these features, and inspection distinguishes
+`0`, `No value` (matched rows) and `No row`. Negative zero also displays as `0`,
+without changing the source measurement. The cross is a location indicator,
+not a size encoding. Color retains its independent signed metric and empty-color
+semantics, including positive size with a missing color metric. Point buttons,
+hover titles and the live selected description expose both quantities. Exactly
+one selection outline is drawn, with every point reachable through native buttons
+even when points overlap. No automatic collision displacement is performed.
+
+Canonical print uses the same positions, circles, cross paths and descriptions;
+native PDF draws circles directly and dashboard XLSX embeds the canonical SVG.
+The point example at `examples/sensor-point-geometry.json` is also shown in the
+geometry preview. Its invented readings cover negative color values, a 4:1 bubble
+area ratio, zero, null, absent rows and positive size with missing color.
 
 ## Runnable synthetic example
 

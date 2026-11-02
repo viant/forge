@@ -55,6 +55,8 @@ function validateNode(schema = {}, value, path = "$", rootSchema = schema) {
   while (normalizedSchema?.$ref) {
     normalizedSchema = resolveRef(rootSchema, normalizedSchema.$ref);
   }
+  if (normalizedSchema === true) return [];
+  if (normalizedSchema === false) return [{path, code: 'falseSchema', message: 'Value is forbidden by a false schema.'}];
   if (!normalizedSchema || typeof normalizedSchema !== "object") {
     return [];
   }
@@ -62,9 +64,9 @@ function validateNode(schema = {}, value, path = "$", rootSchema = schema) {
   // Standard conditional requirements are needed by discriminated chart contracts.
   const conditionalErrors=[];
   if(Array.isArray(normalizedSchema.allOf)) for(const branch of normalizedSchema.allOf) conditionalErrors.push(...validateNode(branch,value,path,rootSchema));
-  if(normalizedSchema.if) {
+  if(normalizedSchema.if !== undefined) {
     const branch=validateNode(normalizedSchema.if,value,path,rootSchema).length===0?normalizedSchema.then:normalizedSchema.else;
-    if(branch) conditionalErrors.push(...validateNode(branch,value,path,rootSchema));
+    if(branch !== undefined) conditionalErrors.push(...validateNode(branch,value,path,rootSchema));
   }
   if(conditionalErrors.length) return conditionalErrors;
 
@@ -179,7 +181,7 @@ function validateNode(schema = {}, value, path = "$", rootSchema = schema) {
         message: `Expected at least ${Number(normalizedSchema.minItems)} item(s).`,
       });
     }
-    if (normalizedSchema.items) {
+    if (normalizedSchema.items !== undefined) {
       value.forEach((item, index) => {
         errors.push(...validateNode(normalizedSchema.items, item, joinPath(path, `[${index}]`), rootSchema));
       });

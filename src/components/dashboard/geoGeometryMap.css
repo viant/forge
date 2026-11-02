@@ -1,7 +1,7 @@
 .forge-geometry-map { min-width: 0; }
 .forge-geometry-map svg { display: block; width: 100%; height: auto; }
-.forge-geometry-map path { stroke: var(--forge-report-border, #bccbd6); stroke-width: 1; cursor: pointer; }
-.forge-geometry-map path.is-selected { stroke: var(--forge-report-text, #101828); stroke-width: 2; }
+.forge-geometry-map path, .forge-geometry-map circle[data-region-key] { stroke: var(--forge-report-border, #bccbd6); stroke-width: 1; cursor: pointer; }
+.forge-geometry-map .is-selected { stroke: var(--forge-report-text, #101828); stroke-width: 2; }
 .forge-geometry-map-legend, .forge-geometry-map-regions { display: flex; flex-wrap: wrap; gap: var(--forge-spacing-2, 8px); align-items: center; }
 .forge-geometry-map-legend { margin-block: var(--forge-spacing-2, 8px); }
 .forge-geometry-map-legend i { display: inline-block; width: 16px; height: 12px; }

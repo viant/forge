@@ -43677,13 +43677,13 @@ Please __addLocaleData before adding additional unit data`);
     return tokens;
   }
   function parseReportCalculatedFieldExpressionTokens(tokens = []) {
-    let position = 0;
+    let position2 = 0;
     function current() {
-      return tokens[position] || null;
+      return tokens[position2] || null;
     }
     function consume() {
       const token = current();
-      position += 1;
+      position2 += 1;
       return token;
     }
     function match2(type, value = void 0) {
@@ -43826,8 +43826,8 @@ Please __addLocaleData before adding additional unit data`);
       return node;
     }
     const ast = parseOr();
-    if (position < tokens.length) {
-      throw buildExpressionError(`unexpected token "${tokens[position].value}"`, tokens[position].index);
+    if (position2 < tokens.length) {
+      throw buildExpressionError(`unexpected token "${tokens[position2].value}"`, tokens[position2].index);
     }
     return ast;
   }
@@ -48038,7 +48038,7 @@ Please __addLocaleData before adding additional unit data`);
         if (!key(group.label)) throw Error("Column group label is required.");
         keys(group.columns, "Grouped columns");
         const positions = group.columns.map((field2) => columns.findIndex((column) => column.key === field2));
-        if (positions.some((position, i3) => position < 0 || i3 > 0 && position !== positions[i3 - 1] + 1)) throw Error("Column groups must name contiguous displayed columns in order.");
+        if (positions.some((position2, i3) => position2 < 0 || i3 > 0 && position2 !== positions[i3 - 1] + 1)) throw Error("Column groups must name contiguous displayed columns in order.");
         for (const field2 of group.columns) {
           if (seen.has(field2)) throw Error("Column groups cannot overlap.");
           seen.add(field2);
@@ -48200,22 +48200,293 @@ Please __addLocaleData before adding additional unit data`);
     return group ? `${group.label} / ${column.label || column.key}` : column.label || column.key;
   }
 
+  // src/reporting/schema/geoGeometrySchema.js
+  var position = { type: "array", minItems: 2, maxItems: 2, items: { type: "number", minimum: -1e9, maximum: 1e9 } };
+  var ring = { type: "array", minItems: 4, items: position };
+  var polygon = { type: "array", minItems: 1, items: ring };
+  var geoGeometrySchema = {
+    type: "object",
+    additionalProperties: false,
+    required: ["type", "features"],
+    properties: { type: { const: "FeatureCollection" }, features: { type: "array", minItems: 1, maxItems: 2e3, items: {
+      type: "object",
+      additionalProperties: false,
+      required: ["type", "id", "geometry"],
+      properties: {
+        type: { const: "Feature" },
+        id: { type: "string", minLength: 1, pattern: "^\\S(?:[\\s\\S]*\\S)?$" },
+        properties: { type: "object", additionalProperties: true, properties: { label: { type: "string", minLength: 1, pattern: "\\S" } } },
+        geometry: { anyOf: [
+          { type: "object", additionalProperties: false, required: ["type", "coordinates"], properties: { type: { const: "Point" }, coordinates: position } },
+          { type: "object", additionalProperties: false, required: ["type", "coordinates"], properties: { type: { const: "Polygon" }, coordinates: polygon } },
+          { type: "object", additionalProperties: false, required: ["type", "coordinates"], properties: { type: { const: "MultiPolygon" }, coordinates: { type: "array", minItems: 1, items: polygon } } }
+        ] }
+      }
+    } } }
+  };
+  var resolvedGeoGeometrySchema = {
+    type: "object",
+    additionalProperties: false,
+    required: ["viewBox", "features"],
+    properties: {
+      viewBox: { enum: [[0, 0, 960, 500]] },
+      features: { type: "array", minItems: 1, maxItems: 2e3, items: {
+        anyOf: ["path", "point"].map((kind) => ({ type: "object", additionalProperties: false, required: ["key", "label", kind], properties: {
+          key: { type: "string", minLength: 1 },
+          label: { type: "string", minLength: 1 },
+          [kind]: kind === "path" ? { type: "string", minLength: 1 } : position
+        } }))
+      } }
+    }
+  };
+  var geoSymbolSizeSchema = { type: "object", additionalProperties: false, required: ["key"], properties: {
+    key: { type: "string", minLength: 1, pattern: "\\S" },
+    label: { type: "string", minLength: 1, pattern: "\\S" },
+    aggregate: { enum: ["sum", "avg", "min", "max", "first"] },
+    format: { enum: ["number", "compact"] },
+    maxRadius: { type: "number", minimum: 1, maximum: 64 }
+  } };
+  var geoPointSizeRequirement = {
+    if: { properties: { geometry: { properties: { features: { type: "array", items: {
+      properties: { geometry: { properties: { type: { enum: ["Polygon", "MultiPolygon"] } } } }
+    } } } } } },
+    then: { properties: { symbolSize: false } },
+    else: { required: ["symbolSize"] }
+  };
+
+  // src/reporting/schema/reportSchemaValidator.js
+  function normalizePathSegment(segment = "") {
+    return String(segment || "").trim();
+  }
+  function joinPath(path = "$", segment = "") {
+    const normalized = normalizePathSegment(segment);
+    if (!normalized) {
+      return path;
+    }
+    if (normalized.startsWith("[")) {
+      return `${path}${normalized}`;
+    }
+    return path === "$" ? `$.${normalized}` : `${path}.${normalized}`;
+  }
+  function isObjectLike(value) {
+    return value != null && typeof value === "object" && !Array.isArray(value);
+  }
+  function matchesType(type, value) {
+    switch (type) {
+      case "object":
+        return isObjectLike(value);
+      case "array":
+        return Array.isArray(value);
+      case "string":
+        return typeof value === "string";
+      case "number":
+        return typeof value === "number" && Number.isFinite(value);
+      case "integer":
+        return typeof value === "number" && Number.isInteger(value);
+      case "boolean":
+        return typeof value === "boolean";
+      case "null":
+        return value === null;
+      default:
+        return true;
+    }
+  }
+  function resolveRef(rootSchema = {}, ref = "") {
+    const normalized = String(ref || "").trim();
+    if (!normalized.startsWith("#/")) {
+      throw new Error(`Unsupported schema ref: ${normalized}`);
+    }
+    return normalized.slice(2).split("/").map((part) => part.replace(/~1/g, "/").replace(/~0/g, "~")).reduce((current, part) => current == null ? void 0 : current[part], rootSchema);
+  }
+  function validateNode(schema4 = {}, value, path = "$", rootSchema = schema4) {
+    let normalizedSchema = schema4;
+    while (normalizedSchema == null ? void 0 : normalizedSchema.$ref) {
+      normalizedSchema = resolveRef(rootSchema, normalizedSchema.$ref);
+    }
+    if (normalizedSchema === true) return [];
+    if (normalizedSchema === false) return [{ path, code: "falseSchema", message: "Value is forbidden by a false schema." }];
+    if (!normalizedSchema || typeof normalizedSchema !== "object") {
+      return [];
+    }
+    const conditionalErrors = [];
+    if (Array.isArray(normalizedSchema.allOf)) for (const branch of normalizedSchema.allOf) conditionalErrors.push(...validateNode(branch, value, path, rootSchema));
+    if (normalizedSchema.if !== void 0) {
+      const branch = validateNode(normalizedSchema.if, value, path, rootSchema).length === 0 ? normalizedSchema.then : normalizedSchema.else;
+      if (branch !== void 0) conditionalErrors.push(...validateNode(branch, value, path, rootSchema));
+    }
+    if (conditionalErrors.length) return conditionalErrors;
+    if (Array.isArray(normalizedSchema.anyOf) && normalizedSchema.anyOf.length > 0) {
+      const candidateErrors = normalizedSchema.anyOf.map((candidate) => validateNode(candidate, value, path, rootSchema));
+      const successful = candidateErrors.find((errors2) => errors2.length === 0);
+      if (!successful) {
+        const mostSpecific = candidateErrors.filter((errors2) => errors2.length > 0).sort((left, right) => {
+          const leftDepth = Math.max(...left.map((error) => String((error == null ? void 0 : error.path) || "").length));
+          const rightDepth = Math.max(...right.map((error) => String((error == null ? void 0 : error.path) || "").length));
+          if (leftDepth !== rightDepth) {
+            return rightDepth - leftDepth;
+          }
+          return left.length - right.length;
+        })[0];
+        return mostSpecific || [{
+          path,
+          code: "anyOf",
+          message: "Value does not match any allowed schema branch."
+        }];
+      }
+    }
+    if (Array.isArray(normalizedSchema.oneOf) && normalizedSchema.oneOf.length) {
+      const matches = normalizedSchema.oneOf.filter((candidate) => validateNode(candidate, value, path, rootSchema).length === 0);
+      if (matches.length !== 1) return [{ path, code: "oneOf", message: "Value must match exactly one allowed schema branch." }];
+    }
+    if (Object.prototype.hasOwnProperty.call(normalizedSchema, "const") && value !== normalizedSchema.const) {
+      return [{
+        path,
+        code: "const",
+        message: `Expected constant value ${JSON.stringify(normalizedSchema.const)}.`
+      }];
+    }
+    if (Array.isArray(normalizedSchema.enum) && !normalizedSchema.enum.some((entry) => JSON.stringify(entry) === JSON.stringify(value))) {
+      return [{
+        path,
+        code: "enum",
+        message: `Value ${JSON.stringify(value)} is not in the allowed enum.`
+      }];
+    }
+    const declaredTypes = Array.isArray(normalizedSchema.type) ? normalizedSchema.type : normalizedSchema.type ? [normalizedSchema.type] : [];
+    if (declaredTypes.length > 0 && !declaredTypes.some((type) => matchesType(type, value))) {
+      return [{
+        path,
+        code: "type",
+        message: `Expected ${declaredTypes.join(" or ")}.`
+      }];
+    }
+    const errors = [];
+    const effectiveType = declaredTypes[0];
+    if (effectiveType === "object" || !declaredTypes.length && isObjectLike(value) && (normalizedSchema.properties || normalizedSchema.required || normalizedSchema.additionalProperties !== void 0)) {
+      const properties = isObjectLike(normalizedSchema.properties) ? normalizedSchema.properties : {};
+      const required = Array.isArray(normalizedSchema.required) ? normalizedSchema.required : [];
+      required.forEach((key2) => {
+        if (!Object.prototype.hasOwnProperty.call(value || {}, key2)) {
+          errors.push({
+            path: joinPath(path, key2),
+            code: "required",
+            message: "Missing required property."
+          });
+        }
+      });
+      if (isObjectLike(value)) {
+        Object.keys(value).forEach((key2) => {
+          if (Object.prototype.hasOwnProperty.call(properties, key2)) {
+            return;
+          }
+          if (normalizedSchema.additionalProperties === false) {
+            errors.push({
+              path: joinPath(path, key2),
+              code: "additionalProperties",
+              message: "Unexpected property."
+            });
+            return;
+          }
+          if (isObjectLike(normalizedSchema.additionalProperties)) {
+            errors.push(...validateNode(
+              normalizedSchema.additionalProperties,
+              value[key2],
+              joinPath(path, key2),
+              rootSchema
+            ));
+          }
+        });
+      }
+      Object.entries(properties).forEach(([key2, propertySchema]) => {
+        if (!Object.prototype.hasOwnProperty.call(value || {}, key2)) {
+          return;
+        }
+        errors.push(...validateNode(propertySchema, value[key2], joinPath(path, key2), rootSchema));
+      });
+    }
+    if (effectiveType === "array" && Array.isArray(value)) {
+      if (Number.isInteger(normalizedSchema.maxItems) && value.length > normalizedSchema.maxItems) {
+        errors.push({ path, code: "maxItems", message: `Expected at most ${normalizedSchema.maxItems} item(s).` });
+      }
+      if (Number.isFinite(Number(normalizedSchema.minItems)) && value.length < Number(normalizedSchema.minItems)) {
+        errors.push({
+          path,
+          code: "minItems",
+          message: `Expected at least ${Number(normalizedSchema.minItems)} item(s).`
+        });
+      }
+      if (normalizedSchema.items !== void 0) {
+        value.forEach((item, index) => {
+          errors.push(...validateNode(normalizedSchema.items, item, joinPath(path, `[${index}]`), rootSchema));
+        });
+      }
+    }
+    if (typeof value === "string" && typeof normalizedSchema.pattern === "string") {
+      try {
+        if (!new RegExp(normalizedSchema.pattern, "u").test(value)) {
+          errors.push({ path, code: "pattern", message: `String must match ${normalizedSchema.pattern}.` });
+        }
+      } catch (e3) {
+        errors.push({ path, code: "invalidPattern", message: `Invalid schema regular expression: ${normalizedSchema.pattern}.` });
+      }
+    }
+    if (typeof value === "string" && Number.isInteger(normalizedSchema.minLength) && Array.from(value).length < normalizedSchema.minLength) {
+      errors.push({
+        path,
+        code: "minLength",
+        message: `Expected at least ${normalizedSchema.minLength} character(s).`
+      });
+    }
+    if ((effectiveType === "number" || effectiveType === "integer") && Number.isFinite(Number(normalizedSchema.minimum))) {
+      if (Number(value) < Number(normalizedSchema.minimum)) {
+        errors.push({
+          path,
+          code: "minimum",
+          message: `Expected number >= ${Number(normalizedSchema.minimum)}.`
+        });
+      }
+    }
+    if ((effectiveType === "number" || effectiveType === "integer") && Number.isFinite(normalizedSchema.maximum) && Number(value) > normalizedSchema.maximum) {
+      errors.push({ path, code: "maximum", message: `Expected number <= ${normalizedSchema.maximum}.` });
+    }
+    return errors;
+  }
+  function validateReportSchema(schema4 = {}, value) {
+    const errors = validateNode(schema4, value, "$", schema4);
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  }
+
   // src/reporting/geoGeometry.js
   var GEO_VIEWBOX = [0, 0, 960, 500];
   var fail2 = (message) => {
     throw new Error(`geo.geometry: ${message}`);
   };
-  var area = (ring) => {
-    const [originX, originY] = ring[0];
-    return ring.slice(1).reduce((sum3, point, i3) => sum3 + (ring[i3][0] - originX) * (point[1] - originY) - (point[0] - originX) * (ring[i3][1] - originY), 0);
+  var area = (ring2) => {
+    const [originX, originY] = ring2[0];
+    return ring2.slice(1).reduce((sum3, point, i3) => sum3 + (ring2[i3][0] - originX) * (point[1] - originY) - (point[0] - originX) * (ring2[i3][1] - originY), 0);
   };
   function buildGeoGeometry(geo = {}) {
+    if (geo.symbolSize !== void 0) {
+      const validation2 = validateReportSchema(geoSymbolSizeSchema, geo.symbolSize);
+      if (!validation2.valid) fail2(`invalid symbolSize: ${JSON.stringify(validation2.errors)}`);
+    }
     if (geo.projection !== "planar") fail2('projection must be "planar" (x right, y up)');
     const collection = geo.geometry;
     if ((collection == null ? void 0 : collection.type) !== "FeatureCollection" || !Array.isArray(collection.features) || !collection.features.length) fail2("provide a nonempty inline FeatureCollection; URLs and resource discovery are unsupported");
     if (collection.features.length > 2e3) fail2("at most 2000 features are supported");
     const keys3 = /* @__PURE__ */ new Set();
     let count = 0, minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    const position2 = (point, key2) => {
+      if (++count > 1e5) fail2("at most 100000 positions are supported");
+      if (!Array.isArray(point) || point.length !== 2 || !point.every((n2) => typeof n2 === "number" && Number.isFinite(n2) && Math.abs(n2) <= 1e9)) fail2(`feature "${key2}" positions must be finite [x,y] numbers within \xB11e9`);
+      minX = Math.min(minX, point[0]);
+      maxX = Math.max(maxX, point[0]);
+      minY = Math.min(minY, point[1]);
+      maxY = Math.max(maxY, point[1]);
+    };
     const features = collection.features.map((feature, index) => {
       var _a5, _b;
       const key2 = feature == null ? void 0 : feature.id;
@@ -48223,41 +48494,48 @@ Please __addLocaleData before adding additional unit data`);
       if (keys3.has(key2)) fail2(`duplicate feature id "${key2}"`);
       keys3.add(key2);
       const geometry = feature.geometry;
-      if (!["Polygon", "MultiPolygon"].includes(geometry == null ? void 0 : geometry.type)) fail2(`feature "${key2}" must be Polygon or MultiPolygon`);
-      const polygons = geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates;
-      if (!Array.isArray(polygons) || !polygons.length) fail2(`feature "${key2}" has no polygons`);
-      const rings = polygons.flatMap((polygon) => {
-        if (!Array.isArray(polygon) || !polygon.length) fail2(`feature "${key2}" has no rings`);
-        return polygon.map((ring, ringIndex) => {
-          if (!Array.isArray(ring) || ring.length < 4) fail2(`feature "${key2}" rings need at least four positions`);
-          ring.forEach((point) => {
-            if (++count > 1e5) fail2("at most 100000 positions are supported");
-            if (!Array.isArray(point) || point.length !== 2 || !point.every((n2) => typeof n2 === "number" && Number.isFinite(n2) && Math.abs(n2) <= 1e9)) fail2(`feature "${key2}" positions must be finite [x,y] numbers within \xB11e9`);
-            minX = Math.min(minX, point[0]);
-            maxX = Math.max(maxX, point[0]);
-            minY = Math.min(minY, point[1]);
-            maxY = Math.max(maxY, point[1]);
-          });
-          if (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1]) fail2(`feature "${key2}" rings must be closed`);
-          const signedArea = area(ring);
-          if (!Number.isFinite(signedArea) || signedArea === 0) fail2(`feature "${key2}" has a degenerate ring`);
-          return signedArea > 0 === (ringIndex === 0) ? ring : [...ring].reverse();
-        });
-      });
       const label = (_b = (_a5 = feature.properties) == null ? void 0 : _a5.label) != null ? _b : key2;
       if (typeof label !== "string" || !label.trim()) fail2(`feature "${key2}" label must be a nonempty string`);
+      if ((geometry == null ? void 0 : geometry.type) === "Point") {
+        position2(geometry.coordinates, key2);
+        return { key: key2, label, point: geometry.coordinates };
+      }
+      if (!["Polygon", "MultiPolygon"].includes(geometry == null ? void 0 : geometry.type)) fail2(`feature "${key2}" must be Point, Polygon or MultiPolygon`);
+      const polygons = geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates;
+      if (!Array.isArray(polygons) || !polygons.length) fail2(`feature "${key2}" has no polygons`);
+      const rings = polygons.flatMap((polygon2) => {
+        if (!Array.isArray(polygon2) || !polygon2.length) fail2(`feature "${key2}" has no rings`);
+        return polygon2.map((ring2, ringIndex) => {
+          if (!Array.isArray(ring2) || ring2.length < 4) fail2(`feature "${key2}" rings need at least four positions`);
+          ring2.forEach((point) => position2(point, key2));
+          if (ring2[0][0] !== ring2[ring2.length - 1][0] || ring2[0][1] !== ring2[ring2.length - 1][1]) fail2(`feature "${key2}" rings must be closed`);
+          const signedArea = area(ring2);
+          if (!Number.isFinite(signedArea) || signedArea === 0) fail2(`feature "${key2}" has a degenerate ring`);
+          return signedArea > 0 === (ringIndex === 0) ? ring2 : [...ring2].reverse();
+        });
+      });
       return { key: key2, label, rings };
     });
-    const scale = Math.min(928 / (maxX - minX), 468 / (maxY - minY));
+    const hasPoints = features.some((feature) => feature.point);
+    const validation = validateReportSchema(geoGeometrySchema, collection);
+    if (!validation.valid) fail2(`invalid FeatureCollection: ${JSON.stringify(validation.errors)}`);
+    const pointSizeValidation = validateReportSchema(geoPointSizeRequirement, geo);
+    if (!pointSizeValidation.valid) fail2(`symbolSize is required exactly when Point features are present: ${JSON.stringify(pointSizeValidation.errors)}`);
+    const padding = hasPoints ? 66 : 16;
+    const scale = maxX === minX && maxY === minY ? 1 : Math.min((960 - 2 * padding) / (maxX - minX), (500 - 2 * padding) / (maxY - minY));
     if (!Number.isFinite(scale) || scale <= 0) fail2("bounds must have positive width and height");
     const xOffset = (960 - (maxX - minX) * scale) / 2;
     const yOffset = (500 - (maxY - minY) * scale) / 2;
     const number3 = (value) => String(Number(value.toFixed(8)));
-    return { viewBox: [...GEO_VIEWBOX], features: features.map(({ key: key2, label, rings }) => ({
+    return { viewBox: [...GEO_VIEWBOX], features: features.map(({ key: key2, label, rings, point }) => point ? {
       key: key2,
       label,
-      path: rings.map((ring) => ring.map(([x2, y4], i3) => `${i3 ? "L" : "M"}${number3(xOffset + (x2 - minX) * scale)},${number3(yOffset + (maxY - y4) * scale)}`).join(" ") + " Z").join(" ")
-    })) };
+      point: [Number(number3(xOffset + (point[0] - minX) * scale)), Number(number3(yOffset + (maxY - point[1]) * scale))]
+    } : {
+      key: key2,
+      label,
+      path: rings.map((ring2) => ring2.map(([x2, y4], i3) => `${i3 ? "L" : "M"}${number3(xOffset + (x2 - minX) * scale)},${number3(yOffset + (maxY - y4) * scale)}`).join(" ") + " Z").join(" ")
+    }) };
   }
 
   // src/reporting/reportViewerSettings.js
@@ -51281,8 +51559,8 @@ Please __addLocaleData before adding additional unit data`);
   }
   function getReportBuilderResultPanePosition(config = {}) {
     var _a5;
-    const position = String(((_a5 = config == null ? void 0 : config.result) == null ? void 0 : _a5.resultPanePosition) || "").trim().toLowerCase();
-    return position === "left" ? "left" : "right";
+    const position2 = String(((_a5 = config == null ? void 0 : config.result) == null ? void 0 : _a5.resultPanePosition) || "").trim().toLowerCase();
+    return position2 === "left" ? "left" : "right";
   }
   function getVisibleReportBuilderMeasures(config = {}) {
     return normalizeArray3(config.measures).filter((entry) => isVisibleField(entry));
@@ -59723,39 +60001,62 @@ ${indent}${end}`;
   }
 
   // src/reporting/reportFillGeoGeometry.js
+  var aggregates2 = ["sum", "avg", "min", "max", "first"];
+  function aggregateValues(values, aggregate, key2) {
+    if (!values.length) return null;
+    const value = aggregate === "min" ? values.reduce((a4, b3) => Math.min(a4, b3), Infinity) : aggregate === "max" ? values.reduce((a4, b3) => Math.max(a4, b3), -Infinity) : aggregate === "first" ? values[0] : values.reduce((a4, b3) => a4 + b3, 0) / (aggregate === "avg" ? values.length : 1);
+    if (!Number.isFinite(value)) throw new Error(`geo feature "${key2}": aggregate is not finite`);
+    return value;
+  }
   function buildReportFillGeoGeometry(block, rows, locale2) {
-    var _a5, _b, _c;
+    var _a5, _b, _c, _d, _e;
     const geometry = buildGeoGeometry(block.geo);
     const config = buildGeoConfig({ geo: block.geo });
     if (!block.geo.key || !((_a5 = block.geo.metric) == null ? void 0 : _a5.key)) throw new Error("geojson requires explicit geo.key and geo.metric.key");
-    if (!["sum", "avg", "min", "max", "first"].includes(config.aggregate)) throw new Error("geo.aggregate is unsupported");
+    if (!aggregates2.includes(config.aggregate)) throw new Error("geo.aggregate is unsupported");
+    const size = block.geo.symbolSize;
+    const hasPoints = geometry.features.some((feature) => feature.point);
+    if (hasPoints && (!size || typeof size.key !== "string" || !size.key.trim())) throw new Error("geo Point requires explicit geo.symbolSize.key");
+    if (size && !hasPoints) throw new Error("geo.symbolSize requires Point geometry");
+    const sizeAggregate = (_b = size == null ? void 0 : size.aggregate) != null ? _b : "sum";
+    const maxRadius = (_c = size == null ? void 0 : size.maxRadius) != null ? _c : 24;
+    if (size && (!aggregates2.includes(sizeAggregate) || typeof maxRadius !== "number" || !Number.isFinite(maxRadius) || maxRadius < 1 || maxRadius > 64)) throw new Error("geo.symbolSize requires a supported aggregate and maxRadius within [1,64]");
+    const pointKeys = new Set(geometry.features.filter((feature) => feature.point).map((feature) => feature.key));
     const groups = new Map(geometry.features.map((feature) => [feature.key, []]));
     for (const [index, row] of rows.entries()) {
       const key2 = resolveKey(row, config.key);
       if (typeof key2 !== "string" || !groups.has(key2)) throw new Error(`geo row ${index}: unknown feature key "${String(key2)}" in ${config.key}`);
       const value = resolveKey(row, config.metricKey);
       if (value != null && (typeof value !== "number" || !Number.isFinite(value))) throw new Error(`geo row ${index}: ${config.metricKey} must be finite number or null`);
+      const sizeValue = size && pointKeys.has(key2) ? resolveKey(row, size.key) : null;
+      if (sizeValue != null && (typeof sizeValue !== "number" || !Number.isFinite(sizeValue) || sizeValue < 0)) throw new Error(`geo row ${index}: ${size.key} symbol size must be a nonnegative finite number or null`);
       groups.get(key2).push(row);
     }
     const regions2 = geometry.features.map((feature) => {
       const matched = groups.get(feature.key);
       const values2 = matched.map((row) => resolveKey(row, config.metricKey)).filter((value) => value != null);
-      let rawValue = null;
-      if (values2.length) {
-        rawValue = config.aggregate === "min" ? values2.reduce((a4, b3) => Math.min(a4, b3), Infinity) : config.aggregate === "max" ? values2.reduce((a4, b3) => Math.max(a4, b3), -Infinity) : config.aggregate === "first" ? values2[0] : values2.reduce((a4, b3) => a4 + b3, 0) / (config.aggregate === "avg" ? values2.length : 1);
-        if (!Number.isFinite(rawValue)) throw new Error(`geo feature "${feature.key}": aggregate is not finite`);
-      }
+      const rawValue = aggregateValues(values2, config.aggregate, feature.key);
+      const sizeValue = feature.point ? aggregateValues(matched.map((row) => resolveKey(row, size.key)).filter((value) => value != null), sizeAggregate, feature.key) : null;
       const rule = findGeoColorRule(matched[0], config.color);
       return {
         key: feature.key,
         label: feature.label,
         rawValue,
+        ...feature.point ? { symbol: { rawValue: sizeValue, displayValue: sizeValue == null ? matched.length ? "No value" : "No row" : formatDashboardValue(sizeValue === 0 ? 0 : sizeValue, size.format || "number", locale2), label: size.label || size.key, radius: 0 } } : {},
         displayValue: rawValue == null ? matched.length ? "No value" : "No row" : formatDashboardValue(rawValue, config.format, locale2),
         color: config.color.empty,
         statusColor: String((rule == null ? void 0 : rule.color) || ""),
         statusLabel: String((rule == null ? void 0 : rule.label) || ""),
         rowCount: matched.length
       };
+    });
+    const sizeMax = regions2.reduce((max2, region) => {
+      var _a6, _b2;
+      return Math.max(max2, (_b2 = (_a6 = region.symbol) == null ? void 0 : _a6.rawValue) != null ? _b2 : 0);
+    }, 0);
+    regions2.forEach((region) => {
+      var _a6;
+      if (region.symbol && sizeMax > 0) region.symbol.radius = maxRadius * (Math.sqrt((_a6 = region.symbol.rawValue) != null ? _a6 : 0) / Math.sqrt(sizeMax));
     });
     const values = regions2.map((region) => region.rawValue).filter((value) => value != null);
     const min = values.length ? values.reduce((a4, b3) => Math.min(a4, b3), Infinity) : 0;
@@ -59764,7 +60065,7 @@ ${indent}${end}`;
       if (region.rawValue != null) region.color = resolveGeoColor({ row: groups.get(region.key)[0], value: region.rawValue, minValue: min, maxValue: max, colorConfig: config.color });
     });
     const ranking = regions2.filter((region) => region.rawValue != null).sort((a4, b3) => b3.rawValue - a4.rawValue || a4.key.localeCompare(b3.key));
-    const rules = config.color.field && ((_b = config.color.rules) == null ? void 0 : _b.filter((rule) => rule.color));
+    const rules = config.color.field && ((_d = config.color.rules) == null ? void 0 : _d.filter((rule) => rule.color));
     return {
       shape: "geojson",
       geometry,
@@ -59777,7 +60078,7 @@ ${indent}${end}`;
       regions: regions2,
       ranking,
       activeRegion: ranking[0] || regions2[0],
-      summary: { regionCount: regions2.length, totalValue: formatDashboardValue(values.reduce((a4, b3) => a4 + b3, 0), config.format, locale2), topKey: ((_c = ranking[0]) == null ? void 0 : _c.key) || "" },
+      summary: { regionCount: regions2.length, totalValue: formatDashboardValue(values.reduce((a4, b3) => a4 + b3, 0), config.format, locale2), topKey: ((_e = ranking[0]) == null ? void 0 : _e.key) || "" },
       legend: !config.legend ? null : (rules == null ? void 0 : rules.length) ? { rules: rules.map((rule) => ({ color: rule.color, label: String(rule.label || rule.value || rule.equals || rule.when) })) } : { min: formatDashboardValue(min, config.format, locale2), max: formatDashboardValue(max, config.format, locale2), palette: config.color.palette }
     };
   }
@@ -62843,6 +63144,27 @@ ${indent}${end}`;
     return omitLegend ? [...pages, ...buildLegendContinuationPages(descriptors, width, maxHeight)] : pages;
   }
 
+  // src/reporting/geoPointMark.js
+  function geoPaintOrder(features, regionsByKey) {
+    return features.map((feature, index) => ({ feature, index })).sort((a4, b3) => {
+      const layer = Number(!!a4.feature.point) - Number(!!b3.feature.point);
+      if (layer) return layer;
+      if (a4.feature.point) {
+        const size = regionsByKey.get(b3.feature.key).symbol.radius - regionsByKey.get(a4.feature.key).symbol.radius;
+        if (size) return size;
+      }
+      return a4.index - b3.index;
+    }).map((entry) => entry.feature);
+  }
+  function geoRegionDescription(region) {
+    return `${region.label}: ${region.displayValue}${region.symbol ? `; ${region.symbol.label}: ${region.symbol.displayValue}` : ""}`;
+  }
+  function geoPointMark(feature, region) {
+    const [cx, cy] = feature.point;
+    const radius = region.symbol.radius;
+    return radius > 0 ? { tag: "circle", attributes: { cx, cy, r: radius, fill: region.color } } : { tag: "path", attributes: { d: `M${cx - 3},${cy} L${cx + 3},${cy} M${cx},${cy - 3} L${cx},${cy + 3}`, fill: "none", stroke: region.rawValue == null ? "#bccbd6" : region.color } };
+  }
+
   // src/reporting/reportPrintGeoSvg.js
   function normalizeString40(value = "") {
     return String(value || "").trim();
@@ -62957,14 +63279,20 @@ ${indent}${end}`;
     if (geo.shape === "geojson" && geo.geometry) {
       const byKey = new Map(geo.regions.map((region) => [region.key, region]));
       const mapHeight2 = 500;
-      const paths = geo.geometry.features.map((feature) => {
+      const paths = geoPaintOrder(geo.geometry.features, byKey).map((feature) => {
         const region = byKey.get(feature.key);
+        if (feature.point) {
+          const mark = geoPointMark(feature, region);
+          const attributes = Object.entries({ ...mark.attributes, stroke: mark.attributes.stroke || "#bccbd6", "stroke-width": 1 }).map(([key2, value]) => `${key2}="${escapeXml2(String(value))}"`).join(" ");
+          return `<${mark.tag} ${attributes}/>`;
+        }
         return `<path d="${escapeXml2(feature.path)}" fill="${escapeXml2(region.color)}" fill-rule="evenodd" stroke="#bccbd6" stroke-width="1"/>`;
       }).join("");
       const colors = ((_b = (_a5 = geo.legend) == null ? void 0 : _a5.rules) == null ? void 0 : _b.map((rule) => rule.color)) || ((_c = geo.legend) == null ? void 0 : _c.palette) || [];
       const swatches = colors.map((color, i3) => `<rect x="${16 + i3 * 928 / colors.length}" y="516" width="${928 / colors.length}" height="12" fill="${escapeXml2(color)}"/>`).join("");
       const legendDetails = !geo.legend ? [] : geo.legend.rules ? geo.legend.rules.map((rule) => `Map legend: ${rule.label} (${rule.color})`) : [`Map legend: ${geo.legend.min} to ${geo.legend.max}`];
-      const labelDetails = [...legendDetails, ...geo.regions.map((region) => `${region.label}: ${region.displayValue}`)];
+      const sizeRegion = geo.regions.find((region) => region.symbol);
+      const labelDetails = [...legendDetails, ...sizeRegion ? [`Bubble area: ${sizeRegion.symbol.label}. Relative to the largest observed size in this map. Cross: zero or missing size.`] : [], ...geo.regions.map(geoRegionDescription)];
       const height = (colors.length ? 548 : 500) * width / 960;
       return { svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 ${colors.length ? 548 : 500}" width="${width}" height="${height}">${paths}${swatches}</svg>`, height, labelDetails, diagnostics: [] };
     }

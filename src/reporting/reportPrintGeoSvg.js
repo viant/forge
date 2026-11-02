@@ -5,6 +5,7 @@ import {
 } from "../components/dashboard/geoMapUtils.js";
 import { wrapReportPrintLabel } from "./reportPrintLabels.js";
 import {WORLD_COUNTRY_PATHS, countryRegionsByKey} from '../components/dashboard/worldCountryModel.js';
+import {geoPointMark, geoRegionDescription, geoPaintOrder} from './geoPointMark.js';
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -139,8 +140,13 @@ export function buildReportPrintGeoSvg({
   if (geo.shape === 'geojson' && geo.geometry) {
     const byKey = new Map(geo.regions.map(region => [region.key, region]));
     const mapHeight = 500;
-    const paths = geo.geometry.features.map(feature => {
+    const paths = geoPaintOrder(geo.geometry.features, byKey).map(feature => {
       const region = byKey.get(feature.key);
+      if (feature.point) {
+        const mark = geoPointMark(feature, region);
+        const attributes = Object.entries({...mark.attributes, stroke: mark.attributes.stroke || '#bccbd6', 'stroke-width': 1}).map(([key,value]) => `${key}="${escapeXml(String(value))}"`).join(' ');
+        return `<${mark.tag} ${attributes}/>`;
+      }
       return `<path d="${escapeXml(feature.path)}" fill="${escapeXml(region.color)}" fill-rule="evenodd" stroke="#bccbd6" stroke-width="1"/>`;
     }).join('');
     const colors = geo.legend?.rules?.map(rule => rule.color) || geo.legend?.palette || [];
@@ -148,7 +154,8 @@ export function buildReportPrintGeoSvg({
     const legendDetails = !geo.legend ? [] : geo.legend.rules
       ? geo.legend.rules.map(rule => `Map legend: ${rule.label} (${rule.color})`)
       : [`Map legend: ${geo.legend.min} to ${geo.legend.max}`];
-    const labelDetails = [...legendDetails, ...geo.regions.map(region => `${region.label}: ${region.displayValue}`)];
+    const sizeRegion = geo.regions.find(region => region.symbol);
+    const labelDetails = [...legendDetails, ...(sizeRegion ? [`Bubble area: ${sizeRegion.symbol.label}. Relative to the largest observed size in this map. Cross: zero or missing size.`] : []), ...geo.regions.map(geoRegionDescription)];
     const height = (colors.length ? 548 : 500) * width / 960;
     return {svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 ${colors.length ? 548 : 500}" width="${width}" height="${height}">${paths}${swatches}</svg>`, height, labelDetails, diagnostics: []};
   }

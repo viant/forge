@@ -2,7 +2,7 @@
 
 Declared planar region maps use the shared `GeoGeometryMap` component with
 semantic typography and Button region selectors. See [the geometry contract and
-synthetic runnable example](geo-geometry.md) for Polygon/MultiPolygon shapes,
+synthetic runnable example](geo-geometry.md) for Point/Polygon/MultiPolygon shapes,
 keyboard selection, missing-value states, and matching canonical print paths.
 This opt-in map does not change the legacy world or US tile appearance.
 
