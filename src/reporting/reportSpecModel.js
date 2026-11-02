@@ -269,8 +269,16 @@ export function buildReportBuilderPublishedDatasetConfig(baseConfig = {}, source
       ...(isPlainObject(column?.runtimeFilter) ? { runtimeFilter: cloneValue(column.runtimeFilter) } : {}),
     }))
     .filter((entry) => entry.id && entry.key && entry.label);
+  // Chart catalogs expose calculated outputs as measures for axis validation;
+  // their definitions still own evaluation and must not become producer fields.
+  const calculatedIds = new Set([
+    ...fieldOptions.filter(column => normalizeString(column?.kind) === "computedMeasure").map(column => normalizeString(column?.key)),
+    ...["calculatedFields", "computedMeasures", "tableCalculations"].flatMap(key => (
+      Array.isArray(normalizedSource?.[key]) ? normalizedSource[key] : []
+    )).flatMap(field => [normalizeString(field?.id), normalizeString(field?.key)]).filter(Boolean),
+  ]);
   const measures = inheritRuntimeFieldCatalog ? cloneValue(baseConfig?.measures || []) : fieldOptions
-    .filter((column) => normalizeString(column?.kind) === "measure")
+    .filter((column) => normalizeString(column?.kind) === "measure" && !calculatedIds.has(normalizeString(column?.key)))
     .map((column) => ({
       id: normalizeString(column?.key),
       key: normalizeString(column?.sourceKey || column?.key) || normalizeString(column?.key),
@@ -287,6 +295,9 @@ export function buildReportBuilderPublishedDatasetConfig(baseConfig = {}, source
     dataSourceRef: normalizeString(normalizedSource?.dataSourceRef || baseConfig?.dataSourceRef),
     dimensions,
     measures,
+    ...Object.fromEntries(["calculatedFields", "computedMeasures", "tableCalculations"]
+      .filter(key => Array.isArray(normalizedSource?.[key]) && normalizedSource[key].length > 0)
+      .map(key => [key, cloneValue(normalizedSource[key])])),
   };
 }
 

@@ -1103,6 +1103,9 @@ function buildReportBuilderReportDocumentDatasets(container = {}, config = {}, s
     request: dataset?.request && typeof dataset.request === "object" && !Array.isArray(dataset.request)
       ? cloneValue(dataset.request)
       : null,
+    ...Object.fromEntries(["calculatedFields", "computedMeasures", "tableCalculations"]
+      .filter(key => Array.isArray(dataset?.[key]) && dataset[key].length > 0)
+      .map(key => [key, cloneValue(dataset[key])])),
     columnOptions: Array.isArray(dataset?.columnOptions) ? cloneValue(dataset.columnOptions) : [],
     valueFieldOptions: Array.isArray(dataset?.valueFieldOptions) ? cloneValue(dataset.valueFieldOptions) : [],
     secondaryFieldOptions: Array.isArray(dataset?.secondaryFieldOptions) ? cloneValue(dataset.secondaryFieldOptions) : [],

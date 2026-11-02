@@ -103,6 +103,14 @@ function buildDerivedMeasureOptions(entry = {}) {
   };
 }
 
+function calculatedMeasures(entry = {}) {
+  return [
+    ...(Array.isArray(entry?.calculatedFields) ? entry.calculatedFields : []),
+    ...(Array.isArray(entry?.computedMeasures) ? entry.computedMeasures : []),
+    ...(Array.isArray(entry?.tableCalculations) ? entry.tableCalculations : []),
+  ];
+}
+
 function deriveColumnOptions(entry = {}) {
   const dimensions = (Array.isArray(entry?.dimensions) ? entry.dimensions : [])
     .map((item) => buildDerivedDimensionOptions(item))
@@ -110,11 +118,15 @@ function deriveColumnOptions(entry = {}) {
   const measures = (Array.isArray(entry?.measures) ? entry.measures : [])
     .map((item) => buildDerivedMeasureOptions(item))
     .filter(Boolean);
-  return [...dimensions, ...measures];
+  const calculated = calculatedMeasures(entry)
+    .map(item => buildDerivedMeasureOptions(item))
+    .filter(Boolean)
+    .map(item => ({ ...item, kind: "computedMeasure" }));
+  return [...dimensions, ...measures, ...calculated];
 }
 
 function deriveValueFieldOptions(entry = {}) {
-  return (Array.isArray(entry?.measures) ? entry.measures : [])
+  return [...(Array.isArray(entry?.measures) ? entry.measures : []), ...calculatedMeasures(entry)]
     .map((item) => {
       const key = normalizeString(item?.key || item?.id);
       if (!key) {
@@ -152,7 +164,7 @@ function deriveChartFieldOptions(entry = {}) {
     key: normalizeString(item?.displayKey || item?.key),
     aliases: [normalizeString(item?.key)].filter(Boolean),
     label: normalizeString(item?.label || item?.key),
-    kind: normalizeString(item?.kind),
+    kind: item?.kind === "computedMeasure" ? "measure" : normalizeString(item?.kind),
     ...(normalizeString(item?.format) ? { format: normalizeString(item.format) } : {}),
     ...(normalizeString(item?.tickFormat) ? { tickFormat: normalizeString(item.tickFormat) } : {}),
     ...(["civil", "instant"].includes(normalizeString(item?.valueMode)) ? { valueMode: normalizeString(item.valueMode) } : {}),
@@ -231,6 +243,9 @@ export function normalizeReportBuilderPublishedDataSources(config = {}) {
         resultContract: normalizeOptionalObject(entry?.resultContract),
         capabilities: normalizeReportDatasetCapabilities(entry?.capabilities),
         request: isPlainObject(entry?.request) ? cloneValue(entry.request) : null,
+        ...Object.fromEntries(["calculatedFields", "computedMeasures", "tableCalculations"]
+          .filter(key => Array.isArray(entry?.[key]) && entry[key].length > 0)
+          .map(key => [key, cloneValue(entry[key])])),
         columnOptions: Array.isArray(entry?.columnOptions) && entry.columnOptions.length > 0
           ? cloneValue(entry.columnOptions)
           : deriveColumnOptions(entry),

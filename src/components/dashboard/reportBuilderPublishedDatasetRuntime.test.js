@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { buildReportBuilderDocumentCompileDiagnostics } from "./reportBuilderDocumentBlocks.js";
+import { buildReportBuilderReportDocument, lowerReportDocumentToReportSpec } from "../../reporting/reportDocumentModel.js";
 
 import {
   buildReportBuilderRuntimePreviewArtifacts,
@@ -378,5 +380,41 @@ assert.equal(datasetCatalogModel.reportSpec.datasets.some((dataset) => dataset.i
 assert.equal(datasetCatalogModel.reportSpec.datasets.some((dataset) => dataset.id === "forecast_chart_only"), true);
 assert.equal(datasetCatalogModel.document.datasets.some((dataset) => dataset.id === "forecast_cube"), true);
 assert.equal(Array.isArray(datasetCatalogModel.document.blocks[0]?.config?.datasets), false);
+
+
+// Independently authored synthetic ratios: a shared endpoint backs two grains.
+const ratioFields = [
+  { id: "successRate", key: "successRate", expr: "successes / nullif(attempts, 0)", format: "percentFraction2" },
+  { id: "failureRate", key: "failureRate", expr: "failures / nullif(attempts, 0)" },
+  { id: "costRate", key: "costRate", expr: "cost / nullif(attempts, 0)" },
+];
+const ratioSources = ["summary", "daily"].map(id => ({
+  id, dataSourceRef: "measurements",
+  dimensions: id === "daily" ? [{ id: "day", key: "day" }] : [],
+  measures: ["successes", "failures", "attempts", "cost"].map(id => ({ id, key: id })),
+  calculatedFields: id === "daily" ? ratioFields.slice(0, 2) : ratioFields,
+  request: { dimensions: id === "daily" ? { day: true } : {}, measures: {}, filters: {} },
+}));
+const ratioConfig = { dataSourceRef: "measurements", dataSources: ratioSources };
+const ratioState = { reportDocumentBlocks: [
+  ...ratioFields.map(field => ({ id: field.id, kind: "kpiBlock", datasetRef: "summary", valueField: field.id })),
+  { id: "rates", kind: "chartBlock", datasetRef: "daily", chartSpec: { type: "line", xField: "day", yFields: ["successRate", "failureRate"] } },
+] };
+assert.deepEqual(buildReportBuilderDocumentCompileDiagnostics({ config: ratioConfig, state: ratioState }), []);
+const ratioSpec = lowerReportDocumentToReportSpec(buildReportBuilderReportDocument({
+  container: { id: "measurements", dataSourceRef: "measurements" }, config: ratioConfig, state: ratioState,
+}));
+assert.deepEqual(ratioSpec.calculatedFields.map(field => [field.datasetRef, field.id, field.expr]).sort(), [
+  ...ratioFields.map(field => ["summary", field.id, field.expr]),
+  ...ratioFields.slice(0, 2).map(field => ["daily", field.id, field.expr]),
+].sort());
+for (const id of ["summary", "daily"]) {
+  const request = ratioSpec.datasets.find(dataset => dataset.id === id).request;
+  assert.equal(request.measures.attempts, true);
+  assert.equal(request.measures.successes, true);
+  assert.equal(request.measures.failures, true);
+  for (const field of ratioFields) assert.equal(request.measures[field.id], undefined);
+}
+assert.equal(ratioSpec.datasets.find(dataset => dataset.id === "summary").request.measures.cost, true);
 
 console.log("reportBuilderPublishedDatasetRuntime ✓ carries configured published datasets through report spec and runtime fill");
