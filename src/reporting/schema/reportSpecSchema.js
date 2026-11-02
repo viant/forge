@@ -713,6 +713,7 @@ export const reportSpecSchema = {
       additionalProperties: false,
       properties: {
         field: { type: "string" },
+        legendScope: { enum: ["declared", "observed"] },
         palette: {
           type: "array",
           items: { type: "string" },
@@ -757,6 +758,7 @@ export const reportSpecSchema = {
         aggregate: { enum: ["sum", "avg", "min", "max", "first"] },
         limit: { type: "number", minimum: 1 },
         legend: { type: "boolean" },
+        summary: { type: "boolean" },
         palette: {
           type: "array",
           items: { type: "string" },

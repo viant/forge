@@ -1032,6 +1032,9 @@ func (r *ReportSpec) Validate() error {
 			if len(block.Geo) == 0 {
 				return fmt.Errorf("reportSpec.blocks[%d].geo is required for geoMapBlock", index)
 			}
+			if err := ValidateGeoPresentation(block.Geo); err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("reportSpec.blocks[%d].kind %q is not supported", index, kind)
 		}

@@ -214,7 +214,7 @@ export function buildReportPrintGeoSvg({
   const mapHeight = (gridRows * tileSize) + ((gridRows - 1) * tileGap);
   const sideX = mapWidth + 24;
 
-  const summarySvg = `
+  const summarySvg = geo.summary === null ? "" : `
     <text x="0" y="12" font-size="11" fill="#667085">${escapeXml(String(summary.regionCount ?? regions.length))} Regions</text>
     <text x="120" y="12" font-size="11" fill="#667085">Total ${escapeXml(normalizeString(geo?.metricLabel) || "Value")}: ${escapeXml(normalizeString(summary?.totalValue) || "-")}</text>
     <text x="${Math.max(260, width - 140)}" y="12" font-size="11" fill="#667085">Top: ${escapeXml(normalizeString(summary?.topKey) || "-")}</text>

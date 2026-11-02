@@ -140,6 +140,7 @@ export function buildGeoConfig(container = {}, titleize = (value) => value) {
             empty: geo.color?.empty || geo.emptyColor || '#eef3f8',
         },
         legend: geo.legend !== false,
+        summary: geo.summary !== false,
     };
 }
 

@@ -48,3 +48,22 @@ discovers geometry, geocodes labels or changes producer requests. Maps without
 Run `npm run test:geo-geometry` for synthetic model, schema, SVG and mounted UI
 checks. Native Go materializer, fill, PDF and XLSX regressions use the same
 neutral example.
+
+
+For a count of distinct devices grouped by site and category, the same device
+can belong to several categories. The [synthetic device membership example](examples/sensor-distinct-device-geometry.json)
+has four devices in each of two categories and six devices overall. It selects
+`geo.summary: false` to omit the additive map summary while retaining every
+mark, exact group value, ranking and selection. The default remains the existing
+summary. Filled maps encode this choice as an explicit `summary: null`;
+missing summary metadata remains invalid.
+
+`geo.color.legendScope: observed` shows only declared color rules that match
+resolved map rows, in authored rule order. An empty observed categorical legend
+is null. The default `declared` retains every declared rule. `geo.legend: false`
+continues to hide the entire legend. Categorical Point series retain typed
+matching: null, false, numeric zero and string zero are separate categories.
+Legacy maps retain their existing color matching semantics. These options apply
+to canonical fills and therefore to UI, print, PDF and XLSX geometry SVGs.
+Unmatched locations still fail geometry resolution; these presentation options
+do not alter source coverage or metric computation.

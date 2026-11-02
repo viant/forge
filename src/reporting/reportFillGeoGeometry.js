@@ -78,11 +78,13 @@ export function buildReportFillGeoGeometry(block, rows, locale) {
     region.color = series && entry.rule?.color ? entry.rule.color : resolveGeoColor({row: entry.row, value: region.rawValue, minValue: min, maxValue: max, colorConfig: series ? {...config.color, field: undefined} : config.color});
   } });
   const ranking = regions.filter(region => region.rawValue != null).sort((a,b) => b.rawValue-a.rawValue || (series ? compareGeoSeriesMarks(a,b) : a.key.localeCompare(b.key)));
-  const rules = config.color.field && config.color.rules?.filter(rule => rule.color);
+  const observedRules = new Set([...regionRows.values()].filter(entry => entry.row).map(entry => entry.rule));
+  const rules = config.color.field && config.color.rules?.filter(rule => rule.color
+    && (config.color.legendScope !== 'observed' || observedRules.has(rule)));
   return {shape: 'geojson', geometry, keyField: config.key, labelField: config.labelKey || '', metricKey: config.metricKey, metricLabel: config.metricLabel,
     ...(series ? {seriesField} : {}),
     format: config.format || 'number', aggregate: config.aggregate, regions, ranking, activeRegion: ranking[0] || regions[0] || null,
-    summary: {regionCount: regions.length, totalValue: formatDashboardValue(values.reduce((a,b) => a+b, 0), config.format, locale), topKey: ranking[0]?.key || ''},
-    legend: !config.legend ? null : rules?.length ? {rules: rules.map(rule => ({color: rule.color, label: series ? geoSeriesRuleLabel(rule) : String(rule.label || rule.value || rule.equals || rule.when)}))} : {min: formatDashboardValue(min, config.format, locale), max: formatDashboardValue(max, config.format, locale), palette: config.color.palette},
+    summary: !config.summary ? null : {regionCount: regions.length, totalValue: formatDashboardValue(values.reduce((a,b) => a+b, 0), config.format, locale), topKey: ranking[0]?.key || ''},
+    legend: !config.legend || (config.color.legendScope === 'observed' && config.color.field && !rules?.length) ? null : rules?.length ? {rules: rules.map(rule => ({color: rule.color, label: series ? geoSeriesRuleLabel(rule) : String(rule.label || rule.value || rule.equals || rule.when)}))} : {min: formatDashboardValue(min, config.format, locale), max: formatDashboardValue(max, config.format, locale), palette: config.color.palette},
   };
 }

@@ -298,6 +298,7 @@ type GeoContent struct {
 }
 
 type ResolvedGeo struct {
+	summaryPresent     bool
 	labelFieldPresent  bool
 	seriesFieldPresent bool
 	SeriesField        string               `json:"seriesField,omitempty"`
@@ -1968,6 +1969,9 @@ func (r *ReportFill) Validate() error {
 			if len(block.GeoContent.Geo) == 0 {
 				return fmt.Errorf("reportFill.blocks[%d].content.geo is required for geoMapBlock", index)
 			}
+			if err := reportspec.ValidateGeoPresentation(block.GeoContent.Geo); err != nil {
+				return err
+			}
 			if block.GeoContent.RowCount == nil {
 				return fmt.Errorf("reportFill.blocks[%d].content.rowCount is required for geoMapBlock", index)
 			}
@@ -2019,17 +2023,23 @@ func (r *ReportFill) Validate() error {
 					return err
 				}
 			}
-			if block.GeoContent.ResolvedGeo.Summary == nil {
-				return fmt.Errorf("reportFill.blocks[%d].content.resolvedGeo.summary is required for geoMapBlock", index)
+			summaryDisabled := block.GeoContent.Geo["summary"] == false
+			if summaryDisabled && (block.GeoContent.ResolvedGeo.Summary != nil || !block.GeoContent.ResolvedGeo.summaryPresent) {
+				return fmt.Errorf("geo.summary false requires explicit resolvedGeo.summary null")
 			}
-			if block.GeoContent.ResolvedGeo.Summary.RegionCount == nil {
-				return fmt.Errorf("reportFill.blocks[%d].content.resolvedGeo.summary.regionCount is required for geoMapBlock", index)
-			}
-			if strings.TrimSpace(block.GeoContent.ResolvedGeo.Summary.TotalValue) == "" {
-				return fmt.Errorf("reportFill.blocks[%d].content.resolvedGeo.summary.totalValue is required for geoMapBlock", index)
-			}
-			if strings.TrimSpace(block.GeoContent.ResolvedGeo.Summary.TopKey) == "" && !(block.GeoContent.ResolvedGeo.Shape == "geojson" && len(block.GeoContent.ResolvedGeo.Ranking) == 0) {
-				return fmt.Errorf("reportFill.blocks[%d].content.resolvedGeo.summary.topKey is required for geoMapBlock", index)
+			if !summaryDisabled {
+				if block.GeoContent.ResolvedGeo.Summary == nil {
+					return fmt.Errorf("reportFill.blocks[%d].content.resolvedGeo.summary is required for geoMapBlock", index)
+				}
+				if block.GeoContent.ResolvedGeo.Summary.RegionCount == nil {
+					return fmt.Errorf("reportFill.blocks[%d].content.resolvedGeo.summary.regionCount is required for geoMapBlock", index)
+				}
+				if strings.TrimSpace(block.GeoContent.ResolvedGeo.Summary.TotalValue) == "" {
+					return fmt.Errorf("reportFill.blocks[%d].content.resolvedGeo.summary.totalValue is required for geoMapBlock", index)
+				}
+				if strings.TrimSpace(block.GeoContent.ResolvedGeo.Summary.TopKey) == "" && !(block.GeoContent.ResolvedGeo.Shape == "geojson" && len(block.GeoContent.ResolvedGeo.Ranking) == 0) {
+					return fmt.Errorf("reportFill.blocks[%d].content.resolvedGeo.summary.topKey is required for geoMapBlock", index)
+				}
 			}
 			if block.GeoContent.ResolvedGeo.Legend != nil {
 				hasRules := len(block.GeoContent.ResolvedGeo.Legend.Rules) > 0

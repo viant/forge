@@ -18,9 +18,9 @@ function normalizeString(value = "") {
   return String(value || "").trim();
 }
 
-function buildLegend(config = {}, range = {}, locale = "en-US") {
+function buildLegend(config = {}, range = {}, locale = "en-US", observedRules = new Set()) {
   const colorRules = config.color?.field && Array.isArray(config.color?.rules)
-    ? config.color.rules.filter((rule) => rule?.color)
+    ? config.color.rules.filter((rule) => rule?.color && (config.color.legendScope !== 'observed' || observedRules.has(rule)))
     : [];
   if (colorRules.length > 0) {
     return {
@@ -30,6 +30,7 @@ function buildLegend(config = {}, range = {}, locale = "en-US") {
       })),
     };
   }
+  if (config.color?.legendScope === 'observed' && config.color?.field) return null;
   return {
     min: formatDashboardValue(range.min, config.format, locale),
     max: formatDashboardValue(range.max, config.format, locale),
@@ -97,11 +98,11 @@ export function buildReportFillGeoPayload(block = {}, rows = [], { locale = "en-
     regions: cloneValue(regions),
     ranking: cloneValue(ranking),
     activeRegion: cloneValue(activeRegion),
-    summary: {
+    summary: !config.summary ? null : {
       regionCount: regions.length,
       totalValue: formatDashboardValue(totalValue, config.format, locale),
       topKey: normalizeString(ranking[0]?.key),
     },
-    legend: config.legend === false ? null : buildLegend(config, range, locale),
+    legend: config.legend === false ? null : buildLegend(config, range, locale, new Set(Array.from(geoRows.values()).map(entry => findGeoColorRule(entry.row, config.color)))),
   };
 }

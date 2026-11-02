@@ -2921,7 +2921,7 @@ function GeoMapBlock({ block = {}, diagnostics = [], onRetryProviderActions = nu
         <Typography as="p" typeRole="body" className="forge-report-document-copy">{supportedShape ? "No geo data." : `Unsupported geo shape: ${shape || "unknown"}.`}</Typography> :
         <div className="forge-report-document-geo">
           <div className="forge-report-document-geo-main">
-            <Typography as="p" typeRole="metadata" className="forge-report-document-geo-summary">{Number(resolvedGeo?.summary?.regionCount || 0)} regions · {normalizeString(resolvedGeo?.summary?.totalValue ?? "-")} total</Typography>
+            {resolvedGeo.summary !== null ? <Typography as="p" typeRole="metadata" className="forge-report-document-geo-summary">{Number(resolvedGeo?.summary?.regionCount || 0)} regions · {normalizeString(resolvedGeo?.summary?.totalValue ?? "-")} total</Typography> : null}
             {shape === "world" ? <WorldCountryMap regions={regions} title={normalizeString(block?.title || "Country map")} onSelect={setSelectedRegion}/> :
               <div className="forge-report-document-map-scroll" role="region" aria-label="Scrollable state map" tabIndex={0}>
                 <div className="forge-report-document-state-map" role="group" aria-label={normalizeString(block?.title || "State map")}>
@@ -2981,11 +2981,11 @@ function GeoMapBlock({ block = {}, diagnostics = [], onRetryProviderActions = nu
       ) : (
         <div className="forge-report-runtime-geo-layout" style={{ display: "grid", gridTemplateColumns: "minmax(496px, 1fr) minmax(220px, 320px)", gap: 16 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, fontSize: "var(--forge-report-type-small-size, 12px)", lineHeight: "var(--forge-report-type-small-line-height, normal)", color: "var(--forge-report-text-secondary, #30404d)" }}>
+            {resolvedGeo.summary !== null ? <div style={{ display: "flex", flexWrap: "wrap", gap: 10, fontSize: "var(--forge-report-type-small-size, 12px)", lineHeight: "var(--forge-report-type-small-line-height, normal)", color: "var(--forge-report-text-secondary, #30404d)" }}>
               <span><strong>{Number(resolvedGeo?.summary?.regionCount || 0)}</strong> Regions</span>
               <span><strong>{normalizeString(resolvedGeo?.summary?.totalValue || "-")}</strong> Total</span>
               <span><strong>{normalizeString(resolvedGeo?.summary?.topKey || "-")}</strong> Top Region</span>
-            </div>
+            </div> : null}
             {shape === "world" ? <WorldCountryMap regions={regions} title={normalizeString(block?.title || "Country map")} onSelect={setSelectedRegion}/> : <div
               role="list"
               className="forge-report-runtime-geo-tiles"

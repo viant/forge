@@ -133,3 +133,17 @@ it('renders shared paths and accessible region controls including null and absen
   expect(outline.getAttribute('fill')).toBe('none');
  } finally {await act(async()=>root.unmount());host.remove();}
 });
+
+it('renders observed device categories through ReportRuntime without a global distinct summary',()=>{
+ const block=structuredClone(categories.block);block.geo.summary=false;block.geo.color.legendScope='observed';
+ block.geo.color.rules.push(...Array.from({length:419},(_,i)=>({value:`unused-${i}`,color:'#778899',label:`Unused category ${i}`})));
+ const geo=buildReportFillGeoPayload(block,categories.rows);
+ const html=renderToStaticMarkup(<ReportRuntime reportSpec={{blocks:[],datasets:[]}} reportFill={{blocks:[{...block,content:{geo:block.geo,resolvedGeo:geo}}],datasets:[]}}/>);
+ const host=document.createElement('div');host.innerHTML=html;
+ expect(host.querySelectorAll('[data-mark-id]')).toHaveLength(2);
+ expect(host.querySelectorAll('.forge-geometry-map-legend span')).toHaveLength(3);
+ expect(host.textContent).not.toContain('Unused category');
+ expect(host.textContent).not.toContain(' total');
+ expect(host.textContent).toContain('series A: 4');
+ expect(host.textContent).toContain('series B: 4');
+});

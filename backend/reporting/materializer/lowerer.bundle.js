@@ -60159,7 +60159,8 @@ ${indent}${end}`;
         palette: ((_b = geo.color) == null ? void 0 : _b.palette) || geo.palette || DEFAULT_GEO_PALETTE,
         empty: ((_c = geo.color) == null ? void 0 : _c.empty) || geo.emptyColor || "#eef3f8"
       },
-      legend: geo.legend !== false
+      legend: geo.legend !== false,
+      summary: geo.summary !== false
     };
   }
   function aggregateGeoRows(collection = [], config) {
@@ -60339,7 +60340,8 @@ ${indent}${end}`;
       }
     });
     const ranking = regions2.filter((region) => region.rawValue != null).sort((a4, b3) => b3.rawValue - a4.rawValue || (series ? compareGeoSeriesMarks(a4, b3) : a4.key.localeCompare(b3.key)));
-    const rules = config.color.field && ((_d = config.color.rules) == null ? void 0 : _d.filter((rule) => rule.color));
+    const observedRules = new Set([...regionRows.values()].filter((entry) => entry.row).map((entry) => entry.rule));
+    const rules = config.color.field && ((_d = config.color.rules) == null ? void 0 : _d.filter((rule) => rule.color && (config.color.legendScope !== "observed" || observedRules.has(rule))));
     return {
       shape: "geojson",
       geometry,
@@ -60353,8 +60355,8 @@ ${indent}${end}`;
       regions: regions2,
       ranking,
       activeRegion: ranking[0] || regions2[0] || null,
-      summary: { regionCount: regions2.length, totalValue: formatDashboardValue(values.reduce((a4, b3) => a4 + b3, 0), config.format, locale2), topKey: ((_e = ranking[0]) == null ? void 0 : _e.key) || "" },
-      legend: !config.legend ? null : (rules == null ? void 0 : rules.length) ? { rules: rules.map((rule) => ({ color: rule.color, label: series ? geoSeriesRuleLabel(rule) : String(rule.label || rule.value || rule.equals || rule.when) })) } : { min: formatDashboardValue(min, config.format, locale2), max: formatDashboardValue(max, config.format, locale2), palette: config.color.palette }
+      summary: !config.summary ? null : { regionCount: regions2.length, totalValue: formatDashboardValue(values.reduce((a4, b3) => a4 + b3, 0), config.format, locale2), topKey: ((_e = ranking[0]) == null ? void 0 : _e.key) || "" },
+      legend: !config.legend || config.color.legendScope === "observed" && config.color.field && !(rules == null ? void 0 : rules.length) ? null : (rules == null ? void 0 : rules.length) ? { rules: rules.map((rule) => ({ color: rule.color, label: series ? geoSeriesRuleLabel(rule) : String(rule.label || rule.value || rule.equals || rule.when) })) } : { min: formatDashboardValue(min, config.format, locale2), max: formatDashboardValue(max, config.format, locale2), palette: config.color.palette }
     };
   }
 
@@ -60365,9 +60367,9 @@ ${indent}${end}`;
   function normalizeString35(value = "") {
     return String(value || "").trim();
   }
-  function buildLegend(config = {}, range = {}, locale2 = "en-US") {
-    var _a5, _b, _c;
-    const colorRules = ((_a5 = config.color) == null ? void 0 : _a5.field) && Array.isArray((_b = config.color) == null ? void 0 : _b.rules) ? config.color.rules.filter((rule) => rule == null ? void 0 : rule.color) : [];
+  function buildLegend(config = {}, range = {}, locale2 = "en-US", observedRules = /* @__PURE__ */ new Set()) {
+    var _a5, _b, _c, _d, _e;
+    const colorRules = ((_a5 = config.color) == null ? void 0 : _a5.field) && Array.isArray((_b = config.color) == null ? void 0 : _b.rules) ? config.color.rules.filter((rule) => (rule == null ? void 0 : rule.color) && (config.color.legendScope !== "observed" || observedRules.has(rule))) : [];
     if (colorRules.length > 0) {
       return {
         rules: colorRules.map((rule) => ({
@@ -60376,10 +60378,11 @@ ${indent}${end}`;
         }))
       };
     }
+    if (((_c = config.color) == null ? void 0 : _c.legendScope) === "observed" && ((_d = config.color) == null ? void 0 : _d.field)) return null;
     return {
       min: formatDashboardValue(range.min, config.format, locale2),
       max: formatDashboardValue(range.max, config.format, locale2),
-      palette: Array.isArray((_c = config.color) == null ? void 0 : _c.palette) && config.color.palette.length > 0 ? cloneValue23(config.color.palette) : cloneValue23(DEFAULT_GEO_PALETTE)
+      palette: Array.isArray((_e = config.color) == null ? void 0 : _e.palette) && config.color.palette.length > 0 ? cloneValue23(config.color.palette) : cloneValue23(DEFAULT_GEO_PALETTE)
     };
   }
   function buildReportFillGeoPayload(block = {}, rows = [], { locale: locale2 = "en-US" } = {}) {
@@ -60426,12 +60429,12 @@ ${indent}${end}`;
       regions: cloneValue23(regions2),
       ranking: cloneValue23(ranking),
       activeRegion: cloneValue23(activeRegion),
-      summary: {
+      summary: !config.summary ? null : {
         regionCount: regions2.length,
         totalValue: formatDashboardValue(totalValue, config.format, locale2),
         topKey: normalizeString35((_b = ranking[0]) == null ? void 0 : _b.key)
       },
-      legend: config.legend === false ? null : buildLegend(config, range, locale2)
+      legend: config.legend === false ? null : buildLegend(config, range, locale2, new Set(Array.from(geoRows.values()).map((entry) => findGeoColorRule(entry.row, config.color))))
     };
   }
 
@@ -63546,7 +63549,7 @@ ${indent}${end}`;
     ));
     const mapHeight = gridRows * tileSize + (gridRows - 1) * tileGap;
     const sideX = mapWidth + 24;
-    const summarySvg = `
+    const summarySvg = geo.summary === null ? "" : `
     <text x="0" y="12" font-size="11" fill="#667085">${escapeXml2(String((_d = summary.regionCount) != null ? _d : regions2.length))} Regions</text>
     <text x="120" y="12" font-size="11" fill="#667085">Total ${escapeXml2(normalizeString40(geo == null ? void 0 : geo.metricLabel) || "Value")}: ${escapeXml2(normalizeString40(summary == null ? void 0 : summary.totalValue) || "-")}</text>
     <text x="${Math.max(260, width - 140)}" y="12" font-size="11" fill="#667085">Top: ${escapeXml2(normalizeString40(summary == null ? void 0 : summary.topKey) || "-")}</text>

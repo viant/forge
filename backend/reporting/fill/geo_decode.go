@@ -26,6 +26,7 @@ func (g *ResolvedGeo) UnmarshalJSON(raw []byte) error {
 	value, present := fields["labelField"]
 	decoded.labelFieldPresent = present && string(value) != "null"
 	_, decoded.seriesFieldPresent = fields["seriesField"]
+	_, decoded.summaryPresent = fields["summary"]
 	*g = ResolvedGeo(decoded)
 	return nil
 }

@@ -581,6 +581,7 @@ export const reportFillSchema = {
       additionalProperties: false,
       properties: {
         field: { type: "string" },
+        legendScope: { enum: ["declared", "observed"] },
         palette: {
           type: "array",
           items: { type: "string" },
@@ -625,6 +626,7 @@ export const reportFillSchema = {
         aggregate: { enum: ["sum", "avg", "min", "max", "first"] },
         limit: { type: "number", minimum: 1 },
         legend: { type: "boolean" },
+        summary: { type: "boolean" },
         palette: {
           type: "array",
           items: { type: "string" },
@@ -856,7 +858,7 @@ export const reportFillSchema = {
                 { $ref: "#/$defs/resolvedGeoRegion" },
               ],
             },
-            summary: {
+            summary: {anyOf: [{type: "null"}, {
               type: "object",
               additionalProperties: false,
               required: ["regionCount", "totalValue", "topKey"],
@@ -865,7 +867,7 @@ export const reportFillSchema = {
                 totalValue: { type: "string" },
                 topKey: { type: "string" },
               },
-            },
+            }]},
             legend: {
               anyOf: [
                 { type: "null" },
@@ -1275,6 +1277,11 @@ export const reportFillSchema = {
           type: "object",
           additionalProperties: false,
           required: ["geo", "rowCount", "resolvedGeo"],
+          allOf: [{
+            if: {properties: {geo: {required: ['summary'], properties: {summary: {const: false}}}}},
+            then: {properties: {resolvedGeo: {properties: {summary: {type: 'null'}}}}},
+            else: {properties: {resolvedGeo: {properties: {summary: {type: 'object'}}}}},
+          }],
           properties: {
             geo: { $ref: "#/$defs/geoConfig" },
             rowCount: { type: "integer", minimum: 0 },

@@ -61,3 +61,60 @@ for(const mutate of [g=>delete g.regions[1].markId,g=>delete g.ranking[0].series
 assert.throws(()=>fill(Array.from({length:10001},(_,status)=>({location:'North',status,count:1}))),/10000 observed marks/);
 assert.equal(fill(Array.from({length:10000},(_,status)=>({location:'North',status,count:1}))).regions.length,10001);
 console.log('Typed categorical Point geometry, per-group counts, colors, bounds and canonical SVG passed');
+
+// Synthetic device memberships overlap across categories: two groups of four
+// may contain the same devices, so their sum must not imply global distinctness.
+const presentation=structuredClone(fixture.block);
+presentation.geo.summary=false;
+presentation.geo.color.legendScope='observed';
+presentation.geo.color.rules.push(...Array.from({length:419},(_,i)=>({value:`unused-${i}`,color:'#aabbcc',label:`Unused category ${i}`})));
+const observed=fill(fixture.rows,presentation);
+assert.equal(observed.summary,null);
+assert.equal(observed.legend.rules.length,2);
+assert.deepEqual(observed.regions,geo.regions);
+assert.deepEqual(observed.ranking,geo.ranking);
+assert.equal(fill(fixture.rows,{...presentation,geo:{...presentation.geo,summary:true,color:{...presentation.geo.color,legendScope:'declared'}}}).legend.rules.length,421);
+assert.equal(fill(fixture.rows).summary.totalValue,'8');
+const observedPrint=buildReportPrintGeoSvg({resolvedGeo:observed});
+assert.equal((observedPrint.svg.match(/<circle /g)||[]).length,2);
+assert.equal(observedPrint.labelDetails.filter(label=>label.startsWith('Map legend:')).length,2);
+assert.ok(!observedPrint.labelDetails.some(label=>label.includes('Unused category')));
+const observedTyped=structuredClone(typedBlock);observedTyped.geo.color.legendScope='observed';
+for(const category of categories) {
+ const result=fill([{location:'North',status:category,count:4}],observedTyped);
+ assert.deepEqual(result.legend.rules,[{color:typedBlock.geo.color.rules.find(rule=>rule.value===category).color,label:JSON.stringify(category)}]);
+}
+assert.equal(fill([],presentation).legend,null);
+assert.equal(fill([{location:'North',status:'unmapped',count:4}],presentation).legend,null);
+assert.throws(()=>fill([{location:'Unknown',status:'A',count:4}],presentation),/unknown feature/);
+for(const schema of [reportSpecSchema,reportFillSchema]) {
+ const config={...schema.$defs.geoConfig,$defs:schema.$defs};
+ assert.equal(validateReportSchema(config,presentation.geo).valid,true);
+ for(const value of [null,'false',0]) assert.equal(validateReportSchema(config,{...presentation.geo,summary:value}).valid,false);
+ for(const value of [null,'all',false]) assert.equal(validateReportSchema(config,{...presentation.geo,color:{...presentation.geo.color,legendScope:value}}).valid,false);
+}
+const contentSchema={...reportFillSchema.$defs.geoMapBlock.properties.content,$defs:reportFillSchema.$defs};
+const content={geo:presentation.geo,rowCount:2,resolvedGeo:observed};
+assert.deepEqual(validateReportSchema(contentSchema,content).errors,[]);
+for(const mutate of [c=>delete c.geo.summary,c=>delete c.resolvedGeo.summary,c=>c.resolvedGeo.summary=geo.summary]) {
+ const invalid=structuredClone(content);mutate(invalid);assert.equal(validateReportSchema(contentSchema,invalid).valid,false);
+}
+
+const distinctFixture=JSON.parse(fs.readFileSync(new URL('../../doc/examples/sensor-distinct-device-geometry.json',import.meta.url)));
+assert.equal(new Set(Object.values(distinctFixture.deviceMemberships).flat()).size,6);
+assert.equal(distinctFixture.rows.reduce((sum,row)=>sum+row.count,0),8);
+const distinctGeo=fill(distinctFixture.rows,distinctFixture.block);
+assert.equal(distinctGeo.summary,null);
+assert.deepEqual(distinctGeo.regions.slice(1).map(r=>r.rawValue),[4,4]);
+assert.deepEqual(distinctGeo.legend.rules.map(r=>r.label),['Category A','Category B']);
+const tileBlock={id:'sites',kind:'geoMapBlock',geo:{shape:'us-states',key:'location',metric:{key:'count',label:'Distinct devices'},aggregate:'first',color:{field:'status',rules:presentation.geo.color.rules}}};
+const tileRows=[{location:'WA',status:'A',count:4},{location:'NY',status:'B',count:4}];
+const defaultTiles=fill(tileRows,tileBlock);
+assert.equal(defaultTiles.summary.totalValue,'8');
+assert.match(buildReportPrintGeoSvg({resolvedGeo:defaultTiles}).svg,/Total Distinct devices: 8/);
+tileBlock.geo.summary=false;tileBlock.geo.color.legendScope='observed';
+const observedTiles=fill(tileRows,tileBlock);
+assert.equal(observedTiles.summary,null);
+assert.equal(observedTiles.legend.rules.length,2);
+assert.deepEqual(observedTiles.regions,defaultTiles.regions);
+assert.doesNotMatch(buildReportPrintGeoSvg({resolvedGeo:observedTiles}).svg,/Total Distinct devices/);
