@@ -21,6 +21,7 @@ export default defineConfig({
       'src/components/lookup/LookupPickerDialog.render.test.jsx',
       'src/components/table/Basic.autoFetch.render.test.jsx',
       'src/components/table/Basic.serverSort.render.test.jsx',
+      'src/components/table/basic/QuickSearch.clientPaging.render.test.jsx',
       'src/components/dashboard/TableAnalytics.render.test.jsx',
       'src/components/dashboard/ReportRuntime.legend.render.test.jsx',
       'src/components/dashboard/DashboardTableContentSort.render.test.jsx',

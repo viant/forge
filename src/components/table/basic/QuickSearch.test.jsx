@@ -3,7 +3,7 @@ import {updateQuickSearch} from './QuickSearch.jsx';
 import {buildSetFilterSignal} from '../../../hooks/dataSource.js';
 const state = {filter:{Status:'Active',Name:'old'},page:3};
 const context={signals:{input:{peek:()=>state}},handlers:{dataSource:{
- setFilter:({filter})=>{Object.assign(state,buildSetFilterSignal(state,filter,'server'));},setPage:page=>{state.page=page;}
+ setFilter:({filter})=>{Object.assign(state,buildSetFilterSignal(state,filter,'server'));},setPage:page=>{Object.assign(state,{page,fetch:false});}
 }}};
 updateQuickSearch(context,'Name','Campaign 2');
 assert.deepEqual(state,{filter:{Status:'Active',Name:'Campaign 2'},page:1,fetch:true});

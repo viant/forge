@@ -1,7 +1,6 @@
 import NativeControlTarget from '../../../runtime/NativeControlTarget.jsx';
 import React, {useLayoutEffect, useRef, useState} from 'react';
 import {Button, InputGroup} from '@blueprintjs/core';
-import {batch} from '@preact/signals-react';
 import {useSignals} from '@preact/signals-react/runtime';
 
 export function updateQuickSearch(context, field, value) {
@@ -9,10 +8,9 @@ export function updateQuickSearch(context, field, value) {
     const filter = {...(current.filter || {})};
     if (String(value).trim()) filter[field] = value;
     else delete filter[field];
-    batch(() => {
-        context.handlers.dataSource.setFilter({filter});
-        context.handlers.dataSource.setPage(1);
-    });
+    // setFilter resets the page and owns the filter mode's fetch decision.
+    // A client-pagination setPage call would cancel a server-filter request.
+    return context.handlers.dataSource.setFilter({filter});
 }
 
 export default function QuickSearch({context, item, disabled = false, onCommit}) {
