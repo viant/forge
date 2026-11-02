@@ -112,7 +112,6 @@ const authored = buildPreviewAuthoredReport({
   rows,
   semanticSummary,
   hasMore: true,
-  error: new Error("Semantic validation prevented one preview refresh."),
 });
 
 assert.deepEqual(authored.document.layout.items, [
@@ -133,13 +132,16 @@ assert.deepEqual(authored.reportSpec.layoutIntent.blockOrder, [
 assert.deepEqual(authored.reportSpec.binding, config.binding);
 assert.equal(authored.reportSpec.semanticSummary.modelLabel, "Ad Delivery");
 assert.equal(authored.reportFill.datasets[0].provenance.hasMore, true);
-assert.deepEqual(authored.reportFill.diagnostics, [
-  {
-    code: "runtimePreviewError",
-    severity: "error",
-    message: "Semantic validation prevented one preview refresh.",
-  },
-]);
+assert.deepEqual(authored.reportFill.diagnostics, []);
+assert.equal(buildPreviewAuthoredReport({
+  container,
+  config,
+  state,
+  rows,
+  semanticSummary,
+  hasMore: true,
+  error: new Error("Semantic validation prevented one preview refresh."),
+}), null, "a failed refresh must not expose executable or exportable preview artifacts");
 assert.deepEqual(authored.reportFill.blocks[0].content.params, [
   {
     id: "dateRange",
