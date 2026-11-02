@@ -69606,13 +69606,19 @@ ${indent}${end}`;
     }
     return output;
   }
-  function buildReportPrintMarkdownLines(markdown, width, fontSize = REPORT_PRINT_THEME.bodyFontSize) {
+  function buildReportPrintMarkdownLines(markdown, width, fontSize = REPORT_PRINT_THEME.bodyFontSize, { paragraphs = false } = {}) {
     const output = [];
+    let paragraph = 0;
+    let boundary = true;
     for (const rawLine of String(markdown).replace(/\r\n/g, "\n").trim().split("\n")) {
       const protectedLine = protectReportMarkdownEscapes(rawLine);
       const line = protectedLine.text.replace(/!?(?:\[([^\]]+)\])\([^\)]+\)/g, "$1").replace(/^\s{0,3}#{1,6}\s*/, "").replace(/^\s*[-*+]\s+/, "").replace(/^\s*\d+\.\s+/, "");
       const runs = parseReportMarkdownInline(line).map((run) => ({ ...run, text: normalizeReportPrintText(protectedLine.restore(run.text)) }));
-      output.push(...wrapReportPrintTextRuns(runs, width, fontSize));
+      const wrapped = wrapReportPrintTextRuns(runs, width, fontSize);
+      const standalone = /^\s{0,3}#{1,6}\s|^\s*(?:[-*+]|\d+\.)\s/.test(rawLine);
+      if (boundary || standalone) paragraph += 1;
+      output.push(...wrapped.map((line2) => paragraphs && line2.text ? { ...line2, paragraph } : line2));
+      boundary = !rawLine.trim() || standalone;
     }
     return output;
   }
@@ -69896,7 +69902,8 @@ ${indent}${end}`;
     align = "",
     x: x2 = void 0,
     width = void 0,
-    onPageBreak = null
+    onPageBreak = null,
+    sequenceState = null
   } = {}) {
     var _a5, _b;
     const ensureLineSpace = (height) => {
@@ -69908,7 +69915,7 @@ ${indent}${end}`;
     };
     const boxX = (_a5 = normalizeNonNegativeNumber(x2)) != null ? _a5 : state.contentLeft;
     const boxWidth = (_b = normalizeNonNegativeNumber(width, { minimum: 1, allowZero: false })) != null ? _b : state.contentWidth;
-    let sequence = 0;
+    let sequence = (sequenceState == null ? void 0 : sequenceState.next) || 0;
     let firstElement = null;
     (Array.isArray(lines2) ? lines2 : []).forEach((line) => {
       if (!line && line !== "") {
@@ -69946,6 +69953,7 @@ ${indent}${end}`;
         sequence += 1;
       });
     });
+    if (sequenceState) sequenceState.next = sequence;
     return firstElement;
   }
   function reportPrintTitleHeight(state, block, layoutNote = "") {
@@ -70159,25 +70167,59 @@ ${indent}${end}`;
     });
   }
   function renderReportPrintTextSectionBlock(state = {}, block = {}, lines2 = [], {
-    layoutNote = ""
+    layoutNote = "",
+    paragraphs = false,
+    lineIdSuffix = "line"
   } = {}) {
     const titleHeight = reportPrintTitleHeight(state, block, layoutNote);
     const bodyHeight = lines2.reduce((height, line) => height + (line === "" || (line == null ? void 0 : line.text) === "" ? REPORT_PRINT_THEME.bodyLineHeight / 2 : (typeof line === "object" ? 1 : wrapReportPrintText(line, state.contentWidth).length) * REPORT_PRINT_THEME.bodyLineHeight), 0);
     const sectionHeight = titleHeight + bodyHeight;
     ensureReportPrintSpace(state, sectionHeight <= state.contentBottom - state.contentTop ? sectionHeight : titleHeight + REPORT_PRINT_THEME.bodyLineHeight);
     renderReportPrintSectionTitle(state, block, { layoutNote });
-    renderReportPrintTextLines(state, {
-      idPrefix: `${normalizeString41((block == null ? void 0 : block.id) || (block == null ? void 0 : block.kind) || "block")}__line`,
-      lines: lines2,
-      onPageBreak: () => renderReportPrintSectionTitle(state, block, { layoutNote, continuation: true })
-    });
+    const idPrefix = `${normalizeString41((block == null ? void 0 : block.id) || (block == null ? void 0 : block.kind) || "block")}__${lineIdSuffix}`;
+    const onPageBreak = () => renderReportPrintSectionTitle(state, block, { layoutNote, continuation: true });
+    if (!paragraphs) {
+      renderReportPrintTextLines(state, { idPrefix, lines: lines2, onPageBreak });
+    } else {
+      const sequenceState = { next: 0 };
+      const lineHeight = REPORT_PRINT_THEME.bodyLineHeight;
+      const continuationHeight = reportPrintTitleHeight(state, block, layoutNote);
+      const freshCapacity = Math.max(1, Math.floor((state.contentBottom - state.contentTop - continuationHeight) / lineHeight));
+      let index = 0;
+      while (index < lines2.length) {
+        const first = lines2[index];
+        if (!(first == null ? void 0 : first.text) || first.paragraph == null) {
+          renderReportPrintTextLines(state, { idPrefix, sequenceState, lines: [first], onPageBreak });
+          index += 1;
+          continue;
+        }
+        let end = index + 1;
+        while (end < lines2.length && lines2[end].paragraph === first.paragraph) end += 1;
+        while (index < end) {
+          const remaining = end - index;
+          let capacity = Math.max(0, Math.floor((state.contentBottom - state.cursorY) / lineHeight));
+          let count = Math.min(remaining, capacity);
+          if (remaining > count && remaining - count === 1) count -= 1;
+          if (count < Math.min(2, remaining) && capacity < freshCapacity) {
+            startNextReportPrintPage(state);
+            onPageBreak();
+            capacity = Math.max(0, Math.floor((state.contentBottom - state.cursorY) / lineHeight));
+            count = Math.min(remaining, capacity);
+            if (remaining > count && remaining - count === 1) count -= 1;
+          }
+          count = Math.max(1, count);
+          renderReportPrintTextLines(state, { idPrefix, sequenceState, lines: lines2.slice(index, index + count), onPageBreak });
+          index += count;
+        }
+      }
+    }
     finishReportPrintBlock(state);
   }
   function renderReportPrintMarkdownBlock(state = {}, block = {}, options = {}) {
     var _a5;
     const markdown = String(((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.markdown) || (block == null ? void 0 : block.markdown) || "");
-    const lines2 = [...markdown ? buildReportPrintMarkdownLines(markdown, state.contentWidth) : ["No narrative content."], ...reportExternalLinks(block).map((link) => `${link.label}: ${link.url}`)];
-    renderReportPrintTextSectionBlock(state, block, lines2, options);
+    const lines2 = [...markdown ? buildReportPrintMarkdownLines(markdown, state.contentWidth, REPORT_PRINT_THEME.bodyFontSize, { paragraphs: true }) : ["No narrative content."], ...reportExternalLinks(block).map((link) => `${link.label}: ${link.url}`)];
+    renderReportPrintTextSectionBlock(state, block, lines2, { ...options, paragraphs: true });
   }
   function renderReportPrintFilterBarBlock(state = {}, block = {}, options = {}) {
     var _a5;
@@ -70510,25 +70552,20 @@ ${indent}${end}`;
     });
     finishReportPrintBlock(state);
   }
-  function renderReportPrintInfoPanelBlock(state = {}, block = {}, {
-    layoutNote = ""
-  } = {}) {
+  function renderReportPrintInfoPanelBlock(state = {}, block = {}, options = {}) {
     var _a5, _b, _c;
-    ensureReportPrintSpace(
-      state,
-      REPORT_PRINT_THEME.titleLineHeight + REPORT_PRINT_THEME.bodyLineHeight * 2 + 8
-    );
-    renderReportPrintSectionTitle(state, block, { layoutNote });
-    const lines2 = [
+    const introductions = [
       normalizeString41(((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.eyebrow) || (block == null ? void 0 : block.eyebrow)),
-      normalizeString41(((_b = block == null ? void 0 : block.content) == null ? void 0 : _b.description) || (block == null ? void 0 : block.description)),
-      ...normalizeMarkdownToPlainText(((_c = block == null ? void 0 : block.content) == null ? void 0 : _c.body) || (block == null ? void 0 : block.body) || "").split("\n").map((entry) => normalizeString41(entry)).filter(Boolean)
+      normalizeString41(((_b = block == null ? void 0 : block.content) == null ? void 0 : _b.description) || (block == null ? void 0 : block.description))
     ].filter(Boolean);
-    renderReportPrintTextLines(state, {
-      idPrefix: `${normalizeString41((block == null ? void 0 : block.id) || (block == null ? void 0 : block.kind) || "block")}__info`,
-      lines: lines2.length > 0 ? lines2 : ["No info panel content available."]
+    const lines2 = introductions.flatMap((text4, index) => wrapReportPrintTextRuns([{ text: text4 }], state.contentWidth).map((line) => ({ ...line, paragraph: -(index + 1) })));
+    const body = String(((_c = block == null ? void 0 : block.content) == null ? void 0 : _c.body) || (block == null ? void 0 : block.body) || "");
+    if (body.trim()) lines2.push(...buildReportPrintMarkdownLines(body, state.contentWidth, REPORT_PRINT_THEME.bodyFontSize, { paragraphs: true }));
+    renderReportPrintTextSectionBlock(state, block, lines2, {
+      ...options,
+      paragraphs: true,
+      lineIdSuffix: "info"
     });
-    finishReportPrintBlock(state);
   }
   function renderReportPrintCalloutBlock(state = {}, block = {}, {
     layoutNote = ""
