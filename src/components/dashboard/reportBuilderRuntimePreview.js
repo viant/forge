@@ -658,6 +658,7 @@ export function buildReportBuilderRuntimePreview({
   hasMore = false,
   datasetPayloads = {},
   error = null,
+  loading = false,
   additionalDiagnostics = [],
   runtimeBlockId = "authoredRuntimePreview",
   runtimeTitle = "",
@@ -665,15 +666,23 @@ export function buildReportBuilderRuntimePreview({
   hostIntent = null,
   pageGeometry = null,
 } = {}) {
-  const artifacts = buildReportBuilderRuntimePreviewArtifacts({
-    model,
-    rows,
-    hasMore,
-    datasetPayloads,
-    error,
-    additionalDiagnostics,
-    pageGeometry,
-  });
+  let artifacts;
+  try {
+    artifacts = buildReportBuilderRuntimePreviewArtifacts({
+      model,
+      rows,
+      hasMore,
+      datasetPayloads,
+      error,
+      loading,
+      additionalDiagnostics,
+      pageGeometry,
+    });
+  } catch (error) {
+    // Completed inputs still use strict materialization. Surface a failed
+    // preview through the existing result frame, never as executable content.
+    return {error};
+  }
   if (!artifacts) {
     return null;
   }
@@ -703,10 +712,11 @@ export function buildReportBuilderRuntimePreviewArtifacts({
   hasMore = false,
   datasetPayloads = {},
   error = null,
+  loading = false,
   additionalDiagnostics = [],
   pageGeometry = null,
 } = {}) {
-  if (!model?.reportSpec) {
+  if (!model?.reportSpec || loading || error) {
     return null;
   }
   const metadataContext = resolveNormalizedReportSpecDocumentContext({
@@ -724,7 +734,7 @@ export function buildReportBuilderRuntimePreviewArtifacts({
     ? (normalizedReportSpec.datasets.find((dataset) => normalizeString(dataset?.id) === "primary")?.request || normalizedReportSpec.datasets[0]?.request || {})
     : {};
   const refinedRows = applyReportRuntimeRequestRefinements(Array.isArray(rows) ? rows : [], primaryRequest);
-  const reportFill = buildReportFillFromReportSpec(normalizedReportSpec, {
+  const payloads = {
     ...(datasetPayloads && typeof datasetPayloads === "object" && !Array.isArray(datasetPayloads)
       ? cloneValue(datasetPayloads)
       : {}),
@@ -736,7 +746,15 @@ export function buildReportBuilderRuntimePreviewArtifacts({
       hasMore: hasMore === true,
       diagnostics: normalizeRuntimePreviewDiagnostics(error, additionalDiagnostics),
     },
-  }, {
+  };
+  // Initial and refreshing builder state is not an executed empty report.
+  // Defer fill/print/export until its declared inputs are available; keep the
+  // strict materializer authoritative for completed data and export integrity.
+  const pending = (normalizedReportSpec.datasets || []).some(dataset => (
+    payloads[normalizeString(dataset?.id)] == null
+  ));
+  if (pending) return null;
+  const reportFill = buildReportFillFromReportSpec(normalizedReportSpec, payloads, {
     unifiedFilterContent: cloneValue(model?.unifiedFilterContent || null),
   });
   const previewReportFill = cloneValue(reportFill);

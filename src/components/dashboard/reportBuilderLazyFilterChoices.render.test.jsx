@@ -97,3 +97,36 @@ it.each(['hidden default','hidden selection','all hidden'])('keeps the actual Bu
   expect(JSON.stringify(context.signals.input.value)).toBe(inputBefore);
  } finally {window.localStorage.removeItem('reportBuilder.workspaceMode.desktop.sectionFilters');}
 });
+
+it.each(['empty','populated','failed','partial','warning'])('renders a Builder while an auxiliary chart is pending, then %s',async outcome=>{
+ const {default:ReportBuilder}=await import('./ReportBuilder.jsx');
+ const {createSectionFilterBuilderFixture}=await import('../../demos/theme/reportSectionFiltersFixture.js');
+ const {container,context}=createSectionFilterBuilderFixture();
+ // Inject a completed producer warning at the preview boundary; the real
+ // Builder, strict materializer, result frame and export controls still run.
+ const previewModule=await import('./reportBuilderRuntimePreview.js');
+ const buildPreview=previewModule.buildReportBuilderRuntimePreview;
+ const warningSpy=outcome==='warning'?vi.spyOn(previewModule,'buildReportBuilderRuntimePreview').mockImplementation(input=>buildPreview({...input,datasetPayloads:input.datasetPayloads?.auxiliary?{...input.datasetPayloads,auxiliary:{...input.datasetPayloads.auxiliary,diagnostics:[{severity:'warning',code:'incomplete',message:'Result incomplete.'}]}}:input.datasetPayloads})):null;
+ container.reportBuilder.dimensions=[{id:'category',key:'category',label:'Category',default:true}];
+ container.reportBuilder.datasets=[{id:'auxiliary',dataSourceRef:'auxiliaryReader',label:'Auxiliary observations',resultContract:{shape:'rowSet',rowPath:'rows',hasMorePath:'hasMore'},request:{measures:{amount:true},dimensions:{category:true},filters:{},limit:100,offset:0},dimensions:[{id:'category',key:'category',label:'Category',default:true,chartAxis:true}],measures:[{id:'amount',key:'amount',label:'Amount',default:true,format:'number2'}]}];
+ context.signals.windowForm.value.sectionFilters.reportDocumentBlocks=[{id:'observations',kind:'chartBlock',title:'Auxiliary observations',datasetRef:'auxiliary',chartSpec:{type:'bar',xField:'category',yFields:['amount']}}];
+ let resolve,reject;
+ const pending=new Promise((yes,no)=>{resolve=yes;reject=no});
+ const fetch=vi.fn(()=>pending);
+ const auxiliary={...context,identity:{dataSourceRef:'auxiliaryReader'},handlers:{...context.handlers,dataSource:{...context.handlers.dataSource,fetchRecords:fetch}}};
+ context.Context=id=>id==='auxiliaryReader'?auxiliary:context;
+ context.handlers.dataSource.fetchRecords=async()=>({rows:[],hasMore:false});
+ window.localStorage.setItem('reportBuilder.workspaceMode.desktop.sectionFilters',JSON.stringify('report'));
+ try {
+  await act(async()=>{root.render(<ReportBuilder container={container} context={context}/>);await Promise.resolve();});
+  expect(fetch).toHaveBeenCalled();
+  expect(host.textContent).toMatch(/Preparing report|Refreshing preview|Loading report data/);
+  expect([...host.querySelectorAll('button')].find(button=>button.textContent.trim()==='Export')?.disabled).toBe(true);
+  expect(host.textContent).not.toContain('Failed to render dashboard block');
+  await act(async()=>{if(outcome==='failed')reject(new Error('Auxiliary request failed. Retry loading the data.'));else resolve({rows:outcome==='populated'?[{category:'Example',amount:7}]:[],hasMore:outcome==='partial'});await pending.catch(()=>{});});
+  expect(host.textContent).not.toContain('Failed to render dashboard block');
+  if(outcome==='warning'){expect(warningSpy).toHaveBeenCalled();}
+  if(['failed','partial','warning'].includes(outcome)){expect(host.textContent).toMatch(/couldn't prepare|couldn't compile|request failed/i);expect([...host.querySelectorAll('button')].find(button=>button.textContent.trim()==='Export')?.disabled).toBe(true);}
+  else {expect(host.textContent).toContain('Auxiliary observations');expect(host.textContent).not.toMatch(/Preparing report|Refreshing preview/);}
+ }finally{warningSpy?.mockRestore();window.localStorage.removeItem('reportBuilder.workspaceMode.desktop.sectionFilters');}
+});

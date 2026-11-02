@@ -205,12 +205,16 @@ export async function fetchReportRuntimePreviewDatasetPayloadResult({
     cancelled: false,
     payloads: Object.fromEntries(entries.map(([datasetId, payload]) => [datasetId, payload])),
     freshDatasetIds: entries
-      .filter(([, , fresh]) => fresh === true)
+      .filter(([, payload, fresh]) => fresh === true
+        && !(payload?.diagnostics || []).some(diagnostic => diagnostic?.severity === "error"))
       .map(([datasetId]) => datasetId),
     freshnessFailedDatasetIds: entries
       .filter(([, , , freshnessError]) => !!freshnessError)
       .map(([datasetId]) => datasetId),
-    error: entries.map(([, , , error]) => error).find(Boolean) || null,
+    error: entries.map(([, , , error]) => error).find(Boolean)
+      || entries.flatMap(([, payload]) => payload?.diagnostics || [])
+        .find(diagnostic => diagnostic?.severity === "error")
+      || null,
   };
 }
 

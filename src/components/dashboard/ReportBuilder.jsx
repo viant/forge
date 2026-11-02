@@ -10409,7 +10409,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             rows: primaryRows,
             hasMore: primaryHasMore,
             datasetPayloads: runtimePreviewDatasetPayloadState.payloads,
-            error: runtimePreviewRowsSource.error,
+            error: runtimePreviewRowsSource.error || runtimePreviewDatasetPayloadState.error,
+            loading: runtimePreviewRowsSource.loading || runtimePreviewDatasetPayloadState.loading,
             additionalDiagnostics: [
                 ...primaryDiagnostics,
                 ...runtimePreviewArtifactDiagnostics,
@@ -10424,7 +10425,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                 || (reportWorkspaceMode ? "" : "Compiled from the current builder state using the generic Forge runtime contract."),
             hostIntent: runtimePreviewHostIntent,
         });
-    }, [frozenRestore, canRunReport, authoredDocumentCompileValidation.valid, authoredDocumentBlockDiagnostics, authoredRuntimePreviewModel, container, displayConfig, reportWorkspaceMode, runtimePreviewDatasetPayloadState.payloads, runtimePreviewArtifactDiagnostics, runtimePreviewConfig?.subtitle, runtimePreviewConfig?.title, runtimePreviewDetailDiagnostic, runtimePreviewHostIntent, runtimePreviewPrimaryDatasetPayload?.diagnostics, runtimePreviewPrimaryDatasetPayload?.hasMore, runtimePreviewPrimaryDatasetPayload?.rows, runtimePreviewRowsSource.error, runtimePreviewRowsSource.hasMore, runtimePreviewRowsSource.rows, state]);
+    }, [frozenRestore, canRunReport, authoredDocumentCompileValidation.valid, authoredDocumentBlockDiagnostics, authoredRuntimePreviewModel, container, displayConfig, reportWorkspaceMode, runtimePreviewDatasetPayloadState.payloads, runtimePreviewDatasetPayloadState.loading, runtimePreviewDatasetPayloadState.error, runtimePreviewArtifactDiagnostics, runtimePreviewConfig?.subtitle, runtimePreviewConfig?.title, runtimePreviewDetailDiagnostic, runtimePreviewHostIntent, runtimePreviewPrimaryDatasetPayload?.diagnostics, runtimePreviewPrimaryDatasetPayload?.hasMore, runtimePreviewPrimaryDatasetPayload?.rows, runtimePreviewRowsSource.error, runtimePreviewRowsSource.loading, runtimePreviewRowsSource.hasMore, runtimePreviewRowsSource.rows, state]);
     const runtimeExportMetadata = useMemo(() => ({
         ...(reportOptionDefinitions.length ? { reportOptions: reportOptionDefinitions } : {}),
         conversationId: String(container?.conversationId || builderContext?.conversationId || builderContext?.windowState?.conversationId || "").trim(),
@@ -11054,7 +11055,9 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         () => authoredReportCsvTables(runtimePreviewArtifact?.document, runtimePreviewArtifact?.reportFill),
         [runtimePreviewArtifact?.document, runtimePreviewArtifact?.reportFill],
     );
-    const canDownloadCsv = authoredDocumentCompileValidation.valid && (authoredCsvTables.length
+    const canDownloadCsv = authoredDocumentCompileValidation.valid
+        && (!authoredRuntimeSurfaceEnabled || !!runtimePreviewArtifact?.reportFill)
+        && (authoredCsvTables.length
         ? authoredCsvTables.some(table => !table.unavailable)
         : Array.isArray(selectedColumns) && selectedColumns.length > 0
             && Array.isArray(exportCollection) && exportCollection.length > 0);
@@ -11104,7 +11107,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         readinessIssueKind: readiness.issueKind,
         runtimePreviewArtifactDiagnostics,
         runtimePreviewBlockedState,
-        runtimePreviewErrorDescription: renderReportBuilderError(runtimePreviewRowsSource.error),
+        runtimePreviewErrorDescription: renderReportBuilderError(runtimePreviewRowsSource.error || runtimePreviewDatasetPayloadState.error || runtimePreviewArtifact?.error),
         presentationMode: reportWorkspaceMode ? "report" : "preview",
     }), [
         frozenRestore,
@@ -11739,6 +11742,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     }, [backendSharedArtifactsListResponse, listReportDocumentsResponse, listReportDocumentsSelectedReportId]);
 
     const downloadCsv = React.useCallback((tableId) => {
+        if (!canDownloadCsv) return;
         let content;
         if (authoredCsvTables.length) {
             const table = tableId ? authoredCsvTables.find(entry => entry.id === tableId)
@@ -11772,7 +11776,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-    }, [authoredCsvTables, container?.id, exportCollection, locale, selectedColumns]);
+    }, [authoredCsvTables, canDownloadCsv, container?.id, exportCollection, locale, selectedColumns]);
 
     const openCompactSheet = React.useCallback((tab = "scope") => {
         setCompactChartSheetOpen(false);

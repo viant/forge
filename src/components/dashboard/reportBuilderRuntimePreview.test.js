@@ -1625,15 +1625,7 @@ const semanticRequestErrorPreview = buildReportBuilderRuntimePreview({
   hasMore: false,
   error: semanticRequestError,
 });
-assert.deepEqual(semanticRequestErrorPreview.reportFill.diagnostics, [
-  {
-    code: "semanticModelError",
-    severity: "error",
-    path: "selection.modelRef",
-    message: "Semantic model metadata failed.",
-    suggestedFix: "Retry loading the semantic model or choose a different semantic binding.",
-  },
-]);
+assert.equal(semanticRequestErrorPreview, null, "failed reads belong in the result frame, not executable/export artifacts");
 
 const transportTimeoutError = new Error('GET error: 500 Internal Server Error: code: -32603, message: code: -32603, message: failed to send request: Post "http://source1.example.invalid/mcp": dial tcp 10.55.130.249:5000: i/o timeout, data: [123]');
 const transportTimeoutPreview = buildReportBuilderRuntimePreview({
@@ -1642,13 +1634,7 @@ const transportTimeoutPreview = buildReportBuilderRuntimePreview({
   hasMore: false,
   error: transportTimeoutError,
 });
-assert.deepEqual(transportTimeoutPreview.reportFill.diagnostics, [
-  {
-    code: "runtimePreviewError",
-    severity: "error",
-    message: "The reporting service at http://source1.example.invalid/mcp did not respond in time. Try again after the service is available.",
-  },
-]);
+assert.equal(transportTimeoutPreview, null, "transport failures cannot produce export artifacts");
 
 const authoredBarsModel = buildReportBuilderRuntimePreviewModel({
   container,

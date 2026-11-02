@@ -319,7 +319,7 @@ export function buildReportBuilderAuthoredRuntimePreviewState({
     const runtimeConfig = runtimePreviewArtifact?.runtimeBlock?.dashboard?.reportRuntime || null;
     const hasRuntimeRows = resolveRuntimeHasRows(runtimeConfig);
     const loading = !!runtimePreviewRowsSource?.loading || runtimePreviewDatasetState.loading === true;
-    const error = runtimePreviewRowsSource?.error || runtimePreviewDatasetState.error || null;
+    const error = runtimePreviewRowsSource?.error || runtimePreviewDatasetState.error || runtimePreviewArtifact?.error || null;
     const diagnostics = Array.isArray(runtimePreviewArtifactDiagnostics)
         ? runtimePreviewArtifactDiagnostics
         : [];
