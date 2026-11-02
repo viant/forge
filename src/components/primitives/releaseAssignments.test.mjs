@@ -23,3 +23,12 @@ test('unknown roots, missing inventories, inactive channels and last artifact re
  assert.throws(()=>assignmentPlan([{...channel('main',[connection]),activated:false}],root,['main']),/not active/);
  assert.throws(()=>assignmentPlan([],root,['invented']),/no longer exists/);
 });
+
+test('unselected older artifact revisions in other releases are preserved',()=>{
+ const old={...root,version:1,hash:'exact-one'};
+ const preview=channel('preview',[connection,old]);
+ const main=channel('main',[unrelated]);
+ const changes=assignmentPlan([preview,main],root,['main']);
+ assert.equal(changes.length,1);assert.equal(changes[0].key.name,'main');assert.deepEqual(preview.bundle.roots,[connection,old]);
+ assert.deepEqual(assignmentPlan([preview],root,[]),[]);
+});

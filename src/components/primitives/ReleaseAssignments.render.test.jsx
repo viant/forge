@@ -32,3 +32,14 @@ it('clears the host dirty guard when membership edits are reverted',async()=>{
  await click(v.host.querySelector('[aria-label="Include in main"]'));expect(onDirtyChange).toHaveBeenLastCalledWith(true);
  await click(v.host.querySelector('[aria-label="Include in main"]'));expect(onDirtyChange).toHaveBeenLastCalledWith(false);expect(api.publish).not.toHaveBeenCalled();await v.close();
 });
+
+it('shows another artifact revision without selecting or silently upgrading its release',async()=>{
+ const older={...root,version:1,hash:'one'};
+ const preview={...channel('preview'),bundle:{roots:[connection,older]}};
+ const api={list:vi.fn(async()=>[preview,channel('main')]),publish:vi.fn(async input=>({status:'active',activated:true,channel:{key:input.key,revision:4}}))};
+ const v=await mount(api);
+ expect(v.host.querySelector('[aria-label="Include in preview"]').checked).toBe(false);
+ expect(v.host.textContent).toContain('contains another artifact revision 1');
+ await click(v.host.querySelector('[aria-label="Include in main"]'));await click(button(v.host,'Review assignments'));await click(button(v.host,'Apply and publish release assignments'));
+ expect(api.publish).toHaveBeenCalledOnce();expect(api.publish.mock.calls[0][0].key.name).toBe('main');await v.close();
+});

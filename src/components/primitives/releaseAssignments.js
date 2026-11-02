@@ -14,7 +14,10 @@ export function assignmentPlan(channels, root, selectedNames) {
     if(!Array.isArray(channel.bundle?.roots))throw new Error(`Included artifacts for ${name} are unavailable. Reload before applying.`);
     const prior=channel.bundle.roots.filter(item=>releaseArtifactID(item)===releaseArtifactID(root));
     const wants=desired.has(name);
-    if(wants && prior.length===1 && releaseRootID(prior[0])===releaseRootID(root) || !wants&&!prior.length)continue;
+    const exact=prior.some(item=>releaseRootID(item)===releaseRootID(root));
+    // Other revisions are not membership in the selected exact root. They
+    // change only when the user explicitly selects this channel to replace it.
+    if(wants&&exact || !wants&&!exact)continue;
     if(channel.releaseStatus!=='active'||channel.activated!==true)throw new Error(`${name} is not active. Reload its release status before changing assignments.`);
     if(!Array.isArray(channel.policies)||!channel.policies.length)throw new Error(`${name} has no verified audience. Open Releases to configure it.`);
     const roots=channel.bundle.roots.filter(item=>releaseArtifactID(item)!==releaseArtifactID(root));
