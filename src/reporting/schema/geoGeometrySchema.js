@@ -37,7 +37,7 @@ export const geoPointSizeRequirement = {
   if: {properties: {geometry: {properties: {features: {type: 'array', items: {
     properties: {geometry: {properties: {type: {enum: ['Polygon', 'MultiPolygon']}}}},
   }}}}}},
-  then: {properties: {symbolSize: false}},
+  then: {properties: {symbolSize: false, seriesField: false}},
   else: {required: ['symbolSize']},
 };
 
@@ -47,6 +47,21 @@ export function geoConfigWithGeometry(base) {
     {...base, properties: {...legacyProperties, shape: {enum: ['us-states', 'us-state-tiles', 'world']}}},
     {...base, allOf: [geoPointSizeRequirement], required: [...base.required, 'shape', 'geometry', 'projection'], properties: {...base.properties, shape: {const: 'geojson'},
       symbolSize: geoSymbolSizeSchema,
+      seriesField: {type: 'string', minLength: 1, pattern: '\\S'},
     }},
   ]};
 }
+
+export const geoSeriesScalarSchema = {type: ['null', 'string', 'number', 'boolean']};
+const noSeries = {properties: {markId: false, seriesValue: false}};
+const seriesRegion = {if: {required: ['symbol']}, then: {required: ['markId', 'seriesValue']}, else: noSeries};
+const regionCopies = (item, bounded = true) => ({properties: {
+  regions: {type: 'array', ...(bounded ? {maxItems: 12000} : {}), items: item},
+  ranking: {type: 'array', ...(bounded ? {maxItems: 10000} : {}), items: item},
+  activeRegion: {anyOf: [{type: 'null'}, {type: 'object', ...item}]},
+}});
+export const resolvedGeoSeriesRequirement = {
+  if: {required: ['seriesField']},
+  then: {allOf: [{properties: {shape: {const: 'geojson'}}}, regionCopies(seriesRegion)]},
+  else: regionCopies(noSeries, false),
+};

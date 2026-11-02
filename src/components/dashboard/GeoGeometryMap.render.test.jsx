@@ -9,6 +9,38 @@ import {renderToStaticMarkup} from 'react-dom/server';
 import {DEFAULT_GEO_PALETTE} from './geoMapUtils.js';
 import points from '../../../doc/examples/sensor-point-geometry.json';
 import {buildReportPrintGeoSvg} from '../../reporting/reportPrintGeoSvg.js';
+import categories from '../../../doc/examples/sensor-category-point-geometry.json';
+it('selects every coincident categorical mark independently while callbacks retain location identity',async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ const geo=buildReportFillGeoPayload(categories.block,categories.rows);
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host),onSelect=vi.fn();
+ try {
+  await act(async()=>root.render(<GeoGeometryMap resolvedGeo={geo} onSelect={onSelect}/>));
+  const marks=[...host.querySelectorAll('[data-mark-id]')];
+  expect(marks).toHaveLength(2);
+  expect(marks.map(mark=>[mark.getAttribute('cx'),mark.getAttribute('cy')])).toEqual([['480','250'],['480','250']]);
+  expect(marks.map(mark=>mark.getAttribute('fill'))).toEqual(['#336699','#cc6633']);
+  await act(async()=>root.render(<GeoGeometryMap resolvedGeo={{...geo,regions:[...geo.regions].reverse()}} onSelect={onSelect}/>));
+  expect([...host.querySelectorAll('[data-mark-id]')].map(mark=>mark.getAttribute('data-mark-id'))).toEqual(marks.map(mark=>mark.getAttribute('data-mark-id')));
+  await act(async()=>root.render(<GeoGeometryMap resolvedGeo={geo} onSelect={onSelect}/>));
+  const buttons=[...host.querySelectorAll('button')];expect(buttons).toHaveLength(3);
+  for(const [index,button] of buttons.slice(1).entries()) {
+   button.focus();expect(document.activeElement).toBe(button);
+   await act(async()=>button.click());
+   expect(onSelect.mock.calls.at(-1)[0]).toMatchObject({key:'North',seriesValue:['A','B'][index],rawValue:4,markId:geo.regions[index+1].markId});
+   expect(host.querySelectorAll('[aria-pressed="true"]')).toHaveLength(1);
+   expect(button.getAttribute('aria-pressed')).toBe('true');
+   expect(host.querySelector('[role=status]').textContent).toContain(`series ${['A','B'][index]}`);
+  }
+  await act(async()=>marks[0].dispatchEvent(new MouseEvent('click',{bubbles:true})));
+  expect(onSelect.mock.calls.at(-1)[0].seriesValue).toBe('A');
+  const withC=buildReportFillGeoPayload(categories.block,[...categories.rows,{location:'North',status:'C',count:2}]);
+  await act(async()=>root.render(<GeoGeometryMap resolvedGeo={withC} onSelect={onSelect}/>));
+  expect(host.querySelectorAll('[data-mark-id]')).toHaveLength(3);
+  expect(host.querySelectorAll('button')).toHaveLength(4);
+  expect(host.querySelectorAll('[aria-pressed="true"]')).toHaveLength(1);
+ } finally {await act(async()=>root.unmount());host.remove();}
+});
 it('paints larger colocated bubbles first in screen and print, retaining small hit targets and all controls',async()=>{
  globalThis.IS_REACT_ACT_ENVIRONMENT=true;
  const example=structuredClone(points);

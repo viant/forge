@@ -48288,8 +48288,20 @@ Please __addLocaleData before adding additional unit data`);
     if: { properties: { geometry: { properties: { features: { type: "array", items: {
       properties: { geometry: { properties: { type: { enum: ["Polygon", "MultiPolygon"] } } } }
     } } } } } },
-    then: { properties: { symbolSize: false } },
+    then: { properties: { symbolSize: false, seriesField: false } },
     else: { required: ["symbolSize"] }
+  };
+  var noSeries = { properties: { markId: false, seriesValue: false } };
+  var seriesRegion = { if: { required: ["symbol"] }, then: { required: ["markId", "seriesValue"] }, else: noSeries };
+  var regionCopies = (item, bounded2 = true) => ({ properties: {
+    regions: { type: "array", ...bounded2 ? { maxItems: 12e3 } : {}, items: item },
+    ranking: { type: "array", ...bounded2 ? { maxItems: 1e4 } : {}, items: item },
+    activeRegion: { anyOf: [{ type: "null" }, { type: "object", ...item }] }
+  } });
+  var resolvedGeoSeriesRequirement = {
+    if: { required: ["seriesField"] },
+    then: { allOf: [{ properties: { shape: { const: "geojson" } } }, regionCopies(seriesRegion)] },
+    else: regionCopies(noSeries, false)
   };
 
   // src/reporting/schema/reportSchemaValidator.js
@@ -60116,6 +60128,47 @@ ${indent}${end}`;
     return byKey;
   }
 
+  // src/reporting/geoSeries.js
+  var GEO_MAX_MARKS = 1e4;
+  function resolveGeoSeriesField(row, path2) {
+    if (typeof path2 !== "string") return void 0;
+    let value = row;
+    for (const part of path2.split(".")) {
+      if (value === null || typeof value !== "object" || !Object.hasOwn(value, part)) return void 0;
+      value = value[part];
+    }
+    return value;
+  }
+  var compareGeoSeriesMarks = (a4, b3) => a4.markId < b3.markId ? -1 : a4.markId > b3.markId ? 1 : 0;
+  function geoSeriesIdentity(key2, value) {
+    if (value !== null && !["string", "number", "boolean"].includes(typeof value) || typeof value === "number" && !Number.isFinite(value)) {
+      throw new Error("geo.seriesField must resolve to a present scalar (null, string, finite number or boolean)");
+    }
+    return JSON.stringify([key2, value]);
+  }
+  var geoSeriesLabel = (value) => value === null ? "No value" : String(value);
+  var ruleField = (rule) => ["value", "equals", "when"].find((key2) => Object.hasOwn(rule, key2));
+  var geoSeriesRuleLabel = (rule) => {
+    var _a5;
+    return String((_a5 = rule.label) != null ? _a5 : ruleField(rule) === void 0 ? "Rule" : geoSeriesLabel(rule[ruleField(rule)]));
+  };
+  function findGeoSeriesColorRule(row, config) {
+    var _a5;
+    const value = resolveGeoSeriesField(row, config.field);
+    return config.field ? (_a5 = config.rules) == null ? void 0 : _a5.find((rule) => {
+      const field2 = ruleField(rule);
+      return field2 !== void 0 && rule[field2] === value;
+    }) : void 0;
+  }
+  function geoRenderEntries(geo) {
+    if (!geo.seriesField) {
+      const regions2 = new Map(geo.regions.map((region) => [region.key, region]));
+      return geo.geometry.features.map((feature) => ({ feature, region: regions2.get(feature.key) }));
+    }
+    const features = new Map(geo.geometry.features.map((feature) => [feature.key, feature]));
+    return geo.regions.map((region) => ({ feature: features.get(region.key), region }));
+  }
+
   // src/reporting/reportFillGeoGeometry.js
   var aggregates2 = ["sum", "avg", "min", "max", "first"];
   function aggregateValues(values, aggregate, key2) {
@@ -60138,26 +60191,50 @@ ${indent}${end}`;
     const maxRadius = (_c = size == null ? void 0 : size.maxRadius) != null ? _c : 24;
     if (size && (!aggregates2.includes(sizeAggregate) || typeof maxRadius !== "number" || !Number.isFinite(maxRadius) || maxRadius < 1 || maxRadius > 64)) throw new Error("geo.symbolSize requires a supported aggregate and maxRadius within [1,64]");
     const pointKeys = new Set(geometry.features.filter((feature) => feature.point).map((feature) => feature.key));
+    const seriesField = block.geo.seriesField;
+    if (seriesField !== void 0 && (typeof seriesField !== "string" || !seriesField.trim() || !hasPoints)) throw new Error("geo.seriesField requires a nonempty field and Point geometry");
+    const series = seriesField !== void 0;
+    const marks = /* @__PURE__ */ new Map();
     const groups = new Map(geometry.features.map((feature) => [feature.key, []]));
     for (const [index, row] of rows.entries()) {
       const key2 = resolveKey(row, config.key);
       if (typeof key2 !== "string" || !groups.has(key2)) throw new Error(`geo row ${index}: unknown feature key "${String(key2)}" in ${config.key}`);
+      let markId;
+      if (series) {
+        if (!pointKeys.has(key2)) throw new Error(`geo row ${index}: series data requires Point geometry; polygon "${key2}" is a static backdrop`);
+        const seriesValue = resolveGeoSeriesField(row, seriesField);
+        markId = geoSeriesIdentity(key2, seriesValue);
+        if (!marks.has(markId)) {
+          if (marks.size >= GEO_MAX_MARKS) throw new Error(`geo.seriesField supports at most ${GEO_MAX_MARKS} observed marks`);
+          marks.set(markId, { key: key2, markId, seriesValue, rows: [] });
+        }
+        marks.get(markId).rows.push(row);
+      }
       const value = resolveKey(row, config.metricKey);
       if (value != null && (typeof value !== "number" || !Number.isFinite(value))) throw new Error(`geo row ${index}: ${config.metricKey} must be finite number or null`);
       const sizeValue = size && pointKeys.has(key2) ? resolveKey(row, size.key) : null;
       if (sizeValue != null && (typeof sizeValue !== "number" || !Number.isFinite(sizeValue) || sizeValue < 0)) throw new Error(`geo row ${index}: ${size.key} symbol size must be a nonnegative finite number or null`);
       groups.get(key2).push(row);
     }
-    const regions2 = geometry.features.map((feature) => {
-      const matched = groups.get(feature.key);
+    const featureByKey = new Map(geometry.features.map((feature) => [feature.key, feature]));
+    const entries2 = series ? [
+      ...geometry.features.filter((feature) => !feature.point).map((feature) => ({ feature, matched: [] })),
+      ...Array.from(marks.values()).sort(compareGeoSeriesMarks).map((mark) => ({ feature: featureByKey.get(mark.key), matched: mark.rows, mark }))
+    ] : geometry.features.map((feature) => ({ feature, matched: groups.get(feature.key) }));
+    const regionRows = /* @__PURE__ */ new Map();
+    const regions2 = entries2.map(({ feature, matched, mark }) => {
+      var _a6;
       const values2 = matched.map((row) => resolveKey(row, config.metricKey)).filter((value) => value != null);
       const rawValue = aggregateValues(values2, config.aggregate, feature.key);
       const sizeValue = feature.point ? aggregateValues(matched.map((row) => resolveKey(row, size.key)).filter((value) => value != null), sizeAggregate, feature.key) : null;
-      const rule = findGeoColorRule(matched[0], config.color);
+      const rule = series ? findGeoSeriesColorRule(matched[0], config.color) : findGeoColorRule(matched[0], config.color);
+      if (series && matched.some((row) => findGeoSeriesColorRule(row, config.color) !== rule)) throw new Error(`geo mark ${mark.markId}: conflicting color rules within a location/series group`);
+      regionRows.set((_a6 = mark == null ? void 0 : mark.markId) != null ? _a6 : feature.key, { row: matched[0], rule });
       return {
         key: feature.key,
         label: feature.label,
         rawValue,
+        ...mark ? { markId: mark.markId, seriesValue: mark.seriesValue } : {},
         ...feature.point ? { symbol: { rawValue: sizeValue, displayValue: sizeValue == null ? matched.length ? "No value" : "No row" : formatDashboardValue(sizeValue === 0 ? 0 : sizeValue, size.format || "number", locale2), label: size.label || size.key, radius: 0 } } : {},
         displayValue: rawValue == null ? matched.length ? "No value" : "No row" : formatDashboardValue(rawValue, config.format, locale2),
         color: config.color.empty,
@@ -60178,9 +60255,13 @@ ${indent}${end}`;
     const min = values.length ? values.reduce((a4, b3) => Math.min(a4, b3), Infinity) : 0;
     const max = values.length ? values.reduce((a4, b3) => Math.max(a4, b3), -Infinity) : 0;
     regions2.forEach((region) => {
-      if (region.rawValue != null) region.color = resolveGeoColor({ row: groups.get(region.key)[0], value: region.rawValue, minValue: min, maxValue: max, colorConfig: config.color });
+      var _a6, _b2;
+      if (region.rawValue != null) {
+        const entry = regionRows.get((_a6 = region.markId) != null ? _a6 : region.key);
+        region.color = series && ((_b2 = entry.rule) == null ? void 0 : _b2.color) ? entry.rule.color : resolveGeoColor({ row: entry.row, value: region.rawValue, minValue: min, maxValue: max, colorConfig: series ? { ...config.color, field: void 0 } : config.color });
+      }
     });
-    const ranking = regions2.filter((region) => region.rawValue != null).sort((a4, b3) => b3.rawValue - a4.rawValue || a4.key.localeCompare(b3.key));
+    const ranking = regions2.filter((region) => region.rawValue != null).sort((a4, b3) => b3.rawValue - a4.rawValue || (series ? compareGeoSeriesMarks(a4, b3) : a4.key.localeCompare(b3.key)));
     const rules = config.color.field && ((_d = config.color.rules) == null ? void 0 : _d.filter((rule) => rule.color));
     return {
       shape: "geojson",
@@ -60189,13 +60270,14 @@ ${indent}${end}`;
       labelField: config.labelKey || "",
       metricKey: config.metricKey,
       metricLabel: config.metricLabel,
+      ...series ? { seriesField } : {},
       format: config.format || "number",
       aggregate: config.aggregate,
       regions: regions2,
       ranking,
-      activeRegion: ranking[0] || regions2[0],
+      activeRegion: ranking[0] || regions2[0] || null,
       summary: { regionCount: regions2.length, totalValue: formatDashboardValue(values.reduce((a4, b3) => a4 + b3, 0), config.format, locale2), topKey: ((_e = ranking[0]) == null ? void 0 : _e.key) || "" },
-      legend: !config.legend ? null : (rules == null ? void 0 : rules.length) ? { rules: rules.map((rule) => ({ color: rule.color, label: String(rule.label || rule.value || rule.equals || rule.when) })) } : { min: formatDashboardValue(min, config.format, locale2), max: formatDashboardValue(max, config.format, locale2), palette: config.color.palette }
+      legend: !config.legend ? null : (rules == null ? void 0 : rules.length) ? { rules: rules.map((rule) => ({ color: rule.color, label: series ? geoSeriesRuleLabel(rule) : String(rule.label || rule.value || rule.equals || rule.when) })) } : { min: formatDashboardValue(min, config.format, locale2), max: formatDashboardValue(max, config.format, locale2), palette: config.color.palette }
     };
   }
 
@@ -63261,19 +63343,11 @@ ${indent}${end}`;
   }
 
   // src/reporting/geoPointMark.js
-  function geoPaintOrder(features, regionsByKey) {
-    return features.map((feature, index) => ({ feature, index })).sort((a4, b3) => {
-      const layer = Number(!!a4.feature.point) - Number(!!b3.feature.point);
-      if (layer) return layer;
-      if (a4.feature.point) {
-        const size = regionsByKey.get(b3.feature.key).symbol.radius - regionsByKey.get(a4.feature.key).symbol.radius;
-        if (size) return size;
-      }
-      return a4.index - b3.index;
-    }).map((entry) => entry.feature);
+  function geoPaintEntries(geo) {
+    return geoRenderEntries(geo).map((entry, index) => ({ ...entry, index })).sort((a4, b3) => Number(!!a4.feature.point) - Number(!!b3.feature.point) || (a4.feature.point ? b3.region.symbol.radius - a4.region.symbol.radius : 0) || (geo.seriesField && a4.feature.point ? compareGeoSeriesMarks(a4.region, b3.region) : 0) || a4.index - b3.index);
   }
   function geoRegionDescription(region) {
-    return `${region.label}: ${region.displayValue}${region.symbol ? `; ${region.symbol.label}: ${region.symbol.displayValue}` : ""}`;
+    return `${region.label}${region.markId !== void 0 ? `; series ${geoSeriesLabel(region.seriesValue)}` : ""}: ${region.displayValue}${region.symbol ? `; ${region.symbol.label}: ${region.symbol.displayValue}` : ""}`;
   }
   function geoPointMark(feature, region) {
     const [cx, cy] = feature.point;
@@ -63393,10 +63467,8 @@ ${indent}${end}`;
       };
     }
     if (geo.shape === "geojson" && geo.geometry) {
-      const byKey = new Map(geo.regions.map((region) => [region.key, region]));
       const mapHeight2 = 500;
-      const paths = geoPaintOrder(geo.geometry.features, byKey).map((feature) => {
-        const region = byKey.get(feature.key);
+      const paths = geoPaintEntries(geo).map(({ feature, region }) => {
         if (feature.point) {
           const mark = geoPointMark(feature, region);
           const attributes = Object.entries({ ...mark.attributes, stroke: mark.attributes.stroke || "#bccbd6", "stroke-width": 1 }).map(([key2, value]) => `${key2}="${escapeXml2(String(value))}"`).join(" ");

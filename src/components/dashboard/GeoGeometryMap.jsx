@@ -1,29 +1,29 @@
 import React, {useState} from 'react';
 import Typography from '../Typography.jsx';
 import Button from '../Button.jsx';
-import {geoPointMark, geoRegionDescription, geoPaintOrder} from '../../reporting/geoPointMark.js';
+import {geoPointMark, geoRegionDescription, geoPaintEntries} from '../../reporting/geoPointMark.js';
+import {geoMarkIdentity} from '../../reporting/geoSeries.js';
 import './geoGeometryMap.css';
 
 export default function GeoGeometryMap({resolvedGeo, title = 'Region map', onSelect}) {
   const [selectedKey, setSelectedKey] = useState(null);
   const regions = resolvedGeo.regions || [];
-  const byKey = new Map(regions.map(region => [region.key, region]));
+  const byKey = new Map(regions.map(region => [geoMarkIdentity(region), region]));
   const selected = byKey.get(selectedKey) || resolvedGeo.activeRegion;
   const selectedFeature = resolvedGeo.geometry.features.find(feature => feature.key === selected?.key);
   const hasPoints = resolvedGeo.geometry.features.some(feature => feature.point);
-  const select = region => {setSelectedKey(region.key); onSelect?.(region);};
+  const select = region => {setSelectedKey(geoMarkIdentity(region)); onSelect?.(region);};
   return <div className="forge-geometry-map">
     <svg role="img" aria-label={title} viewBox={resolvedGeo.geometry.viewBox.join(' ')} preserveAspectRatio="xMidYMid meet">
       <title>{title}</title><desc>{hasPoints
         ? 'Planar features. Use the region buttons below the map to inspect every feature, including small or overlapping points. Bubble area shows size; crosses indicate zero or missing size.'
         : 'Planar regions. Use the region buttons below the map to select any region, including small regions.'}</desc>
-      {geoPaintOrder(resolvedGeo.geometry.features, byKey).map(feature => {
-        const region = byKey.get(feature.key);
+      {geoPaintEntries(resolvedGeo).map(({feature, region}) => {
         if (feature.point) {
           const {tag: Mark, attributes} = geoPointMark(feature, region);
-          return <g key={feature.key} onClick={() => select(region)}>
+          return <g key={geoMarkIdentity(region)} onClick={() => select(region)}>
             <title>{geoRegionDescription(region)}</title>
-            <Mark data-region-key={feature.key} {...attributes} style={attributes.stroke ? {stroke: attributes.stroke} : undefined}/>
+            <Mark data-region-key={feature.key} data-mark-id={region.markId} {...attributes} style={attributes.stroke ? {stroke: attributes.stroke} : undefined}/>
             <circle cx={feature.point[0]} cy={feature.point[1]} r={Math.max(12, region.symbol.radius)} fill="transparent" stroke="none"/>
           </g>;
         }
@@ -46,7 +46,7 @@ export default function GeoGeometryMap({resolvedGeo, title = 'Region map', onSel
     </div> : null}
     {regions.some(region => region.symbol) ? <Typography as="p" typeRole="caption">Bubble area: {regions.find(region => region.symbol).symbol.label}. Relative to the largest observed size in this map. Cross: zero or missing size; inspect the feature for its exact state.</Typography> : null}
     <div className="forge-geometry-map-regions" role="group" aria-label="Select region">
-      {regions.map(region => <Button variant="secondary" key={region.key} aria-pressed={selected?.key === region.key}
+      {regions.map(region => <Button variant="secondary" key={geoMarkIdentity(region)} aria-pressed={selected && geoMarkIdentity(selected) === geoMarkIdentity(region)}
         onClick={() => select(region)}>{geoRegionDescription(region)}</Button>)}
     </div>
     <Typography as="p" typeRole="body" role="status">{selected ? geoRegionDescription(selected) : 'No region selected'}</Typography>

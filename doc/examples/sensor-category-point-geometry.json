@@ -1,0 +1,20 @@
+{
+  "provenance": "Independently invented sensor locations, status categories, counts and planar coordinates.",
+  "block": {
+    "id": "sensors", "kind": "geoMapBlock", "title": "Sensor status counts", "datasetRef": "primary",
+    "geo": {
+      "shape": "geojson", "projection": "planar", "key": "location", "seriesField": "status",
+      "metric": {"key": "count", "label": "Observations"},
+      "symbolSize": {"key": "count", "label": "Observations", "maxRadius": 24},
+      "color": {"field": "status", "rules": [
+        {"value": "A", "label": "Status A", "color": "#336699"},
+        {"value": "B", "label": "Status B", "color": "#cc6633"}
+      ]},
+      "geometry": {"type": "FeatureCollection", "features": [
+        {"type": "Feature", "id": "background", "properties": {"label": "Sensor area"}, "geometry": {"type": "Polygon", "coordinates": [[[0,0],[20,0],[20,20],[0,20],[0,0]]]}},
+        {"type": "Feature", "id": "North", "geometry": {"type": "Point", "coordinates": [10,10]}}
+      ]}
+    }
+  },
+  "rows": [{"location": "North", "status": "A", "count": 4}, {"location": "North", "status": "B", "count": 4}]
+}

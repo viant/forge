@@ -5,7 +5,7 @@ import {pieSliceLabelSchema} from '../../components/pieSliceLabel.js';
 import {hierarchySchema,pivotSchema,columnGroupsSchema} from '../reportTableAnalytics.js';
 import {chartTooltipSchema,chartTooltipEntrySchema} from '../../components/chartTooltip.js';
 import {donutCenterSchema,resolvedDonutCenterSchema} from '../../components/donutCenter.js';
-import {geoGeometrySchema, resolvedGeoGeometrySchema, geoConfigWithGeometry} from './geoGeometrySchema.js';
+import {geoGeometrySchema, resolvedGeoGeometrySchema, geoConfigWithGeometry, geoSeriesScalarSchema, resolvedGeoSeriesRequirement} from './geoGeometrySchema.js';
 import {chartConfigRequirements} from './chartConfigRequirements.js';
 import {categoryRangeSchema} from '../../components/categoryRange.js';
 import {heatmapSchema} from '../../components/categoricalHeatmap.js';
@@ -776,6 +776,8 @@ export const reportFillSchema = {
       additionalProperties: false,
       required: ["key", "label", "rawValue", "displayValue", "color", "statusColor", "statusLabel", "rowCount"],
       properties: {
+        markId: {type: 'string', minLength: 1},
+        seriesValue: geoSeriesScalarSchema,
         symbol: {type: 'object', additionalProperties: false, required: ['rawValue', 'displayValue', 'label', 'radius'], properties: {
           rawValue: {anyOf: [{type: 'null'}, {type: 'number', minimum: 0}]}, displayValue: {type: 'string'}, label: {type: 'string'},
           radius: {type: 'number', minimum: 0, maximum: 64},
@@ -827,10 +829,12 @@ export const reportFillSchema = {
         { type: "null" },
         {
           type: "object",
+          allOf: [resolvedGeoSeriesRequirement],
           additionalProperties: false,
           required: ["shape", "keyField", "labelField", "metricKey", "metricLabel", "format", "aggregate", "regions", "ranking", "activeRegion", "summary", "legend"],
           properties: {
             shape: { type: "string" },
+            seriesField: {type: 'string', minLength: 1, pattern: '\\S'},
             geometry: resolvedGeoGeometrySchema,
             keyField: { type: "string" },
             labelField: { type: "string" },

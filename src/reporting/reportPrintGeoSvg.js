@@ -5,7 +5,7 @@ import {
 } from "../components/dashboard/geoMapUtils.js";
 import { wrapReportPrintLabel } from "./reportPrintLabels.js";
 import {WORLD_COUNTRY_PATHS, countryRegionsByKey} from '../components/dashboard/worldCountryModel.js';
-import {geoPointMark, geoRegionDescription, geoPaintOrder} from './geoPointMark.js';
+import {geoPointMark, geoRegionDescription, geoPaintEntries} from './geoPointMark.js';
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -138,10 +138,8 @@ export function buildReportPrintGeoSvg({
   }
 
   if (geo.shape === 'geojson' && geo.geometry) {
-    const byKey = new Map(geo.regions.map(region => [region.key, region]));
     const mapHeight = 500;
-    const paths = geoPaintOrder(geo.geometry.features, byKey).map(feature => {
-      const region = byKey.get(feature.key);
+    const paths = geoPaintEntries(geo).map(({feature, region}) => {
       if (feature.point) {
         const mark = geoPointMark(feature, region);
         const attributes = Object.entries({...mark.attributes, stroke: mark.attributes.stroke || '#bccbd6', 'stroke-width': 1}).map(([key,value]) => `${key}="${escapeXml(String(value))}"`).join(' ');

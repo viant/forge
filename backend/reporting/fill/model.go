@@ -298,20 +298,22 @@ type GeoContent struct {
 }
 
 type ResolvedGeo struct {
-	labelFieldPresent bool
-	Geometry          *ResolvedGeoGeometry `json:"geometry,omitempty"`
-	Shape             string               `json:"shape"`
-	KeyField          string               `json:"keyField"`
-	LabelField        string               `json:"labelField"`
-	MetricKey         string               `json:"metricKey"`
-	MetricLabel       string               `json:"metricLabel"`
-	Format            string               `json:"format"`
-	Aggregate         string               `json:"aggregate"`
-	Regions           []ResolvedGeoRegion  `json:"regions"`
-	Ranking           []ResolvedGeoRegion  `json:"ranking"`
-	ActiveRegion      *ResolvedGeoRegion   `json:"activeRegion"`
-	Summary           *ResolvedGeoSummary  `json:"summary"`
-	Legend            *ResolvedGeoLegend   `json:"legend"`
+	labelFieldPresent  bool
+	seriesFieldPresent bool
+	SeriesField        string               `json:"seriesField,omitempty"`
+	Geometry           *ResolvedGeoGeometry `json:"geometry,omitempty"`
+	Shape              string               `json:"shape"`
+	KeyField           string               `json:"keyField"`
+	LabelField         string               `json:"labelField"`
+	MetricKey          string               `json:"metricKey"`
+	MetricLabel        string               `json:"metricLabel"`
+	Format             string               `json:"format"`
+	Aggregate          string               `json:"aggregate"`
+	Regions            []ResolvedGeoRegion  `json:"regions"`
+	Ranking            []ResolvedGeoRegion  `json:"ranking"`
+	ActiveRegion       *ResolvedGeoRegion   `json:"activeRegion"`
+	Summary            *ResolvedGeoSummary  `json:"summary"`
+	Legend             *ResolvedGeoLegend   `json:"legend"`
 }
 
 type ResolvedGeoGeometry struct {
@@ -327,15 +329,18 @@ type ResolvedGeoFeature struct {
 }
 
 type ResolvedGeoRegion struct {
-	Symbol       *ResolvedGeoSymbol `json:"symbol,omitempty"`
-	Key          string             `json:"key"`
-	Label        string             `json:"label"`
-	RawValue     any                `json:"rawValue"`
-	DisplayValue string             `json:"displayValue"`
-	Color        string             `json:"color"`
-	StatusColor  string             `json:"statusColor"`
-	StatusLabel  string             `json:"statusLabel"`
-	RowCount     *int               `json:"rowCount"`
+	markIDPresent bool
+	MarkID        string             `json:"markId,omitempty"`
+	SeriesValue   json.RawMessage    `json:"seriesValue,omitempty"`
+	Symbol        *ResolvedGeoSymbol `json:"symbol,omitempty"`
+	Key           string             `json:"key"`
+	Label         string             `json:"label"`
+	RawValue      any                `json:"rawValue"`
+	DisplayValue  string             `json:"displayValue"`
+	Color         string             `json:"color"`
+	StatusColor   string             `json:"statusColor"`
+	StatusLabel   string             `json:"statusLabel"`
+	RowCount      *int               `json:"rowCount"`
 }
 
 type ResolvedGeoSymbol struct {

@@ -2,6 +2,7 @@ import {buildGeoGeometry} from './geoGeometry.js';
 import {buildGeoConfig, resolveGeoColor, findGeoColorRule} from '../components/dashboard/geoMapUtils.js';
 import {formatDashboardValue} from '../components/dashboard/dashboardUtils.js';
 import {resolveKey} from '../utils/selector.js';
+import {GEO_MAX_MARKS, geoSeriesIdentity, geoSeriesRuleLabel, findGeoSeriesColorRule, resolveGeoSeriesField, compareGeoSeriesMarks} from './geoSeries.js';
 
 const aggregates = ['sum', 'avg', 'min', 'max', 'first'];
 function aggregateValues(values, aggregate, key) {
@@ -24,23 +25,45 @@ export function buildReportFillGeoGeometry(block, rows, locale) {
   const maxRadius = size?.maxRadius ?? 24;
   if (size && (!aggregates.includes(sizeAggregate) || typeof maxRadius !== 'number' || !Number.isFinite(maxRadius) || maxRadius < 1 || maxRadius > 64)) throw new Error('geo.symbolSize requires a supported aggregate and maxRadius within [1,64]');
   const pointKeys = new Set(geometry.features.filter(feature => feature.point).map(feature => feature.key));
+  const seriesField = block.geo.seriesField;
+  if (seriesField !== undefined && (typeof seriesField !== 'string' || !seriesField.trim() || !hasPoints)) throw new Error('geo.seriesField requires a nonempty field and Point geometry');
+  const series = seriesField !== undefined;
+  const marks = new Map();
   const groups = new Map(geometry.features.map(feature => [feature.key, []]));
   for (const [index, row] of rows.entries()) {
     const key = resolveKey(row, config.key);
     if (typeof key !== 'string' || !groups.has(key)) throw new Error(`geo row ${index}: unknown feature key "${String(key)}" in ${config.key}`);
+    let markId;
+    if (series) {
+      if (!pointKeys.has(key)) throw new Error(`geo row ${index}: series data requires Point geometry; polygon "${key}" is a static backdrop`);
+      const seriesValue = resolveGeoSeriesField(row, seriesField);
+      markId = geoSeriesIdentity(key, seriesValue);
+      if (!marks.has(markId)) {
+        if (marks.size >= GEO_MAX_MARKS) throw new Error(`geo.seriesField supports at most ${GEO_MAX_MARKS} observed marks`);
+        marks.set(markId, {key, markId, seriesValue, rows: []});
+      }
+      marks.get(markId).rows.push(row);
+    }
     const value = resolveKey(row, config.metricKey);
     if (value != null && (typeof value !== 'number' || !Number.isFinite(value))) throw new Error(`geo row ${index}: ${config.metricKey} must be finite number or null`);
     const sizeValue = size && pointKeys.has(key) ? resolveKey(row, size.key) : null;
     if (sizeValue != null && (typeof sizeValue !== 'number' || !Number.isFinite(sizeValue) || sizeValue < 0)) throw new Error(`geo row ${index}: ${size.key} symbol size must be a nonnegative finite number or null`);
     groups.get(key).push(row);
   }
-  const regions = geometry.features.map(feature => {
-    const matched = groups.get(feature.key);
+  const featureByKey = new Map(geometry.features.map(feature => [feature.key, feature]));
+  const entries = series ? [...geometry.features.filter(feature => !feature.point).map(feature => ({feature, matched: []})),
+    ...Array.from(marks.values()).sort(compareGeoSeriesMarks).map(mark => ({feature: featureByKey.get(mark.key), matched: mark.rows, mark}))]
+    : geometry.features.map(feature => ({feature, matched: groups.get(feature.key)}));
+  const regionRows = new Map();
+  const regions = entries.map(({feature, matched, mark}) => {
     const values = matched.map(row => resolveKey(row, config.metricKey)).filter(value => value != null);
     const rawValue = aggregateValues(values, config.aggregate, feature.key);
     const sizeValue = feature.point ? aggregateValues(matched.map(row => resolveKey(row, size.key)).filter(value => value != null), sizeAggregate, feature.key) : null;
-    const rule = findGeoColorRule(matched[0], config.color);
+    const rule = series ? findGeoSeriesColorRule(matched[0], config.color) : findGeoColorRule(matched[0], config.color);
+    if (series && matched.some(row => findGeoSeriesColorRule(row, config.color) !== rule)) throw new Error(`geo mark ${mark.markId}: conflicting color rules within a location/series group`);
+    regionRows.set(mark?.markId ?? feature.key, {row: matched[0], rule});
     return {key: feature.key, label: feature.label, rawValue,
+      ...(mark ? {markId: mark.markId, seriesValue: mark.seriesValue} : {}),
       ...(feature.point ? {symbol: {rawValue: sizeValue, displayValue: sizeValue == null ? (matched.length ? 'No value' : 'No row') : formatDashboardValue(sizeValue === 0 ? 0 : sizeValue, size.format || 'number', locale), label: size.label || size.key, radius: 0}} : {}),
       displayValue: rawValue == null ? (matched.length ? 'No value' : 'No row') : formatDashboardValue(rawValue, config.format, locale),
       color: config.color.empty, statusColor: String(rule?.color || ''), statusLabel: String(rule?.label || ''), rowCount: matched.length};
@@ -50,12 +73,16 @@ export function buildReportFillGeoGeometry(block, rows, locale) {
   const values = regions.map(region => region.rawValue).filter(value => value != null);
   const min = values.length ? values.reduce((a,b) => Math.min(a,b), Infinity) : 0;
   const max = values.length ? values.reduce((a,b) => Math.max(a,b), -Infinity) : 0;
-  regions.forEach(region => { if (region.rawValue != null) region.color = resolveGeoColor({row: groups.get(region.key)[0], value: region.rawValue, minValue: min, maxValue: max, colorConfig: config.color}); });
-  const ranking = regions.filter(region => region.rawValue != null).sort((a,b) => b.rawValue-a.rawValue || a.key.localeCompare(b.key));
+  regions.forEach(region => { if (region.rawValue != null) {
+    const entry = regionRows.get(region.markId ?? region.key);
+    region.color = series && entry.rule?.color ? entry.rule.color : resolveGeoColor({row: entry.row, value: region.rawValue, minValue: min, maxValue: max, colorConfig: series ? {...config.color, field: undefined} : config.color});
+  } });
+  const ranking = regions.filter(region => region.rawValue != null).sort((a,b) => b.rawValue-a.rawValue || (series ? compareGeoSeriesMarks(a,b) : a.key.localeCompare(b.key)));
   const rules = config.color.field && config.color.rules?.filter(rule => rule.color);
   return {shape: 'geojson', geometry, keyField: config.key, labelField: config.labelKey || '', metricKey: config.metricKey, metricLabel: config.metricLabel,
-    format: config.format || 'number', aggregate: config.aggregate, regions, ranking, activeRegion: ranking[0] || regions[0],
+    ...(series ? {seriesField} : {}),
+    format: config.format || 'number', aggregate: config.aggregate, regions, ranking, activeRegion: ranking[0] || regions[0] || null,
     summary: {regionCount: regions.length, totalValue: formatDashboardValue(values.reduce((a,b) => a+b, 0), config.format, locale), topKey: ranking[0]?.key || ''},
-    legend: !config.legend ? null : rules?.length ? {rules: rules.map(rule => ({color: rule.color, label: String(rule.label || rule.value || rule.equals || rule.when)}))} : {min: formatDashboardValue(min, config.format, locale), max: formatDashboardValue(max, config.format, locale), palette: config.color.palette},
+    legend: !config.legend ? null : rules?.length ? {rules: rules.map(rule => ({color: rule.color, label: series ? geoSeriesRuleLabel(rule) : String(rule.label || rule.value || rule.equals || rule.when)}))} : {min: formatDashboardValue(min, config.format, locale), max: formatDashboardValue(max, config.format, locale), palette: config.color.palette},
   };
 }
