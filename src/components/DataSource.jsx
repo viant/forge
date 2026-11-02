@@ -143,7 +143,8 @@ export default function DataSource({context}) {
             const selectedKey = safeUniqueKey(getUniqueKeyValue, currentSelection.selected);
             const retainedIndex = !parentChanged && currentSelection.selected
                 ? records.findIndex(row => safeUniqueKey(getUniqueKeyValue, row) === selectedKey) : -1;
-            const newDraft = !parentChanged && !currentSelection.selected && signals.formStatus?.peek?.()?.dirty === true;
+            const newDraft = projectionRef.current?.parentIdentity != null && !parentChanged
+                && !currentSelection.selected && signals.formStatus?.peek?.()?.dirty === true;
             const nextRowIndex = retainedIndex >= 0 ? retainedIndex
                 : (!newDraft && dataSource.autoSelect !== false && records.length ? 0 : -1);
             const nextSelected = nextRowIndex >= 0 ? records[nextRowIndex] : null;
