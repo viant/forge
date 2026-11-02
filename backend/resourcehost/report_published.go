@@ -50,7 +50,11 @@ func (g *Gateway) verifyPublishedPin(ctx context.Context, connection Connection,
 	if err != nil {
 		return err
 	}
-	if hash != pin.ContentFingerprint || publishedAuthority(actor, source, uri, hash, admission) != pin.AuthorityBinding || identity.MetadataExpiryExtends(pin.ValidUntil, actor.ValidUntil) {
+	authority, err := publishedAuthority(ctx, actor, source, uri, hash, admission)
+	if err != nil {
+		return err
+	}
+	if hash != pin.ContentFingerprint || authority != pin.AuthorityBinding || identity.MetadataExpiryExtends(pin.ValidUntil, actor.ValidUntil) {
 		return identity.ErrResourceDenied
 	}
 	if err = g.final(ctx, actor); err != nil {
@@ -61,6 +65,13 @@ func (g *Gateway) verifyPublishedPin(ctx context.Context, connection Connection,
 		return err
 	}
 	if fresh != admission || connection.Generation != g.generation(connection.Name) {
+		return identity.ErrResourceDenied
+	}
+	freshAuthority, err := publishedAuthority(ctx, actor, source, uri, hash, fresh)
+	if err != nil {
+		return err
+	}
+	if freshAuthority != authority {
 		return identity.ErrResourceDenied
 	}
 	return nil

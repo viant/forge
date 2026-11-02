@@ -33,6 +33,14 @@ type PublishedMetadataSource interface {
 	CurrentHash(context.Context, string) (string, error)
 }
 
+// PublishedMetadataAuthoritySource separates durable selection authority from
+// cache/readiness epochs. Implementations must bind the current authenticated
+// identity and policy/content selection and fail closed while unavailable.
+// Sources without this optional contract retain AdmissionKey-based bindings.
+type PublishedMetadataAuthoritySource interface {
+	AuthorityKey(context.Context, string) (string, error)
+}
+
 // PublishedMenuProjectionSource exposes prepared menu bytes separately from
 // their immutable source fingerprint. It is an optional local source contract;
 // source selection and authorization remain owned by the admitted replica.
@@ -150,9 +158,19 @@ func (g *Gateway) publishedCapabilities(ctx context.Context, source publishedMet
 	connection.Generation = g.generation(connection.Name)
 	return cloneCapabilities(capabilities{connection: connection, namespaces: namespaces, published: true}), nil
 }
-func publishedAuthority(actor identity.VerifiedActor, source publishedMetadataRegistration, uri identity.ResourceURI, hash, admission string) string {
+func publishedAuthority(ctx context.Context, actor identity.VerifiedActor, source publishedMetadataRegistration, uri identity.ResourceURI, hash, admission string) (string, error) {
+	if stable, ok := source.source.(PublishedMetadataAuthoritySource); ok {
+		var err error
+		admission, err = stable.AuthorityKey(ctx, uri.String())
+		if err != nil {
+			return "", err
+		}
+		if admission == "" {
+			return "", identity.ErrResourceDenied
+		}
+	}
 	raw, _ := json.Marshal([]any{"published.metadata.v1", actor.PublicRead, actor.Issuer, actor.Subject, actor.TenantID, actor.AccountID, actor.IdentityRevision, source.connection.Name, source.connection.ProviderIdentity, uri.Namespace, hash, admission})
-	return identity.ContentFingerprint(raw)
+	return identity.ContentFingerprint(raw), nil
 }
 func publishedState(state *primitive.ResourceState, uri identity.ResourceURI, definition bool) (*primitive.ResourceState, error) {
 	if state == nil || state.URI != uri.String() || state.Kind != uri.Kind || state.Namespace != uri.Namespace || state.Name != uri.Name || state.Revision != "" {
@@ -211,7 +229,11 @@ func getPublished[T any](ctx context.Context, g *Gateway, source publishedMetada
 	if projection == nil {
 		definition = state.Definition
 	}
-	actual := &identity.ResolvedResource{ProviderIdentity: connection.ProviderIdentity, URI: ref.URI, ResourceCandidate: identity.ResourceCandidate{Kind: identity.PublishedCandidate, ContentFingerprint: state.ContentFingerprint}, AuthorityBinding: publishedAuthority(actor, source, uri, state.ContentFingerprint, admission), ValidUntil: actor.ValidUntil}
+	authority, err := publishedAuthority(ctx, actor, source, uri, state.ContentFingerprint, admission)
+	if err != nil {
+		return nil, err
+	}
+	actual := &identity.ResolvedResource{ProviderIdentity: connection.ProviderIdentity, URI: ref.URI, ResourceCandidate: identity.ResourceCandidate{Kind: identity.PublishedCandidate, ContentFingerprint: state.ContentFingerprint}, AuthorityBinding: authority, ValidUntil: actor.ValidUntil}
 	if pin != nil {
 		if pin.ProviderIdentity != actual.ProviderIdentity || pin.URI != actual.URI || pin.ResourceCandidate != actual.ResourceCandidate || pin.AuthorityBinding != actual.AuthorityBinding || !identity.MetadataExpiryValid(pin.ValidUntil, g.now()) {
 			return nil, identity.ErrResourceDenied
@@ -245,6 +267,13 @@ func getPublished[T any](ctx context.Context, g *Gateway, source publishedMetada
 		return nil, err
 	}
 	if freshAdmission != admission {
+		return nil, identity.ErrResourceDenied
+	}
+	freshAuthority, err := publishedAuthority(ctx, actor, source, uri, state.ContentFingerprint, freshAdmission)
+	if err != nil {
+		return nil, err
+	}
+	if freshAuthority != authority {
 		return nil, identity.ErrResourceDenied
 	}
 	if err = g.final(ctx, actor); err != nil {

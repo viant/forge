@@ -180,6 +180,23 @@ func (s *MetadataSource) Get(ctx context.Context, uriText string) (result *primi
 // is not a bearer grant: every read still resolves the caller's session in the
 // replica. Public configuration gateways use it to avoid cross-session reuse.
 func (s *MetadataSource) AdmissionKey(ctx context.Context) (result string, failure error) {
+	return s.admissionKey(ctx, "")
+}
+
+// AuthorityKey binds a published selection to the authenticated identity scope
+// and verified policy/content selection. Reconnecting the metadata transport
+// does not change this authority once the same snapshot is reconciled. The
+// SessionKey is the host's verified identity scope, not an MCP session ID.
+// AdmissionKey retains the readiness epoch for caches and in-flight fences.
+func (s *MetadataSource) AuthorityKey(ctx context.Context, uriText string) (result string, failure error) {
+	uri, err := identity.ParseResourceURI(uriText)
+	if err != nil || !s.claims(uri.Namespace) {
+		return "", metadataAdmissionError(ErrDenied)
+	}
+	return s.admissionKey(ctx, uriText)
+}
+
+func (s *MetadataSource) admissionKey(ctx context.Context, resourceURI string) (result string, failure error) {
 	defer func() { failure = metadataAdmissionError(failure) }()
 	if err := s.replica.EnsureAdmitted(ctx); err != nil {
 		return "", err
@@ -208,7 +225,19 @@ func (s *MetadataSource) AdmissionKey(ctx context.Context) (result string, failu
 	if !admission.validUntil.After(time.Now()) {
 		return "", ErrDenied
 	}
-	raw, err := json.Marshal([]any{s.replica.cfg.Source, s.replica.cfg.Tenant, s.replica.cfg.Account, session, admission.manifestHash, selected, selection.fingerprint, s.replica.metadataEpoch})
+	parts := []any{s.replica.cfg.Source, s.replica.cfg.Tenant, s.replica.cfg.Account, session, admission.manifestHash, selected, selection.fingerprint, s.replica.metadataEpoch}
+	if resourceURI != "" {
+		ref, _, err := s.replica.openRefLocked(session, resourceURI, selected)
+		if err != nil {
+			return "", err
+		}
+		policy := selection.authorities[resourceURI]
+		if policy == "" {
+			return "", ErrDenied
+		}
+		parts = []any{s.replica.cfg.Source, s.replica.cfg.Tenant, s.replica.cfg.Account, session, selected, ref.URI, ref.Hash, policy}
+	}
+	raw, err := json.Marshal(parts)
 	if err != nil {
 		return "", err
 	}

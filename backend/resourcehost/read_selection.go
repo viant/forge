@@ -96,7 +96,17 @@ func (s *resourceReadSequence) selectionKey(ctx context.Context, read selectedRe
 		if admission == "" {
 			return "", identity.ErrResourceDenied
 		}
-		return publishedAuthority(actor, source, uri, read.pin.ContentFingerprint, admission), nil
+		authority, err := publishedAuthority(ctx, actor, source, uri, read.pin.ContentFingerprint, admission)
+		if err != nil {
+			return "", err
+		}
+		// A reusable resource pin may survive unchanged reconciliation, but a
+		// selected in-flight read must still fence its original readiness epoch.
+		raw, err := json.Marshal([]string{authority, admission})
+		if err != nil {
+			return "", err
+		}
+		return identity.ContentFingerprint(raw), nil
 	}
 	options, err := s.gateway.Manager.Options(ctx, read.connection.Name)
 	if err != nil {

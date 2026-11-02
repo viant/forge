@@ -64,18 +64,23 @@ type admission struct {
 }
 type effectiveSelection struct {
 	roots       map[string]RootRef
+	authorities map[string]string
 	err         error
 	fingerprint string
 }
 
-func preparedSelection(roots map[string]RootRef, err error) effectiveSelection {
+func preparedSelection(manifest Manifest, admitted admission, selected string, roots map[string]RootRef, err error) effectiveSelection {
 	refs := make([]RootRef, 0, len(roots))
 	for _, ref := range roots {
 		refs = append(refs, ref)
 	}
 	sort.Slice(refs, func(i, j int) bool { return refs[i].URI < refs[j].URI })
 	raw, _ := json.Marshal(refs)
-	return effectiveSelection{roots: roots, err: err, fingerprint: Hash(raw)}
+	var authorities map[string]string
+	if err == nil {
+		authorities, err = selectionAuthorities(manifest, admitted, selected, roots)
+	}
+	return effectiveSelection{roots: roots, authorities: authorities, err: err, fingerprint: Hash(raw)}
 }
 
 // View exposes selected producer-closed bytes without granting access to the
@@ -725,7 +730,7 @@ func (r *Replica) Admit(ctx context.Context) (admitErr error) {
 	held := admission{tenant: facts.Tenant, validUntil: facts.ValidUntil, policyIndex: policyIndexHash(manifest, facts.Tenant), cohorts: matched, manifestHash: manifest.Hash, selections: map[string]effectiveSelection{}}
 	if r.cfg.Cohort == nil {
 		roots, selectionErr := effectiveRoots(manifest, held, "")
-		held.selections[""] = preparedSelection(roots, selectionErr)
+		held.selections[""] = preparedSelection(manifest, held, "", roots, selectionErr)
 	}
 	r.admissions[key] = held
 	return nil
@@ -887,7 +892,7 @@ func (r *Replica) refreshAdmissionSelectionsLocked() {
 		updated := make(map[string]effectiveSelection, len(held.selections))
 		for selected := range held.selections {
 			roots, selectionErr := effectiveRoots(r.latest, held, selected)
-			updated[selected] = preparedSelection(roots, selectionErr)
+			updated[selected] = preparedSelection(r.latest, held, selected, roots, selectionErr)
 		}
 		held.selections = updated
 		held.manifestHash = r.latest.Hash
@@ -909,7 +914,7 @@ func (r *Replica) ensureSelection(key, selected string) error {
 		return nil
 	}
 	roots, selectionErr := effectiveRoots(r.latest, held, selected)
-	held.selections[selected] = preparedSelection(roots, selectionErr)
+	held.selections[selected] = preparedSelection(r.latest, held, selected, roots, selectionErr)
 	r.admissions[key] = held
 	return nil
 }

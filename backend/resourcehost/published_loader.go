@@ -106,7 +106,11 @@ func Load[T any](ctx context.Context, source *Gateway, uriText string, codec Pub
 	if err != nil {
 		return nil, err
 	}
-	selected := identity.ResolvedResource{ProviderIdentity: connection.ProviderIdentity, URI: uriText, ResourceCandidate: identity.ResourceCandidate{Kind: identity.PublishedCandidate, ContentFingerprint: hash}, AuthorityBinding: publishedAuthority(actor, registration, uri, hash, admission), ValidUntil: actor.ValidUntil}
+	authority, err := publishedAuthority(ctx, actor, registration, uri, hash, admission)
+	if err != nil {
+		return nil, err
+	}
+	selected := identity.ResolvedResource{ProviderIdentity: connection.ProviderIdentity, URI: uriText, ResourceCandidate: identity.ResourceCandidate{Kind: identity.PublishedCandidate, ContentFingerprint: hash}, AuthorityBinding: authority, ValidUntil: actor.ValidUntil}
 	if !selected.ResourceCandidate.Valid() {
 		return nil, identity.ErrResourceDenied
 	}
