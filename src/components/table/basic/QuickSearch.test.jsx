@@ -5,8 +5,8 @@ const state = {filter:{Status:'Active',Name:'old'},page:3};
 const context={signals:{input:{peek:()=>state}},handlers:{dataSource:{
  setFilter:({filter})=>{Object.assign(state,buildSetFilterSignal(state,filter,'server'));},setPage:page=>{Object.assign(state,{page,fetch:false});}
 }}};
-updateQuickSearch(context,'Name','Campaign 2');
-assert.deepEqual(state,{filter:{Status:'Active',Name:'Campaign 2'},page:1,fetch:true});
+updateQuickSearch(context,'Name','Record 2');
+assert.deepEqual(state,{filter:{Status:'Active',Name:'Record 2'},page:1,fetch:true});
 updateQuickSearch(context,'Name','');
 assert.deepEqual(state,{filter:{Status:'Active'},page:1,fetch:true});
 assert.deepEqual(buildSetFilterSignal({filter:{Status:'Active'},page:4,sort:[{field:'id',direction:'desc'}]}, {Status:'Paused'},'server'),
