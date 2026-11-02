@@ -116,6 +116,20 @@ if (process.env.REGENERATE_REPORT_PRINT_FIXTURES === "1") {
 }
 
 assert.deepEqual(validateReportPrint(reportPrint), { valid: true, errors: [] });
+// Currency is authored without fractional digits; the raw amounts remain exact.
+const cells = reportFill.blocks.find(block => block.id === "primaryTable").content.resolvedRows.flatMap(row => row.cells);
+assert.deepEqual(cells.filter(cell => cell.key === "totalSpend").map(cell => cell.value), [40400, 34300, 55200, 48800]);
+const printedCells = reportPrint.pages.flatMap(page => page.elements).filter(element => element.id?.includes("__row_") && element.columnKey);
+assert.equal(printedCells.length, 16, "all four columns and all four rows remain printed");
+assert.deepEqual(printedCells.filter(cell => cell.columnKey === "totalSpend").map(cell => cell.text), ["$40,400", "$34,300", "$55,200", "$48,800"]);
+for (const cell of printedCells) {
+  assert.ok(cell.box.x >= 36 && cell.box.x + cell.box.width <= 756 + 1e-9, "cell remains inside page margins");
+  assert.ok(cell.box.y >= 36 && cell.box.y + cell.box.height <= 576, "cell remains above footer");
+  assert.ok(cell.text.length * 9 * 0.56 <= cell.box.width, "complete cell text fits its allocated width");
+}
+// Four 12px paddings leave 672px; displayed text gives weights 11, 7, 7, 11.
+const header = reportPrint.pages[0].elements.find(element => element.id === "primaryTable__header__eventDate__page_1");
+assert.equal(header.box.width, 672 * 11 / 36);
 assert.deepEqual(reportPrint, fixture);
 
 console.log("authoredLandscapeReportPrintFixture ✓ authored landscape print fixture stays aligned with generated runtime output");

@@ -308,7 +308,21 @@
             "format": "compactNumber",
             "align": "right"
           }
-        ]
+        ],
+        "runtime": {
+          "refinementFields": [
+            {
+              "key": "channelV2",
+              "sourceKey": "channelV2",
+              "displayKey": "channelV2",
+              "label": "Channel",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeChannelV2",
+                "excludeParamPath": "filters.excludeChannelV2"
+              }
+            }
+          ]
+        }
       },
       {
         "id": "primaryChart",
@@ -354,6 +368,20 @@
               "#17becf"
             ]
           }
+        },
+        "runtime": {
+          "refinementFields": [
+            {
+              "key": "channelV2",
+              "sourceKey": "channelV2",
+              "displayKey": "channelV2",
+              "label": "Channel",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeChannelV2",
+                "excludeParamPath": "filters.excludeChannelV2"
+              }
+            }
+          ]
         }
       },
       {
@@ -381,7 +409,7 @@
     "version": 1,
     "kind": "reportFill",
     "specVersion": 1,
-    "specHash": "fnv1a:0521a584",
+    "specHash": "fnv1a:e5bbc728",
     "source": {
       "kind": "dashboard.reportBuilder",
       "containerId": "demoReportBuilder",
@@ -543,6 +571,20 @@
             "align": "right"
           }
         ],
+        "runtime": {
+          "refinementFields": [
+            {
+              "key": "channelV2",
+              "sourceKey": "channelV2",
+              "displayKey": "channelV2",
+              "label": "Channel",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeChannelV2",
+                "excludeParamPath": "filters.excludeChannelV2"
+              }
+            }
+          ]
+        },
         "content": {
           "columns": [
             {
@@ -655,6 +697,20 @@
             ]
           }
         },
+        "runtime": {
+          "refinementFields": [
+            {
+              "key": "channelV2",
+              "sourceKey": "channelV2",
+              "displayKey": "channelV2",
+              "label": "Channel",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeChannelV2",
+                "excludeParamPath": "filters.excludeChannelV2"
+              }
+            }
+          ]
+        },
         "content": {
           "chartSpec": {
             "title": "Inventory · Top Channels",
@@ -761,9 +817,9 @@
     "version": 1,
     "kind": "reportPrint",
     "specVersion": 1,
-    "specHash": "fnv1a:0521a584",
+    "specHash": "fnv1a:e5bbc728",
     "fillVersion": 1,
-    "fillHash": "fnv1a:b7212a4c",
+    "fillHash": "fnv1a:bf82ab0a",
     "source": {
       "kind": "dashboard.reportBuilder",
       "containerId": "demoReportBuilder",

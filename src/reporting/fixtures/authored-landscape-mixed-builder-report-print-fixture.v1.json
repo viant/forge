@@ -66,7 +66,7 @@
           "box": {
             "x": 42,
             "y": 112,
-            "width": 189.53846153846155,
+            "width": 205.33333333333334,
             "height": 16
           },
           "text": "Date",
@@ -80,9 +80,9 @@
           "id": "primaryTable__header__channelId__page_1",
           "kind": "text",
           "box": {
-            "x": 243.53846153846155,
+            "x": 259.33333333333337,
             "y": 112,
-            "width": 120.61538461538461,
+            "width": 130.66666666666669,
             "height": 16
           },
           "text": "Channel",
@@ -96,9 +96,9 @@
           "id": "primaryTable__header__totalSpend__page_1",
           "kind": "text",
           "box": {
-            "x": 376.1538461538462,
+            "x": 402,
             "y": 112,
-            "width": 172.30769230769232,
+            "width": 130.66666666666669,
             "height": 16
           },
           "text": "Spend",
@@ -112,9 +112,9 @@
           "id": "primaryTable__header__impressions__page_1",
           "kind": "text",
           "box": {
-            "x": 560.4615384615386,
+            "x": 544.6666666666667,
             "y": 112,
-            "width": 189.53846153846155,
+            "width": 205.33333333333334,
             "height": 16
           },
           "text": "Impressions",
@@ -142,7 +142,7 @@
           "box": {
             "x": 42,
             "y": 136,
-            "width": 189.53846153846155,
+            "width": 205.33333333333334,
             "height": 16
           },
           "rowKey": "row_1",
@@ -157,9 +157,9 @@
           "id": "primaryTable__row_1__channelId__text",
           "kind": "tableCellText",
           "box": {
-            "x": 243.53846153846155,
+            "x": 259.33333333333337,
             "y": 136,
-            "width": 120.61538461538461,
+            "width": 130.66666666666669,
             "height": 16
           },
           "rowKey": "row_1",
@@ -173,14 +173,14 @@
           "id": "primaryTable__row_1__totalSpend__text",
           "kind": "tableCellText",
           "box": {
-            "x": 376.1538461538462,
+            "x": 402,
             "y": 136,
-            "width": 172.30769230769232,
+            "width": 130.66666666666669,
             "height": 16
           },
           "rowKey": "row_1",
           "columnKey": "totalSpend",
-          "text": "$40,400.00",
+          "text": "$40,400",
           "format": "currency",
           "align": "right",
           "fontSize": 9,
@@ -190,9 +190,9 @@
           "id": "primaryTable__row_1__impressions__text",
           "kind": "tableCellText",
           "box": {
-            "x": 560.4615384615386,
+            "x": 544.6666666666667,
             "y": 136,
-            "width": 189.53846153846155,
+            "width": 205.33333333333334,
             "height": 16
           },
           "rowKey": "row_1",
@@ -221,7 +221,7 @@
           "box": {
             "x": 42,
             "y": 160,
-            "width": 189.53846153846155,
+            "width": 205.33333333333334,
             "height": 16
           },
           "rowKey": "row_2",
@@ -236,9 +236,9 @@
           "id": "primaryTable__row_2__channelId__text",
           "kind": "tableCellText",
           "box": {
-            "x": 243.53846153846155,
+            "x": 259.33333333333337,
             "y": 160,
-            "width": 120.61538461538461,
+            "width": 130.66666666666669,
             "height": 16
           },
           "rowKey": "row_2",
@@ -252,14 +252,14 @@
           "id": "primaryTable__row_2__totalSpend__text",
           "kind": "tableCellText",
           "box": {
-            "x": 376.1538461538462,
+            "x": 402,
             "y": 160,
-            "width": 172.30769230769232,
+            "width": 130.66666666666669,
             "height": 16
           },
           "rowKey": "row_2",
           "columnKey": "totalSpend",
-          "text": "$34,300.00",
+          "text": "$34,300",
           "format": "currency",
           "align": "right",
           "fontSize": 9,
@@ -269,9 +269,9 @@
           "id": "primaryTable__row_2__impressions__text",
           "kind": "tableCellText",
           "box": {
-            "x": 560.4615384615386,
+            "x": 544.6666666666667,
             "y": 160,
-            "width": 189.53846153846155,
+            "width": 205.33333333333334,
             "height": 16
           },
           "rowKey": "row_2",
@@ -300,7 +300,7 @@
           "box": {
             "x": 42,
             "y": 184,
-            "width": 189.53846153846155,
+            "width": 205.33333333333334,
             "height": 16
           },
           "rowKey": "row_3",
@@ -315,9 +315,9 @@
           "id": "primaryTable__row_3__channelId__text",
           "kind": "tableCellText",
           "box": {
-            "x": 243.53846153846155,
+            "x": 259.33333333333337,
             "y": 184,
-            "width": 120.61538461538461,
+            "width": 130.66666666666669,
             "height": 16
           },
           "rowKey": "row_3",
@@ -331,14 +331,14 @@
           "id": "primaryTable__row_3__totalSpend__text",
           "kind": "tableCellText",
           "box": {
-            "x": 376.1538461538462,
+            "x": 402,
             "y": 184,
-            "width": 172.30769230769232,
+            "width": 130.66666666666669,
             "height": 16
           },
           "rowKey": "row_3",
           "columnKey": "totalSpend",
-          "text": "$55,200.00",
+          "text": "$55,200",
           "format": "currency",
           "align": "right",
           "fontSize": 9,
@@ -348,9 +348,9 @@
           "id": "primaryTable__row_3__impressions__text",
           "kind": "tableCellText",
           "box": {
-            "x": 560.4615384615386,
+            "x": 544.6666666666667,
             "y": 184,
-            "width": 189.53846153846155,
+            "width": 205.33333333333334,
             "height": 16
           },
           "rowKey": "row_3",
@@ -379,7 +379,7 @@
           "box": {
             "x": 42,
             "y": 208,
-            "width": 189.53846153846155,
+            "width": 205.33333333333334,
             "height": 16
           },
           "rowKey": "row_4",
@@ -394,9 +394,9 @@
           "id": "primaryTable__row_4__channelId__text",
           "kind": "tableCellText",
           "box": {
-            "x": 243.53846153846155,
+            "x": 259.33333333333337,
             "y": 208,
-            "width": 120.61538461538461,
+            "width": 130.66666666666669,
             "height": 16
           },
           "rowKey": "row_4",
@@ -410,14 +410,14 @@
           "id": "primaryTable__row_4__totalSpend__text",
           "kind": "tableCellText",
           "box": {
-            "x": 376.1538461538462,
+            "x": 402,
             "y": 208,
-            "width": 172.30769230769232,
+            "width": 130.66666666666669,
             "height": 16
           },
           "rowKey": "row_4",
           "columnKey": "totalSpend",
-          "text": "$48,800.00",
+          "text": "$48,800",
           "format": "currency",
           "align": "right",
           "fontSize": 9,
@@ -427,9 +427,9 @@
           "id": "primaryTable__row_4__impressions__text",
           "kind": "tableCellText",
           "box": {
-            "x": 560.4615384615386,
+            "x": 544.6666666666667,
             "y": 208,
-            "width": 189.53846153846155,
+            "width": 205.33333333333334,
             "height": 16
           },
           "rowKey": "row_4",
@@ -524,7 +524,7 @@
             "width": 720,
             "height": 280
           },
-          "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 280\" width=\"720\" height=\"280\">\n      \n    <line x1=\"72\" y1=\"16\" x2=\"704\" y2=\"16\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"64\" y=\"20\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">$55,200.00</text>\n  \n\n    <line x1=\"72\" y1=\"76\" x2=\"704\" y2=\"76\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"64\" y=\"80\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">$36,800.00</text>\n  \n\n    <line x1=\"72\" y1=\"136\" x2=\"704\" y2=\"136\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"64\" y=\"140\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">$18,400.00</text>\n  \n\n    <line x1=\"72\" y1=\"196\" x2=\"704\" y2=\"196\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"64\" y=\"200\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">$0.00</text>\n  \n      \n      <line x1=\"72\" y1=\"196\" x2=\"704\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      <line x1=\"72\" y1=\"16\" x2=\"72\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <path d=\"M72,64.2608695652174 M493.3333333333333,16\" fill=\"none\" stroke=\"#1f77b4\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" />\n      \n      <circle cx=\"72\" cy=\"64.2608695652174\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"493.3333333333333\" cy=\"16\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n      \n    \n\n      <path d=\"M282.66666666666663,84.15217391304348 M704,36.869565217391305\" fill=\"none\" stroke=\"#ff7f0e\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" />\n      \n      <circle cx=\"282.66666666666663\" cy=\"84.15217391304348\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"704\" cy=\"36.869565217391305\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n      \n    \n      \n      <text x=\"72\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\"><tspan>2026-05-01</tspan></text>\n<text x=\"282.66666666666663\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\"><tspan>2026-05-02</tspan></text>\n<text x=\"493.3333333333333\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\"><tspan>2026-05-03</tspan></text>\n<text x=\"692\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\"><tspan>2026-05-04</tspan></text>\n      <text x=\"388\" y=\"232\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"600\" fill=\"#475467\">Date</text>\n      \n      <rect x=\"12\" y=\"237\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"248\" font-size=\"11\" fill=\"#344054\">Display</text>\n    \n\n      <rect x=\"360\" y=\"237\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#ff7f0e\" />\n      <text x=\"378\" y=\"248\" font-size=\"11\" fill=\"#344054\">CTV</text>\n    \n    </svg>"
+          "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 280\" width=\"720\" height=\"280\">\n      \n    <line x1=\"54\" y1=\"16\" x2=\"704\" y2=\"16\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"46\" y=\"20\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">$55,200</text>\n  \n\n    <line x1=\"54\" y1=\"76\" x2=\"704\" y2=\"76\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"46\" y=\"80\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">$36,800</text>\n  \n\n    <line x1=\"54\" y1=\"136\" x2=\"704\" y2=\"136\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"46\" y=\"140\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">$18,400</text>\n  \n\n    <line x1=\"54\" y1=\"196\" x2=\"704\" y2=\"196\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"46\" y=\"200\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">$0</text>\n  \n      \n      <line x1=\"54\" y1=\"196\" x2=\"704\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      <line x1=\"54\" y1=\"16\" x2=\"54\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <path d=\"M54,64.2608695652174 M487.3333333333333,16\" fill=\"none\" stroke=\"#1f77b4\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" />\n      \n      <circle cx=\"54\" cy=\"64.2608695652174\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"487.3333333333333\" cy=\"16\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n      \n    \n\n      <path d=\"M270.66666666666663,84.15217391304348 M704,36.869565217391305\" fill=\"none\" stroke=\"#ff7f0e\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" />\n      \n      <circle cx=\"270.66666666666663\" cy=\"84.15217391304348\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"704\" cy=\"36.869565217391305\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n      \n    \n      \n      <text x=\"54\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\"><tspan>2026-05-01</tspan></text>\n<text x=\"270.66666666666663\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\"><tspan>2026-05-02</tspan></text>\n<text x=\"487.3333333333333\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\"><tspan>2026-05-03</tspan></text>\n<text x=\"692\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\"><tspan>2026-05-04</tspan></text>\n      <text x=\"379\" y=\"232\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"600\" fill=\"#475467\">Date</text>\n      \n      <rect x=\"12\" y=\"237\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"248\" font-size=\"11\" fill=\"#344054\">Display</text>\n    \n\n      <rect x=\"360\" y=\"237\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#ff7f0e\" />\n      <text x=\"378\" y=\"248\" font-size=\"11\" fill=\"#344054\">CTV</text>\n    \n    </svg>"
         }
       ],
       "headerElements": [
@@ -610,7 +610,7 @@
             "width": 720,
             "height": 232
           },
-          "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 232\" width=\"720\" height=\"232\">\n      \n    <text x=\"0\" y=\"12\" font-size=\"11\" fill=\"#667085\">2 Regions</text>\n    <text x=\"120\" y=\"12\" font-size=\"11\" fill=\"#667085\">Total State Spend: $4,360,000</text>\n    <text x=\"580\" y=\"12\" font-size=\"11\" fill=\"#667085\">Top: CA</text>\n  \n      \n      <rect x=\"0\" y=\"24\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"11\" y=\"39\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">AK</text>\n    \n\n      <rect x=\"286\" y=\"24\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"297\" y=\"39\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">ME</text>\n    \n\n      <rect x=\"234\" y=\"50\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"245\" y=\"65\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">VT</text>\n    \n\n      <rect x=\"260\" y=\"50\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"271\" y=\"65\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">NH</text>\n    \n\n      <rect x=\"286\" y=\"50\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"297\" y=\"65\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">MA</text>\n    \n\n      <rect x=\"0\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#d9f0ea\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"11\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">WA</text>\n    \n\n      <rect x=\"26\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"37\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">ID</text>\n    \n\n      <rect x=\"52\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"63\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">MT</text>\n    \n\n      <rect x=\"78\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"89\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">ND</text>\n    \n\n      <rect x=\"104\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"115\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">MN</text>\n    \n\n      <rect x=\"130\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"141\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">IL</text>\n    \n\n      <rect x=\"156\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"167\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">WI</text>\n    \n\n      <rect x=\"182\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"193\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">MI</text>\n    \n\n      <rect x=\"234\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"245\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">NY</text>\n    \n\n      <rect x=\"260\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"271\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">RI</text>\n    \n\n      <rect x=\"286\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"297\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">CT</text>\n    \n\n      <rect x=\"0\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"11\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">OR</text>\n    \n\n      <rect x=\"26\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"37\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">NV</text>\n    \n\n      <rect x=\"52\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"63\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">WY</text>\n    \n\n      <rect x=\"78\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"89\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">SD</text>\n    \n\n      <rect x=\"104\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"115\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">IA</text>\n    \n\n      <rect x=\"130\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"141\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">IN</text>\n    \n\n      <rect x=\"156\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"167\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">OH</text>\n    \n\n      <rect x=\"182\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"193\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">PA</text>\n    \n\n      <rect x=\"234\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"245\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">NJ</text>\n    \n\n      <rect x=\"0\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#db3737\" stroke=\"#101828\" stroke-width=\"1.5\" />\n      <text x=\"11\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">CA</text>\n    \n\n      <rect x=\"26\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"37\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">UT</text>\n    \n\n      <rect x=\"52\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"63\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">CO</text>\n    \n\n      <rect x=\"78\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"89\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">NE</text>\n    \n\n      <rect x=\"104\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"115\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">MO</text>\n    \n\n      <rect x=\"130\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"141\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">KY</text>\n    \n\n      <rect x=\"156\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"167\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">WV</text>\n    \n\n      <rect x=\"182\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"193\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">VA</text>\n    \n\n      <rect x=\"208\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"219\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">MD</text>\n    \n\n      <rect x=\"234\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"245\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">DE</text>\n    \n\n      <rect x=\"26\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"37\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">AZ</text>\n    \n\n      <rect x=\"52\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"63\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">NM</text>\n    \n\n      <rect x=\"78\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"89\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">KS</text>\n    \n\n      <rect x=\"104\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"115\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">AR</text>\n    \n\n      <rect x=\"130\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"141\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">TN</text>\n    \n\n      <rect x=\"156\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"167\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">NC</text>\n    \n\n      <rect x=\"182\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"193\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">SC</text>\n    \n\n      <rect x=\"208\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"219\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">DC</text>\n    \n\n      <rect x=\"0\" y=\"180\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"11\" y=\"195\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">HI</text>\n    \n\n      <rect x=\"78\" y=\"180\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"89\" y=\"195\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">OK</text>\n    \n\n      <rect x=\"104\" y=\"180\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"115\" y=\"195\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">LA</text>\n    \n\n      <rect x=\"130\" y=\"180\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"141\" y=\"195\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">MS</text>\n    \n\n      <rect x=\"156\" y=\"180\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"167\" y=\"195\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">AL</text>\n    \n\n      <rect x=\"182\" y=\"180\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"193\" y=\"195\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">GA</text>\n    \n\n      <rect x=\"78\" y=\"206\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"89\" y=\"221\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">TX</text>\n    \n\n      <rect x=\"208\" y=\"206\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"219\" y=\"221\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">FL</text>\n    \n      \n    <text x=\"384\" y=\"40\" font-size=\"11\" fill=\"#667085\">Selected Area</text>\n    <text x=\"384\" y=\"58\" font-size=\"14\" font-weight=\"600\" fill=\"#101828\">California (CA)</text>\n    <text x=\"384\" y=\"76\" font-size=\"11\" fill=\"#344054\">State Spend: $2,400,000</text>\n    <rect x=\"384\" y=\"86\" width=\"56\" height=\"18\" rx=\"9\" fill=\"#db3737\" opacity=\"0.18\" />\n    <text x=\"394\" y=\"99\" font-size=\"10\" fill=\"#db3737\">Critical</text>\n  \n      \n        <rect x=\"384\" y=\"123\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#db3737\" />\n        <text x=\"402\" y=\"134\" font-size=\"11\" fill=\"#344054\">Critical</text>\n      \n\n        <rect x=\"384\" y=\"141\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#d9f0ea\" />\n        <text x=\"402\" y=\"152\" font-size=\"11\" fill=\"#344054\">Healthy</text>\n      \n      <text x=\"384\" y=\"170\" font-size=\"11\" fill=\"#667085\">Top Regions</text>\n      \n      <text x=\"384\" y=\"189\" font-size=\"10\" fill=\"#344054\">CA</text>\n      <rect x=\"430\" y=\"180\" width=\"228\" height=\"8\" rx=\"4\" fill=\"#eaecf0\" />\n      <rect x=\"430\" y=\"180\" width=\"228\" height=\"8\" rx=\"4\" fill=\"#db3737\" />\n      <text x=\"664\" y=\"189\" font-size=\"10\" fill=\"#667085\">$2,400,000</text>\n    \n\n      <text x=\"384\" y=\"207\" font-size=\"10\" fill=\"#344054\">WA</text>\n      <rect x=\"430\" y=\"198\" width=\"228\" height=\"8\" rx=\"4\" fill=\"#eaecf0\" />\n      <rect x=\"430\" y=\"198\" width=\"186.2\" height=\"8\" rx=\"4\" fill=\"#d9f0ea\" />\n      <text x=\"664\" y=\"207\" font-size=\"10\" fill=\"#667085\">$1,960,000</text>\n    \n    </svg>"
+          "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 232\" width=\"720\" height=\"232\">\n      \n    <text x=\"0\" y=\"12\" font-size=\"11\" fill=\"#667085\">2 Regions</text>\n    <text x=\"120\" y=\"12\" font-size=\"11\" fill=\"#667085\">Total State Spend: $4,360,000</text>\n    <text x=\"580\" y=\"12\" font-size=\"11\" fill=\"#667085\">Top: CA</text>\n  \n      \n      <rect x=\"0\" y=\"24\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"11\" y=\"39\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">AK</text>\n    \n\n      <rect x=\"286\" y=\"24\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"297\" y=\"39\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">ME</text>\n    \n\n      <rect x=\"234\" y=\"50\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"245\" y=\"65\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">VT</text>\n    \n\n      <rect x=\"260\" y=\"50\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"271\" y=\"65\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">NH</text>\n    \n\n      <rect x=\"286\" y=\"50\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"297\" y=\"65\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">MA</text>\n    \n\n      <rect x=\"0\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#d9f0ea\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"11\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">WA</text>\n    \n\n      <rect x=\"26\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"37\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">ID</text>\n    \n\n      <rect x=\"52\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"63\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">MT</text>\n    \n\n      <rect x=\"78\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"89\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">ND</text>\n    \n\n      <rect x=\"104\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"115\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">MN</text>\n    \n\n      <rect x=\"130\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"141\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">IL</text>\n    \n\n      <rect x=\"156\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"167\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">WI</text>\n    \n\n      <rect x=\"182\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"193\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">MI</text>\n    \n\n      <rect x=\"234\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"245\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">NY</text>\n    \n\n      <rect x=\"260\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"271\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">RI</text>\n    \n\n      <rect x=\"286\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"297\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">CT</text>\n    \n\n      <rect x=\"0\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"11\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">OR</text>\n    \n\n      <rect x=\"26\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"37\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">NV</text>\n    \n\n      <rect x=\"52\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"63\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">WY</text>\n    \n\n      <rect x=\"78\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"89\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">SD</text>\n    \n\n      <rect x=\"104\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"115\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">IA</text>\n    \n\n      <rect x=\"130\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"141\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">IN</text>\n    \n\n      <rect x=\"156\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"167\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">OH</text>\n    \n\n      <rect x=\"182\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"193\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">PA</text>\n    \n\n      <rect x=\"234\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"245\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">NJ</text>\n    \n\n      <rect x=\"0\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#db3737\" stroke=\"#101828\" stroke-width=\"1.5\" />\n      <text x=\"11\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">CA</text>\n    \n\n      <rect x=\"26\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"37\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">UT</text>\n    \n\n      <rect x=\"52\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"63\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">CO</text>\n    \n\n      <rect x=\"78\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"89\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">NE</text>\n    \n\n      <rect x=\"104\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"115\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">MO</text>\n    \n\n      <rect x=\"130\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"141\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">KY</text>\n    \n\n      <rect x=\"156\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"167\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">WV</text>\n    \n\n      <rect x=\"182\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"193\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">VA</text>\n    \n\n      <rect x=\"208\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"219\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">MD</text>\n    \n\n      <rect x=\"234\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"245\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">DE</text>\n    \n\n      <rect x=\"26\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"37\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">AZ</text>\n    \n\n      <rect x=\"52\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"63\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">NM</text>\n    \n\n      <rect x=\"78\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"89\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">KS</text>\n    \n\n      <rect x=\"104\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"115\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">AR</text>\n    \n\n      <rect x=\"130\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"141\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">TN</text>\n    \n\n      <rect x=\"156\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"167\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">NC</text>\n    \n\n      <rect x=\"182\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"193\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">SC</text>\n    \n\n      <rect x=\"208\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"219\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">DC</text>\n    \n\n      <rect x=\"0\" y=\"180\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"11\" y=\"195\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">HI</text>\n    \n\n      <rect x=\"78\" y=\"180\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"89\" y=\"195\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">OK</text>\n    \n\n      <rect x=\"104\" y=\"180\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"115\" y=\"195\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">LA</text>\n    \n\n      <rect x=\"130\" y=\"180\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"141\" y=\"195\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">MS</text>\n    \n\n      <rect x=\"156\" y=\"180\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"167\" y=\"195\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">AL</text>\n    \n\n      <rect x=\"182\" y=\"180\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"193\" y=\"195\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">GA</text>\n    \n\n      <rect x=\"78\" y=\"206\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"89\" y=\"221\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">TX</text>\n    \n\n      <rect x=\"208\" y=\"206\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"219\" y=\"221\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">FL</text>\n    \n      \n    <text x=\"384\" y=\"40\" font-size=\"11\" fill=\"#667085\">Selected Area</text>\n    <text x=\"384\" y=\"58\" font-size=\"14\" font-weight=\"600\" fill=\"#101828\">California (CA)</text>\n    <text x=\"384\" y=\"76\" font-size=\"11\" fill=\"#344054\">State Spend: $2,400,000</text>\n    <rect x=\"384\" y=\"86\" width=\"56\" height=\"18\" rx=\"9\" fill=\"#db3737\" opacity=\"0.18\" />\n    <text x=\"394\" y=\"99\" font-size=\"10\" fill=\"#db3737\">Critical</text>\n  \n      \n        <rect x=\"384\" y=\"123\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#db3737\" />\n        <text x=\"402\" y=\"134\" font-size=\"11\" fill=\"#344054\">Critical</text>\n      \n\n        <rect x=\"384\" y=\"141\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#d9f0ea\" />\n        <text x=\"402\" y=\"152\" font-size=\"11\" fill=\"#344054\">Healthy</text>\n      \n      <text x=\"384\" y=\"170\" font-size=\"11\" fill=\"#667085\">Top Regions</text>\n      <rect class=\"forge-geo-ranking-track\" x=\"517\" y=\"180\" width=\"97\" height=\"8\" rx=\"4\" fill=\"#eaecf0\" />\n      <rect x=\"517\" y=\"180\" width=\"97\" height=\"8\" rx=\"4\" fill=\"#db3737\" />\n      <text x=\"384\" y=\"189\" font-size=\"10\" fill=\"#344054\">California</text>\n      <text x=\"620\" y=\"189\" font-size=\"10\" fill=\"#667085\">$2,400,000</text>\n<rect class=\"forge-geo-ranking-track\" x=\"517\" y=\"198\" width=\"97\" height=\"8\" rx=\"4\" fill=\"#eaecf0\" />\n      <rect x=\"517\" y=\"198\" width=\"79.21666666666667\" height=\"8\" rx=\"4\" fill=\"#d9f0ea\" />\n      <text x=\"384\" y=\"207\" font-size=\"10\" fill=\"#344054\">Washington</text>\n      <text x=\"620\" y=\"207\" font-size=\"10\" fill=\"#667085\">$1,960,000</text>\n    </svg>"
         },
         {
           "id": "narrativeIntro__title_0",

@@ -483,7 +483,21 @@
               "format": "currency",
               "align": "right"
             }
-          ]
+          ],
+          "runtime": {
+            "refinementFields": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "label": "Market",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeCountry",
+                  "excludeParamPath": "filters.excludeCountry"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "reachRateTrend",
@@ -532,6 +546,30 @@
                 "#17becf"
               ]
             }
+          },
+          "runtime": {
+            "refinementFields": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "label": "Market",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeCountry",
+                  "excludeParamPath": "filters.excludeCountry"
+                }
+              },
+              {
+                "key": "channelId",
+                "sourceKey": "channelId",
+                "displayKey": "channelId",
+                "label": "Channel",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeChannelId",
+                  "excludeParamPath": "filters.excludeChannelId"
+                }
+              }
+            ]
           }
         },
         {
@@ -561,7 +599,31 @@
               "sourceKey": "reachRate",
               "displayKey": "reachRate"
             }
-          ]
+          ],
+          "runtime": {
+            "refinementFields": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "label": "Market",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeCountry",
+                  "excludeParamPath": "filters.excludeCountry"
+                }
+              },
+              {
+                "key": "channelId",
+                "sourceKey": "channelId",
+                "displayKey": "channelId",
+                "label": "Channel",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeChannelId",
+                  "excludeParamPath": "filters.excludeChannelId"
+                }
+              }
+            ]
+          }
         }
       ]
     },
@@ -702,7 +764,21 @@
               "format": "currency",
               "align": "right"
             }
-          ]
+          ],
+          "runtime": {
+            "refinementFields": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "label": "Market",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeCountry",
+                  "excludeParamPath": "filters.excludeCountry"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "reachRateTrend",
@@ -751,6 +827,30 @@
                 "#17becf"
               ]
             }
+          },
+          "runtime": {
+            "refinementFields": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "label": "Market",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeCountry",
+                  "excludeParamPath": "filters.excludeCountry"
+                }
+              },
+              {
+                "key": "channelId",
+                "sourceKey": "channelId",
+                "displayKey": "channelId",
+                "label": "Channel",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeChannelId",
+                  "excludeParamPath": "filters.excludeChannelId"
+                }
+              }
+            ]
           }
         },
         {
@@ -780,7 +880,31 @@
               "sourceKey": "reachRate",
               "displayKey": "reachRate"
             }
-          ]
+          ],
+          "runtime": {
+            "refinementFields": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "label": "Market",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeCountry",
+                  "excludeParamPath": "filters.excludeCountry"
+                }
+              },
+              {
+                "key": "channelId",
+                "sourceKey": "channelId",
+                "displayKey": "channelId",
+                "label": "Channel",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeChannelId",
+                  "excludeParamPath": "filters.excludeChannelId"
+                }
+              }
+            ]
+          }
         }
       ]
     },
@@ -788,7 +912,7 @@
       "version": 1,
       "kind": "reportFill",
       "specVersion": 1,
-      "specHash": "fnv1a:38bfe023",
+      "specHash": "fnv1a:3f26762f",
       "source": {
         "kind": "dashboard.reportBuilder",
         "containerId": "authoredDerivedCompactBuilder",
@@ -902,6 +1026,20 @@
               "align": "right"
             }
           ],
+          "runtime": {
+            "refinementFields": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "label": "Market",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeCountry",
+                  "excludeParamPath": "filters.excludeCountry"
+                }
+              }
+            ]
+          },
           "content": {
             "columns": [
               {
@@ -1059,6 +1197,30 @@
               ]
             }
           },
+          "runtime": {
+            "refinementFields": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "label": "Market",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeCountry",
+                  "excludeParamPath": "filters.excludeCountry"
+                }
+              },
+              {
+                "key": "channelId",
+                "sourceKey": "channelId",
+                "displayKey": "channelId",
+                "label": "Channel",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeChannelId",
+                  "excludeParamPath": "filters.excludeChannelId"
+                }
+              }
+            ]
+          },
           "content": {
             "chartSpec": {
               "title": "Reach Rate by Market",
@@ -1158,6 +1320,30 @@
               "displayKey": "reachRate"
             }
           ],
+          "runtime": {
+            "refinementFields": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "label": "Market",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeCountry",
+                  "excludeParamPath": "filters.excludeCountry"
+                }
+              },
+              {
+                "key": "channelId",
+                "sourceKey": "channelId",
+                "displayKey": "channelId",
+                "label": "Channel",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeChannelId",
+                  "excludeParamPath": "filters.excludeChannelId"
+                }
+              }
+            ]
+          },
           "content": {
             "columns": [
               {
@@ -1310,9 +1496,9 @@
       "version": 1,
       "kind": "reportPrint",
       "specVersion": 1,
-      "specHash": "fnv1a:38bfe023",
+      "specHash": "fnv1a:3f26762f",
       "fillVersion": 1,
-      "fillHash": "fnv1a:16ceb041",
+      "fillHash": "fnv1a:dc1f1dac",
       "source": {
         "kind": "dashboard.reportBuilder",
         "containerId": "authoredDerivedCompactBuilder",
@@ -1372,7 +1558,7 @@
               "box": {
                 "x": 42,
                 "y": 112,
-                "width": 284.65882352941173,
+                "width": 346.36,
                 "height": 16
               },
               "text": "Market",
@@ -1386,9 +1572,9 @@
               "id": "primaryTable__header__totalSpend__page_1",
               "kind": "text",
               "box": {
-                "x": 338.65882352941173,
+                "x": 400.36,
                 "y": 112,
-                "width": 411.34117647058827,
+                "width": 349.64,
                 "height": 16
               },
               "text": "Spend",
@@ -1416,7 +1602,7 @@
               "box": {
                 "x": 42,
                 "y": 136,
-                "width": 284.65882352941173,
+                "width": 346.36,
                 "height": 16
               },
               "rowKey": "row_1",
@@ -1430,14 +1616,14 @@
               "id": "primaryTable__row_1__totalSpend__text",
               "kind": "tableCellText",
               "box": {
-                "x": 338.65882352941173,
+                "x": 400.36,
                 "y": 136,
-                "width": 411.34117647058827,
+                "width": 349.64,
                 "height": 16
               },
               "rowKey": "row_1",
               "columnKey": "totalSpend",
-              "text": "$82,800.00",
+              "text": "$82,800",
               "format": "currency",
               "align": "right",
               "fontSize": 9,
@@ -1461,7 +1647,7 @@
               "box": {
                 "x": 42,
                 "y": 160,
-                "width": 284.65882352941173,
+                "width": 346.36,
                 "height": 16
               },
               "rowKey": "row_2",
@@ -1475,14 +1661,14 @@
               "id": "primaryTable__row_2__totalSpend__text",
               "kind": "tableCellText",
               "box": {
-                "x": 338.65882352941173,
+                "x": 400.36,
                 "y": 160,
-                "width": 411.34117647058827,
+                "width": 349.64,
                 "height": 16
               },
               "rowKey": "row_2",
               "columnKey": "totalSpend",
-              "text": "$70,300.00",
+              "text": "$70,300",
               "format": "currency",
               "align": "right",
               "fontSize": 9,
@@ -1506,7 +1692,7 @@
               "box": {
                 "x": 42,
                 "y": 184,
-                "width": 284.65882352941173,
+                "width": 346.36,
                 "height": 16
               },
               "rowKey": "row_3",
@@ -1520,14 +1706,14 @@
               "id": "primaryTable__row_3__totalSpend__text",
               "kind": "tableCellText",
               "box": {
-                "x": 338.65882352941173,
+                "x": 400.36,
                 "y": 184,
-                "width": 411.34117647058827,
+                "width": 349.64,
                 "height": 16
               },
               "rowKey": "row_3",
               "columnKey": "totalSpend",
-              "text": "$75,800.00",
+              "text": "$75,800",
               "format": "currency",
               "align": "right",
               "fontSize": 9,
@@ -1551,7 +1737,7 @@
               "box": {
                 "x": 42,
                 "y": 208,
-                "width": 284.65882352941173,
+                "width": 346.36,
                 "height": 16
               },
               "rowKey": "row_4",
@@ -1565,14 +1751,14 @@
               "id": "primaryTable__row_4__totalSpend__text",
               "kind": "tableCellText",
               "box": {
-                "x": 338.65882352941173,
+                "x": 400.36,
                 "y": 208,
-                "width": 411.34117647058827,
+                "width": 349.64,
                 "height": 16
               },
               "rowKey": "row_4",
               "columnKey": "totalSpend",
-              "text": "$67,700.00",
+              "text": "$67,700",
               "format": "currency",
               "align": "right",
               "fontSize": 9,

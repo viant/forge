@@ -1242,7 +1242,21 @@
             "format": "compactNumber",
             "align": "right"
           }
-        ]
+        ],
+        "runtime": {
+          "refinementFields": [
+            {
+              "key": "country",
+              "sourceKey": "country",
+              "displayKey": "country",
+              "label": "Market",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeCountry",
+                "excludeParamPath": "filters.excludeCountry"
+              }
+            }
+          ]
+        }
       },
       {
         "id": "primaryChart",
@@ -1288,6 +1302,20 @@
               "#17becf"
             ]
           }
+        },
+        "runtime": {
+          "refinementFields": [
+            {
+              "key": "country",
+              "sourceKey": "country",
+              "displayKey": "country",
+              "label": "Market",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeCountry",
+                "excludeParamPath": "filters.excludeCountry"
+              }
+            }
+          ]
         }
       },
       {

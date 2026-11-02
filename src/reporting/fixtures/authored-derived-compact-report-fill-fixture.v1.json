@@ -2,7 +2,7 @@
   "version": 1,
   "kind": "reportFill",
   "specVersion": 1,
-  "specHash": "fnv1a:38bfe023",
+  "specHash": "fnv1a:3f26762f",
   "source": {
     "kind": "dashboard.reportBuilder",
     "containerId": "authoredDerivedCompactBuilder",
@@ -116,6 +116,20 @@
           "align": "right"
         }
       ],
+      "runtime": {
+        "refinementFields": [
+          {
+            "key": "country",
+            "sourceKey": "country",
+            "displayKey": "country",
+            "label": "Market",
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeCountry",
+              "excludeParamPath": "filters.excludeCountry"
+            }
+          }
+        ]
+      },
       "content": {
         "columns": [
           {
@@ -273,6 +287,30 @@
           ]
         }
       },
+      "runtime": {
+        "refinementFields": [
+          {
+            "key": "country",
+            "sourceKey": "country",
+            "displayKey": "country",
+            "label": "Market",
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeCountry",
+              "excludeParamPath": "filters.excludeCountry"
+            }
+          },
+          {
+            "key": "channelId",
+            "sourceKey": "channelId",
+            "displayKey": "channelId",
+            "label": "Channel",
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeChannelId",
+              "excludeParamPath": "filters.excludeChannelId"
+            }
+          }
+        ]
+      },
       "content": {
         "chartSpec": {
           "title": "Reach Rate by Market",
@@ -372,6 +410,30 @@
           "displayKey": "reachRate"
         }
       ],
+      "runtime": {
+        "refinementFields": [
+          {
+            "key": "country",
+            "sourceKey": "country",
+            "displayKey": "country",
+            "label": "Market",
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeCountry",
+              "excludeParamPath": "filters.excludeCountry"
+            }
+          },
+          {
+            "key": "channelId",
+            "sourceKey": "channelId",
+            "displayKey": "channelId",
+            "label": "Channel",
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeChannelId",
+              "excludeParamPath": "filters.excludeChannelId"
+            }
+          }
+        ]
+      },
       "content": {
         "columns": [
           {

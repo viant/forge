@@ -63,7 +63,7 @@
           "box": {
             "x": 42,
             "y": 112,
-            "width": 241.468,
+            "width": 284.65882352941173,
             "height": 16
           },
           "text": "State",
@@ -77,9 +77,9 @@
           "id": "primaryTable__header__spend__page_1",
           "kind": "text",
           "box": {
-            "x": 295.46799999999996,
+            "x": 338.65882352941173,
             "y": 112,
-            "width": 454.53200000000004,
+            "width": 411.34117647058827,
             "height": 16
           },
           "text": "Spend",
@@ -107,7 +107,7 @@
           "box": {
             "x": 42,
             "y": 136,
-            "width": 241.468,
+            "width": 284.65882352941173,
             "height": 16
           },
           "rowKey": "row_1",
@@ -121,14 +121,14 @@
           "id": "primaryTable__row_1__spend__text",
           "kind": "tableCellText",
           "box": {
-            "x": 295.46799999999996,
+            "x": 338.65882352941173,
             "y": 136,
-            "width": 454.53200000000004,
+            "width": 411.34117647058827,
             "height": 16
           },
           "rowKey": "row_1",
           "columnKey": "spend",
-          "text": "$1,200,000.00",
+          "text": "$1,200,000",
           "format": "currency",
           "align": "right",
           "fontSize": 9,
@@ -152,7 +152,7 @@
           "box": {
             "x": 42,
             "y": 160,
-            "width": 241.468,
+            "width": 284.65882352941173,
             "height": 16
           },
           "rowKey": "row_2",
@@ -166,14 +166,14 @@
           "id": "primaryTable__row_2__spend__text",
           "kind": "tableCellText",
           "box": {
-            "x": 295.46799999999996,
+            "x": 338.65882352941173,
             "y": 160,
-            "width": 454.53200000000004,
+            "width": 411.34117647058827,
             "height": 16
           },
           "rowKey": "row_2",
           "columnKey": "spend",
-          "text": "$980,000.00",
+          "text": "$980,000",
           "format": "currency",
           "align": "right",
           "fontSize": 9,

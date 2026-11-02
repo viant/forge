@@ -1624,7 +1624,21 @@
             "format": "number",
             "align": "right"
           }
-        ]
+        ],
+        "runtime": {
+          "refinementFields": [
+            {
+              "key": "country",
+              "sourceKey": "country",
+              "displayKey": "country",
+              "label": "Market",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeCountry",
+                "excludeParamPath": "filters.excludeCountry"
+              }
+            }
+          ]
+        }
       },
       {
         "id": "headlineKpi",
@@ -1710,7 +1724,21 @@
             "sourceKey": "hhUniqs",
             "displayKey": "hhUniqs"
           }
-        ]
+        ],
+        "runtime": {
+          "refinementFields": [
+            {
+              "key": "channelV2",
+              "sourceKey": "channelV2",
+              "displayKey": "channelV2",
+              "label": "Channel",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeChannelV2",
+                "excludeParamPath": "filters.excludeChannelV2"
+              }
+            }
+          ]
+        }
       }
     ]
   }

@@ -1202,7 +1202,21 @@
               "format": "compactNumber",
               "align": "right"
             }
-          ]
+          ],
+          "runtime": {
+            "refinementFields": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "label": "Market",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeCountry",
+                  "excludeParamPath": "filters.excludeCountry"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "primaryChart",
@@ -1248,6 +1262,20 @@
                 "#17becf"
               ]
             }
+          },
+          "runtime": {
+            "refinementFields": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "label": "Market",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeCountry",
+                  "excludeParamPath": "filters.excludeCountry"
+                }
+              }
+            ]
           }
         },
         {
@@ -2486,7 +2514,21 @@
                 "format": "compactNumber",
                 "align": "right"
               }
-            ]
+            ],
+            "runtime": {
+              "refinementFields": [
+                {
+                  "key": "country",
+                  "sourceKey": "country",
+                  "displayKey": "country",
+                  "label": "Market",
+                  "runtimeFilter": {
+                    "includeParamPath": "filters.includeCountry",
+                    "excludeParamPath": "filters.excludeCountry"
+                  }
+                }
+              ]
+            }
           },
           {
             "id": "primaryChart",
@@ -2532,6 +2574,20 @@
                   "#17becf"
                 ]
               }
+            },
+            "runtime": {
+              "refinementFields": [
+                {
+                  "key": "country",
+                  "sourceKey": "country",
+                  "displayKey": "country",
+                  "label": "Market",
+                  "runtimeFilter": {
+                    "includeParamPath": "filters.includeCountry",
+                    "excludeParamPath": "filters.excludeCountry"
+                  }
+                }
+              ]
             }
           },
           {
@@ -2871,7 +2927,21 @@
                 "format": "compactNumber",
                 "align": "right"
               }
-            ]
+            ],
+            "runtime": {
+              "refinementFields": [
+                {
+                  "key": "country",
+                  "sourceKey": "country",
+                  "displayKey": "country",
+                  "label": "Market",
+                  "runtimeFilter": {
+                    "includeParamPath": "filters.includeCountry",
+                    "excludeParamPath": "filters.excludeCountry"
+                  }
+                }
+              ]
+            }
           },
           {
             "id": "primaryChart",
@@ -2917,6 +2987,20 @@
                   "#17becf"
                 ]
               }
+            },
+            "runtime": {
+              "refinementFields": [
+                {
+                  "key": "country",
+                  "sourceKey": "country",
+                  "displayKey": "country",
+                  "label": "Market",
+                  "runtimeFilter": {
+                    "includeParamPath": "filters.includeCountry",
+                    "excludeParamPath": "filters.excludeCountry"
+                  }
+                }
+              ]
             }
           },
           {
@@ -2944,7 +3028,7 @@
         "version": 1,
         "kind": "reportFill",
         "specVersion": 1,
-        "specHash": "fnv1a:c9e3016e",
+        "specHash": "fnv1a:199cef1c",
         "source": {
           "kind": "dashboard.reportBuilder",
           "containerId": "demoReportBuilder",
@@ -3087,6 +3171,20 @@
                 "align": "right"
               }
             ],
+            "runtime": {
+              "refinementFields": [
+                {
+                  "key": "country",
+                  "sourceKey": "country",
+                  "displayKey": "country",
+                  "label": "Market",
+                  "runtimeFilter": {
+                    "includeParamPath": "filters.includeCountry",
+                    "excludeParamPath": "filters.excludeCountry"
+                  }
+                }
+              ]
+            },
             "content": {
               "columns": [
                 {
@@ -3198,6 +3296,20 @@
                   "#17becf"
                 ]
               }
+            },
+            "runtime": {
+              "refinementFields": [
+                {
+                  "key": "country",
+                  "sourceKey": "country",
+                  "displayKey": "country",
+                  "label": "Market",
+                  "runtimeFilter": {
+                    "includeParamPath": "filters.includeCountry",
+                    "excludeParamPath": "filters.excludeCountry"
+                  }
+                }
+              ]
             },
             "content": {
               "chartSpec": {
@@ -4547,7 +4659,21 @@
               "format": "compactNumber",
               "align": "right"
             }
-          ]
+          ],
+          "runtime": {
+            "refinementFields": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "label": "Market",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeCountry",
+                  "excludeParamPath": "filters.excludeCountry"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "primaryChart",
@@ -4593,6 +4719,20 @@
                 "#17becf"
               ]
             }
+          },
+          "runtime": {
+            "refinementFields": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "label": "Market",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeCountry",
+                  "excludeParamPath": "filters.excludeCountry"
+                }
+              }
+            ]
           }
         },
         {
@@ -6909,7 +7049,21 @@
               "format": "compactNumber",
               "align": "right"
             }
-          ]
+          ],
+          "runtime": {
+            "refinementFields": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "label": "Market",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeCountry",
+                  "excludeParamPath": "filters.excludeCountry"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "primaryChart",
@@ -6955,6 +7109,20 @@
                 "#17becf"
               ]
             }
+          },
+          "runtime": {
+            "refinementFields": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "label": "Market",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeCountry",
+                  "excludeParamPath": "filters.excludeCountry"
+                }
+              }
+            ]
           }
         },
         {
@@ -6982,7 +7150,7 @@
       "version": 1,
       "kind": "reportFill",
       "specVersion": 1,
-      "specHash": "fnv1a:c9e3016e",
+      "specHash": "fnv1a:199cef1c",
       "source": {
         "kind": "dashboard.reportBuilder",
         "containerId": "demoReportBuilder",
@@ -7125,6 +7293,20 @@
               "align": "right"
             }
           ],
+          "runtime": {
+            "refinementFields": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "label": "Market",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeCountry",
+                  "excludeParamPath": "filters.excludeCountry"
+                }
+              }
+            ]
+          },
           "content": {
             "columns": [
               {
@@ -7236,6 +7418,20 @@
                 "#17becf"
               ]
             }
+          },
+          "runtime": {
+            "refinementFields": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "label": "Market",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeCountry",
+                  "excludeParamPath": "filters.excludeCountry"
+                }
+              }
+            ]
           },
           "content": {
             "chartSpec": {
@@ -7649,7 +7845,21 @@
               "format": "compactNumber",
               "align": "right"
             }
-          ]
+          ],
+          "runtime": {
+            "refinementFields": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "label": "Market",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeCountry",
+                  "excludeParamPath": "filters.excludeCountry"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "primaryChart",
@@ -7695,6 +7905,20 @@
                 "#17becf"
               ]
             }
+          },
+          "runtime": {
+            "refinementFields": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "label": "Market",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeCountry",
+                  "excludeParamPath": "filters.excludeCountry"
+                }
+              }
+            ]
           }
         },
         {
@@ -7722,7 +7946,7 @@
       "version": 1,
       "kind": "reportFill",
       "specVersion": 1,
-      "specHash": "fnv1a:c9e3016e",
+      "specHash": "fnv1a:199cef1c",
       "source": {
         "kind": "dashboard.reportBuilder",
         "containerId": "demoReportBuilder",
@@ -7865,6 +8089,20 @@
               "align": "right"
             }
           ],
+          "runtime": {
+            "refinementFields": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "label": "Market",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeCountry",
+                  "excludeParamPath": "filters.excludeCountry"
+                }
+              }
+            ]
+          },
           "content": {
             "columns": [
               {
@@ -7977,6 +8215,20 @@
               ]
             }
           },
+          "runtime": {
+            "refinementFields": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "label": "Market",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeCountry",
+                  "excludeParamPath": "filters.excludeCountry"
+                }
+              }
+            ]
+          },
           "content": {
             "chartSpec": {
               "title": "Locations · Top Markets",
@@ -8083,9 +8335,9 @@
       "version": 1,
       "kind": "reportPrint",
       "specVersion": 1,
-      "specHash": "fnv1a:c9e3016e",
+      "specHash": "fnv1a:199cef1c",
       "fillVersion": 1,
-      "fillHash": "fnv1a:2bcdfee4",
+      "fillHash": "fnv1a:793115b1",
       "source": {
         "kind": "dashboard.reportBuilder",
         "containerId": "demoReportBuilder",
@@ -8620,9 +8872,9 @@
     "version": 1,
     "kind": "reportPrint",
     "specVersion": 1,
-    "specHash": "fnv1a:c9e3016e",
+    "specHash": "fnv1a:199cef1c",
     "fillVersion": 1,
-    "fillHash": "fnv1a:2bcdfee4",
+    "fillHash": "fnv1a:793115b1",
     "source": {
       "kind": "dashboard.reportBuilder",
       "containerId": "demoReportBuilder",
@@ -10313,7 +10565,21 @@
               "format": "compactNumber",
               "align": "right"
             }
-          ]
+          ],
+          "runtime": {
+            "refinementFields": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "label": "Market",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeCountry",
+                  "excludeParamPath": "filters.excludeCountry"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "primaryChart",
@@ -10359,6 +10625,20 @@
                 "#17becf"
               ]
             }
+          },
+          "runtime": {
+            "refinementFields": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "label": "Market",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeCountry",
+                  "excludeParamPath": "filters.excludeCountry"
+                }
+              }
+            ]
           }
         },
         {
@@ -11578,7 +11858,21 @@
               "format": "compactNumber",
               "align": "right"
             }
-          ]
+          ],
+          "runtime": {
+            "refinementFields": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "label": "Market",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeCountry",
+                  "excludeParamPath": "filters.excludeCountry"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "primaryChart",
@@ -11624,6 +11918,20 @@
                 "#17becf"
               ]
             }
+          },
+          "runtime": {
+            "refinementFields": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "label": "Market",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeCountry",
+                  "excludeParamPath": "filters.excludeCountry"
+                }
+              }
+            ]
           }
         },
         {
@@ -12801,7 +13109,21 @@
                 "format": "compactNumber",
                 "align": "right"
               }
-            ]
+            ],
+            "runtime": {
+              "refinementFields": [
+                {
+                  "key": "country",
+                  "sourceKey": "country",
+                  "displayKey": "country",
+                  "label": "Market",
+                  "runtimeFilter": {
+                    "includeParamPath": "filters.includeCountry",
+                    "excludeParamPath": "filters.excludeCountry"
+                  }
+                }
+              ]
+            }
           },
           {
             "id": "primaryChart",
@@ -12847,6 +13169,20 @@
                   "#17becf"
                 ]
               }
+            },
+            "runtime": {
+              "refinementFields": [
+                {
+                  "key": "country",
+                  "sourceKey": "country",
+                  "displayKey": "country",
+                  "label": "Market",
+                  "runtimeFilter": {
+                    "includeParamPath": "filters.includeCountry",
+                    "excludeParamPath": "filters.excludeCountry"
+                  }
+                }
+              ]
             }
           },
           {
@@ -13186,7 +13522,21 @@
                 "format": "compactNumber",
                 "align": "right"
               }
-            ]
+            ],
+            "runtime": {
+              "refinementFields": [
+                {
+                  "key": "country",
+                  "sourceKey": "country",
+                  "displayKey": "country",
+                  "label": "Market",
+                  "runtimeFilter": {
+                    "includeParamPath": "filters.includeCountry",
+                    "excludeParamPath": "filters.excludeCountry"
+                  }
+                }
+              ]
+            }
           },
           {
             "id": "primaryChart",
@@ -13232,6 +13582,20 @@
                   "#17becf"
                 ]
               }
+            },
+            "runtime": {
+              "refinementFields": [
+                {
+                  "key": "country",
+                  "sourceKey": "country",
+                  "displayKey": "country",
+                  "label": "Market",
+                  "runtimeFilter": {
+                    "includeParamPath": "filters.includeCountry",
+                    "excludeParamPath": "filters.excludeCountry"
+                  }
+                }
+              ]
             }
           },
           {
@@ -13259,7 +13623,7 @@
         "version": 1,
         "kind": "reportFill",
         "specVersion": 1,
-        "specHash": "fnv1a:c9e3016e",
+        "specHash": "fnv1a:199cef1c",
         "source": {
           "kind": "dashboard.reportBuilder",
           "containerId": "demoReportBuilder",
@@ -13402,6 +13766,20 @@
                 "align": "right"
               }
             ],
+            "runtime": {
+              "refinementFields": [
+                {
+                  "key": "country",
+                  "sourceKey": "country",
+                  "displayKey": "country",
+                  "label": "Market",
+                  "runtimeFilter": {
+                    "includeParamPath": "filters.includeCountry",
+                    "excludeParamPath": "filters.excludeCountry"
+                  }
+                }
+              ]
+            },
             "content": {
               "columns": [
                 {
@@ -13513,6 +13891,20 @@
                   "#17becf"
                 ]
               }
+            },
+            "runtime": {
+              "refinementFields": [
+                {
+                  "key": "country",
+                  "sourceKey": "country",
+                  "displayKey": "country",
+                  "label": "Market",
+                  "runtimeFilter": {
+                    "includeParamPath": "filters.includeCountry",
+                    "excludeParamPath": "filters.excludeCountry"
+                  }
+                }
+              ]
             },
             "content": {
               "chartSpec": {

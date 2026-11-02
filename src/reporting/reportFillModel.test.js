@@ -2801,6 +2801,12 @@ assert.deepEqual(currentSelectionSpec.blocks.find((block) => block.id === "curre
       format: "currency",
     },
   ],
+  runtime: {
+    refinementFields: [{
+      key: "channelId", sourceKey: "channelId", displayKey: "channel.channel", label: "Channel",
+      runtimeFilter: { includeParamPath: "filters.includeChannelId", excludeParamPath: "filters.excludeChannelId" },
+    }],
+  },
 });
 
 const currentSelectionFill = buildReportFillFromReportSpec(currentSelectionSpec, {
@@ -2929,3 +2935,11 @@ assert.deepEqual(geoFill.blocks.find((block) => block.id === "stateGeo").content
 });
 
 console.log("reportFillModel ✓ projects ReportSpec and builder state into deterministic ReportFill");
+
+// Legacy authored fields without declared bindings must not gain a portable catalog.
+const unboundConfig = structuredClone(currentSelectionConfig);
+for (const field of unboundConfig.dimensions) delete field.runtimeFilter;
+const unboundDocument = buildReportBuilderReportDocument({container: rawContainer, config: unboundConfig, state: rawState});
+for (const block of lowerReportDocumentToReportSpec(unboundDocument).blocks) {
+  assert.equal(block.runtime?.refinementFields, undefined);
+}

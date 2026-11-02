@@ -2,7 +2,7 @@
   "version": 1,
   "kind": "reportFill",
   "specVersion": 1,
-  "specHash": "fnv1a:b1e2e4cd",
+  "specHash": "fnv1a:480158a7",
   "source": {
     "kind": "dashboard.reportBuilder",
     "containerId": "demoReportBuilder",
@@ -256,6 +256,20 @@
           "align": "right"
         }
       ],
+      "runtime": {
+        "refinementFields": [
+          {
+            "key": "country",
+            "sourceKey": "country",
+            "displayKey": "country",
+            "label": "Market",
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeCountry",
+              "excludeParamPath": "filters.excludeCountry"
+            }
+          }
+        ]
+      },
       "content": {
         "columns": [
           {
@@ -547,6 +561,20 @@
           "displayKey": "hhUniqs"
         }
       ],
+      "runtime": {
+        "refinementFields": [
+          {
+            "key": "channelV2",
+            "sourceKey": "channelV2",
+            "displayKey": "channelV2",
+            "label": "Channel",
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeChannelV2",
+              "excludeParamPath": "filters.excludeChannelV2"
+            }
+          }
+        ]
+      },
       "content": {
         "columns": [
           {

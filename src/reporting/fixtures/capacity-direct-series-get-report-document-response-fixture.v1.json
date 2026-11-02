@@ -1404,7 +1404,10 @@
             "format": "compactNumber",
             "align": "right"
           }
-        ]
+        ],
+        "runtime": {
+          "refinementFields": []
+        }
       },
       {
         "id": "primaryChart",
@@ -1479,6 +1482,9 @@
               "#17becf"
             ]
           }
+        },
+        "runtime": {
+          "refinementFields": []
         }
       },
       {
@@ -1565,7 +1571,21 @@
             "sourceKey": "hhUniqs",
             "displayKey": "hhUniqs"
           }
-        ]
+        ],
+        "runtime": {
+          "refinementFields": [
+            {
+              "key": "channelV2",
+              "sourceKey": "channelV2",
+              "displayKey": "channelV2",
+              "label": "Channel",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeChannelV2",
+                "excludeParamPath": "filters.excludeChannelV2"
+              }
+            }
+          ]
+        }
       }
     ]
   }

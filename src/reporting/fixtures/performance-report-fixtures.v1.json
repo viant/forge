@@ -1172,7 +1172,21 @@
               "format": "compactNumber",
               "align": "right"
             }
-          ]
+          ],
+          "runtime": {
+            "refinementFields": [
+              {
+                "key": "channelId",
+                "sourceKey": "channelId",
+                "displayKey": "channelId",
+                "label": "Channel",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeChannelId",
+                  "excludeParamPath": "filters.excludeChannelId"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "primaryChart",
@@ -1221,6 +1235,20 @@
                 "#17becf"
               ]
             }
+          },
+          "runtime": {
+            "refinementFields": [
+              {
+                "key": "channelId",
+                "sourceKey": "channelId",
+                "displayKey": "channelId",
+                "label": "Channel",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeChannelId",
+                  "excludeParamPath": "filters.excludeChannelId"
+                }
+              }
+            ]
           }
         },
         {
@@ -1255,7 +1283,7 @@
       "version": 1,
       "kind": "reportFill",
       "specVersion": 1,
-      "specHash": "fnv1a:530e84e4",
+      "specHash": "fnv1a:65c55f06",
       "source": {
         "kind": "dashboard.reportBuilder",
         "containerId": "performanceBuilder",
@@ -1377,6 +1405,20 @@
               "align": "right"
             }
           ],
+          "runtime": {
+            "refinementFields": [
+              {
+                "key": "channelId",
+                "sourceKey": "channelId",
+                "displayKey": "channelId",
+                "label": "Channel",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeChannelId",
+                  "excludeParamPath": "filters.excludeChannelId"
+                }
+              }
+            ]
+          },
           "content": {
             "columns": [
               {
@@ -1577,6 +1619,20 @@
                 "#17becf"
               ]
             }
+          },
+          "runtime": {
+            "refinementFields": [
+              {
+                "key": "channelId",
+                "sourceKey": "channelId",
+                "displayKey": "channelId",
+                "label": "Channel",
+                "runtimeFilter": {
+                  "includeParamPath": "filters.includeChannelId",
+                  "excludeParamPath": "filters.excludeChannelId"
+                }
+              }
+            ]
           },
           "content": {
             "chartSpec": {
