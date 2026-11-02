@@ -43363,31 +43363,31 @@ Please __addLocaleData before adding additional unit data`);
   }
 
   // src/utils/selector.js
-  var resolveKey = (object5, path) => {
+  var resolveKey = (object6, path2) => {
     try {
-      return path.split(".").reduce((acc, part) => acc && acc[part], object5);
+      return path2.split(".").reduce((acc, part) => acc && acc[part], object6);
     } catch (e3) {
       return void 0;
     }
   };
-  function assertSafeAssignmentPath(path) {
-    if (typeof path !== "string") return;
-    for (const raw of path.split(/[.:/]/)) {
+  function assertSafeAssignmentPath(path2) {
+    if (typeof path2 !== "string") return;
+    for (const raw of path2.split(/[.:/]/)) {
       const key2 = raw.startsWith("[]") ? raw.slice(2) : raw;
       if (key2 === "__proto__" || key2 === "constructor" || key2 === "prototype") {
-        throw new Error(`Unsafe assignment path: ${path}`);
+        throw new Error(`Unsafe assignment path: ${path2}`);
       }
     }
   }
-  var setSelector = (holder, path, value) => {
-    assertSafeAssignmentPath(path);
-    if (!path || typeof path !== "string" || path.indexOf(".") === -1) {
+  var setSelector = (holder, path2, value) => {
+    assertSafeAssignmentPath(path2);
+    if (!path2 || typeof path2 !== "string" || path2.indexOf(".") === -1) {
       return {
         ...holder || {},
-        [path]: value
+        [path2]: value
       };
     }
-    const keys3 = path.split(".");
+    const keys3 = path2.split(".");
     const [head, ...tail] = keys3;
     const existing = holder && typeof holder === "object" ? holder[head] : void 0;
     return {
@@ -44888,13 +44888,13 @@ Please __addLocaleData before adding additional unit data`);
     let body = text(10, 22, `Projected delivery: ${display(projected.delivered)} ${config.unit} \xB7 Loss: ${display(projected.loss)} ${config.unit}`) + text(10, 44, `${config.outcomeLabel}: ${display(projected.outcome)} ${config.outcomeUnit} \xB7 Change: ${display(model.outcomeDelta)}`) + text(10, 66, `Baseline modeled delivery: ${display(baseline.delivered)} ${config.unit} \xB7 Baseline modeled outcome: ${display(baseline.outcome)}`) + text(10, 88, `Eligible share: ${display(model.state.share * 100)}% \xB7 Categories: ${model.state.categories.join(", ")}`);
     body += text(10, 110, `Measured input: ${display(projected.amount)} ${config.unit}`);
     for (const branch of branches) {
-      const { path, amount, loss, direct, route } = branch;
+      const { path: path2, amount, loss, direct, route } = branch;
       if (amount == null || loss == null) continue;
-      const a4 = sources.get(path.source), b3 = routes.get(route), c3 = targets.get(path.destination), d4 = targets.get("__loss");
+      const a4 = sources.get(path2.source), b3 = routes.get(route), c3 = targets.get(path2.destination), d4 = targets.get("__loss");
       const w2 = size(amount), l2 = size(loss), delivered = Math.max(0, w2 - l2), sy = a4.y + a4.offset + w2 / 2, ry = b3.y + b3.offset + w2 / 2;
       const content = curve(x2[0], x2[1], sy, ry, w2, direct ? accent : muted) + curve(x2[1] + 8, x2[2], b3.y + b3.offset + delivered / 2, c3.y + c3.offset + delivered / 2, delivered, direct ? accent : muted) + curve(x2[1] + 8, x2[2], b3.y + b3.offset + delivered + l2 / 2, d4.y + d4.offset + l2 / 2, l2, muted);
-      const label = `${path.source} via ${route} to ${path.destination}: ${display(amount)} ${config.unit}, loss ${display(loss)}`;
-      body += `<g data-path="${escape(path.id)}" ${interactive ? 'tabindex="0" role="img"' : ""} aria-label="${escape(label)}" class="${highlight && highlight !== path.id ? "scenario-muted" : ""}"><title>${escape(label)}</title>${content}</g>`;
+      const label = `${path2.source} via ${route} to ${path2.destination}: ${display(amount)} ${config.unit}, loss ${display(loss)}`;
+      body += `<g data-path="${escape(path2.id)}" ${interactive ? 'tabindex="0" role="img"' : ""} aria-label="${escape(label)}" class="${highlight && highlight !== path2.id ? "scenario-muted" : ""}"><title>${escape(label)}</title>${content}</g>`;
       a4.offset += w2;
       b3.offset += w2;
       c3.offset += delivered;
@@ -45057,27 +45057,65 @@ Please __addLocaleData before adding additional unit data`);
     return pages;
   }
 
+  // src/reporting/reportRuntimeRefinementFields.js
+  var object = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+  var forbidden = /* @__PURE__ */ new Set(["__proto__", "prototype", "constructor", "backend", "source", "service", "method", "credentials", "secretRef"]);
+  var selector = (value) => typeof value === "string" && value.length <= 256 && value.split(".").length <= 8 && value.split(".").every((part) => /^[A-Za-z][A-Za-z0-9_]*$/.test(part) && !forbidden.has(part));
+  var path = (value) => selector(value) && value.startsWith("filters.");
+  var only = (value, keys3) => object(value) && Object.keys(value).every((key2) => keys3.includes(key2));
+  var invalid = () => {
+    throw Error("Invalid report runtime refinement field metadata.");
+  };
+  function normalizeReportRuntimeRefinementFields(fields2) {
+    if (!Array.isArray(fields2) || fields2.length > 256) return invalid();
+    const aliases2 = /* @__PURE__ */ new Set();
+    return fields2.map((field2) => {
+      var _a5, _b, _c, _d;
+      if (!only(field2, ["key", "sourceKey", "displayKey", "label", "runtimeFilter"]) || !selector(field2.key)) return invalid();
+      const sourceKey = (_a5 = field2.sourceKey) != null ? _a5 : field2.key, displayKey = (_b = field2.displayKey) != null ? _b : sourceKey, label = (_c = field2.label) != null ? _c : field2.key;
+      if (!selector(sourceKey) || !selector(displayKey) || typeof label !== "string" || label.length > 256) return invalid();
+      for (const alias of /* @__PURE__ */ new Set([field2.key, sourceKey, displayKey])) {
+        if (aliases2.has(alias)) return invalid();
+        aliases2.add(alias);
+      }
+      const filter = field2.runtimeFilter;
+      if (!only(filter, ["includeParamPath", "excludeParamPath", "paramPath", "format", "parentField"])) return invalid();
+      const include = (_d = filter.includeParamPath) != null ? _d : filter.paramPath, exclude = filter.excludeParamPath;
+      if (include === void 0 && exclude === void 0 || include !== void 0 && !path(include) || exclude !== void 0 && !path(exclude) || include !== void 0 && include === exclude) return invalid();
+      if (filter.includeParamPath !== void 0 && filter.paramPath !== void 0 && filter.includeParamPath !== filter.paramPath) return invalid();
+      if (filter.format !== void 0 && (typeof filter.format !== "string" || !/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(filter.format))) return invalid();
+      if (filter.parentField !== void 0 && !selector(filter.parentField)) return invalid();
+      return { key: field2.key, sourceKey, displayKey, label, runtimeFilter: { ...filter } };
+    });
+  }
+  function validateReportRuntimeRefinementFields(block = {}) {
+    if (block.runtime && Object.hasOwn(block.runtime, "refinementFields")) {
+      if (!["chartBlock", "tableBlock"].includes(block.kind)) return invalid();
+      normalizeReportRuntimeRefinementFields(block.runtime.refinementFields);
+    }
+  }
+
   // src/components/requestLabelInput.js
   var requestLabelInputSchema = { type: "object", additionalProperties: false, required: ["path", "labels"], properties: { path: { type: "string", minLength: 1 }, labels: { type: "array", minItems: 1, items: { type: "object", additionalProperties: false, required: ["value", "label"], properties: { value: { type: ["string", "number", "boolean"] }, label: { type: "string", minLength: 1 } } } } } };
-  function normalizeRequestLabelInput(selector) {
-    if (!selector || typeof selector !== "object" || Array.isArray(selector) || Object.keys(selector).some((key2) => !["path", "labels"].includes(key2)) || typeof selector.path !== "string" || !selector.path.split(".").every((key2) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(key2) && !["__proto__", "prototype", "constructor"].includes(key2)) || !Array.isArray(selector.labels) || !selector.labels.length) throw new Error("Request label requires a safe filter path and explicit labels.");
+  function normalizeRequestLabelInput(selector2) {
+    if (!selector2 || typeof selector2 !== "object" || Array.isArray(selector2) || Object.keys(selector2).some((key2) => !["path", "labels"].includes(key2)) || typeof selector2.path !== "string" || !selector2.path.split(".").every((key2) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(key2) && !["__proto__", "prototype", "constructor"].includes(key2)) || !Array.isArray(selector2.labels) || !selector2.labels.length) throw new Error("Request label requires a safe filter path and explicit labels.");
     const keys3 = /* @__PURE__ */ new Set();
-    for (const entry of selector.labels) {
+    for (const entry of selector2.labels) {
       if (!entry || Object.keys(entry).some((key3) => !["value", "label"].includes(key3)) || !["number", "string", "boolean"].includes(typeof entry.value) || typeof entry.value === "number" && (!Number.isFinite(entry.value) || Math.abs(entry.value) > Number.MAX_SAFE_INTEGER) || typeof entry.label !== "string" || !entry.label.trim()) throw new Error("Invalid request label mapping.");
       const key2 = JSON.stringify(entry.value);
       if (keys3.has(key2)) throw new Error("Duplicate request label value.");
       keys3.add(key2);
     }
-    return JSON.parse(JSON.stringify(selector));
+    return JSON.parse(JSON.stringify(selector2));
   }
   function resolveRequestLabelInput(input, filters) {
     const config = normalizeRequestLabelInput(input);
-    let selector = filters;
+    let selector2 = filters;
     for (const key2 of config.path.split(".")) {
-      if (!selector || typeof selector !== "object" || !Object.hasOwn(selector, key2)) throw new Error("Request label input is missing from its dataset request.");
-      selector = selector[key2];
+      if (!selector2 || typeof selector2 !== "object" || !Object.hasOwn(selector2, key2)) throw new Error("Request label input is missing from its dataset request.");
+      selector2 = selector2[key2];
     }
-    const selected = config.labels.find((entry) => entry.value === selector);
+    const selected = config.labels.find((entry) => entry.value === selector2);
     if (!selected) throw new Error("Request label input has no declared label.");
     return selected.label;
   }
@@ -46879,9 +46917,9 @@ Please __addLocaleData before adding additional unit data`);
       };
     };
   }
-  function findKey(object5, predicate) {
-    for (var key2 in object5) {
-      if (object5.hasOwnProperty(key2) && predicate(object5[key2])) {
+  function findKey(object6, predicate) {
+    for (var key2 in object6) {
+      if (object6.hasOwnProperty(key2) && predicate(object6[key2])) {
         return key2;
       }
     }
@@ -47985,10 +48023,10 @@ Please __addLocaleData before adding additional unit data`);
     return hierarchy ? columns.filter((column) => (typeof column === "string" ? column : column.key) !== HIERARCHY_PATH_FIELD) : columns;
   }
   var clone = (value) => JSON.parse(JSON.stringify(value));
-  var object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+  var object2 = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
   var key = (value) => typeof value === "string" && value.trim().length > 0;
   function exact(value, fields2, name) {
-    if (!object(value) || Object.keys(value).some((field2) => !fields2.includes(field2))) throw Error(`Invalid ${name} configuration.`);
+    if (!object2(value) || Object.keys(value).some((field2) => !fields2.includes(field2))) throw Error(`Invalid ${name} configuration.`);
   }
   function keys(values, name) {
     if (!Array.isArray(values) || !values.length || values.some((value) => !key(value)) || new Set(values).size !== values.length) throw Error(`${name} requires unique nonempty field names.`);
@@ -48069,7 +48107,7 @@ Please __addLocaleData before adding additional unit data`);
     if (!Array.isArray(rows)) throw Error("Hierarchy rows must be an array.");
     const nodes = /* @__PURE__ */ new Map(), roots = [];
     rows.forEach((row, index) => {
-      if (!object(row)) throw Error("Hierarchy rows must be objects.");
+      if (!object2(row)) throw Error("Hierarchy rows must be objects.");
       const id = row[config.keyField];
       if (!key(id) || nodes.has(id)) throw Error("Hierarchy requires unique nonempty string row keys.");
       if (!Object.hasOwn(row, config.parentField) || !(row[config.parentField] === null || key(row[config.parentField]))) throw Error("Hierarchy parent must be an explicit null root or string key.");
@@ -48157,7 +48195,7 @@ Please __addLocaleData before adding additional unit data`);
     if (!normalized.pivot) return { columns: block.columns, rows, columnGroups: block.columnGroups || [] };
     const pivot = normalized.pivot, tuples = /* @__PURE__ */ new Map();
     for (const row of rows) {
-      if (!object(row)) throw Error("Pivot rows must be objects.");
+      if (!object2(row)) throw Error("Pivot rows must be objects.");
       const values = pivot.rowFields.map((field2) => row[field2]);
       if (values.some((value) => !key(value))) throw Error("Pivot row dimensions require nonempty string keys.");
       const category = pivot.columnCategories.indexOf(row[pivot.columnField]);
@@ -48258,15 +48296,15 @@ Please __addLocaleData before adding additional unit data`);
   function normalizePathSegment(segment = "") {
     return String(segment || "").trim();
   }
-  function joinPath(path = "$", segment = "") {
+  function joinPath(path2 = "$", segment = "") {
     const normalized = normalizePathSegment(segment);
     if (!normalized) {
-      return path;
+      return path2;
     }
     if (normalized.startsWith("[")) {
-      return `${path}${normalized}`;
+      return `${path2}${normalized}`;
     }
-    return path === "$" ? `$.${normalized}` : `${path}.${normalized}`;
+    return path2 === "$" ? `$.${normalized}` : `${path2}.${normalized}`;
   }
   function isObjectLike(value) {
     return value != null && typeof value === "object" && !Array.isArray(value);
@@ -48298,25 +48336,25 @@ Please __addLocaleData before adding additional unit data`);
     }
     return normalized.slice(2).split("/").map((part) => part.replace(/~1/g, "/").replace(/~0/g, "~")).reduce((current, part) => current == null ? void 0 : current[part], rootSchema);
   }
-  function validateNode(schema4 = {}, value, path = "$", rootSchema = schema4) {
+  function validateNode(schema4 = {}, value, path2 = "$", rootSchema = schema4) {
     let normalizedSchema = schema4;
     while (normalizedSchema == null ? void 0 : normalizedSchema.$ref) {
       normalizedSchema = resolveRef(rootSchema, normalizedSchema.$ref);
     }
     if (normalizedSchema === true) return [];
-    if (normalizedSchema === false) return [{ path, code: "falseSchema", message: "Value is forbidden by a false schema." }];
+    if (normalizedSchema === false) return [{ path: path2, code: "falseSchema", message: "Value is forbidden by a false schema." }];
     if (!normalizedSchema || typeof normalizedSchema !== "object") {
       return [];
     }
     const conditionalErrors = [];
-    if (Array.isArray(normalizedSchema.allOf)) for (const branch of normalizedSchema.allOf) conditionalErrors.push(...validateNode(branch, value, path, rootSchema));
+    if (Array.isArray(normalizedSchema.allOf)) for (const branch of normalizedSchema.allOf) conditionalErrors.push(...validateNode(branch, value, path2, rootSchema));
     if (normalizedSchema.if !== void 0) {
-      const branch = validateNode(normalizedSchema.if, value, path, rootSchema).length === 0 ? normalizedSchema.then : normalizedSchema.else;
-      if (branch !== void 0) conditionalErrors.push(...validateNode(branch, value, path, rootSchema));
+      const branch = validateNode(normalizedSchema.if, value, path2, rootSchema).length === 0 ? normalizedSchema.then : normalizedSchema.else;
+      if (branch !== void 0) conditionalErrors.push(...validateNode(branch, value, path2, rootSchema));
     }
     if (conditionalErrors.length) return conditionalErrors;
     if (Array.isArray(normalizedSchema.anyOf) && normalizedSchema.anyOf.length > 0) {
-      const candidateErrors = normalizedSchema.anyOf.map((candidate) => validateNode(candidate, value, path, rootSchema));
+      const candidateErrors = normalizedSchema.anyOf.map((candidate) => validateNode(candidate, value, path2, rootSchema));
       const successful = candidateErrors.find((errors2) => errors2.length === 0);
       if (!successful) {
         const mostSpecific = candidateErrors.filter((errors2) => errors2.length > 0).sort((left, right) => {
@@ -48328,26 +48366,26 @@ Please __addLocaleData before adding additional unit data`);
           return left.length - right.length;
         })[0];
         return mostSpecific || [{
-          path,
+          path: path2,
           code: "anyOf",
           message: "Value does not match any allowed schema branch."
         }];
       }
     }
     if (Array.isArray(normalizedSchema.oneOf) && normalizedSchema.oneOf.length) {
-      const matches = normalizedSchema.oneOf.filter((candidate) => validateNode(candidate, value, path, rootSchema).length === 0);
-      if (matches.length !== 1) return [{ path, code: "oneOf", message: "Value must match exactly one allowed schema branch." }];
+      const matches = normalizedSchema.oneOf.filter((candidate) => validateNode(candidate, value, path2, rootSchema).length === 0);
+      if (matches.length !== 1) return [{ path: path2, code: "oneOf", message: "Value must match exactly one allowed schema branch." }];
     }
     if (Object.prototype.hasOwnProperty.call(normalizedSchema, "const") && value !== normalizedSchema.const) {
       return [{
-        path,
+        path: path2,
         code: "const",
         message: `Expected constant value ${JSON.stringify(normalizedSchema.const)}.`
       }];
     }
     if (Array.isArray(normalizedSchema.enum) && !normalizedSchema.enum.some((entry) => JSON.stringify(entry) === JSON.stringify(value))) {
       return [{
-        path,
+        path: path2,
         code: "enum",
         message: `Value ${JSON.stringify(value)} is not in the allowed enum.`
       }];
@@ -48355,7 +48393,7 @@ Please __addLocaleData before adding additional unit data`);
     const declaredTypes = Array.isArray(normalizedSchema.type) ? normalizedSchema.type : normalizedSchema.type ? [normalizedSchema.type] : [];
     if (declaredTypes.length > 0 && !declaredTypes.some((type) => matchesType(type, value))) {
       return [{
-        path,
+        path: path2,
         code: "type",
         message: `Expected ${declaredTypes.join(" or ")}.`
       }];
@@ -48368,7 +48406,7 @@ Please __addLocaleData before adding additional unit data`);
       required.forEach((key2) => {
         if (!Object.prototype.hasOwnProperty.call(value || {}, key2)) {
           errors.push({
-            path: joinPath(path, key2),
+            path: joinPath(path2, key2),
             code: "required",
             message: "Missing required property."
           });
@@ -48381,7 +48419,7 @@ Please __addLocaleData before adding additional unit data`);
           }
           if (normalizedSchema.additionalProperties === false) {
             errors.push({
-              path: joinPath(path, key2),
+              path: joinPath(path2, key2),
               code: "additionalProperties",
               message: "Unexpected property."
             });
@@ -48391,7 +48429,7 @@ Please __addLocaleData before adding additional unit data`);
             errors.push(...validateNode(
               normalizedSchema.additionalProperties,
               value[key2],
-              joinPath(path, key2),
+              joinPath(path2, key2),
               rootSchema
             ));
           }
@@ -48401,38 +48439,38 @@ Please __addLocaleData before adding additional unit data`);
         if (!Object.prototype.hasOwnProperty.call(value || {}, key2)) {
           return;
         }
-        errors.push(...validateNode(propertySchema, value[key2], joinPath(path, key2), rootSchema));
+        errors.push(...validateNode(propertySchema, value[key2], joinPath(path2, key2), rootSchema));
       });
     }
     if (effectiveType === "array" && Array.isArray(value)) {
       if (Number.isInteger(normalizedSchema.maxItems) && value.length > normalizedSchema.maxItems) {
-        errors.push({ path, code: "maxItems", message: `Expected at most ${normalizedSchema.maxItems} item(s).` });
+        errors.push({ path: path2, code: "maxItems", message: `Expected at most ${normalizedSchema.maxItems} item(s).` });
       }
       if (Number.isFinite(Number(normalizedSchema.minItems)) && value.length < Number(normalizedSchema.minItems)) {
         errors.push({
-          path,
+          path: path2,
           code: "minItems",
           message: `Expected at least ${Number(normalizedSchema.minItems)} item(s).`
         });
       }
       if (normalizedSchema.items !== void 0) {
         value.forEach((item, index) => {
-          errors.push(...validateNode(normalizedSchema.items, item, joinPath(path, `[${index}]`), rootSchema));
+          errors.push(...validateNode(normalizedSchema.items, item, joinPath(path2, `[${index}]`), rootSchema));
         });
       }
     }
     if (typeof value === "string" && typeof normalizedSchema.pattern === "string") {
       try {
         if (!new RegExp(normalizedSchema.pattern, "u").test(value)) {
-          errors.push({ path, code: "pattern", message: `String must match ${normalizedSchema.pattern}.` });
+          errors.push({ path: path2, code: "pattern", message: `String must match ${normalizedSchema.pattern}.` });
         }
       } catch (e3) {
-        errors.push({ path, code: "invalidPattern", message: `Invalid schema regular expression: ${normalizedSchema.pattern}.` });
+        errors.push({ path: path2, code: "invalidPattern", message: `Invalid schema regular expression: ${normalizedSchema.pattern}.` });
       }
     }
     if (typeof value === "string" && Number.isInteger(normalizedSchema.minLength) && Array.from(value).length < normalizedSchema.minLength) {
       errors.push({
-        path,
+        path: path2,
         code: "minLength",
         message: `Expected at least ${normalizedSchema.minLength} character(s).`
       });
@@ -48440,14 +48478,14 @@ Please __addLocaleData before adding additional unit data`);
     if ((effectiveType === "number" || effectiveType === "integer") && Number.isFinite(Number(normalizedSchema.minimum))) {
       if (Number(value) < Number(normalizedSchema.minimum)) {
         errors.push({
-          path,
+          path: path2,
           code: "minimum",
           message: `Expected number >= ${Number(normalizedSchema.minimum)}.`
         });
       }
     }
     if ((effectiveType === "number" || effectiveType === "integer") && Number.isFinite(normalizedSchema.maximum) && Number(value) > normalizedSchema.maximum) {
-      errors.push({ path, code: "maximum", message: `Expected number <= ${normalizedSchema.maximum}.` });
+      errors.push({ path: path2, code: "maximum", message: `Expected number <= ${normalizedSchema.maximum}.` });
     }
     return errors;
   }
@@ -48747,7 +48785,7 @@ Please __addLocaleData before adding additional unit data`);
       });
       if (labels.some((label) => !label) || new Set(labels).size !== labels.length) throw Error("KPI sparkline requires one row per category.");
       if (config.periodStartPath) {
-        const readPath = (path) => path.split(".").reduce((value, key2) => value == null ? void 0 : value[key2], dataset.request);
+        const readPath = (path2) => path2.split(".").reduce((value, key2) => value == null ? void 0 : value[key2], dataset.request);
         const civil = (value) => {
           const text4 = String(value != null ? value : "").slice(0, 10);
           if (!/^\d{4}-\d{2}-\d{2}$/.test(text4)) throw Error("KPI sparkline requires valid civil dates.");
@@ -49858,7 +49896,7 @@ Please __addLocaleData before adding additional unit data`);
   }
   function resolveReportRelativeDateRangeSpec(spec = {}, now = /* @__PURE__ */ new Date(), referenceRequest = null) {
     if (normalizePreset(spec == null ? void 0 : spec.preset) === "previousperiod") {
-      const atPath = (path) => String(path || "").split(".").reduce((value, key2) => value == null ? void 0 : value[key2], referenceRequest);
+      const atPath = (path2) => String(path2 || "").split(".").reduce((value, key2) => value == null ? void 0 : value[key2], referenceRequest);
       return resolveReportPreviousPeriodRange(atPath(spec.startParamPath), atPath(spec.endParamPath));
     }
     const presetRange = resolveReportRelativeDateRange(spec == null ? void 0 : spec.preset, now);
@@ -50025,8 +50063,8 @@ Please __addLocaleData before adding additional unit data`);
     }).filter(Boolean);
   }
   function selectFirstDefined(record = {}, selectors = []) {
-    for (const selector of selectors) {
-      const key2 = String(selector || "").trim();
+    for (const selector2 of selectors) {
+      const key2 = String(selector2 || "").trim();
       if (!key2) continue;
       const value = resolveKey(record, key2);
       if (value !== void 0 && value !== null && value !== "") {
@@ -50035,25 +50073,25 @@ Please __addLocaleData before adding additional unit data`);
     }
     return void 0;
   }
-  function selectorLeaf(selector = "") {
-    const normalized = String(selector || "").trim();
+  function selectorLeaf(selector2 = "") {
+    const normalized = String(selector2 || "").trim();
     if (!normalized) return "";
     const parts = normalized.split(".").map((entry) => entry.trim()).filter(Boolean);
     return parts[parts.length - 1] || normalized;
   }
-  function lookupValueFallbackSelectors(selector = "") {
-    const leaf = selectorLeaf(selector);
+  function lookupValueFallbackSelectors(selector2 = "") {
+    const leaf = selectorLeaf(selector2);
     const lower2 = leaf.toLowerCase();
-    const selectors = [selector, leaf];
+    const selectors = [selector2, leaf];
     if (lower2 === "id" || lower2.endsWith("id")) {
       selectors.push("id", "value");
     }
     return Array.from(new Set(selectors.filter(Boolean)));
   }
-  function lookupLabelFallbackSelectors(selector = "", valueSelector = "") {
-    const leaf = selectorLeaf(selector);
+  function lookupLabelFallbackSelectors(selector2 = "", valueSelector = "") {
+    const leaf = selectorLeaf(selector2);
     const lower2 = leaf.toLowerCase();
-    const selectors = [selector, leaf];
+    const selectors = [selector2, leaf];
     if (lower2 === "label" || lower2.endsWith("label")) {
       selectors.push("label", "name", "displayName", "displayPath");
     } else if (lower2 === "name" || lower2.endsWith("name")) {
@@ -51434,8 +51472,8 @@ Please __addLocaleData before adding additional unit data`);
     }
     return value;
   }
-  function setNestedValue(target, path, value) {
-    const parts = String(path || "").split(".").map((entry) => entry.trim()).filter(Boolean);
+  function setNestedValue(target, path2, value) {
+    const parts = String(path2 || "").split(".").map((entry) => entry.trim()).filter(Boolean);
     if (!parts.length) {
       return target;
     }
@@ -53621,8 +53659,8 @@ Please __addLocaleData before adding additional unit data`);
   function isPlainObject7(value) {
     return !!value && typeof value === "object" && !Array.isArray(value);
   }
-  function setNestedValue2(target, path, value) {
-    const segments = normalizeString28(path).split(".").filter(Boolean);
+  function setNestedValue2(target, path2, value) {
+    const segments = normalizeString28(path2).split(".").filter(Boolean);
     if (!target || typeof target !== "object" || Array.isArray(target) || segments.length === 0) {
       return;
     }
@@ -53636,8 +53674,8 @@ Please __addLocaleData before adding additional unit data`);
     }
     cursor[segments[segments.length - 1]] = value;
   }
-  function getNestedValue(target, path) {
-    const segments = normalizeString28(path).split(".").filter(Boolean);
+  function getNestedValue(target, path2) {
+    const segments = normalizeString28(path2).split(".").filter(Boolean);
     if (!target || typeof target !== "object" || Array.isArray(target) || segments.length === 0) {
       return void 0;
     }
@@ -53650,8 +53688,8 @@ Please __addLocaleData before adding additional unit data`);
     }
     return cursor;
   }
-  function deleteNestedValue(target, path) {
-    const segments = normalizeString28(path).split(".").filter(Boolean);
+  function deleteNestedValue(target, path2) {
+    const segments = normalizeString28(path2).split(".").filter(Boolean);
     if (!target || typeof target !== "object" || Array.isArray(target) || segments.length === 0) {
       return;
     }
@@ -53801,7 +53839,8 @@ Please __addLocaleData before adding additional unit data`);
       ...(column == null ? void 0 : column.displayValueMap) && typeof column.displayValueMap === "object" && !Array.isArray(column.displayValueMap) ? { displayValueMap: cloneValue18(column.displayValueMap) } : {},
       ...normalizeString28(column == null ? void 0 : column.format) ? { format: normalizeString28(column.format) } : {},
       ...normalizeString28(column == null ? void 0 : column.tickFormat) ? { tickFormat: normalizeString28(column.tickFormat) } : {},
-      ...["civil", "instant"].includes(normalizeString28(column == null ? void 0 : column.valueMode)) ? { valueMode: normalizeString28(column.valueMode) } : {}
+      ...["civil", "instant"].includes(normalizeString28(column == null ? void 0 : column.valueMode)) ? { valueMode: normalizeString28(column.valueMode) } : {},
+      ...isPlainObject7(column == null ? void 0 : column.runtimeFilter) ? { runtimeFilter: cloneValue18(column.runtimeFilter) } : {}
     })).filter((entry) => entry.id && entry.key && entry.label);
     const measures = inheritRuntimeFieldCatalog ? cloneValue18((baseConfig == null ? void 0 : baseConfig.measures) || []) : fieldOptions.filter((column) => normalizeString28(column == null ? void 0 : column.kind) === "measure").map((column) => ({
       id: normalizeString28(column == null ? void 0 : column.key),
@@ -54315,8 +54354,8 @@ Please __addLocaleData before adding additional unit data`);
   function isPlainObject8(value) {
     return !!value && typeof value === "object" && !Array.isArray(value);
   }
-  function setNestedValue3(target, path, value) {
-    const segments = String(path || "").split(".").map((segment) => segment.trim()).filter(Boolean);
+  function setNestedValue3(target, path2, value) {
+    const segments = String(path2 || "").split(".").map((segment) => segment.trim()).filter(Boolean);
     if (!target || typeof target !== "object" || Array.isArray(target) || segments.length === 0) {
       return;
     }
@@ -54609,7 +54648,8 @@ Please __addLocaleData before adding additional unit data`);
       key: normalizeString30(column == null ? void 0 : column.key),
       label: normalizeString30((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
       ...normalizeString30(column == null ? void 0 : column.format) ? { format: normalizeString30(column.format) } : {},
-      ...(column == null ? void 0 : column.rowIdentity) === true ? { rowIdentity: true } : {}
+      ...(column == null ? void 0 : column.rowIdentity) === true ? { rowIdentity: true } : {},
+      ...isPlainObject8(column == null ? void 0 : column.runtimeFilter) ? { runtimeFilter: cloneValue19(column.runtimeFilter) } : {}
     })).filter((entry) => entry.id && entry.key && entry.label);
     const measures = inheritRuntimeFieldCatalog ? cloneValue19((baseConfig == null ? void 0 : baseConfig.measures) || []) : columnOptions.filter((column) => normalizeString30(column == null ? void 0 : column.kind) === "measure").map((column) => ({
       id: normalizeString30(column == null ? void 0 : column.key),
@@ -54624,6 +54664,58 @@ Please __addLocaleData before adding additional unit data`);
       dimensions,
       measures
     };
+  }
+  function withDeclaredRuntimeRefinementFields(block, config = {}, declaredDimensions = null) {
+    var _a5, _b;
+    if (!["chartBlock", "tableBlock"].includes(block == null ? void 0 : block.kind)) return block;
+    const dimensions = declaredDimensions || (Array.isArray(config.dimensions) ? config.dimensions : []);
+    if (!dimensions.some((field2) => isPlainObject8(field2.runtimeFilter)) && !Object.hasOwn(block.runtime || {}, "refinementFields")) return block;
+    const explicit = Object.hasOwn(block.runtime || {}, "refinementFields") ? normalizeReportRuntimeRefinementFields(block.runtime.refinementFields) : null;
+    if ((explicit == null ? void 0 : explicit.length) === 0) return { ...block, runtime: normalizeReportBlockRuntime({ ...block.runtime, refinementFields: [] }, block) };
+    const chart = block.chartSpec || {};
+    const refs = block.kind === "tableBlock" ? (block.columns || []).map((column) => column.sourceKey || column.displayKey || column.key) : [chart.xField, chart.seriesField, (_a5 = chart.heatmap) == null ? void 0 : _a5.rowField, (_b = chart.heatmap) == null ? void 0 : _b.columnField];
+    const fields2 = [];
+    for (const ref of new Set(refs.filter(Boolean))) {
+      const matches = dimensions.filter((field3) => [field3.id, field3.key, field3.displayKey].includes(ref));
+      if (matches.length !== 1 || !isPlainObject8(matches[0].runtimeFilter)) continue;
+      const field2 = matches[0];
+      try {
+        fields2.push(...normalizeReportRuntimeRefinementFields([{
+          key: field2.key || field2.id,
+          sourceKey: field2.key || field2.id,
+          displayKey: field2.displayKey || field2.key || field2.id,
+          label: field2.label || field2.key || field2.id,
+          runtimeFilter: field2.runtimeFilter
+        }]));
+      } catch (_2) {
+      }
+    }
+    let refinementFields;
+    try {
+      refinementFields = normalizeReportRuntimeRefinementFields(fields2);
+    } catch (_2) {
+      refinementFields = [];
+    }
+    if (explicit) {
+      const bindingIdentity = (field2) => {
+        var _a6;
+        return JSON.stringify([
+          field2.key,
+          field2.sourceKey,
+          field2.displayKey,
+          (_a6 = field2.runtimeFilter.includeParamPath) != null ? _a6 : field2.runtimeFilter.paramPath,
+          field2.runtimeFilter.excludeParamPath,
+          field2.runtimeFilter.format,
+          field2.runtimeFilter.parentField
+        ]);
+      };
+      refinementFields = explicit.map((field2) => {
+        const declared = refinementFields.find((candidate) => bindingIdentity(candidate) === bindingIdentity(field2));
+        if (!declared) throw Error("Authored refinement fields must match declared same-dataset bindings.");
+        return declared;
+      });
+    }
+    return { ...block, runtime: normalizeReportBlockRuntime({ ...block.runtime, refinementFields }, block) };
   }
   function augmentReportRequestForAuthoredBlocks(baseSpec = {}, blocks = [], config = {}) {
     const datasets = Array.isArray(baseSpec == null ? void 0 : baseSpec.datasets) ? baseSpec.datasets : [];
@@ -55962,12 +56054,14 @@ Please __addLocaleData before adding additional unit data`);
   }
   function normalizeReportBlockRuntime(runtime = null, block = {}) {
     const source = isPlainObject8(runtime) ? runtime : {};
+    if (block.kind) validateReportRuntimeRefinementFields({ ...block, runtime: source });
     const rowVisibility = source.rowVisibility === void 0 ? null : normalizeReportRowVisibility(source.rowVisibility);
     const visibleWhen = isPlainObject8(source == null ? void 0 : source.visibleWhen) ? cloneValue19(source.visibleWhen) : isPlainObject8(block == null ? void 0 : block.visibleWhen) ? cloneValue19(block.visibleWhen) : null;
     const filterBindings = isPlainObject8(source == null ? void 0 : source.filterBindings) ? cloneValue19(source.filterBindings) : isPlainObject8(block == null ? void 0 : block.filterBindings) ? cloneValue19(block.filterBindings) : null;
     const selectionBindings = isPlainObject8(source == null ? void 0 : source.selectionBindings) ? cloneValue19(source.selectionBindings) : isPlainObject8(block == null ? void 0 : block.selectionBindings) ? cloneValue19(block.selectionBindings) : null;
     const actions = Array.isArray(source == null ? void 0 : source.actions) ? cloneValue19(source.actions) : Array.isArray(block == null ? void 0 : block.actions) ? cloneValue19(block.actions) : [];
     const normalized = {
+      ...Object.hasOwn(source, "refinementFields") ? { refinementFields: normalizeReportRuntimeRefinementFields(source.refinementFields) } : {},
       ...rowVisibility ? { rowVisibility } : {},
       ...typeof (source == null ? void 0 : source.requireCompleteDataset) === "boolean" ? { requireCompleteDataset: source.requireCompleteDataset } : {},
       ...(source == null ? void 0 : source.printRowReference) === true ? { printRowReference: true } : {},
@@ -56382,6 +56476,7 @@ Please __addLocaleData before adding additional unit data`);
       baseSpec.datasets = (Array.isArray(baseSpec == null ? void 0 : baseSpec.datasets) ? baseSpec.datasets : []).filter((dataset) => normalizeString30(dataset == null ? void 0 : dataset.id) !== "primary");
     }
     const buildDatasetSpecificRuntimeContext = (datasetRef = "") => {
+      var _a6;
       const normalizedDatasetRef = normalizeString30(datasetRef || "primary") || "primary";
       const staticDataset = staticDatasetIndex.get(normalizedDatasetRef) || null;
       if (staticDataset) {
@@ -56400,6 +56495,9 @@ Please __addLocaleData before adding additional unit data`);
         const datasetConfig = buildReportBuilderPublishedDatasetConfig(effectiveConfig, publishedDataset, { borrowBase: true });
         return {
           config: datasetConfig,
+          // Preserve declaration multiplicity for admission: the display catalog
+          // may deduplicate options, but that must not hide ambiguous bindings.
+          refinementDimensions: ((_a6 = publishedDataset.columnOptions) == null ? void 0 : _a6.length) ? publishedDataset.columnOptions.filter((field2) => field2.kind === "dimension").map((field2) => ({ ...field2, id: field2.key, key: field2.sourceKey || field2.key })) : null,
           fieldCatalog: buildReportBuilderFieldCatalog(datasetConfig, normalizedDatasetRef),
           container: {
             ...loweredContainer,
@@ -56472,7 +56570,10 @@ Please __addLocaleData before adding additional unit data`);
       baseSpec,
       [...Array.isArray(baseSpec == null ? void 0 : baseSpec.blocks) ? baseSpec.blocks : [], ...additionalBlocks]
     );
-    const nextBlocks = filterExclusiveReportRuntimeBlocks(blocks, loweredLayout.blocks, exclusiveSectionOwnership);
+    const nextBlocks = filterExclusiveReportRuntimeBlocks(blocks, loweredLayout.blocks, exclusiveSectionOwnership).map((block) => {
+      const context = resolveDatasetSpecificRuntimeContext(block.datasetRef);
+      return withDeclaredRuntimeRefinementFields(block, context.config, context.refinementDimensions);
+    });
     const nextBlockIds = new Set(nextBlocks.map((block) => normalizeString30(block == null ? void 0 : block.id)).filter(Boolean));
     const referencedDatasetRefs = new Set(
       nextBlocks.flatMap(getReportBlockDatasetRefs).filter((datasetRef) => !!datasetRef && datasetRef !== "primary")
@@ -56601,33 +56702,33 @@ Please __addLocaleData before adding additional unit data`);
     if (!source) {
       return "";
     }
-    return source.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_2, selector) => {
-      const value = resolveKey(holder || {}, String(selector || "").trim());
+    return source.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_2, selector2) => {
+      const value = resolveKey(holder || {}, String(selector2 || "").trim());
       return value == null ? "" : String(value);
     }).replace(/\s{2,}/g, " ").trim();
   }
-  function resolveContextSourceValue({ source = "value", selector = "", context = null, row = null, value = null } = {}) {
+  function resolveContextSourceValue({ source = "value", selector: selector2 = "", context = null, row = null, value = null } = {}) {
     var _a5, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X;
     switch (String(source || "value").trim().toLowerCase()) {
       case "row":
-        return selector ? resolveKey(row || {}, selector) : row;
+        return selector2 ? resolveKey(row || {}, selector2) : row;
       case "value":
-        return selector ? resolveKey(value || {}, selector) : value;
+        return selector2 ? resolveKey(value || {}, selector2) : value;
       case "form":
-        return selector ? resolveKey(((_c = (_b = (_a5 = context == null ? void 0 : context.handlers) == null ? void 0 : _a5.dataSource) == null ? void 0 : _b.getFormData) == null ? void 0 : _c.call(_b)) || {}, selector) : ((_f = (_e = (_d = context == null ? void 0 : context.handlers) == null ? void 0 : _d.dataSource) == null ? void 0 : _e.getFormData) == null ? void 0 : _f.call(_e)) || {};
+        return selector2 ? resolveKey(((_c = (_b = (_a5 = context == null ? void 0 : context.handlers) == null ? void 0 : _a5.dataSource) == null ? void 0 : _b.getFormData) == null ? void 0 : _c.call(_b)) || {}, selector2) : ((_f = (_e = (_d = context == null ? void 0 : context.handlers) == null ? void 0 : _d.dataSource) == null ? void 0 : _e.getFormData) == null ? void 0 : _f.call(_e)) || {};
       case "windowform":
-        return selector ? resolveKey(((_i = (_h = (_g = context == null ? void 0 : context.signals) == null ? void 0 : _g.windowForm) == null ? void 0 : _h.peek) == null ? void 0 : _i.call(_h)) || ((_k = (_j = context == null ? void 0 : context.signals) == null ? void 0 : _j.windowForm) == null ? void 0 : _k.value) || {}, selector) : ((_n = (_m = (_l = context == null ? void 0 : context.signals) == null ? void 0 : _l.windowForm) == null ? void 0 : _m.peek) == null ? void 0 : _n.call(_m)) || ((_p = (_o = context == null ? void 0 : context.signals) == null ? void 0 : _o.windowForm) == null ? void 0 : _p.value) || {};
+        return selector2 ? resolveKey(((_i = (_h = (_g = context == null ? void 0 : context.signals) == null ? void 0 : _g.windowForm) == null ? void 0 : _h.peek) == null ? void 0 : _i.call(_h)) || ((_k = (_j = context == null ? void 0 : context.signals) == null ? void 0 : _j.windowForm) == null ? void 0 : _k.value) || {}, selector2) : ((_n = (_m = (_l = context == null ? void 0 : context.signals) == null ? void 0 : _l.windowForm) == null ? void 0 : _m.peek) == null ? void 0 : _n.call(_m)) || ((_p = (_o = context == null ? void 0 : context.signals) == null ? void 0 : _o.windowForm) == null ? void 0 : _p.value) || {};
       case "metrics":
-        return selector ? resolveKey(((_s = (_r = (_q = context == null ? void 0 : context.signals) == null ? void 0 : _q.metrics) == null ? void 0 : _r.peek) == null ? void 0 : _s.call(_r)) || ((_u = (_t = context == null ? void 0 : context.signals) == null ? void 0 : _t.metrics) == null ? void 0 : _u.value) || {}, selector) : ((_x = (_w = (_v = context == null ? void 0 : context.signals) == null ? void 0 : _v.metrics) == null ? void 0 : _w.peek) == null ? void 0 : _x.call(_w)) || ((_z = (_y = context == null ? void 0 : context.signals) == null ? void 0 : _y.metrics) == null ? void 0 : _z.value) || {};
+        return selector2 ? resolveKey(((_s = (_r = (_q = context == null ? void 0 : context.signals) == null ? void 0 : _q.metrics) == null ? void 0 : _r.peek) == null ? void 0 : _s.call(_r)) || ((_u = (_t = context == null ? void 0 : context.signals) == null ? void 0 : _t.metrics) == null ? void 0 : _u.value) || {}, selector2) : ((_x = (_w = (_v = context == null ? void 0 : context.signals) == null ? void 0 : _v.metrics) == null ? void 0 : _w.peek) == null ? void 0 : _x.call(_w)) || ((_z = (_y = context == null ? void 0 : context.signals) == null ? void 0 : _y.metrics) == null ? void 0 : _z.value) || {};
       case "filter":
-        return selector ? resolveKey(((_C = (_B = (_A = context == null ? void 0 : context.handlers) == null ? void 0 : _A.dataSource) == null ? void 0 : _B.peekFilter) == null ? void 0 : _C.call(_B)) || {}, selector) : ((_F = (_E = (_D = context == null ? void 0 : context.handlers) == null ? void 0 : _D.dataSource) == null ? void 0 : _E.peekFilter) == null ? void 0 : _F.call(_E)) || {};
+        return selector2 ? resolveKey(((_C = (_B = (_A = context == null ? void 0 : context.handlers) == null ? void 0 : _A.dataSource) == null ? void 0 : _B.peekFilter) == null ? void 0 : _C.call(_B)) || {}, selector2) : ((_F = (_E = (_D = context == null ? void 0 : context.handlers) == null ? void 0 : _D.dataSource) == null ? void 0 : _E.peekFilter) == null ? void 0 : _F.call(_E)) || {};
       case "selection": {
         const selection = ((_I = (_H = (_G = context == null ? void 0 : context.handlers) == null ? void 0 : _G.dataSource) == null ? void 0 : _H.getSelection) == null ? void 0 : _I.call(_H)) || ((_L = (_K = (_J = context == null ? void 0 : context.handlers) == null ? void 0 : _J.dataSource) == null ? void 0 : _K.peekSelection) == null ? void 0 : _L.call(_K)) || {};
         const selected = (_N = (_M = selection == null ? void 0 : selection.selected) != null ? _M : selection == null ? void 0 : selection.selection) != null ? _N : selection;
-        return selector ? resolveKey(selected || {}, selector) : selected;
+        return selector2 ? resolveKey(selected || {}, selector2) : selected;
       }
       case "input":
-        return selector ? resolveKey(((_Q = (_P = (_O = context == null ? void 0 : context.signals) == null ? void 0 : _O.input) == null ? void 0 : _P.peek) == null ? void 0 : _Q.call(_P)) || ((_S = (_R = context == null ? void 0 : context.signals) == null ? void 0 : _R.input) == null ? void 0 : _S.value) || {}, selector) : ((_V = (_U = (_T = context == null ? void 0 : context.signals) == null ? void 0 : _T.input) == null ? void 0 : _U.peek) == null ? void 0 : _V.call(_U)) || ((_X = (_W = context == null ? void 0 : context.signals) == null ? void 0 : _W.input) == null ? void 0 : _X.value) || {};
+        return selector2 ? resolveKey(((_Q = (_P = (_O = context == null ? void 0 : context.signals) == null ? void 0 : _O.input) == null ? void 0 : _P.peek) == null ? void 0 : _Q.call(_P)) || ((_S = (_R = context == null ? void 0 : context.signals) == null ? void 0 : _R.input) == null ? void 0 : _S.value) || {}, selector2) : ((_V = (_U = (_T = context == null ? void 0 : context.signals) == null ? void 0 : _T.input) == null ? void 0 : _U.peek) == null ? void 0 : _V.call(_U)) || ((_X = (_W = context == null ? void 0 : context.signals) == null ? void 0 : _W.input) == null ? void 0 : _X.value) || {};
       case "const":
         return value;
       default:
@@ -56637,10 +56738,10 @@ Please __addLocaleData before adding additional unit data`);
   function resolveParameterSpecValue(spec, runtime = {}) {
     if (isObjectValue(spec)) {
       const source = spec.source || (spec.selector ? "row" : Object.prototype.hasOwnProperty.call(spec, "value") ? "const" : "value");
-      const selector = normalizeString31(spec.selector || spec.path || spec.location);
+      const selector2 = normalizeString31(spec.selector || spec.path || spec.location);
       const resolved = resolveContextSourceValue({
         source,
-        selector,
+        selector: selector2,
         context: runtime.context,
         row: runtime.row,
         value: Object.prototype.hasOwnProperty.call(spec, "value") ? spec.value : runtime.value
@@ -56885,20 +56986,20 @@ Please __addLocaleData before adding additional unit data`);
   }
 
   // src/reporting/reportTablePresentation.js
-  var object2 = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+  var object3 = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
   var own = (value, key2) => Object.prototype.hasOwnProperty.call(value, key2);
   var fields = (value, allowed) => Object.keys(value).every((key2) => allowed.includes(key2));
   var cellValue = (cell) => own(cell || {}, "displayValue") ? cell.displayValue : cell == null ? void 0 : cell.value;
   function applyReportTablePresentations(reportFill, presentations = null) {
     var _a5, _b, _c, _d;
     if (presentations == null) return reportFill;
-    if (!object2(presentations) || Object.keys(presentations).length > 128) throw Error("Invalid report table presentation map.");
+    if (!object3(presentations) || Object.keys(presentations).length > 128) throw Error("Invalid report table presentation map.");
     const blocks = new Map(((reportFill == null ? void 0 : reportFill.blocks) || []).map((block) => [block.id, block]));
     const replacements = /* @__PURE__ */ new Map();
     for (const [id, state] of Object.entries(presentations)) {
       const block = blocks.get(id);
       if (!block || block.kind !== "tableBlock") throw Error(`Unknown report table: ${id}.`);
-      if (!object2(state) || !fields(state, ["filter", "sort", "expandedKeys"])) throw Error(`Invalid presentation for table ${id}.`);
+      if (!object3(state) || !fields(state, ["filter", "sort", "expandedKeys"])) throw Error(`Invalid presentation for table ${id}.`);
       if (state.expandedKeys !== void 0 && (!Array.isArray(state.expandedKeys) || state.expandedKeys.some((key2) => typeof key2 !== "string"))) throw Error("Invalid hierarchy expanded keys.");
       const filter = (_a5 = state.filter) != null ? _a5 : "";
       if (typeof filter !== "string" || filter.length > 4096) throw Error(`Invalid filter for table ${id}.`);
@@ -56909,7 +57010,7 @@ Please __addLocaleData before adding additional unit data`);
       const sort = state.sort;
       let sortColumn;
       if (sort != null) {
-        if (!object2(sort) || !fields(sort, ["key", "direction"]) || typeof sort.key !== "string" || !["asc", "desc"].includes(sort.direction)) throw Error(`Invalid sort for table ${id}.`);
+        if (!object3(sort) || !fields(sort, ["key", "direction"]) || typeof sort.key !== "string" || !["asc", "desc"].includes(sort.direction)) throw Error(`Invalid sort for table ${id}.`);
         sortColumn = columns.find((column) => column.key === sort.key);
         if (!sortColumn) throw Error(`Unknown sort column for table ${id}.`);
       }
@@ -57440,17 +57541,17 @@ Please __addLocaleData before adding additional unit data`);
   visit.BREAK = BREAK;
   visit.SKIP = SKIP;
   visit.REMOVE = REMOVE;
-  function visit_(key2, node, visitor, path) {
-    const ctrl = callVisitor(key2, node, visitor, path);
+  function visit_(key2, node, visitor, path2) {
+    const ctrl = callVisitor(key2, node, visitor, path2);
     if (isNode(ctrl) || isPair(ctrl)) {
-      replaceNode(key2, path, ctrl);
-      return visit_(key2, ctrl, visitor, path);
+      replaceNode(key2, path2, ctrl);
+      return visit_(key2, ctrl, visitor, path2);
     }
     if (typeof ctrl !== "symbol") {
       if (isCollection(node)) {
-        path = Object.freeze(path.concat(node));
+        path2 = Object.freeze(path2.concat(node));
         for (let i3 = 0; i3 < node.items.length; ++i3) {
-          const ci = visit_(i3, node.items[i3], visitor, path);
+          const ci = visit_(i3, node.items[i3], visitor, path2);
           if (typeof ci === "number")
             i3 = ci - 1;
           else if (ci === BREAK)
@@ -57461,13 +57562,13 @@ Please __addLocaleData before adding additional unit data`);
           }
         }
       } else if (isPair(node)) {
-        path = Object.freeze(path.concat(node));
-        const ck = visit_("key", node.key, visitor, path);
+        path2 = Object.freeze(path2.concat(node));
+        const ck = visit_("key", node.key, visitor, path2);
         if (ck === BREAK)
           return BREAK;
         else if (ck === REMOVE)
           node.key = null;
-        const cv = visit_("value", node.value, visitor, path);
+        const cv = visit_("value", node.value, visitor, path2);
         if (cv === BREAK)
           return BREAK;
         else if (cv === REMOVE)
@@ -57488,17 +57589,17 @@ Please __addLocaleData before adding additional unit data`);
   visitAsync.BREAK = BREAK;
   visitAsync.SKIP = SKIP;
   visitAsync.REMOVE = REMOVE;
-  async function visitAsync_(key2, node, visitor, path) {
-    const ctrl = await callVisitor(key2, node, visitor, path);
+  async function visitAsync_(key2, node, visitor, path2) {
+    const ctrl = await callVisitor(key2, node, visitor, path2);
     if (isNode(ctrl) || isPair(ctrl)) {
-      replaceNode(key2, path, ctrl);
-      return visitAsync_(key2, ctrl, visitor, path);
+      replaceNode(key2, path2, ctrl);
+      return visitAsync_(key2, ctrl, visitor, path2);
     }
     if (typeof ctrl !== "symbol") {
       if (isCollection(node)) {
-        path = Object.freeze(path.concat(node));
+        path2 = Object.freeze(path2.concat(node));
         for (let i3 = 0; i3 < node.items.length; ++i3) {
-          const ci = await visitAsync_(i3, node.items[i3], visitor, path);
+          const ci = await visitAsync_(i3, node.items[i3], visitor, path2);
           if (typeof ci === "number")
             i3 = ci - 1;
           else if (ci === BREAK)
@@ -57509,13 +57610,13 @@ Please __addLocaleData before adding additional unit data`);
           }
         }
       } else if (isPair(node)) {
-        path = Object.freeze(path.concat(node));
-        const ck = await visitAsync_("key", node.key, visitor, path);
+        path2 = Object.freeze(path2.concat(node));
+        const ck = await visitAsync_("key", node.key, visitor, path2);
         if (ck === BREAK)
           return BREAK;
         else if (ck === REMOVE)
           node.key = null;
-        const cv = await visitAsync_("value", node.value, visitor, path);
+        const cv = await visitAsync_("value", node.value, visitor, path2);
         if (cv === BREAK)
           return BREAK;
         else if (cv === REMOVE)
@@ -57542,24 +57643,24 @@ Please __addLocaleData before adding additional unit data`);
     }
     return visitor;
   }
-  function callVisitor(key2, node, visitor, path) {
+  function callVisitor(key2, node, visitor, path2) {
     var _a5, _b, _c, _d, _e;
     if (typeof visitor === "function")
-      return visitor(key2, node, path);
+      return visitor(key2, node, path2);
     if (isMap(node))
-      return (_a5 = visitor.Map) == null ? void 0 : _a5.call(visitor, key2, node, path);
+      return (_a5 = visitor.Map) == null ? void 0 : _a5.call(visitor, key2, node, path2);
     if (isSeq(node))
-      return (_b = visitor.Seq) == null ? void 0 : _b.call(visitor, key2, node, path);
+      return (_b = visitor.Seq) == null ? void 0 : _b.call(visitor, key2, node, path2);
     if (isPair(node))
-      return (_c = visitor.Pair) == null ? void 0 : _c.call(visitor, key2, node, path);
+      return (_c = visitor.Pair) == null ? void 0 : _c.call(visitor, key2, node, path2);
     if (isScalar(node))
-      return (_d = visitor.Scalar) == null ? void 0 : _d.call(visitor, key2, node, path);
+      return (_d = visitor.Scalar) == null ? void 0 : _d.call(visitor, key2, node, path2);
     if (isAlias(node))
-      return (_e = visitor.Alias) == null ? void 0 : _e.call(visitor, key2, node, path);
+      return (_e = visitor.Alias) == null ? void 0 : _e.call(visitor, key2, node, path2);
     return void 0;
   }
-  function replaceNode(key2, path, node) {
-    const parent = path[path.length - 1];
+  function replaceNode(key2, path2, node) {
+    const parent = path2[path2.length - 1];
     if (isCollection(parent)) {
       parent.items[key2] = node;
     } else if (isPair(parent)) {
@@ -58046,10 +58147,10 @@ Please __addLocaleData before adding additional unit data`);
   }
 
   // node_modules/yaml/browser/dist/nodes/Collection.js
-  function collectionFromPath(schema4, path, value) {
+  function collectionFromPath(schema4, path2, value) {
     let v2 = value;
-    for (let i3 = path.length - 1; i3 >= 0; --i3) {
-      const k2 = path[i3];
+    for (let i3 = path2.length - 1; i3 >= 0; --i3) {
+      const k2 = path2[i3];
       if (typeof k2 === "number" && Number.isInteger(k2) && k2 >= 0) {
         const a4 = [];
         a4[k2] = v2;
@@ -58068,7 +58169,7 @@ Please __addLocaleData before adding additional unit data`);
       sourceObjects: /* @__PURE__ */ new Map()
     });
   }
-  var isEmptyPath = (path) => path == null || typeof path === "object" && !!path[Symbol.iterator]().next().done;
+  var isEmptyPath = (path2) => path2 == null || typeof path2 === "object" && !!path2[Symbol.iterator]().next().done;
   var Collection = class extends NodeBase {
     constructor(type, schema4) {
       super(type);
@@ -58098,11 +58199,11 @@ Please __addLocaleData before adding additional unit data`);
      * be a Pair instance or a `{ key, value }` object, which may not have a key
      * that already exists in the map.
      */
-    addIn(path, value) {
-      if (isEmptyPath(path))
+    addIn(path2, value) {
+      if (isEmptyPath(path2))
         this.add(value);
       else {
-        const [key2, ...rest] = path;
+        const [key2, ...rest] = path2;
         const node = this.get(key2, true);
         if (isCollection(node))
           node.addIn(rest, value);
@@ -58116,8 +58217,8 @@ Please __addLocaleData before adding additional unit data`);
      * Removes a value from the collection.
      * @returns `true` if the item was found and removed.
      */
-    deleteIn(path) {
-      const [key2, ...rest] = path;
+    deleteIn(path2) {
+      const [key2, ...rest] = path2;
       if (rest.length === 0)
         return this.delete(key2);
       const node = this.get(key2, true);
@@ -58131,8 +58232,8 @@ Please __addLocaleData before adding additional unit data`);
      * scalar values from their surrounding node; to disable set `keepScalar` to
      * `true` (collections are always returned intact).
      */
-    getIn(path, keepScalar) {
-      const [key2, ...rest] = path;
+    getIn(path2, keepScalar) {
+      const [key2, ...rest] = path2;
       const node = this.get(key2, true);
       if (rest.length === 0)
         return !keepScalar && isScalar(node) ? node.value : node;
@@ -58150,8 +58251,8 @@ Please __addLocaleData before adding additional unit data`);
     /**
      * Checks if the collection includes a value with the key `key`.
      */
-    hasIn(path) {
-      const [key2, ...rest] = path;
+    hasIn(path2) {
+      const [key2, ...rest] = path2;
       if (rest.length === 0)
         return this.has(key2);
       const node = this.get(key2, true);
@@ -58161,8 +58262,8 @@ Please __addLocaleData before adding additional unit data`);
      * Sets a value in this collection. For `!!set`, `value` needs to be a
      * boolean to add/remove the item from the set.
      */
-    setIn(path, value) {
-      const [key2, ...rest] = path;
+    setIn(path2, value) {
+      const [key2, ...rest] = path2;
       if (rest.length === 0) {
         this.set(key2, value);
       } else {
@@ -59627,9 +59728,9 @@ ${indent}${end}`;
   visit2.BREAK = BREAK2;
   visit2.SKIP = SKIP2;
   visit2.REMOVE = REMOVE2;
-  visit2.itemAtPath = (cst, path) => {
+  visit2.itemAtPath = (cst, path2) => {
     let item = cst;
-    for (const [field2, index] of path) {
+    for (const [field2, index] of path2) {
       const tok = item == null ? void 0 : item[field2];
       if (tok && "items" in tok) {
         item = tok.items[index];
@@ -59638,23 +59739,23 @@ ${indent}${end}`;
     }
     return item;
   };
-  visit2.parentCollection = (cst, path) => {
-    const parent = visit2.itemAtPath(cst, path.slice(0, -1));
-    const field2 = path[path.length - 1][0];
+  visit2.parentCollection = (cst, path2) => {
+    const parent = visit2.itemAtPath(cst, path2.slice(0, -1));
+    const field2 = path2[path2.length - 1][0];
     const coll = parent == null ? void 0 : parent[field2];
     if (coll && "items" in coll)
       return coll;
     throw new Error("Parent collection not found");
   };
-  function _visit(path, item, visitor) {
-    let ctrl = visitor(item, path);
+  function _visit(path2, item, visitor) {
+    let ctrl = visitor(item, path2);
     if (typeof ctrl === "symbol")
       return ctrl;
     for (const field2 of ["key", "value"]) {
       const token = item[field2];
       if (token && "items" in token) {
         for (let i3 = 0; i3 < token.items.length; ++i3) {
-          const ci = _visit(Object.freeze(path.concat([[field2, i3]])), token.items[i3], visitor);
+          const ci = _visit(Object.freeze(path2.concat([[field2, i3]])), token.items[i3], visitor);
           if (typeof ci === "number")
             i3 = ci - 1;
           else if (ci === BREAK2)
@@ -59665,10 +59766,10 @@ ${indent}${end}`;
           }
         }
         if (typeof ctrl === "function" && field2 === "key")
-          ctrl = ctrl(item, path);
+          ctrl = ctrl(item, path2);
       }
     }
-    return typeof ctrl === "function" ? ctrl(item, path) : ctrl;
+    return typeof ctrl === "function" ? ctrl(item, path2) : ctrl;
   }
 
   // node_modules/yaml/browser/dist/parse/lexer.js
@@ -61674,19 +61775,19 @@ ${indent}${end}`;
     if (Object.prototype.hasOwnProperty.call(normalized, "all")) {
       normalized.all = Array.isArray(normalized.all) && normalized.all.length <= 32 ? normalized.all.map((child) => normalizeReportRuntimeCondition(child, depth + 1) || { all: [] }) : [];
     }
-    const selector = normalizeString37((normalized == null ? void 0 : normalized.selector) || (normalized == null ? void 0 : normalized.field) || (normalized == null ? void 0 : normalized.key));
-    if (selector.startsWith("dashboard.selection.")) {
+    const selector2 = normalizeString37((normalized == null ? void 0 : normalized.selector) || (normalized == null ? void 0 : normalized.field) || (normalized == null ? void 0 : normalized.key));
+    if (selector2.startsWith("dashboard.selection.")) {
       normalized.source = "selection";
-      normalized.selector = selector.slice("dashboard.selection.".length);
-    } else if (selector === "dashboard.selection") {
+      normalized.selector = selector2.slice("dashboard.selection.".length);
+    } else if (selector2 === "dashboard.selection") {
       normalized.source = "selection";
       normalized.selector = "";
-    } else if (selector.startsWith("dashboard.filters.")) {
+    } else if (selector2.startsWith("dashboard.filters.")) {
       normalized.source = "filters";
-      normalized.selector = selector.slice("dashboard.filters.".length);
-    } else if (selector.startsWith("filters.")) {
+      normalized.selector = selector2.slice("dashboard.filters.".length);
+    } else if (selector2.startsWith("filters.")) {
       normalized.source = "filters";
-      normalized.selector = selector.slice("filters.".length);
+      normalized.selector = selector2.slice("filters.".length);
     }
     return normalized;
   }
@@ -62532,11 +62633,11 @@ ${indent}${end}`;
       }
       return 2 * previous * next / (previous + next);
     });
-    return points.slice(0, -1).reduce((path, point, index) => {
+    return points.slice(0, -1).reduce((path2, point, index) => {
       const next = points[index + 1];
       const deltaX = next.x - point.x;
       const controlOffset = deltaX / 3;
-      return `${path} C${point.x + controlOffset},${point.y + tangents[index] * controlOffset} ${next.x - controlOffset},${next.y - tangents[index + 1] * controlOffset} ${next.x},${next.y}`;
+      return `${path2} C${point.x + controlOffset},${point.y + tangents[index] * controlOffset} ${next.x - controlOffset},${next.y - tangents[index + 1] * controlOffset} ${next.x},${next.y}`;
     }, `M${points[0].x},${points[0].y}`);
   }
   function buildAreaPath(points = [], baselineY = 0, { smooth = false } = {}) {
@@ -62863,7 +62964,7 @@ ${indent}${end}`;
       const smoothPath = supportedType === "line" || supportedType === "area";
       const strokeDasharray = normalizeString39(series == null ? void 0 : series.strokeDasharray);
       const dashAttribute = escapeStrokeDasharray(strokeDasharray);
-      const path = segments.map((segment2) => smoothPath ? buildMonotonePath(segment2) : buildPolylinePath(segment2)).join(" ");
+      const path2 = segments.map((segment2) => smoothPath ? buildMonotonePath(segment2) : buildPolylinePath(segment2)).join(" ");
       const markers = points.map((point) => `
       <circle cx="${point.x}" cy="${point.y}" r="2.5" fill="${escapeXml(resolveSeriesPointColor(series, point.value, series.color))}" />
     `).join("\n");
@@ -62873,13 +62974,13 @@ ${indent}${end}`;
       if (supportedType === "area") {
         return `
         <path d="${segments.map((segment2) => buildAreaPath(segment2, seriesBaselineY, { smooth: true })).join(" ")}" fill="${escapeXml(series.color)}" fill-opacity="0.18" stroke="none" />
-        <path d="${path}" fill="none" stroke="${escapeXml(series.color)}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"${dashAttribute} />
+        <path d="${path2}" fill="none" stroke="${escapeXml(series.color)}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"${dashAttribute} />
         ${markers}
         ${labels}
       `;
       }
       return `
-      <path d="${path}" fill="none" stroke="${escapeXml(series.color)}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"${dashAttribute} />
+      <path d="${path2}" fill="none" stroke="${escapeXml(series.color)}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"${dashAttribute} />
       ${markers}
       ${labels}
     `;
@@ -68911,7 +69012,7 @@ ${indent}${end}`;
     if (!Array.isArray(paths) || paths.length === 0) {
       return "";
     }
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">${paths.map((path) => `<path d="${path}" fill="${color}"/>`).join("")}</svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">${paths.map((path2) => `<path d="${path2}" fill="${color}"/>`).join("")}</svg>`;
   }
   function resolveReportPrintTheme(reportSpec = {}) {
     const source = (reportSpec == null ? void 0 : reportSpec.theme) && typeof reportSpec.theme === "object" && !Array.isArray(reportSpec.theme) ? reportSpec.theme : {};
@@ -71589,25 +71690,25 @@ ${indent}${end}`;
   }
 
   // src/reporting/reportRequestEnvelope.js
-  var forbidden = /* @__PURE__ */ new Set(["__proto__", "prototype", "constructor", "backend", "credentials", "secretRef", "service", "method", "source", "rows", "reportSpec", "reportFill", "reportPrint"]);
-  var object3 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+  var forbidden2 = /* @__PURE__ */ new Set(["__proto__", "prototype", "constructor", "backend", "credentials", "secretRef", "service", "method", "source", "rows", "reportSpec", "reportFill", "reportPrint"]);
+  var object4 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
   var clone5 = (value) => JSON.parse(JSON.stringify(value));
-  function pathParts(path) {
-    const parts = typeof path === "string" ? path.split(".") : [];
-    if (!parts.length || parts.length > 8 || parts.some((part) => !/^[A-Za-z][A-Za-z0-9_]*$/.test(part) || forbidden.has(part))) throw new Error("Invalid report request binding path.");
+  function pathParts(path2) {
+    const parts = typeof path2 === "string" ? path2.split(".") : [];
+    if (!parts.length || parts.length > 8 || parts.some((part) => !/^[A-Za-z][A-Za-z0-9_]*$/.test(part) || forbidden2.has(part))) throw new Error("Invalid report request binding path.");
     return parts;
   }
-  function read2(value, path) {
-    for (const part of pathParts(path)) {
-      if (!object3(value) || !Object.hasOwn(value, part)) return void 0;
+  function read2(value, path2) {
+    for (const part of pathParts(path2)) {
+      if (!object4(value) || !Object.hasOwn(value, part)) return void 0;
       value = value[part];
     }
     return value;
   }
-  function write(target, path, value) {
-    const parts = pathParts(path);
+  function write(target, path2, value) {
+    const parts = pathParts(path2);
     for (const part of parts.slice(0, -1)) {
-      if (Object.hasOwn(target, part) && !object3(target[part])) throw new Error("Conflicting report request binding paths.");
+      if (Object.hasOwn(target, part) && !object4(target[part])) throw new Error("Conflicting report request binding paths.");
       target = target[part] || (target[part] = {});
     }
     const last = parts.at(-1);
@@ -71617,11 +71718,11 @@ ${indent}${end}`;
   function names(value) {
     let result;
     if (Array.isArray(value)) result = value;
-    else if (object3(value)) {
-      if (Object.keys(value).some((name) => forbidden.has(name)) || Object.values(value).some((selected) => typeof selected !== "boolean")) throw new Error("Invalid enabled-name selection.");
+    else if (object4(value)) {
+      if (Object.keys(value).some((name) => forbidden2.has(name)) || Object.values(value).some((selected) => typeof selected !== "boolean")) throw new Error("Invalid enabled-name selection.");
       result = Object.keys(value).filter((key2) => value[key2]);
     } else throw new Error("Invalid enabled-name selection.");
-    if (result.length > 2048 || result.some((name) => typeof name !== "string" || !name || name.length > 256 || forbidden.has(name))) throw new Error("Invalid enabled-name selection.");
+    if (result.length > 2048 || result.some((name) => typeof name !== "string" || !name || name.length > 256 || forbidden2.has(name))) throw new Error("Invalid enabled-name selection.");
     return [...new Set(result)];
   }
   function declaredReportRequestFields(config) {
@@ -71664,7 +71765,7 @@ ${indent}${end}`;
         }
         break;
       case "declaredOptions": {
-        if (!object3(value)) break;
+        if (!object4(value)) break;
         const definitions = new Map(normalizeReportBuilderOptionDefinitions(config.reportOptions).map((option) => [option.name, option]));
         if (Object.keys(value).length > 32) break;
         for (const [name, item] of Object.entries(value)) {
@@ -71688,11 +71789,11 @@ ${indent}${end}`;
   function reportRequestWindowIdentity(config = {}, windowParameters = {}) {
     var _a5;
     const declaration = (_a5 = config.request) == null ? void 0 : _a5.definitionIdentity;
-    if (!object3(declaration) || Object.keys(declaration).some((key2) => !["fields", "catalog"].includes(key2)) || !object3(declaration.fields) || !Object.keys(declaration.fields).length || Object.keys(declaration.fields).length > 8) throw new Error("A declarative report definition identity is required.");
+    if (!object4(declaration) || Object.keys(declaration).some((key2) => !["fields", "catalog"].includes(key2)) || !object4(declaration.fields) || !Object.keys(declaration.fields).length || Object.keys(declaration.fields).length > 8) throw new Error("A declarative report definition identity is required.");
     const result = {};
     for (const [name, field2] of Object.entries(declaration.fields)) {
       pathParts(name);
-      if (!object3(field2) || Object.keys(field2).some((key2) => !["path", "type", "resolveWhenAbsent"].includes(key2))) throw new Error("Invalid report definition identity declaration.");
+      if (!object4(field2) || Object.keys(field2).some((key2) => !["path", "type", "resolveWhenAbsent"].includes(key2))) throw new Error("Invalid report definition identity declaration.");
       pathParts(field2.path);
       if (!["positiveInteger", "singlePositiveInteger", "boolean", "string"].includes(field2.type)) throw new Error("Invalid report definition identity type.");
       const value = read2(windowParameters, name);
@@ -71713,28 +71814,28 @@ ${indent}${end}`;
     }
     const catalog = config.request.definitionIdentity.catalog;
     if (catalog) {
-      if (!object3(catalog) || Object.keys(catalog).some((key2) => !["path", "prefix", "separator", "fields"].includes(key2)) || typeof catalog.prefix !== "string" || typeof catalog.separator !== "string" || !Array.isArray(catalog.fields) || catalog.fields.length > 8 || catalog.fields.some((name) => !Object.hasOwn(identity, name))) throw new Error("Invalid report catalog identity declaration.");
+      if (!object4(catalog) || Object.keys(catalog).some((key2) => !["path", "prefix", "separator", "fields"].includes(key2)) || typeof catalog.prefix !== "string" || typeof catalog.separator !== "string" || !Array.isArray(catalog.fields) || catalog.fields.length > 8 || catalog.fields.some((name) => !Object.hasOwn(identity, name))) throw new Error("Invalid report catalog identity declaration.");
       const expected = catalog.prefix + catalog.fields.map((name) => String(identity[name])).join(catalog.separator);
       if (read2(definition, catalog.path) !== expected) throw new Error("The current report field catalog identity does not match the selected scope.");
     }
     const defaults = { global: {}, datasets: {} };
     const profiles = config.request.profileQueryDefaults;
     if (profiles) {
-      if (!object3(profiles) || Object.keys(profiles).some((key2) => !["path", "values"].includes(key2)) || !object3(profiles.values) || Object.keys(profiles.values).length > 32) throw new Error("Invalid report profile query defaults.");
+      if (!object4(profiles) || Object.keys(profiles).some((key2) => !["path", "values"].includes(key2)) || !object4(profiles.values) || Object.keys(profiles.values).length > 32) throw new Error("Invalid report profile query defaults.");
       const profile = read2(definition, profiles.path);
       if (profile !== void 0 && typeof profile !== "string") throw new Error("The current report profile is unavailable.");
       if (Object.hasOwn(profiles.values, profile)) defaults.global = clone5(profiles.values[profile]);
     }
     const seenSources = /* @__PURE__ */ new Set();
     for (const source of next.dataSources || []) {
-      if (!object3(source) || typeof source.id !== "string" || !source.id || forbidden.has(source.id) || seenSources.has(source.id)) throw new Error("Invalid or duplicate declared dataset.");
+      if (!object4(source) || typeof source.id !== "string" || !source.id || forbidden2.has(source.id) || seenSources.has(source.id)) throw new Error("Invalid or duplicate declared dataset.");
       seenSources.add(source.id);
       if (!source.queryDefaultsFromDefinition) continue;
-      if (!source.id || forbidden.has(source.id) || !object3(source.queryDefaultsFromDefinition) || Object.keys(source.queryDefaultsFromDefinition).length > 8) throw new Error("Invalid dataset query defaults.");
+      if (!source.id || forbidden2.has(source.id) || !object4(source.queryDefaultsFromDefinition) || Object.keys(source.queryDefaultsFromDefinition).length > 8) throw new Error("Invalid dataset query defaults.");
       const dataset = {};
       for (const [name, binding] of Object.entries(source.queryDefaultsFromDefinition)) {
         pathParts(name);
-        if (!object3(binding) || Object.keys(binding).some((key2) => !["path", "type"].includes(key2)) || binding.type !== "enabledNames") throw new Error("Invalid dataset default binding.");
+        if (!object4(binding) || Object.keys(binding).some((key2) => !["path", "type"].includes(key2)) || binding.type !== "enabledNames") throw new Error("Invalid dataset default binding.");
         const raw = read2(definition, binding.path);
         if (raw === void 0) continue;
         const selected = names(raw);
@@ -71747,15 +71848,15 @@ ${indent}${end}`;
     return next;
   }
   function empty(value) {
-    return value === void 0 || Array.isArray(value) && value.length === 0 || object3(value) && Object.keys(value).length === 0;
+    return value === void 0 || Array.isArray(value) && value.length === 0 || object4(value) && Object.keys(value).length === 0;
   }
   function mapReportRequestEnvelope(config = {}, query = {}, datasetId = "primary") {
     var _a5, _b;
     const declaration = (_a5 = config.request) == null ? void 0 : _a5.envelope;
     if (!declaration) return clone5(query);
-    if (!object3(declaration) || Object.keys(declaration).some((key2) => !["version", "fields"].includes(key2)) || declaration.version !== 1 || !object3(declaration.fields) || Object.keys(declaration.fields).length === 0 || Object.keys(declaration.fields).length > 32 || !object3(query)) throw new Error("Invalid report request envelope declaration.");
+    if (!object4(declaration) || Object.keys(declaration).some((key2) => !["version", "fields"].includes(key2)) || declaration.version !== 1 || !object4(declaration.fields) || Object.keys(declaration.fields).length === 0 || Object.keys(declaration.fields).length > 32 || !object4(query)) throw new Error("Invalid report request envelope declaration.");
     const context = config.request.envelopeContext;
-    if (!object3(context == null ? void 0 : context.identity) || !object3(context == null ? void 0 : context.defaults)) throw new Error("The report request identity has not been verified.");
+    if (!object4(context == null ? void 0 : context.identity) || !object4(context == null ? void 0 : context.defaults)) throw new Error("The report request identity has not been verified.");
     if (datasetId !== "primary" && !(config.dataSources || []).some((source) => source.id === datasetId)) throw new Error("The report request references an undeclared dataset.");
     const effective = clone5(query);
     for (const defaults of [context.defaults.global, (_b = context.defaults.datasets) == null ? void 0 : _b[datasetId]]) {
@@ -71769,11 +71870,11 @@ ${indent}${end}`;
     const result = {};
     for (const [destination, field2] of Object.entries(declaration.fields)) {
       pathParts(destination);
-      if (!object3(field2) || Object.keys(field2).some((key2) => !["literal", "window", "query", "type", "optional", "omitEmpty"].includes(key2)) || ["literal", "window", "query"].filter((key2) => Object.hasOwn(field2, key2)).length !== 1 || field2.optional !== void 0 && typeof field2.optional !== "boolean" || field2.omitEmpty !== void 0 && typeof field2.omitEmpty !== "boolean") throw new Error("Invalid report request envelope field.");
+      if (!object4(field2) || Object.keys(field2).some((key2) => !["literal", "window", "query", "type", "optional", "omitEmpty"].includes(key2)) || ["literal", "window", "query"].filter((key2) => Object.hasOwn(field2, key2)).length !== 1 || field2.optional !== void 0 && typeof field2.optional !== "boolean" || field2.omitEmpty !== void 0 && typeof field2.omitEmpty !== "boolean") throw new Error("Invalid report request envelope field.");
       let value = Object.hasOwn(field2, "literal") ? field2.literal : Object.hasOwn(field2, "window") ? read2(context.identity, field2.window) : read2(effective, field2.query);
       if (value === void 0 && field2.optional === true) continue;
       value = typed(value, field2.type, config);
-      if (field2.omitEmpty === true && (Array.isArray(value) && !value.length || object3(value) && !Object.keys(value).length || value === "")) continue;
+      if (field2.omitEmpty === true && (Array.isArray(value) && !value.length || object4(value) && !Object.keys(value).length || value === "")) continue;
       write(result, destination, value);
     }
     if (JSON.stringify(result).length > 256 * 1024) throw new Error("The report request envelope exceeds the size limit.");
@@ -71803,9 +71904,9 @@ ${indent}${end}`;
     return "";
   }
   function normalizeDisplayKey(value) {
-    const path = normalizeString42(value);
-    if (path) assertSafeAssignmentPath(path);
-    return path;
+    const path2 = normalizeString42(value);
+    if (path2) assertSafeAssignmentPath(path2);
+    return path2;
   }
   function normalizeTablePresentation(value = null) {
     if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -71942,7 +72043,7 @@ ${indent}${end}`;
     "reportDocumentViewer",
     "activeTablePreset"
   ]);
-  var forbidden2 = /* @__PURE__ */ new Set([
+  var forbidden3 = /* @__PURE__ */ new Set([
     "__proto__",
     "prototype",
     "constructor",
@@ -71980,7 +72081,7 @@ ${indent}${end}`;
     "refinementBarBlock",
     "collectionBlock"
   ]);
-  function object4(value) {
+  function object5(value) {
     return !!value && typeof value === "object" && !Array.isArray(value);
   }
   function copy(value, depth = 0) {
@@ -71988,16 +72089,16 @@ ${indent}${end}`;
     if (value === null || typeof value === "boolean" || typeof value === "string") return value;
     if (typeof value === "number" && Number.isFinite(value)) return value;
     if (Array.isArray(value) && value.length <= 2048) return value.map((item) => copy(item, depth + 1));
-    if (!object4(value)) throw new Error("The builder export selection must contain bounded JSON values.");
+    if (!object5(value)) throw new Error("The builder export selection must contain bounded JSON values.");
     const result = {};
     for (const [key2, item] of Object.entries(value)) {
-      if (forbidden2.has(key2)) throw new Error(`Builder export cannot replace ${key2}.`);
+      if (forbidden3.has(key2)) throw new Error(`Builder export cannot replace ${key2}.`);
       result[key2] = copy(item, depth + 1);
     }
     return result;
   }
   function checkedSelection(selection) {
-    if (!object4(selection) || Object.keys(selection).some((key2) => !["version", "containerId", "state"].includes(key2)) || selection.version !== 1 || typeof selection.containerId !== "string" || !selection.containerId.trim() || selection.containerId.length > 256 || !object4(selection.state) || Object.keys(selection.state).some((key2) => !keys2.has(key2))) throw new Error("Invalid window builder export selection.");
+    if (!object5(selection) || Object.keys(selection).some((key2) => !["version", "containerId", "state"].includes(key2)) || selection.version !== 1 || typeof selection.containerId !== "string" || !selection.containerId.trim() || selection.containerId.length > 256 || !object5(selection.state) || Object.keys(selection.state).some((key2) => !keys2.has(key2))) throw new Error("Invalid window builder export selection.");
     const result = copy(selection);
     if (JSON.stringify(result).length > 256 * 1024) throw new Error("The builder export selection exceeds the size limit.");
     return result;
@@ -72005,7 +72106,7 @@ ${indent}${end}`;
   function prepareWindowBuilderExport({ container, config, selection, definition = null, windowParameters = {}, attachedDataSourceIds = [] }) {
     var _a5, _b, _c, _d, _e, _f, _g, _h;
     const input = checkedSelection(selection);
-    if (!object4(container) || container.id !== input.containerId || !object4(config)) throw new Error("The selected window builder is unavailable.");
+    if (!object5(container) || container.id !== input.containerId || !object5(config)) throw new Error("The selected window builder is unavailable.");
     if ((_a5 = config.hooks) == null ? void 0 : _a5.buildRequest) throw new Error("This window requires a declarative export request binding; metadata request hooks cannot run during server export.");
     if (((_b = config.request) == null ? void 0 : _b.envelope) && (!definition || !config.request.definitionIdentity)) throw new Error("The current server report definition identity is unavailable.");
     if (((_c = config.runtimeFieldCatalog) == null ? void 0 : _c.enabled) === true && !Array.isArray((_d = definition == null ? void 0 : definition.fieldCatalog) == null ? void 0 : _d.columns)) {
@@ -72018,7 +72119,7 @@ ${indent}${end}`;
     };
     const visit3 = (value, parent = "") => {
       if (Array.isArray(value)) return value.forEach((item) => visit3(item, parent));
-      if (!object4(value)) return;
+      if (!object5(value)) return;
       for (const [key2, item] of Object.entries(value)) {
         if (fieldKeys.has(key2)) requireField(item);
         if (fieldLists.has(key2)) {
@@ -72037,7 +72138,7 @@ ${indent}${end}`;
     const predicateIds = new Set(predicates.map((predicate) => predicate.id));
     const optionNames = new Set(normalizeReportBuilderOptionDefinitions(trustedConfig.reportOptions).map((option) => option.name));
     for (const key2 of ["scopeParams", "staticFilters", "reportOptions"]) {
-      if (input.state[key2] !== void 0 && !object4(input.state[key2])) throw new Error("The export scope and options must be objects.");
+      if (input.state[key2] !== void 0 && !object5(input.state[key2])) throw new Error("The export scope and options must be objects.");
       const allowed = key2 === "reportOptions" ? optionNames : predicateIds;
       if (Object.keys(input.state[key2] || {}).some((id) => !allowed.has(id))) throw new Error("The export selection references an undeclared scope or option.");
     }
@@ -72046,12 +72147,12 @@ ${indent}${end}`;
       if (predicate.kind !== "dateRange") continue;
       const value = (_g = (_e = input.state.scopeParams) == null ? void 0 : _e[predicate.id]) != null ? _g : (_f = input.state.staticFilters) == null ? void 0 : _f[predicate.id];
       if (value === void 0 || value === null) continue;
-      if (!object4(value) || Object.entries(value).some(([key2, item]) => !["start", "end", "from", "to", "preset"].includes(key2) || item !== null && typeof item !== "string")) throw new Error("The export date range has an invalid shape.");
+      if (!object5(value) || Object.entries(value).some(([key2, item]) => !["start", "end", "from", "to", "preset"].includes(key2) || item !== null && typeof item !== "string")) throw new Error("The export date range has an invalid shape.");
     }
     for (const key2 of ["primaryMeasure", "orderField", "groupBy"]) requireField(input.state[key2]);
     const seen = /* @__PURE__ */ new Set(["primaryBuilder"]);
     for (const block of input.state.reportDocumentBlocks || []) {
-      if (!object4(block) || !blockKinds.has(block.kind) || typeof block.id !== "string" || !block.id || forbidden2.has(block.id) || seen.has(block.id)) throw new Error("The export selection contains an unknown or duplicate report block.");
+      if (!object5(block) || !blockKinds.has(block.kind) || typeof block.id !== "string" || !block.id || forbidden3.has(block.id) || seen.has(block.id)) throw new Error("The export selection contains an unknown or duplicate report block.");
       seen.add(block.id);
     }
     const state = mergeReportBuilderState(trustedConfig, input.state);
@@ -72092,8 +72193,8 @@ ${indent}${end}`;
   function bindInvocationScope(config, state, request) {
     if (!request) return state;
     const safe = (name) => typeof name === "string" && /^[A-Za-z][A-Za-z0-9_]*$/.test(name) && !["constructor", "prototype", "__proto__"].includes(name);
-    const read3 = (path) => {
-      const parts = typeof path === "string" ? path.split(".") : [];
+    const read3 = (path2) => {
+      const parts = typeof path2 === "string" ? path2.split(".") : [];
       if (!parts.length || !["filters", "options"].includes(parts[0]) || !parts.every(safe)) return void 0;
       return parts.reduce((value, key2) => isObject(value) && Object.prototype.hasOwnProperty.call(value, key2) ? value[key2] : void 0, request);
     };

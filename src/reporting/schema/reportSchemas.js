@@ -1,4 +1,5 @@
 import {validateReportRowVisibilityBlock} from '../reportRowVisibility.js';
+import {validateReportRuntimeRefinementFields} from '../reportRuntimeRefinementFields.js';
 import {donutCenterFields,normalizeDonutCenter} from '../../components/donutCenter.js';
 import { validateReportSchema } from "./reportSchemaValidator.js";
 import { reportExportRequestSchema } from "./reportExportRequestSchema.js";
@@ -293,11 +294,17 @@ export function validateReportSpec(value = null) {
     catch (error) { calculatedFieldErrors.push({ path: "$.calculatedFields", code: "invalid", message: error.message }); }
   }
   const visibilityErrors=[];for(const [index,block] of (value?.blocks||[]).entries()){try{validateReportRowVisibilityBlock(block)}catch(error){visibilityErrors.push({path:`$.blocks[${index}].runtime.rowVisibility`,code:'invalid',message:error.message})}}
+  const refinementFieldErrors=[];
+  for(const [index,block] of (value?.blocks||[]).entries()){
+    try{validateReportRuntimeRefinementFields(block);}
+    catch(error){refinementFieldErrors.push({path:`$.blocks[${index}].runtime.refinementFields`,code:'invalid',message:error.message});}
+  }
   const compositeReferenceErrors = validateCompositeBlockReferences(value);
   const errors = [
     ...filterRedundantCalculatedFieldSchemaErrors(topLevel.errors, calculatedFieldErrors),
     ...calculatedFieldErrors,
     ...visibilityErrors,
+    ...refinementFieldErrors,
     ...validateIndependentDonutCenters(value),
     ...compositeReferenceErrors,
     ...validateTabGroupSectionReferences(value),

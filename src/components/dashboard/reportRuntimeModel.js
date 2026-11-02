@@ -1,6 +1,7 @@
 import { resolveNormalizedReportSpecDocumentContext } from "./reportBuilderSavedRecordMetadataContext.js";
 import { buildReportLayoutItem } from "../../reporting/reportLayoutModel.js";
 import { reportBuilderOptionValueKey } from "./reportBuilderOptions.js";
+import {normalizeReportRuntimeRefinementFields} from '../../reporting/reportRuntimeRefinementFields.js';
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -175,9 +176,18 @@ function normalizeScopeParams(params = []) {
     .filter(Boolean);
 }
 
-function resolveReportRuntimeFieldColumn(reportSpec = {}, datasetRef = "", fieldKey = "") {
+function resolveReportRuntimeFieldColumn(reportSpec = {}, datasetRef = "", fieldKey = "", owningBlock = null) {
   const normalizedDatasetRef = normalizeString(datasetRef);
   const normalizedFieldKey = normalizeString(fieldKey);
+  if (owningBlock && normalizeString(owningBlock.datasetRef) === normalizedDatasetRef && Object.hasOwn(owningBlock.runtime || {}, 'refinementFields')) {
+    try {
+      const fields = normalizeReportRuntimeRefinementFields(owningBlock.runtime.refinementFields);
+      const matching = fields.find(field => [field.key, field.sourceKey, field.displayKey].includes(normalizedFieldKey));
+      const datasets = (Array.isArray(reportSpec.datasets) ? reportSpec.datasets : []).filter(dataset => normalizeString(dataset.id) === normalizedDatasetRef);
+      if (datasets.length !== 1 || datasets[0].request?.dimensions?.[matching?.sourceKey] !== true) return null;
+      return matching ? {...matching, runtimeFilterable: true} : null;
+    } catch (_) { return null; }
+  }
   const tableBlocks = Array.isArray(reportSpec?.blocks) ? reportSpec.blocks : [];
   for (const block of tableBlocks) {
     if (normalizeString(block?.kind) !== "tableBlock" || normalizeString(block?.datasetRef) !== normalizedDatasetRef) {
@@ -195,8 +205,8 @@ function resolveReportRuntimeFieldColumn(reportSpec = {}, datasetRef = "", field
   return null;
 }
 
-export function resolveReportRuntimeFieldLabel(reportSpec = {}, datasetRef = "", fieldKey = "", fallbackLabel = "") {
-  const matchingColumn = resolveReportRuntimeFieldColumn(reportSpec, datasetRef, fieldKey);
+export function resolveReportRuntimeFieldLabel(reportSpec = {}, datasetRef = "", fieldKey = "", fallbackLabel = "", owningBlock = null) {
+  const matchingColumn = resolveReportRuntimeFieldColumn(reportSpec, datasetRef, fieldKey, owningBlock);
   if (matchingColumn) {
     return normalizeString(matchingColumn?.label || fallbackLabel || fieldKey);
   }
@@ -482,7 +492,9 @@ export function resolveReportRuntimeRefinementFields(reportSpec = {}, block = {}
         valueKey,
         displayValueKey,
         label: normalizeString(column?.label || valueKey),
-        runtimeFilterable: column?.runtimeFilterable === true,
+        runtimeFilterable: Object.hasOwn(block.runtime || {}, 'refinementFields')
+          ? resolveReportRuntimeFieldColumn(reportSpec, block.datasetRef, valueKey, block)?.runtimeFilterable === true
+          : column?.runtimeFilterable === true,
         ...(column?.displayValueMap && typeof column.displayValueMap === "object" && !Array.isArray(column.displayValueMap)
           ? { displayValueMap: cloneValue(column.displayValueMap) }
           : {}),
@@ -496,29 +508,29 @@ export function resolveReportRuntimeChartActionFields(reportSpec = {}, block = {
   const datasetRef = normalizeString(block?.datasetRef);
   const next = [];
   if (chartSpec.type === 'heatmap' && chartSpec.heatmap) return ['rowField','columnField'].map(kind=>{
-    const valueKey=chartSpec.heatmap[kind],column=resolveReportRuntimeFieldColumn(reportSpec,datasetRef,valueKey);
-    return {kind,valueKey,displayValueKey:valueKey,label:resolveReportRuntimeFieldLabel(reportSpec,datasetRef,valueKey,valueKey),selectionSource:kind==='rowField'?'rowValue':'columnValue',runtimeFilterable:column?.runtimeFilterable===true};
+    const valueKey=chartSpec.heatmap[kind],column=resolveReportRuntimeFieldColumn(reportSpec,datasetRef,valueKey,block);
+    return {kind,valueKey,displayValueKey:valueKey,label:resolveReportRuntimeFieldLabel(reportSpec,datasetRef,valueKey,valueKey,block),selectionSource:kind==='rowField'?'rowValue':'columnValue',runtimeFilterable:column?.runtimeFilterable===true};
   });
   const xField = normalizeString(chartSpec?.xField);
   if (xField) {
-    const xColumn = resolveReportRuntimeFieldColumn(reportSpec, datasetRef, xField);
+    const xColumn = resolveReportRuntimeFieldColumn(reportSpec, datasetRef, xField, block);
     next.push({
       kind: "xField",
       valueKey: xField,
       displayValueKey: normalizeString(xColumn?.displayKey || xColumn?.key || xField),
-      label: resolveReportRuntimeFieldLabel(reportSpec, datasetRef, xField, xField),
+      label: resolveReportRuntimeFieldLabel(reportSpec, datasetRef, xField, xField, block),
       selectionSource: "xValue",
       runtimeFilterable: xColumn?.runtimeFilterable === true,
     });
   }
   const seriesField = normalizeString(chartSpec?.seriesField);
   if (seriesField) {
-    const seriesColumn = resolveReportRuntimeFieldColumn(reportSpec, datasetRef, seriesField);
+    const seriesColumn = resolveReportRuntimeFieldColumn(reportSpec, datasetRef, seriesField, block);
     next.push({
       kind: "seriesField",
       valueKey: seriesField,
       displayValueKey: normalizeString(seriesColumn?.displayKey || seriesColumn?.key || seriesField),
-      label: resolveReportRuntimeFieldLabel(reportSpec, datasetRef, seriesField, seriesField),
+      label: resolveReportRuntimeFieldLabel(reportSpec, datasetRef, seriesField, seriesField, block),
       selectionSource: "seriesKey",
       runtimeFilterable: seriesColumn?.runtimeFilterable === true,
     });

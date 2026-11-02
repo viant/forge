@@ -42,6 +42,7 @@ import {
   formatReportRuntimeScopeValue,
   resolveReportRuntimeActiveScopeSummary,
   resolveReportRuntimeChartActionFields,
+  resolveReportRuntimeFieldActionKey,
   resolveReportRuntimeBindingSummaryChips,
   resolveReportRuntimeBindingSummary,
   resolveReportRuntimeBlocks,
@@ -3547,7 +3548,18 @@ export default function ReportRuntime({
       });
       const supportedChartExecutions = chartInteractionState.executions
         .filter((execution) => supportsReportRuntimeExecution(execution, runtimeHandlers));
-      const effectiveChartInteractionSupport = chartInteractionSupport.enabled && supportedChartExecutions.length === 0
+      // Before the first mark is selected there are no value-bound executions.
+      // Use declared field/provider capabilities to admit selection itself.
+      const hasPotentialChartAction = chartFields.some(field => {
+        const key = resolveReportRuntimeFieldActionKey(block.id, field.valueKey);
+        const actions = providerActionsByField.has(key) ? providerActionsByField.get(key)
+          : field.runtimeFilterable ? [{kind:'keep'}, {kind:'exclude'}] : [];
+        return (actions || []).some(action => supportsReportRuntimeExecution(action, runtimeHandlers)
+          && (!['keep','exclude','drill'].includes(action.kind) || field.runtimeFilterable)
+          && (action.kind !== 'drill' || action.nextFieldRef)
+          && (action.kind !== 'detail' || action.targetRef));
+      });
+      const effectiveChartInteractionSupport = chartInteractionSupport.enabled && !hasPotentialChartAction
         ? {
           enabled: false,
           reason: "readOnlyRuntime",

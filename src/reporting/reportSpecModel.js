@@ -266,6 +266,7 @@ export function buildReportBuilderPublishedDatasetConfig(baseConfig = {}, source
       ...(normalizeString(column?.format) ? { format: normalizeString(column.format) } : {}),
       ...(normalizeString(column?.tickFormat) ? { tickFormat: normalizeString(column.tickFormat) } : {}),
       ...(["civil", "instant"].includes(normalizeString(column?.valueMode)) ? { valueMode: normalizeString(column.valueMode) } : {}),
+      ...(isPlainObject(column?.runtimeFilter) ? { runtimeFilter: cloneValue(column.runtimeFilter) } : {}),
     }))
     .filter((entry) => entry.id && entry.key && entry.label);
   const measures = inheritRuntimeFieldCatalog ? cloneValue(baseConfig?.measures || []) : fieldOptions

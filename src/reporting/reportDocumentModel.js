@@ -1,4 +1,5 @@
 import {isScenarioType,scenarioFields,scenarioKey} from '../components/scenarios/scenarioContract.js';
+import {normalizeReportRuntimeRefinementFields,validateReportRuntimeRefinementFields} from './reportRuntimeRefinementFields.js';
 import {normalizeTemplateRequestInputs} from './reportTemplateRequestInputs.js';
 import {donutCenterFields} from '../components/donutCenter.js';
 import {chartTooltipFields} from '../components/chartTooltip.js';
@@ -488,6 +489,7 @@ export function buildStaticDatasetReportBuilderConfig(baseConfig = {}, dataset =
       label: normalizeString(column?.label || column?.key),
       ...(normalizeString(column?.format) ? { format: normalizeString(column.format) } : {}),
       ...(column?.rowIdentity === true ? { rowIdentity: true } : {}),
+      ...(isPlainObject(column?.runtimeFilter) ? { runtimeFilter: cloneValue(column.runtimeFilter) } : {}),
     }))
     .filter((entry) => entry.id && entry.key && entry.label);
   const measures = inheritRuntimeFieldCatalog ? cloneValue(baseConfig?.measures || []) : columnOptions
@@ -506,6 +508,46 @@ export function buildStaticDatasetReportBuilderConfig(baseConfig = {}, dataset =
     dimensions,
     measures,
   };
+}
+
+function withDeclaredRuntimeRefinementFields(block, config = {}, declaredDimensions = null) {
+  if (!['chartBlock', 'tableBlock'].includes(block?.kind)) return block;
+  const dimensions = declaredDimensions || (Array.isArray(config.dimensions) ? config.dimensions : []);
+  if (!dimensions.some(field => isPlainObject(field.runtimeFilter)) && !Object.hasOwn(block.runtime || {}, 'refinementFields')) return block;
+  const explicit = Object.hasOwn(block.runtime || {}, 'refinementFields')
+    ? normalizeReportRuntimeRefinementFields(block.runtime.refinementFields) : null;
+  if (explicit?.length === 0) return {...block, runtime:normalizeReportBlockRuntime({...block.runtime, refinementFields:[]}, block)};
+  const chart = block.chartSpec || {};
+  const refs = block.kind === 'tableBlock'
+    ? (block.columns || []).map(column => column.sourceKey || column.displayKey || column.key)
+    : [chart.xField, chart.seriesField, chart.heatmap?.rowField, chart.heatmap?.columnField];
+  const fields = [];
+  for (const ref of new Set(refs.filter(Boolean))) {
+    const matches = dimensions.filter(field => [field.id, field.key, field.displayKey].includes(ref));
+    if (matches.length !== 1 || !isPlainObject(matches[0].runtimeFilter)) continue;
+    const field = matches[0];
+    try {
+      fields.push(...normalizeReportRuntimeRefinementFields([{
+        key: field.key || field.id, sourceKey: field.key || field.id,
+        displayKey: field.displayKey || field.key || field.id,
+        label: field.label || field.key || field.id, runtimeFilter: field.runtimeFilter,
+      }]));
+    } catch (_) { /* An invalid declared binding cannot admit an action. */ }
+  }
+  let refinementFields;
+  try { refinementFields = normalizeReportRuntimeRefinementFields(fields); }
+  catch (_) { refinementFields = []; }
+  if (explicit) {
+    const bindingIdentity = field => JSON.stringify([field.key, field.sourceKey, field.displayKey,
+      field.runtimeFilter.includeParamPath ?? field.runtimeFilter.paramPath,
+      field.runtimeFilter.excludeParamPath, field.runtimeFilter.format, field.runtimeFilter.parentField]);
+    refinementFields = explicit.map(field => {
+      const declared = refinementFields.find(candidate => bindingIdentity(candidate) === bindingIdentity(field));
+      if (!declared) throw Error('Authored refinement fields must match declared same-dataset bindings.');
+      return declared;
+    });
+  }
+  return {...block, runtime: normalizeReportBlockRuntime({...block.runtime, refinementFields}, block)};
 }
 
 function augmentReportRequestField(request = {}, fieldLookup = new Map(), fieldKey = "", defaultPathPrefix = "") {
@@ -2111,6 +2153,7 @@ export function buildReportDocumentGeoMapBlock(block = {}) {
 
 export function normalizeReportBlockRuntime(runtime = null, block = {}) {
   const source = isPlainObject(runtime) ? runtime : {};
+  if (block.kind) validateReportRuntimeRefinementFields({...block, runtime:source});
   const rowVisibility = source.rowVisibility === undefined ? null : normalizeReportRowVisibility(source.rowVisibility);
   const visibleWhen = isPlainObject(source?.visibleWhen)
     ? cloneValue(source.visibleWhen)
@@ -2125,6 +2168,7 @@ export function normalizeReportBlockRuntime(runtime = null, block = {}) {
     ? cloneValue(source.actions)
     : (Array.isArray(block?.actions) ? cloneValue(block.actions) : []);
   const normalized = {
+    ...(Object.hasOwn(source,'refinementFields') ? {refinementFields:normalizeReportRuntimeRefinementFields(source.refinementFields)} : {}),
     ...(rowVisibility ? {rowVisibility} : {}),
     ...(typeof source?.requireCompleteDataset === "boolean" ? { requireCompleteDataset: source.requireCompleteDataset } : {}),
     ...(source?.printRowReference === true ? { printRowReference: true } : {}),
@@ -2613,6 +2657,12 @@ export function lowerReportDocumentToReportSpec(document = {}, {
       const datasetConfig = buildReportBuilderPublishedDatasetConfig(effectiveConfig, publishedDataset, { borrowBase: true });
       return {
         config: datasetConfig,
+        // Preserve declaration multiplicity for admission: the display catalog
+        // may deduplicate options, but that must not hide ambiguous bindings.
+        refinementDimensions: publishedDataset.columnOptions?.length
+          ? publishedDataset.columnOptions.filter(field => field.kind === 'dimension')
+            .map(field => ({...field, id:field.key, key:field.sourceKey || field.key}))
+          : null,
         fieldCatalog: buildReportBuilderFieldCatalog(datasetConfig, normalizedDatasetRef),
         container: {
           ...loweredContainer,
@@ -2691,7 +2741,11 @@ export function lowerReportDocumentToReportSpec(document = {}, {
     baseSpec,
     [...(Array.isArray(baseSpec?.blocks) ? baseSpec.blocks : []), ...additionalBlocks],
   );
-  const nextBlocks = filterExclusiveReportRuntimeBlocks(blocks, loweredLayout.blocks, exclusiveSectionOwnership);
+  const nextBlocks = filterExclusiveReportRuntimeBlocks(blocks, loweredLayout.blocks, exclusiveSectionOwnership)
+    .map(block => {
+      const context = resolveDatasetSpecificRuntimeContext(block.datasetRef);
+      return withDeclaredRuntimeRefinementFields(block, context.config, context.refinementDimensions);
+    });
   const nextBlockIds = new Set(nextBlocks.map((block) => normalizeString(block?.id)).filter(Boolean));
   const referencedDatasetRefs = new Set(
     nextBlocks
