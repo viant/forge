@@ -3,6 +3,7 @@ import {
   normalizeGeoKey,
   US_STATE_TILES,
 } from "../components/dashboard/geoMapUtils.js";
+import { wrapReportPrintLabel } from "./reportPrintLabels.js";
 import {WORLD_COUNTRY_PATHS, countryRegionsByKey} from '../components/dashboard/worldCountryModel.js';
 
 function normalizeString(value = "") {
@@ -84,23 +85,38 @@ function buildRankingSvg(ranking = [], x = 0, y = 0, width = 220) {
     return { svg: "", height: 0 };
   }
   const maxValue = Math.max(...topRanking.map((entry) => normalizeNumber(entry?.rawValue) || 0), 1);
-  const barX = x + 46;
-  const barWidth = Math.max(40, width - 108);
+  // Reserve complete text columns and wrap with the shared print-label helper.
+  // A full font-size character budget also covers wide uppercase identifiers.
+  // Narrow panels put labels above the bar.
+  const valueWidth = Math.min(width, Math.max(...topRanking.map(
+    region => (normalizeString(region?.displayValue) || "-").length * 10,
+  )));
+  const inlineLabelWidth = Math.floor(width * 0.38);
+  const rankingLabels = topRanking.map(region => normalizeString(region?.label) || normalizeString(region?.key) || "-");
+  const stacked = width - inlineLabelWidth - valueWidth - 12 < 40
+    || rankingLabels.some(label => label.length * 10 > inlineLabelWidth);
+  const labelWidth = stacked ? width : inlineLabelWidth;
+  const barX = stacked ? x : x + labelWidth + 6;
+  const barWidth = stacked ? width : width - (barX - x) - valueWidth - 6;
+  const renderLines = (lines, textX, textY, color) => lines.map((line, index) =>
+    `<text x="${textX}" y="${textY + index * 12}" font-size="10" fill="${color}">${escapeXml(line)}</text>`,
+  ).join("\n");
+  let rowY = y;
   const rows = topRanking.map((region, index) => {
     const rawValue = normalizeNumber(region?.rawValue) || 0;
-    const lineY = y + (index * 18);
-    const fillWidth = Math.max(2, (rawValue / maxValue) * barWidth);
-    return `
-      <text x="${x}" y="${lineY + 11}" font-size="10" fill="#344054">${escapeXml(normalizeString(region?.key) || "-")}</text>
-      <rect x="${barX}" y="${lineY + 2}" width="${barWidth}" height="8" rx="4" fill="#eaecf0" />
-      <rect x="${barX}" y="${lineY + 2}" width="${fillWidth}" height="8" rx="4" fill="${escapeXml(normalizeString(region?.color) || "#2563eb")}" />
-      <text x="${barX + barWidth + 6}" y="${lineY + 11}" font-size="10" fill="#667085">${escapeXml(normalizeString(region?.displayValue) || "-")}</text>
-    `;
+    const labels = wrapReportPrintLabel(rankingLabels[index], Math.max(1, Math.floor(labelWidth / 10)));
+    const values = wrapReportPrintLabel(normalizeString(region?.displayValue) || "-", Math.max(1, Math.floor(valueWidth / 10)));
+    const valueY = rowY + (stacked ? labels.length * 12 : 0);
+    const barY = stacked ? valueY + values.length * 12 : rowY;
+    const fillWidth = Math.min(barWidth, Math.max(2, (rawValue / maxValue) * barWidth));
+    const svg = `<rect data-ranking-row="${index}" x="${barX}" y="${barY + 2}" width="${barWidth}" height="8" rx="4" fill="#eaecf0" />
+      <rect x="${barX}" y="${barY + 2}" width="${fillWidth}" height="8" rx="4" fill="${escapeXml(normalizeString(region?.color) || "#2563eb")}" />
+      ${renderLines(labels, x, rowY + 11, "#344054")}
+      ${renderLines(values, stacked ? x : barX + barWidth + 6, valueY + 11, "#667085")}`;
+    rowY += (stacked ? labels.length * 12 + values.length * 12 + 12 : Math.max(labels.length, values.length) * 12) + 6;
+    return svg;
   }).join("\n");
-  return {
-    svg: rows,
-    height: (topRanking.length * 18) + 2,
-  };
+  return { svg: rows, height: rowY - y + 2 };
 }
 
 export function buildReportPrintGeoSvg({
