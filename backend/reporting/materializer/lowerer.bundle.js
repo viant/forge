@@ -53292,13 +53292,21 @@ Please __addLocaleData before adding additional unit data`);
       ...(entry == null ? void 0 : entry.governance) && typeof entry.governance === "object" && !Array.isArray(entry.governance) ? { governance: cloneValue16(entry.governance) } : {}
     };
   }
+  function calculatedMeasures(entry = {}) {
+    return [
+      ...Array.isArray(entry == null ? void 0 : entry.calculatedFields) ? entry.calculatedFields : [],
+      ...Array.isArray(entry == null ? void 0 : entry.computedMeasures) ? entry.computedMeasures : [],
+      ...Array.isArray(entry == null ? void 0 : entry.tableCalculations) ? entry.tableCalculations : []
+    ];
+  }
   function deriveColumnOptions(entry = {}) {
     const dimensions = (Array.isArray(entry == null ? void 0 : entry.dimensions) ? entry.dimensions : []).map((item) => buildDerivedDimensionOptions(item)).filter(Boolean);
     const measures = (Array.isArray(entry == null ? void 0 : entry.measures) ? entry.measures : []).map((item) => buildDerivedMeasureOptions(item)).filter(Boolean);
-    return [...dimensions, ...measures];
+    const calculated = calculatedMeasures(entry).map((item) => buildDerivedMeasureOptions(item)).filter(Boolean).map((item) => ({ ...item, kind: "computedMeasure" }));
+    return [...dimensions, ...measures, ...calculated];
   }
   function deriveValueFieldOptions(entry = {}) {
-    return (Array.isArray(entry == null ? void 0 : entry.measures) ? entry.measures : []).map((item) => {
+    return [...Array.isArray(entry == null ? void 0 : entry.measures) ? entry.measures : [], ...calculatedMeasures(entry)].map((item) => {
       const key2 = normalizeString23((item == null ? void 0 : item.key) || (item == null ? void 0 : item.id));
       if (!key2) {
         return null;
@@ -53330,7 +53338,7 @@ Please __addLocaleData before adding additional unit data`);
       key: normalizeString23((item == null ? void 0 : item.displayKey) || (item == null ? void 0 : item.key)),
       aliases: [normalizeString23(item == null ? void 0 : item.key)].filter(Boolean),
       label: normalizeString23((item == null ? void 0 : item.label) || (item == null ? void 0 : item.key)),
-      kind: normalizeString23(item == null ? void 0 : item.kind),
+      kind: (item == null ? void 0 : item.kind) === "computedMeasure" ? "measure" : normalizeString23(item == null ? void 0 : item.kind),
       ...normalizeString23(item == null ? void 0 : item.format) ? { format: normalizeString23(item.format) } : {},
       ...normalizeString23(item == null ? void 0 : item.tickFormat) ? { tickFormat: normalizeString23(item.tickFormat) } : {},
       ...["civil", "instant"].includes(normalizeString23(item == null ? void 0 : item.valueMode)) ? { valueMode: normalizeString23(item.valueMode) } : {},
@@ -53400,6 +53408,7 @@ Please __addLocaleData before adding additional unit data`);
         resultContract: normalizeOptionalObject(entry == null ? void 0 : entry.resultContract),
         capabilities: normalizeReportDatasetCapabilities(entry == null ? void 0 : entry.capabilities),
         request: isPlainObject6(entry == null ? void 0 : entry.request) ? cloneValue16(entry.request) : null,
+        ...Object.fromEntries(["calculatedFields", "computedMeasures", "tableCalculations"].filter((key2) => Array.isArray(entry == null ? void 0 : entry[key2]) && entry[key2].length > 0).map((key2) => [key2, cloneValue16(entry[key2])])),
         columnOptions: Array.isArray(entry == null ? void 0 : entry.columnOptions) && entry.columnOptions.length > 0 ? cloneValue16(entry.columnOptions) : deriveColumnOptions(entry),
         valueFieldOptions: Array.isArray(entry == null ? void 0 : entry.valueFieldOptions) && entry.valueFieldOptions.length > 0 ? cloneValue16(entry.valueFieldOptions) : deriveValueFieldOptions(entry),
         secondaryFieldOptions: Array.isArray(entry == null ? void 0 : entry.secondaryFieldOptions) && entry.secondaryFieldOptions.length > 0 ? cloneValue16(entry.secondaryFieldOptions) : deriveSecondaryFieldOptions(entry),
@@ -53842,7 +53851,11 @@ Please __addLocaleData before adding additional unit data`);
       ...["civil", "instant"].includes(normalizeString28(column == null ? void 0 : column.valueMode)) ? { valueMode: normalizeString28(column.valueMode) } : {},
       ...isPlainObject7(column == null ? void 0 : column.runtimeFilter) ? { runtimeFilter: cloneValue18(column.runtimeFilter) } : {}
     })).filter((entry) => entry.id && entry.key && entry.label);
-    const measures = inheritRuntimeFieldCatalog ? cloneValue18((baseConfig == null ? void 0 : baseConfig.measures) || []) : fieldOptions.filter((column) => normalizeString28(column == null ? void 0 : column.kind) === "measure").map((column) => ({
+    const calculatedIds = /* @__PURE__ */ new Set([
+      ...fieldOptions.filter((column) => normalizeString28(column == null ? void 0 : column.kind) === "computedMeasure").map((column) => normalizeString28(column == null ? void 0 : column.key)),
+      ...["calculatedFields", "computedMeasures", "tableCalculations"].flatMap((key2) => Array.isArray(normalizedSource == null ? void 0 : normalizedSource[key2]) ? normalizedSource[key2] : []).flatMap((field2) => [normalizeString28(field2 == null ? void 0 : field2.id), normalizeString28(field2 == null ? void 0 : field2.key)]).filter(Boolean)
+    ]);
+    const measures = inheritRuntimeFieldCatalog ? cloneValue18((baseConfig == null ? void 0 : baseConfig.measures) || []) : fieldOptions.filter((column) => normalizeString28(column == null ? void 0 : column.kind) === "measure" && !calculatedIds.has(normalizeString28(column == null ? void 0 : column.key))).map((column) => ({
       id: normalizeString28(column == null ? void 0 : column.key),
       key: normalizeString28((column == null ? void 0 : column.sourceKey) || (column == null ? void 0 : column.key)) || normalizeString28(column == null ? void 0 : column.key),
       label: normalizeString28((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
@@ -53856,7 +53869,8 @@ Please __addLocaleData before adding additional unit data`);
       ...isPlainObject7(baseConfig) ? borrowBase ? baseConfig : cloneValue18(baseConfig) : {},
       dataSourceRef: normalizeString28((normalizedSource == null ? void 0 : normalizedSource.dataSourceRef) || (baseConfig == null ? void 0 : baseConfig.dataSourceRef)),
       dimensions,
-      measures
+      measures,
+      ...Object.fromEntries(["calculatedFields", "computedMeasures", "tableCalculations"].filter((key2) => Array.isArray(normalizedSource == null ? void 0 : normalizedSource[key2]) && normalizedSource[key2].length > 0).map((key2) => [key2, cloneValue18(normalizedSource[key2])]))
     };
   }
   function buildReportBuilderPublishedDatasetRequest(source = {}, state = {}, datasetScopeParamValues = null, inheritedRequestContext = null, primaryRequestContext = null) {
@@ -55207,6 +55221,7 @@ Please __addLocaleData before adding additional unit data`);
       ...isPlainObject8(dataset == null ? void 0 : dataset.resultContract) ? { resultContract: cloneValue19(dataset.resultContract) } : {},
       ...isPlainObject8(dataset == null ? void 0 : dataset.capabilities) ? { capabilities: cloneValue19(dataset.capabilities) } : {},
       request: (dataset == null ? void 0 : dataset.request) && typeof dataset.request === "object" && !Array.isArray(dataset.request) ? cloneValue19(dataset.request) : null,
+      ...Object.fromEntries(["calculatedFields", "computedMeasures", "tableCalculations"].filter((key2) => Array.isArray(dataset == null ? void 0 : dataset[key2]) && dataset[key2].length > 0).map((key2) => [key2, cloneValue19(dataset[key2])])),
       columnOptions: Array.isArray(dataset == null ? void 0 : dataset.columnOptions) ? cloneValue19(dataset.columnOptions) : [],
       valueFieldOptions: Array.isArray(dataset == null ? void 0 : dataset.valueFieldOptions) ? cloneValue19(dataset.valueFieldOptions) : [],
       secondaryFieldOptions: Array.isArray(dataset == null ? void 0 : dataset.secondaryFieldOptions) ? cloneValue19(dataset.secondaryFieldOptions) : [],
