@@ -3,7 +3,8 @@ import {defaultDateInputMinDate,defaultDateInputMaxDate} from '../../packs/bluep
 // Live handlers only. Declared metadata and focus targets cannot authorize an
 // operation; renderers register the same callbacks used by normal UI events.
 const registrations = new Map();
-const epochs = new Map();
+const epochs = new Map(),capabilityEpochs=new Map();
+activeWindows.subscribe(windows=>{const active=new Set((windows || []).map(window=>window.windowId));for(const id of capabilityEpochs.keys())if(!active.has(id))capabilityEpochs.delete(id);});
 let nextToken = 0;
 const pendingOperations = new Set();
 const operationStates=new Map();
@@ -25,12 +26,13 @@ function observeInteraction(windowId) {
 }
 const bump = windowId => epochs.set(windowId, (epochs.get(windowId) || 0) + 1);
 export const invalidateControlActionState = bump;
-export const getOperationRegistryEpoch = windowId => epochs.get(windowId) || 0;
+export const getOperationRegistryEpoch = (windowId,purpose) => (purpose==='metadata-refresh'?capabilityEpochs:epochs).get(windowId) || 0;
+const bumpCapabilities=windowId=>{bump(windowId);capabilityEpochs.set(windowId,(capabilityEpochs.get(windowId)||0)+1);};
 export function registerControlActions(meta, provider, readProvider=provider) {
   if (!meta?.windowId || !meta?.controlId || typeof provider !== 'function') throw new Error('A live control identity and state provider are required');
   const token = ++nextToken;
-  registrations.set(token, {meta: {...meta}, provider, readProvider});bump(meta.windowId);
-  return () => {if (registrations.delete(token)) {bump(meta.windowId);if(![...registrations.values()].some(entry=>operationKey(entry.meta)===operationKey(meta)))operationStates.delete(operationKey(meta));if(![...registrations.values()].some(entry=>entry.meta.windowId===meta.windowId))epochs.delete(meta.windowId);}};
+  registrations.set(token, {meta: {...meta}, provider, readProvider});bumpCapabilities(meta.windowId);
+  return () => {if (registrations.delete(token)) {bumpCapabilities(meta.windowId);if(![...registrations.values()].some(entry=>operationKey(entry.meta)===operationKey(meta)))operationStates.delete(operationKey(meta));if(![...registrations.values()].some(entry=>entry.meta.windowId===meta.windowId)){epochs.delete(meta.windowId);if(!(activeWindows.peek()||[]).some(window=>window.windowId===meta.windowId))capabilityEpochs.delete(meta.windowId);}}};
 }
 export function listRegisteredControlActions({windowId, dataSourceRef} = {}) {
   const result=[];

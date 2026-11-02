@@ -44,12 +44,15 @@ export async function refreshWorkspace(params) {
     if(typeof params.reloadMetadata!=='boolean'&&params.reloadMetadata!=null)throw new Error('reloadMetadata must be boolean');
     const mode=params.reloadMetadata===true?'metadata':'data';
     if(typeof entry.adapter[mode]!=='function')throw new Error(`workspace ${mode} refresh is unsupported for this scope`);
-    const revision=assertOperationTarget(params);
+    // A caller-supplied CAS always uses the ordinary UI revision on entry.
+    const initialRevision=assertOperationTarget(params);
+    const purpose=mode==='metadata'?'metadata-refresh':'operation';
+    const revision=mode==='metadata'?getOperationRevision(target.windowId,purpose):initialRevision;
     if(pending.has(target.windowId))throw new Error('another workspace refresh is pending');
     pending.add(target.windowId);
     const check=()=>{
         if(registrations.get(key(target))!==entry)throw new Error('workspace refresh scope changed during admission');
-        assertOperationTarget({...params,expectedRevision:revision});
+        assertOperationTarget({...params,expectedRevision:revision},purpose);
     };
     try {
         const admission=await entry.adapter.admit({...target,mode});check();

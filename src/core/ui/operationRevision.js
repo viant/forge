@@ -21,7 +21,11 @@ function collectionStructure(value,sensitive) {
   if(!Array.isArray(value))return value;
   return JSON.stringify(value.map(row=>row && typeof row==='object'?[objectIdentity(row),Object.keys(row).sort().filter(key=>!secret.test(key)&&!sensitive.has(key)).map(key=>[key,row[key]&&typeof row[key]==='object'?objectIdentity(row[key]):safe(row[key])])]:safe(row)));
 }
-export function getOperationRevision(windowId) {
+// Metadata publication preserves loaded rows and request lifecycle state. Its
+// internal fence still guards every current edit/input and registered capability.
+// No transport parameter can select this purpose.
+export function getOperationRevision(windowId,purpose='operation') {
+  const metadataRefresh=purpose==='metadata-refresh',cachePurpose=metadataRefresh?'metadata-refresh':'operation';
   const window=(activeWindows.peek()||[]).find(item=>item.windowId===windowId);
   if(!window)throw new Error(`window not found: ${windowId}`);
   const metadata=getMetadataSignal(windowId).peek() || {};
@@ -36,26 +40,31 @@ export function getOperationRevision(windowId) {
   // Small mutable form/input snapshots are compared by value, including in-place
   // edits; large collection and definition payloads retain identity-based reuse.
   const small = value => JSON.stringify(safe(value,new WeakSet(),sensitive));
-  const refs = [window, metadata, getOperationRegistryEpoch(windowId), small(getViewSignal(windowId).peek()), small(getFormSignal(`${windowId}:windowForm`).peek())];
+  const refs = [metadataRefresh?small(window):window, metadata, getOperationRegistryEpoch(windowId,purpose), small(getViewSignal(windowId).peek()), small(getFormSignal(`${windowId}:windowForm`).peek())];
   const sourceRefs = Object.keys(metadata.dataSource || {}).sort();
   for(const ref of sourceRefs) {
     const id=`${windowId}DS${ref}`;
-    refs.push(small(getFormSignal(id).peek()),small(getInputSignal(id).peek()),small(getSelectionSignal(id,{}).peek()),getCollectionSignal(id).peek(),collectionStructure(getCollectionSignal(id).peek(),sensitive),small(getControlSignal(id).peek()),small(getFormStatusSignal(id).peek()));
+    const input=getInputSignal(id).peek();
+    let relevantInput=input;
+    if(metadataRefresh){const {fetch,refresh,invocationId,formSynchronization,...intent}=input || {};relevantInput=intent;}
+    refs.push(small(getFormSignal(id).peek()),small(relevantInput),small(getSelectionSignal(id,{}).peek()));
+    if(metadataRefresh)refs.push(small({dirty:getFormStatusSignal(id).peek()?.dirty}));
+    else refs.push(getCollectionSignal(id).peek(),collectionStructure(getCollectionSignal(id).peek(),sensitive),small(getControlSignal(id).peek()),small(getFormStatusSignal(id).peek()));
   }
   for(const dialog of metadata.dialogs || [])if(dialog?.id)refs.push(small(getDialogSignal(`${windowId}Dialog${dialog.id}`).peek()));
-  const cached=revisionCache.get(windowId);
+  const cache=revisionCache.get(windowId),cached=cache?.get(cachePurpose);
   if(cached && refs.length===cached.refs.length && refs.every((value,index)=>Object.is(value,cached.refs[index])))return cached.revision;
   const state=refs.map(value=>safe(value,new WeakSet(),sensitive));
   let revision=2166136261;for(const char of JSON.stringify(state))revision=Math.imul(revision^char.charCodeAt(0),16777619)>>>0;
-  revisionCache.set(windowId,{refs,revision});
+  const revisions=cache || new Map();revisions.set(cachePurpose,{refs,revision});revisionCache.set(windowId,revisions);
   return revision;
 }
-export function assertOperationTarget(params) {
+export function assertOperationTarget(params,purpose='operation') {
   const window=(activeWindows.peek()||[]).find(item=>item.windowId===params.windowId);
   if(!window)throw new Error(`window not found: ${params.windowId}`);
   if(params.conversationId && params.conversationId!==window.conversationId)throw new Error('window is outside the current conversation');
   if(params.resourceTarget && JSON.stringify(safe(params.resourceTarget))!==JSON.stringify(safe(window.resourceTarget)))throw new Error('pinned window target does not match');
-  const revision=getOperationRevision(params.windowId);
+  const revision=getOperationRevision(params.windowId,purpose);
   if(params.expectedRevision!=null && params.expectedRevision!==revision)throw new Error('stale UI operation revision; read current UI state before retrying');
   return revision;
 }
