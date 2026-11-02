@@ -45363,8 +45363,8 @@ Please __addLocaleData before adding additional unit data`);
         return formatExportDecimal(numeric, {
           style: "currency",
           currency: "USD",
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2
+          minimumFractionDigits: normalizedFormat === "currency" ? 0 : 2,
+          maximumFractionDigits: normalizedFormat === "currency" ? 0 : 2
         });
       case "compact":
       case "compactnumber":

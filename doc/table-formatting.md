@@ -1,5 +1,12 @@
 # Table Formatting Rules
 
+Numeric format names declare presentation precision. `currency` displays whole
+currency units (`1234.75` → `$1,235`); `currency2` displays two fractional digits
+(`1234.75` → `$1,234.75`). Canonical report print, HTML, PDF, and XLSX exports
+preserve this distinction. Formatting never rounds source measurements: CSV and
+underlying numeric XLSX cells retain `1234.75`. Null measurements remain missing
+(screen/print placeholders and blank CSV/XLSX cells).
+
 Tables can color rows or cells from explicit metadata. Rules match a named field
 on the row data and never infer status from labels or display text.
 

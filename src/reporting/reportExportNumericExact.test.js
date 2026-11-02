@@ -12,8 +12,8 @@ for (let i = 0; i < 1000; i++) {
 }
 for (const axis of [false, true]) for (const format of formats) for (const value of values) {
   const currency = format.startsWith('currency');
-  const minimumFractionDigits = currency ? 2 : format === 'number5' ? 5 : 0;
-  const maximumFractionDigits = currency || format === 'number2' ? 2 : format === 'number5' ? 5
+  const minimumFractionDigits = format === 'currency2' ? 2 : format === 'number5' ? 5 : 0;
+  const maximumFractionDigits = format === 'currency' ? 0 : format === 'currency2' || format === 'number2' ? 2 : format === 'number5' ? 5
     : format === 'number' ? axis ? Number.isInteger(value) ? 0 : 1 : 5
     : Number.isInteger(value) ? 0 : 2;
   const expected = new Intl.NumberFormat('en-US', {minimumFractionDigits, maximumFractionDigits,

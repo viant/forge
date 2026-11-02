@@ -78,7 +78,7 @@ func TestRenderDashboardPreservesAuthoredTabsAndFullTypedData(t *testing.T) {
 		actual, err := strconv.ParseFloat(raw, 64)
 		require.NoError(t, err)
 		require.Equal(t, value, actual)
-		require.Equal(t, "$0.11", mustCellValue(t, workbook, sheet, "B5"))
+		require.Equal(t, "$0", mustCellValue(t, workbook, sheet, "B5"))
 	}
 	{
 		sheet := "Data primary"

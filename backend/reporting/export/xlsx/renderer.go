@@ -193,6 +193,8 @@ func setXLSXText(workbook *excelize.File, sheet, cell, value string) error {
 func xlsxNumberFormat(format string) string {
 	switch strings.ToLower(strings.TrimSpace(format)) {
 	case "currency":
+		return `"$"#,##0`
+	case "currency2":
 		return `"$"#,##0.00`
 	case "compactnumber":
 		return "#,##0.#####"

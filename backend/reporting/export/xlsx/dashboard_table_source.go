@@ -10,8 +10,6 @@ import (
 
 func dashboardNumberFormat(format string) string {
 	switch strings.ToLower(strings.TrimSpace(format)) {
-	case "currency2":
-		return xlsxNumberFormat("currency")
 	case "number":
 		return "General"
 	case "number5":
