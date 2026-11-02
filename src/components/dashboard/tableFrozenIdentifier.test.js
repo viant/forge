@@ -1,34 +1,27 @@
 import assert from 'node:assert/strict';
 import { compactTableColumnWidth, frozenIdentifierColumn, withFrozenIdentifierColumn } from './tableFrozenIdentifier.js';
 
-const dealColumns = [
-    {key: 'deal_id', label: 'Deal ID'},
-    {key: 'name', label: 'Deal'},
-    {key: 'cost', label: 'Cost'},
-    {key: 'reason', label: 'Rationale'},
-];
-
-assert.equal(frozenIdentifierColumn(dealColumns)?.key, 'name');
-assert.deepEqual(withFrozenIdentifierColumn(dealColumns).map((column) => column.key), ['name', 'deal_id', 'cost', 'reason']);
-assert.equal(compactTableColumnWidth(dealColumns[0]), 96);
-assert.equal(compactTableColumnWidth(dealColumns[3]), 260);
-
-const explicit = [{key: 'code'}, {key: 'label', frozen: true}, {key: 'reason'}];
-assert.equal(frozenIdentifierColumn(explicit)?.key, 'label');
-
-for (const key of ['fluid', 'valid', 'grid', 'solid']) {
-    const columns = [{key: 'prompt', label: 'Prompt'}, {key, label: key}, {key: 'west', label: 'West'}];
-    assert.equal(frozenIdentifierColumn(columns)?.key, 'prompt', `${key} is not an identifier token`);
-    assert.deepEqual(withFrozenIdentifierColumn(columns).map(column => column.key), ['prompt', key, 'west']);
-    assert.equal(compactTableColumnWidth(columns[1]), 148, `${key} keeps the default width`);
+// Independently invented compound identities: keys, labels and print identity
+// anchors never imply a different presentation order or column width.
+for (const firstKey of ['teamName', 'TeamName', 'team_name']) {
+    const columns = [{key:firstKey,label:'Team'}, {key:'teamId',label:'Team ID',rowIdentity:true}, {key:'itemName',label:'Item'}, {key:'itemId',label:'Item ID',rowIdentity:true}];
+    assert.equal(frozenIdentifierColumn(columns), columns[0]);
+    const decorated = withFrozenIdentifierColumn(columns);
+    assert.deepEqual(decorated.map(column=>column.key), columns.map(column=>column.key));
+    assert.deepEqual(decorated.map(column=>column.frozen), [true,false,false,false]);
+    assert.deepEqual(decorated.map(column=>column.resolvedCompactWidth), [148,148,148,148]);
+    assert.deepEqual(decorated.filter(column=>column.rowIdentity).map(column=>column.key), ['teamId','itemId']);
+    const explicitColumns = columns.map((column,index)=>({...column,frozen:index===2}));
+    assert.equal(frozenIdentifierColumn(explicitColumns), explicitColumns[2], 'Explicit frozen metadata still wins');
+    assert.deepEqual(withFrozenIdentifierColumn(explicitColumns).map(column=>column.key), ['itemName',firstKey,'teamId','itemId']);
+    assert.equal(columns.some(column=>'frozen' in column),false,'Source metadata is not mutated');
 }
-for (const column of [{key: 'id'}, {key: 'campaignId'}, {key: 'campaignID'}, {key: 'campaign_id'}, {key: 'reference', label: 'Campaign ID'}]) {
-    const columns = [{key: 'prompt'}, column, {key: 'west'}];
-    assert.equal(frozenIdentifierColumn(columns), column, `${column.key} remains an inferred identifier`);
-    assert.equal(compactTableColumnWidth(column), 96);
-}
-assert.deepEqual(withFrozenIdentifierColumn(explicit).map(column => column.key), ['label', 'code', 'reason'], 'Explicit frozen metadata wins');
-const authored = [{key: 'west'}, {key: 'fluid'}, {key: 'prompt'}];
-assert.deepEqual(withFrozenIdentifierColumn(authored).map(column => column.key), ['west', 'fluid', 'prompt'], 'Preserve a user-authored order without identifier metadata');
-
-console.log('tableFrozenIdentifier ✓ selects and sizes stable frozen identifiers');
+for(const width of [100,220,280])assert.equal(compactTableColumnWidth({key:'item',width}),width);
+assert.equal(compactTableColumnWidth({width:20}),76);
+assert.equal(compactTableColumnWidth({width:400}),280);
+for(const width of [0,-1,NaN,Infinity,undefined])assert.equal(compactTableColumnWidth({width}),148);
+assert.equal(frozenIdentifierColumn([]),null);
+assert.equal(frozenIdentifierColumn(null),null);
+assert.deepEqual(withFrozenIdentifierColumn([]),[]);
+assert.deepEqual(withFrozenIdentifierColumn(null),[]);
+console.log('tableFrozenIdentifier ✓ source order, explicit frozen metadata, compound identities and neutral widths');

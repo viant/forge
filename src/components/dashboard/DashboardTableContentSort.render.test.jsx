@@ -4,6 +4,29 @@ import {createRoot} from 'react-dom/client';
 import {expect,it} from 'vitest';
 import DashboardTableContent from './DashboardTableContent.jsx';
 
+it('keeps compound identity columns in source order through sorting with one frozen leading column',async()=>{
+ const host=document.createElement('div');document.body.append(host);
+ const root=createRoot(host);globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ // Independently invented data; identifiers are print anchors, not pinning instructions.
+ const rows=[{teamName:'Cedar',teamId:20,itemName:'North',itemId:2},{teamName:'Birch',teamId:10,itemName:'South',itemId:1}];
+ const columns=[{key:'teamName',label:'Team'},{key:'teamId',label:'Team ID',rowIdentity:true},{key:'itemName',label:'Item'},{key:'itemId',label:'Item ID',rowIdentity:true}];
+ const context={signals:{collection:{value:rows},control:{value:{loading:false,error:null}},selection:{value:null}},identity:{dataSourceRef:'compound-identities'}};
+ try{
+  await act(async()=>root.render(<DashboardTableContent container={{id:'compound-identities',columns}} context={context}/>));
+  const headers=[...host.querySelectorAll('thead th')];
+  expect(headers.map(header=>header.textContent.trim())).toEqual(['Team','Team ID','Item','Item ID']);
+  expect(headers.filter(header=>header.classList.contains('forge-table-frozen-identifier'))).toEqual([headers[0]]);
+  expect([...host.querySelectorAll('tbody tr')].map(row=>[...row.cells].map(cell=>cell.textContent))).toEqual([['Cedar','20','North','2'],['Birch','10','South','1']]);
+  await act(async()=>host.querySelector('button[aria-label="Sort by Item ID"]').click());
+  expect([...host.querySelectorAll('tbody tr')].map(row=>[...row.cells].map(cell=>cell.textContent))).toEqual([['Birch','10','South','1'],['Cedar','20','North','2']]);
+  for(const row of host.querySelectorAll('tbody tr'))expect([...row.cells].filter(cell=>cell.classList.contains('forge-table-frozen-identifier'))).toEqual([row.cells[0]]);
+  await act(async()=>root.render(<DashboardTableContent container={{id:'compound-identities',columns:columns.map(column=>({...column,frozen:column.key==='itemName'}))}} context={context}/>));
+  expect([...host.querySelectorAll('thead th button')].map(button=>button.getAttribute('aria-label'))).toEqual(['Sort by Item','Sort by Team','Sort by Team ID','Sort by Item ID']);
+  expect(host.querySelector('thead th.forge-table-frozen-identifier')?.textContent.trim()).toBe('Item');
+  expect([...host.querySelectorAll('tbody tr')].map(row=>[...row.cells].map(cell=>cell.textContent))).toEqual([['South','Birch','10','1'],['North','Cedar','20','2']]);
+ }finally{await act(async()=>root.unmount());host.remove();}
+});
+
 it('restores table sort and filter when its report tab remounts',async()=>{
  const host=document.createElement('div');document.body.append(host);
  const root=createRoot(host);globalThis.IS_REACT_ACT_ENVIRONMENT=true;

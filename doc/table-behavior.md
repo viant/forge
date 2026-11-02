@@ -118,6 +118,13 @@ ignored when the input changes.
 
 ## Preference adapter
 
+Dashboard tables preserve declared column order and freeze the first column by
+default. An explicit column `frozen: true` selects the leading frozen column;
+the remaining columns retain their relative order. Keys, labels and print
+`rowIdentity` metadata do not select or reorder frozen columns. Compact widths
+use explicit column widths (clamped to 76–280px), otherwise the neutral 148px
+default. Document tables retain their separate non-frozen presentation.
+
 Browser storage is the default. A host may inject an asynchronous adapter through
 `services.tablePreferences`:
 
