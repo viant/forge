@@ -2,11 +2,13 @@ import React,{act}from'react';import{createRoot}from'react-dom/client';import{ex
 import{executeCommand}from'./primitives/commandExecutor.js';
 import WindowContent from'./WindowContent.jsx';import{SettingProvider}from'../core/context/Setting.jsx';import{getWindowContext}from'../core/context/registry.js';import{removeSignalsForKey}from'../core/store/signals.js';import'../packs/blueprint/index.jsx';
 let index=0;
-async function mount({nativeEnvelope=false,withDialog=false}={}){
+async function mount({nativeEnvelope=false,withDialog=false,autoSelectChildren=false}={}){
  globalThis.IS_REACT_ACT_ENVIRONMENT=true;const windowId='projected-record-'+(++index),host=document.createElement('div');document.body.append(host);const root=createRoot(host);
  let row={id:7,name:'Original',channels:['DISPLAY'],rate:1,acl:[{id:11,role:'OWNER'}]};
  const success=vi.fn();const transport=vi.fn(async()=>nativeEnvelope?{rows:[row],metrics:row,dataInfo:{}}:{data:[row]});
+ if(autoSelectChildren)row.acl.push({id:12,role:'EDITOR'});
  const metadata={dataSource:{record:{id:'record',service:{uri:'mcp://fixture/record'},uniqueKey:[{field:'id'}],selectors:{data:nativeEnvelope?'rows':'data',metrics:nativeEnvelope?'metrics':'data.0'},selectionMode:'single'},properties:{id:'properties',dataSourceRef:'record',uniqueKey:[{field:'id'}],selectors:{metrics:'.'},selectionMode:'single'},defaults:{id:'defaults',dataSourceRef:'record',resourceModelRef:'defaultsRecord',uniqueKey:[{field:'id'}],selectors:{metrics:'.'},selectionMode:'single',on:[{event:'onSuccess',handler:'test.success'}]},permissions:{id:'permissions',dataSourceRef:'record',uniqueKey:[{field:'id'}],selectors:{data:'acl'},autoSelect:false}},schemas:{defaultsRecord:{type:'object',required:['id'],properties:{id:{type:'integer'},channels:{type:'array',items:{type:'string'}}}}},resourceModels:{defaultsRecord:{schemaRef:'defaultsRecord',fields:{id:{read:'id'},channels:{read:'channels'}}}},view:{dataSourceRef:'properties',content:{id:'root',containers:['properties','defaults','permissions'].map(id=>({id:id+'Panel',dataSourceRef:id,fetchData:true}))}}};
+ if(autoSelectChildren)metadata.dataSource.permissions.autoSelect=true;
  if(withDialog){
   for(const id of ['draft','writer','hiddenReader'])metadata.dataSource[id]={id,service:{uri:'mcp://fixture/'+id},selectors:{data:'data'},autoFetch:false,selectionMode:'none'};
   metadata.dialogs=[{id:'editor',title:'Editor',dataSourceRef:'draft',fetchOnOpen:false,content:{id:'editorContent',dataSourceRef:'draft',fetchData:false,draftForm:{submit:{dataSourceRef:'writer',refresh:[{dataSourceRef:'defaults',bypassCache:true},{dataSourceRef:'hiddenReader',bypassCache:true}]}}}}];
@@ -16,6 +18,23 @@ async function mount({nativeEnvelope=false,withDialog=false}={}){
  const context=getWindowContext(windowId);
  return{context,transport,success,setRow:value=>{row=value;},settle,close:async()=>{await settle(()=>root.unmount());host.remove();removeSignalsForKey(windowId);}};
 }
+it('retains an explicitly selected nonfirst child across an authoritative parent refresh',async()=>{
+ const v=await mount({autoSelectChildren:true});try{
+  const child=v.context.Context('permissions');await v.settle(()=>child.handlers.dataSource.setSelected({selected:child.signals.collection.peek()[1],rowIndex:1}));
+  v.setRow({id:7,name:'Updated',acl:[{id:11,role:'OWNER'},{id:12,role:'EDITOR'}]});
+  await v.settle(()=>v.context.Context('record').handlers.dataSource.fetchCollection({cache:{bypassCache:true}}));
+  expect(child.signals.selection.peek().selected?.id).toBe(12);
+ }finally{await v.close();}
+});
+it('retains an unselected new child draft when the same parent refreshes',async()=>{
+ const v=await mount({autoSelectChildren:true});try{
+  const child=v.context.Context('permissions');await v.settle(()=>{child.handlers.dataSource.resetSelection();child.handlers.dataSource.setFormData({values:{id:0,role:''}});child.handlers.dataSource.setEditedFormData({values:{id:0,role:'DRAFT'}});});
+  v.setRow({id:7,name:'Updated',acl:[{id:11,role:'OWNER'},{id:12,role:'EDITOR'}]});
+  await v.settle(()=>v.context.Context('record').handlers.dataSource.fetchCollection({cache:{bypassCache:true}}));
+  expect(child.signals.selection.peek().selected).toBeNull();
+  expect(child.signals.form.peek()).toEqual({id:0,role:'DRAFT'});expect(child.signals.formStatus.peek().dirty).toBe(true);
+ }finally{await v.close();}
+});
 it('serves three local views from one reader and keeps nested values isolated',async()=>{
  const v=await mount();try{
   expect(v.transport).toHaveBeenCalledTimes(1);
