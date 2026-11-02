@@ -373,7 +373,11 @@ func (w *visualDashboardWriter) printGroup(sheet string, group dashboardGroup, p
 					if err = w.file.AddChart(sheet, cell, charts[0], charts[1:]...); err != nil {
 						return err
 					}
-					w.chartDecorations = append(w.chartDecorations, nativeChartDecoration{PointColors: colors, Mini: source.mini})
+					offset, count := 0, len(sourceRows)
+					if binding := element.ChartSource; binding != nil {
+						offset, count = binding.RowOffset, binding.RowCount
+					}
+					w.chartDecorations = append(w.chartDecorations, nativeChartDecoration{PointColors: colors, Mini: source.mini, SignedSeries: nativeSignedSeries(source.sheet, source.block, offset, count)})
 					source.nativeOccurrences++
 					continue
 				}

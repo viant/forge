@@ -27,8 +27,17 @@ var dashboardChartTypes = map[string]excelize.ChartType{
 }
 
 type nativeChartDecoration struct {
-	PointColors []string
-	Mini        bool
+	PointColors  []string
+	Mini         bool
+	SignedSeries map[string][]string // series-name formula -> explicit category overrides
+}
+
+func nativeSignedBar(kind string) bool {
+	switch kind {
+	case "bar", "column", "horizontal_bar", "funnel_bar", "stacked_bar":
+		return true
+	}
+	return false
 }
 
 func chartMap(value any) map[string]any { result, _ := value.(map[string]any); return result }
@@ -74,7 +83,9 @@ func nativeChartDiagnostic(content *reportfill.ChartContent) string {
 	}
 	for _, value := range chartValues(content.ChartModel) {
 		series := chartMap(value)
-		if chartString(series["pointColorMode"]) != "" || chartString(series["strokeDasharray"]) != "" {
+		mode := chartString(series["pointColorMode"])
+		kind := firstText(chartString(series["type"]), resolved.Type)
+		if (mode != "" && mode != "series" && !(mode == "bySign" && nativeSignedBar(kind))) || chartString(series["strokeDasharray"]) != "" {
 			return "The authored point styling is retained in the static print visual. Source filters explore data but do not update that visual."
 		}
 		if kind := chartString(series["type"]); kind != "" {
@@ -267,7 +278,7 @@ func (w *visualDashboardWriter) nativeChart(visual, source string, row int, bloc
 	if err = w.file.AddChart(visual, fmt.Sprintf("A%d", row), charts[0], charts[1:]...); err != nil {
 		return err
 	}
-	w.chartDecorations = append(w.chartDecorations, nativeChartDecoration{PointColors: nativePointColors(block)})
+	w.chartDecorations = append(w.chartDecorations, nativeChartDecoration{PointColors: nativePointColors(block), SignedSeries: nativeSignedSeries(source, block, 0, -1)})
 	return nil
 }
 
@@ -484,6 +495,9 @@ func dashboardNativeChart(source string, block reportfill.Block) (*excelize.Char
 		if authored := excelChartColor(chartString(entry["color"])); authored != "" {
 			color = authored
 		}
+		if chartString(entry["pointColorMode"]) == "bySign" && nativeSignedBar(firstText(chartString(entry["type"]), resolved.Type)) {
+			color = "0F9960"
+		}
 		series := excelize.ChartSeries{Name: fmt.Sprintf("%s$%s$4", quoted, column), Categories: fmt.Sprintf("%s$A$5:$A$%d", quoted, len(rows)+4), Values: fmt.Sprintf("%s$%s$5:$%s$%d", quoted, column, column, len(rows)+4), Fill: excelize.Fill{Type: "pattern", Pattern: 1, Color: []string{color}}}
 		series.Marker = excelize.ChartMarker{Symbol: "circle", Size: 4, Fill: excelize.Fill{Type: "pattern", Pattern: 1, Color: []string{color}}}
 		series.Marker.Border.Fill = series.Fill
@@ -591,6 +605,12 @@ func visibleChartRows(data []byte, workbook *excelize.File, decorations ...nativ
 		}
 		if number > 0 && number <= len(decorations) && len(decorations[number-1].PointColors) > 0 {
 			content, err = applyPointColors(content, decorations[number-1].PointColors)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if number > 0 && number <= len(decorations) && len(decorations[number-1].SignedSeries) > 0 {
+			content, err = applySignedSeries(content, decorations[number-1].SignedSeries)
 			if err != nil {
 				return nil, err
 			}
