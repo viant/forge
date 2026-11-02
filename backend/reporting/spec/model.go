@@ -130,6 +130,7 @@ type ScopeParamFilterBinding struct {
 }
 
 type Dataset struct {
+	Scope         *DatasetScope  `json:"scope,omitempty"`
 	ID            string         `json:"id"`
 	DataSourceRef string         `json:"dataSourceRef"`
 	Request       RequestPayload `json:"request"`

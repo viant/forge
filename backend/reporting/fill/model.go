@@ -63,21 +63,10 @@ type Dataset struct {
 	opaqueDatasourceRequest bool
 }
 
-type DatasetScope struct {
-	Mode              string                    `json:"mode,omitempty"`
-	InheritContext    *bool                     `json:"inheritContext,omitempty"`
-	Local             map[string]any            `json:"local,omitempty"`
-	Exclude           []string                  `json:"exclude,omitempty"`
-	RelativeDateRange *DatasetRelativeDateRange `json:"relativeDateRange,omitempty"`
-}
-type DatasetRelativeDateRange struct {
-	Preset          string `json:"preset,omitempty"`
-	StartExpression string `json:"startExpression,omitempty"`
-	EndExpression   string `json:"endExpression,omitempty"`
-	Format          string `json:"format,omitempty"`
-	StartParamPath  string `json:"startParamPath"`
-	EndParamPath    string `json:"endParamPath"`
-}
+// Scope metadata has one shared spec/fill transport contract.
+type DatasetScope = reportspec.DatasetScope
+type DatasetRelativeDateRange = reportspec.DatasetRelativeDateRange
+
 type DatasetCapabilities struct {
 	InheritRuntimeFieldCatalog *bool             `json:"inheritRuntimeFieldCatalog,omitempty"`
 	BackendRefetch             *bool             `json:"backendRefetch,omitempty"`
