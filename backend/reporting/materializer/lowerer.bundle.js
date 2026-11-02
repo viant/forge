@@ -62930,7 +62930,7 @@ ${indent}${end}`;
       const valueY = rowY + (stacked ? labels.length * 12 : 0);
       const barY = stacked ? valueY + values.length * 12 : rowY;
       const fillWidth = Math.min(barWidth, Math.max(2, rawValue / maxValue * barWidth));
-      const svg = `<rect data-ranking-row="${index}" x="${barX}" y="${barY + 2}" width="${barWidth}" height="8" rx="4" fill="#eaecf0" />
+      const svg = `<rect class="forge-geo-ranking-track" x="${barX}" y="${barY + 2}" width="${barWidth}" height="8" rx="4" fill="#eaecf0" />
       <rect x="${barX}" y="${barY + 2}" width="${fillWidth}" height="8" rx="4" fill="${escapeXml2(normalizeString40(region == null ? void 0 : region.color) || "#2563eb")}" />
       ${renderLines(labels, x2, rowY + 11, "#344054")}
       ${renderLines(values, stacked ? x2 : barX + barWidth + 6, valueY + 11, "#667085")}`;

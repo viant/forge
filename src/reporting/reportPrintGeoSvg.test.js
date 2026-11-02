@@ -126,13 +126,13 @@ for (const largeValues of [true, false]) {
     const printed = buildReportPrintGeoSvg({resolvedGeo: geoForPrint, width});
     assert.deepEqual(geoForPrint, beforePrint, "print layout never mutates UI data");
     assert.match(printed.svg, />Riverbend<\/text>/, "a friendly single-word label stays intact when the panel can fit it");
-    const rows = [...printed.svg.matchAll(/(<rect data-ranking-row="(\d+)"[\s\S]*?)(?=<rect data-ranking-row=|<\/svg>)/g)];
+    const rows = [...printed.svg.matchAll(/(<rect class="forge-geo-ranking-track"[\s\S]*?)(?=<rect class="forge-geo-ranking-track"|<\/svg>)/g)];
     assert.equal(rows.length, 5, "all five ranked rows remain visible");
     let previousBottom = 0;
     let rankingBarWidth;
     for (const [, row] of rows) {
       const texts = [...row.matchAll(/<text x="([\d.]+)" y="([\d.]+)"[^>]*>([^<]*)<\/text>/g)];
-      const tracks = [...row.matchAll(/<rect(?: data-ranking-row="\d+")? x="([\d.]+)" y="([\d.]+)" width="([\d.]+)"/g)];
+      const tracks = [...row.matchAll(/<rect(?: class="forge-geo-ranking-track")? x="([\d.]+)" y="([\d.]+)" width="([\d.]+)"/g)];
       const track = tracks[0].slice(1).map(Number);
       assert.ok(track[0] + track[2] <= width, "bar stays inside SVG");
       rankingBarWidth ??= track[2];
