@@ -63,7 +63,10 @@ export function assertOperationTarget(params,purpose='operation') {
   const window=(activeWindows.peek()||[]).find(item=>item.windowId===params.windowId);
   if(!window)throw new Error(`window not found: ${params.windowId}`);
   if(params.conversationId && params.conversationId!==window.conversationId)throw new Error('window is outside the current conversation');
-  if(params.resourceTarget && JSON.stringify(safe(params.resourceTarget))!==JSON.stringify(safe(window.resourceTarget)))throw new Error('pinned window target does not match');
+  // Canonical resource headers live on mounted metadata; ordinary window
+  // frames need not duplicate them. Legacy frames may retain their own header.
+  const mountedTarget=getMetadataSignal(params.windowId).peek()?.resourceTarget || window.resourceTarget;
+  if(params.resourceTarget && JSON.stringify(safe(params.resourceTarget))!==JSON.stringify(safe(mountedTarget)))throw new Error('pinned window target does not match');
   const revision=getOperationRevision(params.windowId,purpose);
   if(params.expectedRevision!=null && params.expectedRevision!==revision)throw new Error('stale UI operation revision; read current UI state before retrying');
   return revision;
