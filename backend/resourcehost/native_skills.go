@@ -77,7 +77,10 @@ func (s *NativeSkillSource) Get(ctx context.Context, conversation, name string) 
 	if _, published := s.Gateway.publishedByName(name); published {
 		return nil, &requiredSkillDiscoveryFailure{identity.ErrResourceDenied}
 	}
-	c, err := s.Gateway.Manager.Get(ctx, conversation, name)
+	// Skill catalog and package reads share the manager's existing metadata
+	// transport; ordinary action execution retains its conversation scope.
+	scope := s.Gateway.Manager.MetadataConnectionScope(ctx, conversation, name)
+	c, err := s.Gateway.Manager.Get(ctx, scope, name)
 	if err != nil {
 		return nil, err
 	}
