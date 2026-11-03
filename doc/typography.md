@@ -73,6 +73,17 @@ Unsupported Lucide names and variants fail explicitly. The finite registry uses
 named imports from pinned [Lucide React](https://lucide.dev/guide/react/), with
 no CDN or dynamic download. Extend it with an example and test in this owner.
 
+For owned drawing assets, `Icon` also accepts `iconSvg={{viewBox: [0, 0, 24, 24],
+paths: ['M3 4L18 4L10 19Z'], fill: 'currentColor', stroke: 'none'}}`.
+The portable geometry supports path strings and rectangles (`x`, `y`, `width`,
+`height`, optional `rx`). Omitted paint fields retain stroke-icon defaults:
+`fill: 'none'`, `stroke: 'currentColor'`, rounded strokes of width 2. Paint fields
+accept only `none` or `currentColor`; markup, URLs and arbitrary attributes are
+never forwarded. Invalid geometry renders nothing. An authored `name` retains
+precedence, and labels follow the same accessibility contract as named icons.
+Geometry inherits the shared icon size and stroke-width tokens. Asset ownership
+and conversion to drawing coordinates remain with the authoring workspace.
+
 The existing theme-preview.html now includes FoundationSpecimen plus the complete
 TypographySpecimen. Browser checks cover real actions, selection, dialog focus,
 table states, reduced motion and role propagation at desktop and phone widths.
