@@ -22,12 +22,15 @@ const button = (view,label) => [...view.host.querySelectorAll('button')].find(it
 const deferred = () => {let resolve, reject; const promise=new Promise((yes,no)=>{resolve=yes;reject=no;}); return {promise,resolve,reject};};
 it('explains missing required inputs without exposing upstream details',async()=>{
     const failure=Object.assign(new Error('private-token https://internal/source'),{data:{diagnostics:[{code:'missing_report_parameter',message:'private-token'}]}});
-    const view=await mount(vi.fn().mockRejectedValue(failure),{executeOnOpen:true});
+    const publish=vi.fn();
+    const view=await mount(vi.fn().mockRejectedValue(failure),{executeOnOpen:true},{},publish);
     try {
         expect(view.host.textContent).toContain('Enter all required report inputs');
         expect(view.host.textContent).toContain('both a start and an end date');
         expect(view.host.textContent).not.toContain('private-token');
         expect(view.host.textContent).not.toContain('internal/source');
+        expect(publish.mock.calls.at(-1)[0].status).toBe('error');
+        expect(publish.mock.calls.at(-1)[0].error).not.toContain('private-token');
     } finally {await view.close();}
 });
 async function mount(runReport, parameters={}, storeServices={}, onViewStateChange, actionContext={}) {
@@ -574,17 +577,30 @@ it('registers current predefined report state and normal Run without claiming a 
  const {invokeRegisteredControlAction}=await import('../../core/ui/controlActions.js');
  const layout=vi.spyOn(HTMLElement.prototype,'getClientRects').mockReturnValue([{width:100,height:20}]);
  const windowId='predefined-example';activeWindows.value=[{windowId,conversationId:'example-chat'}];
- const runner=vi.fn(async()=>result());
- const view=await mount(runner,{prefill:{from:'2026-10-01',to:'2026-11-01'}},{},undefined,{identity:{windowId},windowState:{windowId,windowForm:{from:'2026-10-02',to:'2026-11-01'}}});
+ const runner=vi.fn(async()=>({...result(),reportFill:{datasets:[{rows:[{count:7}]}]}}));
+ const publish=vi.fn();
+ const view=await mount(runner,{prefill:{from:'2026-10-01',to:'2026-11-01'}},{},publish,{identity:{windowId},windowState:{windowId,windowForm:{from:'2026-10-02',to:'2026-11-01'}}});
  document.body.append(view.host);
  try{
   const current=await invokeReportWindowAction(windowId,'getCurrent');
   expect(current.request.parameters.from).toBe('2026-10-01');expect(current.draftParameters.from).toBe('2026-10-02');
   expect(current.hasCompletedRun).toBe(false);expect(current.canSave).toBe(false);expect(runner).not.toHaveBeenCalled();
+  expect(publish.mock.calls.at(-1)[0]).toMatchObject({parameters:current.request.parameters,draftParameters:current.draftParameters,canRun:true,canSave:false,hasCompletedRun:false,runControlId:'report-run'});
   await expect(invokeReportWindowAction(windowId,'run')).rejects.toThrow(/unavailable/);
   await act(async()=>invokeRegisteredControlAction({windowId,controlId:'report-run'},'click'));
   expect(runner).toHaveBeenCalledTimes(1);
   expect((await invokeReportWindowAction(windowId,'getCurrent')).hasCompletedRun).toBe(true);
+  const completed=await invokeReportWindowAction(windowId,'getCurrent');
+  expect(completed.reportFill.datasets[0].rows).toEqual([{count:7}]);
+  completed.reportFill.datasets[0].rows[0].count=99;
+  expect((await invokeReportWindowAction(windowId,'getCurrent')).reportFill.datasets[0].rows[0].count).toBe(7);
+  expect(publish.mock.calls.at(-1)[0]).toMatchObject({status:'ready',hasCompletedRun:true,parameters:{from:'2026-10-01'},draftParameters:{from:'2026-10-02'}});
+  expect(publish.mock.calls.at(-1)[0]).not.toHaveProperty('reportFill');
+  await view.render({prefill:{from:'2026-10-03',to:'2026-11-01'}});
+  const changed=await invokeReportWindowAction(windowId,'getCurrent');
+  expect(changed.hasCompletedRun).toBe(false);
+  expect(changed.reportFill).toBeUndefined();
+  expect(runner).toHaveBeenCalledTimes(1);
  }finally{await view.close();view.host.remove();activeWindows.value=[];layout.mockRestore();}
  await expect(invokeReportWindowAction(windowId,'getCurrent')).rejects.toThrow(/not found/);
 });

@@ -71,7 +71,6 @@ export default function ReportResourceRuntime({container, context, onViewStateCh
     const displayedSection = visibleSectionId || selectedSectionId || result?.reportSpec?.blocks?.find(block=>block.kind==='tabGroupBlock')?.defaultSectionId || '';
     const displayedTitle = result?.reportSpec?.title || parameters.reportTitle || '';
     const displayedStatus = progress ? 'loading' : error ? 'error' : result ? 'ready' : 'idle';
-    useEffect(()=>{onViewStateChange?.({resourceUri:pin?.uri || '',title:displayedTitle,status:displayedStatus,activeSectionId:displayedSection});},[onViewStateChange,pin?.uri,displayedTitle,displayedStatus,displayedSection]);
     const metadataIdentity = JSON.stringify(pin);
     const getReport = services.reportStore?.getReport;
     const actionPin = useCallback(async (selectedPin, options) => {
@@ -170,18 +169,28 @@ export default function ReportResourceRuntime({container, context, onViewStateCh
             return printed.reportPrint;
         }});
     const windowId=context?.identity?.windowId || context?.windowState?.windowId;
+    const controls = reportResourceControls({canRun, canExport, result, progress});
     useEffect(()=>{
-        if(!windowId)return;
-        return registerReportWindowActions(windowId,{getCurrent:()=>({ok:true,windowId,
+        const current={ok:true,windowId,
             reportId:pin?.uri || '',reportName:displayedTitle,sourceKind:'resource',
             request:{parameters:structuredClone(parameters.prefill || {})},
             draftParameters:structuredClone(context?.windowState?.windowForm || parameters.prefill || {}),
             canRun:canRun&&typeof runReport==='function'&&!progress,canSave:false,
             hasCompletedRun:!!runResult,status:displayedStatus,activeSectionId:displayedSection,
+            error,progress,
             runControlId:parameters.showRunControl===false?'report-filter:apply':'report-run',
-        })});
-    },[windowId,identity,displayedTitle,displayedStatus,displayedSection,canRun,runReport,progress,runResult,context?.windowState?.windowForm]);
-    const controls = reportResourceControls({canRun, canExport, result, progress});
+            canExport:!controls.exportDisabled&&!output.busy,
+        };
+        onViewStateChange?.({resourceUri:current.reportId,title:current.reportName,status:current.status,activeSectionId:current.activeSectionId,
+            parameters:current.request.parameters,draftParameters:current.draftParameters,canRun:current.canRun,canSave:current.canSave,
+            canExport:current.canExport,hasCompletedRun:current.hasCompletedRun,runControlId:current.runControlId,error:current.error,progress:current.progress});
+        if(!windowId)return;
+        return registerReportWindowActions(windowId,{getCurrent:()=>{
+            const completed=runResult?.version===generation.current?runResult:null;
+            return structuredClone({...current,hasCompletedRun:!!completed,
+                ...(completed?{reportSpec:completed.result.reportSpec,reportFill:completed.result.reportFill}: {})});
+        }});
+    },[onViewStateChange,windowId,identity,displayedTitle,displayedStatus,displayedSection,canRun,runReport,error,progress,runResult,context?.windowState?.windowForm,controls.exportDisabled,output.busy]);
     const tables=parameters.reportCapabilities?.tableBlockSelection===true?result?.reportSpec?.blocks?.filter(block=>block.kind==='tableBlock'):undefined;
     return <section style={{padding:16}}>
         <h2>{result?.reportSpec?.title || parameters.reportTitle || "Selected report"}</h2>
