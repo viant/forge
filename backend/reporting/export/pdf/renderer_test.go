@@ -991,22 +991,41 @@ func TestRender_GeoFixtureShapeParity(t *testing.T) {
 	}))
 
 	// Top-region bars from the same canonical geo preview svg.
-	require.True(t, hasMatchingPathBounds(pageContent, 386, 522, 514, 514, "f"))
-	require.True(t, hasMatchingPathBounds(pageContent, 386, 504, 459.14286, 496, "f"))
-	require.True(t, hasMatchingPDFTextRun(pageRuns, pdfTextRun{
-		PageNumber: geoPageNumber,
-		Text:       "CA",
-		FontSize:   10,
-		X:          340,
-		Y:          513,
-	}))
-	require.True(t, hasMatchingPDFTextRun(pageRuns, pdfTextRun{
-		PageNumber: geoPageNumber,
-		Text:       "WA",
-		FontSize:   10,
-		X:          340,
-		Y:          495,
-	}))
+	const (
+		rankingX       = 36.0 + 304
+		rankingWidth   = 540.0 - 304
+		rankingTop     = 160.0
+		lineHeight     = 12.0
+		rowHeight      = lineHeight*2 + 12 + 6
+		pdfOriginY     = 792.0 - 108
+		rankingMaximum = 140.0
+	)
+	for index, region := range []struct {
+		label        string
+		displayValue string
+		rawValue     float64
+	}{
+		{label: "California", displayValue: "$140", rawValue: 140},
+		{label: "Washington", displayValue: "$80", rawValue: 80},
+	} {
+		t.Run(region.label, func(t *testing.T) {
+			rowY := rankingTop + float64(index)*rowHeight
+			barTop := pdfOriginY - (rowY + lineHeight*2 + 2)
+			barBottom := barTop - 8
+			fillWidth := rankingWidth * region.rawValue / rankingMaximum
+			require.True(t, hasMatchingPathBounds(pageContent, rankingX, barTop, rankingX+rankingWidth, barBottom, "f"), "missing full ranking track")
+			require.True(t, hasMatchingPathBounds(pageContent, rankingX, barTop, rankingX+fillWidth, barBottom, "f"), "missing proportional ranking fill")
+			for lineIndex, text := range []string{region.label, region.displayValue} {
+				require.Truef(t, hasMatchingPDFTextRun(pageRuns, pdfTextRun{
+					PageNumber: geoPageNumber,
+					Text:       text,
+					FontSize:   10,
+					X:          rankingX,
+					Y:          pdfOriginY - (rowY + float64(lineIndex)*lineHeight + 11),
+				}), "missing stacked ranking text %q", text)
+			}
+		})
+	}
 }
 
 func TestRender_AuthoredFixtureShapeParity(t *testing.T) {
