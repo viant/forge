@@ -7,8 +7,12 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -125,13 +129,17 @@ func TestPoolEffectiveConfigReplacesEndpointAndRejectsRemoval(t *testing.T) {
 }
 
 func TestPoolConfigChangeDuringCreationCannotPublishOldEndpoint(t *testing.T) {
+	output, err := os.Create(filepath.Join(t.TempDir(), "pool.log"))
+	require.NoError(t, err)
+	previousLog := log.Writer()
+	log.SetOutput(output)
+	t.Cleanup(func() { log.SetOutput(previousLog); _ = output.Close() })
 	started, release := make(chan struct{}), make(chan struct{})
 	a, callsA := poolConfigEndpoint(t, "A", nil, nil)
 	b, callsB := poolConfigEndpoint(t, "B", nil, nil)
 	provider := &changingEndpointProvider{endpoint: a.URL + "/mcp"}
 	var mgr *Manager
 	var once sync.Once
-	var err error
 	mgr, err = New(provider, WithClientFactory(func(ctx context.Context, conversation, name string) (mcpclient.Interface, error) {
 		client, err := mgr.newClient(ctx, conversation, name)
 		if err == nil {
@@ -148,10 +156,17 @@ func TestPoolConfigChangeDuringCreationCannotPublishOldEndpoint(t *testing.T) {
 	case err := <-done:
 		t.Fatalf("client creation stopped before barrier: %v", err)
 	}
-	provider.set(b.URL+"/mcp", false)
+	provider.set(b.URL+"/mcp?token=private-marker", false)
 	interim, err := mgr.Get(context.Background(), "", "owned")
 	require.Error(t, err)
 	require.Nil(t, interim)
+	_, repeated := mgr.Get(context.Background(), "", "owned")
+	require.Error(t, repeated)
+	recorded, readErr := os.ReadFile(output.Name())
+	require.NoError(t, readErr)
+	require.Equal(t, 1, strings.Count(string(recorded), "configuration_conflict"), "one warning per conflicting in-flight creation")
+	require.NotContains(t, string(recorded), "private-marker")
+	provider.set(b.URL+"/mcp", false)
 	close(release)
 	require.Error(t, <-done, "old endpoint client constructed but cannot publish after source changed")
 	latest, err := mgr.Get(context.Background(), "", "owned")
@@ -161,6 +176,13 @@ func TestPoolConfigChangeDuringCreationCannotPublishOldEndpoint(t *testing.T) {
 	require.Equal(t, "B", result.StructuredContent.(map[string]any)["endpoint"])
 	require.Zero(t, callsA.Load())
 	require.EqualValues(t, 1, callsB.Load())
+}
+
+func TestPoolConfigLogNamesDoNotExposeURLCredentials(t *testing.T) {
+	require.Equal(t, "https://fixture.invalid", poolConfigLogName("https://user:credential@fixture.invalid/private/path?token=value#secret"))
+	require.Equal(t, "mcp://sample/reader", poolConfigLogName("mcp://sample/reader?token=value#secret"))
+	require.Equal(t, "reader", poolConfigLogName("reader"))
+	require.True(t, strings.HasPrefix(poolConfigLogName("invalid\nname"), "source:"))
 }
 
 func TestEffectiveConfigFingerprintPreservesExactNumbersAndDefaultNormalization(t *testing.T) {

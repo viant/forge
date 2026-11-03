@@ -8,10 +8,25 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"sort"
 
 	cfg "github.com/viant/mcp/client/config"
 )
+
+// Names can be configured as URLs; never echo their credentials or query.
+func poolConfigLogName(name string) string {
+	parsed, err := url.Parse(name)
+	if err != nil || len(name) > 512 {
+		key := sha256.Sum256([]byte(name))
+		return fmt.Sprintf("source:%x", key[:6])
+	}
+	parsed.User, parsed.RawQuery, parsed.Fragment = nil, "", ""
+	if parsed.Scheme == "http" || parsed.Scheme == "https" {
+		parsed.Path, parsed.RawPath = "", ""
+	}
+	return parsed.String()
+}
 
 func effectiveConfigFingerprint(options *cfg.MCPClient) ([32]byte, error) {
 	if options == nil {

@@ -196,6 +196,7 @@ type entry struct {
 
 type createCall struct {
 	configFingerprint [32]byte
+	conflictLogged    bool
 	ready             chan struct{}
 	entry             *entry
 	err               error
@@ -528,13 +529,17 @@ func (m *Manager) Get(ctx context.Context, convID, serverName string) (result mc
 		m.mu.Lock()
 	}
 	if e := m.pool[key][serverName]; e != nil && e.client != nil && e.configFingerprint != fingerprint {
+		previousFingerprint := e.configFingerprint
 		stale := m.evictEntryLocked(key, serverName, e)
 		m.mu.Unlock()
+		log.Printf("[info][mcp-client-pool] configuration_replaced server=%q scope_type=%s previous=%x current=%x action=refresh", poolConfigLogName(serverName), poolScopeType(key, serverName), previousFingerprint[:6], fingerprint[:6])
 		closeClientBestEffort(stale)
 		m.mu.Lock()
 	}
 	if e := m.pool[key][serverName]; e != nil && e.client != nil && e.configFingerprint != fingerprint {
+		previousFingerprint := e.configFingerprint
 		m.mu.Unlock()
+		log.Printf("[warn][mcp-client-pool] configuration_conflict server=%q scope_type=%s previous=%x current=%x reason=concurrent_replacement action=reject", poolConfigLogName(serverName), poolScopeType(key, serverName), previousFingerprint[:6], fingerprint[:6])
 		return nil, errors.New("mcp manager: configuration changed during client replacement")
 	}
 	if e := m.pool[key][serverName]; e != nil && e.client != nil {
@@ -550,7 +555,13 @@ func (m *Manager) Get(ctx context.Context, convID, serverName string) (result mc
 		return client, nil
 	}
 	if call := m.inflight[key][serverName]; call != nil && call.configFingerprint != fingerprint {
+		warn := !call.conflictLogged
+		call.conflictLogged = true
+		previousFingerprint := call.configFingerprint
 		m.mu.Unlock()
+		if warn {
+			log.Printf("[warn][mcp-client-pool] configuration_conflict server=%q scope_type=%s previous=%x current=%x reason=creation_inflight action=reject", poolConfigLogName(serverName), poolScopeType(key, serverName), previousFingerprint[:6], fingerprint[:6])
+		}
 		return nil, errors.New("mcp manager: configuration changed during client creation")
 	}
 	if call := m.inflight[key][serverName]; call != nil {
