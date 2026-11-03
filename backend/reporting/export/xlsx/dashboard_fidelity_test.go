@@ -3,6 +3,7 @@ package xlsx
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -130,6 +131,48 @@ func TestPrintBorderCornersRetainBothSides(t *testing.T) {
 	opened, err := excelize.OpenReader(bytes.NewReader(data.Bytes()))
 	require.NoError(t, err)
 	require.NoError(t, opened.Close())
+}
+
+func TestPrintRectUsesOneBorderRepresentation(t *testing.T) {
+	for _, radius := range []float64{0, 6} {
+		t.Run(fmt.Sprintf("radius_%g", radius), func(t *testing.T) {
+			f := excelize.NewFile()
+			defer f.Close()
+			w := visualDashboardWriter{dashboardWriter: dashboardWriter{file: f}}
+			element := reportprint.Element{Kind: "rect", Box: reportprint.Box{X: 24, Y: 24, Width: 144, Height: 72}, FillColor: "#eef4ff", StrokeColor: "#123456", StrokeWidth: 1, Radius: radius}
+			require.NoError(t, w.printElement("Sheet1", element, 0))
+			first, last, _, _, err := printCells(element.Box, 0)
+			require.NoError(t, err)
+			for _, cell := range []string{first, last} {
+				id, err := f.GetCellStyle("Sheet1", cell)
+				require.NoError(t, err)
+				style, err := f.GetStyle(id)
+				require.NoError(t, err)
+				require.Equal(t, []string{"EEF4FF"}, style.Fill.Color)
+				hasBorder := false
+				for _, border := range style.Border {
+					hasBorder = hasBorder || border.Style != 0
+				}
+				require.Equal(t, radius == 0, hasBorder)
+			}
+			data, err := f.WriteToBuffer()
+			require.NoError(t, err)
+			entries := workbookZIP(t, data.Bytes())
+			svgCount := 0
+			for name, markup := range entries {
+				if strings.HasSuffix(name, ".svg") {
+					svgCount++
+					require.Contains(t, markup, `rx="6"`)
+					require.Contains(t, markup, `stroke="#123456"`)
+				}
+			}
+			if radius > 0 {
+				require.Equal(t, 1, svgCount)
+			} else {
+				require.Zero(t, svgCount)
+			}
+		})
+	}
 }
 
 func TestCenteredDonutPrintPair(t *testing.T) {

@@ -569,13 +569,13 @@ func (w *visualDashboardWriter) printElement(sheet string, element reportprint.E
 		if err = w.file.SetCellStyle(sheet, first, last, id); err != nil {
 			return err
 		}
-		if element.Kind == "rect" && excelChartColor(element.StrokeColor) != "" {
+		if element.Radius > 0 {
+			return w.printRoundedBorder(sheet, element, offset)
+		}
+		if excelChartColor(element.StrokeColor) != "" {
 			if err = w.printBorder(sheet, first, last, style, excelChartColor(element.StrokeColor)); err != nil {
 				return err
 			}
-		}
-		if element.Kind == "rect" && element.Radius > 0 {
-			return w.printRoundedBorder(sheet, element, offset)
 		}
 		return nil
 	default:
