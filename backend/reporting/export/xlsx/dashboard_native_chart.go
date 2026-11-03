@@ -463,6 +463,7 @@ func dashboardNativeChart(source string, block reportfill.Block) (*excelize.Char
 	chart.VaryColors = &vary
 	if resolved.Type == "horizontal_bar" || resolved.Type == "funnel_bar" {
 		chart.XAxis.ReverseOrder = true
+		chart.XAxis.TickLabelPosition = excelize.ChartTickLabelLow
 		chart.YAxis.TickLabelPosition = excelize.ChartTickLabelHigh
 	}
 	chart.YAxis.MajorGridLines = true
