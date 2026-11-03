@@ -196,6 +196,9 @@ type TableColumn struct {
 	Kind              string            `json:"kind,omitempty"`
 	Format            string            `json:"format,omitempty"`
 	Align             string            `json:"align,omitempty"`
+	Width             *float64          `json:"width,omitempty"`
+	MinWidth          *float64          `json:"minWidth,omitempty"`
+	Flex              bool              `json:"flex,omitempty"`
 	CellVisual        any               `json:"cellVisual,omitempty"`
 	Link              map[string]any    `json:"link,omitempty"`
 	RuntimeFilterable bool              `json:"runtimeFilterable,omitempty"`
@@ -1448,6 +1451,9 @@ func (r *ReportFill) Validate() error {
 				return fmt.Errorf("reportFill.blocks[%d].labelClamp.lines must be 1 or 2 for tableBlock", index)
 			}
 			for columnIndex, column := range block.Columns {
+				if (column.Width != nil && *column.Width < 48) || (column.MinWidth != nil && *column.MinWidth < 48) {
+					return fmt.Errorf("reportFill.blocks[%d].columns[%d] width/minWidth must be >= 48", index, columnIndex)
+				}
 				if column.LabelClamp != nil && column.LabelClamp.Lines != 1 && column.LabelClamp.Lines != 2 {
 					return fmt.Errorf("reportFill.blocks[%d].columns[%d].labelClamp.lines must be 1 or 2", index, columnIndex)
 				}
@@ -1458,6 +1464,9 @@ func (r *ReportFill) Validate() error {
 			{
 				keys := make([]string, len(block.Content.Columns))
 				for i, column := range block.Content.Columns {
+					if (column.Width != nil && *column.Width < 48) || (column.MinWidth != nil && *column.MinWidth < 48) {
+						return fmt.Errorf("reportFill.blocks[%d].content.columns[%d] width/minWidth must be >= 48", index, i)
+					}
 					keys[i] = column.Key
 				}
 				if err := tablemeta.Validate(nil, nil, block.Content.ColumnGroups, keys); err != nil {
