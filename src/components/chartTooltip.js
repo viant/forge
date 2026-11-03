@@ -107,7 +107,7 @@ export function buildChartTooltipEntries(chart,source=[],requestFilters) {
     const lines=config.lines?.map(line=>line.map(segment=>segment.input?resolveRequestLabelInput(segment.input,requestFilters):segment.text??values.get(segment.field)).join(''));
     entries.push({id:identity?JSON.stringify(identity):chartTooltipEntryId(category,seriesKey),category:String(category),seriesKey:String(seriesKey),seriesLabel:String(seriesLabel),rowCount:rows.length,fields,...(lines?{lines}:{})});
   };
-  if(type==='two-set-overlap') {const model=buildTwoSetOverlap(chart.twoSetOverlap,source);if(!model.empty)model.regions.forEach(region=>add(region.label,region.key,region.label,source));
+  if(type==='two-set-overlap') {const model=buildTwoSetOverlap(chart.twoSetOverlap,source);if(!model.empty)model.regions.forEach(region=>region.rows?region.rows.forEach(entry=>add(entry.label,`${region.key}:${entry.rowIndex}`,region.label,[entry.row])):add(region.label,region.key,region.label,source));
   } else if(type==='heatmap') {
     const model=buildHeatmap(chart.heatmap,source);
     model.cells.forEach(cell=>add(`${cell.rowValue} / ${cell.columnValue}`,chart.heatmap.valueField,chart.heatmap.valueField,cell.row?[cell.row]:[],[cell.rowValue,cell.columnValue,chart.heatmap.valueField]));

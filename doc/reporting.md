@@ -814,6 +814,7 @@ Current chart authoring coverage includes:
 
 - grouped and direct cartesian series
 - category pie/donut series
+- [two-set overlap](two-set-overlap.md), including opt-in labeled region lists with matching UI, paginated PDF and editable XLSX source values
 - per-series render type overrides
 - per-series axis assignment
 - per-series stack groups

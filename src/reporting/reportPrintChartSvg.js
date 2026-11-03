@@ -1315,9 +1315,25 @@ export function buildReportPrintChartSvg({
 export function buildReportPrintChartPages({ chartModel = {}, resolvedChart = {}, width = 680, maxHeight = 620, firstMaxHeight = maxHeight, rowLimit = 0 } = {}) {
   if(isScenarioType(resolvedChart?.kind)) return scenarioPrintPages(chartModel,resolvedChart,{width,maxHeight,firstMaxHeight});
   if(resolvedChart?.kind === "two-set-overlap") {
-    const graphic=twoSetOverlapSvg(buildTwoSetOverlap(chartModel.twoSetOverlap,resolvedChart.rows),width,{print:true,colors:resolveChartPalette(chartModel).map(printColor)});
-    if(width<240||graphic.height>maxHeight)return [{svg:'',width,height:0,diagnostics:[{code:'twoSetOverlapPrintLayoutUnavailable',severity:'warning',message:'Two-set overlap and complete labels need a wider or taller print area. Shorten labels or use a larger page.'}]}];
-    return [{...graphic,startNewPage:graphic.height>firstMaxHeight}];
+    const model=buildTwoSetOverlap(chartModel.twoSetOverlap,resolvedChart.rows);
+    const render=rows=>twoSetOverlapSvg(buildTwoSetOverlap(chartModel.twoSetOverlap,rows),width,{print:true,colors:resolveChartPalette(chartModel).map(printColor)});
+    const unavailable=()=>({svg:'',width,height:0,diagnostics:[{code:'twoSetOverlapPrintLayoutUnavailable',severity:'warning',message:'Two-set overlap and complete labels need a wider or taller print area. Shorten labels or use a larger page.'}]});
+    if(width<240)return [unavailable()];
+    if(model.config.mode!=='region-list'||model.empty){const graphic=render(resolvedChart.rows);return graphic.height>maxHeight?[unavailable()]:[{...graphic,startNewPage:graphic.height>firstMaxHeight}];}
+    const pages=[];let offset=0;
+    while(offset<resolvedChart.rows.length){
+      const available=pages.length?maxHeight:firstMaxHeight;
+      let count=0,graphic;
+      while(offset+count<resolvedChart.rows.length){const candidate=render(resolvedChart.rows.slice(offset,offset+count+1));if(candidate.height>available)break;graphic=candidate;count++;}
+      let startNewPage=pages.length>0;
+      if(!count){
+        startNewPage=true;
+        while(offset+count<resolvedChart.rows.length){const candidate=render(resolvedChart.rows.slice(offset,offset+count+1));if(candidate.height>maxHeight)break;graphic=candidate;count++;}
+      }
+      if(!count)return [...pages,unavailable()];
+      pages.push({...graphic,startNewPage,sourceRowOffset:offset,sourceRowCount:count});offset+=count;
+    }
+    return pages;
   }
   if(resolvedChart?.kind === "category-range") return categoryRangePrintPages(buildCategoryRange(chartModel.categoryRange,resolvedChart.rows),{width,maxHeight,firstMaxHeight});
   if(resolvedChart?.kind === "heatmap") return heatmapPrintPages(buildHeatmap(chartModel.heatmap,resolvedChart.rows),{width,maxHeight,firstMaxHeight});

@@ -27,3 +27,19 @@ const invalid=structuredClone(spec);delete invalid.blocks.find(b=>b.id==='device
 assert.throws(()=>normalizeReportBuilderChartSpec({...fixture.chartSpec,stacked:true}));
 assert.throws(()=>buildReportFillFromReportSpec(spec,{primary:{rows:[...fixture.rows,...fixture.rows]}}),/at most one scalar row/);
 console.log('Two-set overlap authored document → spec → fill → typed tooltip → print passed.');
+const listChart=fixture.regionListChartSpec;
+const listBlock=buildReportDocumentChartBlock({id:'device-list',title:'Device groups',chartSpec:listChart});
+const listDocument=buildReportBuilderReportDocument({container:{id:'devices',dataSourceRef:config.dataSourceRef},config:{...config,dimensions:[{id:'deviceGroup',key:'deviceGroup',label:'Device group'}],measures:listChart.yFields.map(key=>({id:key,key,label:key}))},state:{viewMode:'chart',chartSpec:listChart,selectedDimensions:['deviceGroup'],selectedMeasures:listChart.yFields},additionalBlocks:[listBlock]});
+const listSpec=lowerReportDocumentToReportSpec(listDocument,{includePrimaryBlocks:false});
+assert.deepEqual(validateReportSpec(listSpec),{valid:true,errors:[]});
+const listRows=Array.from({length:12},(_,index)=>({...fixture.regionListRows[index%3],deviceGroup:`Group ${index}`}));
+const listFill=buildReportFillFromReportSpec(listSpec,{primary:{rows:listRows}});
+assert.deepEqual(validateReportFill(listFill),{valid:true,errors:[]});
+const listContent=listFill.blocks.find(block=>block.id==='device-list').content;
+assert.deepEqual(listContent.resolvedChart.rows,listRows);
+for(const width of [320,680]){
+ const pages=buildReportPrintChartPages({...listContent,width,maxHeight:650,firstMaxHeight:100});
+ assert.ok(pages.length>1);assert.equal(pages[0].startNewPage,true);
+ assert.equal(pages.reduce((sum,page)=>sum+page.sourceRowCount,0),listRows.length);
+ for(const page of pages){assert.ok(page.height<=650);assert.ok(page.svg);assert.ok(!page.diagnostics?.length);}
+}

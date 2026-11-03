@@ -46,3 +46,27 @@ outside its contract.
 Run `npm run test:two-set-overlap` and
 `go test ./backend/reporting/export/xlsx -run TestTwoSetOverlapCanonicalExports`.
 The maintained theme-preview ChartSpecimen includes both neutral examples.
+
+## Labeled region lists
+
+Opt into `twoSetOverlap.mode: "region-list"` and declare `rowLabelField` to
+show every supplied row in each of the three regions. The default still accepts
+at most one scalar row. Each region independently binds `valueField`, optional
+`secondaryField` (for example a producer-authored percentage), and optional
+`frequencyField` with `frequencyFormat`. These all use the existing numeric
+format contract, including zero, null and missing states. No percentage,
+frequency, total or aggregation is inferred.
+
+Rows retain input order and identity. An authored “All devices” row and child
+rows are all displayed; repeated labels remain separate rows. The neutral
+`regionListChartSpec` and `regionListRows` example includes both cases. The label
+field participates in dataset selection; numeric metric fields remain measures.
+
+The same model and SVG supply the UI and canonical print. Wide containers use
+three lanes linked to the fixed circles; narrow containers stack those lanes.
+The accessible table includes each row's region, label and all declared values.
+Row tooltip inspection retains row identity even when labels repeat. Print
+continues complete source rows on subsequent pages, repeating the fixed diagram
+and region headings. An individual row whose complete labels cannot fit a page
+uses the existing explicit layout diagnostic. XLSX retains that print appearance
+and the existing editable source-data sheets, preserving all source values.

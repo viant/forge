@@ -3,6 +3,7 @@ package xlsx
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	pdfreader "github.com/ledongthuc/pdf"
 	"github.com/stretchr/testify/require"
 	reportpdf "github.com/viant/forge/backend/reporting/export/pdf"
@@ -21,13 +22,28 @@ func TestTwoSetOverlapCanonicalExports(t *testing.T) {
 	require.NoError(t, err)
 	var fixture map[string]any
 	require.NoError(t, json.Unmarshal(raw, &fixture))
-	for _, frequency := range []bool{false, true} {
-		t.Run(map[bool]string{false: "counts", true: "frequency"}[frequency], func(t *testing.T) {
+	for _, mode := range []string{"counts", "frequency", "region-list"} {
+		t.Run(mode, func(t *testing.T) {
+			frequency := mode == "frequency"
 			chartSpec := fixture["chartSpec"].(map[string]any)
 			rows := fixture["rows"]
 			if frequency {
 				chartSpec = fixture["frequencyChartSpec"].(map[string]any)
 				rows = fixture["frequencyRows"]
+			}
+			if mode == "region-list" {
+				chartSpec = fixture["regionListChartSpec"].(map[string]any)
+				source := fixture["regionListRows"].([]any)
+				list := append([]any{}, source...)
+				for index := 0; index < 12; index++ {
+					row := map[string]any{}
+					for key, value := range source[index%len(source)].(map[string]any) {
+						row[key] = value
+					}
+					row["deviceGroup"] = fmt.Sprintf("Group %d", index)
+					list = append(list, row)
+				}
+				rows = list
 			}
 			chart := map[string]any{"type": "two-set-overlap", "twoSetOverlap": chartSpec["twoSetOverlap"], "xAxis": map[string]any{"dataKey": chartSpec["xField"]}, "series": map[string]any{"values": []any{map[string]any{"value": chartSpec["xField"], "label": "Value", "type": "bar"}}}}
 			artifacts := printExample(t, func(spec map[string]any, inputs map[string]json.RawMessage) {
@@ -59,6 +75,12 @@ func TestTwoSetOverlapCanonicalExports(t *testing.T) {
 				expected = "4.12 checks per device"
 			}
 			require.Contains(t, strings.Join(strings.Fields(string(text)), " "), expected)
+			if mode == "region-list" {
+				require.Greater(t, reader.NumPage(), 1)
+				for _, label := range []string{"All devices", "Bench devices", "Group 11", "1.25 checks per device", "Unavailable"} {
+					require.Contains(t, strings.Join(strings.Fields(string(text)), " "), label)
+				}
+			}
 			data, err := RenderDashboardWithPrint(artifacts.ReportFill, artifacts.ReportPrint)
 			require.NoError(t, err)
 			book, err := excelize.OpenReader(bytes.NewReader(data))
@@ -70,8 +92,10 @@ func TestTwoSetOverlapCanonicalExports(t *testing.T) {
 				if strings.HasSuffix(name, ".svg") {
 					svgs++
 					require.Contains(t, content, "<circle")
-					for _, part := range strings.Fields(expected) {
-						require.Contains(t, content, part)
+					if mode != "region-list" {
+						for _, part := range strings.Fields(expected) {
+							require.Contains(t, content, part)
+						}
 					}
 				}
 			}
@@ -83,6 +107,13 @@ func TestTwoSetOverlapCanonicalExports(t *testing.T) {
 				for _, row := range rows {
 					all += strings.Join(row, " ") + "\n"
 				}
+			}
+			if mode == "region-list" {
+				require.Contains(t, all, "All devices")
+				require.Contains(t, all, "Bench devices")
+				require.Contains(t, all, "Group 11")
+				require.Contains(t, all, "checksB")
+				require.Contains(t, all, "1.25")
 			}
 			if frequency {
 				require.Contains(t, all, "checksBoth")

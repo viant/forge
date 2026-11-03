@@ -1703,7 +1703,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                     ) : centerState.resolved && (showZeroDataMessage||showEmptyDataMessage||showSelectionMessage) ? (
                         <EmptyDonutCenter center={centerState.resolved} typography={chartTypography} message={showSelectionMessage?"No slices selected.":showZeroDataMessage?"All slice values are zero.":"No slice data."}/>
                     ) : type === "two-set-overlap" ? (
-                        <TwoSetOverlap colors={palette} textSize={chartTypography.smallSize} lineHeight={chartTypography.smallLineHeight} config={chart.twoSetOverlap} rows={chartData} width={chartSize.width || 680} onInspect={chart.tooltip?key=>inspectTooltip(chart.twoSetOverlap[key].label,key):undefined}/>
+                        <TwoSetOverlap colors={palette} textSize={chartTypography.smallSize} lineHeight={chartTypography.smallLineHeight} config={chart.twoSetOverlap} rows={chartData} width={chartSize.width || 680} onInspect={chart.tooltip?(key,rowIndex)=>rowIndex===undefined?inspectTooltip(chart.twoSetOverlap[key].label,key):inspectTooltip(String(readChartDataValue(chartData[Number(rowIndex)],chart.twoSetOverlap.rowLabelField)??'Unavailable'),`${key}:${rowIndex}`):undefined}/>
                     ) : type === "category-range" ? (
                         <CategoryRange onInspect={chart.tooltip?(rowIndex,seriesIndex)=>inspectTooltip(readChartDataValue(chartData[rowIndex],chart.categoryRange.categoryField),seriesIndex):undefined} config={chart.categoryRange} rows={chartData} width={chartSize.width || 680} onSelect={interactiveDatumSelection?onDatumSelect:undefined}/>
                     ) : isScenarioType(type) ? (

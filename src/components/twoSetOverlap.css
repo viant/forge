@@ -1,5 +1,5 @@
 .forge-two-set-overlap {width:100%;color:var(--forge-chart-text,#293742);}
 .forge-two-set-overlap svg {display:block;max-width:100%;font:inherit;letter-spacing:inherit;}
 .forge-two-set-overlap text {font:inherit;letter-spacing:inherit;fill:currentColor;}
-.forge-two-set-overlap [data-overlap-region]:focus-visible {outline:var(--forge-focus-width,2px) solid var(--forge-focus-color,#137cbd);outline-offset:var(--forge-focus-offset,2px);}
-.forge-overlap-accessible-table {position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;}
+.forge-two-set-overlap [data-overlap-region]:focus-visible, .forge-two-set-overlap [data-overlap-row]:focus-visible {outline:var(--forge-focus-width,2px) solid var(--forge-focus-color,#137cbd);outline-offset:var(--forge-focus-offset,2px);}
+.forge-overlap-accessible-table {display:block;position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;}

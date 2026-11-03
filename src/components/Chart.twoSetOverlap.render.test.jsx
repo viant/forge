@@ -39,3 +39,15 @@ it('runs native authored model to UI, accessible fallback/raw table, filter refr
  const table=[...host.querySelectorAll('button')].find(b=>b.textContent==='Table');expect(table).toBeTruthy();await act(async()=>table.click());expect(host.textContent).toContain('monitoringAOnlyPercent');
  }finally{await act(async()=>root.unmount());host.remove();}
 });
+it('retains every labeled source row independently in all three region lists and accessible table',async()=>{
+ const config=fixture.regionListChartSpec.twoSetOverlap,rows=fixture.regionListRows;
+ const model=buildTwoSetOverlap(config,rows);
+ expect(model.regions[0].rows.map(entry=>entry.row)).toEqual(rows);
+ expect(model.regions[0].rows.map(entry=>entry.label)).toEqual(['All devices','Bench devices','Bench devices']);
+ expect(model.regions[1].rows.map(entry=>entry.primary.displayValue)).toEqual(['610','Unavailable','7']);
+ expect(model.regions[2].rows[1].frequency.displayValue).toBe('1.25 checks per device');
+ for(const width of [320,680]){const graphic=twoSetOverlapSvg(model,width);expect(graphic.svg.match(/<circle/g)).toHaveLength(2);expect(graphic.svg).toContain('All devices');expect(graphic.svg).toContain('Unavailable');expect(graphic.svg).toContain('3.75 checks per device');}
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;const host=document.createElement('div'),root=createRoot(host);document.body.append(host);
+ try{const container=buildExplicitReportBuilderChartContainer({}, {}, {},{...fixture.regionListChartSpec,tooltip:{fields:[{field:'both',label:'Devices in both',format:'number'}]}});await act(async()=>root.render(<Chart container={container} context={{signals:{collection:{value:rows},control:{value:{}},metrics:{value:{}},windowForm:{value:{}}}}}/>));expect(host.querySelectorAll('tbody tr')).toHaveLength(9);expect(host.querySelector('table').textContent).toContain('Frequency');expect(host.querySelector('table').textContent).toContain('1.25 checks per device');await act(async()=>host.querySelector('[data-overlap-region="intersection"] [data-overlap-row="2"]').dispatchEvent(new FocusEvent('focusin',{bubbles:true})));expect(host.querySelector('.forge-chart-tooltip-inspector').textContent).toContain('7');expect(host.querySelector('select[aria-label="Inspect chart details"]').value).toContain('intersection:2');}finally{await act(async()=>root.unmount());host.remove();}
+ expect(()=>buildTwoSetOverlap({...config,mode:undefined},rows)).toThrow('region-list requires rowLabelField');
+});

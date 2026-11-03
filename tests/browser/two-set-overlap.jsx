@@ -12,7 +12,7 @@ import '../../src/components/foundations.css';
 
 // Independent public synthetic counts; no application fixture or query.
 const variant=new URLSearchParams(location.search).get('case');
-const config=structuredClone(fixture.chartSpec),rows=structuredClone(fixture.rows);
+const config=structuredClone(variant==='list'?fixture.regionListChartSpec:fixture.chartSpec),rows=structuredClone(variant==='list'?fixture.regionListRows:fixture.rows);
 if(variant==='long')for(const region of Object.values(config.twoSetOverlap)){region.label+=' — laboratory instruments undergoing scheduled verification in the northern equipment room';region.format={grouping:true,decimals:2,suffix:' independently measured devices'};}
 if(variant==='extreme')Object.assign(rows[0],{monitoringAOnly:Number.MAX_SAFE_INTEGER,both:0,monitoringBOnly:-987654321012.25,bothPercent:null});
 const context=data=>({signals:{collection:signal(data),control:signal({}),metrics:signal({}),windowForm:signal({})}});

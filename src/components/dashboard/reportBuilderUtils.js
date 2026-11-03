@@ -518,8 +518,8 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
     const heatmap = type === "heatmap" ? normalizeHeatmap(chartSpec.heatmap) : null;
     if(isScenarioType(type) && ["seriesField","seriesOptions","metricSelection","layout","stacked","tooltip","center","sliceLabel"].some(key=>chartSpec[key]!=null))throw new Error("Scenario charts use their own declared state, fields and metric contracts.");
     const scenario = isScenarioType(type) ? normalizeScenario(type,chartSpec[scenarioKey(type)]) : null;
-    const xField = (overlap ? overlapFields(overlap)[0] : null) || (scenario ? scenarioFields(type,scenario)[0] : null) || categoryRange?.categoryField || heatmap?.rowField || normalizeChartSpecValue(chartSpec.xField);
-    const yFields = overlap ? overlapFields(overlap) : scenario ? [type === "routing-impact" ? scenario.amountField : (scenario.metrics[0].field || scenario.metrics[0].numeratorField)] : categoryRange ? categoryRangeFields(categoryRange) : heatmap ? [heatmap.valueField] : normalizeStringArray(chartSpec.yFields || chartSpec.yField).filter(Boolean);
+    const xField = (overlap ? overlap.rowLabelField || overlapFields(overlap)[0] : null) || (scenario ? scenarioFields(type,scenario)[0] : null) || categoryRange?.categoryField || heatmap?.rowField || normalizeChartSpecValue(chartSpec.xField);
+    const yFields = overlap ? overlapFields(overlap).filter(field=>field!==overlap.rowLabelField) : scenario ? [type === "routing-impact" ? scenario.amountField : (scenario.metrics[0].field || scenario.metrics[0].numeratorField)] : categoryRange ? categoryRangeFields(categoryRange) : heatmap ? [heatmap.valueField] : normalizeStringArray(chartSpec.yFields || chartSpec.yField).filter(Boolean);
     const seriesField = normalizeChartSpecValue(chartSpec.seriesField);
     const seriesOptions = normalizeChartSeriesOptions(chartSpec.seriesOptions);
     const categoryLabel = normalizeChartCategoryLabel(chartSpec.categoryLabel);
@@ -855,7 +855,8 @@ export function validateReportBuilderChartSpec(config = {}, chartSpec = null, co
     const fields = chartFieldIndex(columns);
     chartTooltipFields(normalized.tooltip).forEach((field,index) => {if(!fields.has(field))errors.push({field:`tooltip.fields.${index}.field`,code:"missingField"});});
     if(normalized.type === "two-set-overlap") {
-        for(const [index,key] of overlapFields(normalized.twoSetOverlap).entries()) {const field=fields.get(key);if(!field||field.kind!=="measure")errors.push({field:`yFields.${index}`,code:!field?"missingField":"wrongKind"});}
+        for(const [index,key] of normalized.yFields.entries()) {const field=fields.get(key);if(!field||field.kind!=="measure")errors.push({field:`yFields.${index}`,code:!field?"missingField":"wrongKind"});}
+        if(normalized.twoSetOverlap.rowLabelField&&!fields.has(normalized.twoSetOverlap.rowLabelField))errors.push({field:'twoSetOverlap.rowLabelField',code:'missingField'});
         return {valid:errors.length===0,errors};
     }
     const xField = normalized.xField ? fields.get(normalized.xField) : null;

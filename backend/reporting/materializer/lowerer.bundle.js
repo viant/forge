@@ -50862,35 +50862,43 @@ ${indent}${end}`;
   // src/components/twoSetOverlap.js
   var overlapRegions = ["leftOnly", "intersection", "rightOnly"];
   var string3 = { type: "string", minLength: 1 };
-  var regionSchema = { type: "object", additionalProperties: false, required: ["label", "valueField"], properties: { label: string3, valueField: string3, secondaryField: string3, format: numericDisplayFormatSchema, secondaryFormat: numericDisplayFormatSchema } };
-  var twoSetOverlapSchema = { type: "object", additionalProperties: false, required: overlapRegions, properties: Object.fromEntries(overlapRegions.map((key2) => [key2, regionSchema])) };
+  var regionSchema = { type: "object", additionalProperties: false, required: ["label", "valueField"], properties: { label: string3, valueField: string3, secondaryField: string3, format: numericDisplayFormatSchema, secondaryFormat: numericDisplayFormatSchema, frequencyField: string3, frequencyFormat: numericDisplayFormatSchema } };
+  var twoSetOverlapSchema = { type: "object", additionalProperties: false, required: overlapRegions, properties: { ...Object.fromEntries(overlapRegions.map((key2) => [key2, regionSchema])), mode: { enum: ["region-list"] }, rowLabelField: string3 }, allOf: [{ if: { required: ["mode"] }, then: { required: ["rowLabelField"] } }, { if: { required: ["rowLabelField"] }, then: { required: ["mode"] } }] };
   function overlapFields(config) {
-    return [...new Set(overlapRegions.flatMap((key2) => [config[key2].valueField, config[key2].secondaryField].filter(Boolean)))];
+    return [.../* @__PURE__ */ new Set([...config.rowLabelField ? [config.rowLabelField] : [], ...overlapRegions.flatMap((key2) => [config[key2].valueField, config[key2].secondaryField, config[key2].frequencyField].filter(Boolean))])];
   }
   function normalizeTwoSetOverlap(input) {
-    if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some((key2) => !overlapRegions.includes(key2))) throw Error("Two-set overlap requires three declared regions.");
+    if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some((key2) => ![...overlapRegions, "mode", "rowLabelField"].includes(key2))) throw Error("Two-set overlap requires three declared regions.");
+    if (input.mode !== void 0 && input.mode !== "region-list") throw Error("Unsupported two-set overlap mode.");
+    if (input.mode === "region-list" ? typeof input.rowLabelField !== "string" || !input.rowLabelField.trim() : input.rowLabelField !== void 0) throw Error("Two-set overlap region-list requires rowLabelField.");
     for (const key2 of overlapRegions) {
       const region = input[key2];
       if (!region || typeof region !== "object" || Array.isArray(region) || Object.keys(region).some((k2) => !Object.hasOwn(regionSchema.properties, k2))) throw Error(`Invalid two-set overlap region: ${key2}`);
-      for (const field2 of ["label", "valueField", ...region.secondaryField !== void 0 ? ["secondaryField"] : []]) if (typeof region[field2] !== "string" || !region[field2].trim()) throw Error(`Two-set overlap ${key2}.${field2} is required.`);
+      for (const field2 of ["label", "valueField", ...["secondaryField", "frequencyField"].filter((field3) => region[field3] !== void 0)]) if (typeof region[field2] !== "string" || !region[field2].trim()) throw Error(`Two-set overlap ${key2}.${field2} is required.`);
       if (region.secondaryFormat && !region.secondaryField) throw Error("Secondary format requires a secondary field.");
+      if (region.frequencyFormat && !region.frequencyField) throw Error("Frequency format requires a frequency field.");
       validateNumericDisplayFormat(region.format);
       validateNumericDisplayFormat(region.secondaryFormat);
+      validateNumericDisplayFormat(region.frequencyFormat);
     }
     return JSON.parse(JSON.stringify(input));
   }
   function buildTwoSetOverlap(input, rows = []) {
     const config = normalizeTwoSetOverlap(input);
-    if (!Array.isArray(rows) || rows.length > 1) throw Error("Two-set overlap requires at most one scalar row.");
+    if (!Array.isArray(rows) || config.mode !== "region-list" && rows.length > 1) throw Error("Two-set overlap requires at most one scalar row.");
     const row = rows[0];
-    const scalar = (field2, format2) => {
-      const value = readChartDataValue(row, field2);
+    const scalar = (field2, format2, row2) => {
+      const value = readChartDataValue(row2, field2);
       if (value !== void 0 && value !== null && (typeof value !== "number" || !Number.isFinite(value))) throw Error("Two-set overlap values must be finite numbers or null.");
       return { field: field2, value, state: value === void 0 ? "missing" : value === null ? "null" : "value", displayValue: formatRangeValue(value, { format: format2 }) };
     };
-    return { config, empty: !row, regions: overlapRegions.map((key2) => {
+    const values = (row2) => (region) => ({ primary: scalar(region.valueField, region.format, row2), ...region.secondaryField ? { secondary: scalar(region.secondaryField, region.secondaryFormat, row2) } : {}, ...region.frequencyField ? { frequency: scalar(region.frequencyField, region.frequencyFormat, row2) } : {} });
+    return { config, empty: !rows.length, regions: overlapRegions.map((key2) => {
       const region = config[key2];
-      return { key: key2, label: region.label, primary: scalar(region.valueField, region.format), ...region.secondaryField ? { secondary: scalar(region.secondaryField, region.secondaryFormat) } : {} };
+      return { key: key2, label: region.label, ...config.mode === "region-list" ? { rows: rows.map((row2, rowIndex) => {
+        const label = readChartDataValue(row2, config.rowLabelField);
+        return { rowIndex, row: row2, label: label == null ? "Unavailable" : String(label), ...values(row2)(region) };
+      }) } : values(row)(region) };
     }) };
   }
   var escape5 = (value) => String(value).replace(/[&<>"']/g, (c3) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c3]);
@@ -50923,19 +50931,33 @@ ${indent}${end}`;
       return [...lines2, line].filter(Boolean);
     };
     const positions = [cx - offset - r2 * 0.48, cx, cx + offset + r2 * 0.48], zoneWidth = r2 * 0.84;
-    const regionLines = model.regions.map((region) => [...wrap2(region.label, zoneWidth), ...wrap2(region.primary.displayValue, zoneWidth), ...region.secondary ? wrap2(region.secondary.displayValue, zoneWidth) : []]);
-    const direct = !narrow && regionLines.every((lines2) => lines2.length * lineHeight <= r2 * 1.35) && model.regions.every((region) => {
-      var _a5;
-      return [region.label, region.primary.displayValue, ((_a5 = region.secondary) == null ? void 0 : _a5.displayValue) || ""].every((value) => String(value).split(/\s+/u).every((word) => measureChartText(word, textSize) <= zoneWidth));
+    const list = model.config.mode === "region-list";
+    const regionLines = model.regions.map((region) => list ? [] : [...wrap2(region.label, zoneWidth), ...wrap2(region.primary.displayValue, zoneWidth), ...region.secondary ? wrap2(region.secondary.displayValue, zoneWidth) : [], ...region.frequency ? wrap2(region.frequency.displayValue, zoneWidth) : []]);
+    const direct = !list && !narrow && regionLines.every((lines2) => lines2.length * lineHeight <= r2 * 1.35) && model.regions.every((region) => {
+      var _a5, _b;
+      return [region.label, region.primary.displayValue, ((_a5 = region.secondary) == null ? void 0 : _a5.displayValue) || "", ((_b = region.frequency) == null ? void 0 : _b.displayValue) || ""].every((value) => String(value).split(/\s+/u).every((word) => measureChartText(word, textSize) <= zoneWidth));
     });
     let bottom = diagramHeight + 24;
     const groups = model.regions.map((region, i3) => {
-      const lines2 = direct ? regionLines[i3] : [...wrap2(`${i3 + 1}. ${region.label}`, narrow ? width - 32 : width / 3 - 24), ...wrap2(region.primary.displayValue, narrow ? width - 32 : width / 3 - 24), ...region.secondary ? wrap2(region.secondary.displayValue, narrow ? width - 32 : width / 3 - 24) : []];
+      var _a5, _b;
+      const budget = narrow ? width - 32 : width / 3 - 24;
+      const lines2 = list ? [...wrap2(`${i3 + 1}. ${region.label}`, budget), ...region.rows.flatMap((entry) => [...wrap2(entry.label, budget), ...wrap2(entry.primary.displayValue, budget), ...entry.secondary ? wrap2(entry.secondary.displayValue, budget) : [], ...entry.frequency ? wrap2(entry.frequency.displayValue, budget) : [], ""])] : direct ? regionLines[i3] : [...wrap2(`${i3 + 1}. ${region.label}`, narrow ? width - 32 : width / 3 - 24), ...wrap2(region.primary.displayValue, narrow ? width - 32 : width / 3 - 24), ...region.secondary ? wrap2(region.secondary.displayValue, narrow ? width - 32 : width / 3 - 24) : [], ...region.frequency ? wrap2(region.frequency.displayValue, narrow ? width - 32 : width / 3 - 24) : []];
       const x2 = direct ? positions[i3] : narrow ? 16 : width * (i3 + 0.5) / 3, y4 = direct ? cy - (lines2.length - 1) * lineHeight / 2 : narrow ? bottom : diagramHeight + 24;
       if (!direct) bottom = narrow ? y4 + lines2.length * lineHeight + 24 : Math.max(bottom, y4 + lines2.length * lineHeight + 24);
-      const description = `${region.label}: ${region.primary.displayValue}${region.secondary ? ", " + region.secondary.displayValue : ""}`;
-      const content = `${direct ? "" : `<text x="${positions[i3]}" y="${cy + textSize * 0.4}" text-anchor="middle">${i3 + 1}</text>`}${lines2.map((line, j) => `<text x="${x2}" y="${y4 + j * lineHeight}" text-anchor="${!direct && narrow ? "start" : "middle"}">${escape5(line)}</text>`).join("")}`;
-      return print ? content : `<g data-overlap-region="${region.key}" tabindex="0" role="img" aria-label="${escape5(description)}"><title>${escape5(description)}</title>${content}</g>`;
+      const description = list ? `${region.label}: ${region.rows.map((entry) => `${entry.label}: ${entry.primary.displayValue}${entry.secondary ? ", " + entry.secondary.displayValue : ""}${entry.frequency ? ", " + entry.frequency.displayValue : ""}`).join("; ")}` : `${region.label}: ${region.primary.displayValue}${region.secondary ? ", " + region.secondary.displayValue : ""}${region.frequency ? ", " + region.frequency.displayValue : ""}`;
+      let content = `${direct ? "" : `<text x="${positions[i3]}" y="${cy + textSize * 0.4}" text-anchor="middle">${i3 + 1}</text>`}${lines2.map((line, j) => `<text x="${x2}" y="${y4 + j * lineHeight}" text-anchor="${!direct && narrow ? "start" : "middle"}">${escape5(line)}</text>`).join("")}`;
+      if (list && !print) {
+        const heading = wrap2(`${i3 + 1}. ${region.label}`, budget);
+        let cursor = heading.length;
+        content = `<text x="${positions[i3]}" y="${cy + textSize * 0.4}" text-anchor="middle">${i3 + 1}</text>` + heading.map((line, j) => `<text x="${x2}" y="${y4 + j * lineHeight}" text-anchor="${narrow ? "start" : "middle"}">${escape5(line)}</text>`).join("");
+        for (const entry of region.rows) {
+          const entryLines = [...wrap2(entry.label, budget), ...wrap2(entry.primary.displayValue, budget), ...entry.secondary ? wrap2(entry.secondary.displayValue, budget) : [], ...entry.frequency ? wrap2(entry.frequency.displayValue, budget) : []];
+          const description2 = [entry.label, entry.primary.displayValue, (_a5 = entry.secondary) == null ? void 0 : _a5.displayValue, (_b = entry.frequency) == null ? void 0 : _b.displayValue].filter((value) => value !== void 0).join(", ");
+          content += `<g data-overlap-row="${entry.rowIndex}" tabindex="0" role="img" aria-label="${escape5(description2)}"><title>${escape5(description2)}</title>${entryLines.map((line, j) => `<text x="${x2}" y="${y4 + (cursor + j) * lineHeight}" text-anchor="${narrow ? "start" : "middle"}">${escape5(line)}</text>`).join("")}</g>`;
+          cursor += entryLines.length + 1;
+        }
+      }
+      return print ? content : `<g data-overlap-region="${region.key}" ${list ? 'role="group"' : 'tabindex="0" role="img"'} aria-label="${escape5(list ? region.label : description)}"><title>${escape5(list ? region.label : description)}</title>${content}</g>`;
     }).join("");
     const note = wrap2("Fixed circles; area does not encode quantity.", width - 24), height = bottom + note.length * lineHeight;
     return { svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" ${print ? "" : 'role="group" aria-label="Two-set overlap; fixed circles do not encode quantity"'}><circle cx="${cx - offset}" cy="${cy}" r="${r2}" fill="${color(0)}" fill-opacity="0.16" stroke="${color(0)}"/><circle cx="${cx + offset}" cy="${cy}" r="${r2}" fill="${color(1)}" fill-opacity="0.16" stroke="${color(1)}"/>${groups}${note.map((line, i3) => `<text x="12" y="${bottom + i3 * lineHeight}">${escape5(line)}</text>`).join("")}</svg>`, width, height };
@@ -51050,7 +51072,7 @@ ${indent}${end}`;
     };
     if (type === "two-set-overlap") {
       const model = buildTwoSetOverlap(chart.twoSetOverlap, source);
-      if (!model.empty) model.regions.forEach((region) => add(region.label, region.key, region.label, source));
+      if (!model.empty) model.regions.forEach((region) => region.rows ? region.rows.forEach((entry) => add(entry.label, `${region.key}:${entry.rowIndex}`, region.label, [entry.row])) : add(region.label, region.key, region.label, source));
     } else if (type === "heatmap") {
       const model = buildHeatmap(chart.heatmap, source);
       model.cells.forEach((cell) => add(`${cell.rowValue} / ${cell.columnValue}`, chart.heatmap.valueField, chart.heatmap.valueField, cell.row ? [cell.row] : [], [cell.rowValue, cell.columnValue, chart.heatmap.valueField]));
@@ -54802,8 +54824,8 @@ ${indent}${end}`;
     const heatmap = type === "heatmap" ? normalizeHeatmap(chartSpec.heatmap) : null;
     if (isScenarioType(type) && ["seriesField", "seriesOptions", "metricSelection", "layout", "stacked", "tooltip", "center", "sliceLabel"].some((key2) => chartSpec[key2] != null)) throw new Error("Scenario charts use their own declared state, fields and metric contracts.");
     const scenario = isScenarioType(type) ? normalizeScenario(type, chartSpec[scenarioKey(type)]) : null;
-    const xField = (overlap ? overlapFields(overlap)[0] : null) || (scenario ? scenarioFields(type, scenario)[0] : null) || (categoryRange == null ? void 0 : categoryRange.categoryField) || (heatmap == null ? void 0 : heatmap.rowField) || normalizeChartSpecValue(chartSpec.xField);
-    const yFields = overlap ? overlapFields(overlap) : scenario ? [type === "routing-impact" ? scenario.amountField : scenario.metrics[0].field || scenario.metrics[0].numeratorField] : categoryRange ? categoryRangeFields(categoryRange) : heatmap ? [heatmap.valueField] : normalizeStringArray3(chartSpec.yFields || chartSpec.yField).filter(Boolean);
+    const xField = (overlap ? overlap.rowLabelField || overlapFields(overlap)[0] : null) || (scenario ? scenarioFields(type, scenario)[0] : null) || (categoryRange == null ? void 0 : categoryRange.categoryField) || (heatmap == null ? void 0 : heatmap.rowField) || normalizeChartSpecValue(chartSpec.xField);
+    const yFields = overlap ? overlapFields(overlap).filter((field2) => field2 !== overlap.rowLabelField) : scenario ? [type === "routing-impact" ? scenario.amountField : scenario.metrics[0].field || scenario.metrics[0].numeratorField] : categoryRange ? categoryRangeFields(categoryRange) : heatmap ? [heatmap.valueField] : normalizeStringArray3(chartSpec.yFields || chartSpec.yField).filter(Boolean);
     const seriesField = normalizeChartSpecValue(chartSpec.seriesField);
     const seriesOptions = normalizeChartSeriesOptions(chartSpec.seriesOptions);
     const categoryLabel = normalizeChartCategoryLabel(chartSpec.categoryLabel);
@@ -55106,10 +55128,11 @@ ${indent}${end}`;
       if (!fields2.has(field2)) errors.push({ field: `tooltip.fields.${index}.field`, code: "missingField" });
     });
     if (normalized.type === "two-set-overlap") {
-      for (const [index, key2] of overlapFields(normalized.twoSetOverlap).entries()) {
+      for (const [index, key2] of normalized.yFields.entries()) {
         const field2 = fields2.get(key2);
         if (!field2 || field2.kind !== "measure") errors.push({ field: `yFields.${index}`, code: !field2 ? "missingField" : "wrongKind" });
       }
+      if (normalized.twoSetOverlap.rowLabelField && !fields2.has(normalized.twoSetOverlap.rowLabelField)) errors.push({ field: "twoSetOverlap.rowLabelField", code: "missingField" });
       return { valid: errors.length === 0, errors };
     }
     const xField = normalized.xField ? fields2.get(normalized.xField) : null;
@@ -63441,9 +63464,40 @@ ${indent}${end}`;
   function buildReportPrintChartPages({ chartModel = {}, resolvedChart = {}, width = 680, maxHeight = 620, firstMaxHeight = maxHeight, rowLimit = 0 } = {}) {
     if (isScenarioType(resolvedChart == null ? void 0 : resolvedChart.kind)) return scenarioPrintPages(chartModel, resolvedChart, { width, maxHeight, firstMaxHeight });
     if ((resolvedChart == null ? void 0 : resolvedChart.kind) === "two-set-overlap") {
-      const graphic2 = twoSetOverlapSvg(buildTwoSetOverlap(chartModel.twoSetOverlap, resolvedChart.rows), width, { print: true, colors: resolveChartPalette(chartModel).map(printColor) });
-      if (width < 240 || graphic2.height > maxHeight) return [{ svg: "", width, height: 0, diagnostics: [{ code: "twoSetOverlapPrintLayoutUnavailable", severity: "warning", message: "Two-set overlap and complete labels need a wider or taller print area. Shorten labels or use a larger page." }] }];
-      return [{ ...graphic2, startNewPage: graphic2.height > firstMaxHeight }];
+      const model = buildTwoSetOverlap(chartModel.twoSetOverlap, resolvedChart.rows);
+      const render = (rows2) => twoSetOverlapSvg(buildTwoSetOverlap(chartModel.twoSetOverlap, rows2), width, { print: true, colors: resolveChartPalette(chartModel).map(printColor) });
+      const unavailable = () => ({ svg: "", width, height: 0, diagnostics: [{ code: "twoSetOverlapPrintLayoutUnavailable", severity: "warning", message: "Two-set overlap and complete labels need a wider or taller print area. Shorten labels or use a larger page." }] });
+      if (width < 240) return [unavailable()];
+      if (model.config.mode !== "region-list" || model.empty) {
+        const graphic2 = render(resolvedChart.rows);
+        return graphic2.height > maxHeight ? [unavailable()] : [{ ...graphic2, startNewPage: graphic2.height > firstMaxHeight }];
+      }
+      const pages2 = [];
+      let offset2 = 0;
+      while (offset2 < resolvedChart.rows.length) {
+        const available = pages2.length ? maxHeight : firstMaxHeight;
+        let count = 0, graphic2;
+        while (offset2 + count < resolvedChart.rows.length) {
+          const candidate = render(resolvedChart.rows.slice(offset2, offset2 + count + 1));
+          if (candidate.height > available) break;
+          graphic2 = candidate;
+          count++;
+        }
+        let startNewPage = pages2.length > 0;
+        if (!count) {
+          startNewPage = true;
+          while (offset2 + count < resolvedChart.rows.length) {
+            const candidate = render(resolvedChart.rows.slice(offset2, offset2 + count + 1));
+            if (candidate.height > maxHeight) break;
+            graphic2 = candidate;
+            count++;
+          }
+        }
+        if (!count) return [...pages2, unavailable()];
+        pages2.push({ ...graphic2, startNewPage, sourceRowOffset: offset2, sourceRowCount: count });
+        offset2 += count;
+      }
+      return pages2;
     }
     if ((resolvedChart == null ? void 0 : resolvedChart.kind) === "category-range") return categoryRangePrintPages(buildCategoryRange(chartModel.categoryRange, resolvedChart.rows), { width, maxHeight, firstMaxHeight });
     if ((resolvedChart == null ? void 0 : resolvedChart.kind) === "heatmap") return heatmapPrintPages(buildHeatmap(chartModel.heatmap, resolvedChart.rows), { width, maxHeight, firstMaxHeight });

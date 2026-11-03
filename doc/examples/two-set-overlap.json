@@ -20,5 +20,22 @@
       "rightOnly": {"label": "Monitoring B only", "valueField": "checksB", "format": {"decimals": 2, "suffix": " checks per device"}}
     }
   },
-  "frequencyRows": [{"checksA": 2.35, "checksBoth": 4.12, "checksB": 1.86}]
+  "frequencyRows": [{"checksA": 2.35, "checksBoth": 4.12, "checksB": 1.86}],
+  "regionListChartSpec": {
+    "type": "two-set-overlap",
+    "appearance": "document",
+    "xField": "deviceGroup",
+    "yFields": ["monitoringAOnly", "monitoringAOnlyPercent", "both", "bothPercent", "monitoringBOnly", "monitoringBOnlyPercent", "checksA", "checksBoth", "checksB"],
+    "twoSetOverlap": {
+      "mode": "region-list", "rowLabelField": "deviceGroup",
+      "leftOnly": {"label": "Monitoring A only", "valueField": "monitoringAOnly", "format": {"grouping": true, "decimals": 0}, "secondaryField": "monitoringAOnlyPercent", "secondaryFormat": {"decimals": 1, "suffix": "%"}, "frequencyField": "checksA", "frequencyFormat": {"decimals": 2, "suffix": " checks per device"}},
+      "intersection": {"label": "Both", "valueField": "both", "format": {"grouping": true, "decimals": 0}, "secondaryField": "bothPercent", "secondaryFormat": {"decimals": 1, "suffix": "%"}, "frequencyField": "checksBoth", "frequencyFormat": {"decimals": 2, "suffix": " checks per device"}},
+      "rightOnly": {"label": "Monitoring B only", "valueField": "monitoringBOnly", "format": {"grouping": true, "decimals": 0}, "secondaryField": "monitoringBOnlyPercent", "secondaryFormat": {"decimals": 1, "suffix": "%"}, "frequencyField": "checksB", "frequencyFormat": {"decimals": 2, "suffix": " checks per device"}}
+    }
+  },
+  "regionListRows": [
+    {"deviceGroup": "All devices", "monitoringAOnly": 1240, "monitoringAOnlyPercent": 41.3, "both": 610, "bothPercent": 20.4, "monitoringBOnly": 1150, "monitoringBOnlyPercent": 38.3, "checksA": 2.35, "checksBoth": 4.12, "checksB": 1.86},
+    {"deviceGroup": "Bench devices", "monitoringAOnly": 0, "monitoringAOnlyPercent": 0, "both": null, "bothPercent": null, "monitoringBOnly": 37, "monitoringBOnlyPercent": 9.7, "checksA": 0, "checksBoth": null, "checksB": 1.25},
+    {"deviceGroup": "Bench devices", "monitoringAOnly": 18, "monitoringAOnlyPercent": 3.1, "both": 7, "bothPercent": 1.4, "monitoringBOnly": 0, "monitoringBOnlyPercent": 0, "checksA": 2.5, "checksBoth": 3.75, "checksB": 0}
+  ]
 }
