@@ -10,6 +10,34 @@ const text = value => typeof value === 'string' && value.length <= 128 && !crede
 const scalar = value => typeof value === 'string' ? text(value) : typeof value === 'boolean' || typeof value === 'number' && Number.isFinite(value) ? value : null;
 const safeValue = value => Array.isArray(value) ? value.slice(0, 8).map(scalar).filter(value => value !== null) : scalar(value);
 const pairs = value => Object.entries(value && typeof value === 'object' && !Array.isArray(value) ? value : {}).sort(([a], [b]) => a.localeCompare(b));
+// Report metadata uses the same bounded advisory channel as tabs and filters.
+// Completed datasets remain available only through the explicit report read.
+function reportContext(window) {
+ const report = window.viewState?.report;
+ if (!report || typeof report !== 'object' || Array.isArray(report)) return null;
+ const out = {};
+ for (const key of ['windowId','windowKey']) if (text(window[key])) out[key]=window[key];
+ for (const key of ['resourceUri','title','status','activeSectionId','runControlId','error']) if (text(report[key])) out[key]=report[key];
+ for (const key of ['canRun','canSave','canExport','hasCompletedRun']) if (typeof report[key]==='boolean') out[key]=report[key];
+ if (typeof report.progress==='number' && Number.isFinite(report.progress)) out.progress=report.progress;
+ const controls=Array.isArray(window.metadata?.view?.controls)?window.metadata.view.controls:[];
+ const sensitive=new Set(controls.filter(control=>control.sensitive===true || secret(control.type) || secret(control.id) || secret(control.dataField)).map(control=>control.dataField || control.bindingPath || control.id));
+ for (const key of ['parameters','draftParameters']) {
+  if (!report[key] || typeof report[key]!=='object' || Array.isArray(report[key])) continue;
+  const entries=pairs(report[key]), values={};let complete=report[key+'Complete']!==false;
+  for (const [name,value] of entries.slice(0,12)) {
+   if (!text(name) || secret(name) || sensitive.has(name)) {complete=false;continue;}
+   const clean=safeValue(value);
+   if(clean===null){complete=false;continue;}
+   values[name]=clean;
+   if(JSON.stringify(clean)!==JSON.stringify(value))complete=false;
+  }
+  out[key]=values;
+  if(entries.length>12)complete=false;
+  if(!complete)out[key+'Complete']=false;
+ }
+ return out;
+}
 export function buildSemanticUIContext(window = {}, {focusedDataSourceRef = window.metadata?.view?.dataSourceRef} = {}) {
  const context = {version: 1, tabs: [], sources: [], dialogs: []};
  for (const [containerId, tabId] of pairs(window.viewState?.tabs).slice(0, 12)) {
@@ -54,10 +82,11 @@ export function buildSemanticUIContext(window = {}, {focusedDataSourceRef = wind
   if (JSON.stringify(context).length > 8192) {context.sources.pop(); context.truncated = true; break;}
  }
  for (const dialog of (Array.isArray(window.dialogs) ? window.dialogs : []).slice(0, 12)) if (text(dialog.id)) context.dialogs.push({id: dialog.id, open: dialog.open === true});
+ const report=reportContext(window);if(report)context.report=report;
  const byteSize = () => typeof TextEncoder === 'function' ? new TextEncoder().encode(JSON.stringify(context)).length : JSON.stringify(context).length * 3;
  while (byteSize() > 8000) {
   context.truncated = true;
-  if (context.sources.length) context.sources.pop(); else if (context.dialogs.length) context.dialogs.pop(); else if (context.tabs.length) context.tabs.pop(); else break;
+  if(context.report)delete context.report;else if (context.sources.length) context.sources.pop(); else if (context.dialogs.length) context.dialogs.pop(); else if (context.tabs.length) context.tabs.pop(); else break;
  }
  // A change marker, never an authorization token. Timestamp remains the
  // enclosing snapshot's ts so unchanged snapshots keep transport deduplication.

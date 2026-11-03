@@ -10,12 +10,13 @@ import (
 // Context is advisory state exposed by Forge, never permission or tool
 // input authority. Do not reconstruct it from arbitrary rows or form contents.
 type Context struct {
-	Version   int      `json:"version"`
-	Revision  uint32   `json:"revision"`
-	Tabs      []Tab    `json:"tabs"`
-	Sources   []Source `json:"sources"`
-	Dialogs   []Dialog `json:"dialogs"`
-	Truncated bool     `json:"truncated,omitempty"`
+	Version   int                    `json:"version"`
+	Revision  uint32                 `json:"revision"`
+	Tabs      []Tab                  `json:"tabs"`
+	Sources   []Source               `json:"sources"`
+	Dialogs   []Dialog               `json:"dialogs"`
+	Truncated bool                   `json:"truncated,omitempty"`
+	Report    map[string]interface{} `json:"report,omitempty"`
 }
 type Tab struct {
 	ContainerID string `json:"containerId"`
@@ -211,9 +212,12 @@ func Project(win *Input) *Context {
 			out.Dialogs = append(out.Dialogs, dialog)
 		}
 	}
+	out.Report = projectReport(supplied.Report, sensitive)
 	for encoded, _ := json.Marshal(out); len(encoded) > 8192; encoded, _ = json.Marshal(out) {
 		out.Truncated = true
-		if len(out.Sources) > 0 {
+		if out.Report != nil {
+			out.Report = nil
+		} else if len(out.Sources) > 0 {
 			out.Sources = out.Sources[:len(out.Sources)-1]
 		} else if len(out.Dialogs) > 0 {
 			out.Dialogs = out.Dialogs[:len(out.Dialogs)-1]
@@ -286,4 +290,71 @@ func collectSensitiveFields(metadata map[string]interface{}) (map[string]map[str
 	}
 	walk(metadata, "", 0)
 	return result, complete
+}
+
+// projectReport retains only immutable advisory metadata. Datasets and arbitrary
+// report payloads remain behind the explicit current-report read.
+func projectReport(input map[string]interface{}, sensitive map[string]map[string]bool) map[string]interface{} {
+	if input == nil {
+		return nil
+	}
+	out := map[string]interface{}{}
+	for _, key := range []string{"windowId", "windowKey", "resourceUri", "title", "status", "activeSectionId", "runControlId", "error"} {
+		if value, ok := input[key].(string); ok && safeUIText(value) {
+			out[key] = value
+		}
+	}
+	for _, key := range []string{"canRun", "canSave", "canExport", "hasCompletedRun"} {
+		if value, ok := input[key].(bool); ok {
+			out[key] = value
+		}
+	}
+	if value, ok := input["progress"].(float64); ok {
+		out["progress"] = value
+	}
+	for _, key := range []string{"parameters", "draftParameters"} {
+		values, ok := input[key].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		clean := map[string]interface{}{}
+		complete := input[key+"Complete"] != false
+		keys := limitUIKeys(values)
+		if len(keys) != len(values) {
+			complete = false
+		}
+		for _, name := range keys {
+			private := SensitiveKey(name)
+			for _, fields := range sensitive {
+				if fields[name] {
+					private = true
+				}
+			}
+			if !safeUIText(name) || private {
+				complete = false
+				continue
+			}
+			value := values[name]
+			if text, ok := value.(string); ok && text == "" {
+				clean[name] = ""
+				continue
+			}
+			projected, ok := safeUIValue(value)
+			if !ok {
+				complete = false
+				continue
+			}
+			clean[name] = projected
+			before, _ := json.Marshal(value)
+			after, _ := json.Marshal(projected)
+			if string(before) != string(after) {
+				complete = false
+			}
+		}
+		out[key] = clean
+		if !complete {
+			out[key+"Complete"] = false
+		}
+	}
+	return out
 }

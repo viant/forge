@@ -25,3 +25,24 @@ func TestSemanticContextRejectsUndeclaredSourcesAndCanonicalPasswordFields(t *te
 	require.Len(t, state.Sources, 1)
 	require.Equal(t, map[string]interface{}{"Name": "Visible"}, state.Sources[0].Filters)
 }
+
+func TestSemanticReportMetadataBoundedCopiedAndRedacted(t *testing.T) {
+	input := &Input{Metadata: map[string]interface{}{"view": map[string]interface{}{"controls": []interface{}{map[string]interface{}{"id": "opaque", "sensitive": true}}}}, SemanticContext: map[string]interface{}{"version": 1, "report": map[string]interface{}{"windowId": "summary-instance", "resourceUri": "report://example/summary", "status": "ready", "hasCompletedRun": true, "parameters": map[string]interface{}{"from": "2026-10-01", "opaque": "private", "password": "private"}, "draftParameters": map[string]interface{}{"from": "", "ids": []interface{}{}}, "reportFill": map[string]interface{}{"rows": []interface{}{map[string]interface{}{"private": "excluded"}}}}}}
+	state := Project(input)
+	raw, err := json.Marshal(state)
+	require.NoError(t, err)
+	var decoded map[string]interface{}
+	require.NoError(t, json.Unmarshal(raw, &decoded))
+	report, ok := decoded["report"].(map[string]interface{})
+	require.True(t, ok)
+	require.Equal(t, "summary-instance", report["windowId"])
+	require.Equal(t, true, report["hasCompletedRun"])
+	require.Equal(t, map[string]interface{}{"from": "2026-10-01"}, report["parameters"])
+	require.Equal(t, false, report["parametersComplete"])
+	require.Equal(t, map[string]interface{}{"from": "", "ids": []interface{}{}}, report["draftParameters"])
+	require.NotContains(t, string(raw), "private")
+	require.NotContains(t, string(raw), "reportFill")
+	input.SemanticContext["report"].(map[string]interface{})["parameters"].(map[string]interface{})["from"] = "2026-10-02"
+	after, _ := json.Marshal(state)
+	require.Equal(t, string(raw), string(after))
+}

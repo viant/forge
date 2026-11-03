@@ -25,3 +25,25 @@ assert.equal(buildSemanticUIContext(many).sources[0].dataSourceRef,'properties')
 assert.equal(buildSemanticUIContext(many,{focusedDataSourceRef:'aaa9'}).sources[0].dataSourceRef,'aaa9');
 
 for(const credential of ['Basic opaque','https://example.invalid/?api_key=opaque','https://example.invalid/#access_token=opaque'])assert.equal(buildSemanticUIContext({dataSources:{rows:{filter:{Name:credential}}}}).sources[0].filters,undefined);
+
+const reportWindow={windowId:'summary-instance',windowKey:'report://example/summary',viewState:{report:{resourceUri:'report://example/summary',title:'Summary',status:'ready',parameters:{from:'2026-10-01',ids:[7],password:'private'},draftParameters:{from:'2026-10-02',ids:[]},canRun:true,canSave:false,canExport:true,hasCompletedRun:true,runControlId:'report-filter:apply',reportFill:{datasets:[{rows:[{private:'excluded'}]}]}}}};
+const reportContext=buildSemanticUIContext(reportWindow);
+assert.equal(reportContext.report.windowId,'summary-instance');
+assert.equal(reportContext.report.parameters.from,'2026-10-01');
+assert.equal(reportContext.report.draftParameters.from,'2026-10-02');
+assert.deepEqual(reportContext.report.draftParameters.ids,[]);
+assert.equal(reportContext.report.parametersComplete,false);
+assert.equal(reportContext.report.hasCompletedRun,true);
+assert.equal(reportContext.report.reportFill,undefined);
+assert.ok(!JSON.stringify(reportContext).includes('private'));
+reportWindow.viewState.report.draftParameters.from='2026-10-03';
+assert.equal(reportContext.report.draftParameters.from,'2026-10-02');
+assert.notEqual(reportContext.revision,buildSemanticUIContext(reportWindow).revision);
+const hidden=buildSemanticUIContext({...reportWindow,metadata:{view:{controls:[{id:'from',sensitive:true}]}}});
+assert.equal(hidden.report.parameters.from,undefined);
+assert.equal(hidden.report.draftParameters.from,undefined);
+const limited=buildSemanticUIContext({windowId:'current',viewState:{report:{windowId:'spoofed',parameters:{ids:Array.from({length:20},(_,i)=>i),empty:'',unsafe:'Bearer private'},draftParameters:{ids:[]},reportSpec:{title:'excluded'}}}}).report;
+assert.equal(limited.windowId,'current');assert.equal(limited.parameters.empty,'');
+assert.equal(limited.parameters.ids.length,8);assert.equal(limited.parametersComplete,false);
+assert.equal(limited.parameters.unsafe,undefined);assert.equal(limited.reportSpec,undefined);
+assert.equal(buildSemanticUIContext({}).report,undefined);

@@ -572,14 +572,16 @@ it('shows the producer input validation message without exposing transport detai
 });
 
 it('registers current predefined report state and normal Run without claiming a durable run action',async()=>{
- const {activeWindows}=await import('../../core/store/signals.js');
+ const {activeWindows,getViewSignal}=await import('../../core/store/signals.js');
+ const {buildUISnapshot}=await import('../../core/ui/snapshot.js');
  const {invokeReportWindowAction}=await import('../../core/ui/reportActions.js');
  const {invokeRegisteredControlAction}=await import('../../core/ui/controlActions.js');
  const layout=vi.spyOn(HTMLElement.prototype,'getClientRects').mockReturnValue([{width:100,height:20}]);
- const windowId='predefined-example';activeWindows.value=[{windowId,conversationId:'example-chat'}];
+ const windowId='predefined-example';activeWindows.value=[{windowId,windowKey:'report://example/summary',conversationId:'example-chat'}];
  const runner=vi.fn(async()=>({...result(),reportFill:{datasets:[{rows:[{count:7}]}]}}));
- const publish=vi.fn();
- const view=await mount(runner,{prefill:{from:'2026-10-01',to:'2026-11-01'}},{},publish,{identity:{windowId},windowState:{windowId,windowForm:{from:'2026-10-02',to:'2026-11-01'}}});
+ const publish=vi.fn(value=>{getViewSignal(windowId).value={report:value};});
+ const actionContext={identity:{windowId},windowState:{windowId,windowForm:{from:'2026-10-02',to:'2026-11-01'}}};
+ const view=await mount(runner,{prefill:{from:'2026-10-01',to:'2026-11-01'}},{},publish,actionContext);
  document.body.append(view.host);
  try{
   const current=await invokeReportWindowAction(windowId,'getCurrent');
@@ -596,10 +598,19 @@ it('registers current predefined report state and normal Run without claiming a 
   expect((await invokeReportWindowAction(windowId,'getCurrent')).reportFill.datasets[0].rows[0].count).toBe(7);
   expect(publish.mock.calls.at(-1)[0]).toMatchObject({status:'ready',hasCompletedRun:true,parameters:{from:'2026-10-01'},draftParameters:{from:'2026-10-02'}});
   expect(publish.mock.calls.at(-1)[0]).not.toHaveProperty('reportFill');
+  const observed=buildUISnapshot().windows[0].semanticContext.report;
+  expect(observed).toMatchObject({windowId,hasCompletedRun:true,status:'ready',parameters:{from:'2026-10-01'},draftParameters:{from:'2026-10-02'}});
+  expect(observed.reportFill).toBeUndefined();expect(JSON.stringify(observed)).not.toContain('rows');
+  actionContext.windowState.windowForm={from:'2026-10-04',to:'2026-11-01'};
+  await view.render();
+  const draft=buildUISnapshot().windows[0].semanticContext.report;
+  expect(draft.draftParameters.from).toBe('2026-10-04');expect(draft.parameters.from).toBe('2026-10-01');
+  expect(observed.draftParameters.from).toBe('2026-10-02');expect(runner).toHaveBeenCalledTimes(1);
   await view.render({prefill:{from:'2026-10-03',to:'2026-11-01'}});
   const changed=await invokeReportWindowAction(windowId,'getCurrent');
   expect(changed.hasCompletedRun).toBe(false);
   expect(changed.reportFill).toBeUndefined();
+  expect(buildUISnapshot().windows[0].semanticContext.report.hasCompletedRun).toBe(false);
   expect(runner).toHaveBeenCalledTimes(1);
  }finally{await view.close();view.host.remove();activeWindows.value=[];layout.mockRestore();}
  await expect(invokeReportWindowAction(windowId,'getCurrent')).rejects.toThrow(/not found/);
