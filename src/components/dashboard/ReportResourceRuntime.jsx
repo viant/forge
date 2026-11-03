@@ -1,3 +1,5 @@
+import NativeControlTarget from "../../runtime/NativeControlTarget.jsx";
+import {registerReportWindowActions} from "../../core/ui/reportActions.js";
 import React, {useCallback, useEffect, useRef, useState} from "react";
 import {Button, Callout, Spinner} from "@blueprintjs/core";
 import ReportPrintPreview from "./ReportPrintPreview.jsx";
@@ -167,15 +169,27 @@ export default function ReportResourceRuntime({container, context, onViewStateCh
             const printed = validateReportResourceRunResult(await runReport(request), refreshed, request.chartMetricSelections);
             return printed.reportPrint;
         }});
+    const windowId=context?.identity?.windowId || context?.windowState?.windowId;
+    useEffect(()=>{
+        if(!windowId)return;
+        return registerReportWindowActions(windowId,{getCurrent:()=>({ok:true,windowId,
+            reportId:pin?.uri || '',reportName:displayedTitle,sourceKind:'resource',
+            request:{parameters:structuredClone(parameters.prefill || {})},
+            draftParameters:structuredClone(context?.windowState?.windowForm || parameters.prefill || {}),
+            canRun:canRun&&typeof runReport==='function'&&!progress,canSave:false,
+            hasCompletedRun:!!runResult,status:displayedStatus,activeSectionId:displayedSection,
+            runControlId:parameters.showRunControl===false?'report-filter:apply':'report-run',
+        })});
+    },[windowId,identity,displayedTitle,displayedStatus,displayedSection,canRun,runReport,progress,runResult,context?.windowState?.windowForm]);
     const controls = reportResourceControls({canRun, canExport, result, progress});
     const tables=parameters.reportCapabilities?.tableBlockSelection===true?result?.reportSpec?.blocks?.filter(block=>block.kind==='tableBlock'):undefined;
     return <section style={{padding:16}}>
         <h2>{result?.reportSpec?.title || parameters.reportTitle || "Selected report"}</h2>
         <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>
-            {parameters.showRunControl !== false && <Button icon="play" onClick={run} disabled={controls.runDisabled}>Run report</Button>}
+            {parameters.showRunControl !== false && <NativeControlTarget context={context} controlId="report-run" item={{type:"button"}} disabled={controls.runDisabled} actions={{click:run}}><Button icon="play" onClick={run} disabled={controls.runDisabled}>Run report</Button></NativeControlTarget>}
 
         </div>
-        <ReportOutputActions scopeKey={identity} output={output} disabled={!canExport||!runResult||!!progress||unexportedMetricSelection} tableBlocks={tables} reportSpec={result?.reportSpec} workbookExport={parameters.reportCapabilities?.workbookExport===true}/>
+        <ReportOutputActions context={context} scopeKey={identity} output={output} disabled={!canExport||!runResult||!!progress||unexportedMetricSelection} tableBlocks={tables} reportSpec={result?.reportSpec} workbookExport={parameters.reportCapabilities?.workbookExport===true}/>
         {unexportedMetricSelection && <Callout>Chart selections cannot be exported from this preview. Run the report again to restore its saved chart choices.</Callout>}
         {progress && <Callout role="status" aria-live="polite" data-forge-status="info" icon={<Spinner size={18}/>} title="Report progress">{progress}</Callout>}
         {metadataRefreshing && <Callout role="status" aria-live="polite" data-forge-status="info" icon={<Spinner size={18}/>}>Refreshing report details.</Callout>}

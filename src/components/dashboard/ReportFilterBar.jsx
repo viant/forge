@@ -5,8 +5,16 @@ import ArrayFields from '../primitives/ArrayFields.jsx';
 import {typographyProps} from '../Typography.jsx';
 import {getWidget, listWidgets} from '../../runtime/widgetRegistry.js';
 import './ReportFilterBar.css';
+import NativeControlTarget from '../../runtime/NativeControlTarget.jsx';
+import {validateWidgetControlValue} from '../../core/ui/controlActions.js';
 
-function Choice({control, values, onChange, loadChoices, scopeKey, onChoices}) {
+function FilterControl({context,controlId,type='text',value,options,disabled=false,required=false,change,click,children}) {
+    const props={value,options,required};
+    return <NativeControlTarget context={context} controlId={controlId} item={{id:controlId,type,scope:'windowForm',dataField:controlId}} value={value} options={options} disabled={disabled} constraints={{required}}
+        validate={next=>validateWidgetControlValue(next,{item:{type},props})} actions={{...(change?{setValue:({value})=>change(value)}:{}),...(click?{click}: {})}}>{children}</NativeControlTarget>;
+}
+
+function Choice({control, values, onChange, loadChoices, scopeKey, onChoices, context, busy}) {
     const [open, setOpen] = useState(false), [query, setQuery] = useState('');
     const [state, setState] = useState({}), [retry, setRetry] = useState(0);
     const inputs = Object.fromEntries(Object.entries(control.inputs || {}).map(([name, alias]) => [name, values[alias]]));
@@ -32,7 +40,7 @@ function Choice({control, values, onChange, loadChoices, scopeKey, onChoices}) {
         return () => controller.abort();
     }, [key, open, retry, control.refreshSelected]);
     const choices = current.choices || [];
-    return <fieldset className="forge-report-filter-choice">
+    return <FilterControl context={context} controlId={control.id} type="multiSelect" value={selected} options={choices} required={control.required} disabled={busy||current.loading} click={()=>setOpen(value=>!value)} change={current.choices?value=>onChange(control.id,value):undefined}><fieldset className="forge-report-filter-choice">
         <legend>{control.label}{control.required ? ' (required)' : ''}</legend>
         <details open={open} onToggle={event => setOpen(event.currentTarget.open)}>
             <summary aria-label={control.label}>{current.loading ? 'Loading choices…' : current.error ? 'Choices unavailable' : selected.length ? `${selected.length} selected` : `Choose ${control.label.toLowerCase()}`}</summary>
@@ -53,7 +61,7 @@ function Choice({control, values, onChange, loadChoices, scopeKey, onChoices}) {
                 <Button variant="ghost" size="compact" onClick={() => onChange(control.id, [])}>Clear {control.label}</Button>
             </div>
         </details>
-    </fieldset>;
+    </fieldset></FilterControl>;
 }
 
 function DatePresets({control, values, onDatePreset, onDateRange, onDateDraft}) {
@@ -76,36 +84,37 @@ function DatePresets({control, values, onDatePreset, onDateRange, onDateDraft}) 
 // Hosts normalize published metadata into controls and own authenticated choice
 // transport. This component never constructs resource URIs or permission grants.
 export default function ReportFilterBar({controls = [], values = {}, onChange, onApply, onReset, loadChoices,
-    scopeKey = '', onChoices, onDatePreset, onDateRange, onDateDraft, busy = false, applyDisabled = false, error = '', placement = 'top', className = ''}) {
+    scopeKey = '', context, onChoices, onDatePreset, onDateRange, onDateDraft, busy = false, applyDisabled = false, error = '', placement = 'top', className = ''}) {
     if (!controls.length) return null;
+    const apply=()=>{if(!busy&&!applyDisabled)onApply?.();};
     return <form className={`forge-report-filter-bar ${className}`.trim()} data-filter-placement={['left','rail-left'].includes(placement)?'left':['right','rail-right'].includes(placement)?'right':'top'} aria-label="Report filters"
-        onSubmit={event => {event.preventDefault(); onApply?.();}} {...typographyProps('body')}>
+        onSubmit={event => {event.preventDefault(); apply();}} {...typographyProps('body')}>
         {controls.map(control => {
-            if (control.kind === 'choice') return <Choice key={control.id} {...{control, values, onChange, loadChoices, scopeKey, onChoices}}/>;
+            if (control.kind === 'choice') return <Choice key={control.id} {...{control, values, onChange, loadChoices, scopeKey, onChoices, context, busy}}/>;
             if (control.kind === 'dateRange') return <fieldset key={control.id}><legend>{control.label}</legend>
                 <DatePresets {...{control, values, onDatePreset, onDateRange, onDateDraft}}/>
                 {[['from', control.start], ['to', control.end]].map(([edge, alias]) => <label key={alias}>{control.label} {edge}
-                    <input type="date" required={control.required} aria-required={control.required || undefined} value={values[alias] ?? ''} onChange={event => onChange(alias, event.target.value)}/></label>)}
+                    <FilterControl context={context} controlId={alias} type="date" value={values[alias] ?? ''} required={control.required} disabled={busy} change={value=>onChange(alias,value)}><input type="date" required={control.required} aria-required={control.required || undefined} value={values[alias] ?? ''} onChange={event => onChange(alias, event.target.value)}/></FilterControl></label>)}
                 {control.datePresetError && <span role="alert">{control.datePresetError} Enter dates manually.</span>}
             </fieldset>;
-            if (control.kind === 'boolean') return <label key={control.id}><input aria-label={control.label} type="checkbox" checked={values[control.id] === true}
-                onChange={event => onChange(control.id,event.target.checked)}/>{control.label}</label>;
-            if (control.kind === 'select') return <label key={control.id}>{control.label}
+            if (control.kind === 'boolean') return <FilterControl key={control.id} context={context} controlId={control.id} type="checkbox" value={values[control.id]===true} disabled={busy} change={value=>onChange(control.id,value)}><label><input aria-label={control.label} type="checkbox" checked={values[control.id] === true}
+                onChange={event => onChange(control.id,event.target.checked)}/>{control.label}</label></FilterControl>;
+            if (control.kind === 'select') return <FilterControl key={control.id} context={context} controlId={control.id} type="select" value={values[control.id]} options={control.choices} disabled={busy} required={control.required} change={value=>onChange(control.id,value)}><label>{control.label}
                 <SelectControl aria-label={control.label} value={String((control.choices || []).findIndex(choice => choice.value === values[control.id]))}
                     onChange={event => onChange(control.id, control.choices[Number(event.target.value)].value)}>
                     <option value="-1" disabled>Choose a value</option>
                     {(control.choices || []).map((choice, index) => <option key={index} value={index}>{choice.label}</option>)}
-                </SelectControl></label>;
-            if (control.kind === 'list') return <fieldset key={control.id} className="forge-report-filter-list"><legend>{control.label}{control.required ? ' (required)' : ''}</legend>
+                </SelectControl></label></FilterControl>;
+            if (control.kind === 'list') return <FilterControl key={control.id} context={context} controlId={control.id} type="chipList" value={values[control.id]||[]} disabled={busy} change={value=>onChange(control.id,value)}><fieldset className="forge-report-filter-list"><legend>{control.label}{control.required ? ' (required)' : ''}</legend>
                 <ArrayFields item={{id:`report-${control.id}`}} value={(Array.isArray(values[control.id]) ? values[control.id] : []).map(value=>({value}))}
                     onChange={rows=>onChange(control.id,rows.map(row=>row.value))} fields={[{field:'value',label:control.label,type:'text'}]} newRow={{value:''}}
-                    addLabel={`Add ${control.label}`} removeLabel={`Remove ${control.label}`} rowLabel={`${control.label} row`}/></fieldset>;
-            return <label key={control.id}>{control.label}{control.required ? ' (required)' : ''}
+                    addLabel={`Add ${control.label}`} removeLabel={`Remove ${control.label}`} rowLabel={`${control.label} row`}/></fieldset></FilterControl>;
+            return <FilterControl key={control.id} context={context} controlId={control.id} type={control.kind==='number'?'number':'text'} value={values[control.id]??''} disabled={busy} required={control.required} change={value=>onChange(control.id,value)}><label>{control.label}{control.required ? ' (required)' : ''}
                 <input aria-label={control.label} type={control.kind === 'number' ? 'number' : 'text'} required={control.required} value={values[control.id] ?? ''}
-                    onChange={event => onChange(control.id, control.kind === 'number' && event.target.value !== '' ? Number(event.target.value) : event.target.value)}/></label>;
+                    onChange={event => onChange(control.id, control.kind === 'number' && event.target.value !== '' ? Number(event.target.value) : event.target.value)}/></label></FilterControl>;
         })}
-        <div className="forge-report-filter-actions"><Button type="submit" variant="primary" disabled={busy || applyDisabled}>Apply filters</Button>
-            <Button variant="secondary" disabled={busy} onClick={onReset}>Reset filters</Button></div>
+        <div className="forge-report-filter-actions"><FilterControl context={context} controlId="report-filter:apply" type="button" disabled={busy||applyDisabled} click={apply}><Button type="submit" variant="primary" disabled={busy || applyDisabled}>Apply filters</Button></FilterControl>
+            <FilterControl context={context} controlId="report-filter:reset" type="button" disabled={busy} click={onReset}><Button variant="secondary" disabled={busy} onClick={onReset}>Reset filters</Button></FilterControl></div>
         {error && <span role="alert">{error}</span>}
     </form>;
 }

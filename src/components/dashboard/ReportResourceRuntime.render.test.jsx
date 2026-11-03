@@ -30,12 +30,12 @@ it('explains missing required inputs without exposing upstream details',async()=
         expect(view.host.textContent).not.toContain('internal/source');
     } finally {await view.close();}
 });
-async function mount(runReport, parameters={}, storeServices={}, onViewStateChange) {
+async function mount(runReport, parameters={}, storeServices={}, onViewStateChange, actionContext={}) {
     globalThis.IS_REACT_ACT_ENVIRONMENT=true;
     const host=document.createElement('div'), root=createRoot(host);
     const handlers={reportStore:{runReport,...storeServices}, reportRuns:{capabilities:{browserSnapshots:false},begin:vi.fn(),complete:vi.fn()},dataSource:{fetchCollection:vi.fn()}};
     const render = async (changes={}) => {parameters={...parameters,...changes};await act(async()=>root.render(
-        <StrictMode><ReportResourceRuntime onViewStateChange={onViewStateChange} container={{parameters:{reportResource:pin,reportCapabilities:{run:true},...parameters}}} context={{handlers}}/></StrictMode>));};
+        <StrictMode><ReportResourceRuntime onViewStateChange={onViewStateChange} container={{parameters:{reportResource:pin,reportCapabilities:{run:true},...parameters}}} context={{handlers,...actionContext}}/></StrictMode>));};
     await render();
     return {host,handlers,render,close:()=>act(async()=>root.unmount())};
 }
@@ -566,4 +566,25 @@ it('shows the producer input validation message without exposing transport detai
   expect(view.host.textContent).not.toContain('private transport detail');
   expect(view.host.querySelector('output')).toBeNull();
  } finally {await view.close();}
+});
+
+it('registers current predefined report state and normal Run without claiming a durable run action',async()=>{
+ const {activeWindows}=await import('../../core/store/signals.js');
+ const {invokeReportWindowAction}=await import('../../core/ui/reportActions.js');
+ const {invokeRegisteredControlAction}=await import('../../core/ui/controlActions.js');
+ const layout=vi.spyOn(HTMLElement.prototype,'getClientRects').mockReturnValue([{width:100,height:20}]);
+ const windowId='predefined-example';activeWindows.value=[{windowId,conversationId:'example-chat'}];
+ const runner=vi.fn(async()=>result());
+ const view=await mount(runner,{prefill:{from:'2026-10-01',to:'2026-11-01'}},{},undefined,{identity:{windowId},windowState:{windowId,windowForm:{from:'2026-10-02',to:'2026-11-01'}}});
+ document.body.append(view.host);
+ try{
+  const current=await invokeReportWindowAction(windowId,'getCurrent');
+  expect(current.request.parameters.from).toBe('2026-10-01');expect(current.draftParameters.from).toBe('2026-10-02');
+  expect(current.hasCompletedRun).toBe(false);expect(current.canSave).toBe(false);expect(runner).not.toHaveBeenCalled();
+  await expect(invokeReportWindowAction(windowId,'run')).rejects.toThrow(/unavailable/);
+  await act(async()=>invokeRegisteredControlAction({windowId,controlId:'report-run'},'click'));
+  expect(runner).toHaveBeenCalledTimes(1);
+  expect((await invokeReportWindowAction(windowId,'getCurrent')).hasCompletedRun).toBe(true);
+ }finally{await view.close();view.host.remove();activeWindows.value=[];layout.mockRestore();}
+ await expect(invokeReportWindowAction(windowId,'getCurrent')).rejects.toThrow(/not found/);
 });

@@ -1,5 +1,6 @@
 import React,{useState} from "react";
 import {Button,Callout,HTMLSelect,Spinner} from "@blueprintjs/core";
+import NativeControlTarget from '../../runtime/NativeControlTarget.jsx';
 import {buildRuntimeSections} from './reportSections.js';
 
 // Keep authored table identities intact. Section labels disambiguate tables
@@ -25,16 +26,16 @@ export function reportExportTableOptions(tableBlocks = [], reportSpec) {
 }
 
 // Shared by stored-resource viewers and workspace/authoring preview adapters.
-export default function ReportOutputActions({scopeKey,output,disabled=false,tableBlocks,reportSpec,cancelable=false,workbookExport=false}) {
+export default function ReportOutputActions({scopeKey,output,disabled=false,tableBlocks,reportSpec,cancelable=false,workbookExport=false,context}) {
     const [table,setTable]=useState(null);
     const selected=tableBlocks?.length===1?tableBlocks[0].id:table?.scopeKey===scopeKey&&tableBlocks?.some(item=>item.id===table.id)?table.id:'';
     const blocked=disabled||!!output.busy;
     const tableUnavailable=Array.isArray(tableBlocks)&&!selected;
     return <div aria-label="Report output" style={{display:'flex',flexDirection:'column',gap:8,margin:'8px 0'}}>
         <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
-            <Button icon="print" onClick={output.previewPrint} disabled={blocked}>{output.printModel?'Close print preview':'Print preview'}</Button>
-            {tableBlocks?.length>1&&<label>Export table <HTMLSelect aria-label="Export table" value={selected} disabled={blocked} onChange={event=>setTable({scopeKey,id:event.target.value})} options={[{value:'',label:'Choose a table'},...reportExportTableOptions(tableBlocks,reportSpec)]}/></label>}
-            {['pdf','csv','xlsx'].map(format=>{const needsTable=format==='csv'||format==='xlsx'&&!workbookExport;return <Button key={format} disabled={blocked||(needsTable&&tableUnavailable)} onClick={()=>output.exportReport(format,needsTable?selected||undefined:undefined)}>Export {format.toUpperCase()}</Button>;})}
+            <NativeControlTarget context={context} controlId="report-output:print" item={{type:'button'}} disabled={blocked} actions={{click:output.previewPrint}}><Button icon="print" onClick={output.previewPrint} disabled={blocked}>{output.printModel?'Close print preview':'Print preview'}</Button></NativeControlTarget>
+            {tableBlocks?.length>1&&<NativeControlTarget context={context} controlId="report-output:table" item={{type:'select'}} value={selected} options={reportExportTableOptions(tableBlocks,reportSpec)} disabled={blocked} actions={{setValue:({value})=>setTable({scopeKey,id:value})}}><label>Export table <HTMLSelect aria-label="Export table" value={selected} disabled={blocked} onChange={event=>setTable({scopeKey,id:event.target.value})} options={[{value:'',label:'Choose a table'},...reportExportTableOptions(tableBlocks,reportSpec)]}/></label></NativeControlTarget>}
+            {['pdf','csv','xlsx'].map(format=>{const needsTable=format==='csv'||format==='xlsx'&&!workbookExport;return <NativeControlTarget key={format} context={context} controlId={`report-output:${format}`} item={{type:'button'}} disabled={blocked||(needsTable&&tableUnavailable)} actions={{click:()=>output.exportReport(format,needsTable?selected||undefined:undefined)}}><Button disabled={blocked||(needsTable&&tableUnavailable)} onClick={()=>output.exportReport(format,needsTable?selected||undefined:undefined)}>Export {format.toUpperCase()}</Button></NativeControlTarget>;})}
             {cancelable&&output.busy&&<Button icon="stop" onClick={output.cancelOutput}>Cancel</Button>}
         </div>
         {output.busy&&<Callout role="status" icon={<Spinner size={18}/>}>{output.busy==='print'?'Preparing print preview.':`Preparing ${output.busy.toUpperCase()} export.`}</Callout>}

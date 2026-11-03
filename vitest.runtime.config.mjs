@@ -83,6 +83,7 @@ export default defineConfig({
       'src/packs/blueprint/dateRangePresetDraft.render.test.jsx',
       'src/packs/blueprint/dateRangePresetControlled.render.test.jsx',
       'src/components/dashboard/ReportFilterBar.render.test.jsx',
+      'src/components/dashboard/ReportFilterBar.operations.render.test.jsx',
       'src/packs/blueprint/fileClear.render.test.jsx',
       'src/packs/blueprint/fileMultiple.render.test.jsx',
       'src/packs/blueprint/blur.render.test.jsx',
