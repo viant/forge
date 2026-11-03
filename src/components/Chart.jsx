@@ -502,7 +502,7 @@ function formatLargeNumber(value) {
 
 function escapeCsvCell(value) {
     const v = String(value ?? "");
-    if (/[",\n]/.test(v)) return `"${v.replace(/"/g, '""')}"`;
+    if (/[",\r\n]/.test(v)) return `"${v.replace(/"/g, '""')}"`;
     return v;
 }
 

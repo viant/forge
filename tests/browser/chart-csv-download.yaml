@@ -1,0 +1,42 @@
+# Requires an owned Chrome debug endpoint and a Forge Vite server. Parameters:
+# pageURL, debuggerAddress, downloadPath (fresh directory), and forgePath.
+pipeline:
+  emptyDestination:
+    action: exec:run
+    strictCompletion: true
+    checkError: true
+    commands:
+      - node '${forgePath}/tests/browser/verify-chart-csv-download.mjs' '$downloadPath' --prepare
+  attach:
+    action: webdriver:open
+    sessionID: neutral-chart-csv
+    browser: chrome
+    directCDP: true
+    debuggerAddress: $debuggerAddress
+  destination:
+    action: webdriver:run
+    sessionID: neutral-chart-csv
+    autoStart: false
+    actions:
+      - key: destination
+        pathKind: 1
+        calls:
+          - method: CDPCommand
+            parameters:
+              - Browser.setDownloadBehavior
+              - {behavior: allow, downloadPath: '$downloadPath', eventsEnabled: true}
+  download:
+    action: webdriver:run
+    sessionID: neutral-chart-csv
+    autoStart: false
+    commands:
+      - page.goto('$pageURL/tests/browser/chart-csv-download.html')
+      - page.getByRole('button','Table').click()
+      - expect(page.locator('tbody tr')).toHaveCount(4,30000)
+      - page.getByRole('button','CSV').click()
+  bytes:
+    action: exec:run
+    strictCompletion: true
+    checkError: true
+    commands:
+      - node '${forgePath}/tests/browser/verify-chart-csv-download.mjs' '$downloadPath'
