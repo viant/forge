@@ -55905,6 +55905,12 @@ ${indent}${end}`;
             ...xSourceKey2 && (xDisplayKey && xDisplayKey !== xSourceKey2 || hasXDisplayValueMap2) ? { sourceNameKey: xSourceKey2 } : {},
             ...hasXDisplayValueMap2 ? { displayValueMap: clone4(xField.displayValueMap) } : {},
             valueKey: String((yMeasure == null ? void 0 : yMeasure.key) || (yMeasure == null ? void 0 : yMeasure.id) || "").trim(),
+            values: [{
+              value: String((yMeasure == null ? void 0 : yMeasure.key) || (yMeasure == null ? void 0 : yMeasure.id) || "").trim(),
+              label: (yMeasure == null ? void 0 : yMeasure.label) || (yMeasure == null ? void 0 : yMeasure.id),
+              color: (yMeasure == null ? void 0 : yMeasure.color) || palette[0],
+              type: seriesType
+            }],
             palette,
             ...normalized.categoryColors ? { categoryColors: normalized.categoryColors } : {}
           }

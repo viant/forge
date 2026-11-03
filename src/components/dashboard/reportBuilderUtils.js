@@ -2417,6 +2417,12 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
                         ? { displayValueMap: clone(xField.displayValueMap) }
                         : {}),
                     valueKey: String(yMeasure?.key || yMeasure?.id || "").trim(),
+                    values: [{
+                        value: String(yMeasure?.key || yMeasure?.id || "").trim(),
+                        label: yMeasure?.label || yMeasure?.id,
+                        color: yMeasure?.color || palette[0],
+                        type: seriesType,
+                    }],
                     palette,
                     ...(normalized.categoryColors ? {categoryColors: normalized.categoryColors} : {}),
                 },

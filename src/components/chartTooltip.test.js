@@ -33,6 +33,21 @@ assert.notEqual(identityEntries[0].id,identityEntries[1].id);
 assert.throws(()=>buildChartTooltipEntries(identityChart,[{day:{id:1},passed:1,note:'object category'}]),/category keys must be scalar/);
 assert.deepEqual(buildReportFillChartPayload(identityChart,identityRows).tooltipEntries,identityEntries);
 for(const type of ['pie','donut']) {
+ const configured={dimensions:[{id:'equipment',key:'equipment',label:'Equipment'}],measures:[{id:'amount',key:'amount',label:'Reserved capacity',format:'number2',color:'#123456'}],result:{}};
+ const authored={type,appearance:'document',xField:'equipment',yFields:['amount'],tooltip:{fields:[{field:'amount',label:'Reading',format:'number2'}]}};
+ const lowered=buildExplicitReportBuilderChartContainer({},configured,{},authored).chart;
+ assert.equal(lowered.series.values[0].color,'#123456');
+ assert.equal(lowered.series.values[0].type,type);
+ for(const appearance of [undefined,'document']) {
+  const specForAppearance={...authored,appearance};
+  const document=buildReportBuilderReportDocument({container:{id:'capacity',dataSourceRef:'readings'},config:{...configured,dataSourceRef:'readings'},state:{viewMode:'chart',selectedDimensions:['equipment'],selectedMeasures:['amount'],chartSpec:specForAppearance},additionalBlocks:[buildReportDocumentChartBlock({id:'declaredCapacity',chartSpec:specForAppearance})]});
+  const spec=lowerReportDocumentToReportSpec(document);
+  assert.deepEqual(validateReportSchema(reportSpecSchema,spec).errors,[],`${type} ${appearance||'legacy'} metadata must satisfy the complete schema`);
+ }
+ const declaredEntries=buildChartTooltipEntries(lowered,[{equipment:'Equipment A',amount:12.25}]);
+ assert.equal(declaredEntries[0].seriesLabel,'Reserved capacity');
+ assert.equal(declaredEntries[0].fields[0].displayValue,'12.25');
+ assert.deepEqual(buildReportFillChartPayload(lowered,[{equipment:'Equipment A',amount:12.25}]).tooltipEntries,declaredEntries);
  const result=buildChartTooltipEntries({...chart,type,series:{nameKey:'day',valueKey:'passed'}},duplicates);assert.equal(result[0].fields[1].displayValue,'20');assert.equal(result[0].fields[4].state,'mixed');
  const pie={type,appearance:'document',series:{},tooltip:{fields:[{field:'note',label:'Note'}]}};
  const rows=[{name:'positive',value:1,note:'positive note'},{name:'zero',value:0,note:'zero note'},{name:'negative',value:-1,note:'negative note'}];
