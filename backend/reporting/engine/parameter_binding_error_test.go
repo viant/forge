@@ -65,25 +65,9 @@ func TestReportParameterBindingUsesEffectiveDeclarations(t *testing.T) {
 	if args["limit"] != false || args["filters"].(map[string]interface{})["advertiserId"] != 0 {
 		t.Fatalf("binding changed false/zero: %v", args)
 	}
-	_, err = reportDatasetArguments(base, map[string]interface{}{"cuts": []interface{}{"private-token"}}, bindingFixtureDescriptor(t), json.RawMessage(bindingFixtureBuilder), nil)
-	if !errors.Is(err, ErrReportParameterBinding) {
-		t.Fatalf("missing typed binding error: %v", err)
-	}
-	var typed *ReportParameterBindingError
-	if !errors.As(err, &typed) {
-		t.Fatal("missing typed diagnostic")
-	}
-	d := typed.ReportParameterBindingDiagnostic()
-	if d.Path != `parameters["cuts"]` || d.Code != "undeclared_report_parameter" {
-		t.Fatal(d)
-	}
-	for _, key := range []string{"advertiserId", "studyNames", "studies", "limit", "offset"} {
-		if !strings.Contains(d.Message, `"`+key+`"`) {
-			t.Fatalf("missing effective declaration %s: %s", key, d.Message)
-		}
-	}
-	if strings.Contains(d.Message, "filters") || strings.Contains(d.Message, "private-token") {
-		t.Fatal("private destination/value exposed")
+	extraArgs, err := reportDatasetArguments(base, map[string]interface{}{"cuts": []interface{}{"example"}}, bindingFixtureDescriptor(t), json.RawMessage(bindingFixtureBuilder), nil)
+	if err != nil || len(extraArgs["cuts"].([]interface{})) != 1 {
+		t.Fatalf("producer-owned argument policy was overridden: %v", err)
 	}
 	aliasArgs, err := reportDatasetArguments(base, map[string]interface{}{"studies": []interface{}{}}, bindingFixtureDescriptor(t), json.RawMessage(bindingFixtureBuilder), nil)
 	if err != nil {
@@ -130,7 +114,7 @@ func TestReportParameterBindingDiagnosticsBoundAndRedactInputs(t *testing.T) {
 
 const bindingFixtureSpec = `{"version":1,"kind":"reportSpec","source":{"kind":"report","containerId":"demo","stateKey":"demo","dataSourceRef":"rows"},"title":"Demo","parameters":{"viewMode":"table","groupBy":"","pageSize":10,"orderField":"","orderDir":"asc"},"layoutIntent":{"kind":"stack","resultPanePosition":"bottom","blockOrder":["summary"]},"refinements":[],"calculatedFields":[],"datasets":[{"id":"primary","dataSourceRef":"rows","request":{}}],"blocks":[{"id":"summary","kind":"markdownBlock","datasetRef":"primary","markdown":"Demo"}]}`
 
-func TestReportParameterBindingActualExecutionRejectsBeforeFetch(t *testing.T) {
+func TestReportParameterBindingDelegatesExtrasAndPreservesAdmission(t *testing.T) {
 	raw, err := json.Marshal(map[string]interface{}{"schemaVersion": 1, "reportDocument": map[string]interface{}{"title": "Demo"}, "reportSpec": json.RawMessage(bindingFixtureSpec), "dataSources": map[string]interface{}{"rows": bindingFixtureDescriptor(t)}})
 	if err != nil {
 		t.Fatal(err)
@@ -146,24 +130,25 @@ func TestReportParameterBindingActualExecutionRejectsBeforeFetch(t *testing.T) {
 	})}
 	service := New(Options{Compiler: NewReportSpecCompiler(time.Now), ResourceResolver: func(context.Context, string) (*identity.ResourceResolver, error) { return resolver, nil }})
 	calls := 0
+	executionError := errors.New("synthetic producer error")
 	service.SetResourceDatasetExecutor(func(context.Context, identity.ResolvedResource, *dsproto.DataSource, map[string]interface{}) (*dsproto.FetchResult, error) {
 		calls++
-		return nil, errors.New("unexpected private execution")
+		return nil, executionError
 	})
 	request := &ExecuteResourceRequest{Resource: &identity.ResourceRef{URI: uri.String()}, Parameters: map[string]interface{}{"advertiserId": 7, "studyNames": []interface{}{"one"}, "cuts": []interface{}{"All"}}}
 	_, err = service.ExecuteResource(context.Background(), request)
-	if !errors.Is(err, ErrReportParameterBinding) || calls != 0 {
-		t.Fatalf("binding did not stop before dispatch: %v calls=%d", err, calls)
+	if !errors.Is(err, executionError) || calls != 1 {
+		t.Fatalf("producer argument policy did not receive execution: %v calls=%d", err, calls)
 	}
 	allowed = false
 	_, err = service.ExecuteResource(context.Background(), request)
-	if !errors.Is(err, identity.ErrResourceDenied) || errors.Is(err, ErrReportParameterBinding) || calls != 0 {
+	if !errors.Is(err, identity.ErrResourceDenied) || errors.Is(err, ErrReportParameterBinding) || calls != 1 {
 		t.Fatalf("denial changed: %v calls=%d", err, calls)
 	}
 	allowed = true
 	expiry = time.Now().Add(-time.Second)
 	_, err = service.ExecuteResource(context.Background(), request)
-	if !errors.Is(err, identity.ErrResourceDenied) || errors.Is(err, ErrReportParameterBinding) || calls != 0 {
+	if !errors.Is(err, identity.ErrResourceDenied) || errors.Is(err, ErrReportParameterBinding) || calls != 1 {
 		t.Fatalf("lease failure changed: %v calls=%d", err, calls)
 	}
 }

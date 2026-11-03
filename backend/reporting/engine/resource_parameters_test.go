@@ -43,7 +43,8 @@ func TestReportParametersUseTrustedAliasesAndPreserveLocalScope(t *testing.T) {
 	if _, err = reportDatasetArguments(base, map[string]interface{}{"source": "other"}, &ds, e.BuilderDefinition, nil); err == nil {
 		t.Fatal("source override accepted")
 	}
-	if _, err = reportDatasetArguments(base, map[string]interface{}{"guessedAccountID": "other"}, &ds, e.BuilderDefinition, nil); err == nil {
-		t.Fatal("undeclared account parameter accepted")
+	delegated, err := reportDatasetArguments(base, map[string]interface{}{"guessedAccountID": "other"}, &ds, e.BuilderDefinition, nil)
+	if err != nil || delegated["guessedAccountID"] != "other" {
+		t.Fatal("producer-owned unknown argument policy was overridden")
 	}
 }

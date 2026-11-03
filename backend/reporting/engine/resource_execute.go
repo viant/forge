@@ -641,10 +641,6 @@ func reportDatasetArguments(base, parameters map[string]interface{}, descriptor 
 			return nil, identity.ErrResourceDenied
 		}
 	}
-	allowed := map[string]bool{}
-	for key := range base {
-		allowed[key] = true
-	}
 	declarations, err := reportParameterDeclarations(builderRaw)
 	if err != nil {
 		return nil, err
@@ -663,11 +659,6 @@ func reportDatasetArguments(base, parameters map[string]interface{}, descriptor 
 					break
 				}
 			}
-		}
-	}
-	for _, p := range descriptor.Parameters {
-		if p.Name != "" {
-			allowed[p.Name] = true
 		}
 	}
 	assigned := map[string]interface{}{}
@@ -694,9 +685,6 @@ func reportDatasetArguments(base, parameters map[string]interface{}, descriptor 
 				return nil, err
 			}
 			continue
-		}
-		if strings.HasPrefix(key, "_") || key == "backend" || key == "source" || key == "service" || key == "method" || !allowed[key] {
-			return nil, newReportParameterBindingError(key, allowed, declarations)
 		}
 		if current, exists := args[key]; exists {
 			if old, ok := current.(map[string]interface{}); ok {
