@@ -847,7 +847,7 @@ function renderCategoryChartSvg({
   // available SVG column. Keep every line rather than clipping or eliding text.
   const labelCharacters = Math.max(1, Math.floor((width - legendX - 26) / 11));
   let legendBottom = legendY;
-  const legend = slices.map((slice, index) => {
+  const legend = chartModel.showLegend === false ? "" : slices.map((slice, index) => {
     const fill = printColor(resolveChartCategoryColor(chartModel, slice.name, palette[index % palette.length]));
     const pct = ((slice.value / total) * 100).toFixed(0);
     const suffix = chartModel.sliceLabel ? (slice.sliceLabel == null ? "" : ` — ${slice.sliceLabel}`) : ` — ${pct}%`;
@@ -861,7 +861,7 @@ function renderCategoryChartSvg({
   const donutHole = innerRadius > 0
     ? `<circle cx="${cx}" cy="${cy}" r="${innerRadius}" fill="#ffffff" />`
     : "";
-  const height = Math.max(size, legendBottom + 6);
+  const height = chartModel.showLegend === false ? size : Math.max(size, legendBottom + 6);
   return {
     svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
       ${total>0?paths:`<circle cx="${cx}" cy="${cy}" r="${r}" fill="#d8e1e8"/>`}
@@ -960,7 +960,7 @@ function renderCartesianChartSvg({
     return leftPad + (index * (plotWidth / (rows.length - 1)));
   });
   const labelStep = Math.max(1, Math.ceil(rows.length / 6));
-  const legend = omitLegend ? {svg: "", height: 0} : buildLegendSvg(seriesDescriptors, width, plotHeight + bottomPad + 4);
+  const legend = omitLegend || chartModel.showLegend === false ? {svg: "", height: 0} : buildLegendSvg(seriesDescriptors, width, plotHeight + bottomPad + 4);
   const height = topPad + plotHeight + bottomPad + legend.height + 12;
   const annotations = renderCartesianAnnotationsSvg({
     chartModel,
@@ -1175,7 +1175,7 @@ function renderHorizontalBarChartSvg({
   const valueRange = bounds.maxValue - bounds.minValue || 1;
   const baselineX = leftPad + (((0 - bounds.minValue) / valueRange) * plotWidth);
   const perSeriesHeight = Math.max(10, Math.floor((rowHeight - (Math.max(0, seriesDescriptors.length - 1) * 4)) / Math.max(seriesDescriptors.length, 1)));
-  const legend = omitLegend ? {svg: "", height: 0} : buildLegendSvg(seriesDescriptors, width, topPad + plotHeight + bottomPad + 4);
+  const legend = omitLegend || chartModel.showLegend === false ? {svg: "", height: 0} : buildLegendSvg(seriesDescriptors, width, topPad + plotHeight + bottomPad + 4);
   const height = baseHeight + legend.height;
   const annotations = renderHorizontalBarAnnotationsSvg({
     chartModel,
@@ -1318,7 +1318,7 @@ export function buildReportPrintChartPages({ chartModel = {}, resolvedChart = {}
   const type = normalizeString(chartModel?.type || resolvedChart?.type).toLowerCase();
   if (!["horizontal_bar", "funnel_bar"].includes(type) || !["directSeries", "groupedSeries"].includes(resolvedChart?.kind)) {
     const result = buildReportPrintChartSvg({ chartModel, resolvedChart, width });
-    if (result.svg && result.height > maxHeight && ["directSeries", "groupedSeries"].includes(resolvedChart?.kind)) {
+    if (chartModel.showLegend !== false && result.svg && result.height > maxHeight && ["directSeries", "groupedSeries"].includes(resolvedChart?.kind)) {
       const plot = renderCartesianChartSvg({chartModel, resolvedChart, width, omitLegend: true});
       if (plot.height <= maxHeight && maxHeight >= 120) {
         const descriptors = resolveCartesianSeriesDescriptors(chartModel, resolvedChart)
@@ -1334,7 +1334,7 @@ export function buildReportPrintChartPages({ chartModel = {}, resolvedChart = {}
   const valueBounds = computeCartesianValueBounds(rows, descriptors);
   const hasLayout = valueBounds && descriptors.length > 0
     && descriptors.every((series) => resolveChartSupportedSeriesType(series.type) === "horizontal_bar");
-  const fullLegendHeight = hasLayout ? buildLegendSvg(descriptors, width, 0).height : 0;
+  const fullLegendHeight = hasLayout && chartModel.showLegend !== false ? buildLegendSvg(descriptors, width, 0).height : 0;
   const minimumPlotHeight = horizontalBarChartMetrics(1, descriptors.length).height;
   const omitLegend = hasLayout && maxHeight >= 120 && minimumPlotHeight <= maxHeight && minimumPlotHeight + fullLegendHeight > maxHeight;
   const legendHeight = omitLegend ? 0 : fullLegendHeight;

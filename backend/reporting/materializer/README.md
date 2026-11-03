@@ -32,6 +32,14 @@ bundle is committed build input; metadata input cannot replace it.
 
 `GOWORK=off go test -race ./...` verifies all ten synthetic envelopes, changed builder/descriptor rejection, duplicate fields and bounded VM interruption. Core adds its own real compiler, pin and authority regression tests. Goja is pinned to the verified published module version in go.mod. Consumers must pin a published Forge revision containing the regenerated bundle; runtime builds do not require a local replacement.
 
+Source admission can use `LowerForValidation(ctx, raw)` before a user has supplied
+invocation dates. It validates the original envelope, dataset scope declarations,
+references and charts, and defers only an entirely unbound `previousPeriod` range.
+The returned spec is for structural compilation, not execution. Partially supplied,
+invalid or reversed dates still fail validation. Runtime `Lower` and
+`LowerWithRequestBase` retain bounded-date enforcement; validation never invents
+dates or modifies the fingerprinted source.
+
 `Materialize(ctx, spec, executedDatasets)` consumes server-executed dataset
 payloads and calls the official fill and print functions. The consuming Core
 service buffers every result, preserves the exact resource lease, and validates

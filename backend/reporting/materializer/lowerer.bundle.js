@@ -70,6 +70,7 @@ var ForgeAuthoredLowerer = (() => {
   var entry_exports = {};
   __export(entry_exports, {
     lower: () => lower,
+    lowerForValidation: () => lowerForValidation,
     lowerWithRequestBase: () => lowerWithRequestBase,
     mapReportRequest: () => mapReportRequest,
     materialize: () => materialize,
@@ -54640,6 +54641,7 @@ ${indent}${end}`;
       return null;
     }
     validateChartAppearance(chartSpec);
+    if (chartSpec.showLegend !== void 0 && typeof chartSpec.showLegend !== "boolean") throw new Error("Chart showLegend must be boolean.");
     const tooltip = normalizeChartTooltip(chartSpec.tooltip);
     const title = String(chartSpec.title || "").trim();
     const eyebrow = String(chartSpec.eyebrow || "").trim();
@@ -54687,6 +54689,7 @@ ${indent}${end}`;
       ...center ? { center } : {},
       ...sliceLabel ? { sliceLabel } : {},
       ...chartSpec.appearance ? { appearance: chartSpec.appearance } : {},
+      ...typeof chartSpec.showLegend === "boolean" ? { showLegend: chartSpec.showLegend } : {},
       ...tooltip ? { tooltip } : {},
       ...chartSpec.layout ? { layout: chartSpec.layout } : {},
       ...typeof chartSpec.stacked === "boolean" ? { stacked: chartSpec.stacked } : {},
@@ -55717,9 +55720,9 @@ ${indent}${end}`;
     if (!normalized) {
       return container;
     }
-    if (isScenarioType(normalized.type)) return { ...container, chart: { type: normalized.type, ...normalized.appearance ? { appearance: normalized.appearance } : {}, ...typeof normalized.allowTableSwitch === "boolean" ? { allowTableSwitch: normalized.allowTableSwitch } : {}, [scenarioKey(normalized.type)]: normalized[scenarioKey(normalized.type)], xAxis: { dataKey: normalized.xField }, series: { valueKey: normalized.yFields[0], values: normalized.yFields.map((value) => ({ value, label: value, type: "bar" })) } } };
-    if (normalized.type === "category-range") return { ...container, chart: { type: "category-range", categoryRange: normalized.categoryRange, ...normalized.appearance ? { appearance: normalized.appearance } : {}, ...normalized.tooltip ? { tooltip: normalized.tooltip } : {}, ...typeof normalized.allowTableSwitch === "boolean" ? { allowTableSwitch: normalized.allowTableSwitch } : {}, xAxis: { dataKey: normalized.xField }, series: { valueKey: normalized.yFields[0], values: normalized.yFields.map((value) => ({ value, label: value, type: "bar" })) } } };
-    if (normalized.type === "heatmap") return { ...container, chart: { type: "heatmap", heatmap: normalized.heatmap, ...normalized.appearance ? { appearance: normalized.appearance } : {}, ...normalized.tooltip ? { tooltip: normalized.tooltip } : {}, ...typeof normalized.allowTableSwitch === "boolean" ? { allowTableSwitch: normalized.allowTableSwitch } : {}, series: { valueKey: normalized.heatmap.valueField, values: [{ value: normalized.heatmap.valueField, label: normalized.heatmap.valueField, type: "heatmap" }] } } };
+    if (isScenarioType(normalized.type)) return { ...container, chart: { type: normalized.type, ...normalized.appearance ? { appearance: normalized.appearance } : {}, ...typeof normalized.showLegend === "boolean" ? { showLegend: normalized.showLegend } : {}, ...typeof normalized.allowTableSwitch === "boolean" ? { allowTableSwitch: normalized.allowTableSwitch } : {}, [scenarioKey(normalized.type)]: normalized[scenarioKey(normalized.type)], xAxis: { dataKey: normalized.xField }, series: { valueKey: normalized.yFields[0], values: normalized.yFields.map((value) => ({ value, label: value, type: "bar" })) } } };
+    if (normalized.type === "category-range") return { ...container, chart: { type: "category-range", categoryRange: normalized.categoryRange, ...normalized.appearance ? { appearance: normalized.appearance } : {}, ...typeof normalized.showLegend === "boolean" ? { showLegend: normalized.showLegend } : {}, ...normalized.tooltip ? { tooltip: normalized.tooltip } : {}, ...typeof normalized.allowTableSwitch === "boolean" ? { allowTableSwitch: normalized.allowTableSwitch } : {}, xAxis: { dataKey: normalized.xField }, series: { valueKey: normalized.yFields[0], values: normalized.yFields.map((value) => ({ value, label: value, type: "bar" })) } } };
+    if (normalized.type === "heatmap") return { ...container, chart: { type: "heatmap", heatmap: normalized.heatmap, ...normalized.appearance ? { appearance: normalized.appearance } : {}, ...typeof normalized.showLegend === "boolean" ? { showLegend: normalized.showLegend } : {}, ...normalized.tooltip ? { tooltip: normalized.tooltip } : {}, ...typeof normalized.allowTableSwitch === "boolean" ? { allowTableSwitch: normalized.allowTableSwitch } : {}, series: { valueKey: normalized.heatmap.valueField, values: [{ value: normalized.heatmap.valueField, label: normalized.heatmap.valueField, type: "heatmap" }] } } };
     const measures = getSelectableReportBuilderMeasures(config);
     const xField = resolveReportBuilderDimensionByField(config, normalized.xField);
     const yMeasures = normalizeStringArray3(normalized.yFields).map((fieldKey) => measures.find((entry) => String((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id) || "").trim() === fieldKey)).filter(Boolean);
@@ -55745,6 +55748,7 @@ ${indent}${end}`;
           ...normalized.sliceLabel ? { sliceLabel: normalized.sliceLabel } : {},
           ...normalized.paletteMode ? { paletteMode: normalized.paletteMode } : {},
           ...normalized.appearance ? { appearance: normalized.appearance } : {},
+          ...typeof normalized.showLegend === "boolean" ? { showLegend: normalized.showLegend } : {},
           ...normalized.tooltip ? { tooltip: normalized.tooltip } : {},
           series: {
             nameKey: xDisplayKey || normalized.xField,
@@ -55763,6 +55767,7 @@ ${indent}${end}`;
       type: seriesType,
       ...normalized.paletteMode ? { paletteMode: normalized.paletteMode } : {},
       ...normalized.appearance ? { appearance: normalized.appearance } : {},
+      ...typeof normalized.showLegend === "boolean" ? { showLegend: normalized.showLegend } : {},
       ...normalized.tooltip ? { tooltip: normalized.tooltip } : {},
       ...normalized.layout ? { layout: normalized.layout } : {},
       ...typeof normalized.stacked === "boolean" ? { stacked: normalized.stacked } : {},
@@ -62899,7 +62904,7 @@ ${indent}${end}`;
     const legendY = belowLegend ? size + 12 : 18;
     const labelCharacters = Math.max(1, Math.floor((width - legendX - 26) / 11));
     let legendBottom = legendY;
-    const legend = slices.map((slice, index) => {
+    const legend = chartModel.showLegend === false ? "" : slices.map((slice, index) => {
       const fill = printColor(resolveChartCategoryColor(chartModel, slice.name, palette[index % palette.length]));
       const pct = (slice.value / total * 100).toFixed(0);
       const suffix = chartModel.sliceLabel ? slice.sliceLabel == null ? "" : ` \u2014 ${slice.sliceLabel}` : ` \u2014 ${pct}%`;
@@ -62910,7 +62915,7 @@ ${indent}${end}`;
     }).join("\n");
     const centerGraphic = center ? donutCenterSvg(center, cx, cy, innerRadius) : null;
     const donutHole = innerRadius > 0 ? `<circle cx="${cx}" cy="${cy}" r="${innerRadius}" fill="#ffffff" />` : "";
-    const height = Math.max(size, legendBottom + 6);
+    const height = chartModel.showLegend === false ? size : Math.max(size, legendBottom + 6);
     return {
       svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
       ${total > 0 ? paths : `<circle cx="${cx}" cy="${cy}" r="${r2}" fill="#d8e1e8"/>`}
@@ -63008,7 +63013,7 @@ ${indent}${end}`;
       return leftPad + index * (plotWidth / (rows.length - 1));
     });
     const labelStep = Math.max(1, Math.ceil(rows.length / 6));
-    const legend = omitLegend ? { svg: "", height: 0 } : buildLegendSvg(seriesDescriptors, width, plotHeight + bottomPad + 4);
+    const legend = omitLegend || chartModel.showLegend === false ? { svg: "", height: 0 } : buildLegendSvg(seriesDescriptors, width, plotHeight + bottomPad + 4);
     const height = topPad + plotHeight + bottomPad + legend.height + 12;
     const annotations = renderCartesianAnnotationsSvg({
       chartModel,
@@ -63208,7 +63213,7 @@ ${indent}${end}`;
     const valueRange = bounds.maxValue - bounds.minValue || 1;
     const baselineX = leftPad + (0 - bounds.minValue) / valueRange * plotWidth;
     const perSeriesHeight = Math.max(10, Math.floor((rowHeight - Math.max(0, seriesDescriptors.length - 1) * 4) / Math.max(seriesDescriptors.length, 1)));
-    const legend = omitLegend ? { svg: "", height: 0 } : buildLegendSvg(seriesDescriptors, width, topPad + plotHeight + bottomPad + 4);
+    const legend = omitLegend || chartModel.showLegend === false ? { svg: "", height: 0 } : buildLegendSvg(seriesDescriptors, width, topPad + plotHeight + bottomPad + 4);
     const height = baseHeight + legend.height;
     const annotations = renderHorizontalBarAnnotationsSvg({
       chartModel,
@@ -63332,7 +63337,7 @@ ${indent}${end}`;
     const type = normalizeString39((chartModel == null ? void 0 : chartModel.type) || (resolvedChart == null ? void 0 : resolvedChart.type)).toLowerCase();
     if (!["horizontal_bar", "funnel_bar"].includes(type) || !["directSeries", "groupedSeries"].includes(resolvedChart == null ? void 0 : resolvedChart.kind)) {
       const result = buildReportPrintChartSvg({ chartModel, resolvedChart, width });
-      if (result.svg && result.height > maxHeight && ["directSeries", "groupedSeries"].includes(resolvedChart == null ? void 0 : resolvedChart.kind)) {
+      if (chartModel.showLegend !== false && result.svg && result.height > maxHeight && ["directSeries", "groupedSeries"].includes(resolvedChart == null ? void 0 : resolvedChart.kind)) {
         const plot = renderCartesianChartSvg({ chartModel, resolvedChart, width, omitLegend: true });
         if (plot.height <= maxHeight && maxHeight >= 120) {
           const descriptors2 = resolveCartesianSeriesDescriptors(chartModel, resolvedChart).filter((series) => resolvedChart.rows.some((row) => normalizeNumber2(row == null ? void 0 : row[series.key]) != null));
@@ -63346,7 +63351,7 @@ ${indent}${end}`;
     const descriptors = resolveCartesianSeriesDescriptors(chartModel, resolvedChart);
     const valueBounds = computeCartesianValueBounds(rows, descriptors);
     const hasLayout = valueBounds && descriptors.length > 0 && descriptors.every((series) => resolveChartSupportedSeriesType(series.type) === "horizontal_bar");
-    const fullLegendHeight = hasLayout ? buildLegendSvg(descriptors, width, 0).height : 0;
+    const fullLegendHeight = hasLayout && chartModel.showLegend !== false ? buildLegendSvg(descriptors, width, 0).height : 0;
     const minimumPlotHeight = horizontalBarChartMetrics(1, descriptors.length).height;
     const omitLegend = hasLayout && maxHeight >= 120 && minimumPlotHeight <= maxHeight && minimumPlotHeight + fullLegendHeight > maxHeight;
     const legendHeight = omitLegend ? 0 : fullLegendHeight;
@@ -72390,7 +72395,7 @@ ${indent}${end}`;
       });
     });
   }
-  function authoredReportDocument(envelope, requestBaseParameters = null) {
+  function authoredReportDocument(envelope, requestBaseParameters = null, sourceValidation = false) {
     var _a5;
     if (!isObject(envelope) || envelope.schemaVersion !== 1 || envelope.format !== "forge.authoredReport") {
       throw new Error("Expected a schema version 1 forge.authoredReport envelope.");
@@ -72423,6 +72428,18 @@ ${indent}${end}`;
       ...listScopeParamValues(buildReportBuilderDefaultState(config)),
       ...listScopeParamValues(savedState)
     });
+    if (sourceValidation) {
+      const request = buildReportBuilderRequest(config, state);
+      const atPath = (path2) => path2.split(".").reduce((value, key2) => value == null ? void 0 : value[key2], request);
+      for (const dataset of Array.isArray(config.dataSources) ? config.dataSources : []) {
+        const scope = normalizeReportDatasetScope(dataset == null ? void 0 : dataset.scope);
+        const range = scope == null ? void 0 : scope.relativeDateRange;
+        if ((range == null ? void 0 : range.preset) === "previousperiod" && atPath(range.startParamPath) == null && atPath(range.endParamPath) == null) {
+          dataset.scope = { ...scope };
+          delete dataset.scope.relativeDateRange;
+        }
+      }
+    }
     const generated = buildReportBuilderReportDocument({
       container,
       config,
@@ -72447,6 +72464,12 @@ ${indent}${end}`;
     if (typeof envelopeJSON !== "string") throw new Error("Authored report input must be JSON text.");
     const envelope = JSON.parse(envelopeJSON);
     const document = authoredReportDocument(envelope);
+    return JSON.stringify(lowerValidatedReportDocument(document));
+  }
+  function lowerForValidation(envelopeJSON) {
+    if (typeof envelopeJSON !== "string") throw new Error("Authored report input must be JSON text.");
+    const envelope = JSON.parse(envelopeJSON);
+    const document = authoredReportDocument(envelope, null, true);
     return JSON.stringify(lowerValidatedReportDocument(document));
   }
   function lowerWithRequestBase(inputJSON) {

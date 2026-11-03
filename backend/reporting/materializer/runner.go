@@ -33,16 +33,23 @@ func Lower(ctx context.Context, raw json.RawMessage) (json.RawMessage, error) {
 // LowerWithRequestBase validates the original fingerprinted envelope before
 // applying host-bound predicate values to an invocation-local builder copy.
 func LowerWithRequestBase(ctx context.Context, raw json.RawMessage, requestBase map[string]interface{}) (json.RawMessage, error) {
-	return lowerWithSourceKind(ctx, raw, requestBase, "report")
+	return lowerWithSourceKind(ctx, raw, requestBase, "report", false)
+}
+
+// LowerForValidation checks an authored source without binding invocation values.
+// Its spec is for structural compilation only: request-relative date ranges are
+// validated but unresolved. Execution must use LowerWithRequestBase instead.
+func LowerForValidation(ctx context.Context, raw json.RawMessage) (json.RawMessage, error) {
+	return lowerWithSourceKind(ctx, raw, nil, "report", true)
 }
 
 // LowerWindowBuilderWithRequestBase is restricted to a host-derived envelope.
 // The engine retains and revalidates the original window pin independently.
 func LowerWindowBuilderWithRequestBase(ctx context.Context, raw json.RawMessage, requestBase map[string]interface{}) (json.RawMessage, error) {
-	return lowerWithSourceKind(ctx, raw, requestBase, "window")
+	return lowerWithSourceKind(ctx, raw, requestBase, "window", false)
 }
 
-func lowerWithSourceKind(ctx context.Context, raw json.RawMessage, requestBase map[string]interface{}, sourceKind string) (json.RawMessage, error) {
+func lowerWithSourceKind(ctx context.Context, raw json.RawMessage, requestBase map[string]interface{}, sourceKind string, sourceValidation bool) (json.RawMessage, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf("materializer context required")
 	}
@@ -69,6 +76,9 @@ func lowerWithSourceKind(ctx context.Context, raw json.RawMessage, requestBase m
 		return nil, fmt.Errorf("trusted lowerer bundle invalid: %w", programError)
 	}
 	entry, input := "lower", raw
+	if sourceValidation {
+		entry = "lowerForValidation"
+	}
 	if requestBase != nil {
 		var err error
 		input, err = json.Marshal(map[string]interface{}{"envelope": json.RawMessage(raw), "requestBaseParameters": requestBase})

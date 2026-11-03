@@ -16,9 +16,10 @@ import {lowerValidatedReportDocument} from "../../../../src/reporting/reportChar
 import {buildReportFillFromReportSpec} from "../../../../src/reporting/reportFillModel.js";
 import {buildReportPrintFromReportFill} from "../../../../src/reporting/reportPrintModel.js";
 import {updateReportDateRangeValue} from "../../../../src/reporting/reportDateRangeValue.js";
-import {buildReportBuilderDefaultState} from "../../../../src/components/dashboard/reportBuilderUtils.js";
+import {buildReportBuilderDefaultState, buildReportBuilderRequest} from "../../../../src/components/dashboard/reportBuilderUtils.js";
 import {listScopeParamValues, mergeScopeParamValues} from "../../../../src/reporting/scopeStateModel.js";
 import {normalizeReportBuilderPredicates} from "../../../../src/components/dashboard/reportBuilderPredicates.js";
+import {normalizeReportDatasetScope} from "../../../../src/reporting/reportDatasetScopeModel.js";
 import {prepareWindowBuilderExport} from "../../../../src/reporting/windowBuilderExportState.js";
 import {mapReportRequestEnvelope, reportRequestWindowIdentity} from "../../../../src/reporting/reportRequestEnvelope.js";
   function isObject(value) {
@@ -78,7 +79,7 @@ import {mapReportRequestEnvelope, reportRequestWindowIdentity} from "../../../..
       });
     });
   }
-  function authoredReportDocument(envelope, requestBaseParameters = null) {
+  function authoredReportDocument(envelope, requestBaseParameters = null, sourceValidation = false) {
     var _a5;
     if (!isObject(envelope) || envelope.schemaVersion !== 1 || envelope.format !== "forge.authoredReport") {
       throw new Error("Expected a schema version 1 forge.authoredReport envelope.");
@@ -113,6 +114,22 @@ import {mapReportRequestEnvelope, reportRequestWindowIdentity} from "../../../..
       ...listScopeParamValues(buildReportBuilderDefaultState(config)),
       ...listScopeParamValues(savedState),
     });
+    if (sourceValidation) {
+      const request = buildReportBuilderRequest(config, state);
+      const atPath = (path) => path.split(".").reduce((value, key) => value?.[key], request);
+      for (const dataset of Array.isArray(config.dataSources) ? config.dataSources : []) {
+        // The native grammar still validates every original scope declaration.
+        // Only an entirely unbound previousPeriod requires deferral. Supplied
+        // dates, including partial or invalid ranges, retain native validation.
+        const scope = normalizeReportDatasetScope(dataset?.scope);
+        const range = scope?.relativeDateRange;
+        if (range?.preset === "previousperiod"
+          && atPath(range.startParamPath) == null && atPath(range.endParamPath) == null) {
+          dataset.scope = {...scope};
+          delete dataset.scope.relativeDateRange;
+        }
+      }
+    }
     const generated = buildReportBuilderReportDocument({
       container,
       config,
@@ -137,6 +154,12 @@ import {mapReportRequestEnvelope, reportRequestWindowIdentity} from "../../../..
     if (typeof envelopeJSON !== "string") throw new Error("Authored report input must be JSON text.");
     const envelope = JSON.parse(envelopeJSON);
     const document = authoredReportDocument(envelope);
+    return JSON.stringify(lowerValidatedReportDocument(document));
+  }
+  export function lowerForValidation(envelopeJSON) {
+    if (typeof envelopeJSON !== "string") throw new Error("Authored report input must be JSON text.");
+    const envelope = JSON.parse(envelopeJSON);
+    const document = authoredReportDocument(envelope, null, true);
     return JSON.stringify(lowerValidatedReportDocument(document));
   }
   export function lowerWithRequestBase(inputJSON) {

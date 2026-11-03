@@ -65,7 +65,7 @@ func PrepareTrustedRuntime(ctx context.Context) error {
 }
 
 func runTrustedEntry(ctx context.Context, compiled *goja.Program, entry string, raw json.RawMessage) (output string, err error) {
-	if compiled == nil || compiled != program || entry != "lower" && entry != "lowerWithRequestBase" && entry != "materialize" && entry != "materializeFill" && entry != "present" && entry != "prepareWindowBuilder" && entry != "reportWindowIdentity" && entry != "mapReportRequest" {
+	if compiled == nil || compiled != program || entry != "lower" && entry != "lowerForValidation" && entry != "lowerWithRequestBase" && entry != "materialize" && entry != "materializeFill" && entry != "present" && entry != "prepareWindowBuilder" && entry != "reportWindowIdentity" && entry != "mapReportRequest" {
 		return "", fmt.Errorf("untrusted materializer entry")
 	}
 	if err := ctx.Err(); err != nil {

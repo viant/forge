@@ -34,6 +34,7 @@ export default defineConfig({
       'src/components/Chart.measurements.render.test.jsx',
       'src/components/Chart.barIdentity.render.test.jsx',
       'src/components/Chart.axisLabels.render.test.jsx',
+      'src/components/Chart.legend.render.test.jsx',
       'src/components/Chart.pointIdentity.render.test.jsx',
       'src/components/Chart.rowLimit.render.test.jsx',
       'src/components/Chart.pieLabels.render.test.jsx',

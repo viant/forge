@@ -1439,6 +1439,12 @@ sections together; the default remains `tabs`. Compiled chart blocks need both
 the authored `chartSpec` and its native `chartModel`. Ordinary UI tabs, forms and
 window links can surround this embedded report.
 
+Charts may declare `showLegend: false` in `chartSpec` to hide static series or
+category legends in the browser, PDF and XLSX. The canonical `chartModel` retains
+the boolean. Omission and `true` preserve existing behavior; axis labels, native
+series selectors, chart/table controls and exported data remain available. This
+setting does not hide geographic or heatmap color scales.
+
 Runtime panel appearance is controlled by shared classes and
 `--forge-report-panel-{radius,background,shadow,padding,gap}` tokens in workspace
 styles. Product-specific values belong in the workspace theme, not React styles.

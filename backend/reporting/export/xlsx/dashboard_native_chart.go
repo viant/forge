@@ -456,6 +456,9 @@ func dashboardNativeChart(source string, block reportfill.Block) (*excelize.Char
 	}
 	model := block.ChartContent.ChartModel
 	chart := &excelize.Chart{Type: dashboardChartTypes[strings.ToLower(resolved.Type)], Dimension: excelize.ChartDimension{Width: 720, Height: 390}, Legend: excelize.ChartLegend{Position: "bottom", Font: &excelize.Font{Size: 11}}, ShowBlanksAs: "gap", HoleSize: 60}
+	if model["showLegend"] == false {
+		chart.Legend.Position = "none"
+	}
 	vary := resolved.Kind == "category"
 	chart.VaryColors = &vary
 	if resolved.Type == "horizontal_bar" || resolved.Type == "funnel_bar" {

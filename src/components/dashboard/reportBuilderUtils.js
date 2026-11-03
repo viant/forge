@@ -495,6 +495,7 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
         return null;
     }
     validateChartAppearance(chartSpec);
+    if (chartSpec.showLegend !== undefined && typeof chartSpec.showLegend !== "boolean") throw new Error("Chart showLegend must be boolean.");
     const tooltip = normalizeChartTooltip(chartSpec.tooltip);
     const title = String(chartSpec.title || "").trim();
     const eyebrow = String(chartSpec.eyebrow || "").trim();
@@ -542,6 +543,7 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
         ...(center ? {center} : {}),
         ...(sliceLabel?{sliceLabel}:{}),
         ...(chartSpec.appearance ? {appearance:chartSpec.appearance} : {}),
+        ...(typeof chartSpec.showLegend === "boolean" ? {showLegend:chartSpec.showLegend} : {}),
         ...(tooltip ? {tooltip} : {}),
         ...(chartSpec.layout ? {layout:chartSpec.layout} : {}),
         ...(typeof chartSpec.stacked === 'boolean' ? {stacked:chartSpec.stacked} : {}),
@@ -2364,9 +2366,9 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
     if (!normalized) {
         return container;
     }
-    if (isScenarioType(normalized.type)) return {...container,chart:{type:normalized.type,...(normalized.appearance?{appearance:normalized.appearance}:{}),...(typeof normalized.allowTableSwitch==='boolean'?{allowTableSwitch:normalized.allowTableSwitch}:{}),[scenarioKey(normalized.type)]:normalized[scenarioKey(normalized.type)],xAxis:{dataKey:normalized.xField},series:{valueKey:normalized.yFields[0],values:normalized.yFields.map(value=>({value,label:value,type:"bar"}))}}};
-    if (normalized.type === "category-range") return {...container,chart:{type:"category-range",categoryRange:normalized.categoryRange,...(normalized.appearance?{appearance:normalized.appearance}:{}),...(normalized.tooltip?{tooltip:normalized.tooltip}:{}),...(typeof normalized.allowTableSwitch === "boolean"?{allowTableSwitch:normalized.allowTableSwitch}:{}),xAxis:{dataKey:normalized.xField},series:{valueKey:normalized.yFields[0],values:normalized.yFields.map(value=>({value,label:value,type:"bar"}))}}};
-    if (normalized.type === "heatmap") return {...container, chart:{type:"heatmap",heatmap:normalized.heatmap,...(normalized.appearance?{appearance:normalized.appearance}:{}),...(normalized.tooltip?{tooltip:normalized.tooltip}:{}),...(typeof normalized.allowTableSwitch === "boolean"?{allowTableSwitch:normalized.allowTableSwitch}:{}),series:{valueKey:normalized.heatmap.valueField,values:[{value:normalized.heatmap.valueField,label:normalized.heatmap.valueField,type:"heatmap"}]}}};
+    if (isScenarioType(normalized.type)) return {...container,chart:{type:normalized.type,...(normalized.appearance?{appearance:normalized.appearance}:{}),...(typeof normalized.showLegend === "boolean" ? {showLegend:normalized.showLegend} : {}),...(typeof normalized.allowTableSwitch==='boolean'?{allowTableSwitch:normalized.allowTableSwitch}:{}),[scenarioKey(normalized.type)]:normalized[scenarioKey(normalized.type)],xAxis:{dataKey:normalized.xField},series:{valueKey:normalized.yFields[0],values:normalized.yFields.map(value=>({value,label:value,type:"bar"}))}}};
+    if (normalized.type === "category-range") return {...container,chart:{type:"category-range",categoryRange:normalized.categoryRange,...(normalized.appearance?{appearance:normalized.appearance}:{}),...(typeof normalized.showLegend === "boolean" ? {showLegend:normalized.showLegend} : {}),...(normalized.tooltip?{tooltip:normalized.tooltip}:{}),...(typeof normalized.allowTableSwitch === "boolean"?{allowTableSwitch:normalized.allowTableSwitch}:{}),xAxis:{dataKey:normalized.xField},series:{valueKey:normalized.yFields[0],values:normalized.yFields.map(value=>({value,label:value,type:"bar"}))}}};
+    if (normalized.type === "heatmap") return {...container, chart:{type:"heatmap",heatmap:normalized.heatmap,...(normalized.appearance?{appearance:normalized.appearance}:{}),...(typeof normalized.showLegend === "boolean" ? {showLegend:normalized.showLegend} : {}),...(normalized.tooltip?{tooltip:normalized.tooltip}:{}),...(typeof normalized.allowTableSwitch === "boolean"?{allowTableSwitch:normalized.allowTableSwitch}:{}),series:{valueKey:normalized.heatmap.valueField,values:[{value:normalized.heatmap.valueField,label:normalized.heatmap.valueField,type:"heatmap"}]}}};
     const measures = getSelectableReportBuilderMeasures(config);
     const xField = resolveReportBuilderDimensionByField(config, normalized.xField);
     const yMeasures = normalizeStringArray(normalized.yFields)
@@ -2397,6 +2399,7 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
                 ...(normalized.sliceLabel?{sliceLabel:normalized.sliceLabel}:{}),
                 ...(normalized.paletteMode?{paletteMode:normalized.paletteMode}:{}),
                 ...(normalized.appearance ? {appearance:normalized.appearance} : {}),
+        ...(typeof normalized.showLegend === "boolean" ? {showLegend:normalized.showLegend} : {}),
         ...(normalized.tooltip ? {tooltip:normalized.tooltip} : {}),
                 series: {
                     nameKey: xDisplayKey || normalized.xField,
@@ -2418,6 +2421,7 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
         type: seriesType,
         ...(normalized.paletteMode?{paletteMode:normalized.paletteMode}:{}),
                 ...(normalized.appearance ? {appearance:normalized.appearance} : {}),
+        ...(typeof normalized.showLegend === "boolean" ? {showLegend:normalized.showLegend} : {}),
         ...(normalized.tooltip ? {tooltip:normalized.tooltip} : {}),
         ...(normalized.layout ? {layout:normalized.layout} : {}),
         ...(typeof normalized.stacked === 'boolean' ? {stacked:normalized.stacked} : {}),
