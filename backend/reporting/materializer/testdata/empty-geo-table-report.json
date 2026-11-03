@@ -1,0 +1,28 @@
+{
+  "reportSpec": {
+    "version": 1,
+    "kind": "reportSpec",
+    "title": "Readings and regions",
+    "source": {"kind":"report","containerId":"readings","stateKey":"readings","dataSourceRef":"readings"},
+    "parameters": {"viewMode":"table","pageSize":10},
+    "layoutIntent": {"kind":"stack","blockOrder":["details","regions"]},
+    "datasets": [
+      {"id":"primary","dataSourceRef":"readings","request":{"limit":10,"offset":0}},
+      {"id":"empty","dataSourceRef":"readings","request":{"limit":10,"offset":0}}
+    ],
+    "blocks": [
+      {"id":"details","kind":"tableBlock","title":"Readings","datasetRef":"primary","columns":[{"key":"label","label":"Label"},{"key":"value","label":"Value","format":"number2"}]},
+      {"id":"regions","kind":"geoMapBlock","title":"Regions","datasetRef":"empty","geo":{
+        "shape":"geojson","projection":"planar","key":"region","metric":{"key":"value","label":"Value","format":"number2"},
+        "geometry":{"type":"FeatureCollection","features":[
+          {"type":"Feature","id":"A","properties":{"label":"Region A"},"geometry":{"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,1],[0,0]]]}},
+          {"type":"Feature","id":"B","properties":{"label":"Region B"},"geometry":{"type":"Polygon","coordinates":[[[2,0],[3,0],[3,1],[2,1],[2,0]]]}}
+        ]}
+      }}
+    ]
+  },
+  "datasets": {
+    "primary": {"rows":[{"label":"Alpha","value":7.25},{"label":"Beta","value":null}],"hasMore":false},
+    "empty": {"rows":[],"hasMore":false}
+  }
+}
