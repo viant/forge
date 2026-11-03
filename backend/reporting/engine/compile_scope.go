@@ -16,6 +16,16 @@ func (s *Service) Compile(ctx context.Context, request *CompileRequest) (out *Co
 // compileWithAdmitted is internal to ExecuteResource. The public Compile path
 // still reads its selected resource through the configured reader.
 func (s *Service) compileWithAdmitted(ctx context.Context, request *CompileRequest, admitted *admittedCompileDefinition) (out *CompileResult, resultErr error) {
+	return s.compileWithPurpose(ctx, request, admitted, false)
+}
+
+// Preparation validates source structure before invocation values exist. The
+// private purpose never enters CompileRequest or an execution cache key.
+func (s *Service) compileForPreparation(ctx context.Context, request *CompileRequest) (*CompileResult, error) {
+	return s.compileWithPurpose(ctx, request, nil, true)
+}
+
+func (s *Service) compileWithPurpose(ctx context.Context, request *CompileRequest, admitted *admittedCompileDefinition, sourceValidation bool) (out *CompileResult, resultErr error) {
 	if s.reportCatalog != nil && s.hasResourceReader() {
 		scopeTiming := observe.Start(ctx, "report.compile.scope", observe.Labels{Kind: "report"})
 		scoped, finish, err := s.reportCatalog.MetadataRead(ctx)
@@ -40,5 +50,5 @@ func (s *Service) compileWithAdmitted(ctx context.Context, request *CompileReque
 		}
 		ctx = scoped
 	}
-	return s.compileUnscoped(ctx, request, admitted)
+	return s.compileUnscoped(ctx, request, admitted, sourceValidation)
 }

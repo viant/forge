@@ -30,7 +30,7 @@ type admittedCompileDefinition struct {
 
 // compileResolved consumes the shared Forge report envelope, not a second
 // client-supplied definition. It preserves the selected identity through compile.
-func (s *Service) compileResolved(ctx context.Context, request *CompileRequest, admitted *admittedCompileDefinition) (*CompileRequest, *identity.ResolvedResource, ResourceReader, error) {
+func (s *Service) compileResolved(ctx context.Context, request *CompileRequest, admitted *admittedCompileDefinition, sourceValidation bool) (*CompileRequest, *identity.ResolvedResource, ResourceReader, error) {
 	if !s.hasResourceReader() {
 		return nil, nil, nil, identity.ErrResourceDenied
 	}
@@ -133,6 +133,8 @@ func (s *Service) compileResolved(ctx context.Context, request *CompileRequest, 
 		lowerTiming := observe.Start(ctx, "report.compile.lower", observe.Labels{Kind: "report"})
 		if windowBuilder {
 			spec, err = materializer.LowerWindowBuilderWithRequestBase(ctx, raw, requestBase)
+		} else if sourceValidation {
+			spec, err = materializer.LowerForValidation(ctx, raw)
 		} else {
 			spec, err = materializer.LowerWithRequestBase(ctx, raw, requestBase)
 		}

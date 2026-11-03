@@ -26,7 +26,7 @@ type preparedReportKey struct{}
 // PrepareReport runs the normal definition/dependency validation once, before
 // accepting the artifact into the host's synchronized runtime cache.
 func (s *Service) PrepareReport(ctx context.Context, request *CompileRequest) (*PreparedReport, error) {
-	compiled, err := s.Compile(ctx, request)
+	compiled, err := s.compileForPreparation(ctx, request)
 	if err != nil {
 		return nil, err
 	}
