@@ -1589,6 +1589,10 @@ func (r *ReportFill) Validate() error {
 				return err
 			}
 			switch strings.TrimSpace(block.ChartContent.ResolvedChart.Kind) {
+			case "two-set-overlap":
+				if block.ChartContent.ResolvedChart.Type != "two-set-overlap" {
+					return fmt.Errorf("reportFill two-set-overlap payload requires matching type")
+				}
 			case "category-range":
 				if block.ChartContent.ResolvedChart.Type != "category-range" {
 					return fmt.Errorf("reportFill category-range payload requires matching type")

@@ -1,6 +1,7 @@
 // The chart type and its required authored configuration travel together at
 // both spec and resolved model boundaries. Other chart types remain unchanged.
 const typedRequirements = [
+  ['two-set-overlap','twoSetOverlap'],
   ['category-range','categoryRange'],
   ['heatmap','heatmap'],
   ['routing-impact','routingImpact'],

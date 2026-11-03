@@ -1,5 +1,6 @@
 import {isScenarioType,scenarioPrintSvg,scenarioPrintPages} from '../components/scenarios/scenarioContract.js';
 import {donutCenterSvg,donutCenterDescription,donutCenterPrintDescription} from '../components/donutCenter.js';
+import {buildTwoSetOverlap,twoSetOverlapSvg} from '../components/twoSetOverlap.js';
 import {buildCategoryRange,categoryRangeSvg,categoryRangePrintPages} from '../components/categoryRange.js';
 import {buildHeatmap,heatmapSvg,heatmapPrintPages} from '../components/categoricalHeatmap.js';
 import {resolveCategoryColor,resolveChartCategoryColor} from '../components/chartTheme.js';
@@ -1282,6 +1283,7 @@ export function buildReportPrintChartSvg({
   rowLimit = 0,
 } = {}) {
   if(isScenarioType(resolvedChart?.kind)) return scenarioPrintSvg(chartModel,resolvedChart,width);
+  if(resolvedChart?.kind === "two-set-overlap") return twoSetOverlapSvg(buildTwoSetOverlap(chartModel.twoSetOverlap,resolvedChart.rows),width,{print:true,colors:resolveChartPalette(chartModel).map(printColor)});
   if(resolvedChart?.kind === "category-range") return categoryRangeSvg(buildCategoryRange(chartModel.categoryRange,resolvedChart.rows),width);
   if(resolvedChart?.kind === "heatmap") return heatmapSvg(buildHeatmap(chartModel.heatmap,resolvedChart.rows),width);
   // Resolved rows already contain complete category aggregations. Limit marks,
@@ -1312,6 +1314,11 @@ export function buildReportPrintChartSvg({
 
 export function buildReportPrintChartPages({ chartModel = {}, resolvedChart = {}, width = 680, maxHeight = 620, firstMaxHeight = maxHeight, rowLimit = 0 } = {}) {
   if(isScenarioType(resolvedChart?.kind)) return scenarioPrintPages(chartModel,resolvedChart,{width,maxHeight,firstMaxHeight});
+  if(resolvedChart?.kind === "two-set-overlap") {
+    const graphic=twoSetOverlapSvg(buildTwoSetOverlap(chartModel.twoSetOverlap,resolvedChart.rows),width,{print:true,colors:resolveChartPalette(chartModel).map(printColor)});
+    if(width<240||graphic.height>maxHeight)return [{svg:'',width,height:0,diagnostics:[{code:'twoSetOverlapPrintLayoutUnavailable',severity:'warning',message:'Two-set overlap and complete labels need a wider or taller print area. Shorten labels or use a larger page.'}]}];
+    return [{...graphic,startNewPage:graphic.height>firstMaxHeight}];
+  }
   if(resolvedChart?.kind === "category-range") return categoryRangePrintPages(buildCategoryRange(chartModel.categoryRange,resolvedChart.rows),{width,maxHeight,firstMaxHeight});
   if(resolvedChart?.kind === "heatmap") return heatmapPrintPages(buildHeatmap(chartModel.heatmap,resolvedChart.rows),{width,maxHeight,firstMaxHeight});
   resolvedChart = { ...resolvedChart, rows: resolvePrintDisplayRows(chartModel, resolvedChart, rowLimit) };

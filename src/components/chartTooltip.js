@@ -1,6 +1,7 @@
 import {requestLabelInputSchema,normalizeRequestLabelInput,resolveRequestLabelInput} from './requestLabelInput.js';
 import {aggregateDirectSeriesData,buildPieChartData,chartCategoryRowOptions,materializeChartDisplayRows,transformData,readChartDataValue,formatChartDisplayValue,applyChartRowLimit} from './chartData.js';
 import {buildHeatmap} from './categoricalHeatmap.js';
+import {buildTwoSetOverlap} from './twoSetOverlap.js';
 import {buildCategoryRange} from './categoryRange.js';
 
 export const chartTooltipFormats=['text','date','number','number2','number5','currency','currency2','percent','percentFraction','percentFraction2','compactNumber'];
@@ -97,7 +98,7 @@ function sourceRows(row,seriesKey) {
 export function buildChartTooltipEntries(chart,source=[],requestFilters) {
   const config=normalizeChartTooltip(chart.tooltip);if(!config)return [];
   const type=chart.type;
-  if(!['line','area','bar','horizontal_bar','funnel_bar','composed','combo','pie','donut','heatmap','category-range'].includes(type))fail(`unsupported chart type ${type}`);
+  if(!['line','area','bar','horizontal_bar','funnel_bar','composed','combo','pie','donut','heatmap','category-range','two-set-overlap'].includes(type))fail(`unsupported chart type ${type}`);
   const entries=[];
   const add=(category,seriesKey,seriesLabel,rows,identity)=>{
     if(!['string','number','boolean'].includes(typeof category)||(typeof category==='number'&&!Number.isFinite(category)))fail('category keys must be scalar strings, finite numbers or booleans');
@@ -106,7 +107,8 @@ export function buildChartTooltipEntries(chart,source=[],requestFilters) {
     const lines=config.lines?.map(line=>line.map(segment=>segment.input?resolveRequestLabelInput(segment.input,requestFilters):segment.text??values.get(segment.field)).join(''));
     entries.push({id:identity?JSON.stringify(identity):chartTooltipEntryId(category,seriesKey),category:String(category),seriesKey:String(seriesKey),seriesLabel:String(seriesLabel),rowCount:rows.length,fields,...(lines?{lines}:{})});
   };
-  if(type==='heatmap') {
+  if(type==='two-set-overlap') {const model=buildTwoSetOverlap(chart.twoSetOverlap,source);if(!model.empty)model.regions.forEach(region=>add(region.label,region.key,region.label,source));
+  } else if(type==='heatmap') {
     const model=buildHeatmap(chart.heatmap,source);
     model.cells.forEach(cell=>add(`${cell.rowValue} / ${cell.columnValue}`,chart.heatmap.valueField,chart.heatmap.valueField,cell.row?[cell.row]:[],[cell.rowValue,cell.columnValue,chart.heatmap.valueField]));
   } else if(type==='category-range') {

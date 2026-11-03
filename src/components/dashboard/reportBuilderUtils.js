@@ -2,6 +2,7 @@ import {isScenarioType,scenarioKey,normalizeScenario,scenarioFields} from '../sc
 import {normalizePieSliceLabel} from '../pieSliceLabel.js';
 import {normalizeChartTooltip,chartTooltipFields} from '../chartTooltip.js';
 import {normalizeDonutCenter,donutCenterFields} from '../donutCenter.js';
+import {normalizeTwoSetOverlap,overlapFields} from '../twoSetOverlap.js';
 import {normalizeCategoryRange,categoryRangeFields} from '../categoryRange.js';
 import {normalizeHeatmap} from '../categoricalHeatmap.js';
 import {normalizeChartMetricSelection, applyChartMetricSelection} from "../chartMetricSelection.js";
@@ -510,13 +511,15 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
     if(chartSpec.paletteMode==='declared'&&['pie','donut'].includes(type)&&(!chartSpec.categoryColors||!Object.keys(chartSpec.categoryColors).length))throw new Error('Declared category palette requires explicit category colors.');
     const center=normalizeDonutCenter(chartSpec.center,type);
     const sliceLabel=normalizePieSliceLabel(chartSpec.sliceLabel,type);
+    if(type === "two-set-overlap" && ["seriesField","seriesOptions","metricSelection","layout","stacked"].some(key=>chartSpec[key]!=null)) throw new Error("Two-set overlap uses independently declared scalar regions.");
+    const overlap=type === "two-set-overlap" ? normalizeTwoSetOverlap(chartSpec.twoSetOverlap) : null;
     const categoryRange = type === "category-range" ? normalizeCategoryRange(chartSpec.categoryRange) : null;
     if(type === "heatmap" && ["seriesField","seriesOptions","metricSelection","layout","stacked"].some(key=>chartSpec[key]!=null)) throw new Error("Heatmap uses its own declared fields, color scale and category order; seriesField, seriesOptions, metricSelection, layout and stacked are unsupported.");
     const heatmap = type === "heatmap" ? normalizeHeatmap(chartSpec.heatmap) : null;
     if(isScenarioType(type) && ["seriesField","seriesOptions","metricSelection","layout","stacked","tooltip","center","sliceLabel"].some(key=>chartSpec[key]!=null))throw new Error("Scenario charts use their own declared state, fields and metric contracts.");
     const scenario = isScenarioType(type) ? normalizeScenario(type,chartSpec[scenarioKey(type)]) : null;
-    const xField = (scenario ? scenarioFields(type,scenario)[0] : null) || categoryRange?.categoryField || heatmap?.rowField || normalizeChartSpecValue(chartSpec.xField);
-    const yFields = scenario ? [type === "routing-impact" ? scenario.amountField : (scenario.metrics[0].field || scenario.metrics[0].numeratorField)] : categoryRange ? categoryRangeFields(categoryRange) : heatmap ? [heatmap.valueField] : normalizeStringArray(chartSpec.yFields || chartSpec.yField).filter(Boolean);
+    const xField = (overlap ? overlapFields(overlap)[0] : null) || (scenario ? scenarioFields(type,scenario)[0] : null) || categoryRange?.categoryField || heatmap?.rowField || normalizeChartSpecValue(chartSpec.xField);
+    const yFields = overlap ? overlapFields(overlap) : scenario ? [type === "routing-impact" ? scenario.amountField : (scenario.metrics[0].field || scenario.metrics[0].numeratorField)] : categoryRange ? categoryRangeFields(categoryRange) : heatmap ? [heatmap.valueField] : normalizeStringArray(chartSpec.yFields || chartSpec.yField).filter(Boolean);
     const seriesField = normalizeChartSpecValue(chartSpec.seriesField);
     const seriesOptions = normalizeChartSeriesOptions(chartSpec.seriesOptions);
     const categoryLabel = normalizeChartCategoryLabel(chartSpec.categoryLabel);
@@ -538,6 +541,7 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
         ...(yAxis ? { yAxis } : {}),
         ...(scenario ? {[scenarioKey(type)]:scenario} : {}),
         ...(heatmap ? {heatmap} : {}),
+        ...(overlap ? {twoSetOverlap:overlap} : {}),
         ...(categoryRange ? {categoryRange} : {}),
         ...(chartSpec.paletteMode?{paletteMode:chartSpec.paletteMode,palette:[...chartSpec.palette]}:{}),
         ...(center ? {center} : {}),
@@ -611,7 +615,7 @@ function sanitizeChartSpecAgainstConfig(config = {}, chartSpec = null) {
     if(normalized.center&&!normalized.center.datasetRef&&donutCenterFields(normalized.center).some(field=>!universe.has(field)))return null;
     if (normalized.type === "heatmap") return universe.has(normalized.heatmap.columnField) ? normalized : null;
     if (isScenarioType(normalized.type)) return scenarioFields(normalized.type,normalized[scenarioKey(normalized.type)]).every(key=>universe.has(key)) ? normalized : null;
-    if (normalized.type === "category-range") return normalized;
+    if (["two-set-overlap","category-range"].includes(normalized.type)) return normalized;
     const family = chartFamilyForType(normalized.type);
 
     if (SINGLE_MEASURE_CATEGORY_TYPES.has(normalized.type) && normalized.yFields.length > 1) {
@@ -850,6 +854,10 @@ export function validateReportBuilderChartSpec(config = {}, chartSpec = null, co
     }
     const fields = chartFieldIndex(columns);
     chartTooltipFields(normalized.tooltip).forEach((field,index) => {if(!fields.has(field))errors.push({field:`tooltip.fields.${index}.field`,code:"missingField"});});
+    if(normalized.type === "two-set-overlap") {
+        for(const [index,key] of overlapFields(normalized.twoSetOverlap).entries()) {const field=fields.get(key);if(!field||field.kind!=="measure")errors.push({field:`yFields.${index}`,code:!field?"missingField":"wrongKind"});}
+        return {valid:errors.length===0,errors};
+    }
     const xField = normalized.xField ? fields.get(normalized.xField) : null;
     if (!xField) {
         errors.push({ field: "xField", code: "missingField" });
@@ -2367,6 +2375,7 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
         return container;
     }
     if (isScenarioType(normalized.type)) return {...container,chart:{type:normalized.type,...(normalized.appearance?{appearance:normalized.appearance}:{}),...(typeof normalized.showLegend === "boolean" ? {showLegend:normalized.showLegend} : {}),...(typeof normalized.allowTableSwitch==='boolean'?{allowTableSwitch:normalized.allowTableSwitch}:{}),[scenarioKey(normalized.type)]:normalized[scenarioKey(normalized.type)],xAxis:{dataKey:normalized.xField},series:{valueKey:normalized.yFields[0],values:normalized.yFields.map(value=>({value,label:value,type:"bar"}))}}};
+    if (normalized.type === "two-set-overlap") return {...container,chart:{type:normalized.type,twoSetOverlap:normalized.twoSetOverlap,...(normalized.paletteMode?{paletteMode:normalized.paletteMode}:{}),...(normalized.appearance?{appearance:normalized.appearance}:{}),...(normalized.tooltip?{tooltip:normalized.tooltip}:{}),allowTableSwitch:normalized.allowTableSwitch!==false,xAxis:{dataKey:normalized.xField},series:{palette:normalized.palette||DEFAULT_CHART_PALETTE,valueKey:normalized.yFields[0],values:normalized.yFields.map(value=>({value,label:value,type:"bar"}))}}};
     if (normalized.type === "category-range") return {...container,chart:{type:"category-range",categoryRange:normalized.categoryRange,...(normalized.appearance?{appearance:normalized.appearance}:{}),...(typeof normalized.showLegend === "boolean" ? {showLegend:normalized.showLegend} : {}),...(normalized.tooltip?{tooltip:normalized.tooltip}:{}),...(typeof normalized.allowTableSwitch === "boolean"?{allowTableSwitch:normalized.allowTableSwitch}:{}),xAxis:{dataKey:normalized.xField},series:{valueKey:normalized.yFields[0],values:normalized.yFields.map(value=>({value,label:value,type:"bar"}))}}};
     if (normalized.type === "heatmap") return {...container, chart:{type:"heatmap",heatmap:normalized.heatmap,...(normalized.appearance?{appearance:normalized.appearance}:{}),...(typeof normalized.showLegend === "boolean" ? {showLegend:normalized.showLegend} : {}),...(normalized.tooltip?{tooltip:normalized.tooltip}:{}),...(typeof normalized.allowTableSwitch === "boolean"?{allowTableSwitch:normalized.allowTableSwitch}:{}),series:{valueKey:normalized.heatmap.valueField,values:[{value:normalized.heatmap.valueField,label:normalized.heatmap.valueField,type:"heatmap"}]}}};
     const measures = getSelectableReportBuilderMeasures(config);

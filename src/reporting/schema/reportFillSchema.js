@@ -8,6 +8,7 @@ import {donutCenterSchema,resolvedDonutCenterSchema} from '../../components/donu
 import {geoGeometrySchema, resolvedGeoGeometrySchema, geoConfigWithGeometry, geoSeriesScalarSchema, resolvedGeoSeriesRequirement} from './geoGeometrySchema.js';
 import {chartConfigRequirements} from './chartConfigRequirements.js';
 import {categoryRangeSchema} from '../../components/categoryRange.js';
+import {twoSetOverlapSchema} from '../../components/twoSetOverlap.js';
 import {heatmapSchema} from '../../components/categoricalHeatmap.js';
 import {kpiSparklineSchema,kpiSparklineContentSchema} from '../reportKpiSparklineModel.js';
 export const reportFillSchema = {
@@ -715,7 +716,7 @@ export const reportFillSchema = {
     },
     resolvedChart: {
       anyOf: [
-        ...["heatmap","category-range","routing-impact","stage-allocation"].map(kind=>({type:"object",additionalProperties:false,required:["kind","type","seriesKeys","rows",...(["routing-impact","stage-allocation"].includes(kind)?["scenarioState"]:[])],properties:{scenarioState:{type:"object"},tooltipEntries:{type:"array",items:chartTooltipEntrySchema},kind:{const:kind},type:{const:kind},seriesKeys:{type:"array",items:{type:"string"}},rows:{type:"array",items:{$ref:"#/$defs/jsonObject"}}}})),
+        ...["two-set-overlap","heatmap","category-range","routing-impact","stage-allocation"].map(kind=>({type:"object",additionalProperties:false,required:["kind","type","seriesKeys","rows",...(["routing-impact","stage-allocation"].includes(kind)?["scenarioState"]:[])],properties:{scenarioState:{type:"object"},tooltipEntries:{type:"array",items:chartTooltipEntrySchema},kind:{const:kind},type:{const:kind},seriesKeys:{type:"array",items:{type:"string"}},rows:{type:"array",items:{$ref:"#/$defs/jsonObject"}}}})),
         { type: "null" },
         {
           type: "object",
@@ -967,6 +968,7 @@ export const reportFillSchema = {
         type: { type: "string" },
         routingImpact: routingImpactSchema,
         stageAllocation: stageAllocationSchema,
+        twoSetOverlap: twoSetOverlapSchema,
         heatmap: heatmapSchema,
         categoryRange: categoryRangeSchema,
         paletteMode:{enum:["declared"]},
@@ -1238,6 +1240,7 @@ export const reportFillSchema = {
         type: { type: "string" },
         routingImpact: routingImpactSchema,
         stageAllocation: stageAllocationSchema,
+        twoSetOverlap: twoSetOverlapSchema,
         heatmap: heatmapSchema,
         categoryRange: categoryRangeSchema,
         paletteMode: {enum:["declared"]},

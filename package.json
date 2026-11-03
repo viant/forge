@@ -59,6 +59,7 @@
   "scripts": {
     "test:releases": "node --test src/components/primitives/releaseAssignments.test.mjs && vitest run --config vitest.releases.config.mjs",
     "test:chart-axis-labels": "node --no-warnings src/reporting/reportChartAxisLabels.test.js && vitest run --config vitest.runtime.config.mjs src/components/Chart.axisLabels.render.test.jsx",
+    "test:two-set-overlap": "node --no-warnings src/reporting/reportTwoSetOverlap.test.js && vitest run --config vitest.runtime.config.mjs src/components/Chart.twoSetOverlap.render.test.jsx",
     "test:chart-legend": "node --no-warnings src/reporting/reportChartLegend.test.js && vitest run --config vitest.runtime.config.mjs src/components/Chart.legend.render.test.jsx",
     "test:interactive-scenarios": "node --no-warnings src/components/scenarios/scenarios.test.js && vitest run --config vitest.scenarios.config.mjs",
     "test:report-scope-controls": "node --no-warnings src/components/dashboard/reportRuntimeScopeControls.test.mjs && node --no-warnings src/components/dashboard/reportRuntimeBindings.test.mjs && vite-node src/components/dashboard/portableNativeReport.render.test.mjs && vitest run --config vitest.runtime.config.mjs src/components/dashboard/ReportRuntime.scopeControls.render.test.jsx",

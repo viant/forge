@@ -2,6 +2,7 @@ import {isScenarioType,freezeScenario} from '../components/scenarios/scenarioCon
 import {resolvePieSliceLabel} from '../components/pieSliceLabel.js';
 import {buildChartTooltipEntries,chartTooltipPieFields} from '../components/chartTooltip.js';
 import {resolveDonutCenter} from '../components/donutCenter.js';
+import {buildTwoSetOverlap,overlapFields} from '../components/twoSetOverlap.js';
 import {buildCategoryRange,categoryRangeFields} from '../components/categoryRange.js';
 import {buildHeatmap} from '../components/categoricalHeatmap.js';
 import {
@@ -34,6 +35,7 @@ function cloneChartRows(rows = []) {
 function buildBaseReportFillChartPayload(chart = {}, rows = [], centerRows, centerInputs, requestFilters) {
   const type = normalizeString(chart?.type).toLowerCase();
   if(isScenarioType(type)) return freezeScenario(chart,rows,requestFilters);
+  if(type === "two-set-overlap") {const model=buildTwoSetOverlap(chart.twoSetOverlap,rows);return {kind:type,type,seriesKeys:overlapFields(model.config),rows:cloneChartRows(rows)};}
   if(type === "category-range") {
     const model=buildCategoryRange(chart.categoryRange,rows);
     return {kind:"category-range",type,seriesKeys:categoryRangeFields(model.config),rows:cloneChartRows(rows)};

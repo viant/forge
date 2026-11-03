@@ -9,6 +9,7 @@ import {donutCenterSchema,resolvedDonutCenterSchema} from '../../components/donu
 import {geoGeometrySchema, resolvedGeoGeometrySchema, geoConfigWithGeometry} from './geoGeometrySchema.js';
 import {chartConfigRequirements} from './chartConfigRequirements.js';
 import {categoryRangeSchema} from '../../components/categoryRange.js';
+import {twoSetOverlapSchema} from '../../components/twoSetOverlap.js';
 import {heatmapSchema} from '../../components/categoricalHeatmap.js';
 import {kpiSparklineSchema} from '../reportKpiSparklineModel.js';
 export const reportSpecSchema = {
@@ -812,6 +813,7 @@ export const reportSpecSchema = {
         type: { type: "string" },
         routingImpact: routingImpactSchema,
         stageAllocation: stageAllocationSchema,
+        twoSetOverlap: twoSetOverlapSchema,
         heatmap: heatmapSchema,
         categoryRange: categoryRangeSchema,
         paletteMode:{enum:["declared"]},
@@ -1084,6 +1086,7 @@ export const reportSpecSchema = {
         type: { type: "string" },
         routingImpact: routingImpactSchema,
         stageAllocation: stageAllocationSchema,
+        twoSetOverlap: twoSetOverlapSchema,
         heatmap: heatmapSchema,
         categoryRange: categoryRangeSchema,
         paletteMode: {enum:["declared"]},

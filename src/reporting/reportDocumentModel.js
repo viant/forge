@@ -6,6 +6,7 @@ import {donutCenterFields} from '../components/donutCenter.js';
 import {chartTooltipFields} from '../components/chartTooltip.js';
 import {tableAnalyticsFields} from './reportTableAnalytics.js';
 import {buildGeoGeometry} from './geoGeometry.js';
+import {overlapFields} from '../components/twoSetOverlap.js';
 import {categoryRangeFields} from '../components/categoryRange.js';
 import {normalizeReportViewerSettings} from './reportViewerSettings.js';
 import {getReportBlockDatasetRefs} from './reportDatasetRefModel.js';
@@ -235,6 +236,7 @@ function buildAuthoredChartBlockState(baseState = {}, chartSpec = {}, fieldCatal
       selectedMeasures.push(fieldId);
     }
   };
+  if(chartSpec?.twoSetOverlap) overlapFields(chartSpec.twoSetOverlap).forEach(addSelection);
   if(chartSpec?.categoryRange) {addSelection(chartSpec.categoryRange.categoryField);categoryRangeFields(chartSpec.categoryRange).forEach(addSelection);}
   chartTooltipFields(chartSpec?.tooltip).forEach(addSelection);
   if(isScenarioType(chartSpec?.type)) scenarioFields(chartSpec.type,chartSpec[scenarioKey(chartSpec.type)]).forEach(addSelection);
@@ -655,6 +657,7 @@ function augmentReportRequestForAuthoredBlocks(baseSpec = {}, blocks = [], confi
           }
         }
         for(const field of chartTooltipFields(normalizedBlock?.chartSpec?.tooltip)) enableField(field,normalizedDatasetRef,request);
+        if(normalizedBlock?.chartSpec?.twoSetOverlap) for(const field of overlapFields(normalizedBlock.chartSpec.twoSetOverlap)) enableField(field,normalizedDatasetRef,request);
         if(normalizedBlock?.chartSpec?.categoryRange) for(const field of [normalizedBlock.chartSpec.categoryRange.categoryField,...categoryRangeFields(normalizedBlock.chartSpec.categoryRange)]) enableField(field,normalizedDatasetRef,request);
         if(normalizedBlock?.chartSpec?.center){
           const center=normalizedBlock.chartSpec.center,ref=center.datasetRef||normalizedDatasetRef;

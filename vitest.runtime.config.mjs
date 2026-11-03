@@ -31,6 +31,7 @@ export default defineConfig({
       'src/components/Chart.tooltip.render.test.jsx',
       'src/components/dashboard/GeoGeometryMap.render.test.jsx',
       'src/components/Chart.categoryRange.render.test.jsx',
+            'src/components/Chart.twoSetOverlap.render.test.jsx',
       'src/components/Chart.measurements.render.test.jsx',
       'src/components/Chart.barIdentity.render.test.jsx',
       'src/components/Chart.axisLabels.render.test.jsx',

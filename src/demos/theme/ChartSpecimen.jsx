@@ -1,3 +1,4 @@
+import overlapFixture from '../../../doc/examples/two-set-overlap.json';
 import donutFixture from '../../../doc/examples/donut-center.json';
 import signedRangeFixture from '../../../doc/examples/category-range-signed.json';
 import rangeFixture from '../../../doc/examples/category-range.json';
@@ -17,6 +18,8 @@ const series = [{value: 'first', name: 'Primary', type: 'line'}, {value: 'second
 export const chartExamples = [
     {id:"donut-independent",title:"Independent selected metric (invented)",rows:donutFixture.independent.sliceRows,centerRows:donutFixture.independent.rows,centerInputs:donutFixture.independent.inputs,chart:{type:"donut",animation:false,center:donutFixture.independent.center,sliceLabel:donutFixture.independent.sliceLabel,paletteMode:"declared",series:{nameKey:"category",valueKey:"items",palette:donutFixture.independent.palette,categoryColors:donutFixture.independent.categoryColors}}},
     ...[{id:"donut-center",title:donutFixture.title,center:donutFixture.chartSpec.center},{id:"donut-center-occupancy",title:"Independent occupancy rate (invented)",center:donutFixture.occupancy},{id:"donut-center-long",title:"Long center label (invented)",center:{...donutFixture.chartSpec.center,label:donutFixture.longLabel}}].map(entry=>({...entry,rows:donutFixture.rows,chart:{type:"donut",animation:false,center:entry.center,series:{nameKey:"category",valueKey:"items"}}})),
+    {id:'two-set-overlap',title:'Device monitoring (invented)',rows:overlapFixture.rows,chartSpec:overlapFixture.chartSpec,config:{}},
+    {id:'two-set-overlap-frequency',title:'Checks per device (invented)',rows:overlapFixture.frequencyRows,chartSpec:overlapFixture.frequencyChartSpec,config:{}},
     {id:"category-range",title:rangeFixture.title,rows:rangeFixture.rows,chartSpec:rangeFixture.chartSpec,config:{}},
     {id:"category-range-signed",title:signedRangeFixture.title,rows:signedRangeFixture.rows,chartSpec:signedRangeFixture.chartSpec,config:{}},
     {id:'heatmap',title:heatmapFixture.title,rows:heatmapFixture.rows,chartSpec:heatmapFixture.chartSpec,config:{}},

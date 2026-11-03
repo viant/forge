@@ -5,6 +5,7 @@ import {resolveDonutCenter} from './donutCenter.js';
 import {DonutCenterLabel,DonutCenterDetails,EmptyDonutCenter} from './DonutCenter.jsx';
 import {buildChartTooltipEntries,chartTooltipEntryId,chartTooltipPieFields} from './chartTooltip.js';
 import {ChartHoverTooltip,ChartTooltipInspector} from './ChartTooltip.jsx';
+import TwoSetOverlap from './TwoSetOverlap.jsx';
 import CategoryRange from './CategoryRange.jsx';
 import CategoricalHeatmap from './CategoricalHeatmap.jsx';
 import {applyChartMetricSelection} from "./chartMetricSelection.js";
@@ -658,7 +659,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     const isPieChart = responsiveChartType === "pie" || responsiveChartType === "donut";
     const isHorizontalBar = isHorizontalBarType(responsiveChartType);
     const prepared = useMemo(() => {
-        if(isScenarioType(type) || type === "category-range" || type === "heatmap") return {chartData:effectiveCollection || [],availableDataKeys:[],yAxisLabel:""};
+        if(isScenarioType(type) || type === "two-set-overlap" || type === "category-range" || type === "heatmap") return {chartData:effectiveCollection || [],availableDataKeys:[],yAxisLabel:""};
         const chartRows = materializeChartDisplayRows(chart, effectiveCollection || []);
         if (isPieChart) {
             const nameKey = chart.tooltip ? chartTooltipPieFields(chart).nameKey : series.nameKey || "name";
@@ -776,7 +777,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     }, [isPieChart, seriesDefinitions, series.valueKey, selectedValueKey]);
 
     const allTableColumns = useMemo(
-        () => isScenarioType(type) ? Array.from(new Set(chartData.flatMap(row=>Object.keys(row)))) : type === 'category-range' ? Array.from(new Set([chart.categoryRange?.categoryField,...chartData.flatMap(row=>Object.keys(row))].filter(Boolean))) : type === 'heatmap' ? Array.from(new Set([chart.heatmap?.rowField,chart.heatmap?.columnField,chart.heatmap?.valueField,...chartData.flatMap(row=>Object.keys(row))].filter(Boolean))) : isPieChart ? ['name', 'value'] : [xAxis?.dataKey, ...stableAvailableDataKeys].filter(Boolean),
+        () => (isScenarioType(type) || type === 'two-set-overlap') ? Array.from(new Set(chartData.flatMap(row=>Object.keys(row)))) : type === 'category-range' ? Array.from(new Set([chart.categoryRange?.categoryField,...chartData.flatMap(row=>Object.keys(row))].filter(Boolean))) : type === 'heatmap' ? Array.from(new Set([chart.heatmap?.rowField,chart.heatmap?.columnField,chart.heatmap?.valueField,...chartData.flatMap(row=>Object.keys(row))].filter(Boolean))) : isPieChart ? ['name', 'value'] : [xAxis?.dataKey, ...stableAvailableDataKeys].filter(Boolean),
         [type, chart.categoryRange, chart.heatmap, chartData, isPieChart, xAxis?.dataKey, stableAvailableDataKeys],
     );
     const [visibleColumns, setVisibleColumns] = useState(allTableColumns);
@@ -1526,8 +1527,8 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     })();
     const chartViewportStyle = {
         width: "100%",
-        height: (centerState.resolved && (showZeroDataMessage||showEmptyDataMessage||showSelectionMessage)) || isScenarioType(type) || type === "category-range" || type === "heatmap" || smallMultiples || (documentAppearance && isHorizontalBar && renderableSeriesDefinitions.length === 1) ? 'auto' : effectiveViewportHeight,
-        minHeight: (centerState.resolved && (showZeroDataMessage||showEmptyDataMessage||showSelectionMessage)) || isScenarioType(type) || type === "category-range" || type === "heatmap" || smallMultiples || (documentAppearance && isHorizontalBar && renderableSeriesDefinitions.length === 1) ? undefined : resolvedMinHeight || undefined,
+        height: (centerState.resolved && (showZeroDataMessage||showEmptyDataMessage||showSelectionMessage)) || isScenarioType(type) || type === "two-set-overlap" || type === "category-range" || type === "heatmap" || smallMultiples || (documentAppearance && isHorizontalBar && renderableSeriesDefinitions.length === 1) ? 'auto' : effectiveViewportHeight,
+        minHeight: (centerState.resolved && (showZeroDataMessage||showEmptyDataMessage||showSelectionMessage)) || isScenarioType(type) || type === "two-set-overlap" || type === "category-range" || type === "heatmap" || smallMultiples || (documentAppearance && isHorizontalBar && renderableSeriesDefinitions.length === 1) ? undefined : resolvedMinHeight || undefined,
         minWidth: 0,
         flex: "0 0 auto",
         margin: isHorizontalBar ? "0 auto" : undefined,
@@ -1701,6 +1702,8 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                     ) : centerState.error ? (<Typography as="p" typeRole="body" role="alert">{centerState.error}</Typography>
                     ) : centerState.resolved && (showZeroDataMessage||showEmptyDataMessage||showSelectionMessage) ? (
                         <EmptyDonutCenter center={centerState.resolved} typography={chartTypography} message={showSelectionMessage?"No slices selected.":showZeroDataMessage?"All slice values are zero.":"No slice data."}/>
+                    ) : type === "two-set-overlap" ? (
+                        <TwoSetOverlap colors={palette} textSize={chartTypography.smallSize} lineHeight={chartTypography.smallLineHeight} config={chart.twoSetOverlap} rows={chartData} width={chartSize.width || 680} onInspect={chart.tooltip?key=>inspectTooltip(chart.twoSetOverlap[key].label,key):undefined}/>
                     ) : type === "category-range" ? (
                         <CategoryRange onInspect={chart.tooltip?(rowIndex,seriesIndex)=>inspectTooltip(readChartDataValue(chartData[rowIndex],chart.categoryRange.categoryField),seriesIndex):undefined} config={chart.categoryRange} rows={chartData} width={chartSize.width || 680} onSelect={interactiveDatumSelection?onDatumSelect:undefined}/>
                     ) : isScenarioType(type) ? (

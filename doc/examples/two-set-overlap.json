@@ -1,0 +1,24 @@
+{
+  "provenance": "Independently invented public laboratory-device example; values and percentages are separately authored, never derived by this chart.",
+  "chartSpec": {
+    "type": "two-set-overlap",
+    "appearance": "document",
+    "xField": "monitoringAOnly",
+    "yFields": ["monitoringAOnly", "monitoringAOnlyPercent", "both", "bothPercent", "monitoringBOnly", "monitoringBOnlyPercent"],
+    "twoSetOverlap": {
+      "leftOnly": {"label": "Monitoring A only", "valueField": "monitoringAOnly", "format": {"grouping": true, "decimals": 0}, "secondaryField": "monitoringAOnlyPercent", "secondaryFormat": {"decimals": 1, "suffix": "%"}},
+      "intersection": {"label": "Both", "valueField": "both", "format": {"grouping": true, "decimals": 0}, "secondaryField": "bothPercent", "secondaryFormat": {"decimals": 1, "suffix": "%"}},
+      "rightOnly": {"label": "Monitoring B only", "valueField": "monitoringBOnly", "format": {"grouping": true, "decimals": 0}, "secondaryField": "monitoringBOnlyPercent", "secondaryFormat": {"decimals": 1, "suffix": "%"}}
+    }
+  },
+  "rows": [{"monitoringAOnly": 1240, "monitoringAOnlyPercent": 41.3, "both": 610, "bothPercent": 20.4, "monitoringBOnly": 1150, "monitoringBOnlyPercent": 38.3}],
+  "frequencyChartSpec": {
+    "type": "two-set-overlap", "xField": "checksA", "yFields": ["checksA", "checksBoth", "checksB"],
+    "twoSetOverlap": {
+      "leftOnly": {"label": "Monitoring A only", "valueField": "checksA", "format": {"decimals": 2, "suffix": " checks per device"}},
+      "intersection": {"label": "Both", "valueField": "checksBoth", "format": {"decimals": 2, "suffix": " checks per device"}},
+      "rightOnly": {"label": "Monitoring B only", "valueField": "checksB", "format": {"decimals": 2, "suffix": " checks per device"}}
+    }
+  },
+  "frequencyRows": [{"checksA": 2.35, "checksBoth": 4.12, "checksB": 1.86}]
+}

@@ -29404,21 +29404,21 @@ Valid values are ${Array.from(VALID_ROUNDING_INCREMENTS).join(", ")}.`, RangeErr
         }
     }
     x2 = result.roundedNumber;
-    let string3 = result.formattedString;
+    let string4 = result.formattedString;
     if (intlObject.trailingZeroDisplay === "stripIfInteger" && x2.isInteger()) {
-      let i3 = string3.indexOf(".");
-      if (i3 > -1) string3 = string3.slice(0, i3);
+      let i3 = string4.indexOf(".");
+      if (i3 > -1) string4 = string4.slice(0, i3);
     }
     const int3 = result.integerDigitsCount;
     const minInteger = intlObject.minimumIntegerDigits;
-    if (int3 < minInteger) string3 = repeat("0", minInteger - int3) + string3;
+    if (int3 < minInteger) string4 = repeat("0", minInteger - int3) + string4;
     if (sign === "negative") {
       if (x2.isZero()) x2 = NEGATIVE_ZERO;
       else x2 = x2.negated();
     }
     return {
       roundedNumber: x2,
-      formattedString: string3
+      formattedString: string4
     };
   }
   function GetOperands(s4, exponent = 0) {
@@ -30540,21 +30540,21 @@ Valid values are ${Array.from(VALID_ROUNDING_INCREMENTS).join(", ")}.`, RangeErr
         }
     }
     x2 = result.roundedNumber;
-    let string3 = result.formattedString;
+    let string4 = result.formattedString;
     if (intlObject.trailingZeroDisplay === "stripIfInteger" && x2.isInteger()) {
-      let i3 = string3.indexOf(".");
-      if (i3 > -1) string3 = string3.slice(0, i3);
+      let i3 = string4.indexOf(".");
+      if (i3 > -1) string4 = string4.slice(0, i3);
     }
     const int3 = result.integerDigitsCount;
     const minInteger = intlObject.minimumIntegerDigits;
-    if (int3 < minInteger) string3 = repeat2("0", minInteger - int3) + string3;
+    if (int3 < minInteger) string4 = repeat2("0", minInteger - int3) + string4;
     if (sign === "negative") {
       if (x2.isZero()) x2 = NEGATIVE_ZERO2;
       else x2 = x2.negated();
     }
     return {
       roundedNumber: x2,
-      formattedString: string3
+      formattedString: string4
     };
   }
   function ComputeExponent(internalSlots, x2) {
@@ -45221,11 +45221,11 @@ Please __addLocaleData before adding additional unit data`);
 
   // node_modules/date-fns/esm/locale/_lib/buildMatchFn/index.js
   function buildMatchFn(args) {
-    return function(string3) {
+    return function(string4) {
       var options = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : {};
       var width = options.width;
       var matchPattern = width && args.matchPatterns[width] || args.matchPatterns[args.defaultMatchWidth];
-      var matchResult = string3.match(matchPattern);
+      var matchResult = string4.match(matchPattern);
       if (!matchResult) {
         return null;
       }
@@ -45239,7 +45239,7 @@ Please __addLocaleData before adding additional unit data`);
       var value;
       value = args.valueCallback ? args.valueCallback(key2) : key2;
       value = options.valueCallback ? options.valueCallback(value) : value;
-      var rest = string3.slice(matchedString.length);
+      var rest = string4.slice(matchedString.length);
       return {
         value,
         rest
@@ -45265,16 +45265,16 @@ Please __addLocaleData before adding additional unit data`);
 
   // node_modules/date-fns/esm/locale/_lib/buildMatchPatternFn/index.js
   function buildMatchPatternFn(args) {
-    return function(string3) {
+    return function(string4) {
       var options = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : {};
-      var matchResult = string3.match(args.matchPattern);
+      var matchResult = string4.match(args.matchPattern);
       if (!matchResult) return null;
       var matchedString = matchResult[0];
-      var parseResult = string3.match(args.parsePattern);
+      var parseResult = string4.match(args.parsePattern);
       if (!parseResult) return null;
       var value = args.valueCallback ? args.valueCallback(parseResult[0]) : parseResult[0];
       value = options.valueCallback ? options.valueCallback(value) : value;
-      var rest = string3.slice(matchedString.length);
+      var rest = string4.slice(matchedString.length);
       return {
         value,
         rest
@@ -50805,6 +50805,142 @@ ${indent}${end}`;
     return pages;
   }
 
+  // src/components/chartTheme.js
+  var LEGACY_CHART_ROLE_BY_COLOR = /* @__PURE__ */ new Map([
+    ["#1f77b4", 1],
+    ["#ff7f0e", 2],
+    ["#2ca02c", 3],
+    ["#d62728", 4],
+    ["#9467bd", 5],
+    ["#8c564b", 6],
+    ["#2f6de1", 1],
+    ["#7a46d8", 2],
+    ["#db2f7d", 3],
+    ["#f55d1f", 4],
+    ["#d79619", 5],
+    ["#2aa84a", 6],
+    ["#137cbd", 1],
+    ["#0f9960", 2],
+    ["#d9822b", 3],
+    ["#8f398f", 4],
+    ["#c23030", 5],
+    ["#5c7080", 6]
+  ]);
+  function normalizedColor(value) {
+    return String(value || "").trim().toLowerCase();
+  }
+  function chartSeriesColor(role, fallback) {
+    const normalizedRole = ((Number(role) || 1) - 1) % 6 + 1;
+    return `var(--forge-chart-series-${normalizedRole}, ${fallback})`;
+  }
+  function resolveThemeAwareChartColor(value, index = 0, { forceRole = false, declared = false } = {}) {
+    const color = String(value || "").trim();
+    if (declared) {
+      if (!/^#[0-9a-f]{6}$/i.test(color)) throw new Error("Declared chart colors must be six-digit hex colors.");
+      return color;
+    }
+    if (!color || color.startsWith("var(")) return color;
+    const mappedRole = LEGACY_CHART_ROLE_BY_COLOR.get(normalizedColor(color));
+    if (!mappedRole && !forceRole) return color;
+    return chartSeriesColor(mappedRole || index % 6 + 1, color);
+  }
+  function resolveCategoryColor(colors, category, fallback) {
+    const key2 = String(category != null ? category : "").trim().toLowerCase();
+    const entry = Object.entries(colors || {}).find(([name]) => name.trim().toLowerCase() === key2);
+    return typeof (entry == null ? void 0 : entry[1]) === "string" && entry[1].trim() ? entry[1].trim() : fallback;
+  }
+  function resolveChartCategoryColor(chart, category, fallback) {
+    var _a5, _b;
+    if ((chart == null ? void 0 : chart.paletteMode) !== "declared") return resolveCategoryColor((_a5 = chart == null ? void 0 : chart.series) == null ? void 0 : _a5.categoryColors, category, fallback);
+    const key2 = String(category != null ? category : "");
+    const colors = ((_b = chart.series) == null ? void 0 : _b.categoryColors) || {};
+    if (Object.hasOwn(colors, key2)) return resolveThemeAwareChartColor(colors[key2], 0, { declared: true });
+    if (["pie", "donut"].includes(chart.type)) throw new Error("Declared category palettes require a color for every category.");
+    return fallback;
+  }
+
+  // src/components/twoSetOverlap.js
+  var overlapRegions = ["leftOnly", "intersection", "rightOnly"];
+  var string3 = { type: "string", minLength: 1 };
+  var regionSchema = { type: "object", additionalProperties: false, required: ["label", "valueField"], properties: { label: string3, valueField: string3, secondaryField: string3, format: numericDisplayFormatSchema, secondaryFormat: numericDisplayFormatSchema } };
+  var twoSetOverlapSchema = { type: "object", additionalProperties: false, required: overlapRegions, properties: Object.fromEntries(overlapRegions.map((key2) => [key2, regionSchema])) };
+  function overlapFields(config) {
+    return [...new Set(overlapRegions.flatMap((key2) => [config[key2].valueField, config[key2].secondaryField].filter(Boolean)))];
+  }
+  function normalizeTwoSetOverlap(input) {
+    if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some((key2) => !overlapRegions.includes(key2))) throw Error("Two-set overlap requires three declared regions.");
+    for (const key2 of overlapRegions) {
+      const region = input[key2];
+      if (!region || typeof region !== "object" || Array.isArray(region) || Object.keys(region).some((k2) => !Object.hasOwn(regionSchema.properties, k2))) throw Error(`Invalid two-set overlap region: ${key2}`);
+      for (const field2 of ["label", "valueField", ...region.secondaryField !== void 0 ? ["secondaryField"] : []]) if (typeof region[field2] !== "string" || !region[field2].trim()) throw Error(`Two-set overlap ${key2}.${field2} is required.`);
+      if (region.secondaryFormat && !region.secondaryField) throw Error("Secondary format requires a secondary field.");
+      validateNumericDisplayFormat(region.format);
+      validateNumericDisplayFormat(region.secondaryFormat);
+    }
+    return JSON.parse(JSON.stringify(input));
+  }
+  function buildTwoSetOverlap(input, rows = []) {
+    const config = normalizeTwoSetOverlap(input);
+    if (!Array.isArray(rows) || rows.length > 1) throw Error("Two-set overlap requires at most one scalar row.");
+    const row = rows[0];
+    const scalar = (field2, format2) => {
+      const value = readChartDataValue(row, field2);
+      if (value !== void 0 && value !== null && (typeof value !== "number" || !Number.isFinite(value))) throw Error("Two-set overlap values must be finite numbers or null.");
+      return { field: field2, value, state: value === void 0 ? "missing" : value === null ? "null" : "value", displayValue: formatRangeValue(value, { format: format2 }) };
+    };
+    return { config, empty: !row, regions: overlapRegions.map((key2) => {
+      const region = config[key2];
+      return { key: key2, label: region.label, primary: scalar(region.valueField, region.format), ...region.secondaryField ? { secondary: scalar(region.secondaryField, region.secondaryFormat) } : {} };
+    }) };
+  }
+  var escape5 = (value) => String(value).replace(/[&<>"']/g, (c3) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c3]);
+  function twoSetOverlapSvg(model, width = 680, { print = false, colors, textSize = 12, lineHeight = Math.max(18, textSize * 1.5) } = {}) {
+    width = Math.max(240, width);
+    const color = (index) => escape5((colors == null ? void 0 : colors[index]) || (print ? ["#1f77b4", "#ff7f0e"][index] : chartSeriesColor(index + 1, ["#1f77b4", "#ff7f0e"][index])));
+    const narrow = width < 440, diagramHeight = Math.min(280, width * 0.55), r2 = diagramHeight * 0.44, cy = diagramHeight / 2, cx = width / 2, offset = r2 * 0.57;
+    if (model.empty) return { svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="48" viewBox="0 0 ${width} 48" ${print ? "" : 'role="img" aria-label="No data available"'}><text x="12" y="28">No data available</text></svg>`, width, height: 48 };
+    const wrap2 = (value, budget) => {
+      const lines2 = [];
+      let line = "";
+      for (const word of String(value).split(/\s+/u)) {
+        const candidate = line ? `${line} ${word}` : word;
+        if (measureChartText(candidate, textSize) <= budget) {
+          line = candidate;
+          continue;
+        }
+        if (line) {
+          lines2.push(line);
+          line = "";
+        }
+        for (const char of word) {
+          if (line && measureChartText(line + char, textSize) > budget) {
+            lines2.push(line);
+            line = "";
+          }
+          line += char;
+        }
+      }
+      return [...lines2, line].filter(Boolean);
+    };
+    const positions = [cx - offset - r2 * 0.48, cx, cx + offset + r2 * 0.48], zoneWidth = r2 * 0.84;
+    const regionLines = model.regions.map((region) => [...wrap2(region.label, zoneWidth), ...wrap2(region.primary.displayValue, zoneWidth), ...region.secondary ? wrap2(region.secondary.displayValue, zoneWidth) : []]);
+    const direct = !narrow && regionLines.every((lines2) => lines2.length * lineHeight <= r2 * 1.35) && model.regions.every((region) => {
+      var _a5;
+      return [region.label, region.primary.displayValue, ((_a5 = region.secondary) == null ? void 0 : _a5.displayValue) || ""].every((value) => String(value).split(/\s+/u).every((word) => measureChartText(word, textSize) <= zoneWidth));
+    });
+    let bottom = diagramHeight + 24;
+    const groups = model.regions.map((region, i3) => {
+      const lines2 = direct ? regionLines[i3] : [...wrap2(`${i3 + 1}. ${region.label}`, narrow ? width - 32 : width / 3 - 24), ...wrap2(region.primary.displayValue, narrow ? width - 32 : width / 3 - 24), ...region.secondary ? wrap2(region.secondary.displayValue, narrow ? width - 32 : width / 3 - 24) : []];
+      const x2 = direct ? positions[i3] : narrow ? 16 : width * (i3 + 0.5) / 3, y4 = direct ? cy - (lines2.length - 1) * lineHeight / 2 : narrow ? bottom : diagramHeight + 24;
+      if (!direct) bottom = narrow ? y4 + lines2.length * lineHeight + 24 : Math.max(bottom, y4 + lines2.length * lineHeight + 24);
+      const description = `${region.label}: ${region.primary.displayValue}${region.secondary ? ", " + region.secondary.displayValue : ""}`;
+      const content = `${direct ? "" : `<text x="${positions[i3]}" y="${cy + textSize * 0.4}" text-anchor="middle">${i3 + 1}</text>`}${lines2.map((line, j) => `<text x="${x2}" y="${y4 + j * lineHeight}" text-anchor="${!direct && narrow ? "start" : "middle"}">${escape5(line)}</text>`).join("")}`;
+      return print ? content : `<g data-overlap-region="${region.key}" tabindex="0" role="img" aria-label="${escape5(description)}"><title>${escape5(description)}</title>${content}</g>`;
+    }).join("");
+    const note = wrap2("Fixed circles; area does not encode quantity.", width - 24), height = bottom + note.length * lineHeight;
+    return { svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" ${print ? "" : 'role="group" aria-label="Two-set overlap; fixed circles do not encode quantity"'}><circle cx="${cx - offset}" cy="${cy}" r="${r2}" fill="${color(0)}" fill-opacity="0.16" stroke="${color(0)}"/><circle cx="${cx + offset}" cy="${cy}" r="${r2}" fill="${color(1)}" fill-opacity="0.16" stroke="${color(1)}"/>${groups}${note.map((line, i3) => `<text x="12" y="${bottom + i3 * lineHeight}">${escape5(line)}</text>`).join("")}</svg>`, width, height };
+  }
+
   // src/components/chartTooltip.js
   var chartTooltipFormats = ["text", "date", "number", "number2", "number5", "currency", "currency2", "percent", "percentFraction", "percentFraction2", "compactNumber"];
   var formats = chartTooltipFormats;
@@ -50899,7 +51035,7 @@ ${indent}${end}`;
     const config = normalizeChartTooltip(chart.tooltip);
     if (!config) return [];
     const type = chart.type;
-    if (!["line", "area", "bar", "horizontal_bar", "funnel_bar", "composed", "combo", "pie", "donut", "heatmap", "category-range"].includes(type)) fail(`unsupported chart type ${type}`);
+    if (!["line", "area", "bar", "horizontal_bar", "funnel_bar", "composed", "combo", "pie", "donut", "heatmap", "category-range", "two-set-overlap"].includes(type)) fail(`unsupported chart type ${type}`);
     const entries2 = [];
     const add = (category, seriesKey, seriesLabel, rows, identity) => {
       var _a6;
@@ -50912,7 +51048,10 @@ ${indent}${end}`;
       }).join(""));
       entries2.push({ id: identity ? JSON.stringify(identity) : chartTooltipEntryId(category, seriesKey), category: String(category), seriesKey: String(seriesKey), seriesLabel: String(seriesLabel), rowCount: rows.length, fields: fields2, ...lines2 ? { lines: lines2 } : {} });
     };
-    if (type === "heatmap") {
+    if (type === "two-set-overlap") {
+      const model = buildTwoSetOverlap(chart.twoSetOverlap, source);
+      if (!model.empty) model.regions.forEach((region) => add(region.label, region.key, region.label, source));
+    } else if (type === "heatmap") {
       const model = buildHeatmap(chart.heatmap, source);
       model.cells.forEach((cell) => add(`${cell.rowValue} / ${cell.columnValue}`, chart.heatmap.valueField, chart.heatmap.valueField, cell.row ? [cell.row] : [], [cell.rowValue, cell.columnValue, chart.heatmap.valueField]));
     } else if (type === "category-range") {
@@ -54143,7 +54282,7 @@ ${indent}${end}`;
   // src/components/dashboard/reportBuilderChartRules.js
   var CARTESIAN_CHART_TYPES = ["line", "bar", "area"];
   var CATEGORY_CHART_TYPES = ["pie", "donut", "horizontal_bar", "funnel_bar"];
-  var ALL_SUPPORTED_CHART_TYPES = [...CARTESIAN_CHART_TYPES, ...CATEGORY_CHART_TYPES, "heatmap", "category-range", "routing-impact", "stage-allocation"];
+  var ALL_SUPPORTED_CHART_TYPES = [...CARTESIAN_CHART_TYPES, ...CATEGORY_CHART_TYPES, "two-set-overlap", "heatmap", "category-range", "routing-impact", "stage-allocation"];
   var SINGLE_MEASURE_CATEGORY_TYPES = /* @__PURE__ */ new Set(["pie", "donut", "funnel_bar"]);
   function chartFamilyForType(type = "") {
     const normalized = String(type || "").trim().toLowerCase();
@@ -54656,13 +54795,15 @@ ${indent}${end}`;
     if (chartSpec.paletteMode === "declared" && ["pie", "donut"].includes(type) && (!chartSpec.categoryColors || !Object.keys(chartSpec.categoryColors).length)) throw new Error("Declared category palette requires explicit category colors.");
     const center = normalizeDonutCenter(chartSpec.center, type);
     const sliceLabel = normalizePieSliceLabel(chartSpec.sliceLabel, type);
+    if (type === "two-set-overlap" && ["seriesField", "seriesOptions", "metricSelection", "layout", "stacked"].some((key2) => chartSpec[key2] != null)) throw new Error("Two-set overlap uses independently declared scalar regions.");
+    const overlap = type === "two-set-overlap" ? normalizeTwoSetOverlap(chartSpec.twoSetOverlap) : null;
     const categoryRange = type === "category-range" ? normalizeCategoryRange(chartSpec.categoryRange) : null;
     if (type === "heatmap" && ["seriesField", "seriesOptions", "metricSelection", "layout", "stacked"].some((key2) => chartSpec[key2] != null)) throw new Error("Heatmap uses its own declared fields, color scale and category order; seriesField, seriesOptions, metricSelection, layout and stacked are unsupported.");
     const heatmap = type === "heatmap" ? normalizeHeatmap(chartSpec.heatmap) : null;
     if (isScenarioType(type) && ["seriesField", "seriesOptions", "metricSelection", "layout", "stacked", "tooltip", "center", "sliceLabel"].some((key2) => chartSpec[key2] != null)) throw new Error("Scenario charts use their own declared state, fields and metric contracts.");
     const scenario = isScenarioType(type) ? normalizeScenario(type, chartSpec[scenarioKey(type)]) : null;
-    const xField = (scenario ? scenarioFields(type, scenario)[0] : null) || (categoryRange == null ? void 0 : categoryRange.categoryField) || (heatmap == null ? void 0 : heatmap.rowField) || normalizeChartSpecValue(chartSpec.xField);
-    const yFields = scenario ? [type === "routing-impact" ? scenario.amountField : scenario.metrics[0].field || scenario.metrics[0].numeratorField] : categoryRange ? categoryRangeFields(categoryRange) : heatmap ? [heatmap.valueField] : normalizeStringArray3(chartSpec.yFields || chartSpec.yField).filter(Boolean);
+    const xField = (overlap ? overlapFields(overlap)[0] : null) || (scenario ? scenarioFields(type, scenario)[0] : null) || (categoryRange == null ? void 0 : categoryRange.categoryField) || (heatmap == null ? void 0 : heatmap.rowField) || normalizeChartSpecValue(chartSpec.xField);
+    const yFields = overlap ? overlapFields(overlap) : scenario ? [type === "routing-impact" ? scenario.amountField : scenario.metrics[0].field || scenario.metrics[0].numeratorField] : categoryRange ? categoryRangeFields(categoryRange) : heatmap ? [heatmap.valueField] : normalizeStringArray3(chartSpec.yFields || chartSpec.yField).filter(Boolean);
     const seriesField = normalizeChartSpecValue(chartSpec.seriesField);
     const seriesOptions = normalizeChartSeriesOptions(chartSpec.seriesOptions);
     const categoryLabel = normalizeChartCategoryLabel(chartSpec.categoryLabel);
@@ -54684,6 +54825,7 @@ ${indent}${end}`;
       ...yAxis ? { yAxis } : {},
       ...scenario ? { [scenarioKey(type)]: scenario } : {},
       ...heatmap ? { heatmap } : {},
+      ...overlap ? { twoSetOverlap: overlap } : {},
       ...categoryRange ? { categoryRange } : {},
       ...chartSpec.paletteMode ? { paletteMode: chartSpec.paletteMode, palette: [...chartSpec.palette] } : {},
       ...center ? { center } : {},
@@ -54753,7 +54895,7 @@ ${indent}${end}`;
     if (normalized.center && !normalized.center.datasetRef && donutCenterFields(normalized.center).some((field2) => !universe.has(field2))) return null;
     if (normalized.type === "heatmap") return universe.has(normalized.heatmap.columnField) ? normalized : null;
     if (isScenarioType(normalized.type)) return scenarioFields(normalized.type, normalized[scenarioKey(normalized.type)]).every((key2) => universe.has(key2)) ? normalized : null;
-    if (normalized.type === "category-range") return normalized;
+    if (["two-set-overlap", "category-range"].includes(normalized.type)) return normalized;
     const family = chartFamilyForType(normalized.type);
     if (SINGLE_MEASURE_CATEGORY_TYPES.has(normalized.type) && normalized.yFields.length > 1) {
       return null;
@@ -54963,6 +55105,13 @@ ${indent}${end}`;
     chartTooltipFields(normalized.tooltip).forEach((field2, index) => {
       if (!fields2.has(field2)) errors.push({ field: `tooltip.fields.${index}.field`, code: "missingField" });
     });
+    if (normalized.type === "two-set-overlap") {
+      for (const [index, key2] of overlapFields(normalized.twoSetOverlap).entries()) {
+        const field2 = fields2.get(key2);
+        if (!field2 || field2.kind !== "measure") errors.push({ field: `yFields.${index}`, code: !field2 ? "missingField" : "wrongKind" });
+      }
+      return { valid: errors.length === 0, errors };
+    }
     const xField = normalized.xField ? fields2.get(normalized.xField) : null;
     if (!xField) {
       errors.push({ field: "xField", code: "missingField" });
@@ -55721,6 +55870,7 @@ ${indent}${end}`;
       return container;
     }
     if (isScenarioType(normalized.type)) return { ...container, chart: { type: normalized.type, ...normalized.appearance ? { appearance: normalized.appearance } : {}, ...typeof normalized.showLegend === "boolean" ? { showLegend: normalized.showLegend } : {}, ...typeof normalized.allowTableSwitch === "boolean" ? { allowTableSwitch: normalized.allowTableSwitch } : {}, [scenarioKey(normalized.type)]: normalized[scenarioKey(normalized.type)], xAxis: { dataKey: normalized.xField }, series: { valueKey: normalized.yFields[0], values: normalized.yFields.map((value) => ({ value, label: value, type: "bar" })) } } };
+    if (normalized.type === "two-set-overlap") return { ...container, chart: { type: normalized.type, twoSetOverlap: normalized.twoSetOverlap, ...normalized.paletteMode ? { paletteMode: normalized.paletteMode } : {}, ...normalized.appearance ? { appearance: normalized.appearance } : {}, ...normalized.tooltip ? { tooltip: normalized.tooltip } : {}, allowTableSwitch: normalized.allowTableSwitch !== false, xAxis: { dataKey: normalized.xField }, series: { palette: normalized.palette || DEFAULT_CHART_PALETTE, valueKey: normalized.yFields[0], values: normalized.yFields.map((value) => ({ value, label: value, type: "bar" })) } } };
     if (normalized.type === "category-range") return { ...container, chart: { type: "category-range", categoryRange: normalized.categoryRange, ...normalized.appearance ? { appearance: normalized.appearance } : {}, ...typeof normalized.showLegend === "boolean" ? { showLegend: normalized.showLegend } : {}, ...normalized.tooltip ? { tooltip: normalized.tooltip } : {}, ...typeof normalized.allowTableSwitch === "boolean" ? { allowTableSwitch: normalized.allowTableSwitch } : {}, xAxis: { dataKey: normalized.xField }, series: { valueKey: normalized.yFields[0], values: normalized.yFields.map((value) => ({ value, label: value, type: "bar" })) } } };
     if (normalized.type === "heatmap") return { ...container, chart: { type: "heatmap", heatmap: normalized.heatmap, ...normalized.appearance ? { appearance: normalized.appearance } : {}, ...typeof normalized.showLegend === "boolean" ? { showLegend: normalized.showLegend } : {}, ...normalized.tooltip ? { tooltip: normalized.tooltip } : {}, ...typeof normalized.allowTableSwitch === "boolean" ? { allowTableSwitch: normalized.allowTableSwitch } : {}, series: { valueKey: normalized.heatmap.valueField, values: [{ value: normalized.heatmap.valueField, label: normalized.heatmap.valueField, type: "heatmap" }] } } };
     const measures = getSelectableReportBuilderMeasures(config);
@@ -57355,6 +57505,7 @@ ${indent}${end}`;
         selectedMeasures.push(fieldId);
       }
     };
+    if (chartSpec == null ? void 0 : chartSpec.twoSetOverlap) overlapFields(chartSpec.twoSetOverlap).forEach(addSelection);
     if (chartSpec == null ? void 0 : chartSpec.categoryRange) {
       addSelection(chartSpec.categoryRange.categoryField);
       categoryRangeFields(chartSpec.categoryRange).forEach(addSelection);
@@ -57695,7 +57846,7 @@ ${indent}${end}`;
       return true;
     };
     (Array.isArray(blocks) ? blocks : []).forEach((block) => {
-      var _a5, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r;
+      var _a5, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s;
       const normalizedBlock = block && typeof block === "object" && !Array.isArray(block) ? block : null;
       if (!normalizedBlock) {
         return;
@@ -57714,8 +57865,9 @@ ${indent}${end}`;
             }
           }
           for (const field2 of chartTooltipFields((_a5 = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _a5.tooltip)) enableField(field2, normalizedDatasetRef, request);
-          if ((_b = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _b.categoryRange) for (const field2 of [normalizedBlock.chartSpec.categoryRange.categoryField, ...categoryRangeFields(normalizedBlock.chartSpec.categoryRange)]) enableField(field2, normalizedDatasetRef, request);
-          if ((_c = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _c.center) {
+          if ((_b = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _b.twoSetOverlap) for (const field2 of overlapFields(normalizedBlock.chartSpec.twoSetOverlap)) enableField(field2, normalizedDatasetRef, request);
+          if ((_c = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _c.categoryRange) for (const field2 of [normalizedBlock.chartSpec.categoryRange.categoryField, ...categoryRangeFields(normalizedBlock.chartSpec.categoryRange)]) enableField(field2, normalizedDatasetRef, request);
+          if ((_d = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _d.center) {
             const center = normalizedBlock.chartSpec.center, ref = center.datasetRef || normalizedDatasetRef;
             const target = nextSpec.datasets.find((entry) => normalizeString31(entry.id) === ref);
             if (!target) throw new Error(`Donut center dataset '${ref}' is unavailable.`);
@@ -57724,12 +57876,12 @@ ${indent}${end}`;
               if (!catalog || !["measure", "calculated"].includes(catalog.kind) || !enableField(field2, ref, target.request)) throw new Error("Donut center fields must be declared measures of their dataset.");
             }
           }
-          if (isScenarioType((_d = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _d.type)) for (const key2 of scenarioFields(normalizedBlock.chartSpec.type, normalizedBlock.chartSpec[scenarioKey(normalizedBlock.chartSpec.type)])) enableField(key2, normalizedDatasetRef, request);
-          for (const key2 of ["rowField", "columnField", "valueField"]) enableField((_f = (_e = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _e.heatmap) == null ? void 0 : _f[key2], normalizedDatasetRef, request);
-          enableField((_h = (_g = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _g.sliceLabel) == null ? void 0 : _h.field, normalizedDatasetRef, request);
-          enableField((_i = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _i.xField, normalizedDatasetRef, request);
-          normalizeString31((_j = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _j.seriesField) && enableField(normalizedBlock.chartSpec.seriesField, normalizedDatasetRef, request);
-          (Array.isArray((_k = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _k.yFields) ? normalizedBlock.chartSpec.yFields : []).forEach((fieldKey) => enableField(fieldKey, normalizedDatasetRef, request));
+          if (isScenarioType((_e = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _e.type)) for (const key2 of scenarioFields(normalizedBlock.chartSpec.type, normalizedBlock.chartSpec[scenarioKey(normalizedBlock.chartSpec.type)])) enableField(key2, normalizedDatasetRef, request);
+          for (const key2 of ["rowField", "columnField", "valueField"]) enableField((_g = (_f = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _f.heatmap) == null ? void 0 : _g[key2], normalizedDatasetRef, request);
+          enableField((_i = (_h = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _h.sliceLabel) == null ? void 0 : _i.field, normalizedDatasetRef, request);
+          enableField((_j = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _j.xField, normalizedDatasetRef, request);
+          normalizeString31((_k = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _k.seriesField) && enableField(normalizedBlock.chartSpec.seriesField, normalizedDatasetRef, request);
+          (Array.isArray((_l = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _l.yFields) ? normalizedBlock.chartSpec.yFields : []).forEach((fieldKey) => enableField(fieldKey, normalizedDatasetRef, request));
           break;
         case "kpiBlock":
           enableField(normalizedBlock == null ? void 0 : normalizedBlock.valueField, normalizedDatasetRef, request);
@@ -57744,7 +57896,7 @@ ${indent}${end}`;
           }
           {
             const secondaryRef = normalizeString31(normalizedBlock == null ? void 0 : normalizedBlock.secondaryDatasetRef) || normalizedDatasetRef;
-            const secondaryRequest = (_l = nextSpec.datasets.find((entry) => normalizeString31(entry == null ? void 0 : entry.id) === secondaryRef)) == null ? void 0 : _l.request;
+            const secondaryRequest = (_m = nextSpec.datasets.find((entry) => normalizeString31(entry == null ? void 0 : entry.id) === secondaryRef)) == null ? void 0 : _m.request;
             if (secondaryRequest) enableField(normalizedBlock == null ? void 0 : normalizedBlock.secondaryField, secondaryRef, secondaryRequest);
           }
           break;
@@ -57764,10 +57916,10 @@ ${indent}${end}`;
           });
           break;
         case "geoMapBlock":
-          enableField((_m = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _m.key, normalizedDatasetRef, request);
-          enableField((_n = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _n.labelKey, normalizedDatasetRef, request);
-          enableField((_p = (_o = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _o.metric) == null ? void 0 : _p.key, normalizedDatasetRef, request);
-          enableField((_r = (_q = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _q.color) == null ? void 0 : _r.field, normalizedDatasetRef, request);
+          enableField((_n = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _n.key, normalizedDatasetRef, request);
+          enableField((_o = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _o.labelKey, normalizedDatasetRef, request);
+          enableField((_q = (_p = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _p.metric) == null ? void 0 : _q.key, normalizedDatasetRef, request);
+          enableField((_s = (_r = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _r.color) == null ? void 0 : _s.field, normalizedDatasetRef, request);
           break;
         default:
           break;
@@ -59981,6 +60133,10 @@ ${indent}${end}`;
     var _a5, _b, _c, _d, _e, _f, _g;
     const type = normalizeString34(chart == null ? void 0 : chart.type).toLowerCase();
     if (isScenarioType(type)) return freezeScenario(chart, rows, requestFilters);
+    if (type === "two-set-overlap") {
+      const model = buildTwoSetOverlap(chart.twoSetOverlap, rows);
+      return { kind: type, type, seriesKeys: overlapFields(model.config), rows: cloneChartRows(rows) };
+    }
     if (type === "category-range") {
       const model = buildCategoryRange(chart.categoryRange, rows);
       return { kind: "category-range", type, seriesKeys: categoryRangeFields(model.config), rows: cloneChartRows(rows) };
@@ -61967,60 +62123,6 @@ ${indent}${end}`;
     return lines2;
   }
 
-  // src/components/chartTheme.js
-  var LEGACY_CHART_ROLE_BY_COLOR = /* @__PURE__ */ new Map([
-    ["#1f77b4", 1],
-    ["#ff7f0e", 2],
-    ["#2ca02c", 3],
-    ["#d62728", 4],
-    ["#9467bd", 5],
-    ["#8c564b", 6],
-    ["#2f6de1", 1],
-    ["#7a46d8", 2],
-    ["#db2f7d", 3],
-    ["#f55d1f", 4],
-    ["#d79619", 5],
-    ["#2aa84a", 6],
-    ["#137cbd", 1],
-    ["#0f9960", 2],
-    ["#d9822b", 3],
-    ["#8f398f", 4],
-    ["#c23030", 5],
-    ["#5c7080", 6]
-  ]);
-  function normalizedColor(value) {
-    return String(value || "").trim().toLowerCase();
-  }
-  function chartSeriesColor(role, fallback) {
-    const normalizedRole = ((Number(role) || 1) - 1) % 6 + 1;
-    return `var(--forge-chart-series-${normalizedRole}, ${fallback})`;
-  }
-  function resolveThemeAwareChartColor(value, index = 0, { forceRole = false, declared = false } = {}) {
-    const color = String(value || "").trim();
-    if (declared) {
-      if (!/^#[0-9a-f]{6}$/i.test(color)) throw new Error("Declared chart colors must be six-digit hex colors.");
-      return color;
-    }
-    if (!color || color.startsWith("var(")) return color;
-    const mappedRole = LEGACY_CHART_ROLE_BY_COLOR.get(normalizedColor(color));
-    if (!mappedRole && !forceRole) return color;
-    return chartSeriesColor(mappedRole || index % 6 + 1, color);
-  }
-  function resolveCategoryColor(colors, category, fallback) {
-    const key2 = String(category != null ? category : "").trim().toLowerCase();
-    const entry = Object.entries(colors || {}).find(([name]) => name.trim().toLowerCase() === key2);
-    return typeof (entry == null ? void 0 : entry[1]) === "string" && entry[1].trim() ? entry[1].trim() : fallback;
-  }
-  function resolveChartCategoryColor(chart, category, fallback) {
-    var _a5, _b;
-    if ((chart == null ? void 0 : chart.paletteMode) !== "declared") return resolveCategoryColor((_a5 = chart == null ? void 0 : chart.series) == null ? void 0 : _a5.categoryColors, category, fallback);
-    const key2 = String(category != null ? category : "");
-    const colors = ((_b = chart.series) == null ? void 0 : _b.categoryColors) || {};
-    if (Object.hasOwn(colors, key2)) return resolveThemeAwareChartColor(colors[key2], 0, { declared: true });
-    if (["pie", "donut"].includes(chart.type)) throw new Error("Declared category palettes require a color for every category.");
-    return fallback;
-  }
-
   // src/reporting/reportChartAnnotations.js
   function normalizeString38(value = "") {
     return String(value || "").trim();
@@ -63304,6 +63406,7 @@ ${indent}${end}`;
     rowLimit = 0
   } = {}) {
     if (isScenarioType(resolvedChart == null ? void 0 : resolvedChart.kind)) return scenarioPrintSvg(chartModel, resolvedChart, width);
+    if ((resolvedChart == null ? void 0 : resolvedChart.kind) === "two-set-overlap") return twoSetOverlapSvg(buildTwoSetOverlap(chartModel.twoSetOverlap, resolvedChart.rows), width, { print: true, colors: resolveChartPalette(chartModel).map(printColor) });
     if ((resolvedChart == null ? void 0 : resolvedChart.kind) === "category-range") return categoryRangeSvg(buildCategoryRange(chartModel.categoryRange, resolvedChart.rows), width);
     if ((resolvedChart == null ? void 0 : resolvedChart.kind) === "heatmap") return heatmapSvg(buildHeatmap(chartModel.heatmap, resolvedChart.rows), width);
     resolvedChart = { ...resolvedChart, rows: resolvePrintDisplayRows(chartModel, resolvedChart, rowLimit) };
@@ -63331,6 +63434,11 @@ ${indent}${end}`;
   }
   function buildReportPrintChartPages({ chartModel = {}, resolvedChart = {}, width = 680, maxHeight = 620, firstMaxHeight = maxHeight, rowLimit = 0 } = {}) {
     if (isScenarioType(resolvedChart == null ? void 0 : resolvedChart.kind)) return scenarioPrintPages(chartModel, resolvedChart, { width, maxHeight, firstMaxHeight });
+    if ((resolvedChart == null ? void 0 : resolvedChart.kind) === "two-set-overlap") {
+      const graphic2 = twoSetOverlapSvg(buildTwoSetOverlap(chartModel.twoSetOverlap, resolvedChart.rows), width, { print: true, colors: resolveChartPalette(chartModel).map(printColor) });
+      if (width < 240 || graphic2.height > maxHeight) return [{ svg: "", width, height: 0, diagnostics: [{ code: "twoSetOverlapPrintLayoutUnavailable", severity: "warning", message: "Two-set overlap and complete labels need a wider or taller print area. Shorten labels or use a larger page." }] }];
+      return [{ ...graphic2, startNewPage: graphic2.height > firstMaxHeight }];
+    }
     if ((resolvedChart == null ? void 0 : resolvedChart.kind) === "category-range") return categoryRangePrintPages(buildCategoryRange(chartModel.categoryRange, resolvedChart.rows), { width, maxHeight, firstMaxHeight });
     if ((resolvedChart == null ? void 0 : resolvedChart.kind) === "heatmap") return heatmapPrintPages(buildHeatmap(chartModel.heatmap, resolvedChart.rows), { width, maxHeight, firstMaxHeight });
     resolvedChart = { ...resolvedChart, rows: resolvePrintDisplayRows(chartModel, resolvedChart, rowLimit) };

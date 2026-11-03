@@ -176,6 +176,11 @@ and inline typography/stroke/bar appearance overrides fail explicitly.
 | stacked | Optional boolean for grouped bar series; direct series may retain existing stackId selections |
 | rowLimit | Existing authored block limit. Positive values retain rank limits; document zero means all already-returned rows. Legacy horizontal/funnel defaults remain ten |
 
+The [fixed two-set overlap chart](two-set-overlap.md) uses independently bound
+scalar regions, complete wrapped value lanes, an assistive table and canonical
+PDF/XLSX geometry. Its equal circles never encode quantity. ChartSpecimen includes
+independently invented monitoring counts/percentages and checks per device.
+
 Line, vertical bar, horizontal/funnel bar, area, pie, donut and composed series
 remain the supported families. Document comparisons have complete wrapped labels,
 exact formatted quantities, signed extents and inert rows unless selection is
