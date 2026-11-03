@@ -63,8 +63,9 @@ func (s *HeaderProjector) decodeHeader(kind, hash string, payload []byte) (Artif
 	}
 	var envelope struct {
 		ArtifactHeader
-		Document json.RawMessage `json:"document"`
-		Profile  *ArtifactHeader `json:"profile"`
+		Document       json.RawMessage `json:"document"`
+		Profile        *ArtifactHeader `json:"profile"`
+		ReportDocument json.RawMessage `json:"reportDocument"`
 	}
 	if err := json.Unmarshal(payload, &envelope); err != nil {
 		return ArtifactHeader{}, ErrInvalid
@@ -72,6 +73,15 @@ func (s *HeaderProjector) decodeHeader(kind, hash string, payload []byte) (Artif
 	value := envelope.ArtifactHeader
 	if envelope.Profile != nil {
 		value.fill(*envelope.Profile)
+	}
+	if kind == "report" && value.Title == "" && len(envelope.ReportDocument) > 0 {
+		var document struct {
+			Title string `json:"title"`
+		}
+		if err := json.Unmarshal(envelope.ReportDocument, &document); err != nil {
+			return ArtifactHeader{}, ErrInvalid
+		}
+		value.Title = document.Title
 	}
 	if len(envelope.Document) > 0 && (kind == "skill" || value.SchemaVersion == primitive.AIEnvelopeVersion && (kind == "agent" || kind == "playbook")) {
 		if document, err := (primitive.DocumentCarrier{SchemaVersion: value.SchemaVersion, Document: envelope.Document}).Bytes(); err == nil {

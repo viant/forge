@@ -91,3 +91,31 @@ func TestStandaloneHeaderProjectorPreservesPayloadAndReturnsValueCopies(t *testi
 	require.Equal(t, "Updated guide", next.Description)
 	require.Empty(t, next.MimeType, "caller retains the original MIME default when none is declared")
 }
+
+func TestReportDiscoveryHeadersUseAuthoredDocumentTitle(t *testing.T) {
+	projector := new(HeaderProjector)
+	for _, format := range []string{"", "forge.authoredReport", "forge.reportReferences"} {
+		t.Run(format, func(t *testing.T) {
+			raw, err := json.Marshal(map[string]any{"schemaVersion": 1, "format": format, "reportDocument": map[string]any{"title": "Regional totals"}})
+			require.NoError(t, err)
+			original := append([]byte(nil), raw...)
+			header, err := projector.Project("report", raw)
+			require.NoError(t, err)
+			require.Equal(t, "Regional totals", header.DisplayTitle("9901"))
+			require.Equal(t, original, []byte(raw))
+			cached, ok := projector.Cached("report", Hash(raw))
+			require.True(t, ok)
+			require.Equal(t, header, cached)
+		})
+	}
+	for _, test := range []struct{ kind, payload, title string }{
+		{"report", `{"title":"Explicit title","reportDocument":{"title":"Document title"}}`, "Explicit title"},
+		{"report", `{"name":"named","reportDocument":{}}`, "named"},
+		{"report", `{"reportDocument":{}}`, "9901"},
+		{"window", `{"reportDocument":{"title":"Not a window header"}}`, "9901"},
+	} {
+		header, err := projector.Project(test.kind, json.RawMessage(test.payload))
+		require.NoError(t, err)
+		require.Equal(t, test.title, header.DisplayTitle("9901"))
+	}
+}
