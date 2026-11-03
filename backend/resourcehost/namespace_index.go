@@ -114,15 +114,32 @@ func (g *Gateway) discoverNamespaceIndex(ctx context.Context, c mcpclient.Interf
 		})
 	}
 	_ = group.Wait()
-	for _, page := range indexed {
+	descriptions := map[string]string{}
+	ambiguousDescriptions := map[string]bool{}
+	for i, page := range indexed {
 		if page.err != nil {
 			return result, page.err
 		}
+		pageAuthorities := map[string]bool{}
 		for uri, resource := range page.resources {
+			pageAuthorities[resource.Namespace] = true
 			if _, exists := result.indexedResources[uri]; exists {
 				return result, fmt.Errorf("%w: duplicate indexed resource", ErrCollision)
 			}
 			result.indexedResources[uri] = resource
+		}
+		// A collection locator/name is not a resource authority. Carry its
+		// description only through unambiguous returned resource membership.
+		for authority := range pageAuthorities {
+			if len(pageAuthorities) != 1 {
+				ambiguousDescriptions[authority] = true
+				continue
+			}
+			description := collections[i].Description
+			if previous, exists := descriptions[authority]; exists && previous != description {
+				ambiguousDescriptions[authority] = true
+			}
+			descriptions[authority] = description
 		}
 	}
 	kinds := map[string]map[string]bool{}
@@ -139,6 +156,9 @@ func (g *Gateway) discoverNamespaceIndex(ctx context.Context, c mcpclient.Interf
 	sort.Strings(authorities)
 	for _, namespace := range authorities {
 		detail := primitive.NamespaceCapabilities{Namespace: namespace, ProviderIdentity: result.connection.ProviderIdentity}
+		if !ambiguousDescriptions[namespace] {
+			detail.Description = descriptions[namespace]
+		}
 		sorted := make([]string, 0, len(kinds[namespace]))
 		for kind := range kinds[namespace] {
 			sorted = append(sorted, kind)
@@ -291,7 +311,7 @@ func decodeCollectionIndex(raw json.RawMessage, legacyOwner []string) (namespace
 		if _, err := namespaces.ParseURI(uri); err != nil {
 			return namespaces.ListResult{}, err
 		}
-		result.Namespaces = append(result.Namespaces, namespaces.Namespace{URI: uri, Name: ns.Name})
+		result.Namespaces = append(result.Namespaces, namespaces.Namespace{URI: uri, Name: ns.Name, Description: ns.Description})
 	}
 	return result, nil
 }

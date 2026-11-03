@@ -21,6 +21,7 @@ type filteredIndexClient struct {
 	t                                     *testing.T
 	lists, reads, namespaceGets, toolGets int
 	legacyOwner                           string
+	description                           string
 	repeatCursor                          bool
 }
 
@@ -41,9 +42,9 @@ func (c *filteredIndexClient) CallTool(_ context.Context, r *schema.CallToolRequ
 	}
 	require.Equal(c.t, "namespaces/list", r.Name)
 	if c.legacyOwner != "" {
-		return &schema.CallToolResult{StructuredContent: map[string]any{"providerIdentity": c.legacyOwner, "complete": true, "management": map[string]any{"canCreate": true}, "namespaces": []any{map[string]any{"uri": "ns://opaque_collection", "name": "remote", "kinds": []string{"window"}, "supportedKinds": []any{}}}}}, nil
+		return &schema.CallToolResult{StructuredContent: map[string]any{"providerIdentity": c.legacyOwner, "complete": true, "management": map[string]any{"canCreate": true}, "namespaces": []any{map[string]any{"uri": "ns://opaque_collection", "name": "remote", "description": c.description, "kinds": []string{"window"}, "supportedKinds": []any{}}}}}, nil
 	}
-	return &schema.CallToolResult{StructuredContent: map[string]any{"namespaces": []any{map[string]any{"uri": "ns://opaque_collection", "name": "Display name only"}}}}, nil
+	return &schema.CallToolResult{StructuredContent: map[string]any{"namespaces": []any{map[string]any{"uri": "ns://opaque_collection", "name": "Display name only", "description": c.description}}}}, nil
 }
 func (c *filteredIndexClient) ListResourcesWithParams(_ context.Context, r *schema.ListResourcesRequestParams, _ ...mcpclient.RequestOption) (*schema.ListResourcesResult, error) {
 	c.lists++
@@ -140,6 +141,41 @@ func TestFilteredLegacyNamespaceIndex(t *testing.T) {
 			}
 			require.Zero(t, client.namespaceGets)
 			require.Zero(t, client.toolGets)
+		})
+	}
+}
+
+func TestFilteredNamespaceIndexPreservesDescription(t *testing.T) {
+	for _, tc := range []struct {
+		name, owner  string
+		restrictions []string
+		want         bool
+	}{
+		{name: "canonical filtered resources", want: true},
+		{name: "legacy filtered resources", owner: "producer", want: true},
+		{name: "excluded collection", restrictions: []string{"ns://other"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			client := &filteredIndexClient{t: t, legacyOwner: tc.owner, description: "Explore the available example resources."}
+			pool, err := manager.New(nil)
+			require.NoError(t, err)
+			require.NoError(t, pool.RegisterLocal(t.Context(), "filtered", &cfg.MCPClient{ClientOptions: &mcp.ClientOptions{}, PrimitiveProviderIdentity: "producer", PrimitiveNamespaces: tc.restrictions}, func(context.Context) (mcpclient.Interface, error) { return client, nil }))
+			t.Cleanup(func() { pool.CloseConversation("") })
+			actor, verify := PublicReadActors()
+			gateway := NewGateway(pool, actor, verify, "consumer")
+			t.Cleanup(gateway.Close)
+			discovered, err := gateway.Discover(t.Context())
+			require.NoError(t, err)
+			if tc.want {
+				require.Len(t, discovered, 1)
+				require.Equal(t, "remote", discovered[0].Namespace)
+				require.Equal(t, client.description, discovered[0].Description)
+			} else {
+				require.Empty(t, discovered)
+				require.Zero(t, client.lists)
+			}
+			require.Zero(t, client.namespaceGets, "description must not add namespace-detail calls")
+			require.Zero(t, client.reads, "description must not materialize resource bodies")
 		})
 	}
 }
