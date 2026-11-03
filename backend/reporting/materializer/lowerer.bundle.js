@@ -70303,6 +70303,7 @@ ${indent}${end}`;
     return span;
   }
   function renderReportPrintGridRow(state = {}, entries2 = []) {
+    var _a5;
     const rowEntries = (Array.isArray(entries2) ? entries2 : []).filter((entry) => !!(entry == null ? void 0 : entry.block) && Number.isFinite(entry == null ? void 0 : entry.span) && entry.span > 0).map((entry) => ({
       block: entry.block,
       span: Math.max(1, Math.min(REPORT_LAYOUT_GRID_COLUMNS, Math.trunc(entry.span))),
@@ -70311,17 +70312,33 @@ ${indent}${end}`;
     if (rowEntries.length === 0) {
       return;
     }
-    ensureReportPrintPage(state);
-    if (rowEntries.length > 1 && state.cursorY > state.contentTop + (state.sectionHeadingHeight || 0)) {
-      const probe = { ...state, pages: [], bookmarks: [], diagnostics: [], currentPage: null, currentPageIndex: null };
-      moveToReportPrintPage(probe, 0);
-      probe.cursorY = state.cursorY;
-      renderReportPrintGridRowAtCurrentPosition(probe, rowEntries);
-      if (probe.currentPageIndex > 0) {
-        startNextReportPrintPage(state);
-      }
+    const previousHeadingHeight = state.sectionHeadingHeight;
+    if (((_a5 = state.compositePrefix) == null ? void 0 : _a5.pending) && state.compositePrefix.fresh) {
+      state.sectionHeadingHeight = Math.max(previousHeadingHeight || 0, state.cursorY - state.contentTop);
     }
-    renderReportPrintGridRowAtCurrentPosition(state, rowEntries);
+    try {
+      ensureReportPrintPage(state);
+      if (rowEntries.length > 1 && state.cursorY > state.contentTop + (state.sectionHeadingHeight || 0)) {
+        const probe = {
+          ...state,
+          pages: [],
+          bookmarks: [],
+          diagnostics: [],
+          currentPage: null,
+          currentPageIndex: null,
+          compositePrefix: state.compositePrefix ? { ...state.compositePrefix, blockIds: new Set(state.compositePrefix.blockIds) } : void 0
+        };
+        moveToReportPrintPage(probe, 0);
+        probe.cursorY = state.cursorY;
+        renderReportPrintGridRowAtCurrentPosition(probe, rowEntries);
+        if (probe.currentPageIndex > 0) {
+          startNextReportPrintPage(state);
+        }
+      }
+      renderReportPrintGridRowAtCurrentPosition(state, rowEntries);
+    } finally {
+      state.sectionHeadingHeight = previousHeadingHeight;
+    }
   }
   function renderReportPrintGridRowAtCurrentPosition(state, rowEntries) {
     ensureReportPrintPage(state);
@@ -70666,10 +70683,97 @@ ${indent}${end}`;
     }
     finishReportPrintBlock(state);
   }
+  function resolveReportPrintCompositeChildren(state, block) {
+    var _a5;
+    const childBlockIds = Array.isArray((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.childBlockIds) ? block.content.childBlockIds : Array.isArray(block == null ? void 0 : block.childBlockIds) ? block.childBlockIds : [];
+    return childBlockIds.filter((blockId) => state.visibleBlockIds.has(normalizeString41(blockId))).map((blockId) => state.blocksById.get(normalizeString41(blockId)) || null).filter(Boolean);
+  }
   function renderReportPrintCompositeBlock(state = {}, block = {}, {
     layoutNote = ""
   } = {}) {
-    var _a5, _b, _c, _d;
+    var _a5, _b;
+    ensureReportPrintPage(state);
+    const blockId = normalizeString41((block == null ? void 0 : block.id) || "composite");
+    const ancestorPrefix = ((_a5 = state.compositePrefix) == null ? void 0 : _a5.pending) ? state.compositePrefix : null;
+    if (ancestorPrefix) {
+      ancestorPrefix.blockIds.add(blockId);
+      const firstChild = resolveReportPrintCompositeChildren(state, block)[0];
+      const spacerHeight = (((_b = block == null ? void 0 : block.content) == null ? void 0 : _b.runtime) || (block == null ? void 0 : block.runtime) || {}).spacerHeight;
+      if ((firstChild == null ? void 0 : firstChild.kind) === "compositeBlock" || Number.isFinite(spacerHeight) && spacerHeight >= 0) {
+        renderReportPrintCompositeContents(state, block, { layoutNote });
+        return;
+      }
+    }
+    const renderContents = (target) => {
+      const previousPrefix = target.compositePrefix;
+      const prefix = {
+        pending: true,
+        blockIds: /* @__PURE__ */ new Set([blockId]),
+        fresh: target.cursorY <= target.contentTop + (target.sectionHeadingHeight || 0)
+      };
+      target.compositePrefix = prefix;
+      try {
+        renderReportPrintCompositeContents(target, block, { layoutNote });
+      } finally {
+        target.compositePrefix = previousPrefix;
+      }
+      return prefix;
+    };
+    try {
+      if (!compositeBare(block) && state.cursorY > state.contentTop) {
+        const elementCounts = state.pages.map((page) => page.elements.length);
+        const detachedState = () => {
+          const target = {
+            ...state,
+            pages: state.pages.map((page) => ({ ...page, elements: [...page.elements] })),
+            bookmarks: [],
+            diagnostics: [],
+            renderedBlockIds: new Set(state.renderedBlockIds)
+          };
+          target.currentPage = target.pages[target.currentPageIndex];
+          return target;
+        };
+        const firstContentPage = (target, prefix2) => target.pages.findIndex(
+          (page, index) => page.elements.slice(elementCounts[index] || 0).some(
+            (element) => {
+              var _a6;
+              return !prefix2.blockIds.has((_a6 = element.id.match(/^([\s\S]*)__(?:title|layout_note|description)_\d+$/)) == null ? void 0 : _a6[1]);
+            }
+          )
+        );
+        let probe = detachedState();
+        const prefix = renderContents(probe);
+        if (firstContentPage(probe, prefix) > state.currentPageIndex) {
+          const fresh = detachedState();
+          ensureReportPrintSpace(fresh, fresh.contentBottom - fresh.cursorY + 1);
+          const freshPageIndex = fresh.currentPageIndex;
+          const freshPrefix = renderContents(fresh);
+          const immediatePrefix = { blockIds: /* @__PURE__ */ new Set([blockId]) };
+          const immediateOrphan = firstContentPage(probe, immediatePrefix) > state.currentPageIndex;
+          if (firstContentPage(fresh, freshPrefix) === freshPageIndex || immediateOrphan && firstContentPage(fresh, immediatePrefix) === freshPageIndex) probe = fresh;
+        }
+        probe.pages.forEach((page, index) => {
+          if (state.pages[index]) {
+            state.pages[index].elements.push(...page.elements.slice(elementCounts[index] || 0));
+          } else {
+            state.pages.push(page);
+          }
+        });
+        state.bookmarks.push(...probe.bookmarks);
+        state.diagnostics.push(...probe.diagnostics);
+        probe.renderedBlockIds.forEach((id) => state.renderedBlockIds.add(id));
+        syncReportPrintStateFromChildren(state, [probe]);
+        return;
+      }
+      renderContents(state);
+    } finally {
+      if (ancestorPrefix) ancestorPrefix.pending = false;
+    }
+  }
+  function renderReportPrintCompositeContents(state = {}, block = {}, {
+    layoutNote = ""
+  } = {}) {
+    var _a5, _b, _c;
     const spacerHeight = (((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.runtime) || (block == null ? void 0 : block.runtime) || {}).spacerHeight;
     if (Number.isFinite(spacerHeight) && spacerHeight >= 0) {
       ensureReportPrintPage(state);
@@ -70687,8 +70791,7 @@ ${indent}${end}`;
       });
       state.cursorY += 4;
     }
-    const childBlockIds = Array.isArray((_c = block == null ? void 0 : block.content) == null ? void 0 : _c.childBlockIds) ? block.content.childBlockIds : Array.isArray(block == null ? void 0 : block.childBlockIds) ? block.childBlockIds : [];
-    const childBlocks = childBlockIds.filter((blockId) => state.visibleBlockIds.has(normalizeString41(blockId))).map((blockId) => state.blocksById.get(normalizeString41(blockId)) || null).filter(Boolean);
+    const childBlocks = resolveReportPrintCompositeChildren(state, block);
     if (childBlocks.length === 0) {
       renderReportPrintTextLines(state, {
         idPrefix: `${normalizeString41((block == null ? void 0 : block.id) || "composite")}__empty`,
@@ -70698,7 +70801,7 @@ ${indent}${end}`;
       finishReportPrintBlock(state);
       return;
     }
-    const authoredLayout = normalizeString41(((_d = block == null ? void 0 : block.content) == null ? void 0 : _d.layout) || (block == null ? void 0 : block.layout));
+    const authoredLayout = normalizeString41(((_c = block == null ? void 0 : block.content) == null ? void 0 : _c.layout) || (block == null ? void 0 : block.layout));
     const weights = compositeChildWeights(block, childBlocks);
     if (weights) {
       if (compositeWeightedTemplate(block, childBlocks, state.contentWidth) === "minmax(0, 1fr)") {
@@ -71748,9 +71851,12 @@ ${indent}${end}`;
     finishReportPrintBlock(state);
   }
   function renderReportPrintBlock(state = {}, block = {}, options = {}) {
-    var _a5;
+    var _a5, _b;
     (_a5 = state.renderedBlockIds) == null ? void 0 : _a5.add(normalizeString41(block == null ? void 0 : block.id));
     const kind = normalizeString41(block == null ? void 0 : block.kind);
+    if (kind !== "compositeBlock" && ((_b = state.compositePrefix) == null ? void 0 : _b.pending)) {
+      state.compositePrefix.pending = false;
+    }
     switch (kind) {
       case "markdownBlock":
         renderReportPrintMarkdownBlock(state, block, options);

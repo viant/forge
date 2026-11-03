@@ -1203,20 +1203,31 @@ function renderReportPrintGridRow(state = {}, entries = []) {
   if (rowEntries.length === 0) {
     return;
   }
-  ensureReportPrintPage(state);
-  if (rowEntries.length > 1 && state.cursorY > state.contentTop + (state.sectionHeadingHeight || 0)) {
-    // Render the authored row into detached pages first. If either column
-    // would spill, move the whole row together; rendering children directly
-    // from the old cursor can strand a half-width partner on the next page.
-    const probe = { ...state, pages: [], bookmarks: [], diagnostics: [], currentPage: null, currentPageIndex: null };
-    moveToReportPrintPage(probe, 0);
-    probe.cursorY = state.cursorY;
-    renderReportPrintGridRowAtCurrentPosition(probe, rowEntries);
-    if (probe.currentPageIndex > 0) {
-      startNextReportPrintPage(state);
-    }
+  const previousHeadingHeight = state.sectionHeadingHeight;
+  if (state.compositePrefix?.pending && state.compositePrefix.fresh) {
+    state.sectionHeadingHeight = Math.max(previousHeadingHeight || 0, state.cursorY - state.contentTop);
   }
-  renderReportPrintGridRowAtCurrentPosition(state, rowEntries);
+  try {
+    ensureReportPrintPage(state);
+    if (rowEntries.length > 1 && state.cursorY > state.contentTop + (state.sectionHeadingHeight || 0)) {
+      // Render the authored row into detached pages first. If either column
+      // would spill, move the whole row together; rendering children directly
+      // from the old cursor can strand a half-width partner on the next page.
+      const probe = {
+        ...state, pages: [], bookmarks: [], diagnostics: [], currentPage: null, currentPageIndex: null,
+        compositePrefix: state.compositePrefix ? { ...state.compositePrefix, blockIds: new Set(state.compositePrefix.blockIds) } : undefined,
+      };
+      moveToReportPrintPage(probe, 0);
+      probe.cursorY = state.cursorY;
+      renderReportPrintGridRowAtCurrentPosition(probe, rowEntries);
+      if (probe.currentPageIndex > 0) {
+        startNextReportPrintPage(state);
+      }
+    }
+    renderReportPrintGridRowAtCurrentPosition(state, rowEntries);
+  } finally {
+    state.sectionHeadingHeight = previousHeadingHeight;
+  }
 }
 
 function renderReportPrintGridRowAtCurrentPosition(state, rowEntries) {
@@ -1592,7 +1603,103 @@ function renderReportPrintSectionBlock(state = {}, block = {}, {
   finishReportPrintBlock(state);
 }
 
+function resolveReportPrintCompositeChildren(state, block) {
+  const childBlockIds = Array.isArray(block?.content?.childBlockIds)
+    ? block.content.childBlockIds
+    : (Array.isArray(block?.childBlockIds) ? block.childBlockIds : []);
+  return childBlockIds
+    .filter(blockId => state.visibleBlockIds.has(normalizeString(blockId)))
+    .map(blockId => state.blocksById.get(normalizeString(blockId)) || null)
+    .filter(Boolean);
+}
+
 function renderReportPrintCompositeBlock(state = {}, block = {}, {
+  layoutNote = "",
+} = {}) {
+  ensureReportPrintPage(state);
+  const blockId = normalizeString(block?.id || "composite");
+  const ancestorPrefix = state.compositePrefix?.pending ? state.compositePrefix : null;
+  if (ancestorPrefix) {
+    ancestorPrefix.blockIds.add(blockId);
+    const firstChild = resolveReportPrintCompositeChildren(state, block)[0];
+    const spacerHeight = (block?.content?.runtime || block?.runtime || {}).spacerHeight;
+    if (firstChild?.kind === "compositeBlock" || (Number.isFinite(spacerHeight) && spacerHeight >= 0)) {
+      // The outer group places this chain. Its terminal group still owns the
+      // native leaf reservation, preserving a feasible suffix on long chains.
+      renderReportPrintCompositeContents(state, block, { layoutNote });
+      return;
+    }
+  }
+  const renderContents = (target) => {
+    const previousPrefix = target.compositePrefix;
+    const prefix = {
+      pending: true,
+      blockIds: new Set([blockId]),
+      fresh: target.cursorY <= target.contentTop + (target.sectionHeadingHeight || 0),
+    };
+    target.compositePrefix = prefix;
+    try {
+      renderReportPrintCompositeContents(target, block, { layoutNote });
+    } finally {
+      target.compositePrefix = previousPrefix;
+    }
+    return prefix;
+  };
+  try {
+    if (!compositeBare(block) && state.cursorY > state.contentTop) {
+      // Consume successful native output instead of rendering it again at
+      // every ancestor. Real page indices preserve all IDs and bookmarks.
+      const elementCounts = state.pages.map(page => page.elements.length);
+      const detachedState = () => {
+        const target = {
+          ...state,
+          pages: state.pages.map(page => ({ ...page, elements: [...page.elements] })),
+          bookmarks: [],
+          diagnostics: [],
+          renderedBlockIds: new Set(state.renderedBlockIds),
+        };
+        target.currentPage = target.pages[target.currentPageIndex];
+        return target;
+      };
+      const firstContentPage = (target, prefix) => target.pages.findIndex((page, index) =>
+        page.elements.slice(elementCounts[index] || 0).some(element =>
+          !prefix.blockIds.has(element.id.match(/^([\s\S]*)__(?:title|layout_note|description)_\d+$/)?.[1]),
+        ),
+      );
+      let probe = detachedState();
+      const prefix = renderContents(probe);
+      if (firstContentPage(probe, prefix) > state.currentPageIndex) {
+        const fresh = detachedState();
+        ensureReportPrintSpace(fresh, fresh.contentBottom - fresh.cursorY + 1);
+        const freshPageIndex = fresh.currentPageIndex;
+        const freshPrefix = renderContents(fresh);
+        // An oversized prefix cannot be repaired by moving it wholesale.
+        // Retain its native terminal reservation instead of retrying ancestors.
+        const immediatePrefix = { blockIds: new Set([blockId]) };
+        const immediateOrphan = firstContentPage(probe, immediatePrefix) > state.currentPageIndex;
+        if (firstContentPage(fresh, freshPrefix) === freshPageIndex
+          || (immediateOrphan && firstContentPage(fresh, immediatePrefix) === freshPageIndex)) probe = fresh;
+      }
+      probe.pages.forEach((page, index) => {
+        if (state.pages[index]) {
+          state.pages[index].elements.push(...page.elements.slice(elementCounts[index] || 0));
+        } else {
+          state.pages.push(page);
+        }
+      });
+      state.bookmarks.push(...probe.bookmarks);
+      state.diagnostics.push(...probe.diagnostics);
+      probe.renderedBlockIds.forEach(id => state.renderedBlockIds.add(id));
+      syncReportPrintStateFromChildren(state, [probe]);
+      return;
+    }
+    renderContents(state);
+  } finally {
+    if (ancestorPrefix) ancestorPrefix.pending = false;
+  }
+}
+
+function renderReportPrintCompositeContents(state = {}, block = {}, {
   layoutNote = "",
 } = {}) {
   const spacerHeight = (block?.content?.runtime || block?.runtime || {}).spacerHeight;
@@ -1612,13 +1719,7 @@ function renderReportPrintCompositeBlock(state = {}, block = {}, {
     });
     state.cursorY += 4;
   }
-  const childBlockIds = Array.isArray(block?.content?.childBlockIds)
-    ? block.content.childBlockIds
-    : (Array.isArray(block?.childBlockIds) ? block.childBlockIds : []);
-  const childBlocks = childBlockIds
-    .filter((blockId) => state.visibleBlockIds.has(normalizeString(blockId)))
-    .map((blockId) => state.blocksById.get(normalizeString(blockId)) || null)
-    .filter(Boolean);
+  const childBlocks = resolveReportPrintCompositeChildren(state, block);
   if (childBlocks.length === 0) {
     renderReportPrintTextLines(state, {
       idPrefix: `${normalizeString(block?.id || "composite")}__empty`,
@@ -2737,6 +2838,9 @@ function renderUnsupportedReportPrintBlock(state = {}, block = {}, {
 function renderReportPrintBlock(state = {}, block = {}, options = {}) {
   state.renderedBlockIds?.add(normalizeString(block?.id));
   const kind = normalizeString(block?.kind);
+  if (kind !== "compositeBlock" && state.compositePrefix?.pending) {
+    state.compositePrefix.pending = false;
+  }
   switch (kind) {
     case "markdownBlock":
       renderReportPrintMarkdownBlock(state, block, options);
