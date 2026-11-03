@@ -739,6 +739,16 @@ func (m *Manager) newClientWithOptions(ctx context.Context, convID, serverName s
 	if opts.ClientOptions == nil {
 		return nil, errors.New("mcp manager: missing client options")
 	}
+	// Runtime injection and SDK negotiation mutate their options. Own those
+	// structs while preserving opaque transports, jars, stores and resolvers.
+	owned := *opts
+	clientOptions := *opts.ClientOptions
+	owned.ClientOptions = &clientOptions
+	if clientOptions.Auth != nil {
+		auth := *clientOptions.Auth
+		clientOptions.Auth = &auth
+	}
+	opts = &owned
 	// Select per-request jar (provider beats static) and merge provider cookies.json into it
 	// (if both present) before override,
 	// so the very first POST can carry previously minted session cookies.
