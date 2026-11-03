@@ -25,6 +25,7 @@ type PivotValue struct {
 }
 type Pivot struct {
 	RowFields        []string     `json:"rowFields"`
+	StaticFields     []string     `json:"staticFields,omitempty"`
 	ColumnField      string       `json:"columnField"`
 	ColumnCategories []string     `json:"columnCategories,omitempty"`
 	ColumnDomain     string       `json:"columnDomain,omitempty"`
@@ -101,6 +102,10 @@ func Validate(hierarchy *Hierarchy, pivot *Pivot, groups []ColumnGroup, columns 
 			return fmt.Errorf("pivot requires row fields, categories and values")
 		}
 		fields := append(append([]string{}, pivot.RowFields...), pivot.ColumnField)
+		if pivot.StaticFields != nil && (len(pivot.StaticFields) == 0 || !unique(pivot.StaticFields)) {
+			return fmt.Errorf("pivot static fields require unique nonempty field names")
+		}
+		fields = append(fields, pivot.StaticFields...)
 		for _, value := range pivot.Values {
 			if strings.TrimSpace(value.Label) == "" || (value.Aggregate != "none" && value.Aggregate != "sum") {
 				return fmt.Errorf("pivot values require label and explicit aggregation")

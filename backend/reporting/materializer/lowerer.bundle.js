@@ -51145,8 +51145,9 @@ ${indent}${end}`;
       } else if (hierarchy.totals.fields !== void 0) throw Error("Producer totals do not declare computed fields.");
     }
     if (pivot != null) {
-      exact(pivot, ["rowFields", "columnField", "columnCategories", "columnDomain", "values"], "table pivot");
+      exact(pivot, ["rowFields", "staticFields", "columnField", "columnCategories", "columnDomain", "values"], "table pivot");
       keys(pivot.rowFields, "Pivot row fields");
+      if (pivot.staticFields !== void 0) keys(pivot.staticFields, "Pivot static fields");
       if (Object.hasOwn(pivot, "columnDomain")) {
         if (pivot.columnDomain !== "observed" || Object.hasOwn(pivot, "columnCategories")) throw Error("Observed pivot domain cannot declare fixed column categories.");
       } else keys(pivot.columnCategories, "Pivot column categories");
@@ -51159,7 +51160,9 @@ ${indent}${end}`;
         measures.push(value.field);
       }
       if (new Set(measures).size !== measures.length || measures.some((field2) => pivot.rowFields.includes(field2) || field2 === pivot.columnField)) throw Error("Pivot value fields must be unique and distinct.");
-      for (const field2 of [...pivot.rowFields, pivot.columnField, ...measures]) if (!known.has(field2)) throw Error(`Pivot field ${field2} must be declared in source columns.`);
+      const fields2 = [...pivot.rowFields, pivot.columnField, ...measures, ...pivot.staticFields || []];
+      if (new Set(fields2).size !== fields2.length) throw Error("Pivot static fields must be distinct from row, column and value fields.");
+      for (const field2 of fields2) if (!known.has(field2)) throw Error(`Pivot field ${field2} must be declared in source columns.`);
     }
     if (columnGroups != null) {
       if (!Array.isArray(columnGroups)) throw Error("Table columnGroups must be an array.");
@@ -51180,7 +51183,7 @@ ${indent}${end}`;
   }
   function tableAnalyticsFields(block) {
     var _a5;
-    return block.hierarchy ? [block.hierarchy.keyField, block.hierarchy.parentField, block.hierarchy.labelField, ...((_a5 = block.hierarchy.totals) == null ? void 0 : _a5.fields) || []] : block.pivot ? [...block.pivot.rowFields, block.pivot.columnField, ...block.pivot.values.map((value) => value.field)] : [];
+    return block.hierarchy ? [block.hierarchy.keyField, block.hierarchy.parentField, block.hierarchy.labelField, ...((_a5 = block.hierarchy.totals) == null ? void 0 : _a5.fields) || []] : block.pivot ? [...block.pivot.rowFields, block.pivot.columnField, ...block.pivot.values.map((value) => value.field), ...block.pivot.staticFields || []] : [];
   }
   var number2 = (value) => {
     if (value == null) return null;
@@ -51288,7 +51291,13 @@ ${indent}${end}`;
     for (let i3 = 0; i3 < category.length; i3++) encoded += category.charCodeAt(i3).toString(16).padStart(4, "0");
     return `__forge_pivot_observed_${encoded}_${measure}`;
   }
-  function materializeAnalyticalTable(block, rows, { columnCategories } = {}) {
+  function pivotRowValues(pivot, row) {
+    if (!object2(row)) throw Error("Pivot rows must be objects.");
+    const values = pivot.rowFields.map((field2) => row[field2]);
+    if (values.some((value) => !key(value) && !(typeof value === "number" && Number.isFinite(value)))) throw Error("Pivot row dimensions require nonempty string or finite numeric keys.");
+    return values;
+  }
+  function materializeAnalyticalTable(block, rows, { columnCategories, sourceRows: sourceRows2 = rows } = {}) {
     const normalized = normalizeTableAnalytics(block);
     if (normalized.hierarchy) {
       const model = buildTableHierarchy(rows, normalized.hierarchy), ordered = hierarchyRows(model).nodes, pathKey = HIERARCHY_PATH_FIELD;
@@ -51308,31 +51317,37 @@ ${indent}${end}`;
     if (!normalized.pivot) return { columns: block.columns, rows, columnGroups: block.columnGroups || [] };
     const pivot = normalized.pivot, tuples = /* @__PURE__ */ new Map(), categories = pivot.columnDomain === "observed" && columnCategories !== void 0 ? [...columnCategories] : resolvePivotColumnCategories(pivot, rows);
     if (categories.some((value) => !key(value)) || new Set(categories).size !== categories.length) throw Error("Pivot column categories require unique nonempty strings.");
+    const staticFields = pivot.staticFields || [], staticValues = /* @__PURE__ */ new Map();
+    if (staticFields.length) for (const source of sourceRows2) {
+      const identity = JSON.stringify(pivotRowValues(pivot, source)), values = staticFields.map((field2) => number2(source[field2])), prior = staticValues.get(identity);
+      if (prior) {
+        for (const [index, field2] of staticFields.entries()) if (prior[index] !== values[index]) throw Error(`Pivot static field ${field2} has inconsistent values for row tuple ${identity}.`);
+      }
+      staticValues.set(identity, values);
+    }
     const categoryIndexes = new Map(categories.map((category, index) => [category, index]));
     for (const row of rows) {
-      if (!object2(row)) throw Error("Pivot rows must be objects.");
-      const values = pivot.rowFields.map((field2) => row[field2]);
-      if (values.some((value) => !key(value))) throw Error("Pivot row dimensions require nonempty string keys.");
-      const categoryValue = row[pivot.columnField];
+      const values = pivotRowValues(pivot, row), categoryValue = row[pivot.columnField];
       let category = categoryIndexes.get(categoryValue);
       if (category === void 0) throw Error("Pivot category is outside its declared ordered domain.");
       const identity = JSON.stringify(values);
       let target = tuples.get(identity);
       if (!target) {
-        target = { row: Object.fromEntries(pivot.rowFields.map((field2, i3) => [field2, values[i3]])), cells: /* @__PURE__ */ new Map() };
+        if (staticFields.length && !staticValues.has(identity)) throw Error("Pivot row tuple is outside its complete static source.");
+        target = { row: Object.fromEntries([...pivot.rowFields.map((field2, index) => [field2, values[index]]), ...staticFields.map((field2, index) => [field2, staticValues.get(identity)[index]])]), cells: /* @__PURE__ */ new Map() };
         tuples.set(identity, target);
       }
       const observations = target.cells.get(category) || [];
       observations.push(row);
       target.cells.set(category, observations);
     }
-    const columns = pivot.rowFields.map((field2) => ({ ...block.columns.find((column) => column.key === field2), rowIdentity: true }));
+    const columns = [...pivot.rowFields.map((field2) => ({ ...block.columns.find((column) => column.key === field2), rowIdentity: true })), ...staticFields.map((field2) => ({ format: "number", align: "right", ...block.columns.find((column) => column.key === field2), rowIdentity: false }))];
     const columnGroups = [{ label: "Rows", columns: [...pivot.rowFields] }];
     categories.forEach((category, c3) => {
       const group = { label: category, columns: [] };
       pivot.values.forEach((value, m3) => {
         const field2 = pivotColumnKey(pivot, category, c3, m3);
-        if (pivot.rowFields.includes(field2)) throw Error("Pivot source key collides with a generated column.");
+        if ([...pivot.rowFields, ...staticFields].includes(field2)) throw Error("Pivot source key collides with a generated column.");
         group.columns.push(field2);
         columns.push({ key: field2, label: value.label, format: value.format || "number", align: "right" });
       });
@@ -61815,7 +61830,7 @@ ${indent}${end}`;
       if (normalizeString37(block == null ? void 0 : block.kind) === "tableBlock") {
         if ((block.hierarchy || block.pivot) && (((_e = sourceDataset == null ? void 0 : sourceDataset.provenance) == null ? void 0 : _e.hasMore) || ((_f = sourceDataset == null ? void 0 : sourceDataset.provenance) == null ? void 0 : _f.truncated) || Number((_g = sourceDataset == null ? void 0 : sourceDataset.request) == null ? void 0 : _g.offset) > 0)) throw new Error("Hierarchy and pivot tables require a complete admitted dataset; partial pages cannot be aggregated.");
         const columnCategories = ((_h = block.pivot) == null ? void 0 : _h.columnDomain) === "observed" ? resolvePivotColumnCategories(block.pivot, (sourceDataset == null ? void 0 : sourceDataset.rows) || []) : void 0;
-        const analytic = materializeAnalyticalTable(block, block.hierarchy ? (sourceDataset == null ? void 0 : sourceDataset.rows) || [] : (dataset == null ? void 0 : dataset.rows) || [], { columnCategories });
+        const analytic = materializeAnalyticalTable(block, block.hierarchy ? (sourceDataset == null ? void 0 : sourceDataset.rows) || [] : (dataset == null ? void 0 : dataset.rows) || [], { columnCategories, sourceRows: (sourceDataset == null ? void 0 : sourceDataset.rows) || [] });
         let tableRows = analytic.rows, sourceIndexes = analytic.sourceIndexes;
         if (block.hierarchy && dataset !== sourceDataset) {
           const model = buildTableHierarchy(tableRows, { ...block.hierarchy, totals: { mode: "producer" } });

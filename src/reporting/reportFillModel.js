@@ -1078,7 +1078,7 @@ function buildReportFillBlocks(reportSpec = {}, datasetsById = new Map(), {
       // Observed coordinates belong to the complete admitted source, so runtime
       // filters only change cell observations, never the generated column keys.
       const columnCategories=block.pivot?.columnDomain==='observed'?resolvePivotColumnCategories(block.pivot,sourceDataset?.rows||[]):undefined;
-      const analytic=materializeAnalyticalTable(block,block.hierarchy ? sourceDataset?.rows || [] : dataset?.rows || [],{columnCategories});
+      const analytic=materializeAnalyticalTable(block,block.hierarchy ? sourceDataset?.rows || [] : dataset?.rows || [],{columnCategories,sourceRows:sourceDataset?.rows||[]});
       let tableRows=analytic.rows,sourceIndexes=analytic.sourceIndexes;
       if(block.hierarchy && dataset!==sourceDataset) {
         const model=buildTableHierarchy(tableRows,{...block.hierarchy,totals:{mode:'producer'}});

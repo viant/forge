@@ -36,7 +36,7 @@ export function buildAnalyticalRuntimeTableRows(block,sourceRows,filteredRows){
  if(block.pivot){
   const identity=row=>JSON.stringify(block.pivot.rowFields.map(field=>row[field]));
   const columnCategories=block.pivot.columnDomain==='observed'?resolvePivotColumnCategories(block.pivot,sourceRows):undefined;
-  const refreshed=new Map(materializeAnalyticalTable(block,filteredRows,{columnCategories}).rows.map(row=>[identity(row),row]));
+  const refreshed=new Map(materializeAnalyticalTable(block,filteredRows,{columnCategories,sourceRows}).rows.map(row=>[identity(row),row]));
   return canonical.map(row=>refreshed.get(identity(row))).filter(Boolean);
  }
  return canonical;

@@ -9,7 +9,7 @@ function exact(value,fields,name){if(!object(value)||Object.keys(value).some(fie
 function keys(values,name){if(!Array.isArray(values)||!values.length||values.some(value=>!key(value))||new Set(values).size!==values.length)throw Error(`${name} requires unique nonempty field names.`);return values;}
 export const columnGroupsSchema={type:'array',items:{type:'object',additionalProperties:false,required:['label','columns'],properties:{label:{type:'string',minLength:1},columns:{type:'array',minItems:1,uniqueItems:true,items:{type:'string',minLength:1}}}}};
 export const hierarchySchema={type:'object',additionalProperties:false,required:['keyField','parentField','labelField','totals'],properties:{...Object.fromEntries(['keyField','parentField','labelField'].map(field=>[field,{type:'string',minLength:1}])),defaultExpandedKeys:{type:'array',uniqueItems:true,items:{type:'string',minLength:1}},totals:{type:'object',additionalProperties:false,required:['mode'],properties:{mode:{enum:['producer','sum-leaves']},fields:{type:'array',minItems:1,uniqueItems:true,items:{type:'string',minLength:1}}}}}};
-export const pivotSchema={type:'object',additionalProperties:false,required:['rowFields','columnField','values'],oneOf:[{required:['columnCategories'],not:{required:['columnDomain']}},{required:['columnDomain'],not:{required:['columnCategories']}}],properties:{rowFields:{type:'array',minItems:1,uniqueItems:true,items:{type:'string',minLength:1}},columnField:{type:'string',minLength:1},columnDomain:{const:'observed'},columnCategories:{type:'array',minItems:1,uniqueItems:true,items:{type:'string',minLength:1}},values:{type:'array',minItems:1,items:{type:'object',additionalProperties:false,required:['field','label','aggregate'],properties:{field:{type:'string',minLength:1},label:{type:'string',minLength:1},aggregate:{enum:['none','sum']},format:{type:'string'}}}}}};
+export const pivotSchema={type:'object',additionalProperties:false,required:['rowFields','columnField','values'],oneOf:[{required:['columnCategories'],not:{required:['columnDomain']}},{required:['columnDomain'],not:{required:['columnCategories']}}],properties:{rowFields:{type:'array',minItems:1,uniqueItems:true,items:{type:'string',minLength:1}},staticFields:{type:'array',minItems:1,uniqueItems:true,items:{type:'string',minLength:1}},columnField:{type:'string',minLength:1},columnDomain:{const:'observed'},columnCategories:{type:'array',minItems:1,uniqueItems:true,items:{type:'string',minLength:1}},values:{type:'array',minItems:1,items:{type:'object',additionalProperties:false,required:['field','label','aggregate'],properties:{field:{type:'string',minLength:1},label:{type:'string',minLength:1},aggregate:{enum:['none','sum']},format:{type:'string'}}}}}};
 export function normalizeTableAnalytics(block){
  const {hierarchy,pivot,columnGroups}=block;
  if(hierarchy&&pivot)throw Error('Table hierarchy and pivot must be separate blocks.');
@@ -29,7 +29,8 @@ export function normalizeTableAnalytics(block){
   else if(hierarchy.totals.fields!==undefined)throw Error('Producer totals do not declare computed fields.');
  }
  if(pivot!=null){
-  exact(pivot,['rowFields','columnField','columnCategories','columnDomain','values'],'table pivot');keys(pivot.rowFields,'Pivot row fields');
+  exact(pivot,['rowFields','staticFields','columnField','columnCategories','columnDomain','values'],'table pivot');keys(pivot.rowFields,'Pivot row fields');
+  if(pivot.staticFields!==undefined)keys(pivot.staticFields,'Pivot static fields');
   if(Object.hasOwn(pivot,'columnDomain')){
    if(pivot.columnDomain!=='observed'||Object.hasOwn(pivot,'columnCategories'))throw Error('Observed pivot domain cannot declare fixed column categories.');
   }else keys(pivot.columnCategories,'Pivot column categories');
@@ -37,12 +38,14 @@ export function normalizeTableAnalytics(block){
   if(!Array.isArray(pivot.values)||!pivot.values.length)throw Error('Pivot values are required.');
   const measures=[];for(const value of pivot.values){exact(value,['field','label','aggregate','format'],'pivot value');if(!key(value.field)||!key(value.label)||!['none','sum'].includes(value.aggregate))throw Error('Pivot values require field, label and explicit none/sum aggregation.');measures.push(value.field);}
   if(new Set(measures).size!==measures.length||measures.some(field=>pivot.rowFields.includes(field)||field===pivot.columnField))throw Error('Pivot value fields must be unique and distinct.');
-  for(const field of [...pivot.rowFields,pivot.columnField,...measures])if(!known.has(field))throw Error(`Pivot field ${field} must be declared in source columns.`);
+  const fields=[...pivot.rowFields,pivot.columnField,...measures,...(pivot.staticFields||[])];
+  if(new Set(fields).size!==fields.length)throw Error('Pivot static fields must be distinct from row, column and value fields.');
+  for(const field of fields)if(!known.has(field))throw Error(`Pivot field ${field} must be declared in source columns.`);
  }
  if(columnGroups!=null){if(!Array.isArray(columnGroups))throw Error('Table columnGroups must be an array.');const seen=new Set();for(const group of columnGroups){exact(group,['label','columns'],'column group');if(!key(group.label))throw Error('Column group label is required.');keys(group.columns,'Grouped columns');const positions=group.columns.map(field=>columns.findIndex(column=>column.key===field));if(positions.some((position,i)=>position<0||(i>0&&position!==positions[i-1]+1)))throw Error('Column groups must name contiguous displayed columns in order.');for(const field of group.columns){if(seen.has(field))throw Error('Column groups cannot overlap.');seen.add(field);}}}
  return {...(hierarchy?{hierarchy:clone(hierarchy)}:{}),...(pivot?{pivot:clone(pivot)}:{}),...(columnGroups?{columnGroups:clone(columnGroups)}:{})};
 }
-export function tableAnalyticsFields(block){return block.hierarchy?[block.hierarchy.keyField,block.hierarchy.parentField,block.hierarchy.labelField,...(block.hierarchy.totals?.fields||[])]:block.pivot?[...block.pivot.rowFields,block.pivot.columnField,...block.pivot.values.map(value=>value.field)]:[];}
+export function tableAnalyticsFields(block){return block.hierarchy?[block.hierarchy.keyField,block.hierarchy.parentField,block.hierarchy.labelField,...(block.hierarchy.totals?.fields||[])]:block.pivot?[...block.pivot.rowFields,block.pivot.columnField,...block.pivot.values.map(value=>value.field),...(block.pivot.staticFields||[])]:[];}
 const number=value=>{if(value==null)return null;if(typeof value!=='number'||!Number.isFinite(value))throw Error('Table aggregate values must be finite numbers or null.');return value;};
 function sum(values){const present=values.map(number).filter(value=>value!==null);if(!present.length)return null;const total=present.reduce((a,b)=>a+b,0);if(!Number.isFinite(total))throw Error('Table aggregate overflowed its finite numeric range.');return total;}
 export function buildTableHierarchy(rows,config){
@@ -87,7 +90,13 @@ export function pivotColumnKey(pivot,category,index,measure){
  for(let i=0;i<category.length;i++)encoded+=category.charCodeAt(i).toString(16).padStart(4,'0');
  return `__forge_pivot_observed_${encoded}_${measure}`;
 }
-export function materializeAnalyticalTable(block,rows,{columnCategories}={}){
+function pivotRowValues(pivot,row){
+ if(!object(row))throw Error('Pivot rows must be objects.');
+ const values=pivot.rowFields.map(field=>row[field]);
+ if(values.some(value=>!key(value)&&!(typeof value==='number'&&Number.isFinite(value))))throw Error('Pivot row dimensions require nonempty string or finite numeric keys.');
+ return values;
+}
+export function materializeAnalyticalTable(block,rows,{columnCategories,sourceRows=rows}={}){
  const normalized=normalizeTableAnalytics(block);
  if(normalized.hierarchy){
   const model=buildTableHierarchy(rows,normalized.hierarchy),ordered=hierarchyRows(model).nodes,pathKey=HIERARCHY_PATH_FIELD;
@@ -98,12 +107,21 @@ export function materializeAnalyticalTable(block,rows,{columnCategories}={}){
  if(!normalized.pivot)return {columns:block.columns,rows,columnGroups:block.columnGroups||[]};
  const pivot=normalized.pivot,tuples=new Map(),categories=pivot.columnDomain==='observed'&&columnCategories!==undefined?[...columnCategories]:resolvePivotColumnCategories(pivot,rows);
  if(categories.some(value=>!key(value))||new Set(categories).size!==categories.length)throw Error('Pivot column categories require unique nonempty strings.');
+ const staticFields=pivot.staticFields||[],staticValues=new Map();
+ if(staticFields.length)for(const source of sourceRows){
+  const identity=JSON.stringify(pivotRowValues(pivot,source)),values=staticFields.map(field=>number(source[field])),prior=staticValues.get(identity);
+  if(prior)for(const [index,field] of staticFields.entries())if(prior[index]!==values[index])throw Error(`Pivot static field ${field} has inconsistent values for row tuple ${identity}.`);
+  staticValues.set(identity,values);
+ }
  const categoryIndexes=new Map(categories.map((category,index)=>[category,index]));
- for(const row of rows){if(!object(row))throw Error('Pivot rows must be objects.');const values=pivot.rowFields.map(field=>row[field]);if(values.some(value=>!key(value)))throw Error('Pivot row dimensions require nonempty string keys.');const categoryValue=row[pivot.columnField];let category=categoryIndexes.get(categoryValue);
-  if(category===undefined)throw Error('Pivot category is outside its declared ordered domain.');const identity=JSON.stringify(values);let target=tuples.get(identity);if(!target){target={row:Object.fromEntries(pivot.rowFields.map((field,i)=>[field,values[i]])),cells:new Map()};tuples.set(identity,target);}const observations=target.cells.get(category)||[];observations.push(row);target.cells.set(category,observations);}
- const columns=pivot.rowFields.map(field=>({...block.columns.find(column=>column.key===field),rowIdentity:true}));
+ for(const row of rows){const values=pivotRowValues(pivot,row),categoryValue=row[pivot.columnField];let category=categoryIndexes.get(categoryValue);
+  if(category===undefined)throw Error('Pivot category is outside its declared ordered domain.');const identity=JSON.stringify(values);let target=tuples.get(identity);if(!target){
+   if(staticFields.length&&!staticValues.has(identity))throw Error('Pivot row tuple is outside its complete static source.');
+   target={row:Object.fromEntries([...pivot.rowFields.map((field,index)=>[field,values[index]]),...staticFields.map((field,index)=>[field,staticValues.get(identity)[index]])]),cells:new Map()};tuples.set(identity,target);}
+  const observations=target.cells.get(category)||[];observations.push(row);target.cells.set(category,observations);}
+ const columns=[...pivot.rowFields.map(field=>({...block.columns.find(column=>column.key===field),rowIdentity:true})),...staticFields.map(field=>({format:'number',align:'right',...block.columns.find(column=>column.key===field),rowIdentity:false}))];
  const columnGroups=[{label:'Rows',columns:[...pivot.rowFields]}];
- categories.forEach((category,c)=>{const group={label:category,columns:[]};pivot.values.forEach((value,m)=>{const field=pivotColumnKey(pivot,category,c,m);if(pivot.rowFields.includes(field))throw Error('Pivot source key collides with a generated column.');group.columns.push(field);columns.push({key:field,label:value.label,format:value.format||'number',align:'right'});});columnGroups.push(group);});
+ categories.forEach((category,c)=>{const group={label:category,columns:[]};pivot.values.forEach((value,m)=>{const field=pivotColumnKey(pivot,category,c,m);if([...pivot.rowFields,...staticFields].includes(field))throw Error('Pivot source key collides with a generated column.');group.columns.push(field);columns.push({key:field,label:value.label,format:value.format||'number',align:'right'});});columnGroups.push(group);});
  const output=Array.from(tuples.values()).map(({row,cells})=>{categories.forEach((category,c)=>pivot.values.forEach((value,m)=>{const observations=cells.get(c)||[];if(value.aggregate==='none'&&observations.length>1)throw Error('Pivot duplicate coordinates require explicit sum aggregation.');row[columnGroups[c+1].columns[m]]=value.aggregate==='sum'?sum(observations.map(source=>source[value.field])):number(observations[0]?.[value.field]);}));return row;});
  return {columns,rows:output,columnGroups};
 }

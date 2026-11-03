@@ -85,14 +85,69 @@ JSON row values; parent computation and the path are materialized presentation r
 ```
 
 Declare the row fields, column field and value fields in the block's source
-columns. Row dimension values and ordered category keys are nonempty strings.
+columns. Row identities are nonempty strings or finite numbers; their types are
+preserved, so numeric `10` and string `"10"` identify different row tuples.
+Ordered category keys remain nonempty strings.
 The first occurrence of each row tuple determines its initial order. Columns use
 the explicit domain, including categories with no observations. Out-of-domain
 categories reject the report. `aggregate: none` requires one source record per
 row-tuple/category pair; duplicates reject rather than overwrite. `sum` is the
 only opt-in aggregation and has the same null/zero/overflow rules as sum-leaves.
 No totals or averages are inferred. Generated field keys are deterministic
-`__forge_pivot_<category index>_<measure index>`; row-field collisions reject.
+`__forge_pivot_<category index>_<measure index>`; row/static-field collisions reject.
+
+### Static typed measures
+
+Optional `pivot.staticFields` names source columns to display once per row tuple,
+before the generated category columns. This is independent of `rowFields`:
+numeric identifiers remain identities, while static measures are payload columns
+and are not repeated as identity anchors in horizontal print bands. The order is
+`rowFields`, then `staticFields`, then the existing ordered category/value columns.
+Source-column labels, formatting and presentation metadata are reused; the default
+static format/alignment is `number`/`right`. Static headers are not category-qualified.
+
+```json
+{
+  "columns": [
+    {"key": "branch", "label": "Branch"},
+    {"key": "month", "label": "Month"},
+    {"key": "circulation", "label": "Circulation"},
+    {"key": "registeredMembers", "label": "Members", "format": "integer"}
+  ],
+  "pivot": {
+    "rowFields": ["branch"],
+    "staticFields": ["registeredMembers"],
+    "columnField": "month",
+    "columnDomain": "observed",
+    "values": [{"field": "circulation", "label": "Circulation", "aggregate": "sum"}]
+  }
+}
+```
+
+Each static field must be a distinct declared source column, separate from row,
+category and dynamic value fields. Its producer-authored values must be finite
+numbers, null or missing. Missing normalizes to null; zero and negative values
+remain numeric. All observations for a row tuple must agree, across categories,
+duplicate coordinates and collected pages. Null/missing agree with each other,
+but not with a number. A disagreement rejects materialization with the static
+field and row tuple in the diagnostic; Forge never sums repeated static values,
+selects an arbitrary first observation, or infers a producer calculation. This
+consistency check uses the complete admitted source even when runtime filters or
+selections hide observations. Dynamic values still follow their authored aggregation
+over the selected observations.
+
+Both fixed and observed pivots use the same optional declaration. Omit it to keep
+existing pivot output unchanged. Updated schema/materializer support is required
+when opting in; no new contract version, export adapter or per-report rule is used.
+Authored report dataset catalogs should declare these fields as measures; normal
+lowering includes them in the producer request projection.
+
+The independently invented [library fixture](examples/library-static-pivot.json)
+has numeric branch IDs, monthly circulation, and producer static membership/balance
+values. Its small constants were authored from scratch, not captured from an
+application, service, workbook or customer dataset. It exercises repeated values,
+zero, negatives, null and missing values through native rendering, materialization,
+CSV, XLSX and PDF regressions.
 
 For a category domain that varies with the admitted data, omit `columnCategories`
 and declare `"columnDomain": "observed"`. The existing materializer derives the

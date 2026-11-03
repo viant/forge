@@ -1,0 +1,31 @@
+{
+  "block": {
+    "id": "visits",
+    "kind": "tableBlock",
+    "datasetRef": "primary",
+    "columns": [
+      {"key": "branchId", "label": "Branch ID", "format": "integer"},
+      {"key": "branch", "label": "Branch"},
+      {"key": "month", "label": "Month"},
+      {"key": "circulation", "label": "Circulation", "format": "integer"},
+      {"key": "registeredMembers", "label": "Members", "format": "integer"},
+      {"key": "balance", "label": "Balance", "format": "decimal", "align": "right"}
+    ],
+    "pivot": {
+      "rowFields": ["branchId", "branch"],
+      "staticFields": ["registeredMembers", "balance"],
+      "columnField": "month",
+      "columnDomain": "observed",
+      "values": [{"field": "circulation", "label": "Circulation", "aggregate": "none", "format": "integer"}]
+    }
+  },
+  "rows": [
+    {"branchId": 10, "branch": "North", "month": "March", "circulation": 8, "registeredMembers": 120, "balance": -2.5},
+    {"branchId": 10, "branch": "North", "month": "January", "circulation": 0, "registeredMembers": 120, "balance": -2.5},
+    {"branchId": 20, "branch": "South", "month": "January", "circulation": -3, "registeredMembers": 0, "balance": 0},
+    {"branchId": 20, "branch": "South", "month": "February", "circulation": null, "registeredMembers": 0, "balance": 0},
+    {"branchId": 30, "branch": "West", "month": "March", "circulation": null, "registeredMembers": null, "balance": null},
+    {"branchId": 30, "branch": "West", "month": "February"},
+    {"branchId": 40, "branch": "East", "month": "February", "circulation": 4}
+  ]
+}

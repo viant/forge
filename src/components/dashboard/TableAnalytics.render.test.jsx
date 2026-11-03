@@ -5,6 +5,7 @@ import DashboardTableContent from './DashboardTableContent.jsx';
 import ReportRuntime from './ReportRuntime.jsx';
 import ReviewTable from './ReviewTable.jsx';
 import fixture from '../../../doc/examples/laboratory-table-analytics.json';
+import libraryFixture from '../../../doc/examples/library-static-pivot.json';
 import {buildReportFillFromReportSpec} from '../../reporting/reportFillModel.js';
 import {materializeAnalyticalTable} from '../../reporting/reportTableAnalytics.js';
 import {renderReportTableCsv} from '../../reporting/reportTableCsv.js';
@@ -84,6 +85,39 @@ it('keeps an observed category sort attached to its label after complete data ch
  }finally{await act(async()=>root.unmount());host.remove();}
 });
 async function changeSearch(input,value){await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));});}
+it('renders producer static measures once beside observed columns in native report tables',async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ const spec=reportSpecFor(libraryFixture.block),fill=buildReportFillFromReportSpec(spec,{primary:{rows:libraryFixture.rows,hasMore:false}});
+ try{
+  await act(async()=>root.render(<ReportRuntime reportSpec={spec} reportFill={fill}/>));
+  expect(host.querySelectorAll('tbody tr').length).toBe(4);
+  expect([...host.querySelectorAll('tbody tr')[0].cells].map(cell=>cell.textContent)).toEqual(['10','North','120','-2.5','8','0','-']);
+  expect(host.querySelectorAll('button[aria-label="Sort by Members"]').length).toBe(1);
+  expect(host.querySelectorAll('thead tr:last-child th').length).toBe(7);
+  await act(async()=>host.querySelector('button[aria-label="Sort by Members"]').click());
+  expect([...host.querySelectorAll('tbody tr')].map(row=>row.cells[1].textContent)).toEqual(['South','North','West','East']);
+  expect(host.querySelectorAll('tbody tr')[0].cells[2].textContent).toBe('0');
+  expect(host.querySelectorAll('tbody tr')[2].cells[2].textContent).toBe('-');
+  const multipleSpec=structuredClone(spec);multipleSpec.blocks[0].columns.push({key:'renewals',label:'Renewals'});multipleSpec.blocks[0].pivot.values.push({field:'renewals',label:'Renewals',aggregate:'sum'});
+  const multipleFill=buildReportFillFromReportSpec(multipleSpec,{primary:{rows:libraryFixture.rows.map(row=>({...row,renewals:2})),hasMore:false}});
+  await act(async()=>root.render(<ReportRuntime reportSpec={multipleSpec} reportFill={multipleFill}/>));
+  expect(host.querySelectorAll('thead tr:last-child th').length).toBe(10);
+  expect(host.querySelectorAll('button[aria-label="Sort by Members"]').length).toBe(1);
+  expect(host.querySelector('button[aria-label="Sort by March / Renewals"]')).toBeTruthy();
+  const analytic=materializeAnalyticalTable(libraryFixture.block,libraryFixture.rows);
+  await act(async()=>root.render(<DashboardTableContent container={{id:'visits',columns:analytic.columns,columnGroups:analytic.columnGroups,pivot:libraryFixture.block.pivot,quickFilter:true,paging:{enabled:true,size:1,rangeLabel:'complete'}}} context={context(analytic.rows)}/>));
+  expect(host.querySelectorAll('tbody tr').length).toBe(1);
+  expect(host.querySelector('tbody tr').cells[2].textContent).toBe('120');
+  await act(async()=>[...host.querySelectorAll('button')].find(node=>node.textContent==='Next').click());
+  expect(host.querySelector('tbody tr').cells[1].textContent).toBe('South');
+  expect(host.querySelector('tbody tr').cells[2].textContent).toBe('0');
+  expect(host.querySelectorAll('thead tr:last-child th').length).toBe(7);
+  await changeSearch(host.querySelector('input[type="search"]'),'120');
+  expect(host.querySelectorAll('tbody tr').length).toBe(1);
+  expect(host.querySelector('tbody tr').cells[1].textContent).toBe('North');
+  expect(host.querySelector('tbody tr').cells[2].textContent).toBe('120');
+ }finally{await act(async()=>root.unmount());host.remove();}
+});
 it('keeps the canonical export path out of actual ReportRuntime columns and matching',async()=>{
  globalThis.IS_REACT_ACT_ENVIRONMENT=true;const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
  const spec=reportSpecFor(fixture.hierarchy),fill=buildReportFillFromReportSpec(spec,{primary:{rows:fixture.inventoryRows}});

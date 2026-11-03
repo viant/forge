@@ -69,6 +69,9 @@ func ValidateTablePresentations(spec json.RawMessage, presentations TablePresent
 			for _, field := range block.Pivot.RowFields {
 				columns[field] = true
 			}
+			for _, field := range block.Pivot.StaticFields {
+				columns[field] = true
+			}
 			for c := range block.Pivot.ColumnCategories {
 				for m := range block.Pivot.Values {
 					columns[fmt.Sprintf("__forge_pivot_%d_%d", c, m)] = true
