@@ -94,6 +94,24 @@ only opt-in aggregation and has the same null/zero/overflow rules as sum-leaves.
 No totals or averages are inferred. Generated field keys are deterministic
 `__forge_pivot_<category index>_<measure index>`; row-field collisions reject.
 
+For a category domain that varies with the admitted data, omit `columnCategories`
+and declare `"columnDomain": "observed"`. The existing materializer derives the
+ordered domain from the complete source snapshot in first-observation order.
+Local table filtering, selection and paging preserve that domain and its column
+coordinates. An empty source produces only the declared row-dimension columns.
+Category values must still be nonempty strings; null, numeric and blank category
+keys are not coerced. Duplicate coordinates still require explicit `sum`.
+
+Observed columns use category-derived keys rather than positional keys. A
+surviving category keeps its identity when a refreshed source changes category
+order or removes another category. A saved sort targeting a removed category is
+rejected by the existing materialized-column check, rather than sorting a
+different category. The UI, CSV, XLSX and PDF share the resolved domain and cells;
+the fill retains the complete long-form source, and dashboard XLSX includes it
+as before. Do not supply both domain
+modes. Existing fixed-category declarations and their strict out-of-domain
+behavior are unchanged.
+
 Pivot rows contain only their declared dimensions and generated measures, not
 an arbitrary first source row's metadata. The fill preserves the complete original
 long-form dataset separately. Checkbox source-row review is rejected for pivots

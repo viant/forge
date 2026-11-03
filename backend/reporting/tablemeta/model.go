@@ -26,7 +26,8 @@ type PivotValue struct {
 type Pivot struct {
 	RowFields        []string     `json:"rowFields"`
 	ColumnField      string       `json:"columnField"`
-	ColumnCategories []string     `json:"columnCategories"`
+	ColumnCategories []string     `json:"columnCategories,omitempty"`
+	ColumnDomain     string       `json:"columnDomain,omitempty"`
 	Values           []PivotValue `json:"values"`
 }
 type ColumnGroup struct {
@@ -93,7 +94,10 @@ func Validate(hierarchy *Hierarchy, pivot *Pivot, groups []ColumnGroup, columns 
 		if len(groups) > 0 {
 			return fmt.Errorf("pivot column groups are generated from categories")
 		}
-		if len(pivot.RowFields) == 0 || len(pivot.ColumnCategories) == 0 || len(pivot.Values) == 0 || !unique(pivot.ColumnCategories) {
+		if pivot.ColumnDomain != "" && (pivot.ColumnDomain != "observed" || pivot.ColumnCategories != nil) {
+			return fmt.Errorf("observed pivot domain cannot declare fixed column categories")
+		}
+		if len(pivot.RowFields) == 0 || (pivot.ColumnDomain == "" && len(pivot.ColumnCategories) == 0) || len(pivot.Values) == 0 || !unique(pivot.ColumnCategories) {
 			return fmt.Errorf("pivot requires row fields, categories and values")
 		}
 		fields := append(append([]string{}, pivot.RowFields...), pivot.ColumnField)

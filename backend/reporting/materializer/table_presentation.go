@@ -6,9 +6,13 @@ import (
 	"errors"
 	"fmt"
 	reportspec "github.com/viant/forge/backend/reporting/spec"
+	"regexp"
+	"strconv"
 )
 
 var ErrTablePresentation = errors.New("invalid report table presentation")
+
+var observedPivotSortKey = regexp.MustCompile(`^__forge_pivot_observed_(?:[0-9a-f]{4})+_(0|[1-9][0-9]*)$`)
 
 // TablePresentations contains advisory display choices, never rows or scope.
 // The trusted materializer validates table/column IDs against the report fill.
@@ -48,6 +52,7 @@ func ValidateTablePresentations(spec json.RawMessage, presentations TablePresent
 		return err
 	}
 	tables := make(map[string]map[string]bool)
+	observedPivots := make(map[string]int)
 	for _, block := range document.Blocks {
 		if block.Kind != "tableBlock" {
 			continue
@@ -57,6 +62,9 @@ func ValidateTablePresentations(spec json.RawMessage, presentations TablePresent
 			columns[column.Key] = true
 		}
 		if block.Pivot != nil {
+			if block.Pivot.ColumnDomain == "observed" {
+				observedPivots[block.ID] = len(block.Pivot.Values)
+			}
 			columns = make(map[string]bool)
 			for _, field := range block.Pivot.RowFields {
 				columns[field] = true
@@ -77,8 +85,19 @@ func ValidateTablePresentations(spec json.RawMessage, presentations TablePresent
 		if len(state.Filter) > 4096 {
 			return fmt.Errorf("%w: filter exceeds limit for table %q", ErrTablePresentation, id)
 		}
-		if state.Sort != nil && (!columns[state.Sort.Key] || (state.Sort.Direction != "asc" && state.Sort.Direction != "desc")) {
-			return fmt.Errorf("%w: sort column or direction is invalid for table %q", ErrTablePresentation, id)
+		if state.Sort != nil {
+			validColumn := columns[state.Sort.Key]
+			if !validColumn && observedPivots[id] > 0 {
+				// Observed category coordinates exist only after the complete fill.
+				// The shared JS presentation path checks the actual generated column.
+				if matches := observedPivotSortKey.FindStringSubmatch(state.Sort.Key); len(matches) == 2 {
+					measure, err := strconv.Atoi(matches[1])
+					validColumn = err == nil && measure < observedPivots[id]
+				}
+			}
+			if !validColumn || (state.Sort.Direction != "asc" && state.Sort.Direction != "desc") {
+				return fmt.Errorf("%w: sort column or direction is invalid for table %q", ErrTablePresentation, id)
+			}
 		}
 	}
 	return nil

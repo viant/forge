@@ -50983,9 +50983,11 @@ ${indent}${end}`;
       } else if (hierarchy.totals.fields !== void 0) throw Error("Producer totals do not declare computed fields.");
     }
     if (pivot != null) {
-      exact(pivot, ["rowFields", "columnField", "columnCategories", "values"], "table pivot");
+      exact(pivot, ["rowFields", "columnField", "columnCategories", "columnDomain", "values"], "table pivot");
       keys(pivot.rowFields, "Pivot row fields");
-      keys(pivot.columnCategories, "Pivot column categories");
+      if (Object.hasOwn(pivot, "columnDomain")) {
+        if (pivot.columnDomain !== "observed" || Object.hasOwn(pivot, "columnCategories")) throw Error("Observed pivot domain cannot declare fixed column categories.");
+      } else keys(pivot.columnCategories, "Pivot column categories");
       if (!key(pivot.columnField) || pivot.rowFields.includes(pivot.columnField)) throw Error("Pivot columnField must be distinct from its rowFields.");
       if (!Array.isArray(pivot.values) || !pivot.values.length) throw Error("Pivot values are required.");
       const measures = [];
@@ -51104,7 +51106,27 @@ ${indent}${end}`;
     selected.forEach(visit3);
     return { nodes: result, rootCount: roots.length, visibleRootCount: selected.length, pageCount };
   }
-  function materializeAnalyticalTable(block, rows) {
+  function resolvePivotColumnCategories(pivot, rows) {
+    if (pivot.columnDomain !== "observed") return [...pivot.columnCategories];
+    const categories = [], seen = /* @__PURE__ */ new Set();
+    for (const row of rows) {
+      if (!object2(row)) throw Error("Pivot rows must be objects.");
+      const value = row[pivot.columnField];
+      if (!key(value)) throw Error("Observed pivot categories require nonempty string keys.");
+      if (!seen.has(value)) {
+        seen.add(value);
+        categories.push(value);
+      }
+    }
+    return categories;
+  }
+  function pivotColumnKey(pivot, category, index, measure) {
+    if (pivot.columnDomain !== "observed") return `__forge_pivot_${index}_${measure}`;
+    let encoded = "";
+    for (let i3 = 0; i3 < category.length; i3++) encoded += category.charCodeAt(i3).toString(16).padStart(4, "0");
+    return `__forge_pivot_observed_${encoded}_${measure}`;
+  }
+  function materializeAnalyticalTable(block, rows, { columnCategories } = {}) {
     const normalized = normalizeTableAnalytics(block);
     if (normalized.hierarchy) {
       const model = buildTableHierarchy(rows, normalized.hierarchy), ordered = hierarchyRows(model).nodes, pathKey = HIERARCHY_PATH_FIELD;
@@ -51122,13 +51144,16 @@ ${indent}${end}`;
       return { columns: [{ key: pathKey, label: "Hierarchy path", rowIdentity: true }, ...block.columns], rows: withPath, sourceIndexes: ordered.map((node) => node.sourceIndex), columnGroups: block.columnGroups || [] };
     }
     if (!normalized.pivot) return { columns: block.columns, rows, columnGroups: block.columnGroups || [] };
-    const pivot = normalized.pivot, tuples = /* @__PURE__ */ new Map();
+    const pivot = normalized.pivot, tuples = /* @__PURE__ */ new Map(), categories = pivot.columnDomain === "observed" && columnCategories !== void 0 ? [...columnCategories] : resolvePivotColumnCategories(pivot, rows);
+    if (categories.some((value) => !key(value)) || new Set(categories).size !== categories.length) throw Error("Pivot column categories require unique nonempty strings.");
+    const categoryIndexes = new Map(categories.map((category, index) => [category, index]));
     for (const row of rows) {
       if (!object2(row)) throw Error("Pivot rows must be objects.");
       const values = pivot.rowFields.map((field2) => row[field2]);
       if (values.some((value) => !key(value))) throw Error("Pivot row dimensions require nonempty string keys.");
-      const category = pivot.columnCategories.indexOf(row[pivot.columnField]);
-      if (category < 0) throw Error("Pivot category is outside its declared ordered domain.");
+      const categoryValue = row[pivot.columnField];
+      let category = categoryIndexes.get(categoryValue);
+      if (category === void 0) throw Error("Pivot category is outside its declared ordered domain.");
       const identity = JSON.stringify(values);
       let target = tuples.get(identity);
       if (!target) {
@@ -51141,10 +51166,10 @@ ${indent}${end}`;
     }
     const columns = pivot.rowFields.map((field2) => ({ ...block.columns.find((column) => column.key === field2), rowIdentity: true }));
     const columnGroups = [{ label: "Rows", columns: [...pivot.rowFields] }];
-    pivot.columnCategories.forEach((category, c3) => {
+    categories.forEach((category, c3) => {
       const group = { label: category, columns: [] };
       pivot.values.forEach((value, m3) => {
-        const field2 = `__forge_pivot_${c3}_${m3}`;
+        const field2 = pivotColumnKey(pivot, category, c3, m3);
         if (pivot.rowFields.includes(field2)) throw Error("Pivot source key collides with a generated column.");
         group.columns.push(field2);
         columns.push({ key: field2, label: value.label, format: value.format || "number", align: "right" });
@@ -51152,11 +51177,11 @@ ${indent}${end}`;
       columnGroups.push(group);
     });
     const output = Array.from(tuples.values()).map(({ row, cells }) => {
-      pivot.columnCategories.forEach((_2, c3) => pivot.values.forEach((value, m3) => {
+      categories.forEach((category, c3) => pivot.values.forEach((value, m3) => {
         var _a5;
         const observations = cells.get(c3) || [];
         if (value.aggregate === "none" && observations.length > 1) throw Error("Pivot duplicate coordinates require explicit sum aggregation.");
-        row[`__forge_pivot_${c3}_${m3}`] = value.aggregate === "sum" ? sum2(observations.map((source) => source[value.field])) : number2((_a5 = observations[0]) == null ? void 0 : _a5[value.field]);
+        row[columnGroups[c3 + 1].columns[m3]] = value.aggregate === "sum" ? sum2(observations.map((source) => source[value.field])) : number2((_a5 = observations[0]) == null ? void 0 : _a5[value.field]);
       }));
       return row;
     });
@@ -61566,7 +61591,7 @@ ${indent}${end}`;
     const availableDatasetRefs = Array.from(datasetsById.keys());
     const datasetsByAlias = buildReportFillDatasetAliasMap(datasetsById);
     return (Array.isArray(reportSpec == null ? void 0 : reportSpec.blocks) ? reportSpec.blocks : []).map((block) => {
-      var _a6, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q;
+      var _a6, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r;
       const normalizedBlock = cloneValue25(block);
       delete normalizedBlock.templateFieldDisplayMap;
       delete normalizedBlock.markerColors;
@@ -61599,7 +61624,8 @@ ${indent}${end}`;
       } : sourceDataset;
       if (normalizeString37(block == null ? void 0 : block.kind) === "tableBlock") {
         if ((block.hierarchy || block.pivot) && (((_e = sourceDataset == null ? void 0 : sourceDataset.provenance) == null ? void 0 : _e.hasMore) || ((_f = sourceDataset == null ? void 0 : sourceDataset.provenance) == null ? void 0 : _f.truncated) || Number((_g = sourceDataset == null ? void 0 : sourceDataset.request) == null ? void 0 : _g.offset) > 0)) throw new Error("Hierarchy and pivot tables require a complete admitted dataset; partial pages cannot be aggregated.");
-        const analytic = materializeAnalyticalTable(block, block.hierarchy ? (sourceDataset == null ? void 0 : sourceDataset.rows) || [] : (dataset == null ? void 0 : dataset.rows) || []);
+        const columnCategories = ((_h = block.pivot) == null ? void 0 : _h.columnDomain) === "observed" ? resolvePivotColumnCategories(block.pivot, (sourceDataset == null ? void 0 : sourceDataset.rows) || []) : void 0;
+        const analytic = materializeAnalyticalTable(block, block.hierarchy ? (sourceDataset == null ? void 0 : sourceDataset.rows) || [] : (dataset == null ? void 0 : dataset.rows) || [], { columnCategories });
         let tableRows = analytic.rows, sourceIndexes = analytic.sourceIndexes;
         if (block.hierarchy && dataset !== sourceDataset) {
           const model = buildTableHierarchy(tableRows, { ...block.hierarchy, totals: { mode: "producer" } });
@@ -61621,8 +61647,8 @@ ${indent}${end}`;
       if (normalizeString37(block == null ? void 0 : block.kind) === "chartBlock") {
         if (block.chartModel && (!dataset || dataset.rows.length === 0)) {
           const payload = datasetPayloads[datasetResolution.datasetRef];
-          const diagnostics = [...(payload == null ? void 0 : payload.diagnostics) || [], ...((_h = payload == null ? void 0 : payload.provenance) == null ? void 0 : _h.diagnostics) || []];
-          if (!sourceDataset || !Array.isArray(payload == null ? void 0 : payload.rows) || sourceDataset.provenance.hasMore || sourceDataset.provenance.truncated || Number((_i = sourceDataset.request) == null ? void 0 : _i.offset) > 0 || diagnostics.length > 0) {
+          const diagnostics = [...(payload == null ? void 0 : payload.diagnostics) || [], ...((_i = payload == null ? void 0 : payload.provenance) == null ? void 0 : _i.diagnostics) || []];
+          if (!sourceDataset || !Array.isArray(payload == null ? void 0 : payload.rows) || sourceDataset.provenance.hasMore || sourceDataset.provenance.truncated || Number((_j = sourceDataset.request) == null ? void 0 : _j.offset) > 0 || diagnostics.length > 0) {
             throw new Error(`Chart '${block.id}' requires complete empty dataset input for '${block.datasetRef}'.`);
           }
         }
@@ -61633,8 +61659,8 @@ ${indent}${end}`;
           content: {
             chartSpec,
             chartModel,
-            rowCount: Number(((_j = dataset == null ? void 0 : dataset.provenance) == null ? void 0 : _j.rowCount) || 0),
-            resolvedChart: buildReportFillChartPayload(chartModel, (dataset == null ? void 0 : dataset.rows) || [], ((_k = chartModel == null ? void 0 : chartModel.center) == null ? void 0 : _k.datasetRef) ? validateDonutCenterDataset(datasetsById.get(chartModel.center.datasetRef)) : void 0, ((_l = chartModel == null ? void 0 : chartModel.center) == null ? void 0 : _l.datasetRef) ? (_n = (_m = datasetsById.get(chartModel.center.datasetRef)) == null ? void 0 : _m.request) == null ? void 0 : _n.filters : (_o = dataset == null ? void 0 : dataset.request) == null ? void 0 : _o.filters, (_p = dataset == null ? void 0 : dataset.request) == null ? void 0 : _p.filters)
+            rowCount: Number(((_k = dataset == null ? void 0 : dataset.provenance) == null ? void 0 : _k.rowCount) || 0),
+            resolvedChart: buildReportFillChartPayload(chartModel, (dataset == null ? void 0 : dataset.rows) || [], ((_l = chartModel == null ? void 0 : chartModel.center) == null ? void 0 : _l.datasetRef) ? validateDonutCenterDataset(datasetsById.get(chartModel.center.datasetRef)) : void 0, ((_m = chartModel == null ? void 0 : chartModel.center) == null ? void 0 : _m.datasetRef) ? (_o = (_n = datasetsById.get(chartModel.center.datasetRef)) == null ? void 0 : _n.request) == null ? void 0 : _o.filters : (_p = dataset == null ? void 0 : dataset.request) == null ? void 0 : _p.filters, (_q = dataset == null ? void 0 : dataset.request) == null ? void 0 : _q.filters)
           }
         };
       }
@@ -61643,7 +61669,7 @@ ${indent}${end}`;
           ...normalizedBlock,
           content: {
             geo: cloneValue25((block == null ? void 0 : block.geo) || {}),
-            rowCount: Number(((_q = dataset == null ? void 0 : dataset.provenance) == null ? void 0 : _q.rowCount) || 0),
+            rowCount: Number(((_r = dataset == null ? void 0 : dataset.provenance) == null ? void 0 : _r.rowCount) || 0),
             resolvedGeo: buildReportFillGeoPayload(block, (dataset == null ? void 0 : dataset.rows) || [])
           }
         };

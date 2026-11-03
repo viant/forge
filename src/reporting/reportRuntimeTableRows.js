@@ -1,4 +1,4 @@
-import {buildTableHierarchy,hierarchyRows,materializeAnalyticalTable} from './reportTableAnalytics.js';
+import {buildTableHierarchy,hierarchyRows,materializeAnalyticalTable,resolvePivotColumnCategories} from './reportTableAnalytics.js';
 import {setSelector} from "../utils/selector.js";
 const normalizeString = value => String(value || "").trim();
 const cloneValue = value => value == null ? value : JSON.parse(JSON.stringify(value));
@@ -35,7 +35,8 @@ export function buildAnalyticalRuntimeTableRows(block,sourceRows,filteredRows){
  }
  if(block.pivot){
   const identity=row=>JSON.stringify(block.pivot.rowFields.map(field=>row[field]));
-  const refreshed=new Map(materializeAnalyticalTable(block,filteredRows).rows.map(row=>[identity(row),row]));
+  const columnCategories=block.pivot.columnDomain==='observed'?resolvePivotColumnCategories(block.pivot,sourceRows):undefined;
+  const refreshed=new Map(materializeAnalyticalTable(block,filteredRows,{columnCategories}).rows.map(row=>[identity(row),row]));
   return canonical.map(row=>refreshed.get(identity(row))).filter(Boolean);
  }
  return canonical;

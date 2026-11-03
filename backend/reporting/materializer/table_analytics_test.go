@@ -38,8 +38,9 @@ func TestTableAnalyticsExports(t *testing.T) {
 	if err = json.Unmarshal(data, &fixture); err != nil {
 		t.Fatal(err)
 	}
-	for _, mode := range []string{"hierarchy", "pivot", "computed"} {
+	for _, mode := range []string{"hierarchy", "pivot", "computed", "observed"} {
 		t.Run(mode, func(t *testing.T) {
+			isPivot := mode == "pivot" || mode == "observed"
 			raw, err := os.ReadFile("testdata/presentation-report.json")
 			if err != nil {
 				t.Fatal(err)
@@ -50,13 +51,19 @@ func TestTableAnalyticsExports(t *testing.T) {
 			}
 			block, rows := fixture.Hierarchy, fixture.InventoryRows
 			expectedRows := 9
-			if mode == "pivot" {
+			if isPivot {
 				block = fixture.Pivot
 				rows = fixture.InspectionRows
 				expectedRows = 3
 			}
+			if mode == "observed" {
+				pivot := block["pivot"].(map[string]any)
+				delete(pivot, "columnCategories")
+				pivot["columnDomain"] = "observed"
+				rows = append(append([]map[string]any{}, rows...), map[string]any{"building": "Atlas", "room": "101", "category": "Thermal", "count": 5})
+			}
 			block["datasetRef"] = "primary"
-			if mode != "pivot" {
+			if !isPivot {
 				rows = nil
 				for batch := 0; batch < 20; batch++ {
 					for _, source := range fixture.InventoryRows {
@@ -137,6 +144,17 @@ func TestTableAnalyticsExports(t *testing.T) {
 			if len(sheetRows) != expectedRows+1 {
 				t.Fatalf("XLSX row count=%d", len(sheetRows))
 			}
+			if mode == "observed" {
+				if records[0][5] != "Thermal / Inspections" || records[1][5] != "5" || sheetRows[0][5] != "Thermal / Inspections" || sheetRows[1][5] != "5" {
+					t.Fatal("observed category missing from complete exports")
+				}
+				if _, err := MaterializePresented(context.Background(), raw, map[string]json.RawMessage{"primary": payload}, TablePresentations{block["id"].(string): {Sort: &TableSort{Key: "__forge_pivot_observed_0054006800650072006d0061006c_0", Direction: "desc"}}}, true); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := MaterializePresented(context.Background(), raw, map[string]json.RawMessage{"primary": payload}, TablePresentations{block["id"].(string): {Sort: &TableSort{Key: "__forge_pivot_observed_004e006f007400500072006500730065006e0074_0", Direction: "desc"}}}, true); err == nil {
+					t.Fatal("unobserved sort coordinate accepted")
+				}
+			}
 			dashboardBytes, err := reportxlsx.RenderDashboard(fill)
 			if err != nil {
 				t.Fatal(err)
@@ -159,7 +177,7 @@ func TestTableAnalyticsExports(t *testing.T) {
 			if !strings.Contains(allWorkbookText, "Dataset primary") {
 				t.Fatal("dashboard workbook lost raw dataset")
 			}
-			if mode == "pivot" && (!strings.Contains(allWorkbookText, "Electrical / Inspections") || !strings.Contains(allWorkbookText, "category")) {
+			if isPivot && (!strings.Contains(allWorkbookText, "Electrical / Inspections") || !strings.Contains(allWorkbookText, "category")) {
 				t.Fatal("dashboard workbook lost pivot headers or raw long-form evidence")
 			}
 			report, err := reportprint.DecodeJSON(artifacts.ReportPrint)
@@ -188,7 +206,10 @@ func TestTableAnalyticsExports(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if mode != "pivot" {
+			if mode == "observed" && !strings.Contains(string(plain), "Thermal") {
+				t.Fatal("PDF lost the newly observed category")
+			}
+			if !isPivot {
 				if len(report.Pages) < 2 {
 					t.Fatal("large hierarchy did not paginate")
 				}
@@ -209,7 +230,7 @@ func TestTableAnalyticsExports(t *testing.T) {
 					t.Fatal("pivot metadata lost in backend round trip")
 				}
 			}
-			if mode != "pivot" {
+			if !isPivot {
 				filtered, filterErr := MaterializePresented(context.Background(), raw, map[string]json.RawMessage{"primary": payload}, TablePresentations{block["id"].(string): {Filter: "Atlas"}}, false)
 				if filterErr != nil {
 					t.Fatal(filterErr)

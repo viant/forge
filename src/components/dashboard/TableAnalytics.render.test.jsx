@@ -67,6 +67,22 @@ it('maps canonical hierarchy review choices to the original source after tree or
 });
 
 function reportSpecFor(block){return {version:1,kind:'reportSpec',title:'Invented analytical table',source:{kind:'report',containerId:'table',stateKey:'table',dataSourceRef:'invented'},parameters:{viewMode:'table',groupBy:'',pageSize:25,orderField:'',orderDir:'asc'},layoutIntent:{kind:'single',resultPanePosition:'bottom',blockOrder:[block.id]},refinements:[],calculatedFields:[],datasets:[{id:'primary',dataSourceRef:'invented',request:{}}],blocks:[{...block,datasetRef:'primary'}]};}
+it('keeps an observed category sort attached to its label after complete data changes',async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ const block=structuredClone(fixture.pivot);delete block.pivot.columnCategories;block.pivot.columnDomain='observed';
+ const rows=[{building:'Atlas',room:'101',category:'Electrical',count:3},{building:'Atlas',room:'101',category:'Mechanical',count:20},{building:'Atlas',room:'102',category:'Electrical',count:2},{building:'Atlas',room:'102',category:'Mechanical',count:10}];
+ const spec=reportSpecFor(block),render=async data=>act(async()=>root.render(<ReportRuntime reportSpec={spec} reportFill={buildReportFillFromReportSpec(spec,{primary:{rows:data,hasMore:false}})}/>));
+ try{
+  await render(rows);
+  expect([...host.querySelectorAll('th[scope="colgroup"]')].map(cell=>cell.textContent)).toEqual(['Rows','Electrical','Mechanical']);
+  await act(async()=>host.querySelector('button[aria-label="Sort by Mechanical / Inspections"]').click());
+  expect(host.querySelector('tbody tr').cells[1].textContent).toBe('102');
+  await render(rows.filter(row=>row.category==='Mechanical'));
+  expect([...host.querySelectorAll('th[scope="colgroup"]')].map(cell=>cell.textContent)).toEqual(['Rows','Mechanical']);
+  expect(host.querySelector('tbody tr').cells[1].textContent).toBe('102');
+  expect(host.querySelector('tbody tr').cells[2].textContent).toBe('10');
+ }finally{await act(async()=>root.unmount());host.remove();}
+});
 async function changeSearch(input,value){await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));});}
 it('keeps the canonical export path out of actual ReportRuntime columns and matching',async()=>{
  globalThis.IS_REACT_ACT_ENVIRONMENT=true;const host=document.createElement('div');document.body.append(host);const root=createRoot(host);

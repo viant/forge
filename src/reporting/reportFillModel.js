@@ -2,7 +2,7 @@ import {applyReportRowVisibility,validateReportRowVisibilityBlock} from './repor
 import {validateNumericDisplayFormat,formatRangeValue} from '../components/categoryRange.js';
 import {resolveTemplateRequestInput,escapeTemplateText} from './reportTemplateRequestInputs.js';
 import {validateDonutCenterDataset} from '../components/donutCenter.js';
-import {materializeAnalyticalTable,buildTableHierarchy,hierarchyRows} from './reportTableAnalytics.js';
+import {materializeAnalyticalTable,resolvePivotColumnCategories,buildTableHierarchy,hierarchyRows} from './reportTableAnalytics.js';
 import {applyReportTablePresentations} from './reportTablePresentation.js';
 import {materializeKpiSparkline} from './reportKpiSparklineModel.js';
 import { calculateKpiSecondaryValue, normalizeKpiSecondaryCalculation } from "./reportKpiComparisonModel.js";
@@ -1075,7 +1075,10 @@ function buildReportFillBlocks(reportSpec = {}, datasetsById = new Map(), {
       : sourceDataset;
     if (normalizeString(block?.kind) === "tableBlock") {
       if((block.hierarchy||block.pivot)&&(sourceDataset?.provenance?.hasMore||sourceDataset?.provenance?.truncated||Number(sourceDataset?.request?.offset)>0)) throw new Error('Hierarchy and pivot tables require a complete admitted dataset; partial pages cannot be aggregated.');
-      const analytic=materializeAnalyticalTable(block,block.hierarchy ? sourceDataset?.rows || [] : dataset?.rows || []);
+      // Observed coordinates belong to the complete admitted source, so runtime
+      // filters only change cell observations, never the generated column keys.
+      const columnCategories=block.pivot?.columnDomain==='observed'?resolvePivotColumnCategories(block.pivot,sourceDataset?.rows||[]):undefined;
+      const analytic=materializeAnalyticalTable(block,block.hierarchy ? sourceDataset?.rows || [] : dataset?.rows || [],{columnCategories});
       let tableRows=analytic.rows,sourceIndexes=analytic.sourceIndexes;
       if(block.hierarchy && dataset!==sourceDataset) {
         const model=buildTableHierarchy(tableRows,{...block.hierarchy,totals:{mode:'producer'}});
