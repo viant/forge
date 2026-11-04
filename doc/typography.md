@@ -15,6 +15,12 @@ The renderer supplies generic behavior, semantic hooks and neutral fallback
 recipes. Workspaces supply palettes, font assets, reviewed values, business
 content and variant selection. Customer styling never belongs in shared code.
 
+Comparison bars adapt to their own panel width. In narrow dashboard columns,
+the label and value remain above a full-width track even on a wide screen.
+Wide panels retain the inline label/track/value layout; the existing phone
+layout and keyboard selection behavior are unchanged. The neutral comparison
+width specimen verifies signed, zero and unavailable values at both sizes.
+
 ## Foundation map
 
 The document Composer reuses its existing showAbort/onAbort action in the Send

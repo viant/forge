@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
-import {buildReportPrintChartSvg} from './reportPrintChartSvg.js';
+import {buildReportPrintChartSvg,buildReportPrintChartPages} from './reportPrintChartSvg.js';
 
 // Independently authored amounts and periods. Measure actual browser glyphs,
 // since an in-bounds text anchor alone does not prove that a tick fits.
@@ -28,5 +28,52 @@ try {
       if(width===540)assert.equal(tick.fontSize,10,'Ordinary charts retain the print font size');
     }
   }
+  // Independently invented comparisons exercise complete signed currency labels
+  // beside wrapped categories, through the same SVG/page path used by PDF.
+  const rows = [
+    {category:'Reference collection',amount:-1250000.25},
+    {category:'Experimental collection',amount:987654.32},
+    {category:'Zero observation',amount:0},
+    {category:'Small negative observation',amount:-12.5},
+    {category:'Small positive observation',amount:23.75},
+  ];
+  const chartModel = {type:'horizontal_bar',showLegend:false,series:{values:[{value:'amount',label:'Amount',format:'currency2',dataLabels:'always'}]}};
+  for(const family of ['Arial','Times New Roman']) for(const width of [270,540,680]) for(const values of [rows,rows.map(row=>({...row,amount:Math.abs(row.amount)})),rows.map(row=>({...row,amount:row.amount===0?0:-Math.abs(row.amount)}))]) {
+    const resolvedChart = {kind:'directSeries',type:'horizontal_bar',xAxisKey:'category',seriesKeys:['amount'],rows:values};
+    const pages = buildReportPrintChartPages({width,chartModel,resolvedChart,maxHeight:180,firstMaxHeight:150});
+    assert.equal(pages.length,2,'Label fitting retains existing row pagination');
+    assert.equal(pages.reduce((count,page)=>count+(page.svg.match(/class="forge-chart-bar"/g)||[]).length,0),rows.length);
+    const categoryText=pages.map(result=>(result.svg.replace(/<[^>]*>/g,'')+(result.labelDetails||[]).join('')).replace(/\s/g,'')).join('');
+    for(const row of rows)assert.ok(categoryText.includes(row.category.replace(/\s/g,'')),'Keep complete wrapped categories or their printable details');
+    const printedValues=[];
+    for(const result of pages) {
+      assert.deepEqual(result.diagnostics,[]);
+      await page.setContent(`<main style="font-family:${family}">${result.svg}</main>`);
+      const plotBottom=Number(await page.locator('svg line[stroke="#eaecf0"]').first().getAttribute('y2'));
+      const boxes=await page.locator('svg text').evaluateAll(nodes=>nodes.map(node=>{const box=node.getBBox();return {text:node.textContent,x:box.x,right:box.x+box.width,y:box.y,bottom:box.y+box.height,baseline:Number(node.getAttribute('y')),fill:node.getAttribute('fill'),anchor:node.getAttribute('text-anchor'),size:Number(node.getAttribute('font-size'))};}));
+      const categoryBoxes=boxes.filter(box=>box.fill==='#344054');
+      const valueBoxes=boxes.filter(box=>box.fill==='#667085'&&box.baseline<=plotBottom);
+      const tickBoxes=boxes.filter(box=>box.fill==='#667085'&&box.baseline>plotBottom);
+      const bars=await page.locator('.forge-chart-bar').evaluateAll(nodes=>nodes.map(node=>{const box=node.getBBox();return {x:box.x,right:box.x+box.width,y:box.y,bottom:box.y+box.height};}));
+      for(const [index,box] of tickBoxes.entries()) {
+        assert.ok(box.x>=0&&box.right<=width,'Tick labels fit the allocation');
+        if(index)assert.ok(tickBoxes[index-1].right<=box.x,'Numeric tick labels remain separate');
+      }
+      assert.equal(categoryBoxes.length>0,true);
+      for(const box of valueBoxes) {
+        printedValues.push(box.text);
+        assert.ok(box.x>=0&&box.right<=width,`${family}/${width}: complete value fits ${JSON.stringify(box)}`);
+        assert.ok(box.size>=6,`${family}/${width}: values retain readable print size`);
+        for(const category of categoryBoxes)assert.ok(box.right<=category.x||box.x>=category.right||box.bottom<=category.y||box.y>=category.bottom,`${family}/${width}: value overlaps category ${JSON.stringify({box,category})}`);
+        for(const bar of bars)assert.ok(box.right<=bar.x||box.x>=bar.right||box.bottom<=bar.y||box.y>=bar.bottom,'Value labels remain outside colored bars');
+      }
+      const plot=await page.locator('svg line[stroke="#eaecf0"]').evaluateAll(nodes=>nodes.map(node=>Number(node.getAttribute('x1'))));
+      assert.ok(Math.max(...plot)-Math.min(...plot)>=24-1e-8,'Retain plotting width inside each allocation');
+    }
+    assert.deepEqual(printedValues.sort(),values.map(row=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:2}).format(row.amount)).sort(),'Keep every exact formatted signed value');
+  }
+  // A short positive label already fits the existing lane; retain its geometry.
+  const ordinary=buildReportPrintChartSvg({width:680,chartModel,resolvedChart:{kind:'directSeries',type:'horizontal_bar',xAxisKey:'category',seriesKeys:['amount'],rows:[{category:'Short',amount:12}]}});
+  assert.match(ordinary.svg,/<text x="620"[^>]*font-size="10"[^>]*>\$12\.00<\/text>/);
 } finally {await browser.close();}
-console.log('print chart tick bounds: full currency labels fit left, right and dual axes in narrow allocations');
+console.log('print chart bounds: full numeric axes and signed comparison labels fit their allocations without category collisions');

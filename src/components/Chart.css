@@ -112,7 +112,7 @@
 .forge-chart-document :is(button,.recharts-wrapper):focus-visible { outline:var(--forge-focus-width,2px) solid var(--forge-focus-color,currentColor); outline-offset:var(--forge-focus-offset,2px); }
 .forge-chart-document [data-forge-chart-point] { cursor:pointer; }
 .forge-chart-document [data-forge-chart-point]:focus-visible { outline:var(--forge-focus-width,2px) solid var(--forge-focus-color,currentColor); outline-offset:var(--forge-focus-offset,2px); }
-.forge-chart-comparisons { display:grid; gap:var(--forge-chart-comparison-gap,18px); list-style:none; margin:var(--forge-chart-comparison-margin,20px 0 4px); padding:0; }
+.forge-chart-comparisons { display:grid; gap:var(--forge-chart-comparison-gap,18px); list-style:none; margin:var(--forge-chart-comparison-margin,20px 0 4px); padding:0; min-width:0; container:forge-comparisons / inline-size; }
 .forge-chart-comparisons li > :is(div,button) { display:grid; grid-template-columns:minmax(150px,200px) minmax(0,1fr) minmax(90px,max-content); align-items:center; gap:var(--forge-spacing-4,16px); width:100%; border:0; padding:0; text-align:left; background:transparent; color:inherit; font-family:var(--forge-type-small-family,var(--forge-font-family)); font-size:var(--forge-type-small-size,12px); font-weight:var(--forge-type-small-weight,400); line-height:var(--forge-chart-comparison-leading,var(--forge-type-small-line-height,18px)); letter-spacing:var(--forge-type-small-letter-spacing,0em); }
 .forge-chart-comparisons button { cursor:pointer; }
 .forge-chart-comparison-label { overflow-wrap:anywhere; }
@@ -126,6 +126,10 @@
 .forge-chart-document .forge-chart-table { font-family:var(--forge-type-body-family,var(--forge-font-family)); font-size:var(--forge-type-body-size,13px); font-weight:var(--forge-type-body-weight,400); line-height:var(--forge-type-body-line-height,20px); letter-spacing:var(--forge-type-body-letter-spacing,0em); }
 .forge-chart-document .forge-chart-table th { font-family:var(--forge-type-metadata-family,var(--forge-font-family)); font-size:var(--forge-type-metadata-size,12px); font-weight:var(--forge-type-label-weight,500); line-height:var(--forge-type-metadata-line-height,16px); letter-spacing:var(--forge-type-metadata-letter-spacing,0em); }
 @media(max-width:600px) {
+    .forge-chart-comparisons li > :is(div,button) { grid-template-columns:minmax(0,1fr) minmax(90px,max-content); gap:var(--forge-spacing-2,8px) var(--forge-spacing-3,12px); }
+    .forge-chart-comparison-track { grid-column:1/-1; grid-row:2; }
+}
+@container forge-comparisons (max-width:420px) {
     .forge-chart-comparisons li > :is(div,button) { grid-template-columns:minmax(0,1fr) minmax(90px,max-content); gap:var(--forge-spacing-2,8px) var(--forge-spacing-3,12px); }
     .forge-chart-comparison-track { grid-column:1/-1; grid-row:2; }
 }

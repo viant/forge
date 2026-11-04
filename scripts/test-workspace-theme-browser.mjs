@@ -10,6 +10,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import {verifyChartFoundation} from '../src/demos/theme/chartFoundation.browser.mjs';
 import {verifyTableWidths} from '../src/demos/theme/tableWidth.browser.mjs';
+import {verifyComparisonWidths} from '../src/demos/theme/comparisonWidth.browser.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const server = await createServer({root, server: {hmr:process.env.FORGE_CHARTS_ONLY?false:undefined, host: '127.0.0.1', port: 0, fs: {allow: [path.dirname(root),fs.realpathSync(path.join(root,'node_modules'))]}}});
@@ -44,6 +45,7 @@ try {
         await verifyAttachmentDialog(proof);
         await verifyComposerFileDrop(proof);
         await verifyTableWidths(proof);
+        await verifyComparisonWidths(proof);
         const foundation = proof.locator('.forge-foundation-specimen');
         const analyticalDocument = foundation.getByRole('region',{name:'Analytical document specimen',exact:true});
         const switchSetting=analyticalDocument.getByRole('combobox',{name:'Chart data switching',exact:true});

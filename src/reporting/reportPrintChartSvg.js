@@ -1169,11 +1169,39 @@ function renderHorizontalBarChartSvg({
     longest,
     ...lines.map((line) => line.length),
   ), 0);
-  const leftPad = Math.min(Math.floor(width * 0.38), Math.max(116, 20 + (longestCategoryLine * 6)));
-  const rightPad = 66;
-  const {topPad, bottomPad, groupGap, rowHeight, plotHeight, height:baseHeight} = horizontalBarChartMetrics(rows.length, seriesDescriptors.length);
-  const plotWidth = Math.max(40, width - leftPad - rightPad);
+  const categoryPad = Math.min(Math.floor(width * 0.38), Math.max(116, 20 + (longestCategoryLine * 6)));
+  // Value labels need their own lanes outside the signed plot. In particular,
+  // the minimum negative value must not print into the category-label gutter.
+  // Reuse the numeric-axis fitter, including its narrow-allocation scaling,
+  // so complete formatted values remain on the page and off the colored bars.
+  const negativeLabels = [];
+  const positiveLabels = [];
+  const initialPlotWidth = Math.max(1, width - categoryPad - 66);
   const valueRange = bounds.maxValue - bounds.minValue || 1;
+  let labelsOverflow = false;
+  seriesDescriptors.forEach((series) => {
+    if (!shouldRenderReportPrintSeriesDataLabels(series, "horizontal_bar", rows.length)) return;
+    rows.forEach((row) => {
+      const value = normalizeNumber(row?.[series.key]);
+      if (value == null) return;
+      const label = formatSeriesDataLabel(value, series.format);
+      (value < 0 ? negativeLabels : positiveLabels).push(label);
+      const valueX = categoryPad + ((value - bounds.minValue) / valueRange) * initialPlotWidth;
+      const labelWidth = Array.from(label).length * 6;
+      labelsOverflow ||= value < 0 ? valueX - 6 - labelWidth < categoryPad : valueX + 6 + labelWidth > width;
+    });
+  });
+  const labelLayout = labelsOverflow
+    ? fitCartesianAxisTicks(width - categoryPad,
+      [...negativeLabels, formatAxisTick(bounds.minValue, seriesDescriptors[0]?.format)],
+      [...positiveLabels, formatAxisTick(bounds.maxValue, seriesDescriptors[0]?.format)])
+    : null;
+  const leftPad = categoryPad + (labelLayout?.leftPad || 0);
+  const rightPad = labelLayout?.rightPad ?? 66;
+  const valueLabelSize = labelLayout?.tickFontSize ?? 10;
+  const valueLabelGap = 6 * valueLabelSize / 10;
+  const {topPad, bottomPad, groupGap, rowHeight, plotHeight, height:baseHeight} = horizontalBarChartMetrics(rows.length, seriesDescriptors.length);
+  const plotWidth = Math.max(1, width - leftPad - rightPad);
   const baselineX = leftPad + (((0 - bounds.minValue) / valueRange) * plotWidth);
   const perSeriesHeight = Math.max(10, Math.floor((rowHeight - (Math.max(0, seriesDescriptors.length - 1) * 4)) / Math.max(seriesDescriptors.length, 1)));
   const legend = omitLegend || chartModel.showLegend === false ? {svg: "", height: 0} : buildLegendSvg(seriesDescriptors, width, topPad + plotHeight + bottomPad + 4);
@@ -1198,14 +1226,23 @@ function renderHorizontalBarChartSvg({
     return {
       value,
       x,
+      labelX: labelLayout && index === 0 ? x - valueLabelGap : labelLayout && index === count - 1 ? x + valueLabelGap : x,
+      anchor: labelLayout && index === 0 ? "end" : labelLayout && index === count - 1 ? "start" : "middle",
       label: formatAxisTick(value, seriesDescriptors[0]?.format),
     };
   });
   // Half-width dashboard bars can leave less than 100px for the value axis.
   // Retain the exact bounds while reducing tick density to fit formatted labels.
   let xTicks = makeTicks(4);
-  const ticksFit = (ticks) => ticks.every((tick, index) => index === 0
-    || tick.x - ticks[index - 1].x >= ((tick.label.length + ticks[index - 1].label.length) * 2.8) + 8);
+  const ticksFit = (ticks) => ticks.every((tick, index) => {
+    if (index === 0) return true;
+    const previous = ticks[index - 1];
+    if (!labelLayout) return tick.x - previous.x >= ((tick.label.length + previous.label.length) * 2.8) + 8;
+    const glyphWidth = 6 * valueLabelSize / 10;
+    const previousRight = previous.labelX + previous.label.length * glyphWidth * (previous.anchor === "end" ? 0 : previous.anchor === "middle" ? 0.5 : 1);
+    const tickLeft = tick.labelX - tick.label.length * glyphWidth * (tick.anchor === "start" ? 0 : tick.anchor === "middle" ? 0.5 : 1);
+    return tickLeft - previousRight >= 8 * valueLabelSize / 10;
+  });
   for (const count of [3, 2]) {
     if (ticksFit(xTicks)) break;
     xTicks = makeTicks(count);
@@ -1213,13 +1250,13 @@ function renderHorizontalBarChartSvg({
 
   const gridLines = xTicks.map((tick) => `
     <line x1="${tick.x}" y1="${topPad}" x2="${tick.x}" y2="${topPad + plotHeight}" stroke="#eaecf0" stroke-width="1" />
-    <text x="${tick.x}" y="${topPad + plotHeight + 18}" text-anchor="middle" font-size="10" fill="#667085">${escapeXml(tick.label)}</text>
+    <text x="${tick.labelX}" y="${topPad + plotHeight + 18}" text-anchor="${tick.anchor}" font-size="${valueLabelSize}" fill="#667085">${escapeXml(tick.label)}</text>
   `).join("\n");
 
   const categoryLabels = rows.map((row, rowIndex) => {
     const groupTop = topPad + (rowIndex * (rowHeight + groupGap));
     return renderPrintLabelLines(categoryLabelLines[rowIndex], {
-      x: leftPad - 8,
+      x: categoryPad - 8,
       y: groupTop + (rowHeight / 2) + 4,
       anchor: "end",
       fill: "#344054",
@@ -1237,11 +1274,11 @@ function renderHorizontalBarChartSvg({
       const valueX = leftPad + (((value - bounds.minValue) / valueRange) * plotWidth);
       const x = Math.min(baselineX, valueX);
       const barWidth = Math.max(1, Math.abs(valueX - baselineX));
-      const labelX = value >= 0 ? valueX + 6 : valueX - 6;
+      const labelX = value >= 0 ? valueX + valueLabelGap : valueX - valueLabelGap;
       const labelAnchor = value >= 0 ? "start" : "end";
       const fillColor = printColor(resolveChartCategoryColor(chartModel, readChartDataValue(row, xAxisKey), resolveSeriesPointColor(series, value, series.color)));
       const valueLabel = shouldRenderReportPrintSeriesDataLabels(series, "horizontal_bar", rows.length)
-        ? `<text x="${labelX}" y="${barY + perSeriesHeight - 2}" text-anchor="${labelAnchor}" font-size="10" fill="#667085">${escapeXml(formatSeriesDataLabel(value, series.format))}</text>`
+        ? `<text x="${labelX}" y="${barY + perSeriesHeight - 2}" text-anchor="${labelAnchor}" font-size="${valueLabelSize}" fill="#667085">${escapeXml(formatSeriesDataLabel(value, series.format))}</text>`
         : "";
       return `
         <path class="forge-chart-bar" d="${buildChartBarPath({x,y:barY,width:barWidth,height:perSeriesHeight,value})}" fill="${escapeXml(fillColor)}" />
