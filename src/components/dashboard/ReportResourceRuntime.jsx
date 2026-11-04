@@ -156,7 +156,7 @@ export default function ReportResourceRuntime({container, context, onViewStateCh
         onExport:async({format,tableBlockId,isCurrent})=>{
             const refreshed=await outputActionPin(runResult.request.resolvedResource,isCurrent);
             if(!refreshed||!isCurrent())return null;
-            return exportSelectedReport({pin:refreshed,parameters:runParameters,format,tableBlockId,services:services.reportExport,isCurrent});
+            return exportSelectedReport({pin:refreshed,parameters:{runOverride:runResult.request.parameters,chartMetricSelections:runResult.request.chartMetricSelections},format,tableBlockId,services:services.reportExport,isCurrent});
         },
         onPrint:async({isCurrent})=>{
             // Full print materialization is an explicit, fresh authorized run.

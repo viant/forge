@@ -22,6 +22,9 @@ func validateScopeControlBindings(r *ReportSpec) error {
 		ids[p.ID]++
 	}
 	for _, p := range r.Scope.Params {
+		if err := validateScopeDatePresets(p, r.Scope.Params); err != nil {
+			return err
+		}
 		if len(p.FilterBindings) > 0 {
 			if err := ValidateScopeParamValue(p); err != nil {
 				return err

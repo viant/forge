@@ -615,3 +615,25 @@ it('registers current predefined report state and normal Run without claiming a 
  }finally{await view.close();view.host.remove();activeWindows.value=[];layout.mockRestore();}
  await expect(invokeReportWindowAction(windowId,'getCurrent')).rejects.toThrow(/not found/);
 });
+
+it('exports the completed applied date selection while window-form dates are dirty and disables output for a newly applied run',async()=>{
+ const applied={from:'2026-01-01',to:'2026-01-07',periodMode:'completed'};
+ const pending=deferred(), run=vi.fn().mockResolvedValueOnce(result()).mockReturnValueOnce(pending.promise);
+ const actionContext={windowState:{windowForm:{...applied}}};
+ const view=await mount(run,{executeOnOpen:true,prefill:applied,reportCapabilities:{run:true,export:true}}, {},undefined,actionContext);
+ const submitResource=vi.fn().mockResolvedValue({jobId:'sample-export'});
+ view.handlers.reportExport={submitResource,getStatus:vi.fn().mockResolvedValue({status:'failed',error:'Synthetic export stop'})};
+ try {
+  actionContext.windowState.windowForm={...applied,periodMode:'custom'};
+  await view.render();
+  await act(async()=>button(view,'Export PDF').click());
+  expect(submitResource.mock.calls[0][0].parameters).toEqual(applied);
+  await view.render({prefill:{...applied,periodMode:'custom'}});
+  expect(run).toHaveBeenCalledTimes(2);
+  expect(button(view,'Export PDF').disabled).toBe(true);
+  expect(submitResource).toHaveBeenCalledTimes(1);
+  await act(async()=>pending.resolve(result()));
+  await act(async()=>button(view,'Export PDF').click());
+  expect(submitResource.mock.calls[1][0].parameters).toEqual({...applied,periodMode:'custom'});
+ } finally {await view.close();}
+});

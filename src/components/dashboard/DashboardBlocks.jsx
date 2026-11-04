@@ -18,6 +18,7 @@ import ReportRuntime from "./ReportRuntime.jsx";
 import {resolveBoundReportRuntime} from './reportRuntimeBindings.js';
 import { resolveDashboardReportRuntimeHandlers } from "./dashboardReportRuntimeHandlers.js";
 import {boundReportDatasetSortHandler, boundReportDatasetPages} from './reportRuntimeTableSort.js';
+import BoundReportDatePresetControls from './BoundReportDatePresetControls.jsx';
 import {boundReportScopeHandlers} from './reportRuntimeScopeControls.js';
 import DashboardTableContent from "./DashboardTableContent.jsx";
 import { buildTableRuntimeColumns, resolveTableCellVisualState } from "./tableCellVisuals.js";
@@ -1254,6 +1255,7 @@ export function DashboardReportRuntime({container, context}) {
     const config = getDashboardReportRuntimeConfig(container);
     const reportSpec = config.reportSpec || EMPTY_REPORT_RUNTIME_SPEC;
     const bound = resolveBoundReportRuntime(config, context);
+    const draftScopeParamIds = new Set((!bound.scopeControlsUnavailable && Object.keys(config.datasetBindings || {}).length ? reportSpec.scope?.params || [] : []).filter(param => param.datePresets).flatMap(param => [param.id, param.datePresets.valueParameter].filter(Boolean)));
     const sortFallbackOrders = useMemo(() => new Map(), [reportSpec, config.datasetBindings]);
     const onDatasetSortChange = useMemo(() => boundReportDatasetSortHandler(config, context, sortFallbackOrders), [context, reportSpec, config.datasetBindings, sortFallbackOrders]);
     const runtimeHandlers = useMemo(() => {
@@ -1279,6 +1281,7 @@ export function DashboardReportRuntime({container, context}) {
             {bound.status === 'error' ? 'This report could not be loaded. Use Refresh to try again.' : 'Loading report…'}
         </div> : null}
         {bound.unavailableDatasets?.length > 0 ? <div className="forge-report-binding-state is-error" role="alert">Some report data is unavailable. Available data remains below.</div> : null}
+        {draftScopeParamIds.size > 0 && !bound.scopeControlsUnavailable ? <BoundReportDatePresetControls config={config} context={context} reportSpec={bound.reportSpec || reportSpec} busy={bound.status === 'loading'}/> : null}
         <ReportRuntime
             reportSpec={bound.reportSpec || reportSpec}
             reportFill={bound.reportFill || bound.pendingReportFill}
@@ -1291,7 +1294,7 @@ export function DashboardReportRuntime({container, context}) {
             subtitle={config.subtitle || container?.subtitle || ""}
             locale={config.locale || getDashboardLocale(context)}
             hostIntent={config.hostIntent || null}
-            runtimeHandlers={runtimeHandlers}
+            runtimeHandlers={{...runtimeHandlers, draftScopeParamIds}}
             presentationMode={config.presentationMode || 'preview'}
             sectionPresentation={config.sectionPresentation || 'tabs'}
             showContextSummary={config.showContextSummary !== false}

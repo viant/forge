@@ -49,7 +49,7 @@ export function useReportDatePresetDraft({ranges=[],parameters={},resetParameter
   return {...state,pending:state.scope===scopeVersion&&state.pending===true,
    stale:state.mode==='relative'&&(state.stale||state.scope!==scopeVersion||state.identity!==identity)};
  };
- const dateBlocked=ranges.some(range=>{const state=stateFor(range);return state.pending||state.stale||((range.datePresets||range.datePresetError||range.required)&&(!validDate(draft[range.start])||!validDate(draft[range.end])||draft[range.start]>draft[range.end]));});
+ const dateBlocked=ranges.some(range=>{const state=stateFor(range);return state.pending||state.stale||((range.datePresets||range.datePresetError||range.required)&&!(range.required===false&&draft[range.start]===''&&draft[range.end]==='')&&(!validDate(draft[range.start])||!validDate(draft[range.end])||draft[range.start]>draft[range.end]));});
  const cancelDraftRequests=()=>{
   invalidate();autoReady.current=false;dirty.current=true;
   setDateState(previous=>Object.fromEntries(Object.entries(previous).map(([id,state])=>[id,{...state,pending:false}])));
@@ -101,8 +101,18 @@ export function useReportDatePresetDraft({ranges=[],parameters={},resetParameter
  useEffect(()=>{
   if(parameterEpoch.current.key!==parametersKey){
    const expected=expectedParameters.current===parametersKey;expectedParameters.current='';
+   const previousParameters=JSON.parse(parameterEpoch.current.key),nextParameters=JSON.parse(parametersKey);
+   const identities=new Set(ranges.map(range=>range.datePresets?.calendar.input.parameter).filter(Boolean));
+   const changed=Array.from(new Set([...Object.keys(previousParameters),...Object.keys(nextParameters)])).filter(key=>JSON.stringify(previousParameters[key])!==JSON.stringify(nextParameters[key]));
+   const identityOnly=changed.length>0&&changed.every(key=>identities.has(key));
    parameterEpoch.current={key:parametersKey,changed:true};
-   invalidate();writeDraft(bindPresetValues(JSON.parse(parametersKey)));
+   invalidate();
+   if(identityOnly){
+    writeDraft({...draftRef.current,...Object.fromEntries(changed.map(key=>[key,nextParameters[key]]))});
+    setDateState(previous=>Object.fromEntries(Object.entries(previous).map(([id,state])=>[id,{...state,pending:false,stale:state.mode==='relative'}])));
+    return;
+   }
+   writeDraft(bindPresetValues(nextParameters));
    if(!expected){dirty.current=false;initialAttempted.current=false;initialCommitted.current=false;autoReady.current=false;setDateState({});}
   }else if(!parameterEpoch.current.changed){writeDraft(initializeDraft(draftRef.current));}
  },[parametersKey,authoredDatesKey]);

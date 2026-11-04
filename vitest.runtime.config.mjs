@@ -53,6 +53,7 @@ export default defineConfig({
       'src/components/dashboard/ReportRuntime.pagination.render.test.jsx',
       'src/components/dashboard/ReportRuntime.assembledLocalPaging.render.test.jsx',
       'src/components/dashboard/ReportRuntime.scopeControls.render.test.jsx',
+      'src/components/dashboard/ReportRuntime.datePresets.render.test.jsx',
       'src/components/dashboard/ReportRuntime.emptyChart.render.test.jsx',
       'src/components/dashboard/ReportPrintPreview.render.test.jsx',
       'src/components/dashboard/reportBuilderConcurrentRead.render.test.jsx',

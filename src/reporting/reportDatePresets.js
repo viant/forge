@@ -57,3 +57,16 @@ export function decodeReportDateCalendar(declaration, identity, response) {
     return {timeZone: requireCalendarTimeZone(read(rows[0], declaration.calendar.timeZoneField))};
 }
 export {resolveDeclaredDateRangePreset};
+
+// Canonical authored admission uses the same declaration consumed by report hosts.
+export const reportDatePresetsSchema = {
+ type:'object', additionalProperties:false, required:['calendar','default','options'], properties:{
+  valueParameter:{type:'string',pattern:'^[A-Za-z][A-Za-z0-9_]*$'}, default:{type:'string'},
+  calendar:{type:'object',additionalProperties:false,required:['dataSourceRef','input','identityField','timeZoneField'],properties:{
+   dataSourceRef:{type:'string',minLength:1},identityField:{type:'string',minLength:1},timeZoneField:{type:'string',minLength:1},
+   input:{type:'object',additionalProperties:false,required:['name','parameter'],properties:{name:{type:'string',minLength:1},parameter:{type:'string',minLength:1},array:{type:'boolean'}}}}},
+  options:{type:'array',minItems:1,maxItems:16,items:{type:'object',additionalProperties:false,required:['value','label'],properties:{
+   value:{type:'string',minLength:1},label:{type:'string',minLength:1,maxLength:160},
+   range:{type:'object',additionalProperties:false,required:['kind','startOffset','endOffset'],properties:{kind:{const:'relativeDays'},startOffset:{type:'integer',minimum:-36600,maximum:0},endOffset:{type:'integer',minimum:-36600,maximum:0}}}}}},
+ }
+};

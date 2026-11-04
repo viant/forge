@@ -90,34 +90,10 @@ export function boundReportScopeHandlers(config, context) {
         const bound = targets(filter);
         if (!bound.length) return false;
         const {param} = bound[0];
-        const current = scopeValue(bound, config);
-        const value = compute(param, current);
-        if (equal(current, value)) return false;
+        const value = compute(param, scopeValue(bound, config));
         if (param.required && (value == null || value === '' || (Array.isArray(value) && !value.length))) return false;
         if (param.required && param.kind === 'dateRange' && (!value?.start || !value?.end)) return false;
-        // Prepare every update before mutating any signal. Keep separate queries
-        // and fixed inputs even when a control is shared across datasets.
-        const updates = new Map();
-        for (const target of bound) {
-            const previous = updates.get(target.handlers);
-            const {parameters: initial, request: fallback} = requestFor(target, config);
-            const parameters = previous?.parameters || initial;
-            const request = resolveSelector(parameters, target.binding.queryPath) ?? fallback;
-            const selected = target.input.valuePath ? resolveSelector(value, target.input.valuePath) : value;
-            if (selected === undefined) throw new Error('Report control value is missing a bound field.');
-            const next = {...request, offset: 0, filters: setSelector(request.filters, target.input.path, selected)};
-            updates.set(target.handlers, {target, parameters: setSelector(parameters, target.binding.queryPath, next)});
-        }
-        for (const {target} of updates.values()) target.handlers.setLoading(true);
-        for (const {target, parameters} of updates.values()) {
-            const {handlers} = target;
-            handlers.setError(null);
-            handlers.setInputParameters(parameters);
-            handlers.setPage(1);
-            const completion = handlers.fetchCollection();
-            if (completion?.catch) completion.catch(() => {}); // datasource publishes its error
-        }
-        return true;
+        return commitBoundReportScopeValues(config, context, {[param.id]: value});
     };
     return {
         scopeControlCommitMode: 'blur',
@@ -153,4 +129,37 @@ export function boundReportScopeHandlers(config, context) {
             return next;
         }),
     };
+}
+
+// Shared atomic request mutation for immediate controls and date-draft Apply.
+export function commitBoundReportScopeValues(config, context, values) {
+    // Prepare every update before mutating any signal. Keep separate queries
+    // and fixed inputs even when a control is shared across datasets.
+    const updates = new Map();
+    for (const [id, value] of Object.entries(values)) {
+        const bound = targetsFor(config, context, id);
+        if (!bound.length) throw new Error('Missing report control binding.');
+        if (equal(scopeValue(bound, config), value)) continue;
+        for (const target of bound) {
+            const previous = updates.get(target.handlers);
+            const {parameters: initial, request: fallback} = requestFor(target, config);
+            const parameters = previous?.parameters || initial;
+            const request = resolveSelector(parameters, target.binding.queryPath) ?? fallback;
+            const selected = target.input.valuePath ? resolveSelector(value, target.input.valuePath) : value;
+            if (selected === undefined) throw new Error('Report control value is missing a bound field.');
+            const next = {...request, offset: 0, filters: setSelector(request.filters, target.input.path, selected)};
+            updates.set(target.handlers, {target, parameters: setSelector(parameters, target.binding.queryPath, next)});
+        }
+    }
+    if (!updates.size) return false;
+    for (const {target} of updates.values()) target.handlers.setLoading(true);
+    for (const {target, parameters} of updates.values()) {
+        const {handlers} = target;
+        handlers.setError(null);
+        handlers.setInputParameters(parameters);
+        handlers.setPage(1);
+        const completion = handlers.fetchCollection();
+        if (completion?.catch) completion.catch(() => {}); // datasource publishes its error
+    }
+    return true;
 }

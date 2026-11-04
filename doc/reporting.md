@@ -1538,3 +1538,14 @@ An absent condition preserves comparisons. Keep source-specific conditions and
 parameter domains in authored assets. Combine this with an explicitly committed
 preset binding when the source treats manual periods differently from named ones;
 endpoint lengths do not identify the user's selected period.
+
+### Calendar-backed bound scope drafts
+
+Canonical date-range scope parameters can opt into the existing `datePresets`
+declaration. The native bound window reuses shared draft/apply host controls,
+calendar loading and resolution; legacy declarations retain the immediate
+bound-window control path through the same reporting and datasource engine.
+The declared preset selection travels with endpoints in the applied request,
+including when manual dates equal a named range. See
+[calendar-backed report date drafts](report-date-presets.md#canonical-bound-windows)
+for declaration, binding, reset, optional-clear and export semantics.

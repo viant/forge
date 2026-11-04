@@ -1,3 +1,4 @@
+import {reportDatePresetsSchema} from '../reportDatePresets.js';
 import {routingImpactSchema,stageAllocationSchema} from '../../components/scenarios/scenarioContract.js';
 import {windowCalculationDefinitions} from "./windowCalculationSchema.js";
 import {numericDisplayFormatSchema} from '../../components/categoryRange.js';
@@ -222,6 +223,7 @@ export const reportSpecSchema = {
         label: { type: "string" },
         description: { type: "string" },
         datasetRef: { type: "string" },
+        datePresets: reportDatePresetsSchema,
         filterBindings: { type: 'array', minItems: 1, items: {
           type: 'object', additionalProperties: false, required: ['datasetRef', 'path'],
           properties: {datasetRef: {type: 'string', minLength: 1}, path: {type: 'string', minLength: 1}, valuePath: {type: 'string', minLength: 1}},

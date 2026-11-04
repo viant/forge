@@ -28,7 +28,7 @@ func ValidateScopeParamValue(param ScopeParam) error {
 	if err != nil {
 		return fmt.Errorf("scope control %q: %w", param.ID, err)
 	}
-	if param.Required {
+	if param.Required && param.DatePresets == nil {
 		missing := value == nil || value == ""
 		if list, ok := value.([]any); ok && len(list) == 0 {
 			missing = true

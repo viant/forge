@@ -107,7 +107,36 @@ type ScopeParamOption struct {
 	Description string `json:"description,omitempty"`
 }
 
+type ReportDatePresets struct {
+	Calendar       ReportDatePresetCalendar `json:"calendar"`
+	Default        string                   `json:"default"`
+	Options        []ReportDatePresetOption `json:"options"`
+	ValueParameter string                   `json:"valueParameter,omitempty"`
+}
+type ReportDatePresetCalendar struct {
+	DataSourceRef string                `json:"dataSourceRef"`
+	Input         ReportDatePresetInput `json:"input"`
+	IdentityField string                `json:"identityField"`
+	TimeZoneField string                `json:"timeZoneField"`
+}
+type ReportDatePresetInput struct {
+	Name      string `json:"name"`
+	Parameter string `json:"parameter"`
+	Array     bool   `json:"array,omitempty"`
+}
+type ReportDatePresetOption struct {
+	Value string                   `json:"value"`
+	Label string                   `json:"label"`
+	Range *ReportRelativeDaysRange `json:"range,omitempty"`
+}
+type ReportRelativeDaysRange struct {
+	Kind        string `json:"kind"`
+	StartOffset *int   `json:"startOffset"`
+	EndOffset   *int   `json:"endOffset"`
+}
+
 type ScopeParam struct {
+	DatePresets    *ReportDatePresets        `json:"datePresets,omitempty"`
 	ID             string                    `json:"id"`
 	Kind           string                    `json:"kind"`
 	Label          string                    `json:"label"`

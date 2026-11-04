@@ -2522,7 +2522,7 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, on
 }
 
 function FilterBarBlock({ block = {}, scopeParams = new Map(), activeScopeSummary = null, presentationMode = "preview", runtimeHandlers = null, availableDatasetRefs = [] }) {
-  const params = Array.isArray(block?.content?.params) ? block.content.params : [];
+  const params = (Array.isArray(block?.content?.params) ? block.content.params : []).filter(param => !runtimeHandlers?.draftScopeParamIds?.has(param.id));
   const criteria = Array.isArray(block?.content?.criteria) ? block.content.criteria : [];
   const normalizedDatasetRef = resolveRuntimeBlockDatasetRef(block, { availableDatasetRefs }).datasetRef;
   const isPrimaryScope = normalizedDatasetRef === "primary";
