@@ -41,4 +41,15 @@ try {
   assert.deepEqual(errors,[]);await page.close();
   console.log(`chart tooltip browser: hover/keyboard/explicit details/escaping at ${width}px passed`);
  }
+ const page=await browser.newPage({viewport:{width:1440,height:900}});
+ await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/chart-tooltip-preview.html?overlapping`);
+ const first=page.locator('[data-forge-chart-point][data-series-id="passed"][data-category="2026-01-05"]');
+ const mark=first.locator('.forge-chart-point-mark');
+ await mark.waitFor();
+ const point=await mark.boundingBox();
+ // Mouse input at the visible mark must inspect that series even if a later transparent target overlaps it.
+ await page.mouse.move(point.x+point.width/2,point.y+point.height/2);
+ await page.waitForTimeout(100);
+ assert.equal(await page.getByRole('combobox',{name:'Inspect chart details'}).inputValue(),JSON.stringify(['2026-01-05','passed']),'a later transparent point target must not steal the visible mark');
+ await page.close();
 }finally {await browser?.close();await server.close();}
