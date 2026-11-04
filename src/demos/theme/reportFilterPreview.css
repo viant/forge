@@ -1,0 +1,4 @@
+body{margin:0;background:var(--forge-surface,#fff);color:var(--forge-text,#253247)}
+main{padding:24px;max-width:1440px;margin:auto}
+section{min-width:0;padding:16px;border:1px solid var(--forge-border-color,#d8dee7)}
+@media(max-width:480px){main{padding:16px}}

@@ -88,3 +88,17 @@ it('shows explicit None only for opted-in supplied empty arrays and preserves th
         expect(host.querySelector('summary').getAttribute('aria-label')).toBe('Available items');
     } finally {await act(async()=>root.unmount());}
 });
+
+it('names date endpoints with their range while keeping concise visible captions', async () => {
+    globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+    const host=document.createElement('div'),root=createRoot(host);
+    const label='Observation period for the selected monitoring locations';
+    try {
+        await act(async()=>root.render(<ReportFilterBar controls={[{id:'period',label,kind:'dateRange',start:'from',end:'to',required:true}]} values={{from:'2026-10-01',to:'2026-10-31'}} onChange={()=>{}}/>));
+        const group=host.querySelector('fieldset');
+        expect(group.querySelector('legend').textContent).toBe(label);
+        expect([...group.querySelectorAll('label')].map(node=>node.textContent)).toEqual(['From','To']);
+        expect([...group.querySelectorAll('input')].map(node=>node.getAttribute('aria-label'))).toEqual([`${label} from`,`${label} to`]);
+        expect([...group.querySelectorAll('input')].every(node=>node.required)).toBe(true);
+    } finally {await act(async()=>root.unmount());}
+});

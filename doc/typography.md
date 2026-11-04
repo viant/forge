@@ -683,6 +683,15 @@ reports use the same placement. Changing placement must preserve filter values.
 </div>
 ```
 
+Date ranges show their authored caption once in the legend and concise From/To
+labels; accessible names retain the full range caption. Endpoints stay together
+when the row wraps, with the preset and other controls aligned at their bottom
+edges. Rails keep vertically stacked, full-width dates. The independently
+authored `report-filter-preview.html` covers short/long captions, presets, custom
+dates, failures and manual dates. Run `node scripts/test-report-filter-browser.mjs`
+for desktop, wrapped and phone checks of all three placements; this browser
+regression also runs in the existing `npm run test:workspace-theme` CI command.
+
 These controls do not change producer authorization or query semantics. Legacy
 ReportBuilder drawer and sheet presentations remain outside this host migration.
 

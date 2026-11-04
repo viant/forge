@@ -1,5 +1,10 @@
 .forge-report-filter-bar{display:flex;align-items:flex-end;flex-wrap:wrap;gap:var(--forge-spacing-3,12px);padding:12px 0;margin-bottom:12px;border-bottom:1px solid var(--forge-border-color,#d8dee7)}
 .forge-report-filter-bar fieldset{display:flex;gap:12px;border:0;padding:0;margin:0;min-width:0}
+.forge-report-filter-bar .forge-report-filter-date-range{align-items:flex-end;flex-wrap:wrap;max-width:100%}
+.forge-report-filter-date-range>.forge-date-range-preset{flex:0 1 max-content;max-width:100%}
+.forge-report-filter-date-fields{display:flex;align-items:flex-end;flex-wrap:wrap;gap:12px;min-width:0;max-width:100%}
+.forge-report-filter-date-fields>label{min-width:0;max-width:100%}
+.forge-report-filter-date-range input[type=date]{box-sizing:border-box;max-width:100%}
 .forge-report-filter-bar legend{font-weight:600;margin-bottom:6px}
 .forge-report-filter-bar label{display:flex;flex-direction:column;gap:4px}
 .forge-report-filter-bar input:not([type=checkbox]):not([type=radio]){font:inherit;min-height:34px;padding:6px 8px;border:1px solid var(--forge-control-border,#c8ced8);border-radius:var(--forge-control-radius,4px);background:var(--forge-control-bg,#fff);color:var(--forge-control-text,inherit)}
@@ -22,5 +27,8 @@
 .forge-report-filter-bar:is([data-filter-placement="left"],[data-filter-placement="right"]){grid-column:1;grid-row:1/span 4;flex-direction:column;align-items:stretch;margin:0;padding:12px;border:1px solid var(--forge-border-color,#d8dee7);border-radius:var(--forge-radius-surface,6px);background:var(--forge-surface,#fff)}
 .forge-report-filter-bar[data-filter-placement="right"]{grid-column:2}
 .forge-report-filter-bar:is([data-filter-placement="left"],[data-filter-placement="right"]) fieldset{flex-direction:column;gap:8px;min-width:0;max-width:none}
+.forge-report-filter-bar:is([data-filter-placement="left"],[data-filter-placement="right"]) .forge-report-filter-date-range{align-items:stretch}
+.forge-report-filter-bar:is([data-filter-placement="left"],[data-filter-placement="right"]) .forge-date-range-preset{flex-basis:auto}
+.forge-report-filter-bar:is([data-filter-placement="left"],[data-filter-placement="right"]) .forge-report-filter-date-fields{flex-direction:column;align-items:stretch;gap:8px}
 .forge-report-filter-bar[data-filter-placement="right"] .forge-report-filter-choice-panel{left:auto;right:0}
 @media(max-width:760px){.forge-report-filter-layout:has(>.forge-report-filter-bar:is([data-filter-placement="left"],[data-filter-placement="right"])){display:block}.forge-report-filter-bar:is([data-filter-placement="left"],[data-filter-placement="right"]){margin-bottom:16px}}

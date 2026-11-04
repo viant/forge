@@ -93,10 +93,10 @@ export default function ReportFilterBar({controls = [], values = {}, onChange, o
         onSubmit={event => {event.preventDefault(); apply();}} {...typographyProps('body')}>
         {controls.map(control => {
             if (control.kind === 'choice') return <Choice key={control.id} {...{control, values, onChange, loadChoices, scopeKey, onChoices, context, busy}}/>;
-            if (control.kind === 'dateRange') return <fieldset key={control.id}><legend>{control.label}</legend>
+            if (control.kind === 'dateRange') return <fieldset key={control.id} className="forge-report-filter-date-range"><legend>{control.label}</legend>
                 <DatePresets {...{control, values, onDatePreset, onDateRange, onDateDraft}}/>
-                {[['from', control.start], ['to', control.end]].map(([edge, alias]) => <label key={alias}>{control.label} {edge}
-                    <FilterControl context={context} controlId={alias} type="date" value={values[alias] ?? ''} required={control.required} disabled={busy} change={value=>onChange(alias,value)}><input type="date" required={control.required} aria-required={control.required || undefined} value={values[alias] ?? ''} onChange={event => onChange(alias, event.target.value)}/></FilterControl></label>)}
+                <div className="forge-report-filter-date-fields">{[['from', control.start], ['to', control.end]].map(([edge, alias]) => <label key={alias}>{edge === 'from' ? 'From' : 'To'}
+                    <FilterControl context={context} controlId={alias} type="date" value={values[alias] ?? ''} required={control.required} disabled={busy} change={value=>onChange(alias,value)}><input type="date" aria-label={`${control.label} ${edge}`} required={control.required} aria-required={control.required || undefined} value={values[alias] ?? ''} onChange={event => onChange(alias, event.target.value)}/></FilterControl></label>)}</div>
                 {control.datePresetError && <span role="alert">{control.datePresetError} Enter dates manually.</span>}
             </fieldset>;
             if (control.kind === 'boolean') return <FilterControl key={control.id} context={context} controlId={control.id} type="checkbox" value={values[control.id]===true} disabled={busy} change={value=>onChange(control.id,value)}><label><input aria-label={control.label} type="checkbox" checked={values[control.id] === true}
