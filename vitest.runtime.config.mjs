@@ -21,6 +21,8 @@ export default defineConfig({
       'src/components/control/ProgressBar.render.test.jsx',
       'src/components/lookup/LookupPickerDialog.render.test.jsx',
       'src/components/table/Basic.autoFetch.render.test.jsx',
+      'src/components/table/Basic.clientPaging.render.test.jsx',
+      'src/components/DataSource.loaderOwnership.render.test.jsx',
       'src/components/table/Basic.serverSort.render.test.jsx',
       'src/components/table/basic/QuickSearch.clientPaging.render.test.jsx',
       'src/components/dashboard/TableAnalytics.render.test.jsx',
