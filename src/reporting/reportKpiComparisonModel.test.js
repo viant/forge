@@ -52,3 +52,21 @@ for(const previous of [[],[{amount:null}],[{amount:0}]]) {
 }
 assert.throws(()=>buildReportFillFromReportSpec({...spec,datasets:spec.datasets.filter(d=>d.id!=='previous')},{primary:{rows:[{amount:80}]}}),/secondary dataset/);
 console.log('reportKpiComparisonModel ✓ authorized dataset closure, nullable ratios, shared fill and print');
+
+// Source-owned period identity, independent of endpoint length or equality.
+const conditional=structuredClone(spec);conditional.scope={dataSourceRef:'authorized',params:[{id:'periodMode',label:'Period mode',required:false,kind:'select',value:'custom',options:[{value:'custom',label:'Custom'},{value:'completed',label:'Completed'}]}]};
+conditional.blocks.find(b=>b.id==='movement').secondaryVisibleWhen={source:'filters',field:'periodMode',equals:'completed'};
+for(const [mode,visible]of[['custom',false],['completed',true]]){
+ conditional.scope.params[0].value=mode;
+ const f=buildReportFillFromReportSpec(conditional,{primary:{rows:[{amount:80}]},previous:{rows:[{amount:100}]}});
+ const block=f.blocks.find(b=>b.id==='movement');assert.equal(block.content.value,80);
+ assert.equal(Object.hasOwn(block.content,'secondaryValue'),visible);
+ assert.equal(Object.hasOwn(block.content,'secondaryLabel'),visible);
+ assert.equal(Object.hasOwn(block,'secondaryField'),visible);
+ assert.equal(Object.hasOwn(block,'secondaryVisibleWhen'),false);
+ assert.equal(validateReportSpec(conditional).valid,true,JSON.stringify(validateReportSpec(conditional)));assert.equal(validateReportFill(f).valid,true);
+ const p=buildReportPrintFromReportFill({reportSpec:conditional,reportFill:f});assert.equal(validateReportPrint(p).valid,true);
+ assert.equal(JSON.stringify(p).includes('Change vs prior period'),visible);
+}
+const authoredConditional=buildReportBuilderReportDocument({container:{id:'conditional',dataSourceRef:'authorized'},config,state:{selectedMeasures:['amount'],selectedDimensions:[],reportDocumentBlocks:[{...delta,secondaryVisibleWhen:{selector:'filters.periodMode',equals:'completed'}}]},additionalBlocks:[{...delta,secondaryVisibleWhen:{selector:'filters.periodMode',equals:'completed'}}]});
+assert.equal(lowerReportDocumentToReportSpec(authoredConditional).blocks.find(b=>b.id==='movement').secondaryVisibleWhen.source,'filters');

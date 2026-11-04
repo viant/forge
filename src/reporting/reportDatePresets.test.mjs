@@ -32,3 +32,6 @@ assert.throws(()=>resolveDateRangePreset('declared',new Date(),undefined,undefin
 assert.throws(()=>resolveDeclaredDateRangePreset(normalized.options[3],new Date('0001-01-01T00:00:00Z'),'UTC'),/supported calendar/);
 assert.equal(resolveDateRangePreset('week',new Date('2026-03-09T06:30:00Z'),undefined,'America/Los_Angeles').end,'2026-03-08','legacy shortcuts still include today');
 console.log('report date presets: source declaration, strict context, civil boundaries and legacy shortcuts pass');
+
+assert.equal(normalizeReportDatePresets({...declaration,valueParameter:'periodMode'},sources).valueParameter,'periodMode');
+for(const valueParameter of ['__proto__','filters.mode','entity',''])assert.throws(()=>normalizeReportDatePresets({...declaration,valueParameter},sources));

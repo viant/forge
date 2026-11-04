@@ -43,3 +43,25 @@ inputs are unresolved; change `defaultsReadyKey` when those domains become ready
 Return the committed parameter object to recognize its subsequent controlled
 update. For user Apply, call `expectParameters(next)` before updating controlled
 parameters. Neither callback executes a report unless the host elects to do so.
+
+To persist the selected option alongside endpoints, declare an optional safe flat
+alias, for example `datePresets.valueParameter: periodMode`. The hook writes that
+parameter into its draft atomically with a successfully resolved named/default
+range. Manual ranges and external absolute endpoints without a declared selected
+option use `custom`, even when those endpoints equal a named range. Binding aliases
+must differ from every range's endpoints, calendar identities and other bindings.
+Caller objects are copied before augmentation. Without this property the existing
+initialization, defaults and parameter shape are unchanged.
+
+Hosts that copy only known input aliases must forward this declared parameter from
+`dates.draft` with the date endpoints. Commit it through the same applied snapshot
+used by execution and export; never consult an unapplied control value during export.
+A producer may map the alias to a source option or ordinary report scope parameter.
+The parameter supplies presentation/query semantics, never execution authority.
+
+An externally supplied valid option plus explicit endpoints represents an applied
+absolute snapshot. The option remains a presentation/source selector; the hook does
+not replay its relative expression on a later context change. To refresh that named
+range, request the preset again. Relative drafts resolved within this hook still
+become stale on calendar/identity changes and block Apply as before. Hosts clearing
+an optional range must clear its bound preset parameter with both endpoints.

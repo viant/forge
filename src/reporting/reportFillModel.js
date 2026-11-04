@@ -1,3 +1,4 @@
+import {isReportRuntimeBlockVisible} from './reportBlockRuntimeModel.js';
 import {applyReportRowVisibility,validateReportRowVisibilityBlock} from './reportRowVisibility.js';
 import {validateNumericDisplayFormat,formatRangeValue} from '../components/categoryRange.js';
 import {resolveTemplateRequestInput,escapeTemplateText} from './reportTemplateRequestInputs.js';
@@ -1041,6 +1042,7 @@ function buildReportFillBlocks(reportSpec = {}, datasetsById = new Map(), {
     delete normalizedBlock.templateRequestInputs;
     delete normalizedBlock.itemTitleDisplayKey;
     delete normalizedBlock.itemTitleDisplayValueMap;
+    delete normalizedBlock.secondaryVisibleWhen;
     delete normalizedBlock.secondaryDisplayKey;
     delete normalizedBlock.secondaryDisplayValueMap;
     const datasetResolution = resolveReportDatasetRefResolution({
@@ -1129,9 +1131,12 @@ function buildReportFillBlocks(reportSpec = {}, datasetsById = new Map(), {
       };
     }
     if (normalizeString(block?.kind) === "kpiBlock") {
+      if (!isReportRuntimeBlockVisible({runtime:{visibleWhen:block?.secondaryVisibleWhen}},{filters:runtimeFilterValues,selection:runtimeSelection})) {
+        for (const key of ["secondaryField","secondaryDatasetRef","secondaryCalculation","secondaryLabel","secondaryFormat","secondaryTrend"]) delete normalizedBlock[key];
+      }
       return {
         ...normalizedBlock,
-        content: buildReportFillKpiContent(block, dataset, {
+        content: buildReportFillKpiContent({...normalizedBlock, secondaryDisplayKey:block.secondaryDisplayKey, secondaryDisplayValueMap:block.secondaryDisplayValueMap}, dataset, {
           datasetsByAlias,
         }),
       };

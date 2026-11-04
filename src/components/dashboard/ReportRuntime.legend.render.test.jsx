@@ -22,3 +22,14 @@ it('renders one complete collection with exact source numeric formats and catego
   expect(host.querySelector('.forge-report-document-collection em')).toBeNull();
  }finally{await act(async()=>root.unmount());host.remove();globalThis.ResizeObserver=old;vi.restoreAllMocks();}
 });
+
+it('uses the authoritative materialized comparison visibility without hiding the primary KPI',async()=>{
+ const spec={...fixture.reportSpec,datasets:[{id:'primary',dataSourceRef:'synthetic',request:{}}],viewer:{appearance:'document'},scope:{params:[{id:'mode',kind:'text',value:'custom'}]},blocks:[{id:'progress',kind:'kpiBlock',title:'Items',datasetRef:'primary',valueField:'amount',secondaryField:'previous',secondaryLabel:'Comparable change',secondaryCalculation:'relativeChange',secondaryFormat:'percentFraction',secondaryVisibleWhen:{source:'filters',field:'mode',equals:'completed'}}],layoutIntent:{kind:'single',blockOrder:['progress']}};
+ const node=document.createElement('div');document.body.append(node);const root=createRoot(node);
+ try{for(const [mode,visible]of[['custom',false],['completed',true]]){
+  spec.scope.params[0].value=mode;const fill=buildReportFillFromReportSpec(spec,{primary:{rows:[{amount:80,previous:100}]}});
+  await act(async()=>root.render(<ReportRuntime reportSpec={spec} reportFill={fill}/>));
+  expect(node.textContent).toContain('80');expect(node.textContent.includes('Comparable change')).toBe(visible);
+  expect(node.querySelectorAll('[data-report-runtime-kpi-trend-row]')).toHaveLength(visible?1:0);
+ }}finally{await act(async()=>root.unmount());node.remove();}
+});

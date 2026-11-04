@@ -1525,3 +1525,16 @@ For single-tool `args`, missing selectors are omitted; existing composite
 `MCPCall.Args` retains its historical null-for-missing behavior. Metadata-named
 targets are excluded again after projection. Indexed paths can create null gaps
 in sparse arrays; the producer validates whether its input allows those gaps.
+
+### Conditional KPI comparisons
+
+`kpiBlock.secondaryVisibleWhen` accepts the existing report runtime condition
+object, such as `{source: "filters", field: "periodMode", equals: "completed"}`.
+It is evaluated against the materialized report scope, using the same condition
+semantics as block visibility. A false condition omits the secondary value, label,
+format and trend together from the canonical fill; the browser, PDF and XLSX consume
+that resolved fill. Primary values and sparklines retain their existing behavior.
+An absent condition preserves comparisons. Keep source-specific conditions and
+parameter domains in authored assets. Combine this with an explicitly committed
+preset binding when the source treats manual periods differently from named ones;
+endpoint lengths do not identify the user's selected period.

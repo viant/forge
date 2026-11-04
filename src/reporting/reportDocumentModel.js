@@ -1,4 +1,4 @@
-import {resolveReportRuntimeExternalActions} from "./reportBlockRuntimeModel.js";
+import {normalizeReportRuntimeCondition,resolveReportRuntimeExternalActions} from "./reportBlockRuntimeModel.js";
 import {isScenarioType,scenarioFields,scenarioKey} from '../components/scenarios/scenarioContract.js';
 import {normalizeReportRuntimeRefinementFields,validateReportRuntimeRefinementFields} from './reportRuntimeRefinementFields.js';
 import {normalizeTemplateRequestInputs} from './reportTemplateRequestInputs.js';
@@ -1683,6 +1683,7 @@ export function buildReportDocumentKpiBlock(block = {}) {
         secondaryField,
         ...(normalizeString(block?.secondaryDatasetRef) ? { secondaryDatasetRef: normalizeString(block.secondaryDatasetRef) } : {}),
         ...(block?.secondaryCalculation ? { secondaryCalculation: normalizeKpiSecondaryCalculation(block.secondaryCalculation) } : {}),
+        ...(normalizeReportRuntimeCondition(block?.secondaryVisibleWhen) ? {secondaryVisibleWhen:normalizeReportRuntimeCondition(block.secondaryVisibleWhen)} : {}),
         secondaryLabel: normalizeString(block?.secondaryLabel || secondaryField),
         ...(normalizeString(block?.secondaryFormat) ? { secondaryFormat: normalizeString(block.secondaryFormat) } : {}),
         ...(block?.secondaryTrend === true ? { secondaryTrend: true } : {}),

@@ -1159,6 +1159,7 @@ export const reportSpecSchema = {
         secondaryDatasetRef: { type: "string", minLength: 1 },
         sparkline: kpiSparklineSchema,
         secondaryCalculation: { enum: ["value", "difference", "relativeChange"] },
+        secondaryVisibleWhen: { $ref: "#/$defs/jsonObject" },
         secondaryLabel: { type: "string" },
         secondaryFormat: { enum: ["currency", "currency2", "number", "number2", "number5", "percent", "percentFraction", "percentFraction2", "compact", "compactNumber"] },
         secondaryTrend: { type: "boolean" },

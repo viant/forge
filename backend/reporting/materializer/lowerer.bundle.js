@@ -58767,6 +58767,7 @@ ${indent}${end}`;
         secondaryField,
         ...normalizeString31(block == null ? void 0 : block.secondaryDatasetRef) ? { secondaryDatasetRef: normalizeString31(block.secondaryDatasetRef) } : {},
         ...(block == null ? void 0 : block.secondaryCalculation) ? { secondaryCalculation: normalizeKpiSecondaryCalculation(block.secondaryCalculation) } : {},
+        ...normalizeReportRuntimeCondition(block == null ? void 0 : block.secondaryVisibleWhen) ? { secondaryVisibleWhen: normalizeReportRuntimeCondition(block.secondaryVisibleWhen) } : {},
         secondaryLabel: normalizeString31((block == null ? void 0 : block.secondaryLabel) || secondaryField),
         ...normalizeString31(block == null ? void 0 : block.secondaryFormat) ? { secondaryFormat: normalizeString31(block.secondaryFormat) } : {},
         ...(block == null ? void 0 : block.secondaryTrend) === true ? { secondaryTrend: true } : {},
@@ -61803,6 +61804,7 @@ ${indent}${end}`;
       delete normalizedBlock.templateRequestInputs;
       delete normalizedBlock.itemTitleDisplayKey;
       delete normalizedBlock.itemTitleDisplayValueMap;
+      delete normalizedBlock.secondaryVisibleWhen;
       delete normalizedBlock.secondaryDisplayKey;
       delete normalizedBlock.secondaryDisplayValueMap;
       const datasetResolution = resolveReportDatasetRefResolution({
@@ -61880,9 +61882,12 @@ ${indent}${end}`;
         };
       }
       if (normalizeString37(block == null ? void 0 : block.kind) === "kpiBlock") {
+        if (!isReportRuntimeBlockVisible({ runtime: { visibleWhen: block == null ? void 0 : block.secondaryVisibleWhen } }, { filters: runtimeFilterValues, selection: runtimeSelection })) {
+          for (const key2 of ["secondaryField", "secondaryDatasetRef", "secondaryCalculation", "secondaryLabel", "secondaryFormat", "secondaryTrend"]) delete normalizedBlock[key2];
+        }
         return {
           ...normalizedBlock,
-          content: buildReportFillKpiContent(block, dataset, {
+          content: buildReportFillKpiContent({ ...normalizedBlock, secondaryDisplayKey: block.secondaryDisplayKey, secondaryDisplayValueMap: block.secondaryDisplayValueMap }, dataset, {
             datasetsByAlias
           })
         };

@@ -9,11 +9,25 @@ const identity=value=>({...value});
 // loader, parameter initialization and commit callback. Calendar zones and range
 // policy come from validated declarations, never browser timezone or host IDs.
 export function useReportDatePresetDraft({ranges=[],parameters={},resetParameters,initialize=identity,contextKey='',loadCalendar,onDefaultsReady,defaultsReadyKey=''}) {
+ const reservedParameters=new Set(ranges.flatMap(range=>[range.start,range.end,range.datePresets?.calendar?.input?.parameter]).filter(Boolean));
+ const presetParameters=new Set();
+ for(const range of ranges){const key=range.datePresets?.valueParameter;if(!key)continue;
+  if(reservedParameters.has(key)||presetParameters.has(key))throw Error('Date-preset value parameters must be distinct from all date endpoints, calendar identities and other preset parameters.');
+  presetParameters.add(key);
+ }
+ const bindPresetValues=values=>{
+  const next={...values};
+  for(const range of ranges){const key=range.datePresets?.valueParameter;if(!key)continue;
+   if((own(next,range.start)||own(next,range.end))&&!range.datePresets.options.some(option=>option.value===next[key]))next[key]='custom';
+  }return next;
+ };
+ const initializeDraft=values=>bindPresetValues(initialize(values));
+ const presetPatch=(range,value)=>range.datePresets?.valueParameter?{[range.datePresets.valueParameter]:value}:{};
  const initialResetParameters=useRef(structuredClone(resetParameters??parameters));
- const [draft,setDraft]=useState(()=>initialize(parameters));
+ const [draft,setDraft]=useState(()=>initializeDraft(parameters));
  const draftRef=useRef(draft);draftRef.current=draft;
  const writeDraft=next=>{draftRef.current=next;setDraft(next);};
- const parametersKey=JSON.stringify(parameters),authoredDatesKey=JSON.stringify(initialize({}));
+ const parametersKey=JSON.stringify(parameters),authoredDatesKey=JSON.stringify(initializeDraft({}));
  const parameterEpoch=useRef({key:parametersKey,changed:false});
  const [dateState,setDateState]=useState({});
  const generation=useRef(0),requests=useRef([]),dirty=useRef(false),initialAttempted=useRef(false),initialCommitted=useRef(false),autoReady=useRef(false),expectedParameters=useRef('');
@@ -30,7 +44,7 @@ export function useReportDatePresetDraft({ranges=[],parameters={},resetParameter
  }
  const scopeVersion=calendarScope.current.version;
  const stateFor=range=>{
-  const state=dateState[range.id]||{mode:'manual',value:'custom'};
+  const state=dateState[range.id]||{mode:'manual',value:range.datePresets?.valueParameter&&range.datePresets.options.some(option=>option.value===draft[range.datePresets.valueParameter])?draft[range.datePresets.valueParameter]:'custom'};
   let identity;try{identity=reportDatePresetInputs(range.datePresets,draft).identity;}catch{/* manual dates do not need calendar metadata */}
   return {...state,pending:state.scope===scopeVersion&&state.pending===true,
    stale:state.mode==='relative'&&(state.stale||state.scope!==scopeVersion||state.identity!==identity)};
@@ -61,7 +75,7 @@ export function useReportDatePresetDraft({ranges=[],parameters={},resetParameter
    const instant=new Date();
    for(const {range,value,option,identity,context}of contexts){
     const pair=resolveDeclaredDateRangePreset(option,instant,context.timeZone);
-    patch[range.start]=pair.start;patch[range.end]=pair.end;
+    patch[range.start]=pair.start;patch[range.end]=pair.end;Object.assign(patch,presetPatch(range,value));
     resolvedStates[range.id]={mode:'relative',value,requestedValue:value,scope:version,identity,pending:false,stale:false,automatic,error:''};
    }
    if(!valid())return false;
@@ -80,7 +94,7 @@ export function useReportDatePresetDraft({ranges=[],parameters={},resetParameter
  };
  const manualRange=(id,pair)=>{
   cancelDraftRequests();const range=ranges.find(range=>range.id===id);if(!range)return;
-  writeDraft({...draftRef.current,[range.start]:pair.start,[range.end]:pair.end});
+  writeDraft({...draftRef.current,[range.start]:pair.start,[range.end]:pair.end,...presetPatch(range,'custom')});
   setDateState(previous=>({...previous,[id]:{mode:'manual',value:'custom',scope:calendarScope.current.version}}));
  };
  // Existing absolute defaults and explicit caller edits retain their semantics.
@@ -88,9 +102,9 @@ export function useReportDatePresetDraft({ranges=[],parameters={},resetParameter
   if(parameterEpoch.current.key!==parametersKey){
    const expected=expectedParameters.current===parametersKey;expectedParameters.current='';
    parameterEpoch.current={key:parametersKey,changed:true};
-   invalidate();writeDraft(JSON.parse(parametersKey));
+   invalidate();writeDraft(bindPresetValues(JSON.parse(parametersKey)));
    if(!expected){dirty.current=false;initialAttempted.current=false;initialCommitted.current=false;autoReady.current=false;setDateState({});}
-  }else if(!parameterEpoch.current.changed){writeDraft(initialize(draftRef.current));}
+  }else if(!parameterEpoch.current.changed){writeDraft(initializeDraft(draftRef.current));}
  },[parametersKey,authoredDatesKey]);
  useEffect(()=>()=>{
   invalidate();autoReady.current=false;
@@ -119,12 +133,13 @@ export function useReportDatePresetDraft({ranges=[],parameters={},resetParameter
  const expectParameters=next=>{expectedParameters.current=JSON.stringify(next);};
  const reset=()=>{
   cancelDraftRequests();parameterEpoch.current.changed=true;initialAttempted.current=true;
-  const next=initialize(structuredClone(resetParameters??initialResetParameters.current));writeDraft(next);setDateState({});
+  const next=initializeDraft(structuredClone(resetParameters??initialResetParameters.current));writeDraft(next);setDateState({});
   const needed=ranges.filter(range=>range.datePresets&&!own(next,range.start)&&!own(next,range.end));
   if(needed.length)void resolveRanges(needed.map(range=>({range,value:range.datePresets.default})),next);
  };
  const editField=(id)=>{
   cancelDraftRequests();
+  for(const range of ranges)if(id===range.start||id===range.end)writeDraft({...draftRef.current,...presetPatch(range,'custom')});
   setDateState(previous=>({...previous,...Object.fromEntries(ranges.flatMap(range=>id===range.start||id===range.end?[[range.id,{mode:'manual',value:'custom',scope:scopeVersion}]]
    :range.datePresets?.calendar.input.parameter===id&&previous[range.id]?.mode==='relative'?[[range.id,{...previous[range.id],pending:false,stale:true}]]:[]))}));
  };

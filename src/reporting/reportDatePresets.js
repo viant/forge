@@ -16,8 +16,10 @@ function read(value, selector) {
     return value;
 }
 export function normalizeReportDatePresets(value, dataSources = {}) {
-    if (!only(value, ['calendar', 'default', 'options']) || !only(value.calendar, ['dataSourceRef', 'input', 'identityField', 'timeZoneField'])) throw new Error('Invalid date-preset declaration.');
+    if (!only(value, ['calendar', 'default', 'options', 'valueParameter']) || !only(value.calendar, ['dataSourceRef', 'input', 'identityField', 'timeZoneField'])) throw new Error('Invalid date-preset declaration.');
+    if (value.valueParameter !== undefined && !alias(value.valueParameter)) throw new Error('Invalid date-preset value parameter.');
     const calendar = value.calendar, input = calendar.input;
+    if (value.valueParameter !== undefined && value.valueParameter === input?.parameter) throw new Error('Date-preset value parameter must differ from calendar identity.');
     if (!alias(calendar.dataSourceRef) || !Object.hasOwn(dataSources, calendar.dataSourceRef)
         || !only(input, ['name', 'parameter', 'array']) || !alias(input.name) || !alias(input.parameter)
         || input.array !== undefined && typeof input.array !== 'boolean') throw new Error('Invalid calendar datasource binding.');
@@ -38,7 +40,7 @@ export function normalizeReportDatePresets(value, dataSources = {}) {
         return {value: option.value, label: option.label};
     });
     if (!seen.has('custom') || !seen.has(value.default) || value.default === 'custom') throw new Error('A relative default and manual date option are required.');
-    return {calendar: {dataSourceRef: calendar.dataSourceRef, input: {name: input.name, parameter: input.parameter, array: input.array === true}, identityField: calendar.identityField, timeZoneField: calendar.timeZoneField}, default: value.default, options};
+    return {calendar: {dataSourceRef: calendar.dataSourceRef, input: {name: input.name, parameter: input.parameter, array: input.array === true}, identityField: calendar.identityField, timeZoneField: calendar.timeZoneField}, default: value.default, options, ...(value.valueParameter ? {valueParameter:value.valueParameter} : {})};
 }
 export function reportDatePresetInputs(declaration, parameters) {
     let identity = parameters?.[declaration.calendar.input.parameter];
