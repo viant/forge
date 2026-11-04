@@ -58,33 +58,45 @@ it('supports above and both side placements without changing controlled values',
     } finally {await act(async()=>root.unmount());}
 });
 
-it('shows explicit None only for opted-in supplied empty arrays and preserves the full accessible label', async () => {
+it('distinguishes optional All and None while preserving legacy, required, async and accessible states', async () => {
     globalThis.IS_REACT_ACT_ENVIRONMENT=true;
     const host=document.createElement('div'),root=createRoot(host),change=vi.fn();
     const control={id:'items',label:'Available items',kind:'choice',dataSourceId:'choices',emptySelection:'none'};
-    const load=vi.fn().mockResolvedValue([{value:1,label:'One'}]);
+    let fail;
+    const load=vi.fn().mockImplementationOnce(()=>new Promise((_resolve,reject)=>{fail=reject;}))
+        .mockResolvedValue([{value:1,label:'One'}]);
     const render=async(values,entry=control)=>act(async()=>root.render(<ReportFilterBar controls={[entry]} values={values} onChange={change} loadChoices={load}/>));
     try {
         for(const values of [{},{items:undefined},{items:null}]) {
             await render(values);
-            expect(host.querySelector('summary').textContent).toBe('Choose available items');
+            expect(host.querySelector('summary').textContent).toBe('(All)');
         }
         await render({items:[]});
         expect(host.querySelector('summary').textContent).toBe('(None)');
         expect(host.querySelector('summary').getAttribute('aria-label')).toBe('Available items');
         await act(async()=>{host.querySelector('details').open=true;host.querySelector('details').dispatchEvent(new Event('toggle'));});
+        expect(host.querySelector('summary').textContent).toBe('Loading choices…');
+        await act(async()=>fail(new Error('Unavailable')));
+        expect(host.querySelector('summary').textContent).toBe('Choices unavailable');
+        await act(async()=>[...host.querySelectorAll('button')].find(button=>button.textContent==='Retry choices').click());
         expect(host.querySelector('summary').textContent).toBe('(None)');
         expect(change).not.toHaveBeenCalled();
         await act(async()=>{host.querySelector('details').open=false;host.querySelector('details').dispatchEvent(new Event('toggle'));});
         await act(async()=>{host.querySelector('details').open=true;host.querySelector('details').dispatchEvent(new Event('toggle'));});
         expect(host.querySelector('summary').textContent).toBe('(None)');
-        expect(load).toHaveBeenCalledTimes(1);
+        expect(load).toHaveBeenCalledTimes(2);
         await render({items:[1]});
         expect(host.querySelector('summary').textContent).toBe('1 selected');
         await render({items:[]},{...control,emptySelection:undefined});
         expect(host.querySelector('summary').textContent).toBe('Choose available items');
+        for(const values of [{},{items:undefined},{items:null}]) {
+            await render(values,{...control,required:true});
+            expect(host.querySelector('summary').textContent).toBe('Choose available items');
+        }
+        await render({items:[]},{...control,required:true});
+        expect(host.querySelector('summary').textContent).toBe('(None)');
         await render({});
-        expect(host.querySelector('summary').textContent).toBe('Choose available items');
+        expect(host.querySelector('summary').textContent).toBe('(All)');
         expect(host.querySelector('summary').getAttribute('aria-label')).toBe('Available items');
     } finally {await act(async()=>root.unmount());}
 });

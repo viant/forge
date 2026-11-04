@@ -13,8 +13,10 @@ host and producer distinguish a supplied empty array from an omitted filter:
 />
 ```
 
-An explicitly present `[]` displays `(None)`. Omitted, undefined and null values
-retain the existing `Choose available items` prompt; a nonempty selection retains
+An explicitly present `[]` displays `(None)`, preserving the existing opted-in
+summary for both optional and required controls. For optional controls, omitted,
+undefined and null values display `(All)`; required controls retain the existing
+`Choose available items` prompt for those values. A nonempty selection retains
 its selected count. Controls without the policy keep their existing appearance.
 Loading and error states keep their existing text and retry behavior. The summary
 always retains the full control label as its accessible name, and opening or

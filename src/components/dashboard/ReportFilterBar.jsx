@@ -22,7 +22,8 @@ function Choice({control, values, onChange, loadChoices, scopeKey, onChoices, co
     const callbacks = useRef({loadChoices, onChoices}); callbacks.current = {loadChoices, onChoices};
     const current = state.key === key ? state : {};
     const selected = Array.isArray(values[control.id]) ? values[control.id] : values[control.id] == null ? [] : [values[control.id]];
-    const explicitNone = control.emptySelection === 'none' && Object.hasOwn(values, control.id)
+    const emptyPolicy = control.emptySelection === 'none';
+    const explicitNone = emptyPolicy && Object.hasOwn(values, control.id)
         && Array.isArray(values[control.id]) && values[control.id].length === 0;
     useEffect(() => {
         if ((!open && !control.refreshSelected) || current.choices) return;
@@ -45,7 +46,7 @@ function Choice({control, values, onChange, loadChoices, scopeKey, onChoices, co
     return <FilterControl context={context} controlId={control.id} type="multiSelect" value={selected} options={choices} required={control.required} disabled={busy||current.loading} click={()=>setOpen(value=>!value)} change={current.choices?value=>onChange(control.id,value):undefined}><fieldset className="forge-report-filter-choice">
         <legend>{control.label}{control.required ? ' (required)' : ''}</legend>
         <details open={open} onToggle={event => setOpen(event.currentTarget.open)}>
-            <summary aria-label={control.label}>{current.loading ? 'Loading choices…' : current.error ? 'Choices unavailable' : selected.length ? `${selected.length} selected` : explicitNone ? '(None)' : `Choose ${control.label.toLowerCase()}`}</summary>
+            <summary aria-label={control.label}>{current.loading ? 'Loading choices…' : current.error ? 'Choices unavailable' : selected.length ? `${selected.length} selected` : explicitNone ? '(None)' : emptyPolicy && !control.required && values[control.id] == null ? '(All)' : `Choose ${control.label.toLowerCase()}`}</summary>
             <div className="forge-report-filter-choice-panel">
                 {current.error && <><span role="alert">{current.error}</span><Button onClick={() => setRetry(value => value + 1)}>Retry choices</Button></>}
                 {current.choices && <>
