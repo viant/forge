@@ -59168,6 +59168,7 @@ ${indent}${end}`;
       geo
     };
   }
+  var compositeLayoutRuntimeKeys = ["chrome", "childWeights", "minColumnWidth", "desktopColumns", "tabletColumns", "mobileColumns", "spacerHeight"];
   function normalizeReportBlockRuntime(runtime = null, block = {}) {
     const source = isPlainObject8(runtime) ? runtime : {};
     if (block.kind) validateReportRuntimeRefinementFields({ ...block, runtime: source });
@@ -59187,7 +59188,13 @@ ${indent}${end}`;
       ...selectionBindings && Object.keys(selectionBindings).length > 0 ? { selectionBindings } : {},
       ...actions.length > 0 ? { actions } : {}
     };
-    return Object.keys(normalized).length > 0 ? normalized : null;
+    if (Object.keys(normalized).length === 0) return null;
+    if (block.kind === "compositeBlock") {
+      for (const key2 of compositeLayoutRuntimeKeys) {
+        if (Object.hasOwn(source, key2)) normalized[key2] = cloneValue20(source[key2]);
+      }
+    }
+    return normalized;
   }
   function withReportBlockRuntime(normalizedBlock = null, sourceBlock = {}) {
     if (!normalizedBlock) {
@@ -63308,6 +63315,7 @@ ${indent}${end}`;
     categoryOffset = 0,
     omitLegend = false
   } = {}) {
+    var _a5, _b, _c, _d;
     const rows = resolveCartesianRows(resolvedChart);
     const seriesDescriptors = resolveCartesianSeriesDescriptors(chartModel, resolvedChart);
     if (rows.length === 0 || seriesDescriptors.length === 0) {
@@ -63357,11 +63365,35 @@ ${indent}${end}`;
       longest,
       ...lines2.map((line) => line.length)
     ), 0);
-    const leftPad = Math.min(Math.floor(width * 0.38), Math.max(116, 20 + longestCategoryLine * 6));
-    const rightPad = 66;
-    const { topPad, bottomPad, groupGap, rowHeight, plotHeight, height: baseHeight } = horizontalBarChartMetrics(rows.length, seriesDescriptors.length);
-    const plotWidth = Math.max(40, width - leftPad - rightPad);
+    const categoryPad = Math.min(Math.floor(width * 0.38), Math.max(116, 20 + longestCategoryLine * 6));
+    const negativeLabels = [];
+    const positiveLabels = [];
+    const initialPlotWidth = Math.max(1, width - categoryPad - 66);
     const valueRange = bounds.maxValue - bounds.minValue || 1;
+    let labelsOverflow = false;
+    seriesDescriptors.forEach((series) => {
+      if (!shouldRenderReportPrintSeriesDataLabels(series, "horizontal_bar", rows.length)) return;
+      rows.forEach((row) => {
+        const value = normalizeNumber2(row == null ? void 0 : row[series.key]);
+        if (value == null) return;
+        const label = formatSeriesDataLabel(value, series.format);
+        (value < 0 ? negativeLabels : positiveLabels).push(label);
+        const valueX = categoryPad + (value - bounds.minValue) / valueRange * initialPlotWidth;
+        const labelWidth2 = Array.from(label).length * 6;
+        labelsOverflow || (labelsOverflow = value < 0 ? valueX - 6 - labelWidth2 < categoryPad : valueX + 6 + labelWidth2 > width);
+      });
+    });
+    const labelLayout = labelsOverflow ? fitCartesianAxisTicks(
+      width - categoryPad,
+      [...negativeLabels, formatAxisTick(bounds.minValue, (_a5 = seriesDescriptors[0]) == null ? void 0 : _a5.format)],
+      [...positiveLabels, formatAxisTick(bounds.maxValue, (_b = seriesDescriptors[0]) == null ? void 0 : _b.format)]
+    ) : null;
+    const leftPad = categoryPad + ((labelLayout == null ? void 0 : labelLayout.leftPad) || 0);
+    const rightPad = (_c = labelLayout == null ? void 0 : labelLayout.rightPad) != null ? _c : 66;
+    const valueLabelSize = (_d = labelLayout == null ? void 0 : labelLayout.tickFontSize) != null ? _d : 10;
+    const valueLabelGap = 6 * valueLabelSize / 10;
+    const { topPad, bottomPad, groupGap, rowHeight, plotHeight, height: baseHeight } = horizontalBarChartMetrics(rows.length, seriesDescriptors.length);
+    const plotWidth = Math.max(1, width - leftPad - rightPad);
     const baselineX = leftPad + (0 - bounds.minValue) / valueRange * plotWidth;
     const perSeriesHeight = Math.max(10, Math.floor((rowHeight - Math.max(0, seriesDescriptors.length - 1) * 4) / Math.max(seriesDescriptors.length, 1)));
     const legend = omitLegend || chartModel.showLegend === false ? { svg: "", height: 0 } : buildLegendSvg(seriesDescriptors, width, topPad + plotHeight + bottomPad + 4);
@@ -63379,30 +63411,40 @@ ${indent}${end}`;
       bounds
     });
     const makeTicks = (count) => Array.from({ length: count }, (_2, index) => {
-      var _a5;
+      var _a6;
       const fraction2 = index / (count - 1);
       const value = bounds.minValue + fraction2 * valueRange;
       const x2 = leftPad + fraction2 * plotWidth;
       return {
         value,
         x: x2,
-        label: formatAxisTick(value, (_a5 = seriesDescriptors[0]) == null ? void 0 : _a5.format)
+        labelX: labelLayout && index === 0 ? x2 - valueLabelGap : labelLayout && index === count - 1 ? x2 + valueLabelGap : x2,
+        anchor: labelLayout && index === 0 ? "end" : labelLayout && index === count - 1 ? "start" : "middle",
+        label: formatAxisTick(value, (_a6 = seriesDescriptors[0]) == null ? void 0 : _a6.format)
       };
     });
     let xTicks = makeTicks(4);
-    const ticksFit = (ticks) => ticks.every((tick, index) => index === 0 || tick.x - ticks[index - 1].x >= (tick.label.length + ticks[index - 1].label.length) * 2.8 + 8);
+    const ticksFit = (ticks) => ticks.every((tick, index) => {
+      if (index === 0) return true;
+      const previous = ticks[index - 1];
+      if (!labelLayout) return tick.x - previous.x >= (tick.label.length + previous.label.length) * 2.8 + 8;
+      const glyphWidth = 6 * valueLabelSize / 10;
+      const previousRight = previous.labelX + previous.label.length * glyphWidth * (previous.anchor === "end" ? 0 : previous.anchor === "middle" ? 0.5 : 1);
+      const tickLeft = tick.labelX - tick.label.length * glyphWidth * (tick.anchor === "start" ? 0 : tick.anchor === "middle" ? 0.5 : 1);
+      return tickLeft - previousRight >= 8 * valueLabelSize / 10;
+    });
     for (const count of [3, 2]) {
       if (ticksFit(xTicks)) break;
       xTicks = makeTicks(count);
     }
     const gridLines = xTicks.map((tick) => `
     <line x1="${tick.x}" y1="${topPad}" x2="${tick.x}" y2="${topPad + plotHeight}" stroke="#eaecf0" stroke-width="1" />
-    <text x="${tick.x}" y="${topPad + plotHeight + 18}" text-anchor="middle" font-size="10" fill="#667085">${escapeXml(tick.label)}</text>
+    <text x="${tick.labelX}" y="${topPad + plotHeight + 18}" text-anchor="${tick.anchor}" font-size="${valueLabelSize}" fill="#667085">${escapeXml(tick.label)}</text>
   `).join("\n");
     const categoryLabels = rows.map((row, rowIndex) => {
       const groupTop = topPad + rowIndex * (rowHeight + groupGap);
       return renderPrintLabelLines(categoryLabelLines[rowIndex], {
-        x: leftPad - 8,
+        x: categoryPad - 8,
         y: groupTop + rowHeight / 2 + 4,
         anchor: "end",
         fill: "#344054"
@@ -63418,10 +63460,10 @@ ${indent}${end}`;
       const valueX = leftPad + (value - bounds.minValue) / valueRange * plotWidth;
       const x2 = Math.min(baselineX, valueX);
       const barWidth = Math.max(1, Math.abs(valueX - baselineX));
-      const labelX = value >= 0 ? valueX + 6 : valueX - 6;
+      const labelX = value >= 0 ? valueX + valueLabelGap : valueX - valueLabelGap;
       const labelAnchor = value >= 0 ? "start" : "end";
       const fillColor = printColor(resolveChartCategoryColor(chartModel, readChartDataValue(row, xAxisKey), resolveSeriesPointColor(series, value, series.color)));
-      const valueLabel = shouldRenderReportPrintSeriesDataLabels(series, "horizontal_bar", rows.length) ? `<text x="${labelX}" y="${barY + perSeriesHeight - 2}" text-anchor="${labelAnchor}" font-size="10" fill="#667085">${escapeXml(formatSeriesDataLabel(value, series.format))}</text>` : "";
+      const valueLabel = shouldRenderReportPrintSeriesDataLabels(series, "horizontal_bar", rows.length) ? `<text x="${labelX}" y="${barY + perSeriesHeight - 2}" text-anchor="${labelAnchor}" font-size="${valueLabelSize}" fill="#667085">${escapeXml(formatSeriesDataLabel(value, series.format))}</text>` : "";
       return `
         <path class="forge-chart-bar" d="${buildChartBarPath({ x: x2, y: barY, width: barWidth, height: perSeriesHeight, value })}" fill="${escapeXml(fillColor)}" />
         ${valueLabel}

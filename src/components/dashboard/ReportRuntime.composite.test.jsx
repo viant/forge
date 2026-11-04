@@ -1,7 +1,19 @@
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import assert from 'node:assert/strict';
-import ReportRuntime from './ReportRuntime.jsx';
+import ReportRuntime, {resolveReportRuntimeCompositeColumns} from './ReportRuntime.jsx';
+import {normalizeReportBuilderDocumentBlocks} from '../../reporting/reportDocumentModel.js';
+
+const [columns] = normalizeReportBuilderDocumentBlocks([{id:'columns',kind:'compositeBlock',layout:'responsiveGrid',
+  childBlockIds:['left','right'],runtime:{desktopColumns:6,tabletColumns:3,mobileColumns:2,minColumnWidth:180,requireCompleteDataset:true}}]);
+assert.equal(resolveReportRuntimeCompositeColumns(columns,1440),6);
+assert.equal(resolveReportRuntimeCompositeColumns(columns,800),3);
+assert.equal(resolveReportRuntimeCompositeColumns(columns,500),2);
+const [lenientColumns] = normalizeReportBuilderDocumentBlocks([{...columns,
+  runtime:{desktopColumns:99,tabletColumns:'invalid',mobileColumns:-3,minColumnWidth:'invalid',requireCompleteDataset:true}}]);
+assert.equal(resolveReportRuntimeCompositeColumns(lenientColumns,1440),6);
+assert.equal(resolveReportRuntimeCompositeColumns(lenientColumns,800),2);
+assert.equal(resolveReportRuntimeCompositeColumns(lenientColumns,500),1);
 
 const children=['left','right'].map(id=>({id,kind:'kpiBlock',title:id,content:{value:42,valueLabel:id}}));
 const group={id:'group',kind:'compositeBlock',title:'Invisible layout title',layout:'responsiveGrid',childBlockIds:['left','right'],runtime:{chrome:'none',childWeights:{left:1,right:3}}};

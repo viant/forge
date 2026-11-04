@@ -2164,6 +2164,8 @@ export function buildReportDocumentGeoMapBlock(block = {}) {
   };
 }
 
+const compositeLayoutRuntimeKeys = ["chrome", "childWeights", "minColumnWidth", "desktopColumns", "tabletColumns", "mobileColumns", "spacerHeight"];
+
 export function normalizeReportBlockRuntime(runtime = null, block = {}) {
   const source = isPlainObject(runtime) ? runtime : {};
   if (block.kind) validateReportRuntimeRefinementFields({...block, runtime:source});
@@ -2191,7 +2193,15 @@ export function normalizeReportBlockRuntime(runtime = null, block = {}) {
     ...(selectionBindings && Object.keys(selectionBindings).length > 0 ? { selectionBindings } : {}),
     ...(actions.length > 0 ? { actions } : {}),
   };
-  return Object.keys(normalized).length > 0 ? normalized : null;
+  if (Object.keys(normalized).length === 0) return null;
+  // Composite construction already retains layout-only runtime. Preserve its
+  // existing layout metadata when shared bindings replace that cloned runtime.
+  if (block.kind === "compositeBlock") {
+    for (const key of compositeLayoutRuntimeKeys) {
+      if (Object.hasOwn(source, key)) normalized[key] = cloneValue(source[key]);
+    }
+  }
+  return normalized;
 }
 
 function withReportBlockRuntime(normalizedBlock = null, sourceBlock = {}) {
