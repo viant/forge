@@ -354,9 +354,11 @@ const ViewDialog = ({context, dialog, focusRequest = 0, mountedDataSourceRefs = 
                         // A fresh dialog instance starts at the first page. Do
                         // not use setPage here: it schedules a read before the
                         // caller's new parameters and filter have been bound.
+                        // Nested content can fetch on mount before the deferred
+                        // read, so install the fresh filter in this same reset.
                         if (dialogContext?.signals?.input) {
                             const input = dialogContext.signals.input;
-                            input.value = {...input.peek(), page: 1, fetch: false, refresh: false};
+                            input.value = {...input.peek(), filter: nextFilter, page: 1, fetch: false, refresh: false};
                         }
                         if (dialogContext?.signals?.collectionInfo) {
                             dialogContext.signals.collectionInfo.value = {};

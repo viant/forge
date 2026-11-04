@@ -24,6 +24,58 @@ it('honors the metadata close guard and invokes onClose for dialog chrome',async
  }finally{await act(async()=>root.unmount());host.remove();removeSignalsForKey(windowId);}
 });
 
+it('binds fresh search filters before a nested dialog table can fetch on reopen', async () => {
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    HTMLElement.prototype.scrollIntoView ||= function () {};
+    const windowId = 'dialog-nested-fresh-filter', host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host), requests = [];
+    const metadata = {
+        dataSource: {
+            home: {id: 'home', backend: {kind: 'inline', rows: []}},
+            choices: {id: 'choices', autoFetch: false, autoSelect: false,
+                backend: {kind: 'mcp_tool', method: 'fixture.choices'},
+                uniqueKey: [{field: 'id'}], selectors: {data: 'data'},
+                filterSet: [{name: 'quick', default: true, template: [{id: 'Name', operator: 'equal'}]}]},
+        },
+        view: {content: {id: 'home', dataSourceRef: 'home', fetchData: false}},
+        dialogs: [{id: 'picker', title: 'Select choice', dataSourceRef: 'choices',
+            properties: {quickFilters: [{field: 'Name', placeholder: 'Search names'}]},
+            content: {id: 'picker-content', dataSourceRef: 'choices', containers: [
+                {id: 'picker-table', dataSourceRef: 'choices', fetchData: true,
+                    table: {columns: [{id: 'name', name: 'Name'}]}},
+            ]}, actions: [{id: 'close', label: 'Dismiss', close: true}]}],
+    };
+    const flush = async action => act(async () => {
+        action?.();
+        for (let i = 0; i < 30; i++) await Promise.resolve();
+    });
+    try {
+        await flush(() => root.render(<SettingProvider endpoints={{}} services={{dataConnectorTransport: async request => {
+            if (request.dataSourceRef === 'choices') requests.push({filter: {...request.options.filter}, parameters: {...request.options.inputParameters}});
+            return {data: [{id: 1, name: 'Synthetic choice'}]};
+        }}} connectorConfig={{window: {service: {uri: '/fixture'}}}}>
+            <WindowContent window={{windowId, windowKey: 'fixture'}} selectedMetadata={metadata}/>
+        </SettingProvider>));
+        const context = getWindowContext(windowId), source = context.Context('choices');
+        const open = parameters => context.handlers.window.openDialog({execution: {args: ['picker']}, parameters});
+        await flush(() => open({Provider: 'First', Name: 'Earlier search'}));
+        await flush(() => source.handlers.dataSource.fetchCollection({filter: {Name: 'Earlier search'}}));
+        expect(requests.at(-1).filter).toEqual({Name: 'Earlier search'});
+        await flush(() => document.querySelector('[role="dialog"] button[title="Dismiss"]').click());
+        const beforeReopen = requests.length;
+        await flush(() => open({Provider: 'Second'}));
+        expect(document.querySelector('input[placeholder="Search names"]').value).toBe('');
+        const reopened = requests.slice(beforeReopen);
+        expect(reopened.length).toBeGreaterThan(0);
+        for (const request of reopened) expect(request).toEqual({filter: {}, parameters: {Provider: 'Second'}});
+    } finally {
+        await flush(() => root.unmount());
+        host.remove();
+        removeSignalsForKey(windowId);
+    }
+});
+
 
 it('fresh dialog opens fetch once on page one, including another provider after paging', async () => {
     globalThis.IS_REACT_ACT_ENVIRONMENT = true;
