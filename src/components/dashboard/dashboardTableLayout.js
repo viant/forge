@@ -4,9 +4,15 @@ function numericWidth(value) {
 }
 
 export function resolveDashboardTableColumnMinWidth(column = {}, index = 0) {
-    const explicit = numericWidth(column?.width) || numericWidth(column?.resolvedCompactWidth);
-    if (explicit > 0) {
-        return Math.max(112, Math.min(320, Math.round(explicit)));
+    const authored = numericWidth(column?.width);
+    if (authored > 0) {
+        // Report columns admit authored widths from 48px; inferred compact
+        // widths and legacy out-of-contract values keep their existing floor.
+        return Math.max(authored >= 48 ? 48 : 112, Math.min(320, Math.round(authored)));
+    }
+    const compact = numericWidth(column?.resolvedCompactWidth);
+    if (compact > 0) {
+        return Math.max(112, Math.min(320, Math.round(compact)));
     }
     if (column?.frozen === true || index === 0) {
         return 148;

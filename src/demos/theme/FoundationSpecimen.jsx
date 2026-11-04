@@ -5,6 +5,7 @@ import AttachmentDialog from '../../components/chat/AttachmentDialog.jsx';
 import Composer from '../../components/chat/Composer.jsx';
 import DocumentSpecimen from './DocumentSpecimen.jsx';
 import ReportDocumentSpecimen from './ReportDocumentSpecimen.jsx';
+import TableWidthSpecimen from './TableWidthSpecimen.jsx';
 import {signal} from '@preact/signals-react';
 import {Button as BlueprintButton, Callout, Card, Dialog, Tag} from '@blueprintjs/core';
 import Button from '../../components/Button.jsx';
@@ -59,6 +60,7 @@ export default function FoundationSpecimen({iconExamples = ['menu', 'search', 'p
     return <div className="forge-foundation-specimen">
         <DocumentSpecimen/>
         <ReportDocumentSpecimen/>
+        <TableWidthSpecimen/>
         <header>
             <Typography as="h1" typeRole="display">Workspace design system</Typography>
             <Typography as="p" typeRole="body">The shared components, foundations and states available to workspace authors. Appearance follows the selected workspace theme.</Typography>
