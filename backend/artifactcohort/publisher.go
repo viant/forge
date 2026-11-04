@@ -14,11 +14,13 @@ import (
 // generation. Producer adapters validate closed source bytes before calling
 // Publish and emit standard MCP resource notifications after a successful swap.
 type Publisher struct {
-	mu         sync.RWMutex
-	active     map[string]*Artifact // URI -> latest published version
-	versions   map[string]*Artifact // RootKey -> immutable retained version
-	manifest   *Manifest
-	generation uint64
+	mu             sync.RWMutex
+	active         map[string]*Artifact // URI -> latest published version
+	versions       map[string]*Artifact // RootKey -> immutable retained version
+	manifest       *Manifest
+	policyStore    *authz.StaticStore
+	cohortPolicies map[string][]authz.Resource
+	generation     uint64
 }
 
 func NewPublisher() *Publisher {
@@ -295,8 +297,14 @@ func (p *Publisher) ReplaceCatalog(ctx context.Context, policies []authz.Documen
 	if err = ValidateManifest(next); err != nil {
 		return Manifest{}, err
 	}
+	cohortPolicies := make(map[string][]authz.Resource, len(next.Cohorts))
+	for _, cohort := range next.Cohorts {
+		cohortPolicies[cohort.Name] = append(cohortPolicies[cohort.Name], cohort.PolicyResource)
+	}
 	p.generation = next.Generation
 	p.manifest = &next
+	p.policyStore = store
+	p.cohortPolicies = cohortPolicies
 	return CloneManifest(next)
 }
 func (p *Publisher) Snapshot() (Manifest, error) {
