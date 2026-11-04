@@ -202,6 +202,8 @@ func xlsxNumberFormat(format string) string {
 		return "0"
 	case "number":
 		return "0.00000"
+	case "number2":
+		return "#,##0.##"
 	case "percent":
 		return `0.0"%"`
 	case "percentfraction":
