@@ -1,5 +1,5 @@
 /* Specimen composition only. Component appearance stays in the shared pack. */
-.forge-foundation-specimen { display: grid; gap: var(--forge-spacing-6, 24px); padding: var(--forge-spacing-6, 24px); max-width: 1100px; min-width: 0; color: var(--forge-text); background: var(--forge-surface); }
+.forge-foundation-specimen { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--forge-spacing-6, 24px); padding: var(--forge-spacing-6, 24px); max-width: 1100px; min-width: 0; color: var(--forge-text); background: var(--forge-surface); }
 .forge-foundation-specimen :is(header, section) { display: grid; gap: var(--forge-spacing-3, 12px); min-width: 0; scroll-margin-block-start: var(--forge-spacing-6, 24px); }
 .forge-foundation-specimen :is(h1, h2, h3, p) { margin: 0; }
 .forge-foundation-specimen p { max-width: 75ch; }
