@@ -270,6 +270,7 @@ type Block struct {
 	ValueFormat              string                          `json:"valueFormat,omitempty"`
 	Suffix                   string                          `json:"suffix,omitempty"`
 	SecondaryDatasetRef      string                          `json:"secondaryDatasetRef,omitempty"`
+	SecondaryVisibleWhen     map[string]any                  `json:"secondaryVisibleWhen,omitempty"`
 	SecondaryCalculation     string                          `json:"secondaryCalculation,omitempty"`
 	SecondaryField           string                          `json:"secondaryField,omitempty"`
 	SecondaryLabel           string                          `json:"secondaryLabel,omitempty"`
@@ -399,6 +400,7 @@ type rawKPIBlock struct {
 	ValueFormat              string            `json:"valueFormat,omitempty"`
 	Suffix                   string            `json:"suffix,omitempty"`
 	SecondaryDatasetRef      json.RawMessage   `json:"secondaryDatasetRef,omitempty"`
+	SecondaryVisibleWhen     map[string]any    `json:"secondaryVisibleWhen,omitempty"`
 	SecondaryCalculation     json.RawMessage   `json:"secondaryCalculation,omitempty"`
 	SecondaryField           string            `json:"secondaryField,omitempty"`
 	SecondaryLabel           string            `json:"secondaryLabel,omitempty"`
@@ -1159,6 +1161,7 @@ func decodeBlock(payload json.RawMessage, index int) (result Block, resultErr er
 			ValueFormat:              block.ValueFormat,
 			Suffix:                   block.Suffix,
 			SecondaryDatasetRef:      secondaryDatasetRef,
+			SecondaryVisibleWhen:     block.SecondaryVisibleWhen,
 			SecondaryCalculation:     secondaryCalculation,
 			SecondaryField:           block.SecondaryField,
 			SecondaryLabel:           block.SecondaryLabel,

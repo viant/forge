@@ -14,6 +14,7 @@ import (
 	reportxlsx "github.com/viant/forge/backend/reporting/export/xlsx"
 	reportfill "github.com/viant/forge/backend/reporting/fill"
 	reportprint "github.com/viant/forge/backend/reporting/print"
+	reportspec "github.com/viant/forge/backend/reporting/spec"
 	"github.com/xuri/excelize/v2"
 )
 
@@ -29,12 +30,23 @@ func TestKPIComparisonVisibilityCanonicalArtifacts(t *testing.T) {
 		t.Fatal(err)
 	}
 	spec["title"] = "Collection progress"
-	spec["layoutIntent"] = map[string]any{"kind": "single", "blockOrder": []string{"progress"}}
+	spec["layoutIntent"] = map[string]any{"kind": "single", "resultPanePosition": "main", "blockOrder": []string{"progress"}}
 	spec["blocks"] = []any{map[string]any{"id": "progress", "kind": "kpiBlock", "title": "Items", "datasetRef": "primary", "valueField": "value", "valueLabel": "Items", "secondaryField": "previous", "secondaryCalculation": "relativeChange", "secondaryLabel": "Comparable change", "secondaryFormat": "percentFraction", "secondaryTrend": true, "secondaryVisibleWhen": map[string]any{"source": "filters", "field": "periodMode", "equals": "completed"}}}
 	for _, mode := range []string{"custom", "completed"} {
 		t.Run(mode, func(t *testing.T) {
 			spec["scope"] = map[string]any{"dataSourceRef": "approved", "params": []any{map[string]any{"id": "periodMode", "label": "Period mode", "required": false, "kind": "select", "value": mode, "options": []any{map[string]any{"value": "custom", "label": "Custom"}, map[string]any{"value": "completed", "label": "Completed"}}}}}
 			encoded, _ := json.Marshal(spec)
+			admitted, err := reportspec.DecodeJSON(encoded)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if admitted.Blocks[0].SecondaryVisibleWhen["field"] != "periodMode" {
+				t.Fatal("strict native spec decoder lost comparison condition")
+			}
+			encoded, err = json.Marshal(admitted)
+			if err != nil {
+				t.Fatal(err)
+			}
 			artifacts, err := Materialize(context.Background(), encoded, map[string]json.RawMessage{"primary": json.RawMessage(`{"rows":[{"value":80,"previous":100}],"hasMore":false}`)})
 			if err != nil {
 				t.Fatal(err)
