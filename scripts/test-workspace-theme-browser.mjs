@@ -348,7 +348,19 @@ try {
         }
         assert.equal(await exampleName.inputValue(),'Retained document edit');
         assert.equal(await proof.locator('input[data-forge-control-id="specimenInput"]').inputValue(), 'Retained while roles change');
-        assert.deepEqual(await proof.evaluate(() => [...document.querySelectorAll('body *')].filter(node => {const rect = node.getBoundingClientRect(); return rect.width && rect.right > innerWidth + 1 && getComputedStyle(node).position !== 'fixed' && !node.closest('.forge-dashboard-table-wrap, .forge-section-tab-rail, .forge-categorical-heatmap, .forge-category-range');}).map(node => `${node.tagName}.${node.className}`).slice(0, 12)), [], 'Foundation content must stay within the page');
+        // The overlap's assistive table stays in the accessibility tree while its
+        // intrinsic cell widths are clipped to one pixel. Check that contract
+        // before ignoring descendant layout boxes in the visible-page sweep.
+        const overlapTables = proof.locator('.forge-overlap-accessible-table');
+        const overlapTableCount = await overlapTables.count();
+        assert.ok(overlapTableCount > 0, 'The overlap specimen must exercise its assistive table');
+        assert.equal(await proof.getByRole('table', {name:'Two-set overlap values',exact:true}).count(), overlapTableCount);
+        for (const clipping of await overlapTables.evaluateAll(nodes => nodes.map(node => {
+            const rect = node.getBoundingClientRect();
+            const css = getComputedStyle(node);
+            return {width:rect.width,height:rect.height,overflowX:css.overflowX,overflowY:css.overflowY,clipPath:css.clipPath};
+        }))) assert.deepEqual(clipping, {width:1,height:1,overflowX:'hidden',overflowY:'hidden',clipPath:'inset(50%)'});
+        assert.deepEqual(await proof.evaluate(() => [...document.querySelectorAll('body *')].filter(node => {const rect = node.getBoundingClientRect(); return rect.width && rect.right > innerWidth + 1 && getComputedStyle(node).position !== 'fixed' && !node.matches('.forge-overlap-accessible-table *') && !node.closest('.forge-dashboard-table-wrap, .forge-section-tab-rail, .forge-categorical-heatmap, .forge-category-range');}).map(node => `${node.tagName}.${node.className}`).slice(0, 12)), [], 'Foundation content must stay within the page');
         assert.equal(await proof.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
         if(process.env.FORGE_FOCUS_EVIDENCE) await proof.locator('[data-chart-example="category-range"]').screenshot({path:path.join(process.env.FORGE_FOCUS_EVIDENCE,`category-range-${viewport.width}.png`)});
         assert.deepEqual(failures, []);
