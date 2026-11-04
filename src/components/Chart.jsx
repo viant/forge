@@ -39,6 +39,7 @@ import {
     Legend,
     LabelList,
     Label,
+    Text,
     ReferenceArea,
     ReferenceDot,
     ReferenceLine,
@@ -840,6 +841,20 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     const axisLabelStyle = embedded
         ? undefined
         : {fontSize: chartTypography.smallSize, lineHeight: `${chartTypography.smallLineHeight}px`, fill: "var(--forge-chart-text-muted, #667085)", fontFamily: chartTypography.smallFamily, fontWeight: chartTypography.smallWeight, letterSpacing: chartTypography.smallLetterSpacing};
+    // Label's insideLeft/insideRight anchors are horizontal; after rotation
+    // they extend a whole title above the midpoint. Reuse native Text wrapping
+    // against the actual axis length, including the space consumed by legends.
+    const renderValueAxisTitle = ({value, viewBox, angle, position}) => {
+        const {x, y, width, height} = viewBox;
+        return <Text className="recharts-label" {...axisLabelStyle}
+            style={axisLabelStyle}
+            x={position === 'insideRight' ? x + width - 5 : x + 5}
+            y={y + height / 2} width={height}
+            angle={angle} textAnchor="middle" verticalAnchor="start"
+            breakAll={String(value).split(/\s+/).some(word => measureCategoryTickText(word, axisLabelStyle) > height)}>
+            {value}
+        </Text>;
+    };
     const renderXAxisCategoryTick = categoryLabelConfig
         ? ((props) => <ClampedCategoryTick {...props} config={categoryLabelConfig} valueFormatter={(value) => formatChartXAxisValue(value, resolvedTickFormat, resolvedTickValueMode)} style={axisTickStyle} />)
         : axisTickStyle;
@@ -895,7 +910,8 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         for (const value of Array.isArray(axis?.domain) ? axis.domain : []) if (Number.isFinite(value)) { minimum = Math.min(minimum, value); maximum = Math.max(maximum, value); }
         const format = createAxisTickFormatter(axis?.format, true);
         const width = Math.max(...[minimum, maximum, minimum * 1.25, maximum * 1.25, 0].map(value => measureCategoryTickText(format(value), axisTickStyle)));
-        return Math.max(documentStyle.axisWidth, Math.ceil(width) + documentStyle.axisTickMargin * 2);
+        const titleInset = !embedded && (axis?.label || (axisId === 'left' && yAxisLabel)) ? chartTypography.smallLineHeight : 0;
+        return Math.max(documentStyle.axisWidth, Math.ceil(width) + documentStyle.axisTickMargin * 2) + titleInset;
     };
 
     const emitDatumSelection = React.useCallback((event) => {
@@ -1149,6 +1165,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                     angle: -90,
                     position: "insideLeft",
                     ...axisLabelStyle,
+                    content: renderValueAxisTitle,
                 }}
                 domain={resolveChartValueAxisDomain(type, leftAxis.domain)}
             />
@@ -1167,6 +1184,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                         angle: 90,
                         position: "insideRight",
                         ...axisLabelStyle,
+                        content: renderValueAxisTitle,
                     } : undefined}
                     domain={rightAxis?.domain}
                 />

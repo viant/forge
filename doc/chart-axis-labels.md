@@ -45,6 +45,18 @@ Go ReportSpec JSON round trips, and native materialization retain both labels.
 The existing UI consumes the numeric title in vertical and horizontal orientation;
 native XLSX charts export both category and value-axis titles.
 
+Browser Cartesian value titles use the existing Recharts Label/Text path with
+centered rotation and native wrapping against the actual axis height. Both
+sides preserve complete words, and an overlong token uses native character
+wrapping. Document axes reserve an additional small-role line-height for their
+title lane. No authored property changes. The independently invented
+`chart-axis-labels-preview.html` fixture exercises both axes at 240px and 380px
+heights and 960px and 390px viewport widths, including long titles and tokens.
+Run `node scripts/test-chart-axis-labels-browser.mjs`; screenshots remain in the
+ignored `output/playwright` directory. Coverage checks SVG bounds, complete
+titles, retained ticks and series, and title/tick separation for those sizes.
+Arbitrarily long titles at smaller axis sizes remain outside this bounded check.
+
 No renderer or editor control is added. Existing print/SVG layout is unchanged:
 vertical Cartesian SVGs display the category caption, but numeric-axis captions
 and horizontal category captions are not newly drawn. Horizontal UI category
