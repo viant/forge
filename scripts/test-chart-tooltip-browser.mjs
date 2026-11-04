@@ -41,15 +41,59 @@ try {
   assert.deepEqual(errors,[]);await page.close();
   console.log(`chart tooltip browser: hover/keyboard/explicit details/escaping at ${width}px passed`);
  }
- const page=await browser.newPage({viewport:{width:1440,height:900}});
+ const page=await browser.newPage({viewport:{width:1440,height:900},hasTouch:true});
  await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/chart-tooltip-preview.html?overlapping`);
- const first=page.locator('[data-forge-chart-point][data-series-id="passed"][data-category="2026-01-05"]');
- const mark=first.locator('.forge-chart-point-mark');
- await mark.waitFor();
- const point=await mark.boundingBox();
- // Mouse input at the visible mark must inspect that series even if a later transparent target overlaps it.
- await page.mouse.move(point.x+point.width/2,point.y+point.height/2);
- await page.waitForTimeout(100);
- assert.equal(await page.getByRole('combobox',{name:'Inspect chart details'}).inputValue(),JSON.stringify(['2026-01-05','passed']),'a later transparent point target must not steal the visible mark');
+ const primary=page.locator('[data-pointer-fixture="primary"]');
+ const neighbor=page.locator('[data-pointer-fixture="neighbor"]');
+ const selector=primary.getByRole('combobox',{name:'Inspect chart details'});
+ const point=(series,day)=>primary.locator(`[data-forge-chart-point][data-series-id="${series}"][data-category="${day}"]`);
+ const center=async locator=>{const box=await locator.locator('.forge-chart-point-mark').boundingBox();return {x:box.x+box.width/2,y:box.y+box.height/2};};
+ const inspect=async(series,day)=>{
+  const position=await center(point(series,day));await page.mouse.move(position.x,position.y);
+  await page.waitForFunction(expected=>document.querySelector('[data-pointer-fixture="primary"] select[aria-label="Inspect chart details"]').value===expected,JSON.stringify([day,series]),{timeout:5000});
+ };
+ const selections=async()=>JSON.parse(await primary.locator('[data-point-selections]').textContent());
+ for(const width of [1440,390]) {
+  await page.setViewportSize({width,height:900});await page.waitForTimeout(200);
+  await point('passed','2026-01-15').scrollIntoViewIfNeeded();
+  await page.evaluate(()=>window.scrollBy(0,50));
+  assert.equal(await point('passed','2026-01-15').locator('.forge-chart-point-target').getAttribute('r'),'22');
+  // Both series and adjacent-category targets overlap. Movement within a single
+  // native hit target must still follow the nearest actual visible mark.
+  const focusedBeforeHover=await page.evaluateHandle(()=>document.activeElement);
+  for(const [series,day] of [['passed','2026-01-15'],['failed','2026-01-15'],['passed','2026-01-16'],['passed','2026-02-21']])await inspect(series,day);
+  assert.ok(await page.evaluate(focused=>document.activeElement===focused,focusedBeforeHover),'hover must preserve focus');await focusedBeforeHover.dispose();
+  await inspect('passed','2026-01-15');
+  const position=await center(point('passed','2026-01-15'));
+  const before=(await selections()).length;
+  await page.mouse.click(position.x,position.y);
+  let selected=await selections();assert.equal(selected.length,before+1);assert.equal(selected.at(-1).seriesKey,'passed');assert.equal(selected.at(-1).xValue,'2026-01-15');
+  assert.ok(await point('passed','2026-01-15').evaluate(node=>node===node.ownerDocument.activeElement),'click focuses the logical selected point');
+  assert.equal(await point('passed','2026-01-15').getAttribute('tabindex'),'0');
+  await page.keyboard.press('Enter');
+  selected=await selections();assert.equal(selected.length,before+2);assert.equal(selected.at(-1).seriesKey,'passed');assert.equal(selected.at(-1).xValue,'2026-01-15');
+  // Rerendered callbacks retain the current selection history, and touch uses
+  // the same nearest rendered mark as mouse input.
+  await page.touchscreen.tap(position.x,position.y);
+  selected=await selections();assert.equal(selected.length,before+3);assert.equal(selected.at(-1).seriesKey,'passed');assert.equal(selected.at(-1).xValue,'2026-01-15');
+  assert.ok(await point('passed','2026-01-15').evaluate(node=>node===node.ownerDocument.activeElement),'tap focuses the logical selected point');
+  await page.keyboard.press('Enter');await page.keyboard.press('Space');
+  selected=await selections();assert.equal(selected.length,before+5);
+  assert.deepEqual(selected.slice(before).map(selection=>[selection.seriesKey,selection.xValue]),Array.from({length:5},()=>['passed','2026-01-15']),'click/tap and immediate keyboard continuation select the same observation');
+  await point('failed','2026-01-15').focus();
+  assert.equal(await selector.inputValue(),JSON.stringify(['2026-01-15','failed']));
+  await page.keyboard.press('ArrowRight');
+  assert.equal(await selector.inputValue(),JSON.stringify(['2026-01-16','failed']));
+  assert.equal(await point('failed','2026-01-16').getAttribute('tabindex'),'0');
+  for(const key of ['Enter','Space'])await page.keyboard.press(key);
+  selected=await selections();assert.equal(selected.length,before+7);assert.equal(selected.at(-1).seriesKey,'failed');assert.equal(selected.at(-1).xValue,'2026-01-16');
+  await page.keyboard.press('Home');assert.equal(await selector.inputValue(),JSON.stringify(['2026-01-05','failed']));
+  await page.keyboard.press('End');assert.equal(await selector.inputValue(),JSON.stringify(['2026-02-21','failed']));
+  assert.equal(await neighbor.getByRole('combobox',{name:'Inspect chart details'}).inputValue(),JSON.stringify(['2026-01-05','passed']));
+  // Coincident marks preserve the native paint-order winner on repeated hits.
+  const tied=await center(point('failed','2026-01-07'));
+  for(let repeat=0;repeat<3;repeat++){await page.mouse.move(0,0);await page.mouse.move(tied.x,tied.y);assert.equal(await selector.inputValue(),JSON.stringify(['2026-01-07','failed']));}
+  console.log(`chart point browser: overlap/adjacent/resize/scroll/click/touch/keyboard/isolation at ${width}px passed`);
+ }
  await page.close();
 }finally {await browser?.close();await server.close();}

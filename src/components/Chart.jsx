@@ -1112,7 +1112,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         if (entry.type === "area") {
             const dotRenderer = documentAppearance ? props=>documentPoint(props,entry) : renderSeriesPoint(entry, singlePointSeries || embedded || interactiveDatumSelection || entry.pointColorMode === "bySign");
             return (
-                <Area key={entry.value} {...commonProps} type={documentAppearance ? 'linear' : 'monotone'} connectNulls={!documentAppearance} dot={dotRenderer} activeDot={documentAppearance ? {r:documentStyle.pointRadius + 1,strokeWidth:documentStyle.pointStrokeWidth} : embedded || interactiveDatumSelection ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
+                <Area key={entry.value} {...commonProps} type={documentAppearance ? 'linear' : 'monotone'} connectNulls={!documentAppearance} dot={dotRenderer} activeDot={documentAppearance ? {r:documentStyle.pointRadius + 1,strokeWidth:documentStyle.pointStrokeWidth,pointerEvents:"none"} : embedded || interactiveDatumSelection ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
                     {showSeriesDataLabels ? (
                         <LabelList dataKey={entry.value} position="top" formatter={dataLabelFormatter} fill="var(--forge-chart-text-muted, #5f6b7c)" fontSize={chartTypography.captionSize} fontFamily={chartTypography.captionFamily} fontWeight={chartTypography.captionWeight} letterSpacing={chartTypography.captionLetterSpacing} />
                     ) : null}
@@ -1121,7 +1121,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         }
         const lineDotRenderer = documentAppearance ? props=>documentPoint(props,entry) : renderSeriesPoint(entry, singlePointSeries || embedded || interactiveDatumSelection || entry.pointColorMode === "bySign");
         return (
-            <Line key={entry.value} {...commonProps} type={documentAppearance ? 'linear' : 'monotone'} connectNulls={!documentAppearance} strokeLinecap="round" strokeLinejoin="round" dot={lineDotRenderer} activeDot={documentAppearance ? {r:documentStyle.pointRadius + 1,strokeWidth:documentStyle.pointStrokeWidth} : embedded || interactiveDatumSelection ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
+            <Line key={entry.value} {...commonProps} type={documentAppearance ? 'linear' : 'monotone'} connectNulls={!documentAppearance} strokeLinecap="round" strokeLinejoin="round" dot={lineDotRenderer} activeDot={documentAppearance ? {r:documentStyle.pointRadius + 1,strokeWidth:documentStyle.pointStrokeWidth,pointerEvents:"none"} : embedded || interactiveDatumSelection ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
                 {showSeriesDataLabels ? (
                     <LabelList dataKey={entry.value} position="top" formatter={dataLabelFormatter} fill="var(--forge-chart-text-muted, #5f6b7c)" fontSize={chartTypography.captionSize} fontFamily={chartTypography.captionFamily} fontWeight={chartTypography.captionWeight} letterSpacing={chartTypography.captionLetterSpacing} />
                 ) : null}

@@ -207,6 +207,13 @@ behavior and chart data can be read with the existing Table switch. Existing
 CSV and print payload behavior is retained; export styling is separate from the
 browser recipe and needs release-specific verification.
 
+Overlapping point targets inspect/select the nearest rendered mark among native
+pointer hits in that chart. Equal-distance hits retain native paint order;
+keyboard activation stays with the focused observation. Click/tap focuses the
+selected point and updates its series tab stop; hover preserves focus. Active-dot decoration
+does not intercept the point targets. The tooltip browser check exercises close
+series and adjacent categories, resize/scroll, touch and keyboard selection.
+
 Workspace CSS may set --forge-chart-line-width, --forge-chart-point-radius,
 --forge-chart-point-stroke-width, --forge-chart-column-size, --forge-chart-bar-size,
 --forge-chart-plot-height, --forge-chart-small-plot-height, --forge-chart-axis-width,
