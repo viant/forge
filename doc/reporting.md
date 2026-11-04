@@ -764,7 +764,8 @@ Runtime behavior:
 - omitted `layout` preserves the legacy child-span behavior (which stacks children without authored spans); explicit `stack` forces one full-width child per row
 - `responsiveGrid` defaults to three columns above 960px, two columns from 641px through 960px, and one column at 640px or below; explicit runtime column counts override those defaults, subject to `minColumnWidth`
 - print/export lowers the grouped children inside the composite panel in order
-- print/export lowers `responsiveGrid` deterministically as three equal columns; it does not depend on a browser viewport
+- print/export lowers unweighted `responsiveGrid` deterministically as three equal columns; browser column counts do not change that print layout
+- optional `runtime.childWeights` supplies shared screen and print proportions, keyed by every child block ID; see [proportional report groups](report-composite-layout.md). For a pair of equal chart panels, use two weights of `1`. `runtime.minColumnWidth` controls when these weighted tracks stack on both surfaces
 
 ## `collectionBlock`
 
