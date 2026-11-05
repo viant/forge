@@ -15,11 +15,12 @@ export function requireCalendarTimeZone(timeZone) {
 
 export function normalizeRelativeDaysRange(range) {
     if (!range || typeof range !== 'object' || Array.isArray(range)
-        || Object.keys(range).some(key => !['kind', 'startOffset', 'endOffset'].includes(key))
+        || Object.keys(range).some(key => !['kind', 'startOffset', 'endOffset', 'anchor'].includes(key))
         || range.kind !== 'relativeDays'
+        || range.anchor != null && range.anchor !== 'sourceDate'
         || ![range.startOffset, range.endOffset].every(value => Number.isSafeInteger(value) && value >= -36600 && value <= 0)
         || range.startOffset > range.endOffset) throw new Error('Invalid relative-days preset definition.');
-    return {kind: 'relativeDays', startOffset: range.startOffset, endOffset: range.endOffset};
+    return {kind: 'relativeDays', startOffset: range.startOffset, endOffset: range.endOffset, ...(range.anchor != null ? {anchor: range.anchor} : {})};
 }
 
 export function normalizeLifetimeStart(value, fallback = '2026-01-01') {
@@ -45,9 +46,15 @@ function calendarDateInTimeZone(now, timeZone = 'UTC') {
 }
 
 export function resolveDateRangePreset(value, now = new Date(), lifetimeStart = '2026-01-01', timeZone = 'UTC', range = null) {
-    if (range) { normalizeRelativeDaysRange(range); requireCalendarTimeZone(arguments[3]); }
+    if (range) {
+        normalizeRelativeDaysRange(range); requireCalendarTimeZone(arguments[3]);
+        if (range.anchor === 'sourceDate') throw new Error('A declared source calendar date is required.');
+    }
+    return resolveCivilDateRangePreset(value, calendarDateInTimeZone(now, timeZone), lifetimeStart, range);
+}
+
+function resolveCivilDateRangePreset(value, today, lifetimeStart, range) {
     const normalized = String(value || '').trim().toLowerCase();
-    const today = calendarDateInTimeZone(now, timeZone);
     const addDays = (days) => new Date(today.getTime() + days * 86400000);
     const monthStart = civilDate(today.getUTCFullYear(), today.getUTCMonth(), 1);
     const startOfQuarter = civilDate(today.getUTCFullYear(), Math.floor(today.getUTCMonth() / 3) * 3, 1);
@@ -90,13 +97,22 @@ export function resolveDateRangePreset(value, now = new Date(), lifetimeStart = 
     };
 }
 
-// Authored report controls require explicit context before entering legacy
-// default arguments. Existing window-form consumers retain their old contract.
-export function resolveDeclaredDateRangePreset(option, now, timeZone) {
+// Source anchors are civil dates, never timezone-shifted midnight instants.
+export function requireCalendarAnchorDate(value) {
+    if (typeof value !== 'string' || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value) || value.startsWith('0000-')
+        || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString().slice(0, 10) !== value) throw new Error('Invalid calendar anchor date.');
+    return value;
+}
+
+// Authored report controls require explicit context; legacy consumers retain
+// their clock and timezone defaults.
+export function resolveDeclaredDateRangePreset(option, now, timeZone, anchorDate) {
     requireCalendarTimeZone(timeZone);
     if (!(now instanceof Date) || !Number.isFinite(now.getTime()) || now.getUTCFullYear() < 1 || now.getUTCFullYear() > 9999) throw new Error('Invalid calendar instant.');
     if (!option?.range && !['yesterday', 'month_to_date', 'last_month'].includes(option?.value)) throw new Error('The date preset must declare its relative-days range.');
-    const resolved = resolveDateRangePreset(option?.value, now, undefined, timeZone, option?.range || null);
+    if (option?.range) normalizeRelativeDaysRange(option.range);
+    const today = option?.range?.anchor === 'sourceDate' ? new Date(`${requireCalendarAnchorDate(anchorDate)}T00:00:00Z`) : calendarDateInTimeZone(now, timeZone);
+    const resolved = resolveCivilDateRangePreset(option?.value, today, undefined, option?.range || null);
     if (!resolved || ![resolved.start, resolved.end].every(value => /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value) && !value.startsWith('0000-')) || resolved.start > resolved.end) throw new Error('The date preset is unavailable or outside the supported calendar.');
     return resolved;
 }

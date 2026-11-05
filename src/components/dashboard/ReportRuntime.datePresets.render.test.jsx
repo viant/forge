@@ -10,10 +10,10 @@ import '../../packs/blueprint/index.jsx';
 
 // Independently invented window; the native datasource transport is the only fake.
 let sequence=0;
-async function mount({required=true, deferred=false, declared=true, zone='America/Los_Angeles', missing=false}={}) {
+async function mount({required=true, deferred=false, declared=true, zone='America/Los_Angeles', missing=false, anchorDate}={}) {
  globalThis.IS_REACT_ACT_ENVIRONMENT=true;
  const windowId=`calendar-window-${++sequence}`, host=document.createElement('div'),root=createRoot(host);document.body.append(host);
- const datePresets={calendar:{dataSourceRef:'calendar',input:{name:'ids',parameter:'identity',array:true},identityField:'id',timeZoneField:'zone'},default:'completed',valueParameter:'mode',options:[{value:'completed',label:'Completed days',range:{kind:'relativeDays',startOffset:-7,endOffset:-1}},{value:'custom',label:'Custom'}]};
+ const datePresets={calendar:{dataSourceRef:'calendar',input:{name:'ids',parameter:'identity',array:true},identityField:'id',timeZoneField:'zone',...(anchorDate!==undefined?{anchorField:'latestDate'}:{})},default:'completed',valueParameter:'mode',options:[{value:'completed',label:'Completed days',range:{kind:'relativeDays',...(anchorDate!==undefined?{anchor:'sourceDate'}:{}),startOffset:anchorDate!==undefined?-29:-7,endOffset:anchorDate!==undefined?0:-1}},{value:'custom',label:'Custom'}]};
  const params=[{id:'period',kind:'dateRange',label:'Period',required,value:missing?{}:{start:'2025-12-24',end:'2025-12-30'},...(declared?{datePresets}:{}),filterBindings:[{datasetRef:'primary',path:'from',valuePath:'start'},{datasetRef:'primary',path:'to',valuePath:'end'}]},
  {id:'identity',kind:'integer',label:'Identity',required:true,value:17,filterBindings:[{datasetRef:'primary',path:'identity'}]},
  {id:'mode',kind:'text',label:'Mode',required:false,value:'custom',filterBindings:[{datasetRef:'primary',path:'mode'}]}];
@@ -27,7 +27,7 @@ async function mount({required=true, deferred=false, declared=true, zone='Americ
  const metadata={dataSource:{reader:{id:'reader',service:{uri:'mcp://fixture/reader'},selectors:{data:'data'},autoFetch:false,selectionMode:'none'},calendar:{id:'calendar',cache:{enabled:false},service:{uri:'mcp://fixture/calendar'},selectors:{data:'data'},autoFetch:false,selectionMode:'none'}},view:{content:{id:'root',dataSourceRef:'reader',fetchData:false,containers:[{id:'report',kind:'dashboard.reportRuntime',dashboard:{reportRuntime:{reportSpec,datasetBindings:{primary:{dataSourceRef:'reader',queryPath:'query'}},presentationMode:'report'}}}]}}};
  const waiting=[];
  const transport=vi.fn(request=>{
-  if(request.dataSourceRef === 'calendar') return deferred?new Promise(resolve=>waiting.push(resolve)):Promise.resolve({data:[{id:17,zone}]});
+  if(request.dataSourceRef === 'calendar') return deferred?new Promise(resolve=>waiting.push(resolve)):Promise.resolve({data:[{id:17,zone,latestDate:anchorDate}]});
   return Promise.resolve({data:[{mode:request.options.inputParameters?.query?.filters?.mode || 'custom',amount:80,previous:100}]});
  });
  const settle=fn=>act(async()=>{fn?.();for(let i=0;i<50;i++)await Promise.resolve();});
@@ -128,4 +128,21 @@ it('resolves missing defaults as an unapplied draft and Reset reloads through th
   expect(v.transport.mock.calls.filter(([r])=>r.dataSourceRef==='calendar')).toHaveLength(2);
   expect(v.transport.mock.calls.filter(([r])=>r.dataSourceRef==='reader')).toHaveLength(0);
  } finally {await v.close();}
+});
+
+it('applies source anchored thirty days through the native window snapshot and keeps reset unapplied',async()=>{
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-01-01T07:59:00Z'));
+ const v=await mount({anchorDate:'2026-03-08'});
+ try {
+  await v.openPreset();await v.click('Completed days');
+  expect([...v.host.querySelectorAll('input[type="date"]')].map(input=>input.value)).toEqual(['2026-02-07','2026-03-08']);
+  expect(v.reader.handlers.dataSource.peekInput().parameters.query.filters.from).toBe('2025-12-24');
+  await v.click('Apply filters');
+  expect(v.reader.handlers.dataSource.peekInput().parameters.query.filters).toMatchObject({from:'2026-02-07',to:'2026-03-08',mode:'completed'});
+  expect(v.host.textContent).toContain('Comparable change');
+  expect(v.transport.mock.calls.filter(([r])=>r.dataSourceRef==='reader')).toHaveLength(1);
+  await v.click('Reset filters');
+  expect(v.host.querySelector('input[type="date"]').value).toBe('2025-12-24');
+  expect(v.reader.handlers.dataSource.peekInput().parameters.query.filters.to).toBe('2026-03-08');
+ } finally {await v.close();vi.useRealTimers();}
 });

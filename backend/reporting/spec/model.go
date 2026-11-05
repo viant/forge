@@ -118,6 +118,7 @@ type ReportDatePresetCalendar struct {
 	Input         ReportDatePresetInput `json:"input"`
 	IdentityField string                `json:"identityField"`
 	TimeZoneField string                `json:"timeZoneField"`
+	AnchorField   *string               `json:"anchorField,omitempty"`
 }
 type ReportDatePresetInput struct {
 	Name      string `json:"name"`
@@ -130,9 +131,10 @@ type ReportDatePresetOption struct {
 	Range *ReportRelativeDaysRange `json:"range,omitempty"`
 }
 type ReportRelativeDaysRange struct {
-	Kind        string `json:"kind"`
-	StartOffset *int   `json:"startOffset"`
-	EndOffset   *int   `json:"endOffset"`
+	Anchor      *string `json:"anchor,omitempty"`
+	Kind        string  `json:"kind"`
+	StartOffset *int    `json:"startOffset"`
+	EndOffset   *int    `json:"endOffset"`
 }
 
 type ScopeParam struct {

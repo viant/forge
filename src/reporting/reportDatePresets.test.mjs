@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import {normalizeReportDatePresets,reportDatePresetInputs,decodeReportDateCalendar,resolveDeclaredDateRangePreset} from './reportDatePresets.js';
+import {reportDatePresetsSchema} from './reportDatePresets.js';
+import {validateReportSchema} from './schema/reportSchemaValidator.js';
 import {resolveDateRangePreset} from '../packs/blueprint/dateRangePreset.js';
 const declaration={calendar:{dataSourceRef:'calendar',input:{name:'Ids',parameter:'entity',array:true},identityField:'id',timeZoneField:'zone.iana'},default:'completed7',options:[{value:'yesterday',label:'Yesterday'},{value:'last_month',label:'Last month'},{value:'month_to_date',label:'Month to date'},{value:'completed7',label:'Completed seven',range:{kind:'relativeDays',startOffset:-7,endOffset:-1}},{value:'completed30',label:'Completed thirty',range:{kind:'relativeDays',startOffset:-30,endOffset:-1}},{value:'custom',label:'Custom'}]};
 const sources={calendar:{cache:{enabled:false}}};const normalized=normalizeReportDatePresets(declaration,sources);
@@ -35,3 +37,41 @@ console.log('report date presets: source declaration, strict context, civil boun
 
 assert.equal(normalizeReportDatePresets({...declaration,valueParameter:'periodMode'},sources).valueParameter,'periodMode');
 for(const valueParameter of ['__proto__','filters.mode','entity',''])assert.throws(()=>normalizeReportDatePresets({...declaration,valueParameter},sources));
+
+const anchored=normalizeReportDatePresets({...declaration,calendar:{...declaration.calendar,anchorField:'dates.latestDate'}},sources);
+assert.equal(anchored.calendar.anchorField,'dates.latestDate');
+for(const anchorField of ['','__proto__.date','dates.constructor'])assert.throws(()=>normalizeReportDatePresets({...declaration,calendar:{...declaration.calendar,anchorField}},sources));
+for(const anchorDate of [undefined,null,'','2026-02-30','0000-01-01','2026-01-01T00:00:00Z',17])assert.throws(()=>decodeReportDateCalendar(anchored,17,{data:[{id:17,zone:{iana:'UTC'},dates:{latestDate:anchorDate}}]}),/anchor date/);
+const sourceContext=decodeReportDateCalendar(anchored,17,{data:[{id:17,zone:{iana:'America/Los_Angeles'},dates:{latestDate:'2026-03-08'}}]});
+assert.deepEqual(sourceContext,{timeZone:'America/Los_Angeles',anchorDate:'2026-03-08'});
+const lastThirty={value:'lastThirty',range:{kind:'relativeDays',anchor:'sourceDate',startOffset:-29,endOffset:0}};
+for(const zone of ['America/Los_Angeles','Asia/Tokyo']){
+ const resolved=resolveDeclaredDateRangePreset(lastThirty,new Date('2026-01-01T07:59:00Z'),zone,sourceContext.anchorDate);
+ assert.deepEqual([resolved.start,resolved.end],['2026-02-07','2026-03-08']);
+}
+
+assert.equal(validateReportSchema(reportDatePresetsSchema,anchored).valid,true);
+assert.equal(validateReportSchema(reportDatePresetsSchema,{...anchored,calendar:{...anchored.calendar,anchorField:null}}).valid,true);
+
+const mixed=normalizeReportDatePresets({...declaration,calendar:{...declaration.calendar,anchorField:'dates.latestDate'},options:declaration.options.map(option=>option.value==='completed30'?{...option,range:{...option.range,startOffset:-29,endOffset:0,anchor:'sourceDate'}}:option)},sources);
+const mixedNow=new Date('2026-01-01T07:59:00Z');
+for(const [value,expected] of [['completed30',['2026-02-07','2026-03-08']],['month_to_date',['2025-12-01','2025-12-31']],['last_month',['2025-11-01','2025-11-30']]]){
+ const pair=resolveDeclaredDateRangePreset(mixed.options.find(option=>option.value===value),mixedNow,sourceContext.timeZone,sourceContext.anchorDate);
+ assert.deepEqual([pair.start,pair.end],expected);
+}
+assert.throws(()=>normalizeReportDatePresets({...mixed,calendar:declaration.calendar},sources),/anchor field/);
+assert.throws(()=>normalizeReportDatePresets({...mixed,options:mixed.options.map(option=>option.range?{...option,range:{...option.range,anchor:'invalid'}}:option)},sources));
+assert.throws(()=>resolveDeclaredDateRangePreset(lastThirty,mixedNow,'UTC'),/anchor date/);
+assert.throws(()=>resolveDateRangePreset(lastThirty.value,mixedNow,undefined,'UTC',lastThirty.range),/source calendar date/);
+
+// JSON optional-field parity with Go decoding: null is absent, empty is invalid.
+for(const [anchor,anchorField,valid] of [[undefined,undefined,true],[null,null,true],['','dates.latestDate',false],[null,'',false],['sourceDate','dates.latestDate',true],[17,'dates.latestDate',false],[null,17,false],['sourceDate',undefined,false],['sourceDate',null,false]]){
+ const candidate={...declaration,calendar:{...declaration.calendar,...(anchorField===undefined?{}:{anchorField})},options:declaration.options.map(option=>option.range?{...option,range:{...option.range,...(anchor===undefined?{}:{anchor})}}:option)};
+ if(valid){
+  const normalized=normalizeReportDatePresets(candidate,sources);
+  assert.equal(validateReportSchema(reportDatePresetsSchema,candidate).valid,true);
+  if(anchor==null)assert.equal(Object.hasOwn(normalized.options[3].range,'anchor'),false);
+  if(anchorField==null)assert.equal(Object.hasOwn(normalized.calendar,'anchorField'),false);
+ }else assert.throws(()=>normalizeReportDatePresets(candidate,sources));
+ if(anchor===''||anchor===17||anchorField===''||anchorField===17)assert.equal(validateReportSchema(reportDatePresetsSchema,candidate).valid,false);
+}

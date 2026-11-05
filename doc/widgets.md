@@ -322,6 +322,13 @@ later than end) in the explicit timezone. `yesterday`, `last_month` and
 `month_to_date` reuse the existing resolver. Existing window preset aliases keep
 their legacy meanings. Labels do not redefine interval semantics.
 
+Optional `calendar.anchorField` reads a strict `YYYY-MM-DD` source civil date
+from the same calendar row. Only relative ranges declaring `anchor: sourceDate` use that date; an inclusive
+thirty-day source range declares `anchor: sourceDate, startOffset: -29, endOffset: 0`.
+Omitting the range anchor retains current-clock resolution in the declared timezone. Missing or invalid
+configured anchors fail calendar resolution. See the [shared lifecycle contract](report-date-presets.md)
+for source date semantics and applied snapshot behavior.
+
 `DateRangePresetInput` additionally supports controlled `range:{start,end}`,
 `onRangeChange(pair)`, `onPresetRequest(option)`, `onDraftChange()` and
 `presetPending`. Controlled mode never seeds window-form signals or resolves its

@@ -110,3 +110,35 @@ test('externally applied named absolute endpoints are a snapshot until the user 
  rerender({contextKey:'snapshot-two'});
  expect(result.current.draft).toEqual(parameters);expect(result.current.controls[0].presetValue).toBe('completed');expect(result.current.controls[0].presetError).toBe('');expect(result.current.dateBlocked).toBe(false);expect(loadCalendar).not.toHaveBeenCalled();
 });
+
+// Synthetic source date deliberately differs from the execution clock.
+test('source civil anchor resolves inclusive thirty days and reset through the existing draft lifecycle',async()=>{
+ const anchored=[{...ranges[0],datePresets:{...declaration,calendar:{...declaration.calendar,anchorField:'latestDate'},valueParameter:'periodMode',options:[{value:'completed',label:'Last thirty',range:{kind:'relativeDays',anchor:'sourceDate',startOffset:-29,endOffset:0}},{value:'custom',label:'Custom'}]}}];
+ const loadCalendar=vi.fn().mockResolvedValue({data:[{id:17,zone:'America/Los_Angeles',latestDate:'2026-02-28'}]}),onDefaultsReady=vi.fn();
+ const {result}=renderHook(()=>useReportDatePresetDraft({ranges:anchored,parameters:{entity:17},loadCalendar,onDefaultsReady}));
+ await waitFor(()=>expect(result.current.draft.to).toBe('2026-02-28'));
+ expect(result.current.draft).toEqual({entity:17,from:'2026-01-30',to:'2026-02-28',periodMode:'completed'});
+ const applied={...result.current.draft};expect(onDefaultsReady).toHaveBeenCalledWith(applied);
+ act(()=>result.current.manualRange('period',{start:'2026-02-01',end:'2026-02-02'}));expect(result.current.draft.periodMode).toBe('custom');
+ act(()=>result.current.reset());await waitFor(()=>expect(result.current.draft).toEqual(applied));
+ expect(loadCalendar).toHaveBeenCalledTimes(2);expect(onDefaultsReady).toHaveBeenCalledTimes(1);
+});
+
+test.each([null,undefined,'2026-02-30'])('invalid configured anchor fails closed without a clock fallback: %s',async latestDate=>{
+ const anchored=[{...ranges[0],datePresets:{...declaration,calendar:{...declaration.calendar,anchorField:'latestDate'}}}];
+ const loadCalendar=vi.fn().mockResolvedValue({data:[{id:17,zone:'UTC',latestDate}]}),onDefaultsReady=vi.fn();
+ const {result}=renderHook(()=>useReportDatePresetDraft({ranges:anchored,parameters:{entity:17},loadCalendar,onDefaultsReady}));
+ await waitFor(()=>expect(result.current.controls[0].presetError).toBe('Calendar date context is unavailable.'));
+ expect(result.current.dateBlocked).toBe(true);expect(result.current.draft.from).toBeUndefined();expect(onDefaultsReady).not.toHaveBeenCalled();
+});
+
+test('one calendar supports a source anchored thirty days and clock based month presets',async()=>{
+ const anchored=[{...ranges[0],datePresets:{...declaration,calendar:{...declaration.calendar,anchorField:'latestDate'},options:[{value:'completed',label:'Last thirty',range:{kind:'relativeDays',anchor:'sourceDate',startOffset:-29,endOffset:0}},{value:'month_to_date',label:'Month to date'},{value:'last_month',label:'Last month'},{value:'custom',label:'Custom'}]}}];
+ const loadCalendar=vi.fn().mockResolvedValue({data:[{id:17,zone:'America/Los_Angeles',latestDate:'2026-03-08'}]});
+ const {result}=renderHook(()=>useReportDatePresetDraft({ranges:anchored,parameters:{entity:17},loadCalendar}));
+ await waitFor(()=>expect(result.current.draft.to).toBe('2026-03-08'));
+ await act(async()=>{await result.current.requestPreset('period','month_to_date');});
+ expect(result.current.draft).toMatchObject({from:'2025-12-01',to:'2025-12-31'});
+ await act(async()=>{await result.current.requestPreset('period','last_month');});
+ expect(result.current.draft).toMatchObject({from:'2025-11-01',to:'2025-11-30'});
+});

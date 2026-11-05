@@ -30,7 +30,7 @@ func validateScopeDatePresets(p ScopeParam, params []ScopeParam) error {
 		}
 		return true
 	}
-	if p.Kind != "dateRange" || len(p.FilterBindings) == 0 || !safe(d.Calendar.DataSourceRef) || !safe(d.Calendar.Input.Name) || !safe(d.Calendar.Input.Parameter) || !path(d.Calendar.IdentityField) || !path(d.Calendar.TimeZoneField) || len(d.Options) < 1 || len(d.Options) > 16 {
+	if p.Kind != "dateRange" || len(p.FilterBindings) == 0 || !safe(d.Calendar.DataSourceRef) || !safe(d.Calendar.Input.Name) || !safe(d.Calendar.Input.Parameter) || !path(d.Calendar.IdentityField) || !path(d.Calendar.TimeZoneField) || (d.Calendar.AnchorField != nil && !path(*d.Calendar.AnchorField)) || len(d.Options) < 1 || len(d.Options) > 16 {
 		return fail()
 	}
 	if d.ValueParameter != "" {
@@ -83,7 +83,7 @@ func validateScopeDatePresets(p ScopeParam, params []ScopeParam) error {
 			defaultFound = true
 		}
 		if r := option.Range; r != nil {
-			if r.Kind != "relativeDays" || r.StartOffset == nil || r.EndOffset == nil || *r.StartOffset < -36600 || *r.EndOffset > 0 || *r.StartOffset > *r.EndOffset {
+			if (r.Anchor != nil && *r.Anchor != "sourceDate") || (r.Anchor != nil && *r.Anchor == "sourceDate" && d.Calendar.AnchorField == nil) || r.Kind != "relativeDays" || r.StartOffset == nil || r.EndOffset == nil || *r.StartOffset < -36600 || *r.EndOffset > 0 || *r.StartOffset > *r.EndOffset {
 				return fail()
 			}
 		} else if option.Value != "custom" && option.Value != "yesterday" && option.Value != "month_to_date" && option.Value != "last_month" {

@@ -74,7 +74,7 @@ export function useReportDatePresetDraft({ranges=[],parameters={},resetParameter
    // default operation with several independently declared date controls.
    const instant=new Date();
    for(const {range,value,option,identity,context}of contexts){
-    const pair=resolveDeclaredDateRangePreset(option,instant,context.timeZone);
+    const pair=resolveDeclaredDateRangePreset(option,instant,context.timeZone,context.anchorDate);
     patch[range.start]=pair.start;patch[range.end]=pair.end;Object.assign(patch,presetPatch(range,value));
     resolvedStates[range.id]={mode:'relative',value,requestedValue:value,scope:version,identity,pending:false,stale:false,automatic,error:''};
    }
@@ -83,7 +83,7 @@ export function useReportDatePresetDraft({ranges=[],parameters={},resetParameter
    if(automatic)autoReady.current=true;
    return true;
   }catch{
-   if(valid())setDateState(previous=>({...previous,...Object.fromEntries(items.map(({range,value})=>[range.id,{...previous[range.id],scope:version,pending:false,requestedValue:value,stale:previous[range.id]?.mode==='relative',error:'Calendar timezone is unavailable.'}]))}));
+   if(valid())setDateState(previous=>({...previous,...Object.fromEntries(items.map(({range,value})=>[range.id,{...previous[range.id],scope:version,pending:false,requestedValue:value,stale:previous[range.id]?.mode==='relative',error:range.datePresets?.calendar.anchorField?'Calendar date context is unavailable.':'Calendar timezone is unavailable.'}]))}));
    return false;
   }
  };
