@@ -10,14 +10,15 @@ import '../../packs/blueprint/index.jsx';
 
 // Independently invented window; the native datasource transport is the only fake.
 let sequence=0;
-async function mount({required=true, deferred=false, declared=true, zone='America/Los_Angeles', missing=false, anchorDate}={}) {
+async function mount({required=true, deferred=false, declared=true, zone='America/Los_Angeles', missing=false, anchorDate, dependent=false, dependentParameter='basis', tabularCalendar=false}={}) {
  globalThis.IS_REACT_ACT_ENVIRONMENT=true;
  const windowId=`calendar-window-${++sequence}`, host=document.createElement('div'),root=createRoot(host);document.body.append(host);
- const datePresets={calendar:{dataSourceRef:'calendar',input:{name:'ids',parameter:'identity',array:true},identityField:'id',timeZoneField:'zone',...(anchorDate!==undefined?{anchorField:'latestDate'}:{})},default:'completed',valueParameter:'mode',options:[{value:'completed',label:'Completed days',range:{kind:'relativeDays',...(anchorDate!==undefined?{anchor:'sourceDate'}:{}),startOffset:anchorDate!==undefined?-29:-7,endOffset:anchorDate!==undefined?0:-1}},{value:'custom',label:'Custom'}]};
+ const datePresets={calendar:{dataSourceRef:'calendar',input:{name:'ids',parameter:'identity',array:true},identityField:'id',timeZoneField:'zone',...(dependent?{inputs:[{name:'basis',parameter:dependentParameter}]}:{}),...(anchorDate!==undefined?{anchorField:'latestDate'}:{})},default:'completed',valueParameter:'mode',options:[{value:'completed',label:'Completed days',range:{kind:'relativeDays',...(anchorDate!==undefined?{anchor:'sourceDate'}:{}),startOffset:anchorDate!==undefined?-29:-7,endOffset:anchorDate!==undefined?0:-1}},{value:'custom',label:'Custom'}]};
  const params=[{id:'period',kind:'dateRange',label:'Period',required,value:missing?{}:{start:'2025-12-24',end:'2025-12-30'},...(declared?{datePresets}:{}),filterBindings:[{datasetRef:'primary',path:'from',valuePath:'start'},{datasetRef:'primary',path:'to',valuePath:'end'}]},
  {id:'identity',kind:'integer',label:'Identity',required:true,value:17,filterBindings:[{datasetRef:'primary',path:'identity'}]},
+ ...(dependent?[{id:'basis',kind:'text',label:'Basis',required:false,value:'A',filterBindings:[{datasetRef:'primary',path:'basis'}]}]:[]),
  {id:'mode',kind:'text',label:'Mode',required:false,value:'custom',filterBindings:[{datasetRef:'primary',path:'mode'}]}];
- const query={offset:0,limit:10,filters:{from:'2025-12-24',to:'2025-12-30',identity:17,mode:'custom',fixed:'retained'}};
+ const query={offset:0,limit:10,filters:{...(dependent?{basis:'A'}:{}),from:'2025-12-24',to:'2025-12-30',identity:17,mode:'custom',fixed:'retained'}};
  if(missing){delete query.filters.from;delete query.filters.to;}
  const authoredSpec={title:'Sample readings',viewer:{appearance:'document'},scope:{dataSourceRef:'reader',params},datasets:[{id:'primary',dataSourceRef:'reader',request:query}],layoutIntent:{blockOrder:['filters','metric','evidence']},blocks:[{id:'filters',kind:'filterBarBlock',paramIds:params.map(p=>p.id)},{id:'metric',kind:'kpiBlock',title:'Readings',datasetRef:'primary',valueField:'amount',secondaryField:'previous',secondaryLabel:'Comparable change',secondaryCalculation:'relativeChange',secondaryFormat:'percentFraction',secondaryVisibleWhen:{source:'filters',field:'mode',equals:'completed'}},{id:'evidence',kind:'tableBlock',datasetRef:'primary',columns:[{key:'mode',label:'Applied mode'}]}]};
  const authoredDocument={version:1,kind:'reportDocument',id:'sample',title:'Sample readings',scope:authoredSpec.scope,viewer:authoredSpec.viewer,layoutIntent:authoredSpec.layoutIntent,blocks:[
@@ -27,7 +28,7 @@ async function mount({required=true, deferred=false, declared=true, zone='Americ
  const metadata={dataSource:{reader:{id:'reader',service:{uri:'mcp://fixture/reader'},selectors:{data:'data'},autoFetch:false,selectionMode:'none'},calendar:{id:'calendar',cache:{enabled:false},service:{uri:'mcp://fixture/calendar'},selectors:{data:'data'},autoFetch:false,selectionMode:'none'}},view:{content:{id:'root',dataSourceRef:'reader',fetchData:false,containers:[{id:'report',kind:'dashboard.reportRuntime',dashboard:{reportRuntime:{reportSpec,datasetBindings:{primary:{dataSourceRef:'reader',queryPath:'query'}},presentationMode:'report'}}}]}}};
  const waiting=[];
  const transport=vi.fn(request=>{
-  if(request.dataSourceRef === 'calendar') return deferred?new Promise(resolve=>waiting.push(resolve)):Promise.resolve({data:[{id:17,zone,latestDate:anchorDate}]});
+  if(request.dataSourceRef === 'calendar') return deferred?new Promise(resolve=>waiting.push(resolve)):Promise.resolve({data:tabularCalendar?[{columns:[{name:'id'},{name:'zone'},{name:'latestDate'}],rows:[[17,zone,anchorDate]]}]:[{id:17,zone,latestDate:dependent&&request.options.inputParameters?.basis==='B'?'2026-04-30':anchorDate}]});
   return Promise.resolve({data:[{mode:request.options.inputParameters?.query?.filters?.mode || 'custom',amount:80,previous:100}]});
  });
  const settle=fn=>act(async()=>{fn?.();for(let i=0;i<50;i++)await Promise.resolve();});
@@ -145,4 +146,47 @@ it('applies source anchored thirty days through the native window snapshot and k
   expect(v.host.querySelector('input[type="date"]').value).toBe('2025-12-24');
   expect(v.reader.handlers.dataSource.peekInput().parameters.query.filters.to).toBe('2026-03-08');
  } finally {await v.close();vi.useRealTimers();}
+});
+
+it('native bound scope input changes invalidate relative dates and feed the same calendar loader',async()=>{
+ const v=await mount({anchorDate:'2026-02-28',dependent:true});
+ try {
+  await v.openPreset();await v.click('Completed days');
+  expect(v.transport.mock.calls.filter(([r])=>r.dataSourceRef==='calendar').at(-1)[0].options.inputParameters).toEqual({ids:[17],basis:'A'});
+  await v.click('Apply filters');
+  expect(v.reader.handlers.dataSource.peekInput().parameters.query.filters.to).toBe('2026-02-28');
+  await v.settle(()=>v.host.querySelector('[aria-label="Toggle report filters"]').click());
+  const input=v.host.querySelector('input[aria-label="Basis"]');
+  await v.edit(input,'B');await v.settle(()=>input.dispatchEvent(new FocusEvent('focusout',{bubbles:true})));
+  expect(v.host.textContent).toContain('calendar context changed');
+  expect([...v.host.querySelectorAll('button')].find(b=>b.textContent==='Apply filters').disabled).toBe(true);
+  await v.openPreset();await v.click('Completed days');
+  expect(v.transport.mock.calls.filter(([r])=>r.dataSourceRef==='calendar').at(-1)[0].options.inputParameters).toEqual({ids:[17],basis:'B'});
+  expect([...v.host.querySelectorAll('input[type="date"]')].map(input=>input.value)).toEqual(['2026-04-01','2026-04-30']);
+  expect(v.reader.handlers.dataSource.peekInput().parameters.query.filters.to).toBe('2026-02-28');
+  await v.click('Apply filters');
+  expect(v.reader.handlers.dataSource.peekInput().parameters.query.filters).toMatchObject({basis:'B',from:'2026-04-01',to:'2026-04-30',mode:'completed'});
+  await v.click('Reset filters');
+  expect(v.host.querySelector('input[type="date"]').value).toBe('2025-12-24');
+  expect(v.reader.handlers.dataSource.peekInput().parameters.query.filters.to).toBe('2026-04-30');
+ } finally {await v.close();}
+});
+
+it('rejects a calendar binding to its own canonical date-range value before loading',async()=>{
+ const v=await mount({dependent:true,dependentParameter:'period'});
+ try {
+  expect(v.host.textContent).toContain('Calendar inputs cannot bind to their own date outputs.');
+  expect(v.transport.mock.calls.some(([r])=>r.dataSourceRef==='calendar')).toBe(false);
+  expect([...v.host.querySelectorAll('button')].find(b=>b.textContent==='Apply filters').disabled).toBe(true);
+ } finally {await v.close();}
+});
+
+it('uses existing native tabular decoding for a source-anchored calendar request',async()=>{
+ const v=await mount({anchorDate:'2026-03-08',tabularCalendar:true});
+ try {
+  await v.openPreset();await v.click('Completed days');
+  expect([...v.host.querySelectorAll('input[type="date"]')].map(input=>input.value)).toEqual(['2026-02-07','2026-03-08']);
+  await v.click('Apply filters');
+  expect(v.reader.handlers.dataSource.peekInput().parameters.query.filters).toMatchObject({from:'2026-02-07',to:'2026-03-08',mode:'completed'});
+ } finally {await v.close();}
 });

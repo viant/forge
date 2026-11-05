@@ -4,12 +4,14 @@ import {reportDatePresetInputs,decodeReportDateCalendar,resolveDeclaredDateRange
 const own=(value,key)=>Object.prototype.hasOwnProperty.call(value,key);
 const validDate=value=>typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value)&&!Number.isNaN(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value;
 const identity=value=>({...value});
+const calendarParameters=range=>[range.datePresets?.calendar?.input?.parameter,...(range.datePresets?.calendar?.inputs||[]).map(binding=>binding.parameter)].filter(Boolean);
 
 // Shared calendar/default lifecycle. Hosts supply only their ordinary metadata
 // loader, parameter initialization and commit callback. Calendar zones and range
 // policy come from validated declarations, never browser timezone or host IDs.
 export function useReportDatePresetDraft({ranges=[],parameters={},resetParameters,initialize=identity,contextKey='',loadCalendar,onDefaultsReady,defaultsReadyKey=''}) {
- const reservedParameters=new Set(ranges.flatMap(range=>[range.start,range.end,range.datePresets?.calendar?.input?.parameter]).filter(Boolean));
+ for(const range of ranges)if((range.datePresets?.calendar?.inputs||[]).some(binding=>binding.parameter===range.start||binding.parameter===range.end))throw Error('Calendar inputs cannot bind to their own date outputs.');
+ const reservedParameters=new Set(ranges.flatMap(range=>[range.start,range.end,...calendarParameters(range)]).filter(Boolean));
  const presetParameters=new Set();
  for(const range of ranges){const key=range.datePresets?.valueParameter;if(!key)continue;
   if(reservedParameters.has(key)||presetParameters.has(key))throw Error('Date-preset value parameters must be distinct from all date endpoints, calendar identities and other preset parameters.');
@@ -33,7 +35,11 @@ export function useReportDatePresetDraft({ranges=[],parameters={},resetParameter
  const generation=useRef(0),requests=useRef([]),dirty=useRef(false),initialAttempted=useRef(false),initialCommitted=useRef(false),autoReady=useRef(false),expectedParameters=useRef('');
  const calendarDefinitionKey=JSON.stringify(ranges.map(range=>[range.id,range.start,range.end,range.required,range.datePresets,range.datePresetError]));
  const calendarScope=useRef({key:'',loader:null,version:0});
- const scopeKey=JSON.stringify([contextKey,calendarDefinitionKey]);
+ const calendarInputsKey=JSON.stringify(ranges.map(range=>{
+  try{return reportDatePresetInputs(range.datePresets,draft).inputs;}
+  catch{return calendarParameters(range).map(parameter=>[parameter,own(draft,parameter),draft[parameter]]);}
+ }));
+ const scopeKey=JSON.stringify([contextKey,calendarDefinitionKey,calendarInputsKey]);
  const invalidate=()=>{generation.current++;requests.current.forEach(controller=>controller.abort());requests.current=[];};
  // Loader identity includes the authenticated preview session. Invalidate in
  // render too, so a late reply cannot win before the scope effect runs.
@@ -102,7 +108,7 @@ export function useReportDatePresetDraft({ranges=[],parameters={},resetParameter
   if(parameterEpoch.current.key!==parametersKey){
    const expected=expectedParameters.current===parametersKey;expectedParameters.current='';
    const previousParameters=JSON.parse(parameterEpoch.current.key),nextParameters=JSON.parse(parametersKey);
-   const identities=new Set(ranges.map(range=>range.datePresets?.calendar.input.parameter).filter(Boolean));
+   const identities=new Set(ranges.flatMap(calendarParameters));
    const changed=Array.from(new Set([...Object.keys(previousParameters),...Object.keys(nextParameters)])).filter(key=>JSON.stringify(previousParameters[key])!==JSON.stringify(nextParameters[key]));
    const identityOnly=changed.length>0&&changed.every(key=>identities.has(key));
    parameterEpoch.current={key:parametersKey,changed:true};
@@ -151,7 +157,7 @@ export function useReportDatePresetDraft({ranges=[],parameters={},resetParameter
   cancelDraftRequests();
   for(const range of ranges)if(id===range.start||id===range.end)writeDraft({...draftRef.current,...presetPatch(range,'custom')});
   setDateState(previous=>({...previous,...Object.fromEntries(ranges.flatMap(range=>id===range.start||id===range.end?[[range.id,{mode:'manual',value:'custom',scope:scopeVersion}]]
-   :range.datePresets?.calendar.input.parameter===id&&previous[range.id]?.mode==='relative'?[[range.id,{...previous[range.id],pending:false,stale:true}]]:[]))}));
+   :calendarParameters(range).includes(id)&&previous[range.id]?.mode==='relative'?[[range.id,{...previous[range.id],pending:false,stale:true}]]:[]))}));
  };
  const controls=ranges.map(range=>{const state=range.datePresets?stateFor(range):{};return {...range,kind:'dateRange',presetValue:state.value,presetRequestedValue:state.requestedValue,presetPending:state.pending,
   presetError:range.datePresetError||state.error||(state.stale?'The calendar context changed. Choose the preset again or use manual dates.':'')};});

@@ -24,14 +24,39 @@ const dates = useReportDatePresetDraft({
   onApply={() => commit(dates.draft)} />
 ```
 
+Optional `calendar.inputs` passes additional declared report parameters through
+the same calendar request. Each entry reuses `{name, parameter, array?}`: `name`
+is the producer input alias and `parameter` is a safe flat report parameter alias.
+For example, `inputs: [{name: basis, parameter: selectedBasis}]` adds the current
+`selectedBasis` value as `basis` while the existing singular `calendar.input`
+continues to select and validate the calendar identity. Request names must be
+unique, including the identity input name; selected preset bindings must differ
+from all calendar parameter aliases. Additional inputs cannot bind to the owning
+range's date endpoints or its canonical date-range value; these are outputs of
+that same resolution. Other report inputs retain their declared producer semantics.
+
+Omitted/null `inputs` and an empty array add no inputs. Missing or undefined
+parameter values are omitted; explicit null, blank, false and zero are forwarded
+without required-value or domain validation. Producer validation owns their
+meaning. Values and existing arrays retain their shape; `array: true` wraps a
+non-null scalar in an array. An omitted/null additional `array` flag leaves the
+value unchanged. No undeclared report parameter is forwarded.
+Changing a declared input cancels pending calendar work, ignores late responses
+even if cancellation is unsupported, and marks resolved relative dates stale.
+Select the preset again or use manual dates before Apply. Pending automatic
+defaults restart with the new inputs; Reset restores its authored parameters.
+Absolute applied snapshots and custom dates retain their existing semantics.
+
 Keep the calendar loader stable until its authenticated/resource context changes.
 Changing that loader or `contextKey` cancels outstanding responses and marks an
 already resolved relative draft stale. The loader receives an AbortSignal; stale
 responses are ignored even if the underlying transport cannot cancel them. This
 is a UI lifecycle fence, not an authorization decision.
 
-The loader returns `{data: [...]}` with exactly one matching identity and a valid
-IANA timezone at the declaration's paths. The hook never falls back to UTC or the
+The loader returns ordinary records or an existing native tabular envelope
+(`{data: [{columns, rows}]}`). The shared `extractData` decoder supplies the
+records; exactly one matching identity and a valid
+IANA timezone at the declaration's paths are required. The hook never falls back to UTC or the
 browser timezone. Multiple defaults use one instant after all calendars arrive.
 Optional `calendar.anchorField` selects a source civil date from that same
 matching row, using the same safe dotted-path grammar as the timezone field.

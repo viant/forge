@@ -75,3 +75,41 @@ for(const [anchor,anchorField,valid] of [[undefined,undefined,true],[null,null,t
  }else assert.throws(()=>normalizeReportDatePresets(candidate,sources));
  if(anchor===''||anchor===17||anchorField===''||anchorField===17)assert.equal(validateReportSchema(reportDatePresetsSchema,candidate).valid,false);
 }
+
+const mapped=normalizeReportDatePresets({...declaration,calendar:{...declaration.calendar,inputs:[{name:'basis',parameter:'selection'},{name:'groups',parameter:'groups',array:true},{name:'optional',parameter:'missing'}]}},sources);
+assert.deepEqual(reportDatePresetInputs(mapped,{entity:17,selection:'A',groups:[2,3]}),{identity:17,inputs:{Ids:[17],basis:'A',groups:[2,3]}});
+assert.deepEqual(reportDatePresetInputs(mapped,{entity:17,selection:null,groups:2}),{identity:17,inputs:{Ids:[17],basis:null,groups:[2]}});
+assert.deepEqual(reportDatePresetInputs(mapped,{entity:17,selection:'',groups:null}),{identity:17,inputs:{Ids:[17],basis:'',groups:null}});
+assert.deepEqual(reportDatePresetInputs(mapped,{entity:17}),{identity:17,inputs:{Ids:[17]}});
+assert.equal(validateReportSchema(reportDatePresetsSchema,mapped).valid,true);
+for(const inputs of [undefined,null,[]]){
+ const candidate={...declaration,calendar:{...declaration.calendar,...(inputs===undefined?{}:{inputs})}};
+ const normalized=normalizeReportDatePresets(candidate,sources);
+ assert.deepEqual(reportDatePresetInputs(normalized,{entity:17}).inputs,{Ids:[17]});
+ assert.equal(validateReportSchema(reportDatePresetsSchema,candidate).valid,true);
+}
+for(const inputs of ['',17,{},[null],[{name:'Ids',parameter:'selection'}],[{name:'basis',parameter:'selection'},{name:'basis',parameter:'other'}],[{name:'basis',parameter:'selection',extra:true}],[{name:'basis',parameter:'__proto__'}],[{name:'basis',parameter:'selection',array:'true'}]])assert.throws(()=>normalizeReportDatePresets({...declaration,calendar:{...declaration.calendar,inputs}},sources));
+assert.throws(()=>normalizeReportDatePresets({...declaration,valueParameter:'selection',calendar:{...declaration.calendar,inputs:[{name:'basis',parameter:'selection'}]}},sources));
+
+const nullArray={...declaration,calendar:{...declaration.calendar,inputs:[{name:'basis',parameter:'selection',array:null}]}};
+assert.equal(validateReportSchema(reportDatePresetsSchema,nullArray).valid,true);
+assert.deepEqual(reportDatePresetInputs(normalizeReportDatePresets(nullArray,sources),{entity:17,selection:'A'}).inputs,{Ids:[17],basis:'A'});
+
+// Independently invented native tabular calendar envelope; no application capture.
+const flatCalendar={...anchored,calendar:{...anchored.calendar,timeZoneField:'zone',anchorField:'latestDate'}};
+const calendarColumns=[{name:'id'},{name:'zone'},{name:'latestDate'}];
+const tabularCalendar={data:[{columns:calendarColumns,rows:[[17,'America/Los_Angeles','2026-03-08']]}]};
+assert.deepEqual(decodeReportDateCalendar(flatCalendar,17,tabularCalendar),{timeZone:'America/Los_Angeles',anchorDate:'2026-03-08'});
+assert.deepEqual(decodeReportDateCalendar(flatCalendar,17,{data:[{id:17,zone:'America/Los_Angeles',latestDate:'2026-03-08'}]}),{timeZone:'America/Los_Angeles',anchorDate:'2026-03-08'});
+for(const dataset of [
+ {columns:calendarColumns,rows:[]},
+ {columns:calendarColumns,rows:[[17,'UTC','2026-03-08'],[17,'UTC','2026-03-08']]},
+ {columns:calendarColumns,rows:[[18,'UTC','2026-03-08']]},
+ {columns:calendarColumns,rows:[[17,'Invalid/Zone','2026-03-08']]},
+ {columns:calendarColumns,rows:[[17,'UTC',null]]},
+ {columns:calendarColumns,rows:[[17,'UTC','2026-02-30']]},
+ {columns:calendarColumns,rows:[null]},
+ {columns:[{}],rows:[[17]]},
+ {columns:calendarColumns},
+ {rows:[[17,'UTC','2026-03-08']]},
+])assert.throws(()=>decodeReportDateCalendar(flatCalendar,17,{data:[dataset]}));

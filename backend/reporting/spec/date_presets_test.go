@@ -66,6 +66,55 @@ func TestDatePresetsStrictReportDecode(t *testing.T) {
 			}
 		})
 	}
+
+	for _, tc := range []struct {
+		name   string
+		inputs any
+		omit   bool
+		valid  bool
+	}{
+		{name: "inputs omitted", omit: true, valid: true},
+		{name: "inputs null", valid: true},
+		{name: "inputs empty", inputs: []any{}, valid: true},
+		{name: "inputs null array flag", inputs: []any{map[string]any{"name": "basis", "parameter": "selection", "array": nil}}, valid: true},
+		{name: "inputs valid", inputs: []any{map[string]any{"name": "basis", "parameter": "selection"}}, valid: true},
+		{name: "inputs wrong type", inputs: ""},
+		{name: "inputs null entry", inputs: []any{nil}},
+		{name: "inputs missing parameter", inputs: []any{map[string]any{"name": "basis"}}},
+		{name: "inputs identity name collision", inputs: []any{map[string]any{"name": "ids", "parameter": "selection"}}},
+		{name: "inputs duplicate name", inputs: []any{map[string]any{"name": "basis", "parameter": "selection"}, map[string]any{"name": "basis", "parameter": "other"}}},
+		{name: "inputs own date output", inputs: []any{map[string]any{"name": "basis", "parameter": "period"}}},
+		{name: "inputs mode collision", inputs: []any{map[string]any{"name": "basis", "parameter": "mode"}}},
+		{name: "inputs unsafe parameter", inputs: []any{map[string]any{"name": "basis", "parameter": "__proto__"}}},
+		{name: "inputs unknown field", inputs: []any{map[string]any{"name": "basis", "parameter": "selection", "extra": true}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var sample map[string]any
+			require.NoError(t, json.Unmarshal(wire, &sample))
+			calendar := sample["scope"].(map[string]any)["params"].([]any)[0].(map[string]any)["datePresets"].(map[string]any)["calendar"].(map[string]any)
+			if !tc.omit {
+				calendar["inputs"] = tc.inputs
+			}
+			input, err := json.Marshal(sample)
+			require.NoError(t, err)
+			spec, err := DecodeJSON(input)
+			if err == nil {
+				err = spec.Validate()
+			}
+			if tc.valid {
+				require.NoError(t, err)
+				again, err := json.Marshal(spec)
+				require.NoError(t, err)
+				roundTrip, err := DecodeJSON(again)
+				require.NoError(t, err)
+				roundTripWire, err := json.Marshal(roundTrip)
+				require.NoError(t, err)
+				require.JSONEq(t, string(again), string(roundTripWire))
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
 	decoded, err := DecodeJSON(wire)
 	require.NoError(t, err)
 	require.Equal(t, "mode", decoded.Scope.Params[0].DatePresets.ValueParameter)

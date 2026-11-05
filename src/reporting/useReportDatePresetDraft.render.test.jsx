@@ -142,3 +142,42 @@ test('one calendar supports a source anchored thirty days and clock based month 
  await act(async()=>{await result.current.requestPreset('period','last_month');});
  expect(result.current.draft).toMatchObject({from:'2025-11-01',to:'2025-11-30'});
 });
+
+test('dependent calendar input changes at the same identity refetch and ignore a late response after abort',async()=>{
+ const bound=[{...ranges[0],datePresets:{...declaration,calendar:{...declaration.calendar,inputs:[{name:'basis',parameter:'basis'}],anchorField:'latestDate'},options:[{value:'completed',label:'Last thirty',range:{kind:'relativeDays',anchor:'sourceDate',startOffset:-29,endOffset:0}},{value:'custom',label:'Custom'}]}}];
+ const pending=[];const loadCalendar=vi.fn((id,inputs,signal)=>new Promise(resolve=>pending.push({inputs,signal,resolve})));
+ const {result,rerender}=renderHook(({basis})=>useReportDatePresetDraft({ranges:bound,parameters:{entity:17,basis},loadCalendar}),{initialProps:{basis:'A'}});
+ expect(pending[0].inputs).toEqual({ids:[17],basis:'A'});
+ rerender({basis:'B'});
+ await waitFor(()=>expect(pending).toHaveLength(2));expect(pending[0].signal.aborted).toBe(true);expect(pending[1].inputs).toEqual({ids:[17],basis:'B'});
+ await act(async()=>pending[1].resolve({data:[{id:17,zone:'UTC',latestDate:'2026-04-30'}]}));
+ expect(result.current.draft).toMatchObject({basis:'B',from:'2026-04-01',to:'2026-04-30'});
+ await act(async()=>pending[0].resolve({data:[{id:17,zone:'UTC',latestDate:'2026-02-28'}]}));
+ expect(result.current.draft.to).toBe('2026-04-30');
+});
+
+test('dependent source drafts become stale, manual dates remain available, and Reset resolves authored dependencies',async()=>{
+ const bound=[{...ranges[0],datePresets:{...declaration,valueParameter:'periodMode',calendar:{...declaration.calendar,inputs:[{name:'basis',parameter:'basis'}],anchorField:'latestDate'},options:[{value:'completed',label:'Last thirty',range:{kind:'relativeDays',anchor:'sourceDate',startOffset:-29,endOffset:0}},{value:'month_to_date',label:'Month to date'},{value:'custom',label:'Custom'}]}}];
+ const loadCalendar=vi.fn((id,inputs)=>Promise.resolve({data:[{id:17,zone:'America/Los_Angeles',latestDate:inputs.basis==='B'?'2026-04-30':'2026-02-28'}]}));
+ const {result}=renderHook(()=>useReportDatePresetDraft({ranges:bound,parameters:{entity:17,basis:'A'},loadCalendar}));
+ await waitFor(()=>expect(result.current.draft.to).toBe('2026-02-28'));
+ act(()=>{result.current.editField('basis');result.current.writeDraft({...result.current.draftRef.current,basis:'B'});});
+ expect(result.current.dateBlocked).toBe(true);
+ await act(async()=>{await result.current.requestPreset('period','completed');});
+ expect(result.current.draft).toMatchObject({basis:'B',from:'2026-04-01',to:'2026-04-30',periodMode:'completed'});
+ await act(async()=>{await result.current.requestPreset('period','month_to_date');});
+ expect(result.current.draft).toMatchObject({basis:'B',from:'2025-12-01',to:'2025-12-31'});
+ act(()=>result.current.manualRange('period',{start:'2026-01-01',end:'2026-01-02'}));
+ act(()=>{result.current.editField('basis');result.current.writeDraft({...result.current.draftRef.current,basis:'A'});});
+ expect(result.current.dateBlocked).toBe(false);expect(result.current.draft.periodMode).toBe('custom');
+ act(()=>result.current.reset());await waitFor(()=>expect(result.current.draft.to).toBe('2026-02-28'));
+ expect(result.current.draft).toMatchObject({basis:'A',periodMode:'completed'});
+ expect(loadCalendar.mock.calls.map(call=>call[1].basis)).toEqual(['A','B','B','A']);
+});
+
+test.each(['from','to'])('rejects a calendar input bound to its own %s endpoint before loading',parameter=>{
+ const bound=[{...ranges[0],datePresets:{...declaration,calendar:{...declaration.calendar,inputs:[{name:'basis',parameter}]}}}];
+ const loadCalendar=vi.fn();
+ expect(()=>renderHook(()=>useReportDatePresetDraft({ranges:bound,parameters:{entity:17,from:'2026-01-01',to:'2026-01-02'},loadCalendar}))).toThrow(/Calendar inputs cannot bind to their own date outputs/);
+ expect(loadCalendar).not.toHaveBeenCalled();
+});

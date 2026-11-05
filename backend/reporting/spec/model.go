@@ -114,11 +114,12 @@ type ReportDatePresets struct {
 	ValueParameter string                   `json:"valueParameter,omitempty"`
 }
 type ReportDatePresetCalendar struct {
-	DataSourceRef string                `json:"dataSourceRef"`
-	Input         ReportDatePresetInput `json:"input"`
-	IdentityField string                `json:"identityField"`
-	TimeZoneField string                `json:"timeZoneField"`
-	AnchorField   *string               `json:"anchorField,omitempty"`
+	DataSourceRef string                  `json:"dataSourceRef"`
+	Input         ReportDatePresetInput   `json:"input"`
+	Inputs        []ReportDatePresetInput `json:"inputs,omitempty"`
+	IdentityField string                  `json:"identityField"`
+	TimeZoneField string                  `json:"timeZoneField"`
+	AnchorField   *string                 `json:"anchorField,omitempty"`
 }
 type ReportDatePresetInput struct {
 	Name      string `json:"name"`

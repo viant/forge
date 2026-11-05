@@ -13,6 +13,7 @@ export default function BoundReportDatePresetControls({config, context, reportSp
         const range = {id:param.id, label:param.label, required:param.required, start:`${param.id}.start`, end:`${param.id}.end`};
         try {
             const datePresets = normalizeReportDatePresets(param.datePresets, context.metadata?.dataSource || {});
+            if ((datePresets.calendar.inputs || []).some(binding => binding.parameter === param.id)) throw Error('Calendar inputs cannot bind to their own date outputs.');
             const selected = authored.find(other => other.id === datePresets.valueParameter);
             const compatible = selected?.filterBindings?.length && !selected.multiple && (selected.kind === 'text' || selected.options?.length && datePresets.options.every(option => selected.options.some(choice => choice.value === option.value)));
             if (!param.filterBindings?.length || param.kind !== 'dateRange' || datePresets.valueParameter && (!compatible || selected.datePresets)) throw Error('Date-preset selection requires a compatible bound scope parameter.');

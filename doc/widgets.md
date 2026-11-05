@@ -322,6 +322,13 @@ later than end) in the explicit timezone. `yesterday`, `last_month` and
 `month_to_date` reuse the existing resolver. Existing window preset aliases keep
 their legacy meanings. Labels do not redefine interval semantics.
 
+Optional `calendar.inputs: [{name: basis, parameter: selectedBasis}]` maps
+additional producer inputs through the same loader. Missing values are omitted;
+explicit null and other values retain producer semantics. Changes invalidate
+pending and resolved relative calendar drafts. The singular identity binding and
+its response identity check remain unchanged. See the shared lifecycle contract
+for array conversion and Apply/Reset behavior.
+
 Optional `calendar.anchorField` reads a strict `YYYY-MM-DD` source civil date
 from the same calendar row. Only relative ranges declaring `anchor: sourceDate` use that date; an inclusive
 thirty-day source range declares `anchor: sourceDate, startOffset: -29, endOffset: 0`.

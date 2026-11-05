@@ -33,6 +33,14 @@ func validateScopeDatePresets(p ScopeParam, params []ScopeParam) error {
 	if p.Kind != "dateRange" || len(p.FilterBindings) == 0 || !safe(d.Calendar.DataSourceRef) || !safe(d.Calendar.Input.Name) || !safe(d.Calendar.Input.Parameter) || !path(d.Calendar.IdentityField) || !path(d.Calendar.TimeZoneField) || (d.Calendar.AnchorField != nil && !path(*d.Calendar.AnchorField)) || len(d.Options) < 1 || len(d.Options) > 16 {
 		return fail()
 	}
+
+	names := map[string]bool{d.Calendar.Input.Name: true}
+	for _, input := range d.Calendar.Inputs {
+		if !safe(input.Name) || !safe(input.Parameter) || names[input.Name] || input.Parameter == d.ValueParameter || input.Parameter == p.ID {
+			return fail()
+		}
+		names[input.Name] = true
+	}
 	if d.ValueParameter != "" {
 		if !safe(d.ValueParameter) || d.ValueParameter == d.Calendar.Input.Parameter || d.ValueParameter == p.ID {
 			return fail()
