@@ -4,6 +4,7 @@ import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import DashboardTableContent from './DashboardTableContent.jsx';
 import {resolveReportTableCellVisualState} from './reportTableCellVisuals.js';
+import {buildReportBuilderReportDocument, lowerReportDocumentToReportSpec} from '../../reporting/reportDocumentModel.js';
 import {buildReportFillFromReportSpec} from '../../reporting/reportFillModel.js';
 import {buildReportPrintFromReportFill} from '../../reporting/reportPrintModel.js';
 import {validateReportSpec, validateReportFill, validateReportPrint} from '../../reporting/schema/reportSchemas.js';
@@ -121,4 +122,28 @@ for(const kind of ['tone','badge']) {
   const legacySpec=specFor({...labeled,label:'Measurement'});
   assert.equal(buildReportFillFromReportSpec(legacySpec,{primary:{rows:[rows[0]]}}).blocks[0].content.resolvedRows[0].cells[0].visualState.label,'Needs review');
 }
-console.log('Numeric tone runtime, schema, fill, CSV and canonical print checks passed.');
+
+// colorField is the only reference to this calculation. Its rank/expression
+// dependencies must survive lowering while unrelated catalog fields stay out.
+const calculatedExample=JSON.parse(readFileSync(new URL('../../../doc/examples/calculated-numeric-tone.json',import.meta.url)));
+const calculatedDocument=buildReportBuilderReportDocument({
+  container:{id:'measurements',stateKey:'measurements',dataSourceRef:'measurements'},
+  config:calculatedExample.config,state:calculatedExample.state,
+  additionalBlocks:[{id:'calculatedDetails',kind:'tableBlock',title:'Calculated measurements',datasetRef:'primary',columns:[calculatedExample.column]}],
+});
+const calculatedSpec=lowerReportDocumentToReportSpec(calculatedDocument,{includePrimaryBlocks:false});
+assert.deepEqual(calculatedSpec.calculatedFields.map(field=>field.key).sort(),['calculatedTone','sampleRank','sampleSort']);
+assert.deepEqual(calculatedSpec.datasets[0].request.measures,{measurement:true});
+assert.deepEqual(calculatedSpec.datasets[0].request.dimensions,{sampleCode:true,status:true});
+const calculatedFill=buildReportFillFromReportSpec(calculatedSpec,{primary:{rows:calculatedExample.rows,hasMore:false}});
+const calculatedTable=calculatedFill.blocks.find(block=>block.id==='calculatedDetails');
+assert.deepEqual(calculatedTable.content.resolvedRows.map(row=>row.cells[0].visualState.tone),['danger','success']);
+const calculatedPrint=buildReportPrintFromReportFill({reportSpec:calculatedSpec,reportFill:calculatedFill});
+assert.deepEqual(calculatedPrint.pages.flatMap(page=>page.elements).filter(e=>e.kind==='tableCellTone').map(e=>e.label),['123.46','123.46']);
+assert.equal(renderReportTableCsv(calculatedTable),'Measurement\n123.456\n123.456\n');
+for(const row of calculatedFill.datasets[0].rows) {
+  const html=render(row,calculatedExample.column);
+  assert.ok(html.includes('123.46'));
+  assert.ok(html.includes(`data-visual-tone="${row.status==='good'?'success':'danger'}"`));
+}
+console.log('Numeric tone lowering, runtime, schema, fill, CSV and canonical print checks passed.');

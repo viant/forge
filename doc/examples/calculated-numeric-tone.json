@@ -1,0 +1,123 @@
+{
+  "config": {
+    "title": "Calculated measurement tones",
+    "dataSourceRef": "measurements",
+    "measures": [
+      {
+        "id": "measurement",
+        "key": "measurement",
+        "label": "Measurement",
+        "format": "number2",
+        "paramPath": "measures.measurement"
+      },
+      {
+        "id": "unusedMeasurement",
+        "key": "unusedMeasurement",
+        "paramPath": "measures.unusedMeasurement"
+      }
+    ],
+    "dimensions": [
+      {
+        "id": "sampleCode",
+        "key": "sampleCode",
+        "paramPath": "dimensions.sampleCode"
+      },
+      {
+        "id": "status",
+        "key": "status",
+        "paramPath": "dimensions.status"
+      },
+      {
+        "id": "unusedGroup",
+        "key": "unusedGroup",
+        "paramPath": "dimensions.unusedGroup"
+      }
+    ],
+    "calculatedFields": [
+      {
+        "id": "sampleSort",
+        "key": "sampleSort",
+        "dataType": "number",
+        "expr": "sampleCode + 0"
+      },
+      {
+        "id": "sampleRank",
+        "key": "sampleRank",
+        "dataType": "number",
+        "compute": {
+          "type": "rank",
+          "sourceField": "sampleSort",
+          "orderBy": [
+            {
+              "field": "sampleSort",
+              "direction": "asc"
+            }
+          ],
+          "tieMode": "dense"
+        }
+      },
+      {
+        "id": "calculatedTone",
+        "key": "calculatedTone",
+        "dataType": "string",
+        "expr": "if(sampleRank <= 2, status, 'other')"
+      },
+      {
+        "id": "unusedCalculated",
+        "key": "unusedCalculated",
+        "dataType": "number",
+        "expr": "unusedMeasurement * 2"
+      }
+    ],
+    "result": {
+      "defaultMode": "table",
+      "pageSize": 25
+    }
+  },
+  "state": {
+    "selectedMeasures": [
+      "measurement"
+    ],
+    "primaryMeasure": "measurement",
+    "selectedDimensions": [],
+    "viewMode": "table",
+    "pageSize": 25,
+    "orderField": "",
+    "orderDir": "asc"
+  },
+  "column": {
+    "key": "measurement",
+    "label": "Measurement",
+    "format": "number2",
+    "cellVisual": {
+      "kind": "tone",
+      "colorField": "calculatedTone",
+      "rules": [
+        {
+          "value": "low",
+          "tone": "danger",
+          "color": "#b42318",
+          "background": "#fff1f0"
+        },
+        {
+          "value": "good",
+          "tone": "success",
+          "color": "#027a48",
+          "background": "#ecfdf3"
+        }
+      ]
+    }
+  },
+  "rows": [
+    {
+      "measurement": 123.456,
+      "sampleCode": 1,
+      "status": "low"
+    },
+    {
+      "measurement": 123.456,
+      "sampleCode": 2,
+      "status": "good"
+    }
+  ]
+}

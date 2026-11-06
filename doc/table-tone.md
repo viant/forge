@@ -25,5 +25,10 @@ Run the example through the real table, fill, schema, CSV and print paths with:
 node --no-warnings ./node_modules/vite-node/vite-node.mjs src/components/dashboard/reportTableNumericTone.render.test.mjs
 ```
 
+The [calculated tone example](examples/calculated-numeric-tone.json) references
+a calculated status only from `colorField`. Lowering retains its expression and
+rank dependencies and requests their native inputs; unrelated calculations and
+fields remain pruned.
+
 Native PDF and XLSX coverage lives in
 `backend/reporting/export/xlsx/numeric_tone_test.go`.

@@ -57952,11 +57952,12 @@ ${indent}${end}`;
         case "tableBlock":
           tableAnalyticsFields(normalizedBlock).forEach((field2) => enableField(field2, normalizedDatasetRef, request));
           (Array.isArray(normalizedBlock == null ? void 0 : normalizedBlock.columns) ? normalizedBlock.columns : []).forEach((column) => {
-            var _a6, _b2, _c2;
+            var _a6, _b2, _c2, _d2;
             enableField(column == null ? void 0 : column.key, normalizedDatasetRef, request);
             enableField((_a6 = column == null ? void 0 : column.cellVisual) == null ? void 0 : _a6.valueField, normalizedDatasetRef, request);
-            enableField((_b2 = column == null ? void 0 : column.link) == null ? void 0 : _b2.urlField, normalizedDatasetRef, request);
-            enableField((_c2 = column == null ? void 0 : column.link) == null ? void 0 : _c2.idField, normalizedDatasetRef, request);
+            enableField((_b2 = column == null ? void 0 : column.cellVisual) == null ? void 0 : _b2.colorField, normalizedDatasetRef, request);
+            enableField((_c2 = column == null ? void 0 : column.link) == null ? void 0 : _c2.urlField, normalizedDatasetRef, request);
+            enableField((_d2 = column == null ? void 0 : column.link) == null ? void 0 : _d2.idField, normalizedDatasetRef, request);
           });
           break;
         case "geoMapBlock":

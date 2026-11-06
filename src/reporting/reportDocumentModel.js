@@ -704,6 +704,7 @@ function augmentReportRequestForAuthoredBlocks(baseSpec = {}, blocks = [], confi
         (Array.isArray(normalizedBlock?.columns) ? normalizedBlock.columns : []).forEach((column) => {
           enableField(column?.key, normalizedDatasetRef, request);
           enableField(column?.cellVisual?.valueField, normalizedDatasetRef, request);
+          enableField(column?.cellVisual?.colorField, normalizedDatasetRef, request);
           enableField(column?.link?.urlField, normalizedDatasetRef, request);
           enableField(column?.link?.idField, normalizedDatasetRef, request);
         });
