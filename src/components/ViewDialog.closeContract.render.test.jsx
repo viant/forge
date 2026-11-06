@@ -2,6 +2,7 @@ import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {expect,it} from 'vitest';
 import WindowContent from './WindowContent.jsx';
+import {requestLookupSelection} from '../utils/lookup.js';
 import {SettingProvider} from '../core/context/Setting.jsx';
 import {getWindowContext} from '../core/context/registry.js';
 import {removeSignalsForKey} from '../core/store/signals.js';
@@ -135,6 +136,88 @@ it('fresh dialog opens fetch once on page one, including another provider after 
         expect(requests.slice(beforeReopen)).toEqual([{Provider: 'Second', Page: 1, Limit: 25}]);
         expect(source.signals.collection.peek()).toEqual([{id: 1, name: 'Second page 1'}]);
         expect(firstOpenCount).toBe(1);
+    } finally {
+        await flush(() => root.unmount());
+        host.remove();
+        removeSignalsForKey(windowId);
+    }
+});
+
+
+it('binds native lookup parameter envelopes to the visible quick filter before the first fetch', async () => {
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    HTMLElement.prototype.scrollIntoView ||= function () {};
+    const windowId = 'lookup-dialog-search-seed', host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host), requests = [];
+    const metadata = {
+        dataSource: {
+            home: {id: 'home', backend: {kind: 'inline', rows: []}},
+            choices: {id: 'choices', autoFetch: false, autoSelect: false,
+                backend: {kind: 'mcp_tool', method: 'fixture.choices'},
+                uniqueKey: [{field: 'id'}], selectors: {data: 'data'},
+                filterSet: [{name: 'quick', default: true, template: [{id: 'Name', operator: 'equal'}]}]},
+        },
+        view: {content: {id: 'home', dataSourceRef: 'home', fetchData: false}},
+        dialogs: [{id: 'picker', title: 'Select choice', dataSourceRef: 'choices',
+            properties: {quickFilters: [{field: 'Name', placeholder: 'Search names'}]},
+            content: {id: 'picker-content', dataSourceRef: 'choices', containers: [
+                {id: 'picker-table', dataSourceRef: 'choices', fetchData: true,
+                    table: {columns: [{id: 'name', name: 'Name'}]}},
+            ]}}],
+    };
+    const item = {id: 'choiceName', lookup: {dialogId: 'picker', dataSource: 'choices', inputs: [
+        {from: ':windowform', to: ':query', location: 'typed', name: 'Name'},
+        {from: ':windowform', to: ':query', location: 'provider', name: 'Provider'},
+        {from: ':windowform', to: ':query', location: 'trial', name: 'Trial'},
+    ]}};
+    const flush = action => act(async () => {
+        action?.();
+        for (let i = 0; i < 30; i++) await Promise.resolve();
+        await new Promise(resolve => setTimeout(resolve, 0));
+        for (let i = 0; i < 30; i++) await Promise.resolve();
+    });
+    try {
+        await flush(() => root.render(<SettingProvider endpoints={{}} services={{dataConnectorTransport: async request => {
+            if (request.dataSourceRef === 'choices') requests.push({filter: {...request.options.filter}, parameters: {...request.options.inputParameters}});
+            return {data: [{id: 1, name: 'Synthetic choice'}]};
+        }}} connectorConfig={{window: {service: {uri: '/fixture'}}}}>
+            <WindowContent window={{windowId, windowKey: 'fixture'}} selectedMetadata={metadata}/>
+        </SettingProvider>));
+        const context = getWindowContext(windowId).Context('home');
+        for (const typed of ['Fir', '710001', '']) {
+            const before = requests.length;
+            let result;
+            await flush(() => {
+                context.signals.windowForm.value = {typed, provider: 'Synthetic provider', trial: false};
+                result = requestLookupSelection({item, context, value: typed});
+            });
+            expect(document.querySelector('input[placeholder="Search names"]').value).toBe(typed);
+            const opened = requests.slice(before);
+            expect(opened.length).toBeGreaterThan(0);
+            for (const request of opened) {
+                expect(request.filter).toEqual(typed ? {Name: typed} : {});
+                expect(request.parameters).toEqual({Provider: 'Synthetic provider', Trial: false});
+            }
+            await flush(() => document.querySelector('.bp6-dialog-close-button').click());
+            await result;
+        }
+        // Explicit caller parameters remain authoritative, including blank text
+        // overriding an otherwise populated scoped lookup binding.
+        const beforeExplicit = requests.length;
+        await flush(() => {
+            context.signals.windowForm.value = {typed: 'Stale seed', provider: 'Old provider', trial: true};
+            context.handlers.window.openDialog({
+                execution: {args: ['picker'], parameters: item.lookup.inputs},
+                parameters: {Name: '', Provider: 'Explicit provider', Trial: false},
+                context,
+            });
+        });
+        expect(document.querySelector('input[placeholder="Search names"]').value).toBe('');
+        expect(requests.slice(beforeExplicit).length).toBeGreaterThan(0);
+        for (const request of requests.slice(beforeExplicit)) {
+            expect(request).toEqual({filter: {}, parameters: {Provider: 'Explicit provider', Trial: false}});
+        }
     } finally {
         await flush(() => root.unmount());
         host.remove();

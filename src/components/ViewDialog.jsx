@@ -309,6 +309,7 @@ const ViewDialog = ({context, dialog, focusRequest = 0, mountedDataSourceRefs = 
                 focusRequest,
                 lastHandledFocusRequest,
             );
+            let initialFilter = {};
             try {
                 const args = handlers.dialog.callerArgs();
                 const callerProps = handlers.dialog.callerProps?.() || {};
@@ -324,12 +325,13 @@ const ViewDialog = ({context, dialog, focusRequest = 0, mountedDataSourceRefs = 
                     const inputObj = (scoped && typeof scoped === 'object') ? (scoped.input || scoped) : {};
                     params = (inputObj && typeof inputObj === 'object') ? (inputObj.parameters || inputObj) : {};
                 }
+                // Lookup bindings resolve into datasource-scoped parameters.
+                // Seed the editable filter from the same unwrapped caller input
+                // before removing its fields from the fixed parameters.
+                const nextFilter = buildQuickFilterSeed(params, quickFilterSpecs);
+                initialFilter = nextFilter;
                 params = withoutQuickFilterParameters(params, quickFilterSpecs);
                 const current = dialogDataSourceHandlers?.peekInput?.() || {};
-                const filterSeedSource = Object.keys(explicitParameters).length > 0
-                    ? explicitParameters
-                    : args;
-                const nextFilter = buildQuickFilterSeed(filterSeedSource, quickFilterSpecs);
                 const nextArgsStr = JSON.stringify(args || {});
                 const prevArgsStr = JSON.stringify((current.args || {}));
                 const nextParamsStr = JSON.stringify(params || {});
@@ -407,10 +409,9 @@ const ViewDialog = ({context, dialog, focusRequest = 0, mountedDataSourceRefs = 
                         const explicitParameters = (callerProps?.parameters && typeof callerProps.parameters === 'object')
                             ? callerProps.parameters
                             : {};
-                        const filterSeedSource = Object.keys(explicitParameters).length > 0
-                            ? explicitParameters
-                            : args;
-                        const filter = buildQuickFilterSeed(filterSeedSource, quickFilterSpecs);
+                        // Reuse the synchronous seed so a nested table and the
+                        // deferred read use exactly the same initial filter.
+                        const filter = initialFilter;
                         console.debug(
                             '[lookup-dialog][seed]',
                             JSON.stringify({
