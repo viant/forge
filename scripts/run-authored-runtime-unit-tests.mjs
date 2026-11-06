@@ -438,6 +438,7 @@ const runtimeUnitTests = [
   "src/components/dashboard/reportBuilderPreviewAuthoredRender.test.mjs",
   "src/components/dashboard/reportBuilderResultState.test.js",
   "src/components/dashboard/reportBuilderRuntimePreviewSection.test.js",
+  "src/components/dashboard/reportTableNumericTone.render.test.mjs",
 ];
 
 function discoverReportingTests(directory) {

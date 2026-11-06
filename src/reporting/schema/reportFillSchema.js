@@ -533,7 +533,22 @@ export const reportFillSchema = {
           additionalProperties: false,
           required: ["kind"],
           properties: {
-            kind: { enum: ["tone", "badge", "delta", "rank"] },
+            kind: { const: "tone" },
+            valueField: { type: "string" },
+            colorField: { type: "string" },
+            range: { $ref: "#/$defs/cellVisualRange" },
+            palette: { type: "array", items: { type: "string" } },
+            nullBehavior: { type: "string" },
+            rules: { type: "array", items: { $ref: "#/$defs/cellVisualRule" } },
+            positiveIsGood: { type: "boolean" },
+          },
+        },
+        {
+          type: "object",
+          additionalProperties: false,
+          required: ["kind"],
+          properties: {
+            kind: { enum: ["badge", "delta", "rank"] },
             valueField: { type: "string" },
             range: { $ref: "#/$defs/cellVisualRange" },
             palette: { type: "array", items: { type: "string" } },

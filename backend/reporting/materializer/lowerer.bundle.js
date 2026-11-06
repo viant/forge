@@ -60827,7 +60827,7 @@ ${indent}${end}`;
     });
   }
   function resolveCellVisualState(row = {}, column = {}) {
-    var _a5, _b, _c, _d, _e, _f, _g, _h;
+    var _a5, _b, _c, _d, _e, _f, _g, _h, _i;
     const kind = normalizeString36((_a5 = column == null ? void 0 : column.cellVisual) == null ? void 0 : _a5.kind);
     if (!kind) {
       return null;
@@ -60840,8 +60840,8 @@ ${indent}${end}`;
       }
       const range = ((_b = column == null ? void 0 : column.cellVisualRuntime) == null ? void 0 : _b.range) || null;
       const palette = Array.isArray((_c = column == null ? void 0 : column.cellVisual) == null ? void 0 : _c.palette) ? column.cellVisual.palette : [];
-      const colorField = normalizeString36((_d = column == null ? void 0 : column.cellVisual) == null ? void 0 : _d.colorField);
-      const colorValue = colorField ? resolveKey(row, colorField) : rawValue;
+      const colorField2 = normalizeString36((_d = column == null ? void 0 : column.cellVisual) == null ? void 0 : _d.colorField);
+      const colorValue = colorField2 ? resolveKey(row, colorField2) : rawValue;
       const colorRule = resolveRuleMatch(colorValue, resolveCellVisualRules(column));
       const ruleColor = normalizeString36(colorRule == null ? void 0 : colorRule.color);
       const resolvedPalette = colorRule ? [normalizeString36(colorRule == null ? void 0 : colorRule.background) || buildReportVisualTint(ruleColor) || palette[0], ruleColor || palette[1]].filter(Boolean) : palette;
@@ -60918,14 +60918,19 @@ ${indent}${end}`;
         label: `#${rank}`
       };
     }
-    const rule = resolveRuleMatch(rawValue, resolveCellVisualRules(column));
+    const colorField = kind === "tone" ? normalizeString36((_i = column == null ? void 0 : column.cellVisual) == null ? void 0 : _i.colorField) : "";
+    const rule = resolveRuleMatch(colorField ? resolveKey(row, colorField) : rawValue, resolveCellVisualRules(column));
     if (!rule) {
+      return null;
+    }
+    const label = normalizeString36(rule == null ? void 0 : rule.label) || (colorField ? String(formatDashboardValue(resolveTableColumnDisplayValue(row, column), column == null ? void 0 : column.format)) : String(rawValue != null ? rawValue : ""));
+    if (colorField && !normalizeString36(label)) {
       return null;
     }
     return {
       kind,
       tone: normalizeString36((rule == null ? void 0 : rule.tone) || "info") || "info",
-      label: normalizeString36(rule == null ? void 0 : rule.label) || String(rawValue != null ? rawValue : ""),
+      label,
       ...normalizeString36(rule == null ? void 0 : rule.background) ? { backgroundColor: normalizeString36(rule.background) } : {},
       ...normalizeString36(rule == null ? void 0 : rule.color) ? { textColor: normalizeString36(rule.color), borderColor: normalizeString36(rule.color) } : {}
     };

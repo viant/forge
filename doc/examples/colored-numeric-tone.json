@@ -1,0 +1,19 @@
+{
+  "column": {
+    "key": "measurement",
+    "label": "Measurement",
+    "format": "number2",
+    "cellVisual": {
+      "kind": "tone",
+      "colorField": "status",
+      "rules": [
+        { "value": "low", "tone": "danger", "color": "#b42318", "background": "#fff1f0" },
+        { "value": "good", "tone": "success", "color": "#027a48", "background": "#ecfdf3" }
+      ]
+    }
+  },
+  "rows": [
+    { "measurement": 123.456, "status": "low" },
+    { "measurement": 123.456, "status": "good" }
+  ]
+}

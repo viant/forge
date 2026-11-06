@@ -254,14 +254,22 @@ function resolveCellVisualState(row = {}, column = {}) {
       label: `#${rank}`,
     };
   }
-  const rule = resolveRuleMatch(rawValue, resolveCellVisualRules(column));
+  const colorField = kind === "tone" ? normalizeString(column?.cellVisual?.colorField) : "";
+  const rule = resolveRuleMatch(colorField ? resolveKey(row, colorField) : rawValue, resolveCellVisualRules(column));
   if (!rule) {
+    return null;
+  }
+  const label = normalizeString(rule?.label) || (colorField
+    ? String(formatDashboardValue(resolveTableColumnDisplayValue(row, column), column?.format))
+    : String(rawValue ?? ""));
+  // Native tone labels are nonempty; preserve blank cells without a visual.
+  if (colorField && !normalizeString(label)) {
     return null;
   }
   return {
     kind,
     tone: normalizeString(rule?.tone || "info") || "info",
-    label: normalizeString(rule?.label) || String(rawValue ?? ""),
+    label,
     ...(normalizeString(rule?.background) ? { backgroundColor: normalizeString(rule.background) } : {}),
     ...(normalizeString(rule?.color) ? { textColor: normalizeString(rule.color), borderColor: normalizeString(rule.color) } : {}),
   };

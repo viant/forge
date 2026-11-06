@@ -1,4 +1,6 @@
 import equal from "fast-deep-equal";
+import { resolveDashboardTableColumnValue } from "./dashboardTableValue.js";
+import { resolveKey } from "../../utils/selector.js";
 import { buildReportVisualTint } from "../../reporting/reportVisualColor.js";
 
 function normalizeString(value = "") {
@@ -208,14 +210,22 @@ export function resolveReportTableCellVisualState(row = {}, column = {}) {
       label: `#${rank}`,
     };
   }
-  const rule = resolveRuleMatch(rawValue, resolveCellVisualRules(column));
+  const colorField = kind === "tone" ? normalizeString(column?.cellVisual?.colorField) : "";
+  const rule = resolveRuleMatch(colorField ? resolveKey(row, colorField) : rawValue, resolveCellVisualRules(column));
   if (!rule) {
+    return null;
+  }
+  // Blank display values keep the ordinary empty cell, unless a rule names it.
+  const displayValue = colorField ? resolveDashboardTableColumnValue(row, column) : undefined;
+  if (colorField && !normalizeString(rule?.label)
+      && typeof displayValue === "string" && !displayValue.trim()) {
     return null;
   }
   return {
     kind,
     tone: normalizeString(rule?.tone || "info") || "info",
-    label: normalizeString(rule?.label) || String(rawValue ?? ""),
+    // With a separate color field, the cell renderer owns the formatted text.
+    label: normalizeString(rule?.label) || (colorField ? "" : String(rawValue ?? "")),
     ...(normalizeString(rule?.background) ? { backgroundColor: normalizeString(rule.background) } : {}),
     ...(normalizeString(rule?.color) ? { textColor: normalizeString(rule.color), borderColor: normalizeString(rule.color) } : {}),
   };
