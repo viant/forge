@@ -47,6 +47,14 @@ type PublishedMetadataAuthoritySource interface {
 type PublishedMenuProjectionSource interface {
 	GetMenu(context.Context, string) (*primitive.GetResult, error)
 }
+
+// PublishedParameterizedMenuSource distinguishes mutable origin projections
+// from static source-derived menus. Only the latter may use immutable codecs.
+type PublishedParameterizedMenuSource interface {
+	GetMenuWithParameters(context.Context, string, map[string]any) (*primitive.GetResult, error)
+	MenuSourceBacked(context.Context, string) (bool, error)
+}
+
 type publishedMetadataRegistration struct {
 	connection Connection
 	namespaces map[string]bool
@@ -207,7 +215,13 @@ func getPublished[T any](ctx context.Context, g *Gateway, source publishedMetada
 	var projection *primitive.MenuProjection
 	var definition json.RawMessage
 	if menus, ok := source.source.(PublishedMenuProjectionSource); ok && uri.Kind == "navigation" {
-		got, getErr := menus.GetMenu(ctx, ref.URI)
+		var got *primitive.GetResult
+		var getErr error
+		if contextual, ok := source.source.(PublishedParameterizedMenuSource); ok {
+			got, getErr = contextual.GetMenuWithParameters(ctx, ref.URI, MenuParameters(ctx))
+		} else {
+			got, getErr = menus.GetMenu(ctx, ref.URI)
+		}
 		if getErr != nil {
 			return nil, getErr
 		}

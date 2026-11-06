@@ -30,6 +30,19 @@ func (g *Gateway) GetMenu(ctx context.Context, connection Connection, ref identi
 	return &result.GetResult, nil
 }
 
+// Menu parameters are transient UI context, never authority or source selection.
+// The configured producer owns binding and authorization of these values.
+type menuParametersKey struct{}
+
+func WithMenuParameters(ctx context.Context, parameters map[string]any) context.Context {
+	return context.WithValue(ctx, menuParametersKey{}, parameters)
+}
+
+func MenuParameters(ctx context.Context) map[string]any {
+	parameters, _ := ctx.Value(menuParametersKey{}).(map[string]any)
+	return parameters
+}
+
 func declaresMenuFormat(c capabilities, namespace string) bool {
 	for _, ns := range c.namespaces {
 		if ns.Namespace != namespace {

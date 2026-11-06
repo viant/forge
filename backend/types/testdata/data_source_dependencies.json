@@ -1,0 +1,466 @@
+[
+  {
+    "name": "implicit required absent",
+    "descriptor": {
+      "parameters": [
+        {
+          "name": "Entity"
+        }
+      ]
+    },
+    "values": {},
+    "filter": {},
+    "ready": false,
+    "expectedValues": {},
+    "expectedFilter": {}
+  },
+  {
+    "name": "optional absent",
+    "descriptor": {
+      "parameters": [
+        {
+          "name": "Entity",
+          "required": false
+        }
+      ]
+    },
+    "values": {},
+    "filter": {},
+    "ready": true,
+    "expectedValues": {},
+    "expectedFilter": {}
+  },
+  {
+    "name": "zero and false are meaningful",
+    "descriptor": {
+      "parameters": [
+        {
+          "name": "Entity"
+        },
+        {
+          "name": "Enabled"
+        }
+      ]
+    },
+    "values": {
+      "Entity": 0,
+      "Enabled": false
+    },
+    "filter": {},
+    "ready": true,
+    "expectedValues": {
+      "Entity": 0,
+      "Enabled": false
+    },
+    "expectedFilter": {}
+  },
+  {
+    "name": "null is unresolved",
+    "descriptor": {
+      "parameters": [
+        {
+          "name": "Entity"
+        }
+      ]
+    },
+    "values": {
+      "Entity": null
+    },
+    "filter": {},
+    "ready": false,
+    "expectedValues": {
+      "Entity": null
+    },
+    "expectedFilter": {}
+  },
+  {
+    "name": "blank is unresolved",
+    "descriptor": {
+      "parameters": [
+        {
+          "name": "Entity"
+        }
+      ]
+    },
+    "values": {
+      "Entity": " \t\ufeff"
+    },
+    "filter": {},
+    "ready": false,
+    "expectedValues": {
+      "Entity": " \t\ufeff"
+    },
+    "expectedFilter": {}
+  },
+  {
+    "name": "empty array is unresolved",
+    "descriptor": {
+      "parameters": [
+        {
+          "name": "Entity"
+        }
+      ]
+    },
+    "values": {
+      "Entity": []
+    },
+    "filter": {},
+    "ready": false,
+    "expectedValues": {
+      "Entity": []
+    },
+    "expectedFilter": {}
+  },
+  {
+    "name": "nested empty arrays are unresolved",
+    "descriptor": {
+      "parameters": [
+        {
+          "name": "Entity"
+        }
+      ]
+    },
+    "values": {
+      "Entity": [
+        null,
+        [],
+        [
+          " "
+        ]
+      ]
+    },
+    "filter": {},
+    "ready": false,
+    "expectedValues": {
+      "Entity": [
+        null,
+        [],
+        [
+          " "
+        ]
+      ]
+    },
+    "expectedFilter": {}
+  },
+  {
+    "name": "array with zero is meaningful",
+    "descriptor": {
+      "parameters": [
+        {
+          "name": "Entity"
+        }
+      ]
+    },
+    "values": {
+      "Entity": [
+        null,
+        [
+          0
+        ]
+      ]
+    },
+    "filter": {},
+    "ready": true,
+    "expectedValues": {
+      "Entity": [
+        null,
+        [
+          0
+        ]
+      ]
+    },
+    "expectedFilter": {}
+  },
+  {
+    "name": "explicit null default resolves",
+    "descriptor": {
+      "parameters": [
+        {
+          "name": "Entity",
+          "default": null
+        }
+      ]
+    },
+    "values": {},
+    "filter": {},
+    "ready": true,
+    "expectedValues": {
+      "Entity": null
+    },
+    "expectedFilter": {}
+  },
+  {
+    "name": "false and zero defaults resolve",
+    "descriptor": {
+      "parameters": [
+        {
+          "name": "Enabled",
+          "default": false
+        },
+        {
+          "name": "Limit",
+          "default": 0
+        }
+      ]
+    },
+    "values": {},
+    "filter": {},
+    "ready": true,
+    "expectedValues": {
+      "Enabled": false,
+      "Limit": 0
+    },
+    "expectedFilter": {}
+  },
+  {
+    "name": "nested default resolves",
+    "descriptor": {
+      "parameters": [
+        {
+          "name": "filters.Limit",
+          "default": 8
+        }
+      ]
+    },
+    "values": {
+      "filters": {}
+    },
+    "filter": {},
+    "ready": true,
+    "expectedValues": {
+      "filters": {
+        "Limit": 8
+      }
+    },
+    "expectedFilter": {}
+  },
+  {
+    "name": "array member default resolves",
+    "descriptor": {
+      "parameters": [
+        {
+          "name": "filters.0.Limit",
+          "default": 8
+        }
+      ]
+    },
+    "values": {
+      "filters": [
+        {}
+      ]
+    },
+    "filter": {},
+    "ready": true,
+    "expectedValues": {
+      "filters": [
+        {
+          "Limit": 8
+        }
+      ]
+    },
+    "expectedFilter": {}
+  },
+  {
+    "name": "constant populates filter",
+    "descriptor": {
+      "parameters": [
+        {
+          "name": "filters.Mode",
+          "from": "const",
+          "location": "month"
+        }
+      ]
+    },
+    "values": {},
+    "filter": {},
+    "ready": true,
+    "expectedValues": {},
+    "expectedFilter": {
+      "filters": {
+        "Mode": "month"
+      }
+    }
+  },
+  {
+    "name": "required spread absent",
+    "descriptor": {
+      "parameters": [
+        {
+          "name": "...",
+          "required": true
+        }
+      ]
+    },
+    "values": {},
+    "filter": {},
+    "ready": false,
+    "expectedValues": {},
+    "expectedFilter": {}
+  },
+  {
+    "name": "required spread meaningful",
+    "descriptor": {
+      "parameters": [
+        {
+          "name": "...",
+          "required": true
+        }
+      ]
+    },
+    "values": {
+      "Enabled": false
+    },
+    "filter": {},
+    "ready": true,
+    "expectedValues": {
+      "Enabled": false
+    },
+    "expectedFilter": {}
+  },
+  {
+    "name": "optional spread absent",
+    "descriptor": {
+      "parameters": [
+        {
+          "name": "...",
+          "required": false
+        }
+      ]
+    },
+    "values": {},
+    "filter": {},
+    "ready": true,
+    "expectedValues": {},
+    "expectedFilter": {}
+  },
+  {
+    "name": "required any unresolved",
+    "descriptor": {
+      "parameters": [
+        {
+          "name": "Primary",
+          "required": false
+        },
+        {
+          "name": "Alternate",
+          "required": false
+        }
+      ],
+      "requiredAnyParameters": [
+        "Primary",
+        "Alternate"
+      ]
+    },
+    "values": {
+      "Primary": [],
+      "Alternate": null
+    },
+    "filter": {},
+    "ready": false,
+    "expectedValues": {
+      "Primary": [],
+      "Alternate": null
+    },
+    "expectedFilter": {}
+  },
+  {
+    "name": "required any zero",
+    "descriptor": {
+      "parameters": [
+        {
+          "name": "Primary",
+          "required": false
+        },
+        {
+          "name": "Alternate",
+          "required": false
+        }
+      ],
+      "requiredAnyParameters": [
+        " Primary ",
+        "Alternate"
+      ]
+    },
+    "values": {
+      "Primary": 0
+    },
+    "filter": {},
+    "ready": true,
+    "expectedValues": {
+      "Primary": 0
+    },
+    "expectedFilter": {}
+  },
+  {
+    "name": "default checked by required any",
+    "descriptor": {
+      "parameters": [
+        {
+          "name": "Primary",
+          "default": null,
+          "required": false
+        }
+      ],
+      "requiredAnyParameters": [
+        "Primary"
+      ]
+    },
+    "values": {},
+    "filter": {},
+    "ready": false,
+    "expectedValues": {
+      "Primary": null
+    },
+    "expectedFilter": {}
+  },
+  {
+    "name": "no parameters preserves native early return",
+    "descriptor": {
+      "parameters": [],
+      "requiredAnyParameters": [
+        "Primary"
+      ]
+    },
+    "values": {},
+    "filter": {},
+    "ready": true,
+    "expectedValues": {},
+    "expectedFilter": {}
+  },
+  {
+    "name": "empty object is meaningful",
+    "descriptor": {
+      "parameters": [
+        {
+          "name": "filters"
+        }
+      ]
+    },
+    "values": {
+      "filters": {}
+    },
+    "filter": {},
+    "ready": true,
+    "expectedValues": {
+      "filters": {}
+    },
+    "expectedFilter": {}
+  },
+  {
+    "name": "unsafe assignment propagates",
+    "descriptor": {
+      "parameters": [
+        {
+          "name": "__proto__.value",
+          "default": 1
+        }
+      ]
+    },
+    "values": {},
+    "filter": {},
+    "ready": false,
+    "expectedValues": {},
+    "expectedFilter": {},
+    "error": true
+  }
+]

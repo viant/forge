@@ -1,3 +1,4 @@
+import './dataSourceDependencies.parity.test.mjs';
 import assert from 'node:assert/strict';
 import {hasResolvedDependencies} from './dataSourceDependencies.js';
 

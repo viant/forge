@@ -72,7 +72,8 @@ func (g *Gateway) publishedCompiledCache() *publishedCompiledCache {
 
 // Load selects a current locally admitted root, decodes once per immutable hash
 // and codec, then fences the original session/root before release. No operation
-// in this loader performs network access, policy evaluation, or synchronization.
+// in this loader initiates synchronization. Source-backed navigation resolves
+// current origin rows on every call and bypasses the shared representation cache.
 // Cache entries hold representations only; authority is selected on every call.
 func Load[T any](ctx context.Context, source *Gateway, uriText string, codec PublishedCodec[T]) (out *PublishedValue[T], failure error) {
 	if ctx == nil || source == nil || codec.ID == "" || strings.TrimSpace(codec.ID) != codec.ID || codec.Decode == nil || (!codec.Immutable && codec.Clone == nil) {
@@ -114,16 +115,30 @@ func Load[T any](ctx context.Context, source *Gateway, uriText string, codec Pub
 	if !selected.ResourceCandidate.Valid() {
 		return nil, identity.ErrResourceDenied
 	}
-	cache := source.publishedCompiledCache()
+	var cache *publishedCompiledCache
+	dynamic := false
+	if menus, ok := registration.source.(PublishedParameterizedMenuSource); ok && uri.Kind == "navigation" {
+		dynamic, err = menus.MenuSourceBacked(ctx, uriText)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if !dynamic {
+		cache = source.publishedCompiledCache()
+	}
 	key := publishedCompiledKey{provider: connection.ProviderIdentity, uri: uriText, hash: hash, codec: codec.ID}
 	// Navigation bytes are derived from this admitted root set while their
 	// immutable source hash can stay identical across callers and selectors.
 	if uri.Kind == "navigation" {
 		key.admission = admission
 	}
-	entry, found, err := cache.entry(ctx, key, codec.Immutable)
-	if err != nil {
-		return nil, err
+	entry := &publishedCompiledEntry{ready: make(chan struct{}), immutable: codec.Immutable}
+	found := false
+	if cache != nil {
+		entry, found, err = cache.entry(ctx, key, codec.Immutable)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if found {
 		status = observe.CacheHit
@@ -144,36 +159,40 @@ func Load[T any](ctx context.Context, source *Gateway, uriText string, codec Pub
 		} else {
 			entry.err = readErr
 		}
-		cache.mu.Lock()
-		if entry.err != nil {
-			delete(cache.entries, key)
-		} else {
-			cache.bytes += entry.bytes
-			// Eviction drops representations only. In-flight readers keep immutable
-			// entry pointers and must still pass their own admission/selection fence.
-			if cache.bytes > 32<<20 {
-				for oldKey, old := range cache.entries {
-					if cache.bytes <= 32<<20 {
-						break
-					}
-					if old == entry {
-						continue
-					}
-					select {
-					case <-old.ready:
-						delete(cache.entries, oldKey)
-						cache.bytes -= old.bytes
-					default:
-					}
-				}
+		if cache != nil {
+			cache.mu.Lock()
+			if entry.err != nil {
+				delete(cache.entries, key)
+			} else {
+				cache.bytes += entry.bytes
+				// Eviction drops representations only. In-flight readers keep immutable
+				// entry pointers and must still pass their own admission/selection fence.
 				if cache.bytes > 32<<20 {
-					delete(cache.entries, key)
-					cache.bytes -= entry.bytes
+					for oldKey, old := range cache.entries {
+						if cache.bytes <= 32<<20 {
+							break
+						}
+						if old == entry {
+							continue
+						}
+						select {
+						case <-old.ready:
+							delete(cache.entries, oldKey)
+							cache.bytes -= old.bytes
+						default:
+						}
+					}
+					if cache.bytes > 32<<20 {
+						delete(cache.entries, key)
+						cache.bytes -= entry.bytes
+					}
 				}
 			}
+			close(entry.ready)
+			cache.mu.Unlock()
+		} else {
+			close(entry.ready)
 		}
-		close(entry.ready)
-		cache.mu.Unlock()
 	}
 	if entry.err != nil {
 		return nil, entry.err

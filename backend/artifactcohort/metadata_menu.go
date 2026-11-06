@@ -120,6 +120,21 @@ func (s *MetadataSource) preparedNavigation(ctx context.Context) (*preparedMenus
 	return prepared, nil
 }
 
+// MenuSourceBacked reports whether the admitted immutable root requires a
+// request-scoped origin projection. It resolves no rows and executes no query.
+func (s *MetadataSource) MenuSourceBacked(ctx context.Context, uriText string) (bool, error) {
+	uri, err := identity.ParseResourceURI(uriText)
+	if err != nil || uri.Kind != "navigation" || !s.claims(uri.Namespace) {
+		return false, metadataAdmissionError(ErrDenied)
+	}
+	prepared, err := s.preparedNavigation(ctx)
+	if err != nil {
+		return false, metadataAdmissionError(err)
+	}
+	_, dynamic := prepared.dynamic[uriText]
+	return dynamic, nil
+}
+
 // GetMenu returns source identity separately from prepared visible bytes.
 // Ordinary Get deliberately cannot expose unprojected navigation.
 func (s *MetadataSource) GetMenu(ctx context.Context, uriText string) (*primitive.GetResult, error) {

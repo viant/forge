@@ -38,7 +38,7 @@ func TestProjectMenuRowsIdentityOrderingAndAuthoredActions(t *testing.T) {
 	for _, row := range rows {
 		bindings[MenuRowIdentity{GroupID: row["group_id"].(string), ItemID: row["item_id"].(string)}] = MenuRowBinding{Action: action}
 	}
-	app := json.RawMessage(`{"id":"workspace","title":"Workspace","icon":"application","menus":[{"id":"replaced"}]}`)
+	app := json.RawMessage(`{"id":"workspace","title":"Workspace","icon":"application","menus":[]}`)
 	raw, err := ProjectMenuRows(context.Background(), rows, syntheticMenuFields, app, bindings)
 	require.NoError(t, err)
 	require.NoError(t, ValidateMenuTargets(context.Background(), raw))
@@ -82,7 +82,7 @@ func TestProjectMenuRowsIdentityOrderingAndAuthoredActions(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, raw, again)
 	}
-	require.JSONEq(t, `{"id":"workspace","title":"Workspace","icon":"application","menus":[{"id":"replaced"}]}`, string(app), "authored input is not mutated")
+	require.JSONEq(t, `{"id":"workspace","title":"Workspace","icon":"application","menus":[]}`, string(app), "authored input is not mutated")
 }
 
 func TestProjectMenuRowsUsesProducerSelectionAndNativeDisabledSemantics(t *testing.T) {
@@ -138,14 +138,68 @@ func TestProjectMenuRowsPreservesDatabaseIntegerOrderPrecision(t *testing.T) {
 	require.JSONEq(t, `{"schemaVersion":1,"applications":[{"id":"workspace","menus":[{"id":"group","title":"Same group","menus":[{"id":"earlier","title":"Same item","disabled":true},{"id":"later","title":"Same item","disabled":true}]}]}]}`, string(raw))
 }
 
-func TestProjectMenuRowsRejectsUnboundOrInvalidActionThroughNativeContract(t *testing.T) {
+func TestProjectMenuRowsPreservesStaticMenusAndApplicationContext(t *testing.T) {
+	app := json.RawMessage(`{"id":"workspace","title":"Workspace","context":{"selectedKey":"current","parameterBindings":{"Key":{"from":["key"]}}},"menus":[{"id":"selector","title":"Select workspace","action":{"resourceUri":"window://synthetic/selector","parameters":{"mode":"select"}}}]}`)
+	original := append(json.RawMessage(nil), app...)
+	bound := syntheticMenuRow("group", 1, "bound", 1)
+	// Only identity is needed for a catalog row without an authored target.
+	unbound := map[string]any{"group_id": "unbound-group", "item_id": "unbound"}
+	bindings := map[MenuRowIdentity]MenuRowBinding{
+		{GroupID: "group", ItemID: "bound"}: {Action: json.RawMessage(`{"resourceUri":"report://synthetic/entry"}`)},
+	}
+	for _, tc := range []struct {
+		name                   string
+		rows                   []map[string]any
+		wantMenus, wantActions int
+	}{
+		{name: "no rows", wantMenus: 1, wantActions: 1},
+		{name: "unbound rows", rows: []map[string]any{unbound}, wantMenus: 1, wantActions: 1},
+		{name: "static before bound rows", rows: []map[string]any{unbound, bound}, wantMenus: 2, wantActions: 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw, err := ProjectMenuRows(context.Background(), tc.rows, syntheticMenuFields, app, bindings)
+			require.NoError(t, err)
+			require.NoError(t, ValidateMenuTargets(context.Background(), raw))
+			var envelope struct {
+				Applications []json.RawMessage `json:"applications"`
+			}
+			require.NoError(t, json.Unmarshal(raw, &envelope))
+			require.Len(t, envelope.Applications, 1)
+			var application map[string]json.RawMessage
+			require.NoError(t, json.Unmarshal(envelope.Applications[0], &application))
+			require.JSONEq(t, `"workspace"`, string(application["id"]))
+			require.JSONEq(t, `{"selectedKey":"current","parameterBindings":{"Key":{"from":["key"]}}}`, string(application["context"]))
+			var menus []map[string]json.RawMessage
+			require.NoError(t, json.Unmarshal(application["menus"], &menus))
+			require.Len(t, menus, tc.wantMenus)
+			require.JSONEq(t, `"selector"`, string(menus[0]["id"]))
+			require.JSONEq(t, `{"resourceUri":"window://synthetic/selector","parameters":{"mode":"select"}}`, string(menus[0]["action"]))
+			require.NotContains(t, string(raw), "unbound-group")
+			checked := 0
+			filtered, err := filterMenuNodes(context.Background(), envelope.Applications, func(json.RawMessage) (bool, error) {
+				checked++
+				return false, nil
+			}, 0)
+			require.NoError(t, err)
+			require.Equal(t, tc.wantActions, checked, "static and dynamic actions both use native visibility")
+			require.Empty(t, filtered)
+			require.Equal(t, original, app, "composition does not mutate the authored application")
+		})
+	}
+}
+
+func TestProjectMenuRowsWithoutStaticMenusOmitsUnboundRows(t *testing.T) {
+	rows := []map[string]any{syntheticMenuRow("group", 1, "unbound", 1)}
+	raw, err := ProjectMenuRows(context.Background(), rows, syntheticMenuFields, json.RawMessage(`{"id":"workspace","menus":[]}`), nil)
+	require.NoError(t, err)
+	require.JSONEq(t, `{"schemaVersion":1,"applications":[]}`, string(raw))
+}
+
+func TestProjectMenuRowsRejectsInvalidActionThroughNativeContract(t *testing.T) {
 	row := syntheticMenuRow("group", 1, "item", 1)
 	key := MenuRowIdentity{GroupID: "group", ItemID: "item"}
-	for _, binding := range []*MenuRowBinding{nil, {}, {Disabled: false}, {Disabled: true, Action: json.RawMessage(`null`)}, {Action: json.RawMessage(`"invalid"`)}} {
-		bindings := make(map[MenuRowIdentity]MenuRowBinding)
-		if binding != nil {
-			bindings[key] = *binding
-		}
+	for _, binding := range []MenuRowBinding{{}, {Disabled: false}, {Disabled: true, Action: json.RawMessage(`null`)}, {Action: json.RawMessage(`"invalid"`)}} {
+		bindings := map[MenuRowIdentity]MenuRowBinding{key: binding}
 		_, err := ProjectMenuRows(context.Background(), []map[string]any{row}, syntheticMenuFields, json.RawMessage(`{"id":"workspace"}`), bindings)
 		require.Error(t, err)
 	}

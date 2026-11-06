@@ -35,7 +35,8 @@ type MenuRowBinding struct {
 
 // ProjectMenuRows groups producer-selected rows into one authored application
 // and returns the existing schemaVersion:1 applications/menus envelope. The
-// application's menus are replaced; its other authored fields are preserved.
+// application's authored menus precede row-derived groups; all other authored
+// fields are preserved.
 // Rows supply only identity, title and ordering. Actions come exclusively from
 // bindings keyed by group and item identity. Producers select visible rows and
 // supply any disabled presentation before calling; this utility makes no access
@@ -43,8 +44,9 @@ type MenuRowBinding struct {
 // publication and visibility path on the resulting definition.
 //
 // Groups and items sort by their declared order, preserving input order on ties.
-// A group's first row supplies its title and order. Each item identity must
-// occur once and have a binding, including explicitly disabled labels.
+// A group's first included row supplies its title and order. Each included item
+// identity must occur once. Rows without a binding are omitted; an explicitly
+// supplied binding must satisfy the existing action or disabled-label contract.
 func ProjectMenuRows(ctx context.Context, rows []map[string]any, fields MenuRowFields, application json.RawMessage, bindings map[MenuRowIdentity]MenuRowBinding) (json.RawMessage, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf("menu rows require a context")
@@ -60,6 +62,12 @@ func ProjectMenuRows(ctx context.Context, rows []map[string]any, fields MenuRowF
 	var app map[string]json.RawMessage
 	if json.Unmarshal(application, &app) != nil || app == nil {
 		return nil, fmt.Errorf("menu rows require an authored application object")
+	}
+	menus := make([]json.RawMessage, 0)
+	if authored, ok := app["menus"]; ok {
+		if json.Unmarshal(authored, &menus) != nil || menus == nil {
+			return nil, fmt.Errorf("authored application menus must be an array")
+		}
 	}
 	type item struct {
 		ID       string          `json:"id"`
@@ -81,6 +89,19 @@ func ProjectMenuRows(ctx context.Context, rows []map[string]any, fields MenuRowF
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
+		groupID, err := menuRowScalar(row[fields.GroupID])
+		if err != nil {
+			return nil, fmt.Errorf("menu row %d field %q: %w", i, fields.GroupID, err)
+		}
+		itemID, err := menuRowScalar(row[fields.ItemID])
+		if err != nil {
+			return nil, fmt.Errorf("menu row %d field %q: %w", i, fields.ItemID, err)
+		}
+		key := MenuRowIdentity{GroupID: groupID, ItemID: itemID}
+		binding, ok := bindings[key]
+		if !ok {
+			continue
+		}
 		values := make([]string, 6)
 		for j, field := range []string{fields.GroupID, fields.GroupLabel, fields.GroupOrder, fields.ItemID, fields.ItemLabel, fields.ItemOrder} {
 			value, err := menuRowScalar(row[field])
@@ -97,15 +118,10 @@ func ProjectMenuRows(ctx context.Context, rows []map[string]any, fields MenuRowF
 		if err != nil {
 			return nil, fmt.Errorf("menu row %d item order: %w", i, err)
 		}
-		key := MenuRowIdentity{GroupID: values[0], ItemID: values[3]}
 		if seen[key] {
 			return nil, fmt.Errorf("menu row %d repeats an item identity", i)
 		}
 		seen[key] = true
-		binding, ok := bindings[key]
-		if !ok {
-			return nil, fmt.Errorf("menu row %d has no authored binding", i)
-		}
 		g := byGroup[key.GroupID]
 		if g == nil {
 			g = &group{ID: key.GroupID, Title: values[1], Menus: make([]item, 0), order: groupOrder}
@@ -118,14 +134,21 @@ func ProjectMenuRows(ctx context.Context, rows []map[string]any, fields MenuRowF
 	for _, g := range groups {
 		sort.SliceStable(g.Menus, func(i, j int) bool { return g.Menus[i].order.Cmp(g.Menus[j].order) < 0 })
 	}
-	menus, err := json.Marshal(groups)
+	for _, g := range groups {
+		encoded, err := json.Marshal(g)
+		if err != nil {
+			return nil, err
+		}
+		menus = append(menus, encoded)
+	}
+	encodedMenus, err := json.Marshal(menus)
 	if err != nil {
 		return nil, err
 	}
-	app["menus"] = menus
-	// An empty datasource produces no applications, rather than an empty group.
+	app["menus"] = encodedMenus
+	// Preserve static menus even when no datasource rows have authored targets.
 	applications := make([]map[string]json.RawMessage, 0, 1)
-	if len(groups) > 0 {
+	if len(menus) > 0 {
 		applications = append(applications, app)
 	}
 	raw, err := json.Marshal(struct {
