@@ -52,6 +52,12 @@ func (c MCPCaller) ResolveMenu(ctx context.Context, ref RootRef, parameters map[
 	if err != nil {
 		return nil, err
 	}
+	// Resource tool failures retain the native gateway's terminal denial
+	// classification. Their body is producer-owned and must not be decoded as
+	// an exact published artifact or exposed in a public error.
+	if response != nil && response.IsError != nil && *response.IsError {
+		return nil, ErrDenied
+	}
 	raw, err := exactText(response)
 	if err != nil {
 		return nil, err
