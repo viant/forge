@@ -14,7 +14,8 @@ import (
 
 // MetadataSource projects only the locally admitted, producer-closed artifacts.
 // The immutable payload is authoritative; no revision is selected or retrieved
-// here. All methods are local and errors never initiate synchronization.
+// here. Source-backed menu pulls resolve request-scoped projections at the
+// configured origin; errors never initiate synchronization.
 type MetadataSource struct {
 	HeaderProjector
 	replica      *Replica
@@ -67,7 +68,7 @@ func (s *MetadataSource) Namespaces(ctx context.Context) (result []primitive.Nam
 		kinds[namespace] = map[string]bool{}
 	}
 	for _, root := range roots {
-		if root.Kind == "navigation" && menus.visible[root.URI] == nil {
+		if root.Kind == "navigation" && menus.visible[root.URI] == nil && menus.dynamic[root.URI].URI == "" {
 			continue
 		}
 		uri, err := identity.ParseResourceURI(root.URI)
@@ -114,7 +115,7 @@ func (s *MetadataSource) List(ctx context.Context, kind, namespace string) (resu
 	}
 	result = []primitive.ResourceState{}
 	for _, root := range roots {
-		if root.Kind == "navigation" && menus != nil && menus.visible[root.URI] == nil {
+		if root.Kind == "navigation" && menus != nil && menus.visible[root.URI] == nil && menus.dynamic[root.URI].URI == "" {
 			continue
 		}
 		uri, err := identity.ParseResourceURI(root.URI)

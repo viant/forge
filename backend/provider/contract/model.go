@@ -72,9 +72,10 @@ type ListRequest struct {
 	Limit     int    `json:"limit,omitempty"`
 }
 type GetRequest struct {
-	URI         string `json:"uri"`
-	Revision    string `json:"revision,omitempty"`
-	WorkspaceID string `json:"workspaceId,omitempty"`
+	Parameters  map[string]any `json:"parameters,omitempty"`
+	URI         string         `json:"uri"`
+	Revision    string         `json:"revision,omitempty"`
+	WorkspaceID string         `json:"workspaceId,omitempty"`
 }
 
 // Locator retains the delegated MCP owner next to a canonical resource pin.

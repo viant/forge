@@ -15,10 +15,11 @@ type preparedMenus struct {
 	roots   []RootRef
 	visible map[string]*primitive.MenuProjection
 	sources map[string]RootRef
+	dynamic map[string]RootRef
 }
 
-// preparedNavigation derives menu visibility once per local admitted selection.
-// No business rules, policy evaluations or producer metadata reads run here.
+// preparedNavigation caches static visibility and source-backed root identities
+// once per local admitted selection. It never resolves source-backed data.
 func (s *MetadataSource) preparedNavigation(ctx context.Context) (*preparedMenus, error) {
 	key, err := s.AdmissionKey(ctx)
 	if err != nil {
@@ -62,7 +63,7 @@ func (s *MetadataSource) preparedNavigation(ctx context.Context) (*preparedMenus
 		s.menuBindings[key] = contentKey
 		return cached, nil
 	}
-	prepared := &preparedMenus{roots: roots, visible: map[string]*primitive.MenuProjection{}, sources: map[string]RootRef{}}
+	prepared := &preparedMenus{roots: roots, visible: map[string]*primitive.MenuProjection{}, sources: map[string]RootRef{}, dynamic: map[string]RootRef{}}
 	permitted := make(map[string]bool, len(roots))
 	for _, root := range roots {
 		permitted[root.URI] = true
@@ -77,6 +78,18 @@ func (s *MetadataSource) preparedNavigation(ctx context.Context) (*preparedMenus
 		}
 		if view.Ref() != root {
 			return nil, ErrUnavailable
+		}
+		// A source-backed definition is immutable configuration, but its rows are
+		// request-scoped origin data. Discovery advertises it without execution.
+		var envelope struct {
+			Source json.RawMessage `json:"source"`
+		}
+		if err := json.Unmarshal(view.Payload(), &envelope); err != nil {
+			return nil, err
+		}
+		if len(envelope.Source) != 0 {
+			prepared.dynamic[root.URI] = root
+			continue
 		}
 		projection, err := producer.ProjectMenuTargets(ctx, view.Payload(), permitted)
 		if err != nil {
@@ -107,17 +120,53 @@ func (s *MetadataSource) preparedNavigation(ctx context.Context) (*preparedMenus
 	return prepared, nil
 }
 
-// GetMenu returns source identity separately from locally prepared visible
-// bytes. Ordinary Get deliberately cannot expose unprojected navigation.
-func (s *MetadataSource) GetMenu(ctx context.Context, uriText string) (result *primitive.GetResult, failure error) {
+// GetMenu returns source identity separately from prepared visible bytes.
+// Ordinary Get deliberately cannot expose unprojected navigation.
+func (s *MetadataSource) GetMenu(ctx context.Context, uriText string) (*primitive.GetResult, error) {
+	return s.GetMenuWithParameters(ctx, uriText, nil)
+}
+
+// GetMenuWithParameters resolves source-backed menus at their configured origin
+// on every pull. Parameters and the authenticated request context are transient;
+// neither rows nor their projections enter the immutable artifact cache.
+func (s *MetadataSource) GetMenuWithParameters(ctx context.Context, uriText string, parameters map[string]any) (result *primitive.GetResult, failure error) {
 	defer func() { failure = metadataAdmissionError(failure) }()
 	uri, err := identity.ParseResourceURI(uriText)
 	if err != nil || uri.Kind != "navigation" || !s.claims(uri.Namespace) {
 		return nil, ErrDenied
 	}
+	key, err := s.AdmissionKey(ctx)
+	if err != nil {
+		return nil, err
+	}
 	prepared, err := s.preparedNavigation(ctx)
 	if err != nil {
 		return nil, err
+	}
+	if ref, ok := prepared.dynamic[uriText]; ok {
+		resolver, ok := s.replica.cfg.Caller.(MenuResolver)
+		if !ok {
+			return nil, ErrUnsupported
+		}
+		resolved, err := resolver.ResolveMenu(ctx, ref, parameters)
+		if err != nil {
+			return nil, err
+		}
+		if err := validateResolvedMenu(ref, resolved); err != nil {
+			return nil, err
+		}
+		current, err := s.AdmissionKey(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if current != key {
+			return nil, ErrUnavailable
+		}
+		// Do not expose runtime execution provenance or unprojected definitions.
+		resource := &primitive.ResourceState{URI: uriText, Kind: uri.Kind, Namespace: uri.Namespace, Name: uri.Name, Title: resolved.Resource.Title, Lifecycle: identity.PublishedCandidate, FormatVersion: 1, ContentFingerprint: ref.Hash}
+		projection := *resolved.MenuProjection
+		projection.DefinitionBytes = bytes.Clone(projection.DefinitionBytes)
+		return &primitive.GetResult{Resource: resource, MenuProjection: &projection}, nil
 	}
 	projection := prepared.visible[uriText]
 	if projection == nil {
