@@ -1,14 +1,19 @@
 import assert from 'node:assert/strict';
 
-export async function verifyTableWidths(page) {
+export async function verifyTableWidths(page, {expectFits}) {
     const specimen = page.getByRole('region', {name: 'Authored table widths', exact: true});
     const table = specimen.locator('.forge-dashboard-table');
     const wrap = specimen.getByRole('region', {name: 'Scrollable data table', exact: true});
     assert.deepEqual(await table.locator('col').evaluateAll(nodes => nodes.map(node => node.style.width)), ['148px', '48px', '52px', '48px']);
     assert.equal(await table.evaluate(node => node.style.minWidth), '296px');
     const fitting = await wrap.evaluate(node => ({client: node.clientWidth, scroll: node.scrollWidth}));
-    assert.ok(fitting.client >= 296 && fitting.client < 484, JSON.stringify(fitting));
-    assert.ok(fitting.scroll <= fitting.client + 1, 'Admitted compact widths fit the narrow composite');
+    if (expectFits) {
+        assert.ok(fitting.client >= 296 && fitting.client < 484, JSON.stringify(fitting));
+        assert.ok(fitting.scroll <= fitting.client + 1, 'Admitted compact widths fit the narrow composite');
+    } else {
+        assert.ok(fitting.client < 296, JSON.stringify(fitting));
+        assert.ok(fitting.scroll > fitting.client, 'Phone panels scroll rather than shrink authored columns');
+    }
     const longHeader = table.getByRole('button', {name: 'Sort by A complete descriptive record label', exact: true});
     assert.equal(await longHeader.isVisible(), true);
     assert.ok(await longHeader.locator('.forge-dashboard-table__header-label').evaluate(node => node.getBoundingClientRect().height > parseFloat(getComputedStyle(node).lineHeight)), 'Long headers wrap');

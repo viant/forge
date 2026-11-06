@@ -44,7 +44,7 @@ try {
         await verifyComposerMenuDirection(proof);
         await verifyAttachmentDialog(proof);
         await verifyComposerFileDrop(proof);
-        await verifyTableWidths(proof);
+        await verifyTableWidths(proof, {expectFits: viewport.width === 1440});
         await verifyComparisonWidths(proof);
         const foundation = proof.locator('.forge-foundation-specimen');
         const analyticalDocument = foundation.getByRole('region',{name:'Analytical document specimen',exact:true});
