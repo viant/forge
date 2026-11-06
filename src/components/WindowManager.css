@@ -27,17 +27,47 @@
 
 .forge-window-content-mount, .forge-window-content-root { display: flex; flex-direction: column; flex: 1 1 0; min-height: 0; min-width: 0; }
 
+/* One bounded strip; labels and controls remain usable without wrapping. */
+.forge-window-manager-tablist {
+  display: flex; align-items: stretch; gap: 4px;
+  min-width: 0; max-width: 100%; overflow-x: auto; overflow-y: hidden;
+  padding: 4px 6px 0; border-bottom: 1px solid var(--forge-border-color, #d8dee7);
+  scrollbar-width: thin;
+}
 .forge-window-manager-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding-left: 3px;
-  min-width: 0;
+  display: inline-flex; flex: 0 0 auto; align-items: center;
+  gap: 2px; max-width: 260px; min-width: 0; padding: 0 3px;
+  border-radius: 6px 6px 0 0;
+}
+.forge-window-manager-tab:has(> [aria-selected="true"]) {
+  background: var(--forge-control-bg, #f2f5fa);
+  box-shadow: inset 0 -2px var(--forge-focus-color, #215db0);
 }
 .forge-window-manager-tab > [role="tab"] {
-  font-weight: 600;
+  appearance: none; border: 0; border-radius: 0; background: transparent;
+  color: var(--forge-text-muted, #5b6677); font: inherit; font-weight: 500;
+  min-width: 0; padding: 8px; line-height: 20px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  cursor: pointer; box-shadow: none;
+}
+.forge-window-manager-tab > [role="tab"][aria-selected="true"] {
+  color: var(--forge-text, #202833); font-weight: 600;
+}
+.forge-window-tab-action {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 28px; width: 28px; height: 28px; padding: 0;
+  border: 0; border-radius: 4px; background: transparent;
+  color: var(--forge-text-muted, #5b6677); cursor: pointer; --forge-icon-size: 14px;
+}
+.forge-window-tab-action:hover { background: var(--forge-control-bg, #e9edf3); }
+.forge-window-manager-tab > button:focus-visible {
+  outline: 2px solid var(--forge-focus-color, #215db0); outline-offset: -2px;
+}
+@media (pointer: coarse) {
+  .forge-window-tab-action { flex-basis: 44px; width: 44px; height: 44px; }
 }
 
 /* Custom renderers and content-sized windows share one bounded scroll host.
    Fill-sized layouts may still own their internal scrolling. */
 .forge-window-content-root { overflow: auto; }
+.forge-window-manager-tab:not(:has(> [aria-selected="true"])) > .forge-window-tab-undock { display: none; }

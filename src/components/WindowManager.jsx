@@ -20,6 +20,7 @@ import {
 import {Rnd} from 'react-rnd';
 import WindowControls from './WindowControls';
 import './WindowManager.css';
+import Icon from './Icon.jsx';
 import { resolveTabWindows, resolveVisibleTabId } from './windowManagerState.js';
 
 const WindowManager = ({renderWindowContent, isTabVisible, includeHosted = false, windowFilter, onCloseWindow, workspaceRuntime = {}}) => {
@@ -176,10 +177,10 @@ const WindowManager = ({renderWindowContent, isTabVisible, includeHosted = false
             {/* Tabs for windows in tabbed mode */}
             <WorkspaceRuntimeSurface tabMount={workspaceRuntime.tabMount} className="forge-window-manager-tabs" style={{flex:1,minHeight:0}}
                 tabProps={{id:'window-manager-tabs',tabIdFor:(id,windowId)=>`bp6-tab-title_${id}_${windowId}`,panelIdFor:(id,windowId)=>`bp6-tab-panel_${id}_${windowId}`,entries:tabWindows,selectedId:visibleTabId,onSelect:handleTabChange,onClose:closeWindow,
-                    onRuntimeEvent:workspaceRuntime.onRuntimeEvent,className:workspaceRuntime.tabListClassName || 'bp6-tab-list',itemClassName:workspaceRuntime.tabItemClassName || 'forge-window-manager-tab',tabClassName:'bp6-tab',ariaLabel:'Open windows',
+                    onRuntimeEvent:workspaceRuntime.onRuntimeEvent,className:`forge-window-manager-tablist ${workspaceRuntime.tabListClassName || 'bp6-tab-list'}`,itemClassName:workspaceRuntime.tabItemClassName || 'forge-window-manager-tab',tabClassName:'bp6-tab',ariaLabel:'Open windows',
                     renderLabel:workspaceRuntime.renderTabLabel || resolveDisplayWindowTitle,
-                    renderLeading:(win,{close})=><WindowControls onClose={close} onMaximize={event=>{event.stopPropagation();undockWindow(win.windowId);}} showMinimize={false} showMaximize/>,
-                    renderClose:()=>null}}
+                    renderClose:(win,{close})=><button type="button" className="forge-window-tab-action" aria-label="Close window" title={`Close ${resolveDisplayWindowTitle(win)}`} onClick={close}><Icon name="lucide:x"/></button>,
+                    renderTrailing:(win)=><button type="button" className="forge-window-tab-action forge-window-tab-undock" aria-label="Maximize window" title={`Open ${resolveDisplayWindowTitle(win)} in a floating window`} onClick={event=>{event.stopPropagation();undockWindow(win.windowId);}}><Icon name="lucide:maximize-2"/></button>}}
                 panelProps={{id:'window-manager-tabs',tabIdFor:(id,windowId)=>`bp6-tab-title_${id}_${windowId}`,panelIdFor:(id,windowId)=>`bp6-tab-panel_${id}_${windowId}`,entries:tabWindows,selectedId:visibleTabId,className:'forge-window-manager-tabs__panel',
                     getPresentation:workspaceRuntime.getPresentation || (win=>({label:resolveDisplayWindowTitle(win),kind:'window'})),onLifecycle:workspaceRuntime.onLifecycle,onRuntimeEvent:workspaceRuntime.onRuntimeEvent,
                     renderContent:win=><WindowContentMount windowId={win.windowId} register={registerContentHost}/>}}/>
