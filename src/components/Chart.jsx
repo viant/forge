@@ -1048,6 +1048,32 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         "data-series-id": String(seriesKey),
         "data-category": String(row?.[xAxis?.dataKey] ?? ""),
     });
+    const barSelectionProps = (entry) => {
+        if (!interactiveDatumSelection) return {};
+        const select = (datum) => emitSeriesDatumSelection(entry.value, datum);
+        return {
+            onClick: select,
+            onKeyDown: (datum, _index, event) => {
+                if (event.key !== "Enter" && event.key !== " ") return;
+                event.preventDefault();
+                event.stopPropagation();
+                if (!event.repeat) select(datum);
+            },
+        };
+    };
+    const barCellProps = (entry, row) => {
+        const identity = chartPointIdentity(entry.value, row);
+        const value = readChartDataValue(row, entry.value);
+        if (!interactiveDatumSelection || !isChartNumericValue(value)) return identity;
+        const category = formatChartXAxisValue(readChartDataValue(row, xAxis?.dataKey), resolvedTickFormat, resolvedTickValueMode);
+        const label = entry.name || entry.label || entry.value;
+        return {
+            ...identity,
+            role: "button",
+            tabIndex: 0,
+            "aria-label": `${label}, ${category}: ${formatValueByFormat(value, entry.format || leftAxis.format)}`,
+        };
+    };
     const renderSeriesPoint = (entry, visible) => (props = {}) => {
         const row = props.payload ?? normalizedChartData[props.index];
         const value = row?.[entry.value] ?? (Array.isArray(props.value) ? props.value.at(-1) : props.value);
@@ -1097,10 +1123,10 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         // The same tip corners therefore handle positive and negative bars.
         if (entry.type === "bar") {
             return (
-                <Bar key={entry.value} {...commonProps} radius={entry.stackId || chart.stacked ? 0 : resolveChartBarCornerRadii(1, 'vertical')} barSize={documentAppearance ? undefined : configuredBarSize} maxBarSize={documentAppearance ? configuredBarSize : undefined} stackId={entry.stackId || (chart.stacked ? 'total' : undefined)} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
+                <Bar key={entry.value} {...commonProps} radius={entry.stackId || chart.stacked ? 0 : resolveChartBarCornerRadii(1, 'vertical')} barSize={documentAppearance ? undefined : configuredBarSize} maxBarSize={documentAppearance ? configuredBarSize : undefined} stackId={entry.stackId || (chart.stacked ? 'total' : undefined)} {...barSelectionProps(entry)}>
                     {normalizedChartData.map((row, index) => (
                         <Cell key={`${entry.value}-cell-${index}`}
-                              {...chartPointIdentity(entry.value, row)}
+                              {...barCellProps(entry, row)}
                               {...(entry.pointColorMode === "bySign" ? {fill: resolveChartCategoryColor(chart, row?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color))} : {})} />
                     ))}
                     {showSeriesDataLabels ? (
@@ -1271,7 +1297,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                         fill={primarySeries.color}
                         barSize={barSize}
                         isAnimationActive={resolveChartAnimationActive(chart)}
-                        {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(primarySeries.value, payload) } : {})}
+                        {...barSelectionProps(primarySeries)}
                     >
                         {showHorizontalDataLabels ? (
                             <LabelList dataKey={primarySeries.value} content={(props) => <HorizontalBarValueLabel {...props} formatter={primaryDataLabelFormatter} />} />
@@ -1279,7 +1305,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                         {normalizedChartData.map((row, index) => (
                             <Cell
                                 key={`cell-${index}`}
-                                {...chartPointIdentity(primarySeries.value, row)}
+                                {...barCellProps(primarySeries, row)}
                                 fill={resolveChartCategoryColor(chart, row?.[xAxis?.dataKey], primarySeries.pointColorMode === "bySign"
                                     ? resolveConditionalSeriesColor(primarySeries, row?.[primarySeries.value], activePalette[index % activePalette.length])
                                     : activePalette[index % activePalette.length])}
@@ -1297,11 +1323,11 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                             barSize={barSize}
                             isAnimationActive={resolveChartAnimationActive(chart)}
                             stackId={responsiveChartType === "funnel_bar" ? undefined : entry.stackId}
-                            {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}
+                            {...barSelectionProps(entry)}
                         >
                             {normalizedChartData.map((row, index) => (
                                 <Cell key={`${entry.value}-cell-${index}`}
-                                      {...chartPointIdentity(entry.value, row)}
+                                      {...barCellProps(entry, row)}
                                       {...(entry.pointColorMode === "bySign" ? {fill: resolveChartCategoryColor(chart, row?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color))} : {})} />
                             ))}
                             {shouldRenderSeriesDataLabels(entry, responsiveChartType, normalizedChartData.length, embedded) ? (

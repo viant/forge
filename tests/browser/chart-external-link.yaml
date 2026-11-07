@@ -25,3 +25,51 @@ pipeline:
       - expect(page.getByRole('status')).toHaveText('[["https://example.invalid/records/17","_blank","noopener,noreferrer"]]')
       - page.getByRole('button','Safe4').press('Enter')
       - expect(page.getByRole('status')).toHaveText('[["https://example.invalid/records/17","_blank","noopener,noreferrer"],["https://example.invalid/records/17","_blank","noopener,noreferrer"]]')
+  svgSelection:
+    action: webdriver:run
+    sessionID: neutral-chart-links
+    autoStart: false
+    commands:
+      - page.goto('$pageURL/tests/browser/chart-external-link.html?appearance=legacy')
+      - expect(page.locator('#intents')).toHaveText('[]')
+      - page.locator('path[data-category="Safe"]').click()
+      - expect(page.locator('#intents')).toHaveText('[["https://example.invalid/records/17","_blank","noopener,noreferrer"]]')
+      - page.locator('svg[tabindex="0"]').press('Tab')
+      - expect(page.locator('path[data-category="Safe"]:focus')).toHaveCount(1,3000)
+      - 'page.getByRole(''button'',''Amount, Safe: 4'').press(''Enter'')'
+      - expect(page.locator('#intents')).toHaveText('[["https://example.invalid/records/17","_blank","noopener,noreferrer"],["https://example.invalid/records/17","_blank","noopener,noreferrer"]]')
+      - 'page.getByRole(''button'',''Amount, Safe: 4'').press(''Space'')'
+      - expect(page.locator('#intents')).toHaveText('[["https://example.invalid/records/17","_blank","noopener,noreferrer"],["https://example.invalid/records/17","_blank","noopener,noreferrer"],["https://example.invalid/records/17","_blank","noopener,noreferrer"]]')
+      - 'page.getByRole(''button'',''Amount, Unsafe: 3'').press(''Enter'')'
+      - 'page.getByRole(''button'',''Amount, Missing: 2'').press(''Space'')'
+      - 'page.getByRole(''button'',''Amount, Ambiguous: 2'').press(''Enter'')'
+      - expect(page.locator('#intents')).toHaveText('[["https://example.invalid/records/17","_blank","noopener,noreferrer"],["https://example.invalid/records/17","_blank","noopener,noreferrer"],["https://example.invalid/records/17","_blank","noopener,noreferrer"]]')
+      - page.locator('svg[tabindex="0"]').press('Tab')
+  svgRepeatedKeys:
+    action: webdriver:run
+    sessionID: neutral-chart-links
+    autoStart: false
+    actions:
+      - key: heldKeys
+        calls:
+          - {method: CDPCommand, parameters: [Input.dispatchKeyEvent, {type: keyDown, key: Enter, code: Enter, windowsVirtualKeyCode: 13}]}
+          - {method: CDPCommand, parameters: [Input.dispatchKeyEvent, {type: keyDown, key: Enter, code: Enter, windowsVirtualKeyCode: 13, autoRepeat: true}]}
+          - {method: CDPCommand, parameters: [Input.dispatchKeyEvent, {type: keyUp, key: Enter, code: Enter, windowsVirtualKeyCode: 13}]}
+          - {method: CDPCommand, parameters: [Input.dispatchKeyEvent, {type: keyDown, key: ' ', code: Space, windowsVirtualKeyCode: 32}]}
+          - {method: CDPCommand, parameters: [Input.dispatchKeyEvent, {type: keyDown, key: ' ', code: Space, windowsVirtualKeyCode: 32, autoRepeat: true}]}
+          - {method: CDPCommand, parameters: [Input.dispatchKeyEvent, {type: keyUp, key: ' ', code: Space, windowsVirtualKeyCode: 32}]}
+      - key: navigationIntents
+        calls:
+          - {method: ExecuteScript, parameters: ["return window.chartNavigationIntents.length;", []]}
+    expect:
+      navigationIntents: 5
+  svgReadOnly:
+    action: webdriver:run
+    sessionID: neutral-chart-links
+    autoStart: false
+    commands:
+      - page.goto('$pageURL/tests/browser/chart-external-link.html?appearance=legacy&selection=off')
+      - page.locator('path[data-category="Safe"]').click()
+      - expect(page.locator('path[data-category="Safe"][role="button"]')).toHaveCount(0)
+      - expect(page.locator('path[data-category="Safe"][tabindex]')).toHaveCount(0)
+      - expect(page.locator('#intents')).toHaveText('[]')

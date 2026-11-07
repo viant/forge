@@ -59,6 +59,11 @@
     outline-offset: 2px;
 }
 
+[data-dashboard-chart-id] .recharts-bar-rectangle [role="button"]:focus-visible {
+    outline: var(--forge-focus-width, 2px) solid var(--forge-focus-color, currentColor);
+    outline-offset: var(--forge-focus-offset, 2px);
+}
+
 /* Recharts retains the last tooltip position while hidden. A tooltip left at a
    desktop coordinate must not enlarge its scroll container after a resize. */
 [data-dashboard-chart-id] .recharts-tooltip-wrapper {

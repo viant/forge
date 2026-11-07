@@ -64,6 +64,9 @@ An aggregate mark opens a destination only when every contributing row belongs
 to that chart's active dataset and all rows resolve to the same URL. Missing,
 unsafe, mixed, or foreign-dataset destinations produce no navigation. Multiple
 external actions on one block are ambiguous and produce no navigation. Existing
-mark keyboard activation uses the same selection path. The destination always
+mark keyboard activation uses the same selection path. Selectable SVG bars are
+named Tab targets; Enter or Space activates the focused bar, and held-key repeats
+do not repeat the action. Read-only bars do not gain button roles or Tab stops.
+The destination always
 uses the table link policy's `_blank` target; mark controls do not expose native
 anchor context-menu or modifier-click semantics.

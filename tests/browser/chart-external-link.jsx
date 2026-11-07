@@ -10,8 +10,11 @@ const rows = [
   {category:'Ambiguous',amount:1,detailUrl:'https://example.invalid/records/18'},
   {category:'Ambiguous',amount:1,detailUrl:'https://example.invalid/records/19'},
 ];
-const block = {id:'records',kind:'chartBlock',title:'Synthetic records',datasetRef:'records',runtime:{actions:[{kind:'external',urlField:'detailUrl'}]},chartSpec:{type:'horizontal_bar',xField:'category',yFields:['amount']}};
-const chartModel = {type:'horizontal_bar',appearance:'document',animation:false,xAxis:{dataKey:'category'},series:{values:[{value:'amount',label:'Amount'}]}};
+const params = new URLSearchParams(window.location.search);
+const legacy = params.get('appearance') === 'legacy';
+const runtime = params.get('selection') === 'off' ? {} : {actions:[{kind:'external',urlField:'detailUrl'}]};
+const block = {id:'records',kind:'chartBlock',title:'Synthetic records',datasetRef:'records',runtime,chartSpec:{type:'horizontal_bar',xField:'category',yFields:['amount']}};
+const chartModel = {type:'horizontal_bar',animation:false,xAxis:{dataKey:'category'},series:{values:[{value:'amount',label:'Amount'}]},...(legacy ? {tooltip:{fields:[{field:'category',label:'Category',format:'text'}]}} : {appearance:'document'})};
 const spec = {title:'Synthetic links',blocks:[block],datasets:[{id:'records',request:{}}]};
 const fill = {blocks:[{...block,content:{chartSpec:block.chartSpec,chartModel}}],datasets:[{id:'records',rows}]};
 window.chartNavigationIntents = [];
