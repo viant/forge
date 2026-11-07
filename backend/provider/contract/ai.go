@@ -16,6 +16,10 @@ type AgentDocumentEnvelope struct {
 	SchemaVersion int64  `json:"schemaVersion" yaml:"schemaVersion"`
 	Document      string `json:"document" yaml:"document"`
 }
+type RoutingGuideEnvelope struct {
+	SchemaVersion int64  `json:"schemaVersion" yaml:"schemaVersion"`
+	Document      string `json:"document" yaml:"document"`
+}
 type PromptEnvelope struct {
 	SchemaVersion int64            `json:"schemaVersion" yaml:"schemaVersion"`
 	Text          string           `json:"text" yaml:"text"`

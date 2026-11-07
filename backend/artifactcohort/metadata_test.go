@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 	"time"
+
+	primitive "github.com/viant/forge/backend/provider/contract"
 )
 
 // All definitions below are independent synthetic envelopes, not captures.
@@ -14,9 +16,13 @@ func TestMetadataSourceAllKindsStayLocalAndSelectOneHash(t *testing.T) {
 	roots := []RootRef{}
 	// Navigation uses the separately fingerprinted GetMenu contract, covered by
 	// metadata_menu_test.go; ordinary kinds retain exact source-byte delivery.
-	kinds := []string{"window", "report", "mcp", "skill", "playbook", "toolfeed", "eval", "agent", "prompt"}
+	kinds := []string{"window", "report", "mcp", "skill", "playbook", "toolfeed", "eval", "agent", "prompt", primitive.RoutingKind}
 	for _, kind := range kinds {
-		a, _, err := publisher.Publish(ctx, RootRef{URI: kind + "://example/sample", Kind: kind, Version: 7}, json.RawMessage(`{"schemaVersion":1,"title":"Synthetic fixture","description":"Synthetic discovery guidance"}`), allowPublished)
+		raw := json.RawMessage(`{"schemaVersion":1,"title":"Synthetic fixture","description":"Synthetic discovery guidance"}`)
+		if kind == primitive.RoutingKind {
+			raw = json.RawMessage(`{"schemaVersion":1,"document":"---\nname: Synthetic fixture\ndescription: Synthetic discovery guidance\n---\nRoute record review to the available reader.\n"}`)
+		}
+		a, _, err := publisher.Publish(ctx, RootRef{URI: kind + "://example/sample", Kind: kind, Version: 7}, raw, allowPublished)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -99,12 +105,12 @@ func TestMetadataSourceAllKindsStayLocalAndSelectOneHash(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	root := roots[0]
-	next, _, err := publisher.Publish(ctx, RootRef{URI: root.URI, Kind: root.Kind, Version: 8}, json.RawMessage(`{"schemaVersion":1,"title":"Updated synthetic fixture"}`), allowPublished)
+	root := roots[len(roots)-1]
+	next, _, err := publisher.Publish(ctx, RootRef{URI: root.URI, Kind: root.Kind, Version: 8}, json.RawMessage(`{"schemaVersion":1,"document":"---\nname: Updated synthetic fixture\ndescription: Updated discovery guidance\n---\nRoute record review to the selected reader.\n"}`), allowPublished)
 	if err != nil {
 		t.Fatal(err)
 	}
-	cohorts[0].Roots[0] = next.Root
+	cohorts[0].Roots[len(roots)-1] = next.Root
 	if _, err = publisher.ReplaceCatalog(ctx, policies, cohorts, publisher.Generation()); err != nil {
 		t.Fatal(err)
 	}

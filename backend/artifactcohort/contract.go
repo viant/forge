@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/viant/authz"
+	primitive "github.com/viant/forge/backend/provider/contract"
 )
 
 const (
@@ -53,7 +54,7 @@ func RootKey(ref RootRef) string { return ref.URI + "\x00" + strconv.FormatUint(
 
 func RootKind(kind string) bool {
 	switch kind {
-	case "window", "skill", "playbook", "intent", "agent", "report", "prompt", "eval", "navigation", "mcp", "toolfeed", "feed":
+	case "window", "skill", "playbook", "intent", "agent", "report", "prompt", "eval", "navigation", "mcp", "toolfeed", "feed", primitive.RoutingKind:
 		return true
 	}
 	return false

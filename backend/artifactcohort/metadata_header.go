@@ -93,6 +93,17 @@ func (s *HeaderProjector) decodeHeader(kind, hash string, payload []byte) (Artif
 			}
 		}
 	}
+	if kind == primitive.RoutingKind {
+		document, err := (primitive.DocumentCarrier{SchemaVersion: value.SchemaVersion, Document: envelope.Document}).Bytes()
+		if err != nil {
+			return ArtifactHeader{}, ErrInvalid
+		}
+		guide, err := primitive.ParseRoutingGuide(primitive.RoutingGuideEnvelope{SchemaVersion: value.SchemaVersion, Document: string(document)})
+		if err != nil {
+			return ArtifactHeader{}, ErrInvalid
+		}
+		value.fill(ArtifactHeader{Name: guide.Name, Description: guide.Description})
+	}
 	s.headerMu.Lock()
 	defer s.headerMu.Unlock()
 	if s.headers == nil {

@@ -48,7 +48,13 @@ are established; immutable payloads can be reused from backing storage.
 
 ## Registration and synchronization
 
-This package is an opt-in host/producer contract over an already authenticated MCP connection. A producer validates the complete top-level artifact at publication, including every declared private dependency, before `Publisher.Publish` activates the immutable version. A published window contains its selected datasource/dialog/CSS definitions in its schema 2 closure. Dependencies do not gain public versions or separate access grants. Window, skill, intent, agent, report, prompt, eval, navigation, toolfeed, and feed roots follow the same top-level rule. This production contract supersedes the exploratory signed PoC under Agently Core's performance output; it adds no new signature or event-sequence protocol.
+This package is an opt-in host/producer contract over an already authenticated MCP connection. A producer validates the complete top-level artifact at publication, including every declared private dependency, before `Publisher.Publish` activates the immutable version. A published window contains its selected datasource/dialog/CSS definitions in its schema 2 closure. Dependencies do not gain public versions or separate access grants. Window, skill, intent, agent, report, prompt, routing, eval, navigation, toolfeed, and feed roots follow the same top-level rule. This production contract supersedes the exploratory signed PoC under Agently Core's performance output; it adds no new signature or event-sequence protocol.
+
+Routing guides use the `routing://namespace/name` URI and the version 1
+`RoutingGuideEnvelope` with an authored Markdown document. Upgrade every
+synchronization client of the namespace before adding its first routing root.
+Clients that predate the kind reject the catalog containing it, including when
+the root is assigned to another cohort in the same namespace.
 
 Minimal trusted Go registration:
 

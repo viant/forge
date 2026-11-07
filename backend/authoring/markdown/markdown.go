@@ -40,28 +40,40 @@ func Marshal(metadata []byte, messages []Message) ([]byte, error) {
 	return MarshalMarkdown(metadata, messages)
 }
 
+// SplitFrontmatter reads leading YAML while keeping the remaining Markdown a
+// single literal body. Role headers are meaningful only to ParseMarkdown.
+func SplitFrontmatter(raw []byte) (metadata []byte, body string, err error) {
+	lines, err := markdownLines(raw)
+	if err != nil {
+		return nil, "", err
+	}
+	metadata, start, err := leadingFrontmatter(lines)
+	if err != nil {
+		return nil, "", err
+	}
+	return metadata, strings.Join(lines[start:], "\n"), nil
+}
+
 // ParseMarkdown accepts document frontmatter followed by message blocks of the
 // form --- / role: system|user|assistant / --- / Markdown body. Unsectioned
 // body is a system message. Horizontal rules and fenced delimiters stay text.
 func ParseMarkdown(raw []byte) (MarkdownDocument, error) {
-	if len(raw) > 1<<20 {
-		return MarkdownDocument{}, fmt.Errorf("markdown definition exceeds 1 MiB")
+	lines, err := markdownLines(raw)
+	if err != nil {
+		return MarkdownDocument{}, err
 	}
-	text := strings.TrimPrefix(strings.ReplaceAll(string(raw), "\r\n", "\n"), "\ufeff")
-	lines := strings.Split(text, "\n")
+	first, bodyStart, err := leadingFrontmatter(lines)
+	if err != nil {
+		return MarkdownDocument{}, err
+	}
 	doc := MarkdownDocument{}
 	start := 0
-	if len(lines) > 0 && lines[0] == "---" {
-		end := delimiterAfter(lines, 1)
-		if end < 0 {
-			return MarkdownDocument{}, fmt.Errorf("unterminated YAML frontmatter")
-		}
-		first := []byte(strings.Join(lines[1:end], "\n"))
+	if bodyStart > 0 {
 		if _, isHeader, err := decodeRoleHeader(first); err != nil {
 			return MarkdownDocument{}, err
 		} else if !isHeader {
 			doc.Metadata = first
-			start = end + 1
+			start = bodyStart
 		}
 	}
 	current := MarkdownMessage{Role: "system"}
@@ -108,6 +120,25 @@ func ParseMarkdown(raw []byte) (MarkdownDocument, error) {
 		return MarkdownDocument{}, err
 	}
 	return doc, nil
+}
+
+func markdownLines(raw []byte) ([]string, error) {
+	if len(raw) > 1<<20 {
+		return nil, fmt.Errorf("markdown definition exceeds 1 MiB")
+	}
+	text := strings.TrimPrefix(strings.ReplaceAll(string(raw), "\r\n", "\n"), "\ufeff")
+	return strings.Split(text, "\n"), nil
+}
+
+func leadingFrontmatter(lines []string) (metadata []byte, bodyStart int, err error) {
+	if len(lines) == 0 || lines[0] != "---" {
+		return nil, 0, nil
+	}
+	end := delimiterAfter(lines, 1)
+	if end < 0 {
+		return nil, 0, fmt.Errorf("unterminated YAML frontmatter")
+	}
+	return []byte(strings.Join(lines[1:end], "\n")), end + 1, nil
 }
 
 // MarshalMarkdown writes complete YAML metadata and ordered role blocks. It
