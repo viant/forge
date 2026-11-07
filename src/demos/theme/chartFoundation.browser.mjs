@@ -116,7 +116,12 @@ export async function verifyChartFoundation(page,{expectedFont}={}) {
     const typography=await line.locator('.recharts-cartesian-axis-tick text').first().evaluate(node=>{const css=getComputedStyle(node);return {size:parseFloat(css.fontSize),roleSize:parseFloat(css.getPropertyValue('--forge-type-small-size')),family:css.fontFamily,weight:Number(css.fontWeight),roleWeight:Number(css.getPropertyValue('--forge-type-small-weight'))};});
     assert.equal(typography.size,typography.roleSize);
     assert.equal(typography.weight,typography.roleWeight);
-    const overflow=await specimen.evaluate(root=>[...root.querySelectorAll('*')].filter(node=>{const rect=node.getBoundingClientRect();return rect.width>0 && rect.right>innerWidth+1 && !node.closest('.forge-chart-table-scroll, .forge-categorical-heatmap, .forge-category-range') && getComputedStyle(node).position!=='fixed';}).map(node=>node.className?.baseVal||node.className).slice(0,5));
+    // Accessibility tables retain intrinsic cell widths but paint no content.
+    // Verify their clipping before excluding their descendants from visual bounds.
+    const accessibleTables=await specimen.locator('.forge-overlap-accessible-table').evaluateAll(nodes=>nodes.map(node=>{const css=getComputedStyle(node);return {position:css.position,overflow:css.overflow,clipPath:css.clipPath};}));
+    assert.ok(accessibleTables.length>0,'Overlap data remains available in accessibility tables');
+    for(const table of accessibleTables) assert.deepEqual(table,{position:'absolute',overflow:'hidden',clipPath:'inset(50%)'},'Accessibility tables must remain visually clipped');
+    const overflow=await specimen.evaluate(root=>[...root.querySelectorAll('*')].filter(node=>{const rect=node.getBoundingClientRect();return rect.width>0 && rect.right>innerWidth+1 && !node.closest('.forge-chart-table-scroll, .forge-categorical-heatmap, .forge-category-range, .forge-overlap-accessible-table') && getComputedStyle(node).position!=='fixed';}).map(node=>({tag:node.tagName,classes:node.getAttribute('class')||'',example:node.closest('[data-chart-example]')?.getAttribute('data-chart-example'),right:node.getBoundingClientRect().right,viewport:innerWidth})).slice(0,5));
     assert.deepEqual(overflow,[],'Chart examples must fit the page');
     const clippedValueTicks=await specimen.locator('.recharts-yAxis .recharts-cartesian-axis-tick text').evaluateAll(nodes=>nodes.filter(node=>{const rect=node.getBoundingClientRect(),svg=node.closest('svg').getBoundingClientRect();return rect.width>0 && rect.left<svg.left-1;}).map(node=>node.textContent));
     assert.deepEqual(clippedValueTicks,[],'Numeric axis labels must fit inside their chart');
