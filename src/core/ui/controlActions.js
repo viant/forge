@@ -79,8 +79,9 @@ export async function invokeRegisteredControlAction(params, action) {
       if(observed.error)throw observed.error;result=observed.value;
     } else result=invoked;
     if(result===false)throw new Error('normal UI handler rejected the action');
-    if(result && ['failed','invalid','indeterminate','confirmation_unavailable','blocked','busy','guarded'].includes(result.status))throw Object.assign(new Error(result.error?.message || `normal UI action ${result.status}; inspect current state before retrying`),{code:result.error?.code || result.status,accepted:result.accepted});
-    return {ok:true,controlId:meta.controlId,dataSourceRef:meta.dataSourceRef || null,action,status:result?.status || 'handler_completed',...(typeof result?.accepted==='boolean'?{accepted:result.accepted}:{}),...(result?.pendingConfirmation===true?{pendingConfirmation:true}:{})};
+    if(result && ['failed','cancelled','invalid','indeterminate','confirmation_unavailable','blocked','busy','guarded'].includes(result.status))throw Object.assign(new Error(result.error?.message || `normal UI action ${result.status}; inspect current state before retrying`),{code:result.error?.code || result.status,accepted:result.accepted});
+    const receipt=result?.receipt && typeof result.receipt==='object'?Object.fromEntries(['status','artifactId','jobId','format'].filter(key=>typeof result.receipt[key]==='string').map(key=>[key,result.receipt[key]])):null;
+    return {ok:true,...(receipt&&Object.keys(receipt).length?{receipt}:{}),controlId:meta.controlId,dataSourceRef:meta.dataSourceRef || null,action,status:result?.status || 'handler_completed',...(typeof result?.accepted==='boolean'?{accepted:result.accepted}:{}),...(result?.pendingConfirmation===true?{pendingConfirmation:true}:{})};
   } finally {interaction.close();pendingOperations.delete(meta.windowId);}
 }
 export function isLiveControlVisible(element) {

@@ -16,10 +16,11 @@ async function mount(props={}){
  URL.createObjectURL=vi.fn(()=> 'blob:report');URL.revokeObjectURL=vi.fn();
  const click=vi.spyOn(HTMLAnchorElement.prototype,'click').mockImplementation(()=>{});
  const host=document.createElement('div'),root=createRoot(host);
- const Harness=p=>{const output=useReportOutput(p);return <><ReportOutputActions {...p} output={output} cancelable/><output>{output.printModel?.title}</output></>};
+ let latestOutput;
+ const Harness=p=>{const output=useReportOutput(p);latestOutput=output;return <><ReportOutputActions {...p} output={output} cancelable/><output>{output.printModel?.title}</output></>};
  let current={scopeKey:'first',tableBlocks:[{id:'evidence',title:'Evidence'}],...props};
  const render=async change=>{current={...current,...change};await act(async()=>root.render(<StrictMode><Harness {...current}/></StrictMode>));};
- await render();return{host,render,click,button:label=>[...host.querySelectorAll('button')].find(b=>b.textContent===label),close:()=>act(async()=>root.unmount())};
+ await render();return{host,render,click,get output(){return latestOutput},button:label=>[...host.querySelectorAll('button')].find(b=>b.textContent===label),close:()=>act(async()=>root.unmount())};
 }
 it('downloads the chosen complete table through the shared file path',async()=>{
  const run=vi.fn(async({format})=>artifact(format)),v=await mount({onExport:run});
@@ -59,4 +60,19 @@ it('rejects malformed, partial and mismatched output rather than invoking a down
 it('opens a fresh canonical print model, closes it, and drops it on identity change',async()=>{
  const print=vi.fn(async()=>({kind:'reportPrint',title:'Fresh complete print',pages:[{number:1}],pageGeometry:{width:612,height:792}})),v=await mount({onPrint:print});
  try{await act(async()=>v.button('Print preview').click());expect(print).toHaveBeenCalledTimes(1);expect(v.host.querySelector('output').textContent).toBe('Fresh complete print');await act(async()=>v.button('Close print preview').click());expect(v.host.querySelector('output').textContent).toBe('');await act(async()=>v.button('Print preview').click());await v.render({scopeKey:'new-metrics'});expect(v.host.querySelector('output').textContent).toBe('');}finally{await v.close()}
+});
+
+it('returns compact successful export receipts without retaining file bytes',async()=>{
+ const run=vi.fn(async()=>({...artifact('xlsx'),artifactId:'artifact-1',jobId:'job-1',extra:'not part of receipt'})),v=await mount({onExport:run});
+ try{let receipt;await act(async()=>{receipt=await v.output.exportReport('xlsx')});expect(receipt).toEqual({status:'succeeded',receipt:{status:'succeeded',format:'xlsx',artifactId:'artifact-1',jobId:'job-1'}});expect(v.click).toHaveBeenCalledOnce();}finally{await v.close()}
+});
+it('returns failed export outcomes to automation as well as the visible alert',async()=>{
+ const v=await mount({onExport:async()=>{throw Error('Synthetic export failure')}});
+ try{let receipt;await act(async()=>{receipt=await v.output.exportReport('xlsx')});expect(receipt).toEqual({status:'failed',error:{message:'Synthetic export failure'}});expect(v.host.textContent).toContain('Synthetic export failure');expect(v.click).not.toHaveBeenCalled();}finally{await v.close()}
+});
+it('does not return successful receipts after a scope change or cancellation',async()=>{
+ for(const changeScope of [true,false]){
+  const pending=deferred(),v=await mount({onExport:()=>pending.promise});let result;
+  try{await act(async()=>{result=v.output.exportReport('xlsx')});if(changeScope)await v.render({scopeKey:'different'});else await act(async()=>v.output.cancelOutput());let receipt;await act(async()=>{pending.resolve({...artifact('xlsx'),artifactId:'stale'});receipt=await result});expect(receipt.status).toBe('cancelled');expect(v.click).not.toHaveBeenCalled();}finally{await v.close()}
+ }
 });

@@ -41,3 +41,22 @@ it('native export operates the existing enabled output callback and rejects unav
   expect(exportReport).toHaveBeenCalledExactlyOnceWith('pdf',undefined);
  }finally{await act(async()=>root.unmount());host.remove();activeWindows.value=[];layout.mockRestore();}
 });
+
+it('returns the completed export receipt through the mounted native action without file bytes',async()=>{
+ const {default:ReportOutputActions}=await import('./ReportOutputActions.jsx');
+ const {useReportOutput}=await import('./useReportOutput.js');
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ const layout=vi.spyOn(HTMLElement.prototype,'getClientRects').mockReturnValue([{width:100,height:20}]);
+ const download=vi.spyOn(HTMLAnchorElement.prototype,'click').mockImplementation(()=>{});
+ URL.createObjectURL=vi.fn(()=> 'blob:example');URL.revokeObjectURL=vi.fn();
+ const id='receipt-report';activeWindows.value=[{windowId:id,conversationId:'example-chat'}];getMetadataSignal(id).value={};
+ const exportData=vi.fn(async()=>({artifactId:'artifact-1',jobId:'job-1',format:'xlsx',filename:'example.xlsx',contentType:'application/octet-stream',data:btoa('synthetic file bytes')}));
+ function Output(){const output=useReportOutput({scopeKey:'same',onExport:exportData});return <ReportOutputActions context={{identity:{windowId:id}}} scopeKey="same" output={output} workbookExport/>;}
+ try{
+  await act(async()=>root.render(<Output/>));
+  let result;await act(async()=>{result=await runUICommand({method:'ui.control.click',params:{windowId:id,controlId:'report-output:xlsx'}})});
+  expect(result.receipt).toEqual({status:'succeeded',format:'xlsx',artifactId:'artifact-1',jobId:'job-1'});
+  expect(result.status).toBe('succeeded');expect(download).toHaveBeenCalledOnce();expect(exportData).toHaveBeenCalledOnce();
+  expect(JSON.stringify(result).length).toBeLessThan(400);expect(JSON.stringify(result)).not.toContain('data:');
+ }finally{await act(async()=>root.unmount());host.remove();activeWindows.value=[];layout.mockRestore();download.mockRestore();}
+});

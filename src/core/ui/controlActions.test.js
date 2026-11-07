@@ -74,3 +74,11 @@ await assert.rejects(invokeRegisteredControlAction({windowId:'lookup-flow',contr
 await invokeRegisteredControlAction({windowId:'lookup-flow',controlId:'picker:select'},'click');for(let i=0;i<5;i++)await Promise.resolve();
 assert.equal(chosen.id,7);assert.equal(originCalls,1);assert.equal(readRegisteredControlActions({windowId:'lookup-flow',controlId:'lookup'}).controls[0].operationState.status,'handler_completed');originOff();continueOff();
 console.log('PASS: awaited native-dialog continuation yields pending state, accepts normal same-window selection and records completion without duplicate origin invocation');
+
+const receiptOff=registerControlActions({windowId:'receipt-window',controlId:'export'},()=>({visible:true,disabled:false,actions:{click:async()=>({status:'succeeded',receipt:{status:'succeeded',artifactId:'artifact-1',jobId:'job-1',format:'xlsx',data:'excluded workbook bytes',credential:'excluded'}})}}));
+const receiptResult=await invokeRegisteredControlAction({windowId:'receipt-window',controlId:'export'},'click');
+assert.deepEqual(receiptResult.receipt,{status:'succeeded',artifactId:'artifact-1',jobId:'job-1',format:'xlsx'});receiptOff();
+for(const status of ['failed','cancelled']){
+ const remove=registerControlActions({windowId:'receipt-window',controlId:'export'},()=>({visible:true,disabled:false,actions:{click:async()=>({status,error:{message:'Synthetic output failure'}})}}));
+ await assert.rejects(invokeRegisteredControlAction({windowId:'receipt-window',controlId:'export'},'click'),/Synthetic output failure/);remove();
+}
