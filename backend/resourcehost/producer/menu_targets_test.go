@@ -39,6 +39,45 @@ func TestProjectMenuTargetsEmptyUnknownAndAmbiguousActions(t *testing.T) {
 	require.ErrorIs(t, err, context.Canceled)
 }
 
+func TestProjectMenuTargetsRequiresEveryDeclaredResource(t *testing.T) {
+	ctx := context.Background()
+	raw := json.RawMessage(`{"schemaVersion":1,"applications":[{"menus":[{"id":"legacy","action":{"resourceURI":"window://synthetic/launcher"}},{"id":"dependent","action":{"resourceUri":"window://synthetic/launcher","requiredResources":["report://synthetic/detail","datasource://synthetic/summary"],"parameters":{"value":9007199254740993}}}]}]}`)
+	require.NoError(t, ValidateMenuTargets(ctx, raw))
+	permitted := map[string]bool{"window://synthetic/launcher": true}
+	projection, err := ProjectMenuTargets(ctx, raw, permitted)
+	require.NoError(t, err)
+	require.JSONEq(t, `{"schemaVersion":1,"applications":[{"menus":[{"id":"legacy","action":{"resourceURI":"window://synthetic/launcher"}}]}]}`, string(projection.DefinitionBytes))
+
+	permitted["report://synthetic/detail"] = true
+	projection, err = ProjectMenuTargets(ctx, raw, permitted)
+	require.NoError(t, err)
+	require.NotContains(t, string(projection.DefinitionBytes), "dependent")
+
+	permitted["datasource://synthetic/summary"] = true
+	projection, err = ProjectMenuTargets(ctx, raw, permitted)
+	require.NoError(t, err)
+	require.JSONEq(t, string(raw), string(projection.DefinitionBytes))
+	require.Contains(t, string(projection.DefinitionBytes), "9007199254740993")
+
+	delete(permitted, "window://synthetic/launcher")
+	projection, err = ProjectMenuTargets(ctx, raw, permitted)
+	require.NoError(t, err)
+	require.Nil(t, projection)
+}
+
+func TestReleasedMenuRejectsMalformedRequiredResources(t *testing.T) {
+	ctx := context.Background()
+	for _, resources := range []string{`null`, `"report://synthetic/detail"`, `[null]`, `[42]`, `["report://synthetic/../detail"]`, `["https://example.test/detail"]`} {
+		t.Run(resources, func(t *testing.T) {
+			raw := json.RawMessage(`{"schemaVersion":1,"applications":[{"menus":[{"action":{"resourceUri":"window://synthetic/missing"},"children":[{"action":{"resourceUri":"window://synthetic/launcher","requiredResources":` + resources + `}}]}]}]}`)
+			require.ErrorIs(t, ValidateMenuTargets(ctx, raw), identity.ErrResource)
+			_, err := ProjectMenuTargets(ctx, raw, nil)
+			require.ErrorIs(t, err, identity.ErrResource)
+			require.ErrorContains(t, err, "requiredResources")
+		})
+	}
+}
+
 func TestReleasedLegacyMenuNormalizesOnlyDerivedVersion(t *testing.T) {
 	ctx := context.Background()
 	legacy := json.RawMessage(`{"applications":[{"id":"app","menus":[{"id":"allowed","action":{"resourceURI":"window://synthetic/allowed","parameters":{"large":9007199254740993}}},{"id":"denied-group","children":[{"action":{"resourceUri":"window://synthetic/denied"}}]}]}]}`)

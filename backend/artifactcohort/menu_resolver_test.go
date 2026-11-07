@@ -16,10 +16,12 @@ import (
 
 type menuOriginCaller struct {
 	*fakeCaller
-	calls   int
-	rows    string
-	failure error
-	seenRef RootRef
+	calls         int
+	rows          string
+	definition    json.RawMessage
+	duringResolve func()
+	failure       error
+	seenRef       RootRef
 }
 
 type menuResponseClient struct {
@@ -74,7 +76,16 @@ func (c *menuOriginCaller) ResolveMenu(ctx context.Context, ref RootRef, paramet
 	if err != nil {
 		return nil, err
 	}
-	raw, _ := json.Marshal(map[string]any{"schemaVersion": 1, "applications": []any{map[string]any{"id": fmt.Sprint(actor, "/", parameters["scope"], "/", c.rows), "disabled": true}}})
+	raw := c.definition
+	if raw == nil {
+		raw, _ = json.Marshal(map[string]any{"schemaVersion": 1, "applications": []any{map[string]any{
+			"id":     fmt.Sprint(actor, "/", parameters["scope"], "/", c.rows),
+			"action": map[string]string{"resourceUri": "window://example/launcher"},
+		}}})
+	}
+	if c.duringResolve != nil {
+		c.duringResolve()
+	}
 	return &primitive.GetResult{Resource: &primitive.ResourceState{URI: ref.URI, ContentFingerprint: ref.Hash}, MenuProjection: &primitive.MenuProjection{SchemaVersion: 1, DefinitionBytes: raw, ContentFingerprint: identity.ContentFingerprint(raw)}}, nil
 }
 
@@ -85,8 +96,10 @@ func TestSourceBackedMenuAlwaysResolvesAtOriginWithoutCachingRows(t *testing.T) 
 	raw := json.RawMessage(`{"schemaVersion":1,"name":"Origin navigation","source":{"dataSourceRef":{"resource":{"uri":"datasource://example/path/rows"},"providerIdentity":"original"},"contextBindings":{"scope":"scope"},"resultPath":"data.navigation"},"applications":[]}`)
 	artifact, _, err := publisher.Publish(ctx, RootRef{URI: "navigation://example/path/main", Kind: "navigation", Version: 7}, raw, allowPublished)
 	require.NoError(t, err)
+	launcher, _, err := publisher.Publish(ctx, RootRef{URI: "window://example/launcher", Kind: "window", Version: 1}, json.RawMessage(`{"schemaVersion":1}`), allowPublished)
+	require.NoError(t, err)
 	policies, cohorts := cohortFixture()
-	cohorts[0].Roots = []RootRef{artifact.Root}
+	cohorts[0].Roots = []RootRef{artifact.Root, launcher.Root}
 	_, err = publisher.ReplaceCatalog(ctx, policies, cohorts, publisher.Generation())
 	require.NoError(t, err)
 	caller := &menuOriginCaller{fakeCaller: &fakeCaller{publisher: publisher, fetches: map[string]int{}}, rows: "first"}
@@ -100,7 +113,7 @@ func TestSourceBackedMenuAlwaysResolvesAtOriginWithoutCachingRows(t *testing.T) 
 	require.Len(t, rows, 1)
 	namespaces, err := source.Namespaces(ctx)
 	require.NoError(t, err)
-	require.Len(t, namespaces[0].Kinds, 1)
+	require.Len(t, namespaces[0].Kinds, 2)
 	require.Zero(t, caller.calls, "discovery must not query local or origin data")
 	for _, input := range []struct{ actor, scope string }{{"alice", "one"}, {"bob", "two"}, {"alice", "two"}} {
 		result, err := source.GetMenuWithParameters(actorContext(input.actor, "operator"), artifact.Root.URI, map[string]any{"scope": input.scope})
@@ -124,6 +137,87 @@ func TestSourceBackedMenuAlwaysResolvesAtOriginWithoutCachingRows(t *testing.T) 
 	retained, err := publisher.Get(artifact.Root)
 	require.NoError(t, err)
 	require.JSONEq(t, string(raw), string(retained.Payload))
+}
+
+// The same origin data and navigation pin serve two independently authored
+// release selections. Only one includes the destination behind the launcher.
+func TestSourceBackedMenuFiltersAgainstSelectedReleaseRoots(t *testing.T) {
+	ctx := actorContext("synthetic-reader", "operator")
+	publisher := NewPublisher()
+	publish := func(uri, kind, raw string) RootRef {
+		artifact, _, err := publisher.Publish(ctx, RootRef{URI: uri, Kind: kind, Version: 1}, json.RawMessage(raw), allowPublished)
+		require.NoError(t, err)
+		return artifact.Root
+	}
+	menu := publish("navigation://synthetic/main", "navigation", `{"schemaVersion":1,"source":{"dataSourceRef":{"resource":{"uri":"datasource://synthetic/rows"},"providerIdentity":"origin"}},"applications":[]}`)
+	launcher := publish("window://synthetic/launcher", "window", `{"schemaVersion":1}`)
+	detail := publish("report://synthetic/detail", "report", `{"schemaVersion":1}`)
+	policies, _ := cohortFixture()
+	cohorts := []Cohort{
+		{Tenant: "tenant", Name: "older", PolicyResource: policies[0].Resource, Roots: []RootRef{menu, launcher}},
+		{Tenant: "tenant", Name: "newer", PolicyResource: policies[0].Resource, Roots: []RootRef{menu, launcher, detail}},
+		{Tenant: "tenant", Name: "menu-only", PolicyResource: policies[0].Resource, Roots: []RootRef{menu}},
+	}
+	_, err := publisher.ReplaceCatalog(ctx, policies, cohorts, publisher.Generation())
+	require.NoError(t, err)
+	caller := &menuOriginCaller{
+		fakeCaller: &fakeCaller{publisher: publisher, fetches: map[string]int{}},
+		definition: json.RawMessage(`{"schemaVersion":1,"name":"Synthetic","applications":[{"id":"app","menus":[{"id":"chooser","action":{"resourceURI":"window://synthetic/launcher"}},{"id":"detail","action":{"resourceUri":"window://synthetic/launcher","requiredResources":["report://synthetic/detail"]}}]}]}`),
+	}
+	facts := &countedFacts{}
+	replica, err := NewReplica(Config{Enabled: true, Source: "origin", Tenant: "tenant", Account: "account", Caller: caller, Facts: facts, SessionKey: fixtureSession, Cohort: func(ctx context.Context) (string, error) {
+		selected, _ := ctx.Value(cohortSelectorKey{}).(string)
+		return selected, nil
+	}})
+	require.NoError(t, err)
+	require.NoError(t, replica.Sync(ctx))
+	source, err := NewMetadataSource(replica, []string{"synthetic"})
+	require.NoError(t, err)
+	older, newer := selectCohort(ctx, "older"), selectCohort(ctx, "newer")
+	for _, test := range []struct {
+		ctx       context.Context
+		hasDetail bool
+		hasMenu   bool
+	}{
+		{older, false, true},
+		{newer, true, true},
+		{older, false, true},
+		{selectCohort(ctx, "menu-only"), false, false},
+	} {
+		got, err := source.GetMenu(test.ctx, menu.URI)
+		require.NoError(t, err)
+		require.Equal(t, menu, caller.seenRef)
+		require.Equal(t, menu.Hash, got.Resource.ContentFingerprint)
+		require.Equal(t, identity.ContentFingerprint(got.MenuProjection.DefinitionBytes), got.MenuProjection.ContentFingerprint)
+		visible := string(got.MenuProjection.DefinitionBytes)
+		if test.hasDetail {
+			require.JSONEq(t, string(caller.definition), visible)
+		} else if test.hasMenu {
+			require.JSONEq(t, `{"schemaVersion":1,"name":"Synthetic","applications":[{"id":"app","menus":[{"id":"chooser","action":{"resourceURI":"window://synthetic/launcher"}}]}]}`, visible)
+		} else {
+			require.JSONEq(t, `{"schemaVersion":1,"applications":[]}`, visible)
+		}
+	}
+	require.Equal(t, 4, caller.calls, "one origin request per menu pull")
+	require.Equal(t, 1, caller.discovers, "filtering must reuse the loaded release")
+	for _, count := range caller.fetches {
+		require.Equal(t, 1, count)
+	}
+	denied := selectCohort(actorContext("synthetic-viewer", "viewer"), "newer")
+	got, err := source.GetMenu(denied, menu.URI)
+	require.ErrorIs(t, err, ErrDenied)
+	require.Nil(t, got)
+	require.Equal(t, 4, caller.calls, "prepared release roots do not authorize another actor")
+
+	caller.duringResolve = func() { require.NoError(t, replica.MarkUpdated(detail.URI)) }
+	got, err = source.GetMenu(newer, menu.URI)
+	require.ErrorIs(t, err, ErrUnavailable, "an in-flight partition update fences delivery")
+	require.Nil(t, got)
+	caller.duringResolve = nil
+	got, err = source.GetMenu(newer, menu.URI)
+	require.NoError(t, err)
+	require.NotContains(t, string(got.MenuProjection.DefinitionBytes), "detail", "a stale destination is excluded while the launcher stays available")
+	require.Contains(t, string(got.MenuProjection.DefinitionBytes), "chooser")
 }
 
 func TestMenuOriginTransportUsesExactRootAndRejectsMismatchedIdentity(t *testing.T) {

@@ -7,11 +7,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/viant/forge/backend/provider/contract/observe"
 	"reflect"
 	"strings"
 
 	primitive "github.com/viant/forge/backend/provider/contract"
+	"github.com/viant/forge/backend/provider/contract/observe"
 	identity "github.com/viant/forge/backend/resource"
 )
 
@@ -136,6 +136,7 @@ func filterMenuNodes(ctx context.Context, nodes []json.RawMessage, visible func(
 
 // ValidateMenuTargets validates the explicit target contract used by released
 // navigation. Publication validators can call it before retaining source bytes.
+// An action can declare additional canonical resource URIs in requiredResources.
 // An absent legacy schemaVersion defaults to one without changing source bytes.
 // General ValidateMenu remains compatible with host-specific action handlers.
 func ValidateMenuTargets(ctx context.Context, raw json.RawMessage) error {
@@ -173,13 +174,13 @@ func validatedReleasedMenu(ctx context.Context, raw json.RawMessage) (map[string
 	var applications []json.RawMessage
 	_ = json.Unmarshal(envelope["applications"], &applications)
 	_, err := filterMenuNodes(ctx, applications, func(action json.RawMessage) (bool, error) {
-		_, err := releasedMenuTarget(action)
+		_, _, err := releasedMenuTargets(action)
 		return true, err // validate all descendants before any visibility pruning
 	}, 0)
 	return envelope, err
 }
 
-func releasedMenuTarget(action json.RawMessage) (string, error) {
+func releasedMenuTargets(action json.RawMessage) (string, []string, error) {
 	var fields map[string]json.RawMessage
 	_ = json.Unmarshal(action, &fields)
 	var target string
@@ -187,28 +188,34 @@ func releasedMenuTarget(action json.RawMessage) (string, error) {
 		if encoded, exists := fields[key]; exists {
 			var value string
 			if json.Unmarshal(encoded, &value) != nil || value == "" || target != "" {
-				return "", fmt.Errorf("%w: released navigation action requires exactly one nonempty resourceUri or resourceURI string", identity.ErrResource)
+				return "", nil, fmt.Errorf("%w: released navigation action requires exactly one nonempty resourceUri or resourceURI string", identity.ErrResource)
 			}
 			target = value
 		}
 	}
 	uri, err := identity.ParseResourceURI(target)
 	if err != nil || uri.String() != target {
-		return "", fmt.Errorf("%w: released navigation action requires a canonical resourceUri or resourceURI; normalize custom action targets before publication", identity.ErrResource)
+		return "", nil, fmt.Errorf("%w: released navigation action requires a canonical resourceUri or resourceURI; normalize custom action targets before publication", identity.ErrResource)
 	}
-	return target, nil
+	var required []string
+	if encoded, exists := fields["requiredResources"]; exists {
+		if json.Unmarshal(encoded, &required) != nil || required == nil {
+			return "", nil, fmt.Errorf("%w: requiredResources must be an array of canonical resource URIs", identity.ErrResource)
+		}
+		for _, resource := range required {
+			uri, err := identity.ParseResourceURI(resource)
+			if err != nil || uri.String() != resource {
+				return "", nil, fmt.Errorf("%w: requiredResources must contain canonical resource URIs", identity.ErrResource)
+			}
+		}
+	}
+	return target, required, nil
 }
 
 // ProjectMenuTargets prepares a navigation projection from an already admitted
-// exact target set. It performs only membership filtering, never authorization
-// or remote I/O. A nil projection means no executable menu remains.
+// exact target set. The action target and every required resource must belong
+// to that set. A nil projection means no executable menu remains.
 func ProjectMenuTargets(ctx context.Context, raw json.RawMessage, permitted map[string]bool) (*primitive.MenuProjection, error) {
-	if ctx == nil {
-		return nil, identity.ErrResource
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
 	envelope, err := validatedReleasedMenu(ctx, raw)
 	if err != nil {
 		return nil, err
@@ -216,8 +223,16 @@ func ProjectMenuTargets(ctx context.Context, raw json.RawMessage, permitted map[
 	var applications []json.RawMessage
 	_ = json.Unmarshal(envelope["applications"], &applications)
 	filtered, err := filterMenuNodes(ctx, applications, func(action json.RawMessage) (bool, error) {
-		target, err := releasedMenuTarget(action)
-		return permitted[target], err
+		target, required, err := releasedMenuTargets(action)
+		if err != nil || !permitted[target] {
+			return false, err
+		}
+		for _, resource := range required {
+			if !permitted[resource] {
+				return false, nil
+			}
+		}
+		return true, nil
 	}, 0, true)
 	if err != nil || len(filtered) == 0 {
 		return nil, err

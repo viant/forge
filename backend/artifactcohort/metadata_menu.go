@@ -12,10 +12,11 @@ import (
 )
 
 type preparedMenus struct {
-	roots   []RootRef
-	visible map[string]*primitive.MenuProjection
-	sources map[string]RootRef
-	dynamic map[string]RootRef
+	roots     []RootRef
+	permitted map[string]bool
+	visible   map[string]*primitive.MenuProjection
+	sources   map[string]RootRef
+	dynamic   map[string]RootRef
 }
 
 // preparedNavigation caches static visibility and source-backed root identities
@@ -63,10 +64,15 @@ func (s *MetadataSource) preparedNavigation(ctx context.Context) (*preparedMenus
 		s.menuBindings[key] = contentKey
 		return cached, nil
 	}
-	prepared := &preparedMenus{roots: roots, visible: map[string]*primitive.MenuProjection{}, sources: map[string]RootRef{}, dynamic: map[string]RootRef{}}
-	permitted := make(map[string]bool, len(roots))
+	prepared := &preparedMenus{
+		roots:     roots,
+		permitted: make(map[string]bool, len(roots)),
+		visible:   map[string]*primitive.MenuProjection{},
+		sources:   map[string]RootRef{},
+		dynamic:   map[string]RootRef{},
+	}
 	for _, root := range roots {
-		permitted[root.URI] = true
+		prepared.permitted[root.URI] = true
 	}
 	for _, root := range roots {
 		if root.Kind != "navigation" {
@@ -91,7 +97,7 @@ func (s *MetadataSource) preparedNavigation(ctx context.Context) (*preparedMenus
 			prepared.dynamic[root.URI] = root
 			continue
 		}
-		projection, err := producer.ProjectMenuTargets(ctx, view.Payload(), permitted)
+		projection, err := producer.ProjectMenuTargets(ctx, view.Payload(), prepared.permitted)
 		if err != nil {
 			return nil, fmt.Errorf("navigation %s: %w", root.URI, err)
 		}
@@ -170,6 +176,10 @@ func (s *MetadataSource) GetMenuWithParameters(ctx context.Context, uriText stri
 		if err := validateResolvedMenu(ref, resolved); err != nil {
 			return nil, err
 		}
+		projection, err := producer.ProjectMenuTargets(ctx, resolved.MenuProjection.DefinitionBytes, prepared.permitted)
+		if err != nil {
+			return nil, err
+		}
 		current, err := s.AdmissionKey(ctx)
 		if err != nil {
 			return nil, err
@@ -177,11 +187,14 @@ func (s *MetadataSource) GetMenuWithParameters(ctx context.Context, uriText stri
 		if current != key {
 			return nil, ErrUnavailable
 		}
+		if projection == nil {
+			// The admitted source still resolves when no executable items remain.
+			empty := []byte(`{"schemaVersion":1,"applications":[]}`)
+			projection = &primitive.MenuProjection{SchemaVersion: 1, DefinitionBytes: empty, ContentFingerprint: identity.ContentFingerprint(empty)}
+		}
 		// Do not expose runtime execution provenance or unprojected definitions.
 		resource := &primitive.ResourceState{URI: uriText, Kind: uri.Kind, Namespace: uri.Namespace, Name: uri.Name, Title: resolved.Resource.Title, Lifecycle: identity.PublishedCandidate, FormatVersion: 1, ContentFingerprint: ref.Hash}
-		projection := *resolved.MenuProjection
-		projection.DefinitionBytes = bytes.Clone(projection.DefinitionBytes)
-		return &primitive.GetResult{Resource: resource, MenuProjection: &projection}, nil
+		return &primitive.GetResult{Resource: resource, MenuProjection: projection}, nil
 	}
 	projection := prepared.visible[uriText]
 	if projection == nil {
