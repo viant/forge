@@ -19,3 +19,20 @@ public/window-editor/wasm_exec.js
 
 # Compiled Go test executables.
 *.test
+
+# Historical local planning and investigation paths.
+/advence-reporting/README.md
+/advence-reporting/phase-1-semantic-modeling-layer.md
+/advence-reporting/phase-2-authored-reports-and-drill-navigation.md
+/advence-reporting/phase-3-calculated-fields-and-ad-hoc-exploration.md
+/advence-reporting/phase-4-sharing-governance-and-export-polish.md
+/advence-reporting/phase-5-go-export-engine.md
+/advence-reporting/proposal.md
+/doc/primitive-mobile-pairing-audit.md
+/doc/reporting-platform-parity.md
+/docs/forecasting-report-builder-implementation-plan.md
+/reporting-ux.md
+/ui-improvement.md
+
+# Private local captures and runtime state.
+/android/sdk/src/test/resources/steward-request-only.json
