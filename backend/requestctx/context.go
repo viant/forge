@@ -4,15 +4,14 @@ package requestctx
 
 import (
 	"context"
+	sharedctx "github.com/viant/mcp/client/requestctx"
 	"strings"
 	"sync"
 
 	"github.com/google/uuid"
 )
 
-type conversationIDKey string
-
-var ConversationIDKey = conversationIDKey("conversationID")
+var ConversationIDKey = sharedctx.ConversationIDKey
 
 func ConversationIDFromContext(ctx context.Context) string {
 	value := ctx.Value(ConversationIDKey)

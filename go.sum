@@ -127,10 +127,16 @@ github.com/viant/govalidator v0.3.3 h1:Dk9a+LQhZKpVe2bPUEin8GcFbVfC5oVpyNsvoqjbT
 github.com/viant/govalidator v0.3.3/go.mod h1:D35Dwx0R8rR1knRxhlseoYvOkiqo24kpMg1/o977i9Y=
 github.com/viant/jsonrpc v0.25.1-0.20261014230436-c7e03c1c46eb h1:xZ/QTDNgUOhn/MMmUHOtYA57l0lZW5cQ0gLQFQeS2Yw=
 github.com/viant/jsonrpc v0.25.1-0.20261014230436-c7e03c1c46eb/go.mod h1:b214Lo4zBwLqbu6Tf2bRlgQkFfPMBW5ap4qS+I3zcJ8=
+github.com/viant/jsonrpc v0.25.1 h1:Qn/Z7jXogc1iR53KCuJLnqqgvvtmxmftiif2BCRnYV0=
+github.com/viant/jsonrpc v0.25.1/go.mod h1:b214Lo4zBwLqbu6Tf2bRlgQkFfPMBW5ap4qS+I3zcJ8=
 github.com/viant/mcp v0.24.1-0.20261016035016-dc29fe9112e9 h1:z+UmgfWgZm3jcD0H9X+9/pCiKgHEO1inFxurGEZ+5fI=
 github.com/viant/mcp v0.24.1-0.20261016035016-dc29fe9112e9/go.mod h1:Yn0ypkLtyn531y0pQTGBdNU8mFtEJlW+r76YoFaOAY0=
+github.com/viant/mcp v0.24.2-0.20261107201957-8748c0cb8ca8 h1:C/6rmFUDAPIbQtHScMx/B9dZ9CGDPxP+w5112w4YmaA=
+github.com/viant/mcp v0.24.2-0.20261107201957-8748c0cb8ca8/go.mod h1:f5ZT0adIbghdjCrsxHifnDUGhHB9fVzK6bqfzG+OGMk=
 github.com/viant/mcp-protocol v0.19.1-0.20261014173008-af92f34f304b h1:0VPbrlB8gbHLc1zrwbFW+f3IowORM5MmqpldnWm0+eY=
 github.com/viant/mcp-protocol v0.19.1-0.20261014173008-af92f34f304b/go.mod h1:8h2yGk/LjWpyLqQEZYOGuNZQPohCr1vtM8IvtcNcEIQ=
+github.com/viant/mcp-protocol v0.19.2-0.20261029232114-446f89dc454b h1:BBQbDtI+VH2rBTAhnpwz8Edd/gbx6gV3A7qfLBr+3FA=
+github.com/viant/mcp-protocol v0.19.2-0.20261029232114-446f89dc454b/go.mod h1:aIspjnR3WXyP2+BDM1CdCu/L7hpQtEz6cD36rz0qZ0k=
 github.com/viant/parsly v0.3.3 h1:7ytgfLOG4Ils+wviGacWxRD0gAUvVEH/iGsSE+UI8YM=
 github.com/viant/parsly v0.3.3/go.mod h1:85fneXJbErKMGhSQto3A5ElTQCwl3t74U9cSV0waBHw=
 github.com/viant/scache v0.5.1-0.20241014222741-4367658dff4f h1:dWVuenSFFeAqWPslOXhCj+ND5CwiCVBaAyq3vefDvBs=
@@ -147,6 +153,8 @@ github.com/viant/x v0.4.1-0.20260914174450-0e043f24aec5 h1:lawjTgyL6kTkNui0nO90p
 github.com/viant/x v0.4.1-0.20260914174450-0e043f24aec5/go.mod h1:Ud4v5LGA8uA0EfmuO4H0t0YgAq2FNLnh3ydQUjBdaLI=
 github.com/viant/xunsafe v0.11.0 h1:Yp5n4JR/6dTZ5asx+hmLGT7UXh5NPz7O9NKmYsk2k0o=
 github.com/viant/xunsafe v0.11.0/go.mod h1:RLSFNYewiF4p7+Lc18N4Zv4DHPWMTEky2VCLWvBdC5o=
+github.com/viant/xunsafe v0.11.1 h1:cKzAyBzlc4xh771ihsrHqQeBP0wFWCkLCfzT8u+SULU=
+github.com/viant/xunsafe v0.11.1/go.mod h1:tREfeTKhjN/P6Ul0qmGgt3eiTMkCSlFzfEv4SneNEEs=
 github.com/xuri/efp v0.0.1 h1:fws5Rv3myXyYni8uwj2qKjVaRP30PdjeYe2Y6FDsCL8=
 github.com/xuri/efp v0.0.1/go.mod h1:ybY/Jr0T0GTCnYjKqmdwxyxn2BQf2RcQIIvex5QldPI=
 github.com/xuri/excelize/v2 v2.10.0 h1:8aKsP7JD39iKLc6dH5Tw3dgV3sPRh8uRVXu/fMstfW4=

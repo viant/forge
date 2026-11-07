@@ -16,9 +16,9 @@ require (
 	github.com/viant/authz v0.0.0-20261022171511-cc9325165338
 	github.com/viant/bintly v0.2.0
 	github.com/viant/govalidator v0.3.3
-	github.com/viant/jsonrpc v0.25.1-0.20261014230436-c7e03c1c46eb
-	github.com/viant/mcp v0.24.1-0.20261016035016-dc29fe9112e9
-	github.com/viant/mcp-protocol v0.19.1-0.20261014173008-af92f34f304b
+	github.com/viant/jsonrpc v0.25.1
+	github.com/viant/mcp v0.24.2-0.20261107201957-8748c0cb8ca8
+	github.com/viant/mcp-protocol v0.19.2-0.20261029232114-446f89dc454b
 	github.com/viant/scache v0.5.1-0.20241014222741-4367658dff4f
 	github.com/viant/scy v0.30.0
 	github.com/viant/tagly v0.4.2-0.20261028223500-81e046a19ef9
@@ -54,7 +54,7 @@ require (
 	github.com/viant/gosh v0.3.0 // indirect
 	github.com/viant/parsly v0.3.3 // indirect
 	github.com/viant/structology v0.2.0 // indirect
-	github.com/viant/xunsafe v0.11.0 // indirect
+	github.com/viant/xunsafe v0.11.1 // indirect
 	golang.org/x/mod v0.38.0 // indirect
 )
 

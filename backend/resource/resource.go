@@ -8,12 +8,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	sharedcatalog "github.com/viant/mcp/client/catalog"
 	"strings"
 	"time"
 )
 
 var ErrResource = errors.New("invalid resource identity")
-var ErrResourceDenied = errors.New("resource revision denied")
+var ErrResourceDenied = sharedcatalog.ErrResourceDenied
 var ErrResourceStale = errors.New("resolved resource content changed")
 
 const WorkingCandidate = "working"
