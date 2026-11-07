@@ -34,7 +34,7 @@ func coldHTTPGateway(t *testing.T) (*Gateway, *localFixtureSource, fixtureOption
 	t.Cleanup(gateway.Close)
 	return gateway, source, options
 }
-func TestColdCatalogCapturesInitializedSharedOptions(t *testing.T) {
+func TestColdCatalogInitializesWithoutMutatingSharedOptions(t *testing.T) {
 	g, _, options := coldHTTPGateway(t)
 	cfg := options["cold"]
 	require.Empty(t, cfg.Name)
@@ -46,11 +46,11 @@ func TestColdCatalogCapturesInitializedSharedOptions(t *testing.T) {
 	page, err := ListPage[json.RawMessage](ctx, g, "window", CatalogQuery{}, true)
 	require.NoError(t, err)
 	require.Len(t, page.Items, 1)
-	require.NotEmpty(t, cfg.Name)
-	require.NotEmpty(t, cfg.Version)
+	require.Empty(t, cfg.Name)
+	require.Empty(t, cfg.Version)
 	after, err := json.Marshal(cfg)
 	require.NoError(t, err)
-	require.NotEqual(t, before, after, "normal MCP Init changes shared options; capture after initialization")
+	require.Equal(t, before, after, "client initialization must not mutate shared source configuration")
 	got, err := Get[json.RawMessage](ctx, g, page.Items[0].Connection, identity.ResourceRef{URI: page.Items[0].Resource.URI}, nil)
 	require.NoError(t, err)
 	require.NotEmpty(t, got.Definition)

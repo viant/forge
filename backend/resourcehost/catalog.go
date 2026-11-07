@@ -47,11 +47,27 @@ func (g *Gateway) catalog(ctx context.Context, kind, category string, load func(
 		if err != nil {
 			return nil, actor, err
 		}
-		items, err := load(ctx)
-		if err != nil {
-			return nil, actor, err
+		var index *primitive.Catalog[json.RawMessage]
+		if g.Manager != nil {
+			names, namesErr := g.catalogConnectionNames(ctx)
+			if namesErr != nil {
+				return nil, actor, namesErr
+			}
+			sort.Strings(names)
+			partition := g.Manager.WithCatalogSources(ctx, g.Manager.CatalogPartition(ctx, catalogPrincipalScope(actor), category), names)
+			key := fmt.Sprintf("published:%p:%s:%s:%s:%q:%x", g, actorKey(actor, "", 0), admission, kind, names, g.catalogGeneration(names))
+			index, err = g.Manager.VisibleCatalogInPartition(ctx, key, partition, actor.ValidUntil, load, sourceLease...)
+		} else {
+			var items []primitive.CatalogItem[json.RawMessage]
+			items, err = load(ctx)
+			if err == nil {
+				var raw []byte
+				raw, err = json.Marshal(items)
+				if err == nil {
+					index = primitive.NewCatalog(actorKey(actor, "published", 0)+admission+string(raw), items)
+				}
+			}
 		}
-		raw, err := json.Marshal(items)
 		if err != nil {
 			return nil, actor, err
 		}
@@ -66,7 +82,7 @@ func (g *Gateway) catalog(ctx context.Context, kind, category string, load func(
 			return nil, actor, identity.ErrResourceDenied
 		}
 		catalogSucceeded = true
-		return primitive.NewCatalog(actorKey(actor, "published", 0)+admission+string(raw), items), actor, nil
+		return index, actor, nil
 	}
 	names, err := g.catalogConnectionNames(ctx)
 	if err != nil {
@@ -252,7 +268,7 @@ func ListPage[T any](ctx context.Context, g *Gateway, kind string, query Catalog
 	}
 	var definitionLease time.Time
 	index, actor, err := g.catalog(ctx, catalogKind, kind, func(ctx context.Context) ([]primitive.CatalogItem[json.RawMessage], error) {
-		rows, err := g.List(ctx, kind, query.Namespace)
+		rows, err := g.List(ctx, kind, "")
 		if err != nil {
 			return nil, err
 		}
