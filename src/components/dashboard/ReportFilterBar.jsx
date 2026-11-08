@@ -67,14 +67,15 @@ function Choice({control, values, onChange, loadChoices, scopeKey, onChoices, co
     </fieldset></FilterControl>;
 }
 
-function DatePresets({control, values, onDatePreset, onDateRange, onDateDraft}) {
+function DatePresets({control, values, context, busy, onDatePreset, onDateRange, onDateDraft}) {
     if (!control.datePresets) return null;
     if (!listWidgets().includes('dateRangePreset') || typeof onDatePreset !== 'function' || typeof onDateRange !== 'function') {
         return <span role="status">Date presets are unavailable in this host. Enter dates manually.</span>;
     }
     const Preset = getWidget('dateRangePreset');
     return <>
-        <Preset item={{id: control.id, label: control.label}} value={control.presetValue || 'custom'}
+        <Preset context={context} item={{id: `report-filter:date-range:${control.id}`, label: control.label, scope: 'windowForm'}}
+            disabled={busy} value={control.presetValue || 'custom'}
             range={{start: values[control.start], end: values[control.end]}} options={control.datePresets.options}
             onPresetRequest={option => onDatePreset(control.id, option.value)}
             onRangeChange={range => onDateRange(control.id, range)} onDraftChange={() => onDateDraft?.(control.id)}
@@ -95,7 +96,7 @@ export default function ReportFilterBar({controls = [], values = {}, onChange, o
         {controls.map(control => {
             if (control.kind === 'choice') return <Choice key={control.id} {...{control, values, onChange, loadChoices, scopeKey, onChoices, context, busy}}/>;
             if (control.kind === 'dateRange') return <fieldset key={control.id} className="forge-report-filter-date-range"><legend>{control.label}</legend>
-                <DatePresets {...{control, values, onDatePreset, onDateRange, onDateDraft}}/>
+                <DatePresets {...{control, values, context, busy, onDatePreset, onDateRange, onDateDraft}}/>
                 <div className="forge-report-filter-date-fields">{[['from', control.start], ['to', control.end]].map(([edge, alias]) => <label key={alias}>{edge === 'from' ? 'From' : 'To'}
                     <FilterControl context={context} controlId={alias} type="date" value={values[alias] ?? ''} required={control.required} disabled={busy} change={value=>onChange(alias,value)}><input type="date" aria-label={`${control.label} ${edge}`} required={control.required} aria-required={control.required || undefined} value={values[alias] ?? ''} onChange={event => onChange(alias, event.target.value)}/></FilterControl></label>)}</div>
                 {control.datePresetError && <span role="alert">{control.datePresetError} Enter dates manually.</span>}

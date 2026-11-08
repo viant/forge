@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
-import React,{act,useState} from 'react';
+import React,{act,useEffect,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {expect,it,vi} from 'vitest';
 import ReportFilterBar from './ReportFilterBar.jsx';
-import {activeWindows,getMetadataSignal} from '../../core/store/signals.js';
+import {activeWindows,getMetadataSignal,getViewSignal} from '../../core/store/signals.js';
 import {runUICommand} from '../../core/ui/commands.js';
+import '../../packs/blueprint/index.jsx';
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 
 it('native Read and Operate reuse normal filter callbacks and Apply exactly once',async()=>{
@@ -23,6 +24,54 @@ it('native Read and Operate reuse normal filter callbacks and Apply exactly once
   expect(apply).toHaveBeenCalledTimes(1);expect(apply).toHaveBeenCalledWith({from:'2026-01-02',to:'2026-01-31'});
   await expect(runUICommand({method:'ui.controls.list',params:{windowId:id,conversationId:'other'}})).rejects.toThrow(/conversation/);
  }finally{await act(async()=>root.unmount());host.remove();activeWindows.value=[];layout.mockRestore();}
+});
+
+it('sets both preset dates through one native action before applying the draft', async () => {
+ const host = document.createElement('div');
+ document.body.append(host);
+ const root = createRoot(host);
+ const windowId = 'example-range';
+ const rangeControlId = 'report-filter:date-range:from';
+ activeWindows.value = [{windowId, conversationId:'example-chat'}];
+ const apply = vi.fn();
+ const initial = {from:'2026-01-01',to:'2026-01-31'};
+ const range = {start:'2026-02-01',end:'2026-02-28'};
+ const changeRange = vi.fn();
+ const datePresets = {options:[{value:'custom',label:'Custom'}]};
+ function Filters({busy=false}) {
+  const [values,setValues] = useState(initial);
+  useEffect(() => {getViewSignal(windowId).value = {report:{draftParameters:values}};}, [values]);
+  return <ReportFilterBar context={{identity:{windowId}}} busy={busy}
+   controls={[{id:'from',label:'Period',kind:'dateRange',start:'from',end:'to',required:true,datePresets}]}
+   values={values} onDatePreset={()=>{}}
+   onDateRange={(id,next)=>{changeRange(id,next);setValues({from:next.start,to:next.end});}}
+   onChange={(key,value)=>setValues(previous=>({...previous,[key]:value}))}
+   onApply={()=>apply(values)}/>;
+ }
+ const read = () => runUICommand({method:'ui.controls.list',params:{windowId}});
+ const setRange = expectedRevision => runUICommand({method:'ui.control.setValue',params:{windowId,controlId:rangeControlId,scope:'windowForm',value:range,expectedRevision}});
+ try {
+  await act(async()=>root.render(<Filters busy/>));
+  const busy = await read();
+  expect(busy.controls).toEqual(expect.arrayContaining([expect.objectContaining({controlId:rangeControlId,type:'dateRangePreset',disabled:true})]));
+  await expect(setRange(busy.operationRevision)).rejects.toThrow(/disabled/);
+  await act(async()=>root.render(<Filters/>));
+  const before = await read();
+  expect(before.controls.map(control=>control.controlId)).toEqual(expect.arrayContaining([rangeControlId,'from','to','report-filter:apply']));
+  let changed;
+  await act(async()=>{changed = await setRange(before.operationRevision);});
+  expect(changeRange).toHaveBeenCalledExactlyOnceWith('from',range);
+  expect(apply).not.toHaveBeenCalled();
+  expect(host.querySelector('[aria-label="Period from"]').value).toBe(range.start);
+  expect(host.querySelector('[aria-label="Period to"]').value).toBe(range.end);
+  expect(changed.operationRevision).toBe((await read()).operationRevision);
+  await act(async()=>runUICommand({method:'ui.control.click',params:{windowId,controlId:'report-filter:apply',expectedRevision:changed.operationRevision}}));
+  expect(apply).toHaveBeenCalledExactlyOnceWith({from:range.start,to:range.end});
+ } finally {
+  await act(async()=>root.unmount());
+  host.remove();
+  activeWindows.value=[];
+ }
 });
 
 it('native export operates the existing enabled output callback and rejects unavailable output',async()=>{

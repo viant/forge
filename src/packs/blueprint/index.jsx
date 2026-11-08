@@ -21,7 +21,7 @@ import './theme.css';
 import React from 'react';
 import {batch} from '@preact/signals-react';
 import {fileToMCPBlob} from './fileBlob.js';
-import {createPortal} from 'react-dom';
+import {createPortal, flushSync} from 'react-dom';
 import {
     InputGroup,
     Checkbox,
@@ -258,9 +258,15 @@ export function DateRangePresetInput({
         if (!customApplyEnabled || !draft.start || !draft.end || draft.start > draft.end) return false;
         const error=validateWidgetControlValue(draft,{item:{widget:'dateRange'},props:{}});if(error)throw new Error(error);
         if (controlled) {
-            setPresetRequestError('');
-            onRangeChange({start: draft.start, end: draft.end});
-            setOpen(false);
+            const commit = () => {
+                setPresetRequestError('');
+                onRangeChange({start: draft.start, end: draft.end});
+                setOpen(false);
+            };
+            // Native operations return the revision immediately after the
+            // callback. Include the controlled draft in that revision.
+            if (strict) flushSync(commit);
+            else commit();
             return true;
         }
         const startDate = new Date(`${draft.start}T00:00:00Z`),endDate = new Date(`${draft.end}T00:00:00Z`);
