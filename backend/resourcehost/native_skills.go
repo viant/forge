@@ -389,3 +389,27 @@ func optionalSkillProviderContact(err error) bool {
 	}
 	return true
 }
+
+// ReadSkillResource preserves the gateway actor boundary while forwarding the
+// managed client's existing immutable skill-document cache when available.
+func (c *nativeSkillClient) ReadSkillResource(ctx context.Context, manifest *schema.GetSkillResult, uri string, opts ...client.RequestOption) (*schema.ReadResourceResult, error) {
+	a, err := c.gateway.actor(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var out *schema.ReadResourceResult
+	if reader, ok := c.Interface.(interface {
+		ReadSkillResource(context.Context, *schema.GetSkillResult, string, ...client.RequestOption) (*schema.ReadResourceResult, error)
+	}); ok {
+		out, err = reader.ReadSkillResource(ctx, manifest, uri, opts...)
+	} else {
+		out, err = c.Interface.ReadResource(ctx, &schema.ReadResourceRequestParams{Uri: uri}, opts...)
+	}
+	if err == nil {
+		err = c.gateway.final(ctx, a)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
