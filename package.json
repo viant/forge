@@ -57,6 +57,7 @@
     "./reporting/section-datasets": "./src/reporting/reportSectionDatasets.js"
   },
   "scripts": {
+    "test:calculated-catalog": "node --no-warnings src/components/dashboard/reportBuilderCalculatedCatalog.test.js && node --no-warnings ./node_modules/vite-node/vite-node.mjs src/components/dashboard/reportBuilderCalculatedCatalog.render.test.mjs",
     "test:releases": "node --test src/components/primitives/releaseAssignments.test.mjs && vitest run --config vitest.releases.config.mjs",
     "test:chart-axis-labels": "node --no-warnings src/reporting/reportChartAxisLabels.test.js && vitest run --config vitest.runtime.config.mjs src/components/Chart.axisLabels.render.test.jsx",
     "test:two-set-overlap": "node --no-warnings src/reporting/reportTwoSetOverlap.test.js && vitest run --config vitest.runtime.config.mjs src/components/Chart.twoSetOverlap.render.test.jsx",

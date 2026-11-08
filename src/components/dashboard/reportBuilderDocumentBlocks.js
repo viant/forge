@@ -28,6 +28,7 @@ import {
     resolveReportLayoutSpan,
 } from "../../reporting/reportLayoutModel.js";
 import { normalizeReportTableCellVisual } from "../../reporting/tableVisualSpec.js";
+import { normalizeReportCalculatedFields } from "../../reporting/calculatedFieldModel.js";
 import { resolveReportDatasetRefResolution } from "../../reporting/reportDatasetRefModel.js";
 import { buildReportBuilderCalculatedFieldConfig } from "./reportBuilderCalculatedFieldAuthoring.js";
 import { resolveReportBuilderDynamicFilterFamilies, resolveReportBuilderScopeParamFilters } from "./reportBuilderPredicates.js";
@@ -2955,7 +2956,10 @@ export function buildReportBuilderDocumentBlockFieldOptionsFromPreparedConfig({
         })
         .filter(Boolean);
     const availableDimensions = buildAvailableAuthoringDimensions(preparedConfig, normalizedState);
-    const availableMeasures = buildAvailableAuthoringMeasures(preparedConfig, normalizedState);
+    // Calculations belong to logical datasets, even when they share a transport.
+    // Build the inherited producer catalog first, then add each dataset's outputs.
+    const producerConfig = { ...preparedConfig, calculatedFields: [], computedMeasures: [], tableCalculations: [] };
+    const availableMeasures = buildAvailableAuthoringMeasures(producerConfig, normalizedState);
     const tableColumnOptions = [
         ...availableDimensions.map((dimension) => ({
             key: dimension.id,
@@ -3017,7 +3021,7 @@ export function buildReportBuilderDocumentBlockFieldOptionsFromPreparedConfig({
             ...(dimension.governance ? { governance: cloneValue(dimension.governance) } : {}),
         }))
         .filter((option) => option.value);
-    const chartFieldOptions = buildReportBuilderChartFields(preparedConfig, buildAuthoringChartState(preparedConfig, normalizedState));
+    const chartFieldOptions = buildReportBuilderChartFields(producerConfig, buildAuthoringChartState(producerConfig, normalizedState));
     const chartState = buildAuthoringChartState(preparedConfig, normalizedState);
     const dynamicFilterFamilies = resolveReportBuilderDynamicFilterFamilies(preparedConfig);
     const filterBarGroupOptions = [
@@ -3048,14 +3052,33 @@ export function buildReportBuilderDocumentBlockFieldOptionsFromPreparedConfig({
         scopeParamOptions,
         filterBarGroupOptions,
     });
+    const calculations = normalizeReportCalculatedFields([
+        ...getComputedReportBuilderMeasures(preparedConfig),
+        ...getTableCalculationReportBuilderMeasures(preparedConfig),
+    ]);
+    datasetOptions.forEach((option) => {
+        const scopedCalculations = calculations.filter((field) => !field.datasetRef || field.datasetRef === option.value);
+        const outputs = scopedCalculations.flatMap((field) => Array.from(new Set([field.id, field.key])).map((key) => ({
+            key, label: field.label, kind: "measure", calculated: true,
+            ...(field.format ? { format: field.format } : {}),
+        })));
+        if (outputs.length === 0) return;
+        option.columnOptions = [...(option.columnOptions || []), ...normalizeTableColumnOptions(outputs)
+            .filter((field) => !(option.columnOptions || []).some((existing) => existing.key === field.key))];
+        option.valueFieldOptions = [...(option.valueFieldOptions || []), ...outputs.map(({ key, ...field }) => ({ ...field, value: key }))];
+        const existingChartFields = option.chartFieldOptions?.length ? option.chartFieldOptions : option.columnOptions;
+        option.chartFieldOptions = [...existingChartFields, ...normalizeChartFieldOptions(outputs)
+            .filter((field) => !existingChartFields.some((existing) => existing.key === field.key))];
+    });
+    const primary = datasetOptions.find((option) => option.value === "primary");
     return {
-        valueFieldOptions,
+        valueFieldOptions: primary?.valueFieldOptions || valueFieldOptions,
         secondaryFieldOptions,
-        tableColumnOptions,
+        tableColumnOptions: primary?.columnOptions || tableColumnOptions,
         scopeParamOptions,
         filterBarGroupOptions,
         datasetOptions,
-        chartFieldOptions,
+        chartFieldOptions: primary?.chartFieldOptions || chartFieldOptions,
         supportedChartTypes: getReportBuilderSupportedChartTypes(preparedConfig),
         chartConfig: cloneValue(preparedConfig),
         chartState: cloneValue(chartState),
