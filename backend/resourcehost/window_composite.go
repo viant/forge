@@ -32,6 +32,19 @@ func (c *CompositeWindowCatalog) AuthzReady() bool {
 }
 func (c *CompositeWindowCatalog) UsesResourceResolution() bool { return true }
 
+// MetadataOnlyWindowList preserves the local catalog's existing discovery
+// contract. Delegated List already applies its provider metadata admission.
+func (c *CompositeWindowCatalog) MetadataOnlyWindowList() bool {
+	if c == nil {
+		return false
+	}
+	if c.Local == nil {
+		return true
+	}
+	local, ok := c.Local.(interface{ MetadataOnlyWindowList() bool })
+	return ok && local.MetadataOnlyWindowList()
+}
+
 // ListFrom retains local UI exposure while limiting delegated inventory to trusted roots.
 func (c *CompositeWindowCatalog) ListFrom(ctx context.Context, roots []Connection, input *service.WindowDefinitionListInput) (*service.WindowDefinitionListOutput, error) {
 	if len(roots) == 0 {
