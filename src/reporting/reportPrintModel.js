@@ -1388,7 +1388,13 @@ function renderReportPrintTextSectionBlock(state = {}, block = {}, lines = [], {
 
 function renderReportPrintMarkdownBlock(state = {}, block = {}, options = {}) {
   const markdown = String(block?.content?.markdown || block?.markdown || "");
-  const lines = [...(markdown ? buildReportPrintMarkdownLines(markdown,state.contentWidth,REPORT_PRINT_THEME.bodyFontSize,{paragraphs:true}) : ["No narrative content."]),...reportExternalLinks(block).map(link=>`${link.label}: ${link.url}`)];
+  const title = normalizeString(block?.title || block?.content?.title);
+  const heading = /^\s*#{1,2} ([^\r\n]+)(?:\r?\n|$)/.exec(markdown);
+  // The print section supplies the heading, including on continuation pages.
+  const body = heading && title && normalizeString(heading[1]).toLowerCase() === title.toLowerCase()
+    ? markdown.slice(heading[0].length).replace(/^(?:[ \t]*\r?\n)+/, "")
+    : markdown;
+  const lines = [...(markdown ? buildReportPrintMarkdownLines(body,state.contentWidth,REPORT_PRINT_THEME.bodyFontSize,{paragraphs:true}) : ["No narrative content."]),...reportExternalLinks(block).map(link=>`${link.label}: ${link.url}`)];
   renderReportPrintTextSectionBlock(state, block, lines, {...options, paragraphs:true});
 }
 

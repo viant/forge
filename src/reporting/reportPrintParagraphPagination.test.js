@@ -14,6 +14,14 @@ function print(markdown, pageGeometry, kind = "markdownBlock", precedingHeight =
   return buildReportPrintFromReportFill({reportSpec, reportFill, ...(pageGeometry ? {pageGeometry} : {})});
 }
 const body = result => result.pages.map(page => page.elements.filter(element => /^help__(?:line|info)/.test(element.id)));
+test('an opening Markdown heading that repeats the panel title prints once', () => {
+  for (const marker of ['#', '##']) {
+    const elements = print(`${marker} Help\n\nRead this first.\n\n## Details`).pages.flatMap(page => page.elements);
+    assert.equal(elements.filter(element => element.text === 'Help').length, 1);
+    assert.ok(elements.some(element => element.text === 'Read this first.'));
+    assert.ok(elements.some(element => element.text === 'Details'));
+  }
+});
 for (const count of [24, 25]) {
   test(`paragraph avoids a single line at either side of a page break after ${count} short paragraphs`, () => {
     const markdown = Array.from({length:count}, (_, i) => `Paragraph ${i+1} explains the neutral specimen.`).join('\n\n')+'\n\n'+paragraph;

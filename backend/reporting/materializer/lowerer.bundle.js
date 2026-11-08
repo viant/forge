@@ -70599,9 +70599,12 @@ ${indent}${end}`;
     finishReportPrintBlock(state);
   }
   function renderReportPrintMarkdownBlock(state = {}, block = {}, options = {}) {
-    var _a5;
+    var _a5, _b;
     const markdown = String(((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.markdown) || (block == null ? void 0 : block.markdown) || "");
-    const lines2 = [...markdown ? buildReportPrintMarkdownLines(markdown, state.contentWidth, REPORT_PRINT_THEME.bodyFontSize, { paragraphs: true }) : ["No narrative content."], ...reportExternalLinks(block).map((link) => `${link.label}: ${link.url}`)];
+    const title = normalizeString41((block == null ? void 0 : block.title) || ((_b = block == null ? void 0 : block.content) == null ? void 0 : _b.title));
+    const heading = /^\s*#{1,2} ([^\r\n]+)(?:\r?\n|$)/.exec(markdown);
+    const body = heading && title && normalizeString41(heading[1]).toLowerCase() === title.toLowerCase() ? markdown.slice(heading[0].length).replace(/^(?:[ \t]*\r?\n)+/, "") : markdown;
+    const lines2 = [...markdown ? buildReportPrintMarkdownLines(body, state.contentWidth, REPORT_PRINT_THEME.bodyFontSize, { paragraphs: true }) : ["No narrative content."], ...reportExternalLinks(block).map((link) => `${link.label}: ${link.url}`)];
     renderReportPrintTextSectionBlock(state, block, lines2, { ...options, paragraphs: true });
   }
   function renderReportPrintFilterBarBlock(state = {}, block = {}, options = {}) {
