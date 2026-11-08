@@ -23,11 +23,19 @@ import (
 // all three exports consume the same canonical fill, without synthetic zero rows.
 func TestCompleteEmptyChartExports(t *testing.T) {
 	for _, kind := range []string{"directSeries", "groupedSeries", "pie", "donut"} {
-		t.Run(kind, func(t *testing.T) { testCompleteEmptyChartExports(t, kind) })
+		// Nonpaged executed payloads may omit hasMore, including for an empty result.
+		t.Run(kind, func(t *testing.T) { testCompleteEmptyChartExports(t, kind, `{"rows":[]}`, 0) })
 	}
+	t.Run("donutWithoutDrawableValues", func(t *testing.T) {
+		// Synthetic rows with valid categories, a missing measurement and a zero measurement.
+		testCompleteEmptyChartExports(t, "donut", `{"rows":[{"category":"History","amount":null},{"category":"Art","amount":0}]}`, 2)
+	})
+	t.Run("groupedSeriesWithoutCoordinates", func(t *testing.T) {
+		testCompleteEmptyChartExports(t, "groupedSeries", `{"rows":[{"category":null,"amount":8}]}`, 1)
+	})
 }
 
-func testCompleteEmptyChartExports(t *testing.T, kind string) {
+func testCompleteEmptyChartExports(t *testing.T, kind, source string, sourceRowCount int) {
 	raw, err := os.ReadFile("testdata/empty-chart-report.json")
 	require.NoError(t, err)
 	var fixture struct {
@@ -35,9 +43,7 @@ func testCompleteEmptyChartExports(t *testing.T, kind string) {
 		Datasets   map[string]json.RawMessage `json:"datasets"`
 	}
 	require.NoError(t, json.Unmarshal(raw, &fixture))
-	// Nonpaged executed payloads historically omit hasMore; the admitted rows
-	// array is still a real empty result, distinct from a missing payload.
-	fixture.Datasets["empty"] = json.RawMessage(`{"rows":[]}`)
+	fixture.Datasets["empty"] = json.RawMessage(source)
 	if kind != "directSeries" {
 		var spec map[string]any
 		require.NoError(t, json.Unmarshal(fixture.ReportSpec, &spec))
@@ -55,7 +61,7 @@ func testCompleteEmptyChartExports(t *testing.T, kind string) {
 	require.NoError(t, err)
 	fill, err := reportfill.DecodeJSON(artifacts.ReportFill)
 	require.NoError(t, err)
-	require.Equal(t, 0, *fill.Blocks[1].ChartContent.RowCount)
+	require.Equal(t, sourceRowCount, *fill.Blocks[1].ChartContent.RowCount)
 	require.NotNil(t, fill.Blocks[1].ChartContent.ResolvedChart.Rows)
 	require.Empty(t, fill.Blocks[1].ChartContent.ResolvedChart.Rows)
 	if kind == "directSeries" {
@@ -74,14 +80,21 @@ func testCompleteEmptyChartExports(t *testing.T, kind string) {
 	require.NoError(t, err)
 	pdf, err := reportpdf.Render(printed, reportpdf.Options{})
 	require.NoError(t, err)
-	require.Empty(t, pdf.Diagnostics)
+	emptyMessage := "No data for the selected scope."
+	if sourceRowCount == 0 {
+		require.Empty(t, pdf.Diagnostics)
+	} else {
+		require.Len(t, pdf.Diagnostics, 1)
+		require.Equal(t, "emptyReportPrintChart", pdf.Diagnostics[0].Code)
+		emptyMessage = "No measurements are available for this chart in the selected scope."
+	}
 	reader, err := pdfreader.NewReader(bytes.NewReader(pdf.Bytes), int64(len(pdf.Bytes)))
 	require.NoError(t, err)
 	plain, err := reader.GetPlainText()
 	require.NoError(t, err)
 	text, err := io.ReadAll(plain)
 	require.NoError(t, err)
-	require.Contains(t, string(text), "No data for the selected scope.")
+	require.Contains(t, string(text), emptyMessage)
 	require.Contains(t, string(text), "Reference")
 	xlsx, err := reportxlsx.RenderDashboardWithPrint(artifacts.ReportFill, artifacts.ReportPrint)
 	require.NoError(t, err)
@@ -96,12 +109,20 @@ func testCompleteEmptyChartExports(t *testing.T, kind string) {
 			workbookText.WriteString(strings.Join(row, " ") + "\n")
 		}
 	}
-	require.Contains(t, workbookText.String(), "No data for the selected scope.")
+	require.Contains(t, workbookText.String(), emptyMessage)
 	require.Contains(t, workbookText.String(), "Filters explore its retained resolved values without rerunning the report.")
 	require.Contains(t, workbookText.String(), "Reference")
 	require.Contains(t, workbookText.String(), "7.25")
+	if sourceRowCount > 0 {
+		// The hosted exporter uses compact worksheets with the matched print visibility.
+		compact, err := reportxlsx.RenderDashboardWithVisibility(artifacts.ReportFill, artifacts.ReportPrint)
+		require.NoError(t, err)
+		workbook, err := excelize.OpenReader(bytes.NewReader(compact))
+		require.NoError(t, err)
+		require.NoError(t, workbook.Close())
+	}
 	if kind != "directSeries" {
-		for _, invalid := range []string{"missingSource", "partial", "truncated", "offset", "sourceError", "incompleteDiagnostic", "missingRows", "nonemptyRows", "nonzeroCount", "missingSeriesKeys"} {
+		for _, invalid := range []string{"missingSource", "partial", "truncated", "offset", "sourceError", "incompleteDiagnostic", "missingRows", "nonemptyRows", "negativeRowCount", "excessRowCount", "missingSeriesKeys"} {
 			t.Run("reject/"+invalid, func(t *testing.T) {
 				candidate, err := reportfill.DecodeJSON(artifacts.ReportFill)
 				require.NoError(t, err)
@@ -125,8 +146,11 @@ func testCompleteEmptyChartExports(t *testing.T, kind string) {
 					chart.ChartContent.ResolvedChart.Rows = nil
 				case "nonemptyRows":
 					chart.ChartContent.ResolvedChart.Rows = []map[string]any{{"category": "Reference", "amount": 7.25}}
-				case "nonzeroCount":
-					value := 1
+				case "negativeRowCount":
+					value := -1
+					chart.ChartContent.RowCount = &value
+				case "excessRowCount":
+					value := len(source.Rows) + 1
 					chart.ChartContent.RowCount = &value
 				case "missingSeriesKeys":
 					chart.ChartContent.ResolvedChart.SeriesKeys = nil

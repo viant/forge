@@ -1294,10 +1294,10 @@ func extractFillBlockRuntime(payload json.RawMessage, label string) (map[string]
 	return runtime, sanitized, nil
 }
 
-// Empty category/grouped charts have no data-derived series keys. Admit that
-// canonical shape only when the referenced source is complete and successful.
+// A complete source may have rows that contribute no categories or series.
+// Use the resolved rows to identify an empty chart and keep the source checks.
 func (r *ReportFill) completeEmptyChart(block Block) bool {
-	if block.ChartContent == nil || block.ChartContent.RowCount == nil || *block.ChartContent.RowCount != 0 || block.ChartContent.ResolvedChart == nil || block.ChartContent.ResolvedChart.Rows == nil || len(block.ChartContent.ResolvedChart.Rows) != 0 {
+	if block.ChartContent == nil || block.ChartContent.RowCount == nil || block.ChartContent.ResolvedChart == nil || block.ChartContent.ResolvedChart.Rows == nil || len(block.ChartContent.ResolvedChart.Rows) != 0 {
 		return false
 	}
 	if kind := block.ChartContent.ResolvedChart.Kind; kind != "category" && kind != "groupedSeries" {
@@ -1306,6 +1306,9 @@ func (r *ReportFill) completeEmptyChart(block Block) bool {
 	for _, dataset := range r.Datasets {
 		if dataset.ID != block.DatasetRef {
 			continue
+		}
+		if rowCount := *block.ChartContent.RowCount; rowCount < 0 || rowCount > len(dataset.Rows) {
+			return false
 		}
 		if dataset.Rows == nil || dataset.Provenance.Truncated || dataset.Provenance.HasMore || (dataset.Request.Offset != nil && *dataset.Request.Offset > 0) {
 			return false
