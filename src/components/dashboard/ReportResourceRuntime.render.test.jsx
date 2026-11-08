@@ -637,3 +637,28 @@ it('exports the completed applied date selection while window-form dates are dir
   expect(submitResource.mock.calls[1][0].parameters).toEqual({...applied,periodMode:'custom'});
  } finally {await view.close();}
 });
+
+it('keeps the completed fill and scope after native authority renewal and exports with the current pin',async()=>{
+    const renewed={...pin,authorityBinding:'readmitted-principal'};
+    const run=vi.fn().mockResolvedValue(result());
+    const publish=vi.fn();
+    const view=await mount(run,{executeOnOpen:true,prefill:{sampleIds:[7]},reportCapabilities:{run:true,export:true}}, {},publish);
+    const submitResource=vi.fn().mockResolvedValue({jobId:'example-job'});
+    view.handlers.reportExport={submitResource,getStatus:vi.fn().mockResolvedValue({status:'failed',error:'Example export stop'})};
+    try {
+        expect(view.host.querySelector('output').textContent).toBe('Server report');
+        await view.render({reportResource:renewed});
+        expect(run).toHaveBeenCalledTimes(1);
+        expect(view.host.querySelector('output').textContent).toBe('Server report');
+        expect(publish.mock.calls.at(-1)[0].hasCompletedRun).toBe(true);
+        expect(publish.mock.calls.at(-1)[0].parameters).toEqual({sampleIds:[7]});
+        await act(async()=>button(view,'Export CSV').click());
+        expect(submitResource).toHaveBeenCalledExactlyOnceWith({resource:{uri:pin.uri,revision:pin.revision},resolvedResource:renewed,parameters:{sampleIds:[7]},format:'csv'});
+        expect(run).toHaveBeenCalledTimes(1);
+        run.mockResolvedValueOnce(result(renewed,'New run'));
+        await act(async()=>button(view,'Run report').click());
+        expect(run).toHaveBeenCalledTimes(2);
+        expect(run.mock.calls[1][0].resolvedResource).toEqual(renewed);
+        expect(view.host.querySelector('output').textContent).toBe('New run');
+    } finally {await view.close();}
+});

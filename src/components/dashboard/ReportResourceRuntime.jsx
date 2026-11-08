@@ -55,7 +55,10 @@ export default function ReportResourceRuntime({container, context, onViewStateCh
     const [error, setError] = useState("");
     const [progress, setProgress] = useState("");
     const generation = useRef(0);
-    const sourceIdentity = JSON.stringify([pin, parameters.runOverride, parameters.prefill, parameters.runTrigger]);
+    // The native host may readmit the same content after credential rotation.
+    // Keep the completed display and scope; new actions use its current pin.
+    const {authorityBinding: _authority, validUntil: _expiry, ...contentPin} = pin || {};
+    const sourceIdentity = JSON.stringify([contentPin, parameters.runOverride, parameters.prefill, parameters.runTrigger]);
     const [metricState, setMetricState] = useState(null);
     const metricSelections = metricState?.identity === sourceIdentity ? metricState.selections : {};
     const identity = JSON.stringify([sourceIdentity,canSelectMetrics ? metricSelections : {}]);
@@ -73,13 +76,18 @@ export default function ReportResourceRuntime({container, context, onViewStateCh
     const displayedStatus = progress ? 'loading' : error ? 'error' : result ? 'ready' : 'idle';
     const metadataIdentity = JSON.stringify(pin);
     const getReport = services.reportStore?.getReport;
+    const currentMetadata = useRef(null);
+    currentMetadata.current = {pin, metadataIdentity};
     const actionPin = useCallback(async (selectedPin, options) => {
+        const current = currentMetadata.current;
+        const sameContent = ['providerIdentity','uri','kind','revision','contentFingerprint'].every(field => (current.pin?.[field] ?? '') === (selectedPin?.[field] ?? ''));
+        const selected = sameContent ? current.pin : selectedPin;
         const cached = metadataCache.current;
-        const candidate = cached?.identity === metadataIdentity && sameReportActionIdentity(cached.pin,selectedPin) ? cached.pin : selectedPin;
+        const candidate = cached?.identity === current.metadataIdentity && sameReportActionIdentity(cached.pin,selected) ? cached.pin : selected;
         const fresh = await freshReportActionPin(candidate,getReport,options);
-        if (fresh && options.isCurrent()) metadataCache.current={identity:metadataIdentity,pin:fresh};
+        if (fresh && options.isCurrent()) metadataCache.current={identity:current.metadataIdentity,pin:fresh};
         return fresh;
-    },[metadataIdentity,getReport]);
+    },[getReport]);
     const outputActionPin = async (selectedPin,isCurrent) => {
         try {return await actionPin(selectedPin,{isCurrent,onRefresh:()=>{if(isCurrent())setMetadataRefreshing(true);}});}
         finally {if(isCurrent())setMetadataRefreshing(false);}
@@ -97,7 +105,7 @@ export default function ReportResourceRuntime({container, context, onViewStateCh
             // settles must execute again.
             let pending = pendingRun.current;
             if (!pending || pending.identity !== identity || pending.runReport !== runReport || pending.getReport !== getReport) {
-                const request = {...buildReportResourceRunRequest(pin, runParameters), fillOnly:true, ...(selectedSection.current ? {prioritySectionId:selectedSection.current} : {})};
+                const request = {...buildReportResourceRunRequest(currentMetadata.current.pin, runParameters), fillOnly:true, ...(selectedSection.current ? {prioritySectionId:selectedSection.current} : {})};
                 pending = {identity, runReport, getReport, request, progress:"", listener:null, snapshot:null, updateListener:null, done:false};
                 pending.promise = Promise.resolve().then(async () => {
                     const refreshed = await actionPin(request.resolvedResource,{isCurrent:()=>pending.isCurrent?.()===true,onRefresh:()=>{
@@ -151,7 +159,7 @@ export default function ReportResourceRuntime({container, context, onViewStateCh
     const unexportedMetricSelection = !canSelectMetrics && Object.keys(metricSelections).length > 0;
     // A manual rerun can keep the same parameters. Its output still belongs to
     // a new execution, so a pending print/export from the older run must expire.
-    const outputScopeKey = JSON.stringify([identity, runResult?.version]);
+    const outputScopeKey = JSON.stringify([identity, metadataIdentity, runResult?.version]);
     const output = useReportOutput({scopeKey:outputScopeKey,disabled:!canExport||!runResult||!!progress||unexportedMetricSelection,
         onExport:async({format,tableBlockId,isCurrent})=>{
             const refreshed=await outputActionPin(runResult.request.resolvedResource,isCurrent);
