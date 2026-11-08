@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import "./reportProjection.test.js";
 
 import { runUICommand } from "./commands.js";
 import {

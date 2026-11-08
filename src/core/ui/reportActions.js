@@ -63,7 +63,39 @@ export async function invokeReportWindowAction(windowId, action, input = {}) {
   if (typeof handler !== 'function') {
     throw new Error(`report action is unavailable: ${actionName}`);
   }
-  return handler(input);
+  const result = await handler(input);
+  return actionName === 'getCurrent' ? structuredClone(projectCurrentReport(result, input.include)) : result;
+}
+
+// Keep the legacy response when no selection is supplied. Projection happens
+// before the bridge serializes the result and never mutates the live report.
+export function projectCurrentReport(result, include) {
+  if (!include || include.raw === true || !result || typeof result !== 'object') return result;
+  const out = {};
+  const copy = (source, keys, target) => {
+    for (const key of keys) if (Object.hasOwn(source || {}, key)) target[key] = source[key];
+  };
+  copy(result, ['ok','error','windowId','windowKey','reportId','reportName','sourceKind'], out);
+  if (include.state) copy(result, ['request','parameters','draftParameters','status','progress','hasCompletedRun','canRun','canSave','canExport','runControlId','activeSectionId','materialization'], out);
+  const spec = {}, fill = {};
+  if (include.inputs) copy(result.reportSpec, ['scope','parameters','inputs','refinements'], spec);
+  if (include.description) copy(result.reportSpec, ['title','description','semanticSummary'], spec);
+  if (include.sources) copy(result.reportSpec, ['datasets','dataSources','source','binding'], spec);
+  if (include.visuals) {
+    copy(result.reportSpec, ['blocks','layout','layoutIntent','presentation','calculatedFields'], spec);
+  }
+  if (include.tabs) {
+    copy(result, ['activeSectionId'], out);
+    for (const [source, target] of [[result.reportSpec, spec], [result.reportFill, fill]]) {
+      if (Array.isArray(source?.blocks)) target.blocks = source.blocks.filter(block => ['tabGroupBlock','sectionBlock'].includes(block.kind));
+    }
+    // The visual selection includes all blocks, not just navigation blocks.
+    if (include.visuals && result.reportSpec?.blocks) spec.blocks = result.reportSpec.blocks;
+  }
+  if (include.data) copy(result.reportFill, ['datasets','blocks','parameters','source'], fill);
+  if (Object.keys(spec).length) out.reportSpec = spec;
+  if (Object.keys(fill).length) out.reportFill = fill;
+  return out;
 }
 
 export function clearReportWindowActions(windowId) {

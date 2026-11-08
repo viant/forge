@@ -195,8 +195,8 @@ export default function ReportResourceRuntime({container, context, onViewStateCh
         if(!windowId)return;
         return registerReportWindowActions(windowId,{getCurrent:()=>{
             const completed=runResult?.version===generation.current?runResult:null;
-            return structuredClone({...current,hasCompletedRun:!!completed,
-                ...(completed?{reportSpec:completed.result.reportSpec,reportFill:completed.result.reportFill}: {})});
+            return {...current,hasCompletedRun:!!completed,
+                ...(completed?{reportSpec:completed.result.reportSpec,reportFill:completed.result.reportFill}: {})};
         }});
     },[onViewStateChange,windowId,identity,displayedTitle,displayedStatus,displayedSection,canRun,runReport,error,progress,runResult,context?.windowState?.windowForm,controls.exportDisabled,output.busy]);
     const tables=parameters.reportCapabilities?.tableBlockSelection===true?result?.reportSpec?.blocks?.filter(block=>block.kind==='tableBlock'):undefined;
