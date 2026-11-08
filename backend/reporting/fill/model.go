@@ -1651,7 +1651,7 @@ func (r *ReportFill) Validate() error {
 			if strings.TrimSpace(block.ValueLabel) == "" {
 				return fmt.Errorf("reportFill.blocks[%d].valueLabel is required for kpiBlock", index)
 			}
-			if !isAllowedReportValueFormat(block.ValueFormat) {
+			if !isAllowedKPIValueFormat(block.ValueFormat) {
 				return fmt.Errorf("reportFill.blocks[%d].valueFormat %q is not supported for kpiBlock", index, block.ValueFormat)
 			}
 			switch block.SecondaryCalculation {
@@ -1660,7 +1660,7 @@ func (r *ReportFill) Validate() error {
 				return fmt.Errorf("reportFill.blocks[%d].secondaryCalculation %q is not supported for kpiBlock", index, block.SecondaryCalculation)
 			}
 
-			if !isAllowedReportValueFormat(block.SecondaryFormat) {
+			if !isAllowedKPIValueFormat(block.SecondaryFormat) {
 				return fmt.Errorf("reportFill.blocks[%d].secondaryFormat %q is not supported for kpiBlock", index, block.SecondaryFormat)
 			}
 			if !isAllowedReportRowSelector(block.RowSelector) {
@@ -1684,10 +1684,10 @@ func (r *ReportFill) Validate() error {
 			if strings.TrimSpace(block.KPIContent.ValueLabel) == "" {
 				return fmt.Errorf("reportFill.blocks[%d].content.valueLabel is required for kpiBlock", index)
 			}
-			if !isAllowedReportValueFormat(block.KPIContent.ValueFormat) {
+			if !isAllowedKPIValueFormat(block.KPIContent.ValueFormat) {
 				return fmt.Errorf("reportFill.blocks[%d].content.valueFormat %q is not supported for kpiBlock", index, block.KPIContent.ValueFormat)
 			}
-			if !isAllowedReportValueFormat(block.KPIContent.SecondaryFormat) {
+			if !isAllowedKPIValueFormat(block.KPIContent.SecondaryFormat) {
 				return fmt.Errorf("reportFill.blocks[%d].content.secondaryFormat %q is not supported for kpiBlock", index, block.KPIContent.SecondaryFormat)
 			}
 			if !isAllowedReportRowSelector(block.KPIContent.RowSelector) {
@@ -2287,6 +2287,11 @@ func decodeRequestPayload(payload json.RawMessage, index int) (reportspec.Reques
 		return reportspec.RequestPayload{}, err
 	}
 	return request, nil
+}
+
+// KPI display can format source dates without changing their raw values.
+func isAllowedKPIValueFormat(value string) bool {
+	return strings.TrimSpace(value) == "date" || isAllowedReportValueFormat(value)
 }
 
 func isAllowedReportValueFormat(value string) bool {

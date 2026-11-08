@@ -602,6 +602,13 @@ Supported KPI and collection value formats:
 - `percent`
 - `percentFraction`
 
+KPI `valueFormat` and `secondaryFormat` also accept `date`. They reuse the
+calendar-date formatter for date-only and timestamp strings (for example,
+`2040-02-29T00:00:00Z` displays as `Feb 29, 2040`). This changes display only:
+fill datasets and typed workbook source values retain the original strings.
+Null dates retain the authored unavailable state; invalid source strings are
+not coerced to a date. Unknown formats remain invalid.
+
 ### KPI Resolution
 
 KPI data is resolved structurally first:

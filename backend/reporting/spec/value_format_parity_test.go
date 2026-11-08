@@ -9,6 +9,9 @@ func TestReportValueFormatsMatchPublishedSchema(t *testing.T) {
 			t.Errorf("schema format rejected: %s", value)
 		}
 	}
+	if isAllowedReportValueFormat("date") {
+		t.Fatal("KPI-only date format leaked into the general value contract")
+	}
 	if isAllowedReportValueFormat("unrecognized") {
 		t.Fatal("unknown format accepted")
 	}

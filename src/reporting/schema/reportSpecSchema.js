@@ -1170,7 +1170,7 @@ export const reportSpecSchema = {
         datasetRef: { type: "string" },
         valueField: { type: "string" },
         valueLabel: { type: "string" },
-        valueFormat: { enum: ["currency", "currency2", "number", "number2", "number5", "percent", "percentFraction", "percentFraction2", "compact", "compactNumber"] },
+        valueFormat: { enum: ["currency", "currency2", "number", "number2", "number5", "percent", "percentFraction", "percentFraction2", "compact", "compactNumber", "date"] },
         suffix: { type: "string" },
         secondaryField: { type: "string" },
         secondaryDatasetRef: { type: "string", minLength: 1 },
@@ -1178,7 +1178,7 @@ export const reportSpecSchema = {
         secondaryCalculation: { enum: ["value", "difference", "relativeChange"] },
         secondaryVisibleWhen: { $ref: "#/$defs/jsonObject" },
         secondaryLabel: { type: "string" },
-        secondaryFormat: { enum: ["currency", "currency2", "number", "number2", "number5", "percent", "percentFraction", "percentFraction2", "compact", "compactNumber"] },
+        secondaryFormat: { enum: ["currency", "currency2", "number", "number2", "number5", "percent", "percentFraction", "percentFraction2", "compact", "compactNumber", "date"] },
         secondaryTrend: { type: "boolean" },
         secondaryDisplayKey: { type: "string" },
         secondaryDisplayValueMap: {

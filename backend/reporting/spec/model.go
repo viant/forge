@@ -887,7 +887,7 @@ func (r *ReportSpec) Validate() error {
 			if strings.TrimSpace(block.ValueLabel) == "" {
 				return fmt.Errorf("reportSpec.blocks[%d].valueLabel is required for kpiBlock", index)
 			}
-			if !isAllowedReportValueFormat(block.ValueFormat) {
+			if !isAllowedKPIValueFormat(block.ValueFormat) {
 				return fmt.Errorf("reportSpec.blocks[%d].valueFormat %q is not supported for kpiBlock", index, block.ValueFormat)
 			}
 			switch block.SecondaryCalculation {
@@ -896,7 +896,7 @@ func (r *ReportSpec) Validate() error {
 				return fmt.Errorf("reportSpec.blocks[%d].secondaryCalculation %q is not supported for kpiBlock", index, block.SecondaryCalculation)
 			}
 
-			if !isAllowedReportValueFormat(block.SecondaryFormat) {
+			if !isAllowedKPIValueFormat(block.SecondaryFormat) {
 				return fmt.Errorf("reportSpec.blocks[%d].secondaryFormat %q is not supported for kpiBlock", index, block.SecondaryFormat)
 			}
 			if !isAllowedReportRowSelector(block.RowSelector) {
@@ -1468,6 +1468,11 @@ func rejectTrailingJSON(decoder *json.Decoder, label string) error {
 		return fmt.Errorf("decode %s: %w", label, err)
 	}
 	return nil
+}
+
+// KPI display can format source dates without changing their raw values.
+func isAllowedKPIValueFormat(value string) bool {
+	return strings.TrimSpace(value) == "date" || isAllowedReportValueFormat(value)
 }
 
 func isAllowedReportValueFormat(value string) bool {
