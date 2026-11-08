@@ -918,11 +918,9 @@ function normalizeCalculatedField(definition = {}, {
   };
 }
 
-export function normalizeReportCalculatedFields(definitions = [], options = {}) {
-  // Dataset-scoped fields often repeat the same formula. Parse its dependency
-  // facts once for this array only; each definition still owns its metadata and
-  // merged dependency array. Nothing survives the normalization call.
-  const expressionDependencies = new Map();
+export function normalizeReportCalculatedFields(definitions = [], options = {}, expressionDependencies = new Map()) {
+  // Only expression-derived field names can be shared across catalogs. Each
+  // definition keeps its own explicit dependencies, aliases and dataset scope.
   return (Array.isArray(definitions) ? definitions : [])
     .map((definition) => normalizeCalculatedField(definition, options, expressionDependencies))
     .filter(Boolean);

@@ -187,7 +187,7 @@ function resolveReportBuilderFieldId(entry = {}) {
   return normalizeString(entry?.id || entry?.key);
 }
 
-function buildReportBuilderFieldCatalog(config = {}, datasetRef = "primary") {
+function buildReportBuilderFieldCatalog(config, datasetRef, expressionDependencies) {
   const lookup = new Map();
   const addEntries = (entries = [], kind = "") => {
     buildReportBuilderFieldLookup(entries).forEach((entry, alias) => {
@@ -202,7 +202,7 @@ function buildReportBuilderFieldCatalog(config = {}, datasetRef = "primary") {
     ...(Array.isArray(config?.calculatedFields) ? config.calculatedFields : []),
     ...(Array.isArray(config?.computedMeasures) ? config.computedMeasures : []),
     ...(Array.isArray(config?.tableCalculations) ? config.tableCalculations : []),
-  ], { datasetRef }).filter(field => field.datasetRef === datasetRef);
+  ], { datasetRef }, expressionDependencies).filter(field => field.datasetRef === datasetRef);
   validateReportCalculatedFieldDependencies(calculatedFields);
   addEntries(calculatedFields, "calculated");
   return { lookup };
@@ -570,16 +570,16 @@ function augmentReportRequestField(request = {}, fieldLookup = new Map(), fieldK
   return true;
 }
 
-function augmentReportRequestForAuthoredBlocks(baseSpec = {}, blocks = [], config = {}) {
+function augmentReportRequestForAuthoredBlocks(baseSpec, blocks, config, expressionDependencies) {
   const datasets = Array.isArray(baseSpec?.datasets) ? baseSpec.datasets : [];
   if (datasets.length === 0) {
     return baseSpec;
   }
   const nextSpec = cloneValue(baseSpec);
-  const fieldCatalog = buildReportBuilderFieldCatalog(config);
+  const fieldCatalog = buildReportBuilderFieldCatalog(config, "primary", expressionDependencies);
   const datasetFieldCatalogs = new Map(normalizeReportBuilderPublishedDataSources(config).map((source) => [
     source.id,
-    buildReportBuilderFieldCatalog(buildReportBuilderPublishedDatasetConfig(config, source, { borrowBase: true }), source.id),
+    buildReportBuilderFieldCatalog(buildReportBuilderPublishedDatasetConfig(config, source, { borrowBase: true }), source.id, expressionDependencies),
   ]));
   const calculatedFields = Array.isArray(nextSpec?.calculatedFields) ? nextSpec.calculatedFields : [];
   nextSpec.calculatedFields = calculatedFields;
@@ -2615,7 +2615,9 @@ export function lowerReportDocumentToReportSpec(document = {}, {
   const effectiveScopedConfig = builderContext?.config || {};
   const effectiveScopedState = builderContext?.state || {};
   const effectiveConfig = buildReportBuilderCalculatedFieldConfig(effectiveScopedConfig, effectiveScopedState);
-  const effectiveFieldCatalog = buildReportBuilderFieldCatalog(effectiveConfig);
+  // Parsing depends on expression text. Field aliases and output dependencies remain catalog-specific.
+  const expressionDependencies = new Map();
+  const effectiveFieldCatalog = buildReportBuilderFieldCatalog(effectiveConfig, "primary", expressionDependencies);
   const staticDatasets = Array.isArray(builderContext?.staticDatasets) ? builderContext.staticDatasets : [];
   const loweringState = effectiveScopedState;
   const staticDatasetIndex = new Map(
@@ -2669,7 +2671,7 @@ export function lowerReportDocumentToReportSpec(document = {}, {
       const datasetConfig = buildStaticDatasetReportBuilderConfig(effectiveConfig, staticDataset);
       return {
         config: datasetConfig,
-        fieldCatalog: buildReportBuilderFieldCatalog(datasetConfig, normalizedDatasetRef),
+        fieldCatalog: buildReportBuilderFieldCatalog(datasetConfig, normalizedDatasetRef, expressionDependencies),
         container: {
           ...loweredContainer,
           dataSourceRef: normalizeString(staticDataset?.dataSourceRef || loweredContainer?.dataSourceRef),
@@ -2687,7 +2689,7 @@ export function lowerReportDocumentToReportSpec(document = {}, {
           ? publishedDataset.columnOptions.filter(field => field.kind === 'dimension')
             .map(field => ({...field, id:field.key, key:field.sourceKey || field.key}))
           : null,
-        fieldCatalog: buildReportBuilderFieldCatalog(datasetConfig, normalizedDatasetRef),
+        fieldCatalog: buildReportBuilderFieldCatalog(datasetConfig, normalizedDatasetRef, expressionDependencies),
         container: {
           ...loweredContainer,
           dataSourceRef: normalizeString(publishedDataset?.dataSourceRef || loweredContainer?.dataSourceRef),
@@ -2837,5 +2839,5 @@ export function lowerReportDocumentToReportSpec(document = {}, {
     calculatedFields: nextCalculatedFields,
     blocks: nextBlocks,
   };
-  return augmentReportRequestForAuthoredBlocks(nextSpec, nextBlocks, effectiveConfig);
+  return augmentReportRequestForAuthoredBlocks(nextSpec, nextBlocks, effectiveConfig, expressionDependencies);
 }

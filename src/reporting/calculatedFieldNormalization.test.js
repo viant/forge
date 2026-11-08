@@ -47,5 +47,22 @@ for (const expression of ['amount +', 'unsupported(amount)']) {
 assert.throws(() => validateReportCalculatedFieldDependencies([
   {id: 'first', expr: 'second + 1'}, {id: 'second', expr: 'first + 1'},
 ]), /cycle/);
+// Identical formula text can appear in several catalogs in one lowering.
+const sharedDependencies = new Map();
+const scoped = (datasetRef, dependency, expression) => normalizeReportCalculatedFields(
+  [{id: 'margin', expr: expression, dependencies: [dependency]}],
+  {datasetRef},
+  sharedDependencies,
+)[0];
+const first = scoped('primary', 'primaryScope', 'amount - cost');
+const second = scoped('secondary', 'secondaryScope', 'amount - cost');
+const alternate = scoped('third', 'thirdScope', 'revenue - expense');
+assert.equal(sharedDependencies.size, 2);
+assert.equal(second.datasetRef, 'secondary');
+assert.deepEqual(first.dependencies, ['primaryScope', 'amount', 'cost']);
+assert.deepEqual(second.dependencies, ['secondaryScope', 'amount', 'cost']);
+assert.deepEqual(alternate.dependencies, ['thirdScope', 'revenue', 'expense']);
+second.dependencies.push('mutated');
+assert.deepEqual(sharedDependencies.get('amount - cost'), ['amount', 'cost']);
 assert.deepEqual(normalizeReportCalculatedFields(null), []);
 console.log('calculated-field normalization: repeated formulas retain validation, metadata and independent dependencies');

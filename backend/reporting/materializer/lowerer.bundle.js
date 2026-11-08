@@ -49136,8 +49136,7 @@ ${indent}${end}`;
       ...normalizedExpression ? { expr: normalizedExpression.expr } : { compute: normalizedCompute.compute }
     };
   }
-  function normalizeReportCalculatedFields(definitions = [], options = {}) {
-    const expressionDependencies = /* @__PURE__ */ new Map();
+  function normalizeReportCalculatedFields(definitions = [], options = {}, expressionDependencies = /* @__PURE__ */ new Map()) {
     return (Array.isArray(definitions) ? definitions : []).map((definition) => normalizeCalculatedField(definition, options, expressionDependencies)).filter(Boolean);
   }
   function buildPartitionGroups(rowsToPartition = [], partitionBy = []) {
@@ -57501,7 +57500,7 @@ ${indent}${end}`;
   function resolveReportBuilderFieldId(entry = {}) {
     return normalizeString31((entry == null ? void 0 : entry.id) || (entry == null ? void 0 : entry.key));
   }
-  function buildReportBuilderFieldCatalog(config = {}, datasetRef = "primary") {
+  function buildReportBuilderFieldCatalog(config, datasetRef, expressionDependencies) {
     const lookup = /* @__PURE__ */ new Map();
     const addEntries = (entries2 = [], kind = "") => {
       buildReportBuilderFieldLookup(entries2).forEach((entry, alias) => {
@@ -57516,7 +57515,7 @@ ${indent}${end}`;
       ...Array.isArray(config == null ? void 0 : config.calculatedFields) ? config.calculatedFields : [],
       ...Array.isArray(config == null ? void 0 : config.computedMeasures) ? config.computedMeasures : [],
       ...Array.isArray(config == null ? void 0 : config.tableCalculations) ? config.tableCalculations : []
-    ], { datasetRef }).filter((field2) => field2.datasetRef === datasetRef);
+    ], { datasetRef }, expressionDependencies).filter((field2) => field2.datasetRef === datasetRef);
     validateReportCalculatedFieldDependencies(calculatedFields);
     addEntries(calculatedFields, "calculated");
     return { lookup };
@@ -57825,16 +57824,16 @@ ${indent}${end}`;
     }
     return { ...block, runtime: normalizeReportBlockRuntime({ ...block.runtime, refinementFields }, block) };
   }
-  function augmentReportRequestForAuthoredBlocks(baseSpec = {}, blocks = [], config = {}) {
+  function augmentReportRequestForAuthoredBlocks(baseSpec, blocks, config, expressionDependencies) {
     const datasets = Array.isArray(baseSpec == null ? void 0 : baseSpec.datasets) ? baseSpec.datasets : [];
     if (datasets.length === 0) {
       return baseSpec;
     }
     const nextSpec = cloneValue20(baseSpec);
-    const fieldCatalog = buildReportBuilderFieldCatalog(config);
+    const fieldCatalog = buildReportBuilderFieldCatalog(config, "primary", expressionDependencies);
     const datasetFieldCatalogs = new Map(normalizeReportBuilderPublishedDataSources(config).map((source) => [
       source.id,
-      buildReportBuilderFieldCatalog(buildReportBuilderPublishedDatasetConfig(config, source, { borrowBase: true }), source.id)
+      buildReportBuilderFieldCatalog(buildReportBuilderPublishedDatasetConfig(config, source, { borrowBase: true }), source.id, expressionDependencies)
     ]));
     const calculatedFields = Array.isArray(nextSpec == null ? void 0 : nextSpec.calculatedFields) ? nextSpec.calculatedFields : [];
     nextSpec.calculatedFields = calculatedFields;
@@ -59559,7 +59558,8 @@ ${indent}${end}`;
     const effectiveScopedConfig = (builderContext == null ? void 0 : builderContext.config) || {};
     const effectiveScopedState = (builderContext == null ? void 0 : builderContext.state) || {};
     const effectiveConfig = buildReportBuilderCalculatedFieldConfig(effectiveScopedConfig, effectiveScopedState);
-    const effectiveFieldCatalog = buildReportBuilderFieldCatalog(effectiveConfig);
+    const expressionDependencies = /* @__PURE__ */ new Map();
+    const effectiveFieldCatalog = buildReportBuilderFieldCatalog(effectiveConfig, "primary", expressionDependencies);
     const staticDatasets = Array.isArray(builderContext == null ? void 0 : builderContext.staticDatasets) ? builderContext.staticDatasets : [];
     const loweringState = effectiveScopedState;
     const staticDatasetIndex = new Map(
@@ -59607,7 +59607,7 @@ ${indent}${end}`;
         const datasetConfig = buildStaticDatasetReportBuilderConfig(effectiveConfig, staticDataset);
         return {
           config: datasetConfig,
-          fieldCatalog: buildReportBuilderFieldCatalog(datasetConfig, normalizedDatasetRef),
+          fieldCatalog: buildReportBuilderFieldCatalog(datasetConfig, normalizedDatasetRef, expressionDependencies),
           container: {
             ...loweredContainer,
             dataSourceRef: normalizeString31((staticDataset == null ? void 0 : staticDataset.dataSourceRef) || (loweredContainer == null ? void 0 : loweredContainer.dataSourceRef))
@@ -59622,7 +59622,7 @@ ${indent}${end}`;
           // Preserve declaration multiplicity for admission: the display catalog
           // may deduplicate options, but that must not hide ambiguous bindings.
           refinementDimensions: ((_a6 = publishedDataset.columnOptions) == null ? void 0 : _a6.length) ? publishedDataset.columnOptions.filter((field2) => field2.kind === "dimension").map((field2) => ({ ...field2, id: field2.key, key: field2.sourceKey || field2.key })) : null,
-          fieldCatalog: buildReportBuilderFieldCatalog(datasetConfig, normalizedDatasetRef),
+          fieldCatalog: buildReportBuilderFieldCatalog(datasetConfig, normalizedDatasetRef, expressionDependencies),
           container: {
             ...loweredContainer,
             dataSourceRef: normalizeString31((publishedDataset == null ? void 0 : publishedDataset.dataSourceRef) || (loweredContainer == null ? void 0 : loweredContainer.dataSourceRef))
@@ -59756,7 +59756,7 @@ ${indent}${end}`;
       calculatedFields: nextCalculatedFields,
       blocks: nextBlocks
     };
-    return augmentReportRequestForAuthoredBlocks(nextSpec, nextBlocks, effectiveConfig);
+    return augmentReportRequestForAuthoredBlocks(nextSpec, nextBlocks, effectiveConfig, expressionDependencies);
   }
 
   // src/reporting/reportChartValidation.js
