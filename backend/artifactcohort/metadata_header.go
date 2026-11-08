@@ -65,6 +65,7 @@ func (s *HeaderProjector) decodeHeader(kind, hash string, payload []byte) (Artif
 		ArtifactHeader
 		Document       json.RawMessage `json:"document"`
 		Profile        *ArtifactHeader `json:"profile"`
+		Template       json.RawMessage `json:"template"`
 		ReportDocument json.RawMessage `json:"reportDocument"`
 	}
 	if err := json.Unmarshal(payload, &envelope); err != nil {
@@ -73,6 +74,13 @@ func (s *HeaderProjector) decodeHeader(kind, hash string, payload []byte) (Artif
 	value := envelope.ArtifactHeader
 	if envelope.Profile != nil {
 		value.fill(*envelope.Profile)
+	}
+	if kind == "template" && len(envelope.Template) > 0 {
+		var header ArtifactHeader
+		if err := json.Unmarshal(envelope.Template, &header); err != nil {
+			return ArtifactHeader{}, ErrInvalid
+		}
+		value.fill(header)
 	}
 	if kind == "report" && value.Title == "" && len(envelope.ReportDocument) > 0 {
 		var document struct {

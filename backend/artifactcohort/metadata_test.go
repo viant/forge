@@ -16,9 +16,12 @@ func TestMetadataSourceAllKindsStayLocalAndSelectOneHash(t *testing.T) {
 	roots := []RootRef{}
 	// Navigation uses the separately fingerprinted GetMenu contract, covered by
 	// metadata_menu_test.go; ordinary kinds retain exact source-byte delivery.
-	kinds := []string{"window", "report", "mcp", "skill", "playbook", "toolfeed", "eval", "agent", "prompt", primitive.RoutingKind}
+	kinds := []string{"window", "report", "mcp", "skill", "playbook", "toolfeed", "eval", "agent", "prompt", "template", primitive.RoutingKind}
 	for _, kind := range kinds {
 		raw := json.RawMessage(`{"schemaVersion":1,"title":"Synthetic fixture","description":"Synthetic discovery guidance"}`)
+		if kind == "template" {
+			raw = json.RawMessage(`{"schemaVersion":1,"template":{"id":"sample","name":"Synthetic fixture","description":"Synthetic discovery guidance","instructions":"Summarize the requested evidence."}}`)
+		}
 		if kind == primitive.RoutingKind {
 			raw = json.RawMessage(`{"schemaVersion":1,"document":"---\nname: Synthetic fixture\ndescription: Synthetic discovery guidance\n---\nRoute record review to the available reader.\n"}`)
 		}

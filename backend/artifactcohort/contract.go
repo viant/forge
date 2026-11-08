@@ -54,7 +54,7 @@ func RootKey(ref RootRef) string { return ref.URI + "\x00" + strconv.FormatUint(
 
 func RootKind(kind string) bool {
 	switch kind {
-	case "window", "skill", "playbook", "intent", "agent", "report", "prompt", "eval", "navigation", "mcp", "toolfeed", "feed", primitive.RoutingKind, primitive.StarterTaskKind, primitive.KnowledgeKind:
+	case "window", "skill", "playbook", "intent", "agent", "report", "prompt", "template", "eval", "navigation", "mcp", "toolfeed", "feed", primitive.RoutingKind, primitive.StarterTaskKind, primitive.KnowledgeKind:
 		return true
 	}
 	return false
