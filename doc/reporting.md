@@ -609,6 +609,14 @@ fill datasets and typed workbook source values retain the original strings.
 Null dates retain the authored unavailable state; invalid source strings are
 not coerced to a date. Unknown formats remain invalid.
 
+Interactive report tables honor the declared column format in both dashboard and
+document appearances: `currency` displays whole units and `currency2` displays
+two fractional digits. Numeric source and workbook values retain their precision.
+The shared `DashboardTableContent` accepts an optional `formatValue(value, format,
+locale, options)` callback; the report runtime supplies its existing native value
+formatter for plain cells, explicit cell visuals, mobile records and review tables.
+Without a callback, legacy dashboard table currency keeps its two-decimal default.
+
 ### KPI Resolution
 
 KPI data is resolved structurally first:

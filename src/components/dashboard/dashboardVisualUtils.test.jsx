@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import React from "react";
+import { formatDashboardValue } from "./dashboardUtils.js";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import {
@@ -11,6 +12,11 @@ import {
 
 assert.equal(formatDashboardTableCellText(11.03573785, {}, { format: "currency" }, "en-US"), "$11.04");
 assert.equal(formatDashboardTableCellText(11.03573785, {}, { format: "compactNumber" }, "en-US"), "11");
+for (const [value, whole, cents] of [[130.4, "$130", "$130.40"], [-70.2, "-$70", "-$70.20"], [0, "$0", "$0.00"]]) {
+  assert.equal(formatDashboardTableCellText(value, {}, {format:"currency"}, "en-US", formatDashboardValue), whole);
+  assert.equal(formatDashboardTableCellText(value, {}, {format:"currency2"}, "en-US", formatDashboardValue), cents);
+  assert.equal(formatDashboardTableCellText(value, {}, {format:"currency"}, "en-US"), cents);
+}
 
 const badgeHtml = renderToStaticMarkup(
   renderExplicitReportTableCellVisual(

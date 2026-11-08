@@ -20,7 +20,7 @@ import {
 import { resolveDashboardTableColumnValue } from "./dashboardTableValue.js";
 import { buildTableRuntimeColumns } from "./tableCellVisuals.js";
 import { withFrozenIdentifierColumn } from "./tableFrozenIdentifier.js";
-import { renderDashboardTableCell, titleizeDashboardKey } from "./dashboardVisualUtils.jsx";
+import { renderDashboardTableCell as renderLegacyDashboardTableCell, titleizeDashboardKey } from "./dashboardVisualUtils.jsx";
 import { clampPresentationText, normalizePresentationClampConfig, normalizePresentationText } from "../../utils/presentationText.js";
 import "./documentTable.css";
 import {documentTableLayout} from "./documentTable.js";
@@ -67,6 +67,7 @@ export default function DashboardTableContent({
     container,
     context,
     locale = 'en-US',
+    formatValue = null,
     subtitleStyle = DEFAULT_SUBTITLE_STYLE,
     onPresentationStateChange = null,
     initialPresentationState = null,
@@ -74,6 +75,8 @@ export default function DashboardTableContent({
     onSortChange = null,
     canSortColumn = null,
 }) {
+    const renderDashboardTableCell = (cell, row, column, cellLocale, cellContext) =>
+        renderLegacyDashboardTableCell(cell, row, column, cellLocale, cellContext, formatValue);
     const {collection, loading, error, selection} = useDataSourceState(context);
     const hierarchy=container.dashboard?.table?.hierarchy || container.hierarchy;
     const columnGroups=container.dashboard?.table?.columnGroups || container.columnGroups || [];

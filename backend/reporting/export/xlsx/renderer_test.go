@@ -334,3 +334,28 @@ func validTestReportFillJSON() string {
 		"diagnostics": []
 	}`
 }
+
+func TestRenderTableCurrencyFormatsRetainDistinctPrecision(t *testing.T) {
+	for _, tc := range []struct{ format, positive, zero string }{{"currency", "$130", "$0"}, {"currency2", "$130.40", "$0.00"}} {
+		t.Run(tc.format, func(t *testing.T) {
+			report, err := reportfill.DecodeJSON([]byte(validTestReportFillJSON()))
+			require.NoError(t, err)
+			report.Blocks[0].Content.Columns[1].Format = tc.format
+			for index, value := range []float64{130.4, 0} {
+				report.Datasets[0].Rows[index]["spend"] = value
+				report.Blocks[0].Content.ResolvedRows[index].Cells[1].Value = value
+				report.Blocks[0].Content.ResolvedRows[index].Cells[1].DisplayValue = value
+			}
+			data, err := Render(report)
+			require.NoError(t, err)
+			book, err := excelize.OpenReader(bytes.NewReader(data))
+			require.NoError(t, err)
+			defer book.Close()
+			require.Equal(t, tc.positive, mustCellValue(t, book, "Report", "B2"))
+			require.Equal(t, tc.zero, mustCellValue(t, book, "Report", "B3"))
+			raw, err := book.GetCellValue("Report", "B2", excelize.Options{RawCellValue: true})
+			require.NoError(t, err)
+			require.Equal(t, "130.4", raw, "display precision must preserve the numeric source")
+		})
+	}
+}

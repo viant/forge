@@ -69,23 +69,25 @@ export function dashboardStatusTone(value = '') {
     return toneColors.warning;
 }
 
-export function formatDashboardTableCellText(cell, row, column, locale) {
+export function formatDashboardTableCellText(cell, row, column, locale, formatValue = null) {
     const formatOptions = {
         timeZone: column?.timeZone || (column?.timeZoneSelector ? resolveKey(row, column.timeZoneSelector) : undefined),
     };
-    const tableFormat = column?.format === 'currency' ? 'currency2' : column?.format;
+    // Legacy dashboard currency keeps its two-decimal default; authored reports
+    // supply the native value formatter to honor their explicit column format.
+    const tableFormat = !formatValue && column?.format === 'currency' ? 'currency2' : column?.format;
     if (typeof cell === 'number' || column?.format === 'date' || column?.format === 'dateTime' || column?.format === 'wallClockHour' || column?.format === 'wallClockDate') {
-        return formatDashboardValue(cell, tableFormat, locale, formatOptions);
+        return (formatValue || formatDashboardValue)(cell, tableFormat, locale, formatOptions);
     }
     return String(cell ?? '-');
 }
 
-export function renderExplicitReportTableCellVisual(cell, row, column, locale) {
+export function renderExplicitReportTableCellVisual(cell, row, column, locale, formatValue = null) {
   const visualState = resolveTableCellVisualState(row, column);
     if (!visualState) {
         return null;
     }
-    const text = formatDashboardTableCellText(cell, row, column, locale);
+    const text = formatDashboardTableCellText(cell, row, column, locale, formatValue);
     if (visualState.kind === 'dataBar') {
         const [background = '#dbeafe', foreground = '#2563eb'] = visualState.palette || [];
         return (
@@ -355,7 +357,7 @@ export function renderExplicitReportTableCellVisual(cell, row, column, locale) {
     );
 }
 
-export function renderDashboardTableCell(cell, row, column, locale, context) {
+export function renderDashboardTableCell(cell, row, column, locale, context, formatValue = null) {
     const reportLink = resolveReportTableLink({
         row,
         column,
@@ -412,11 +414,11 @@ export function renderDashboardTableCell(cell, row, column, locale, context) {
             </a>
         );
     }
-    const explicitVisual = renderExplicitReportTableCellVisual(cell, row, column, locale);
+    const explicitVisual = renderExplicitReportTableCellVisual(cell, row, column, locale, formatValue);
     if (explicitVisual) {
         return explicitVisual;
     }
-    const text = formatDashboardTableCellText(cell, row, column, locale);
+    const text = formatDashboardTableCellText(cell, row, column, locale, formatValue);
     if (column?.statusPresentation !== 'text' && isDashboardStatusValue(text)) {
         const tone = dashboardStatusTone(text);
         return (

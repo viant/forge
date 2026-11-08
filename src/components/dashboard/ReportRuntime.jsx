@@ -2459,7 +2459,7 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, on
         id={`${normalizeString(block?.id || "tableBlock")}__table_content`}
       >
       {authoredBlock.selection?.mode === 'checkbox' ? <ReviewTable
-        id={block.id} rows={runtimeTableRows} columns={columns} selectionField={authoredBlock.selection.field}
+        id={block.id} rows={runtimeTableRows} columns={columns} formatValue={formatDashboardValue} selectionField={authoredBlock.selection.field}
         initialPresentationState={initialPresentationState}
         remoteSort={partialDataset}
         canSortColumn={partialDataset ? column => !!reportDatasetSortField(reportSpec, authoredBlock, column) : null}
@@ -2471,6 +2471,7 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, on
         }) : undefined} locale={locale} onPresentationStateChange={handleTablePresentationChange}
         container={{dashboard:{table:{rowActions,quickFilter:true,hierarchy:authoredBlock.hierarchy,analyticsMaterialized:true,hierarchyRootLimit:collapsed&&!localPaging?5:undefined,forceHierarchyExpansion:dataset.rows.length<sourceRows.length,columnGroups:block.content?.columnGroups || authoredBlock.columnGroups}}}}/>
         : <DashboardTableContent
+        formatValue={formatDashboardValue}
         container={{
           id: block.id,
           kind: "dashboard.table",

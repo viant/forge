@@ -3713,3 +3713,16 @@ const groupedNoGapHtml=renderToStaticMarkup(React.createElement(ReportRuntime,{
 }));
 assert.doesNotMatch(groupedNoGapHtml,/data-report-runtime-block-id="rankAlternative[0-7]"/);
 assert.match(groupedNoGapHtml,/data-report-runtime-block-id="rankAlternative8"/);
+
+// Authored report precision is shared by interactive tables and print/export.
+// Synthetic fractional inputs distinguish whole currency from currency2.
+for (const appearance of ['dashboard', 'document']) for (const selection of [undefined, {mode:'checkbox',field:'selected'}]) {
+  const columns = [{key:'whole',label:'Whole',format:'currency'},{key:'cents',label:'Cents',format:'currency2'}];
+  const row = {whole:130.4,cents:130.4,selected:false};
+  const table = {id:'precision',kind:'tableBlock',datasetRef:'primary',selection,columns,content:{columns,rowCount:1,resolvedRows:[{rowIndex:0,cells:columns.map(column=>({key:column.key,sourceKey:column.key,displayKey:column.key,value:row[column.key],displayValue:row[column.key]}))}]}};
+  const before = JSON.stringify({table,row});
+  const html = renderToStaticMarkup(React.createElement(ReportRuntime,{reportSpec:{title:'Precision specimen',viewer:appearance==='document'?{appearance}:undefined,blocks:[table]},reportFill:{blocks:[table],datasets:[{id:'primary',rows:[row]}],diagnostics:[]}}));
+  assert.match(html,/title="\$130">\$130</,`${appearance} retains authored whole currency`);
+  assert.match(html,/title="\$130\.40">\$130\.40</,`${appearance} retains authored currency2`);
+  assert.equal(JSON.stringify({table,row}),before);
+}
