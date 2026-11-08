@@ -24,7 +24,7 @@ import { renderDashboardTableCell as renderLegacyDashboardTableCell, titleizeDas
 import { clampPresentationText, normalizePresentationClampConfig, normalizePresentationText } from "../../utils/presentationText.js";
 import "./documentTable.css";
 import {documentTableLayout} from "./documentTable.js";
-import { buildDashboardTableLayout } from "./dashboardTableLayout.js";
+import { buildDashboardTableLayout, resolveDashboardTableColumnMinWidth } from "./dashboardTableLayout.js";
 import Typography from '../Typography.jsx';
 import ForgeIcon from '../Icon.jsx';
 import { compareDashboardTableValues } from "./dashboardTableSort.js";
@@ -402,7 +402,12 @@ export default function DashboardTableContent({
                                     ) : null}
                                     {displayColumns.map((col, ci) => {
                                         const cellRules = matchingRules(row, formattingRules, "cell", col.key);
-                                        const cellStyle = {...rowStyle, ...mergeStyles(cellRules), textAlign: col.align || 'left'};
+                                        const authoredWidth = col.width == null ? 0 : resolveDashboardTableColumnMinWidth(col, ci);
+                                        // Authored narrow columns share the existing 48px floor; reserve
+                                        // their content space proportionally instead of consuming 20px.
+                                        const compactPadding = !documentTable && density === 'compact' && authoredWidth >= 48 && authoredWidth < 112
+                                            ? Math.max(3, authoredWidth * 0.05) : undefined;
+                                        const cellStyle = {...(compactPadding === undefined ? {} : {paddingInline: compactPadding}), ...rowStyle, ...mergeStyles(cellRules), textAlign: col.align || 'left'};
                                         const cellClassName = [rowClassName, mergeClassNames(cellRules)].filter(Boolean).join(" ");
                                         const value = resolveDashboardTableColumnValue(row, col, { preferDisplay: true });
                                         const presentationValue = typeof value === 'string' ? normalizePresentationText(value) : value;

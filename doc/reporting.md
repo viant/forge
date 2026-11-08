@@ -616,6 +616,9 @@ The shared `DashboardTableContent` accepts an optional `formatValue(value, forma
 locale, options)` callback; the report runtime supplies its existing native value
 formatter for plain cells, explicit cell visuals, mobile records and review tables.
 Without a callback, legacy dashboard table currency keeps its two-decimal default.
+Explicit 48–111px compact dashboard columns use proportional inline cell padding
+to retain readable content space. Normal and unspecified widths keep their existing
+padding; document tables retain their own presentation recipe.
 
 ### KPI Resolution
 

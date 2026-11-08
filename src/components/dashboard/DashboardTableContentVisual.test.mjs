@@ -120,3 +120,14 @@ assert.ok(selectableHtml.includes('aria-label="Select Display"'));
 assert.ok(selectableHtml.includes('checked=""'));
 
 console.log("DashboardTableContentVisual ✓ renders compact runtime action chips with short visible labels and full hidden labels");
+
+// Explicit narrow compact columns reserve readable content space; normal
+// legacy widths and comfortable tables retain their existing CSS padding.
+for (const [width, density, expectedPadding] of [[48,'compact','3px'],[52,'compact','3px'],[80,'compact','4px'],[112,'compact',null],[148,'compact',null],[52,'comfortable',null]]) {
+  const html=renderToStaticMarkup(React.createElement(DashboardTableContent,{container:{id:'precision',dashboard:{table:{density,columns:[{key:'value',label:'Value',width,format:'percentFraction'}]}}},context:createContext([{value:-0.7}]),locale:'en-US'}));
+  if(expectedPadding)assert.ok(html.includes('padding-inline:'+expectedPadding),width+'px compact content is padded proportionally');
+  else assert.ok(!html.includes('padding-inline:'),width+'px '+density+' retains default padding');
+  assert.ok(html.includes('-70.0%'));
+}
+const styledNarrowHtml=renderToStaticMarkup(React.createElement(DashboardTableContent,{container:{id:'styled',dashboard:{table:{density:'compact',columns:[{key:'value',label:'Value',width:52}],formattingRules:[{field:'value',operator:'between',values:[-1,0],target:'cell',style:{paddingInline:6}}]}}},context:createContext([{value:-0.7}])}));
+assert.ok(styledNarrowHtml.includes('padding-inline:6px'),'declared cell styles override the compact default');
