@@ -6,4 +6,5 @@ const label=value=>renderToStaticMarkup(<svg><HorizontalBarValueLabel value={val
 for(const value of [undefined,null,NaN,Infinity,''])assert.equal(label(value),'<svg></svg>','Missing/nonfinite observations must not display as zero');
 assert.match(label(0),/>\$0\.00</,'An explicit observed zero must remain visible');
 assert.match(label(.76),/>\$0\.76</);
+assert.match(label(.76), /pointer-events="none"/, "A value label must let the underlying bar receive pointer input");
 console.log('PASS horizontal bar labels distinguish missing observations from observed zero');

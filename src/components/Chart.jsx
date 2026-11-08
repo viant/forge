@@ -178,6 +178,7 @@ export function HorizontalBarValueLabel({ x = 0, y = 0, width = 0, height = 0, v
             x={layout.x}
             y={(Number(y) || 0) + (Number(height) || 0) / 2}
             textAnchor={layout.textAnchor}
+            pointerEvents="none"
             dominantBaseline="middle"
             fill={layout.fill}
             fontSize={11}
