@@ -126,7 +126,9 @@ function deriveColumnOptions(entry = {}) {
 }
 
 function deriveValueFieldOptions(entry = {}) {
-  return [...(Array.isArray(entry?.measures) ? entry.measures : []), ...calculatedMeasures(entry)]
+  const columns = (Array.isArray(entry?.columnOptions) ? entry.columnOptions : [])
+    .filter(item => ["measure", "computedMeasure"].includes(normalizeString(item?.kind)));
+  return [...(Array.isArray(entry?.measures) ? entry.measures : []), ...calculatedMeasures(entry), ...columns]
     .map((item) => {
       const key = normalizeString(item?.key || item?.id);
       if (!key) {
@@ -139,11 +141,14 @@ function deriveValueFieldOptions(entry = {}) {
         ...(item?.default === true ? { default: true } : {}),
       };
     })
-    .filter(Boolean);
+    .filter(Boolean)
+    .filter((item, index, items) => items.findIndex(candidate => candidate.value === item.value) === index);
 }
 
 function deriveSecondaryFieldOptions(entry = {}) {
-  return (Array.isArray(entry?.dimensions) ? entry.dimensions : [])
+  const columns = (Array.isArray(entry?.columnOptions) ? entry.columnOptions : [])
+    .filter(item => normalizeString(item?.kind) === "dimension");
+  return [...(Array.isArray(entry?.dimensions) ? entry.dimensions : []), ...columns]
     .map((item) => {
       const key = normalizeString(item?.key || item?.id);
       if (!key) {
@@ -156,15 +161,22 @@ function deriveSecondaryFieldOptions(entry = {}) {
         ...(item?.default === true ? { default: true } : {}),
       };
     })
-    .filter(Boolean);
+    .filter(Boolean)
+    .filter((item, index, items) => items.findIndex(candidate => candidate.value === item.value) === index);
 }
 
 function deriveChartFieldOptions(entry = {}) {
-  return deriveColumnOptions(entry).map((item) => ({
+  const derived = deriveColumnOptions(entry);
+  const derivedByKey = new Map(derived.map(item => [item.key, item]));
+  const columns = Array.isArray(entry?.columnOptions) && entry.columnOptions.length > 0
+    ? entry.columnOptions
+    : derived;
+  return columns.map((item) => ({
     key: normalizeString(item?.displayKey || item?.key),
     aliases: [normalizeString(item?.key)].filter(Boolean),
     label: normalizeString(item?.label || item?.key),
-    kind: item?.kind === "computedMeasure" ? "measure" : normalizeString(item?.kind),
+    kind: item?.kind === "computedMeasure" || item?.kind === "calculated" && derivedByKey.get(item.key)?.kind === "computedMeasure"
+      ? "measure" : normalizeString(item?.kind),
     ...(normalizeString(item?.format) ? { format: normalizeString(item.format) } : {}),
     ...(normalizeString(item?.tickFormat) ? { tickFormat: normalizeString(item.tickFormat) } : {}),
     ...(["civil", "instant"].includes(normalizeString(item?.valueMode)) ? { valueMode: normalizeString(item.valueMode) } : {}),

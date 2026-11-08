@@ -66,6 +66,7 @@ function normalizeFieldOptions(options = []) {
             return {
                 value,
                 label: normalizeString(option?.label || value),
+                aliases: normalizeStringArray(option?.aliases).filter(alias => alias !== value),
             };
         })
         .filter(Boolean);
@@ -293,6 +294,7 @@ function normalizeTableColumnOptions(options = []) {
                 key,
                 sourceKey,
                 displayKey,
+                aliases: normalizeStringArray(option?.aliases).filter(alias => alias !== key),
                 ...(option?.displayValueMap && typeof option.displayValueMap === "object" && !Array.isArray(option.displayValueMap)
                     ? { displayValueMap: cloneValue(option.displayValueMap) }
                     : {}),
@@ -2556,9 +2558,9 @@ export function buildReportBuilderDocumentBlockDiagnostics(blocks = [], {
         })
         .filter(Boolean);
     const datasetOptionsByValue = new Map(normalizedDatasetOptions.map((option) => [option.value, option]));
-    const valueOptionIds = new Set(normalizedValueOptions.map((option) => option.value));
-    const secondaryOptionIds = new Set(normalizedSecondaryOptions.map((option) => option.value));
-    const tableColumnOptionIds = new Set(normalizedTableColumnOptions.map((option) => option.key));
+    const valueOptionIds = new Set(normalizedValueOptions.flatMap((option) => [option.value, ...option.aliases]));
+    const secondaryOptionIds = new Set(normalizedSecondaryOptions.flatMap((option) => [option.value, ...option.aliases]));
+    const tableColumnOptionIds = new Set(normalizedTableColumnOptions.flatMap((option) => [option.key, ...option.aliases]));
     const datasetOptionIds = new Set(normalizedDatasetOptions.map((option) => option.value));
     const diagnostics = [];
 
@@ -2573,18 +2575,18 @@ export function buildReportBuilderDocumentBlockDiagnostics(blocks = [], {
         const normalizedDatasetRef = datasetResolution.datasetRef;
         const datasetOption = datasetOptionsByValue.get(normalizedDatasetRef) || null;
         const effectiveValueOptionIds = datasetOption
-            ? new Set((datasetOption.valueFieldOptions || []).map((option) => option.value))
+            ? new Set((datasetOption.valueFieldOptions || []).flatMap((option) => [option.value, ...option.aliases]))
             : valueOptionIds;
         const effectiveSecondaryOptionIds = datasetOption
             ? new Set([
-                ...(datasetOption.secondaryFieldOptions || []).map((option) => option.value),
-                ...(datasetOption.valueFieldOptions || []).map((option) => option.value),
+                ...(datasetOption.secondaryFieldOptions || []).flatMap((option) => [option.value, ...option.aliases]),
+                ...(datasetOption.valueFieldOptions || []).flatMap((option) => [option.value, ...option.aliases]),
             ])
             : new Set([...secondaryOptionIds, ...valueOptionIds]);
         const effectiveTableColumnOptions = datasetOption?.tableColumnOptions?.length > 0
             ? datasetOption.tableColumnOptions
             : normalizedTableColumnOptions;
-        const effectiveTableColumnOptionIds = new Set(effectiveTableColumnOptions.map((option) => option.key));
+        const effectiveTableColumnOptionIds = new Set(effectiveTableColumnOptions.flatMap((option) => [option.key, ...option.aliases]));
         const effectiveChartFieldOptions = datasetOption?.chartFieldOptions?.length > 0
             ? datasetOption.chartFieldOptions
             : normalizeChartFieldOptions(chartFieldOptions);
@@ -2719,7 +2721,31 @@ export function buildReportBuilderDocumentBlockDiagnostics(blocks = [], {
         if (normalizedKind === "kpiBlock") {
             const valueField = normalizeString(block?.valueField);
             const secondaryField = normalizeString(block?.secondaryField);
-            if (valueField && !effectiveValueOptionIds.has(valueField)) {
+            const secondaryDatasetRef = normalizeString(block?.secondaryDatasetRef);
+            const secondaryDatasetResolution = resolveDocumentBlockDatasetRefResolution(secondaryDatasetRef, normalizedDatasetOptions);
+            const secondaryDataset = secondaryDatasetRef
+                ? datasetOptionsByValue.get(secondaryDatasetResolution.datasetRef)
+                : datasetOption;
+            const secondaryOptionIds = secondaryDatasetRef
+                ? new Set([
+                    ...(secondaryDataset?.secondaryFieldOptions || []).flatMap((option) => [option.value, ...option.aliases]),
+                    ...(secondaryDataset?.valueFieldOptions || []).flatMap((option) => [option.value, ...option.aliases]),
+                ])
+                : effectiveSecondaryOptionIds;
+            if (secondaryDatasetRef && !secondaryDataset) {
+                diagnostics.push({
+                    id: `documentBlockSecondaryDatasetUnavailable:${blockId}`,
+                    code: "documentBlockSecondaryDatasetUnavailable",
+                    severity: "error",
+                    blockId,
+                    path: `reportDocument.blocks.${blockId}.secondaryDatasetRef`,
+                    message: `${blockTitle} references unavailable KPI secondary data source '${secondaryDatasetRef}'.`,
+                    suggestedFix: "Select an available secondary data source or restore the missing data source in the builder.",
+                });
+            }
+            // Runtime KPI values select one row (including date/text dimensions)
+            // rather than requiring a numeric aggregation, unlike chart Y axes.
+            if (valueField && !effectiveSecondaryOptionIds.has(valueField)) {
                 diagnostics.push({
                     id: `documentBlockValueFieldUnavailable:${blockId}`,
                     code: "documentBlockValueFieldUnavailable",
@@ -2730,7 +2756,7 @@ export function buildReportBuilderDocumentBlockDiagnostics(blocks = [], {
                     suggestedFix: "Edit the KPI block to use one of the current available measures or restore the missing measure in the builder.",
                 });
             }
-            if (secondaryField && !effectiveSecondaryOptionIds.has(secondaryField)) {
+            if (secondaryField && (!secondaryDatasetRef || secondaryDataset) && !secondaryOptionIds.has(secondaryField)) {
                 diagnostics.push({
                     id: `documentBlockSecondaryFieldUnavailable:${blockId}`,
                     code: "documentBlockSecondaryFieldUnavailable",
@@ -3058,17 +3084,25 @@ export function buildReportBuilderDocumentBlockFieldOptionsFromPreparedConfig({
     ]);
     datasetOptions.forEach((option) => {
         const scopedCalculations = calculations.filter((field) => !field.datasetRef || field.datasetRef === option.value);
-        const outputs = scopedCalculations.flatMap((field) => Array.from(new Set([field.id, field.key])).map((key) => ({
-            key, label: field.label, kind: "measure", calculated: true,
+        const outputs = scopedCalculations.map((field) => ({
+            key: field.key || field.id,
+            aliases: Array.from(new Set([field.id, field.key])).filter(key => key && key !== (field.key || field.id)),
+            label: field.label, kind: "measure", calculated: true,
             ...(field.format ? { format: field.format } : {}),
-        })));
+        }));
         if (outputs.length === 0) return;
-        option.columnOptions = [...(option.columnOptions || []), ...normalizeTableColumnOptions(outputs)
-            .filter((field) => !(option.columnOptions || []).some((existing) => existing.key === field.key))];
-        option.valueFieldOptions = [...(option.valueFieldOptions || []), ...outputs.map(({ key, ...field }) => ({ ...field, value: key }))];
-        const existingChartFields = option.chartFieldOptions?.length ? option.chartFieldOptions : option.columnOptions;
-        option.chartFieldOptions = [...existingChartFields, ...normalizeChartFieldOptions(outputs)
-            .filter((field) => !existingChartFields.some((existing) => existing.key === field.key))];
+        // One picker entry per calculation; its ID and row key remain aliases
+        // for existing documents rather than separate visible fields.
+        for (const [property, keyProperty] of [["columnOptions", "key"], ["valueFieldOptions", "value"], ["chartFieldOptions", "key"]]) {
+            let fields = property === "chartFieldOptions" && !option[property]?.length ? option.columnOptions || [] : option[property] || [];
+            outputs.forEach((output) => {
+                const keys = new Set([output.key, ...output.aliases]);
+                const existing = fields.find(field => keys.has(field[keyProperty]));
+                fields = fields.filter(field => !keys.has(field[keyProperty]));
+                fields.push({ ...existing, ...output, [keyProperty]: output.key });
+            });
+            option[property] = fields;
+        }
     });
     const primary = datasetOptions.find((option) => option.value === "primary");
     return {
