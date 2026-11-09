@@ -2,7 +2,10 @@ package registry
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -102,5 +105,44 @@ func awaitWatchEvent(t *testing.T, events <-chan error, wantError bool) {
 		case <-deadline:
 			t.Fatalf("timed out waiting for watcher event (wantError=%v)", wantError)
 		}
+	}
+}
+
+func TestPollingReportsDoNotRetainFileDescriptors(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("kqueue descriptor regression")
+	}
+	root := t.TempDir()
+	assetRoot := filepath.Join(root, "reports")
+	if err := os.Mkdir(assetRoot, 0700); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 512; i++ {
+		if err := os.WriteFile(filepath.Join(assetRoot, fmt.Sprintf("asset-%d.json", i)), []byte("{}"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	count := func() int {
+		f, err := os.Open("/dev/fd")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer f.Close()
+		names, err := f.Readdirnames(-1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(names)
+	}
+	before := count()
+	w := NewWatcher(NewLoader(Options{WorkspaceRoot: root, ReportingRoot: "reports"}))
+	if err := w.Start(context.Background(), nil); err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	if delta := count() - before; delta > 8 {
+		t.Fatalf("512 assets retained %d additional descriptors", delta)
+	} else {
+		t.Logf("512 assets: descriptor delta %d", delta)
 	}
 }

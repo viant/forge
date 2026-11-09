@@ -4,16 +4,15 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/fsnotify/fsnotify"
 )
 
-const defaultWatchDebounce = 250 * time.Millisecond
+const defaultWatchDebounce = 30 * time.Second
 
 type WatchOption func(*Watcher)
 
@@ -32,8 +31,9 @@ type Watcher struct {
 	loader   *Loader
 	debounce time.Duration
 
-	mu      sync.Mutex
-	watcher *fsnotify.Watcher
+	mu         sync.Mutex
+	cancel     context.CancelFunc
+	generation uint64
 }
 
 func NewWatcher(loader *Loader, options ...WatchOption) *Watcher {
@@ -46,7 +46,7 @@ func NewWatcher(loader *Loader, options ...WatchOption) *Watcher {
 	return result
 }
 
-// Start begins recursive observation and returns after watches are installed.
+// Start begins recursive observation and returns after the initial metadata snapshot.
 // onReload receives both successful registries and validation/watch errors.
 func (w *Watcher) Start(ctx context.Context, onReload func(*Registry, error)) error {
 	if w == nil || w.loader == nil {
@@ -65,120 +65,97 @@ func (w *Watcher) Start(ctx context.Context, onReload func(*Registry, error)) er
 		return fmt.Errorf("watch reporting root %q: not a directory", root)
 	}
 
-	fileWatcher, err := fsnotify.NewWatcher()
+	previous, err := reportingStamps(ctx, root)
 	if err != nil {
-		return fmt.Errorf("create reporting watcher: %w", err)
-	}
-	if err = addRecursiveReportingWatch(fileWatcher, root); err != nil {
-		_ = fileWatcher.Close()
-		return fmt.Errorf("watch reporting root %q: %w", root, err)
+		return err
 	}
 	w.mu.Lock()
-	if w.watcher != nil {
+	if w.cancel != nil {
 		w.mu.Unlock()
-		_ = fileWatcher.Close()
 		return fmt.Errorf("reporting watcher already started")
 	}
-	w.watcher = fileWatcher
+	ctx, cancel := context.WithCancel(ctx)
+	w.cancel = cancel
+	w.generation++
+	generation := w.generation
 	w.mu.Unlock()
-
-	go w.loop(ctx, root, fileWatcher, onReload)
+	go func() {
+		defer func() {
+			w.mu.Lock()
+			if w.generation == generation {
+				w.cancel = nil
+			}
+			w.mu.Unlock()
+			cancel()
+		}()
+		ticker := time.NewTicker(w.debounce)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				next, err := reportingStamps(ctx, root)
+				if ctx.Err() != nil {
+					return
+				}
+				if err != nil {
+					if onReload != nil {
+						onReload(w.loader.Current(), err)
+					}
+					continue
+				}
+				if maps.Equal(previous, next) {
+					continue
+				}
+				previous = next
+				current, err := w.loader.Reload(ctx)
+				if onReload != nil && ctx.Err() == nil {
+					onReload(current, err)
+				}
+			}
+		}
+	}()
 	return nil
 }
 
 func (w *Watcher) Close() error {
-	if w == nil {
-		return nil
-	}
-	w.mu.Lock()
-	fileWatcher := w.watcher
-	w.watcher = nil
-	w.mu.Unlock()
-	if fileWatcher == nil {
-		return nil
-	}
-	return fileWatcher.Close()
-}
-
-func (w *Watcher) loop(ctx context.Context, root string, fileWatcher *fsnotify.Watcher, onReload func(*Registry, error)) {
-	defer func() {
+	if w != nil {
 		w.mu.Lock()
-		if w.watcher == fileWatcher {
-			w.watcher = nil
+		if w.cancel != nil {
+			w.cancel()
+			w.cancel = nil
 		}
 		w.mu.Unlock()
-		_ = fileWatcher.Close()
-	}()
-
-	timer := time.NewTimer(time.Hour)
-	if !timer.Stop() {
-		<-timer.C
 	}
-	pending := false
-	schedule := func() {
-		if pending && !timer.Stop() {
-			select {
-			case <-timer.C:
-			default:
-			}
-		}
-		timer.Reset(w.debounce)
-		pending = true
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case event, ok := <-fileWatcher.Events:
-			if !ok {
-				return
-			}
-			if event.Has(fsnotify.Create) {
-				if info, statErr := os.Stat(event.Name); statErr == nil && info.IsDir() {
-					_ = addRecursiveReportingWatch(fileWatcher, event.Name)
-					// The editor may have populated the directory before this event
-					// was delivered, so rescan rather than waiting for a missed file event.
-					schedule()
-					continue
-				}
-			}
-			if isReportingAsset(root, event.Name) && event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Remove|fsnotify.Rename) != 0 {
-				schedule()
-			}
-		case <-timer.C:
-			pending = false
-			registry, reloadErr := w.loader.Reload(context.Background())
-			if onReload != nil {
-				onReload(registry, reloadErr)
-			}
-		case watchErr, ok := <-fileWatcher.Errors:
-			if !ok {
-				return
-			}
-			if onReload != nil {
-				onReload(w.loader.Current(), fmt.Errorf("reporting watcher: %w", watchErr))
-			}
-		}
-	}
+	return nil
 }
 
-func addRecursiveReportingWatch(watcher *fsnotify.Watcher, root string) error {
-	return filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
+type assetStamp struct {
+	modified time.Time
+	size     int64
+}
+
+func reportingStamps(ctx context.Context, root string) (map[string]assetStamp, error) {
+	stamps := map[string]assetStamp{}
+	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
 		}
-		if entry.Type()&os.ModeSymlink != 0 {
-			if entry.IsDir() {
-				return filepath.SkipDir
-			}
+		if err = ctx.Err(); err != nil {
+			return err
+		}
+		if entry.Type()&os.ModeSymlink != 0 || entry.IsDir() || !isReportingAsset(root, path) {
 			return nil
 		}
-		if entry.IsDir() {
-			return watcher.Add(path)
+		info, err := entry.Info()
+		if err != nil {
+			return err
 		}
+		stamps[path] = assetStamp{info.ModTime(), info.Size()}
 		return nil
 	})
+	return stamps, err
 }
 
 func isReportingAsset(root, filename string) bool {
