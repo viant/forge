@@ -63360,7 +63360,12 @@ ${indent}${end}`;
     const labelDetails = [];
     const labelCharacters = Math.max(12, Math.floor((width * 0.38 - 28) / 6));
     const categoryLabelLines = rows.map((row, index) => {
-      const label = compactReportPrintSequence(readChartDataValue(row, xAxisKey));
+      var _a6, _b2;
+      const label = compactReportPrintSequence(formatChartXAxisValue(
+        readChartDataValue(row, xAxisKey),
+        normalizeString39((_a6 = chartModel == null ? void 0 : chartModel.xAxis) == null ? void 0 : _a6.tickFormat),
+        normalizeString39((_b2 = chartModel == null ? void 0 : chartModel.xAxis) == null ? void 0 : _b2.valueMode)
+      ));
       const lines2 = wrapReportPrintLabel(label, labelCharacters);
       if (lines2.length <= 2) return lines2;
       const key2 = `Category ${categoryOffset + index + 1}`;

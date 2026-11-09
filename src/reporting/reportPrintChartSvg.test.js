@@ -623,3 +623,29 @@ for(const width of [140,170,270,540]) for(const negative of [false,true]) {
   assert.ok(Number(grid[1])>=0&&Number(grid[2])<=width);
   assert.ok(Number(grid[2])-Number(grid[1])>=24-1e-8,'Keep a plotting area when reserving axis labels');
 }
+
+// Display metadata formats a civil day without changing raw categories or the
+// existing sequence compaction contract for undeclared horizontal labels.
+const datedHorizontalRows = [{ day: "2026-06-13T00:00:00Z", amount: 9 }];
+for (const declared of [false, true]) {
+  const rendered = buildReportPrintChartSvg({
+    chartModel: {
+      type: "horizontal_bar",
+      xAxis: { dataKey: "day", ...(declared ? { tickFormat: "MMM d", valueMode: "civil" } : {}) },
+      series: { values: [{ value: "amount", label: "Amount" }] },
+    },
+    resolvedChart: { kind: "directSeries", type: "horizontal_bar", xAxisKey: "day", seriesKeys: ["amount"], rows: datedHorizontalRows },
+    width: 640,
+  });
+  assert.equal(rendered.diagnostics.length, 0);
+  assert.match(rendered.svg, declared ? /Jun 13/ : /2026-06-13T00:00:00Z/);
+  if (declared) assert.doesNotMatch(rendered.svg, /T00:00:00Z/);
+}
+assert.deepEqual(datedHorizontalRows, [{ day: "2026-06-13T00:00:00Z", amount: 9 }]);
+const repeatedHorizontal = buildReportPrintChartSvg({
+  chartModel: { type: "horizontal_bar", xAxis: { dataKey: "path" }, series: { values: [{ value: "amount" }] } },
+  resolvedChart: { kind: "directSeries", type: "horizontal_bar", xAxisKey: "path", seriesKeys: ["amount"], rows: [{ path: "Alpha -> Alpha -> Beta", amount: 9 }] },
+  width: 640,
+});
+assert.match(repeatedHorizontal.svg, /Alpha \[x2\]/);
+assert.match(repeatedHorizontal.svg, /3 touchpoints/);

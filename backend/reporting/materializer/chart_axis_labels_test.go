@@ -141,3 +141,67 @@ func TestAuthoredChartAxisLabels(t *testing.T) {
 		}
 	}
 }
+
+func TestHorizontalCivilDateCategoryDisplay(t *testing.T) {
+	encode := func(value any) json.RawMessage {
+		data, err := json.Marshal(value)
+		require.NoError(t, err)
+		return data
+	}
+	const rawDay = "2026-06-13T00:00:00Z"
+	for _, declared := range []bool{false, true} {
+		name := "raw"
+		if declared {
+			name = "civil"
+		}
+		t.Run(name, func(t *testing.T) {
+			dimension := map[string]any{"id": "day", "key": "day", "label": "Day", "default": true, "chartAxis": true}
+			if declared {
+				dimension["tickFormat"], dimension["valueMode"] = "MMM d", "civil"
+			}
+			config := map[string]any{
+				"title": "Dated amounts", "dataSourceRef": "datedRows",
+				"dimensions": []any{dimension},
+				"measures":   []any{map[string]any{"id": "amount", "key": "amount", "label": "Amount", "format": "number", "default": true}},
+				"result":     map[string]any{"defaultMode": "chart", "chartCreationMode": "explicit", "supportedChartTypes": []string{"horizontal_bar"}},
+			}
+			chart := map[string]any{"type": "horizontal_bar", "xField": "day", "yFields": []string{"amount"}}
+			envelope := registry.ReportEnvelope{
+				SchemaVersion: 1, Format: "forge.authoredReport", BuilderRef: "datedBuilder",
+				BuilderDefinition: encode(map[string]any{"kind": "forge.reporting.builder", "id": "datedBuilder", "reportBuilder": config}),
+				ReportDocument:    encode(map[string]any{"version": 1, "kind": "reportDocument", "id": "dated", "title": "Dated amounts", "blocks": []any{}}),
+				State:             encode(map[string]any{"viewMode": "chart", "selectedDimensions": []string{"day"}, "selectedMeasures": []string{"amount"}, "chartSpec": chart}),
+				DataSources: map[string]json.RawMessage{"datedRows": encode(map[string]any{
+					"dataSourceRef": "datedRows", "kind": "published", "source": map[string]any{"kind": "datly", "uri": "dated"},
+					"dimensions": config["dimensions"], "measures": config["measures"],
+				})},
+			}
+			envelope.Dependencies = []registry.ReportDependency{
+				{Kind: "builder", ID: envelope.BuilderRef, ContentFingerprint: identity.ContentFingerprint(envelope.BuilderDefinition)},
+				{Kind: "report", ID: "report://example/dated", ContentFingerprint: identity.ContentFingerprint(envelope.ReportDocument)},
+				{Kind: "datasource", ID: "datedRows", ContentFingerprint: identity.ContentFingerprint(envelope.DataSources["datedRows"])},
+			}
+			lowered, err := Lower(context.Background(), encode(envelope))
+			require.NoError(t, err)
+			artifacts, err := Materialize(context.Background(), lowered, map[string]json.RawMessage{
+				"primary": encode(map[string]any{"rows": []any{map[string]any{"day": rawDay, "amount": 9}}}),
+			})
+			require.NoError(t, err)
+			require.Contains(t, string(artifacts.ReportFill), rawDay)
+			print, err := reportprint.DecodeJSON(artifacts.ReportPrint)
+			require.NoError(t, err)
+			var svg strings.Builder
+			for _, page := range print.Pages {
+				for _, element := range page.Elements {
+					svg.WriteString(element.SVG)
+				}
+			}
+			if declared {
+				require.Contains(t, svg.String(), "Jun 13")
+				require.NotContains(t, svg.String(), "T00:00:00Z")
+			} else {
+				require.Contains(t, svg.String(), rawDay)
+			}
+		})
+	}
+}

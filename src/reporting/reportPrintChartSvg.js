@@ -1158,7 +1158,11 @@ function renderHorizontalBarChartSvg({
   const labelDetails = [];
   const labelCharacters = Math.max(12, Math.floor((width * 0.38 - 28) / 6));
   const categoryLabelLines = rows.map((row, index) => {
-    const label = compactReportPrintSequence(readChartDataValue(row, xAxisKey));
+    const label = compactReportPrintSequence(formatChartXAxisValue(
+      readChartDataValue(row, xAxisKey),
+      normalizeString(chartModel?.xAxis?.tickFormat),
+      normalizeString(chartModel?.xAxis?.valueMode),
+    ));
     const lines = wrapReportPrintLabel(label, labelCharacters);
     if (lines.length <= 2) return lines;
     const key = `Category ${categoryOffset + index + 1}`;

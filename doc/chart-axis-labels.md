@@ -45,6 +45,14 @@ Go ReportSpec JSON round trips, and native materialization retain both labels.
 The existing UI consumes the numeric title in vertical and horizontal orientation;
 native XLSX charts export both category and value-axis titles.
 
+Document horizontal comparison bars and canonical print reuse the existing
+resolved category-axis `tickFormat` and `valueMode`. A published day dimension
+can declare `tickFormat: "MMM d"` and `valueMode: "civil"` to display a midnight
+transport timestamp as `Jun 13`. Source rows, category-color identities and
+selection/inspection payloads retain the original category value. Omitting
+formatting retains raw labels and print sequence compaction. This does not add
+format overrides to authored `chartSpec` axes.
+
 Browser Cartesian value titles use the existing Recharts Label/Text path with
 centered rotation and native wrapping against the actual axis height. Both
 sides preserve complete words, and an overlong token uses native character

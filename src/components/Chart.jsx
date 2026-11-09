@@ -860,7 +860,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         ? ((props) => <ClampedCategoryTick {...props} config={categoryLabelConfig} valueFormatter={(value) => formatChartXAxisValue(value, resolvedTickFormat, resolvedTickValueMode)} style={axisTickStyle} />)
         : axisTickStyle;
     const renderYAxisCategoryTick = categoryLabelConfig
-        ? ((props) => <ClampedCategoryTick {...props} config={categoryLabelConfig} orientation="y" style={axisTickStyle} availableWidth={Math.max(0, horizontalBarLayout.categoryWidth - 10)} />)
+        ? ((props) => <ClampedCategoryTick {...props} config={categoryLabelConfig} orientation="y" valueFormatter={value=>formatChartXAxisValue(value,resolvedTickFormat,resolvedTickValueMode)} style={axisTickStyle} availableWidth={Math.max(0, horizontalBarLayout.categoryWidth - 10)} />)
         : (embedded || documentAppearance ? axisTickStyle : undefined);
     const gridStroke = "var(--forge-chart-grid, rgba(152,162,179,0.22))";
     const showEmbeddedSeriesSelector = !documentAppearance && embedded && !isPieChart && availableDataKeys.length > 1;
@@ -1283,6 +1283,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                     dataKey={categoryKey}
                     width={categoryWidth}
                     tick={renderYAxisCategoryTick}
+                    tickFormatter={value=>formatChartXAxisValue(value,resolvedTickFormat,resolvedTickValueMode)}
                 />
                 <Tooltip
                 {...(chart.tooltip ? {content: props => <ChartHoverTooltip {...props} entries={tooltipEntries} chart={chart}/>, allowEscapeViewBox: {x:false,y:false}, wrapperStyle:{maxWidth:"100%",pointerEvents:"none"}} : {})}
@@ -1830,7 +1831,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                             })}
                         </div>
                     ) : documentAppearance && isHorizontalBar && renderableSeriesDefinitions.length === 1 ? (
-                        <ComparisonBars onInspect={chart.tooltip?row=>inspectTooltip(readChartDataValue(row,xAxis.dataKey),renderableSeriesDefinitions[0].value):undefined} rows={normalizedChartData} series={renderableSeriesDefinitions[0]} categoryKey={xAxis.dataKey} colors={chart.series?.categoryColors} colorForValue={value=>resolveConditionalSeriesColor(renderableSeriesDefinitions[0],value,renderableSeriesDefinitions[0].color)} formatter={buildDataLabelFormatter((renderableSeriesDefinitions[0].format || leftAxis.format) === 'currency' ? 'currency2' : renderableSeriesDefinitions[0].format || leftAxis.format)} onSelect={interactiveDatumSelection ? row => emitSeriesDatumSelection(renderableSeriesDefinitions[0].value,row) : undefined}/>
+                        <ComparisonBars onInspect={chart.tooltip?row=>inspectTooltip(readChartDataValue(row,xAxis.dataKey),renderableSeriesDefinitions[0].value):undefined} rows={normalizedChartData} series={renderableSeriesDefinitions[0]} categoryKey={xAxis.dataKey} categoryFormatter={value=>formatChartXAxisValue(value,resolvedTickFormat,resolvedTickValueMode)} colors={chart.series?.categoryColors} colorForValue={value=>resolveConditionalSeriesColor(renderableSeriesDefinitions[0],value,renderableSeriesDefinitions[0].color)} formatter={buildDataLabelFormatter((renderableSeriesDefinitions[0].format || leftAxis.format) === 'currency' ? 'currency2' : renderableSeriesDefinitions[0].format || leftAxis.format)} onSelect={interactiveDatumSelection ? row => emitSeriesDatumSelection(renderableSeriesDefinitions[0].value,row) : undefined}/>
                     ) : chartCanRenderViewport ? (
                         <ResponsiveContainer width={chartSize.width} height={chartSize.height}>
                             {isPieChart
