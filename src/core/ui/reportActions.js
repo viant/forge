@@ -76,7 +76,8 @@ export function projectCurrentReport(result, include) {
     for (const key of keys) if (Object.hasOwn(source || {}, key)) target[key] = source[key];
   };
   copy(result, ['ok','error','windowId','windowKey','reportId','reportName','sourceKind'], out);
-  if (include.state) copy(result, ['request','parameters','draftParameters','status','progress','hasCompletedRun','canRun','canSave','canExport','runControlId','activeSectionId','materialization'], out);
+  if (include.visible) copy(result, ['visible'], out);
+  if (include.state || include.visible) copy(result, ['request','parameters','draftParameters','status','progress','hasCompletedRun','canRun','canSave','canExport','runControlId','activeSectionId','materialization'], out);
   const spec = {}, fill = {};
   if (include.inputs) copy(result.reportSpec, ['scope','parameters','inputs','refinements'], spec);
   if (include.description) copy(result.reportSpec, ['title','description','semanticSummary'], spec);

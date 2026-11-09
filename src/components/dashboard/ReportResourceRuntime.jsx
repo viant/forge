@@ -1,3 +1,4 @@
+import {readVisibleReport} from "../../core/ui/reportVisible.js";
 import NativeControlTarget from "../../runtime/NativeControlTarget.jsx";
 import {registerReportWindowActions} from "../../core/ui/reportActions.js";
 import React, {useCallback, useEffect, useRef, useState} from "react";
@@ -38,6 +39,7 @@ export function validateReportSectionSnapshot(value, expected, choices = {}) {
 }
 
 export default function ReportResourceRuntime({container, context, onViewStateChange}) {
+    const rendererRoot = useRef(null);
     const pin = hostedReportResource(container);
     const parameters = hostedReportParameters(container);
     const canRun = parameters.reportCapabilities?.run === true || parameters.reportCapabilities?.runRange === true;
@@ -193,9 +195,10 @@ export default function ReportResourceRuntime({container, context, onViewStateCh
             parameters:current.request.parameters,draftParameters:current.draftParameters,canRun:current.canRun,canSave:current.canSave,
             canExport:current.canExport,hasCompletedRun:current.hasCompletedRun,runControlId:current.runControlId,error:current.error,progress:current.progress});
         if(!windowId)return;
-        return registerReportWindowActions(windowId,{getCurrent:()=>{
+        return registerReportWindowActions(windowId,{getCurrent:({include} = {})=>{
             const completed=runResult?.version===generation.current?runResult:null;
             return {...current,hasCompletedRun:!!completed,
+                ...(include?.visible && !include.raw && completed && current.status === "ready" ? {visible:readVisibleReport(rendererRoot.current)} : {}),
                 ...(completed?{reportSpec:completed.result.reportSpec,reportFill:completed.result.reportFill}: {})};
         }});
     },[onViewStateChange,windowId,identity,displayedTitle,displayedStatus,displayedSection,canRun,runReport,error,progress,runResult,context?.windowState?.windowForm,controls.exportDisabled,output.busy]);
@@ -211,7 +214,7 @@ export default function ReportResourceRuntime({container, context, onViewStateCh
         {progress && <Callout role="status" aria-live="polite" data-forge-status="info" icon={<Spinner size={18}/>} title="Report progress">{progress}</Callout>}
         {metadataRefreshing && <Callout role="status" aria-live="polite" data-forge-status="info" icon={<Spinner size={18}/>}>Refreshing report details.</Callout>}
         {error && <Callout intent="danger" title="Report unavailable">{error}</Callout>}
-        {result && !output.printModel && <ReportRuntime reportSpec={result.reportSpec} reportFill={result.reportFill} presentationMode="report" onChartMetricSelectionChange={changeMetrics}
+        {result && !output.printModel && <ReportRuntime reportRootRef={rendererRoot} reportSpec={result.reportSpec} reportFill={result.reportFill} presentationMode="report" onChartMetricSelectionChange={changeMetrics}
             selectedSectionId={selectedSectionId} onSectionChange={changeSection} onActiveSectionChange={setVisibleSectionId}
             sectionNavigation={sectionSnapshot?.sections || null}
             sectionLoading={!!sectionSnapshot && selectedSectionId !== sectionSnapshot.sectionId}/>}

@@ -1,3 +1,4 @@
+import {readVisibleReport} from "../../core/ui/reportVisible.js";
 import Popover from '../Popover.jsx';
 import {updateReportChartTableSwitch} from '../../reporting/reportViewerSettings.js';
 import {reportDatasetReadContextIdentity} from './reportBuilderConcurrentRead.js';
@@ -2142,6 +2143,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     const currentReportMaterializationFingerprintRef = useRef("");
     const currentReportDispatchMaterializationRef = useRef(null);
     const activeRunEventRef = useRef(null);
+    const authoredRendererRoot = useRef(null);
+    const importedRendererRoot = useRef(null);
     const trustedReportRunConversationIdRef = useRef("");
     trustedReportRunConversationIdRef.current = normalizeString(reportEventContext.conversationId);
     const reportRunPendingBeginScopeKey = React.useId();
@@ -14515,7 +14518,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             return undefined;
         }
         return registerReportWindowActions(windowId, {
-            getCurrent: () => ({
+            getCurrent: ({include} = {}) => ({
+                ...(include?.visible && !include.raw && currentTerminalMaterializationFresh ? {visible: readVisibleReport(authoredRendererRoot.current) ?? readVisibleReport(importedRendererRoot.current)} : {}),
                 ok: true,
                 windowId,
                 windowKey: normalizeString(reportEventContext.windowKey),
@@ -14558,6 +14562,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         canSaveCurrentReportFile,
         currentRequest,
         currentReportDatasetMaterialization,
+        currentTerminalMaterializationFresh,
         hasCompletedCurrentRun,
         reportEventContext.windowId,
         reportEventContext.windowKey,
@@ -20615,7 +20620,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                         downloadArtifact: downloadImportedPipelineExportArtifact,
                         failureNotice: importedPipelineExportFailureNotice,
                     })}
-                <ReportRuntime
+                <ReportRuntime reportRootRef={importedRendererRoot}
                     headerActions={reportOptionHeaderActions}
                     reportSpec={importedPipelineRuntimeConfig.reportSpec}
                     reportDocument={importedPipelineRuntimeArtifact?.document || null}
@@ -20754,7 +20759,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                         return null;
                     }
                     const runtimeContent = (
-                        <ReportRuntime
+                        <ReportRuntime reportRootRef={authoredRendererRoot}
                             key={currentWindowExportParameterIdentity}
                             headerActions={reportOptionHeaderActions}
                             reportSpec={previewStateForDisplay.runtimeConfig.reportSpec}

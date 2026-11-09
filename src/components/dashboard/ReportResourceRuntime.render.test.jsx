@@ -7,10 +7,10 @@ vi.mock('@blueprintjs/core', () => ({
     Spinner: () => <span/>,
     HTMLSelect: props => <select {...props}/>,
 }));
-vi.mock('./ReportRuntime.jsx', () => ({default: ({reportSpec,onChartMetricSelectionChange,sectionNavigation,selectedSectionId,onSectionChange,sectionLoading}) => <>
+vi.mock('./ReportRuntime.jsx', () => ({default: ({reportRootRef,reportSpec,onChartMetricSelectionChange,sectionNavigation,selectedSectionId,onSectionChange,sectionLoading}) => <div ref={reportRootRef} data-forge-report-active-section="dashboard"><div data-report-runtime-block-id="metric">Visible KPI</div>
     {(sectionNavigation || (reportSpec.blocks || []).filter(block=>block.kind==='sectionBlock').map(block=>({id:block.id,label:block.title}))).map(section=><button key={section.id} onClick={()=>onSectionChange(section.id)}>{section.label}</button>)}
     {sectionLoading ? <p>Loading section…</p> : <output data-selected-section={selectedSectionId}>{reportSpec.title}</output>}
-    {onChartMetricSelectionChange&&<button onClick={()=>onChartMetricSelectionChange({blockId:'trend',selection:{primaryField:'count',secondaryField:'rate'}})}>Choose metrics</button>}</>}));
+    {onChartMetricSelectionChange&&<button onClick={()=>onChartMetricSelectionChange({blockId:'trend',selection:{primaryField:'count',secondaryField:'rate'}})}>Choose metrics</button>}</div>}));
 vi.mock('./ReportPrintPreview.jsx', () => ({default: () => <aside>Print</aside>}));
 import ReportResourceRuntime from './ReportResourceRuntime.jsx';
 
@@ -661,4 +661,32 @@ it('keeps the completed fill and scope after native authority renewal and export
         expect(run.mock.calls[1][0].resolvedResource).toEqual(renewed);
         expect(view.host.querySelector('output').textContent).toBe('New run');
     } finally {await view.close();}
+});
+
+it('reads visible content only from the completed mounted window without executing again', async () => {
+    const {invokeReportWindowAction} = await import('../../core/ui/reportActions.js');
+    const pending = deferred();
+    const run = vi.fn(() => pending.promise);
+    const view = await mount(run, {executeOnOpen:true}, {}, undefined, {identity:{windowId:'visible-test'}});
+    document.body.append(view.host);
+    const read = () => invokeReportWindowAction('visible-test','getCurrent',{include:{visible:true}});
+    try {
+        expect((await read()).visible).toBeUndefined();
+        await act(async () => pending.resolve(result()));
+        for (const element of view.host.querySelectorAll('[data-forge-report-active-section], [data-report-runtime-block-id]')) {
+            element.checkVisibility = () => true;
+        }
+        const projected = await read();
+        expect(projected.visible.blocks).toEqual([{id:'metric',text:'Visible KPI'}]);
+        expect(projected.hasCompletedRun).toBe(true);
+        expect(projected.reportFill).toBeUndefined();
+        expect(run).toHaveBeenCalledTimes(1);
+        const full = await invokeReportWindowAction('visible-test','getCurrent',{});
+        expect(full.reportFill).toBeDefined();
+        expect(full.visible).toBeUndefined();
+    } finally {
+        await view.close();
+        view.host.remove();
+    }
+    await expect(read()).rejects.toThrow('report surface not found');
 });
