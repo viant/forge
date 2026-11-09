@@ -138,7 +138,13 @@ type ReportRelativeDaysRange struct {
 	EndOffset   *int    `json:"endOffset"`
 }
 
+type ScopeDatePrefill struct {
+	Start string `json:"start"`
+	End   string `json:"end"`
+}
+
 type ScopeParam struct {
+	Prefill        *ScopeDatePrefill         `json:"prefill,omitempty"`
 	DatePresets    *ReportDatePresets        `json:"datePresets,omitempty"`
 	ID             string                    `json:"id"`
 	Kind           string                    `json:"kind"`

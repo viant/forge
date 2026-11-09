@@ -223,6 +223,7 @@ export const reportSpecSchema = {
         label: { type: "string" },
         description: { type: "string" },
         datasetRef: { type: "string" },
+        prefill: {type:"object", additionalProperties:false, required:["start","end"], properties:{start:{type:"string",minLength:1},end:{type:"string",minLength:1}}},
         datePresets: reportDatePresetsSchema,
         filterBindings: { type: 'array', minItems: 1, items: {
           type: 'object', additionalProperties: false, required: ['datasetRef', 'path'],

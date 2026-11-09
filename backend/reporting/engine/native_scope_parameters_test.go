@@ -164,3 +164,69 @@ func TestNativeScopeBindingsKeepCanonicalSourceFilterPaths(t *testing.T) {
 		}
 	}
 }
+
+func TestNativeDateAliasesPreserveInitialBoundsAndPreferEdits(t *testing.T) {
+	raw := json.RawMessage(`{"scope":{"params":[{"id":"period","kind":"dateRange","prefill":{"start":"arrival","end":"departure"},"filterBindings":[{"datasetRef":"primary","path":"from","valuePath":"start"},{"datasetRef":"primary","path":"to","valuePath":"end"}]}]},"datasets":[{"id":"primary","request":{"offset":50,"filters":{"tenant":7}}}]}`)
+	for _, edited := range []bool{false, true} {
+		input := map[string]interface{}{"arrival": "2031-05-01", "departure": "2031-05-07", "scopeID": 7}
+		want := "2031-05-01"
+		if edited {
+			input["period"] = map[string]interface{}{"start": "2031-05-03", "end": "2031-05-04"}
+			want = "2031-05-03"
+		}
+		b, rest, err := bindNativeScopeParameters(raw, input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var result struct {
+			Datasets []struct {
+				Request struct {
+					Offset  int
+					Filters map[string]interface{}
+				}
+			}
+		}
+		if err = json.Unmarshal(b, &result); err != nil {
+			t.Fatal(err)
+		}
+		if result.Datasets[0].Request.Filters["from"] != want || result.Datasets[0].Request.Filters["tenant"] != float64(7) || result.Datasets[0].Request.Offset != 0 || !reflect.DeepEqual(rest, map[string]interface{}{"scopeID": 7}) {
+			t.Fatal(string(b), rest)
+		}
+	}
+	for _, input := range []map[string]interface{}{{"arrival": "2031-05-01"}, {"arrival": "bad", "departure": "2031-05-01"}} {
+		if _, _, err := bindNativeScopeParameters(raw, input); err == nil {
+			t.Fatal("invalid initial range accepted")
+		}
+	}
+}
+
+func TestNativeDateAliasesClearAndRejectCollisions(t *testing.T) {
+	makeSpec := func(start, end, kind string) json.RawMessage {
+		raw, _ := json.Marshal(map[string]any{
+			"scope":    map[string]any{"params": []any{map[string]any{"id": "period", "kind": kind, "prefill": map[string]string{"start": start, "end": end}, "filterBindings": []any{map[string]string{"datasetRef": "daily", "path": "from", "valuePath": "start"}, map[string]string{"datasetRef": "daily", "path": "to", "valuePath": "end"}}}}},
+			"datasets": []any{map[string]any{"id": "daily", "request": map[string]any{"filters": map[string]any{"from": "2030-01-01", "to": "2030-01-31"}}}},
+		})
+		return raw
+	}
+	raw := makeSpec("from", "to", "dateRange")
+	bound, remaining, err := bindNativeScopeParameters(raw, map[string]any{"from": "2030-01-01", "to": "2030-01-31", "period": nil})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cleared struct {
+		Datasets []struct {
+			Request struct{ Filters map[string]any }
+		}
+	}
+	if err = json.Unmarshal(bound, &cleared); err != nil {
+		t.Fatal(err)
+	}
+	if cleared.Datasets[0].Request.Filters["from"] != nil || cleared.Datasets[0].Request.Filters["to"] != nil || len(remaining) != 0 {
+		t.Fatal(string(bound), remaining)
+	}
+	for _, pair := range [][3]string{{"from", "from", "dateRange"}, {"period", "to", "dateRange"}, {"filters", "to", "dateRange"}, {"from.start", "to", "dateRange"}, {"from", "to", "text"}} {
+		if _, _, err = bindNativeScopeParameters(makeSpec(pair[0], pair[1], pair[2]), nil); err == nil {
+			t.Fatal("invalid alias admitted", pair)
+		}
+	}
+}

@@ -187,3 +187,33 @@ still declares the datasource and query path. This does not introduce a
 `reportBuilder.predicates.datePresets` grammar or infer missing filter bindings.
 Author the canonical scope declaration once; lowering retains it rather than
 creating a second calendar policy.
+
+### Native date input aliases
+
+A native report can initialize a date control from named invocation inputs.
+Declare the aliases on the scope parameter and bind its values to dataset filters.
+
+```json
+{
+  "id": "period",
+  "kind": "dateRange",
+  "label": "Period",
+  "required": true,
+  "prefill": {"start": "from", "end": "to"},
+  "filterBindings": [
+    {"datasetRef": "daily", "path": "from", "valuePath": "start"},
+    {"datasetRef": "daily", "path": "to", "valuePath": "end"}
+  ]
+}
+```
+
+The initial invocation can supply `from` and `to`. A later explicit `period`
+value takes precedence. The engine consumes the aliases and writes the validated
+range into `request.filters.from` and `request.filters.to` for each declared
+dataset. Datasource argument mappings must read those filter paths. A changed
+range resets the dataset offset to zero.
+
+An optional control accepts explicit null to clear its bindings. Partial or
+invalid initial dates fail validation. Aliases must be distinct simple names,
+must be unique across controls, and must not collide with a control ID or
+reserved transport parameter.

@@ -41,10 +41,41 @@ func bindNativeScopeParameters(raw json.RawMessage, parameters map[string]interf
 	for key, value := range parameters {
 		remaining[key] = value
 	}
+	aliases := map[string]bool{}
+	for _, param := range scope.Params {
+		if param.Prefill == nil {
+			continue
+		}
+		if param.Kind != "dateRange" {
+			return nil, nil, nativeScopeError("date aliases require a date range")
+		}
+		for _, alias := range []string{param.Prefill.Start, param.Prefill.End} {
+			if !nativeScopeEditable(reportspec.ScopeParam{ID: alias, Kind: "text"}) || aliases[alias] {
+				return nil, nil, nativeScopeError("invalid or ambiguous date alias")
+			}
+			for _, other := range scope.Params {
+				if other.ID == alias {
+					return nil, nil, nativeScopeError("date alias collides with a control")
+				}
+			}
+			aliases[alias] = true
+		}
+	}
 	seen, changed := map[string]bool{}, false
 	for index := range scope.Params {
 		param := &scope.Params[index]
 		value, supplied := parameters[param.ID]
+		if param.Prefill != nil {
+			start, hasStart := parameters[param.Prefill.Start]
+			end, hasEnd := parameters[param.Prefill.End]
+			if !supplied && (hasStart || hasEnd) {
+				value = map[string]interface{}{"start": start, "end": end}
+				supplied = true
+			}
+			// Explicit control edits supersede launch aliases for this invocation.
+			delete(remaining, param.Prefill.Start)
+			delete(remaining, param.Prefill.End)
+		}
 		if !supplied || !nativeScopeEditable(*param) {
 			continue
 		}
