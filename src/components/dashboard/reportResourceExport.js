@@ -30,10 +30,14 @@ export function decodeReportArtifact(artifact) {
     return Uint8Array.from(atob(data),character=>character.charCodeAt(0));
 }
 
-export function downloadReportArtifact(artifact,format) {
+export function validateReportArtifact(artifact,format) {
     if(!['pdf','csv','xlsx'].includes(format)||artifact?.format!==format)throw Error('The export provider returned a different file format.');
     if(artifact.incompleteDatasetIds?.length)throw Error('The export is incomplete. Narrow the filters and try again.');
-    const bytes=decodeReportArtifact(artifact);
+    return decodeReportArtifact(artifact);
+}
+
+export function downloadReportArtifact(artifact,format) {
+    const bytes=validateReportArtifact(artifact,format);
     const url=URL.createObjectURL(new Blob([bytes],{type:artifact.contentType||'application/octet-stream'}));
     try{const link=document.createElement('a');link.href=url;link.download=artifact.filename||artifact.fileName||`report.${format}`;link.click();}
     finally{setTimeout(()=>URL.revokeObjectURL(url),1000);}

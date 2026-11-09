@@ -76,3 +76,64 @@ it('does not return successful receipts after a scope change or cancellation',as
   try{await act(async()=>{result=v.output.exportReport('xlsx')});if(changeScope)await v.render({scopeKey:'different'});else await act(async()=>v.output.cancelOutput());let receipt;await act(async()=>{pending.resolve({...artifact('xlsx'),artifactId:'stale'});receipt=await result});expect(receipt.status).toBe('cancelled');expect(v.click).not.toHaveBeenCalled();}finally{await v.close()}
  }
 });
+it('awaits a host download and keeps delivery busy until acknowledgement',async()=>{
+ const ack=deferred(),download=vi.fn(()=>ack.promise),value=artifact('pdf'),v=await mount({onExport:async()=>value,onDownload:download});
+ let outcome;
+ try{
+  await act(async()=>{outcome=v.output.exportReport('pdf')});
+  expect(download).toHaveBeenCalledOnce();expect(download.mock.calls[0][0]).toBe(value);expect(download.mock.calls[0][1]).toBe('pdf');
+  expect(download.mock.calls[0][2].signal.aborted).toBe(false);expect(download.mock.calls[0][2].isCurrent()).toBe(true);
+  expect(v.output.busy).toBe('pdf');expect(v.click).not.toHaveBeenCalled();
+  await act(async()=>ack.resolve());expect(await outcome).toMatchObject({status:'succeeded'});expect(v.output.busy).toBe('');
+ }finally{await v.close()}
+});
+it('validates format, completeness and payload before invoking a host download',async()=>{
+ const download=vi.fn(),run=vi.fn().mockResolvedValueOnce({...artifact('csv'),data:'invalid!'}).mockResolvedValueOnce({...artifact('csv'),incompleteDatasetIds:['primary']}).mockResolvedValueOnce(artifact('xlsx'));
+ const v=await mount({onExport:run,onDownload:download});
+ try{for(const message of ['valid base64','incomplete','different file format']){await act(async()=>v.button('Export CSV').click());expect(v.host.textContent).toContain(message)}expect(download).not.toHaveBeenCalled();expect(v.click).not.toHaveBeenCalled();}finally{await v.close()}
+});
+it('shows a rejected or unsupported host download without a browser fallback',async()=>{
+ for(const message of ['Host declined the download.','This host does not support file downloads.']){
+  const download=vi.fn(async()=>{throw Error(message)}),v=await mount({onExport:async()=>artifact('pdf'),onDownload:download});
+  try{let outcome;await act(async()=>{outcome=await v.output.exportReport('pdf')});expect(outcome).toEqual({status:'failed',error:{message}});expect(v.host.textContent).toContain(message);expect(v.click).not.toHaveBeenCalled();}finally{await v.close()}
+ }
+});
+it('never invokes the host for cancelled or obsolete producer output',async()=>{
+ for(const invalidate of ['scope','cancel','unmount']){
+  const pending=deferred(),download=vi.fn(),v=await mount({onExport:()=>pending.promise,onDownload:download});let outcome,closed=false;
+  try{
+   await act(async()=>{outcome=v.output.exportReport('pdf')});
+   if(invalidate==='scope')await v.render({scopeKey:'new-scope'});
+   else if(invalidate==='cancel')await act(async()=>v.output.cancelOutput());
+   else{await v.close();closed=true;}
+   await act(async()=>pending.resolve(artifact('pdf')));expect(await outcome).toEqual({status:'cancelled'});expect(download).not.toHaveBeenCalled();expect(v.click).not.toHaveBeenCalled();
+  }finally{if(!closed)await v.close()}
+ }
+});
+it('a late host acknowledgement cannot overwrite output for a later scope',async()=>{
+ const ack=deferred(),delivered=[],download=vi.fn(async(value,format,{signal,isCurrent})=>{if(value.filename==='old.pdf')await ack.promise;if(signal.aborted||!isCurrent())return;delivered.push(value.filename)});
+ let old=true;const v=await mount({onExport:async()=>({...artifact('pdf'),filename:old?'old.pdf':'new.pdf'}),onDownload:download});let previous;
+ try{
+  await act(async()=>{previous=v.output.exportReport('pdf')});const first=download.mock.calls[0][2];
+  await v.render({scopeKey:'new-scope'});expect(first.signal.aborted).toBe(true);expect(first.isCurrent()).toBe(false);old=false;
+  let current;await act(async()=>{current=await v.output.exportReport('pdf')});expect(current.status).toBe('succeeded');
+  await act(async()=>ack.resolve());expect(await previous).toEqual({status:'cancelled'});expect(delivered).toEqual(['new.pdf']);expect(v.output.error).toBe('');expect(v.output.busy).toBe('');
+ }finally{await v.close()}
+});
+it('cancel and unmount abort an awaiting host delivery before it commits',async()=>{
+ for(const unmount of [false,true]){
+  const ack=deferred(),delivered=vi.fn(),download=vi.fn(async(value,format,{signal,isCurrent})=>{await ack.promise;if(!signal.aborted&&isCurrent())delivered(value)});
+  const v=await mount({onExport:async()=>artifact('pdf'),onDownload:download});let outcome,closed=false;
+  try{
+   await act(async()=>{outcome=v.output.exportReport('pdf')});
+   if(unmount){await v.close();closed=true;}else await act(async()=>v.output.cancelOutput());
+   expect(download.mock.calls[0][2].signal.aborted).toBe(true);
+   await act(async()=>ack.resolve());expect(await outcome).toEqual({status:'cancelled'});expect(delivered).not.toHaveBeenCalled();expect(v.click).not.toHaveBeenCalled();
+  }finally{if(!closed)await v.close()}
+ }
+});
+
+it('retains the ordinary browser download for an omitted host callback',async()=>{
+ const v=await mount({onExport:async()=>artifact('csv'),onDownload:null});
+ try{await act(async()=>v.button('Export CSV').click());expect(v.click).toHaveBeenCalledOnce();}finally{await v.close()}
+});

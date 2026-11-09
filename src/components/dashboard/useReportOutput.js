@@ -1,10 +1,10 @@
 import {useEffect, useRef, useState} from "react";
-import {downloadReportArtifact} from "./reportResourceExport.js";
+import {downloadReportArtifact,validateReportArtifact} from "./reportResourceExport.js";
 
 // One output belongs to the currently displayed report/scope. Hosts supply the
 // transport; this hook owns cancellation, stale settlement and print visibility.
-export function useReportOutput({scopeKey, disabled=false, onExport, onPrint}) {
-    const callbacks = useRef({onExport,onPrint}); callbacks.current = {onExport,onPrint};
+export function useReportOutput({scopeKey, disabled=false, onExport, onPrint, onDownload}) {
+    const callbacks = useRef({onExport,onPrint,onDownload}); callbacks.current = {onExport,onPrint,onDownload};
     const owner = useRef(null);
     const rendered=useRef({scopeKey,disabled});rendered.current={scopeKey,disabled};
     const [state,setState] = useState(null);
@@ -26,7 +26,14 @@ export function useReportOutput({scopeKey, disabled=false, onExport, onPrint}) {
                 if(value?.kind!=='reportPrint'||!Array.isArray(value.pages)||!value.pageGeometry)throw Error('The provider did not return a canonical print layout.');
                 setState({scopeKey,printModel:value});
             }else{
-                downloadReportArtifact(value,format);
+                const download=callbacks.current.onDownload;
+                if(download==null)downloadReportArtifact(value,format);
+                else{
+                    validateReportArtifact(value,format);
+                    if(typeof download!=='function')throw Error('Report download is unavailable.');
+                    await download(value,format,{signal:operation.controller.signal,isCurrent});
+                }
+                if(!isCurrent())return {status:'cancelled'};
                 setState({scopeKey});
                 return {status:'succeeded',receipt:{status:'succeeded',format,...(value.artifactId?{artifactId:value.artifactId}:{}),...(value.jobId?{jobId:value.jobId}:{})}};
             }
