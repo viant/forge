@@ -71366,12 +71366,15 @@ ${indent}${end}`;
     return columns.map((column) => {
       const key2 = normalizeString41(column == null ? void 0 : column.key);
       const labelWords = normalizeString41((column == null ? void 0 : column.label) || key2).split(/\s+/);
-      let characters = Math.max(6, ...labelWords.map((word) => Math.min(12, word.length)));
+      const longestWord = Math.max(...labelWords.map((word) => word.length));
+      let characters = Math.max(6, longestWord);
       rows.slice(0, 50).forEach((row) => {
         const cell = ((row == null ? void 0 : row.cells) || []).find((entry) => normalizeString41(entry == null ? void 0 : entry.key) === key2);
         characters = Math.max(characters, resolveText(column, cell).length);
       });
-      return Math.min(cap, Math.max(44, characters * 9 * 0.56 + padding));
+      const width = characters * 9 * 0.56 + padding;
+      const minimumWidth = longestWord > 12 && longestWord === characters ? Math.ceil(width) : width;
+      return Math.min(cap, Math.max(44, minimumWidth));
     });
   }
   function buildReportPrintTableColumnLayout(state = {}, block = {}, columns = [], resolveText = resolveReportPrintTableCellText) {

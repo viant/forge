@@ -2179,8 +2179,8 @@ function createReportPrintTableCellTextResolver() {
 const negativeZeroPrintValue = Symbol("negative zero");
 
 // Size compact evidence from its displayed content rather than a fixed column count.
-// Cap long labels so descriptive columns can wrap without forcing every row into
-// another horizontal pane. Dates and numeric identifiers keep their full width.
+// Reserve room for whole header words up to the same width cap as cell text.
+// Very long words still wrap within bounded columns.
 function minimumReportPrintColumnWidths(state = {}, block = {}, columns = [], resolveText = resolveReportPrintTableCellText) {
   const rows = Array.isArray(block?.content?.resolvedRows) ? block.content.resolvedRows : [];
   const padding = REPORT_PRINT_THEME.tableCellPaddingX * 2;
@@ -2188,12 +2188,17 @@ function minimumReportPrintColumnWidths(state = {}, block = {}, columns = [], re
   return columns.map((column) => {
     const key = normalizeString(column?.key);
     const labelWords = normalizeString(column?.label || key).split(/\s+/);
-    let characters = Math.max(6, ...labelWords.map((word) => Math.min(12, word.length)));
+    const longestWord = Math.max(...labelWords.map((word) => word.length));
+    let characters = Math.max(6, longestWord);
     rows.slice(0, 50).forEach((row) => {
       const cell = (row?.cells || []).find((entry) => normalizeString(entry?.key) === key);
       characters = Math.max(characters, resolveText(column, cell).length);
     });
-    return Math.min(cap, Math.max(44, characters * 9 * 0.56 + padding));
+    const width = characters * 9 * 0.56 + padding;
+    // Give newly widened headers a whole-point minimum so rounding in the
+    // wrap calculation cannot put the last character on a line of its own.
+    const minimumWidth = longestWord > 12 && longestWord === characters ? Math.ceil(width) : width;
+    return Math.min(cap, Math.max(44, minimumWidth));
   });
 }
 
