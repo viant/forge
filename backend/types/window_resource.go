@@ -112,6 +112,7 @@ type WindowTargetBinding struct {
 }
 type WindowResourceVariant struct {
 	Fingerprint         string                                   `json:"-"`
+	PublishedVersion    uint64                                   `json:"-"`
 	Window              *Window                                  `json:"window"`
 	DataSources         map[string]json.RawMessage               `json:"dataSources"`
 	DataSourceResources map[string]primitive.DataSourceReference `json:"dataSourceResources,omitempty"`

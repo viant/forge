@@ -80,7 +80,7 @@ func (g *Gateway) readPublishedWindow(ctx context.Context, connection Connection
 		}
 		return nil, identity.ErrResourceDenied
 	}
-	loaded, err := Load[*publishedWindowTemplate](ctx, g, ref.URI, PublishedCodec[*publishedWindowTemplate]{ID: "forge.published-window.v1", Immutable: true, Decode: func(_ context.Context, _ string, raw json.RawMessage) (*publishedWindowTemplate, error) {
+	loaded, err := Load[*publishedWindowTemplate](ctx, g, ref.URI, PublishedCodec[*publishedWindowTemplate]{ID: "forge.published-window.v1", Immutable: true, CaptureVersion: true, Decode: func(_ context.Context, _ string, raw json.RawMessage) (*publishedWindowTemplate, error) {
 		var envelope struct {
 			Format   string                      `json:"format"`
 			Targets  []types.WindowTargetBinding `json:"targets"`
@@ -145,6 +145,7 @@ func (g *Gateway) readPublishedWindow(ctx context.Context, connection Connection
 		return nil, identity.ErrResourceDenied
 	}
 	variant.Window.ResourceTarget = &normalized
+	variant.PublishedVersion = loaded.Version
 	if err = g.verifyPublishedPin(ctx, connection, selected); err != nil {
 		return nil, err
 	}

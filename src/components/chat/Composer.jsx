@@ -144,7 +144,7 @@ export default function Composer({
     onCaptureImage,
     inputComponent: InputComponent,
     inputProps = {},
-    disabled = false,
+    disabled: disabledProp = false,
     attachments = [],
     uploads = [],
     onCancelUpload,
@@ -176,6 +176,11 @@ export default function Composer({
     const documentAppearance = appearance === 'document';
     if (appearance && !documentAppearance) throw new Error(`Unsupported chat appearance: ${appearance}`);
     const inputHostRef = useRef(null);
+    const pendingScopedSubmit = useRef(null);
+    const [scopedSubmitting, setScopedSubmitting] = useState(false);
+    const currentDraftKey = useRef(draftKey);
+    currentDraftKey.current = draftKey;
+    const disabled = disabledProp || scopedSubmitting;
 	const [draft, setDraft] = useState(String(draftValue || ""));
     const [composerCollapsed, setComposerCollapsed] = useState(false);
 	const [historyOpen, setHistoryOpen] = useState(false);
@@ -663,7 +668,7 @@ export default function Composer({
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (disabled || inputInvalid || uploads.some(isUnresolvedUpload)) return; // Keep lookup validation authoritative
+        if (disabled || pendingScopedSubmit.current || inputInvalid || uploads.some(isUnresolvedUpload)) return;
         const resolver = inputValueResolverRef.current;
         const resolvedValue = typeof resolver === 'function' ? resolver() : '';
         if (resolvedValue === null) return;
@@ -671,14 +676,40 @@ export default function Composer({
         const content = String(resolution.content || draftRef.current || '').trim();
         const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
         if (!content && !hasAttachments) return;
-        setHistoryOpen(false);
-        storeDraftForConversation(currentConversationIdFromLocation(), '');
-        onSubmit?.({ content, toolNames: selectedTools, ...(resolution.lookupSelections ? {lookupSelections: resolution.lookupSelections} : {}) });
-        updateDraft("");
-        if (documentAppearance) requestAnimationFrame(() => {
-            inputHostRef.current?.querySelector('textarea, [contenteditable="true"]')?.focus({preventScroll: true});
-            inputHostRef.current?.closest('[data-testid="chat-root"]')?.dispatchEvent(new CustomEvent('forge:chat-submitted', {bubbles: true}));
-        });
+        const complete = () => {
+            setHistoryOpen(false);
+            updateDraft('');
+            if (documentAppearance) requestAnimationFrame(() => {
+                inputHostRef.current?.querySelector('textarea, [contenteditable="true"]')?.focus({preventScroll: true});
+                inputHostRef.current?.closest('[data-testid="chat-root"]')?.dispatchEvent(new CustomEvent('forge:chat-submitted', {bubbles: true}));
+            });
+        };
+        if (!resolution.lookupSelections) {
+            storeDraftForConversation(currentConversationIdFromLocation(), '');
+            onSubmit?.({content, toolNames: selectedTools});
+            complete();
+            return;
+        }
+        const submission = {};
+        pendingScopedSubmit.current = submission;
+        setScopedSubmitting(true);
+        const finish = () => {
+            if (pendingScopedSubmit.current !== submission) return;
+            pendingScopedSubmit.current = null;
+            setScopedSubmitting(false);
+        };
+        const onAccepted = () => {
+            if (pendingScopedSubmit.current !== submission) return;
+            if (currentDraftKey.current === draftKey) complete();
+            else onDraftChange?.('');
+            finish();
+        };
+        try {
+            const pending = onSubmit?.({content, toolNames: selectedTools, lookupSelections: resolution.lookupSelections, onAccepted});
+            Promise.resolve(pending).then(finish, finish);
+        } catch {
+            finish();
+        }
     };
 
     const handleComposerKeyDown = (event) => {

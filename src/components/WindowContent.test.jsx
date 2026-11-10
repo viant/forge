@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import {verifyPublishedPickerRoot} from './WindowContent.jsx';
 
 import { applyWindowPermissionMetadata, canUseInlineMetadataFallback, compilePermissionAppliedMetadata, formatWindowMetadataError, isAdmittedPublishedWindowResponse, isProtectedWindowMetadata, resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialDateRangePresetValues, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowDataSourceFetchFlag, resolveWindowMetadataDisplayState, resolveWindowMetadataForTarget, resolveWindowModelCacheScope, resolveWindowRootContainer, reuseShallowEqualRuntimeObject, scopedWindowHostServices, shouldPreserveMissingResolvedParameters, shouldPrimeDataSourceFetch, shouldResetWindowDashboardState } from './WindowContent.jsx';
 
@@ -36,6 +37,15 @@ describe('local datasource parent placeholder', () => {
 });
 
 describe('applyWindowPermissionMetadata', () => {
+  it('requires the exact admitted picker version and hash before rendering', () => {
+    const root = {version: '9007199254740993', contentFingerprint: 'a'.repeat(64)};
+    const receipt = {artifactVersion: root.version, artifactHash: root.contentFingerprint};
+    expect(() => verifyPublishedPickerRoot(root, receipt)).not.toThrow();
+    expect(() => verifyPublishedPickerRoot(root, {...receipt, artifactVersion: '9007199254740992'})).toThrow(/picker has changed/);
+    expect(() => verifyPublishedPickerRoot(root, {...receipt, artifactHash: 'b'.repeat(64)})).toThrow(/picker has changed/);
+    expect(() => verifyPublishedPickerRoot(root, {})).toThrow(/picker has changed/);
+    expect(() => verifyPublishedPickerRoot(undefined, {})).not.toThrow();
+  });
   it('recognizes only a bound canonical cohort GET as an already-admitted delivery', () => {
     const hash='a'.repeat(64),etag=`"${hash}.cohort-v2"`;
     const responseInfo={artifactHash:hash,etag};

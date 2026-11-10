@@ -698,7 +698,9 @@ export default function Chat({
     const conversationID = normalizeString(externalComposerProps?.conversationId || conversationSnapshot?.id);
     const documentAppearance = chatCfg.appearance === 'document';
     if (chatCfg.appearance && !documentAppearance) throw new Error(`Unsupported chat appearance: ${chatCfg.appearance}`);
-    const [selectedStarter, setSelectedStarter] = useStarterSelection(documentAppearance ? conversationID : '');
+    const retainedStarterConversation = useRef('');
+    const holdStarter = !!conversationID && retainedStarterConversation.current === conversationID;
+    const [selectedStarter, setSelectedStarter] = useStarterSelection(documentAppearance && !holdStarter ? conversationID : '');
     const [taskLibrary, setTaskLibrary] = useState(selectedStarter?.source.library || false);
     const selectedStarterTask = selectedStarter && starterTasks.find(task => task.id === selectedStarter.id);
     const starterFingerprint = selectedStarter?.fingerprint || selectedStarterTask?.lookupFingerprint;
@@ -706,7 +708,10 @@ export default function Chat({
     const starterLookup = starterFingerprint && !staleStarter
         ? {id: selectedStarter.id, fingerprint: starterFingerprint, prompt: selectedStarterTask.prompt}
         : null;
-    const draftKey = conversationID || (selectedStarter ? starterDraftKey(selectedStarter.id, starterFingerprint) : '__pending__');
+    const starterKey = selectedStarter ? starterDraftKey(selectedStarter.id, starterFingerprint) : '';
+    const draftKey = (holdStarter && starterKey) || conversationID || starterKey || '__pending__';
+    const activeStarterKey = useRef(starterKey);
+    activeStarterKey.current = starterKey;
     const [composerDraft, setComposerDraft] = useComposerDraft(draftKey);
 
     const backendConversationRunning = effectiveBackendConversationRunning(conversationSnapshot);
@@ -803,7 +808,7 @@ export default function Chat({
         }
     };
 
-    const handleSubmit = ({ content, toolNames = [], lookupSelections }) => {
+    const handleSubmit = ({ content, toolNames = [], lookupSelections, onAccepted }) => {
         if (documentAppearance && uploader.items.some(isUnresolvedUpload)) return;
         const submitModel = (() => {
             if (usesExternalComposerProps) {
@@ -828,6 +833,23 @@ export default function Chat({
         };
 
         const serviceOwnsSubmit = !!events.onSubmit?.isDefined?.();
+        const submission = {message: userMessage, context, agent: currentAgent, model: submitModel, reasoningEffort: currentReasoning, tools: currentTools};
+        if (starterLookup) {
+            if (!serviceOwnsSubmit || !onAccepted) return;
+            return events.onSubmit.execute({
+                ...submission,
+                onConversationCreated: id => {
+                    if (activeStarterKey.current === starterKey) retainedStarterConversation.current = id;
+                },
+                onAccepted: () => {
+                    onAccepted();
+                    if (activeStarterKey.current !== starterKey) return;
+                    clearPendingAttachments();
+                    retainedStarterConversation.current = '';
+                    setSelectedStarter(null);
+                },
+            });
+        }
         // When the caller drives its own chat state (chatStore via onSubmit),
         // the four internal bookkeeping pieces below are redundant: the
         // caller's reducer handles identity + dedup + running + queued. Skip
@@ -867,14 +889,7 @@ export default function Chat({
 
         // Execute custom event callback defined in configuration (if any)
         if (events.onSubmit?.isDefined?.()) {
-            events.onSubmit.execute({
-                message: userMessage,
-                context,
-                agent: currentAgent,
-                model: submitModel,
-                reasoningEffort: currentReasoning,
-                tools: currentTools,
-            });
+            events.onSubmit.execute(submission);
         }
 
         // Clear pending attachments after sending and reset form field
@@ -1043,6 +1058,9 @@ export default function Chat({
         });
     };
 
+    // Keep a scoped task composer mounted through first-turn queue admission.
+    // Its live picker receipt belongs to that draft and is intentionally not persisted.
+    const showHomeComposer = documentAppearance && (showStarterTasks || !!starterFingerprint);
     const composer = effectiveShowInput && (
                 <Composer key="conversation-composer"
                     appearance={chatCfg.appearance}
@@ -1164,7 +1182,7 @@ export default function Chat({
                 }
             })()}
 
-            {documentAppearance && showStarterTasks && composer}
+            {showHomeComposer && composer}
             <div
                 className="chat-feed-stage"
                 data-testid="chat-feed-stage"
@@ -1224,7 +1242,7 @@ export default function Chat({
                 )}
             </div>
 
-            {!(documentAppearance && showStarterTasks) && composer}
+            {!showHomeComposer && composer}
 
             {documentAppearance && <input ref={uploadInputRef} type="file" multiple hidden aria-label="Choose files"
                 disabled={composerDisabled || !chatCfg.showUpload} onChange={event => {

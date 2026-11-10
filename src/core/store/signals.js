@@ -909,6 +909,7 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
             linkedRevision: options.linkedRevision,
             providerIdentity: options.providerIdentity,
             pickerDialogId: options.pickerDialogId,
+            pickerRoot: options.pickerRoot ? {...options.pickerRoot} : undefined,
             pickerParameters: options.pickerParameters,
             isModal: !!options.modal,
         };
@@ -986,6 +987,7 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
             linkedRevision: options.linkedRevision,
             providerIdentity: options.providerIdentity,
             pickerDialogId: options.pickerDialogId,
+            pickerRoot: options.pickerRoot ? {...options.pickerRoot} : undefined,
             pickerParameters: options.pickerParameters,
             isModal: !!options.modal,
         };

@@ -343,6 +343,7 @@ export function useWindowHandlers(windowId) {
                 || maybe.linkedRevision !== undefined
                 || maybe.providerIdentity !== undefined
                 || maybe.pickerDialogId !== undefined
+                || maybe.pickerRoot !== undefined
                 || maybe.identityParameters !== undefined
                 || maybe.navigation !== undefined
                 || maybe.navigationTrail !== undefined
@@ -439,6 +440,7 @@ export function useWindowHandlers(windowId) {
                         ? scopedWindowProviderIdentity(windowKey, sourceResource)
                         : undefined,
                 pickerDialogId: options.pickerDialogId,
+                pickerRoot: options.pickerRoot,
                 pickerParameters: options.parameters,
             }
         );

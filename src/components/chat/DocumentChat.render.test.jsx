@@ -127,6 +127,71 @@ describe('document composer and task discovery', () => {
         }
     });
 
+    it('retains a scoped draft and ready attachment across a rejected first submit', async () => {
+        const task = {id: 'startertask://example/default#review', lookupFingerprint: 'a'.repeat(64), title: 'Review an example', prompt: 'Review the selected record.'};
+        const draftKey = `starter:${task.id}:${task.lookupFingerprint}`;
+        const witness = {token: '@{record:1 "One"}', pickerRoot: {version: '1', contentFingerprint: 'b'.repeat(64)}};
+        const Input = ({value, onValueResolver, onKeyDown, disabled}) => {
+            React.useLayoutEffect(() => onValueResolver(() => ({content: value, lookupSelections: [witness]})), [onValueResolver, value]);
+            return <textarea aria-label="Message" readOnly value={value} disabled={disabled} onKeyDown={onKeyDown}/>;
+        };
+        let conversationId = '';
+        let current;
+        const submit = vi.fn(request => new Promise((resolve, reject) => {current = {request, resolve, reject};}));
+        const setFormField = vi.fn();
+        const context = {
+            identity: {windowId: 'example-starter-submit'},
+            signals: {collection: signal([]), control: signal({}), selection: signal(null), message: signal('')},
+            handlers: {chat: {}, dataSource: {setFormField}},
+            Context: () => null,
+            lookupHandler: name => name === 'chat.renderFeed' ? () => null : name === 'chat.submitMessage' ? submit
+                : name === 'chat.resolveComposerProps' ? () => ({commandCenter: true, conversationId, inputComponent: Input, starterTasks: [task]}) : undefined,
+        };
+        const chat = () => <Chat context={context} container={{chat: {appearance: 'document', showUpload: true,
+            on: [{event: 'onSubmit', handler: 'chat.submitMessage'}]}}}/>;
+        class UploadRequest {
+            upload = {};
+            open() {}
+            send() {
+                this.readyState = 4;
+                this.status = 200;
+                this.responseText = JSON.stringify({uri: 'file://synthetic', name: 'Example.txt'});
+                this.onreadystatechange();
+            }
+        }
+        vi.stubGlobal('XMLHttpRequest', UploadRequest);
+        try {
+            await render(chat());
+            await click(host.querySelector('.forge-task-row'));
+            const shell = host.querySelector('[data-testid=chat-composer-shell]');
+            const dataTransfer = {types: ['Files'], files: [new File(['fixture'], 'Example.txt')]};
+            await act(async () => Simulate.drop(shell, {dataTransfer}));
+            expect(host.querySelector('[data-testid=chat-attachments]').textContent).toContain('Example.txt');
+            await press(host.querySelector('textarea'), 'Enter');
+            expect(submit).toHaveBeenCalledTimes(1);
+            expect(current.request.message.attachments[0].name).toBe('Example.txt');
+            expect(host.querySelector('textarea').value).toBe(task.prompt);
+            expect(host.querySelector('[data-testid=chat-composer-send]').disabled).toBe(true);
+            await act(async () => current.request.onConversationCreated('first-conversation'));
+            conversationId = 'first-conversation';
+            await render(chat());
+            await act(async () => current.reject(new Error('Queue rejected')));
+            expect(host.querySelector('textarea').value).toBe(task.prompt);
+            expect(host.querySelector('[data-testid=chat-attachments]').textContent).toContain('Example.txt');
+            await press(host.querySelector('textarea'), 'Enter');
+            expect(submit).toHaveBeenCalledTimes(2);
+            expect(current.request.message.starterTask.id).toBe(task.id);
+            expect(current.request.message.attachments[0].name).toBe('Example.txt');
+            await act(async () => {current.request.onAccepted(); current.resolve();});
+            expect(host.querySelector('textarea').value).toBe('');
+            expect(host.querySelector('[data-testid=chat-attachments]')).toBeNull();
+            expect(JSON.parse(sessionStorage.getItem('forge.composerDrafts.v1'))[draftKey]).toBe('');
+        } finally {
+            vi.unstubAllGlobals();
+            window.history.replaceState(null, '', '/');
+        }
+    });
+
     it('groups real selector callbacks under Tools and returns focus on Escape', async () => {
         const agent = vi.fn(), model = vi.fn(), reasoning = vi.fn(), attach = vi.fn();
         await render(<Composer appearance="document" draftKey="a" showUpload onOpenAttach={attach}

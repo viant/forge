@@ -52,6 +52,7 @@ func (r *Replica) OpenWindowVariant(ctx context.Context, uri string, requested *
 	if err != nil {
 		return nil, "", ErrInvalid
 	}
+	variant.PublishedVersion = view.Ref().Version
 	return variant, view.ETag(), nil
 }
 

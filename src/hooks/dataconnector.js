@@ -386,6 +386,8 @@ export function createDataConnector(dataSource, runtime = {}) {
                 const resp = await fetch(finalUrl, request);
                 if (responseInfo && typeof responseInfo === 'object') {
                     responseInfo.artifactHash = resp.headers?.get?.('X-Artifact-Hash') || '';
+                    const artifactVersion = resp.headers?.get?.('X-Artifact-Version');
+                    if (artifactVersion) responseInfo.artifactVersion = artifactVersion;
                     responseInfo.etag = resp.headers?.get?.('ETag') || '';
                 }
                 if (resp.status === 304 && ifNoneMatch && requestMethod === 'GET') return {notModified:true};

@@ -221,6 +221,7 @@ export function windowMetadataFetchKey(window = {}, targetContext = null) {
         conversationId: window.conversationId,
         parameters: window.parameters,
         resource: window.resource,
+        pickerRoot: window.pickerRoot,
         targetContext,
         selectionBinding: canonicalSelectionBinding(window),
     }));
@@ -318,6 +319,12 @@ export function isAdmittedPublishedWindowResponse(responseInfo, window, metadata
     if (metadata.resource?.uri && metadata.resource.uri !== uri) return false;
     if (metadata.resource?.providerIdentity && metadata.resource.providerIdentity !== providerIdentity) return false;
     return true;
+}
+
+export function verifyPublishedPickerRoot(root, responseInfo) {
+    if (root && (root.version !== responseInfo.artifactVersion || root.contentFingerprint !== responseInfo.artifactHash)) {
+        throw new Error('The picker has changed. Reopen the task to choose again.');
+    }
 }
 
 export function resolveInitialWindowFormValues(metadata) {
@@ -1549,7 +1556,7 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
         const attemptTransport = getActiveUIBridgeTransportContext();
         withWindowPermissionDeadline(async () => {
             recordWindowPerfPhase('metadata-request-scheduled',windowId);
-            return connector.get({responseInfo,ifNoneMatch:await publishedWindowConditionalETag(modelIdentity)})
+            return connector.get({responseInfo,fresh:!!runtimeWindow.pickerRoot,ifNoneMatch:await publishedWindowConditionalETag(modelIdentity)})
             .then(async (resp) => {
                 if (cancelled || expired) return;
                 recordWindowPerfPhase('metadata-response-parsed',windowId);
@@ -1560,6 +1567,7 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
                     return services.resourceFS ? services.resourceFS.loadWindow(selected) : selected;
                 };
                 const modelRequest = {...modelIdentity,hash:responseInfo.artifactHash,etag:responseInfo.etag,compile:compileModel};
+                verifyPublishedPickerRoot(runtimeWindow.pickerRoot, responseInfo);
                 let admittedResponseInfo=responseInfo;
                 try {
                     completeMetadata = await admittedPublishedWindowModel({...modelRequest,definition:resp.notModified ? null : resp.data});
@@ -1569,6 +1577,7 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
                     // turn an empty 304 into a usable definition.
                     const freshInfo = {};
                     const fresh = await connector.get({responseInfo:freshInfo,fresh:true});
+                    verifyPublishedPickerRoot(runtimeWindow.pickerRoot, freshInfo);
                     completeMetadata = await admittedPublishedWindowModel({...modelIdentity,hash:freshInfo.artifactHash,etag:freshInfo.etag,
                         definition:fresh.data,compile:compileModel});
                     admittedResponseInfo=freshInfo;
@@ -1691,6 +1700,7 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
             };
             const response=await connector.get({signal:controller.signal,fresh:true,cache:{bypassCache:true},responseInfo,
                 ifNoneMatch:await publishedWindowConditionalETag(identity)});
+            verifyPublishedPickerRoot(runtimeWindow.pickerRoot, responseInfo);
             let admittedInfo=responseInfo,definition;
             try{
                 definition=await admittedPublishedWindowModel({...identity,hash:responseInfo.artifactHash,etag:responseInfo.etag,
@@ -1701,6 +1711,7 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
                 // admitted GET; it cannot render or bind from an empty body.
                 const freshInfo={};
                 const fresh=await connector.get({signal:controller.signal,fresh:true,cache:{bypassCache:true},responseInfo:freshInfo});
+                verifyPublishedPickerRoot(runtimeWindow.pickerRoot, freshInfo);
                 definition=await admittedPublishedWindowModel({...identity,hash:freshInfo.artifactHash,etag:freshInfo.etag,
                     definition:fresh.data,compile});
                 admittedInfo=freshInfo;

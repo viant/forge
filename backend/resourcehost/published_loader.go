@@ -26,6 +26,12 @@ type PublishedCodec[T any] struct {
 	// ExpectedVersion fences exact published dependency references. Leave zero
 	// to read the ordinary selected content by its fingerprint.
 	ExpectedVersion uint64
+	// CaptureVersion projects the selected producer version when the source
+	// publishes versioned roots.
+	CaptureVersion bool
+	// FenceSnapshot lets a composed read check its original source admission
+	// after all of its dependent published reads complete.
+	FenceSnapshot bool
 }
 type PublishedValue[T any] struct {
 	Value    T
@@ -33,6 +39,8 @@ type PublishedValue[T any] struct {
 	// Metadata contains detached publication headers, without definition bodies.
 	Metadata       *primitive.ResourceState
 	MenuProjection *primitive.MenuProjection
+	Version        uint64
+	VerifySnapshot func(context.Context) error
 }
 type publishedCompiledKey struct{ provider, uri, hash, codec, admission string }
 type publishedCompiledEntry struct {
@@ -107,22 +115,27 @@ func Load[T any](ctx context.Context, source *Gateway, uriText string, codec Pub
 		return nil, identity.ErrResourceDenied
 	}
 	currentHash := registration.source.CurrentHash
-	if codec.ExpectedVersion != 0 {
+	var version uint64
+	if codec.ExpectedVersion != 0 || codec.CaptureVersion {
 		versioned, ok := registration.source.(interface {
 			CurrentVersionHash(context.Context, string) (uint64, string, error)
 		})
-		if !ok {
+		if !ok && codec.ExpectedVersion != 0 {
 			return nil, identity.ErrResourceDenied
 		}
-		currentHash = func(ctx context.Context, uri string) (string, error) {
-			version, hash, err := versioned.CurrentVersionHash(ctx, uri)
-			if err != nil {
-				return "", err
+		if ok {
+			version = codec.ExpectedVersion
+			currentHash = func(ctx context.Context, uri string) (string, error) {
+				currentVersion, hash, err := versioned.CurrentVersionHash(ctx, uri)
+				if err != nil {
+					return "", err
+				}
+				if currentVersion == 0 || version != 0 && currentVersion != version {
+					return "", identity.ErrResourceStale
+				}
+				version = currentVersion
+				return hash, nil
 			}
-			if version != codec.ExpectedVersion {
-				return "", identity.ErrResourceStale
-			}
-			return hash, nil
 		}
 	}
 	hash, err := currentHash(ctx, uriText)
@@ -237,7 +250,26 @@ func Load[T any](ctx context.Context, source *Gateway, uriText string, codec Pub
 	if err = source.verifyPublishedPin(ctx, connection, selected, currentHash); err != nil {
 		return nil, err
 	}
-	return &PublishedValue[T]{Value: value, Resource: &selected, Metadata: publishedMetadataHeader(entry.metadata), MenuProjection: clonePublishedMenu(entry.projection)}, nil
+	out = &PublishedValue[T]{Value: value, Resource: &selected, Metadata: publishedMetadataHeader(entry.metadata), MenuProjection: clonePublishedMenu(entry.projection), Version: version}
+	if codec.FenceSnapshot {
+		out.VerifySnapshot = func(ctx context.Context) error {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			if err := source.final(ctx, actor); err != nil {
+				return err
+			}
+			fresh, err := registration.source.AdmissionKey(ctx)
+			if err != nil {
+				return err
+			}
+			if fresh != admission || connection.Generation != source.generation(connection.Name) || !identity.MetadataExpiryValid(selected.ValidUntil, source.now()) {
+				return identity.ErrResourceStale
+			}
+			return nil
+		}
+	}
+	return out, nil
 }
 
 func clonePublishedMenu(value *primitive.MenuProjection) *primitive.MenuProjection {
