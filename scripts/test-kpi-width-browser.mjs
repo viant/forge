@@ -9,12 +9,14 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const output = path.resolve(root, process.env.FORGE_KPI_EVIDENCE || 'output/playwright/kpi-width');
 await fs.mkdir(output, {recursive: true});
 const server = await createServer({root, server: {host: '127.0.0.1', port: 0, hmr: false}});
+const commonValues = ['2,847,391', '$58,264.93'];
+const expected = [...commonValues, '17,203.64829', '-$938,264.57', '-18,364.28579%'];
 let browser;
 const results = [];
 try {
     await server.listen();
     browser = await chromium.launch({headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome'});
-    for (const width of [1660, 1440, 1200, 1050, 820, 768, 390]) {
+    for (const width of [1660, 1440, 1200, 1050, 961, 820, 768, 390, 320]) {
         const page = await browser.newPage({viewport: {width, height: 1000}});
         const errors = [];
         page.on('pageerror', error => errors.push(error.message));
@@ -22,11 +24,19 @@ try {
         const cards = page.locator('.forge-report-runtime-kpi-panel');
         await cards.last().waitFor();
         await page.waitForFunction(() => document.querySelectorAll('.forge-report-runtime-kpi-panel').length === 6);
-        const expected = ['2,847,391', '$58,264.93', '17,203.64829', '-$938,264.57', '-18,364.28579%'];
+        const themedSize = width === 820 ? 34 : 28;
+        if (width === 820) {
+            await page.getByRole('main').evaluate((node, size) => node.style.setProperty('--forge-report-type-metric-size', `${size}px`), themedSize);
+        }
+        const values = [];
         for (let index = 0; index < expected.length; index++) {
             const value = cards.nth(index).getByText(expected[index], {exact: true});
             assert.equal(await value.count(), 1);
-            assert.equal(await value.evaluate(node => getComputedStyle(node).fontSize), '28px', 'Narrow columns retain the existing metric typography');
+            values.push(await value.evaluate(node => {
+                const range = document.createRange();
+                range.selectNodeContents(node);
+                return {text: node.textContent, fontSize: parseFloat(getComputedStyle(node).fontSize), lines: range.getClientRects().length};
+            }));
         }
         assert.ok((await cards.first().textContent()).includes('+3498672.15%'));
         assert.ok((await cards.nth(3).textContent()).includes('-3498672.15%'));
@@ -57,11 +67,20 @@ try {
         }
         const pageFits = await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
         await page.getByRole('main', {name: 'Metric card widths'}).screenshot({path: path.join(output, `${width}.png`)});
-        results.push({width, columns, geometry, pageFits, errors});
+        results.push({width, columns, geometry, values, themedSize, pageFits, errors});
         await page.close();
     }
     await fs.writeFile(path.join(output, 'geometry.json'), JSON.stringify(results, null, 2));
     assert.deepEqual(results.flatMap(result => result.errors), []);
+    const narrowDesktop = results.find(result => result.width === 1440);
+    assert.ok(narrowDesktop.geometry.every(card => Math.abs(card.width - 172) < 1), 'Desktop specimen exercises six 172px cards');
+    assert.deepEqual(narrowDesktop.values.filter(value => commonValues.includes(value.text) && value.lines > 1), [], 'Counts and currency fit on one line in 172px cards');
+    const tightDesktop = results.find(result => result.width === 961);
+    const longValue = tightDesktop.values.at(-1);
+    assert.ok(longValue.fontSize === 16 && longValue.lines > 1, 'A long value can wrap at the readable size floor');
+    for (const result of results.filter(result => result.width >= 390 && result.columns < 6)) {
+        assert.ok(result.values.every(value => value.lines === 1 && value.fontSize === result.themedSize), 'Roomy cards keep single-line values at the theme size');
+    }
     assert.ok(results.every(result => result.pageFits && result.geometry.every(card => !card.overflows.length && !card.overlap)), `Metric card text must fit without overlap; inspect ${output}/geometry.json`);
     console.log('Metric cards preserve exact values and contain all text at desktop (six columns), tablet, and phone widths.');
 } finally {

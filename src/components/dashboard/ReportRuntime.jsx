@@ -1659,7 +1659,7 @@ function KpiBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProvi
                     {valueLabel}
                   </span>
                 ) : null}
-                <span style={{ fontSize: "var(--forge-report-type-metric-size, 28px)", fontWeight: 800, lineHeight: "var(--forge-report-type-metric-line-height, 1.1)", color: "var(--forge-report-text, #182026)", fontVariantNumeric: "tabular-nums" }}>
+                <span className="forge-report-runtime-kpi-value" style={{ fontWeight: 800, lineHeight: "var(--forge-report-type-metric-line-height, 1.1)", color: "var(--forge-report-text, #182026)", fontVariantNumeric: "tabular-nums" }}>
                   {formattedPrimaryValue}
                 </span>
               </div>

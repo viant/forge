@@ -36,7 +36,7 @@ for (const role of [
 
 assert.ok(runtime.includes('forge-report-runtime-panel'));
 assert.ok(runtime.includes('var(--forge-report-surface, #ffffff)'));
-assert.ok(runtime.includes('var(--forge-report-type-metric-size, 28px)'));
+assert.ok(runtime.includes('forge-report-runtime-kpi-value'));
 assert.ok(runtime.includes('var(--forge-report-status-danger-foreground, #a82a2a)'));
 assert.doesNotMatch(runtime, /fontSize:\s*(?:10|11|12|13|14|15|16|18|24|28)\b/);
 assert.doesNotMatch(runtime, /borderLeft:\s*[`"](?:[3-9]|[1-9]\d+)px\s+solid/);
@@ -47,6 +47,7 @@ const unthemedRuntimeColorLines = runtime
 assert.deepEqual(unthemedRuntimeColorLines, [], `unthemed report runtime colors:\n${unthemedRuntimeColorLines.join('\n')}`);
 
 assert.ok(dashboardStyles.includes('background: var(--forge-report-canvas, #f3f6f9)'));
+assert.ok(dashboardStyles.includes('font-size: var(--forge-report-type-metric-size, 28px)'));
 assert.ok(dashboardStyles.includes('font-size: var(--forge-report-type-metric-size, 25px)'));
 assert.ok(dashboardStyles.includes('var(--forge-report-status-success-background, #e7f7ef)'));
 assert.ok(tabStyles.includes('var(--forge-report-text-muted, #486579)'));

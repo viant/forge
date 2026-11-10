@@ -24,7 +24,7 @@ export const kpiWidthReport = {title: 'Metric layout example', blocks: [
         layout: 'responsiveGrid', runtime: {desktopColumns: 6, tabletColumns: 2, mobileColumns: 1}},
 ]};
 export default function KpiWidthSpecimen() {
-    return <main aria-label="Metric card widths" style={{maxWidth: 1160, margin: '24px auto', padding: 16}}>
+    return <main aria-label="Metric card widths" style={{maxWidth: 1178, margin: '24px auto', padding: 16, fontFamily: 'system-ui, sans-serif'}}>
         <ReportRuntime reportSpec={kpiWidthReport} reportFill={{blocks: kpiWidthReport.blocks, datasets: [], diagnostics: []}}/>
     </main>;
 }

@@ -7653,12 +7653,16 @@ button.forge-report-builder__dialog-source-card:focus-visible {
     gap: var(--forge-report-panel-gap, 12px);
     min-width: 0;
 }
-/* Keep complete formatted values readable within authored narrow KPI columns.
-   Wrapping follows the document metric recipe; typography remains theme-owned. */
+/* Scale metric type in narrow cards and wrap values that exceed the readable size. */
 .forge-report-runtime-kpi-panel {
     height: 100%;
     box-sizing: border-box;
+    container-type: inline-size;
     overflow-wrap: anywhere;
+}
+.forge-report-runtime-kpi-value {
+    font-size: var(--forge-report-type-metric-size, 28px);
+    font-size: min(var(--forge-report-type-metric-size, 28px), max(1rem, 16cqi));
 }
 .forge-report-runtime-kpi-panel .forge-report-runtime-panel__heading { min-width: 0; }
 .forge-report-runtime-kpi-panel [data-report-runtime-kpi-trend-row] { flex-wrap: wrap; }
