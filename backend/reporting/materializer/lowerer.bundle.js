@@ -70037,46 +70037,54 @@ ${indent}${end}`;
     }
     return "";
   }
-  function wrapReportPrintText(text4 = "", width = 0, fontSize = REPORT_PRINT_THEME.bodyFontSize) {
+  function trimReportPrintWrapSpace(text4) {
+    return text4.endsWith(" ") ? text4.slice(0, -1) : text4;
+  }
+  function wrapReportPrintText(text4 = "", width = 0, fontSize = REPORT_PRINT_THEME.bodyFontSize, headerLines = null) {
     const normalized = String(text4 || "");
     if (!normalized) {
       return [];
     }
     const maxChars = Math.max(1, Math.floor(Math.max(1, width) / Math.max(4, fontSize * 0.56)));
     const wrapped = [];
-    normalized.split("\n").forEach((line) => {
-      const trimmedLine = line.trim();
-      if (!trimmedLine) {
+    const separator = headerLines ? "" : " ";
+    (headerLines || normalized.split("\n")).forEach((line) => {
+      const tokens = headerLines ? line : line.trim().split(/\s+/).filter(Boolean);
+      if (tokens.length === 0) {
         wrapped.push("");
         return;
       }
-      const words = trimmedLine.split(/\s+/).filter(Boolean);
       let current = "";
-      const pushChunk = (chunk = "") => {
+      const pushChunk = () => {
+        const chunk = headerLines ? trimReportPrintWrapSpace(current) : current;
         if (!chunk) {
           return;
         }
-        if (chunk.length <= maxChars) {
+        const characters = headerLines ? Array.from(chunk) : chunk;
+        if (characters.length <= maxChars) {
           wrapped.push(chunk);
           return;
         }
-        for (let index = 0; index < chunk.length; index += maxChars) {
-          wrapped.push(chunk.slice(index, index + maxChars));
+        for (let index = 0; index < characters.length; index += maxChars) {
+          const part = characters.slice(index, index + maxChars);
+          wrapped.push(headerLines ? part.join("") : part);
         }
       };
-      words.forEach((word) => {
+      tokens.forEach((token) => {
         if (!current) {
-          current = word;
+          current = token;
           return;
         }
-        if (`${current} ${word}`.length <= maxChars) {
-          current = `${current} ${word}`;
+        const candidate = `${current}${separator}${token}`;
+        const length = headerLines ? Array.from(trimReportPrintWrapSpace(candidate)).length : candidate.length;
+        if (length <= maxChars) {
+          current = candidate;
           return;
         }
-        pushChunk(current);
-        current = word;
+        pushChunk();
+        current = headerLines && token === " " ? "" : token;
       });
-      pushChunk(current);
+      pushChunk();
     });
     return wrapped;
   }
@@ -71358,6 +71366,21 @@ ${indent}${end}`;
     };
   }
   var negativeZeroPrintValue = Symbol("negative zero");
+  function prepareReportPrintTableColumn(column, groups, index) {
+    const label = normalizeString41(qualifiedTableColumnLabel(column, groups)) || `Column ${index + 1}`;
+    const paragraphs = label.replace(/\r\n|<br[ \t\n\f\r]*\/?>/gi, "\n").split("\n").map(normalizeReportPrintText);
+    const normalizedLabel = paragraphs.join("\n");
+    let longestHeaderWord = 0;
+    const headerLines = paragraphs.map((paragraph) => {
+      const line = paragraph.replace(/[\t-\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+/g, " ").replace(/^ +| +$/g, "");
+      const tokens = line.match(/[^ >-]*[ >-]|[^ >-]+$/g) || [];
+      for (const token of tokens) {
+        longestHeaderWord = Math.max(longestHeaderWord, Array.from(trimReportPrintWrapSpace(token)).length);
+      }
+      return tokens;
+    });
+    return { ...column, label: normalizedLabel.trim() ? normalizedLabel : label, headerLines, longestHeaderWord };
+  }
   function minimumReportPrintColumnWidths(state = {}, block = {}, columns = [], resolveText = resolveReportPrintTableCellText) {
     var _a5;
     const rows = Array.isArray((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.resolvedRows) ? block.content.resolvedRows : [];
@@ -71365,8 +71388,7 @@ ${indent}${end}`;
     const cap = Math.min(128, state.contentWidth / 2);
     return columns.map((column) => {
       const key2 = normalizeString41(column == null ? void 0 : column.key);
-      const labelWords = normalizeString41((column == null ? void 0 : column.label) || key2).split(/\s+/);
-      const longestWord = Math.max(...labelWords.map((word) => word.length));
+      const longestWord = column.longestHeaderWord;
       let characters = Math.max(6, longestWord);
       rows.slice(0, 50).forEach((row) => {
         const cell = ((row == null ? void 0 : row.cells) || []).find((entry) => normalizeString41(entry == null ? void 0 : entry.key) === key2);
@@ -71386,7 +71408,7 @@ ${indent}${end}`;
         const cell = (Array.isArray(row == null ? void 0 : row.cells) ? row.cells : []).find((entry) => normalizeString41(entry == null ? void 0 : entry.key) === key2);
         return typeof (cell == null ? void 0 : cell.value) === "number";
       });
-      let longest = numeric ? Math.min(12, normalizeString41((column == null ? void 0 : column.label) || key2).length) : normalizeString41((column == null ? void 0 : column.label) || key2).length;
+      let longest = numeric ? Math.min(12, column.label.length) : column.label.length;
       rows.slice(0, 50).forEach((row) => {
         const cell = (Array.isArray(row == null ? void 0 : row.cells) ? row.cells : []).find((entry) => normalizeString41(entry == null ? void 0 : entry.key) === key2);
         longest = Math.max(longest, resolveText(column, cell).length);
@@ -71407,9 +71429,10 @@ ${indent}${end}`;
     const headerHeight = Math.max(
       REPORT_PRINT_THEME.tableHeaderHeight,
       ...columns.map((column, index) => wrapReportPrintText(
-        normalizeString41((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key) || `Column ${index + 1}`),
+        column.label,
         Math.max(1, widths[index] - REPORT_PRINT_THEME.tableCellPaddingX * 2),
-        9
+        9,
+        column.headerLines
       ).length * 12 + REPORT_PRINT_THEME.tableCellPaddingY * 2)
     );
     return { widths, offsets, headerHeight };
@@ -71458,7 +71481,7 @@ ${indent}${end}`;
           width: Math.max(1, (widths[columnIndex] || 1) - REPORT_PRINT_THEME.tableCellPaddingX * 2),
           height: headerHeight - REPORT_PRINT_THEME.tableCellPaddingY * 2
         },
-        text: normalizeString41((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key) || `Column ${columnIndex + 1}`),
+        text: column.label,
         fontSize: 9,
         fontWeight: "600",
         color: REPORT_PRINT_THEME.titleColor,
@@ -71715,22 +71738,22 @@ ${indent}${end}`;
     columnBand = false,
     firstRowProbe = false
   } = {}) {
-    var _a5, _b, _c;
+    var _a5, _b, _c, _d;
     const description = normalizeString41(block == null ? void 0 : block.description);
     if (description && !layoutNote.includes(description)) layoutNote = [description, layoutNote].filter(Boolean).join("\n");
     const authoredColumns = Array.isArray((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.columns) ? block.content.columns : [];
     let columns = block.selection && !authoredColumns.some((column) => column.key === block.selection.field) ? [...authoredColumns, { key: block.selection.field, label: "Selected" }] : authoredColumns;
-    columns = columns.map((column) => {
-      var _a6;
-      return { ...column, label: qualifiedTableColumnLabel(column, ((_a6 = block.content) == null ? void 0 : _a6.columnGroups) || block.columnGroups || []) };
-    });
-    block = { ...block, columnGroups: void 0, content: { ...block.content, columnGroups: void 0 } };
     let rows = Array.isArray((_b = block == null ? void 0 : block.content) == null ? void 0 : _b.resolvedRows) ? block.content.resolvedRows : [];
     if (!columnBand && ((_c = block == null ? void 0 : block.runtime) == null ? void 0 : _c.printRowReference) === true && columns.length > 0 && rows.length > 0) {
       block = withReportPrintRowReference(block, columns, rows);
       columns = block.content.columns;
       rows = block.content.resolvedRows;
     }
+    if (!columnBand) {
+      const groups = ((_d = block.content) == null ? void 0 : _d.columnGroups) || block.columnGroups || [];
+      columns = columns.map((column, index) => prepareReportPrintTableColumn(column, groups, index));
+    }
+    block = { ...block, columnGroups: void 0, content: { ...block.content, columnGroups: void 0 } };
     const resolveText = state.resolveTableCellText;
     const minimumWidths = minimumReportPrintColumnWidths(state, block, columns, resolveText);
     if (!columnBand && rows.length > 0 && columns.length > 2 && minimumWidths.reduce((sum3, width) => sum3 + width, 0) > state.contentWidth) {

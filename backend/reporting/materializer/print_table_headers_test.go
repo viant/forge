@@ -15,6 +15,31 @@ import (
 // An independently invented inventory table puts seven ordinary headings in a
 // full first band and one long, unbreakable label in a second band.
 func TestPrintTableHeaderWordsPDF(t *testing.T) {
+	for _, tc := range []struct {
+		name, label, neighbor, canonical string
+		lines                            []string
+		requirementsBand                 string
+	}{
+		{"ordinary", "Specifications", "Verification", "Specifications", []string{"Specifications"}, "1"},
+		{"HTML breaks", "FirstA<br/>Second<BR />ThirdC", "Verification", "FirstA\nSecond\nThirdC", []string{"FirstA", "Second", "ThirdC"}, "1"},
+		{"mixed breaks", "FirstA<br>Second\r\nThirdC", "Verification", "FirstA\nSecond\nThirdC", []string{"FirstA", "Second", "ThirdC"}, "1"},
+		{"native breaks", "FirstA\nSecond\r\nThirdC", "Verification", "FirstA\nSecond\nThirdC", []string{"FirstA", "Second", "ThirdC"}, "1"},
+		{"punctuation", "Qualifications…", "Verification", "Qualifications...", []string{"Qualifications..."}, "2"},
+		{"hyphen breaks", "Integration-Performance-Architecture", "Verifications", "Integration-Performance-Architecture", []string{"Integration-", "Performance-", "Architecture"}, "1"},
+		{"separator breaks", "Integration>Performance>Architecture", "Verifications", "Integration>Performance>Architecture", []string{"Integration>", "Performance>", "Architecture"}, "1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			checkPrintTableHeaderWordsPDF(t, tc.label, tc.neighbor, tc.canonical, tc.lines, tc.requirementsBand)
+		})
+	}
+}
+
+func checkPrintTableHeaderWordsPDF(t *testing.T, label, neighbor, canonical string, lines []string, requirementsBand string) {
+	t.Helper()
+	heading, err := json.Marshal(label)
+	if err != nil {
+		t.Fatal(err)
+	}
 	identifier := strings.Repeat("AXZ", 30)
 	spec := json.RawMessage(`{
 		"version":1,"kind":"reportSpec","title":"Inventory summary",
@@ -25,11 +50,11 @@ func TestPrintTableHeaderWordsPDF(t *testing.T) {
 		"datasets":[{"id":"primary","dataSourceRef":"rows","request":{}}],
 		"blocks":[{"id":"inventory","kind":"tableBlock","datasetRef":"primary","columns":[
 			{"key":"site","label":"Distribution","rowIdentity":true},
-			{"key":"specs","label":"Specifications","kind":"measure","format":"number"},
+			{"key":"specs","label":` + string(heading) + `,"kind":"measure","format":"number"},
 			{"key":"features","label":"Characteristics","kind":"measure","format":"number"},
 			{"key":"measurements","label":"Measurements","kind":"measure","format":"number"},
 			{"key":"availability","label":"Availability","kind":"measure","format":"number"},
-			{"key":"verification","label":"Verification","kind":"measure","format":"number"},
+			{"key":"verification","label":"` + neighbor + `","kind":"measure","format":"number"},
 			{"key":"requirements","label":"Requirements","kind":"measure","format":"number"},
 			{"key":"unit","label":"` + identifier + `"}
 		]}]
@@ -66,10 +91,13 @@ func TestPrintTableHeaderWordsPDF(t *testing.T) {
 		t.Fatal(err)
 	}
 	plain := string(raw)
-	for _, word := range []string{"Distribution", "Specifications", "Characteristics", "Measurements", "Availability", "Verification", "Requirements"} {
+	for _, word := range []string{"Distribution", "Characteristics", "Measurements", "Availability", neighbor, "Requirements"} {
 		if !strings.Contains(plain, word) {
 			t.Errorf("PDF split header word %q: %q", word, plain)
 		}
+	}
+	if !strings.Contains(strings.Join(strings.Fields(plain), " "), strings.Join(lines, " ")) {
+		t.Errorf("PDF lost heading lines %q: %q", lines, plain)
 	}
 	if strings.Contains(plain, identifier) || !strings.Contains(strings.Join(strings.Fields(plain), ""), identifier) {
 		t.Errorf("PDF should wrap the long label and retain all of its text: %q", plain)
@@ -85,11 +113,18 @@ func TestPrintTableHeaderWordsPDF(t *testing.T) {
 			band, _, isHeader := strings.Cut(element.ID, "__header__")
 			if isHeader {
 				wantBand := "inventory__columns_1"
-				if element.Text == identifier {
+				switch element.Text {
+				case identifier:
 					wantBand = "inventory__columns_2"
+				case "Requirements":
+					wantBand = "inventory__columns_" + requirementsBand
 				}
 				if element.Text != "Distribution" && band != wantBand {
 					t.Errorf("header %q in band %q, want %q", element.Text, band, wantBand)
+				}
+				if strings.Contains(element.ID, "__header__specs__") &&
+					(element.Text != canonical || element.Box.Height < float64(len(lines)*12)) {
+					t.Errorf("heading has text %q and height %g, want space for %q", element.Text, element.Box.Height, lines)
 				}
 			}
 			if isHeader || element.Kind == "tableCellText" {

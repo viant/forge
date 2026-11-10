@@ -758,46 +758,55 @@ function inferReportPrintNumericFormat(value, format = "") {
   return "";
 }
 
-function wrapReportPrintText(text = "", width = 0, fontSize = REPORT_PRINT_THEME.bodyFontSize) {
+function trimReportPrintWrapSpace(text) {
+  return text.endsWith(" ") ? text.slice(0, -1) : text;
+}
+
+function wrapReportPrintText(text = "", width = 0, fontSize = REPORT_PRINT_THEME.bodyFontSize, headerLines = null) {
   const normalized = String(text || "");
   if (!normalized) {
     return [];
   }
   const maxChars = Math.max(1, Math.floor(Math.max(1, width) / Math.max(4, fontSize * 0.56)));
   const wrapped = [];
-  normalized.split("\n").forEach((line) => {
-    const trimmedLine = line.trim();
-    if (!trimmedLine) {
+  const separator = headerLines ? "" : " ";
+  (headerLines || normalized.split("\n")).forEach((line) => {
+    const tokens = headerLines ? line : line.trim().split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) {
       wrapped.push("");
       return;
     }
-    const words = trimmedLine.split(/\s+/).filter(Boolean);
     let current = "";
-    const pushChunk = (chunk = "") => {
+    const pushChunk = () => {
+      const chunk = headerLines ? trimReportPrintWrapSpace(current) : current;
       if (!chunk) {
         return;
       }
-      if (chunk.length <= maxChars) {
+      const characters = headerLines ? Array.from(chunk) : chunk;
+      if (characters.length <= maxChars) {
         wrapped.push(chunk);
         return;
       }
-      for (let index = 0; index < chunk.length; index += maxChars) {
-        wrapped.push(chunk.slice(index, index + maxChars));
+      for (let index = 0; index < characters.length; index += maxChars) {
+        const part = characters.slice(index, index + maxChars);
+        wrapped.push(headerLines ? part.join("") : part);
       }
     };
-    words.forEach((word) => {
+    tokens.forEach((token) => {
       if (!current) {
-        current = word;
+        current = token;
         return;
       }
-      if (`${current} ${word}`.length <= maxChars) {
-        current = `${current} ${word}`;
+      const candidate = `${current}${separator}${token}`;
+      const length = headerLines ? Array.from(trimReportPrintWrapSpace(candidate)).length : candidate.length;
+      if (length <= maxChars) {
+        current = candidate;
         return;
       }
-      pushChunk(current);
-      current = word;
+      pushChunk();
+      current = headerLines && token === " " ? "" : token;
     });
-    pushChunk(current);
+    pushChunk();
   });
   return wrapped;
 }
@@ -2178,6 +2187,24 @@ function createReportPrintTableCellTextResolver() {
 }
 const negativeZeroPrintValue = Symbol("negative zero");
 
+function prepareReportPrintTableColumn(column, groups, index) {
+  const label = normalizeString(qualifiedTableColumnLabel(column, groups)) || `Column ${index + 1}`;
+  const paragraphs = label.replace(/\r\n|<br[ \t\n\f\r]*\/?>/gi, "\n").split("\n").map(normalizeReportPrintText);
+  const normalizedLabel = paragraphs.join("\n");
+  let longestHeaderWord = 0;
+  // Match the native textwrap.Lines break points and whitespace. Keep the
+  // delimiters on their tokens so width measurement and wrapping agree.
+  const headerLines = paragraphs.map((paragraph) => {
+    const line = paragraph.replace(/[\t-\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+/g, " ").replace(/^ +| +$/g, "");
+    const tokens = line.match(/[^ >-]*[ >-]|[^ >-]+$/g) || [];
+    for (const token of tokens) {
+      longestHeaderWord = Math.max(longestHeaderWord, Array.from(trimReportPrintWrapSpace(token)).length);
+    }
+    return tokens;
+  });
+  return { ...column, label: normalizedLabel.trim() ? normalizedLabel : label, headerLines, longestHeaderWord };
+}
+
 // Size compact evidence from its displayed content rather than a fixed column count.
 // Reserve room for whole header words up to the same width cap as cell text.
 // Very long words still wrap within bounded columns.
@@ -2187,8 +2214,7 @@ function minimumReportPrintColumnWidths(state = {}, block = {}, columns = [], re
   const cap = Math.min(128, state.contentWidth / 2);
   return columns.map((column) => {
     const key = normalizeString(column?.key);
-    const labelWords = normalizeString(column?.label || key).split(/\s+/);
-    const longestWord = Math.max(...labelWords.map((word) => word.length));
+    const longestWord = column.longestHeaderWord;
     let characters = Math.max(6, longestWord);
     rows.slice(0, 50).forEach((row) => {
       const cell = (row?.cells || []).find((entry) => normalizeString(entry?.key) === key);
@@ -2210,9 +2236,7 @@ function buildReportPrintTableColumnLayout(state = {}, block = {}, columns = [],
       const cell = (Array.isArray(row?.cells) ? row.cells : []).find((entry) => normalizeString(entry?.key) === key);
       return typeof cell?.value === "number";
     });
-    let longest = numeric
-      ? Math.min(12, normalizeString(column?.label || key).length)
-      : normalizeString(column?.label || key).length;
+    let longest = numeric ? Math.min(12, column.label.length) : column.label.length;
     rows.slice(0, 50).forEach((row) => {
       const cell = (Array.isArray(row?.cells) ? row.cells : []).find((entry) => normalizeString(entry?.key) === key);
       longest = Math.max(longest, resolveText(column, cell).length);
@@ -2234,9 +2258,10 @@ function buildReportPrintTableColumnLayout(state = {}, block = {}, columns = [],
     REPORT_PRINT_THEME.tableHeaderHeight,
     ...columns.map((column, index) => (
       (wrapReportPrintText(
-        normalizeString(column?.label || column?.key || `Column ${index + 1}`),
+        column.label,
         Math.max(1, widths[index] - (REPORT_PRINT_THEME.tableCellPaddingX * 2)),
         9,
+        column.headerLines,
       ).length * 12) + (REPORT_PRINT_THEME.tableCellPaddingY * 2)
     )),
   );
@@ -2286,7 +2311,7 @@ function renderReportPrintTableHeader(state = {}, block = {}, columns = [], rowY
         width: Math.max(1, (widths[columnIndex] || 1) - (REPORT_PRINT_THEME.tableCellPaddingX * 2)),
         height: headerHeight - (REPORT_PRINT_THEME.tableCellPaddingY * 2),
       },
-      text: normalizeString(column?.label || column?.key || `Column ${columnIndex + 1}`),
+      text: column.label,
       fontSize: 9,
       fontWeight: "600",
       color: REPORT_PRINT_THEME.titleColor,
@@ -2572,14 +2597,17 @@ function renderReportPrintTableBlock(state = {}, block = {}, {
   const authoredColumns = Array.isArray(block?.content?.columns) ? block.content.columns : [];
   let columns = block.selection && !authoredColumns.some(column => column.key === block.selection.field)
     ? [...authoredColumns,{key:block.selection.field,label:'Selected'}] : authoredColumns;
-  columns=columns.map(column=>({...column,label:qualifiedTableColumnLabel(column,block.content?.columnGroups || block.columnGroups || [])}));
-  block={...block,columnGroups:undefined,content:{...block.content,columnGroups:undefined}};
   let rows = Array.isArray(block?.content?.resolvedRows) ? block.content.resolvedRows : [];
   if (!columnBand && block?.runtime?.printRowReference === true && columns.length > 0 && rows.length > 0) {
     block = withReportPrintRowReference(block, columns, rows);
     columns = block.content.columns;
     rows = block.content.resolvedRows;
   }
+  if (!columnBand) {
+    const groups = block.content?.columnGroups || block.columnGroups || [];
+    columns = columns.map((column, index) => prepareReportPrintTableColumn(column, groups, index));
+  }
+  block={...block,columnGroups:undefined,content:{...block.content,columnGroups:undefined}};
   const resolveText = state.resolveTableCellText;
   const minimumWidths = minimumReportPrintColumnWidths(state, block, columns, resolveText);
   if (!columnBand && rows.length > 0 && columns.length > 2 && minimumWidths.reduce((sum, width) => sum + width, 0) > state.contentWidth) {
