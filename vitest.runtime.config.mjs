@@ -97,6 +97,7 @@ export default defineConfig({
       'src/components/WindowContent.dateRangePreset.render.test.jsx',
       'src/components/WindowContent.lazyOptions.render.test.jsx',
       'src/components/dashboard/reportBuilderLazyFilterChoices.render.test.jsx',
+      'src/components/dashboard/reportBuilderMountedReadback.render.test.jsx',
       'src/components/DataSource.spread.render.test.jsx',
       'src/components/DataSource.aggregateOffset.render.test.jsx',
       'src/components/primitives/EditableCollection.readiness.render.test.jsx',

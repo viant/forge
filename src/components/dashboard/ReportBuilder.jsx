@@ -2145,6 +2145,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     const activeRunEventRef = useRef(null);
     const authoredRendererRoot = useRef(null);
     const importedRendererRoot = useRef(null);
+    const interactiveRendererRoot = useRef(null);
     const trustedReportRunConversationIdRef = useRef("");
     trustedReportRunConversationIdRef.current = normalizeString(reportEventContext.conversationId);
     const reportRunPendingBeginScopeKey = React.useId();
@@ -10517,6 +10518,21 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             && runtimePreviewRowsSource.loading !== true
         : hasCompletedCurrentRun;
     const currentReportDatasetMaterialization = useMemo(() => {
+        if (!frozenRestore && !isAuthoredRuntimeExecution) {
+            // The interactive table reads the builder datasource. Runtime
+            // previews may independently request a different projection.
+            return {
+                status: error ? "failed" : currentTerminalMaterializationFresh ? "completed" : loading ? "running" : "pending",
+                fresh: currentTerminalMaterializationFresh,
+                datasets: [{
+                    id: "primary",
+                    dataSourceRef: normalizeString(builderContext?.identity?.dataSourceRef || container?.dataSourceRef),
+                    rowCount: currentTerminalMaterializationFresh ? computedCollection.length : 0,
+                    fresh: currentTerminalMaterializationFresh,
+                    hasMore: currentTerminalMaterializationFresh && collectionInfo?.hasMore === true,
+                }],
+            };
+        }
         const freshPublishedIds = new Set(
             (Array.isArray(runtimePreviewDatasetPayloadState?.freshDatasetIds)
                 ? runtimePreviewDatasetPayloadState.freshDatasetIds
@@ -10562,7 +10578,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             fresh: !!currentTerminalMaterializationFresh,
             datasets,
         };
-    }, [currentPrimaryRuntimeResultFresh, currentTerminalMaterializationFresh, runtimePreviewDatasetPayloadState?.error, runtimePreviewDatasetPayloadState?.freshDatasetIds, runtimePreviewDatasetPayloadState?.loading, runtimePreviewDatasetPayloadState?.payloads, runtimePreviewPrimaryDataset?.dataSourceRef, runtimePreviewPrimaryDataset?.id, runtimePreviewPrimaryDatasetPayload?.hasMore, runtimePreviewPrimaryDatasetPayload?.rows, runtimePreviewPublishedDatasets, runtimePreviewRowsSource?.error, runtimePreviewRowsSource?.hasMore, runtimePreviewRowsSource?.loading, runtimePreviewRowsSource?.rows, runtimePreviewRowsState.loading]);
+    }, [builderContext?.identity?.dataSourceRef, collectionInfo?.hasMore, computedCollection.length, container?.dataSourceRef, currentPrimaryRuntimeResultFresh, currentTerminalMaterializationFresh, error, frozenRestore, isAuthoredRuntimeExecution, loading, runtimePreviewDatasetPayloadState?.error, runtimePreviewDatasetPayloadState?.freshDatasetIds, runtimePreviewDatasetPayloadState?.loading, runtimePreviewDatasetPayloadState?.payloads, runtimePreviewPrimaryDataset?.dataSourceRef, runtimePreviewPrimaryDataset?.id, runtimePreviewPrimaryDatasetPayload?.hasMore, runtimePreviewPrimaryDatasetPayload?.rows, runtimePreviewPublishedDatasets, runtimePreviewRowsSource?.error, runtimePreviewRowsSource?.hasMore, runtimePreviewRowsSource?.loading, runtimePreviewRowsSource?.rows, runtimePreviewRowsState.loading]);
     currentReportEventRequestRef.current = draftExportRequest;
     currentReportEventIdentityRef.current = {
         reportId: activeReportEventId,
@@ -14519,7 +14535,11 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         }
         return registerReportWindowActions(windowId, {
             getCurrent: ({include} = {}) => ({
-                ...(include?.visible && !include.raw && currentTerminalMaterializationFresh ? {visible: readVisibleReport(authoredRendererRoot.current) ?? readVisibleReport(importedRendererRoot.current)} : {}),
+                ...(include?.visible && !include.raw && currentTerminalMaterializationFresh ? {
+                    visible: readVisibleReport(authoredRendererRoot.current)
+                        ?? readVisibleReport(importedRendererRoot.current)
+                        ?? readVisibleReport(interactiveRendererRoot.current),
+                } : {}),
                 ok: true,
                 windowId,
                 windowKey: normalizeString(reportEventContext.windowKey),
@@ -23878,7 +23898,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                             {workspaceMode !== "report" ? renderCompactBottomBar() : null}
                             {!showAuthoredReportSurface ? (
                                 <>
-                                    <div className="forge-report-builder__result-frame">
+                                    <div className="forge-report-builder__result-frame" ref={interactiveRendererRoot} data-forge-report-active-section="">
                                         {activeResultLoading ? (
                                             <ReportBuilderResultState
                                                 icon="refresh"
@@ -23946,7 +23966,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                                             />
                                         ) : null}
                                         {resultVisibility.showChartResult ? (
-                                            <div className="forge-report-builder__chart-wrap">
+                                            <div className="forge-report-builder__chart-wrap" data-report-runtime-block-id="chart">
                                                 <Chart
                                                     key={chartRenderKey}
                                                     container={chartContainer}
@@ -23958,7 +23978,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                                             </div>
                                         ) : null}
                                         {resultVisibility.showTableResult ? (
-                                            <div className="forge-report-builder__table-wrap">
+                                            <div className="forge-report-builder__table-wrap" data-report-runtime-block-id="table">
                                                 <table className="forge-report-builder__table">
                                                     <thead>
                                                         <tr>
