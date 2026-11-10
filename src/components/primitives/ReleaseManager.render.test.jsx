@@ -17,10 +17,10 @@ const api = (overrides={}) => ({
   history:vi.fn(async()=>history),publish:vi.fn(async()=>({channel:{key:{...scope,name:'poc'},activeBundleHash:'sha256:new',revision:1},status:'active',activated:true})),
   promote:vi.fn(async()=>({channel:{...channel,activeBundleHash:'sha256:older',revision:5},status:'active',activated:true})),...overrides,
 });
-const render = async (adapter, channelKey=scope, onActivated) => {
+const render = async (adapter, channelKey=scope, onActivated, publicationSource) => {
   globalThis.IS_REACT_ACT_ENVIRONMENT=true;
   const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
-  await act(async()=>{root.render(<ReleaseManager api={adapter} channelKey={channelKey} onActivated={onActivated}/>);});
+  await act(async()=>{root.render(<ReleaseManager api={adapter} channelKey={channelKey} onActivated={onActivated} publicationSource={publicationSource}/>);});
   return {host,update:async(nextAPI,nextScope,onNextActivated)=>act(async()=>root.render(<ReleaseManager api={nextAPI} channelKey={nextScope} onActivated={onNextActivated}/>)),close:async()=>{await act(async()=>root.unmount());host.remove();}};
 };
 const text = async(input,value) => act(async()=>{
@@ -293,4 +293,62 @@ it('searches the complete artifact inventory and keeps selections through 25-row
  await text(view.host.querySelector('#release-artifact-query'),'');await click(button(view.host,'Previous artifacts'));
  expect(view.host.querySelector('.forge-release-manager-artifact select').value).not.toBe('');
  expect(adapter.publish).not.toHaveBeenCalled();await view.close();
+});
+
+
+it('an optional complete source reuses channel and policy controls without manufacturing roots',async()=>{
+  const adapter=api({list:vi.fn(async()=>[channel])});
+  const completion=deferred();
+  const source={label:'Captured collection',ready:true,render:({disabled})=><button disabled={disabled}>Choose captured collection</button>,publish:vi.fn(()=>completion.promise)};
+  const view=await render(adapter,scope,undefined,source);
+  try {
+    await select(view.host.querySelector('#release-channel'),'poc');
+    await select(view.host.querySelector('#release-contents'),'source');
+    expect(view.host.querySelector('#release-artifact-0')).toBeNull();
+    await click(button(view.host,'Publish'));
+    expect(source.publish).toHaveBeenCalledWith({key:channel.key,description:'First release',policies:[{resource:policy.resource,revision:policy.revision}],expectedRevision:4});
+    expect(adapter.publish).not.toHaveBeenCalled();
+    expect(button(view.host,'Choose captured collection').disabled).toBe(true);
+    expect(view.host.textContent).toContain('Publishing release…');
+    await act(async()=>completion.resolve({status:'failed',activated:false}));
+    expect(view.host.textContent).toContain('The release failed to activate.');
+    expect(view.host.textContent).not.toContain('Release activated.');
+  } finally {await view.close();}
+});
+
+it('a complete source must be ready and switching back preserves stamped publication',async()=>{
+  const adapter=api();
+  const source={label:'Captured collection',ready:false,render:()=> <p>Loading captured collection…</p>,publish:vi.fn()};
+  const view=await render(adapter,scope,undefined,source);
+  try {
+    await text(view.host.querySelector('#release-name'),'poc');
+    await click(view.host.querySelector('input[type="checkbox"]'));
+    await include(view.host);
+    await select(view.host.querySelector('#release-contents'),'source');
+    expect(button(view.host,'Publish').disabled).toBe(true);
+    await select(view.host.querySelector('#release-contents'),'artifacts');
+    expect(button(view.host,'Publish').disabled).toBe(false);
+    await click(button(view.host,'Publish'));
+    expect(adapter.publish).toHaveBeenCalledOnce();
+    expect(source.publish).not.toHaveBeenCalled();
+  } finally {await view.close();}
+});
+
+
+it('a pending source cannot mistake the previous active revision for its own success',async()=>{
+  const old={...channel,releaseStatus:'active',activated:true,bundle:{roots:[rootRef]}};
+  const adapter=api({list:vi.fn(async()=>[old])});
+  const source={label:'Captured collection',ready:true,render:()=> <p>Complete collection</p>,publish:vi.fn(async()=>({status:'pending',activated:false}))};
+  const view=await render(adapter,scope,undefined,source);
+  try {
+    await select(view.host.querySelector('#release-channel'),'poc');
+    await select(view.host.querySelector('#release-contents'),'source');
+    await click(button(view.host,'Publish'));
+    await click(button(view.host,'Refresh releases'));
+    expect(view.host.textContent).not.toContain('Release activated.');
+    expect(view.host.textContent).toContain('Publishing is in progress.');
+    adapter.list.mockResolvedValue([{...old,revision:5,activeBundleHash:'sha256:new'}]);
+    await click(button(view.host,'Refresh releases'));
+    expect(view.host.textContent).toContain('Release activated.');
+  } finally {await view.close();}
 });
