@@ -50,6 +50,17 @@ describe('document composer and task discovery', () => {
         expect(JSON.parse(sessionStorage.getItem('forge.composerDrafts.v1'))).toMatchObject({a: '', b: 'B'});
     });
 
+    it('keeps a later prefill after an ordinary asynchronous submission settles', async () => {
+        let finish;
+        const submit = vi.fn(() => new Promise(resolve => {finish = resolve;}));
+        await render(<Composer appearance="document" draftKey="ordinary" draftValue="First message" onSubmit={submit}/>);
+        await press(host.querySelector('textarea'), 'Enter');
+        expect(host.querySelector('textarea').value).toBe('');
+        await act(async () => window.dispatchEvent(new CustomEvent('forge:composer-prefill', {detail: {prompt: 'Later message'}})));
+        await act(async () => finish());
+        expect(host.querySelector('textarea').value).toBe('Later message');
+    });
+
     it('focuses the selected task composer without stealing input from another chat', async () => {
         const frames = [];
         const animation = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
@@ -127,7 +138,10 @@ describe('document composer and task discovery', () => {
         }
     });
 
-    it('retains a scoped draft and ready attachment across a rejected first submit', async () => {
+    it.each([
+        {description: 'clears the accepted draft and attachment after a rejected first submit', laterDraft: ''},
+        {description: 'keeps a later native file and prefill when the submitted snapshot is accepted', laterDraft: 'Text for the next message.'},
+    ])('$description', async ({laterDraft}) => {
         const task = {id: 'startertask://example/default#review', lookupFingerprint: 'a'.repeat(64), title: 'Review an example', prompt: 'Review the selected record.'};
         const draftKey = `starter:${task.id}:${task.lookupFingerprint}`;
         const witness = {token: '@{record:1 "One"}', pickerRoot: {version: '1', contentFingerprint: 'b'.repeat(64)}};
@@ -152,10 +166,10 @@ describe('document composer and task discovery', () => {
         class UploadRequest {
             upload = {};
             open() {}
-            send() {
+            send(form) {
                 this.readyState = 4;
                 this.status = 200;
-                this.responseText = JSON.stringify({uri: 'file://synthetic', name: 'Example.txt'});
+                this.responseText = JSON.stringify({uri: 'file://synthetic', name: form.get('name')});
                 this.onreadystatechange();
             }
         }
@@ -182,10 +196,27 @@ describe('document composer and task discovery', () => {
             expect(submit).toHaveBeenCalledTimes(2);
             expect(current.request.message.starterTask.id).toBe(task.id);
             expect(current.request.message.attachments[0].name).toBe('Example.txt');
-            await act(async () => {current.request.onAccepted(); current.resolve();});
-            expect(host.querySelector('textarea').value).toBe('');
-            expect(host.querySelector('[data-testid=chat-attachments]')).toBeNull();
-            expect(JSON.parse(sessionStorage.getItem('forge.composerDrafts.v1'))[draftKey]).toBe('');
+            if (laterDraft) {
+                const fileInput = host.querySelector('input[type=file]');
+                Object.defineProperty(fileInput, 'files', {configurable: true, value: [new File(['late fixture'], 'Later.txt')]});
+                await act(async () => Simulate.change(fileInput));
+                expect(host.querySelector('[data-testid=chat-attachments]').textContent).toContain('Later.txt');
+                expect(current.request.message.attachments.map(file => file.name)).toEqual(['Example.txt']);
+            }
+            await act(async () => {
+                if (laterDraft) window.dispatchEvent(new CustomEvent('forge:composer-prefill', {detail: {prompt: laterDraft}}));
+                current.request.onAccepted();
+                current.resolve();
+            });
+            expect(host.querySelector('textarea').value).toBe(laterDraft);
+            const attachments = host.querySelector('[data-testid=chat-attachments]');
+            const drafts = JSON.parse(sessionStorage.getItem('forge.composerDrafts.v1'));
+            expect(drafts[draftKey]).toBe('');
+            if (laterDraft) {
+                expect(attachments.textContent).toContain('Later.txt');
+                expect(attachments.textContent).not.toContain('Example.txt');
+                expect(drafts[conversationId]).toBe(laterDraft);
+            } else expect(attachments).toBeNull();
         } finally {
             vi.unstubAllGlobals();
             window.history.replaceState(null, '', '/');

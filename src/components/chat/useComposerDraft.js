@@ -11,10 +11,28 @@ export default function useComposerDraft(draftKey) {
     const [drafts, setDrafts] = useState(read);
     const update = useCallback(value => {
         setDrafts(previous => {
-            const next = {...previous, [id]: String(typeof value === 'function' ? value(previous[id] || '') : value)};
-            try {sessionStorage.setItem(key, JSON.stringify({...read(), [id]: next[id]}));} catch {}
+            const stored = read();
+            const current = String(previous[id] ?? stored[id] ?? '');
+            const updated = String(typeof value === 'function' ? value(current) : value);
+            if (typeof value === 'function' && current === updated) return previous;
+            const next = {...previous, [id]: updated};
+            try {sessionStorage.setItem(key, JSON.stringify({...stored, [id]: updated}));} catch {}
             return next;
         });
     }, [id]);
-    return [String(drafts[id] ?? read()[id] ?? ''), update];
+    // A newer draft can follow its first accepted turn into the conversation.
+    // Preserve both drafts if the destination already has different text.
+    const moveTo = useCallback((target, value) => {
+        if (!target || target === id) return;
+        setDrafts(previous => {
+            const stored = read();
+            const current = previous[id] ?? stored[id];
+            const destination = previous[target] ?? stored[target];
+            if (current !== value || (destination && destination !== value)) return previous;
+            const moved = {[id]: '', [target]: value};
+            try {sessionStorage.setItem(key, JSON.stringify({...stored, ...moved}));} catch {}
+            return {...previous, ...moved};
+        });
+    }, [id]);
+    return [String(drafts[id] ?? read()[id] ?? ''), update, moveTo];
 }

@@ -712,7 +712,7 @@ export default function Chat({
     const draftKey = (holdStarter && starterKey) || conversationID || starterKey || '__pending__';
     const activeStarterKey = useRef(starterKey);
     activeStarterKey.current = starterKey;
-    const [composerDraft, setComposerDraft] = useComposerDraft(draftKey);
+    const [composerDraft, setComposerDraft, moveComposerDraft] = useComposerDraft(draftKey);
 
     const backendConversationRunning = effectiveBackendConversationRunning(conversationSnapshot);
     const queuedTurns = Array.isArray(conversationSnapshot?.queuedTurns) ? conversationSnapshot.queuedTurns : [];
@@ -836,15 +836,27 @@ export default function Chat({
         const submission = {message: userMessage, context, agent: currentAgent, model: submitModel, reasoningEffort: currentReasoning, tools: currentTools};
         if (starterLookup) {
             if (!serviceOwnsSubmit || !onAccepted) return;
+            const submittedAttachments = new Set(pendingAttachments.map(file => file.uploadId || file));
             return events.onSubmit.execute({
                 ...submission,
                 onConversationCreated: id => {
                     if (activeStarterKey.current === starterKey) retainedStarterConversation.current = id;
                 },
                 onAccepted: () => {
-                    onAccepted();
+                    const accepted = onAccepted();
+                    if (!accepted) return;
+                    if (submittedAttachments.size) setPendingAttachments(current => {
+                        const next = current.filter(file => !submittedAttachments.has(file.uploadId || file));
+                        if (next.length === current.length) return current;
+                        try { handlers?.dataSource?.setFormField?.({ item: { id: uploadField, bindingPath: uploadField }, value: next }); } catch (_) {}
+                        return next;
+                    });
                     if (activeStarterKey.current !== starterKey) return;
-                    clearPendingAttachments();
+                    if (accepted.retainedDraft !== undefined) {
+                        const nextConversation = retainedStarterConversation.current || conversationID;
+                        if (!nextConversation) return;
+                        moveComposerDraft(nextConversation, accepted.retainedDraft);
+                    }
                     retainedStarterConversation.current = '';
                     setSelectedStarter(null);
                 },

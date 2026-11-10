@@ -198,6 +198,7 @@ export default function Composer({
 	const [inputInvalid, setInputInvalid] = useState(false);
 	const micOn = (micOnProp !== undefined) ? !!micOnProp : micOnInternal;
 	const draftRef = useRef(String(draftValue || ""));
+    const draftRevision = useRef(0);
 	const recognitionRef = useRef(null);
 	const recognitionRestartRef = useRef(false);
 	const dictationBaseRef = useRef('');
@@ -213,6 +214,7 @@ export default function Composer({
 		const prev = String(draftRef.current || "");
 		const resolved = typeof nextValue === 'function' ? nextValue(prev) : nextValue;
 		const next = String(resolved || "");
+        draftRevision.current++;
 		draftRef.current = next;
 		setDraft((current) => current === next ? current : next);
 		onDraftChange?.(next);
@@ -221,6 +223,7 @@ export default function Composer({
 	useEffect(() => {
 		if (draftValue === undefined) return;
 		const next = String(draftValue || "");
+        if (draftRef.current !== next) draftRevision.current++;
 		draftRef.current = next;
 		setDraft((prev) => prev === next ? prev : next);
 	}, [draftValue]);
@@ -235,8 +238,12 @@ export default function Composer({
 	        const currentId = draftKey !== undefined ? String(draftKey) : currentConversationIdFromLocation();
 	        if (targetId && currentId && targetId !== currentId) return;
 	        const next = String(prompt || '');
+            if (draftKey !== undefined) {
+                updateDraft(next);
+                return;
+            }
 	        setDraft((prev) => {
-	            if (draftKey === undefined && prev && prev.trim()) return prev;
+	            if (prev && prev.trim()) return prev;
 	            draftRef.current = next;
 	            onDraftChange?.(next);
 	            return next;
@@ -279,7 +286,7 @@ export default function Composer({
 	        window.removeEventListener(CONVERSATION_ACTIVE_EVENT, handleConversationActive);
 	        window.removeEventListener('popstate', handleConversationActive);
 	    };
-	}, [draftKey, onDraftChange]);
+	}, [draftKey, onDraftChange, updateDraft]);
 
 	useEffect(() => {
 	    if (draftKey !== undefined) return;
@@ -691,6 +698,8 @@ export default function Composer({
             return;
         }
         const submission = {};
+        const submittedDraft = draftRef.current;
+        const submittedRevision = draftRevision.current;
         pendingScopedSubmit.current = submission;
         setScopedSubmitting(true);
         const finish = () => {
@@ -700,9 +709,15 @@ export default function Composer({
         };
         const onAccepted = () => {
             if (pendingScopedSubmit.current !== submission) return;
-            if (currentDraftKey.current === draftKey) complete();
-            else onDraftChange?.('');
+            let retainedDraft;
+            if (currentDraftKey.current === draftKey) {
+                if (draftRevision.current === submittedRevision && draftRef.current === submittedDraft) complete();
+                else retainedDraft = draftRef.current;
+            } else {
+                onDraftChange?.(current => current === submittedDraft ? '' : current);
+            }
             finish();
+            return {retainedDraft};
         };
         try {
             const pending = onSubmit?.({content, toolNames: selectedTools, lookupSelections: resolution.lookupSelections, onAccepted});
