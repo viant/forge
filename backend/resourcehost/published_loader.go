@@ -23,6 +23,9 @@ type PublishedCodec[T any] struct {
 	Decode    func(context.Context, string, json.RawMessage) (T, error)
 	Clone     func(T) (T, error)
 	Immutable bool
+	// ExpectedVersion fences exact published dependency references. Leave zero
+	// to read the ordinary selected content by its fingerprint.
+	ExpectedVersion uint64
 }
 type PublishedValue[T any] struct {
 	Value    T
@@ -103,7 +106,26 @@ func Load[T any](ctx context.Context, source *Gateway, uriText string, codec Pub
 	if admission == "" {
 		return nil, identity.ErrResourceDenied
 	}
-	hash, err := registration.source.CurrentHash(ctx, uriText)
+	currentHash := registration.source.CurrentHash
+	if codec.ExpectedVersion != 0 {
+		versioned, ok := registration.source.(interface {
+			CurrentVersionHash(context.Context, string) (uint64, string, error)
+		})
+		if !ok {
+			return nil, identity.ErrResourceDenied
+		}
+		currentHash = func(ctx context.Context, uri string) (string, error) {
+			version, hash, err := versioned.CurrentVersionHash(ctx, uri)
+			if err != nil {
+				return "", err
+			}
+			if version != codec.ExpectedVersion {
+				return "", identity.ErrResourceStale
+			}
+			return hash, nil
+		}
+	}
+	hash, err := currentHash(ctx, uriText)
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +234,7 @@ func Load[T any](ctx context.Context, source *Gateway, uriText string, codec Pub
 			return nil, err
 		}
 	}
-	if err = source.verifyPublishedPin(ctx, connection, selected); err != nil {
+	if err = source.verifyPublishedPin(ctx, connection, selected, currentHash); err != nil {
 		return nil, err
 	}
 	return &PublishedValue[T]{Value: value, Resource: &selected, Metadata: publishedMetadataHeader(entry.metadata), MenuProjection: clonePublishedMenu(entry.projection)}, nil

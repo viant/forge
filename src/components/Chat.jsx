@@ -803,7 +803,7 @@ export default function Chat({
         }
     };
 
-    const handleSubmit = ({ content, toolNames = [] }) => {
+    const handleSubmit = ({ content, toolNames = [], lookupSelections }) => {
         if (documentAppearance && uploader.items.some(isUnresolvedUpload)) return;
         const submitModel = (() => {
             if (usesExternalComposerProps) {
@@ -824,7 +824,7 @@ export default function Chat({
             toolNames,
             createdAt: new Date().toISOString(),
             attachments: pendingAttachments && pendingAttachments.length ? pendingAttachments : undefined,
-            ...(starterLookup ? {starterTask: {id: starterLookup.id, fingerprint: starterLookup.fingerprint}} : {}),
+            ...(starterLookup ? {starterTask: {id: starterLookup.id, fingerprint: starterLookup.fingerprint}, lookupSelections} : {}),
         };
 
         const serviceOwnsSubmit = !!events.onSubmit?.isDefined?.();

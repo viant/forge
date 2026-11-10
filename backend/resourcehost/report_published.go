@@ -23,7 +23,7 @@ func (r *gatewayReportReader) VerifyPublishedResource(ctx context.Context, pin i
 	connection.Generation = r.catalog.Gateway.generation(connection.Name)
 	return r.catalog.Gateway.verifyPublishedPin(ctx, connection, pin)
 }
-func (g *Gateway) verifyPublishedPin(ctx context.Context, connection Connection, pin identity.ResolvedResource) error {
+func (g *Gateway) verifyPublishedPin(ctx context.Context, connection Connection, pin identity.ResolvedResource, hashes ...func(context.Context, string) (string, error)) error {
 	uri, err := identity.ParseResourceURI(pin.URI)
 	if err != nil || pin.Kind != identity.PublishedCandidate || !pin.ResourceCandidate.Valid() || !identity.MetadataExpiryValid(pin.ValidUntil, g.now()) {
 		return identity.ErrResourceDenied
@@ -46,7 +46,11 @@ func (g *Gateway) verifyPublishedPin(ctx context.Context, connection Connection,
 	if admission == "" {
 		return identity.ErrResourceDenied
 	}
-	hash, err := source.source.CurrentHash(ctx, pin.URI)
+	currentHash := source.source.CurrentHash
+	if len(hashes) > 0 {
+		currentHash = hashes[0]
+	}
+	hash, err := currentHash(ctx, pin.URI)
 	if err != nil {
 		return err
 	}

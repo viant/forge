@@ -667,12 +667,13 @@ export default function Composer({
         const resolver = inputValueResolverRef.current;
         const resolvedValue = typeof resolver === 'function' ? resolver() : '';
         if (resolvedValue === null) return;
-        const content = String(resolvedValue || draftRef.current || '').trim();
+        const resolution = typeof resolvedValue === 'object' ? resolvedValue : {content: resolvedValue};
+        const content = String(resolution.content || draftRef.current || '').trim();
         const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
         if (!content && !hasAttachments) return;
         setHistoryOpen(false);
         storeDraftForConversation(currentConversationIdFromLocation(), '');
-        onSubmit?.({ content, toolNames: selectedTools });
+        onSubmit?.({ content, toolNames: selectedTools, ...(resolution.lookupSelections ? {lookupSelections: resolution.lookupSelections} : {}) });
         updateDraft("");
         if (documentAppearance) requestAnimationFrame(() => {
             inputHostRef.current?.querySelector('textarea, [contenteditable="true"]')?.focus({preventScroll: true});

@@ -247,33 +247,40 @@ func (s *MetadataSource) admissionKey(ctx context.Context, resourceURI string) (
 
 // CurrentHash fences delivery against a concurrent local selection update.
 // It performs no payload hydration, parsing, hashing or producer access.
-func (s *MetadataSource) CurrentHash(ctx context.Context, uriText string) (result string, failure error) {
+func (s *MetadataSource) CurrentHash(ctx context.Context, uriText string) (string, error) {
+	_, hash, err := s.CurrentVersionHash(ctx, uriText)
+	return hash, err
+}
+
+// CurrentVersionHash returns the exact admitted root identity through the
+// same local selection fence used for CurrentHash.
+func (s *MetadataSource) CurrentVersionHash(ctx context.Context, uriText string) (version uint64, result string, failure error) {
 	defer func() { failure = metadataAdmissionError(failure) }()
 	uri, err := identity.ParseResourceURI(uriText)
 	if err != nil || !s.claims(uri.Namespace) {
-		return "", ErrDenied
+		return 0, "", ErrDenied
 	}
 	if err = s.replica.EnsureAdmitted(ctx); err != nil {
-		return "", err
+		return 0, "", err
 	}
 	key, err := s.replica.cfg.SessionKey(ctx)
 	if err != nil || key == "" {
-		return "", ErrDenied
+		return 0, "", ErrDenied
 	}
 	selected, err := s.replica.selectedCohort(ctx)
 	if err != nil {
-		return "", err
+		return 0, "", err
 	}
 	if err = s.replica.ensureSelection(key, selected); err != nil {
-		return "", err
+		return 0, "", err
 	}
 	s.replica.mu.RLock()
 	defer s.replica.mu.RUnlock()
 	ref, _, err := s.replica.openRefLocked(key, uriText, selected)
 	if err != nil {
-		return "", err
+		return 0, "", err
 	}
-	return ref.Hash, nil
+	return ref.Version, ref.Hash, nil
 }
 
 // Optional application discovery can omit an inaccessible cohort while direct
