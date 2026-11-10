@@ -86,11 +86,18 @@ it('manual edits and Reset cancel native calendar requests and stale responses c
   expect(v.transport.mock.calls.filter(([r])=>r.dataSourceRef==='reader')).toHaveLength(0);
  } finally {await v.close();}
 });
-it('blocks invalid calendar metadata and stale relative drafts after a calendar identity change',async()=>{
+it('defaults invalid timezone to UTC and blocks stale relative drafts after identity change',async()=>{
  const invalid=await mount({zone:'Invalid/Zone'});
  try {
   await invalid.openPreset();await invalid.click('Completed days');
-  expect(invalid.host.textContent).toContain('Calendar timezone is unavailable');
+  expect(invalid.host.textContent).not.toContain('Calendar timezone is unavailable');
+  expect(invalid.host.querySelector('select[aria-label$="timezone"]').value).toBe('UTC');
+  const zone=invalid.host.querySelector('select[aria-label$="timezone"]');
+  const metadataReads=invalid.transport.mock.calls.filter(([request])=>request.dataSourceRef==='calendar').length;
+  await invalid.settle(()=>{zone.value='America/Los_Angeles';zone.dispatchEvent(new Event('change',{bubbles:true}));});
+  expect(zone.value).toBe('America/Los_Angeles');
+  expect(invalid.transport.mock.calls.filter(([request])=>request.dataSourceRef==='calendar')).toHaveLength(metadataReads);
+
   expect(invalid.reader.handlers.dataSource.peekInput().parameters.query.filters.mode).toBe('custom');
  } finally {await invalid.close();}
  const v=await mount();

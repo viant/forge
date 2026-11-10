@@ -1,3 +1,4 @@
+import {requireCalendarTimeZone} from '../packs/blueprint/dateRangePreset.js';
 import {useEffect,useRef,useState} from 'react';
 import {reportDatePresetInputs,decodeReportDateCalendar,resolveDeclaredDateRangePreset} from './reportDatePresets.js';
 
@@ -8,7 +9,7 @@ const calendarParameters=range=>[range.datePresets?.calendar?.input?.parameter,.
 
 // Shared calendar/default lifecycle. Hosts supply only their ordinary metadata
 // loader, parameter initialization and commit callback. Calendar zones and range
-// policy come from validated declarations, never browser timezone or host IDs.
+// policy come from validated declarations. A missing/invalid zone defaults to UTC; users can override it.
 export function useReportDatePresetDraft({ranges=[],parameters={},resetParameters,initialize=identity,contextKey='',loadCalendar,onDefaultsReady,defaultsReadyKey=''}) {
  for(const range of ranges)if((range.datePresets?.calendar?.inputs||[]).some(binding=>binding.parameter===range.start||binding.parameter===range.end))throw Error('Calendar inputs cannot bind to their own date outputs.');
  const reservedParameters=new Set(ranges.flatMap(range=>[range.start,range.end,...calendarParameters(range)]).filter(Boolean));
@@ -32,6 +33,7 @@ export function useReportDatePresetDraft({ranges=[],parameters={},resetParameter
  const parametersKey=JSON.stringify(parameters),authoredDatesKey=JSON.stringify(initializeDraft({}));
  const parameterEpoch=useRef({key:parametersKey,changed:false});
  const [dateState,setDateState]=useState({});
+ const timeZoneOverrides=useRef({});
  const generation=useRef(0),requests=useRef([]),dirty=useRef(false),initialAttempted=useRef(false),initialCommitted=useRef(false),autoReady=useRef(false),expectedParameters=useRef('');
  const calendarDefinitionKey=JSON.stringify(ranges.map(range=>[range.id,range.start,range.end,range.required,range.datePresets,range.datePresetError]));
  const calendarScope=useRef({key:'',loader:null,version:0});
@@ -44,7 +46,7 @@ export function useReportDatePresetDraft({ranges=[],parameters={},resetParameter
  // Loader identity includes the authenticated preview session. Invalidate in
  // render too, so a late reply cannot win before the scope effect runs.
  if(calendarScope.current.key!==scopeKey||calendarScope.current.loader!==loadCalendar){
-  invalidate();autoReady.current=false;
+  invalidate();autoReady.current=false;timeZoneOverrides.current={};
   if(!initialCommitted.current&&!dirty.current)initialAttempted.current=false;
   calendarScope.current={key:scopeKey,loader:loadCalendar,version:calendarScope.current.version+1};
  }
@@ -60,7 +62,7 @@ export function useReportDatePresetDraft({ranges=[],parameters={},resetParameter
   invalidate();autoReady.current=false;dirty.current=true;
   setDateState(previous=>Object.fromEntries(Object.entries(previous).map(([id,state])=>[id,{...state,pending:false}])));
  };
- const resolveRanges=async(items,base,{automatic=false}={})=>{
+ const resolveRanges=async(items,base,{automatic=false,reuseCalendar=false}={})=>{
   invalidate();const ticket=generation.current,version=calendarScope.current.version;
   const valid=()=>ticket===generation.current&&version===calendarScope.current.version;
   setDateState(previous=>({...previous,...Object.fromEntries(items.map(({range,value})=>[range.id,{...previous[range.id],pending:true,scope:version,requestedValue:value,error:''}]))}));
@@ -70,10 +72,16 @@ export function useReportDatePresetDraft({ranges=[],parameters={},resetParameter
     const declaration=range.datePresets,option=declaration.options.find(option=>option.value===value);
     if(!option||value==='custom')throw Error('Choose an available date preset.');
     const {identity,inputs}=reportDatePresetInputs(declaration,base),controller=new AbortController();requests.current.push(controller);
-    if(typeof loadCalendar!=='function')throw Error('Calendar metadata is unavailable.');
-    const response=await loadCalendar(declaration.calendar.dataSourceRef,inputs,controller.signal);
-    if(!valid())return false;
-    const context=decodeReportDateCalendar(declaration,identity,response);
+    const saved=dateState[range.id];
+    let context;
+    if(reuseCalendar&&saved?.scope===version&&saved.identity===identity&&saved.calendarContext){
+     context={...saved.calendarContext,timeZone:timeZoneOverrides.current[range.id]||saved.calendarContext.timeZone};
+    }else{
+     if(typeof loadCalendar!=='function')throw Error('Calendar metadata is unavailable.');
+     const response=await loadCalendar(declaration.calendar.dataSourceRef,inputs,controller.signal);
+     if(!valid())return false;
+     context=decodeReportDateCalendar(declaration,identity,response,timeZoneOverrides.current[range.id]);
+    }
     contexts.push({range,value,option,identity,context});
    }
    // One instant follows all metadata for this operation, including an initial
@@ -82,7 +90,7 @@ export function useReportDatePresetDraft({ranges=[],parameters={},resetParameter
    for(const {range,value,option,identity,context}of contexts){
     const pair=resolveDeclaredDateRangePreset(option,instant,context.timeZone,context.anchorDate);
     patch[range.start]=pair.start;patch[range.end]=pair.end;Object.assign(patch,presetPatch(range,value));
-    resolvedStates[range.id]={mode:'relative',value,requestedValue:value,scope:version,identity,pending:false,stale:false,automatic,error:''};
+    resolvedStates[range.id]={mode:'relative',value,requestedValue:value,scope:version,identity,calendarContext:context,timeZone:context.timeZone,pending:false,stale:false,automatic,error:''};
    }
    if(!valid())return false;
    writeDraft({...draftRef.current,...patch});setDateState(previous=>({...previous,...resolvedStates}));
@@ -97,6 +105,18 @@ export function useReportDatePresetDraft({ranges=[],parameters={},resetParameter
   cancelDraftRequests();
   const range=ranges.find(range=>range.id===id&&range.datePresets);
   return range?resolveRanges([{range,value}],draftRef.current):Promise.resolve(false);
+ };
+ const setTimeZone=(id,value)=>{
+  const zone=requireCalendarTimeZone(value),range=ranges.find(range=>range.id===id&&range.datePresets);
+  if(!range)return Promise.resolve(false);
+  const state=stateFor(range);
+  timeZoneOverrides.current[id]=zone;
+  setDateState(previous=>({...previous,[id]:{...previous[id],timeZone:zone}}));
+  if(state.mode==='relative'||state.error){
+   cancelDraftRequests();
+   return resolveRanges([{range,value:state.requestedValue||state.value||range.datePresets.default}],draftRef.current,{reuseCalendar:true});
+  }
+  return Promise.resolve(true);
  };
  const manualRange=(id,pair)=>{
   cancelDraftRequests();const range=ranges.find(range=>range.id===id);if(!range)return;
@@ -160,6 +180,6 @@ export function useReportDatePresetDraft({ranges=[],parameters={},resetParameter
    :calendarParameters(range).includes(id)&&previous[range.id]?.mode==='relative'?[[range.id,{...previous[range.id],pending:false,stale:true}]]:[]))}));
  };
  const controls=ranges.map(range=>{const state=range.datePresets?stateFor(range):{};return {...range,kind:'dateRange',presetValue:state.value,presetRequestedValue:state.requestedValue,presetPending:state.pending,
-  presetError:range.datePresetError||state.error||(state.stale?'The calendar context changed. Choose the preset again or use manual dates.':'')};});
- return {draft,draftRef,writeDraft,controls,dateBlocked,requestPreset,manualRange,cancelDraftRequests,editField,reset,expectParameters};
+  timeZone:timeZoneOverrides.current[range.id]||state.timeZone||'UTC',presetError:range.datePresetError||state.error||(state.stale?'The calendar context changed. Choose the preset again or use manual dates.':'')};});
+ return {draft,draftRef,writeDraft,controls,dateBlocked,requestPreset,setTimeZone,manualRange,cancelDraftRequests,editField,reset,expectParameters};
 }

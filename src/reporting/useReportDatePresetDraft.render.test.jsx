@@ -45,7 +45,7 @@ test('account and loader replacement cancels old defaults; a resolved relative d
  await act(async()=>newFinish(calendar(17,'UTC')));expect(result.current.draft.from).toBe('2025-12-25');
  rerender({contextKey:'three',loadCalendar:newLoad});expect(result.current.dateBlocked).toBe(true);expect(result.current.controls[0].presetError).toMatch(/context changed/);
 });
-test.each([calendar(18),calendar(17,'invalid/zone'),{data:[]}])('missing or mismatched calendar fails closed without timezone fallback',async response=>{
+test.each([calendar(18)])('missing or mismatched calendar fails closed without timezone fallback',async response=>{
  const loadCalendar=vi.fn().mockResolvedValue(response),onDefaultsReady=vi.fn();
  const {result}=renderHook(()=>useReportDatePresetDraft({ranges,parameters:{entity:17},loadCalendar,onDefaultsReady}));
  await waitFor(()=>expect(result.current.controls[0].presetError).toMatch(/Calendar timezone is unavailable/));expect(result.current.dateBlocked).toBe(true);expect(onDefaultsReady).not.toHaveBeenCalled();
@@ -180,4 +180,20 @@ test.each(['from','to'])('rejects a calendar input bound to its own %s endpoint 
  const loadCalendar=vi.fn();
  expect(()=>renderHook(()=>useReportDatePresetDraft({ranges:bound,parameters:{entity:17,from:'2026-01-01',to:'2026-01-02'},loadCalendar}))).toThrow(/Calendar inputs cannot bind to their own date outputs/);
  expect(loadCalendar).not.toHaveBeenCalled();
+});
+
+test.each([calendar(17,'invalid/zone'),calendar(17,''),{data:[]}])('invalid or absent timezone uses UTC and can be changed',async response=>{
+ const loadCalendar=vi.fn().mockResolvedValue(response);
+ const {result}=renderHook(()=>useReportDatePresetDraft({ranges,parameters:{entity:17},loadCalendar}));
+ await waitFor(()=>expect(result.current.draft.from).toBe('2025-12-25'));
+ expect(result.current.controls[0].timeZone).toBe('UTC');
+ expect(result.current.dateBlocked).toBe(false);
+ await act(async()=>result.current.setTimeZone('period','America/Los_Angeles'));
+ expect(result.current.draft.from).toBe('2025-12-24');
+ expect(result.current.controls[0].timeZone).toBe('America/Los_Angeles');
+ act(()=>result.current.manualRange('period',{start:'2026-02-01',end:'2026-02-02'}));
+ const calls=loadCalendar.mock.calls.length;
+ await act(async()=>result.current.setTimeZone('period','UTC'));
+ expect(result.current.draft.from).toBe('2026-02-01');
+ expect(loadCalendar).toHaveBeenCalledTimes(calls);
 });

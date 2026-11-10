@@ -69,10 +69,14 @@ export function reportDatePresetInputs(declaration, parameters) {
     }
     return {identity, inputs};
 }
-export function decodeReportDateCalendar(declaration, identity, response) {
+export function decodeReportDateCalendar(declaration, identity, response, selectedTimeZone) {
     const rows = extractData({}, undefined, response).records;
+    if (Array.isArray(rows) && rows.length === 0 && !declaration.calendar.anchorField) return {timeZone: selectedTimeZone ? requireCalendarTimeZone(selectedTimeZone) : 'UTC'};
     if (!Array.isArray(rows) || rows.length !== 1 || read(rows[0], declaration.calendar.identityField) !== identity) throw new Error('Calendar context does not match the selected identity.');
-    return {timeZone: requireCalendarTimeZone(read(rows[0], declaration.calendar.timeZoneField)),
+    let timeZone = 'UTC';
+    try { timeZone = requireCalendarTimeZone(read(rows[0], declaration.calendar.timeZoneField)); } catch { /* Missing or invalid calendar zones use the explicit UTC default. */ }
+    if (selectedTimeZone) timeZone = requireCalendarTimeZone(selectedTimeZone);
+    return {timeZone,
         ...(declaration.calendar.anchorField != null ? {anchorDate: requireCalendarAnchorDate(read(rows[0], declaration.calendar.anchorField))} : {})};
 }
 export {resolveDeclaredDateRangePreset};

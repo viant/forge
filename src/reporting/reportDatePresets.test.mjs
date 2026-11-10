@@ -9,14 +9,14 @@ assert.deepEqual(reportDatePresetInputs(normalized,{entity:17}),{identity:17,inp
 assert.deepEqual(reportDatePresetInputs(normalized,{entity:[17]}),{identity:17,inputs:{Ids:[17]}});
 for(const entity of [[],[17,18],0,'17',NaN])assert.throws(()=>reportDatePresetInputs(normalized,{entity}));
 assert.deepEqual(decodeReportDateCalendar(normalized,17,{data:[{id:17,zone:{iana:'America/Los_Angeles'}}]}),{timeZone:'America/Los_Angeles'});
-for(const response of [{data:[]},{data:[{id:18,zone:{iana:'UTC'}}]},{data:[{id:17,zone:{iana:'Invalid/Zone'}}]},{data:[{id:17}]},{data:[{id:17},{id:17}]}])assert.throws(()=>decodeReportDateCalendar(normalized,17,response));
+for(const response of [{data:[{id:18,zone:{iana:'UTC'}}]},{data:[{id:17},{id:17}]}])assert.throws(()=>decodeReportDateCalendar(normalized,17,response));
 for(const mutate of [d=>d.calendar.timeZoneField='__proto__.zone',d=>d.options.push(d.options[0]),d=>d.options[3].range.endOffset=1,d=>d.options[3].range.startOffset=-36601,d=>d.options[3].range.startOffset=0,d=>d.options[3].range.sql='unsafe',d=>d.default='absent',d=>d.calendar.input.array='true',d=>d.extra=true]){const d=structuredClone(declaration);mutate(d);assert.throws(()=>normalizeReportDatePresets(d,sources));}
 assert.throws(()=>normalizeReportDatePresets(declaration,{calendar:{}}),/caching disabled/);
 for(const value of ['Custom','CUSTOM','Completed7']){
  const d=structuredClone(declaration);d.options.push({value,label:'Collision',range:{kind:'relativeDays',startOffset:-7,endOffset:-1}});d.default=value;
  assert.throws(()=>normalizeReportDatePresets(d,sources));
 }
-for(const zone of ['+01:00','-05:00','+0100','01:00'])assert.throws(()=>decodeReportDateCalendar(normalized,17,{data:[{id:17,zone:{iana:zone}}]}),/named calendar timezone/);
+for(const zone of ['+01:00','-05:00','+0100','01:00'])assert.equal(decodeReportDateCalendar(normalized,17,{data:[{id:17,zone:{iana:zone}}]}).timeZone,'UTC');
 assert.equal(decodeReportDateCalendar(normalized,17,{data:[{id:17,zone:{iana:'Etc/GMT+5'}}]}).timeZone,'Etc/GMT+5');
 const vectors=[
  ['2026-01-01T07:59:00Z','America/Los_Angeles',['2025-12-24','2025-12-30'],['2025-12-01','2025-12-31']],
@@ -105,7 +105,6 @@ for(const dataset of [
  {columns:calendarColumns,rows:[]},
  {columns:calendarColumns,rows:[[17,'UTC','2026-03-08'],[17,'UTC','2026-03-08']]},
  {columns:calendarColumns,rows:[[18,'UTC','2026-03-08']]},
- {columns:calendarColumns,rows:[[17,'Invalid/Zone','2026-03-08']]},
  {columns:calendarColumns,rows:[[17,'UTC',null]]},
  {columns:calendarColumns,rows:[[17,'UTC','2026-02-30']]},
  {columns:calendarColumns,rows:[null]},
@@ -113,3 +112,5 @@ for(const dataset of [
  {columns:calendarColumns},
  {rows:[[17,'UTC','2026-03-08']]},
 ])assert.throws(()=>decodeReportDateCalendar(flatCalendar,17,{data:[dataset]}));
+
+for(const response of [{data:[]},{data:[{id:17}]},{data:[{id:17,zone:{iana:'Invalid/Zone'}}]}])assert.equal(decodeReportDateCalendar(normalized,17,response).timeZone,'UTC');

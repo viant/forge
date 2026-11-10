@@ -67,7 +67,9 @@ function Choice({control, values, onChange, loadChoices, scopeKey, onChoices, co
     </fieldset></FilterControl>;
 }
 
-function DatePresets({control, values, context, busy, onDatePreset, onDateRange, onDateDraft}) {
+const calendarTimeZones = ['UTC', ...new Set(typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : ['America/Los_Angeles','America/New_York','Europe/London','Asia/Tokyo'])];
+
+function DatePresets({control, values, context, busy, onDatePreset, onDateRange, onDateDraft, onDateTimeZone}) {
     if (!control.datePresets) return null;
     if (!listWidgets().includes('dateRangePreset') || typeof onDatePreset !== 'function' || typeof onDateRange !== 'function') {
         return <span role="status">Date presets are unavailable in this host. Enter dates manually.</span>;
@@ -80,6 +82,10 @@ function DatePresets({control, values, context, busy, onDatePreset, onDateRange,
             onPresetRequest={option => onDatePreset(control.id, option.value)}
             onRangeChange={range => onDateRange(control.id, range)} onDraftChange={() => onDateDraft?.(control.id)}
             presetPending={control.presetPending === true} customApplyEnabled/>
+        {onDateTimeZone && <label>Timezone<select aria-label={`${control.label || 'Date range'} timezone`} value={control.timeZone || 'UTC'} disabled={busy}
+            onChange={event => onDateTimeZone(control.id,event.target.value)}>
+            {[...new Set([control.timeZone || 'UTC',...calendarTimeZones])].map(zone=><option key={zone} value={zone}>{zone}</option>)}
+        </select></label>}
         {control.presetError && <span role="alert">{control.presetError} Enter dates manually or retry the preset.</span>}
         {control.presetError && <Button type="button" variant="ghost" onClick={() => onDatePreset(control.id, control.presetRequestedValue || control.datePresets.default)}>Retry date preset</Button>}
     </>;
@@ -88,7 +94,7 @@ function DatePresets({control, values, context, busy, onDatePreset, onDateRange,
 // Hosts normalize published metadata into controls and own authenticated choice
 // transport. This component never constructs resource URIs or permission grants.
 export default function ReportFilterBar({controls = [], values = {}, onChange, onApply, onReset, loadChoices,
-    scopeKey = '', context, onChoices, onDatePreset, onDateRange, onDateDraft, busy = false, applyDisabled = false, error = '', placement = 'top', className = ''}) {
+    scopeKey = '', context, onChoices, onDatePreset, onDateRange, onDateDraft, onDateTimeZone, busy = false, applyDisabled = false, error = '', placement = 'top', className = ''}) {
     if (!controls.length) return null;
     const apply=()=>{if(!busy&&!applyDisabled)onApply?.();};
     return <form className={`forge-report-filter-bar ${className}`.trim()} data-filter-placement={['left','rail-left'].includes(placement)?'left':['right','rail-right'].includes(placement)?'right':'top'} aria-label="Report filters"
@@ -96,7 +102,7 @@ export default function ReportFilterBar({controls = [], values = {}, onChange, o
         {controls.map(control => {
             if (control.kind === 'choice') return <Choice key={control.id} {...{control, values, onChange, loadChoices, scopeKey, onChoices, context, busy}}/>;
             if (control.kind === 'dateRange') return <fieldset key={control.id} className="forge-report-filter-date-range"><legend>{control.label}</legend>
-                <DatePresets {...{control, values, context, busy, onDatePreset, onDateRange, onDateDraft}}/>
+                <DatePresets {...{control, values, context, busy, onDatePreset, onDateRange, onDateDraft, onDateTimeZone}}/>
                 <div className="forge-report-filter-date-fields">{[['from', control.start], ['to', control.end]].map(([edge, alias]) => <label key={alias}>{edge === 'from' ? 'From' : 'To'}
                     <FilterControl context={context} controlId={alias} type="date" value={values[alias] ?? ''} required={control.required} disabled={busy} change={value=>onChange(alias,value)}><input type="date" aria-label={`${control.label} ${edge}`} required={control.required} aria-required={control.required || undefined} value={values[alias] ?? ''} onChange={event => onChange(alias, event.target.value)}/></FilterControl></label>)}</div>
                 {control.datePresetError && <span role="alert">{control.datePresetError} Enter dates manually.</span>}

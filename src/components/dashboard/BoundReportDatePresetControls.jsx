@@ -46,6 +46,6 @@ export default function BoundReportDatePresetControls({config, context, reportSp
     };
     return <ReportFilterBar controls={dates.controls} values={dates.draft} context={context}
         onChange={(id,value) => {dates.editField(id); dates.writeDraft({...dates.draftRef.current,[id]:value});}}
-        onDatePreset={dates.requestPreset} onDateRange={dates.manualRange} onDateDraft={dates.cancelDraftRequests}
+        onDatePreset={dates.requestPreset} onDateRange={dates.manualRange} onDateDraft={dates.cancelDraftRequests} onDateTimeZone={dates.setTimeZone}
         onApply={apply} onReset={dates.reset} busy={busy} applyDisabled={dates.dateBlocked || ranges.some(range => range.datePresetError)}/>;
 }
