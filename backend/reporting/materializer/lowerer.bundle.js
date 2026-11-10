@@ -56398,7 +56398,8 @@ ${indent}${end}`;
     return [...dimensions, ...measures, ...calculated];
   }
   function deriveValueFieldOptions(entry = {}) {
-    return [...Array.isArray(entry == null ? void 0 : entry.measures) ? entry.measures : [], ...calculatedMeasures(entry)].map((item) => {
+    const columns = (Array.isArray(entry == null ? void 0 : entry.columnOptions) ? entry.columnOptions : []).filter((item) => ["measure", "computedMeasure"].includes(normalizeString24(item == null ? void 0 : item.kind)));
+    return [...Array.isArray(entry == null ? void 0 : entry.measures) ? entry.measures : [], ...calculatedMeasures(entry), ...columns].map((item) => {
       const key2 = normalizeString24((item == null ? void 0 : item.key) || (item == null ? void 0 : item.id));
       if (!key2) {
         return null;
@@ -56409,10 +56410,11 @@ ${indent}${end}`;
         ...normalizeString24(item == null ? void 0 : item.format) ? { format: normalizeString24(item.format) } : {},
         ...(item == null ? void 0 : item.default) === true ? { default: true } : {}
       };
-    }).filter(Boolean);
+    }).filter(Boolean).filter((item, index, items) => items.findIndex((candidate) => candidate.value === item.value) === index);
   }
   function deriveSecondaryFieldOptions(entry = {}) {
-    return (Array.isArray(entry == null ? void 0 : entry.dimensions) ? entry.dimensions : []).map((item) => {
+    const columns = (Array.isArray(entry == null ? void 0 : entry.columnOptions) ? entry.columnOptions : []).filter((item) => normalizeString24(item == null ? void 0 : item.kind) === "dimension");
+    return [...Array.isArray(entry == null ? void 0 : entry.dimensions) ? entry.dimensions : [], ...columns].map((item) => {
       const key2 = normalizeString24((item == null ? void 0 : item.key) || (item == null ? void 0 : item.id));
       if (!key2) {
         return null;
@@ -56423,26 +56425,32 @@ ${indent}${end}`;
         ...normalizeString24(item == null ? void 0 : item.format) ? { format: normalizeString24(item.format) } : {},
         ...(item == null ? void 0 : item.default) === true ? { default: true } : {}
       };
-    }).filter(Boolean);
+    }).filter(Boolean).filter((item, index, items) => items.findIndex((candidate) => candidate.value === item.value) === index);
   }
   function deriveChartFieldOptions(entry = {}) {
-    return deriveColumnOptions(entry).map((item) => ({
-      key: normalizeString24((item == null ? void 0 : item.displayKey) || (item == null ? void 0 : item.key)),
-      aliases: [normalizeString24(item == null ? void 0 : item.key)].filter(Boolean),
-      label: normalizeString24((item == null ? void 0 : item.label) || (item == null ? void 0 : item.key)),
-      kind: (item == null ? void 0 : item.kind) === "computedMeasure" ? "measure" : normalizeString24(item == null ? void 0 : item.kind),
-      ...normalizeString24(item == null ? void 0 : item.format) ? { format: normalizeString24(item.format) } : {},
-      ...normalizeString24(item == null ? void 0 : item.tickFormat) ? { tickFormat: normalizeString24(item.tickFormat) } : {},
-      ...["civil", "instant"].includes(normalizeString24(item == null ? void 0 : item.valueMode)) ? { valueMode: normalizeString24(item.valueMode) } : {},
-      ...(item == null ? void 0 : item.default) === true ? { default: true } : {},
-      ...(item == null ? void 0 : item.chartAxis) === true ? { chartAxis: true } : {},
-      ...normalizeString24(item == null ? void 0 : item.rawId) ? { rawId: normalizeString24(item.rawId) } : {},
-      ...normalizeString24(item == null ? void 0 : item.description) ? { description: normalizeString24(item.description) } : {},
-      ...normalizeString24(item == null ? void 0 : item.category) ? { category: normalizeString24(item.category) } : {},
-      ...normalizeString24(item == null ? void 0 : item.definitionRef) ? { definitionRef: normalizeString24(item.definitionRef) } : {},
-      ...normalizeString24(item == null ? void 0 : item.semanticRef) ? { semanticRef: normalizeString24(item.semanticRef) } : {},
-      ...(item == null ? void 0 : item.governance) && typeof item.governance === "object" && !Array.isArray(item.governance) ? { governance: cloneValue17(item.governance) } : {}
-    }));
+    const derived = deriveColumnOptions(entry);
+    const derivedByKey = new Map(derived.map((item) => [item.key, item]));
+    const columns = Array.isArray(entry == null ? void 0 : entry.columnOptions) && entry.columnOptions.length > 0 ? entry.columnOptions : derived;
+    return columns.map((item) => {
+      var _a5;
+      return {
+        key: normalizeString24((item == null ? void 0 : item.displayKey) || (item == null ? void 0 : item.key)),
+        aliases: [normalizeString24(item == null ? void 0 : item.key)].filter(Boolean),
+        label: normalizeString24((item == null ? void 0 : item.label) || (item == null ? void 0 : item.key)),
+        kind: (item == null ? void 0 : item.kind) === "computedMeasure" || (item == null ? void 0 : item.kind) === "calculated" && ((_a5 = derivedByKey.get(item.key)) == null ? void 0 : _a5.kind) === "computedMeasure" ? "measure" : normalizeString24(item == null ? void 0 : item.kind),
+        ...normalizeString24(item == null ? void 0 : item.format) ? { format: normalizeString24(item.format) } : {},
+        ...normalizeString24(item == null ? void 0 : item.tickFormat) ? { tickFormat: normalizeString24(item.tickFormat) } : {},
+        ...["civil", "instant"].includes(normalizeString24(item == null ? void 0 : item.valueMode)) ? { valueMode: normalizeString24(item.valueMode) } : {},
+        ...(item == null ? void 0 : item.default) === true ? { default: true } : {},
+        ...(item == null ? void 0 : item.chartAxis) === true ? { chartAxis: true } : {},
+        ...normalizeString24(item == null ? void 0 : item.rawId) ? { rawId: normalizeString24(item.rawId) } : {},
+        ...normalizeString24(item == null ? void 0 : item.description) ? { description: normalizeString24(item.description) } : {},
+        ...normalizeString24(item == null ? void 0 : item.category) ? { category: normalizeString24(item.category) } : {},
+        ...normalizeString24(item == null ? void 0 : item.definitionRef) ? { definitionRef: normalizeString24(item.definitionRef) } : {},
+        ...normalizeString24(item == null ? void 0 : item.semanticRef) ? { semanticRef: normalizeString24(item.semanticRef) } : {},
+        ...(item == null ? void 0 : item.governance) && typeof item.governance === "object" && !Array.isArray(item.governance) ? { governance: cloneValue17(item.governance) } : {}
+      };
+    });
   }
   function buildReportBuilderPublishedDatasetRefIndex(sources = []) {
     const normalizedSources = (Array.isArray(sources) ? sources : []).filter(isPlainObject6);

@@ -102,6 +102,25 @@ func TestAuthoredChartValidationActualLoweringAndValidEmpty(t *testing.T) {
 	}
 }
 
+func TestAuthoredChartValidationUsesExplicitDatasetFields(t *testing.T) {
+	// A legacy measure catalog must not reintroduce a field that the explicit
+	// dataset columns omit from the generated chart catalog.
+	envelope := chartValidationEnvelope(`,"dimensions":[{"key":"region"}],"measures":[{"key":"observations"}],"columnOptions":[{"key":"region","kind":"dimension"},{"key":"volume","kind":"measure"}]`)
+	raw, err := json.Marshal(envelope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = Lower(t.Context(), raw)
+	var invalid *AuthoredChartValidationError
+	if !errors.As(err, &invalid) {
+		t.Fatalf("expected typed source failure, got %v", err)
+	}
+	want := ChartValidationDiagnostic{BlockID: "chart", DatasetRef: "detail", Field: "yFields.0", FieldRef: "observations", ValidationCode: "missingField"}
+	if diagnostics := invalid.AuthoredChartValidationDiagnostics(); len(diagnostics) != 1 || diagnostics[0] != want {
+		t.Fatalf("diagnostics = %+v, want %+v", diagnostics, want)
+	}
+}
+
 func chartValidationEnvelope(schema string) registry.ReportEnvelope {
 	// Synthetic source uses the ordinary complete dependency closure. Updating
 	// its authored bytes requires their matching fingerprints, just as publishing.
