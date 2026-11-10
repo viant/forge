@@ -144,13 +144,16 @@ func (s *NativeSkillSource) CatalogScope(ctx context.Context, conversation strin
 		if err != nil {
 			return "", false, err
 		}
+		// Scope checks must inspect the same metadata transport used by Get;
+		// acquiring a conversation client here would repeat its handshake.
+		metadataScope := s.Gateway.Manager.MetadataConnectionScope(ctx, conversation, name)
 		// Automatic discovery is optional for both configured and published MCPs.
 		// Explicit skill discovery retains its required-provider failure semantics.
 		automatic := options != nil && options.SkillDiscovery == nil
 		if automatic {
 			// Separate provider contact from the credential/configuration scope
 			// checks below. A contact failure is optional; a scope failure is not.
-			_, contactErr := s.Gateway.Manager.Get(s.WithAuthTokenContext(ctx, name), conversation, name)
+			_, contactErr := s.Gateway.Manager.Get(s.WithAuthTokenContext(ctx, name), metadataScope, name)
 			if contactErr != nil {
 				if ctx.Err() != nil {
 					return "", false, ctx.Err()
@@ -163,7 +166,7 @@ func (s *NativeSkillSource) CatalogScope(ctx context.Context, conversation strin
 				return "", false, contactErr
 			}
 		}
-		scope, reusable, scopeErr := s.Gateway.Manager.CatalogScope(ctx, conversation, []string{name})
+		scope, reusable, scopeErr := s.Gateway.Manager.CatalogScope(ctx, metadataScope, []string{name})
 		if aggregateLinkRequired(scopeErr) {
 			// Optional metadata discovery cannot require linking. Do not cache
 			// this partial snapshot across a later credential-state change.

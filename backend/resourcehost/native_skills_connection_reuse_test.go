@@ -83,6 +83,9 @@ func TestNativeSkillSourceReusesMetadataConnectionWithoutSharingExecution(t *tes
 		got, err := source.Get(alice, conversation, "ordinary")
 		require.NoError(t, err)
 		metadataClients = append(metadataClients, got.(*nativeSkillClient).Interface)
+		_, reusable, err := source.CatalogScope(alice, conversation, []string{"ordinary"})
+		require.NoError(t, err)
+		require.True(t, reusable)
 	}
 	require.EqualValues(t, 1, initializes.Load(), "skill metadata must reuse the already-negotiated gateway connection")
 	for _, metadata := range metadataClients {
