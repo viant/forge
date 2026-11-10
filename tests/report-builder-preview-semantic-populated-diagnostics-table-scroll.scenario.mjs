@@ -91,8 +91,7 @@ export default {
           && scroller.scrollWidth > scroller.clientWidth + 300
           && widths.length === 8 && widths.every((width) => width >= 112)
           && scroller.querySelectorAll('tbody tr').length === 8
-          && hint && getComputedStyle(hint).display !== 'none'
-          && (hint.innerText || hint.textContent || '').includes('Scroll horizontally')
+          && !hint
           && categoricalPanel?.querySelectorAll('.recharts-yAxis .recharts-cartesian-axis-tick').length === 4
           && categoricalPanel?.querySelectorAll('.recharts-xAxis .recharts-cartesian-axis-tick').length <= 3
           && categoricalGrid?.getBBox().width >= 110
