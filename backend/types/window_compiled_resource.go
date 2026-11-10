@@ -69,18 +69,12 @@ func (c *CompiledWindowResource) Select(requested *WindowTarget) (*WindowResourc
 		}
 		original = *c.historical
 	} else {
-		found := false
-		for _, binding := range c.envelope.Targets {
-			if binding.Target.ProfileKey() == normalized.ProfileKey() {
-				original = c.envelope.Variants[binding.Variant]
-				original.Fingerprint = binding.Variant
-				found = true
-				break
-			}
+		binding, err := SelectWindowTargetBinding(c.envelope.Targets, normalized)
+		if err != nil {
+			return nil, err
 		}
-		if !found {
-			return nil, fmt.Errorf("unsupported window target")
-		}
+		original = c.envelope.Variants[binding.Variant]
+		original.Fingerprint = binding.Variant
 	}
 	// Clone only the selected validated JSON-origin variant. Mutable maps,
 	// slices, raw bytes and pointers remain private to this caller.

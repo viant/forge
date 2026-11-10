@@ -48,18 +48,11 @@ func (r *Replica) OpenWindowVariant(ctx context.Context, uri string, requested *
 	if err != nil {
 		return nil, "", ErrInvalid
 	}
-	for _, binding := range envelope.Targets {
-		if binding.Target.ProfileKey() != target.ProfileKey() {
-			continue
-		}
-		variant, ok := envelope.Variants[binding.Variant]
-		if !ok || variant.Window == nil {
-			return nil, "", ErrInvalid
-		}
-		variant.Window.ResourceTarget = &target
-		return &variant, view.ETag(), nil
+	variant, err := envelope.SelectPresentation(target)
+	if err != nil {
+		return nil, "", ErrInvalid
 	}
-	return nil, "", ErrUnavailable
+	return variant, view.ETag(), nil
 }
 
 func (r *Replica) OpenWindow(ctx context.Context, uri string, requested *types.WindowTarget) (*types.Window, string, error) {

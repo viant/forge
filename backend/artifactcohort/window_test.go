@@ -55,7 +55,7 @@ func TestReplicaOpenWindowSelectsPublishedClosureLocally(t *testing.T) {
 		}
 	}))
 	for i := 0; i < 10; i++ {
-		selected, hash, e := r.OpenWindowVariant(actor, a.Root.URI, nil)
+		selected, hash, e := r.OpenWindowVariant(actor, a.Root.URI, &types.WindowTarget{Platform: "web", FormFactor: "phone", Surface: "browser"})
 		if e != nil || hash != a.Root.Hash || selected.Window.WindowKey != "main" || len(selected.DataSources) != 1 || selected.Window.DataSource["items"].InitialFilter["id"] != json.Number("9007199254740993") {
 			t.Fatalf("select: %+v %q %v", selected, hash, e)
 		}

@@ -249,15 +249,7 @@ func selectWindowResource(raw json.RawMessage, requested *WindowTarget, referenc
 	if err := envelope.Validate(); err != nil {
 		return nil, err
 	}
-	for _, binding := range envelope.Targets {
-		if binding.Target.ProfileKey() == normalized.ProfileKey() {
-			variant := envelope.Variants[binding.Variant]
-			variant.Fingerprint = binding.Variant
-			variant.Window.ResourceTarget = &normalized
-			return &variant, nil
-		}
-	}
-	return nil, fmt.Errorf("unsupported window target")
+	return envelope.SelectPresentation(normalized)
 }
 
 // decodeWindowResourceJSON preserves authored numbers in interface-valued
@@ -272,4 +264,47 @@ func decodeWindowResourceJSON(raw []byte, destination any) error {
 		return fmt.Errorf("trailing window data")
 	}
 	return nil
+}
+
+// SelectPresentation prefers an exact profile and otherwise uses the explicit
+// published default. Presentation hints do not grant or revoke resource access.
+// Callers must validate the envelope or obtain it from a verified publisher.
+func (e *WindowResourceEnvelope) SelectPresentation(requested WindowTarget) (*WindowResourceVariant, error) {
+	target, err := requested.Normalize()
+	if err != nil {
+		return nil, err
+	}
+	binding, err := SelectWindowTargetBinding(e.Targets, target)
+	if err != nil {
+		return nil, err
+	}
+	selected := binding.Variant
+	variant, ok := e.Variants[selected]
+	if !ok || variant.Window == nil {
+		return nil, fmt.Errorf("unsupported window target")
+	}
+	window := *variant.Window
+	window.ResourceTarget = &target
+	variant.Window = &window
+	variant.Fingerprint = selected
+	return &variant, nil
+}
+
+// SelectWindowTargetBinding is shared by decoded, cached and cohort readers.
+// The explicit default is a presentation fallback, never an access grant.
+func SelectWindowTargetBinding(bindings []WindowTargetBinding, requested WindowTarget) (WindowTargetBinding, error) {
+	var fallback *WindowTargetBinding
+	for i := range bindings {
+		binding := &bindings[i]
+		if binding.Target.ProfileKey() == requested.ProfileKey() {
+			return *binding, nil
+		}
+		if binding.Target.ProfileKey() == (WindowTarget{}).ProfileKey() {
+			fallback = binding
+		}
+	}
+	if fallback != nil {
+		return *fallback, nil
+	}
+	return WindowTargetBinding{}, fmt.Errorf("unsupported window target")
 }

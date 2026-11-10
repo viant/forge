@@ -126,14 +126,12 @@ func (g *Gateway) readPublishedWindow(ctx context.Context, connection Connection
 		}
 		variant.Fingerprint = selected.ContentFingerprint
 	} else {
-		var raw json.RawMessage
-		for _, binding := range template.targets {
-			if binding.Target.ProfileKey() == normalized.ProfileKey() {
-				raw = template.variants[binding.Variant]
-				variant.Fingerprint = binding.Variant
-				break
-			}
+		binding, err := types.SelectWindowTargetBinding(template.targets, normalized)
+		if err != nil {
+			return nil, err
 		}
+		raw := template.variants[binding.Variant]
+		variant.Fingerprint = binding.Variant
 		if len(raw) == 0 {
 			return nil, identity.ErrResourceDenied
 		}

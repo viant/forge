@@ -41,8 +41,11 @@ func TestWindowBundleSelectsCompletePinnedVariantAndRetainsOverrides(t *testing.
 			t.Fatalf("complete target selection: %+v %v", v, err)
 		}
 	}
-	if _, err := SelectWindowResource(raw, &WindowTarget{Platform: "unsupported", FormFactor: "phone"}); err == nil {
-		t.Fatal("undeclared target fell back to desktop")
+	for _, target := range []WindowTarget{{Platform: "web", FormFactor: "phone"}, {Platform: "web", FormFactor: "tablet"}} {
+		variant, err := SelectWindowResource(raw, &target)
+		if err != nil || variant.Window.View.Content.ID != "desktopRoot" {
+			t.Fatalf("published default unavailable: %+v %v", variant, err)
+		}
 	}
 	legacy, _ := json.Marshal(e.Variants[e.Targets[0].Variant].Window)
 	if _, err := SelectWindowResource(legacy, nil); err != nil {

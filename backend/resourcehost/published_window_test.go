@@ -137,7 +137,7 @@ func TestPublishedBrowserWindowSourceSharesTypedLoaderAndOwnsMutableVariants(t *
 	first.Window.View.Content.ID = "caller-mutation"
 	first.DataSources["rows"][0] = '!'
 	delete(first.DataSourceResources, "rows")
-	second, secondHash, err := gateway.OpenPublishedWindowVariantForProvider(ctx, "publisher", uri, nil)
+	second, secondHash, err := gateway.OpenPublishedWindowVariantForProvider(ctx, "publisher", uri, &types.WindowTarget{Platform: "web", FormFactor: "phone", Surface: "browser"})
 	require.NoError(t, err)
 	require.Equal(t, hash, secondHash)
 	require.Equal(t, "root", second.Window.View.Content.ID)
