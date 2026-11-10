@@ -107,13 +107,13 @@ export async function verifyChartFoundation(page,{expectedFont}={}) {
     assert.equal(new Set(scales).size,1,'Small plots share their rendered value scale');
     await state.selectOption('populated');
     await page.waitForFunction(font=>{
-        const node=document.querySelector('[data-chart-example="line"] .recharts-cartesian-axis-tick text');
+        const node=document.querySelector('[data-chart-example="line"] .recharts-cartesian-axis-tick-value');
         if(!node)return false;
         const css=getComputedStyle(node),normalized=document.createElement('span').style;
         normalized.fontFamily=css.getPropertyValue('--forge-type-small-family');
         return (!normalized.fontFamily || normalized.fontFamily===css.fontFamily) && (!font || css.fontFamily.includes(font));
     },expectedFont);
-    const typography=await line.locator('.recharts-cartesian-axis-tick text').first().evaluate(node=>{const css=getComputedStyle(node);return {size:parseFloat(css.fontSize),roleSize:parseFloat(css.getPropertyValue('--forge-type-small-size')),family:css.fontFamily,weight:Number(css.fontWeight),roleWeight:Number(css.getPropertyValue('--forge-type-small-weight'))};});
+    const typography=await line.locator('.recharts-cartesian-axis-tick-value').first().evaluate(node=>{const css=getComputedStyle(node);return {size:parseFloat(css.fontSize),roleSize:parseFloat(css.getPropertyValue('--forge-type-small-size')),family:css.fontFamily,weight:Number(css.fontWeight),roleWeight:Number(css.getPropertyValue('--forge-type-small-weight'))};});
     assert.equal(typography.size,typography.roleSize);
     assert.equal(typography.weight,typography.roleWeight);
     // Accessibility tables retain intrinsic cell widths but paint no content.
@@ -123,7 +123,7 @@ export async function verifyChartFoundation(page,{expectedFont}={}) {
     for(const table of accessibleTables) assert.deepEqual(table,{position:'absolute',overflow:'hidden',clipPath:'inset(50%)'},'Accessibility tables must remain visually clipped');
     const overflow=await specimen.evaluate(root=>[...root.querySelectorAll('*')].filter(node=>{const rect=node.getBoundingClientRect();return rect.width>0 && rect.right>innerWidth+1 && !node.closest('.forge-chart-table-scroll, .forge-categorical-heatmap, .forge-category-range, .forge-overlap-accessible-table') && getComputedStyle(node).position!=='fixed';}).map(node=>({tag:node.tagName,classes:node.getAttribute('class')||'',example:node.closest('[data-chart-example]')?.getAttribute('data-chart-example'),right:node.getBoundingClientRect().right,viewport:innerWidth})).slice(0,5));
     assert.deepEqual(overflow,[],'Chart examples must fit the page');
-    const clippedValueTicks=await specimen.locator('.recharts-yAxis .recharts-cartesian-axis-tick text').evaluateAll(nodes=>nodes.filter(node=>{const rect=node.getBoundingClientRect(),svg=node.closest('svg').getBoundingClientRect();return rect.width>0 && rect.left<svg.left-1;}).map(node=>node.textContent));
+    const clippedValueTicks=await specimen.locator('.recharts-yAxis .recharts-cartesian-axis-tick-value').evaluateAll(nodes=>nodes.filter(node=>{const rect=node.getBoundingClientRect(),svg=node.closest('svg').getBoundingClientRect();return rect.width>0 && rect.left<svg.left-1;}).map(node=>node.textContent));
     assert.deepEqual(clippedValueTicks,[],'Numeric axis labels must fit inside their chart');
     return {examples:exampleCount,states:7,selection:'keyboard comparison and series toggle',table:'pie data',sparse:'gaps and common scale',typography};
 }
