@@ -4,6 +4,8 @@ package primitive
 import (
 	"fmt"
 	"strings"
+
+	lookup "github.com/viant/forge/backend/lookup/contract"
 )
 
 const StarterTaskKind = "startertask"
@@ -11,16 +13,17 @@ const StarterTaskResourceName = "default"
 
 // StarterTask describes a suggested prompt for an empty chat.
 type StarterTask struct {
-	AgentID         string   `yaml:"agentId,omitempty" json:"agentId,omitempty"`
-	ID              string   `yaml:"id,omitempty" json:"id,omitempty"`
-	CategoryID      string   `yaml:"categoryId,omitempty" json:"categoryId,omitempty"`
-	Title           string   `yaml:"title,omitempty" json:"title,omitempty"`
-	Prompt          string   `yaml:"prompt,omitempty" json:"prompt,omitempty"`
-	Description     string   `yaml:"description,omitempty" json:"description,omitempty"`
-	ResultLabel     string   `yaml:"resultLabel,omitempty" json:"resultLabel,omitempty"`
-	Icon            string   `yaml:"icon,omitempty" json:"icon,omitempty"`
-	CoverageEvalIDs []string `yaml:"coverageEvalIds,omitempty" json:"coverageEvalIds,omitempty"`
-	Priority        int      `yaml:"priority,omitempty" json:"priority,omitempty"`
+	AgentID         string                    `yaml:"agentId,omitempty" json:"agentId,omitempty"`
+	ID              string                    `yaml:"id,omitempty" json:"id,omitempty"`
+	CategoryID      string                    `yaml:"categoryId,omitempty" json:"categoryId,omitempty"`
+	Title           string                    `yaml:"title,omitempty" json:"title,omitempty"`
+	Prompt          string                    `yaml:"prompt,omitempty" json:"prompt,omitempty"`
+	Description     string                    `yaml:"description,omitempty" json:"description,omitempty"`
+	ResultLabel     string                    `yaml:"resultLabel,omitempty" json:"resultLabel,omitempty"`
+	Icon            string                    `yaml:"icon,omitempty" json:"icon,omitempty"`
+	CoverageEvalIDs []string                  `yaml:"coverageEvalIds,omitempty" json:"coverageEvalIds,omitempty"`
+	Priority        int                       `yaml:"priority,omitempty" json:"priority,omitempty"`
+	LookupLibraries []lookup.LibraryReference `yaml:"lookupLibraries,omitempty" json:"lookupLibraries,omitempty"`
 }
 
 // StarterTaskCategory describes an optional grouping for starter tasks.
@@ -69,7 +72,7 @@ func (t StarterTask) Validate() error {
 	if !validStarterTaskID(t.ID) || strings.TrimSpace(t.Title) == "" || strings.TrimSpace(t.Prompt) == "" {
 		return fmt.Errorf("starter task requires an ID, title and prompt")
 	}
-	return nil
+	return lookup.ValidateLibraryReferences(t.LookupLibraries, true)
 }
 
 func validStarterTaskID(id string) bool {

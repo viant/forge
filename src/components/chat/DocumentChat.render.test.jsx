@@ -92,6 +92,41 @@ describe('document composer and task discovery', () => {
         }
     });
 
+    it('restores an admitted namespace task and blocks its stale draft', async () => {
+        const fingerprint = 'a'.repeat(64);
+        const task = {id: 'startertask://example/default#review', lookupFingerprint: fingerprint, title: 'Review an example', prompt: 'Review /record.'};
+        const Input = ({starterLookup, value, disabled}) => <textarea aria-label="Message" readOnly disabled={disabled}
+            data-starter={starterLookup?.id} data-fingerprint={starterLookup?.fingerprint} value={value}/>;
+        const context = {
+            identity: {windowId: 'example-starter'},
+            signals: {collection: signal([]), control: signal({}), selection: signal(null), message: signal('')},
+            handlers: {chat: {}},
+            Context: () => null,
+            lookupHandler: name => name === 'chat.renderFeed' ? () => null
+                : name === 'chat.resolveComposerProps' ? () => ({commandCenter: true, inputComponent: Input, starterTasks: [task]}) : undefined,
+        };
+        const chat = () => <Chat context={context} container={{chat: {appearance: 'document'}}}/>;
+        try {
+            await render(chat());
+            await click(host.querySelector('.forge-task-row'));
+            expect(host.querySelector('textarea').dataset.starter).toBe(task.id);
+            expect(host.querySelector('textarea').dataset.fingerprint).toBe(fingerprint);
+            expect(host.querySelector('textarea').value).toBe(task.prompt);
+            await render(null);
+            await render(chat());
+            expect(host.querySelector('textarea').value).toBe(task.prompt);
+            task.lookupFingerprint = 'b'.repeat(64);
+            await render(chat());
+            expect(host.querySelector('textarea').disabled).toBe(true);
+            expect(host.querySelector('[role="status"]').textContent).toContain('This task has changed');
+            await click(host.querySelector('.forge-task-back'));
+            expect(host.querySelector('textarea').disabled).toBe(false);
+            expect(new URLSearchParams(window.location.search).has('starterFingerprint')).toBe(false);
+        } finally {
+            window.history.replaceState(null, '', '/');
+        }
+    });
+
     it('groups real selector callbacks under Tools and returns focus on Escape', async () => {
         const agent = vi.fn(), model = vi.fn(), reasoning = vi.fn(), attach = vi.fn();
         await render(<Composer appearance="document" draftKey="a" showUpload onOpenAttach={attach}

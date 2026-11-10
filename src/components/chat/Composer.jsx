@@ -666,6 +666,7 @@ export default function Composer({
         if (disabled || inputInvalid || uploads.some(isUnresolvedUpload)) return; // Keep lookup validation authoritative
         const resolver = inputValueResolverRef.current;
         const resolvedValue = typeof resolver === 'function' ? resolver() : '';
+        if (resolvedValue === null) return;
         const content = String(resolvedValue || draftRef.current || '').trim();
         const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
         if (!content && !hasAttachments) return;

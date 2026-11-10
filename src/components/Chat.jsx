@@ -317,6 +317,10 @@ function attachmentConversationId(attachment = null) {
 }
 
 const COMPOSER_DRAFTS_KEY = 'forge.composerDrafts.v1';
+
+function starterDraftKey(id, fingerprint) {
+    return fingerprint ? `starter:${id}:${fingerprint}` : `starter:${id}`;
+}
 const COMPOSER_PREFILL_EVENT = 'forge:composer-prefill';
 
 function preserveDraftForConversation(conversationId = '', draft = '') {
@@ -696,7 +700,13 @@ export default function Chat({
     if (chatCfg.appearance && !documentAppearance) throw new Error(`Unsupported chat appearance: ${chatCfg.appearance}`);
     const [selectedStarter, setSelectedStarter] = useStarterSelection(documentAppearance ? conversationID : '');
     const [taskLibrary, setTaskLibrary] = useState(selectedStarter?.source.library || false);
-    const draftKey = conversationID || (selectedStarter ? `starter:${selectedStarter.id}` : '__pending__');
+    const selectedStarterTask = selectedStarter && starterTasks.find(task => task.id === selectedStarter.id);
+    const starterFingerprint = selectedStarter?.fingerprint || selectedStarterTask?.lookupFingerprint;
+    const staleStarter = !!starterFingerprint && selectedStarterTask?.lookupFingerprint !== starterFingerprint;
+    const starterLookup = starterFingerprint && !staleStarter
+        ? {id: selectedStarter.id, fingerprint: starterFingerprint, prompt: selectedStarterTask.prompt}
+        : null;
+    const draftKey = conversationID || (selectedStarter ? starterDraftKey(selectedStarter.id, starterFingerprint) : '__pending__');
     const [composerDraft, setComposerDraft] = useComposerDraft(draftKey);
 
     const backendConversationRunning = effectiveBackendConversationRunning(conversationSnapshot);
@@ -814,6 +824,7 @@ export default function Chat({
             toolNames,
             createdAt: new Date().toISOString(),
             attachments: pendingAttachments && pendingAttachments.length ? pendingAttachments : undefined,
+            ...(starterLookup ? {starterTask: {id: starterLookup.id, fingerprint: starterLookup.fingerprint}} : {}),
         };
 
         const serviceOwnsSubmit = !!events.onSubmit?.isDefined?.();
@@ -1086,7 +1097,7 @@ export default function Chat({
                     }}
                     onAbort={handleAbort}
                     showAbort={effectiveShowAbortWhileRunning}
-                    disabled={composerDisabled}
+                    disabled={composerDisabled || staleStarter}
                     attachments={pendingAttachments}
                     uploads={documentAppearance ? uploader.items.map(upload => upload.status === UploadStatus.DONE && !announcedDone.current.has(upload.id)
                         ? {...upload, status: UploadStatus.UPLOADING} : upload) : []}
@@ -1114,7 +1125,7 @@ export default function Chat({
                     reasoningValue={currentReasoning}
                     onReasoningChange={handleReasoningChange}
                     inputComponent={externalComposerProps?.inputComponent}
-                    inputProps={externalComposerProps?.inputProps}
+                    inputProps={starterLookup ? {...externalComposerProps?.inputProps, starterLookup} : externalComposerProps?.inputProps}
                     activeChips={activeChips}
                     onChipClear={(chip) => handleChipClear(chip)}
                 />
@@ -1131,7 +1142,7 @@ export default function Chat({
         >
 
             {documentAppearance && showStarterTasks ? <>
-                {selectedStarter ? <div className="forge-chat-task-back"><SharedButton className="forge-task-back" variant="link" {...typographyProps('small')} icon="lucide:arrow-left" onClick={() => setSelectedStarter(null)}>{selectedStarter.source.library ? 'All tasks' : 'New Chat'}</SharedButton></div> : null}
+                {selectedStarter ? <div className="forge-chat-task-back"><SharedButton className="forge-task-back" variant="link" {...typographyProps('small')} icon="lucide:arrow-left" onClick={() => setSelectedStarter(null)}>{selectedStarter.source.library ? 'All tasks' : 'New Chat'}</SharedButton>{staleStarter ? <p role="status">This task has changed or is unavailable. Return to the task list to reopen it.</p> : null}</div> : null}
                 <Typography className="forge-chat-welcome" as="h1" typeRole="display">Start a new conversation</Typography>
             </> : null}
             {/* Optional toolbar */}
@@ -1172,10 +1183,11 @@ export default function Chat({
                     const assignedAgent = String(task.agentId || '').trim();
                     if (assignedAgent) handleAgentChange(assignedAgent);
                     const prompt = chatService.resolveStarterPrompt?.(task.prompt) || String(task.prompt || '');
-                    setSelectedStarter({id: task.id, source});
+                    setSelectedStarter({id: task.id, source, fingerprint: task.lookupFingerprint});
                     try {
                         const raw = JSON.parse(sessionStorage.getItem(COMPOSER_DRAFTS_KEY) || '{}');
-                        if (raw[`starter:${task.id}`] === undefined) raw[`starter:${task.id}`] = prompt;
+                        const key = starterDraftKey(task.id, task.lookupFingerprint);
+                        if (raw[key] === undefined) raw[key] = prompt;
                         sessionStorage.setItem(COMPOSER_DRAFTS_KEY, JSON.stringify(raw));
                     } catch {}
                     requestAnimationFrame(() => chatRootRef.current?.querySelector('[data-testid="chat-composer-input"]')?.focus({preventScroll: true}));
