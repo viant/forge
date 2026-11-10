@@ -34,8 +34,10 @@ jobs:
         with:
           go-version-file: forge/go.mod
           cache-dependency-path: forge/go.sum
-      - run: go test ./backend/types ./backend/reporting/spec ./backend/reporting/fill ./backend/reporting/materializer ./backend/reporting/export/pdf
+      - run: go test ./backend/authoring/schema ./backend/types ./backend/reporting/spec ./backend/reporting/fill ./backend/reporting/materializer ./backend/reporting/export/pdf
       - run: npm ci
+      - name: Verify canonical authoring schema exports
+        run: node --no-warnings backend/authoring/schema/generate.mjs --check
       - run: npx playwright install --with-deps chromium
       - run: node --no-warnings src/components/Chart.test.js && node --no-warnings src/components/dashboard/reportBuilderUtils.test.js
       - run: npm run test:schema-form-layout
