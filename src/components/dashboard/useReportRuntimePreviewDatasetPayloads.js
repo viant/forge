@@ -1,4 +1,5 @@
 import React from "react";
+import {reportDatasetReadContextIdentity} from "./reportBuilderConcurrentRead.js";
 import {scheduleReportDataset} from './reportDatasetScheduler.js';
 
 import { isDeferredCacheHitEnvelope } from "../../reporting/dataEnvelopeModel.js";
@@ -407,6 +408,7 @@ export function useReportRuntimePreviewDatasetPayloads({
   requestKey = "",
   fetcherOptions = null,
   retainResolvedRequests = false,
+  retentionScopeKey = "",
 } = {}) {
   const [state, setState] = React.useState(buildIdleReportRuntimePreviewDatasetPayloadState);
   const [progress, setProgress] = React.useState(null);
@@ -423,6 +425,13 @@ export function useReportRuntimePreviewDatasetPayloads({
   // exact request. Keep only a few results within this component's lifetime;
   // manual refresh and scope changes produce different request keys.
   const resolvedRequestsRef = React.useRef(new Map());
+  const retainedScopeRef = React.useRef(null);
+  const retentionIdentity = JSON.stringify([retentionScopeKey, fetcherOptions?.concurrentRequestScope,
+    reportDatasetReadContextIdentity(builderContext), builderContext?.identity?.actorRef]);
+  const retentionTransport = builderContext?.handlers?.reportBuilderPreview?.fetchByRef;
+  const datasetIdentities = new Map((Array.isArray(datasets) ? datasets : []).map(dataset => [dataset.id, JSON.stringify([
+    dataset.id, dataset.dataSourceRef, dataset.request, dataset.resultContract, dataset.source, dataset.capabilities,
+  ])]));
   React.useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -458,15 +467,27 @@ export function useReportRuntimePreviewDatasetPayloads({
       setProgress(null);
       return undefined;
     }
+    const scope = retainedScopeRef.current;
+    const scopeChanged = !scope || scope.identity !== retentionIdentity || scope.owner !== builderContextRef.current || scope.transport !== retentionTransport;
+    if (scopeChanged) {
+      resolvedRequestsRef.current.clear();
+      retainedScopeRef.current = {identity: retentionIdentity, owner: builderContextRef.current, transport: retentionTransport};
+    }
+    let compatible;
     if (retainResolvedRequests) {
-      const previous = resolvedRequestsRef.current.get(normalizedRequestKey);
-      if (previous?.freshResultRequestKey === normalizedRequestKey) {
+      const retained = resolvedRequestsRef.current;
+      compatible = [...retained.values()].at(-1);
+      const exact = retained.get(normalizedRequestKey);
+      const matched = exact || (retentionScopeKey ? [...retained.values()].reverse().find(entry =>
+        [...datasetIdentities].every(([id, identity]) => entry.identities.get(id) === identity)) : null);
+      if (matched?.state?.freshResultRequestKey) {
+        const previous = {...matched.state, requestKey: normalizedRequestKey, freshResultRequestKey: normalizedRequestKey};
         if (stateRef.current.requestKey !== normalizedRequestKey || stateRef.current.loading) setState(previous);
         setProgress(null);
         return undefined;
       }
     }
-    if (!shouldStartReportRuntimePreviewDatasetFetch({
+    if (!scopeChanged && !shouldStartReportRuntimePreviewDatasetFetch({
       state: stateRef.current,
       requestKey: normalizedRequestKey,
       activeRequestKey: activeRequestKeyRef.current,
@@ -502,9 +523,16 @@ export function useReportRuntimePreviewDatasetPayloads({
       applyState: (nextState) => {
         if (shouldContinue()) {
           if (retainResolvedRequests && nextState?.freshResultRequestKey === normalizedRequestKey && !nextState.error) {
+            if (retentionScopeKey && compatible) {
+              nextState = {...nextState,
+                payloads: {...compatible.state.payloads, ...nextState.payloads},
+                freshDatasetIds: [...new Set([...compatible.state.freshDatasetIds, ...nextState.freshDatasetIds])],
+              };
+            }
             const retained = resolvedRequestsRef.current;
             retained.delete(normalizedRequestKey);
-            retained.set(normalizedRequestKey, {...nextState,payloads:cloneValue(nextState.payloads)});
+            retained.set(normalizedRequestKey, {state:{...nextState,payloads:cloneValue(nextState.payloads)},
+              identities:new Map([...(compatible?.identities || []),...datasetIdentities])});
             if (retained.size > 8) retained.delete(retained.keys().next().value);
           }
           setState(nextState);
@@ -531,7 +559,7 @@ export function useReportRuntimePreviewDatasetPayloads({
         activeRequestKeyRef.current = "";
       }
     };
-  }, [enabled, normalizedRequestKey, retainResolvedRequests]);
+  }, [enabled, normalizedRequestKey, retainResolvedRequests, retentionIdentity, builderContext, retentionTransport]);
 
   return React.useMemo(() => ({...state, progress: state.loading ? progress : null}), [state, progress]);
 }

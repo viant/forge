@@ -1,3 +1,4 @@
+import {buildRuntimeSections} from '../../reporting/reportSections.js';
 const name = value => String(value || '').trim();
 const ids = value => Array.isArray(value) ? value.map(name).filter(Boolean) : [];
 
@@ -49,3 +50,10 @@ export function reportRuntimeSectionDatasets(document, reportSpec, requestedSect
 }
 import {getReportBlockDatasetRefs} from '../../reporting/reportDatasetRefModel.js';
 
+
+// Navigation is metadata, independent of whether a dataset completed. Keep the
+// declared rail available when the existing execution state displays an error.
+export function reportRuntimeSectionNavigation(document) {
+  return buildRuntimeSections(Array.isArray(document?.blocks) ? document.blocks : [])
+    .map(section => ({id:section.id,label:section.navigationLabel}));
+}

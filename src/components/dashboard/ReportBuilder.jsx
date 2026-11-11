@@ -33,7 +33,7 @@ import { useSignals } from "@preact/signals-react/runtime";
 
 import Chart from "../Chart.jsx";
 import { useDataSourceState } from "../../hooks/useDataSourceState.js";
-import { reportRuntimeSectionDatasets } from "./reportRuntimeSectionDatasets.js";
+import { reportRuntimeSectionDatasets, reportRuntimeSectionNavigation } from "./reportRuntimeSectionDatasets.js";
 import {
     resolveReportBuilderDefinitionDataSourceRef,
     resolveReportBuilderDefinitionInitialization,
@@ -10277,13 +10277,11 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         hydrateRows: hydrateRuntimePreviewRows,
     });
     const runtimePreviewRowsState = frozenRestore ? {...fetchedRuntimePreviewRowsState, rows:frozenRestore.payloads.primary?.rows || [], hasMore:false, error:null, loading:false, requestKey:runtimePreviewRequestKey, freshResultRequestKey:runtimePreviewRequestKey} : fetchedRuntimePreviewRowsState;
-    const runtimePreviewPublishedDatasets = useMemo(() => {
+    const runtimePreviewAllPublishedDatasets = useMemo(() => {
         if (frozenRestore) return frozenRestore.datasets.map(dataset => ({...dataset, completedRequest:dataset.request}));
         const datasets = Array.isArray(authoredRuntimePreviewModel?.reportSpec?.datasets)
             ? authoredRuntimePreviewModel.reportSpec.datasets
             : [];
-        const selectedIds = runtimePreviewSectionSelection ? new Set(runtimePreviewSectionSelection.datasetIds) : null;
-        const primaryId = String(runtimePreviewPrimaryDataset?.id || "primary").trim();
         const staticDatasetIds = new Set(
             authoredRuntimePreviewModel?.staticDatasetPayloads && typeof authoredRuntimePreviewModel.staticDatasetPayloads === "object" && !Array.isArray(authoredRuntimePreviewModel.staticDatasetPayloads)
                 ? Object.keys(authoredRuntimePreviewModel.staticDatasetPayloads).map((datasetId) => normalizeString(datasetId)).filter(Boolean)
@@ -10292,8 +10290,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         return datasets
             .filter((dataset) => {
                 const datasetId = normalizeString(dataset?.id);
-                return datasetId && !staticDatasetIds.has(datasetId)
-                    && (!selectedIds || selectedIds.has(datasetId) && datasetId !== primaryId);
+                return datasetId && !staticDatasetIds.has(datasetId);
             })
             .map((dataset) => {
                 const canonicalRequest = dataset?.request && typeof dataset.request === "object" && !Array.isArray(dataset.request)
@@ -10317,8 +10314,16 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                 };
             })
             .filter((dataset) => dataset.id && dataset.dataSourceRef && dataset.request);
-    }, [frozenRestore, authoredDatasetOptionIndex, authoredRuntimePreviewModel?.reportSpec?.datasets, authoredRuntimePreviewModel?.staticDatasetPayloads, builderContext, displayConfig, runtimePreviewPrimaryDataset?.id, runtimePreviewSectionSelection, state]);
+    }, [frozenRestore, authoredDatasetOptionIndex, authoredRuntimePreviewModel?.reportSpec?.datasets, authoredRuntimePreviewModel?.staticDatasetPayloads, builderContext, displayConfig, state]);
+    const runtimePreviewPublishedDatasets = useMemo(() => {
+        if (frozenRestore || !runtimePreviewSectionSelection) return runtimePreviewAllPublishedDatasets;
+        const ids = new Set(runtimePreviewSectionSelection.datasetIds);
+        return runtimePreviewAllPublishedDatasets.filter(dataset => ids.has(dataset.id) && dataset.id !== runtimePreviewPrimaryDataset?.id);
+    }, [frozenRestore, runtimePreviewAllPublishedDatasets, runtimePreviewSectionSelection, runtimePreviewPrimaryDataset?.id]);
     const runtimePreviewPublishedContextKey = JSON.stringify(reportDatasetReadContextIdentity(builderContext));
+    const runtimePreviewRetentionScopeKey = useMemo(() => JSON.stringify({datasets:runtimePreviewAllPublishedDatasets,
+        manualRunSequence,recovery:runtimePreviewRecoveryToken,extract:runtimePreviewExtractConfigFingerprint,context:runtimePreviewPublishedContextKey}),
+        [runtimePreviewAllPublishedDatasets,manualRunSequence,runtimePreviewRecoveryToken,runtimePreviewExtractConfigFingerprint,runtimePreviewPublishedContextKey]);
     const runtimePreviewPublishedDatasetsRequestKey = useMemo(() => JSON.stringify({
         datasets: runtimePreviewPublishedDatasets,
         manualRunSequence,
@@ -10352,6 +10357,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         datasets: runtimePreviewPublishedDatasets,
         requestKey: runtimePreviewPublishedDatasetsRequestKey,
         retainResolvedRequests: !!runtimePreviewSectionSelection,
+        retentionScopeKey: runtimePreviewRetentionScopeKey,
         fetcherOptions: {
             preferDataSourceRoute: true,
             concurrentRequestScope: runtimePreviewRequestKey,
@@ -20672,6 +20678,11 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                     <div className="forge-report-builder__result-meta" aria-label="Active report filters">
                         <span className="forge-report-builder__result-meta-chip">{requiredFilterSummary.text}</span>
                     </div>
+                ) : null}
+                {!previewStateForDisplay.canRenderRuntime && runtimePreviewSectionSelection ? (
+                    <SectionTabRail items={reportRuntimeSectionNavigation(authoredRuntimePreviewModel?.document)}
+                        selectedId={activeRuntimeSectionId ?? runtimePreviewSectionSelection.sectionId}
+                        onChange={setActiveRuntimeSectionId} ariaLabel="Report sections" />
                 ) : null}
                 {previewStateForDisplay.loadingState ? (
                     <ReportBuilderResultState
