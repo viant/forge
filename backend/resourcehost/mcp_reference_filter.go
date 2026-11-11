@@ -41,6 +41,10 @@ func (r *MCPReferenceReader) filteredMCPRows(ctx context.Context, root Connectio
 		// cohort contributes no MCP definitions; do not contact its producer or
 		// let its absence abort unrelated retained tool resolution.
 		if _, err = source.source.AdmissionKey(ctx); err != nil {
+			if purePublishedUnavailable(err) {
+				markMCPReferenceFailure(ctx, "published_admission", "unavailable", err)
+				return nil, true, g.final(ctx, actor)
+			}
 			if purePublishedDenial(err) {
 				return nil, true, g.final(ctx, actor)
 			}

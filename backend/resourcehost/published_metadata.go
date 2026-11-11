@@ -337,9 +337,27 @@ func (g *Gateway) listPublished(ctx context.Context, source publishedMetadataReg
 func (g *Gateway) publishedAdmissionKeys(ctx context.Context) (string, error) {
 	keys := []string{}
 	for _, source := range g.publishedRegistrations() {
+		// An explicitly scoped catalog must not depend on unrelated producers'
+		// admission or availability. Use the same trusted roots as discovery/load.
+		if roots, scoped := ctx.Value(catalogRootsKey{}).([]Connection); scoped {
+			selected := false
+			for _, root := range roots {
+				if source.matchesName(root.Name) {
+					selected = true
+					break
+				}
+			}
+			if !selected {
+				continue
+			}
+		}
 		key, err := source.source.AdmissionKey(ctx)
 		if ctx.Err() != nil {
 			return "", ctx.Err()
+		}
+		if _, scoped := ctx.Value(catalogRootsKey{}).([]Connection); !scoped && purePublishedUnavailable(err) {
+			keys = append(keys, source.connection.Name+"\x00unavailable")
+			continue
 		}
 		if purePublishedDenial(err) {
 			// Denied providers contribute no catalog entries. Record the state so
@@ -419,4 +437,22 @@ func (g *Gateway) publishedCanonicalNameLocked(name string) string {
 		}
 	}
 	return name
+}
+
+// Only a typed unavailable dependency is optional in aggregate discovery.
+// Explicit reads and scoped catalogs retain the original error and cause.
+func purePublishedUnavailable(err error) bool {
+	unavailable := false
+	for current := err; current != nil; current = errors.Unwrap(current) {
+		if _, joined := current.(interface{ Unwrap() []error }); joined {
+			return false
+		}
+		if current == context.Canceled || current == context.DeadlineExceeded || current == identity.ErrInvalid || current == identity.ErrResourceStale || current == identity.ErrResource {
+			return false
+		}
+		if errors.Is(current, ErrUnavailable) {
+			unavailable = true
+		}
+	}
+	return unavailable
 }

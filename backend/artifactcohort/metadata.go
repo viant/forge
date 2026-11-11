@@ -10,6 +10,7 @@ import (
 
 	primitive "github.com/viant/forge/backend/provider/contract"
 	identity "github.com/viant/forge/backend/resource"
+	producer "github.com/viant/forge/backend/resourcehost/producer"
 )
 
 // MetadataSource projects only the locally admitted, producer-closed artifacts.
@@ -290,7 +291,17 @@ type metadataDenied struct{ error }
 
 func (e metadataDenied) Unwrap() error     { return e.error }
 func (metadataDenied) HTTPStatusCode() int { return 403 }
+
+type metadataUnavailable struct{ error }
+
+func (e metadataUnavailable) Unwrap() error      { return e.error }
+func (metadataUnavailable) HTTPStatusCode() int  { return 503 }
+func (metadataUnavailable) Is(target error) bool { return target == producer.ErrUnavailable }
+
 func metadataAdmissionError(err error) error {
+	if err == ErrUnavailable {
+		return metadataUnavailable{err}
+	}
 	if errors.Is(err, ErrDenied) {
 		return metadataDenied{err}
 	}
