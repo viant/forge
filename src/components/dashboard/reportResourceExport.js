@@ -1,3 +1,4 @@
+import {sanitizeFilenameSegment} from "./reportBuilderExportLifecycle.js";
 import {buildReportResourceRunRequest} from "./reportBuilderResourceLifecycle.js";
 
 export async function exportSelectedReport({pin, parameters, format, tableBlockId, services, isCurrent, wait = ms => new Promise(resolve => setTimeout(resolve, ms))}) {
@@ -34,6 +35,25 @@ export function validateReportArtifact(artifact,format) {
     if(!['pdf','csv','xlsx'].includes(format)||artifact?.format!==format)throw Error('The export provider returned a different file format.');
     if(artifact.incompleteDatasetIds?.length)throw Error('The export is incomplete. Narrow the filters and try again.');
     return decodeReportArtifact(artifact);
+}
+
+// Prepare the name once before choosing browser or host delivery. Explicit
+// producer names remain authoritative; report.xlsx is the generated fallback.
+export function withReportArtifactFilename(artifact, format, title = '') {
+    if (format !== 'xlsx' || !artifact || typeof artifact !== 'object') return artifact;
+    const explicit = [artifact.filename, artifact.fileName].find(name => typeof name === 'string' && name.trim() && name.trim().toLowerCase() !== 'report.xlsx');
+    if (explicit) return !artifact.filename || artifact.filename === explicit ? artifact : {...artifact, filename: explicit};
+    const base = sanitizeFilenameSegment(title).replace(/^[ .]+|[ .]+$/g, '') || 'Report';
+    let name = '', byteLength = 0;
+    // Filesystem limits apply to UTF-8 bytes, not JavaScript string length.
+    for (const character of base) {
+        const point = character.codePointAt(0);
+        const bytes = point <= 0x7f ? 1 : point <= 0x7ff ? 2 : point <= 0xffff ? 3 : 4;
+        if (byteLength + bytes > 180) break;
+        name += character;
+        byteLength += bytes;
+    }
+    return {...artifact, filename: `${name}_${new Date().toISOString().slice(0, 10)}.xlsx`};
 }
 
 export function downloadReportArtifact(artifact,format) {

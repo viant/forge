@@ -137,3 +137,43 @@ it('retains the ordinary browser download for an omitted host callback',async()=
  const v=await mount({onExport:async()=>artifact('csv'),onDownload:null});
  try{await act(async()=>v.button('Export CSV').click());expect(v.click).toHaveBeenCalledOnce();}finally{await v.close()}
 });
+
+it('names browser XLSX fallback downloads with the current report title and UTC export date',async()=>{
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-10T20:00:00-07:00'));
+ const value={...artifact('xlsx'),filename:undefined},run=vi.fn(async()=>value),v=await mount({title:'Performance Overview',onExport:run,workbookExport:true});
+ try{
+  await act(async()=>v.output.exportReport('xlsx'));
+  expect(v.click.mock.contexts[0].download).toBe('Performance Overview_2026-11-11.xlsx');
+  expect(run).toHaveBeenCalledOnce();expect(value.filename).toBeUndefined();
+ }finally{await v.close();vi.useRealTimers()}
+});
+it('passes the same descriptive XLSX fallback to host downloads without changing bytes',async()=>{
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-11T03:00:00Z'));
+ const value=artifact('xlsx'),download=vi.fn(),v=await mount({title:'Équipe / "Quarter"\r\nnotes',onExport:async()=>value,onDownload:download});
+ try{
+  for(let index=0;index<2;index++)await act(async()=>v.output.exportReport('xlsx'));
+  expect(download).toHaveBeenCalledTimes(2);
+  for(const [delivered] of download.mock.calls){expect(delivered.filename).toBe('Équipe - -Quarter-notes_2026-11-11.xlsx');expect(delivered.data).toBe(value.data)}
+  expect(value.filename).toBe('report.xlsx');
+ }finally{await v.close();vi.useRealTimers()}
+});
+it('preserves authored XLSX filename aliases for both browser and host delivery',async()=>{
+ for(const field of ['filename','fileName'])for(const hosted of [false,true]){
+  const value={...artifact('xlsx'),filename:undefined,[field]:'Authored workbook.xlsx'},download=hosted?vi.fn():undefined;
+  const v=await mount({title:'Performance Overview',onExport:async()=>value,onDownload:download});
+  try{await act(async()=>v.output.exportReport('xlsx'));if(hosted)expect(download.mock.calls[0][0]).toBe(value);else expect(v.click.mock.contexts[0].download).toBe('Authored workbook.xlsx');}finally{await v.close()}
+ }
+});
+it('uses a safe report fallback when the XLSX title is blank',async()=>{
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-11T03:00:00Z'));
+ const download=vi.fn(),v=await mount({title:' . ',onExport:async()=>artifact('xlsx'),onDownload:download});
+ try{await act(async()=>v.output.exportReport('xlsx'));expect(download.mock.calls[0][0].filename).toBe('Report_2026-11-11.xlsx');}finally{await v.close();vi.useRealTimers()}
+});
+it('keeps long Unicode XLSX suggestions bounded and safe for host resource URIs',async()=>{
+ const download=vi.fn(),v=await mount({title:'日本😀'.repeat(100),onExport:async()=>({...artifact('xlsx'),filename:'report.xlsx',fileName:''}),onDownload:download});
+ try{await act(async()=>v.output.exportReport('xlsx'));const name=download.mock.calls[0][0].filename;expect(new TextEncoder().encode(name).length).toBeLessThanOrEqual(196);expect(()=>encodeURIComponent(name)).not.toThrow();expect(name.startsWith('日本😀')).toBe(true);}finally{await v.close()}
+});
+it('retains an authored filename alias even when the other field is a generic fallback',async()=>{
+ const download=vi.fn(),v=await mount({title:'Performance Overview',onExport:async()=>({...artifact('xlsx'),fileName:'Authored workbook.xlsx'}),onDownload:download});
+ try{await act(async()=>v.output.exportReport('xlsx'));expect(download.mock.calls[0][0].filename).toBe('Authored workbook.xlsx');}finally{await v.close()}
+});

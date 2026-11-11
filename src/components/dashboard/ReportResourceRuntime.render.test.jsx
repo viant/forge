@@ -690,3 +690,18 @@ it('reads visible content only from the completed mounted window without executi
     }
     await expect(read()).rejects.toThrow('report surface not found');
 });
+
+it('uses the completed report title for a queued XLSX fallback without extra report reads',async()=>{
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-11T03:00:00Z'));
+ const create=URL.createObjectURL,revoke=URL.revokeObjectURL;URL.createObjectURL=vi.fn(()=> 'blob:report-export');URL.revokeObjectURL=vi.fn();
+ const click=vi.spyOn(HTMLAnchorElement.prototype,'click').mockImplementation(()=>{});
+ const run=vi.fn().mockResolvedValue(result(pin,'Performance Overview'));
+ const view=await mount(run,{executeOnOpen:true,reportCapabilities:{run:true,export:true,workbookExport:true}});
+ const submitResource=vi.fn().mockResolvedValue({jobId:'xlsx-export'}),getStatus=vi.fn().mockResolvedValue({status:'succeeded',artifactId:'xlsx-artifact'}),getArtifact=vi.fn().mockResolvedValue({jobId:'xlsx-export',artifactId:'xlsx-artifact',artifactRef:pin.uri,format:'xlsx',data:btoa('synthetic transport bytes')});
+ view.handlers.reportExport={submitResource,getStatus,getArtifact};
+ try{
+  await act(async()=>button(view,'Export XLSX').click());
+  expect(click.mock.contexts[0].download).toBe('Performance Overview_2026-11-11.xlsx');
+  expect(run).toHaveBeenCalledOnce();expect(submitResource).toHaveBeenCalledOnce();expect(getStatus).toHaveBeenCalledOnce();expect(getArtifact).toHaveBeenCalledOnce();
+ }finally{await view.close();URL.createObjectURL=create;URL.revokeObjectURL=revoke;click.mockRestore();vi.useRealTimers()}
+});

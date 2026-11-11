@@ -1,9 +1,10 @@
 import {useEffect, useRef, useState} from "react";
-import {downloadReportArtifact,validateReportArtifact} from "./reportResourceExport.js";
+import {downloadReportArtifact,validateReportArtifact,withReportArtifactFilename} from "./reportResourceExport.js";
 
 // One output belongs to the currently displayed report/scope. Hosts supply the
 // transport; this hook owns cancellation, stale settlement and print visibility.
-export function useReportOutput({scopeKey, disabled=false, onExport, onPrint, onDownload}) {
+// Title is already-present display metadata used only for an unnamed XLSX download.
+export function useReportOutput({scopeKey, title='', disabled=false, onExport, onPrint, onDownload}) {
     const callbacks = useRef({onExport,onPrint,onDownload}); callbacks.current = {onExport,onPrint,onDownload};
     const owner = useRef(null);
     const rendered=useRef({scopeKey,disabled});rendered.current={scopeKey,disabled};
@@ -26,12 +27,13 @@ export function useReportOutput({scopeKey, disabled=false, onExport, onPrint, on
                 if(value?.kind!=='reportPrint'||!Array.isArray(value.pages)||!value.pageGeometry)throw Error('The provider did not return a canonical print layout.');
                 setState({scopeKey,printModel:value});
             }else{
+                const artifact=withReportArtifactFilename(value,format,title);
                 const download=callbacks.current.onDownload;
-                if(download==null)downloadReportArtifact(value,format);
+                if(download==null)downloadReportArtifact(artifact,format);
                 else{
-                    validateReportArtifact(value,format);
+                    validateReportArtifact(artifact,format);
                     if(typeof download!=='function')throw Error('Report download is unavailable.');
-                    await download(value,format,{signal:operation.controller.signal,isCurrent});
+                    await download(artifact,format,{signal:operation.controller.signal,isCurrent});
                 }
                 if(!isCurrent())return {status:'cancelled'};
                 setState({scopeKey});

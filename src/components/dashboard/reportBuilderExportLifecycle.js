@@ -6,8 +6,8 @@ function cloneValue(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
 }
 
-function sanitizeFilenameSegment(value = "") {
-    return normalizeString(value).replace(/[\\/:*?"<>|]+/g, "-");
+export function sanitizeFilenameSegment(value = "") {
+    return normalizeString(value).replace(/[\\/:*?"<>|\u0000-\u001f\u007f]+/g, "-");
 }
 
 function normalizeDiagnostics(values = []) {

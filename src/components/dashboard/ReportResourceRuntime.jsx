@@ -162,7 +162,7 @@ export default function ReportResourceRuntime({container, context, onViewStateCh
     // A manual rerun can keep the same parameters. Its output still belongs to
     // a new execution, so a pending print/export from the older run must expire.
     const outputScopeKey = JSON.stringify([identity, metadataIdentity, runResult?.version]);
-    const output = useReportOutput({scopeKey:outputScopeKey,disabled:!canExport||!runResult||!!progress||unexportedMetricSelection,
+    const output = useReportOutput({scopeKey:outputScopeKey,title:displayedTitle,disabled:!canExport||!runResult||!!progress||unexportedMetricSelection,
         onExport:async({format,tableBlockId,isCurrent})=>{
             const refreshed=await outputActionPin(runResult.request.resolvedResource,isCurrent);
             if(!refreshed||!isCurrent())return null;
