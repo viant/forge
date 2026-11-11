@@ -1134,9 +1134,9 @@ const publicReportFailureState = buildReportBuilderAuthoredRuntimePreviewState({
     }],
     presentationMode: "report",
 });
-assert.equal(publicReportFailureState.errorState?.description, "The latest report data could not be prepared for the current authorized scope. Review the report filters and try again.");
+assert.equal(publicReportFailureState.errorState?.description, "unsupported report option");
 assert.equal(publicReportFailureState.errorState?.diagnostics, undefined);
-assert.doesNotMatch(JSON.stringify(publicReportFailureState.errorState), /unsupported report option|runtimePreviewDatasetFetchFailed/);
+assert.doesNotMatch(JSON.stringify(publicReportFailureState.errorState), /"status"|runtimePreviewDatasetFetchFailed/);
 
 assert.deepEqual(buildReportBuilderAuthoredRuntimePreviewState({
     runtimePreviewEnabled: true,

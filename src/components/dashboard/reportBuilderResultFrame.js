@@ -2,6 +2,7 @@ import { resolvePreferredReportBuilderSemanticBindingViewState } from "./reportB
 import { buildReportBuilderScopeSummaryFromParams } from "./reportBuilderDocumentBlocks.js";
 import { resolveNormalizedReportSpecDocumentContext } from "./reportBuilderSavedRecordMetadataContext.js";
 import { hasReportBuilderSemanticModelResolutionDiagnostics } from "./reportBuilderSemantic.js";
+import { normalizeReportBuilderErrorText } from "./reportBuilderErrorText.js";
 
 export function resolveReportBuilderActiveResultState({
     loading = false,
@@ -387,7 +388,7 @@ export function buildReportBuilderAuthoredRuntimePreviewState({
                 eyebrow: reportPresentation ? "Report" : "Runtime preview",
                 title: reportPresentation ? "We couldn't prepare this report" : "We couldn't compile these runtime results",
                 description: reportPresentation
-                    ? "The latest report data could not be prepared for the current authorized scope. Review the report filters and try again."
+                    ? normalizeReportBuilderErrorText(error) || "The report could not be prepared. Try again."
                     : String(runtimePreviewErrorDescription || "").trim(),
                 ...(
                     String(readinessAction || "").trim() === "retrySemanticModelLoad"

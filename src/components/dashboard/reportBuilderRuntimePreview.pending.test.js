@@ -40,4 +40,7 @@ for(const payload of [{rows:[],hasMore:true},{rows:[],diagnostics:[{severity:'wa
  assert.ok(rejected.error);assert.equal(rejected.reportFill,undefined);assert.equal(rejected.reportPrint,undefined);assert.equal(rejected.exportRequest,undefined);
  const rejectedState=buildReportBuilderAuthoredRuntimePreviewState({runtimePreviewEnabled:true,canRunReport:true,runtimePreviewArtifact:rejected,runtimePreviewErrorDescription:'Completed result could not be materialized. Retry the data source.'});
  assert.ok(rejectedState.errorState);assert.equal(rejectedState.canRenderRuntime,false);assert.equal(rejectedState.loadingState,null);
+ const reportState=buildReportBuilderAuthoredRuntimePreviewState({runtimePreviewEnabled:true,canRunReport:true,runtimePreviewArtifact:rejected,presentationMode:'report'});
+ assert.match(reportState.errorState.description,/requires complete empty dataset/,'report presentation must retain the materialization failure cause');
+ assert.doesNotMatch(reportState.errorState.description,/authorized scope/);
 }
