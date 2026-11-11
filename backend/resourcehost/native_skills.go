@@ -158,6 +158,10 @@ func (s *NativeSkillSource) CatalogScope(ctx context.Context, conversation strin
 				if ctx.Err() != nil {
 					return "", false, ctx.Err()
 				}
+				if aggregateLinkRequired(contactErr) {
+					parts = append(parts, name, "unlinked")
+					continue
+				}
 				if optionalSkillProviderContact(contactErr) {
 					cacheable = false
 					parts = append(parts, name, "unavailable")
@@ -168,9 +172,8 @@ func (s *NativeSkillSource) CatalogScope(ctx context.Context, conversation strin
 		}
 		scope, reusable, scopeErr := s.Gateway.Manager.CatalogScope(ctx, metadataScope, []string{name})
 		if aggregateLinkRequired(scopeErr) {
-			// Optional metadata discovery cannot require linking. Do not cache
-			// this partial snapshot across a later credential-state change.
-			cacheable = false
+			// Unlinked is a known credential state. A later linked credential
+			// replaces this scope marker, invalidating the existing snapshot.
 			parts = append(parts, name, "unlinked")
 			continue
 		}

@@ -62,7 +62,7 @@ func TestNativeSkillScopeHonorsParticipantsAndSkipsOnlyOptionalLink(t *testing.T
 				return
 			}
 			require.NoError(t, err)
-			require.False(t, reusable, "partial metadata must not cache across a credential-state change")
+			require.True(t, reusable, "known unlinked state remains reusable until the credential scope changes")
 			_, err = source.Get(context.Background(), "skill-catalog", "optional")
 			require.ErrorIs(t, err, missing, "explicit selected-provider use must still require credentials")
 			linked = true
