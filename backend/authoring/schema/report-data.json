@@ -1,0 +1,72 @@
+{
+  "$id": "report://schema/report-data/v2",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "scope",
+    "id",
+    "reportRef",
+    "sequence",
+    "format",
+    "mode",
+    "data"
+  ],
+  "properties": {
+    "version": {
+      "const": 2
+    },
+    "scope": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "reportRef": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "format": {
+      "enum": [
+        "json",
+        "csv"
+      ]
+    },
+    "mode": {
+      "enum": [
+        "replace",
+        "append",
+        "patch"
+      ]
+    },
+    "data": {}
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "format": {
+            "const": "csv"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  ]
+}

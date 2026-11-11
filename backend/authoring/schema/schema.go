@@ -16,7 +16,7 @@ import (
 )
 
 //go:generate node generate.mjs
-//go:embed report-spec.json window.json
+//go:embed report-spec.json window.json report-transaction.json report-data.json
 var documents embed.FS
 
 var ErrSelection = errors.New("invalid authoring schema selection")
@@ -43,7 +43,7 @@ type document struct {
 	computations int
 }
 
-var canonical = map[string]*document{"forge:report-spec": {}, "forge:window": {}}
+var canonical = map[string]*document{"forge:report-spec": {}, "forge:window": {}, "forge:report-transaction": {}, "forge:report-data": {}}
 
 func load(reference string) (*document, error) {
 	entry, ok := canonical[reference]

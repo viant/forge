@@ -51,7 +51,7 @@ func TestProcessSchemasPreparedOnceAcrossConcurrentReads(t *testing.T) {
 		wait.Add(1)
 		go func() {
 			defer wait.Done()
-			for _, ref := range []string{"forge:report-spec", "forge:window"} {
+			for _, ref := range []string{"forge:report-spec", "forge:window", "forge:report-transaction", "forge:report-data"} {
 				if _, err := Compact(ref); err != nil {
 					t.Error(err)
 				}
