@@ -17,6 +17,9 @@ function reachableDefinitions(schema) {
   Object.values(value).forEach(visit);
  };
  visit(output);
+ // Retain the explicitly published envelope selection as well as the complete
+ // contract. Both use the same owning field definitions.
+ if(definitions.transactionEnvelope) visit({$ref:'#/$defs/transactionEnvelope'});
  output.$defs=Object.fromEntries([...used].sort().map(name=>[name,definitions[name]]));
  return output;
 }

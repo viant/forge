@@ -12496,6 +12496,195 @@
           "type": "string"
         }
       }
+    },
+    "transactionEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Partial guidance: progressive transaction envelope only. Use the selected block or field fragments for complete merged block state; native assembly owns patch semantics and final validation.",
+      "required": [
+        "version",
+        "scope",
+        "id",
+        "sequence",
+        "mode"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._-]+$"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._-]+$"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "mode": {
+          "enum": [
+            "start",
+            "append",
+            "patch",
+            "replace",
+            "commit"
+          ]
+        },
+        "grammar": {
+          "const": "report-document-v1"
+        },
+        "title": {
+          "type": "string"
+        },
+        "subtitle": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "viewer": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "allowChartTableSwitch": {
+              "type": "boolean"
+            },
+            "appearance": {
+              "enum": [
+                "document"
+              ]
+            }
+          }
+        },
+        "theme": {
+          "$ref": "#/$defs/reportTheme"
+        },
+        "blocks": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "enum": [
+                "report",
+                "block"
+              ]
+            },
+            "ref": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._-]+$"
+            },
+            "slot": {
+              "enum": [
+                "childBlockIds",
+                "sectionIds"
+              ]
+            },
+            "position": {
+              "const": "append"
+            }
+          }
+        },
+        "removeBlockIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._-]+$"
+          }
+        },
+        "layout": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "grid"
+            },
+            "columns": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "blockId"
+                ],
+                "properties": {
+                  "blockId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z0-9._-]+$"
+                  },
+                  "span": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  },
+                  "size": {
+                    "enum": [
+                      "full",
+                      "half",
+                      "third",
+                      "quarter",
+                      "two-thirds",
+                      "twothirds",
+                      "1/4",
+                      "1/3",
+                      "2/3"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "metadata": {
+          "type": "object"
+        },
+        "fallback": {
+          "type": "object"
+        },
+        "datasets": {
+          "type": "array"
+        },
+        "dataSources": {
+          "type": "object"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "enum": [
+                  "start",
+                  "replace"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "grammar"
+            ]
+          }
+        }
+      ]
     }
   }
 }

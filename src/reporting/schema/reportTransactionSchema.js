@@ -70,6 +70,16 @@ function patchSchema(value) {
 }
 for (const [name, definition] of Object.entries(definitions)) definitions[`patch_${name}`] = patchSchema(definition);
 const patchBlock = { allOf: [{ $ref: '#/$defs/patch_block' }, { required: ['id'] }] };
+// This named selection deliberately covers the transport envelope only. Block
+// fragments describe complete merged block state; the native assembler retains
+// ownership of recursive patches, ordering, references and final validation.
+definitions.transactionEnvelope = {
+  type: 'object', additionalProperties: false,
+  description: 'Partial guidance: progressive transaction envelope only. Use the selected block or field fragments for complete merged block state; native assembly owns patch semantics and final validation.',
+  required: ['version', 'scope', 'id', 'sequence', 'mode'],
+  properties: { ...envelope, blocks: { type: 'array', items: { type: 'object' } } },
+  allOf: [{ if: { properties: { mode: { enum: ['start', 'replace'] } } }, then: { required: ['grammar'] } }],
+};
 export const reportTransactionSchema = {
   $id: 'report://schema/report-transaction/v1', $schema: reportSpecSchema.$schema,
   type: 'object', additionalProperties: false,
