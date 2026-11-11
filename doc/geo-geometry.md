@@ -45,6 +45,15 @@ legend text and region descriptions through the canonical report text layout.
 Selection is
 local inspection; it does not infer report filter bindings.
 
+The existing region-button group scrolls vertically above 15rem so large
+collections do not stretch neighboring report content. All regions remain in
+the group, including absent rows; native keyboard focus reveals each button,
+and the selected region's live description remains below it. The geometry
+preview includes 51 independently invented areas. Run
+`node scripts/test-geo-region-list-browser.mjs` to check bounded geometry,
+complete labels, Tab traversal and selection at desktop and phone widths.
+Canonical print retains its complete, paginated region descriptions.
+
 ## Explicit points and bubble area
 
 A Point supplies exactly one `[x,y]` position; positions are never inferred from

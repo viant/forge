@@ -6,7 +6,10 @@ import {buildReportFillGeoPayload} from '../reporting/reportFillGeoPayload.js';
 import fixture from '../../doc/examples/campus-zone-geometry.json';
 import pointFixture from '../../doc/examples/sensor-point-geometry.json';
 import categoryFixture from '../../doc/examples/sensor-category-point-geometry.json';
+import {manyRegionGeometry, manyRegionRows} from '../../doc/examples/many-region-geometry.js';
 import {ForgeThemeProvider, ForgeThemeBoundary} from '../components/ThemeBoundary.jsx';
+import '@blueprintjs/core/lib/css/blueprint.css';
+import '../components/dashboard/Dashboard.css';
 const resolvedGeo = buildReportFillGeoPayload(fixture.block, fixture.rows);
 const reportSpec = {title:fixture.block.title,viewer:{appearance:'document'},blocks:[fixture.block],datasets:[{id:'primary',request:{}}]};
 const reportFill = {diagnostics:[],datasets:[{id:'primary',rows:fixture.rows,provenance:{rowCount:fixture.rows.length,diagnostics:[]}}],blocks:[{...fixture.block,content:{geo:fixture.block.geo,rowCount:fixture.rows.length,resolvedGeo}}]};
@@ -16,6 +19,9 @@ const pointFill = {diagnostics:[],datasets:[{id:'primary',rows:pointFixture.rows
 const categoryGeo = buildReportFillGeoPayload(categoryFixture.block, categoryFixture.rows);
 const categorySpec = {...reportSpec,title:categoryFixture.block.title,blocks:[categoryFixture.block]};
 const categoryFill = {diagnostics:[],datasets:[{id:'primary',rows:categoryFixture.rows,provenance:{rowCount:categoryFixture.rows.length,diagnostics:[]}}],blocks:[{...categoryFixture.block,content:{geo:categoryFixture.block.geo,rowCount:categoryFixture.rows.length,resolvedGeo:categoryGeo}}]};
+const manyGeo = buildReportFillGeoPayload(manyRegionGeometry, manyRegionRows);
+const manySpec = {...reportSpec, title:manyRegionGeometry.title, blocks:[manyRegionGeometry]};
+const manyFill = {diagnostics:[],datasets:[{id:'primary',rows:manyRegionRows}],blocks:[{...manyRegionGeometry,content:{geo:manyRegionGeometry.geo,resolvedGeo:manyGeo}}]};
 createRoot(document.getElementById('root')).render(<ForgeThemeProvider><ForgeThemeBoundary windowKey="geometry-preview" presentation="document"><main>
   <Typography as="p" typeRole="body">{fixture.provenance}</Typography>
   <ReportRuntime reportSpec={reportSpec} reportFill={reportFill}/>
@@ -29,4 +35,9 @@ createRoot(document.getElementById('root')).render(<ForgeThemeProvider><ForgeThe
   <Typography as="p" typeRole="body">{categoryFixture.provenance}</Typography>
   <ReportRuntime reportSpec={categorySpec} reportFill={categoryFill}/>
   <pre>{JSON.stringify(categoryFixture.rows, null, 2)}</pre>
+  <section aria-label="Many region controls" style={{width: '100%', maxWidth: 531}}>
+    <Typography as="h2" typeRole="section">Many region controls</Typography>
+    <Typography as="p" typeRole="body">Independently invented areas with values, zero, missing values and absent rows.</Typography>
+    <ReportRuntime reportSpec={manySpec} reportFill={manyFill}/>
+  </section>
 </main></ForgeThemeBoundary></ForgeThemeProvider>);
