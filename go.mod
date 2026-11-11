@@ -24,6 +24,7 @@ require (
 	github.com/viant/tagly v0.4.2-0.20261028223500-81e046a19ef9
 	github.com/viant/toolbox v0.37.1-0.20241210210120-32350b063cf8
 	github.com/viant/x v0.4.1-0.20260914174450-0e043f24aec5
+	github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f
 	github.com/xuri/excelize/v2 v2.10.0
 	golang.org/x/image v0.33.0
 	golang.org/x/oauth2 v0.32.0
