@@ -7662,7 +7662,8 @@ button.forge-report-builder__dialog-source-card:focus-visible {
 }
 .forge-report-runtime-kpi-value {
     font-size: var(--forge-report-type-metric-size, 28px);
-    font-size: min(var(--forge-report-type-metric-size, 28px), max(1rem, 16cqi));
+    /* Leave room for common currency values in wider platform system fonts. */
+    font-size: min(var(--forge-report-type-metric-size, 28px), max(1rem, 15cqi));
 }
 .forge-report-runtime-kpi-panel .forge-report-runtime-panel__heading { min-width: 0; }
 .forge-report-runtime-kpi-panel [data-report-runtime-kpi-trend-row] { flex-wrap: wrap; }

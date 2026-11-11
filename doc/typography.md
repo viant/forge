@@ -605,6 +605,13 @@ grid when no layout was authored. Detailed metrics use three, two or one columns
 based on the report container. Plain summaries fit readable tracks to available
 width, with a 220px default minimum and 128px below 600px. An explicit `stack`
 or `responsiveGrid` keeps its prior behavior.
+
+KPI value typography scales with the card content width at 15cqi, capped by
+the theme metric size and floored at 1rem. The sizing leaves room for common
+count and currency values across platform system fonts in six-column layouts.
+Longer values wrap at the readable floor without truncation or lost precision.
+The neutral KPI width specimen checks desktop, tablet and phone layouts.
+
 Document-table defaults give a non-identifier dimension the flexible column when
 no `flex` was authored. Explicit flex selections keep priority; width applies
 to bounded columns, while the flexible column uses minWidth. Measures and
