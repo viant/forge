@@ -35,7 +35,7 @@ export function createReleaseMCPAdapter({callTool, namespace, listPolicies}) {
       return Array.isArray(result) ? result : array(result,'policies');
     },
     publish(input) {
-      return invoke('releases/publish',{namespace,name:input.key.name,description:input.description,roots:input.roots,policies:input.policies,expectedRevision:input.expectedRevision});
+      return invoke('releases/publish',{namespace,name:input.key.name,description:input.description,roots:input.roots,...(input.public?{public:true}:{}),policies:input.policies,expectedRevision:input.expectedRevision});
     },
     promote(input) {
       return invoke('releases/promote',{namespace,name:input.key.name,bundleHash:input.bundleHash,expectedRevision:input.expectedRevision});

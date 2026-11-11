@@ -54,3 +54,27 @@ resource and the same scoped revision index. Unsupported provider kinds should
 be omitted from preload configuration. `read(uri, {revision})` resolves an exact
 stamp; without a revision it uses the publisher's `selected: true` entry.
 These archives contain definitions, never report result rows or mutation output.
+
+### Scoped styles
+
+`compileResourceCSS(definition, {providerIdentity, namespace, uri})` compiles a
+style resource into its provider/namespace boundary, including owned portals.
+The shared parser isolates animation, font, registered-property and layer names.
+It rejects unsupported global rules before installation.
+
+A host rendering an admitted shared base can pass `scopeSelector` for its own
+workspace boundary. This is trusted host wiring, never a selector copied from
+an authored definition. Omitting it preserves namespace confinement. The host
+owns stylesheet order and removal; the compiler neither fetches resources nor
+makes access decisions. A trusted host can set `global: true` for its one configured global stylesheet;
+this preserves document-root selectors while retaining symbol isolation. Never
+copy that option from authored definition data. Other resource consumers retain
+namespace confinement by default.
+
+`prepareResourceStyle` returns the compiled CSS, normalized token values, and an
+`installFonts` function for embedded WOFF2 faces. It reuses the shared bounded
+font decoder and validates before installation. Resource-scoped faces receive
+private family names; a global owner preserves its declared workspace families.
+A scoped preview of that same global owner can request `sharedFonts: true`. Call the returned cleanup when replacing or removing a sheet;
+it removes only that sheet's faces. Warm consumers retain prepared sheets and
+faces until publication changes, rather than installing fonts per window.

@@ -5,8 +5,11 @@ const ThemeContext = createContext(null);
 const useClientLayoutEffect = typeof document === 'undefined' ? useEffect : useLayoutEffect;
 
 // The host owns selection and asset loading. Forge owns DOM/portal propagation.
-export function ForgeThemeProvider({themeId = '', mode = 'light', scopeClassName = 'agently-workspace', portalContainer, children}) {
+export function ForgeThemeProvider({themeId, mode, scopeClassName, portalContainer, children}) {
     const inherited = useContext(ThemeContext);
+    themeId=themeId??inherited?.themeId??'';
+    mode=mode??inherited?.mode??'light';
+    scopeClassName=scopeClassName??inherited?.scopeClassName??'agently-workspace';
     // Nested window providers keep the host's portal ownership unless explicitly overridden.
     const resolvedPortalContainer = portalContainer ?? inherited?.portalContainer;
     const value = useMemo(() => ({themeId, mode: mode === 'dark' ? 'dark' : 'light', scopeClassName, portalContainer: resolvedPortalContainer}), [themeId, mode, scopeClassName, resolvedPortalContainer]);

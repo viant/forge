@@ -48,3 +48,14 @@ it('scopes document presentation to its content and owned portal without changin
   expect(content.hasAttribute('data-forge-presentation')).toBe(false);expect(portal.hasAttribute('data-forge-presentation')).toBe(false);
  } finally {await act(async()=>root.unmount());host.remove();}
 });
+
+it('inherits global theme selection through nested providers and preserves explicit reset',async()=>{
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ try{
+  const view=themeId=><ForgeThemeProvider themeId="shared" mode="dark"><ForgeThemeProvider themeId={themeId}><ForgeThemeBoundary windowKey="nested"><span>Nested</span></ForgeThemeBoundary></ForgeThemeProvider></ForgeThemeProvider>;
+  await act(async()=>root.render(view(undefined)));
+  const content=host.querySelector('.agently-workspace'),portal=document.body.querySelector('[data-forge-theme-portal][data-forge-window-key="nested"]');
+  expect(content.dataset.forgeTheme).toBe('shared');expect(content.dataset.forgeColorMode).toBe('dark');expect(portal.dataset.forgeTheme).toBe('shared');
+  await act(async()=>root.render(view('')));expect(content.hasAttribute('data-forge-theme')).toBe(false);expect(portal.hasAttribute('data-forge-theme')).toBe(false);
+ }finally{await act(async()=>root.unmount());host.remove();}
+});

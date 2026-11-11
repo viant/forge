@@ -352,3 +352,17 @@ it('a pending source cannot mistake the previous active revision for its own suc
     expect(view.host.textContent).toContain('Release activated.');
   } finally {await view.close();}
 });
+
+it('publishes an explicit public audience without requiring or sending named policies',async()=>{
+  const adapter=api({policies:vi.fn(async()=>[])});const view=await render(adapter);
+  try{
+    await text(view.host.querySelector('#release-name'),'poc');
+    await include(view.host);
+    expect(button(view.host,'Publish').disabled).toBe(true);
+    await select(view.host.querySelector('#release-audience'),'public');
+    expect(view.host.textContent).toContain('Anyone can read the published contents.');
+    expect(button(view.host,'Publish').disabled).toBe(false);
+    await click(button(view.host,'Publish'));
+    expect(adapter.publish).toHaveBeenCalledWith(expect.objectContaining({public:true,policies:[]}));
+  }finally{await view.close();}
+});

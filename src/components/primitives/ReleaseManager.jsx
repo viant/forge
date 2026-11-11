@@ -47,6 +47,7 @@ function ScopedReleaseManager({api, channelKey, disabled, onActivated, renderVal
   const [artifactQuery, setArtifactQuery] = useState('');
   const [artifactPage, setArtifactPage] = useState(0);
   const [policies, setPolicies] = useState([]);
+  const [publicAudience,setPublicAudience]=useState(false);
   const [promotionTarget, setPromotionTarget] = useState('');
   const [rollbackHash, setRollbackHash] = useState('');
   const [loading, setLoading] = useState(true);
@@ -83,7 +84,7 @@ function ScopedReleaseManager({api, channelKey, disabled, onActivated, renderVal
       if (pendingName.current) {
         const outcome = listed.find(channel => channelName(channel) === pendingName.current);
         if (outcome?.releaseStatus === 'active' && outcome.activated === true && outcome.activeBundleHash && Number(outcome.revision) > Number(pendingRevision.current)) {
-          setSelected(channelName(outcome));setName(channelName(outcome));setDescription(outcome.description || '');setPolicies(outcome.policies || []);
+          setSelected(channelName(outcome));setName(channelName(outcome));setDescription(outcome.description || '');setPolicies(outcome.policies || []);setPublicAudience(outcome.public===true);
           setRoots(outcome.bundle?.roots || []);
           setProgress('');setNotice('Release activated.');pendingName.current='';
         } else if (outcome?.releaseStatus === 'failed') {
@@ -105,7 +106,7 @@ function ScopedReleaseManager({api, channelKey, disabled, onActivated, renderVal
     setSelected(releaseName);
     setName(releaseName);
     setDescription(channel?.description || '');
-    setPolicies(channel?.policies || []);
+    setPolicies(channel?.policies || []);setPublicAudience(channel?.public===true);
     setRoots([]);
     setHistory([]);
     setPromotionTarget('');
@@ -137,7 +138,7 @@ function ScopedReleaseManager({api, channelKey, disabled, onActivated, renderVal
     setSelected(channelName(channel));
     setName(channelName(channel));
     setDescription(channel.description || '');
-    setPolicies(channel.policies || []);
+    setPolicies(channel.policies || []);setPublicAudience(channel.public===true);
     setRoots(selectedRoots || []);
     setNotice(message);
     try { onActivated?.(channel); }
@@ -162,7 +163,7 @@ function ScopedReleaseManager({api, channelKey, disabled, onActivated, renderVal
     const releaseName = name.trim();
     const target = mode === 'promote' ? channels.find(channel => channelName(channel) === promotionTarget) : current;
     const chosenRollback = history.find(bundle => bundle.hash === rollbackHash);
-    if (!releaseName || (mode === 'publish' && (!(source ? source.ready : currentRootsKnown && roots.length) || !policiesAssignable || !policies.length)) || (mode === 'promote' && (!current?.activeBundleHash || !target || target === current)) || (mode === 'rollback' && !chosenRollback)) return;
+    if (!releaseName || (mode === 'publish' && (!(source ? source.ready : currentRootsKnown && roots.length) || (!publicAudience && (!policiesAssignable || !policies.length)))) || (mode === 'promote' && (!current?.activeBundleHash || !target || target === current)) || (mode === 'rollback' && !chosenRollback)) return;
     submitLock.current = true;
     setPending(true);
     setPendingAction(mode);
@@ -171,7 +172,7 @@ function ScopedReleaseManager({api, channelKey, disabled, onActivated, renderVal
     setProgress('');
     try {
       const input = mode === 'publish'
-        ? {key: key(releaseName), description: description.trim(), ...(source ? {} : {roots: roots.map(({uri, kind, version, hash}) => ({uri, kind, version, hash}))}), policies: policies.map(({resource, revision}) => ({resource, revision})), expectedRevision}
+        ? {key: key(releaseName), description: description.trim(), ...(source ? {} : {roots: roots.map(({uri, kind, version, hash}) => ({uri, kind, version, hash}))}), ...(publicAudience?{public:true}:{}), policies: publicAudience ? [] : policies.map(({resource, revision}) => ({resource, revision})), expectedRevision}
         : {key: target.key, expectedRevision: target.revision, bundleHash: mode === 'promote' ? current.activeBundleHash : rollbackHash};
       const result = await (mode === 'publish' ? (source ? source.publish(input) : api.publish(input)) : api.promote(input));
       if (!alive.current) return;
@@ -226,12 +227,17 @@ function ScopedReleaseManager({api, channelKey, disabled, onActivated, renderVal
       <TextArea id="release-description" fill value={description} disabled={disabled || pending || loading} onChange={event => { setDescription(event.target.value); setNotice(''); }}/>
     </FormGroup>
     <fieldset disabled={disabled || pending || loading || !inventoryReady}><legend>Who can use this?</legend>
-      {policyChoices.length ? policyChoices.map(policy => <label key={policyID(policy)} className="forge-release-manager-choice">
+      <FormGroup label="Audience" labelFor="release-audience">
+        <HTMLSelect id="release-audience" fill value={publicAudience?'public':'policies'} onChange={event=>{setPublicAudience(event.target.value==='public');setNotice('');}}>
+          <option value="policies">Selected policy members</option><option value="public">Public</option>
+        </HTMLSelect>
+      </FormGroup>
+      {publicAudience?<p>Anyone can read the published contents. Editing and publishing still require permission.</p>:policyChoices.length ? policyChoices.map(policy => <label key={policyID(policy)} className="forge-release-manager-choice">
         <input type="checkbox" checked={policies.some(item => policyID(item) === policyID(policy))} disabled={!availablePolicies.some(candidate => policyID(candidate) === policyID(policy)) && !policies.some(item => policyID(item) === policyID(policy))} onChange={() => toggle(policies, setPolicies, policy, policyID)}/>
         <span>{policyLabel(policy)}{!availablePolicies.some(candidate => policyID(candidate) === policyID(policy)) ? ' · Unavailable for new releases' : ''}</span>
       </label>) : !error && <p>No policies are available for this release. Create an account policy in Security, then reload.</p>}
     </fieldset>
-    {!policiesAssignable && <Callout intent="warning">Remove unavailable policies before publishing. The server will verify every chosen policy again.</Callout>}
+    {!publicAudience && !policiesAssignable && <Callout intent="warning">Remove unavailable policies before publishing. The server will verify every chosen policy again.</Callout>}
     {publicationSource && <FormGroup label="Release contents" labelFor="release-contents">
       <HTMLSelect id="release-contents" fill value={usePublicationSource ? 'source' : 'artifacts'} disabled={disabled || pending || loading || !inventoryReady} onChange={event => {setUsePublicationSource(event.target.value === 'source');setError('');setNotice('');}}>
         <option value="artifacts">Stamped artifacts</option>
@@ -265,7 +271,7 @@ function ScopedReleaseManager({api, channelKey, disabled, onActivated, renderVal
       {!!policies.length && <ul>{policies.map(policy => <li key={policyID(policy)}>{policyLabel(policy)} · {policy.resource?.kind}:{policy.resource?.id} · resource v{policy.resource?.version} · policy revision {policy.revision}</li>)}</ul>}
       {!source && !!roots.length && <ul>{roots.map(root => <li key={rootID(root)}>{root.kind} · {root.uri} · revision {root.version} · hash <code title={root.hash}>{shortHash(root.hash)}</code></li>)}</ul>}
     </details>
-    <Button intent="primary" loading={pendingAction === 'publish'} disabled={disabled || pending || loading || !inventoryReady || !(source ? source.ready : currentRootsKnown && roots.length) || !policiesAssignable || !name.trim() || !policies.length} onClick={() => submit('publish')}>Publish</Button>
+    <Button intent="primary" loading={pendingAction === 'publish'} disabled={disabled || pending || loading || !inventoryReady || !(source ? source.ready : currentRootsKnown && roots.length) || !name.trim() || (!publicAudience && (!policiesAssignable || !policies.length))} onClick={() => submit('publish')}>Publish</Button>
     {current && <section aria-label="Promotion and rollback">
       <h3>Promotion and rollback</h3>
       <FormGroup label="Promote to…" labelFor="release-promotion-target">
