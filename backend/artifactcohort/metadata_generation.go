@@ -10,13 +10,16 @@ import (
 // pointers for request-local metadata memos. It reads no artifact body, catalog
 // inventory, transport, or roles beyond the existing session admission.
 func (s *MetadataSource) MetadataGeneration(ctx context.Context, kind string) (string, error) {
-	if s == nil || s.replica == nil || !RootKind(kind) || ctx == nil || ctx.Err() != nil {
+	if s == nil || s.replica == nil || !RootKind(kind) || ctx == nil {
 		return "", ErrDenied
+	}
+	if err := ctx.Err(); err != nil {
+		return "", err
 	}
 	if err := s.replica.EnsureAdmitted(ctx); err != nil {
 		return "", err
 	}
-	session, err := s.replica.cfg.SessionKey(ctx)
+	session, err := s.replica.admissionKey(ctx)
 	if err != nil || session == "" {
 		return "", ErrDenied
 	}
@@ -27,7 +30,7 @@ func (s *MetadataSource) MetadataGeneration(ctx context.Context, kind string) (s
 	s.replica.mu.RLock()
 	defer s.replica.mu.RUnlock()
 	admitted, ok := s.replica.admissions[session]
-	if !ok || !s.replica.ready || admitted.manifestHash != s.replica.latest.Hash || !admitted.validUntil.After(time.Now()) {
+	if !ok || !s.replica.ready || admitted.manifestHash != s.replica.latest.Hash || !admitted.validAt(time.Now()) {
 		return "", ErrDenied
 	}
 	type head struct{ Namespace, Kind, Policy string }

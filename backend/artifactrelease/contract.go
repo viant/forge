@@ -130,6 +130,7 @@ func validHash(value string) bool {
 // Named references follow reviewed minimum revisions; current policy heads
 // and their dependencies must be fenced by the producer adapter.
 type Channel struct {
+	Public           bool                   `json:"public,omitempty"`
 	Key              Key                    `json:"key"`
 	Description      string                 `json:"description,omitempty"`
 	Policies         []authz.NamedReference `json:"policies"`
@@ -144,8 +145,13 @@ func NewChannel(key Key, description string, policies []authz.NamedReference) (C
 	return channel, ValidateChannel(channel)
 }
 
+func NewPublicChannel(key Key, description string) (Channel, error) {
+	channel := Channel{Key: key, Description: description, Public: true}
+	return channel, ValidateChannel(channel)
+}
+
 func ValidateChannel(channel Channel) error {
-	if !channel.Key.Valid() || strings.TrimSpace(channel.Description) != channel.Description || len(channel.Description) > 4096 || len(channel.Policies) == 0 || channel.Revision > math.MaxInt64 || channel.ActiveBundleHash != "" && !validHash(channel.ActiveBundleHash) {
+	if !channel.Key.Valid() || strings.TrimSpace(channel.Description) != channel.Description || len(channel.Description) > 4096 || (channel.Public && len(channel.Policies) != 0 || !channel.Public && len(channel.Policies) == 0) || channel.Revision > math.MaxInt64 || channel.ActiveBundleHash != "" && !validHash(channel.ActiveBundleHash) {
 		return ErrInvalid
 	}
 	prior := ""
@@ -178,6 +184,11 @@ func PreparePromotion(current Channel, expectedRevision uint64, target Bundle) (
 // that candidate as one release activation; changing policy refs in place
 // without a new cohort projection is never valid.
 func PrepareChannelUpdate(current Channel, expectedRevision uint64, description string, policies []authz.NamedReference, target Bundle) (Channel, error) {
+	return PrepareChannelUpdateAudience(current, expectedRevision, description, policies, current.Public, target)
+}
+
+// PrepareChannelUpdateAudience changes the explicit publication audience in the existing revision CAS.
+func PrepareChannelUpdateAudience(current Channel, expectedRevision uint64, description string, policies []authz.NamedReference, public bool, target Bundle) (Channel, error) {
 	if err := ValidateChannel(current); err != nil {
 		return Channel{}, err
 	}
@@ -191,6 +202,7 @@ func PrepareChannelUpdate(current Channel, expectedRevision uint64, description 
 		return Channel{}, ErrInvalid
 	}
 	next := current
+	next.Public = public
 	next.Description = description
 	next.Policies = append([]authz.NamedReference(nil), policies...)
 	sort.Slice(next.Policies, func(i, j int) bool { return policyKey(next.Policies[i]) < policyKey(next.Policies[j]) })
@@ -235,6 +247,8 @@ func releaseHash(value any) string {
 }
 
 func ReleaseCohortPrefix(key Key) string { return "release-" + releaseHash(key) + "-" }
+
+func ReleasePublicCohortName(key Key) string { return ReleaseCohortPrefix(key) + "public" }
 
 func ReleaseCohortName(key Key, ref authz.NamedReference) string {
 	return ReleaseCohortPrefix(key) + releaseHash(ref.Resource)

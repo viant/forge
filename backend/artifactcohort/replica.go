@@ -55,6 +55,7 @@ type partitionState struct {
 	stale     bool
 }
 type admission struct {
+	public              bool
 	tenant, policyIndex string
 	validUntil          time.Time
 	denied              bool
@@ -105,6 +106,8 @@ type Replica struct {
 	cfg           Config
 	syncMu        sync.Mutex
 	mu            sync.RWMutex
+	publicDenied  bool
+	publicOnly    bool
 	latest        Manifest
 	persistedHash string // guarded by syncMu; last successfully saved complete manifest
 	store         *authz.StaticStore
@@ -245,6 +248,9 @@ func staticPolicyStore(ctx context.Context, manifest Manifest) (*authz.StaticSto
 		return nil, ErrInvalid
 	}
 	for _, cohort := range manifest.Cohorts {
+		if cohort.Public {
+			continue
+		}
 		doc, e := store.Get(ctx, cohort.PolicyResource)
 		if e != nil {
 			return nil, ErrInvalid
@@ -465,6 +471,14 @@ func (r *Replica) Sync(ctx context.Context) (syncErr error) {
 	}
 	discoveryTiming.EndBytes(timingOutcome(err), discoveryCache, discoveryBytes)
 	if err != nil {
+		if errors.Is(err, ErrDenied) {
+			r.mu.Lock()
+			if r.publicOnly && r.latest.Hash == prior.Hash {
+				r.publicDenied = true
+				r.admissions = map[string]admission{}
+			}
+			r.mu.Unlock()
+		}
 		return err
 	}
 	unchanged := manifest.Unchanged
@@ -532,7 +546,7 @@ func (r *Replica) Sync(ctx context.Context) (syncErr error) {
 		}
 		r.partitions = next // full snapshot removes omitted roots
 		r.metadataEpoch++
-		r.latest = manifest
+		r.setManifestLocked(manifest)
 		r.store = policyStore
 		r.refreshAdmissionSelectionsLocked()
 		r.mu.Unlock()
@@ -603,7 +617,7 @@ func (r *Replica) Sync(ctx context.Context) (syncErr error) {
 		}
 		r.partitions = staged
 		r.metadataEpoch++
-		r.latest = manifest
+		r.setManifestLocked(manifest)
 		r.store = policyStore
 		r.ready = true
 		r.mu.Unlock()
@@ -662,17 +676,16 @@ func policyIndexHash(manifest Manifest, tenant string) string {
 	return Hash(raw)
 }
 func (r *Replica) Admit(ctx context.Context) (admitErr error) {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if !r.Enabled() {
 		return ErrUnsupported
 	}
 	admitTiming := timing(ctx, phaseAdmit, r.cfg.Source, "")
 	defer func() { admitTiming.End(timingOutcome(admitErr), observe.CacheUnknown) }()
-	key, err := r.cfg.SessionKey(ctx)
+	key, err := r.admissionKey(ctx)
 	if err != nil || key == "" {
-		return ErrDenied
-	}
-	facts, err := r.cfg.Facts.Resolve(ctx)
-	if err != nil || facts.Subject == "" || facts.Tenant == "" {
 		return ErrDenied
 	}
 	r.mu.RLock()
@@ -680,13 +693,24 @@ func (r *Replica) Admit(ctx context.Context) (admitErr error) {
 		r.mu.RUnlock()
 		return ErrUnavailable
 	}
-	manifest, store := r.latest, r.store
+	manifest, store, publicOnly := r.latest, r.store, r.publicOnly
 	r.mu.RUnlock()
+	facts := authz.Facts{Tenant: r.cfg.Tenant, Subject: "public"}
+	if !publicOnly {
+		facts, err = r.cfg.Facts.Resolve(ctx)
+		if err != nil || facts.Subject == "" || facts.Tenant == "" {
+			return ErrDenied
+		}
+	}
 	service := &authz.Service{Store: store, Provider: factProvider{facts: facts}}
 	matched := map[string]string{}
 	for i := range manifest.Cohorts {
 		cohort := &manifest.Cohorts[i]
 		if cohort.Tenant != facts.Tenant {
+			continue
+		}
+		if cohort.Public {
+			matched[cohort.Name] = cohort.PolicyHash
 			continue
 		}
 		decision, selected, _, e := service.AuthorizeWithRevision(ctx, authz.Request{Resource: cohort.PolicyResource, Action: PolicyAction})
@@ -698,7 +722,7 @@ func (r *Replica) Admit(ctx context.Context) (admitErr error) {
 		}
 		matched[cohort.Name] = cohort.PolicyHash
 	}
-	if len(matched) == 0 {
+	if len(matched) == 0 && !publicOnly {
 		r.mu.Lock()
 		if r.ready && r.latest.Hash == manifest.Hash {
 			r.admissions[key] = admission{tenant: facts.Tenant, validUntil: facts.ValidUntil, denied: true, policyIndex: policyIndexHash(manifest, facts.Tenant), cohorts: matched, manifestHash: manifest.Hash, selections: map[string]effectiveSelection{}}
@@ -727,7 +751,7 @@ func (r *Replica) Admit(ctx context.Context) (admitErr error) {
 	if !r.ready || r.latest.Hash != manifest.Hash {
 		return ErrUnavailable
 	}
-	held := admission{tenant: facts.Tenant, validUntil: facts.ValidUntil, policyIndex: policyIndexHash(manifest, facts.Tenant), cohorts: matched, manifestHash: manifest.Hash, selections: map[string]effectiveSelection{}}
+	held := admission{public: publicOnly, tenant: facts.Tenant, validUntil: facts.ValidUntil, policyIndex: policyIndexHash(manifest, facts.Tenant), cohorts: matched, manifestHash: manifest.Hash, selections: map[string]effectiveSelection{}}
 	if r.cfg.Cohort == nil {
 		roots, selectionErr := effectiveRoots(manifest, held, "")
 		held.selections[""] = preparedSelection(manifest, held, "", roots, selectionErr)
@@ -740,10 +764,13 @@ func (r *Replica) Admit(ctx context.Context) (admitErr error) {
 // that session's cohort policy hash changes. Ordinary opens take the pointer
 // lookup path and never evaluate policy or contact MCP.
 func (r *Replica) EnsureAdmitted(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if !r.Enabled() {
 		return ErrUnsupported
 	}
-	key, err := r.cfg.SessionKey(ctx)
+	key, err := r.admissionKey(ctx)
 	if err != nil || key == "" {
 		return ErrDenied
 	}
@@ -751,7 +778,7 @@ func (r *Replica) EnsureAdmitted(ctx context.Context) error {
 	held, ok := r.admissions[key]
 	// Manifest activation refreshes this pointer only when policy heads are
 	// unchanged. No policy hashing, sorting or evaluation belongs on an open.
-	current := ok && r.ready && held.manifestHash == r.latest.Hash && held.validUntil.After(time.Now())
+	current := ok && r.ready && held.manifestHash == r.latest.Hash && held.validAt(time.Now())
 	r.mu.RUnlock()
 	if current {
 		if held.denied {
@@ -762,12 +789,15 @@ func (r *Replica) EnsureAdmitted(ctx context.Context) error {
 	return r.Admit(ctx)
 }
 func (r *Replica) Open(ctx context.Context, uri string) (view *View, openErr error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if !r.Enabled() {
 		return nil, ErrUnsupported
 	}
 	openTiming := timing(ctx, phaseRootOpen, r.cfg.Source, "")
 	defer func() { openTiming.End(timingOutcome(openErr), observe.CacheUnknown) }()
-	key, err := r.cfg.SessionKey(ctx)
+	key, err := r.admissionKey(ctx)
 	if err != nil || key == "" {
 		return nil, ErrDenied
 	}
@@ -920,7 +950,7 @@ func (r *Replica) ensureSelection(key, selected string) error {
 }
 
 func (r *Replica) selectedRootLocked(admitted admission, uri, selected string) (RootRef, error) {
-	if admitted.manifestHash != r.latest.Hash || !admitted.validUntil.After(time.Now()) {
+	if admitted.manifestHash != r.latest.Hash || !admitted.validAt(time.Now()) {
 		return RootRef{}, ErrDenied
 	}
 	selection, ok := admitted.selections[selected]
@@ -975,7 +1005,7 @@ func (r *Replica) PermittedRoots(ctx context.Context) ([]RootRef, error) {
 	if !r.Enabled() {
 		return nil, ErrUnsupported
 	}
-	key, err := r.cfg.SessionKey(ctx)
+	key, err := r.admissionKey(ctx)
 	if err != nil || key == "" {
 		return nil, ErrDenied
 	}
@@ -995,7 +1025,7 @@ func (r *Replica) PermittedRoots(ctx context.Context) ([]RootRef, error) {
 	if len(r.latest.Cohorts) == 0 {
 		return nil, ErrDenied
 	}
-	if admitted.manifestHash != r.latest.Hash || !admitted.validUntil.After(time.Now()) {
+	if admitted.manifestHash != r.latest.Hash || !admitted.validAt(time.Now()) {
 		return nil, ErrDenied
 	}
 	selection, ok := admitted.selections[selected]
@@ -1016,4 +1046,37 @@ func (r *Replica) PermittedRoots(ctx context.Context) ([]RootRef, error) {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].URI < out[j].URI })
 	return out, nil
+}
+
+// Public metadata is pinned to the configured publisher and manifest, not to
+// user roles or a cached user grant. Private admissions retain their expiry.
+func (a admission) validAt(now time.Time) bool { return a.public || a.validUntil.After(now) }
+
+func (r *Replica) admissionKey(ctx context.Context) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	r.mu.RLock()
+	public, denied := r.publicOnly, r.publicDenied
+	r.mu.RUnlock()
+	if denied {
+		return "", ErrDenied
+	}
+	if public {
+		return "public", nil
+	}
+	return r.cfg.SessionKey(ctx)
+}
+
+func (r *Replica) setManifestLocked(manifest Manifest) {
+	public := len(manifest.Policies) == 0 && (len(manifest.Cohorts) > 0 || r.publicOnly)
+	for _, cohort := range manifest.Cohorts {
+		if !cohort.Public {
+			public = false
+			break
+		}
+	}
+	r.latest = manifest
+	r.publicOnly = public
+	r.publicDenied = false
 }

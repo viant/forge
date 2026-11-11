@@ -28,6 +28,9 @@ func CompileCohorts(ctx context.Context, channel Channel, bundle Bundle, namedDo
 	if ctx == nil || ctx.Err() != nil || validateTargetChannel(channel, bundle) != nil {
 		return Compilation{}, ErrInvalid
 	}
+	if channel.Public {
+		return Compilation{Cohorts: []artifactcohort.Cohort{{Tenant: channel.Key.Tenant, Name: ReleasePublicCohortName(channel.Key), Public: true, Roots: append([]artifactcohort.RootRef(nil), bundle.Roots...)}}}, nil
+	}
 	store, err := authz.NewStaticStore(namedDocuments)
 	if err != nil {
 		return Compilation{}, ErrInvalid

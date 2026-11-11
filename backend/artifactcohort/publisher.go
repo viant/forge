@@ -14,13 +14,18 @@ import (
 // generation. Producer adapters validate closed source bytes before calling
 // Publish and emit standard MCP resource notifications after a successful swap.
 type Publisher struct {
-	mu             sync.RWMutex
-	active         map[string]*Artifact // URI -> latest published version
-	versions       map[string]*Artifact // RootKey -> immutable retained version
-	manifest       *Manifest
-	policyStore    *authz.StaticStore
-	cohortPolicies map[string][]authz.Resource
-	generation     uint64
+	mu              sync.RWMutex
+	active          map[string]*Artifact // URI -> latest published version
+	versions        map[string]*Artifact // RootKey -> immutable retained version
+	manifest        *Manifest
+	policyStore     *authz.StaticStore
+	cohortPolicies  map[string][]authz.Resource
+	generation      uint64
+	publicOnly      bool
+	publicReadable  bool
+	publicRoots     map[string]RootRef
+	publicURIs      map[string]RootRef
+	publicAmbiguous map[string]bool
 }
 
 func NewPublisher() *Publisher {
@@ -181,6 +186,7 @@ func (p *Publisher) Publish(ctx context.Context, root RootRef, payload json.RawM
 	}
 	p.generation = nextGeneration
 	p.manifest = next
+	p.preparePublicLocked()
 	result := CloneArtifact(candidate)
 	p.mu.Unlock()
 	return result, nextGeneration, nil
@@ -220,25 +226,32 @@ func (p *Publisher) ReplaceCatalog(ctx context.Context, policies []authz.Documen
 	}
 	for i := range detached.Cohorts {
 		c := &detached.Cohorts[i]
-		if c.Name == "" || c.Tenant == "" || c.PolicyResource.Tenant != c.Tenant {
+		if c.Name == "" || c.Tenant == "" || (!c.Public && c.PolicyResource.Tenant != c.Tenant) {
 			return Manifest{}, ErrInvalid
 		}
-		doc, e := store.Get(ctx, c.PolicyResource)
-		if e != nil {
-			return Manifest{}, ErrInvalid
+		if c.Public {
+			if c.PolicyResource != (authz.Resource{}) || c.PolicyHash != "" && c.PolicyHash != publicPolicyHash {
+				return Manifest{}, ErrInvalid
+			}
+			c.PolicyHash = publicPolicyHash
+		} else {
+			doc, e := store.Get(ctx, c.PolicyResource)
+			if e != nil {
+				return Manifest{}, ErrInvalid
+			}
+			resolved, dependencies, e := authz.ResolveNamedDocument(ctx, store, doc)
+			if e != nil {
+				return Manifest{}, ErrInvalid
+			}
+			if _, ok := authz.PolicyForAction(resolved.Policies, PolicyAction); !ok {
+				return Manifest{}, ErrInvalid
+			}
+			policyBytes, _ := json.Marshal(struct {
+				Original, Resolved authz.Document
+				Dependencies       []authz.NamedDependency
+			}{doc, resolved, dependencies})
+			c.PolicyHash = Hash(policyBytes)
 		}
-		resolved, dependencies, e := authz.ResolveNamedDocument(ctx, store, doc)
-		if e != nil {
-			return Manifest{}, ErrInvalid
-		}
-		if _, ok := authz.PolicyForAction(resolved.Policies, PolicyAction); !ok {
-			return Manifest{}, ErrInvalid
-		}
-		policyBytes, _ := json.Marshal(struct {
-			Original, Resolved authz.Document
-			Dependencies       []authz.NamedDependency
-		}{doc, resolved, dependencies})
-		c.PolicyHash = Hash(policyBytes)
 		followInput := map[string]bool{}
 		for _, uri := range c.FollowPublished {
 			if uri == "" || followInput[uri] {
@@ -299,10 +312,13 @@ func (p *Publisher) ReplaceCatalog(ctx context.Context, policies []authz.Documen
 	}
 	cohortPolicies := make(map[string][]authz.Resource, len(next.Cohorts))
 	for _, cohort := range next.Cohorts {
-		cohortPolicies[cohort.Name] = append(cohortPolicies[cohort.Name], cohort.PolicyResource)
+		if !cohort.Public {
+			cohortPolicies[cohort.Name] = append(cohortPolicies[cohort.Name], cohort.PolicyResource)
+		}
 	}
 	p.generation = next.Generation
 	p.manifest = &next
+	p.preparePublicLocked()
 	p.policyStore = store
 	p.cohortPolicies = cohortPolicies
 	return CloneManifest(next)

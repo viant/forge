@@ -54,7 +54,7 @@ func RootKey(ref RootRef) string { return ref.URI + "\x00" + strconv.FormatUint(
 
 func RootKind(kind string) bool {
 	switch kind {
-	case "window", "skill", "playbook", "intent", "agent", "report", "prompt", "template", "eval", "navigation", "mcp", "toolfeed", "feed", primitive.RoutingKind, primitive.StarterTaskKind, primitive.KnowledgeKind:
+	case "style", "window", "skill", "playbook", "intent", "agent", "report", "prompt", "template", "eval", "navigation", "mcp", "toolfeed", "feed", primitive.RoutingKind, primitive.StarterTaskKind, primitive.KnowledgeKind:
 		return true
 	}
 	return false
@@ -90,6 +90,7 @@ func (a *Artifact) ETag() string {
 }
 
 type Cohort struct {
+	Public            bool           `json:"public,omitempty"`
 	Tenant            string         `json:"tenant"`
 	Name              string         `json:"name"`
 	PolicyResource    authz.Resource `json:"policyResource"`
@@ -261,6 +262,16 @@ func FillPartitionHashes(value *Manifest) {
 		}
 	}
 }
+
+var publicPolicyHash = Hash([]byte("artifact-cohort-public-audience-v1"))
+
+func validCohortAuthority(c Cohort) bool {
+	if c.Public {
+		return c.PolicyResource == (authz.Resource{}) && c.PolicyHash == publicPolicyHash
+	}
+	return c.PolicyHash != "" && c.PolicyResource.Kind != "" && c.PolicyResource.Tenant == c.Tenant
+}
+
 func ValidateManifest(value Manifest) error {
 	if value.Unchanged || value.Generation == 0 || value.Hash == "" || value.Hash != ManifestHash(value) {
 		return ErrInvalid
@@ -271,7 +282,7 @@ func ValidateManifest(value Manifest) error {
 	seen := map[string]bool{}
 	sharedRoots := map[string]RootRef{}
 	for _, cohort := range value.Cohorts {
-		if cohort.Tenant == "" || cohort.Name == "" || cohort.PolicyHash == "" || cohort.Hash != CohortHash(cohort) || cohort.PolicyResource.Kind == "" || cohort.PolicyResource.Tenant != cohort.Tenant || seen[cohort.Tenant+"|"+cohort.Name] {
+		if cohort.Tenant == "" || cohort.Name == "" || !validCohortAuthority(cohort) || cohort.Hash != CohortHash(cohort) || seen[cohort.Tenant+"|"+cohort.Name] {
 			return ErrInvalid
 		}
 		seen[cohort.Tenant+"|"+cohort.Name] = true

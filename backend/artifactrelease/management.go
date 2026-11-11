@@ -59,6 +59,7 @@ func (in CandidatesInput) Validate() error {
 // trusted adapter resolves root bytes and named policy heads, then calls
 // NewBundle and PrepareChannelUpdate inside its publication lifecycle.
 type PublishInput struct {
+	Public           bool                     `json:"public,omitempty"`
 	Namespace        string                   `json:"namespace"`
 	Name             string                   `json:"name"`
 	Description      string                   `json:"description,omitempty"`
@@ -68,7 +69,7 @@ type PublishInput struct {
 }
 
 func (in PublishInput) Validate() error {
-	if !validName(in.Namespace) || !validName(in.Name) || strings.TrimSpace(in.Description) != in.Description || len(in.Description) > 4096 || in.ExpectedRevision > math.MaxInt64 || len(in.Policies) == 0 || len(in.Roots) == 0 {
+	if !validName(in.Namespace) || !validName(in.Name) || strings.TrimSpace(in.Description) != in.Description || len(in.Description) > 4096 || in.ExpectedRevision > math.MaxInt64 || (in.Public && len(in.Policies) != 0 || !in.Public && len(in.Policies) == 0) || len(in.Roots) == 0 {
 		return ErrInvalid
 	}
 	priorPolicies := map[string]bool{}

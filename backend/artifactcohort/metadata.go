@@ -202,7 +202,7 @@ func (s *MetadataSource) admissionKey(ctx context.Context, resourceURI string) (
 	if err := s.replica.EnsureAdmitted(ctx); err != nil {
 		return "", err
 	}
-	session, err := s.replica.cfg.SessionKey(ctx)
+	session, err := s.replica.admissionKey(ctx)
 	if err != nil || session == "" {
 		return "", ErrDenied
 	}
@@ -223,7 +223,7 @@ func (s *MetadataSource) admissionKey(ctx context.Context, resourceURI string) (
 	if selection.err != nil {
 		return "", selection.err
 	}
-	if !admission.validUntil.After(time.Now()) {
+	if !admission.validAt(time.Now()) {
 		return "", ErrDenied
 	}
 	parts := []any{s.replica.cfg.Source, s.replica.cfg.Tenant, s.replica.cfg.Account, session, admission.manifestHash, selected, selection.fingerprint, s.replica.metadataEpoch}
@@ -263,7 +263,7 @@ func (s *MetadataSource) CurrentVersionHash(ctx context.Context, uriText string)
 	if err = s.replica.EnsureAdmitted(ctx); err != nil {
 		return 0, "", err
 	}
-	key, err := s.replica.cfg.SessionKey(ctx)
+	key, err := s.replica.admissionKey(ctx)
 	if err != nil || key == "" {
 		return 0, "", ErrDenied
 	}

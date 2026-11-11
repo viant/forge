@@ -22,17 +22,23 @@ func selectionAuthorities(manifest Manifest, admitted admission, selected string
 		if cohort.Tenant != admitted.tenant || admitted.cohorts[cohort.Name] != cohort.PolicyHash {
 			continue
 		}
-		doc, err := store.Get(context.Background(), cohort.PolicyResource)
-		if err != nil {
-			return nil, ErrInvalid
-		}
-		resolved, dependencies, err := authz.ResolveNamedDocument(context.Background(), store, doc)
-		if err != nil {
-			return nil, ErrInvalid
-		}
-		policy, ok := authz.PolicyForAction(resolved.Policies, PolicyAction)
-		if !ok {
-			return nil, ErrInvalid
+		policy := authz.Policy{Mode: "public"}
+		var dependencies []authz.NamedDependency
+		if !cohort.Public {
+			doc, err := store.Get(context.Background(), cohort.PolicyResource)
+			if err != nil {
+				return nil, ErrInvalid
+			}
+			resolved, used, err := authz.ResolveNamedDocument(context.Background(), store, doc)
+			if err != nil {
+				return nil, ErrInvalid
+			}
+			var ok bool
+			policy, ok = authz.PolicyForAction(resolved.Policies, PolicyAction)
+			if !ok {
+				return nil, ErrInvalid
+			}
+			dependencies = used
 		}
 		add := func(refs []RootRef, mode string) error {
 			raw, err := json.Marshal(struct {
