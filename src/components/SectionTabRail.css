@@ -20,7 +20,7 @@
     scroll-padding-inline: 44px;
     padding: 0 2px;
     border: 0;
-    border-bottom: 1px solid var(--forge-report-border, #dbe5ec);
+    border-bottom: 1px solid var(--forge-border-color, var(--forge-report-border, #dbe5ec));
     border-radius: 0;
     background: transparent;
     scrollbar-width: thin;
@@ -47,7 +47,7 @@
     border-bottom: 3px solid transparent;
     border-radius: 0;
     background: transparent;
-    color: var(--forge-report-text-muted, #486579);
+    color: var(--forge-text-secondary, var(--forge-report-text-muted, #486579));
     font: inherit;
     font-size: var(--forge-report-type-small-size, 13px);
     font-synthesis: none;
@@ -58,8 +58,8 @@
 }
 
 .forge-section-tab:hover {
-    color: var(--forge-report-text, #28445a);
-    background: var(--forge-report-selected, rgba(47, 109, 225, 0.045));
+    color: var(--forge-text, var(--forge-report-text, #28445a));
+    background: var(--forge-selected-background, var(--forge-report-selected, rgba(47, 109, 225, 0.045)));
 }
 
 .forge-section-tab.is-selected {
@@ -84,7 +84,7 @@
     min-height: 35px;
     padding: 0 2px;
     scroll-snap-type: x proximity;
-    background: var(--forge-report-surface, rgba(255, 255, 255, 0.98));
+    background: var(--forge-surface-raised, var(--forge-report-surface, rgba(255, 255, 255, 0.98)));
 }
 
 .forge-section-tab-rail.is-compact .forge-section-tab {
@@ -119,8 +119,8 @@
     padding: 8px 12px;
     border: 1px solid var(--forge-report-action, #215db0);
     border-radius: 6px;
-    color: var(--forge-report-text, #20394b);
-    background: var(--forge-report-surface, #fff);
+    color: var(--forge-control-text, var(--forge-report-text, #20394b));
+    background: var(--forge-control-bg, var(--forge-report-surface, #fff));
     font: inherit;
 }
 

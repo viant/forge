@@ -139,11 +139,11 @@ function DashboardMessage({ payload, context, messageID }) {
         <div style={{ display: "flex", flexDirection: "column", gap: "10px", width: "100%" }}>
             {payload?.title ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px", padding: "2px 2px 4px" }}>
-                    <div style={{ fontSize: "19px", fontWeight: 800, letterSpacing: "0.01em", color: "#182026" }}>{payload.title}</div>
+                    <div style={{ fontSize: "19px", fontWeight: 800, letterSpacing: "0.01em", color: "var(--forge-text, #182026)" }}>{payload.title}</div>
                     {payload?.subtitle ? (
-                        <div style={{ fontSize: "12px", color: "#5f6b7c", lineHeight: 1.45, maxWidth: "110ch" }}>{payload.subtitle}</div>
+                        <div style={{ fontSize: "12px", color: "var(--forge-text-secondary, #5f6b7c)", lineHeight: 1.45, maxWidth: "110ch" }}>{payload.subtitle}</div>
                     ) : null}
-                    <div style={{ height: "1px", width: "100%", background: "linear-gradient(90deg, rgba(19,124,189,0.18) 0%, rgba(15,153,96,0.08) 50%, rgba(219,225,232,0.14) 100%)" }} />
+                    <div style={{ height: "1px", width: "100%", background: "linear-gradient(90deg, var(--forge-selected-background, rgba(19,124,189,0.18)) 0%, var(--forge-selected-background, rgba(15,153,96,0.08)) 50%, color-mix(in srgb, var(--forge-surface-subtle, rgb(219 225 232)) 14%, transparent) 100%)" }} />
                 </div>
             ) : null}
             {blocks.map((block, index) => (
@@ -175,10 +175,10 @@ function messageTestID(msg, fallbackIndex, suffix) {
 export default function MessageCard({ msg, context, resolveIcon, messageIndex = 0 }) {
     const avatarColour =
         msg.role === "user"
-            ? "var(--blue4)"
+            ? "var(--forge-selected-background)"
             : msg.role === "assistant"
-                ? "var(--light-gray4)"
-                : "var(--orange3)";
+                ? "var(--forge-surface-subtle)"
+                : "var(--forge-status-warning-background)";
 
     // Determine which icon to show for this message.
     // 1. Explicit override on the message object

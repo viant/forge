@@ -5,7 +5,7 @@ button.forge-workspace-icon-action {
 }
 button.forge-workspace-icon-action > .bp6-icon,
 button.forge-workspace-icon-action > .bp5-icon { color: inherit; }
-button.forge-workspace-icon-action:hover:not(:disabled) { background: rgba(45,108,223,.09); }
+button.forge-workspace-icon-action:hover:not(:disabled) { background: var(--forge-disabled-bg, rgba(45,108,223,.09)); }
 button.forge-workspace-icon-action:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 button.forge-workspace-icon-action:disabled, button.forge-workspace-icon-action.bp6-disabled { opacity: .45; }
 button.forge-workspace-icon-action.bp6-button,

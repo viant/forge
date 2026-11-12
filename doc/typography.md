@@ -133,6 +133,25 @@ appearance on new variants. The specimen runs with neutral shared fixtures or
 externally supplied workspace assets. This is bounded foundation evidence, not
 a claim that every legacy control, table interaction or device has migrated.
 
+## Existing component appearance
+
+Existing tab rails, container/form chrome, chips, lookup controls, tree browsers,
+chat, content actions, terminal chrome, dashboard/catalog/builder panels, workflow
+primitives, reader authoring and window editors consume the same surface, text,
+border, interaction, focus, disabled and feedback roles. Code-like UI text uses
+the existing code-family role; the host chooses its font. Component geometry,
+producer metadata and callbacks remain unchanged.
+
+Literal values inside `var()` remain neutral fallback recipes for unthemed
+consumers. Central Blueprint defaults, camera/document backing and image opacity
+masks retain their distinct purpose. Authored data palettes, contrast calculated
+from data colors, syntax highlighting and canonical print output remain owned by
+their existing renderers. They are not interface surface selections.
+
+`semanticStyles.contract.test.mjs` checks all source stylesheets for direct paint
+outside those bounded exceptions. The normal workspace-theme check includes it;
+new component chrome must consume existing semantic roles too.
+
 ## Shared web table styling
 
 List tables, editable collections, report tables and report editing tables share

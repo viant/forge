@@ -135,10 +135,10 @@
     gap: 8px;
     width: fit-content;
     min-height: 34px;
-    border: 1px solid #cbd7e4;
+    border: 1px solid var(--forge-border-color, #cbd7e4);
     border-radius: 999px;
-    background: #f7f9fc;
-    color: #5c6c7f;
+    background: var(--forge-surface, #f7f9fc);
+    color: var(--forge-text-secondary, #5c6c7f);
     padding: 4px 10px 4px 5px;
     font: inherit;
     font-size: 12px;
@@ -146,12 +146,12 @@
     cursor: pointer;
 }
 
-.forge-boolean-pill__track { position: relative; width: 32px; height: 20px; border-radius: 999px; background: #a9b6c5; transition: background .15s ease; }
-.forge-boolean-pill__thumb { position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(15,23,42,.25); transition: transform .15s ease; }
-.forge-boolean-pill.is-on { border-color: #8eb7a0; background: #eef8f2; color: #17613c; }
-.forge-boolean-pill.is-on .forge-boolean-pill__track { background: #168052; }
+.forge-boolean-pill__track { position: relative; width: 32px; height: 20px; border-radius: 999px; background: var(--forge-surface-subtle, #a9b6c5); transition: background .15s ease; }
+.forge-boolean-pill__thumb { position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--forge-surface, #fff); box-shadow: 0 1px 3px color-mix(in srgb, var(--forge-text, rgb(15 23 42)) 25%, transparent); transition: transform .15s ease; }
+.forge-boolean-pill.is-on { border-color: var(--forge-status-success-border, #8eb7a0); background: var(--forge-surface-subtle, #eef8f2); color: var(--forge-text, #17613c); }
+.forge-boolean-pill.is-on .forge-boolean-pill__track { background: var(--forge-interaction-color, #168052); }
 .forge-boolean-pill.is-on .forge-boolean-pill__thumb { transform: translateX(12px); }
-.forge-boolean-pill:focus-visible { outline: 2px solid #2f6de1; outline-offset: 2px; }
+.forge-boolean-pill:focus-visible { outline: 2px solid var(--forge-focus-color, #2f6de1); outline-offset: 2px; }
 
 .forge-form-panel-tab-title {
     display: inline-flex;
@@ -166,10 +166,10 @@
     max-width: 100%;
     margin: 0 12px 6px;
     padding: 5px;
-    border: 1px solid #dce5ef;
+    border: 1px solid var(--forge-border-color, #dce5ef);
     border-radius: 13px;
-    background: #f3f6fa;
-    box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.035);
+    background: var(--forge-surface-subtle, #f3f6fa);
+    box-shadow: inset 0 1px 2px color-mix(in srgb, var(--forge-text, rgb(15 23 42)) 3.5%, transparent);
 }
 
 .forge-form-panel-tabs.forge-form-panel-tabs--pills :is(.bp4-tab, .bp5-tab, .bp6-tab) {
@@ -178,22 +178,22 @@
     padding: 7px 12px;
     border: 0;
     border-radius: 9px;
-    color: #617086;
+    color: var(--forge-text-muted, #617086);
     font-size: 13px;
     font-weight: 650;
     line-height: 20px;
 }
 
 .forge-form-panel-tabs.forge-form-panel-tabs--pills :is(.bp4-tab, .bp5-tab, .bp6-tab):hover {
-    background: rgba(255, 255, 255, 0.72);
-    color: #26384e;
+    background: var(--forge-surface-subtle, rgba(255,255,255,0.72));
+    color: var(--forge-text, #26384e);
 }
 
 .forge-form-panel-tabs.forge-form-panel-tabs--pills :is(.bp4-tab, .bp5-tab, .bp6-tab)[aria-selected="true"] {
     border: 0;
-    background: #ffffff;
-    color: #214f9a;
-    box-shadow: 0 1px 3px rgba(33, 79, 154, 0.13), 0 0 0 1px rgba(75, 112, 181, 0.13);
+    background: var(--forge-selected-background, #ffffff);
+    color: var(--forge-interaction-color, #214f9a);
+    box-shadow: 0 1px 3px color-mix(in srgb, var(--forge-text, rgb(33 79 154)) 13%, transparent), 0 0 0 1px color-mix(in srgb, var(--forge-text, rgb(75 112 181)) 13%, transparent);
 }
 
 /* Lookup/signal controls use a restrained green surface only after a value
@@ -208,8 +208,8 @@
 }
 
 .forge-dictionary-input select:focus {
-    border-color: #4b78cf;
-    box-shadow: 0 0 0 2px rgba(75, 120, 207, 0.16);
+    border-color: var(--forge-focus-color, #4b78cf);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--forge-text, rgb(75 120 207)) 16%, transparent);
 }
 
 /* Required controls retain a light rose fill and required frame. A resolved
@@ -285,7 +285,7 @@
         .forge-required-invalid.bp4-button, .forge-required-invalid.bp5-button, .forge-required-invalid.bp6-button),
 .forge-required-input .forge-required-invalid
     :is(.bp4-input, .bp5-input, .bp6-input, .bp4-button, .bp5-button, .bp6-button, select) {
-    border-color: #c9372c;
+    border-color: var(--forge-status-danger-border, #c9372c);
     background-color: var(--forge-required-bg, #fff3f4);
 }
 
@@ -317,7 +317,7 @@
 }
 
 .forge-control-validation-message {
-    color: #b42318;
+    color: var(--forge-interaction-color, #b42318);
     font-size: 12px;
     font-weight: 600;
     line-height: 1.3;
@@ -365,55 +365,55 @@
 .forge-primary-form-shell.bp6-section,
 .forge-primary-form-shell.bp5-section,
 .forge-primary-form-shell.bp4-section {
-    border-color: #dedce7;
-    background: #ffffff;
-    box-shadow: 0 4px 14px rgba(43, 46, 69, 0.045);
+    border-color: var(--forge-border-color, #dedce7);
+    background: var(--forge-surface, #ffffff);
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--forge-text, rgb(43 46 69)) 4.5%, transparent);
 }
 
 .forge-primary-form-shell > :is(.bp6-section-header, .bp5-section-header, .bp4-section-header) {
     min-height: 36px;
-    border-bottom: 1px solid #dedce7;
-    background: #f4f3f8;
+    border-bottom: 1px solid var(--forge-border-color, #dedce7);
+    background: var(--forge-surface-subtle, #f4f3f8);
 }
 
 .forge-primary-form-shell > :is(.bp6-section-header, .bp5-section-header, .bp4-section-header) :is(.bp6-heading, .bp5-heading, .bp4-heading) {
-    color: #35364a;
+    color: var(--forge-text, #35364a);
 }
 
 .forge-muted-section.bp6-section,
 .forge-muted-section.bp5-section,
 .forge-muted-section.bp4-section {
-    border-color: #dedce7;
-    background: #ffffff;
-    box-shadow: 0 3px 12px rgba(43, 46, 69, 0.04);
+    border-color: var(--forge-border-color, #dedce7);
+    background: var(--forge-surface, #ffffff);
+    box-shadow: 0 3px 12px color-mix(in srgb, var(--forge-text, rgb(43 46 69)) 4%, transparent);
 }
 
 .forge-muted-section > :is(.bp6-section-header, .bp5-section-header, .bp4-section-header) {
     min-height: 34px;
     padding: 3px 10px;
-    border-bottom: 1px solid #dedce7;
-    background: #f5f5f8;
+    border-bottom: 1px solid var(--forge-border-color, #dedce7);
+    background: var(--forge-surface-subtle, #f5f5f8);
 }
 
 .forge-muted-section > :is(.bp6-section-header, .bp5-section-header, .bp4-section-header) :is(.bp6-heading, .bp5-heading, .bp4-heading) {
-    color: #35364a;
+    color: var(--forge-text-muted, #35364a);
     font-size: 13px;
 }
 
 .forge-compact-section.bp6-section,
 .forge-compact-section.bp5-section,
 .forge-compact-section.bp4-section {
-    border-color: #e3e1ea;
+    border-color: var(--forge-border-color, #e3e1ea);
     border-radius: 10px;
-    background: #ffffff;
-    box-shadow: 0 3px 10px rgba(43, 46, 69, 0.035);
+    background: var(--forge-surface, #ffffff);
+    box-shadow: 0 3px 10px color-mix(in srgb, var(--forge-text, rgb(43 46 69)) 3.5%, transparent);
 }
 
 .forge-compact-section > :is(.bp6-section-header, .bp5-section-header, .bp4-section-header) {
     min-height: 32px;
     padding: 3px 10px;
-    border-bottom: 1px solid #e3e1ea;
-    background: #f7f6fa;
+    border-bottom: 1px solid var(--forge-border-color, #e3e1ea);
+    background: var(--forge-surface, #f7f6fa);
 }
 
 .forge-compact-section > :is(.bp6-card, .bp5-card, .bp4-card) {
@@ -424,7 +424,7 @@
 }
 
 .forge-compact-section > :is(.bp6-section-header, .bp5-section-header, .bp4-section-header) :is(.bp6-heading, .bp5-heading, .bp4-heading) {
-    color: #424258;
+    color: var(--forge-text-secondary, #424258);
     font-size: 13px;
 }
 

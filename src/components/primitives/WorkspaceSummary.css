@@ -16,7 +16,7 @@
 .forge-workspace-summary__list > button { cursor:pointer; }
 .forge-workspace-summary__list > :last-child { border-bottom:0; }
 .forge-workspace-summary__list > button:hover { background:var(--forge-hover-color, #f3f7fc); }
-.forge-workspace-summary__list > button:focus-visible { outline:2px solid #2d72d2; outline-offset:-2px; }
+.forge-workspace-summary__list > button:focus-visible { outline:2px solid var(--forge-focus-color, #2d72d2); outline-offset:-2px; }
 .forge-workspace-summary__identity { flex:1; min-width:0; }
 .forge-workspace-summary__identity strong, .forge-workspace-summary__identity small { display:block; overflow-wrap:anywhere; }
 .forge-workspace-summary__identity small { margin-top:4px; color:var(--forge-muted-color, #667085); font-size:12px; line-height:1.45; }

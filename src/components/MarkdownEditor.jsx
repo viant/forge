@@ -282,10 +282,10 @@ export default function MarkdownEditor({
               disabled={readOnly || disabled}
               title={item.title}
               style={{
-                border: '1px solid #cbd5e1',
+                border: "1px solid var(--forge-border-color, #cbd5e1)",
                 borderRadius: 10,
-                background: '#f8fbff',
-                color: '#314e69',
+                background: "var(--forge-surface, #f8fbff)",
+                color: "var(--forge-text-secondary, #314e69)",
                 fontWeight: 700,
                 fontSize: 12,
                 lineHeight: 1,

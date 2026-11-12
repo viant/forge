@@ -14,14 +14,14 @@ export default function Avatar({ role = 'assistant', size = 24 }) {
         alignItems: 'center',
         justifyContent: 'center',
         fontSize: 12,
-        color: '#fff',
+        color: 'var(--forge-text, #263244)',
         fontWeight: 600,
         background:
             role === 'user'
-                ? 'var(--blue4)'
+                ? 'var(--forge-selected-background)'
                 : role === 'assistant'
-                    ? 'var(--light-gray4)'
-                    : 'var(--orange3)',
+                    ? 'var(--forge-surface-subtle)'
+                    : 'var(--forge-status-warning-background)',
     };
 
     const letter = role === 'assistant' ? 'A' : role === 'tool' ? 'T' : 'U';

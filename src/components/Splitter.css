@@ -16,7 +16,7 @@
 }
 
 .splitter-resizer {
-    background-color: #ccc;
+    background-color: var(--forge-surface-subtle, #ccc);
     flex-shrink: 0;
     cursor: col-resize;
     width: 5px; /* Increased width for better user experience */
@@ -29,5 +29,5 @@
 }
 
 .splitter-resizer:hover {
-    background-color: #999; /* Darker color on hover */
+    background-color: var(--forge-surface-subtle, #999); /* Darker color on hover */
 }

@@ -1246,7 +1246,7 @@ export default function Composer({
                         return (
                             <div
                                 key={id}
-                                style={{ border: '1px solid rgba(16,22,26,0.15)', borderRadius: 8, padding: 8, display: 'flex', gap: 8 }}
+                                style={{ border: "1px solid var(--forge-border-color, rgba(16,22,26,0.15))", borderRadius: 8, padding: 8, display: 'flex', gap: 8 }}
                                 data-testid={`chat-queue-item-${id}`}
                             >
                                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -1698,7 +1698,7 @@ export default function Composer({
                                 background: 'var(--bp4-background-color, #fff)',
                                 border: '1px solid var(--bp4-border-color, #ccc)',
                                 borderRadius: 8,
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                                boxShadow: "0 2px 8px color-mix(in srgb, var(--forge-text, rgb(0 0 0)) 15%, transparent)",
                                 maxHeight: 240,
                                 overflowY: 'auto',
                                 zIndex: 100,
@@ -1831,7 +1831,7 @@ export default function Composer({
                                     background: 'var(--bp4-background-color, #fff)',
                                     border: '1px solid var(--bp4-border-color, #ccc)',
                                     borderRadius: 8,
-                                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                                    boxShadow: "0 2px 8px color-mix(in srgb, var(--forge-text, rgb(0 0 0)) 15%, transparent)",
                                     maxHeight: 240,
                                     overflowY: 'auto',
                                     zIndex: 100,

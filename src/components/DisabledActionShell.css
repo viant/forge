@@ -10,7 +10,7 @@
 
 .forge-disabled-action-shell:focus-visible {
   border-radius: 8px;
-  outline: 2px solid #2f6fdd;
+  outline: 2px solid var(--forge-focus-color, #2f6fdd);
   outline-offset: 2px;
 }
 

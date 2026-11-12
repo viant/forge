@@ -1900,13 +1900,13 @@ function ReportBuilderDefinitionStatus({ status = "loading", message = "" }) {
             style={{
                 margin: 16,
                 padding: 20,
-                border: `1px solid ${failed ? "#f5c2c0" : "#dbe5ec"}`,
+                border: `1px solid ${failed ? "var(--forge-status-danger-border, #f5c2c0)" : "var(--forge-border-color, #dbe5ec)"}`,
                 borderRadius: 14,
-                background: failed ? "#fff5f4" : "#fbfdff",
-                color: "#30404d",
+                background: failed ? "var(--forge-status-danger-background, #fff5f4)" : "var(--forge-surface, #fbfdff)",
+                color: "var(--forge-text, #30404d)",
             }}
         >
-            <h4 style={{ margin: "0 0 8px", color: "#182026" }}>
+            <h4 style={{ margin: "0 0 8px", color: "var(--forge-text, #182026)" }}>
                 {failed ? "Report definition unavailable" : "Preparing report"}
             </h4>
             <p style={{ margin: 0 }}>{message || (failed ? "The report cannot be initialized." : "Loading report definition…")}</p>
@@ -6931,7 +6931,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                 </select>
             </label>
             {state.reportDocumentTemplateLabel ? (
-                <div style={{ fontSize: 11, lineHeight: 1.5, color: "#486579" }}>
+                <div style={{ fontSize: 11, lineHeight: 1.5, color: "var(--forge-text-secondary, #486579)" }}>
                     Seeded from template: {state.reportDocumentTemplateLabel}
                 </div>
             ) : null}
@@ -7100,7 +7100,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                 {renderSemanticBindingFieldGroups(semanticWorkspacePanelState, { marginTop: 10 })}
                 {semanticWorkspacePanelState.governanceItems.length > 0 ? (
                     <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--forge-text-muted, #738694)" }}>
                             {semanticWorkspacePanelState.governanceTitle}
                         </div>
                         <div className="forge-report-builder__semantic-diagnostics-list">
@@ -7446,7 +7446,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                                     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                                         {scopeSummary.items.map((item) => (
                                             <span key={item.id}>
-                                                <strong style={{ color: "#314154" }}>{item.label}</strong>
+                                                <strong style={{ color: "var(--forge-text, #314154)" }}>{item.label}</strong>
                                                 {item.description ? <span>{`: ${item.description}`}</span> : null}
                                             </span>
                                         ))}
@@ -7558,10 +7558,10 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                             data-report-document-block-id={block.id}
                             data-report-document-block-kind={normalizedKind}
                             style={{
-                                border: "1px solid #d7e2ee",
+                                border: "1px solid var(--forge-border-color, #d7e2ee)",
                                 borderRadius: 12,
                                 padding: "12px 14px",
-                                background: "#fbfdff",
+                                background: "var(--forge-surface, #fbfdff)",
                                 display: "flex",
                                 flexDirection: "column",
                                 gap: 8,
@@ -7574,11 +7574,11 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                                     </span>
                                     <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}>
                                         <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-                                            <strong style={{ color: "#183247", fontSize: 13 }}>{block.title || block.id}</strong>
+                                            <strong style={{ color: "var(--forge-text, #183247)", fontSize: 13 }}>{block.title || block.id}</strong>
                                             <span className="forge-report-builder__result-meta-chip">{kindLabel}</span>
                                             <span className="forge-report-builder__result-meta-chip">{widthLabels.currentLabel}</span>
                                         </div>
-                                        <div style={{ fontSize: 12, lineHeight: 1.5, color: "#5f6b7c" }}>{summary}</div>
+                                        <div style={{ fontSize: 12, lineHeight: 1.5, color: "var(--forge-text-secondary, #5f6b7c)" }}>{summary}</div>
                                         <div className="forge-report-builder__document-block-width-control">
                                             <div className="forge-report-builder__document-block-width-copy">
                                                 <span className="forge-report-builder__document-block-width-title">Resize</span>
@@ -7690,7 +7690,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                     );
                         })}
                         {authoredCapabilities.notes.map((note) => (
-                            <div key={note.id} style={{ fontSize: 11, lineHeight: 1.5, color: "#8a5d00" }}>
+                            <div key={note.id} style={{ fontSize: 11, lineHeight: 1.5, color: "var(--forge-status-warning-foreground, #8a5d00)" }}>
                                 {note.message}
                             </div>
                         ))}
@@ -16967,12 +16967,12 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         return (
             <div style={{ display: "grid", gap: 8, marginTop, marginBottom }}>
                 {title ? (
-                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--forge-text-muted, #738694)" }}>
                         {title}
                     </div>
                 ) : null}
                 {text ? (
-                    <div style={{ fontSize: 12, color: "#4b5d6b", lineHeight: 1.5 }}>
+                    <div style={{ fontSize: 12, color: "var(--forge-text-secondary, #4b5d6b)", lineHeight: 1.5 }}>
                         {text}
                     </div>
                 ) : null}
@@ -16987,7 +16987,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                             return (
                                 <div
                                     key={String(entry?.id || entryLabel || entryValue)}
-                                    style={{ display: "flex", flexWrap: "wrap", gap: 6, fontSize: 12, color: "#4b5d6b", lineHeight: 1.5 }}
+                                    style={{ display: "flex", flexWrap: "wrap", gap: 6, fontSize: 12, color: "var(--forge-text-secondary, #4b5d6b)", lineHeight: 1.5 }}
                                 >
                                     {entryLabel ? <strong>{entryLabel}:</strong> : null}
                                     {entryValue ? <span>{entryValue}</span> : null}
@@ -17015,12 +17015,12 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         return (
             <div style={{ display: "grid", gap: 8, marginTop, marginBottom }}>
                 {title ? (
-                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--forge-text-muted, #738694)" }}>
                         {title}
                     </div>
                 ) : null}
                 {text ? (
-                    <div style={{ fontSize: 12, color: "#4b5d6b", lineHeight: 1.5 }}>
+                    <div style={{ fontSize: 12, color: "var(--forge-text-secondary, #4b5d6b)", lineHeight: 1.5 }}>
                         {text}
                     </div>
                 ) : null}
@@ -17042,7 +17042,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                 {rows.length > 0 ? (
                     <div style={{ display: "grid", gap: 4 }}>
                         {rows.map((row) => (
-                            <div key={String(row?.id || row?.label || row?.value)} style={{ display: "flex", flexWrap: "wrap", gap: 6, fontSize: 12, color: "#4b5d6b", lineHeight: 1.5 }}>
+                            <div key={String(row?.id || row?.label || row?.value)} style={{ display: "flex", flexWrap: "wrap", gap: 6, fontSize: 12, color: "var(--forge-text-secondary, #4b5d6b)", lineHeight: 1.5 }}>
                                 {String(row?.label || "").trim() ? <strong>{String(row.label).trim()}:</strong> : null}
                                 {String(row?.value || "").trim() ? <span>{String(row.value).trim()}</span> : null}
                             </div>
@@ -17081,20 +17081,20 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             <div style={{ display: "grid", gap: 8, marginTop }}>
                 {authoredSummaryText ? (
                     <div style={{ display: "grid", gap: 4 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--forge-text-muted, #738694)" }}>
                             Authored Blocks
                         </div>
-                        <div style={{ fontSize: 12, color: "#4b5d6b", lineHeight: 1.5 }}>
+                        <div style={{ fontSize: 12, color: "var(--forge-text-secondary, #4b5d6b)", lineHeight: 1.5 }}>
                             {authoredSummaryText}
                         </div>
                     </div>
                 ) : null}
                 {drillSummaryText ? (
                     <div style={{ display: "grid", gap: 4 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--forge-text-muted, #738694)" }}>
                             Drill Navigation
                         </div>
-                        <div style={{ fontSize: 12, color: "#4b5d6b", lineHeight: 1.5 }}>
+                        <div style={{ fontSize: 12, color: "var(--forge-text-secondary, #4b5d6b)", lineHeight: 1.5 }}>
                             {drillSummaryText}
                         </div>
                     </div>
@@ -18131,7 +18131,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                     ) : null}
                     {selectedTableRowActions.length > 0 ? (
                         <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--forge-text-muted, #738694)" }}>
                                 Row actions
                             </div>
                             <ReportBuilderRuntimeActionStrip
@@ -18143,7 +18143,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                     ) : null}
                     {selectedChartActions.length > 0 ? (
                         <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--forge-text-muted, #738694)" }}>
                                 Chart actions
                             </div>
                             <ReportBuilderRuntimeActionStrip
@@ -18155,7 +18155,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                     ) : null}
                     {selectedDocumentDrillState.bindings.length > 0 ? (
                         <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--forge-text-muted, #738694)" }}>
                                 Detail actions
                             </div>
                             <div className="forge-report-builder__drill-card-list">
@@ -18202,7 +18202,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                     ) : null}
                     {selectedDocumentDrillMissingFieldOptions.length > 0 ? (
                         <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--forge-text-muted, #738694)" }}>
                                 Add detail actions
                             </div>
                             <div className="forge-report-builder__result-header-actions">
@@ -19271,7 +19271,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                 }}
             >
                 {panelState.error ? (
-                    <div style={{ marginTop: 4, color: "#486579" }}>
+                    <div style={{ marginTop: 4, color: "var(--forge-text-secondary, #486579)" }}>
                         {panelState.error}
                     </div>
                 ) : null}
@@ -22275,7 +22275,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                                     {savedReportPayloadSummary && savedReportPayloadApiArtifactsOpen ? (
                                         <div className="forge-report-builder__result-header-actions" style={{ marginTop: 8, flexWrap: "wrap" }}>
                                             <span className="forge-report-builder__result-meta-chip">Delivery handoff</span>
-                                            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#486579", fontSize: 11 }}>
+                                            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--forge-text-secondary, #486579)", fontSize: 11 }}>
                                                 <span>{savedArtifactViewState.savedReportPayload.documentVersionLabel}</span>
                                                 <input
                                                     aria-label="Document version"
@@ -22289,9 +22289,9 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                                                         minHeight: 28,
                                                         padding: "4px 8px",
                                                         borderRadius: 8,
-                                                        border: "1px solid #c8d6e5",
-                                                        background: "#ffffff",
-                                                        color: "#183247",
+                                                        border: "1px solid var(--forge-border-color, #c8d6e5)",
+                                                        background: "var(--forge-surface, #ffffff)",
+                                                        color: "var(--forge-text, #183247)",
                                                     }}
                                                 />
                                             </label>
@@ -22311,7 +22311,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                                             >
                                                 {savedArtifactViewState.savedReportPayload.prepareListResponseLabel}
                                             </Button>
-                                            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#486579", fontSize: 11 }}>
+                                            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--forge-text-secondary, #486579)", fontSize: 11 }}>
                                                 <span>{savedArtifactViewState.savedReportPayload.expectedVersionLabel}</span>
                                                 <input
                                                     aria-label="Expected version"
@@ -22325,9 +22325,9 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                                                         minHeight: 28,
                                                         padding: "4px 8px",
                                                         borderRadius: 8,
-                                                        border: "1px solid #c8d6e5",
-                                                        background: "#ffffff",
-                                                        color: "#183247",
+                                                        border: "1px solid var(--forge-border-color, #c8d6e5)",
+                                                        background: "var(--forge-surface, #ffffff)",
+                                                        color: "var(--forge-text, #183247)",
                                                     }}
                                                 />
                                             </label>
@@ -22347,10 +22347,10 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                                             >
                                                 {savedArtifactViewState.savedReportPayload.prepareCreatePayloadLabel}
                                             </Button>
-                                            <span style={{ fontSize: 11, color: "#486579" }}>
+                                            <span style={{ fontSize: 11, color: "var(--forge-text-secondary, #486579)" }}>
                                                 {reportDocumentVersionState.helperText}
                                             </span>
-                                            <span style={{ fontSize: 11, color: "#486579" }}>
+                                            <span style={{ fontSize: 11, color: "var(--forge-text-secondary, #486579)" }}>
                                                 {updateReportDocumentExpectedVersionState.helperText}
                                             </span>
                                         </div>
@@ -22500,7 +22500,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                                         >
                                             <span className="forge-report-builder__result-meta-chip">Catalog delivery</span>
                                             {listReportDocumentsEntryOptions.length > 0 ? (
-                                                <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#486579", fontSize: 11 }}>
+                                                <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--forge-text-secondary, #486579)", fontSize: 11 }}>
                                                     <span>Entry</span>
                                                     <select
                                                         aria-label="API handoff list response entry"
@@ -22510,9 +22510,9 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                                                             minHeight: 28,
                                                             padding: "4px 8px",
                                                             borderRadius: 8,
-                                                            border: "1px solid #c8d6e5",
-                                                            background: "#ffffff",
-                                                            color: "#183247",
+                                                            border: "1px solid var(--forge-border-color, #c8d6e5)",
+                                                            background: "var(--forge-surface, #ffffff)",
+                                                            color: "var(--forge-text, #183247)",
                                                         }}
                                                     >
                                                         {listReportDocumentsEntryOptions.map((entry) => (
@@ -22777,7 +22777,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                                             }}
                                         >
                                             <span className="forge-report-builder__result-meta-chip">Conflict review</span>
-                                            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#486579", fontSize: 11 }}>
+                                            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--forge-text-secondary, #486579)", fontSize: 11 }}>
                                                 <span>Current version</span>
                                                 <input
                                                     aria-label="API handoff current version"
@@ -22791,9 +22791,9 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                                                         minHeight: 28,
                                                         padding: "4px 8px",
                                                         borderRadius: 8,
-                                                        border: "1px solid #c8d6e5",
-                                                        background: "#ffffff",
-                                                        color: "#183247",
+                                                        border: "1px solid var(--forge-border-color, #c8d6e5)",
+                                                        background: "var(--forge-surface, #ffffff)",
+                                                        color: "var(--forge-text, #183247)",
                                                     }}
                                                 />
                                             </label>
@@ -22805,7 +22805,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                                             >
                                                 Prepare conflict diagnostic
                                             </Button>
-                                            <span style={{ fontSize: 11, color: "#486579" }}>
+                                            <span style={{ fontSize: 11, color: "var(--forge-text-secondary, #486579)" }}>
                                                 {updateReportDocumentConflictVersionState.helperText}
                                             </span>
                                         </div>
@@ -23403,7 +23403,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                                         <span className="forge-report-builder__result-meta-chip">{listReportDocumentsResponseSummary.cursor || "no-cursor"}</span>
                                         <span className="forge-report-builder__result-meta-chip">{listReportDocumentsResponseSummary.hasMore ? "has-more" : "complete"}</span>
                                         {listReportDocumentsEntryOptions.length > 0 ? (
-                                            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#486579", fontSize: 11 }}>
+                                            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--forge-text-secondary, #486579)", fontSize: 11 }}>
                                                 <span>Entry</span>
                                                 <select
                                                     aria-label="List response entry"
@@ -23413,9 +23413,9 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                                                         minHeight: 28,
                                                         padding: "4px 8px",
                                                         borderRadius: 8,
-                                                        border: "1px solid #c8d6e5",
-                                                        background: "#ffffff",
-                                                        color: "#183247",
+                                                        border: "1px solid var(--forge-border-color, #c8d6e5)",
+                                                        background: "var(--forge-surface, #ffffff)",
+                                                        color: "var(--forge-text, #183247)",
                                                     }}
                                                 >
                                                     {listReportDocumentsEntryOptions.map((entry) => (
@@ -23792,7 +23792,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                                     <span className="forge-report-builder__result-meta-chip">{updateReportDocumentPayloadSummary.compileStatus}</span>
                                     <span className="forge-report-builder__result-meta-chip">{updateReportDocumentPayloadSummary.blockCount} blocks</span>
                                     <span className="forge-report-builder__result-meta-chip">{updateReportDocumentPayloadSummary.datasetCount} dataset</span>
-                                    <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#486579", fontSize: 11 }}>
+                                    <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--forge-text-secondary, #486579)", fontSize: 11 }}>
                                         <span>Current version</span>
                                         <input
                                             aria-label="Current version"
@@ -23806,9 +23806,9 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                                                 minHeight: 28,
                                                 padding: "4px 8px",
                                                 borderRadius: 8,
-                                                border: "1px solid #c8d6e5",
-                                                background: "#ffffff",
-                                                color: "#183247",
+                                                border: "1px solid var(--forge-border-color, #c8d6e5)",
+                                                background: "var(--forge-surface, #ffffff)",
+                                                color: "var(--forge-text, #183247)",
                                             }}
                                         />
                                     </label>
@@ -24022,7 +24022,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                                                                     });
                                                                 }}
                                                                 style={{
-                                                                    background: selectedBuilderTableRow?.rowIndex === index ? "#eef5ff" : "",
+                                                                    background: selectedBuilderTableRow?.rowIndex === index ? "var(--forge-surface-subtle, #eef5ff)" : "",
                                                                     cursor: "pointer",
                                                                 }}
                                                             >

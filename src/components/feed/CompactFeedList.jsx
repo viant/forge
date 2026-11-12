@@ -66,7 +66,7 @@ function FeedObject({ value, depth, classNamePrefix, onPathActivate }) {
             className={`${classNamePrefix}-pathButton`}
             onClick={() => onPathActivate(value)}
             title={String(titleField)}
-            style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left', background: 'none', border: 'none', padding: 0, color: '#2b6cb0', cursor: 'pointer' }}
+            style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left', background: 'none', border: 'none', padding: 0, color: "var(--forge-interaction-color, #2b6cb0)", cursor: 'pointer' }}
           >
             {String(titleField)}
           </button>
@@ -75,7 +75,7 @@ function FeedObject({ value, depth, classNamePrefix, onPathActivate }) {
             {String(titleField)}
           </span>
         )}
-        {secondary != null ? <span style={{ color: '#6b7280', fontSize: 11, flexShrink: 0 }}>{secondary}</span> : null}
+        {secondary != null ? <span style={{ color: "var(--forge-text-muted, #6b7280)", fontSize: 11, flexShrink: 0 }}>{secondary}</span> : null}
       </div>
     );
   }
@@ -100,7 +100,7 @@ function FeedObject({ value, depth, classNamePrefix, onPathActivate }) {
 
   return (
     <div className={`${classNamePrefix}-step`}>
-      <span style={{ color: '#6b7280', fontSize: 11 }}>
+      <span style={{ color: "var(--forge-text-muted, #6b7280)", fontSize: 11 }}>
         {keys.slice(0, 8).map((key) => {
           const itemValue = value[key];
           const display = Array.isArray(itemValue)
@@ -127,9 +127,9 @@ function PaginatedList({ items, depth, label, classNamePrefix, onPathActivate })
     <div>
       {label ? (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 0', marginBottom: 2 }}>
-          <span style={{ fontWeight: 600, fontSize: 12, color: '#4a5568' }}>{label} ({total})</span>
+          <span style={{ fontWeight: 600, fontSize: 12, color: "var(--forge-text-secondary, #4a5568)" }}>{label} ({total})</span>
           {needsPagination ? (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#6b7280' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: "var(--forge-text-muted, #6b7280)" }}>
               <button className={`${classNamePrefix}-page-btn`} disabled={page <= 0} onClick={() => setPage(page - 1)}>‹</button>
               {page + 1}/{totalPages}
               <button className={`${classNamePrefix}-page-btn`} disabled={page >= totalPages - 1} onClick={() => setPage(page + 1)}>›</button>
@@ -138,7 +138,7 @@ function PaginatedList({ items, depth, label, classNamePrefix, onPathActivate })
         </div>
       ) : needsPagination ? (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '2px 0', marginBottom: 2 }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#6b7280' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: "var(--forge-text-muted, #6b7280)" }}>
             {total} items
             <button className={`${classNamePrefix}-page-btn`} disabled={page <= 0} onClick={() => setPage(page - 1)}>‹</button>
             {page + 1}/{totalPages}

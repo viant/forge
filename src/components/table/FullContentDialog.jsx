@@ -55,7 +55,7 @@ const styles = {
         overflowY: 'auto',
     },
     jsonViewer: {
-        fontFamily: 'monospace',
+        fontFamily: "var(--forge-font-family-monospace, monospace)",
         position: 'relative',
     },
     copyButtonWrapper: {

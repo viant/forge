@@ -4,7 +4,7 @@
 .forge-report-block-designer__toolbar { padding: .8rem 1rem; border: 1px solid var(--forge-control-border, #d8e1eb); border-radius: .65rem; background: var(--forge-control-bg, #f8fafc); }
 .forge-report-block-designer__toolbar label { display: flex; align-items: center; gap: .65rem; font-weight: 600; }
 .forge-report-block-designer__list { list-style: none; padding: 0; margin: .8rem 0 0; display: grid; gap: .45rem; }
-.forge-report-block-designer__item { min-height: 3.3rem; border: 1px solid var(--forge-control-border, #d8e1eb); border-radius: .65rem; padding: .55rem .75rem .55rem 1rem; background: var(--forge-surface, #fff); box-shadow: 0 1px 2px #1826380d; }
+.forge-report-block-designer__item { min-height: 3.3rem; border: 1px solid var(--forge-control-border, #d8e1eb); border-radius: .65rem; padding: .55rem .75rem .55rem 1rem; background: var(--forge-surface, #fff); box-shadow: 0 1px 2px color-mix(in srgb, var(--forge-text, rgb(24 38 56)) 5.098%, transparent); }
 .forge-report-block-designer__item > span:first-child { display: grid; gap: .15rem; min-width: 0; }
 .forge-report-block-designer__item strong { font-weight: 600; overflow-wrap: anywhere; }
 .forge-report-block-designer__item small { color: var(--forge-text-muted, #5e6b7c); font-size: .78rem; }
@@ -20,5 +20,5 @@
 .forge-report-block-designer textarea { resize: vertical; }
 .forge-report-block-designer select:focus-visible, .forge-report-block-designer input:focus-visible, .forge-report-block-designer textarea:focus-visible { outline: 2px solid var(--forge-focus-color, #2d72d2); outline-offset: 1px; }
 .forge-report-block-designer__form-actions { justify-content: flex-end; padding-top: .2rem; }
-.forge-report-block-designer__form [role="alert"] { color: #9d2720; margin: 0; }
+.forge-report-block-designer__form [role="alert"] { color: var(--forge-status-danger-foreground, #9d2720); margin: 0; }
 @media (max-width: 38rem) { .forge-report-block-designer__toolbar, .forge-report-block-designer__item { align-items: flex-start; flex-direction: column; } .forge-report-block-designer__actions { flex-wrap: wrap; } .forge-report-block-designer__form-actions { justify-content: flex-start; } }

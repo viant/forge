@@ -669,12 +669,12 @@ function BindingFieldCard({ field = {} }) {
           </div>
         ) : null}
         {rawId ? (
-          <div style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)", color: "var(--forge-report-text-muted, #5f6b7c)", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+          <div style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)", color: "var(--forge-report-text-muted, #5f6b7c)", fontFamily: "var(--forge-font-family-monospace, ui-monospace, SFMono-Regular, Menlo, monospace)" }}>
             {rawId}
           </div>
         ) : null}
         {definitionRef ? (
-          <div style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", color: "var(--forge-report-text-muted, #5f6b7c)", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", lineHeight: "var(--forge-report-type-caption-line-height, 1.45)" }}>
+          <div style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", color: "var(--forge-report-text-muted, #5f6b7c)", fontFamily: "var(--forge-font-family-monospace, ui-monospace, SFMono-Regular, Menlo, monospace)", lineHeight: "var(--forge-report-type-caption-line-height, 1.45)" }}>
             {definitionRef}
           </div>
         ) : null}
@@ -3011,7 +3011,7 @@ function GeoMapBlock({ block = {}, diagnostics = [], onRetryProviderActions = nu
                       gridColumn: entry.col,
                       gridRow: entry.row,
                       borderRadius: 10,
-                      border: region ? "1px solid rgba(24,32,38,0.14)" : "1px dashed rgba(95,107,124,0.22)",
+                      border: region ? "1px solid var(--forge-border-color, rgba(24,32,38,0.14))" : "1px dashed var(--forge-border-color, rgba(95,107,124,0.22))",
                       background: region?.color || "var(--forge-report-surface-subtle, #eef3f8)",
                       color: region ? resolveGeoTextColor(region.color) : "var(--forge-report-text-muted, #5f6b7c)",
                       display: "flex",
