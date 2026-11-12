@@ -50,6 +50,19 @@ test.each([calendar(18)])('missing or mismatched calendar fails closed without t
  const {result}=renderHook(()=>useReportDatePresetDraft({ranges,parameters:{entity:17},loadCalendar,onDefaultsReady}));
  await waitFor(()=>expect(result.current.controls[0].presetError).toMatch(/Calendar timezone is unavailable/));expect(result.current.dateBlocked).toBe(true);expect(onDefaultsReady).not.toHaveBeenCalled();
 });
+test.each([
+ [Object.assign(new Error('Synthetic private diagnostic'),{status:401}),'Sign in to load calendar metadata (401).'],
+ [Object.assign(new Error('Synthetic private diagnostic'),{status:403}),'Calendar metadata access was denied (403).'],
+ [Object.assign(new Error('Synthetic private diagnostic'),{status:503}),'Calendar metadata could not be loaded (503).'],
+ [new Error('Synthetic private diagnostic'),'Calendar metadata could not be loaded.'],
+ [new DOMException('Synthetic cancellation','AbortError'),'Calendar metadata request was canceled.'],
+])('calendar transport failures retain their phase and never produce guessed dates',async(cause,message)=>{
+ const loadCalendar=vi.fn().mockRejectedValue(cause),onDefaultsReady=vi.fn();
+ const {result}=renderHook(()=>useReportDatePresetDraft({ranges,parameters:{entity:17},loadCalendar,onDefaultsReady}));
+ await waitFor(()=>expect(result.current.controls[0].presetError).toBe(message));
+ expect(result.current.draft).toEqual({entity:17});expect(result.current.dateBlocked).toBe(true);
+ expect(onDefaultsReady).not.toHaveBeenCalled();expect(loadCalendar).toHaveBeenCalledTimes(1);
+});
 test('malformed declaration blocks missing dates but deliberate complete manual dates remain available',()=>{
  const malformed=[{id:'period',start:'from',end:'to',datePresetError:'Invalid calendar datasource binding.'}];
  const {result}=renderHook(()=>useReportDatePresetDraft({ranges:malformed,parameters:{}}));expect(result.current.dateBlocked).toBe(true);

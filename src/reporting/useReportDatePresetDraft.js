@@ -67,6 +67,7 @@ export function useReportDatePresetDraft({ranges=[],parameters={},resetParameter
   const valid=()=>ticket===generation.current&&version===calendarScope.current.version;
   setDateState(previous=>({...previous,...Object.fromEntries(items.map(({range,value})=>[range.id,{...previous[range.id],pending:true,scope:version,requestedValue:value,error:''}]))}));
   const patch={},resolvedStates={},contexts=[];
+  let loadingCalendar=false;
   try{
    for(const {range,value}of items){
     const declaration=range.datePresets,option=declaration.options.find(option=>option.value===value);
@@ -77,9 +78,11 @@ export function useReportDatePresetDraft({ranges=[],parameters={},resetParameter
     if(reuseCalendar&&saved?.scope===version&&saved.identity===identity&&saved.calendarContext){
      context={...saved.calendarContext,timeZone:timeZoneOverrides.current[range.id]||saved.calendarContext.timeZone};
     }else{
+     loadingCalendar=true;
      if(typeof loadCalendar!=='function')throw Error('Calendar metadata is unavailable.');
      const response=await loadCalendar(declaration.calendar.dataSourceRef,inputs,controller.signal);
      if(!valid())return false;
+     loadingCalendar=false;
      context=decodeReportDateCalendar(declaration,identity,response,timeZoneOverrides.current[range.id]);
     }
     contexts.push({range,value,option,identity,context});
@@ -96,8 +99,10 @@ export function useReportDatePresetDraft({ranges=[],parameters={},resetParameter
    writeDraft({...draftRef.current,...patch});setDateState(previous=>({...previous,...resolvedStates}));
    if(automatic)autoReady.current=true;
    return true;
-  }catch{
-   if(valid())setDateState(previous=>({...previous,...Object.fromEntries(items.map(({range,value})=>[range.id,{...previous[range.id],scope:version,pending:false,requestedValue:value,stale:previous[range.id]?.mode==='relative',error:range.datePresets?.calendar.anchorField?'Calendar date context is unavailable.':'Calendar timezone is unavailable.'}]))}));
+  }catch(cause){
+   const status=Number(cause?.status),statusLabel=Number.isInteger(status)&&status>=400&&status<=599?` (${status})`:'';
+   const loadingError=cause?.name==='AbortError'?'Calendar metadata request was canceled.':status===401?'Sign in to load calendar metadata (401).':status===403?'Calendar metadata access was denied (403).':`Calendar metadata could not be loaded${statusLabel}.`;
+   if(valid())setDateState(previous=>({...previous,...Object.fromEntries(items.map(({range,value})=>[range.id,{...previous[range.id],scope:version,pending:false,requestedValue:value,stale:previous[range.id]?.mode==='relative',cause,error:loadingCalendar?loadingError:range.datePresets?.calendar.anchorField?'Calendar date context is unavailable.':'Calendar timezone is unavailable.'}]))}));
    return false;
   }
  };
