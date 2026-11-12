@@ -1,3 +1,4 @@
+import UnifiedIcon from '../../Icon.jsx';
 import Popover from '../../Popover.jsx';
 import NativeControlTarget from '../../../runtime/NativeControlTarget.jsx';
 import RegisteredPopover from '../../RegisteredPopover.jsx';
@@ -50,10 +51,7 @@ export function toolbarItemIcon(icon) {
     if (normalized === 'pdf' || normalized === 'document-pdf') {
         return <span className="forge-toolbar-pdf-icon" aria-hidden="true">PDF</span>;
     }
-    if (normalized === 'sparkles') {
-        return <span className="forge-sparkles-icon" aria-hidden="true">✦</span>;
-    }
-    return icon;
+    return normalized ? <ForgeIcon name={normalized}/> : undefined;
 }
 
 export function toolbarItemLabel(item = {}) {
@@ -217,7 +215,7 @@ export function TableExportControl({context, item, align, disabled = false, rows
                         {formats.map((format) => (
                             <NativeControlTarget key={format} context={context} item={{id:`${item.id}:${format}`,type:'button',label:format.toUpperCase()}} disabled={busy} actions={{click:()=>{close();return runExport(format,true);}}}><MenuItem
                                 text={format.toUpperCase()}
-                                icon={format === 'xlsx' ? 'th' : 'document'}
+                                icon={(iconName => iconName ? <UnifiedIcon name={iconName}/> : iconName)(format === 'xlsx' ? 'th' : 'document')}
                                 disabled={busy}
                                 onClick={() => {close();return runExport(format);}}
                             /></NativeControlTarget>
@@ -227,7 +225,7 @@ export function TableExportControl({context, item, align, disabled = false, rows
                 <Button
                     type="button"
                     icon={toolbarItemIcon(item.icon || 'export')}
-                    rightIcon={actionIconOnly({...item, icon: item.icon || 'export'}) ? undefined : "caret-down"}
+                    rightIcon={(iconName => iconName ? <UnifiedIcon name={iconName}/> : iconName)(actionIconOnly({...item, icon: item.icon || 'export'}) ? undefined : "caret-down")}
                     className={['forge-toolbar-action', actionIconOnly(item) ? 'is-icon-only' : '', item.className].filter(Boolean).join(' ')}
                     loading={busy}
                     disabled={exportDisabled}
@@ -308,7 +306,7 @@ const Toolbar = ({
                                     return (
                                         <NativeControlTarget key={menuItem.id} context={context} item={{...menuItem,id:`${item.id}:${menuItem.id}`,type:'button'}} disabled={menuDisabled||menuItem.disabled===true||nestedReadonly} actions={{click:({event})=>{const result=(nested.events?.onClick?.operate || nested.events?.onClick)?.(event);close();return result;}}}><MenuItem
                                             text={menuItem.label || menuItem.id}
-                                            icon={menuItem.icon}
+                                            icon={(iconName => iconName ? <UnifiedIcon name={iconName}/> : iconName)(menuItem.icon)}
                                             disabled={menuItem.disabled === true || nestedReadonly}
                                             title={menuItem.tooltip || menuItem.label || menuItem.id}
                                             onClick={event=>{const result=nested.events?.onClick?.(event);close();return result;}}
@@ -320,7 +318,7 @@ const Toolbar = ({
                         <Button
                             type="button"
                             icon={toolbarItemIcon(item.icon)}
-                            rightIcon={actionIconOnly({...item, icon: item.icon || 'export'}) ? undefined : "caret-down"}
+                            rightIcon={(iconName => iconName ? <UnifiedIcon name={iconName}/> : iconName)(actionIconOnly({...item, icon: item.icon || 'export'}) ? undefined : "caret-down")}
                             className={['forge-toolbar-action', actionIconOnly(item) ? 'is-icon-only' : '', item.className].filter(Boolean).join(' ')}
                             disabled={menuDisabled}
                             aria-label={actionAccessibleName(item)}
@@ -436,7 +434,7 @@ const Toolbar = ({
                                         key={String(option.value)}
                                         text={option.label ?? option.text ?? String(option.value)}
                                         active={String(option.value) === String(value ?? '')}
-                                        icon={String(option.value) === String(value ?? '') ? 'tick' : undefined}
+                                        icon={(iconName => iconName ? <UnifiedIcon name={iconName}/> : iconName)(String(option.value) === String(value ?? '') ? 'tick' : undefined)}
                                         disabled={option.disabled===true}
                                         onClick={() => {const result=selectValue(option.value);close();return result;}}
                                     />
@@ -445,7 +443,7 @@ const Toolbar = ({
                         )}>
                         <Button
                             type="button"
-                            rightIcon="caret-down"
+                            rightIcon={<UnifiedIcon name="caret-down"/>}
                             disabled={toolbarItemShouldDisable(item, context, isReadonly) || disabled}
                             aria-label={`${item.label || item.id || 'Select'}: ${toolbarSelectLabel(item.options, value)}`}
                             title={item.tooltip || item.label || item.id}

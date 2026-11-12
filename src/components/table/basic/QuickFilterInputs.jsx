@@ -1,6 +1,7 @@
+import UnifiedIcon from '../../Icon.jsx';
 import NativeControlTarget from '../../../runtime/NativeControlTarget.jsx';
 import React from 'react';
-import { InputGroup, ControlGroup, HTMLSelect, Icon } from '@blueprintjs/core';
+import {InputGroup, ControlGroup, HTMLSelect} from '@blueprintjs/core';
 import {
     resolveQuickFilterSet,
     isQuickFiltersActive,
@@ -179,7 +180,7 @@ export default function QuickFilterInputs({ context, align = 'right' }) {
                                 margin: '7px 3px',
                             }}
                         >
-                            <Icon icon={iconName} size={12} />
+                            <UnifiedIcon name={iconName}  />
                         </span></NativeControlTarget>
                     ) : undefined
                 }

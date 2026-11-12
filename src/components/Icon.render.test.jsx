@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
-import Icon from './Icon.jsx';
+import Icon, {iconNames} from './Icon.jsx';
+import AvatarIcon from './AvatarIcon.jsx';
 
 // Independently authored neutral geometry; no application asset dependency.
 const geometry = {viewBox: [0, 0, 24, 24], paths: ['M3 4L18 4L10 19Z'], rects: [{x: 4, y: 5, width: 6, height: 7, rx: 1}]};
@@ -31,6 +32,17 @@ for (const iconSvg of [
     {viewBox: [0, 0, 24, 24]},
 ]) assert.equal(render({iconSvg}), '', 'Invalid drawing metadata must not render an icon');
 assert.match(render({name: 'lucide:check', iconSvg: geometry}), /lucide-check/);
-assert.match(render({name: 'document', iconSvg: geometry}), /bp6-icon-document/);
+assert.match(render({name: 'document', iconSvg: geometry}), /lucide-file-text/);
 assert.throws(() => render({name: 'lucide:not-an-icon'}), /Unsupported icon/);
 console.log('shared drawing-only icons, accessibility and named-icon compatibility passed');
+
+for (const name of ['refresh','double-chevron-left','double-caret-vertical','warning-sign','undo','lucide:chevron-left']) assert.match(render({name}), /class="lucide [^"]*forge-icon/);
+
+for (const name of iconNames) {
+  const markup=render({name});
+  assert.match(markup,/class="lucide [^"]*forge-icon/);
+  assert.match(markup,/viewBox="0 0 24 24"/);
+  assert.match(markup,/aria-hidden="true"/);
+}
+assert.match(renderToStaticMarkup(<AvatarIcon name="SmileyWink"/>),/lucide-smile/);
+assert.match(renderToStaticMarkup(<AvatarIcon name="UsersFour"/>),/lucide-users-round/);

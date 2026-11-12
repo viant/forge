@@ -1,3 +1,4 @@
+import UnifiedIcon from '../../Icon.jsx';
 import NativeControlTarget from '../../../runtime/NativeControlTarget.jsx';
 import React, { useRef } from 'react';
 import { Button } from '@blueprintjs/core';
@@ -39,7 +40,7 @@ export default function QuickFilterToggle({ context }) {
 
     return (
         <NativeControlTarget context={context} item={{id:'quickFilterToggle',type:'button',label:'Toggle quick filters'}} actions={{click:toggle}}><Button
-            icon={active ? 'filter-remove' : 'filter'}
+            icon={(iconName => iconName ? <UnifiedIcon name={iconName}/> : iconName)(active ? 'filter-remove' : 'filter')}
             minimal
             small
             onClick={toggle}

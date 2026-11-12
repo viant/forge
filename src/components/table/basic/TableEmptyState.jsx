@@ -1,5 +1,6 @@
+import UnifiedIcon from '../../Icon.jsx';
 import React from 'react';
-import {Button, Icon} from '@blueprintjs/core';
+import {Button} from '@blueprintjs/core';
 import {useToolbarControlEvents} from '../../../hooks/event.js';
 
 const TableEmptyState = ({context, config = {}}) => {
@@ -17,7 +18,7 @@ const TableEmptyState = ({context, config = {}}) => {
         >
             {config.icon ? (
                 <div className="forge-table-empty-state__visual" aria-hidden="true">
-                    <Icon icon={config.icon} size={28}/>
+                    <UnifiedIcon name={config.icon} />
                 </div>
             ) : null}
             {config.kicker ? <div className="forge-table-empty-state__kicker">{config.kicker}</div> : null}
@@ -38,7 +39,7 @@ const TableEmptyState = ({context, config = {}}) => {
             ) : null}
             {action ? (
                 <Button
-                    icon={action.icon}
+                    icon={(iconName => iconName ? <UnifiedIcon name={iconName}/> : iconName)(action.icon)}
                     intent={action.intent || 'primary'}
                     disabled={disabled}
                     className={`forge-table-empty-state__action${action.className ? ` ${action.className}` : ''}`}

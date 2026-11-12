@@ -1,3 +1,4 @@
+import SharedIcon from '../../Icon.jsx';
 import NativeControlTarget from '../../../runtime/NativeControlTarget.jsx';
 // src/components/table/basic/PaginationBar.jsx
 
@@ -84,6 +85,7 @@ const PaginationBar = ({
         return (
             <NativeControlTarget context={context} item={{id:actionKey,type:'button',label:properties.label}} disabled={disabled||actionDisabled} actions={{click:onClick}}><Button
                 {...properties}
+                icon={<SharedIcon name={properties.icon}/>}
                 onClick={onClick}
                 disabled={disabled || actionDisabled}
                 minimal={true}

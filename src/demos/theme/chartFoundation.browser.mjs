@@ -113,7 +113,14 @@ export async function verifyChartFoundation(page,{expectedFont}={}) {
         normalized.fontFamily=css.getPropertyValue('--forge-type-small-family');
         return (!normalized.fontFamily || normalized.fontFamily===css.fontFamily) && (!font || css.fontFamily.includes(font));
     },expectedFont);
-    const typography=await line.locator('.recharts-cartesian-axis-tick-value').first().evaluate(node=>{const css=getComputedStyle(node);return {size:parseFloat(css.fontSize),roleSize:parseFloat(css.getPropertyValue('--forge-type-small-size')),family:css.fontFamily,weight:Number(css.fontWeight),roleWeight:Number(css.getPropertyValue('--forge-type-small-weight'))};});
+    const typography=await line.locator('.recharts-cartesian-axis-tick-value').first().evaluate(node=>{const css=getComputedStyle(node);
+        // Semantic dimensions can be calc()/var() expressions. Resolve with the
+        // browser instead of treating a valid CSS expression as a number.
+        const probe=document.createElement('span');
+        probe.style.fontSize=css.getPropertyValue('--forge-type-small-size');
+        document.body.appendChild(probe);
+        const roleSize=parseFloat(getComputedStyle(probe).fontSize);probe.remove();
+        return {size:parseFloat(css.fontSize),roleSize,family:css.fontFamily,weight:Number(css.fontWeight),roleWeight:Number(css.getPropertyValue('--forge-type-small-weight'))};});
     assert.equal(typography.size,typography.roleSize);
     assert.equal(typography.weight,typography.roleWeight);
     // Accessibility tables retain intrinsic cell widths but paint no content.

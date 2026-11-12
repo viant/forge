@@ -1,3 +1,4 @@
+import UnifiedIcon from '../../Icon.jsx';
 import NativeControlTarget from '../../../runtime/NativeControlTarget.jsx';
 import React, {useRef, useState} from 'react';
 import {Button} from '@blueprintjs/core';
@@ -26,7 +27,7 @@ export default function RefreshAction({context, item, disabled = false}) {
             setRequested(false);
         }
     };
-    return <NativeControlTarget context={context} item={{...item,type:'button'}} disabled={disabled||busy} actions={{click:()=>refresh(true)}}><Button type="button" icon="refresh" minimal
+    return <NativeControlTarget context={context} item={{...item,type:'button'}} disabled={disabled||busy} actions={{click:()=>refresh(true)}}><Button type="button" icon={<UnifiedIcon name="refresh"/>} minimal
         className={['forge-toolbar-action is-icon-only',item.className].filter(Boolean).join(' ')}
         aria-label={item.ariaLabel || 'Refresh data'} title={item.tooltip || 'Refresh data'}
         loading={busy} disabled={disabled || busy} onClick={()=>refresh()}/></NativeControlTarget>;

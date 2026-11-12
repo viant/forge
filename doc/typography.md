@@ -72,7 +72,7 @@ callback and retained draft; host browser proof exercises the real specimen.
 | Spacing | spacing.1 through spacing.6; component insets and gaps consume them. Breakpoints belong to the owning shared pattern. |
 | Borders/radii | border.width, control.radius, radius.surface and radius.pill. Ordinary surfaces use quiet borders. |
 | Elevation | Existing --forge-overlay-shadow plus --forge-modal-shadow. Neutral recipes live in foundations.css; workspace CSS assets may select reviewed recipes. |
-| Icons | Icon from forge/components or forge/theme, with finite lucide: names and currentColor. Legacy Blueprint names retain their meaning. |
+| Icons | Icon from forge/components or forge/theme, with finite lucide: names and currentColor. Known legacy action names retain their meaning using Lucide equivalents; unmapped producer names retain the existing Blueprint fallback. |
 | Focus | focus.color, focus.width and focus.offset, including icon actions and controls. |
 | Motion | motion.fast and the neutral --forge-motion-easing recipe. Reduced motion removes transitions and loading rotation. |
 | Responsive behavior | Wrapping action groups and content-based fields. New variant buttons provide a 44px coarse-pointer target. Legacy pattern geometry remains its owner's migration scope. |
@@ -105,8 +105,12 @@ directly. Both reuse Button. New variants reject inline appearance overrides;
 use tokens or extend the shared component. Legacy button style props remain
 compatible. Optional --forge-button-hover-bg and --forge-button-active-bg hooks
 let a workspace select reviewed states; neutral defaults derive from its palette.
+Ghost/link hover and pressed states keep their transparent border. Hover uses a semantic background; only keyboard focus adds the focus ring. Existing Blueprint minimal controls reuse that quiet recipe and preserve callbacks, dimensions, disabled state and intent.
+
 Compact and icon-only variants retain a minimum 44px target on coarse pointers;
 the compact desktop height remains 28px. FoundationSpecimen includes both forms.
+
+Icon uses the installed `lucide-react` package with one currentColor stroke family. New authored icons must use explicit `lucide:` names from `iconNames`. Keep shared size/stroke tokens; do not mix another icon package or draw replacement control glyphs. The legacy avatar API retains its names using Lucide equivalents; decorative wink/sticker faces share Smile, nervous shares Frown, and group variants use UsersRound.
 
 Icon accepts `name` and optional `label`. Informative standalone icons have a
 label; button icons are decorative because their action supplies its name.

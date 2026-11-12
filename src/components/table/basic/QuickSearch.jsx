@@ -1,3 +1,4 @@
+import UnifiedIcon from '../../Icon.jsx';
 import NativeControlTarget from '../../../runtime/NativeControlTarget.jsx';
 import React, {useLayoutEffect, useRef, useState} from 'react';
 import {Button, InputGroup} from '@blueprintjs/core';
@@ -42,7 +43,7 @@ export default function QuickSearch({context, item, disabled = false, onCommit})
     };
     return <NativeControlTarget context={context} item={{...item,scope:windowFormBinding?'windowForm':'filter',dataField:field}} disabled={disabled} value={value}
         validate={next=>typeof next==='string'?null:'search text must be a string'} actions={{setValue:({value:next})=>{setDraft(next);setExpanded(true);return commit(next,true);},click:()=>expanded?close():setExpanded(true)}}><div className="forge-quick-search">
-        <Button type="button" icon="search" minimal elementRef={button}
+        <Button type="button" icon={<UnifiedIcon name="search"/>} minimal elementRef={button}
             className="forge-toolbar-action is-icon-only"
             disabled={disabled} aria-label={expanded ? 'Close quick search' : `Search: ${label}`}
             title={expanded ? 'Clear and close quick search' : label}

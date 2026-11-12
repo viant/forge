@@ -1,3 +1,4 @@
+import UnifiedIcon from '../../Icon.jsx';
 import NativeControlTarget from '../../../runtime/NativeControlTarget.jsx';
 import {navigateNativeLink} from '../../../runtime/nativeNavigation.js';
 import MediaPreviewPopover from "../../MediaPreviewPopover.jsx";
@@ -7,7 +8,7 @@ import {tableCellPolicy} from './tableCellPolicy.js';
 import EditableTextCell from "./EditableTextCell.jsx";
 import ImageLabelCell from "./ImageLabelCell.jsx";
 import React, {useEffect, useRef, useState} from "react";
-import {Button, Icon} from "@blueprintjs/core";
+import {Button} from '@blueprintjs/core';
 import ProgressBar from "../../control/ProgressBar.jsx";
 import {useCellEvents} from "../../../hooks/event.js";
 import {resolveTableLink} from "../../../utils/tableLink.js";
@@ -154,10 +155,10 @@ const TableCell = ({
             cellContent = <ImageLabelCell value={value} emptyText={col.emptyText}/>;
             break;
         case "icon":
-            cellContent = <Icon
-                icon={value}
-                size={10}
-                small={true}
+            cellContent = <UnifiedIcon
+                name={value}
+
+
                 onClick={handleMoreClick}
                 style={{marginLeft: 4}}
             />
@@ -179,7 +180,7 @@ const TableCell = ({
             }
             cellContent = <Button
                 {...isolateButtonCellProps(cellProps)}
-                icon={resolveButtonIcon(col, value, cellProps.icon)}
+                icon={(iconName => iconName ? <UnifiedIcon name={iconName}/> : iconName)(resolveButtonIcon(col, value, cellProps.icon))}
                 aria-pressed={resolveButtonPressed(col, value)}
             />;
             break;
@@ -350,7 +351,7 @@ const TableCell = ({
                                     cursor: 'pointer',
                                 }}
                             >
-                                <Icon icon="maximize" size={10} small={true}/>
+                                <UnifiedIcon name="maximize"  />
                             </button>
                         )}
                     </div>
@@ -373,7 +374,7 @@ const TableCell = ({
             >
                 {resolvedBadge.icon === 'sparkles'
                     ? <svg className="forge-sparkles-icon" aria-hidden="true" viewBox="0 0 16 16"><path fill="currentColor" d="M8 1 10 6 15 8 10 10 8 15 6 10 1 8 6 6Z"/></svg>
-                    : (resolvedBadge.icon ? <Icon icon={resolvedBadge.icon} size={12}/> : null)}
+                    : (resolvedBadge.icon ? <UnifiedIcon name={resolvedBadge.icon} /> : null)}
                 {resolvedBadge.hideLabel ? null : <span>{resolvedBadge.label}</span>}
             </span>
     );
