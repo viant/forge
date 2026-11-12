@@ -11,6 +11,7 @@ import { ReaderSubviewDialog } from './ReaderSubviewDialog.jsx';
 import { ReaderCreateForm } from './ReaderCreateForm.jsx';
 import { ReaderRemoveViewDialog } from './ReaderRemoveViewDialog.jsx';
 import { ReaderCubePreview } from './ReaderCubePreview.jsx';
+import { ReaderPreviewParameters } from './ReaderPreviewParameters.jsx';
 import { ReaderAnalyticsDialog } from './ReaderAnalyticsDialog.jsx';
 import { ReaderCacheDialog } from './ReaderCacheDialog.jsx';
 import { ResultPreview } from './NestedDataGrid.jsx';
@@ -64,6 +65,7 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
   const [previewTarget, setPreviewTarget] = useState(null);
   const [previewing, setPreviewing] = useState(false);
   const [cubePreviewOpen, setCubePreviewOpen] = useState(false);
+  const [previewParametersOpen, setPreviewParametersOpen] = useState(false);
   const [testedView, setTestedView] = useState(null);
   const [testedRelation, setTestedRelation] = useState(null);
   const [testingView, setTestingView] = useState('');
@@ -83,6 +85,8 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
   const [previewOrigin,setPreviewOrigin] = useState('graph');
   const lastPreviewRequest=useRef(null);
   const previewGeneration=useRef(0);
+  const previewContractKey = JSON.stringify([report?.id, version?.versionNo, version?.sourceRevision, inspection?.previewInput]);
+  useEffect(() => { lastPreviewRequest.current=null; setPreviewParametersOpen(false); }, [previewContractKey]);
   const inputSelection=useMemo(()=>({type:'input'}),[]);
   const outputSelection=useMemo(()=>({type:'output'}),[]);
   const [viewTabs, setViewTabs] = useState([]);
@@ -225,18 +229,19 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
   const runPreview = async (target = null, input = {}, cube = false) => {
     if (!inspection?.version) return;
     const generation=++previewGeneration.current;
-    lastPreviewRequest.current={target,input,cube};
+    const submitted = structuredClone(input);
+    lastPreviewRequest.current={target,input:submitted,cube};
     if(workspaceTab!=='preview')setPreviewOrigin(workspaceTab);
-    setWorkspaceTab('preview');setCubePreviewOpen(false);
+    setWorkspaceTab('preview');setCubePreviewOpen(false);setPreviewParametersOpen(false);
     setPreviewing(true); setPreviewError(''); setPreview(null);setTestedView(null); setPreviewTarget(target);
-    try { const result=await api.previewReader(report.id, inspection.version.versionNo, input, 50, inspection?.structure?.component?.routes?.[0]?.path, cube);if(generation===previewGeneration.current)setPreview(result); }
+    try { const result=await api.previewReader(report.id, inspection.version.versionNo, structuredClone(submitted), 50, inspection?.structure?.component?.routes?.[0]?.path, cube);if(generation===previewGeneration.current)setPreview(result); }
     catch (cause) { if(generation===previewGeneration.current)setPreviewError(cause.message); }
     finally { if(generation===previewGeneration.current)setPreviewing(false); }
   };
   const openCubePreview = () => {
     previewTriggerRef.current = document.activeElement;
     if(workspaceTab!=='preview')setPreviewOrigin(workspaceTab);
-    setWorkspaceTab('preview');setCubePreviewOpen(true);
+    setWorkspaceTab('preview');setCubePreviewOpen(true);setPreviewParametersOpen(false);
   };
   const closeCubePreview = () => {
     setCubePreviewOpen(false);
@@ -244,7 +249,15 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
   };
   const requestPreview = (target = null) => {
     if (!target && inspection?.structure?.component?.settings?.report?.enabled) openCubePreview();
-    else runPreview(target);
+    else if (target) runPreview(target);
+    else {
+      const schema = inspection?.previewInput?.schema;
+      if (schema?.type === 'object' && Object.keys(schema.properties || {}).length === 0) runPreview();
+      else {
+        if(workspaceTab!=='preview')setPreviewOrigin(workspaceTab);
+        setWorkspaceTab('preview');setCubePreviewOpen(false);setPreviewParametersOpen(true);
+      }
+    }
   };
   const viewNames = useMemo(() => collectViews(inspection?.structure), [inspection]);
   const runViewTest = async (view) => {
@@ -252,7 +265,7 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
     const root = inspection.structure?.component?.rootView;
     if (inspection.structure?.component?.settings?.report?.enabled && [root?.name,root?.namespace].includes(view)) {openCubePreview();return;}
     if(workspaceTab!=='preview')setPreviewOrigin(workspaceTab);
-    setWorkspaceTab('preview');setCubePreviewOpen(false);setPreview(null);
+    setWorkspaceTab('preview');setCubePreviewOpen(false);setPreviewParametersOpen(false);setPreview(null);
     const generation=++previewGeneration.current;
     lastPreviewRequest.current={view};
     setTestingView(view); setPreviewError(''); setTestedView(null);
@@ -433,7 +446,12 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
         <section className="studio-workspace-panel studio-preview-workspace" role="tabpanel" id="reader-panel-preview" aria-labelledby="reader-tab-preview" hidden={workspaceTab!=='preview'}>
           <div className="studio-preview-navigation"><Button minimal icon="arrow-left" onClick={()=>navigateWorkspace(previewOrigin)}>Back to {previewOrigin==='sql'?'SQL':previewOrigin.charAt(0).toUpperCase()+previewOrigin.slice(1)}</Button>{inspection?.structure?.component?.settings?.report?.enabled&&<Button small icon="settings" onClick={()=>setCubePreviewOpen((value)=>!value)}>{cubePreviewOpen?'Results':'Preview settings'}</Button>}</div>
           {inspection?.structure?.component?.settings?.report?.enabled&&<div className="studio-cube-configuration" hidden={!cubePreviewOpen}><ReaderCubePreview key={`${report.id}:${version.versionNo}`} structure={inspection?.structure} pending={previewing} onRun={(input)=>runPreview(null,input,true)} onClose={closeCubePreview}/></div>}
-          <div className="studio-preview-results" hidden={cubePreviewOpen}>
+          {!inspection?.structure?.component?.settings?.report?.enabled && <div className="studio-preview-parameters-slot" hidden={!previewParametersOpen}>
+            <ReaderPreviewParameters key={previewContractKey} metadata={inspection?.previewInput} diagnostics={diagnostics} pending={previewing || !canPreview}
+              onRun={input=>runPreview(null,input)} onClose={()=>setPreviewParametersOpen(false)}
+              onRefresh={async()=>{await load(version?.versionNo);setPreviewParametersOpen(true);}}/>
+          </div>}
+          <div className="studio-preview-results" hidden={cubePreviewOpen || previewParametersOpen}>
             {dirtyTabs.size>0&&<Callout compact intent="warning">Preview uses the saved revision. Save SQL to include your edits.</Callout>}
             {(previewing||testingView)&&<div className="studio-loading" role="status"><Spinner size={24}/><span>{testingView?`Testing ${testingView}…`:'Running preview…'}</span></div>}
             {previewError&&<Callout intent="danger" role="alert" title="Preview failed">{previewError}<Button small intent="danger" onClick={retryPreview}>Retry preview</Button></Callout>}
