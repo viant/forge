@@ -432,7 +432,7 @@ const TableCell = ({
     if (col.link) dataAttrs['data-link-kind'] = col.link.kind || (col.link.href || col.link.hrefTemplate ? 'external' : 'configured');
 
     return (
-        <td style={tdStyle} className={tdClass} {...dataAttrs}>
+        <td style={tdStyle} className={tdClass} {...dataAttrs} data-forge-cell-kind={col.multiSelect ? 'selection' : col.type}>
             {fixedRowHeight ? <div className="forge-fixed-row-content" title={typeof displayedText === 'string' || typeof displayedText === 'number' ? String(displayedText) : undefined}>{cellContent}</div> : cellContent}
         </td>
     );

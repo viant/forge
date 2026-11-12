@@ -198,3 +198,24 @@ actor scope remain in the host's normal data boundary; these controls contain no
 producer tool names or authorization policy. Hosts must replace context/adapter
 identity when the actor changes so disposed sessions cannot publish stale data.
 Saved presets do not by themselves configure active table-preference persistence.
+
+## Shared workspace table styling
+
+Basic list tables, editable collections (through Basic), dashboard/report tables, and report editable tables consume `src/components/table/tableTheme.css`. Select table styling once
+in the workspace theme; existing and future tables using these renderers inherit
+it without a per-page appearance switch. The renderer does not change fields,
+queries, totals, selection, permissions, paging, or actions.
+
+The recipe consumes the existing table surface, header, muted, hover, border,
+radius, text, link, selection, and typography roles. Additional geometry roles
+are `--forge-table-header-height`, `--forge-table-header-padding-block`,
+`--forge-table-cell-min-height`, `--forge-table-cell-padding-block`,
+`--forge-table-cell-padding-inline`, and `--forge-table-cell-vertical-align`.
+Header type roles are `--forge-table-header-size`,
+`--forge-table-header-weight`, and `--forge-table-header-line-height`.
+`--forge-table-divider` and `--forge-table-toolbar-surface` select quiet
+dividers and toolbar surfaces. Keep reviewed brand values in the workspace.
+
+Explicit cell/row formatting continues to carry producer-declared meaning.
+Responsive cards retain their authored field order and behavior; export and
+print layouts are separate renderers and are not restyled by this web recipe.
