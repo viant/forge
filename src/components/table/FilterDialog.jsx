@@ -3,7 +3,10 @@ import React, { useEffect, useState } from "react";
 import {useSignals} from '@preact/signals-react/runtime';
 import {evaluatePlainVisibleWhen, trackVisibleWhen} from '../visibleWhen.js';
 import './FilterDialog.css';
-import { Button, Checkbox, Classes, Dialog, DialogBody, DialogFooter, HTMLSelect, InputGroup } from "@blueprintjs/core";
+import Button from '../Button.jsx';
+import SelectControl from '../SelectControl.jsx';
+import {typographyProps} from '../Typography.jsx';
+import { Checkbox, Classes, Dialog, DialogBody, DialogFooter, InputGroup } from "@blueprintjs/core";
 import {normalizeSubmittedFilterValue} from './filterValue.js';
 
 const FilterDialog = ({
@@ -79,7 +82,7 @@ const FilterDialog = ({
             isOpen={isOpen}
             onClose={onClose}
             title="Filter"
-            className="forge-filter-dialog"
+            className="forge-filter-dialog forge-foundation-overlay"
         >
             <DialogBody>
                 {visibleSets.length > 1 && (
@@ -89,9 +92,7 @@ const FilterDialog = ({
                             {visibleSets.map((fs) => (
                                 <Button
                                     key={fs.name}
-                                    minimal
-                                    text={fs.name}
-                                    intent={fs.name === activeSet.name ? "primary" : "none"}
+                                    variant={fs.name === activeSet.name ? "primary" : "ghost"}
                                     onClick={() => {
                                         setSelectedSet(fs);
                                         setFilterValues(
@@ -101,7 +102,7 @@ const FilterDialog = ({
                                             }, {}) || {}
                                         );
                                     }}
-                                />
+                                >{fs.name}</Button>
                             ))}
                         </div>
                     </>
@@ -110,7 +111,7 @@ const FilterDialog = ({
                 <div className="forge-filter-dialog__fields">
                     {visibleTemplate.map((tpl) => (
                         <React.Fragment key={tpl.id}>
-                            <label htmlFor={`forge-filter-${tpl.id}`} className="forge-filter-dialog__label">
+                            <label {...typographyProps('label')} htmlFor={`forge-filter-${tpl.id}`} className="forge-filter-dialog__label">
                                 {tpl.label}
                             </label>
                             {tpl.type === 'boolean' ? (
@@ -120,9 +121,9 @@ const FilterDialog = ({
                                     onChange={(e) => handleInputChange(tpl.id, e.target.checked)}
                                 />
                             ) : Array.isArray(tpl.options) ? (
-                                <HTMLSelect
+                                <SelectControl
                                     id={`forge-filter-${tpl.id}`}
-                                    fill
+                                    {...typographyProps('body')}
                                     value={filterValues[tpl.id] ?? ''}
                                     onChange={(e) => handleInputChange(tpl.id, e.target.value)}
                                 >
@@ -130,9 +131,11 @@ const FilterDialog = ({
                                     {tpl.options.map((option) => (
                                         <option key={String(option.value)} value={option.value}>{option.label ?? option.value}</option>
                                     ))}
-                                </HTMLSelect>
+                                </SelectControl>
                             ) : (
                                 <InputGroup
+                                    data-forge-part="input"
+                                    {...typographyProps('body')}
                                     id={`forge-filter-${tpl.id}`}
                                     placeholder={tpl.operator}
                                     value={filterValues[tpl.id] ?? ""}
@@ -145,9 +148,9 @@ const FilterDialog = ({
             </DialogBody>
             <DialogFooter
                 actions={[
-                    <Button key="cancel" text="Cancel" onClick={onClose} />,
-                    <Button key="clear" text="Clear filters" onClick={handleClearFilters} />,
-                    <Button key="ok" intent="primary" text="OK" onClick={handleApplyFilters} />,
+                    <Button key="cancel" variant="secondary" onClick={onClose}>Cancel</Button>,
+                    <Button key="clear" variant="ghost" onClick={handleClearFilters}>Clear filters</Button>,
+                    <Button key="ok" variant="primary" onClick={handleApplyFilters}>OK</Button>,
                 ]}
             />
         </Dialog>

@@ -17,6 +17,7 @@ import TableHeader from "./basic/TableHeader.jsx";
 import FilterDialog from "./FilterDialog.jsx";
 import SettingsDialog from "./SettingsDialog.jsx";
 import "./Basic.css";
+import "./tableTheme.css";
 import Toolbar from "./basic/Toolbar.jsx";
 import TableEmptyState from "./basic/TableEmptyState.jsx";
 import FullContentDialog from "./FullContentDialog.jsx";

@@ -30,6 +30,7 @@ import {editableNumberValue} from './editableTableValue.js';
 import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
 import "./Dashboard.css";
 import "./documentTable.css";
+import "../table/tableTheme.css";
 import SharedIcon from "../Icon.jsx";
 import {documentTableColumns, documentTableLayout} from "./documentTable.js";
 
