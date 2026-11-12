@@ -554,7 +554,10 @@ func (w *visualDashboardWriter) printElement(sheet string, element reportprint.E
 		if err != nil {
 			return err
 		}
-		return w.file.SetCellStyle(sheet, first, last, id)
+		// A merged cell renders text from its anchor. Styling its entire fine
+		// print grid materializes thousands of otherwise blank cells per label.
+		// Keep background and border cells painted by earlier primitives intact.
+		return w.file.SetCellStyle(sheet, first, first, id)
 	case "tableCellDataBar":
 		return w.printDataBar(sheet, element, offset)
 	case "rect":
