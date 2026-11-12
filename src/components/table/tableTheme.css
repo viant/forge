@@ -1,0 +1,71 @@
+/* Shared web table recipe. Workspace-owned roles supply the visual identity.
+ * Basic lists, editable collections (which use Basic), and report tables
+ * consume this file. No page-specific selectors or data transformations. */
+.agently-workspace :is(.basic-table-wrapper, .forge-dashboard-table-wrap, .forge-editable-collection__table-wrap) {
+    color: var(--forge-text);
+    font-family: var(--forge-type-body-family, inherit);
+}
+.agently-workspace .basic-table-wrapper {
+    border-color: var(--forge-table-border);
+    border-radius: var(--forge-table-radius);
+}
+.agently-workspace :is(.forge-dashboard-table-wrap, .forge-editable-collection__table-wrap) {
+    border: var(--forge-border-width, 1px) solid var(--forge-table-border);
+    border-radius: var(--forge-table-radius);
+    background: var(--forge-table-surface);
+}
+.agently-workspace :is(.basic-table-wrapper, .forge-dashboard-table-wrap, .forge-editable-collection__table-wrap) table thead th {
+    height: var(--forge-table-header-height, 32px);
+    padding: var(--forge-table-header-padding-block, 6px) var(--forge-table-cell-padding-inline, 8px);
+    background: var(--forge-table-header-surface);
+    color: var(--forge-table-header-text, var(--forge-text));
+    border-bottom-color: var(--forge-table-divider, var(--forge-table-border));
+    font-family: var(--forge-type-label-family, inherit);
+    font-size: var(--forge-table-header-size, 13px);
+    font-weight: var(--forge-table-header-weight, 600);
+    line-height: var(--forge-table-header-line-height, 18px);
+    text-transform: none;
+    letter-spacing: var(--forge-type-label-letter-spacing, normal);
+}
+.agently-workspace :is(.basic-table-wrapper, .forge-dashboard-table-wrap, .forge-editable-collection__table-wrap) table tbody td {
+    height: var(--forge-table-cell-min-height, var(--forge-table-row-height, auto)) !important;
+    padding: var(--forge-table-cell-padding-block, 10px) var(--forge-table-cell-padding-inline, 14px) !important;
+    vertical-align: var(--forge-table-cell-vertical-align, top);
+    background: var(--forge-table-surface);
+    color: var(--forge-text);
+    border-bottom-color: var(--forge-table-divider, var(--forge-table-border));
+    font-family: var(--forge-type-body-family, inherit);
+    font-size: var(--forge-type-body-size, 14px);
+    font-weight: var(--forge-type-body-weight, 400);
+    line-height: var(--forge-type-body-line-height, 20px);
+}
+.agently-workspace :is(.basic-table-wrapper, .forge-dashboard-table-wrap, .forge-editable-collection__table-wrap) table tbody tr:nth-child(even) td {
+    background: var(--forge-table-muted-surface, var(--forge-table-surface));
+}
+.agently-workspace :is(.basic-table-wrapper, .forge-dashboard-table-wrap, .forge-editable-collection__table-wrap) table tbody tr:hover td {
+    background: var(--forge-table-hover-surface);
+    color: var(--forge-table-hover-text, var(--forge-text));
+}
+.agently-workspace :is(.basic-table-wrapper, .forge-dashboard-table-wrap, .forge-editable-collection__table-wrap) table tbody :is(tr.selected-row, tr[aria-selected="true"]) td {
+    background: var(--forge-selected-background);
+    color: var(--forge-table-selected-text, var(--forge-text));
+    font-weight: var(--forge-type-body-weight, 400);
+}
+.agently-workspace :is(.basic-table-wrapper, .forge-dashboard-table-wrap, .forge-editable-collection__table-wrap) :is(.forge-table-link, .forge-dashboard-table-link) {
+    color: var(--forge-interaction-color);
+    font-family: inherit; font-size: inherit;
+}
+.agently-workspace .basic-table-filterbar {
+    background: var(--forge-table-toolbar-surface, var(--forge-table-surface));
+    border-bottom-color: var(--forge-table-divider, var(--forge-table-border));
+}
+
+.agently-workspace :is(.basic-table-wrapper, .forge-dashboard-table-wrap, .forge-editable-collection__table-wrap) table :is(th, td)[data-forge-cell-kind="selection"],
+.agently-workspace :is(.basic-table-wrapper, .forge-dashboard-table-wrap, .forge-editable-collection__table-wrap) table :is(th, td)[data-forge-cell-kind="button"] {
+    padding-inline: var(--forge-spacing-1, 4px) !important;
+    text-align: center;
+}
+
+.agently-workspace :is(.basic-table-wrapper, .forge-dashboard-table-wrap, .forge-editable-collection__table-wrap) table tbody :is(tr.selected-row, tr[aria-selected="true"]):hover td {
+    background: var(--forge-table-selected-hover-surface, var(--forge-selected-background));
+}

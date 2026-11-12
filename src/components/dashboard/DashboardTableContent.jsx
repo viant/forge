@@ -23,6 +23,7 @@ import { withFrozenIdentifierColumn } from "./tableFrozenIdentifier.js";
 import { renderDashboardTableCell as renderLegacyDashboardTableCell, titleizeDashboardKey } from "./dashboardVisualUtils.jsx";
 import { clampPresentationText, normalizePresentationClampConfig, normalizePresentationText } from "../../utils/presentationText.js";
 import "./documentTable.css";
+import "../table/tableTheme.css";
 import {documentTableLayout} from "./documentTable.js";
 import { buildDashboardTableLayout, resolveDashboardTableColumnMinWidth } from "./dashboardTableLayout.js";
 import Typography from '../Typography.jsx';
@@ -321,7 +322,7 @@ export default function DashboardTableContent({
                         {columnGroups.length>0?<tr>{multiSelect?<th/>:null}{tableHeaderGroups(displayColumns,columnGroups).map((group,index)=><th key={index} scope="colgroup" colSpan={group.span}>{group.label}</th>)}{rowActions.length?<th/>:null}</tr>:null}
                         <tr>
                             {multiSelect ? (
-                                <th style={{width: 42, textAlign: 'center'}}>
+                                <th data-forge-cell-kind="selection" style={{width: 42, textAlign: 'center'}}>
                                     <label className="forge-table-selection-target"><input
                                         type="checkbox"
                                         disabled={container.readOnly === true}
@@ -373,7 +374,7 @@ export default function DashboardTableContent({
                             return (
                                 <tr key={hierarchy?row[hierarchy.keyField]:index} data-hierarchy-key={hierarchy?row[hierarchy.keyField]:undefined} data-hierarchy-level={hierarchyModel?.nodes.get(row[hierarchy?.keyField])?.depth} className={rowClassName} style={rowStyle}>
                                     {multiSelect ? (
-                                        <td style={{textAlign: 'center'}}>
+                                        <td data-forge-cell-kind="selection" style={{textAlign: 'center'}}>
                                             <label className="forge-table-selection-target"><input
                                                 type="checkbox"
                                                 disabled={container.readOnly === true}

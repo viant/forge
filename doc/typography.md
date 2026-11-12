@@ -15,6 +15,41 @@ The renderer supplies generic behavior, semantic hooks and neutral fallback
 recipes. Workspaces supply palettes, font assets, reviewed values, business
 content and variant selection. Customer styling never belongs in shared code.
 
+## Editable theme packages
+
+Use the existing style-resource definition as the portable design package:
+`schemaVersion: 1`, `css`, optional `tokens`, embedded `fonts`, and a host-owned
+`themeCatalog`. The catalog carries named profiles, Light/Dark mode values,
+`defaultTheme`, and `defaultMode`. This is authored data consumed by the existing
+runtime, not a separate renderer or a new npm package for each visual theme.
+
+Forge already exports the reusable implementation through `forge/theme`,
+`forge/components`, `forge/resources/scopedStyles`, and
+`forge/resources/workspaceFonts`. Hosts reuse `prepareResourceStyle` to prepare
+the definition, install its fonts, and apply its CSS. `ForgeThemeProvider` and
+`ForgeThemeBoundary` propagate the selected profile and mode to content and owned
+portals. The host owns package loading, profile selection and publication.
+
+Keep palettes, brand fonts and editable theme values in the host's style resource.
+Keep component anatomy, states, interactions and neutral fallback recipes in
+Forge. Shared components consume semantic variables such as `--forge-text`,
+`--forge-control-bg`, `--forge-table-header-surface`, and the typography roles.
+New tables that reuse the native shared implementations inherit the same recipe.
+Custom or legacy renderers require explicit adoption; a package cannot change
+components that do not consume its roles.
+
+Changing supported color, typography, spacing or state values does not require
+a Forge code release. Adding a new component, state or semantic capability does.
+Review that capability in its owning shared component, release it, then update
+the consuming host before activating a package that depends on it. Never publish
+private theme data or font assets in this public repository.
+
+An authoring host can version the style definition using its existing working
+draft, immutable stamp and selection/release workflow. Saving a draft is distinct
+from activating it. Compare the current remote definition before importing a
+local package, retain the prior selected revision, and verify both modes plus
+hover, focus, pressed, disabled, validation and portal states before activation.
+
 Comparison bars adapt to their own panel width. In narrow dashboard columns,
 the label and value remain above a full-width track even on a wide screen.
 Wide panels retain the inline label/track/value layout; the existing phone
@@ -97,6 +132,20 @@ Render checks reject customer branding in the new shared source and inline
 appearance on new variants. The specimen runs with neutral shared fixtures or
 externally supplied workspace assets. This is bounded foundation evidence, not
 a claim that every legacy control, table interaction or device has migrated.
+
+## Shared web table styling
+
+List tables, editable collections, report tables and report editing tables share
+`src/components/table/tableTheme.css`. Their common geometry and appearance
+consume workspace roles documented in [Table behavior](table-behavior.md).
+Update that shared recipe when a pattern changes; do not create a separate table
+renderer or page-specific styling copy. Workspace CSS owns brand values.
+Producer-declared data formatting, permissions and interactions retain their owners.
+
+Shared table toolbar and pagination controls consume the same workspace surface,
+text, hover, disabled and font roles as other controls while retaining their native
+dimensions and callbacks. Danger actions can select `--forge-danger-hover-bg` for an exact workspace-owned
+state color; otherwise the existing neutral recipe remains.
 
 ## Anchored panels stay visible
 

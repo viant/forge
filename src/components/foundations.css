@@ -51,7 +51,7 @@
 .forge-button[data-forge-variant="link"] { color: var(--forge-interaction-color); text-decoration: underline; text-underline-offset: .2em; }
 .forge-button[data-forge-variant]:not(:disabled):hover { background: var(--forge-surface-subtle); border-color: var(--forge-border-strong); }
 .forge-button[data-forge-variant="primary"]:not(:disabled):hover { background: var(--forge-button-hover-bg, color-mix(in srgb, var(--forge-button-bg) 88%, var(--forge-control-text))); border-color: transparent; }
-.forge-button[data-forge-variant="danger"]:not(:disabled):hover { background: color-mix(in srgb, var(--forge-status-danger-foreground) 90%, var(--forge-text)); }
+.forge-button[data-forge-variant="danger"]:not(:disabled):hover { background: var(--forge-danger-hover-bg, color-mix(in srgb, var(--forge-status-danger-foreground) 90%, var(--forge-text))); }
 .forge-button[data-forge-variant]:not(:disabled):active { background: var(--forge-selected-background); }
 .forge-button[data-forge-variant="primary"]:not(:disabled):active { background: var(--forge-button-active-bg, color-mix(in srgb, var(--forge-button-bg) 80%, var(--forge-control-text))); }
 .forge-button[data-forge-variant]:disabled { background: var(--forge-disabled-bg); color: var(--forge-disabled-text); border-color: transparent; cursor: default; }
@@ -80,3 +80,32 @@
     .forge-button[data-forge-variant][data-forge-size] { min-height: 44px; min-width: 44px; }
 }
 @media (prefers-reduced-motion: reduce) { .forge-button[data-forge-variant], .forge-segmented-control__option[data-forge-type] { transition-duration: 0s; } .forge-button__busy { animation: none; } }
+
+/* Native table toolbar/pager controls reuse workspace roles just like Button.
+ * Preserve existing dimensions, actions, keyboard targets and disabled state. */
+.agently-workspace :is(.toolbar-container, .pagination-bar) :is(.bp6-button, .bp4-button) {
+    background: var(--forge-control-bg);
+    color: var(--forge-text-muted);
+    font-family: var(--forge-font-family, inherit);
+}
+.agently-workspace :is(.toolbar-container, .pagination-bar) :is(.bp6-button, .bp4-button):not(:disabled):hover {
+    background: var(--forge-surface-subtle);
+    color: var(--forge-interaction-hover-color);
+}
+.agently-workspace :is(.toolbar-container, .pagination-bar) :is(.bp6-button, .bp4-button):disabled {
+    background: var(--forge-control-bg);
+    color: var(--forge-disabled-text);
+}
+.agently-workspace [data-forge-part="input"]::placeholder {
+    color: var(--forge-text-muted);
+    opacity: 1;
+}
+.agently-workspace .forge-foundation-overlay,
+.agently-workspace .forge-foundation-overlay :is(.bp6-dialog-header, .bp6-dialog-footer, .bp6-heading) {
+    background: var(--forge-surface-raised, var(--forge-surface));
+    color: var(--forge-text);
+    font-family: var(--forge-font-family, inherit);
+}
+.agently-workspace[data-forge-theme][data-forge-color-mode] [data-forge-part="validation-message"][role="alert"] {
+    color: var(--forge-invalid-border, var(--forge-status-danger-foreground));
+}
