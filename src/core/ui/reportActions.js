@@ -63,7 +63,13 @@ export async function invokeReportWindowAction(windowId, action, input = {}) {
   if (typeof handler !== 'function') {
     throw new Error(`report action is unavailable: ${actionName}`);
   }
-  const result = await handler(input);
+  let result = await handler(input);
+  // Older report surfaces may only implement an immediate snapshot. Never
+  // silently call that a completed wait, and never start a run on their behalf.
+  if (actionName === 'getCurrent' && input.waitForCompletion === true &&
+      (['loading','running'].includes(result?.status) || result?.materialization?.status === 'running') && result?.ok !== false) {
+    result = {...result,ok:false,status:'wait_unavailable',error:'This report surface cannot wait for completion; inspect its current state.'};
+  }
   return actionName === 'getCurrent' ? structuredClone(projectCurrentReport(result, input.include)) : result;
 }
 

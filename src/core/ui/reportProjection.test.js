@@ -40,3 +40,8 @@ const release = registerReportWindowActions('state-only', {getCurrent: () => ({
 assert.equal((await invokeReportWindowAction('state-only','getCurrent',{include:{state:true}})).status,'ready');
 release();
 console.log('Report projection checks passed');
+
+const stopImmediate = registerReportWindowActions('legacy-pending', {getCurrent:()=>({ok:true,status:'loading',hasCompletedRun:false})});
+assert.equal((await invokeReportWindowAction('legacy-pending','getCurrent')).status,'loading');
+assert.equal((await invokeReportWindowAction('legacy-pending','getCurrent',{waitForCompletion:true,include:{state:true}})).status,'wait_unavailable');
+stopImmediate();

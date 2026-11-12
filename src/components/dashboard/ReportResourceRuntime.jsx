@@ -1,7 +1,7 @@
 import {readVisibleReport} from "../../core/ui/reportVisible.js";
 import NativeControlTarget from "../../runtime/NativeControlTarget.jsx";
 import {registerReportWindowActions} from "../../core/ui/reportActions.js";
-import React, {useCallback, useEffect, useRef, useState} from "react";
+import React, {useCallback, useEffect, useLayoutEffect, useRef, useState} from "react";
 import {Button, Callout, Spinner} from "@blueprintjs/core";
 import ReportPrintPreview from "./ReportPrintPreview.jsx";
 import ReportRuntime from "./ReportRuntime.jsx";
@@ -71,6 +71,16 @@ export default function ReportResourceRuntime({container, context, onViewStateCh
         setMetricState(previous => ({identity:sourceIdentity,selections:{...(previous?.identity===sourceIdentity ? previous.selections : {}),[blockId]:selection}}));
     };
     const pendingRun = useRef(null);
+    const completion = useRef(null);
+    const currentRead = useRef(null);
+    useEffect(() => () => {
+        completion.current?.finish({status:'closed',error:'Report window closed while waiting.'});
+    }, []);
+    useLayoutEffect(() => {
+        const waiting = completion.current;
+        if (!waiting || waiting.generation !== generation.current || progress) return;
+        if (runResult?.version === waiting.generation || error) waiting.finish();
+    }, [runResult, error, progress]);
     const metadataCache = useRef(null);
     const [metadataRefreshing, setMetadataRefreshing] = useState(false);
     const displayedSection = visibleSectionId || selectedSectionId || result?.reportSpec?.blocks?.find(block=>block.kind==='tabGroupBlock')?.defaultSectionId || '';
@@ -97,7 +107,11 @@ export default function ReportResourceRuntime({container, context, onViewStateCh
     const runReport = services.reportStore?.runReport;
     const executeOnOpen = parameters.executeOnOpen === true;
     const run = useCallback(async () => {
+        completion.current?.finish({status:'superseded',error:'Report execution was superseded.'});
         const current = ++generation.current;
+        let finish;
+        const promise = new Promise(resolve => {finish=resolve;});
+        completion.current = {generation:current,promise,finish};
         if (!canSelectMetrics) setMetricState(null);
         setRunResult(null); setSectionSnapshot(null); setMetadataRefreshing(false); setError(""); setProgress("Running the selected report revision.");
         try {
@@ -147,7 +161,7 @@ export default function ReportResourceRuntime({container, context, onViewStateCh
             if (pending.snapshot) pending.updateListener(pending.snapshot);
             const value = await pending.promise;
             if (current === generation.current) {setSectionSnapshot(null);setRunResult({result:value, request:pending.request, version:current});}
-        } catch (failure) {if (current === generation.current) {setSectionSnapshot(null);setError(failure instanceof ReportMetadataRefreshError ? failure.message : reportResourceFailureMessage(failure));}}
+        } catch (failure) {if (current === generation.current) {completion.current.failure=failure;setSectionSnapshot(null);setError(failure instanceof ReportMetadataRefreshError ? failure.message : reportResourceFailureMessage(failure));}}
         finally {if (current === generation.current) setProgress("");}
     }, [identity, canRun, runReport, canSelectMetrics, actionPin, getReport]);
     useEffect(() => {
@@ -156,7 +170,7 @@ export default function ReportResourceRuntime({container, context, onViewStateCh
         if (executeOnOpen || canSelectMetrics && Object.keys(metricSelections).length > 0) void run();
         // The host contract has no abort signal. Invalidate UI ownership so a
         // late result cannot replace a newer selection or update a closed view.
-        return () => {++generation.current;};
+        return () => {++generation.current;completion.current?.finish({status:'superseded',error:'Report execution was superseded.'});};
     }, [identity, executeOnOpen, run]);
     const unexportedMetricSelection = !canSelectMetrics && Object.keys(metricSelections).length > 0;
     // A manual rerun can keep the same parameters. Its output still belongs to
@@ -180,7 +194,7 @@ export default function ReportResourceRuntime({container, context, onViewStateCh
         }});
     const windowId=context?.identity?.windowId || context?.windowState?.windowId;
     const controls = reportResourceControls({canRun, canExport, result, progress});
-    useEffect(()=>{
+    useLayoutEffect(()=>{
         const current={ok:true,windowId,
             reportId:pin?.uri || '',reportName:displayedTitle,sourceKind:'resource',
             request:{parameters:structuredClone(parameters.prefill || {})},
@@ -195,11 +209,29 @@ export default function ReportResourceRuntime({container, context, onViewStateCh
             parameters:current.request.parameters,draftParameters:current.draftParameters,canRun:current.canRun,canSave:current.canSave,
             canExport:current.canExport,hasCompletedRun:current.hasCompletedRun,runControlId:current.runControlId,error:current.error,progress:current.progress});
         if(!windowId)return;
-        return registerReportWindowActions(windowId,{getCurrent:({include} = {})=>{
+        currentRead.current = ({include} = {}) => {
             const completed=runResult?.version===generation.current?runResult:null;
             return {...current,hasCompletedRun:!!completed,
                 ...(include?.visible && !include.raw && completed && current.status === "ready" ? {visible:readVisibleReport(rendererRoot.current)} : {}),
                 ...(completed?{reportSpec:completed.result.reportSpec,reportFill:completed.result.reportFill}: {})};
+        };
+        return registerReportWindowActions(windowId,{getCurrent:async(input = {})=>{
+            if (input.waitForCompletion === true && currentRead.current?.().status === 'loading') {
+                const waiting = completion.current;
+                if (!waiting) throw new Error('Report completion is unavailable for this execution.');
+                let timer;
+                try {
+                    const timeout = Number.isFinite(input.timeoutMs) && input.timeoutMs > 0 ? input.timeoutMs : 330000;
+                    const outcome = await Promise.race([waiting.promise,new Promise(resolve=>{
+                        timer=setTimeout(()=>resolve({status:'timeout',error:'Timed out waiting for report completion; execution may still be running.'}),timeout);
+                    })]);
+                    if (outcome) return {...currentRead.current(input),ok:false,...outcome};
+                    if (waiting.generation !== generation.current) return {...currentRead.current(input),ok:false,status:'superseded',error:'Report execution was superseded.'};
+                } finally {clearTimeout(timer);}
+            }
+            const snapshot=currentRead.current(input);
+            return input.waitForCompletion === true && snapshot.status === 'error'
+                ? {...snapshot,ok:false,...(completion.current?.failure?.name === 'AbortError' ? {status:'cancelled'} : {})} : snapshot;
         }});
     },[onViewStateChange,windowId,identity,displayedTitle,displayedStatus,displayedSection,canRun,runReport,error,progress,runResult,context?.windowState?.windowForm,controls.exportDisabled,output.busy]);
     const tables=parameters.reportCapabilities?.tableBlockSelection===true?result?.reportSpec?.blocks?.filter(block=>block.kind==='tableBlock'):undefined;

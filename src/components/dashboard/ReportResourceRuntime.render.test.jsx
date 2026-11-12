@@ -705,3 +705,119 @@ it('uses the completed report title for a queued XLSX fallback without extra rep
   expect(run).toHaveBeenCalledOnce();expect(submitResource).toHaveBeenCalledOnce();expect(getStatus).toHaveBeenCalledOnce();expect(getArtifact).toHaveBeenCalledOnce();
  }finally{await view.close();URL.createObjectURL=create;URL.revokeObjectURL=revoke;click.mockRestore();vi.useRealTimers()}
 });
+
+
+// Synthetic report fixtures: no external records or producer dependencies.
+it('waits for the current run and rendered state without executing another run',async()=>{
+ const {invokeReportWindowAction}=await import('../../core/ui/reportActions.js');
+ const pending=deferred(),runner=vi.fn(()=>pending.promise),windowId='wait-example';
+ const view=await mount(runner,{executeOnOpen:true},{},undefined,{identity:{windowId}});
+ document.body.append(view.host);
+ try {
+  const immediate=await invokeReportWindowAction(windowId,'getCurrent',{include:{state:true}});
+  expect(immediate.status).toBe('loading');expect(immediate.hasCompletedRun).toBe(false);
+  let settled=false;
+  const waiting=invokeReportWindowAction(windowId,'getCurrent',{waitForCompletion:true,include:{state:true}}).then(value=>{settled=true;return value;});
+  await Promise.resolve();expect(settled).toBe(false);
+  await act(async()=>pending.resolve(result()));
+  const completed=await waiting;
+  expect(completed).toMatchObject({ok:true,status:'ready',hasCompletedRun:true});
+  expect(completed.reportSpec).toBeUndefined();expect(completed.reportFill).toBeUndefined();
+  for(const element of view.host.querySelectorAll('[data-forge-report-active-section], [data-report-runtime-block-id]')) element.checkVisibility=()=>true;
+  const visible=await invokeReportWindowAction(windowId,'getCurrent',{waitForCompletion:true,include:{visible:true}});
+  expect(JSON.stringify(visible.visible)).toContain('Visible KPI');
+  expect(runner).toHaveBeenCalledTimes(1);
+ }finally{await view.close();view.host.remove();}
+});
+
+it('returns idle immediately when waiting and never starts a report',async()=>{
+ const {invokeReportWindowAction}=await import('../../core/ui/reportActions.js');
+ const runner=vi.fn(),windowId='wait-idle';const view=await mount(runner,{}, {},undefined,{identity:{windowId}});
+ try {expect(await invokeReportWindowAction(windowId,'getCurrent',{waitForCompletion:true})).toMatchObject({status:'idle',hasCompletedRun:false});expect(runner).not.toHaveBeenCalled();}finally{await view.close();}
+});
+
+it('preserves execution failure in a waiting read',async()=>{
+ const {invokeReportWindowAction}=await import('../../core/ui/reportActions.js');
+ const pending=deferred(),runner=vi.fn(()=>pending.promise),windowId='wait-failure';const view=await mount(runner,{executeOnOpen:true},{},undefined,{identity:{windowId}});
+ try {
+  const waiting=invokeReportWindowAction(windowId,'getCurrent',{waitForCompletion:true,include:{state:true}});
+  await act(async()=>pending.reject(new Error('private upstream detail')));
+  expect(await waiting).toMatchObject({ok:false,status:'error',hasCompletedRun:false});
+  expect((await waiting).error).not.toContain('private upstream detail');expect(runner).toHaveBeenCalledOnce();
+ }finally{await view.close();}
+});
+
+it('times out only the read and allows the same report to finish',async()=>{
+ const {invokeReportWindowAction}=await import('../../core/ui/reportActions.js');
+ const pending=deferred(),runner=vi.fn(()=>pending.promise),windowId='wait-timeout';const view=await mount(runner,{executeOnOpen:true},{},undefined,{identity:{windowId}});
+ try {
+  const timed=await invokeReportWindowAction(windowId,'getCurrent',{waitForCompletion:true,timeoutMs:5,include:{state:true}});
+  expect(timed).toMatchObject({ok:false,status:'timeout',hasCompletedRun:false});
+  await act(async()=>pending.resolve(result()));
+  expect(await invokeReportWindowAction(windowId,'getCurrent',{include:{state:true}})).toMatchObject({ok:true,status:'ready',hasCompletedRun:true});
+  expect(runner).toHaveBeenCalledOnce();
+ }finally{await view.close();}
+});
+
+it('settles a waiting read on close even when the producer is still pending',async()=>{
+ const {invokeReportWindowAction}=await import('../../core/ui/reportActions.js');
+ const pending=deferred(),windowId='wait-close';const view=await mount(vi.fn(()=>pending.promise),{executeOnOpen:true},{},undefined,{identity:{windowId}});
+ const waiting=invokeReportWindowAction(windowId,'getCurrent',{waitForCompletion:true,include:{state:true}});
+ await view.close();expect(await waiting).toMatchObject({ok:false,status:'closed'});
+ pending.resolve(result());
+});
+
+it('does not substitute a newer run for the execution a read was waiting on',async()=>{
+ const {invokeReportWindowAction}=await import('../../core/ui/reportActions.js');
+ const first=deferred(),second=deferred(),runner=vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise),windowId='wait-superseded';
+ const view=await mount(runner,{executeOnOpen:true,prefill:{period:'first'}},{},undefined,{identity:{windowId}});
+ try {
+  const waiting=invokeReportWindowAction(windowId,'getCurrent',{waitForCompletion:true,include:{state:true}});
+  await view.render({prefill:{period:'second'}});
+  expect(await waiting).toMatchObject({ok:false,status:'superseded'});
+  const current=invokeReportWindowAction(windowId,'getCurrent',{waitForCompletion:true,include:{state:true}});
+  await act(async()=>second.resolve(result()));
+  expect(await current).toMatchObject({status:'ready',request:{parameters:{period:'second'}}});
+  await act(async()=>first.resolve(result(pin,'Old report')));
+  expect((await invokeReportWindowAction(windowId,'getCurrent')).reportSpec.title).toBe('Server report');
+  expect(runner).toHaveBeenCalledTimes(2);
+ }finally{await view.close();}
+});
+
+it('keeps completion waits isolated between report windows',async()=>{
+ const {invokeReportWindowAction}=await import('../../core/ui/reportActions.js');
+ const a=deferred(),b=deferred();
+ const first=await mount(vi.fn(()=>a.promise),{executeOnOpen:true},{},undefined,{identity:{windowId:'wait-first'}});
+ const second=await mount(vi.fn(()=>b.promise),{executeOnOpen:true},{},undefined,{identity:{windowId:'wait-second'}});
+ try {
+  let secondSettled=false;
+  const wa=invokeReportWindowAction('wait-first','getCurrent',{waitForCompletion:true,include:{state:true}});
+  const wb=invokeReportWindowAction('wait-second','getCurrent',{waitForCompletion:true,include:{state:true}}).then(value=>{secondSettled=true;return value;});
+  await act(async()=>a.resolve(result()));expect((await wa).status).toBe('ready');expect(secondSettled).toBe(false);
+  await act(async()=>b.resolve(result()));expect((await wb).status).toBe('ready');
+ }finally{await first.close();await second.close();}
+});
+
+it('distinguishes a cancelled execution from a waiting-read timeout',async()=>{
+ const {invokeReportWindowAction}=await import('../../core/ui/reportActions.js');
+ const pending=deferred(),windowId='wait-cancelled';const view=await mount(vi.fn(()=>pending.promise),{executeOnOpen:true},{},undefined,{identity:{windowId}});
+ try {
+  const waiting=invokeReportWindowAction(windowId,'getCurrent',{waitForCompletion:true,include:{state:true}});
+  await act(async()=>pending.reject(Object.assign(new Error('aborted'),{name:'AbortError'})));
+  expect(await waiting).toMatchObject({ok:false,status:'cancelled',hasCompletedRun:false});
+ }finally{await view.close();}
+});
+
+it('returns newly mounted visible content from the same waiting read',async()=>{
+ const {invokeReportWindowAction}=await import('../../core/ui/reportActions.js');
+ const original=Object.getOwnPropertyDescriptor(HTMLElement.prototype,'checkVisibility');
+ Object.defineProperty(HTMLElement.prototype,'checkVisibility',{configurable:true,value:()=>true});
+ const pending=deferred(),windowId='wait-visible';const view=await mount(vi.fn(()=>pending.promise),{executeOnOpen:true},{},undefined,{identity:{windowId}});
+ document.body.append(view.host);
+ try {
+  const waiting=invokeReportWindowAction(windowId,'getCurrent',{waitForCompletion:true,include:{visible:true}});
+  await act(async()=>pending.resolve(result()));
+  expect(await waiting).toMatchObject({status:'ready',hasCompletedRun:true,visible:{blocks:[{id:'metric',text:'Visible KPI'}]}});
+  expect(await waiting).not.toHaveProperty('reportFill');
+ }finally{await view.close();view.host.remove();if(original)Object.defineProperty(HTMLElement.prototype,'checkVisibility',original);else delete HTMLElement.prototype.checkVisibility;}
+});
