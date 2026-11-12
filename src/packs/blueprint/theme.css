@@ -257,7 +257,7 @@
 }
 /* Blueprint's global :focus outline must not become a mouse selection state. */
 :where(.agently-application, .agently-workspace) :where(button, [role="button"], [role="tab"], a[href]):focus:not(:focus-visible) {
-    outline: none;
+    outline: 0;
 }
 :where(.agently-application, .agently-workspace) :where(button, [role="button"], [role="tab"], a[href]):focus-visible {
     outline: var(--forge-focus-width, 2px) solid var(--forge-focus-color, currentColor);

@@ -1,3 +1,4 @@
+import UnifiedIcon from '../Icon.jsx';
 import React, { useState, useEffect } from "react";
 import './SettingsDialog.css';
 import TableViewPresets from './TableViewPresets.jsx';
@@ -97,7 +98,7 @@ const SettingsDialog = ({
                     <MenuItem
                         key={col.id}
                         text={col.displayName || col.name}
-                        icon={col.visible ? "eye-open" : "eye-off"}
+                        icon={(iconName => iconName ? <UnifiedIcon name={iconName}/> : iconName)(col.visible ? "eye-open" : "eye-off")}
                         onClick={() => handleToggleVisible(col.id)}
                     />
                 ))}
@@ -114,13 +115,13 @@ const SettingsDialog = ({
                             <h5>{col.displayName || col.name}</h5>
                             <div>
                                 <Button
-                                    icon="arrow-up"
+                                    icon={<UnifiedIcon name="arrow-up"/>}
                                     minimal
                                     disabled={index === 0}
                                     onClick={() => handleMoveUp(col.id)}
                                 />
                                 <Button
-                                    icon="arrow-down"
+                                    icon={<UnifiedIcon name="arrow-down"/>}
                                     minimal
                                     disabled={index === localColumns.length - 1}
                                     onClick={() => handleMoveDown(col.id)}

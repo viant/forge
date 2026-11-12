@@ -50,6 +50,9 @@
 .forge-button:is([data-forge-variant="ghost"], [data-forge-variant="link"]) { background: transparent; border-color: transparent; }
 .forge-button[data-forge-variant="link"] { color: var(--forge-interaction-color); text-decoration: underline; text-underline-offset: .2em; }
 .forge-button[data-forge-variant]:not(:disabled):hover { background: var(--forge-surface-subtle); border-color: var(--forge-border-strong); }
+/* Quiet variants never acquire an outline-like hover border. Keyboard focus
+ * remains a separate, visible state. */
+.forge-button:is([data-forge-variant="ghost"], [data-forge-variant="link"]):not(:disabled):is(:hover, :active) { border-color: transparent; box-shadow: none; }
 .forge-button[data-forge-variant="primary"]:not(:disabled):hover { background: var(--forge-button-hover-bg, color-mix(in srgb, var(--forge-button-bg) 88%, var(--forge-control-text))); border-color: transparent; }
 .forge-button[data-forge-variant="danger"]:not(:disabled):hover { background: var(--forge-danger-hover-bg, color-mix(in srgb, var(--forge-status-danger-foreground) 90%, var(--forge-text))); }
 .forge-button[data-forge-variant]:not(:disabled):active { background: var(--forge-selected-background); }
@@ -109,3 +112,10 @@
 .agently-workspace[data-forge-theme][data-forge-color-mode] [data-forge-part="validation-message"][role="alert"] {
     color: var(--forge-invalid-border, var(--forge-status-danger-foreground));
 }
+
+/* Existing Blueprint quiet actions share the same semantic state recipe. */
+:is(.agently-application, .agently-workspace) .bp6-button.bp6-minimal:not([class*="bp6-intent-"]) { color: var(--forge-text, var(--agently-theme-text, inherit)); border-color: transparent; box-shadow: none; }
+:is(.agently-application, .agently-workspace) .bp6-button.bp6-minimal:not(:disabled):hover { background: var(--forge-surface-subtle, var(--agently-theme-surface-subtle)); border-color: transparent; box-shadow: none; }
+:is(.agently-application, .agently-workspace) .bp6-button.bp6-minimal:not(:disabled):active { background: var(--forge-selected-background, var(--agently-theme-selected-background)); border-color: transparent; }
+:is(.agently-application, .agently-workspace) .bp6-button.bp6-minimal:focus:not(:focus-visible) { outline: 0; box-shadow: none; }
+:is(.agently-application, .agently-workspace) .bp6-button.bp6-minimal:focus-visible { outline: var(--forge-focus-width, 2px) solid var(--forge-focus-color, var(--agently-theme-focus)); outline-offset: var(--forge-focus-offset, 2px); box-shadow: none; }

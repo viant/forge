@@ -90,7 +90,7 @@ export default function FoundationSpecimen({iconExamples = ['menu', 'search', 'p
                 <Button variant="danger">Remove example</Button><Button variant="secondary" size="compact">Compact action</Button>
                 <Button variant="primary" disabled>Unavailable action</Button><Button variant="primary" loading>Saving example</Button>
                 <Button variant="ghost" size="compact" icon="lucide:panel-right" hideLabel aria-label="Show example panel" onClick={() => setDialog(true)}/>
-                <BlueprintButton minimal icon="refresh" aria-label="Reset example count" onClick={() => setSaved(0)}/>
+                <BlueprintButton minimal icon={<Icon name="lucide:refresh-cw"/>} aria-label="Reset example count" onClick={() => setSaved(0)}/>
             </div>
             <Typography as="p" typeRole="metadata" role="status">Example saved {saved} {saved === 1 ? 'time' : 'times'}.</Typography>
             <SectionTabRail ariaLabel="Example sections" items={['overview', 'records', 'schedule', 'sources', 'settings', 'history'].map(id => ({id, label:id.charAt(0).toUpperCase()+id.slice(1)}))} selectedId={section} onChange={setSection}/>

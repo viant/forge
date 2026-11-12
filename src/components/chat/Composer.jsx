@@ -2,7 +2,7 @@ import Popover from '../Popover.jsx';
 // Composer.jsx – TextArea prompt with send/upload/tools controls
 import React, { useCallback, useEffect, useMemo, useRef, useState, useLayoutEffect } from "react";
 import { Button, Menu, MenuDivider, MenuItem, Tag, TextArea } from "@blueprintjs/core";
-import { PaperPlaneRight, Stop, Microphone, ListBullets, UserCircle, Lightbulb, Brain, ImageSquare, XCircle, CaretDown, CaretUp } from '@phosphor-icons/react';
+
 import {isUnresolvedUpload} from '../../hooks/useUpload.js';
 import DocumentComposer from './DocumentComposer.jsx';
 import {typographyProps} from '../Typography.jsx';
@@ -749,11 +749,11 @@ export default function Composer({
     const showAbortButton = !!showAbort;
     const terminateOverridesSubmit = showAbortButton && !commandCenter;
     const submitIconEl = isQueueMode ? (
-        <ListBullets size={18} weight="fill" />
+        <Icon name="lucide:list" />
     ) : (
-        <PaperPlaneRight size={18} weight="fill" />
+        <Icon name="lucide:send" />
     );
-    const abortIconEl = <Stop size={18} weight="fill" />;
+    const abortIconEl = <Icon name="lucide:square" />;
 
     const hasToolsPicker = Array.isArray(toolOptions) ? toolOptions.length > 0 : Array.isArray(tools) && tools.length > 0;
     const effectiveToolOptions = Array.isArray(toolOptions)
@@ -1382,7 +1382,7 @@ export default function Composer({
 	            aria-expanded={agentOpen}
 	            title={`Agent: ${currentAgentLabel}`}
 	            className="composer-icon-btn composer-icon-btn--agent composer-icon-btn--labelText"
-	            icon={<UserCircle size={20} weight="duotone" />}
+	            icon={<Icon name="lucide:circle-user" />}
 	            text={currentAgentLabel}
 	            onClick={(e) => { e.preventDefault(); setAgentOpen((v) => !v); }}
 	        />,
@@ -1397,7 +1397,7 @@ export default function Composer({
 	            aria-label="Model"
 	            title={`Model: ${currentModelLabel}`}
 	            className="composer-icon-btn composer-icon-btn--model composer-icon-btn--labelText"
-	            icon={<Brain size={20} weight="duotone" />}
+	            icon={<Icon name="lucide:brain" />}
 	            text={currentModelLabel}
 	            onClick={(e) => { e.preventDefault(); setModelOpen((v) => !v); }}
 	        />,
@@ -1439,7 +1439,7 @@ export default function Composer({
 	            small
 	            disabled={disabled}
 	            data-testid="chat-composer-reasoning"
-	            icon={<Lightbulb size={18} weight="duotone" />}
+	            icon={<Icon name="lucide:lightbulb" />}
 	            className="composer-icon-btn composer-icon-btn--reasoning composer-icon-btn--labelText"
 	            aria-label="Reasoning"
 	            title={String(reasoningValue || '').trim() ? `Reasoning: ${reasoningValue}` : 'Reasoning: default'}
@@ -1470,11 +1470,11 @@ export default function Composer({
 	                <div className="composer-shell" data-testid="chat-composer-shell">
 	                <div className="composer-bar" data-testid="chat-composer-bar">
 	                    <div className="composer-bar-left">
-                        {draft.length > 0 && <Button type="button" minimal small disabled={disabled} icon={<XCircle size={20} weight="fill" />} className="composer-icon-btn composer-icon-btn--clear" aria-label="Clear message" title="Clear message" onClick={() => setDraft('')} />}
-                        <Button type="button" minimal small disabled={disabled} icon={composerCollapsed ? <CaretUp size={20} /> : <CaretDown size={20} />} className="composer-icon-btn composer-icon-btn--collapse" aria-label={composerCollapsed ? 'Expand composer' : 'Collapse composer'} title={composerCollapsed ? 'Expand composer' : 'Collapse composer'} aria-expanded={!composerCollapsed} onClick={() => setComposerCollapsed(value => !value)} />
+                        {draft.length > 0 && <Button type="button" minimal small disabled={disabled} icon={<Icon name="lucide:circle-x" />} className="composer-icon-btn composer-icon-btn--clear" aria-label="Clear message" title="Clear message" onClick={() => setDraft('')} />}
+                        <Button type="button" minimal small disabled={disabled} icon={composerCollapsed ? <Icon name="lucide:chevron-up" /> : <Icon name="lucide:chevron-down" />} className="composer-icon-btn composer-icon-btn--collapse" aria-label={composerCollapsed ? 'Expand composer' : 'Collapse composer'} title={composerCollapsed ? 'Expand composer' : 'Collapse composer'} aria-expanded={!composerCollapsed} onClick={() => setComposerCollapsed(value => !value)} />
                         {showUpload && withTooltip(
                             <Button
-                                icon={<ImageSquare size={20} />}
+                                icon={<Icon name="lucide:image" />}
                                 minimal
                                 small
                                 disabled={disabled}
@@ -1578,7 +1578,7 @@ export default function Composer({
                                 title={micTooltip || (micOn ? 'Disable mic' : 'Enable mic')}
                                 onClick={(e) => { e.preventDefault(); toggleMic(); }}
                             >
-                                {micOn ? <Stop size={18} weight="fill" /> : <Microphone size={18} />}
+                                {micOn ? <Icon name="lucide:square" /> : <Icon name="lucide:mic" />}
                             </Button>,
                             micTooltip
                         )}
@@ -1870,7 +1870,7 @@ export default function Composer({
                             aria-label={micTooltip || (micOn ? 'Disable mic' : 'Enable mic')}
                             title={micTooltip || (micOn ? 'Disable mic' : 'Enable mic')}
                         >
-                            {micOn ? <Stop size={18} weight="fill" /> : <Microphone size={18} />}
+                            {micOn ? <Icon name="lucide:square" /> : <Icon name="lucide:mic" />}
                         </Button>,
                         micTooltip
                     )}

@@ -17,7 +17,7 @@
     padding: var(--forge-spacing-5, 24px) var(--forge-spacing-4, 16px);
     gap: var(--forge-spacing-4, 16px);
     color: var(--chat-text);
-    background: var(--chat-surface);
+    background: var(--forge-canvas, var(--agently-theme-canvas));
 }
 .forge-document-chat.is-starting { gap: 0; overflow: auto; padding: 76px 36px 50px; background: var(--forge-canvas, var(--agently-theme-canvas)); }
 .forge-document-chat.is-starting > * { width: min(100%, 748px); margin-inline: auto; flex: none; }

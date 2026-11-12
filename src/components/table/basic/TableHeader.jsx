@@ -1,5 +1,6 @@
+import UnifiedIcon from '../../Icon.jsx';
 import React from "react";
-import { Icon, Tooltip, Position } from "@blueprintjs/core";
+import {Tooltip, Position} from '@blueprintjs/core';
 
 const TableHeader = ({ context,
                        fillerWidth = 0, columns, tableTitle, sortConfig }) => {
@@ -64,15 +65,15 @@ const TableHeader = ({ context,
                 ) : null}
                 <span className="forge-table-header-label">{displayName || name}</span>
                 {col.sortable && (
-                    <Icon
-                        icon={
+                    <UnifiedIcon
+                        name={
                             sortColumnId === col.id
                                 ? sortDirection === "asc"
                                     ? "chevron-up"
                                     : "chevron-down"
                                 : "double-caret-vertical"
                         }
-                        intent="primary"
+
                         style={{ marginLeft: 4 }}
                     />
                 )}

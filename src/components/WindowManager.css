@@ -59,7 +59,7 @@
   border: 0; border-radius: 4px; background: transparent;
   color: var(--forge-text-muted, #5b6677); cursor: pointer; --forge-icon-size: 14px;
 }
-.forge-window-tab-action:hover { background: var(--forge-control-bg, #e9edf3); }
+.forge-window-tab-action:hover { background: var(--forge-surface-subtle, var(--forge-control-bg, #e9edf3)); }
 .forge-window-manager-tab > button:focus-visible {
   outline: 2px solid var(--forge-focus-color, #215db0); outline-offset: -2px;
 }

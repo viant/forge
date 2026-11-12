@@ -1,8 +1,9 @@
+import UnifiedIcon from '../../Icon.jsx';
 /* ------------------------------------------------------------------
  * TableBackfill - Renders blank rows to fill space if needed
  * ------------------------------------------------------------------ */
 import React from "react";
-import {Colors, Icon} from "@blueprintjs/core";
+import {Colors} from '@blueprintjs/core';
 import SoftSkeleton from '../../SoftSkeleton.jsx';
 import { formatDataSourceError } from "../../../utils/dataSourceError.js";
 
@@ -24,9 +25,9 @@ const TableBackfill = ({context, fixedRowHeight, rowCount, colSpan, collection})
                     <div className="table-state-message" role={error ? "alert" : "status"}>
                     {loading && !error ? (<SoftSkeleton lines={1} height={10} />) : null}
                     {noData && !disabled && !loading && !error ? (
-                        <span style={{color: Colors.BLUE3}}><Icon icon="info-sign"></Icon> No data. </span>) : null}
+                        <span style={{color: Colors.BLUE3}}><UnifiedIcon name="info-sign"></UnifiedIcon> No data. </span>) : null}
                     {error ?
-                        <span className="forge-table-error-message"><Icon icon="error"></Icon> {errorMessage} </span> : null}
+                        <span className="forge-table-error-message"><UnifiedIcon name="error"></UnifiedIcon> {errorMessage} </span> : null}
                     </div>
                 </td>
             </tr>);

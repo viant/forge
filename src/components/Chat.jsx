@@ -1,3 +1,4 @@
+import SharedIcon from './Icon.jsx';
 import React, { useState, useCallback } from "react";
 import { useDataSourceState } from "../hooks/useDataSourceState.js";
 
@@ -19,31 +20,7 @@ import { useSignalEffect } from '@preact/signals-react';
 
 import { chatHandlers } from "../hooks/index.js";
 import { useEffect, useRef } from "react";
-import {
-    BugBeetle,
-    CalendarDots,
-    ChartLineUp,
-    ChartPieSlice,
-    ClipboardText,
-    CirclesThree,
-    EnvelopeSimple,
-    FileText,
-    Flask,
-    GameController,
-    GlobeHemisphereWest,
-    Path,
-    PencilSimple,
-    ImageSquare,
-    Pulse,
-    Palette,
-    RocketLaunch,
-    ShieldWarning,
-    TrendUp,
-    Stack,
-    Target,
-    Wrench,
-    TreeStructure
-} from '@phosphor-icons/react';
+
 
 
 // Shared chat styles (avatars, bubbles, etc.)
@@ -118,34 +95,34 @@ export const defaultRenderers = {
 };
 
 const STARTER_TASK_ICON_MAP = {
-    'bug': BugBeetle,
-    'calendar-report': CalendarDots,
-    'chart-line': ChartLineUp,
-    'chart-arcs': ChartPieSlice,
-    'clipboard': ClipboardText,
-    'venn': CirclesThree,
-    'document': FileText,
-    'email': EnvelopeSimple,
-    'flask': Flask,
-    'gamepad': GameController,
-    'globe-search': GlobeHemisphereWest,
-    'pencil': PencilSimple,
-    'image': ImageSquare,
-    'pulse': Pulse,
-    'palette': Palette,
-    'route': Path,
-    'rocket': RocketLaunch,
-    'shield-warning': ShieldWarning,
-    'trend-up': TrendUp,
-    'layers': Stack,
-    'target': Target,
-    'wrench': Wrench,
-    'tree-structure': TreeStructure,
+    'bug': 'lucide:bug',
+    'calendar-report': 'lucide:calendar',
+    'chart-line': 'lucide:chart-no-axes-combined',
+    'chart-arcs': 'lucide:chart-pie',
+    'clipboard': 'lucide:clipboard',
+    'venn': 'lucide:blend',
+    'document': 'lucide:file-text',
+    'email': 'lucide:mail',
+    'flask': 'lucide:flask-conical',
+    'gamepad': 'lucide:gamepad-2',
+    'globe-search': 'lucide:globe',
+    'pencil': 'lucide:pencil',
+    'image': 'lucide:image',
+    'pulse': 'lucide:activity',
+    'palette': 'lucide:palette',
+    'route': 'lucide:route',
+    'rocket': 'lucide:rocket',
+    'shield-warning': 'lucide:shield-alert',
+    'trend-up': 'lucide:trending-up',
+    'layers': 'lucide:layers',
+    'target': 'lucide:target',
+    'wrench': 'lucide:wrench',
+    'tree-structure': 'lucide:network',
 };
 
 function StarterTaskIcon({ icon }) {
-    const Icon = STARTER_TASK_ICON_MAP[String(icon || '').trim().toLowerCase()] || PencilSimple;
-    return <Icon size={20} weight="duotone" />;
+    const name = STARTER_TASK_ICON_MAP[String(icon || '').trim().toLowerCase()] || 'lucide:pencil';
+    return <SharedIcon name={name}/>;
 }
 
 function taskMatchesCategory(task = {}, category = {}) {

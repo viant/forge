@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const themeCSS = fs.readFileSync(new URL('../packs/blueprint/theme.css', import.meta.url), 'utf8');
-assert.match(themeCSS, /:where\(\.agently-application, \.agently-workspace\) :where\(button, \[role="button"\], \[role="tab"\], a\[href\]\):focus:not\(:focus-visible\)\s*{\s*outline: none;/);
+assert.match(themeCSS, /:where\(\.agently-application, \.agently-workspace\) :where\(button, \[role="button"\], \[role="tab"\], a\[href\]\):focus:not\(:focus-visible\)\s*{\s*outline: 0;/);
 assert.match(themeCSS, /:where\(\.agently-application, \.agently-workspace\) :where\(button, \[role="button"\], \[role="tab"\], a\[href\]\):focus-visible\s*{[^}]*outline: var\(--forge-focus-width, 2px\) solid var\(--forge-focus-color, currentColor\)/s);
 
 for (const token of [

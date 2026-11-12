@@ -1,3 +1,4 @@
+import UnifiedIcon from '../Icon.jsx';
 import React from 'react';
 import { Dialog, Button } from "@blueprintjs/core";
 import PrettyJson from "../PrettyJson.jsx";
@@ -18,7 +19,7 @@ const JsonViewer = ({ content }) => {
     return (
         <div style={styles.jsonViewer}>
             <div style={styles.copyButtonWrapper}>
-                <Button icon="clipboard" onClick={handleCopy} >
+                <Button icon={<UnifiedIcon name="clipboard"/>} onClick={handleCopy} >
                 </Button>
             </div>
             <PrettyJson

@@ -1,3 +1,4 @@
+import UnifiedIcon from '../Icon.jsx';
 import React from 'react';
 import {Button, Callout, HTMLTable, InputGroup} from '@blueprintjs/core';
 import {validateSchedule} from './workflowModels.js';
@@ -31,12 +32,12 @@ export default function ScheduleEditor({container, context}) {
           <td><InputGroup type="datetime-local" value={row._scheduleDraft?.[startField] ?? displayWallTime(row[startField], row)} onChange={(event) => updateWallTime(index, row, startField, event.currentTarget.value)}/></td>
           <td><InputGroup type="datetime-local" value={row._scheduleDraft?.[endField] ?? displayWallTime(row[endField], row)} onChange={(event) => updateWallTime(index, row, endField, event.currentTarget.value)}/></td>
           {spec.timeZoneField ? <td><InputGroup value={row[spec.timeZoneField] || ''} onChange={(event) => updateTimeZone(index, event.currentTarget.value)}/></td> : null}
-          {spec.allowRemove !== false ? <td><Button minimal icon="trash" aria-label="Remove schedule row" onClick={() => remove(index)}/></td> : null}
+          {spec.allowRemove !== false ? <td><Button minimal icon={<UnifiedIcon name="trash"/>} aria-label="Remove schedule row" onClick={() => remove(index)}/></td> : null}
         </tr>)}</tbody>
       </HTMLTable>
       {!validation.valid ? <Callout intent="danger">{rows.flatMap((row) => Object.values(row._scheduleErrors || {})).find(Boolean) || 'Resolve invalid or overlapping schedule ranges before saving.'}</Callout> : null}
       <div className="forge-schedule-editor__actions">
-        {spec.allowAdd !== false ? <Button icon="plus" onClick={() => setRows((current) => [...current, {[startField]: '', [endField]: ''}])}>Add period</Button> : null}
+        {spec.allowAdd !== false ? <Button icon={<UnifiedIcon name="plus"/>} onClick={() => setRows((current) => [...current, {[startField]: '', [endField]: ''}])}>Add period</Button> : null}
         {spec.mutation ? <MutationCommand command={{...spec.mutation, label: 'Save schedule', intent: 'primary'}} context={dataContext} extras={{rows: rows.map(({_scheduleErrors, _scheduleDraft, ...row}) => row)}} disabled={!validation.valid}/> : null}
       </div>
     </div>
