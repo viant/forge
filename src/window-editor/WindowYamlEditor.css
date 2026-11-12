@@ -1,11 +1,11 @@
 .fwe {
-  --fwe-ink: #243349;
-  --fwe-muted: #526277;
-  --fwe-line: #dce3eb;
-  --fwe-accent: #125abd;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --fwe-ink: var(--forge-text, #243349);
+  --fwe-muted: var(--forge-text-muted, #526277);
+  --fwe-line: var(--forge-border-color, #dce3eb);
+  --fwe-accent: var(--forge-interaction-color, #125abd);
+  font-family:var(--forge-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
   color: var(--fwe-ink);
-  background: #fff;
+  background: var(--forge-surface, #fff);
   container-name: fwe;
   container-type: inline-size;
   display: flex;
@@ -28,7 +28,7 @@
 }
 .fwe button {
   cursor: pointer;
-  background: white;
+  background: var(--forge-surface, white);
   border: 1px solid var(--fwe-line);
   border-radius: 5px;
   padding: 7px 10px;
@@ -38,7 +38,7 @@
   gap: 7px;
 }
 .fwe button:hover {
-  background: #edf3fb;
+  background: var(--forge-surface-subtle, #edf3fb);
 }
 .fwe button:disabled {
   opacity: 0.45;
@@ -49,7 +49,7 @@
   outline-offset: 2px;
 }
 .fwe ::selection {
-  background: #cfe2ff;
+  background: var(--forge-selected-background, #cfe2ff);
 }
 .fwe h1,
 .fwe h2,
@@ -103,33 +103,33 @@
   min-width: 68px;
 }
 .fwe-switch button[aria-pressed="true"] {
-  background: var(--fwe-accent);
-  color: white;
+  background: var(--forge-button-bg, var(--fwe-accent));
+  color: var(--forge-button-text, white);
 }
 .fwe-status {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #f1f6fc;
+  background: var(--forge-surface-subtle, #f1f6fc);
   padding: 10px 24px;
   font-size: 12px;
-  color: #34516c;
+  color: var(--forge-text-secondary, #34516c);
   border-bottom: 1px solid var(--fwe-line);
 }
 .fwe-status.has-error {
-  background: #fff3df;
-  color: #744700;
+  background: var(--forge-status-danger-background, #fff3df);
+  color: var(--forge-status-warning-foreground, #744700);
 }
 .fwe-status button {
   margin-left: auto;
   padding: 3px 8px;
 }
 .fwe-diagnostics {
-  background: #fff7ed;
+  background: var(--forge-surface-subtle, #fff7ed);
   padding: 8px 24px;
   max-height: 160px;
   overflow: auto;
-  color: #8a3600;
+  color: var(--forge-interaction-color, #8a3600);
 }
 .fwe-diagnostics pre {
   margin: 5px 0;
@@ -146,7 +146,7 @@
   border-right: 1px solid var(--fwe-line);
   display: flex;
   flex-direction: column;
-  background: #f8fafc;
+  background: var(--forge-surface, #f8fafc);
   overflow: hidden;
 }
 .fwe-panel-heading {
@@ -185,7 +185,7 @@
   padding-right: 10px;
 }
 .fwe-tree-row.is-selected {
-  background: #e3edfc;
+  background: var(--forge-selected-background, #e3edfc);
 }
 .fwe button.fwe-expander {
   border: 0;
@@ -215,7 +215,7 @@
 }
 .fwe-node svg {
   flex-shrink: 0;
-  color: #53677f;
+  color: var(--forge-text-secondary, #53677f);
 }
 .fwe-node small {
   color: var(--fwe-muted);
@@ -229,7 +229,7 @@
 .fwe-target {
   padding-left: 12px;
   margin-top: 9px;
-  color: #334a64;
+  color: var(--forge-text-secondary, #334a64);
 }
 .fwe-target small {
   color: var(--fwe-muted);
@@ -320,18 +320,18 @@
 .fwe select {
   width: 100%;
   min-width: 0;
-  border: 1px solid #becbd9;
+  border: 1px solid var(--forge-control-border, #becbd9);
   border-radius: 5px;
   padding: 8px 10px;
-  background: white;
+  background: var(--forge-control-bg, white);
   caret-color: var(--fwe-accent);
 }
 .fwe button.fwe-nested {
   width: 100%;
   justify-content: space-between;
   font-size: 12px;
-  background: #f7f9fc;
-  color: #34516c;
+  background: var(--forge-surface, #f7f9fc);
+  color: var(--forge-text-secondary, #34516c);
 }
 .fwe .fwe-icon-button {
   border: 0;
@@ -348,7 +348,7 @@
   color: var(--fwe-muted);
 }
 .fwe-attribute small.fwe-field-error {
-  color: #b52616;
+  color: var(--forge-status-danger-foreground, #b52616);
 }
 .fwe-add {
   margin-top: 30px;
@@ -383,8 +383,8 @@
   width: 40%;
 }
 .fwe button.fwe-primary {
-  background: var(--fwe-accent);
-  color: white;
+  background: var(--forge-button-bg, var(--fwe-accent));
+  color: var(--forge-button-text, white);
   border-color: var(--fwe-accent);
   margin-top: 3px;
 }
@@ -407,8 +407,8 @@
   height: 9px;
 }
 .fwe ::-webkit-scrollbar-thumb {
-  background: #bdcbdc;
-  border: 2px solid #f8fafc;
+  background: var(--forge-surface-subtle, #bdcbdc);
+  border: 2px solid var(--forge-border-color, #f8fafc);
   border-radius: 6px;
 }
 @media (max-width: 700px) {
@@ -460,10 +460,10 @@
   width: 100%;
   min-width: 0;
   resize: vertical;
-  border: 1px solid #becbd9;
+  border: 1px solid var(--forge-control-border, #becbd9);
   border-radius: 5px;
   padding: 8px 10px;
-  background: white;
+  background: var(--forge-control-bg, white);
   caret-color: var(--fwe-accent);
   line-height: 1.5;
 }
@@ -476,9 +476,9 @@
 }
 .fwe-pending {
   padding: 10px 24px;
-  background: #fff7e8;
-  color: #744700;
-  border-bottom: 1px solid #dfc89c;
+  background: var(--forge-status-warning-background, #fff7e8);
+  color: var(--forge-status-warning-foreground, #744700);
+  border-bottom: 1px solid var(--forge-status-warning-border, #dfc89c);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -502,10 +502,10 @@
   font-size: 11px;
 }
 .fwe-pending .fwe-field-error {
-  color: #9b2417;
+  color: var(--forge-status-danger-foreground, #9b2417);
 }
 .fwe [aria-invalid="true"] {
-  border-color: #b52616;
+  border-color: var(--forge-status-danger-border, #b52616);
 }
 @media (max-width: 700px) {
   .fwe-pending {
@@ -526,9 +526,9 @@
 .fwe-source .cm-editor { height: 100%; }
 .fwe-source .cm-scroller { overflow: auto; }
 .fwe-tree-scroll, .fwe-inspector-scroll { min-height: 0; }
-.fwe-shared-notice { padding: 10px 22px; background: #f1f6fc; font-size: 12px; }
+.fwe-shared-notice { padding: 10px 22px; background: var(--forge-surface-subtle, #f1f6fc); font-size: 12px; }
 .fwe-shared-notice button { padding: 3px 6px; margin-top: 5px; }
-.fwe-node small.fwe-shared { color: #125abd; flex-shrink: 0; }
+.fwe-node small.fwe-shared { color: var(--forge-interaction-color, #125abd); flex-shrink: 0; }
 @media (max-width: 700px) { .fwe-workspace { flex: none; } .fwe-source { min-height: 350px; } }
 
 /* Narrow embedded panels use their own width, independently of host chrome. */

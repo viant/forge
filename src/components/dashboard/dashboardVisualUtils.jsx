@@ -89,7 +89,7 @@ export function renderExplicitReportTableCellVisual(cell, row, column, locale, f
     }
     const text = formatDashboardTableCellText(cell, row, column, locale, formatValue);
     if (visualState.kind === 'dataBar') {
-        const [background = '#dbeafe', foreground = '#2563eb'] = visualState.palette || [];
+        const [background = 'var(--forge-surface-subtle, #dbeafe)', foreground = 'var(--forge-data-categorical-1, #2563eb)'] = visualState.palette || [];
         return (
             <span
                 className="forge-dashboard-table-cell-visual forge-dashboard-table-cell-visual--data-bar"
@@ -102,7 +102,7 @@ export function renderExplicitReportTableCellVisual(cell, row, column, locale, f
                     minHeight: 24,
                     padding: '2px 8px',
                     borderRadius: 999,
-                    background: '#f7fafc',
+                    background: "var(--forge-surface, #f7fafc)",
                     overflow: 'hidden',
                 }}
             >
@@ -120,14 +120,14 @@ export function renderExplicitReportTableCellVisual(cell, row, column, locale, f
                         borderRadius: 999,
                     }}
                 />
-                <span style={{ position: 'relative', zIndex: 1, fontWeight: 600, color: '#10243a' }}>
+                <span style={{ position: 'relative', zIndex: 1, fontWeight: 600, color: "var(--forge-text, #10243a)" }}>
                     {text}
                 </span>
             </span>
         );
     }
     if (visualState.kind === 'progressBar') {
-        const [background = '#e5edf5', foreground = '#2f6de1'] = visualState.palette || [];
+        const [background = 'var(--forge-surface-subtle, #e5edf5)', foreground = 'var(--forge-data-categorical-1, #2f6de1)'] = visualState.palette || [];
         return (
             <span
                 className="forge-dashboard-table-cell-visual forge-dashboard-table-cell-visual--progress-bar"
@@ -166,14 +166,14 @@ export function renderExplicitReportTableCellVisual(cell, row, column, locale, f
                         }}
                     />
                 </span>
-                <span style={{fontSize: '11px', fontWeight: 600, color: '#30404d'}}>
+                <span style={{fontSize: '11px', fontWeight: 600, color: "var(--forge-text, #30404d)"}}>
                     {text}
                 </span>
             </span>
         );
     }
     if (visualState.kind === 'sparkBar') {
-        const [background = '#eef2f6', foreground = '#4c6fff'] = visualState.palette || [];
+        const [background = 'var(--forge-surface-subtle, #eef2f6)', foreground = 'var(--forge-data-categorical-1, #4c6fff)'] = visualState.palette || [];
         return (
             <span
                 className="forge-dashboard-table-cell-visual forge-dashboard-table-cell-visual--spark-bar"
@@ -213,7 +213,7 @@ export function renderExplicitReportTableCellVisual(cell, row, column, locale, f
                         }}
                     />
                 </span>
-                <span style={{fontSize: '11px', fontWeight: 600, color: '#30404d'}}>
+                <span style={{fontSize: '11px', fontWeight: 600, color: "var(--forge-text, #30404d)"}}>
                     {text}
                 </span>
             </span>
@@ -243,7 +243,7 @@ export function renderExplicitReportTableCellVisual(cell, row, column, locale, f
                         minWidth: 72,
                         height: 8,
                         borderRadius: 999,
-                        background: '#e5edf5',
+                        background: "var(--forge-surface-subtle, #e5edf5)",
                         overflow: 'hidden',
                     }}
                 >
@@ -267,7 +267,7 @@ export function renderExplicitReportTableCellVisual(cell, row, column, locale, f
                         return element;
                     })}
                 </span>
-                <span style={{fontSize: '11px', fontWeight: 600, color: '#30404d'}}>
+                <span style={{fontSize: '11px', fontWeight: 600, color: "var(--forge-text, #30404d)"}}>
                     {segments.map((segment) => `${segment.label} ${formatDashboardValue(segment.percent || 0, 'percentFraction', locale)}`).join(' · ')}
                 </span>
             </span>

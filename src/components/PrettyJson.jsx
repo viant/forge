@@ -85,7 +85,7 @@ export default function PrettyJson({
                 onChange={handleChange}
                 onBlur={handleBlur}
                 intent={error ? 'danger' : 'none'}
-                style={{ fontFamily: 'monospace', ...style, maxHeight }}
+                style={{ fontFamily: "var(--forge-font-family-monospace, monospace)", ...style, maxHeight }}
             />
             {error && (
                 <span className="bp4-text-small bp4-text-danger">Invalid JSON</span>

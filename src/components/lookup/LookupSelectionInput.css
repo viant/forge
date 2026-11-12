@@ -1,5 +1,5 @@
 .forge-lookup-selection-input {
-    --forge-lookup-input-background: #eef8f1;
+    --forge-lookup-input-background: var(--forge-control-bg, #eef8f1);
     display: flex;
     flex-direction: column;
     gap: 5px;
@@ -24,10 +24,10 @@
     gap: 5px;
     max-width: 100%;
     min-height: 24px;
-    border: 1px solid #e2c96a;
+    border: 1px solid var(--forge-interaction-color, #e2c96a);
     border-radius: 999px;
-    background: #fff7d8;
-    color: #755600;
+    background: var(--forge-surface-subtle, #fff7d8);
+    color: var(--forge-interaction-color, #755600);
     padding: 0 8px;
     cursor: pointer;
     font-size: 11px;
@@ -35,9 +35,9 @@
 }
 
 .forge-lookup-chip.is-unresolved {
-    border-color: #e5bf68;
-    background: #fff5d6;
-    color: #8a5d00;
+    border-color: var(--forge-status-warning-border, #e5bf68);
+    background: var(--forge-status-warning-background, #fff5d6);
+    color: var(--forge-status-warning-foreground, #8a5d00);
 }
 
 .forge-lookup-chip span:first-child {
@@ -59,13 +59,13 @@
     width: fit-content;
     max-width: 100%;
     min-height: 36px;
-    border: 1px solid #cfe0f0;
+    border: 1px solid var(--forge-control-border, #cfe0f0);
     border-radius: 999px;
     background: var(--forge-lookup-input-background);
     padding: 3px 4px 3px 10px;
     box-shadow:
-        0 0 0 2px rgba(47, 112, 225, 0.06),
-        0 1px 2px rgba(15, 23, 42, 0.06);
+        0 0 0 2px color-mix(in srgb, var(--forge-text, rgb(47 112 225)) 6%, transparent),
+        0 1px 2px color-mix(in srgb, var(--forge-text, rgb(15 23 42)) 6%, transparent);
 }
 
 .forge-lookup-selection-input__field {
@@ -75,7 +75,7 @@
     border: 0;
     border-radius: 999px;
     background: transparent;
-    color: #1f3b2b;
+    color: var(--forge-text, #1f3b2b);
     padding: 0 4px 0 0;
     outline: none;
     font-size: 12px;
@@ -87,30 +87,30 @@
 }
 
 .forge-lookup-selection-input__field::placeholder {
-    color: #668873;
+    color: var(--forge-text-muted, #668873);
 }
 
 .forge-lookup-selection-input__end-button {
     width: 28px;
     min-width: 28px;
     height: 28px;
-    border: 1px solid #0f6b43;
+    border: 1px solid var(--forge-interaction-color, #0f6b43);
     border-radius: 999px;
-    background: linear-gradient(180deg, #187a4f 0%, #0f633d 100%);
-    color: #ffffff;
+    background: linear-gradient(180deg, var(--forge-button-bg, #187a4f) 0%, var(--forge-button-bg, #0f633d) 100%);
+    color: var(--forge-button-text, #ffffff);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     padding: 0;
-    box-shadow: 0 1px 1px rgba(15, 23, 42, 0.05);
+    box-shadow: 0 1px 1px color-mix(in srgb, var(--forge-text, rgb(15 23 42)) 5%, transparent);
 }
 
 .forge-lookup-selection-input__end-button:disabled {
     cursor: default;
-    color: #ffffff;
-    border-color: #8fb7a0;
-    background: #8fb7a0;
+    color: var(--forge-disabled-text, #ffffff);
+    border-color: var(--forge-border-color, #8fb7a0);
+    background: var(--forge-disabled-bg, #8fb7a0);
 }
 
 .forge-lookup-selection-input--search .forge-lookup-selection-input__control {

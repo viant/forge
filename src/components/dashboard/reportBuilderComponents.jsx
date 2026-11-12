@@ -591,9 +591,9 @@ export function ReportBuilderInspectorNotice({
                     margin: 0,
                     padding: "12px 14px",
                     borderRadius: 10,
-                    border: "1px solid #d7e2ee",
-                    background: "#fbfdff",
-                    color: "#294256",
+                    border: "1px solid var(--forge-border-color, #d7e2ee)",
+                    background: "var(--forge-surface, #fbfdff)",
+                    color: "var(--forge-text, #294256)",
                     fontSize: 11,
                     lineHeight: 1.5,
                     whiteSpace: "pre-wrap",
@@ -674,7 +674,7 @@ export function ReportBuilderSemanticBindingChips({
             style={{ display: "grid", gap: 8, marginTop, marginBottom }}
         >
             {title ? (
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--forge-text-muted, #738694)" }}>
                     {title}
                 </div>
             ) : null}
@@ -712,7 +712,7 @@ export function ReportBuilderSemanticFieldGroups({
                 }
                 return (
                     <div key={groupId} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--forge-text-muted, #738694)" }}>
                             {groupTitle}
                         </div>
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
@@ -741,16 +741,16 @@ export function ReportBuilderSemanticFieldGroups({
                                     <div
                                         key={`${groupId}:${String(field?.id || field?.rawId || label).trim()}:${index}`}
                                         style={{
-                                            border: "1px solid #d7e2ee",
+                                            border: "1px solid var(--forge-border-color, #d7e2ee)",
                                             borderRadius: 10,
-                                            background: "#fbfdff",
+                                            background: "var(--forge-surface, #fbfdff)",
                                             padding: "10px 12px",
                                             display: "flex",
                                             flexDirection: "column",
                                             gap: 6,
                                         }}
                                     >
-                                        <div style={{ fontSize: 12, fontWeight: 700, color: "#183247" }}>{label}</div>
+                                        <div style={{ fontSize: 12, fontWeight: 700, color: "var(--forge-text, #183247)" }}>{label}</div>
                                         {metadataChips.length > 0 ? (
                                             <div className="forge-report-builder__result-meta" aria-label={`${label} metadata`}>
                                                 {metadataChips.map((chip) => (
@@ -759,17 +759,17 @@ export function ReportBuilderSemanticFieldGroups({
                                             </div>
                                         ) : null}
                                         {rawId ? (
-                                            <div style={{ fontSize: 11, color: "#486579", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+                                            <div style={{ fontSize: 11, color: "var(--forge-text-secondary, #486579)", fontFamily: "var(--forge-font-family-monospace, ui-monospace, SFMono-Regular, Menlo, monospace)" }}>
                                                 {rawId}
                                             </div>
                                         ) : null}
                                         {definitionRef ? (
-                                            <div style={{ fontSize: 11, color: "#486579", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", lineHeight: 1.45 }}>
+                                            <div style={{ fontSize: 11, color: "var(--forge-text-secondary, #486579)", fontFamily: "var(--forge-font-family-monospace, ui-monospace, SFMono-Regular, Menlo, monospace)", lineHeight: 1.45 }}>
                                                 {definitionRef}
                                             </div>
                                         ) : null}
                                         {description ? (
-                                            <div style={{ fontSize: 11, lineHeight: 1.45, color: "#486579" }}>
+                                            <div style={{ fontSize: 11, lineHeight: 1.45, color: "var(--forge-text-secondary, #486579)" }}>
                                                 {description}
                                             </div>
                                         ) : null}
@@ -836,11 +836,11 @@ export function ReportBuilderScopeSummary({
             data-report-builder-scope-title={title || undefined}
             style={{ display: "grid", gap: 8, marginTop, marginBottom }}
         >
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--forge-text-muted, #738694)" }}>
                 {title}
             </div>
             {text ? (
-                <div style={{ fontSize: 12, lineHeight: 1.5, color: "#486579" }}>
+                <div style={{ fontSize: 12, lineHeight: 1.5, color: "var(--forge-text-secondary, #486579)" }}>
                     {text}
                 </div>
             ) : null}
@@ -849,21 +849,21 @@ export function ReportBuilderScopeSummary({
                     <div
                         key={String(item?.id || item?.label || "").trim()}
                         style={{
-                            border: "1px solid #d7e2ee",
+                            border: "1px solid var(--forge-border-color, #d7e2ee)",
                             borderRadius: 10,
-                            background: "#fbfdff",
+                            background: "var(--forge-surface, #fbfdff)",
                             padding: "10px 12px",
                             display: "flex",
                             flexDirection: "column",
                             gap: 4,
                         }}
                     >
-                        <div style={{ fontSize: 12, fontWeight: 700, color: "#183247" }}>{String(item?.label || item?.id || "").trim()}</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "var(--forge-text, #183247)" }}>{String(item?.label || item?.id || "").trim()}</div>
                         {String(item?.value || "").trim() ? (
-                            <div style={{ fontSize: 12, lineHeight: 1.45, color: "#304e63" }}>{String(item.value).trim()}</div>
+                            <div style={{ fontSize: 12, lineHeight: 1.45, color: "var(--forge-text-secondary, #304e63)" }}>{String(item.value).trim()}</div>
                         ) : null}
                         {String(item?.description || "").trim() ? (
-                            <div style={{ fontSize: 11, lineHeight: 1.45, color: "#5f6b7c" }}>{String(item?.description || "").trim()}</div>
+                            <div style={{ fontSize: 11, lineHeight: 1.45, color: "var(--forge-text-secondary, #5f6b7c)" }}>{String(item?.description || "").trim()}</div>
                         ) : null}
                     </div>
                 ))}
@@ -898,12 +898,12 @@ export function ReportBuilderArtifactEntryCard({
                 gap: 8,
                 padding: "10px 12px",
                 borderRadius: 14,
-                border: "1px solid #d7e2ee",
-                background: normalizedEntry.active ? "#eef6ff" : "#f8fbff",
+                border: "1px solid var(--forge-border-color, #d7e2ee)",
+                background: normalizedEntry.active ? "var(--forge-surface-subtle, #eef6ff)" : "var(--forge-surface, #f8fbff)",
                 maxWidth: 420,
             }}
         >
-            <span style={{ fontSize: 12, color: "#183247", fontWeight: 600 }}>
+            <span style={{ fontSize: 12, color: "var(--forge-text, #183247)", fontWeight: 600 }}>
                 {title}
             </span>
             {normalizedEntry.notice && typeof normalizedEntry.notice === "object" && !Array.isArray(normalizedEntry.notice)
@@ -982,29 +982,29 @@ export function ReportBuilderPreparedArtifactCard({
                 gap: 8,
                 padding: "12px 14px",
                 borderRadius: 14,
-                border: "1px solid #d7e2ee",
-                background: "#f8fbff",
+                border: "1px solid var(--forge-border-color, #d7e2ee)",
+                background: "var(--forge-surface, #f8fbff)",
                 minWidth: 220,
                 maxWidth: 340,
                 flex: "1 1 240px",
             }}
         >
             {String(normalizedArtifact?.label || "").trim() ? (
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--forge-text-muted, #738694)" }}>
                     {String(normalizedArtifact.label || "").trim()}
                 </div>
             ) : null}
             <div style={{ display: "grid", gap: 4 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#183247" }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--forge-text, #183247)" }}>
                     {normalizedTitle}
                 </div>
                 {String(normalizedArtifact?.subtitle || "").trim() ? (
-                    <div style={{ fontSize: 12, color: "#486579" }}>
+                    <div style={{ fontSize: 12, color: "var(--forge-text-secondary, #486579)" }}>
                         {String(normalizedArtifact.subtitle || "").trim()}
                     </div>
                 ) : null}
                 {String(normalizedArtifact?.description || "").trim() ? (
-                    <div style={{ fontSize: 11, lineHeight: 1.45, color: "#5f6b7c" }}>
+                    <div style={{ fontSize: 11, lineHeight: 1.45, color: "var(--forge-text-secondary, #5f6b7c)" }}>
                         {String(normalizedArtifact.description || "").trim()}
                     </div>
                 ) : null}
@@ -3072,22 +3072,22 @@ export function ReportBuilderDocumentBlockDialog({
                                                         gap: 10,
                                                         padding: "10px 12px",
                                                         borderRadius: 12,
-                                                        border: draggingFilterBarGroupId === option.value ? "1px solid #93c5fd" : "1px solid #d7e2ee",
-                                                        background: draggingFilterBarGroupId === option.value ? "#eef6ff" : "#fbfdff",
+                                                        border: draggingFilterBarGroupId === option.value ? "1px solid var(--forge-interaction-color, #93c5fd)" : "1px solid var(--forge-border-color, #d7e2ee)",
+                                                        background: draggingFilterBarGroupId === option.value ? "var(--forge-surface-subtle, #eef6ff)" : "var(--forge-surface, #fbfdff)",
                                                     }}
                                                 >
-                                                    <span style={{ cursor: "grab", color: "#738694", fontSize: 14 }} aria-label={`Drag ${option.label}`}>⋮⋮</span>
+                                                    <span style={{ cursor: "grab", color: "var(--forge-text-muted, #738694)", fontSize: 14 }} aria-label={`Drag ${option.label}`}>⋮⋮</span>
                                                     <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: "1 1 auto" }}>
                                                         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                                                            <strong style={{ color: "#183247", fontSize: 12 }}>{option.label}</strong>
+                                                            <strong style={{ color: "var(--forge-text, #183247)", fontSize: 12 }}>{option.label}</strong>
                                                             <span className="forge-report-builder__result-meta-chip">{option.kind === "scopeParam" ? "Baseline" : "Unified"}</span>
                                                             {option.required ? <span className="forge-report-builder__result-meta-chip">Required</span> : null}
                                                         </div>
                                                         {option.description ? (
-                                                            <span style={{ fontSize: 11, lineHeight: 1.45, color: "#5f6b7c" }}>{option.description}</span>
+                                                            <span style={{ fontSize: 11, lineHeight: 1.45, color: "var(--forge-text-secondary, #5f6b7c)" }}>{option.description}</span>
                                                         ) : null}
                                                     </div>
-                                                    <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "#486579" }}>
+                                                    <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--forge-text-secondary, #486579)" }}>
                                                         <input
                                                             type="checkbox"
                                                             checked={!selectedFilterBarCollapsedGroups.has(option.value)}
@@ -3107,15 +3107,15 @@ export function ReportBuilderDocumentBlockDialog({
                                             ))}
                                         </div>
                                     ) : (
-                                        <span style={{ fontSize: 12, color: "#5f6b7c" }}>
+                                        <span style={{ fontSize: 12, color: "var(--forge-text-secondary, #5f6b7c)" }}>
                                             No visible groups selected yet.
                                         </span>
                                     )}
                                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                                        <span style={{ fontSize: 12, color: "#486579" }}>Available groups</span>
+                                        <span style={{ fontSize: 12, color: "var(--forge-text-secondary, #486579)" }}>Available groups</span>
                                         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                                             {availableFilterBarGroupOptions.length === 0 ? (
-                                                <span style={{ fontSize: 12, color: "#5f6b7c" }}>No additional groups available.</span>
+                                                <span style={{ fontSize: 12, color: "var(--forge-text-secondary, #5f6b7c)" }}>No additional groups available.</span>
                                             ) : availableFilterBarGroupOptions.map((option) => (
                                                 <button
                                                     key={option.value}
@@ -3268,16 +3268,16 @@ export function ReportBuilderDocumentBlockDialog({
                                         <div
                                             key={step?.id || `step_${index + 1}`}
                                             style={{
-                                                border: "1px solid #d7e2ee",
+                                                border: "1px solid var(--forge-border-color, #d7e2ee)",
                                                 borderRadius: 12,
                                                 padding: 12,
                                                 display: "grid",
                                                 gap: 8,
-                                                background: "#fbfdff",
+                                                background: "var(--forge-surface, #fbfdff)",
                                             }}
                                         >
                                             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                                                <strong style={{ color: "#183247", fontSize: 12 }}>Step {index + 1}</strong>
+                                                <strong style={{ color: "var(--forge-text, #183247)", fontSize: 12 }}>Step {index + 1}</strong>
                                                 <Button
                                                     small
                                                     minimal
@@ -3356,16 +3356,16 @@ export function ReportBuilderDocumentBlockDialog({
                                         <div
                                             key={event?.id || `event_${eventIndex + 1}`}
                                             style={{
-                                                border: "1px solid #d7e2ee",
+                                                border: "1px solid var(--forge-border-color, #d7e2ee)",
                                                 borderRadius: 12,
                                                 padding: 12,
                                                 display: "grid",
                                                 gap: 8,
-                                                background: "#fbfdff",
+                                                background: "var(--forge-surface, #fbfdff)",
                                             }}
                                         >
                                             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                                                <strong style={{ color: "#183247", fontSize: 12 }}>Event {eventIndex + 1}</strong>
+                                                <strong style={{ color: "var(--forge-text, #183247)", fontSize: 12 }}>Event {eventIndex + 1}</strong>
                                                 <Button
                                                     small
                                                     minimal
@@ -3463,16 +3463,16 @@ export function ReportBuilderDocumentBlockDialog({
                                         <div
                                             key={column?.id || `column_${columnIndex + 1}`}
                                             style={{
-                                                border: "1px solid #d7e2ee",
+                                                border: "1px solid var(--forge-border-color, #d7e2ee)",
                                                 borderRadius: 12,
                                                 padding: 12,
                                                 display: "grid",
                                                 gap: 8,
-                                                background: "#fbfdff",
+                                                background: "var(--forge-surface, #fbfdff)",
                                             }}
                                         >
                                             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                                                <strong style={{ color: "#183247", fontSize: 12 }}>Lane {columnIndex + 1}</strong>
+                                                <strong style={{ color: "var(--forge-text, #183247)", fontSize: 12 }}>Lane {columnIndex + 1}</strong>
                                                 <Button
                                                     small
                                                     minimal
@@ -3501,12 +3501,12 @@ export function ReportBuilderDocumentBlockDialog({
                                                     <div
                                                         key={card?.id || `card_${cardIndex + 1}`}
                                                         style={{
-                                                            border: "1px solid #e1e8ef",
+                                                            border: "1px solid var(--forge-border-color, #e1e8ef)",
                                                             borderRadius: 10,
                                                             padding: 10,
                                                             display: "grid",
                                                             gap: 8,
-                                                            background: "#fff",
+                                                            background: "var(--forge-surface, #fff)",
                                                         }}
                                                     >
                                                         <input
@@ -3735,7 +3735,7 @@ export function ReportBuilderDocumentBlockDialog({
                                         {normalizedChildBlockOptions.map((option) => {
                                             const checked = selectedCompositeChildBlockIds.includes(option.value);
                                             return (
-                                                <label key={option.value} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "#314154" }}>
+                                                <label key={option.value} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "var(--forge-text, #314154)" }}>
                                                     <input
                                                         type="checkbox"
                                                         checked={checked}
@@ -3760,8 +3760,8 @@ export function ReportBuilderDocumentBlockDialog({
                                         {selectedCompositeChildBlockIds.map((blockId, index) => {
                                             const option = normalizedChildBlockOptions.find((entry) => entry.value === blockId);
                                             return (
-                                                <div key={blockId} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 10px", border: "1px solid #d9e2ec", borderRadius: 10, background: "#fbfdff" }}>
-                                                    <span style={{ fontSize: 13, color: "#314154" }}>{option?.label || blockId}</span>
+                                                <div key={blockId} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 10px", border: "1px solid var(--forge-border-color, #d9e2ec)", borderRadius: 10, background: "var(--forge-surface, #fbfdff)" }}>
+                                                    <span style={{ fontSize: 13, color: "var(--forge-text, #314154)" }}>{option?.label || blockId}</span>
                                                     <div style={{ display: "flex", gap: 6 }}>
                                                         <button type="button" className="forge-report-builder-button forge-report-builder-button--secondary" onClick={() => moveCompositeChildBlockId(blockId, -1)} disabled={index === 0}>Up</button>
                                                         <button type="button" className="forge-report-builder-button forge-report-builder-button--secondary" onClick={() => moveCompositeChildBlockId(blockId, 1)} disabled={index === selectedCompositeChildBlockIds.length - 1}>Down</button>
@@ -3786,7 +3786,7 @@ export function ReportBuilderDocumentBlockDialog({
                                         {normalizedSectionOptions.map((option) => {
                                             const checked = selectedTabSectionIds.includes(option.value);
                                             return (
-                                                <label key={option.value} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "#314154" }}>
+                                                <label key={option.value} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "var(--forge-text, #314154)" }}>
                                                     <input
                                                         type="checkbox"
                                                         checked={checked}
@@ -3974,7 +3974,7 @@ export function ReportBuilderDocumentBlockDialog({
                                         toolbar: ["bold", "italic", "heading", "|", "quote", "unordered-list", "ordered-list"],
                                     }}
                                 />
-                                <span style={{ fontSize: 12, lineHeight: 1.45, color: "#5f6b7c" }}>
+                                <span style={{ fontSize: 12, lineHeight: 1.45, color: "var(--forge-text-secondary, #5f6b7c)" }}>
                                     Available macros: {"${value}"}, {"${valueLabel}"}, {"${secondaryValue}"}, {"${secondaryLabel}"}, {"${row.fieldName}"}, {"${dataset.label}"}, {"${primary.avails}"}, {"${fmt.compact(row.avails)}"}, {"${fmt.currency(row.ecpm)}"}, and {"${fmt.percent(row.winRate)}"}.
                                 </span>
                                 <Button
@@ -4096,7 +4096,7 @@ export function ReportBuilderDocumentBlockDialog({
                                     <option value="body">Body only (narrative KPI)</option>
                                     <option value="both">Card and body</option>
                                 </select>
-                                <span style={{ fontSize: 12, lineHeight: 1.45, color: "#5f6b7c" }}>
+                                <span style={{ fontSize: 12, lineHeight: 1.45, color: "var(--forge-text-secondary, #5f6b7c)" }}>
                                     Card mode keeps the familiar KPI tile. Body modes add a Markdown note resolved from the same KPI fields.
                                 </span>
                             </label>
@@ -4114,7 +4114,7 @@ export function ReportBuilderDocumentBlockDialog({
                                             toolbar: ["bold", "italic", "heading", "|", "quote", "unordered-list", "ordered-list"],
                                         }}
                                     />
-                                    <span style={{ fontSize: 12, lineHeight: 1.45, color: "#5f6b7c" }}>
+                                    <span style={{ fontSize: 12, lineHeight: 1.45, color: "var(--forge-text-secondary, #5f6b7c)" }}>
                                         Available macros: {"${value}"}, {"${valueLabel}"}, {"${secondaryValue}"}, {"${secondaryLabel}"}, {"${row.fieldName}"}, {"${dataset.label}"}, {"${primary.avails}"}, {"${forecasting_cube_report.avails}"}, {"${fmt.compact(row.avails)}"}, {"${fmt.currency(row.ecpm)}"}, {"${fmt.percent(row.winRate)}"}, and {"${format(row.fieldName,currency})"}.
                                     </span>
                                 </label>
@@ -4163,13 +4163,13 @@ export function ReportBuilderDocumentBlockDialog({
                                                 gap: 10,
                                                 alignItems: "end",
                                                 padding: "12px",
-                                                border: "1px solid #d7e2ee",
+                                                border: "1px solid var(--forge-border-color, #d7e2ee)",
                                                 borderRadius: 12,
-                                                background: "#fbfdff",
+                                                background: "var(--forge-surface, #fbfdff)",
                                             }}
                                         >
                                             <label style={{ display: "grid", gap: 6 }}>
-                                                <span style={{ fontSize: 12, color: "#486579" }}>Label</span>
+                                                <span style={{ fontSize: 12, color: "var(--forge-text-secondary, #486579)" }}>Label</span>
                                                 <input
                                                     type="text"
                                                     className={errorByField.has("items") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
@@ -4184,7 +4184,7 @@ export function ReportBuilderDocumentBlockDialog({
                                                 />
                                             </label>
                                             <label style={{ display: "grid", gap: 6 }}>
-                                                <span style={{ fontSize: 12, color: "#486579" }}>Field</span>
+                                                <span style={{ fontSize: 12, color: "var(--forge-text-secondary, #486579)" }}>Field</span>
                                                 <select
                                                     className={errorByField.has(`items.${index}.valueField`) ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
                                                     value={item.valueField}
@@ -4201,7 +4201,7 @@ export function ReportBuilderDocumentBlockDialog({
                                             </label>
                                             {item.valueField ? (
                                                 <div style={{ display: "grid", gap: 6 }}>
-                                                    <span style={{ fontSize: 12, color: "#486579" }}>Label source</span>
+                                                    <span style={{ fontSize: 12, color: "var(--forge-text-secondary, #486579)" }}>Label source</span>
                                                     <Button
                                                         small
                                                         minimal
@@ -4214,7 +4214,7 @@ export function ReportBuilderDocumentBlockDialog({
                                                 <div />
                                             )}
                                             <label style={{ display: "grid", gap: 6 }}>
-                                                <span style={{ fontSize: 12, color: "#486579" }}>Value</span>
+                                                <span style={{ fontSize: 12, color: "var(--forge-text-secondary, #486579)" }}>Value</span>
                                                 <input
                                                     type="text"
                                                     className="forge-report-builder-select"
@@ -4225,14 +4225,14 @@ export function ReportBuilderDocumentBlockDialog({
                                             </label>
                                             {item.format ? (
                                                 <div style={{ display: "grid", gap: 6 }}>
-                                                    <span style={{ fontSize: 12, color: "#486579" }}>Format</span>
+                                                    <span style={{ fontSize: 12, color: "var(--forge-text-secondary, #486579)" }}>Format</span>
                                                     <div className="forge-report-builder__result-meta-chip">{item.format}</div>
                                                 </div>
                                             ) : (
                                                 <div />
                                             )}
                                             <label style={{ display: "grid", gap: 6 }}>
-                                                <span style={{ fontSize: 12, color: "#486579" }}>Tone</span>
+                                                <span style={{ fontSize: 12, color: "var(--forge-text-secondary, #486579)" }}>Tone</span>
                                                 <select
                                                     className="forge-report-builder-select"
                                                     value={item.tone}
@@ -4263,15 +4263,15 @@ export function ReportBuilderDocumentBlockDialog({
                                                         return (
                                                             <div
                                                                 style={{
-                                                                    border: "1px solid #d7e2ee",
+                                                                    border: "1px solid var(--forge-border-color, #d7e2ee)",
                                                                     borderRadius: 10,
-                                                                    background: "#fbfdff",
+                                                                    background: "var(--forge-surface, #fbfdff)",
                                                                     padding: "10px 12px",
                                                                     display: "grid",
                                                                     gap: 6,
                                                                 }}
                                                             >
-                                                                <div style={{ fontSize: 12, fontWeight: 700, color: "#183247" }}>
+                                                                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--forge-text, #183247)" }}>
                                                                     {fieldSummary.label}
                                                                 </div>
                                                                 {fieldSummary.chips.length > 0 ? (
@@ -4282,22 +4282,22 @@ export function ReportBuilderDocumentBlockDialog({
                                                                     </div>
                                                                 ) : null}
                                                                 {fieldSummary.rawId ? (
-                                                                    <div style={{ fontSize: 11, color: "#486579", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+                                                                    <div style={{ fontSize: 11, color: "var(--forge-text-secondary, #486579)", fontFamily: "var(--forge-font-family-monospace, ui-monospace, SFMono-Regular, Menlo, monospace)" }}>
                                                                         {fieldSummary.rawId}
                                                                     </div>
                                                                 ) : null}
                                                                 {fieldSummary.semanticRef ? (
-                                                                    <div style={{ fontSize: 11, color: "#486579", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+                                                                    <div style={{ fontSize: 11, color: "var(--forge-text-secondary, #486579)", fontFamily: "var(--forge-font-family-monospace, ui-monospace, SFMono-Regular, Menlo, monospace)" }}>
                                                                         {fieldSummary.semanticRef}
                                                                     </div>
                                                                 ) : null}
                                                                 {fieldSummary.definitionRef ? (
-                                                                    <div style={{ fontSize: 11, color: "#486579", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", lineHeight: 1.45 }}>
+                                                                    <div style={{ fontSize: 11, color: "var(--forge-text-secondary, #486579)", fontFamily: "var(--forge-font-family-monospace, ui-monospace, SFMono-Regular, Menlo, monospace)", lineHeight: 1.45 }}>
                                                                         {fieldSummary.definitionRef}
                                                                     </div>
                                                                 ) : null}
                                                                 {fieldSummary.description ? (
-                                                                    <div style={{ fontSize: 11, lineHeight: 1.45, color: "#486579" }}>
+                                                                    <div style={{ fontSize: 11, lineHeight: 1.45, color: "var(--forge-text-secondary, #486579)" }}>
                                                                         {fieldSummary.description}
                                                                     </div>
                                                                 ) : null}
@@ -4305,7 +4305,7 @@ export function ReportBuilderDocumentBlockDialog({
                                                         );
                                                     })()}
                                                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                                                        <span style={{ fontSize: 12, color: "#486579", fontWeight: 600 }}>Display rules</span>
+                                                        <span style={{ fontSize: 12, color: "var(--forge-text-secondary, #486579)", fontWeight: 600 }}>Display rules</span>
                                                         <Button
                                                             small
                                                             minimal
@@ -4331,13 +4331,13 @@ export function ReportBuilderDocumentBlockDialog({
                                                                         gap: 10,
                                                                         alignItems: "end",
                                                                         padding: "10px",
-                                                                        border: "1px solid #d7e2ee",
+                                                                        border: "1px solid var(--forge-border-color, #d7e2ee)",
                                                                         borderRadius: 10,
-                                                                        background: "#ffffff",
+                                                                        background: "var(--forge-surface, #ffffff)",
                                                                     }}
                                                                 >
                                                                     <label style={{ display: "grid", gap: 6 }}>
-                                                                        <span style={{ fontSize: 12, color: "#486579" }}>Match value</span>
+                                                                        <span style={{ fontSize: 12, color: "var(--forge-text-secondary, #486579)" }}>Match value</span>
                                                                         <input
                                                                             type="text"
                                                                             className="forge-report-builder-select"
@@ -4347,7 +4347,7 @@ export function ReportBuilderDocumentBlockDialog({
                                                                         />
                                                                     </label>
                                                                     <label style={{ display: "grid", gap: 6 }}>
-                                                                        <span style={{ fontSize: 12, color: "#486579" }}>Display label</span>
+                                                                        <span style={{ fontSize: 12, color: "var(--forge-text-secondary, #486579)" }}>Display label</span>
                                                                         <input
                                                                             type="text"
                                                                             className="forge-report-builder-select"
@@ -4357,7 +4357,7 @@ export function ReportBuilderDocumentBlockDialog({
                                                                         />
                                                                     </label>
                                                                     <label style={{ display: "grid", gap: 6 }}>
-                                                                        <span style={{ fontSize: 12, color: "#486579" }}>Tone</span>
+                                                                        <span style={{ fontSize: 12, color: "var(--forge-text-secondary, #486579)" }}>Tone</span>
                                                                         <select
                                                                             className="forge-report-builder-select"
                                                                             value={String(rule?.tone || "info")}
@@ -4410,7 +4410,7 @@ export function ReportBuilderDocumentBlockDialog({
                                     <span>Table projection</span>
                                     {normalizedProjectionOptions.length > 1 ? (
                                         <label style={{ display: "grid", gap: 6 }}>
-                                            <span style={{ fontSize: 12, color: "#486579" }}>Starter projection</span>
+                                            <span style={{ fontSize: 12, color: "var(--forge-text-secondary, #486579)" }}>Starter projection</span>
                                             <select
                                                 className="forge-report-builder-select"
                                                 value={matchedProjectionOption?.value || "__custom__"}
@@ -4641,7 +4641,7 @@ export function ReportBuilderDocumentBlockDialog({
                                                     <Icon icon="cross" size={12} />
                                                 </button>
                                             </div>
-                                            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "#486579" }}>
+                                            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--forge-text-secondary, #486579)" }}>
                                                 <span>Visual</span>
                                                 <select
                                                     aria-label={`Visual for ${openColumnSettingsOption.label}`}
@@ -4662,7 +4662,7 @@ export function ReportBuilderDocumentBlockDialog({
                                             </label>
                                             {visualKind === "badge" || visualKind === "tone" || visualKind === "shareBar" ? (
                                                 <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                                                    <span style={{ fontSize: 12, color: "#486579" }}>
+                                                    <span style={{ fontSize: 12, color: "var(--forge-text-secondary, #486579)" }}>
                                                         {visualKind === "tone" ? "Tone rules" : visualKind === "shareBar" ? "Share segments" : "Badge rules"}
                                                     </span>
                                                     <textarea
@@ -4696,7 +4696,7 @@ export function ReportBuilderDocumentBlockDialog({
                                     toolbar: ["bold", "italic", "heading", "|", "quote", "unordered-list", "ordered-list", "|", "link", "preview"],
                                 }}
                             />
-                            <span style={{ fontSize: 12, lineHeight: 1.45, color: "#5f6b7c", marginTop: 6 }}>
+                            <span style={{ fontSize: 12, lineHeight: 1.45, color: "var(--forge-text-secondary, #5f6b7c)", marginTop: 6 }}>
                                 Narrative blocks can use data macros like {"${primary.avails}"}, {"${forecasting_cube_report.avails}"}, {"${row.fieldName}"}, time macros like {"${time.today}"}, {"${time.last7Days.start}"}, {"${timeAt(\"2 days ago in UTC\")}"}, and formatter helpers like {"${fmt.compact(primary.avails)}"}.
                             </span>
                         </label>

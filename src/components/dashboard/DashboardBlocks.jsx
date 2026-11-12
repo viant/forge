@@ -42,10 +42,10 @@ const panelStyle = {
     minHeight: 0,
     minWidth: 0,
     padding: '14px',
-    border: '1px solid #dbe5ec',
+    border: "1px solid var(--forge-border-color, #dbe5ec)",
     borderRadius: '14px',
-    background: 'linear-gradient(180deg, #ffffff 0%, #fbfdff 100%)',
-    boxShadow: '0 8px 18px rgba(16, 22, 26, 0.035), 0 1px 2px rgba(16, 22, 26, 0.05)',
+    background: "linear-gradient(180deg, var(--forge-surface, #ffffff) 0%, var(--forge-surface, #fbfdff) 100%)",
+    boxShadow: "0 8px 18px color-mix(in srgb, var(--forge-text, rgb(16 22 26)) 3.5%, transparent), 0 1px 2px color-mix(in srgb, var(--forge-text, rgb(16 22 26)) 5%, transparent)",
     display: 'flex',
     flexDirection: 'column',
     gap: '12px',
@@ -56,7 +56,7 @@ const panelStyle = {
 const titleStyle = {
     fontSize: '12px',
     fontWeight: 800,
-    color: '#182026',
+    color: "var(--forge-text, #182026)",
     margin: 0,
     letterSpacing: '0.05em',
     textTransform: 'uppercase',
@@ -64,14 +64,14 @@ const titleStyle = {
 
 const subtitleStyle = {
     fontSize: '12px',
-    color: '#5f6b7c',
+    color: "var(--forge-text-secondary, #5f6b7c)",
     margin: 0,
 };
 
 const sectionRuleStyle = {
     height: '1px',
     width: '100%',
-    background: 'linear-gradient(90deg, rgba(19,124,189,0.24) 0%, rgba(15,153,96,0.1) 50%, rgba(219,225,232,0.18) 100%)',
+    background: "linear-gradient(90deg, var(--forge-selected-background, rgba(19,124,189,0.24)) 0%, var(--forge-selected-background, rgba(15,153,96,0.1)) 50%, color-mix(in srgb, var(--forge-surface-subtle, rgb(219 225 232)) 18%, transparent) 100%)",
 };
 
 const metricCardAccent = ['#137cbd', '#0f9960', '#d9822b', '#8f3985', '#c23030'];
@@ -246,28 +246,28 @@ export function DashboardCompare({container, context}) {
                         <div
                             key={item.id || item.label || item.current}
                             style={{
-                                border: '1px solid #d8e1e8',
+                                border: "1px solid var(--forge-border-color, #d8e1e8)",
                                 borderTop: `3px solid ${compareAccent[Math.abs(String(item.id || item.label || '').length) % compareAccent.length]}`,
                                 borderRadius: '10px',
                                 padding: '12px',
-                                background: 'linear-gradient(180deg, #ffffff 0%, #f8fbfe 100%)',
+                                background: "linear-gradient(180deg, var(--forge-surface, #ffffff) 0%, var(--forge-surface, #f8fbfe) 100%)",
                                 display: 'flex',
                                 flexDirection: 'column',
                                 gap: '8px',
-                                boxShadow: '0 1px 2px rgba(16, 22, 26, 0.05)',
+                                boxShadow: "0 1px 2px color-mix(in srgb, var(--forge-text, rgb(16 22 26)) 5%, transparent)",
                             }}
                         >
-                            <div style={{fontSize: '11px', letterSpacing: '0.02em', textTransform: 'uppercase', color: '#5f6b7c'}}>{item.label}</div>
-                            <div style={{fontSize: '24px', fontWeight: 700, color: '#182026'}}>{formatDashboardValue(currentValue, item.format, locale)}</div>
+                            <div style={{fontSize: '11px', letterSpacing: '0.02em', textTransform: 'uppercase', color: "var(--forge-text-secondary, #5f6b7c)"}}>{item.label}</div>
+                            <div style={{fontSize: '24px', fontWeight: 700, color: "var(--forge-text, #182026)"}}>{formatDashboardValue(currentValue, item.format, locale)}</div>
                             {(item.currentLabel || item.previousLabel) ? (
                                 <div style={{display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '2px'}}>
                                     {item.currentLabel ? (
-                                        <span style={{display: 'inline-flex', alignItems: 'center', width: 'fit-content', fontSize: '11px', fontWeight: 700, color: '#30404d', background: '#edf4fa', border: '1px solid #d5e3ef', borderRadius: '999px', padding: '4px 9px'}}>
+                                        <span style={{display: 'inline-flex', alignItems: 'center', width: 'fit-content', fontSize: '11px', fontWeight: 700, color: "var(--forge-text, #30404d)", background: "var(--forge-surface-subtle, #edf4fa)", border: "1px solid var(--forge-border-color, #d5e3ef)", borderRadius: '999px', padding: '4px 9px'}}>
                                             {item.currentLabel}
                                         </span>
                                     ) : null}
                                     {item.previousLabel ? (
-                                        <div style={{fontSize: '11px', color: '#5f6b7c', lineHeight: 1.35}}>
+                                        <div style={{fontSize: '11px', color: "var(--forge-text-secondary, #5f6b7c)", lineHeight: 1.35}}>
                                             <span style={{fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', fontSize: '10px'}}>Baseline</span>
                                             {' '}
                                             {item.previousLabel}
@@ -276,7 +276,7 @@ export function DashboardCompare({container, context}) {
                                 </div>
                             ) : null}
                             <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', paddingTop: '2px'}}>
-                                <span style={{fontSize: '12px', color: '#5f6b7c'}}>
+                                <span style={{fontSize: '12px', color: "var(--forge-text-secondary, #5f6b7c)"}}>
                                     {item.deltaLabel || 'vs previous'}: {formatDashboardValue(previousValue, item.format, locale)}
                                 </span>
                                 <span
@@ -342,7 +342,7 @@ export function DashboardKPITable({container, context}) {
                             <thead>
                             <tr>
                                 {normalizedColumns.map((column) => (
-                                    <th key={column.key} style={{textAlign: 'left', borderBottom: '1px solid #d8e1e8', padding: '10px 8px', background: '#f7fafc', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.02em', color: '#5f6b7c', position: 'sticky', top: 0}}>
+                                    <th key={column.key} style={{textAlign: 'left', borderBottom: "1px solid var(--forge-border-color, #d8e1e8)", padding: '10px 8px', background: "var(--forge-surface, #f7fafc)", fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.02em', color: "var(--forge-text-secondary, #5f6b7c)", position: 'sticky', top: 0}}>
                                         {column.label}
                                     </th>
                                 ))}
@@ -352,9 +352,9 @@ export function DashboardKPITable({container, context}) {
                             {rows.map((row, index) => {
                                 const cells = Array.isArray(row) ? row : normalizedColumns.map((column) => row?.[column.key]);
                                 return (
-                                    <tr key={index} style={{background: index % 2 === 0 ? '#ffffff' : '#fbfdff'}}>
+                                    <tr key={index} style={{background: index % 2 === 0 ? "var(--forge-surface, #ffffff)" : "var(--forge-surface, #fbfdff)"}}>
                                         {cells.map((cell, cellIndex) => (
-                                            <td key={`${index}-${cellIndex}`} style={{padding: '10px 8px', borderBottom: '1px solid #ebf1f5', color: cellIndex === 0 ? '#182026' : '#30404d', fontWeight: cellIndex === 0 ? 600 : 400, fontSize: '12px', lineHeight: 1.45, verticalAlign: 'top', maxWidth: cellIndex >= normalizedColumns.length - 1 ? '320px' : undefined, whiteSpace: cellIndex >= normalizedColumns.length - 2 ? 'normal' : 'nowrap'}}>
+                                            <td key={`${index}-${cellIndex}`} style={{padding: '10px 8px', borderBottom: "1px solid var(--forge-border-color, #ebf1f5)", color: cellIndex === 0 ? "var(--forge-text, #182026)" : "var(--forge-text, #30404d)", fontWeight: cellIndex === 0 ? 600 : 400, fontSize: '12px', lineHeight: 1.45, verticalAlign: 'top', maxWidth: cellIndex >= normalizedColumns.length - 1 ? '320px' : undefined, whiteSpace: cellIndex >= normalizedColumns.length - 2 ? 'normal' : 'nowrap'}}>
                                                 {renderDashboardTableCell(cell, row, normalizedColumns[cellIndex], locale, context)}
                                             </td>
                                         ))}
@@ -367,10 +367,10 @@ export function DashboardKPITable({container, context}) {
                         <>
                             <thead>
                             <tr>
-                                <th style={{textAlign: 'left', borderBottom: '1px solid #d8e1e8', padding: '8px'}}>Metric</th>
-                                <th style={{textAlign: 'right', borderBottom: '1px solid #d8e1e8', padding: '8px'}}>Value</th>
+                                <th style={{textAlign: 'left', borderBottom: "1px solid var(--forge-border-color, #d8e1e8)", padding: '8px'}}>Metric</th>
+                                <th style={{textAlign: 'right', borderBottom: "1px solid var(--forge-border-color, #d8e1e8)", padding: '8px'}}>Value</th>
                                 {showContextColumn ? (
-                                    <th style={{textAlign: 'right', borderBottom: '1px solid #d8e1e8', padding: '8px'}}>Context</th>
+                                    <th style={{textAlign: 'right', borderBottom: "1px solid var(--forge-border-color, #d8e1e8)", padding: '8px'}}>Context</th>
                                 ) : null}
                             </tr>
                             </thead>
@@ -380,12 +380,12 @@ export function DashboardKPITable({container, context}) {
                                 const value = resolveKey(metricsData, row.value);
                                 return (
                                     <tr key={row.id || row.label || index}>
-                                        <td style={{padding: '8px', borderBottom: '1px solid #ebf1f5', fontWeight: 600}}>{row.label}</td>
-                                        <td style={{padding: '8px', textAlign: 'right', borderBottom: '1px solid #ebf1f5'}}>{formatDashboardValue(value, row.format, locale, {
+                                        <td style={{padding: '8px', borderBottom: "1px solid var(--forge-border-color, #ebf1f5)", fontWeight: 600}}>{row.label}</td>
+                                        <td style={{padding: '8px', textAlign: 'right', borderBottom: "1px solid var(--forge-border-color, #ebf1f5)"}}>{formatDashboardValue(value, row.format, locale, {
                                             timeZone: row.timeZone || (row.timeZoneSelector ? resolveKey(metricsData, row.timeZoneSelector) : undefined),
                                         })}</td>
                                         {showContextColumn ? (
-                                            <td style={{padding: '8px', textAlign: 'right', borderBottom: '1px solid #ebf1f5'}}>
+                                            <td style={{padding: '8px', textAlign: 'right', borderBottom: "1px solid var(--forge-border-color, #ebf1f5)"}}>
                                                 {row.context ? (
                                                     <span style={{fontSize: '12px', color: tone.text, background: tone.background, border: `1px solid ${tone.border}`, borderRadius: '999px', padding: '2px 8px'}}>
                                                         {row.context}
@@ -468,20 +468,20 @@ export function DashboardFilters({container, context}) {
                         const range = current && typeof current === 'object' ? current : {};
                         return (
                             <div key={field} style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
-                                <div style={{fontSize: '12px', fontWeight: 600, color: '#5f6b7c'}}>{item.label}</div>
+                                <div style={{fontSize: '12px', fontWeight: 600, color: "var(--forge-text-secondary, #5f6b7c)"}}>{item.label}</div>
                                 <div style={{display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center'}}>
                                     <input
                                         type="date"
                                         value={range.start || ''}
                                         onChange={(e) => setDateRange(item, 'start', e.target.value)}
-                                        style={{border: '1px solid #ced9e0', borderRadius: '6px', padding: '4px 8px', fontSize: '12px', color: '#30404d'}}
+                                        style={{border: "1px solid var(--forge-border-color, #ced9e0)", borderRadius: '6px', padding: '4px 8px', fontSize: '12px', color: "var(--forge-text, #30404d)"}}
                                     />
-                                    <span style={{fontSize: '12px', color: '#5f6b7c'}}>to</span>
+                                    <span style={{fontSize: '12px', color: "var(--forge-text-secondary, #5f6b7c)"}}>to</span>
                                     <input
                                         type="date"
                                         value={range.end || ''}
                                         onChange={(e) => setDateRange(item, 'end', e.target.value)}
-                                        style={{border: '1px solid #ced9e0', borderRadius: '6px', padding: '4px 8px', fontSize: '12px', color: '#30404d'}}
+                                        style={{border: "1px solid var(--forge-border-color, #ced9e0)", borderRadius: '6px', padding: '4px 8px', fontSize: '12px', color: "var(--forge-text, #30404d)"}}
                                     />
                                 </div>
                             </div>
@@ -489,7 +489,7 @@ export function DashboardFilters({container, context}) {
                     }
                     return (
                         <div key={field} style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
-                            <div style={{fontSize: '12px', fontWeight: 600, color: '#5f6b7c'}}>{item.label}</div>
+                            <div style={{fontSize: '12px', fontWeight: 600, color: "var(--forge-text-secondary, #5f6b7c)"}}>{item.label}</div>
                             <div style={{display: 'flex', flexWrap: 'wrap', gap: '8px'}}>
                                 {(item.options || []).map((option) => {
                                     const active = item.multiple
@@ -503,9 +503,9 @@ export function DashboardFilters({container, context}) {
                                             className={active ? 'forge-dashboard-filter-chip is-active' : 'forge-dashboard-filter-chip'}
                                             onClick={() => toggleOption(item, option.value)}
                                             style={{
-                                                border: '1px solid #ced9e0',
-                                                background: active ? '#137cbd' : '#ffffff',
-                                                color: active ? '#ffffff' : '#30404d',
+                                                border: "1px solid var(--forge-border-color, #ced9e0)",
+                                                background: active ? "var(--forge-selected-background, #137cbd)" : "var(--forge-surface, #ffffff)",
+                                                color: active ? "var(--forge-text, #ffffff)" : "var(--forge-text, #30404d)",
                                                 borderRadius: '999px',
                                                 padding: '4px 10px',
                                                 cursor: 'pointer',
@@ -634,7 +634,7 @@ export function DashboardGeoMap({container, context}) {
     return (
         <Panel container={container}>
             {loading ? <div style={subtitleStyle}>Loading…</div> : null}
-            {error ? <div style={{...subtitleStyle, color: '#a82a2a'}}>{String(error)}</div> : null}
+            {error ? <div style={{...subtitleStyle, color: "var(--forge-status-danger-foreground, #a82a2a)"}}>{String(error)}</div> : null}
             {!loading && !error && sortedRegions.length === 0 ? <div style={subtitleStyle}>No geo data.</div> : null}
             <div className="forge-dashboard-geo">
                 <div className="forge-dashboard-geo-stage">
@@ -820,7 +820,7 @@ export function DashboardTimeline({container, context, isActive}) {
 
     return (
         <Panel container={container}>
-            <div style={{flex: '1 1 auto', minHeight: '500px', overflow: 'hidden', border: '1px solid #dbe6ef', borderRadius: '14px', background: 'linear-gradient(180deg, #fdfefe 0%, #f4f8fb 100%)', padding: '12px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.85)'}}>
+            <div style={{flex: '1 1 auto', minHeight: '500px', overflow: 'hidden', border: "1px solid var(--forge-border-color, #dbe6ef)", borderRadius: '14px', background: "linear-gradient(180deg, var(--forge-surface, #fdfefe) 0%, var(--forge-surface, #f4f8fb) 100%)", padding: '12px', boxShadow: "inset 0 1px 0 color-mix(in srgb, var(--forge-surface, rgb(255 255 255)) 85%, transparent)"}}>
                 <Chart container={chartContainer} context={filteredContext} isActive={isActive} embedded={true}/>
             </div>
         </Panel>
@@ -918,9 +918,9 @@ export function DashboardDimensions({container, context}) {
                             type="button"
                             onClick={() => setViewMode(mode)}
                             style={{
-                                border: '1px solid #ced9e0',
-                                background: mode === viewMode ? '#137cbd' : '#ffffff',
-                                color: mode === viewMode ? '#ffffff' : '#30404d',
+                                border: "1px solid var(--forge-border-color, #ced9e0)",
+                                background: mode === viewMode ? "var(--forge-selected-background, #137cbd)" : "var(--forge-surface, #ffffff)",
+                                color: mode === viewMode ? "var(--forge-text, #ffffff)" : "var(--forge-text, #30404d)",
                                 borderRadius: '6px',
                                 padding: '4px 10px',
                                 cursor: 'pointer',
@@ -933,14 +933,14 @@ export function DashboardDimensions({container, context}) {
             ) : null}
         >
             {loading ? <div style={subtitleStyle}>Loading…</div> : null}
-            {error ? <div style={{...subtitleStyle, color: '#a82a2a'}}>{String(error)}</div> : null}
+            {error ? <div style={{...subtitleStyle, color: "var(--forge-status-danger-foreground, #a82a2a)"}}>{String(error)}</div> : null}
             {!loading && !error && viewMode === 'table' ? (
                 <div style={{overflow: 'auto'}}>
                     <table style={{width: '100%', borderCollapse: 'collapse'}}>
                         <thead>
                         <tr>
-                            <th style={{textAlign: 'left', borderBottom: '1px solid #d8e1e8', padding: '8px'}}>Dimension</th>
-                            <th style={{textAlign: 'right', borderBottom: '1px solid #d8e1e8', padding: '8px'}}>{metricLabel}</th>
+                            <th style={{textAlign: 'left', borderBottom: "1px solid var(--forge-border-color, #d8e1e8)", padding: '8px'}}>Dimension</th>
+                            <th style={{textAlign: 'right', borderBottom: "1px solid var(--forge-border-color, #d8e1e8)", padding: '8px'}}>{metricLabel}</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -948,10 +948,10 @@ export function DashboardDimensions({container, context}) {
                             <tr
                                 key={`${row?.[dimensionKey] ?? 'dimension'}:${index}`}
                                 onClick={() => onSelect(row, index)}
-                                style={{cursor: 'pointer', background: selectedEntityKey === row?.[dimensionKey] ? '#ebf1f5' : 'transparent'}}
+                                style={{cursor: 'pointer', background: selectedEntityKey === row?.[dimensionKey] ? "var(--forge-surface-subtle, #ebf1f5)" : 'transparent'}}
                             >
-                                <td style={{padding: '8px', borderBottom: '1px solid #ebf1f5'}}>{row?.[dimensionKey] ?? '-'}</td>
-                                <td style={{padding: '8px', textAlign: 'right', borderBottom: '1px solid #ebf1f5'}}>{formatDashboardValue(row?.[metricKey], metric.format, locale)}</td>
+                                <td style={{padding: '8px', borderBottom: "1px solid var(--forge-border-color, #ebf1f5)"}}>{row?.[dimensionKey] ?? '-'}</td>
+                                <td style={{padding: '8px', textAlign: 'right', borderBottom: "1px solid var(--forge-border-color, #ebf1f5)"}}>{formatDashboardValue(row?.[metricKey], metric.format, locale)}</td>
                             </tr>
                         ))}
                         </tbody>
@@ -973,8 +973,8 @@ export function DashboardDimensions({container, context}) {
                                     display: 'flex',
                                     flexDirection: 'column',
                                     gap: '6px',
-                                    border: isSelected ? `1px solid ${barColor}` : '1px solid #d8e1e8',
-                                    background: '#ffffff',
+                                    border: isSelected ? `1px solid ${barColor}` : "1px solid var(--forge-border-color, #d8e1e8)",
+                                    background: "var(--forge-surface, #ffffff)",
                                     borderRadius: '8px',
                                     padding: '10px',
                                     cursor: 'pointer',
@@ -982,10 +982,10 @@ export function DashboardDimensions({container, context}) {
                                 }}
                             >
                                 <div style={{display: 'flex', justifyContent: 'space-between', gap: '12px'}}>
-                                    <span style={{fontWeight: 600, color: '#182026'}}>{row?.[dimensionKey] ?? '-'}</span>
-                                    <span style={{color: '#30404d'}}>{formatDashboardValue(value, metric.format, locale)}</span>
+                                    <span style={{fontWeight: 600, color: "var(--forge-text, #182026)"}}>{row?.[dimensionKey] ?? '-'}</span>
+                                    <span style={{color: "var(--forge-text, #30404d)"}}>{formatDashboardValue(value, metric.format, locale)}</span>
                                 </div>
-                                <div style={{height: '8px', background: '#ebf1f5', borderRadius: '999px', overflow: 'hidden'}}>
+                                <div style={{height: '8px', background: "var(--forge-surface-subtle, #ebf1f5)", borderRadius: '999px', overflow: 'hidden'}}>
                                     <div style={{height: '100%', width, background: barColor}}/>
                                 </div>
                             </button>
@@ -1059,11 +1059,11 @@ export function DashboardMessages({container, context}) {
                 return (
                     <div
                         key={`${resolvedTitle || resolvedBody || index}`}
-                        style={{padding: '16px', borderRadius: '12px', border: `1px solid ${tone.border}`, borderLeft: `4px solid ${tone.border}`, background: tone.background, color: tone.text, display: 'flex', flexDirection: 'column', gap: '10px', boxShadow: '0 1px 2px rgba(16, 22, 26, 0.04)'}}
+                        style={{padding: '16px', borderRadius: '12px', border: `1px solid ${tone.border}`, borderLeft: `4px solid ${tone.border}`, background: tone.background, color: tone.text, display: 'flex', flexDirection: 'column', gap: '10px', boxShadow: "0 1px 2px color-mix(in srgb, var(--forge-text, rgb(16 22 26)) 4%, transparent)"}}
                     >
                         <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px'}}>
                             {resolvedTitle ? <div style={{fontWeight: 700}}>{resolvedTitle}</div> : <div />}
-                            <span style={{fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', border: `1px solid ${tone.border}`, borderRadius: '999px', padding: '2px 8px', background: '#ffffffaa', color: tone.text}}>
+                            <span style={{fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', border: `1px solid ${tone.border}`, borderRadius: '999px', padding: '2px 8px', background: "color-mix(in srgb, var(--forge-surface, rgb(255 255 255)) 66.667%, transparent)", color: tone.text}}>
                                 {String(item.severity || 'info')}
                             </span>
                         </div>
@@ -1117,14 +1117,14 @@ export function DashboardFeed({container, context}) {
     return (
         <Panel container={container}>
             {loading ? <div style={subtitleStyle}>Loading…</div> : null}
-            {error ? <div style={{...subtitleStyle, color: '#a82a2a'}}>{String(error)}</div> : null}
+            {error ? <div style={{...subtitleStyle, color: "var(--forge-status-danger-foreground, #a82a2a)"}}>{String(error)}</div> : null}
             {!loading && !items.length ? <div style={subtitleStyle}>No feed entries.</div> : null}
             <div style={{display: 'flex', flexDirection: 'column', gap: '10px', overflow: 'auto'}}>
                 {items.map((item, index) => (
-                    <div key={index} style={{borderLeft: '3px solid #137cbd', paddingLeft: '12px'}}>
-                        {fields.timestamp ? <div style={{fontSize: '11px', color: '#5f6b7c', marginBottom: '4px'}}>{resolveKey(item, fields.timestamp)}</div> : null}
-                        {fields.title ? <div style={{fontWeight: 600, color: '#182026', marginBottom: '4px'}}>{resolveKey(item, fields.title)}</div> : null}
-                        {fields.body ? <div style={{fontSize: '13px', lineHeight: 1.5, color: '#30404d'}}>{resolveKey(item, fields.body)}</div> : null}
+                    <div key={index} style={{borderLeft: "3px solid var(--forge-interaction-color, #137cbd)", paddingLeft: '12px'}}>
+                        {fields.timestamp ? <div style={{fontSize: '11px', color: "var(--forge-text-secondary, #5f6b7c)", marginBottom: '4px'}}>{resolveKey(item, fields.timestamp)}</div> : null}
+                        {fields.title ? <div style={{fontWeight: 600, color: "var(--forge-text, #182026)", marginBottom: '4px'}}>{resolveKey(item, fields.title)}</div> : null}
+                        {fields.body ? <div style={{fontSize: '13px', lineHeight: 1.5, color: "var(--forge-text, #30404d)"}}>{resolveKey(item, fields.body)}</div> : null}
                     </div>
                 ))}
             </div>

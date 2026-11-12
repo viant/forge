@@ -1315,7 +1315,7 @@ function WindowContentInner({window, metadata, services}) {
         const cancelLabel = cancelCfg.label || 'Cancel';
 
         return (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 12px', borderTop: '1px solid #eee', position: 'sticky', bottom: 0, background: '#fff' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 12px', borderTop: "1px solid var(--forge-border-color, #eee)", position: 'sticky', bottom: 0, background: "var(--forge-surface, #fff)" }}>
                 <button className="bp4-button bp4-minimal" onClick={onCancel}>{cancelLabel}</button>
                 <button
                     className={`bp4-button bp4-intent-primary ${(!canSelect && requireSel) ? 'bp4-disabled' : ''}`}
@@ -1751,10 +1751,10 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
                 style={{
                     margin: 16,
                     padding: '14px 16px',
-                    border: '1px solid #efc7c2',
+                    border: "1px solid var(--forge-border-color, #efc7c2)",
                     borderRadius: 8,
-                    background: '#fff7f6',
-                    color: '#7a271a',
+                    background: "var(--forge-surface, #fff7f6)",
+                    color: "var(--forge-status-danger-foreground, #7a271a)",
                     lineHeight: 1.4,
                 }}
             >
@@ -1775,7 +1775,7 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
 
     if (displayState === 'empty') {
         return (
-            <div style={{ padding: 16, height: '100%', minHeight: 0, color: '#888' }}>
+            <div style={{ padding: 16, height: '100%', minHeight: 0, color: "var(--forge-text-muted, #888)" }}>
                 {fetchError
                     ? <span>{formatWindowMetadataError(fetchError)}</span>
                     : <span>No metadata available for window "{windowKey}"</span>}

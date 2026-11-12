@@ -45,13 +45,13 @@
 .basic-table-filterbar .bp6-input {
     height: 40px;
     border-radius: 7px;
-    box-shadow: inset 0 0 0 1px #c8d1dc;
+    box-shadow: inset 0 0 0 1px var(--forge-surface, #c8d1dc);
     font-size: 14px;
 }
 
 .basic-table-filterbar .bp4-input:focus,
 .basic-table-filterbar .bp6-input:focus {
-    box-shadow: inset 0 0 0 1px #2f6fdd, 0 0 0 3px rgba(47, 111, 221, 0.14);
+    box-shadow: inset 0 0 0 1px var(--forge-text, #2f6fdd), 0 0 0 3px color-mix(in srgb, var(--forge-text, rgb(47 111 221)) 14%, transparent);
 }
 
 .basic-table-filterbar.is-compact {
@@ -132,8 +132,8 @@
 
 .forge-quick-filter--field-selector select {
     min-width: 118px;
-    border-color: #c8d1dc;
-    color: #40506a;
+    border-color: var(--forge-control-border, #c8d1dc);
+    color: var(--forge-text-secondary, #40506a);
     background: var(--forge-table-muted-surface, #f8fafc);
     font-weight: 650;
 }
@@ -144,7 +144,7 @@
     overflow: auto;
     scrollbar-gutter: stable;
     scrollbar-width: thin;
-    scrollbar-color: #9aabc0 #edf2f7;
+    scrollbar-color: var(--forge-border-strong, #9aabc0) var(--forge-surface-subtle, #edf2f7);
 }
 
 /* Overlay scrollbars must not cover actions in the final row. */
@@ -160,13 +160,13 @@
 }
 
 .basic-table-scroll::-webkit-scrollbar-track {
-    background: #edf2f7;
+    background: var(--forge-surface-subtle, #edf2f7);
 }
 
 .basic-table-scroll::-webkit-scrollbar-thumb {
-    border: 2px solid #edf2f7;
+    border: 2px solid var(--forge-border-color, #edf2f7);
     border-radius: 999px;
-    background: #9aabc0;
+    background: var(--forge-surface-subtle, #9aabc0);
 }
 
 .basic-table-overflow-cue {
@@ -178,9 +178,9 @@
 
 .basic-table-overflow-cue:hover,
 .basic-table-overflow-cue:focus-visible {
-    border-color: #7d9fc0;
+    border-color: var(--forge-focus-color, #7d9fc0);
     background: var(--forge-table-surface, #ffffff);
-    color: #174f86;
+    color: var(--forge-interaction-hover-color, #174f86);
 }
 
 .basic-table-overflow-cue.is-left { left: 6px; }
@@ -199,7 +199,7 @@
 
 .basic-table-wrapper tbody tr:nth-child(even) td.is-sticky-left { background: var(--forge-table-muted-surface, #f8fafc); }
 .basic-table-wrapper tbody tr:hover td.is-sticky-left { background: var(--forge-table-hover-surface, #f1f6fd); }
-.basic-table-wrapper.has-table-overflow-left .is-sticky-left.is-sticky-edge { box-shadow: 8px 0 12px -10px rgba(31, 51, 73, 0.65); }
+.basic-table-wrapper.has-table-overflow-left .is-sticky-left.is-sticky-edge { box-shadow: 8px 0 12px -10px color-mix(in srgb, var(--forge-text, rgb(31 51 73)) 65%, transparent); }
 
 .basic-table-paginationbar {
     display: flex; flex: 0 0 auto; align-items: center; justify-content: flex-end;
@@ -301,10 +301,10 @@
     justify-content: center;
     padding: 42px 28px 48px;
     text-align: center;
-    color: #42516a;
+    color: var(--forge-text-muted, #42516a);
     background:
-        radial-gradient(circle at 50% 10%, rgba(45, 108, 223, 0.13), transparent 31%),
-        linear-gradient(180deg, rgba(252, 253, 255, 0.96) 0%, rgba(244, 248, 253, 0.99) 100%);
+        radial-gradient(circle at 50% 10%, var(--forge-selected-background, rgba(45,108,223,0.13)), transparent 31%),
+        linear-gradient(180deg, color-mix(in srgb, var(--forge-surface, rgb(252 253 255)) 96%, transparent) 0%, color-mix(in srgb, var(--forge-surface, rgb(244 248 253)) 99%, transparent) 100%);
 }
 
 .forge-table-empty-state__visual {
@@ -313,16 +313,16 @@
     height: 66px;
     margin-bottom: 18px;
     place-items: center;
-    border: 1px solid rgba(45, 108, 223, 0.22);
+    border: 1px solid var(--forge-interaction-color, rgba(45,108,223,0.22));
     border-radius: 22px;
-    color: #2767d3;
-    background: linear-gradient(145deg, #ffffff 6%, #eaf2ff 94%);
-    box-shadow: 0 16px 34px rgba(45, 89, 170, 0.16);
+    color: var(--forge-interaction-color, #2767d3);
+    background: linear-gradient(145deg, var(--forge-surface, #ffffff) 6%, var(--forge-surface-subtle, #eaf2ff) 94%);
+    box-shadow: 0 16px 34px color-mix(in srgb, var(--forge-text, rgb(45 89 170)) 16%, transparent);
 }
 
 .forge-table-empty-state__kicker {
     margin-bottom: 9px;
-    color: #2d6cdf;
+    color: var(--forge-interaction-color, #2d6cdf);
     font-size: 11px;
     font-weight: 800;
     letter-spacing: 0.13em;
@@ -331,7 +331,7 @@
 
 .forge-table-empty-state__title {
     margin: 0;
-    color: #1b2737;
+    color: var(--forge-text-muted, #1b2737);
     font-size: clamp(24px, 3vw, 32px);
     font-weight: 800;
     line-height: 1.18;
@@ -361,10 +361,10 @@
     align-items: flex-start;
     gap: 11px;
     padding: 15px;
-    border: 1px solid rgba(186, 201, 224, 0.74);
+    border: 1px solid var(--forge-border-color, rgba(186,201,224,0.74));
     border-radius: 15px;
-    background: rgba(255, 255, 255, 0.82);
-    box-shadow: 0 8px 20px rgba(39, 61, 98, 0.06);
+    background: color-mix(in srgb, var(--forge-surface, rgb(255 255 255)) 82%, transparent);
+    box-shadow: 0 8px 20px color-mix(in srgb, var(--forge-text, rgb(39 61 98)) 6%, transparent);
 }
 
 .forge-table-empty-state__step-number {
@@ -374,8 +374,8 @@
     height: 28px;
     place-items: center;
     border-radius: 10px;
-    color: #2459bb;
-    background: #e8f0ff;
+    color: var(--forge-interaction-color, #2459bb);
+    background: var(--forge-surface-subtle, #e8f0ff);
     font-size: 12px;
     font-weight: 800;
 }
@@ -385,13 +385,13 @@
     min-width: 0;
     flex-direction: column;
     gap: 3px;
-    color: #68758a;
+    color: var(--forge-text-muted, #68758a);
     font-size: 12px;
     line-height: 1.45;
 }
 
 .forge-table-empty-state__step-copy strong {
-    color: #263449;
+    color: var(--forge-text-muted, #263449);
     font-size: 13px;
 }
 
@@ -402,7 +402,7 @@
     padding-inline: 19px;
     border-radius: 12px;
     font-weight: 750;
-    box-shadow: 0 10px 22px rgba(45, 108, 223, 0.22);
+    box-shadow: 0 10px 22px color-mix(in srgb, var(--forge-text, rgb(45 108 223)) 22%, transparent);
 }
 
 .forge-table-empty-state.is-compact {
@@ -474,12 +474,12 @@
     min-width: 28px;
     min-height: 28px;
     border-radius: 4px;
-    color: #607086;
+    color: var(--forge-text-secondary, #607086);
 }
 
 .pagination-bar .bp4-button:not(:disabled):hover,
 .pagination-bar .bp6-button:not(:disabled):hover {
-    background: #e9f1ff;
+    background: var(--forge-disabled-bg, #e9f1ff);
     color: var(--forge-focus-color, #245cc8);
 }
 
@@ -500,7 +500,7 @@
     bottom: 0;
     z-index: 2;
     background: var(--forge-table-surface, rgba(255, 255, 255, 0.94));
-    border-top: 1px solid #d9e0ea;
+    border-top: 1px solid var(--forge-border-color, #d9e0ea);
     backdrop-filter: blur(10px);
 }
 
@@ -514,33 +514,33 @@
     align-items: center;
     gap: 6px;
     padding: 5px 8px;
-    border: 1px solid #c8d9fb;
+    border: 1px solid var(--forge-border-color, #c8d9fb);
     border-radius: 999px;
     background: var(--forge-table-surface, rgba(255, 255, 255, 0.96));
-    box-shadow: 0 4px 14px rgba(18, 44, 87, 0.12);
-    color: #40506a;
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--forge-text, rgb(18 44 87)) 12%, transparent);
+    color: var(--forge-text-secondary, #40506a);
     font-size: 11px;
     font-weight: 650;
 }
 
 .forge-table-tone-info {
-    background-color: #edf4ff;
-    color: #1757bc;
+    background-color: var(--forge-surface-subtle, #edf4ff);
+    color: var(--forge-interaction-color, #1757bc);
 }
 
 .forge-table-tone-success {
-    background-color: #ecfdf4;
-    color: #087044;
+    background-color: var(--forge-status-success-background, #ecfdf4);
+    color: var(--forge-status-success-foreground, #087044);
 }
 
 .forge-table-tone-warning {
-    background-color: #fff7e8;
-    color: #8a4b00;
+    background-color: var(--forge-status-warning-background, #fff7e8);
+    color: var(--forge-status-warning-foreground, #8a4b00);
 }
 
 .forge-table-tone-danger {
-    background-color: #fff1f0;
-    color: #b42318;
+    background-color: var(--forge-surface, #fff1f0);
+    color: var(--forge-status-danger-foreground, #b42318);
 }
 
 .table-pending {
@@ -610,23 +610,23 @@
 }
 
 .row:hover td {
-    background-color: #edf5ff;
+    background-color: var(--forge-surface-subtle, #edf5ff);
 }
 
 .row:hover td.forge-table-tone-info {
-    background-color: #edf4ff;
+    background-color: var(--forge-surface-subtle, #edf4ff);
 }
 
 .row:hover td.forge-table-tone-success {
-    background-color: #ecfdf4;
+    background-color: var(--forge-status-success-background, #ecfdf4);
 }
 
 .row:hover td.forge-table-tone-warning {
-    background-color: #fff7e8;
+    background-color: var(--forge-status-warning-background, #fff7e8);
 }
 
 .row:hover td.forge-table-tone-danger {
-    background-color: #fff1f0;
+    background-color: var(--forge-surface-subtle, #fff1f0);
 }
 
 .empty-row:hover td {
@@ -661,23 +661,23 @@
 .row td {
     padding: 10px 14px;
     margin: 0;
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: 1px solid var(--forge-border-color, #e2e8f0);
     background: var(--forge-table-surface, #ffffff);
-    color: #243247;
+    color: var(--forge-text, #243247);
     transition: background-color 120ms ease;
 }
 
 .basic-table-wrapper tbody tr:nth-child(even) td {
-    background: #f8fafd;
+    background: var(--forge-surface, #f8fafd);
 }
 
 .basic-table-wrapper tbody tr:nth-child(even):hover td {
-    background: #edf5ff;
+    background: var(--forge-surface-subtle, #edf5ff);
 }
 
 
 .selected-row td {
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--forge-control-border, #e0e0e0);
     font-weight: bold;
 }
 
@@ -716,13 +716,13 @@
 }
 
 .forge-table-stacked-summary__meta {
-    color: #5f6b7c;
+    color: var(--forge-text-secondary, #5f6b7c);
     font-size: 12px;
     line-height: 1.25;
 }
 
 .forge-table-stacked-summary__title {
-    color: #182230;
+    color: var(--forge-text, #182230);
     font-size: 14px;
     font-weight: 700;
     line-height: 1.3;
@@ -731,7 +731,7 @@
 .forge-table-stacked-summary__body {
     display: -webkit-box;
     overflow: hidden;
-    color: #42526a;
+    color: var(--forge-text-secondary, #42526a);
     font-size: 13px;
     line-height: 1.35;
     -webkit-box-orient: vertical;
@@ -744,7 +744,7 @@
     border: 0;
     padding: 4px 0;
     background: transparent;
-    color: #1757bc;
+    color: var(--forge-interaction-color, #1757bc);
     font-weight: 700;
     cursor: pointer;
 }
@@ -757,8 +757,8 @@
     overflow: hidden;
     border-radius: 4px;
     padding: 3px 6px;
-    background: #eef1f5;
-    color: #536174;
+    background: var(--forge-surface-subtle, #eef1f5);
+    color: var(--forge-text-secondary, #536174);
     font-size: 12px;
     font-weight: 600;
     line-height: 1.2;
@@ -766,29 +766,29 @@
 }
 
 .forge-table-cell-badge.is-accent {
-    background: #eee9f7;
-    color: #7048a8;
+    background: var(--forge-surface-subtle, #eee9f7);
+    color: var(--forge-interaction-color, #7048a8);
 }
 
 .forge-table-cell-badge.is-positive {
-    background: #e7f5ec;
-    color: #17613c;
+    background: var(--forge-status-success-background, #e7f5ec);
+    color: var(--forge-status-success-foreground, #17613c);
 }
 
 .forge-table-cell-badge.is-info {
-    background: #e8f0fb;
-    color: #235a9f;
+    background: var(--forge-status-info-background, #e8f0fb);
+    color: var(--forge-status-info-foreground, #235a9f);
 }
 
 .forge-table-cell-badge.is-warning {
-    background: #fff2d8;
-    color: #7a4b00;
+    background: var(--forge-status-warning-background, #fff2d8);
+    color: var(--forge-status-warning-foreground, #7a4b00);
 }
 
 .forge-table-cell-badge.is-danger,
 .forge-table-cell-badge.is-error {
-    background: #fde8e7;
-    color: #b42318;
+    background: var(--forge-status-danger-background, #fde8e7);
+    color: var(--forge-status-danger-foreground, #b42318);
 }
 
 .forge-table-cell-badge > span:last-child {

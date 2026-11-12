@@ -34,7 +34,7 @@ const ProgressBar = ({ value = 0, text, maxValue = 100, progress = {}, row = {},
                     height: "20px",
                     borderRadius: "4px",
                     overflow: "hidden",
-                    boxShadow: "0px 0px 4px rgba(0, 0, 0, 0.2)",
+                    boxShadow: "0px 0px 4px color-mix(in srgb, var(--forge-text, rgb(0 0 0)) 20%, transparent)",
                 }}
             >
                 <div

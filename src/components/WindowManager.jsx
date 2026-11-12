@@ -196,7 +196,7 @@ const WindowManager = ({renderWindowContent, isTabVisible, includeHosted = false
                 return (
                     <div
                         key={`backdrop-${top.windowId}`}
-                        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: z, pointerEvents: 'auto' }}
+                        style={{ position: 'fixed', inset: 0, background: "color-mix(in srgb, var(--forge-text, rgb(0 0 0)) 35%, transparent)", zIndex: z, pointerEvents: 'auto' }}
                         onMouseDown={(e) => e.stopPropagation()}
                         onClick={(e) => e.stopPropagation()}
                     />
@@ -311,21 +311,21 @@ const WindowManager = ({renderWindowContent, isTabVisible, includeHosted = false
                     <div
                         className="floating-window"
                         style={{
-                            border: '1px solid #ccc',
-                            background: '#fff',
+                            border: "1px solid var(--forge-border-color, #ccc)",
+                            background: "var(--forge-surface, #fff)",
                             display: 'flex',
                             flexDirection: 'column',
-                            boxShadow: '0 0 10px rgba(0,0,0,0.3)',
+                            boxShadow: "0 0 10px color-mix(in srgb, var(--forge-text, rgb(0 0 0)) 30%, transparent)",
                             height: '100%',
-                            outline: win.isModal ? '2px solid #2684FF33' : undefined,
+                            outline: win.isModal ? "2px solid var(--forge-focus-color, #2684FF33)" : undefined,
                         }}
                         data-window-id={win.windowId}
                     >
                         <div
                             className="window-header"
                             style={{
-                                background: 'linear-gradient(135deg, #eef4ff 0%, #dce8fb 100%)',
-                                borderBottom: '1px solid rgba(148, 163, 184, 0.28)',
+                                background: "linear-gradient(135deg, var(--forge-surface-subtle, #eef4ff) 0%, var(--forge-surface-subtle, #dce8fb) 100%)",
+                                borderBottom: "1px solid var(--forge-border-color, rgba(148,163,184,0.28))",
                                 padding: '8px 12px',
                                 cursor: 'move',
                                 display: 'grid',
@@ -351,7 +351,7 @@ const WindowManager = ({renderWindowContent, isTabVisible, includeHosted = false
                                     showMaximize={!win.isModal}
                                 />
                             </div>
-                            <span style={{textAlign: 'center', fontWeight: 700, color: '#1f2a44'}}>{resolveDisplayWindowTitle(win)}</span>
+                            <span style={{textAlign: 'center', fontWeight: 700, color: "var(--forge-text, #1f2a44)"}}>{resolveDisplayWindowTitle(win)}</span>
                             <div />
                         </div>
                         <div

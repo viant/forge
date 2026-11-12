@@ -1,9 +1,9 @@
 /* Simple terminal-style scrollable container and entry styling */
 .terminal-container {
-  background-color: #0b0d10;
-  color: #e6edf3;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  border: 1px solid #1f2937;
+  background-color: var(--forge-surface-subtle, #0b0d10);
+  color: var(--forge-text, #e6edf3);
+  font-family:var(--forge-font-family-monospace, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+  border: 1px solid var(--forge-border-color, #1f2937);
   border-radius: 6px;
   overflow-y: auto;
 }
@@ -18,9 +18,9 @@
 
 .term-entry .term-command {
   white-space: pre-wrap;
-  color: #e6edf3;
-  background: #0f1318;
-  border: 1px solid #1b2533;
+  color: var(--forge-text, #e6edf3);
+  background: var(--forge-surface-subtle, #0f1318);
+  border: 1px solid var(--forge-border-color, #1b2533);
   padding: 6px 8px;
   border-radius: 4px;
 }
@@ -28,34 +28,34 @@
 .term-entry .term-output {
   margin-top: 4px;
   white-space: pre-wrap;
-  color: #c9d1d9;
-  border-left: 3px solid #334155; /* slate */
+  color: var(--forge-text-muted, #c9d1d9);
+  border-left: 3px solid var(--forge-border-color, #334155); /* slate */
   padding-left: 8px;
 }
 
 .term-entry .term-stderr {
   margin-top: 4px;
   white-space: pre-wrap;
-  color: #ffb4ab; /* soft red for stderr text */
-  border-left: 3px solid #ff6b6b;
+  color: var(--forge-status-danger-foreground, #ffb4ab); /* soft red for stderr text */
+  border-left: 3px solid var(--forge-status-danger-border, #ff6b6b);
   padding-left: 8px;
 }
 
 .term-prompt {
-  color: #7dd3fc;
+  color: var(--forge-interaction-color, #7dd3fc);
   font-weight: 700;
 }
 
-.term-input-text { color: #7dd3fc; }
+.term-input-text { color: var(--forge-interaction-color, #7dd3fc); }
 
 .term-entry:not(.error) .term-output {
-  color: #6ee7b7;
-  border-left-color: #34d399;
+  color: var(--forge-status-success-foreground, #6ee7b7);
+  border-left-color: var(--forge-status-success-border, #34d399);
 }
 
 .term-entry.error .term-output {
-  color: #fca5a5;
-  border-left-color: #f87171;
+  color: var(--forge-status-danger-foreground, #fca5a5);
+  border-left-color: var(--forge-status-danger-border, #f87171);
 }
 
 .term-status {
@@ -69,23 +69,23 @@
 }
 
 .term-status.ok {
-  color: #0c3b2e;
-  background: #3fb67a; /* green */
+  color: var(--forge-status-success-foreground, #0c3b2e);
+  background: var(--forge-status-success-background, #3fb67a); /* green */
 }
 
 .term-status.err {
-  color: #4a1313;
-  background: #ff6b6b; /* red */
+  color: var(--forge-status-danger-foreground, #4a1313);
+  background: var(--forge-status-danger-background, #ff6b6b); /* red */
 }
 
 .term-entry.error .term-command {
-  color: #ff8a8a;
+  color: var(--forge-status-danger-foreground, #ff8a8a);
 }
 
 .term-divider {
   margin: 10px 0;
   border: 0;
-  border-top: 1px solid #1f2937;
+  border-top: 1px solid var(--forge-border-color, #1f2937);
 }
 
 /* Truncated block container with an expand control */
@@ -98,9 +98,9 @@
 .term-expand {
   margin-top: 4px;
   cursor: pointer;
-  color: #93c5fd; /* light blue link-like */
+  color: var(--forge-interaction-color, #93c5fd); /* light blue link-like */
 }
 
 .term-expand:hover {
-  color: #bfdbfe;
+  color: var(--forge-text-muted, #bfdbfe);
 }
