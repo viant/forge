@@ -118,12 +118,15 @@ func FindRoot(roots []RootRef, uri string) (RootRef, bool) {
 }
 
 type Manifest struct {
-	Unchanged       bool              `json:"unchanged,omitempty"`
-	Generation      uint64            `json:"generation"`
-	Hash            string            `json:"hash"`
-	PartitionHashes map[string]string `json:"partitionHashes"`
-	Policies        []authz.Document  `json:"policies"`
-	Cohorts         []Cohort          `json:"cohorts"`
+	// NamespaceMetadata is advisory metadata from the enclosing namespace sync
+	// response. It is not part of the artifact wire format or permission hash.
+	NamespaceMetadata map[string]primitive.NamespaceMetadata `json:"-"`
+	Unchanged         bool                                   `json:"unchanged,omitempty"`
+	Generation        uint64                                 `json:"generation"`
+	Hash              string                                 `json:"hash"`
+	PartitionHashes   map[string]string                      `json:"partitionHashes"`
+	Policies          []authz.Document                       `json:"policies"`
+	Cohorts           []Cohort                               `json:"cohorts"`
 }
 
 func ManifestHash(value Manifest) string {

@@ -5,11 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/viant/authz"
+	primitive "github.com/viant/forge/backend/provider/contract"
 	"github.com/viant/forge/backend/provider/contract/observe"
 )
 
@@ -486,7 +488,9 @@ func (r *Replica) Sync(ctx context.Context) (syncErr error) {
 		if manifest.Hash != prior.Hash || !loadedCandidate && priorStore == nil || len(manifest.Cohorts) != 0 || len(manifest.Policies) != 0 || len(manifest.PartitionHashes) != 0 {
 			return ErrInvalid
 		}
+		metadata := manifest.NamespaceMetadata
 		manifest = prior
+		manifest.NamespaceMetadata = metadata
 	} else if err = ValidateManifest(manifest); err != nil {
 		return err
 	}
@@ -525,6 +529,7 @@ func (r *Replica) Sync(ctx context.Context) (syncErr error) {
 			r.mu.Unlock()
 			return ErrConflict
 		}
+		metadataChanged := r.latest.Hash != manifest.Hash || !sameNamespaceGuidance(r.latest.NamespaceMetadata, manifest.NamespaceMetadata)
 		next := map[string]*partitionState{}
 		for key, hash := range manifest.PartitionHashes {
 			current := r.partitions[key]
@@ -544,8 +549,18 @@ func (r *Replica) Sync(ctx context.Context) (syncErr error) {
 				pending = append(pending, key)
 			}
 		}
+		if len(next) != len(r.partitions) {
+			metadataChanged = true
+		}
+		for key, state := range next {
+			if r.partitions[key] != state {
+				metadataChanged = true
+			}
+		}
 		r.partitions = next // full snapshot removes omitted roots
-		r.metadataEpoch++
+		if metadataChanged {
+			r.metadataEpoch++
+		}
 		r.setManifestLocked(manifest)
 		r.store = policyStore
 		r.refreshAdmissionSelectionsLocked()
@@ -1068,7 +1083,32 @@ func (r *Replica) admissionKey(ctx context.Context) (string, error) {
 	return r.cfg.SessionKey(ctx)
 }
 
+// Guidance is advisory metadata carried beside the immutable artifact catalog.
+// An unchanged sync preserves catalog identities; only actual guidance changes
+// or partition/readiness changes invalidate prepared metadata lookups.
+func sameNamespaceGuidance(a, b map[string]primitive.NamespaceMetadata) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for name, left := range a {
+		right, ok := b[name]
+		if !ok || left.Description != right.Description || !slices.Equal(left.UseCases, right.UseCases) {
+			return false
+		}
+	}
+	return true
+}
+
 func (r *Replica) setManifestLocked(manifest Manifest) {
+	if manifest.NamespaceMetadata != nil {
+		metadata := make(map[string]primitive.NamespaceMetadata, len(manifest.NamespaceMetadata))
+		for name, value := range manifest.NamespaceMetadata {
+			value.UseCases = append([]string(nil), value.UseCases...)
+			value.Synchronization = nil
+			metadata[name] = value
+		}
+		manifest.NamespaceMetadata = metadata
+	}
 	public := len(manifest.Policies) == 0 && (len(manifest.Cohorts) > 0 || r.publicOnly)
 	for _, cohort := range manifest.Cohorts {
 		if !cohort.Public {

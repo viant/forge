@@ -73,14 +73,16 @@ func TestCohortSupportsPublishedMCPDefinitions(t *testing.T) {
 }
 
 type namespaceReplicaTool struct {
-	publisher *Publisher
-	mu        sync.Mutex
-	calls     map[string]int
+	publisher   *Publisher
+	mu          sync.Mutex
+	calls       map[string]int
+	description string
 }
 
 func (c *namespaceReplicaTool) CallTool(ctx context.Context, in *schema.CallToolRequestParams, _ ...mcpclient.RequestOption) (*schema.CallToolResult, error) {
 	c.mu.Lock()
 	c.calls[in.Name]++
+	description := c.description
 	c.mu.Unlock()
 	var value any
 	switch in.Name {
@@ -99,7 +101,7 @@ func (c *namespaceReplicaTool) CallTool(ctx context.Context, in *schema.CallTool
 			catalog = map[string]any{"unchanged": true, "hash": manifest.Hash}
 		}
 		raw, _ := json.Marshal(catalog)
-		value = map[string]any{"sync": primitive.NamespaceSyncResult{Catalog: raw, FetchMethod: MethodFetch}}
+		value = map[string]any{"description": description, "sync": primitive.NamespaceSyncResult{Catalog: raw, FetchMethod: MethodFetch}}
 	case MethodFetch:
 		raw, _ := json.Marshal(in.Arguments)
 		var request FetchInput

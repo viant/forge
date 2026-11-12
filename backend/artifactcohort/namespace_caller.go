@@ -35,6 +35,7 @@ func (c NamespaceCaller) DiscoverKnown(ctx context.Context, knownHash string) (M
 		return Manifest{}, err
 	}
 	var response struct {
+		primitive.NamespaceMetadata
 		Sync *primitive.NamespaceSyncResult `json:"sync"`
 	}
 	if json.Unmarshal(raw, &response) != nil || response.Sync == nil || response.Sync.FetchMethod != MethodFetch {
@@ -48,6 +49,7 @@ func (c NamespaceCaller) DiscoverKnown(ctx context.Context, knownHash string) (M
 		if knownHash == "" || manifest.Hash != knownHash || len(manifest.Cohorts) != 0 || len(manifest.Policies) != 0 || len(manifest.PartitionHashes) != 0 {
 			return Manifest{}, ErrInvalid
 		}
+		manifest.NamespaceMetadata = namespaceSyncMetadata(c.Namespace, response.NamespaceMetadata)
 		return manifest, nil
 	}
 	if err = ValidateManifest(manifest); err != nil {
@@ -59,7 +61,15 @@ func (c NamespaceCaller) DiscoverKnown(ctx context.Context, knownHash string) (M
 			return Manifest{}, ErrInvalid
 		}
 	}
+	manifest.NamespaceMetadata = namespaceSyncMetadata(c.Namespace, response.NamespaceMetadata)
 	return manifest, nil
+}
+
+func namespaceSyncMetadata(namespace string, metadata primitive.NamespaceMetadata) map[string]primitive.NamespaceMetadata {
+	if metadata.Description == "" && len(metadata.UseCases) == 0 {
+		return nil
+	}
+	return map[string]primitive.NamespaceMetadata{namespace: {Description: metadata.Description, UseCases: append([]string(nil), metadata.UseCases...)}}
 }
 
 func (c NamespaceCaller) Fetch(ctx context.Context, input FetchInput) (*Artifact, error) {

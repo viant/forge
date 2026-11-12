@@ -86,6 +86,13 @@ func (s *MetadataSource) Namespaces(ctx context.Context) (result []primitive.Nam
 			names = append(names, kind)
 		}
 		sort.Strings(names)
+		if len(names) > 0 {
+			s.replica.mu.RLock()
+			metadata := s.replica.latest.NamespaceMetadata[namespace]
+			capability.Description = metadata.Description
+			capability.UseCases = append([]string(nil), metadata.UseCases...)
+			s.replica.mu.RUnlock()
+		}
 		for _, kind := range names {
 			support := primitive.KindSupport{Kind: kind, Operations: []string{"list", "get"}}
 			if kind == "navigation" {
