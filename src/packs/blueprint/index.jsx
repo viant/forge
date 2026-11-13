@@ -5,6 +5,7 @@ import {useRegisteredControlActions} from '../../runtime/useRegisteredControlAct
 import {isLiveControlVisible,validateWidgetControlValue} from '../../core/ui/controlActions.js';
 import Typography, {typographyProps} from '../../components/Typography.jsx';
 import ForgeButton from '../../components/Button.jsx';
+import {useForgeTheme} from '../../components/ThemeBoundary.jsx';
 import {preserveSelectExternalFocus} from './selectCloseFocus.js';
 import {inheritFieldTrackSelectTokens} from './selectPortalTokens.js';
 import SwitchControl from '../../components/SwitchControl.jsx';
@@ -38,6 +39,7 @@ import {
     Tooltip,
     AnchorButton,
     FileInput,
+    Portal,
 } from '@blueprintjs/core';
 import TextLookup from './TextLookup.jsx';
 import { Select, MultiSelect } from '@blueprintjs/select';
@@ -164,6 +166,10 @@ const formatDateRangeDay = (value) => {
     }).format(parsed);
 };
 
+function DateRangePresetPortal({themed, children}) {
+    return themed ? <Portal>{children}</Portal> : createPortal(children, document.body);
+}
+
 export function DateRangePresetInput({
     value = '',
     onChange,
@@ -188,6 +194,8 @@ export function DateRangePresetInput({
     onDraftChange,
     presetPending = false,
 }) {
+    const theme = useForgeTheme();
+    const themedCalendar = theme?.themeId === 'design-system-2';
     const controlled = range != null && typeof onRangeChange === 'function';
     const [open, setOpen] = React.useState(false);
     const [presetRequestError, setPresetRequestError] = React.useState('');
@@ -326,8 +334,9 @@ export function DateRangePresetInput({
             </Button>
             {controlled && presetPending && <span role="status">Resolving date preset…</span>}
             {presetRequestError && <span role="alert">{presetRequestError}</span>}
-            {open && typeof document !== 'undefined' ? createPortal((
+            {open && typeof document !== 'undefined' ? <DateRangePresetPortal themed={themedCalendar}>
                 <div
+                    className={themedCalendar ? 'forge-date-range-preset-menu' : undefined}
                     role="dialog"
                     aria-label={`${item?.label || 'Date range'} options`}
                     style={{
@@ -337,21 +346,25 @@ export function DateRangePresetInput({
                         zIndex: 3000,
                         width: 360,
                         maxWidth: 'min(360px, calc(100vw - 32px))',
-                        border: '1px solid #d7dbe5',
-                        borderRadius: 10,
-                        background: '#ffffff',
-                        boxShadow: '0 12px 30px rgba(31, 41, 55, 0.16)',
+                        border: themedCalendar ? 'var(--forge-border-width, 1px) solid var(--forge-border-color)' : '1px solid #d7dbe5',
+                        borderRadius: themedCalendar ? 'var(--forge-menu-radius, 6px)' : 10,
+                        background: themedCalendar ? 'var(--forge-surface-raised)' : '#ffffff',
+                        color: themedCalendar ? 'var(--forge-text)' : undefined,
+                        colorScheme: themedCalendar ? theme.mode : undefined,
+                        boxShadow: themedCalendar ? 'var(--forge-menu-shadow, none)' : '0 12px 30px rgba(31, 41, 55, 0.16)',
                         padding: 12,
                     }}
                 >
-                    <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 6}}>
+                    <div style={{display: 'grid', gridTemplateColumns: themedCalendar ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))', gap: themedCalendar ? 0 : 6}}>
                         {options.filter((option) => String(option.value).toLowerCase() !== 'custom').map((option) => (
                             <Button
                                 key={option.value}
                                 type="button"
-                                minimal={String(option.value) !== String(value)}
-                                intent={String(option.value) === String(value) ? 'primary' : 'none'}
+                                className={themedCalendar ? `forge-date-range-preset-option${String(option.value) === String(value) ? ' is-selected' : ''}` : undefined}
+                                minimal={themedCalendar || String(option.value) !== String(value)}
+                                intent={!themedCalendar && String(option.value) === String(value) ? 'primary' : 'none'}
                                 alignText="left"
+                                aria-pressed={themedCalendar ? String(option.value) === String(value) : undefined}
                                 disabled={option.disabled === true || controlled && typeof onPresetRequest !== 'function'}
                                 onClick={() => choosePreset(option)}
                             >
@@ -359,10 +372,10 @@ export function DateRangePresetInput({
                             </Button>
                         ))}
                     </div>
-                    <div style={{margin: '12px -12px', borderTop: '1px solid #e4e7ee'}} />
-                    <div style={{fontSize: 12, fontWeight: 700, color: '#394257', marginBottom: 8}}>Custom dates</div>
+                    <div style={{margin: '12px -12px', borderTop: themedCalendar ? '1px solid var(--forge-border-color)' : '1px solid #e4e7ee'}} />
+                    <div style={{fontSize: 12, fontWeight: 700, color: themedCalendar ? 'var(--forge-text)' : '#394257', marginBottom: 8}}>Custom dates</div>
                     <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8}}>
-                        <label style={{display: 'grid', gap: 4, fontSize: 11, color: '#596579'}}>
+                        <label style={{display: 'grid', gap: 4, fontSize: 11, color: themedCalendar ? 'var(--forge-text-secondary)' : '#596579'}}>
                             Start
                             <input
                                 className="bp6-input"
@@ -373,7 +386,7 @@ export function DateRangePresetInput({
                                 onChange={(event) => { onDraftChange?.(); setCustomDraft(previous => ({...previous, start: event.target.value})); }}
                             />
                         </label>
-                        <label style={{display: 'grid', gap: 4, fontSize: 11, color: '#596579'}}>
+                        <label style={{display: 'grid', gap: 4, fontSize: 11, color: themedCalendar ? 'var(--forge-text-secondary)' : '#596579'}}>
                             End
                             <input
                                 className="bp6-input"
@@ -385,9 +398,9 @@ export function DateRangePresetInput({
                             />
                         </label>
                     </div>
-                    {invalid ? <div role="alert" style={{color: '#b42318', fontSize: 11, marginTop: 7}}>Start date must be on or before end date.</div> : null}
+                    {invalid ? <div role="alert" style={{color: themedCalendar ? 'var(--forge-status-danger-foreground)' : '#b42318', fontSize: 11, marginTop: 7}}>Start date must be on or before end date.</div> : null}
                     <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 10}}>
-                        <span style={{display: 'grid', gap: 4, color: '#6c7587', fontSize: 10, lineHeight: 1.3}}>
+                        <span style={{display: 'grid', gap: 4, color: themedCalendar ? 'var(--forge-text-secondary)' : '#6c7587', fontSize: 10, lineHeight: 1.3}}>
                             {!controlled && <Checkbox
                                 className="forge-blueprint-checkbox-compat"
                                 checked={includePartialData}
@@ -401,7 +414,7 @@ export function DateRangePresetInput({
                         </Button>
                     </div>
                 </div>
-            ), document.body) : null}
+            </DateRangePresetPortal> : null}
         </div>
     );
 }

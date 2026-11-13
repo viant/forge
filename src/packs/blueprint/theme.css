@@ -31,6 +31,39 @@
 .forge-segmented-control__option:disabled {
     cursor: not-allowed;
 }
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .forge-date-range-preset > .bp6-button {
+    min-height: var(--forge-control-height, 40px);
+    border: var(--forge-border-width, 1px) solid var(--forge-control-border);
+    border-radius: var(--forge-control-radius, 8px);
+    background: var(--forge-control-bg);
+    color: var(--forge-control-text);
+    box-shadow: none;
+}
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .forge-date-range-preset-menu .forge-date-range-preset-option {
+    width: 100%;
+    min-height: var(--forge-control-height, 40px);
+    border: 0;
+    border-radius: var(--forge-menu-radius, 6px);
+    background: transparent;
+    color: var(--forge-text);
+    box-shadow: none;
+}
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .forge-date-range-preset-menu .forge-date-range-preset-option:not(:disabled):hover {
+    background: var(--forge-menu-hover-background, var(--forge-surface-subtle));
+}
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .forge-date-range-preset-menu .forge-date-range-preset-option.is-selected,
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .forge-date-range-preset-menu .forge-date-range-preset-option.is-selected:not(:disabled):hover {
+    background: var(--forge-menu-selected-background, var(--forge-selected-background));
+    color: var(--forge-text);
+}
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .forge-date-range-preset-menu .bp6-input[type="date"] {
+    min-height: var(--forge-control-height, 40px);
+    border: var(--forge-border-width, 1px) solid var(--forge-control-border);
+    border-radius: var(--forge-control-radius, 8px);
+    background: var(--forge-control-bg);
+    color: var(--forge-control-text);
+    box-shadow: none;
+}
 .agently-workspace:not([data-forge-theme]) {
     --forge-type-caption-size: var(--forge-default-type-caption-size);
     --forge-type-caption-line-height: var(--forge-default-type-caption-line-height);

@@ -52,13 +52,15 @@ body { margin: 0; }
 .ds2-library__chip-row { display: flex; flex-wrap: wrap; gap: var(--forge-spacing-2, 8px); }
 .ds2-library__count-examples { display: flex; flex-wrap: wrap; gap: var(--forge-spacing-3, 12px); }
 .ds2-library__count-examples > span { display: inline-flex; align-items: center; gap: var(--forge-spacing-1, 4px); color: var(--forge-text-secondary); }
-.ds2-library__count-badge { display: inline-grid; place-items: center; min-width: 20px; min-height: 20px; padding-inline: var(--forge-spacing-1, 4px); border-radius: var(--forge-radius-pill, 999px); background: var(--forge-surface); color: var(--forge-text); font-size: var(--forge-type-caption-size, 11px); font-weight: var(--forge-type-label-weight, 600); line-height: 1; }
 .ds2-library__candidate-note { margin: var(--forge-spacing-3, 12px) 0 0; color: var(--forge-text-secondary); font-size: var(--forge-type-small-size, 12px); }
 .ds2-library__skeleton-review > span:not(.ds2-library__sr-only) { display: block; margin: var(--forge-spacing-3, 12px) 0 var(--forge-spacing-2, 8px); color: var(--forge-text-secondary); font-size: var(--forge-type-small-size, 12px); }
 .ds2-library__skeleton-candidate .soft-skeleton-line { background: color-mix(in srgb, var(--forge-text) 10%, var(--forge-surface)); }
 @media (prefers-reduced-motion: reduce) { .ds2-library__skeleton-candidate .soft-skeleton-line::after { animation: none; } }
 .ds2-library__sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .ds2-library__conversation { display: grid; gap: var(--forge-spacing-4, 16px); max-width: 760px; }
+.ds2-library__menu-examples { display: flex; flex-wrap: wrap; align-items: center; gap: var(--forge-spacing-3, 12px); }
+.ds2-library__calendar-example { width: min(100%, 360px); margin-top: var(--forge-spacing-6, 24px); }
+.ds2-library__calendar-example h3 { margin: 0 0 var(--forge-spacing-2, 8px); font-size: var(--forge-type-section-size, 16px); }
 .ds2-library__conversation .chat-row { width: 100%; }
 .ds2-library__patterns { max-width: 1100px; min-width: 0; margin: var(--forge-spacing-6, 24px) auto 0; background: var(--forge-surface); overflow-x: auto; }
 .ds2-library__patterns > h2, .ds2-library__patterns > p { margin: 0; padding-inline: var(--forge-spacing-6, 24px); }
