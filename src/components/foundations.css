@@ -138,6 +138,9 @@
 :is(.agently-workspace, .agently-application) .bp6-date-input-popover > .bp6-popover-content,
 :is(.agently-workspace, .agently-application) .bp6-popover .bp6-menu,
 :is(.agently-workspace, .agently-application) .bp6-menu-item {
+    border-radius: var(--forge-control-radius, 8px);
+}
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) :is(.bp6-date-input-popover > .bp6-popover-content, .bp6-popover .bp6-menu, .bp6-menu-item) {
     border-radius: var(--forge-menu-radius, var(--forge-control-radius, 8px));
 }
 :is(.agently-workspace, .agently-application) .bp6-date-input-popover > .bp6-popover-content {
@@ -159,6 +162,9 @@
     --rdp-background-color: var(--forge-surface-raised, var(--forge-surface));
 }
 :is(.agently-workspace, .agently-application) .bp6-date-input-popover .rdp-day {
+    border-radius: var(--forge-control-radius, 8px);
+}
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .bp6-date-input-popover .rdp-day {
     border-radius: var(--forge-menu-radius, var(--forge-control-radius, 8px));
 }
 :is(.agently-workspace, .agently-application) .bp6-date-input-popover .rdp-day:not([disabled], .rdp-day_selected):is(:hover, :focus) {
@@ -170,11 +176,14 @@
     background: var(--forge-button-bg);
     color: var(--forge-button-text);
 }
-:is(.agently-workspace, .agently-application) .bp6-menu-item:not(.bp6-disabled):is(:hover, :focus, .bp6-active) {
+:is(.agently-workspace, .agently-application) .bp6-menu-item:not(.bp6-disabled):is(:hover, :focus) {
+    background: var(--forge-surface-subtle);
+}
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .bp6-menu-item:not(.bp6-disabled):is(:hover, :focus, .bp6-active) {
     background: var(--forge-menu-hover-background, var(--forge-surface-subtle));
 }
-:is(.agently-workspace, .agently-application) .bp6-menu-item.bp6-selected,
-:is(.agently-workspace, .agently-application) .bp6-menu-item[aria-selected="true"] {
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .bp6-menu-item.bp6-selected,
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .bp6-menu-item[aria-selected="true"] {
     background: var(--forge-menu-selected-background, var(--forge-selected-background));
     color: var(--forge-text);
 }
