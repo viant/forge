@@ -6,18 +6,22 @@ import { parseWarmupCases, validateWarmupCases, warmupCaseCount, warmupCaseExpre
 export function ReaderCacheDialog({ api, report, version, canWarmup, isOpen, structure, onClose, onApply, onWarmup }) {
   const cache = structure?.component?.settings?.cache;
   const warmupConfig = cache?.warmup;
-  const columns = structure?.component?.rootView?.columns ?? [];
-  const connectors = structure?.availableConnectors ?? [];
+  const [discoveredStructure, setDiscoveredStructure] = useState(null);
+  const [columnDiscoveryError, setColumnDiscoveryError] = useState('');
+  const inspectedStructure = discoveredStructure || structure;
+  const columns = inspectedStructure?.component?.rootView?.columns ?? [];
+  const connectors = inspectedStructure?.availableConnectors ?? structure?.availableConnectors ?? [];
+  const namedCache = Boolean(cache?.name && !cache?.provider && !cache?.location);
   const [name, setName] = useState('');
-  const [ttl, setTTL] = useState('60s');
+  const [ttl, setTTL] = useState('');
   const [location, setLocation] = useState('');
-  const [backend, setBackend] = useState('afs');
+  const [backend, setBackend] = useState('');
   const [provider, setProvider] = useState('');
   const [indexColumn, setIndexColumn] = useState('');
   const [indexParameter, setIndexParameter] = useState('');
   const [connector, setConnector] = useState('');
-  const [maxCases, setMaxCases] = useState(30);
-  const [limit, setLimit] = useState(100);
+  const [maxCases, setMaxCases] = useState(undefined);
+  const [limit, setLimit] = useState(undefined);
   const [fieldNames, setFieldNames] = useState('');
   const [caseLines, setCaseLines] = useState('');
   const [saving, setSaving] = useState(false);
@@ -29,14 +33,23 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, isOpen, str
 
   useEffect(() => {
     if (!isOpen) return;
-    setName(cache?.name ?? ''); setTTL(cache?.ttl ?? '60s'); setLocation(cache?.location ?? '');
-    setBackend(cache?.provider ? 'aerospike' : 'afs'); setProvider(cache?.provider ?? '');
-    setIndexColumn(warmupConfig?.indexColumn ?? columns[0]?.source ?? columns[0]?.name ?? '');
+    setDiscoveredStructure(null); setColumnDiscoveryError('');
+    setName(cache?.name ?? ''); setTTL(cache?.ttl ?? ''); setLocation(cache?.location ?? '');
+    setBackend(cache?.provider ? 'aerospike' : cache?.location ? 'afs' : ''); setProvider(cache?.provider ?? '');
+    setIndexColumn(warmupConfig?.indexColumn ?? '');
     setIndexParameter(warmupConfig?.indexParameter ?? ''); setConnector(warmupConfig?.connector ?? '');
-    setMaxCases(warmupConfig?.maxCases ?? 30); setLimit(warmupConfig?.limit ?? 100);
+    setMaxCases(warmupConfig?.maxCases); setLimit(warmupConfig?.limit);
     setFieldNames((warmupConfig?.fieldNames ?? []).join(', ')); setCaseLines(renderCases(warmupConfig));
     setSaving(false); setError(''); setWarmup(null); setHistory([]); setWarming(false);
-  }, [isOpen, cache, warmupConfig, columns]);
+    if (!api?.inspectVersion || !report?.id || !version?.versionNo) return;
+    let cancelled = false;
+    api.inspectVersion(report.id, version.versionNo, { discoverColumns: true }).then((inspected) => {
+      if (!cancelled) setDiscoveredStructure(inspected?.structure || null);
+    }).catch((cause) => {
+      if (!cancelled) setColumnDiscoveryError(cause.message);
+    });
+    return () => { cancelled = true; };
+  }, [isOpen, api, report?.id, version?.versionNo, cache, warmupConfig]);
 
   useEffect(() => {
     if (!isOpen || !api || !report?.id || !version?.versionNo) return undefined;
@@ -51,10 +64,13 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, isOpen, str
   const caseCount = useMemo(() => warmupCaseCount(cases), [cases]);
   const caseExpression = useMemo(() => warmupCaseExpression(cases), [cases]);
   const activeRun = warmup && ['accepted','running'].includes(warmup.status);
-  const ready = name.trim() && /^\d+(ms|s|m|h)$/.test(ttl) && location.trim() && (backend === 'afs' || provider.trim());
+  const maxCasesLabel = maxCases ?? 'native default';
+  const limitLabel = limit ?? 'native default';
+  const ready = namedCache || (name.trim() && /^\d+(ms|s|m|h)$/.test(ttl) && location.trim() && (backend === 'afs' || provider.trim()));
 
   const saveCache = async () => {
-    if (!ready || location.includes("'")) { setError('Provide a cache name, positive duration, location, and host-approved provider reference for Aerospike.'); return; }
+    if (namedCache) return;
+    if (!ready || location.includes("'")) { setError('Provide a cache name, duration, location, and host-approved provider reference for Aerospike.'); return; }
     setSaving(true); setError('');
     const options = [{ name: 'WithLocation', args: [quote(location.trim())] }];
     if (backend === 'aerospike') options.unshift({ name: 'WithProvider', args: [quote(provider.trim())] });
@@ -66,14 +82,8 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, isOpen, str
   const saveWarmup = async () => {
     if (!cache?.enabled) { setError('Save an enabled cache before authoring warmup.'); return; }
     if (caseErrors.length) { setError(caseErrors[0]); return; }
-    if (!indexColumn.trim() || maxCases < 1 || limit < 1 || caseCount > maxCases) { setError(`Warmup needs an index column and positive budgets; ${caseCount} cases exceed MaxCases ${maxCases}.`); return; }
-    const args = [quote(indexColumn.trim())];
-    if (connector) args.push(quote(`Connector=${connector}`));
-    if (indexParameter.trim()) args.push(quote(`IndexParameter=${indexParameter.trim()}`));
-    args.push(quote(`MaxCases=${maxCases}`), quote(`Limit=${limit}`));
-    const fields = fieldNames.split(',').map((item) => item.trim()).filter(Boolean);
-    if (fields.length) args.push(quote(`FieldNames=${fields.join(',')}`));
-    for (const item of cases) args.push(quote(`${item.name}=${item.values.join(',')}`));
+    if (!indexColumn.trim()) { setError('Warmup needs an index column.'); return; }
+    const args = serializeWarmupArgs(warmupConfig, {indexColumn, indexParameter, connector, maxCases, limit, fieldNames, cases});
     setSaving(true); setError('');
     try { await onApply({ type: 'setSetting', setting: { name: 'cache_warmup', args } }); }
     catch (cause) { setError(cause.message); }
@@ -106,22 +116,23 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, isOpen, str
     <DialogBody className="studio-connector-dialog-body">
       <p className="studio-dialog-lead">Configure Datly’s native prepared-view cache, then author a bounded server-owned warmup plan. Browser values never contain cache credentials.</p>
       {error && <Callout intent="danger" role="alert">{error}</Callout>}
+      {columnDiscoveryError && <Callout intent="warning">Column discovery failed; the configured index column was retained. {columnDiscoveryError}</Callout>}
       <div className="studio-cache-layout"><div className="studio-cache-configuration">
       <section className="studio-cache-section"><div className="studio-panel-heading"><div><h3>Cache storage</h3><p>One explicit backend; no automatic AFS/Aerospike fallback.</p></div>{cache?.enabled && <Tag minimal intent="success">enabled</Tag>}</div>
-        <div className="studio-form-grid"><FormGroup label="Backend" labelFor="cache-backend"><HTMLSelect id="cache-backend" value={backend} onChange={(event)=>setBackend(event.target.value)} fill disabled={saving}><option value="afs">AFS</option><option value="aerospike">Aerospike</option></HTMLSelect></FormGroup><FormGroup label="TTL" labelFor="cache-ttl" helperText="ms, s, m, or h"><InputGroup id="cache-ttl" value={ttl} onChange={(event)=>setTTL(event.target.value)} disabled={saving}/></FormGroup></div>
-        <FormGroup label="Cache name" labelFor="cache-name"><InputGroup id="cache-name" value={name} onChange={(event)=>setName(event.target.value)} placeholder="product-status" disabled={saving}/></FormGroup>
-        {backend === 'aerospike' && <FormGroup label="Approved provider" labelFor="cache-provider" helperText="Host-owned provider reference; never credentials."><InputGroup id="cache-provider" value={provider} onChange={(event)=>setProvider(event.target.value)} placeholder="aerospike://approved-provider" disabled={saving}/></FormGroup>}
-        <FormGroup label="Location" labelFor="cache-location"><InputGroup id="cache-location" value={location} onChange={(event)=>setLocation(event.target.value)} placeholder={backend==='afs'?'/var/cache/datly/products':'namespace/set'} disabled={saving}/></FormGroup>
-        <Button intent="primary" icon="floppy-disk" loading={saving} disabled={!ready} onClick={saveCache}>Save cache storage</Button>
+        {namedCache ? <p role="status">Host-configured cache: {cache.name}.</p> : <><div className="studio-form-grid"><FormGroup label="Backend" labelFor="cache-backend"><HTMLSelect id="cache-backend" value={backend} onChange={(event)=>setBackend(event.target.value)} fill disabled={saving}><option value="">Select backend</option><option value="afs">AFS</option><option value="aerospike">Aerospike</option></HTMLSelect></FormGroup><FormGroup label="TTL" labelFor="cache-ttl" helperText="ms, s, m, or h"><InputGroup id="cache-ttl" value={ttl} onChange={(event)=>setTTL(event.target.value)} disabled={saving}/></FormGroup></div>
+          <FormGroup label="Cache name" labelFor="cache-name"><InputGroup id="cache-name" value={name} onChange={(event)=>setName(event.target.value)} placeholder="product-status" disabled={saving}/></FormGroup>
+          {backend === 'aerospike' && <FormGroup label="Approved provider" labelFor="cache-provider" helperText="Host-owned provider reference; never credentials."><InputGroup id="cache-provider" value={provider} onChange={(event)=>setProvider(event.target.value)} placeholder="aerospike://approved-provider" disabled={saving}/></FormGroup>}
+          <FormGroup label="Location" labelFor="cache-location"><InputGroup id="cache-location" value={location} onChange={(event)=>setLocation(event.target.value)} placeholder={backend==='afs'?'/var/cache/datly/products':'namespace/set'} disabled={saving}/></FormGroup>
+          <Button intent="primary" icon="floppy-disk" loading={saving} disabled={!ready} onClick={saveCache}>Save cache storage</Button></>}
       </section>
 
-      <section className="studio-cache-section"><div className="studio-panel-heading"><div><h3>Warmup plan</h3><p>Estimate the complete case product before authoring or execution.</p></div><Tag minimal intent={caseCount <= maxCases ? 'success' : 'danger'}>{caseCount} / {maxCases} cases</Tag></div>
-        <div className="studio-form-grid"><FormGroup label="Index column" labelFor="warmup-index"><HTMLSelect id="warmup-index" value={indexColumn} onChange={(event)=>setIndexColumn(event.target.value)} fill disabled={saving}><option value="">Select a column</option>{columns.map((column)=><option key={column.source||column.name} value={column.source||column.name}>{column.name}</option>)}</HTMLSelect></FormGroup><FormGroup label="Index parameter" labelFor="warmup-parameter"><InputGroup id="warmup-parameter" value={indexParameter} onChange={(event)=>setIndexParameter(event.target.value)} placeholder="TenantID" disabled={saving}/></FormGroup></div>
+      <section className="studio-cache-section"><div className="studio-panel-heading"><div><h3>Warmup plan</h3><p>Estimate the complete case product before authoring or execution.</p></div><Tag minimal intent={maxCases == null || caseCount <= maxCases ? 'success' : 'danger'}>{caseCount} / {maxCasesLabel} cases</Tag></div>
+        <div className="studio-form-grid"><FormGroup label="Index column" labelFor="warmup-index"><HTMLSelect id="warmup-index" value={indexColumn} onChange={(event)=>setIndexColumn(event.target.value)} fill disabled={saving}><option value="">Select a column</option>{indexColumn && !columns.some((column)=>column.source===indexColumn || column.name===indexColumn) && <option value={indexColumn}>{indexColumn}</option>}{columns.map((column)=><option key={column.source||column.name} value={column.source||column.name}>{column.name}</option>)}</HTMLSelect></FormGroup><FormGroup label="Index parameter" labelFor="warmup-parameter"><InputGroup id="warmup-parameter" value={indexParameter} onChange={(event)=>setIndexParameter(event.target.value)} placeholder="TenantID" disabled={saving}/></FormGroup></div>
         <div className="studio-form-grid"><FormGroup label="Warmup connector" labelFor="warmup-connector"><HTMLSelect id="warmup-connector" value={connector} onChange={(event)=>setConnector(event.target.value)} fill disabled={saving}><option value="">Component connector</option>{connectors.map((name)=><option key={name} value={name}>{name}</option>)}</HTMLSelect></FormGroup><FormGroup label="Selected fields" labelFor="warmup-fields"><InputGroup id="warmup-fields" value={fieldNames} onChange={(event)=>setFieldNames(event.target.value)} placeholder="id, status, total" disabled={saving}/></FormGroup></div>
-        <div className="studio-form-grid"><FormGroup label="Max cases" labelFor="warmup-max"><NumericInput id="warmup-max" min={1} value={maxCases} onValueChange={setMaxCases} fill disabled={saving}/></FormGroup><FormGroup label="Row limit" labelFor="warmup-limit"><NumericInput id="warmup-limit" min={1} value={limit} onValueChange={setLimit} fill disabled={saving}/></FormGroup></div>
+        <div className="studio-form-grid"><FormGroup label="Max cases" labelFor="warmup-max"><NumericInput id="warmup-max" min={0} value={maxCases ?? ''} onValueChange={(value)=>setMaxCases(Number.isNaN(value)?undefined:value)} fill disabled={saving}/></FormGroup><FormGroup label="Row limit" labelFor="warmup-limit"><NumericInput id="warmup-limit" min={0} value={limit ?? ''} onValueChange={(value)=>setLimit(Number.isNaN(value)?undefined:value)} fill disabled={saving}/></FormGroup></div>
         <FormGroup label="Case dimensions" labelFor="warmup-cases" helperText="One Name=value1,value2 dimension per line. Case count is the Cartesian product."><TextArea id="warmup-cases" value={caseLines} onChange={(event)=>setCaseLines(event.target.value)} fill rows={4} className="studio-code-input" placeholder={'Period=today,yesterday\nGranularity=hour,day'} disabled={saving}/></FormGroup>
-        <div className={`studio-case-product ${caseErrors.length||caseCount>maxCases?'invalid':''}`}><strong>{caseExpression} = {caseCount} {caseCount===1?'case':'cases'}</strong><span>MaxCases {maxCases} · {Math.max(0,maxCases-caseCount)} remaining · row limit {limit}</span>{caseErrors.length>0&&<span>{caseErrors[0]}</span>}</div>
-        <div className="studio-warmup-actions"><Button intent="primary" icon="heatmap" loading={saving} disabled={!cache?.enabled || caseErrors.length>0 || caseCount > maxCases} onClick={saveWarmup}>Save warmup plan</Button>{warmupConfig && <Button icon="trash" intent="danger" disabled={saving||warming||activeRun} onClick={removeWarmup}>Remove plan</Button>}<Button icon="play" loading={warming||activeRun} disabled={!canWarmup||!warmupConfig||saving||activeRun} title={!canWarmup?'Publish permission is required to run warmup':''} onClick={executeWarmup}>{history.length?'Run again':'Run warmup'}</Button></div>
+        <div className={`studio-case-product ${caseErrors.length?'invalid':''}`}><strong>{caseExpression} = {caseCount} {caseCount===1?'case':'cases'}</strong><span>MaxCases {maxCasesLabel} · row limit {limitLabel}</span>{caseErrors.length>0&&<span>{caseErrors[0]}</span>}</div>
+        <div className="studio-warmup-actions"><Button intent="primary" icon="heatmap" loading={saving} disabled={!cache?.enabled || caseErrors.length>0} onClick={saveWarmup}>Save warmup plan</Button>{warmupConfig && <Button icon="trash" intent="danger" disabled={saving||warming||activeRun} onClick={removeWarmup}>Remove plan</Button>}<Button icon="play" loading={warming||activeRun} disabled={!canWarmup||!warmupConfig||saving||activeRun} title={!canWarmup?'Publish permission is required to run warmup':''} onClick={executeWarmup}>{history.length?'Run again':'Run warmup'}</Button></div>
       </section>
       </div><aside className="studio-warmup-evidence-panel" aria-label="Warmup operation evidence"><div className="studio-panel-heading"><div><h3>Operation evidence</h3><p>Server-owned runs survive this dialog and client disconnects.</p></div>{historyLoading&&<Tag minimal>Loading</Tag>}</div>
         {!warmup&&!historyLoading?<div className="studio-empty-compact">No warmup has been run for this version.</div>:warmup&&<WarmupEvidence run={warmup}/>}
@@ -133,6 +144,24 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, isOpen, str
 }
 
 function renderCases(warmup) { return (warmup?.cases?.[0]?.set ?? []).map((item)=>`${item.name}=${(item.values??[]).join(',')}`).join('\n'); }
+export function serializeWarmupArgs(warmup, edits) {
+  const args = [quote(edits.indexColumn.trim())];
+  const add = (name, value) => { if (value !== undefined && value !== null && value !== '') args.push(quote(`${name}=${value}`)); };
+  add('Name', warmup?.name); add('Priority', warmup?.priority); add('CaseRefs', Array.isArray(warmup?.caseRefs) ? warmup.caseRefs.join(',') : warmup?.caseRefs);
+  if (warmup?.indexMeta !== undefined) add('IndexMeta', warmup.indexMeta ? 'true' : 'false');
+  add('Connector', edits.connector?.trim()); add('IndexParameter', edits.indexParameter?.trim());
+  add('MaxCases', edits.maxCases); add('Limit', edits.limit);
+  const fields = edits.fieldNames.split(',').map((item) => item.trim()).filter(Boolean);
+  if (fields.length) add('FieldNames', fields.join(','));
+  const existingParams = new Map((warmup?.cases?.[0]?.set ?? []).map((item) => [String(item.name).toLowerCase(), item]));
+  const excluded = [];
+  for (const item of edits.cases) {
+    if (item.excludeDefault || existingParams.get(item.name.toLowerCase())?.excludeDefault) excluded.push(item.name);
+    args.push(quote(`${item.name}=${item.values.join(',')}`));
+  }
+  if (excluded.length) add('ExcludeDefault', excluded.join(','));
+  return args;
+}
 function quote(value) { return `'${String(value).replaceAll("'", "''")}'`; }
 function formatDuration(value) { const nanoseconds=Number(value);if(!Number.isFinite(nanoseconds))return'completed';if(nanoseconds<1e6)return`${Math.round(nanoseconds/1e3)}µs`;return`${(nanoseconds/1e6).toFixed(1)}ms`; }
 function formatDate(value){if(!value)return'—';const date=new Date(value);return Number.isNaN(date.valueOf())?value:new Intl.DateTimeFormat(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(date);}
