@@ -23,8 +23,8 @@ export default function AccessibleSection({title = '', subtitle = '', icon, righ
     delete safeCardProps.properties;
     const {isOpen: _isOpen, defaultIsOpen: _defaultIsOpen, onToggle: _onToggle, ...collapseRest} = collapseProps || {};
     return (
-        <Card {...safeCardProps} aria-labelledby={title ? titleId : undefined} className={`bp6-section${compact ? ' bp6-compact' : ''}${!isOpen ? ' bp6-section-collapsed' : ''}${className ? ` ${className}` : ''}`}>
-            {title ? <div data-forge-part="section-header" className={`bp6-section-header${collapsible ? ' bp6-interactive' : ''}`} onClick={collapsible ? toggle : undefined}>
+        <Card {...safeCardProps} data-forge-component="section" data-forge-state={collapsible ? (isOpen ? 'open' : 'closed') : 'static'} aria-labelledby={title ? titleId : undefined} className={`bp6-section${compact ? ' bp6-compact' : ''}${!isOpen ? ' bp6-section-collapsed' : ''}${className ? ` ${className}` : ''}`}>
+            {title ? <div data-forge-part="section-header" data-forge-state={collapsible ? (isOpen ? 'open' : 'closed') : 'static'} aria-expanded={collapsible ? isOpen : undefined} aria-controls={collapsible ? contentId : undefined} className={`bp6-section-header${collapsible ? ' bp6-interactive' : ''}`} onClick={collapsible ? toggle : undefined}>
                 <div className="bp6-section-header-left">
                     {icon ? <Icon icon={icon} aria-hidden="true" className="bp6-text-muted"/> : null}
                     <div>

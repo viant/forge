@@ -765,6 +765,8 @@
     white-space: nowrap;
 }
 
+.forge-table-status-chip { max-width: 100%; gap: var(--forge-spacing-1, 4px); }
+
 .forge-table-cell-badge.is-accent {
     background: var(--forge-surface-subtle, #eee9f7);
     color: var(--forge-interaction-color, #7048a8);

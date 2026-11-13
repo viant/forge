@@ -7,6 +7,7 @@ import { formatDashboardValue } from "./dashboardUtils.js";
 import { resolveDashboardTableColumnValue } from "./dashboardTableValue.js";
 import { resolveTableCellVisualState } from "./tableCellVisuals.js";
 import { normalizeReportTableLink, resolveReportTableLink } from "../../reporting/reportTableLink.js";
+import StatusChip, {statusChipTones} from "../StatusChip.jsx";
 
 export const toneColors = {
     info: {
@@ -59,14 +60,18 @@ export function isDashboardStatusValue(value = '') {
 }
 
 export function dashboardStatusTone(value = '') {
+    return toneColors[dashboardStatusToneName(value)];
+}
+
+function dashboardStatusToneName(value = '') {
     const normalized = String(value || '').trim().toLowerCase();
     if (normalized === 'ahead' || normalized === 'on_track' || normalized === 'on track' || normalized === 'healthy' || normalized === 'active') {
-        return toneColors.success;
+        return 'success';
     }
     if (normalized === 'behind' || normalized === 'underpacing' || normalized === 'critical' || normalized === 'inactive') {
-        return toneColors.danger;
+        return 'danger';
     }
-    return toneColors.warning;
+    return 'warning';
 }
 
 export function formatDashboardTableCellText(cell, row, column, locale, formatValue = null) {
@@ -329,9 +334,20 @@ export function renderExplicitReportTableCellVisual(cell, row, column, locale, f
             </span>
         );
     }
-    const fontWeight = visualState.kind === 'badge' ? 700 : 600;
-    const textTransform = visualState.kind === 'badge' ? 'uppercase' : 'none';
-    const letterSpacing = visualState.kind === 'badge' ? '0.03em' : 'normal';
+    if (visualState.kind === 'badge') {
+        const tone = statusChipTones.includes(visualState.tone) ? visualState.tone : 'info';
+        return <StatusChip
+            tone={tone}
+            className={`forge-dashboard-table-cell-visual forge-dashboard-table-cell-visual--badge forge-dashboard-table-cell-visual--${tone}`}
+            data-visual-kind="badge"
+            data-visual-tone={visualState.tone || 'info'}
+            style={{
+                ...(visualState.backgroundColor ? {background: visualState.backgroundColor} : {}),
+                ...(visualState.textColor ? {color: visualState.textColor} : {}),
+            }}>
+            {visualState.label || text}
+        </StatusChip>;
+    }
     return (
         <span
             className={`forge-dashboard-table-cell-visual forge-dashboard-table-cell-visual--${visualState.kind} forge-dashboard-table-cell-visual--${visualState.tone || 'info'}`}
@@ -342,9 +358,7 @@ export function renderExplicitReportTableCellVisual(cell, row, column, locale, f
                 alignItems: 'center',
                 width: 'fit-content',
                 fontSize: '11px',
-                fontWeight,
-                textTransform,
-                letterSpacing,
+                fontWeight: 600,
                 color: textColor,
                 background: backgroundColor,
                 border: `1px solid ${borderColor}`,
@@ -420,12 +434,7 @@ export function renderDashboardTableCell(cell, row, column, locale, context, for
     }
     const text = formatDashboardTableCellText(cell, row, column, locale, formatValue);
     if (column?.statusPresentation !== 'text' && isDashboardStatusValue(text)) {
-        const tone = dashboardStatusTone(text);
-        return (
-            <span style={{fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', color: tone.text, background: tone.background, border: `1px solid ${tone.border}`, borderRadius: '999px', padding: '2px 8px'}}>
-                {text.replace(/_/g, ' ')}
-            </span>
-        );
+        return <StatusChip tone={dashboardStatusToneName(text)}>{text.replace(/_/g, ' ')}</StatusChip>;
     }
     const rawValue = resolveDashboardTableColumnValue(row, column, {preferDisplay: false});
     const icon = column?.displayIconMap && typeof column.displayIconMap === 'object'

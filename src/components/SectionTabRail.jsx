@@ -1,5 +1,5 @@
 import React from 'react';
-import {Icon} from '@blueprintjs/core';
+import Icon from './Icon.jsx';
 import SelectControl from './SelectControl.jsx';
 import {typographyProps} from './Typography.jsx';
 import './SectionTabRail.css';
@@ -114,7 +114,7 @@ export default function SectionTabRail({items = [], selectedId = '', onChange, o
                 {items.map(item => <option key={item.id} value={item.id} disabled={item.disabled === true}>{item.label || item.title || item.id}</option>)}
             </SelectControl>
         </label> : null}
-        {!useMenu && showLeftCue ? <button type="button" className="forge-section-tab-rail-cue is-left" aria-label="Scroll tabs left" onClick={() => scrollRail(-1)}><Icon icon="chevron-left" size={14}/></button> : null}
+        {!useMenu && showLeftCue ? <button type="button" className="forge-section-tab-rail-cue is-left" aria-label="Scroll tabs left" onClick={() => scrollRail(-1)}><Icon name="lucide:chevron-left"/></button> : null}
         <div ref={railRef} className={`forge-section-tab-rail${compact ? ' is-compact' : ''}`} role="tablist" aria-label={ariaLabel} aria-hidden={useMenu || undefined}>
             {items.map((item, index) => {
                 const selected = String(item?.id || '') === String(selectedId || '');
@@ -154,13 +154,13 @@ export default function SectionTabRail({items = [], selectedId = '', onChange, o
                             onTabKeyDown(event, index);
                         }}
                         onClick={() => onChange?.(item.id)}>
-                        {showIcons && item.icon ? <Icon icon={item.icon} size={14}/> : null}
+                        {showIcons && item.icon ? <Icon name={item.icon}/> : null}
                         <span>{item.label || item.title || item.id}</span>
                     </button>
                 );
             })}
         </div>
-        {!useMenu && showRightCue ? <button type="button" className="forge-section-tab-rail-cue is-right" aria-label="Scroll tabs right" onClick={() => scrollRail(1)}><Icon icon="chevron-right" size={14}/></button> : null}
+        {!useMenu && showRightCue ? <button type="button" className="forge-section-tab-rail-cue is-right" aria-label="Scroll tabs right" onClick={() => scrollRail(1)}><Icon name="lucide:chevron-right"/></button> : null}
         </div>
     );
 }

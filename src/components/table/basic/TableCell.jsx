@@ -1,4 +1,5 @@
 import UnifiedIcon from '../../Icon.jsx';
+import StatusChip, {statusChipTones} from '../../StatusChip.jsx';
 import NativeControlTarget from '../../../runtime/NativeControlTarget.jsx';
 import {navigateNativeLink} from '../../../runtime/nativeNavigation.js';
 import MediaPreviewPopover from "../../MediaPreviewPopover.jsx";
@@ -365,7 +366,14 @@ const TableCell = ({
     const resolvedBadges = [col.badge, ...(Array.isArray(col.badges) ? col.badges : [])]
         .map((badge) => resolveTableCellBadge(row, badge, context))
         .filter(Boolean);
-    const renderBadge = (resolvedBadge, key) => (
+    const renderBadge = (resolvedBadge, key) => resolvedBadge.appearance === 'status'
+        ? <StatusChip key={key}
+            tone={statusChipTones.includes(resolvedBadge.tone) ? resolvedBadge.tone : 'neutral'}
+            className={`forge-table-status-chip${resolvedBadge.className ? ` ${resolvedBadge.className}` : ''}`}
+            title={resolvedBadge.tooltip}>
+            {resolvedBadge.icon ? <UnifiedIcon name={resolvedBadge.icon}/> : null}<span>{resolvedBadge.label}</span>
+        </StatusChip>
+        : (
             <span
                 key={key}
                 className={`forge-table-cell-badge is-${resolvedBadge.tone}${resolvedBadge.className ? ` ${resolvedBadge.className}` : ''}`}

@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Forge component gallery · Steward review</title>
+  <style>
+    :root {
+      --forge-surface: #ffffff;
+      --forge-surface-subtle: #f5f7fa;
+      --forge-surface-raised: #ffffff;
+      --forge-bg: #eef2f6;
+      --forge-border-color: #d7dee8;
+      --forge-border-strong: #b9c4d2;
+      --forge-text: #172231;
+      --forge-text-secondary: #526175;
+      --forge-text-muted: #7a8798;
+      --forge-interaction-color: #2f6de1;
+      --forge-interaction-hover: #2257bb;
+      --forge-selected-background: #e9f0ff;
+      --forge-focus-color: #2f6de1;
+      --forge-success: #16825d;
+      --forge-warning: #a66a00;
+      --forge-danger: #b42318;
+      --forge-shadow: 0 8px 24px rgba(23, 34, 49, .08);
+      --forge-radius: 10px;
+      --forge-radius-sm: 6px;
+    }
+    [data-theme="dark"] {
+      --forge-surface: #172231;
+      --forge-surface-subtle: #202d3c;
+      --forge-surface-raised: #253344;
+      --forge-bg: #101821;
+      --forge-border-color: #3a4a5d;
+      --forge-border-strong: #53657b;
+      --forge-text: #f1f5f9;
+      --forge-text-secondary: #bfcbda;
+      --forge-text-muted: #91a0b3;
+      --forge-interaction-color: #82aaff;
+      --forge-interaction-hover: #a4c0ff;
+      --forge-selected-background: #233c68;
+      --forge-focus-color: #82aaff;
+      --forge-success: #53c99a;
+      --forge-warning: #e5b45e;
+      --forge-danger: #ff8b82;
+      --forge-shadow: 0 10px 24px rgba(0, 0, 0, .22);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--forge-bg); color: var(--forge-text); font-family: "Plus Jakarta Sans", Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.45; }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    .topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 22px; padding: 16px 28px; background: var(--forge-surface); border-bottom: 1px solid var(--forge-border-color); }
+    .brand { display: flex; align-items: center; gap: 11px; min-width: 240px; }
+    .brand-mark { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid var(--forge-border-strong); border-radius: 8px; color: var(--forge-interaction-color); font-weight: 800; }
+    .brand strong { display: block; font-size: 15px; letter-spacing: -.02em; }
+    .brand span { display: block; color: var(--forge-text-muted); font-size: 11px; }
+    .search { flex: 1; max-width: 520px; }
+    input, select { width: 100%; min-height: 36px; padding: 8px 11px; border: 1px solid var(--forge-border-color); border-radius: var(--forge-radius-sm); background: var(--forge-surface); color: var(--forge-text); outline: none; }
+    input:focus, select:focus, button:focus-visible { border-color: var(--forge-focus-color); outline: 2px solid color-mix(in srgb, var(--forge-focus-color) 24%, transparent); outline-offset: 1px; }
+    .top-actions { display: flex; gap: 8px; margin-left: auto; }
+    .btn { min-height: 34px; padding: 7px 12px; border: 1px solid var(--forge-border-color); border-radius: var(--forge-radius-sm); background: var(--forge-surface); color: var(--forge-text); font-weight: 650; }
+    .btn.primary { border-color: var(--forge-interaction-color); background: var(--forge-interaction-color); color: #fff; }
+    .btn.ghost { border-color: transparent; background: transparent; color: var(--forge-text-secondary); }
+    .layout { display: grid; grid-template-columns: 255px minmax(0, 1fr); min-height: calc(100vh - 73px); }
+    .sidebar { position: sticky; top: 73px; align-self: start; height: calc(100vh - 73px); overflow: auto; padding: 24px 16px; border-right: 1px solid var(--forge-border-color); background: var(--forge-surface); }
+    .sidebar-label { margin: 0 10px 10px; color: var(--forge-text-muted); font-size: 11px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+    .nav-item { display: flex; align-items: center; justify-content: space-between; width: 100%; margin: 2px 0; padding: 9px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--forge-text-secondary); text-align: left; }
+    .nav-item:hover, .nav-item.active { background: var(--forge-selected-background); color: var(--forge-text); }
+    .count { color: var(--forge-text-muted); font-size: 11px; }
+    .content { max-width: 1360px; width: 100%; margin: 0 auto; padding: 30px 36px 80px; }
+    .hero { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr); gap: 28px; align-items: end; margin-bottom: 28px; }
+    .eyebrow { margin: 0 0 8px; color: var(--forge-interaction-color); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { margin-bottom: 10px; font-size: clamp(30px, 4vw, 50px); line-height: 1.04; letter-spacing: -.055em; }
+    h2 { margin-bottom: 5px; font-size: 23px; line-height: 1.12; letter-spacing: -.035em; }
+    h3 { margin-bottom: 4px; font-size: 15px; }
+    .hero-copy { max-width: 730px; color: var(--forge-text-secondary); font-size: 16px; }
+    .review-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 16px; border: 1px solid var(--forge-border-color); border-radius: var(--forge-radius); background: var(--forge-surface); box-shadow: var(--forge-shadow); }
+    .summary-value { display: block; font-size: 25px; font-weight: 750; letter-spacing: -.04em; }
+    .summary-label { color: var(--forge-text-muted); font-size: 11px; }
+    .section { scroll-margin-top: 94px; margin-top: 34px; }
+    .section-heading { display: flex; align-items: end; gap: 16px; margin-bottom: 14px; }
+    .section-heading p { margin-bottom: 0; max-width: 700px; color: var(--forge-text-secondary); }
+    .status { display: inline-flex; align-items: center; width: fit-content; padding: 3px 8px; border: 1px solid var(--forge-border-color); border-radius: 999px; color: var(--forge-text-secondary); font-size: 11px; font-weight: 750; white-space: nowrap; }
+    .status.priority { border-color: color-mix(in srgb, var(--forge-warning) 45%, var(--forge-border-color)); color: var(--forge-warning); }
+    .status.partial { border-color: color-mix(in srgb, var(--forge-interaction-color) 45%, var(--forge-border-color)); color: var(--forge-interaction-color); }
+    .status.migrated { border-color: color-mix(in srgb, var(--forge-success) 45%, var(--forge-border-color)); color: var(--forge-success); }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .panel { min-width: 0; border: 1px solid var(--forge-border-color); border-radius: var(--forge-radius); background: var(--forge-surface); box-shadow: var(--forge-shadow); overflow: hidden; }
+    .panel-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 12px 16px; border-bottom: 1px solid var(--forge-border-color); }
+    .panel-header strong { font-size: 12px; }
+    .panel-body { padding: 16px; }
+    .muted { color: var(--forge-text-muted); }
+    .small { font-size: 12px; }
+    .surface-stack { display: grid; gap: 9px; }
+    .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .tabs { display: flex; gap: 2px; padding-bottom: 9px; border-bottom: 1px solid var(--forge-border-color); }
+    .tab { padding: 7px 10px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--forge-text-secondary); }
+    .tab.active { border-bottom-color: var(--forge-interaction-color); color: var(--forge-text); font-weight: 700; }
+    .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .kpi { padding: 12px; border: 1px solid var(--forge-border-color); border-radius: var(--forge-radius-sm); background: var(--forge-surface-subtle); }
+    .kpi strong { display: block; font-size: 22px; letter-spacing: -.04em; }
+    .kpi span { color: var(--forge-text-muted); font-size: 11px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { padding: 10px 8px; border-bottom: 1px solid var(--forge-border-color); text-align: left; }
+    th { color: var(--forge-text-muted); font-size: 11px; font-weight: 750; }
+    tr:last-child td { border-bottom: 0; }
+    .dot { display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: var(--forge-success); }
+    .dot.warn { background: var(--forge-warning); }
+    .dot.danger { background: var(--forge-danger); }
+    .chart { position: relative; height: 150px; padding: 12px 8px 24px; border-bottom: 1px solid var(--forge-border-color); }
+    .chart-grid { position: absolute; inset: 12px 8px 24px; display: grid; grid-template-rows: repeat(4, 1fr); }
+    .chart-grid i { border-top: 1px dashed var(--forge-border-color); }
+    .bars { position: absolute; inset: 20px 18px 24px; display: flex; align-items: end; justify-content: space-around; gap: 12px; }
+    .bar-group { display: flex; align-items: end; gap: 4px; height: 100%; }
+    .bar { width: 16px; border-radius: 3px 3px 0 0; background: var(--forge-interaction-color); }
+    .bar.alt { background: var(--forge-success); opacity: .78; }
+    .axis { position: absolute; inset: auto 14px 4px; display: flex; justify-content: space-between; color: var(--forge-text-muted); font-size: 10px; }
+    .callout { padding: 12px; border-left: 3px solid var(--forge-interaction-color); background: var(--forge-selected-background); color: var(--forge-text-secondary); font-size: 12px; }
+    .callout strong { display: block; margin-bottom: 3px; color: var(--forge-text); }
+    .composer { display: flex; gap: 8px; align-items: end; padding: 10px; border: 1px solid var(--forge-border-color); border-radius: var(--forge-radius-sm); background: var(--forge-surface-subtle); }
+    .composer input { background: var(--forge-surface); }
+    .message { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 9px; }
+    .avatar { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--forge-selected-background); color: var(--forge-interaction-color); font-size: 11px; font-weight: 800; }
+    .message p { margin: 0; font-size: 12px; }
+    .code { padding: 12px; border-radius: var(--forge-radius-sm); background: var(--forge-bg); color: var(--forge-text-secondary); font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .chip-row { display: flex; flex-wrap: wrap; gap: 7px; }
+    .chip { padding: 5px 9px; border: 1px solid var(--forge-border-color); border-radius: 999px; color: var(--forge-text-secondary); font-size: 11px; }
+    .chip.selected { border-color: var(--forge-interaction-color); background: var(--forge-selected-background); color: var(--forge-interaction-color); }
+    .hidden { display: none !important; }
+    .footer-note { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--forge-border-color); color: var(--forge-text-muted); font-size: 12px; }
+    @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } .sidebar { position: static; height: auto; display: flex; gap: 4px; overflow: auto; padding: 10px; border-right: 0; border-bottom: 1px solid var(--forge-border-color); } .sidebar-label { display: none; } .nav-item { min-width: max-content; } .hero { grid-template-columns: 1fr; } .content { padding: 24px 18px 60px; } }
+    @media (max-width: 700px) { .topbar { padding: 12px 16px; flex-wrap: wrap; } .brand { min-width: 0; } .search { order: 3; flex-basis: 100%; } .grid, .grid.three { grid-template-columns: 1fr; } .kpis { grid-template-columns: 1fr; } .section-heading { display: block; } .section-heading .status { margin-top: 8px; } }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><div class="brand-mark">F</div><div><strong>Forge component gallery</strong><span>Steward UI review surface</span></div></div>
+    <div class="search"><input id="search" type="search" placeholder="Search component families, e.g. report, table, chat…" /></div>
+    <div class="top-actions"><button class="btn" id="themeToggle">Dark mode</button><button class="btn primary" id="showPriority">Show priorities</button></div>
+  </header>
+  <div class="layout">
+    <aside class="sidebar"><div><p class="sidebar-label">Component families</p><nav id="nav"></nav></div></aside>
+    <main class="content">
+      <section class="hero">
+        <div><p class="eyebrow">A visual inventory for decisions</p><h1>Every surface, in one place.</h1><p class="hero-copy">Review the Forge library as Steward users experience it: shell chrome, controls, data, reports, charts, chat, workbenches, and specialized flows. Use this page to decide what stays, what improves, and what gets a deeper redesign.</p></div>
+        <div class="review-summary"><div><strong class="summary-value">10</strong><span class="summary-label">component families</span></div><div><strong class="summary-value">3</strong><span class="summary-label">priority areas</span></div><div><strong class="summary-value">2</strong><span class="summary-label">theme modes</span></div></div>
+      </section>
+
+      <section class="section" data-family="foundations"><div class="section-heading"><div><h2>Foundations</h2><p>Theme boundary, typography, buttons, icons, feedback, and shared interaction roles.</p></div><span class="status migrated">Migrated</span></div><div class="grid three"><div class="panel"><div class="panel-header"><strong>Typography hierarchy</strong><span class="status migrated">Ready</span></div><div class="panel-body surface-stack"><h3>Report title</h3><p>Body copy establishes a readable workspace rhythm.</p><p class="muted small">Metadata, helper text, and secondary labels</p></div></div><div class="panel"><div class="panel-header"><strong>Actions & states</strong><span class="status migrated">Ready</span></div><div class="panel-body surface-stack"><div class="toolbar"><button class="btn primary">Primary</button><button class="btn">Secondary</button><button class="btn ghost">Ghost</button></div><div class="toolbar"><span class="status migrated">Success</span><span class="status partial">Review</span><span class="status priority">Attention</span></div></div></div><div class="panel"><div class="panel-header"><strong>Feedback</strong><span class="status migrated">Ready</span></div><div class="panel-body surface-stack"><div class="callout"><strong>Theme roles are active</strong>Semantic foreground, surface, border, and focus roles are visible across this state.</div></div></div></div></section>
+
+      <section class="section" data-family="shell"><div class="section-heading"><div><h2>Workspace shell</h2><p>Window manager, tabs, navigation, containers, splitters, and layout chrome.</p></div><span class="status partial">Needs review</span></div><div class="grid"><div class="panel"><div class="panel-header"><strong>Window manager</strong><span class="status partial">Partial</span></div><div class="panel-body surface-stack"><div class="tabs"><button class="tab active">Operations</button><button class="tab">Revenue</button><button class="tab">Alerts</button></div><div class="toolbar"><strong>Operations overview</strong><span class="status migrated">Open</span><button class="btn ghost">Close</button></div><p class="muted small">Review active tab weight, window title hierarchy, close affordance, and panel boundaries.</p></div></div><div class="panel"><div class="panel-header"><strong>Container & navigation density</strong><span class="status partial">Partial</span></div><div class="panel-body"><div class="toolbar"><button class="btn primary">Workspace</button><button class="btn">Data sources</button><button class="btn">Settings</button></div><div class="callout" style="margin-top: 14px"><strong>Review focus</strong>Spacing, selected state, and the relationship between app canvas and Forge surface.</div></div></div></div></section>
+
+      <section class="section" data-family="controls"><div class="section-heading"><div><h2>Controls & forms</h2><p>Forms, selectors, parameter editors, validation, disabled states, and loading.</p></div><span class="status partial">Needs review</span></div><div class="grid three"><div class="panel"><div class="panel-header"><strong>Editor fields</strong><span class="status partial">Partial</span></div><div class="panel-body surface-stack"><label class="small muted">Report name</label><input value="Operations overview" /><label class="small muted">Mode</label><select><option>Review mode</option><option>Edit mode</option></select><div class="toolbar"><button class="btn primary">Apply</button><button class="btn">Reset</button><button class="btn" disabled>Disabled</button></div></div></div><div class="panel"><div class="panel-header"><strong>Validation</strong><span class="status priority">Review</span></div><div class="panel-body surface-stack"><input value="invalid query" style="border-color: var(--forge-danger)" /><div class="callout" style="border-left-color: var(--forge-danger); background: color-mix(in srgb, var(--forge-danger) 10%, var(--forge-surface))"><strong>Query needs attention</strong>Check the selected field and date range.</div></div></div><div class="panel"><div class="panel-header"><strong>Filters & toggles</strong><span class="status partial">Partial</span></div><div class="panel-body surface-stack"><div class="chip-row"><span class="chip selected">Region: West</span><span class="chip">Status: Active</span><span class="chip">+ Add filter</span></div><div class="toolbar"><span class="small">Include archived</span><button class="btn" id="toggleFake">Off</button></div></div></div></div></section>
+
+      <section class="section" data-family="data"><div class="section-heading"><div><h2>Tables & data states</h2><p>Basic tables, filters, pagination, row selection, presets, loading, empty, and denial states.</p></div><span class="status partial">Needs review</span></div><div class="grid"><div class="panel"><div class="panel-header"><strong>Basic table</strong><span class="status migrated">Semantic recipe</span></div><div class="panel-body"><table><thead><tr><th>Surface</th><th>Status</th><th style="text-align:right">Rows</th></tr></thead><tbody><tr><td>Campaigns</td><td><span class="dot"></span>Ready</td><td style="text-align:right">2,481</td></tr><tr><td>Accounts</td><td><span class="dot"></span>Syncing</td><td style="text-align:right">846</td></tr><tr><td>Placements</td><td><span class="dot warn"></span>Attention</td><td style="text-align:right">93</td></tr></tbody></table></div></div><div class="panel"><div class="panel-header"><strong>Data-source states</strong><span class="status priority">Review</span></div><div class="panel-body surface-stack"><div class="callout"><strong>Loading data</strong>Keep the table structure stable while results arrive.</div><div class="callout" style="border-left-color: var(--forge-danger); background: color-mix(in srgb, var(--forge-danger) 10%, var(--forge-surface))"><strong>Access denied</strong>Explain the next action without collapsing the surrounding layout.</div><div class="toolbar"><button class="btn">Previous</button><span class="small muted">Page 2 of 18</span><button class="btn">Next</button></div></div></div></div></section>
+
+      <section class="section" data-family="dashboard"><div class="section-heading"><div><h2>Dashboards & reports</h2><p>The highest-priority family: report runtime, builder, blocks, catalog, filters, KPI cards, maps, and print preview.</p></div><span class="status priority">Priority</span></div><div class="panel"><div class="panel-header"><strong>Report runtime · Operations overview</strong><div class="toolbar"><span class="status priority">Priority</span><button class="btn">Edit report</button><button class="btn primary">Publish</button></div></div><div class="panel-body surface-stack"><div class="kpis"><div class="kpi"><strong>$4.82M</strong><span>Booked revenue</span></div><div class="kpi"><strong>12.6%</strong><span>Growth vs prior</span></div><div class="kpi"><strong>3</strong><span>Open review items</span></div></div><div class="chart"><div class="chart-grid"><i></i><i></i><i></i><i></i></div><div class="bars"><div class="bar-group"><span class="bar" style="height:44%"></span><span class="bar alt" style="height:52%"></span></div><div class="bar-group"><span class="bar" style="height:57%"></span><span class="bar alt" style="height:58%"></span></div><div class="bar-group"><span class="bar" style="height:51%"></span><span class="bar alt" style="height:64%"></span></div><div class="bar-group"><span class="bar" style="height:70%"></span><span class="bar alt" style="height:71%"></span></div><div class="bar-group"><span class="bar" style="height:78%"></span><span class="bar alt" style="height:77%"></span></div></div><div class="axis"><span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span></div></div><div class="toolbar"><span class="chip selected">All regions</span><span class="chip">Last 30 days</span><span class="chip">Booked revenue</span><button class="btn ghost">Add filter</button></div><div class="callout"><strong>Decision point</strong>Review the hierarchy between KPI cards, chart, filters, report actions, and the table below.</div><table><thead><tr><th>Campaign</th><th>Owner</th><th>Delivery</th><th style="text-align:right">Spend</th></tr></thead><tbody><tr><td>Spring launch</td><td>Activation</td><td><span class="dot"></span>On pace</td><td style="text-align:right">$842k</td></tr><tr><td>Brand lift</td><td>Planning</td><td><span class="dot warn"></span>Review</td><td style="text-align:right">$611k</td></tr></tbody></table></div></div></section>
+
+      <section class="section" data-family="charts"><div class="section-heading"><div><h2>Charts & analytics</h2><p>Chart, heatmap, comparison bars, KPI sparkline, legends, labels, tooltips, and chart/table mode.</p></div><span class="status partial">Needs review</span></div><div class="grid"><div class="panel"><div class="panel-header"><strong>Trend with target line</strong><span class="status partial">Partial</span></div><div class="panel-body"><div class="chart"><div class="chart-grid"><i></i><i></i><i></i><i></i></div><svg viewBox="0 0 500 130" preserveAspectRatio="none" style="position:absolute;inset:14px 12px 24px;width:calc(100% - 24px);height:calc(100% - 38px);overflow:visible"><polyline points="0,96 110,72 220,80 330,42 500,28" fill="none" stroke="var(--forge-interaction-color)" stroke-width="3"/><polyline points="0,112 110,104 220,110 330,90 500,96" fill="none" stroke="var(--forge-danger)" stroke-width="2" stroke-dasharray="5 5"/></svg><div class="axis"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span></div></div><div class="toolbar" style="margin-top: 12px"><span class="chip selected">Requests</span><span class="chip">Errors</span><span class="small muted">Target: 30</span></div></div></div><div class="panel"><div class="panel-header"><strong>Distribution & legend</strong><span class="status partial">Partial</span></div><div class="panel-body"><div style="display:grid;grid-template-columns: 170px 1fr;gap:18px;align-items:center"><div style="width:150px;height:150px;border:18px solid var(--forge-interaction-color);border-right-color:var(--forge-success);border-bottom-color:var(--forge-border-strong);border-radius:50%;position:relative"><div style="position:absolute;inset:0;margin:auto;width:70px;height:70px;border-radius:50%;background:var(--forge-surface)"></div></div><div class="surface-stack"><div><span class="dot"></span>Media <span class="muted">44%</span></div><div><span class="dot" style="background:var(--forge-success)"></span>Search <span class="muted">31%</span></div><div><span class="dot" style="background:var(--forge-border-strong)"></span>Other <span class="muted">25%</span></div></div></div></div></div></div></section>
+
+      <section class="section" data-family="chat"><div class="section-heading"><div><h2>Chat & feeds</h2><p>Conversation, composer, messages, uploads, tool results, terminal, and compact feeds.</p></div><span class="status partial">Needs review</span></div><div class="grid"><div class="panel"><div class="panel-header"><strong>Conversation</strong><span class="status partial">Partial</span></div><div class="panel-body surface-stack"><div class="message"><div class="avatar">S</div><p><strong>Steward</strong><br />I found three pacing risks and one missing approval in the current campaign.</p></div><div class="message"><div class="avatar">Y</div><p><strong>You</strong><br />Show me the highest-impact issue first.</p></div><div class="composer"><input placeholder="Ask Steward…" /><button class="btn primary">Send</button></div></div></div><div class="panel"><div class="panel-header"><strong>Tool result & feed</strong><span class="status priority">Review</span></div><div class="panel-body surface-stack"><div class="callout"><strong>Query complete</strong>3,842 rows · 1.8s · Export available</div><div class="code">campaign_id   delivery_status   risk<br />cmp_1042      pacing            high<br />cmp_1051      approval          medium</div><div class="toolbar"><button class="btn">Open result</button><button class="btn">Export</button></div></div></div></div></section>
+
+      <section class="section" data-family="lookup"><div class="section-heading"><div><h2>Lookup & selection</h2><p>Lookup input, picker dialogs, tree multi-select, chips, and selection states.</p></div><span class="status partial">Needs review</span></div><div class="grid three"><div class="panel"><div class="panel-header"><strong>Lookup input</strong><span class="status partial">Partial</span></div><div class="panel-body surface-stack"><label class="small muted">Advertiser</label><input value="Viant" /><div class="chip-row"><span class="chip selected">Viant · account</span><span class="chip">Clear</span></div></div></div><div class="panel"><div class="panel-header"><strong>Picker dialog</strong><span class="status partial">Partial</span></div><div class="panel-body surface-stack"><div class="toolbar"><strong>Select placements</strong><span class="status migrated">12 selected</span></div><div class="surface-stack small"><label><input type="checkbox" checked /> Display</label><label><input type="checkbox" /> Video</label><label><input type="checkbox" checked /> Native</label></div><button class="btn primary">Apply selection</button></div></div><div class="panel"><div class="panel-header"><strong>Chips & filters</strong><span class="status partial">Partial</span></div><div class="panel-body"><div class="chip-row"><span class="chip selected">West</span><span class="chip selected">Active</span><span class="chip">+ Add</span></div></div></div></div></section>
+
+      <section class="section" data-family="workbench"><div class="section-heading"><div><h2>Reader & workbench</h2><p>Document reading, previews, resource policy, release flows, media, and authoring workbenches.</p></div><span class="status priority">Priority</span></div><div class="grid"><div class="panel"><div class="panel-header"><strong>Reader workbench</strong><span class="status priority">Priority</span></div><div class="panel-body surface-stack"><div class="toolbar"><strong>Campaign brief.md</strong><span class="status">Draft</span><span class="spacer"></span><button class="btn">Preview</button><button class="btn primary">Publish</button></div><div class="code"># Campaign brief<br /><br />Objective<br />Improve delivery quality across the active portfolio.<br /><br />Review notes<br />Confirm pacing, approval, and regional ownership.</div><div class="toolbar"><span class="chip selected">Reading mode</span><span class="chip">Edit mode</span><span class="chip">Outline</span></div></div></div><div class="panel"><div class="panel-header"><strong>Policy & release states</strong><span class="status priority">Priority</span></div><div class="panel-body surface-stack"><div class="callout"><strong>Ready for review</strong>2 resources have changed since the last release.</div><table><thead><tr><th>Artifact</th><th>Owner</th><th>State</th></tr></thead><tbody><tr><td>Media plan</td><td>Activation</td><td>Review</td></tr><tr><td>Audience map</td><td>Planning</td><td>Ready</td></tr></tbody></table></div></div></div></section>
+
+      <section class="section" data-family="specialized"><div class="section-heading"><div><h2>Specialized workflows</h2><p>Scenario views, workflow primitives, resource windows, maps, file browsing, and editors.</p></div><span class="status partial">Needs review</span></div><div class="grid three"><div class="panel"><div class="panel-header"><strong>Scenario stages</strong><span class="status partial">Partial</span></div><div class="panel-body surface-stack"><div class="toolbar"><span class="status migrated">1. Brief</span><span class="status migrated">2. Plan</span><span class="status partial">3. Activate</span></div><div class="callout"><strong>Current stage: Plan</strong>Next action is ready for review.</div></div></div><div class="panel"><div class="panel-header"><strong>Map / geo surface</strong><span class="status partial">Partial</span></div><div class="panel-body"><div style="height:130px;border:1px solid var(--forge-border-color);border-radius:var(--forge-radius-sm);background:var(--forge-surface-subtle);display:grid;place-items:center;color:var(--forge-text-muted)">GeoGeometryMap</div></div></div><div class="panel"><div class="panel-header"><strong>File & resource window</strong><span class="status partial">Partial</span></div><div class="panel-body surface-stack"><div class="chip-row"><span class="chip selected">workspace/</span><span class="chip">reports/</span></div><div class="code">report.md<br />media-plan.json<br />audience.csv</div><button class="btn">Open resource</button></div></div></div></section>
+
+      <p class="footer-note">Source: Forge exported component inventory and current semantic-theme migration branches. Use this gallery for visual review; it is a decision surface, not a production route.</p>
+    </main>
+  </div>
+  <script>
+    const nav = document.getElementById('nav');
+    const sections = [...document.querySelectorAll('[data-family]')];
+    const search = document.getElementById('search');
+    const priority = document.getElementById('showPriority');
+    let priorityOnly = false;
+    sections.forEach((section) => {
+      const title = section.querySelector('h2').textContent;
+      const status = section.querySelector('.status').textContent;
+      const button = document.createElement('button');
+      button.className = 'nav-item';
+      button.innerHTML = `<span>${title}</span><span class="count">${status}</span>`;
+      button.addEventListener('click', () => section.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+      nav.appendChild(button);
+    });
+    function applyFilter() {
+      const term = search.value.trim().toLowerCase();
+      sections.forEach((section) => {
+        const matchText = section.textContent.toLowerCase().includes(term);
+        const matchPriority = !priorityOnly || section.querySelector('.status.priority');
+        section.classList.toggle('hidden', !matchText || !matchPriority);
+      });
+    }
+    search.addEventListener('input', applyFilter);
+    priority.addEventListener('click', () => { priorityOnly = !priorityOnly; priority.textContent = priorityOnly ? 'Show all families' : 'Show priorities'; priority.classList.toggle('primary', priorityOnly); applyFilter(); });
+    document.getElementById('themeToggle').addEventListener('click', (event) => { const dark = document.body.dataset.theme === 'dark'; document.body.dataset.theme = dark ? 'light' : 'dark'; event.currentTarget.textContent = dark ? 'Dark mode' : 'Light mode'; });
+    document.getElementById('toggleFake').addEventListener('click', (event) => { event.currentTarget.textContent = event.currentTarget.textContent === 'Off' ? 'On' : 'Off'; event.currentTarget.classList.toggle('primary'); });
+  </script>
+</body>
+</html>

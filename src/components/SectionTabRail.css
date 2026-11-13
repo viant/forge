@@ -29,7 +29,7 @@
 .forge-section-tab-rail-cue {
     display: inline-flex; flex: 0 0 32px; width: 32px; height: 32px;
     align-items: center; justify-content: center; padding: 0; border: 0;
-    border-radius: 4px; background: transparent; color: var(--forge-text, #263244); cursor: pointer;
+    border-radius: var(--forge-control-radius, 8px); background: transparent; color: var(--forge-text, #263244); cursor: pointer;
 }
 .forge-section-tab-rail-cue:focus-visible { outline: 2px solid var(--forge-focus-color, #215db0); }
 .forge-section-tab {
@@ -45,7 +45,7 @@
     padding: 7px 12px 8px;
     border: 0;
     border-bottom: 3px solid transparent;
-    border-radius: 0;
+    border-radius: var(--forge-control-radius, 8px) var(--forge-control-radius, 8px) 0 0;
     background: transparent;
     color: var(--forge-text-secondary, var(--forge-report-text-muted, #486579));
     font: inherit;
@@ -59,7 +59,7 @@
 
 .forge-section-tab:hover {
     color: var(--forge-text, var(--forge-report-text, #28445a));
-    background: var(--forge-selected-background, var(--forge-report-selected, rgba(47, 109, 225, 0.045)));
+    background: var(--forge-surface-subtle, var(--forge-report-selected, rgba(47, 109, 225, 0.045)));
 }
 
 .forge-section-tab.is-selected {
@@ -69,6 +69,10 @@
     font-weight: var(--forge-section-tab-font-weight);
     box-shadow: none;
     scroll-margin-inline: 44px;
+}
+
+.forge-section-tab.is-selected:hover {
+    background: var(--forge-surface-subtle, var(--forge-report-selected, rgba(47, 109, 225, 0.045)));
 }
 
 .forge-section-tab:focus-visible {

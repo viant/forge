@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Forge · Section Pattern</title>
+  <link rel="stylesheet" href="./src/components/Container.css">
+  <style>
+    :root {
+      /* Published Steward baseline semantic values. */
+      --steward-semantic-color-surface-canvas: #f7f8fa;
+      --steward-semantic-color-surface-default: #ffffff;
+      --steward-semantic-color-surface-subtle: #fbfbfc;
+      --steward-semantic-color-text-primary: #171b26;
+      --steward-semantic-color-text-secondary: #3f4a5e;
+      --steward-semantic-color-text-tertiary: #6d7586;
+      --steward-semantic-color-border-default: #dde2eb;
+      --steward-semantic-component-input-default-border: #788397;
+      --steward-semantic-color-focus-ring: #4466cc;
+      /* Forge role aliases are the only values consumed by the pattern. */
+      --forge-canvas: var(--steward-semantic-color-surface-canvas);
+      --forge-surface: var(--steward-semantic-color-surface-default);
+      --forge-surface-subtle: var(--steward-semantic-color-surface-subtle);
+      --forge-text: var(--steward-semantic-color-text-primary);
+      --forge-text-secondary: var(--steward-semantic-color-text-secondary);
+      --forge-text-muted: var(--steward-semantic-color-text-tertiary);
+      --forge-border-color: var(--steward-semantic-color-border-default);
+      --forge-control-border: var(--steward-semantic-component-input-default-border);
+      --forge-focus-color: var(--steward-semantic-color-focus-ring);
+      --forge-spacing-2: 8px;
+      --forge-spacing-3: 12px;
+      --forge-spacing-4: 16px;
+      --forge-spacing-6: 24px;
+      --forge-radius-surface: 16px;
+      --forge-border-width: 1px;
+      --forge-type-section-size: 15px;
+      --forge-type-section-line-height: 22px;
+      --forge-type-body-size: 14px;
+      --forge-type-body-line-height: 20px;
+      --forge-font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+      --forge-touch-target-min: 44px;
+      --forge-layout-page-gutter: 24px;
+      --forge-layout-page-gutter-compact: 16px;
+      --forge-layout-section-gap: 24px;
+      --forge-layout-content-max: 1440px;
+      --forge-section-header-min-height: 48px;
+      --forge-section-content-padding: 16px 24px;
+      --forge-section-quiet-padding: 24px;
+      font-family: var(--forge-font-family);
+      color: var(--forge-text);
+      background: var(--forge-canvas);
+    }
+    :root[data-mode="dark"] {
+      --steward-semantic-color-surface-canvas: #1b2230;
+      --steward-semantic-color-surface-default: #1b2230;
+      --steward-semantic-color-surface-subtle: #202d3c;
+      --steward-semantic-color-text-primary: #edf1f7;
+      --steward-semantic-color-text-secondary: #c0c8d7;
+      --steward-semantic-color-text-tertiary: #a2adbf;
+      --steward-semantic-color-border-default: #4d5c72;
+      --steward-semantic-component-input-default-border: #8491a6;
+      --steward-semantic-color-focus-ring: #9db5ff;
+    }
+    body { margin: 0; min-height: 100vh; background: var(--forge-canvas); }
+    .preview { max-width: var(--forge-layout-content-max); margin: 0 auto; padding: 48px var(--forge-layout-page-gutter) 72px; }
+    .intro { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
+    h1 { margin: 0 0 8px; font-size: 28px; line-height: 34px; letter-spacing: -.02em; }
+    .intro p { max-width: 650px; margin: 0; color: var(--forge-text-secondary); line-height: 20px; }
+    button { min-height: 36px; padding: 0 14px; border: 1px solid var(--forge-control-border); border-radius: 8px; background: var(--forge-surface); color: var(--forge-text); font: inherit; cursor: pointer; }
+    button:focus-visible { outline: 2px solid var(--forge-focus-color); outline-offset: 2px; }
+    .stack { display: grid; gap: var(--forge-layout-section-gap); }
+    .bp6-section { min-width: 0; }
+    .bp6-section-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .bp6-section-header-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .bp6-section-header-right { display: flex; align-items: center; gap: 8px; }
+    .bp6-heading { font-size: inherit; }
+    .bp6-section-header-sub-title { margin-top: 2px; color: var(--forge-text-muted); font-size: 12px; line-height: 16px; }
+    .bp6-section-content-demo { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .metric { padding: 12px; border: 1px solid var(--forge-border-color); border-radius: 8px; background: color-mix(in srgb, var(--forge-surface) 92%, var(--forge-text)); }
+    .metric span { display: block; color: var(--forge-text-muted); font-size: 12px; }
+    .metric strong { display: block; margin-top: 4px; font-size: 20px; line-height: 24px; }
+    .quiet-copy { max-width: 720px; margin: 0; color: var(--forge-text-secondary); line-height: 20px; }
+    .flush-grid { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--forge-border-color); }
+    .flush-cell { padding: 14px 24px; border-bottom: 1px solid var(--forge-border-color); }
+    .flush-cell:nth-child(odd) { border-right: 1px solid var(--forge-border-color); }
+    .caption { margin-top: 28px; color: var(--forge-text-muted); font-size: 12px; line-height: 16px; }
+    .impact-panel { margin-top: 40px; }
+    .impact-heading { margin: 0 0 4px; font-size: 20px; line-height: 26px; }
+    .impact-copy { margin: 0 0 18px; color: var(--forge-text-secondary); line-height: 20px; }
+    .impact-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .impact-card { min-width: 0; }
+    .impact-card .bp6-section-header { min-height: 42px; }
+    .impact-card .bp6-section-content { min-height: 70px; }
+    .impact-card p { margin: 0; color: var(--forge-text-secondary); font-size: 13px; line-height: 18px; }
+    .impact-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .impact-meta span { padding: 3px 7px; border-radius: 999px; background: color-mix(in srgb, var(--forge-surface-subtle) 80%, var(--forge-text)); color: var(--forge-text-muted); font-size: 11px; line-height: 14px; }
+    .impact-boundary { margin: 16px 0 0; padding: 12px 14px; border: 1px dashed var(--forge-border-color); border-radius: 8px; color: var(--forge-text-secondary); font-size: 12px; line-height: 17px; }
+    @media (max-width: 767px) { .preview { padding: 28px var(--forge-layout-page-gutter-compact) 48px; } .intro { align-items: start; flex-direction: column; } .bp6-section-content-demo, .flush-grid { grid-template-columns: 1fr; } .flush-cell:nth-child(odd) { border-right: 0; } }
+    @media (max-width: 767px) { .impact-grid { grid-template-columns: 1fr; } }
+    @media (pointer: coarse) { button { min-height: var(--forge-touch-target-min); } }
+  </style>
+</head>
+<body>
+  <main class="preview">
+    <div class="intro">
+      <div>
+        <h1>Forge Section Pattern</h1>
+        <p>Draft component anatomy for shared Steward AI pages. The host supplies semantic values; Forge supplies the reusable surface, header, content, and state behavior.</p>
+      </div>
+      <button type="button" id="mode-toggle">Switch to dark</button>
+    </div>
+
+    <div class="stack">
+      <section class="bp6-section" data-forge-component="section" data-forge-section-appearance="primary" aria-labelledby="primary-title">
+        <header class="bp6-section-header" data-forge-part="section-header">
+          <div class="bp6-section-header-left"><div><h2 id="primary-title" class="bp6-heading">Primary section</h2><div class="bp6-section-header-sub-title">Default page-level grouping</div></div></div>
+          <div class="bp6-section-header-right"><button type="button">Action</button></div>
+        </header>
+        <div data-forge-part="section-content"><div class="bp6-section-content-demo"><div class="metric"><span>Surface</span><strong>Default</strong></div><div class="metric"><span>Header</span><strong>Emphasized</strong></div><div class="metric"><span>Inset</span><strong>24 / 16</strong></div></div></div>
+      </section>
+
+      <section class="bp6-section" data-forge-component="section" data-forge-section-appearance="quiet" aria-labelledby="quiet-title">
+        <header class="bp6-section-header" data-forge-part="section-header">
+          <div class="bp6-section-header-left"><div><h2 id="quiet-title" class="bp6-heading">Quiet section</h2><div class="bp6-section-header-sub-title">Supporting content without another card</div></div></div>
+        </header>
+        <div data-forge-part="section-content"><p class="quiet-copy">Quiet sections preserve hierarchy without adding another elevated surface. This is the pattern for supporting fields, secondary context, and divided form compositions.</p></div>
+      </section>
+
+      <section class="bp6-section" data-forge-component="section" data-forge-section-appearance="primary" data-forge-section-content-inset="flush" aria-labelledby="flush-title">
+        <header class="bp6-section-header" data-forge-part="section-header"><div class="bp6-section-header-left"><h2 id="flush-title" class="bp6-heading">Flush content inset</h2></div></header>
+        <div data-forge-part="section-content"><div class="flush-grid"><div class="flush-cell">Lookup results</div><div class="flush-cell">Selected values</div><div class="flush-cell">Responsive data</div><div class="flush-cell">Shared table edge</div></div></div>
+      </section>
+    </div>
+
+    <section class="impact-panel" aria-labelledby="impact-title">
+      <h2 id="impact-title" class="impact-heading">Steward AI · Media Plan impact</h2>
+      <p class="impact-copy">These are the current product sections that opt into the shared pattern metadata. The content is representative; the section anatomy, appearance, inset, spacing, and responsive behavior are the proposed production behavior.</p>
+      <div class="impact-grid">
+        <section class="impact-card bp6-section" data-forge-component="section" data-forge-section-appearance="quiet" data-forge-section-content-inset="flush" aria-labelledby="impact-plan-hero">
+          <header class="bp6-section-header" data-forge-part="section-header"><div class="bp6-section-header-left"><h3 id="impact-plan-hero" class="bp6-heading">Strategy</h3></div></header>
+          <div data-forge-part="section-content"><p>Supporting context and campaign explanation without another elevated card.</p><div class="impact-meta"><span>planHero</span><span>quiet</span><span>flush</span></div></div>
+        </section>
+        <section class="impact-card bp6-section" data-forge-component="section" data-forge-section-appearance="primary" data-forge-section-content-inset="flush" aria-labelledby="impact-plan-editor">
+          <header class="bp6-section-header" data-forge-part="section-header"><div class="bp6-section-header-left"><h3 id="impact-plan-editor" class="bp6-heading">Plan essentials</h3></div></header>
+          <div data-forge-part="section-content"><p>The primary campaign form keeps a shared header and a flush field/table edge.</p><div class="impact-meta"><span>planEditor</span><span>primary</span><span>flush</span></div></div>
+        </section>
+        <section class="impact-card bp6-section" data-forge-component="section" data-forge-section-appearance="primary" data-forge-section-content-inset="flush" aria-labelledby="impact-audience">
+          <header class="bp6-section-header" data-forge-part="section-header"><div class="bp6-section-header-left"><h3 id="impact-audience" class="bp6-heading">Audience profile</h3></div></header>
+          <div data-forge-part="section-content"><p>Targeting context uses the emphasized section treatment and shared content rhythm.</p><div class="impact-meta"><span>audienceProfile</span><span>primary</span><span>flush</span></div></div>
+        </section>
+        <section class="impact-card bp6-section" data-forge-component="section" data-forge-section-appearance="primary" data-forge-section-content-inset="flush" aria-labelledby="impact-targeting">
+          <header class="bp6-section-header" data-forge-part="section-header"><div class="bp6-section-header-left"><h3 id="impact-targeting" class="bp6-heading">Targeting controls</h3></div></header>
+          <div data-forge-part="section-content"><p>Form controls stay aligned to the same responsive section and touch-target rules.</p><div class="impact-meta"><span>targetingSummary</span><span>primary</span><span>flush</span></div></div>
+        </section>
+        <section class="impact-card bp6-section" data-forge-component="section" data-forge-section-appearance="primary" data-forge-section-content-inset="flush" aria-labelledby="impact-availability">
+          <header class="bp6-section-header" data-forge-part="section-header"><div class="bp6-section-header-left"><h3 id="impact-availability" class="bp6-heading">Targeting availability</h3></div></header>
+          <div data-forge-part="section-content"><p>Availability data uses the same surface, border, header, and mobile stacking contract.</p><div class="impact-meta"><span>targetingAvailability</span><span>primary</span><span>flush</span></div></div>
+        </section>
+        <section class="impact-card bp6-section" data-forge-component="section" data-forge-section-appearance="quiet" aria-labelledby="impact-editors">
+          <header class="bp6-section-header" data-forge-part="section-header"><div class="bp6-section-header-left"><h3 id="impact-editors" class="bp6-heading">Campaign and investment editors</h3></div></header>
+          <div data-forge-part="section-content"><p>Supporting editors remain quiet so the page does not become a stack of competing cards.</p><div class="impact-meta"><span>campaignEditor</span><span>investmentEditor</span><span>quiet</span></div></div>
+        </section>
+      </div>
+      <p class="impact-boundary"><strong>Current adoption boundary:</strong> Media Plan is the only Steward AI product surface currently opted into this pattern contract. Other Steward pages are not changed by this draft until their metadata is migrated and approved.</p>
+    </section>
+    <p class="caption">Current values are the published Steward baseline Light/Dark semantic roles. This preview is draft until the visual direction is approved.</p>
+  </main>
+  <script>
+    const root = document.documentElement;
+    const toggle = document.getElementById('mode-toggle');
+    toggle.addEventListener('click', () => {
+      const dark = root.dataset.mode === 'dark';
+      root.dataset.mode = dark ? 'light' : 'dark';
+      toggle.textContent = dark ? 'Switch to dark' : 'Switch to light';
+    });
+  </script>
+</body>
+</html>

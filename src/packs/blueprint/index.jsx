@@ -9,6 +9,7 @@ import {preserveSelectExternalFocus} from './selectCloseFocus.js';
 import {inheritFieldTrackSelectTokens} from './selectPortalTokens.js';
 import SwitchControl from '../../components/SwitchControl.jsx';
 import ForgeFormGroup from './ForgeFormGroup.jsx';
+import '@blueprintjs/datetime2/lib/css/blueprint-datetime2.css';
 import './theme.css';
 /* -------------------------------------------------------------------------
  * Blueprint Pack – Phase 2

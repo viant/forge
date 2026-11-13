@@ -4,6 +4,13 @@
     --forge-motion-easing: cubic-bezier(0.2, 0, 0, 1);
     --forge-default-overlay-shadow: 0 12px 28px -10px color-mix(in srgb, var(--forge-text, currentColor) 24%, transparent);
     --forge-default-modal-shadow: 0 24px 60px -18px color-mix(in srgb, var(--forge-text, currentColor) 36%, transparent);
+    /* Responsive foundation roles. Breakpoint numbers live in responsive.js;
+       these geometry roles are overridable by a host boundary. */
+    --forge-touch-target-min: 44px;
+    --forge-layout-page-gutter: var(--forge-spacing-6, 24px);
+    --forge-layout-page-gutter-compact: var(--forge-spacing-4, 16px);
+    --forge-layout-section-gap: var(--forge-spacing-6, 24px);
+    --forge-layout-content-max: 1440px;
 }
 /* The same public primitives can consume the host's application boundary. */
 .agently-application[data-agently-theme] :is(.forge-button[data-forge-variant], .forge-select-control):not(.agently-workspace *) {
@@ -31,7 +38,22 @@
     --forge-focus-width: var(--agently-theme-focus-width);
     --forge-focus-offset: var(--agently-theme-focus-offset);
     --forge-motion-fast: var(--agently-theme-motion-fast);
-    --forge-spacing-2: var(--agently-theme-spacing-2);
+    --forge-spacing-1: var(--agently-theme-spacing-1, 4px);
+    --forge-spacing-2: var(--agently-theme-spacing-2, 8px);
+    --forge-spacing-3: var(--agently-theme-spacing-3, 12px);
+    --forge-spacing-4: var(--agently-theme-spacing-4, 16px);
+    --forge-spacing-5: var(--agently-theme-spacing-5, 20px);
+    --forge-spacing-6: var(--agently-theme-spacing-6, 24px);
+    --forge-border-width: var(--agently-theme-border-width, 1px);
+    --forge-radius-surface: var(--agently-theme-radius-surface, 12px);
+    --forge-radius-pill: var(--agently-theme-radius-pill, 999px);
+    --forge-control-height: var(--agently-theme-control-height, 36px);
+    --forge-control-radius: var(--agently-theme-control-radius, 8px);
+    --forge-control-padding-inline: var(--agently-theme-control-padding-inline, 12px);
+    --forge-focus-width: var(--agently-theme-focus-width, 2px);
+    --forge-focus-offset: var(--agently-theme-focus-offset, 2px);
+    --forge-motion-fast: var(--agently-theme-motion-fast, 120ms);
+    --forge-icon-size: var(--agently-theme-icon-size, 16px);
     --forge-status-danger-foreground: var(--agently-theme-status-danger-foreground, var(--agently-theme-validation-border));
 }
 .forge-icon { width: var(--forge-icon-size, var(--agently-theme-icon-size, 16px)); height: var(--forge-icon-size, var(--agently-theme-icon-size, 16px)); flex: none; stroke-width: var(--forge-icon-stroke-width, 2); }
@@ -59,7 +81,8 @@
 .forge-button[data-forge-variant="primary"]:not(:disabled):active { background: var(--forge-button-active-bg, color-mix(in srgb, var(--forge-button-bg) 80%, var(--forge-control-text))); }
 .forge-button[data-forge-variant]:disabled { background: var(--forge-disabled-bg); color: var(--forge-disabled-text); border-color: transparent; cursor: default; }
 .forge-button[data-forge-variant][data-forge-size="compact"] { min-height: 28px; padding-inline: var(--forge-spacing-2, 8px); }
-.forge-button[data-forge-variant].forge-button--icon-only { min-width: var(--forge-control-height, 36px); padding-inline: var(--forge-spacing-2, 8px); }
+.forge-button[data-forge-variant].forge-button--icon-only { width: var(--forge-control-height, 36px); min-width: var(--forge-control-height, 36px); padding-inline: 0; justify-content: center; }
+.forge-button[data-forge-variant][data-forge-size="compact"].forge-button--icon-only { width: 28px; min-width: 28px; }
 .forge-button[data-forge-variant]:focus-visible { outline: var(--forge-focus-width, 2px) solid var(--forge-focus-color); outline-offset: var(--forge-focus-offset, 2px); }
 .forge-button__busy { width: var(--forge-icon-size, 16px); height: var(--forge-icon-size, 16px); border: 2px solid currentColor; border-inline-end-color: transparent; border-radius: 50%; animation: forge-busy 800ms linear infinite; }
 @keyframes forge-busy { to { transform: rotate(360deg); } }
@@ -68,19 +91,90 @@
 [data-forge-status="success"] { --forge-status-bg: var(--forge-status-success-background); --forge-status-fg: var(--forge-status-success-foreground); --forge-status-border: var(--forge-status-success-border); }
 [data-forge-status="warning"] { --forge-status-bg: var(--forge-status-warning-background); --forge-status-fg: var(--forge-status-warning-foreground); --forge-status-border: var(--forge-status-warning-border); }
 [data-forge-status="danger"] { --forge-status-bg: var(--forge-status-danger-background); --forge-status-fg: var(--forge-status-danger-foreground); --forge-status-border: var(--forge-status-danger-border); }
+[data-forge-status="neutral"] { --forge-status-bg: color-mix(in srgb, var(--forge-text-secondary) 10%, var(--forge-surface)); --forge-status-fg: var(--forge-text-secondary); }
+.forge-status-chip {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    min-height: 24px;
+    padding: 3px var(--forge-spacing-2, 8px);
+    border: 0;
+    border-radius: var(--forge-radius-pill, 999px);
+    background: var(--forge-status-bg);
+    color: var(--forge-status-fg);
+    font-family: var(--forge-type-metadata-family, var(--forge-font-family, inherit));
+    font-size: var(--forge-type-metadata-size, 12px);
+    font-weight: var(--forge-type-label-weight, 600);
+    line-height: var(--forge-type-metadata-line-height, 16px);
+    white-space: nowrap;
+}
 :is(.agently-workspace, .agently-application) :is(.bp6-callout, .bp6-tag)[data-forge-status] { background: var(--forge-status-bg); color: var(--forge-status-fg); box-shadow: none; }
 .bp6-callout[data-forge-status] { padding: var(--forge-spacing-4, 16px); border-radius: var(--forge-radius-surface, 12px); }
 .bp6-callout[data-forge-status] .bp6-heading { color: inherit; }
 .bp6-tag[data-forge-status] { border-radius: var(--forge-radius-pill, 999px); padding: var(--forge-spacing-1, 4px) var(--forge-spacing-2, 8px); }
 .forge-foundation-overlay { background: var(--forge-surface-raised, var(--forge-surface)); color: var(--forge-text); border-radius: var(--forge-radius-surface, 12px); box-shadow: var(--forge-overlay-shadow, var(--forge-default-overlay-shadow)); padding: var(--forge-spacing-4, 16px); }
 .forge-foundation-overlay.bp6-dialog { box-shadow: var(--forge-modal-shadow, var(--forge-default-modal-shadow)); width: min(480px, calc(100vw - 32px)); }
-.forge-segmented-control[data-forge-type] { border-color: var(--forge-control-border); background: var(--forge-surface-subtle); gap: var(--forge-spacing-1, 4px); }
+:is(.agently-workspace, .agently-application) .bp6-popover:has(.bp6-menu),
+:is(.agently-workspace, .agently-application) .bp6-popover:has(.bp6-menu) > .bp6-popover-content,
+:is(.agently-workspace, .agently-application) .bp6-date-input-popover,
+:is(.agently-workspace, .agently-application) .bp6-date-input-popover > .bp6-popover-content,
+:is(.agently-workspace, .agently-application) .bp6-popover .bp6-menu,
+:is(.agently-workspace, .agently-application) .bp6-menu-item {
+    border-radius: var(--forge-control-radius, 8px);
+}
+:is(.agently-workspace, .agently-application) .bp6-date-input-popover > .bp6-popover-content {
+    overflow: hidden;
+    background: var(--forge-surface-raised, var(--forge-surface));
+    color: var(--forge-text);
+}
+:is(.agently-workspace, .agently-application) .bp6-date-input-popover .bp6-datepicker {
+    background: var(--forge-surface-raised, var(--forge-surface));
+    color: var(--forge-text);
+}
+:is(.agently-workspace, .agently-application) .bp6-date-input-popover .rdp {
+    --rdp-accent-color: var(--forge-interaction-color);
+    --rdp-background-color: var(--forge-surface-raised, var(--forge-surface));
+}
+:is(.agently-workspace, .agently-application) .bp6-date-input-popover .rdp-day {
+    border-radius: var(--forge-control-radius, 8px);
+}
+:is(.agently-workspace, .agently-application) .bp6-date-input-popover .rdp-day:not([disabled], .rdp-day_selected):is(:hover, :focus) {
+    background: var(--forge-surface-subtle);
+    color: var(--forge-text);
+}
+:is(.agently-workspace, .agently-application) .bp6-date-input-popover .rdp-day.rdp-day_selected,
+:is(.agently-workspace, .agently-application) .bp6-date-input-popover .rdp-day.rdp-day_selected:is(:hover, :focus) {
+    background: var(--forge-button-bg);
+    color: var(--forge-button-text);
+}
+:is(.agently-workspace, .agently-application) .bp6-menu-item:not(.bp6-disabled):is(:hover, :focus) {
+    background: var(--forge-surface-subtle);
+}
+.forge-segmented-control[data-forge-type] { border-color: transparent; background: var(--forge-surface-subtle); gap: var(--forge-spacing-1, 4px); }
 .forge-segmented-control__option[data-forge-type] { transition-property: background-color, color, border-color; transition-duration: var(--forge-motion-fast, 120ms); transition-timing-function: var(--forge-motion-easing); }
-.forge-segmented-control__option[data-forge-type][aria-pressed="true"] { background: var(--forge-selected-background); color: var(--forge-text); font-weight: inherit; box-shadow: none; }
+.forge-segmented-control__option[data-forge-type][aria-pressed="true"] { background: var(--forge-surface); color: var(--forge-interaction-color); font-weight: inherit; box-shadow: 0 1px 2px color-mix(in srgb, var(--forge-text) 8%, transparent); }
 .forge-segmented-control__option[data-forge-type]:focus-visible, .forge-switch[data-forge-type]:focus-visible { outline: var(--forge-focus-width, 2px) solid var(--forge-focus-color); outline-offset: var(--forge-focus-offset, 2px); }
+:is(.agently-workspace, .agently-application) .forge-blueprint-checkbox-compat > .bp6-control-indicator {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+}
+:is(.agently-workspace, .agently-application) .forge-blueprint-checkbox-compat > input[type="checkbox"]:checked ~ .bp6-control-indicator {
+    background: var(--forge-button-bg);
+    border-color: var(--forge-button-bg);
+}
+:is(.agently-workspace, .agently-application) .forge-blueprint-checkbox-compat > input[type="checkbox"]:checked ~ .bp6-control-indicator::before {
+    width: 18px;
+    height: 18px;
+    background: var(--forge-button-text);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M12 5a1 1 0 0 0-.71.29L7 9.59l-2.29-2.3a1 1 0 1 0-1.42 1.42l3 3a1 1 0 0 0 1.42 0l5-5A1 1 0 0 0 12 5Z'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M12 5a1 1 0 0 0-.71.29L7 9.59l-2.29-2.3a1 1 0 1 0-1.42 1.42l3 3a1 1 0 0 0 1.42 0l5-5A1 1 0 0 0 12 5Z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
 @media (pointer: coarse) {
     .forge-button[data-forge-variant],
-    .forge-button[data-forge-variant][data-forge-size] { min-height: 44px; min-width: 44px; }
+    .forge-button[data-forge-variant][data-forge-size] { min-height: var(--forge-touch-target-min); min-width: var(--forge-touch-target-min); }
+    .forge-button[data-forge-variant].forge-button--icon-only,
+    .forge-button[data-forge-variant][data-forge-size="compact"].forge-button--icon-only { width: var(--forge-touch-target-min); min-width: var(--forge-touch-target-min); }
 }
 @media (prefers-reduced-motion: reduce) { .forge-button[data-forge-variant], .forge-segmented-control__option[data-forge-type] { transition-duration: 0s; } .forge-button__busy { animation: none; } }
 

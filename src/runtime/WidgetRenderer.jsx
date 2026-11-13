@@ -370,6 +370,7 @@ function WidgetRendererContent({
     } else if (requiredState) {
         widgetProps['aria-invalid'] = false;
     }
+    if (validationMsg || item?.validationError) widgetProps['aria-invalid'] = true;
     const itemWithError = validationMsg || item?.validationError || requiredState
         ? { ...item, validationError: validationMsg || item?.validationError || undefined, requiredState }
         : item;

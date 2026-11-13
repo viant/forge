@@ -1,0 +1,75 @@
+body { margin: 0; }
+.ds2-library {
+    min-height: 100vh;
+    padding-bottom: var(--forge-spacing-6, 24px);
+    background: var(--forge-canvas);
+    color: var(--forge-text);
+    font-family: var(--forge-font-family, sans-serif);
+    font-size: var(--forge-type-body-size, 14px);
+    line-height: var(--forge-type-body-line-height, 20px);
+}
+.ds2-library__top {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--forge-spacing-4, 16px);
+    padding: var(--forge-spacing-3, 12px) var(--forge-spacing-6, 24px);
+    background: var(--forge-surface);
+    border-bottom: 1px solid var(--forge-border-color);
+}
+.ds2-library__top > div { display: grid; gap: 2px; }
+.ds2-library__top .ds2-library__top-actions { display: flex; flex-wrap: wrap; gap: var(--forge-spacing-2, 8px); }
+.ds2-library__top strong { font-size: var(--forge-type-section-size, 16px); }
+.ds2-library__top .ds2-library__mobile-title { display: none; }
+.ds2-library__top span { color: var(--forge-text-secondary); font-size: var(--forge-type-small-size, 12px); }
+.ds2-library__intro { max-width: 1100px; margin: auto; padding: var(--forge-spacing-6, 24px); }
+.ds2-library__intro h1 { margin: 0 0 8px; font-size: var(--forge-type-display-size, 24px); line-height: var(--forge-type-display-line-height, 32px); }
+.ds2-library__intro p { max-width: 72ch; margin: 0 0 16px; color: var(--forge-text-secondary); }
+.ds2-library__intro .ds2-library__review-state { width: fit-content; padding: var(--forge-spacing-2, 8px) var(--forge-spacing-3, 12px); border-radius: var(--forge-radius-pill, 999px); background: var(--forge-surface-subtle); color: var(--forge-text); }
+.ds2-library .forge-foundation-specimen { margin: 0 auto; }
+.ds2-library__charts { max-width: 1100px; min-width: 0; margin: var(--forge-spacing-6, 24px) auto 0; padding: var(--forge-spacing-6, 24px); background: var(--forge-surface); overflow-x: auto; }
+.ds2-library__family { max-width: 1100px; margin: var(--forge-spacing-6, 24px) auto 0; padding: var(--forge-spacing-6, 24px); background: var(--forge-surface); }
+.ds2-library__family h2 { margin: 0 0 8px; font-size: var(--forge-type-heading-size, 18px); }
+.ds2-library__family p { margin: 0 0 16px; color: var(--forge-text-secondary); }
+.ds2-library__family > span[role="status"] { display: inline-block; margin-left: 12px; color: var(--forge-text-muted); }
+.ds2-library__progress-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--forge-spacing-4, 16px); }
+.ds2-library__progress-grid > div { min-width: 0; padding: var(--forge-spacing-4, 16px); border-radius: var(--forge-radius-surface, 12px); background: var(--forge-surface-subtle); }
+.ds2-library__progress-grid h3 { margin: 0 0 var(--forge-spacing-4, 16px); font-size: var(--forge-type-section-size, 16px); }
+.ds2-library__progress-grid .forge-progress-inline { justify-content: flex-start; }
+.ds2-library__progress-candidate .forge-progress-inline { display: grid; grid-template-columns: minmax(0, 1fr); justify-content: stretch; gap: var(--forge-spacing-2, 8px); width: 100%; }
+.ds2-library__progress-candidate .forge-progress-inline__value { text-align: start; }
+.ds2-library__progress-candidate .forge-progress-inline__meter { justify-self: stretch; width: 100%; height: 8px; border-radius: var(--forge-radius-pill, 999px); background: var(--forge-progress-track, color-mix(in srgb, var(--forge-interaction-color) 12%, var(--forge-surface))); }
+.ds2-library__progress-candidate .forge-progress-inline__meter::-webkit-progress-bar { border-radius: var(--forge-radius-pill, 999px); background: var(--forge-progress-track, color-mix(in srgb, var(--forge-interaction-color) 12%, var(--forge-surface))); }
+.ds2-library__progress-candidate .forge-progress-inline__meter::-webkit-progress-value { border-radius: var(--forge-radius-pill, 999px); }
+.ds2-library__progress-candidate .forge-progress-inline__meter::-moz-progress-bar { border-radius: var(--forge-radius-pill, 999px); }
+.ds2-library__progress-grid .soft-skeleton { max-width: 240px; }
+.ds2-library__chip-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--forge-spacing-4, 16px); }
+.ds2-library__chip-grid > div { min-width: 0; padding: var(--forge-spacing-4, 16px); border-radius: var(--forge-radius-surface, 12px); background: var(--forge-surface-subtle); }
+.ds2-library__chip-grid h3 { margin: 0 0 var(--forge-spacing-4, 16px); font-size: var(--forge-type-section-size, 16px); }
+.ds2-library__chip-row { display: flex; flex-wrap: wrap; gap: var(--forge-spacing-2, 8px); }
+.ds2-library__count-examples { display: flex; flex-wrap: wrap; gap: var(--forge-spacing-3, 12px); }
+.ds2-library__count-examples > span { display: inline-flex; align-items: center; gap: var(--forge-spacing-1, 4px); color: var(--forge-text-secondary); }
+.ds2-library__count-badge { display: inline-grid; place-items: center; min-width: 20px; min-height: 20px; padding-inline: var(--forge-spacing-1, 4px); border-radius: var(--forge-radius-pill, 999px); background: var(--forge-surface); color: var(--forge-text); font-size: var(--forge-type-caption-size, 11px); font-weight: var(--forge-type-label-weight, 600); line-height: 1; }
+.ds2-library__candidate-note { margin: var(--forge-spacing-3, 12px) 0 0; color: var(--forge-text-secondary); font-size: var(--forge-type-small-size, 12px); }
+.ds2-library__skeleton-review > span:not(.ds2-library__sr-only) { display: block; margin: var(--forge-spacing-3, 12px) 0 var(--forge-spacing-2, 8px); color: var(--forge-text-secondary); font-size: var(--forge-type-small-size, 12px); }
+.ds2-library__skeleton-candidate .soft-skeleton-line { background: color-mix(in srgb, var(--forge-text) 10%, var(--forge-surface)); }
+@media (prefers-reduced-motion: reduce) { .ds2-library__skeleton-candidate .soft-skeleton-line::after { animation: none; } }
+.ds2-library__sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.ds2-library__conversation { display: grid; gap: var(--forge-spacing-4, 16px); max-width: 760px; }
+.ds2-library__conversation .chat-row { width: 100%; }
+.ds2-library__patterns { max-width: 1100px; min-width: 0; margin: var(--forge-spacing-6, 24px) auto 0; background: var(--forge-surface); overflow-x: auto; }
+.ds2-library__patterns > h2, .ds2-library__patterns > p { margin: 0; padding-inline: var(--forge-spacing-6, 24px); }
+.ds2-library__patterns > h2 { padding-block-start: var(--forge-spacing-6, 24px); font-size: var(--forge-type-heading-size, 18px); }
+.ds2-library__patterns > p { padding-block-start: var(--forge-spacing-2, 8px); color: var(--forge-text-secondary); }
+.ds2-library__pattern-grid { display: grid; gap: var(--forge-spacing-6, 24px); padding: var(--forge-spacing-6, 24px); min-width: 0; }
+@media (max-width: 640px) {
+    .ds2-library__top { padding: var(--forge-spacing-2, 8px) var(--forge-spacing-4, 16px); }
+    .ds2-library__top strong:first-child, .ds2-library__top span { display: none; }
+    .ds2-library__top .ds2-library__mobile-title { display: block; }
+    .ds2-library__intro, .ds2-library__charts, .ds2-library__family { padding: var(--forge-spacing-4, 16px); }
+    .ds2-library__progress-grid { grid-template-columns: minmax(0, 1fr); }
+    .ds2-library__chip-grid { grid-template-columns: minmax(0, 1fr); }
+}

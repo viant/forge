@@ -79,18 +79,54 @@ callback and retained draft; host browser proof exercises the real specimen.
 
 ## Components, variants and states
 
+### Shared pattern library
+
+Forge is the canonical component and pattern library for Steward AI. Import
+reusable components from `forge/components`; import composition patterns from
+`forge/patterns`. A pattern owns its markup, variants, interaction behavior,
+accessibility contract and semantic variable names. Agently composes these
+patterns into the application shell, while Steward AI selects them in product
+metadata and publishes the token values.
+
+The first public pattern is `SectionPattern`, which supports the semantic
+`primary` and `quiet` appearances plus the `flush` content inset. New pages
+should use that contract instead of adding page-specific panel CSS. A new
+pattern is complete only when its API, states, semantic roles, consumer and
+contract checks land together.
+
+Responsive behavior is part of the same library. `responsive.js` owns the
+phone/tablet/desktop form-factor contract and the shared roles for touch
+targets, page gutters, section gaps and content width. Components use those
+roles with container-aware CSS; Agently and Steward AI should not create a
+second breakpoint or touch-target vocabulary.
+
 | Implementation | Supported contract and scope |
 | --- | --- |
 | Button | primary, secondary, ghost, link, danger; default/compact sizes; hover, active, focus, disabled, readOnly and loading. Icon-only actions require a name. |
 | WidgetRenderer/Blueprint pack | Text, number, textarea, select, checkbox, radio and SwitchControl bindings. Required/error/helper associations and availability remain intact. Select and segmented roles reach their controls. |
-| Blueprint Callout/Tag | Select data-forge-status info/success/warning/danger and a typography role. Include text; dynamic results use role=status or role=alert. |
+| StatusChip/Blueprint Callout | Use `StatusChip` for compact status labels with neutral/info/success/warning/danger tones. Callouts retain data-forge-status and a typography role. Include text; dynamic results use role=status or role=alert. |
 | Card/AccessibleSection | Existing renderer container anatomy, semantic appearance and keyboard collapse. The same implementations are used by Container. |
 | Blueprint Popover/Dialog | Theme-owned portals, raised surface/elevation, focus trapping, initial control via onOpened, Escape and return focus. |
 | DashboardTableContent/Chart | Existing data-driven components. Populated/empty/loading/error table states and chart typography are demonstrated. The opt-in document table supplies quiet headers, flexible columns and editable row details. Remaining table/chart migration and accessibility review stay separate. |
 | Agently shell | Navigation, history, composer docking/transitions and viewer patterns are Agently-owned. Forge owns the shared Chat/Composer recipe described below. |
 
+An authored `validationError` marks its field `aria-invalid="true"` and links the
+visible error through `aria-errormessage`, including optional fields. The
+semantic error color and message recipe apply in both Light and Dark modes.
+
+`StatusChip` owns the borderless, pill-shaped status treatment. Its neutral,
+information, success, warning, and danger tones consume the existing semantic
+surface and feedback roles in both modes. Automatic dashboard table status
+values and authored badge visuals now use this component. Other authored table
+visuals and report badges still have their own legacy recipes; migrate them
+after visual review instead of layering another page-level override.
+The neutral chip mixes the semantic secondary text and surface roles so it
+remains a visible chip inside a subtle card without adding a hard border.
+Interactive `FilterChips` is a separate control with selected and disabled
+states; its older content-widget color recipe remains a review target.
+
 ```jsx
-import {Button, Icon, Typography} from 'forge/components';
+import {Button, Icon, StatusChip, Typography} from 'forge/components';
 
 <Button variant="primary" icon="lucide:check" loading={saving} onClick={save}>
   Save changes
@@ -98,6 +134,7 @@ import {Button, Icon, Typography} from 'forge/components';
 <Button variant="ghost" icon="lucide:panel-right" hideLabel
   aria-label="Show panel" onClick={showPanel}/>
 <Typography as="h2" typeRole="section">Details</Typography>
+<StatusChip tone="warning">Needs review</StatusChip>
 ```
 
 Widget metadata selects `properties.variant`; toolbar metadata selects `variant`
@@ -106,6 +143,16 @@ use tokens or extend the shared component. Legacy button style props remain
 compatible. Optional --forge-button-hover-bg and --forge-button-active-bg hooks
 let a workspace select reviewed states; neutral defaults derive from its palette.
 Ghost/link hover and pressed states keep their transparent border. Hover uses a semantic background; only keyboard focus adds the focus ring. Existing Blueprint minimal controls reuse that quiet recipe and preserve callbacks, dimensions, disabled state and intent.
+
+The shared action corner is `--forge-control-radius` for primary, secondary,
+ghost, link and danger buttons, including their hover and focus surfaces.
+Blueprint minimal actions in a themed boundary use the same radius and
+`--forge-icon-size` glyph scale. Variant icon-only Forge buttons are square:
+the default side follows `--forge-control-height`, while the compact side is
+28px on desktop. Their icon remains the same shared 16px default size; compact
+changes the target, not the glyph. Coarse pointers raise both sides to the
+44px shared minimum. Legacy Blueprint icon-only actions keep their existing
+footprint until their consumers move to the shared Button contract.
 
 Compact and icon-only variants retain a minimum 44px target on coarse pointers;
 the compact desktop height remains 28px. FoundationSpecimen includes both forms.

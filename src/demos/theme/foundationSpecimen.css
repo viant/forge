@@ -17,3 +17,4 @@
 @media (max-width: 600px) { .forge-foundation-fields { grid-template-columns: minmax(0, 1fr); } .forge-foundation-swatches { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 .forge-foundation-icon-example { display: inline-flex; align-items: center; gap: var(--forge-spacing-2, 8px); }
+.forge-foundation-action-sample { display: grid; grid-template-rows: 44px auto; justify-items: center; align-items: center; gap: var(--forge-spacing-1, 4px); min-width: 84px; }

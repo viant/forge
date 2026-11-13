@@ -192,7 +192,7 @@ export default function Icon({name, iconSvg, label, className = ''}) {
     const Glyph = Object.hasOwn(icons, key) ? icons[key] : null;
     if (!Glyph) {
         if (typeof name === 'string' && name.startsWith('lucide:')) throw new Error(`Unsupported icon: ${name}`);
-        return <BlueprintIcon icon={name} size={14} {...accessibility} className={className}/>;
+        return <BlueprintIcon icon={name} size={16} {...accessibility} className={className}/>;
     }
     return <Glyph {...accessibility} focusable="false" className={`forge-icon ${className}`.trim()}/>;
 }

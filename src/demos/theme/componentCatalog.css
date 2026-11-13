@@ -1,0 +1,39 @@
+.ds2-catalog { max-width: 1100px; margin: 0 auto var(--forge-spacing-6, 24px); padding: 0 var(--forge-spacing-6, 24px); }
+.ds2-catalog__heading { display: flex; justify-content: space-between; align-items: end; gap: var(--forge-spacing-4, 16px); margin-bottom: var(--forge-spacing-5, 20px); }
+.ds2-catalog__heading h2 { margin: 0 0 var(--forge-spacing-2, 8px); font-size: var(--forge-type-display-size, 24px); line-height: var(--forge-type-display-line-height, 32px); }
+.ds2-catalog__heading p { margin: 0; color: var(--forge-text-secondary); }
+.ds2-catalog__heading .ds2-catalog__summary { flex: none; padding-bottom: var(--forge-spacing-1, 4px); font-size: var(--forge-type-small-size, 12px); }
+.ds2-catalog__tools { display: grid; gap: var(--forge-spacing-4, 16px); padding: var(--forge-spacing-5, 20px); border-radius: var(--forge-radius-surface, 12px); background: var(--forge-surface); }
+.ds2-catalog__search { display: grid; gap: var(--forge-spacing-2, 8px); max-width: 480px; font-weight: var(--forge-type-label-weight, 600); }
+.ds2-catalog__search-field { position: relative; display: flex; align-items: center; }
+.ds2-catalog__search-field > .forge-icon { position: absolute; inset-inline-start: var(--forge-spacing-3, 12px); color: var(--forge-text-secondary); pointer-events: none; }
+.ds2-catalog__search input { box-sizing: border-box; width: 100%; height: var(--forge-control-height, 40px); padding: 0 var(--forge-control-padding-inline, 12px) 0 40px; border: var(--forge-border-width, 1px) solid var(--forge-control-border); border-radius: var(--forge-control-radius, 8px); outline: none; background: var(--forge-control-bg); color: var(--forge-control-text); font: inherit; font-weight: 400; }
+.ds2-catalog__search input::placeholder { color: var(--forge-text-muted); opacity: 1; }
+.ds2-catalog__search input:focus-visible { outline: var(--forge-focus-width, 2px) solid var(--forge-focus-color); outline-offset: var(--forge-focus-offset, 2px); }
+.ds2-catalog__result { margin: var(--forge-spacing-4, 16px) 0 var(--forge-spacing-3, 12px); color: var(--forge-text-secondary); font-size: var(--forge-type-small-size, 12px); }
+.ds2-catalog__group { overflow: hidden; margin-top: var(--forge-spacing-4, 16px); border-radius: var(--forge-radius-surface, 12px); background: var(--forge-surface); }
+.ds2-catalog__group h3 { display: flex; justify-content: space-between; align-items: center; margin: 0; padding: var(--forge-spacing-4, 16px) var(--forge-spacing-5, 20px); background: var(--forge-surface-subtle); font-size: var(--forge-type-section-size, 16px); }
+.ds2-catalog__group h3 span { color: var(--forge-text-secondary); font-size: var(--forge-type-small-size, 12px); font-weight: 400; }
+.ds2-catalog__item { display: grid; grid-template-columns: minmax(170px, .8fr) minmax(0, 2fr) auto; align-items: center; gap: var(--forge-spacing-4, 16px); min-width: 0; padding: var(--forge-spacing-4, 16px) var(--forge-spacing-5, 20px); border-bottom: var(--forge-border-width, 1px) solid var(--forge-border-color); }
+.ds2-catalog__item:last-child { border-bottom: 0; }
+.ds2-catalog__identity { display: flex; flex-wrap: wrap; align-items: center; gap: var(--forge-spacing-2, 8px); }
+.ds2-catalog__identity h4 { margin: 0; font-size: var(--forge-type-body-size, 14px); line-height: var(--forge-type-body-line-height, 20px); }
+.ds2-catalog__item dl { display: grid; gap: var(--forge-spacing-2, 8px); min-width: 0; margin: 0; }
+.ds2-catalog__item dl > div { display: grid; grid-template-columns: 65px minmax(0, 1fr); gap: var(--forge-spacing-2, 8px); }
+.ds2-catalog__item dt { color: var(--forge-text-secondary); font-size: var(--forge-type-small-size, 12px); }
+.ds2-catalog__item dd { min-width: 0; margin: 0; color: var(--forge-text); }
+.ds2-catalog__item a { display: inline-flex; align-items: center; justify-content: center; gap: var(--forge-spacing-1, 4px); min-height: 36px; padding: 0 var(--forge-spacing-2, 8px); border-radius: var(--forge-control-radius, 8px); color: var(--forge-interaction-color); text-decoration: none; white-space: nowrap; }
+.ds2-catalog__item a:hover { background: var(--forge-surface-subtle); }
+.ds2-catalog__item a:focus-visible { outline: var(--forge-focus-width, 2px) solid var(--forge-focus-color); outline-offset: var(--forge-focus-offset, 2px); }
+.ds2-catalog__item a .forge-icon { width: var(--forge-icon-size, 16px); height: var(--forge-icon-size, 16px); }
+.ds2-catalog__pending { color: var(--forge-text-muted); font-size: var(--forge-type-small-size, 12px); white-space: nowrap; }
+.ds2-catalog__empty { margin: var(--forge-spacing-4, 16px) 0; padding: var(--forge-spacing-6, 24px); border-radius: var(--forge-radius-surface, 12px); background: var(--forge-surface); color: var(--forge-text-secondary); }
+@media (max-width: 760px) {
+    .ds2-catalog { padding-inline: var(--forge-spacing-4, 16px); }
+    .ds2-catalog__heading { align-items: start; flex-direction: column; }
+    .ds2-catalog__tools { padding: var(--forge-spacing-4, 16px); }
+    .ds2-catalog__item { grid-template-columns: minmax(0, 1fr); gap: var(--forge-spacing-3, 12px); padding: var(--forge-spacing-4, 16px); }
+    .ds2-catalog__item dl > div { grid-template-columns: 60px minmax(0, 1fr); }
+    .ds2-catalog__item a { width: fit-content; }
+}
+@media (pointer: coarse) { .ds2-catalog__item a { min-height: var(--forge-touch-target-min, 44px); } }

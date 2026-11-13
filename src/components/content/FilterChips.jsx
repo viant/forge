@@ -10,7 +10,7 @@ export default function FilterChips({id, value = [], options = [], onChange, dis
             return <button key={`${typeof option.value}:${String(option.value)}`} type="button" aria-pressed={active}
                 disabled={disabled || readOnly || option.disabled}
                 onClick={() => onChange?.(toggleChipValue(selected, option.value, !active))}>
-                {option.label}{option.count != null ? <span className="forge-filter-chips__count">{option.count}</span> : null}
+                {option.label}{option.count != null ? <>{' '}<span className="forge-filter-chips__count">{option.count}</span></> : null}
             </button>;
         })}
     </div>;

@@ -41,6 +41,8 @@ assert.ok(badgeHtml.includes("forge-dashboard-table-cell-visual--badge"));
 assert.ok(badgeHtml.includes("forge-dashboard-table-cell-visual--info"));
 assert.ok(badgeHtml.includes("data-visual-kind=\"badge\""));
 assert.ok(badgeHtml.includes("data-visual-tone=\"info\""));
+assert.ok(badgeHtml.includes('data-forge-status="info"'));
+assert.ok(!badgeHtml.includes('border:1px solid'));
 assert.ok(badgeHtml.includes("Display"));
 
 const toneHtml = renderToStaticMarkup(
@@ -120,5 +122,13 @@ const plainTextHtml = renderToStaticMarkup(
 
 assert.ok(plainTextHtml.includes("forge-dashboard-table-cell-text"));
 assert.ok(plainTextHtml.includes("Plain"));
+
+const statusHtml = renderToStaticMarkup(
+  renderDashboardTableCell("on_track", {status: "on_track"}, {key: "status", label: "Status"}, "en-US"),
+);
+assert.ok(statusHtml.includes('class="forge-status-chip"'));
+assert.ok(statusHtml.includes('data-forge-status="success"'));
+assert.ok(statusHtml.includes('on track'));
+assert.ok(!statusHtml.includes('border:1px solid'));
 
 console.log("dashboardVisualUtils ✓ exposes stable classes for explicit table visuals while preserving plain-text fallback rendering");

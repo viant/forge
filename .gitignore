@@ -5,6 +5,8 @@ android/sample/
 android/app/
 android/mock-backend/
 output/
+.env.local
+vite.config.local.mjs
 
 # Logs and lock files
 *.log

@@ -17,14 +17,16 @@ export function resolveTableCellBadge(row = {}, badge = null, context = null) {
         : undefined;
     const label = String(mappedLabel ?? badge.label ?? '').trim();
     const icon = String(badge.icon || '').trim();
-    if (!label && !icon) return null;
+    const appearance = badge.appearance === 'status' ? 'status' : undefined;
+    if (!label && (!icon || appearance === 'status')) return null;
     return {
         label,
         icon,
+        ...(appearance ? {appearance} : {}),
         tone: String(mappedTone || badge.tone || 'neutral').trim().toLowerCase(),
         className: String(badge.className || '').trim(),
-        tooltip: String(badge.tooltip || (badge.hideLabel ? actual : label) || label).trim(),
+        tooltip: String(badge.tooltip || (badge.hideLabel && appearance !== 'status' ? actual : label) || label).trim(),
         replaceValue: badge.replaceValue === true,
-        hideLabel: badge.hideLabel === true,
+        hideLabel: appearance === 'status' ? false : badge.hideLabel === true,
     };
 }

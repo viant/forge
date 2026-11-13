@@ -362,6 +362,136 @@
     }
 }
 
+/* Canonical section pattern. Hosts choose semantic roles and values through
+   --forge-* variables; Forge owns the reusable structure and interaction
+   anatomy so new pages do not need product-specific section CSS. */
+[data-forge-component="section"][data-forge-section-appearance="primary"],
+[data-forge-part="container-section"][data-forge-section-appearance="primary"] {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+    border: var(--forge-border-width, 1px) solid var(--forge-border-color, currentColor);
+    border-radius: var(--forge-radius-surface, 12px);
+    background: var(--forge-surface, transparent);
+    color: var(--forge-text, currentColor);
+    box-shadow: var(--forge-section-shadow, none);
+}
+
+[data-forge-component="section"][data-forge-section-appearance="quiet"],
+[data-forge-part="container-section"][data-forge-section-appearance="quiet"] {
+    display: flex;
+    flex-direction: column;
+    padding: var(--forge-section-quiet-padding, var(--forge-spacing-6, 24px));
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--forge-text, currentColor);
+    box-shadow: none;
+}
+
+:is(
+    [data-forge-component="section"],
+    [data-forge-part="container-section"]
+) > :is(.bp6-section-header, .bp5-section-header, .bp4-section-header) {
+    min-height: var(--forge-section-header-min-height, 44px);
+    padding: var(--forge-section-header-padding, var(--forge-spacing-3, 12px) var(--forge-spacing-6, 24px));
+    border-bottom: var(--forge-border-width, 1px) solid var(--forge-section-header-border, var(--forge-border-color, currentColor));
+    background: var(--forge-section-header-surface, var(--forge-surface-subtle, transparent));
+    color: var(--forge-section-header-text, var(--forge-text, currentColor));
+    box-shadow: var(--forge-section-header-shadow, none);
+}
+
+:is(
+    [data-forge-component="section"],
+    [data-forge-part="container-section"]
+) > :is(.bp6-section-header, .bp5-section-header, .bp4-section-header) :is(.bp6-heading, .bp5-heading, .bp4-heading) {
+    margin: 0;
+    color: inherit;
+    font-family: var(--forge-type-section-family, var(--forge-font-family, inherit));
+    font-size: var(--forge-section-header-font-size, var(--forge-type-section-size, 1rem));
+    font-weight: var(--forge-type-section-weight, 600);
+    line-height: var(--forge-section-header-line-height, var(--forge-type-section-line-height, 1.4));
+}
+
+:is(
+    [data-forge-component="section"],
+    [data-forge-part="container-section"]
+) > [data-forge-part="section-content"] {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    padding: var(--forge-section-content-padding, var(--forge-spacing-4, 16px) var(--forge-spacing-6, 24px));
+}
+
+:is(
+    [data-forge-component="section"],
+    [data-forge-part="container-section"]
+)[data-forge-section-appearance="primary"] > [data-forge-part="section-content"] {
+    padding: var(--forge-section-primary-content-padding, var(--forge-section-content-padding, var(--forge-spacing-4, 16px) var(--forge-spacing-6, 24px)));
+}
+
+:is(
+    [data-forge-component="section"],
+    [data-forge-part="container-section"]
+)[data-forge-section-appearance="quiet"] > [data-forge-part="section-content"] {
+    padding: var(--forge-section-quiet-content-padding, 0);
+}
+
+:is(
+    [data-forge-component="section"],
+    [data-forge-part="container-section"]
+)[data-forge-section-appearance="primary"] > :is(.bp6-section-header, .bp5-section-header, .bp4-section-header) {
+    --forge-section-header-surface: var(--forge-section-primary-header-surface, var(--forge-surface-subtle, transparent));
+    --forge-section-header-font-size: var(--forge-section-primary-header-font-size, var(--forge-type-section-size, 1rem));
+    --forge-section-header-line-height: var(--forge-section-primary-header-line-height, var(--forge-type-section-line-height, 1.4));
+}
+
+:is(
+    [data-forge-component="section"],
+    [data-forge-part="container-section"]
+)[data-forge-section-appearance="quiet"] > :is(.bp6-section-header, .bp5-section-header, .bp4-section-header) {
+    min-height: var(--forge-section-quiet-header-min-height, 0);
+    margin-bottom: var(--forge-section-quiet-header-margin-bottom, 0);
+    padding: var(--forge-section-quiet-header-padding, 0 0 var(--forge-spacing-3, 12px));
+    --forge-section-header-surface: var(--forge-section-quiet-header-surface, transparent);
+    --forge-section-header-font-size: var(--forge-section-quiet-header-font-size, var(--forge-type-body-size, 0.875rem));
+    --forge-section-header-line-height: var(--forge-section-quiet-header-line-height, var(--forge-type-body-line-height, 1.4));
+}
+
+:is(
+    [data-forge-component="section"],
+    [data-forge-part="container-section"]
+)[data-forge-section-content-inset="flush"] > [data-forge-part="section-content"] {
+    padding: 0;
+}
+
+@media (max-width: 767px) {
+    :is(
+        [data-forge-component="section"],
+        [data-forge-part="container-section"]
+    )[data-forge-section-appearance="primary"] > :is(.bp6-section-header, .bp5-section-header, .bp4-section-header) {
+        padding: var(--forge-section-primary-header-padding-compact, var(--forge-spacing-4, 16px));
+    }
+
+    :is(
+        [data-forge-component="section"],
+        [data-forge-part="container-section"]
+    )[data-forge-section-appearance="primary"] > [data-forge-part="section-content"] {
+        padding: var(--forge-section-primary-content-padding-compact, var(--forge-spacing-4, 16px));
+    }
+
+    :is(
+        [data-forge-component="section"],
+        [data-forge-part="container-section"]
+    )[data-forge-section-appearance="quiet"] {
+        padding: var(--forge-section-quiet-padding-compact, var(--forge-spacing-4, 16px));
+    }
+}
+
+/* Legacy section classes remain supported while consumers migrate to the
+   semantic appearance attributes above. */
 .forge-primary-form-shell.bp6-section,
 .forge-primary-form-shell.bp5-section,
 .forge-primary-form-shell.bp4-section {

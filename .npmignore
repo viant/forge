@@ -1,0 +1,5 @@
+# Keep verification and fixture sources out of the runtime package.
+src/**/*.test.*
+src/**/testdata/
+src/**/*.browser.*
+src/window-editor/testCompiler.mjs

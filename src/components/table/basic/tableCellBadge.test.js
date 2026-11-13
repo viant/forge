@@ -37,6 +37,17 @@ assert.deepEqual(resolveTableCellBadge({status: 0}, {
   label: 'Inactive', icon: '', tone: 'neutral', className: '', tooltip: 'Inactive', replaceValue: true, hideLabel: false,
 });
 
+assert.deepEqual(resolveTableCellBadge({status: 'APPLIED'}, {
+  appearance: 'status', field: 'status', valueMap: {APPLIED: 'Applied'},
+  toneMap: {APPLIED: 'success'}, replaceValue: true, hideLabel: true,
+}), {
+  label: 'Applied', icon: '', appearance: 'status', tone: 'success', className: '',
+  tooltip: 'Applied', replaceValue: true, hideLabel: false,
+});
+assert.equal(resolveTableCellBadge({status: 'OTHER'}, {
+  appearance: 'status', field: 'status', valueMap: {APPLIED: 'Applied'},
+}), null, 'unknown status retains the original cell text instead of an empty chip');
+
 assert.deepEqual(resolveTableCellBadge({validationAlert: 'Creative has validation errors'}, {
   field: 'validationAlert', icon: 'warning-sign', tone: 'danger', hideLabel: true,
 }), {
@@ -45,6 +56,6 @@ assert.deepEqual(resolveTableCellBadge({validationAlert: 'Creative has validatio
 
 const styles = readFileSync(new URL('../Basic.css', import.meta.url), 'utf8');
 assert.match(styles, /\.forge-table-cell-badges\s*\{[\s\S]*display:\s*inline-flex;[\s\S]*white-space:\s*nowrap/);
-assert.match(styles, /\.forge-table-cell-badge\.is-danger,[\s\S]*color:\s*#b42318/);
+assert.match(styles, /\.forge-table-cell-badge\.is-danger,[\s\S]*color:\s*var\(--forge-status-danger-foreground,\s*#b42318\)/);
 
 console.log('tableCellBadge ✓ conditionally resolves a generic row decoration');

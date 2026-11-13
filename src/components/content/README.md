@@ -14,6 +14,9 @@ Carousel and card actions emit `onClick` with the original record in
 `event.detail.item` and its ID in `event.target.value`. Filter chips emit a new
 selection array through `onChange`; numeric and string values remain distinct.
 Use stable, unique record IDs to preserve carousel selection across reordering.
+When authored through `WidgetRenderer`, the carousel stores its visible slide
+under the authored control ID in the window view state. The wrapper's unique
+DOM ID remains separate so the same control can appear in different windows.
 
 ```yaml
 - id: featured
@@ -41,6 +44,11 @@ Styles are scoped to `forge-content-*`, `forge-card-rail` and
 `--forge-carousel-background`, `--forge-carousel-color`,
 `--forge-carousel-heading-size`, `--forge-carousel-copy-size`,
 `--forge-card-width` and `--forge-card-image-height`.
+
+Without a content-specific palette, filter backgrounds and count text fall back
+to the shared semantic surface, selection, and secondary-text roles. A host
+that keeps a separate legacy content palette should set the existing
+`--forge-content-*` hooks on that surface so Light and Dark stay readable.
 
 Focused checks:
 

@@ -36,10 +36,10 @@
 .forge-document-input .forge-document-textarea:focus { outline: 0; box-shadow: none; }
 .forge-document-textarea::placeholder { color: var(--chat-muted); opacity: 1; }
 .forge-document-toolbar { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.forge-document-toolbar .forge-icon { width: 18px; height: 18px; }
+.forge-document-toolbar .forge-icon { width: var(--forge-icon-size, 16px); height: var(--forge-icon-size, 16px); }
 .forge-document-submit { margin-left: auto; display: flex; gap: 6px; align-items: center; }
 .forge-document-chat .forge-document-submit > .forge-button[data-forge-variant] { min-width: 44px; min-height: 44px; padding: 0; }
-.forge-document-chat .forge-document-submit > .forge-document-send[data-forge-variant] { min-width: 36px; min-height: 36px; border-radius: var(--forge-radius-pill, 999px); }
+.forge-document-chat .forge-document-submit > .forge-document-send[data-forge-variant] { width: 44px; min-width: 44px; height: 44px; min-height: 44px; border-radius: var(--forge-control-radius, 8px); }
 .forge-composer-trigger.forge-button { flex: none; gap: 6px; min-width: 44px; min-height: 44px; padding-inline: 10px; }
 .forge-composer-popover .forge-composer-options { display: flex; flex-direction: column; gap: var(--forge-spacing-3, 12px); width: 280px; max-width: 100%; padding: var(--forge-spacing-3, 12px); color: var(--forge-text); }
 .forge-composer-group-content { overflow: auto; overscroll-behavior: contain; }

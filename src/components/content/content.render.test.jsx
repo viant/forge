@@ -46,6 +46,8 @@ await click(button('Text one'));assert.deepEqual(chips, [1, '1']);
 await click(button('Unavailable'));assert.deepEqual(chips, [1, '1']);
 await render(<FilterChips value={chips} options={options} readOnly onChange={() => {throw Error('Readonly changed');}}/>);
 assert.ok([...document.querySelectorAll('button')].every(node => node.disabled));
+await render(<FilterChips options={[{value: 'pending', label: 'Pending', count: 4}]}/>);
+assert.equal(document.querySelector('button').textContent, 'Pending 4', 'Filter label and count remain separate words for assistive reading');
 
 const cards = [{id: 7, title: '<img onerror=alert(1)>', subtitle: 'Reference', facts: [{label: 'Count', value: 12}], tags: ['Category']}];
 await render(<CardRail value={cards} heading="Collection" onClick={event => selected = event.detail.item}/>);
@@ -106,6 +108,7 @@ assert.deepEqual(context.signals.windowForm.peek().selected, [1]);
 await render(<WidgetRenderer context={context} item={{id: 'feature', type: 'contentCarousel', scope: 'windowForm', dataField: 'featured', wrapper: 'none'}} events={{onClick: event => selected = event.detail.item}}/>);
 const carouselView = getViewSignal('content-window');
 const currentSlide = () => carouselView.peek().carousels.feature;
+assert.notEqual(document.querySelector('.forge-content-carousel').id, 'feature', 'Wrapper keeps a unique DOM ID separate from the authored state key');
 assert.deepEqual(currentSlide(), {itemId: 10, title: 'First', index: 0, total: 2}, 'Authored widget publishes initial visible slide');
 selected = undefined;
 await act(async () => {

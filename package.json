@@ -1,12 +1,26 @@
 {
   "name": "forge",
-  "version": "1.0.0",
+  "version": "1.1.1",
   "main": "index.js",
+  "files": [
+    "index.js",
+    "src",
+    "!src/**/*.test.*",
+    "!src/**/testdata/**",
+    "!src/**/*.browser.*",
+    "!src/window-editor/testCompiler.mjs",
+    "public",
+    "README.md",
+    "NOTICE",
+    "package.json"
+  ],
   "exports": {
     "./validation": "./src/validation/index.js",
     "./core": "./src/core/index.js",
     "./hooks": "./src/hooks/index.js",
     "./components": "./src/components/index.js",
+    "./patterns": "./src/components/patterns/index.js",
+    "./responsive": "./src/components/responsive.js",
     "./lookup-picker": "./src/components/lookup/LookupPickerDialog.jsx",
     "./lookup-selection": "./src/components/lookup/LookupSelectionInput.jsx",
     "./window": "./src/components/WindowContent.jsx",

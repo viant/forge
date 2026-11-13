@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Forge × Agently · component and theme sheet</title>
+  <style>
+    :root { --agently-theme-canvas:#f7f8fa; --agently-theme-surface:#ffffff; --agently-theme-surface-subtle:#fbfbfc; --agently-theme-text:#171b26; --agently-theme-text-secondary:#3f4a5e; --agently-theme-text-muted:#626d7e; --agently-theme-border:#dde2eb; --agently-theme-border-strong:#788397; --agently-theme-interaction:#3453b3; --agently-theme-selected-background:#eef2ff; --agently-theme-button-background:#3453b3; --agently-theme-button-foreground:#ffffff; --agently-theme-control-background:#ffffff; --agently-theme-control-foreground:#171b26; --agently-theme-control-border:#788397; --agently-theme-disabled-background:#edf0f5; --agently-theme-disabled-foreground:#626d7e; --agently-theme-focus:#4466cc; --agently-theme-status-success-foreground:#1f6b45; --agently-theme-status-warning-foreground:#875500; --agently-theme-status-danger-foreground:#b42318; --forge-canvas:var(--agently-theme-canvas); --forge-surface:var(--agently-theme-surface); --forge-surface-subtle:var(--agently-theme-surface-subtle); --forge-text:var(--agently-theme-text); --forge-text-secondary:var(--agently-theme-text-secondary); --forge-text-muted:var(--agently-theme-text-muted); --forge-border-color:var(--agently-theme-border); --forge-border-strong:var(--agently-theme-border-strong); --forge-interaction-color:var(--agently-theme-interaction); --forge-selected-background:var(--agently-theme-selected-background); --forge-button-bg:var(--agently-theme-button-background); --forge-button-text:var(--agently-theme-button-foreground); --forge-control-bg:var(--agently-theme-control-background); --forge-control-text:var(--agently-theme-control-foreground); --forge-control-border:var(--agently-theme-control-border); --forge-disabled-bg:var(--agently-theme-disabled-background); --forge-disabled-text:var(--agently-theme-disabled-foreground); --forge-focus-color:var(--agently-theme-focus); --forge-status-success:var(--agently-theme-status-success-foreground); --forge-status-warning:var(--agently-theme-status-warning-foreground); --forge-status-danger:var(--agently-theme-status-danger-foreground); --forge-font-family:"Plus Jakarta Sans", Inter, system-ui, sans-serif; --page:var(--forge-canvas); --ink:var(--forge-text); --muted:var(--forge-text-muted); --line:var(--forge-border-color); --surface:var(--forge-surface); --surface2:var(--forge-surface-subtle); --accent:var(--forge-interaction-color); --selected:var(--forge-selected-background); --success:var(--forge-status-success); --warning:var(--forge-status-warning); --danger:var(--forge-status-danger); --radius:12px; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--page); color:var(--ink); font-family:var(--forge-font-family); font-size:13px; line-height:1.45; }
+    body.dark { --agently-theme-canvas:#1b2230; --agently-theme-surface:#1b2230; --agently-theme-surface-subtle:#202d3c; --agently-theme-text:#edf1f7; --agently-theme-text-secondary:#c4cfdd; --agently-theme-text-muted:#a2adbf; --agently-theme-border:#3a4a5d; --agently-theme-border-strong:#8491a6; --agently-theme-interaction:#a9bfff; --agently-theme-selected-background:#263c64; --agently-theme-button-background:#a9bfff; --agently-theme-button-foreground:#172447; --agently-theme-control-background:#242d3d; --agently-theme-control-foreground:#edf1f7; --agently-theme-control-border:#8491a6; --agently-theme-disabled-background:#30394a; --agently-theme-disabled-foreground:#a2adbf; --agently-theme-focus:#9db5ff; --agently-theme-status-success-foreground:#5ace9f; --agently-theme-status-warning-foreground:#e7b85e; --agently-theme-status-danger-foreground:#ff8f86; }
+    .theme[data-theme-sheet="dark"] { --agently-theme-canvas:#1b2230; --agently-theme-surface:#1b2230; --agently-theme-surface-subtle:#202d3c; --agently-theme-text:#edf1f7; --agently-theme-text-secondary:#c4cfdd; --agently-theme-text-muted:#a2adbf; --agently-theme-border:#3a4a5d; --agently-theme-border-strong:#8491a6; --agently-theme-interaction:#a9bfff; --agently-theme-selected-background:#263c64; --agently-theme-button-background:#a9bfff; --agently-theme-button-foreground:#172447; --agently-theme-control-background:#242d3d; --agently-theme-control-foreground:#edf1f7; --agently-theme-control-border:#8491a6; --agently-theme-disabled-background:#30394a; --agently-theme-disabled-foreground:#a2adbf; --agently-theme-focus:#9db5ff; --agently-theme-status-success-foreground:#5ace9f; --agently-theme-status-warning-foreground:#e7b85e; --agently-theme-status-danger-foreground:#ff8f86; }
+    .top { position:sticky; top:0; z-index:4; display:flex; align-items:center; gap:16px; padding:14px 22px; background:var(--surface); border-bottom:1px solid var(--line); }
+    .mark { display:grid; place-items:center; width:28px; height:28px; border:1px solid var(--line); border-radius:7px; color:var(--accent); font-weight:800; }
+    .top h1 { margin:0; font-size:16px; letter-spacing:-.03em; }
+    .top p { margin:1px 0 0; color:var(--muted); font-size:11px; }
+    .top-actions { display:flex; gap:8px; margin-left:auto; }
+    button, select { font:inherit; }
+    button { cursor:pointer; }
+    .btn { min-height:32px; padding:6px 10px; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--ink); font-weight:650; }
+    .btn.active, .btn.primary { border-color:var(--accent); background:var(--accent); color:#fff; }
+    .wrap { max-width:1500px; margin:auto; padding:28px 30px 70px; }
+    .hero { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(300px,.75fr); gap:28px; align-items:end; margin-bottom:24px; }
+    .eyebrow { margin:0 0 8px; color:var(--accent); font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+    h2 { margin:0 0 5px; font-size:28px; line-height:1.1; letter-spacing:-.05em; }
+    .hero p { max-width:780px; margin:0; color:var(--muted); font-size:15px; }
+    .legend { display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; }
+    .pill { display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border:1px solid var(--line); border-radius:999px; color:var(--muted); font-size:11px; font-weight:700; white-space:nowrap; }
+    .pill.overlap { border-color:var(--warning); color:var(--warning); }
+    .pill.forge { border-color:var(--accent); color:var(--accent); }
+    .pill.agently { border-color:var(--success); color:var(--success); }
+    .section-title { display:flex; align-items:end; justify-content:space-between; gap:16px; margin:30px 0 12px; }
+    .section-title h3 { margin:0; font-size:18px; letter-spacing:-.03em; }
+    .section-title p { margin:0; color:var(--muted); }
+    .sheet { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+    .theme { min-width:0; overflow:hidden; border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); }
+    .theme-head { display:flex; align-items:center; justify-content:space-between; padding:12px 15px; border-bottom:1px solid var(--line); }
+    .theme-head strong { font-size:13px; }
+    .theme-head span { color:var(--muted); font-size:11px; }
+    .theme-body { padding:15px; background:var(--surface2); }
+    .component-stack { display:grid; gap:11px; }
+    .component { overflow:hidden; border:1px solid var(--line); border-radius:8px; background:var(--surface); }
+    .component.overlap { border-left:3px solid var(--warning); }
+    .component-head { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:9px 11px; border-bottom:1px solid var(--line); }
+    .component-head strong { font-size:12px; }
+    .component-body { padding:11px; }
+    .meta { color:var(--muted); font-size:11px; }
+    .row { display:flex; flex-wrap:wrap; align-items:center; gap:7px; }
+    .spacer { flex:1; }
+    .tabs { display:flex; gap:2px; border-bottom:1px solid var(--line); }
+    .tab { padding:7px 9px; border:0; border-bottom:2px solid transparent; background:transparent; color:var(--muted); }
+    .tab.active { border-bottom-color:var(--accent); color:var(--ink); font-weight:700; }
+    .field { display:grid; gap:5px; }
+    .field label { color:var(--muted); font-size:11px; }
+    input, select { min-height:32px; width:100%; padding:6px 8px; border:1px solid var(--line); border-radius:5px; background:var(--surface); color:var(--ink); }
+    .btnrow { display:flex; flex-wrap:wrap; gap:7px; }
+    .table { width:100%; border-collapse:collapse; font-size:11px; }
+    .table th, .table td { padding:7px 6px; border-bottom:1px solid var(--line); text-align:left; }
+    .table th { color:var(--muted); font-weight:750; }
+    .table tr:last-child td { border-bottom:0; }
+    .dot { display:inline-block; width:7px; height:7px; margin-right:5px; border-radius:50%; background:var(--success); }
+    .dot.warn { background:var(--warning); }
+    .kpis { display:grid; grid-template-columns:repeat(3,1fr); gap:7px; }
+    .kpi { padding:9px; border:1px solid var(--line); border-radius:6px; background:var(--surface2); }
+    .kpi strong { display:block; font-size:17px; letter-spacing:-.04em; }
+    .kpi span { color:var(--muted); font-size:10px; }
+    .bars { display:flex; align-items:end; gap:6px; height:78px; padding:8px 6px 0; border-bottom:1px solid var(--line); }
+    .bar { flex:1; min-width:8px; border-radius:3px 3px 0 0; background:var(--accent); }
+    .bar.green { background:var(--success); opacity:.8; }
+    .notice { padding:9px 10px; border-left:3px solid var(--accent); background:var(--selected); color:var(--muted); font-size:11px; }
+    .notice strong { display:block; margin-bottom:2px; color:var(--ink); }
+    .message { display:grid; grid-template-columns:24px minmax(0,1fr); gap:7px; }
+    .avatar { display:grid; place-items:center; width:24px; height:24px; border-radius:50%; background:var(--selected); color:var(--accent); font-size:10px; font-weight:800; }
+    .message p { margin:0; font-size:11px; }
+    .code { padding:9px; border-radius:5px; background:var(--page); color:var(--muted); font:10px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; }
+    .overlap-map { display:grid; grid-template-columns:1.1fr 1.1fr 1.4fr; border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; background:var(--surface); }
+    .overlap-map > div { padding:12px 14px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); }
+    .overlap-map > div:nth-child(3n) { border-right:0; }
+    .overlap-map > div:nth-last-child(-n+3) { border-bottom:0; }
+    .overlap-map .header { background:var(--surface2); color:var(--muted); font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; }
+    .overlap-map .area { font-weight:700; }
+    .overlap-map .owner { color:var(--muted); font-size:11px; }
+    .overlap-map .decision { color:var(--warning); font-size:11px; }
+    .callout { margin-top:16px; padding:13px 15px; border:1px solid color-mix(in srgb,var(--warning) 45%,var(--line)); border-left:4px solid var(--warning); border-radius:7px; background:var(--surface); }
+    .callout strong { display:block; margin-bottom:3px; }
+    .hidden { display:none !important; }
+    .footer { margin-top:30px; color:var(--muted); font-size:11px; }
+    @media(max-width:900px){ .hero{grid-template-columns:1fr}.legend{justify-content:flex-start}.sheet{grid-template-columns:1fr}.overlap-map{grid-template-columns:1fr}.overlap-map > div,.overlap-map > div:nth-child(3n),.overlap-map > div:nth-last-child(-n+3){border-right:0;border-bottom:1px solid var(--line)} }
+  </style>
+</head>
+<body>
+  <header class="top"><div class="mark">F</div><div><h1>Forge × Agently</h1><p>One visual sheet · Light and dark theme · ownership and overlap review</p></div><div class="top-actions"><button class="btn" id="themeToggle">Use dark page</button><button class="btn primary" id="onlyOverlap">Show overlap only</button></div></header>
+  <main class="wrap">
+    <section class="hero"><div><p class="eyebrow">Production alignment review</p><h2>Same surface. Different owners.</h2><p>This sheet shows the reusable Forge layer beside the Agently application-shell layer in both theme modes. Amber-marked components are the areas where ownership is currently shared or easy to duplicate.</p></div><div class="legend"><span class="pill forge">Forge-owned behavior</span><span class="pill agently">Agently-owned shell</span><span class="pill overlap">Overlap / clarify</span></div></section>
+
+    <div class="section-title"><div><h3>Light mode</h3><p>Same component anatomy, copy, and density under light semantic values.</p></div><span class="pill">Compare left vs right</span></div>
+    <section class="sheet" data-theme-sheet="light">
+      <article class="theme" data-owner="forge"><div class="theme-head"><strong>Forge · Light</strong><span>Reusable renderers</span></div><div class="theme-body"><div class="component-stack">
+        <div class="component"><div class="component-head"><strong>Window and surface primitives</strong><span class="pill forge">Forge</span></div><div class="component-body"><div class="tabs"><button class="tab active">Operations</button><button class="tab">Revenue</button><button class="tab">Alerts</button></div><div class="row" style="margin-top:9px"><strong>Operations overview</strong><span class="spacer"></span><button class="btn">Close</button></div><p class="meta">Window manager · Container · SectionTabRail · Splitter</p></div></div>
+        <div class="component overlap"><div class="component-head"><strong>Controls and field states</strong><span class="pill overlap">Shared</span></div><div class="component-body"><div class="field"><label>Report name</label><input value="Operations overview" /></div><div class="btnrow" style="margin-top:8px"><button class="btn primary">Apply</button><button class="btn">Reset</button><button class="btn">Disabled</button></div><p class="meta">FormRenderer · SchemaBasedForm · SelectControl · validation hooks</p></div></div>
+        <div class="component"><div class="component-head"><strong>Tables and reporting</strong><span class="pill forge">Forge</span></div><div class="component-body"><div class="kpis"><div class="kpi"><strong>$4.82M</strong><span>Booked revenue</span></div><div class="kpi"><strong>12.6%</strong><span>Growth</span></div><div class="kpi"><strong>3</strong><span>Review items</span></div></div><table class="table" style="margin-top:9px"><thead><tr><th>Campaign</th><th>Delivery</th><th>Spend</th></tr></thead><tbody><tr><td>Spring launch</td><td><span class="dot"></span>On pace</td><td>$842k</td></tr><tr><td>Brand lift</td><td><span class="dot warn"></span>Review</td><td>$611k</td></tr></tbody></table><p class="meta">BasicTable · ReviewTable · ReportRuntime · ReportBuilder</p></div></div>
+        <div class="component"><div class="component-head"><strong>Charts, lookup, and workbench</strong><span class="pill forge">Forge</span></div><div class="component-body"><div class="bars"><span class="bar" style="height:43%"></span><span class="bar" style="height:56%"></span><span class="bar green" style="height:49%"></span><span class="bar" style="height:72%"></span><span class="bar green" style="height:66%"></span><span class="bar" style="height:82%"></span></div><div class="row" style="margin-top:9px"><span class="pill">Chart</span><span class="pill">LookupSelectionInput</span><span class="pill">ReaderWorkbench</span></div></div></div>
+      </div></div></article>
+      <article class="theme" data-owner="agently"><div class="theme-head"><strong>Agently · Light</strong><span>Shell and conversation</span></div><div class="theme-body"><div class="component-stack">
+        <div class="component"><div class="component-head"><strong>Application shell</strong><span class="pill agently">Agently</span></div><div class="component-body"><div class="row"><strong>Steward workspace</strong><span class="spacer"></span><span class="pill">Ready</span></div><div class="btnrow" style="margin-top:9px"><button class="btn primary">Workspace</button><button class="btn">Data sources</button><button class="btn">Settings</button></div><p class="meta">Shell navigation · topbar · workspace frame · settings surfaces</p></div></div>
+        <div class="component overlap"><div class="component-head"><strong>Shell controls and states</strong><span class="pill overlap">Shared</span></div><div class="component-body"><div class="row"><span class="pill">Filter: Active</span><span class="pill">Date: 30 days</span><button class="btn">Add filter</button></div><div class="notice" style="margin-top:9px"><strong>Review state</strong>Agently supplies shell context; Forge supplies the reusable control anatomy.</div><p class="meta">Shell buttons · settings forms · focus/disabled/status roles</p></div></div>
+        <div class="component overlap"><div class="component-head"><strong>Conversation and tool feed</strong><span class="pill overlap">Shared</span></div><div class="component-body"><div class="message"><div class="avatar">S</div><p><strong>Steward</strong><br />I found three pacing risks in the current campaign.</p></div><div class="code" style="margin-top:9px">tool.result · 3,842 rows · 1.8s</div><div class="row" style="margin-top:9px"><button class="btn">Open result</button><button class="btn">Export</button></div><p class="meta">Chat shell · message cards · tool-feed chrome · approval states</p></div></div>
+      </div></div></article>
+    </section>
+
+    <div class="section-title"><div><h3>Dark mode</h3><p>Same component anatomy, copy, and density under dark semantic values.</p></div><span class="pill">Compare left vs right</span></div>
+    <section class="sheet" data-theme-sheet="dark">
+      <article class="theme" data-owner="forge"><div class="theme-head"><strong>Forge · Dark</strong><span>Reusable renderers</span></div><div class="theme-body"><div class="component-stack">
+        <div class="component"><div class="component-head"><strong>Window and surface primitives</strong><span class="pill forge">Forge</span></div><div class="component-body"><div class="tabs"><button class="tab active">Operations</button><button class="tab">Revenue</button><button class="tab">Alerts</button></div><div class="row" style="margin-top:9px"><strong>Operations overview</strong><span class="spacer"></span><button class="btn">Close</button></div><p class="meta">Window manager · Container · SectionTabRail · Splitter</p></div></div>
+        <div class="component overlap"><div class="component-head"><strong>Controls and field states</strong><span class="pill overlap">Shared</span></div><div class="component-body"><div class="field"><label>Report name</label><input value="Operations overview" /></div><div class="btnrow" style="margin-top:8px"><button class="btn primary">Apply</button><button class="btn">Reset</button><button class="btn">Disabled</button></div><p class="meta">FormRenderer · SchemaBasedForm · SelectControl · validation hooks</p></div></div>
+        <div class="component"><div class="component-head"><strong>Tables and reporting</strong><span class="pill forge">Forge</span></div><div class="component-body"><div class="kpis"><div class="kpi"><strong>$4.82M</strong><span>Booked revenue</span></div><div class="kpi"><strong>12.6%</strong><span>Growth</span></div><div class="kpi"><strong>3</strong><span>Review items</span></div></div><table class="table" style="margin-top:9px"><thead><tr><th>Campaign</th><th>Delivery</th><th>Spend</th></tr></thead><tbody><tr><td>Spring launch</td><td><span class="dot"></span>On pace</td><td>$842k</td></tr><tr><td>Brand lift</td><td><span class="dot warn"></span>Review</td><td>$611k</td></tr></tbody></table><p class="meta">BasicTable · ReviewTable · ReportRuntime · ReportBuilder</p></div></div>
+        <div class="component"><div class="component-head"><strong>Charts, lookup, and workbench</strong><span class="pill forge">Forge</span></div><div class="component-body"><div class="bars"><span class="bar" style="height:43%"></span><span class="bar" style="height:56%"></span><span class="bar green" style="height:49%"></span><span class="bar" style="height:72%"></span><span class="bar green" style="height:66%"></span><span class="bar" style="height:82%"></span></div><div class="row" style="margin-top:9px"><span class="pill">Chart</span><span class="pill">LookupSelectionInput</span><span class="pill">ReaderWorkbench</span></div></div></div>
+      </div></div></article>
+      <article class="theme" data-owner="agently"><div class="theme-head"><strong>Agently · Dark</strong><span>Shell and conversation</span></div><div class="theme-body"><div class="component-stack">
+        <div class="component"><div class="component-head"><strong>Application shell</strong><span class="pill agently">Agently</span></div><div class="component-body"><div class="row"><strong>Steward workspace</strong><span class="spacer"></span><span class="pill">Ready</span></div><div class="btnrow" style="margin-top:9px"><button class="btn primary">Workspace</button><button class="btn">Data sources</button><button class="btn">Settings</button></div><p class="meta">Shell navigation · topbar · workspace frame · settings surfaces</p></div></div>
+        <div class="component overlap"><div class="component-head"><strong>Shell controls and states</strong><span class="pill overlap">Shared</span></div><div class="component-body"><div class="row"><span class="pill">Filter: Active</span><span class="pill">Date: 30 days</span><button class="btn">Add filter</button></div><div class="notice" style="margin-top:9px"><strong>Review state</strong>Agently supplies shell context; Forge supplies the reusable control anatomy.</div><p class="meta">Shell buttons · settings forms · focus/disabled/status roles</p></div></div>
+        <div class="component overlap"><div class="component-head"><strong>Conversation and tool feed</strong><span class="pill overlap">Shared</span></div><div class="component-body"><div class="message"><div class="avatar">S</div><p><strong>Steward</strong><br />I found three pacing risks in the current campaign.</p></div><div class="code" style="margin-top:9px">tool.result · 3,842 rows · 1.8s</div><div class="row" style="margin-top:9px"><button class="btn">Open result</button><button class="btn">Export</button></div><p class="meta">Chat shell · message cards · tool-feed chrome · approval states</p></div></div>
+      </div></div></article>
+    </section>
+
+    <div class="callout"><strong>Theme invariant</strong>Light and Dark use the same copy, component order, and layout density. Only semantic presentation values change: surface, text, border, interaction, status, focus, and typography tokens.</div>
+
+    <div class="section-title"><div><h3>Where the components overlap</h3><p>These are the areas to clarify before pushing more visual changes toward production.</p></div><span class="pill overlap">Amber = overlap</span></div>
+    <section class="overlap-map" id="overlapMap"><div class="header">Area</div><div class="header">Current split</div><div class="header">Decision needed</div><div class="area">Shell controls</div><div class="owner">Forge owns reusable control anatomy; Agently owns shell placement and shell-specific states.</div><div class="decision">One state contract. No duplicate button, focus, disabled, or status recipes.</div><div class="area">Typography & spacing</div><div class="owner">Forge exposes roles; Agently applies them across conversation and workspace shell.</div><div class="decision">Agently should select roles; Forge should own generic type behavior.</div><div class="area">Panels, lookup, tables, pagers</div><div class="owner">Forge is the intended shared owner; Steward/Agently still carry compatibility styling.</div><div class="decision">Move geometry into Forge and leave product choice in Steward metadata.</div><div class="area">Chat and tool feeds</div><div class="owner">Agently owns conversation composition; Forge renders reusable result, table, and window components.</div><div class="decision">Define the handoff boundary so feed chrome is not recreated in Forge.</div><div class="area">Responsive behavior</div><div class="owner">Both layers currently contain responsive rules in different places.</div><div class="decision">Component stacking belongs with the rendered owner; remove duplicate mobile overrides.</div><div class="area">Theme publication</div><div class="owner">Steward AI publishes selected values; Forge and Agently consume the roles.</div><div class="decision">Treat the published style catalog as the production source of truth.</div></section>
+    <div class="callout"><strong>Bottom line</strong>Forge should own reusable component anatomy and behavior. Agently should own the application shell and conversation composition. Steward AI should choose product-specific variants and publish the theme values. The biggest collision zones are controls, typography/spacing, panels/tables/pagers, chat/feed handoff, and responsive rules.</div>
+    <p class="footer">This is a visual review sheet for the current local branches. It does not claim that these values are active in production.</p>
+  </main>
+  <script>
+    const body = document.body;
+    const themeToggle = document.getElementById('themeToggle');
+    const overlapButton = document.getElementById('onlyOverlap');
+    let overlapOnly = false;
+    themeToggle.addEventListener('click', () => { body.classList.toggle('dark'); themeToggle.textContent = body.classList.contains('dark') ? 'Use light page' : 'Use dark page'; });
+    overlapButton.addEventListener('click', () => { overlapOnly = !overlapOnly; overlapButton.textContent = overlapOnly ? 'Show all components' : 'Show overlap only'; document.querySelectorAll('.component').forEach((item) => item.classList.toggle('hidden', overlapOnly && !item.classList.contains('overlap'))); document.getElementById('overlapMap').scrollIntoView({ behavior:'smooth', block:'start' }); });
+  </script>
+</body>
+</html>

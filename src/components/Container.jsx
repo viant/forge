@@ -70,7 +70,7 @@ import {
     sectionAppearanceAttributes,
     sectionContentInsetAttributes,
 } from './containerChrome.js';
-import AccessibleSection from './AccessibleSection.jsx';
+import {SectionPattern} from './patterns/index.js';
 import {resolveDynamicDataSourceRef} from '../runtime/dataSourceRef.js';
 import {isPureBoundLabelSection} from './containerEmptyState.js';
 import {containerAnchorProps} from './containerAnchor.js';
@@ -105,7 +105,7 @@ const wrapContainerChrome = (container, content, suppressTitle = false, sectionP
     }
     if (container?.section) {
         const sectionProperties = sectionPropertiesOverride || resolveSectionProperties(container.section);
-        const SectionComponent = sectionProperties.collapsible === true || container.section.appearance ? AccessibleSection : Section;
+        const SectionComponent = sectionProperties.collapsible === true || container.section.appearance ? SectionPattern : Section;
         const sectionStyle = {
             ...outerStyle,
             ...(sectionProperties.style || {}),

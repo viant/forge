@@ -7,12 +7,12 @@ import ContentImage from './ContentImage.jsx';
 import {contentRecords, contentAction} from './contentModel.js';
 import './content.css';
 
-export default function ContentCarousel({id, context, value = [], onClick, disabled, autoRotateMs = 0, wholeSlideAction = false, className = '', style, 'aria-label': ariaLabel = 'Featured content'}) {
+export default function ContentCarousel({id, item, context, value = [], onClick, disabled, autoRotateMs = 0, wholeSlideAction = false, className = '', style, 'aria-label': ariaLabel = 'Featured content'}) {
     useSignals();
     const slides = useMemo(() => contentRecords(value), [value]), generatedId = useId();
     const [activeId, setActiveId] = useState(null), [hovered, setHovered] = useState(false), [focused, setFocused] = useState(false), [paused, setPaused] = useState(false);
     const [reducedMotion, setReducedMotion] = useState(false);
-    const controlId = id || generatedId;
+    const controlId = item?.id || id || generatedId;
     const viewSignal = context?.identity?.windowId ? getViewSignal(context.identity.windowId) : null;
     const selection = useViewPartition(viewSignal, 'carousels', controlId).value;
     const selectedId = viewSignal ? selection?.itemId : activeId;

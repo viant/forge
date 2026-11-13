@@ -8,13 +8,14 @@ import ReportDocumentSpecimen from './ReportDocumentSpecimen.jsx';
 import TableWidthSpecimen from './TableWidthSpecimen.jsx';
 import ComparisonWidthSpecimen from './ComparisonWidthSpecimen.jsx';
 import {signal} from '@preact/signals-react';
-import {Button as BlueprintButton, Callout, Card, Dialog, Tag} from '@blueprintjs/core';
+import {Button as BlueprintButton, Callout, Card, Dialog} from '@blueprintjs/core';
 import Button from '../../components/Button.jsx';
+import StatusChip from '../../components/StatusChip.jsx';
 import SectionTabRail from '../../components/SectionTabRail.jsx';
 import SelectControl from '../../components/SelectControl.jsx';
 import Icon from '../../components/Icon.jsx';
 import Typography, {typographyProps} from '../../components/Typography.jsx';
-import AccessibleSection from '../../components/AccessibleSection.jsx';
+import {SectionPattern} from '../../components/patterns/index.js';
 import DashboardTableContent from '../../components/dashboard/DashboardTableContent.jsx';
 import {DashboardEditableTable} from '../../components/dashboard/DashboardBlocks.jsx';
 import '../../components/dashboard/Dashboard.css';
@@ -38,8 +39,8 @@ const editableTable = {...table, dataSourceRef:'examples', allowAdd:false, colum
     {key:'notes',label:'Notes',flex:true,minWidth:240,editor:false},
 ]};
 
-export default function FoundationSpecimen({iconExamples = ['menu', 'search', 'plus', 'panel-right', 'maximize', 'minimize', 'thumbs-up', 'thumbs-down', 'ellipsis'].map(name => ({name: `lucide:${name}`, label: name}))}) {
-    const state = useState({foundationName: '', foundationAmount: 12345, foundationSelect: 'all', foundationRadio: 'daily', foundationCheck: true, foundationSwitch: false});
+export default function FoundationSpecimen({includeDocuments = true, iconExamples = ['menu', 'search', 'plus', 'panel-right', 'maximize', 'minimize', 'thumbs-up', 'thumbs-down', 'ellipsis'].map(name => ({name: `lucide:${name}`, label: name}))}) {
+    const state = useState({foundationName: '', foundationAmount: 12345, foundationSelect: 'all', foundationRadio: 'daily', foundationCheck: true, foundationSwitch: false, foundationDate: null});
     const [saved, setSaved] = useState(0);
     const [dialog, setDialog] = useState(false);
     const [attachmentsOpen, setAttachmentsOpen] = useState(false);
@@ -59,10 +60,7 @@ export default function FoundationSpecimen({iconExamples = ['menu', 'search', 'p
         tableContext.signals.collection.value = value === 'empty' ? [] : [{name: 'First example', count: 12345, status: 'Active', frequency: '3 per 1 day'}, {name: 'Second example with a longer name', count: 86, status: 'Warning', frequency: '5 per 1 week'}];
     };
     return <div className="forge-foundation-specimen">
-        <DocumentSpecimen/>
-        <ReportDocumentSpecimen/>
-        <TableWidthSpecimen/>
-        <ComparisonWidthSpecimen/>
+        {includeDocuments && <><DocumentSpecimen/><ReportDocumentSpecimen/><TableWidthSpecimen/><ComparisonWidthSpecimen/></>}
         <header>
             <Typography as="h1" typeRole="display">Workspace design system</Typography>
             <Typography as="p" typeRole="body">The shared components, foundations and states available to workspace authors. Appearance follows the selected workspace theme.</Typography>
@@ -79,18 +77,23 @@ export default function FoundationSpecimen({iconExamples = ['menu', 'search', 'p
             <Typography as="h2" typeRole="section">Spacing and surfaces</Typography>
             <div className="forge-foundation-row">{[1, 2, 3, 4, 5, 6].map(step => <div className="forge-foundation-space" key={step}><span className="forge-foundation-space__sample" style={{width: `var(--forge-spacing-${step}, ${step * 4}px)`}}/><Typography typeRole="metadata">Step {step}</Typography></div>)}</div>
             <Card className="forge-foundation-card" data-forge-part="container-card"><Typography as="h3" typeRole="section">Surface with a quiet border</Typography><Typography as="p" typeRole="body">Shared border, radius and inset roles. Elevation is reserved for overlays.</Typography></Card>
-            <AccessibleSection title="Reusable section" collapsible data-forge-part="container-section" data-forge-section-appearance="quiet"><Typography as="p" typeRole="body">The section retains its keyboard control and expanded state.</Typography></AccessibleSection>
+            <SectionPattern title="Reusable section" appearance="quiet" collapsible data-forge-part="container-section"><Typography as="p" typeRole="body">The section retains its keyboard control and expanded state.</Typography></SectionPattern>
         </section>
         <section id="foundation-actions" aria-label="Actions and icons">
             <Typography as="h2" typeRole="section">Actions and icons</Typography>
+            <Typography as="p" typeRole="body">Buttons, link actions, ghost actions and icon actions use one control radius. Forge icon actions are square; all displayed action icons use one shared size.</Typography>
             <div className="forge-foundation-row">
                 <Button variant="primary" icon="lucide:check" onClick={() => setSaved(saved + 1)}>Save example</Button>
                 <Button variant="secondary" onClick={() => setSaved(0)}>Reset example</Button>
                 <Button variant="ghost">Ghost action</Button><Button variant="link">Link action</Button>
-                <Button variant="danger">Remove example</Button><Button variant="secondary" size="compact">Compact action</Button>
+                <Button variant="danger">Remove example</Button>
                 <Button variant="primary" disabled>Unavailable action</Button><Button variant="primary" loading>Saving example</Button>
-                <Button variant="ghost" size="compact" icon="lucide:panel-right" hideLabel aria-label="Show example panel" onClick={() => setDialog(true)}/>
-                <BlueprintButton minimal icon={<Icon name="lucide:refresh-cw"/>} aria-label="Reset example count" onClick={() => setSaved(0)}/>
+            </div>
+            <div className="forge-foundation-row" aria-label="Icon action comparison">
+                <span className="forge-foundation-action-sample"><Button variant="ghost" icon="lucide:panel-right" hideLabel aria-label="Show example panel" onClick={() => setDialog(true)}/><Typography typeRole="metadata">Default</Typography></span>
+                <span className="forge-foundation-action-sample"><Button variant="ghost" size="compact" icon="lucide:search" hideLabel aria-label="Search examples"/><Typography typeRole="metadata">Compact</Typography></span>
+                <span className="forge-foundation-action-sample"><BlueprintButton minimal icon={<Icon name="lucide:refresh-cw"/>} aria-label="Reset example count" onClick={() => setSaved(0)}/><Typography typeRole="metadata">Legacy minimal</Typography></span>
+                <Typography typeRole="metadata">Hover each action to compare its control surface.</Typography>
             </div>
             <Typography as="p" typeRole="metadata" role="status">Example saved {saved} {saved === 1 ? 'time' : 'times'}.</Typography>
             <SectionTabRail ariaLabel="Example sections" items={['overview', 'records', 'schedule', 'sources', 'settings', 'history'].map(id => ({id, label:id.charAt(0).toUpperCase()+id.slice(1)}))} selectedId={section} onChange={setSection}/>
@@ -102,6 +105,7 @@ export default function FoundationSpecimen({iconExamples = ['menu', 'search', 'p
                 {input('foundationName', 'Name', 'text', {helperText: 'Enter a descriptive name.'})}
                 {input('foundationAmount', 'Amount', 'number')}
                 {input('foundationSelect', 'Scope', 'select', {options: [{value: 'all', label: 'All records'}, {value: 'selected', label: 'Selected records'}]})}
+                {input('foundationDate', 'Date', 'date')}
                 {input('foundationNotes', 'Notes', 'textarea')}
                 {input('foundationDisabled', 'Disabled field', 'text', {disabled: true})}
                 {input('foundationInvalid', 'Required name', 'text', {validationError: 'Enter a name to continue.'})}
@@ -112,7 +116,7 @@ export default function FoundationSpecimen({iconExamples = ['menu', 'search', 'p
         </section>
         <section id="foundation-feedback" aria-label="Feedback">
             <Typography as="h2" typeRole="section">Feedback</Typography>
-            <div className="forge-foundation-row">{Object.entries(statuses).map(([status, label]) => <Tag key={status} data-forge-status={status} {...typographyProps('metadata')}>{label}</Tag>)}</div>
+            <div className="forge-foundation-row">{Object.entries(statuses).map(([tone, label]) => <StatusChip key={tone} tone={tone}>{label}</StatusChip>)}</div>
             <Callout data-forge-status="info" icon={null} {...typographyProps('body')}>Supporting information stays visible next to the task.</Callout>
             <Callout data-forge-status="success" icon={null} {...typographyProps('body')}>The example was saved.</Callout>
             <Callout data-forge-status="warning" icon={null} {...typographyProps('body')}>Review the assumptions before continuing.</Callout>

@@ -5,14 +5,14 @@
     gap: var(--forge-segmented-gap, 2px);
     padding: var(--forge-segmented-padding, 3px);
     border: 1px solid var(--forge-segmented-border, #d0d9ea);
-    border-radius: var(--forge-segmented-radius, 10px);
+    border-radius: var(--forge-control-radius, var(--forge-segmented-radius, 10px));
     background: var(--forge-segmented-background, #eef2f8);
 }
 .forge-segmented-control__option {
     min-height: var(--forge-segmented-option-height, 30px);
     padding: var(--forge-segmented-option-padding, 4px 16px);
     border: 0;
-    border-radius: var(--forge-segmented-option-radius, 7px);
+    border-radius: var(--forge-control-radius, var(--forge-segmented-option-radius, 7px));
     background: transparent;
     color: var(--forge-segmented-option-color, #607089);
     font-family: inherit;
@@ -264,6 +264,32 @@
     outline-offset: var(--forge-focus-offset, 2px);
 }
 
+/* Blueprint minimal actions follow the shared button corner and icon geometry. */
+:is(.agently-workspace[data-forge-theme], .agently-application[data-agently-theme]) .bp6-button.bp6-minimal:not(.forge-button) {
+    border-radius: var(--forge-control-radius, var(--agently-theme-control-radius, 8px));
+}
+:is(.agently-workspace[data-forge-theme], .agently-application[data-agently-theme]) .bp6-button.bp6-minimal:not(.forge-button):has(> :is(.bp6-icon, .forge-icon)):not(:has(.bp6-button-text)) {
+    box-sizing: border-box;
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
+    min-height: 28px;
+    padding: 0;
+    justify-content: center;
+}
+:is(.agently-workspace[data-forge-theme], .agently-application[data-agently-theme]) .bp6-button.bp6-minimal .bp6-icon svg {
+    width: var(--forge-icon-size, var(--agently-theme-icon-size, 16px));
+    height: var(--forge-icon-size, var(--agently-theme-icon-size, 16px));
+}
+@media (pointer: coarse) {
+    :is(.agently-workspace[data-forge-theme], .agently-application[data-agently-theme]) .bp6-button.bp6-minimal:not(.forge-button):has(> :is(.bp6-icon, .forge-icon)):not(:has(.bp6-button-text)) {
+        width: var(--forge-touch-target-min, 44px);
+        min-width: var(--forge-touch-target-min, 44px);
+        height: var(--forge-touch-target-min, 44px);
+        min-height: var(--forge-touch-target-min, 44px);
+    }
+}
+
 .agently-workspace[data-forge-theme] [data-forge-part="input"] {
     background-color: var(--forge-control-bg);
     color: var(--forge-control-text);
@@ -273,6 +299,16 @@
     border-radius: var(--forge-control-radius);
     min-height: var(--forge-control-height);
 
+}
+.agently-workspace[data-forge-theme] .bp6-date-input > .bp6-input {
+    box-sizing: border-box;
+    min-height: var(--forge-control-height);
+    border: var(--forge-border-width, 1px) solid var(--forge-control-border);
+    border-radius: var(--forge-control-radius);
+    padding-inline: var(--forge-control-padding-inline);
+    background-color: var(--forge-control-bg);
+    color: var(--forge-control-text);
+    box-shadow: none;
 }
 /* Explicit semantic roles own all five type properties. */
 .agently-workspace[data-forge-theme] [data-forge-part="input"]:not([data-forge-type]) {

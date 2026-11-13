@@ -71,7 +71,11 @@ export {default as WorkspaceRuntimeSurface, WorkspaceRuntimeTabs, WorkspaceRunti
 
 export {default as Typography, typographyProps, typographyRoles} from './Typography.jsx';
 export {default as Button, buttonVariants, buttonSizes} from './Button.jsx';
+export {default as StatusChip, statusChipTones} from './StatusChip.jsx';
 export {default as Icon, iconNames} from './Icon.jsx';
+export {default as AccessibleSection} from './AccessibleSection.jsx';
+export {SectionPattern, patternCatalog} from './patterns/index.js';
+export {FORGE_FORM_FACTOR_BREAKPOINTS, FORGE_RESPONSIVE_VARIABLES, forgeFormFactorForWidth} from './responsive.js';
 
 export {default as SelectControl} from './SelectControl.jsx';
 

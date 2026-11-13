@@ -1,8 +1,15 @@
 .forge-filter-chips{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .forge-filter-chips button,.forge-card-rail__controls button,.forge-content-carousel__previous,.forge-content-carousel__next{border:1px solid var(--forge-content-border,#dce0e7);border-radius:4px;background:var(--forge-content-surface,#fff);color:inherit;min-height:30px;padding:6px 12px;font:inherit;cursor:pointer}
-.forge-filter-chips button[aria-pressed=true]{border-color:var(--forge-content-accent,#009fda);background:var(--forge-content-selected,#e8f7fd)}
-.forge-filter-chips__count{margin-inline-start:6px;color:var(--forge-content-muted,#697b97)}
-.forge-filter-chips button:disabled,.forge-card-rail button:disabled,.forge-content-carousel button:disabled{cursor:default;opacity:.45}
+.forge-filter-chips button{min-height:32px;border-color:transparent;border-radius:var(--forge-radius-pill,999px);background:var(--forge-surface,var(--forge-content-surface,#fff));color:var(--forge-text,inherit)}
+.forge-filter-chips button[aria-pressed=true]{border-color:var(--forge-interaction-color,var(--forge-content-accent,#009fda));background:color-mix(in srgb,var(--forge-interaction-color,var(--forge-content-accent,#009fda)) 24%,var(--forge-surface,#fff));color:var(--forge-interaction-color,var(--forge-content-accent,#009fda))}
+.forge-filter-chips button:not(:disabled):not([aria-pressed=true]):hover{background:var(--forge-surface-subtle,var(--forge-content-selected,#e8f7fd))}
+.forge-filter-chips button:not(:disabled)[aria-pressed=true]:hover{background:color-mix(in srgb,var(--forge-interaction-color,var(--forge-content-accent,#009fda)) 26%,var(--forge-surface,#fff))}
+.forge-filter-chips__count{margin-inline-start:6px;color:inherit}
+.forge-filter-chips button:disabled{opacity:1;background:var(--forge-disabled-bg,var(--forge-surface-subtle,#eef2f8));color:var(--forge-disabled-text,#697b97)}
+.forge-filter-chips button:focus-visible{outline:var(--forge-focus-width,2px) solid var(--forge-focus-color,var(--forge-content-accent,#009fda));outline-offset:var(--forge-focus-offset,2px)}
+@media(pointer:coarse){.forge-filter-chips button{min-height:var(--forge-touch-target-min,44px)}}
+.forge-filter-chips button:disabled,.forge-card-rail button:disabled,.forge-content-carousel button:disabled{cursor:default}
+.forge-card-rail button:disabled,.forge-content-carousel button:disabled{opacity:.45}
 .forge-content-carousel{height:var(--forge-carousel-height,308px);position:relative;overflow:hidden;border:1px solid var(--forge-content-border,#dce0e7);border-radius:8px;background:var(--forge-carousel-background,#eef1f5);color:var(--forge-carousel-color,inherit);isolation:isolate}
 .forge-content-carousel__slide{position:absolute;inset:0}
 .forge-content-carousel__image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:right center;z-index:-1}
@@ -32,7 +39,7 @@
 .forge-content-card dl{margin:0}.forge-content-card dl>div{display:flex;justify-content:space-between;gap:8px;margin-top:8px}
 .forge-content-card dt{color:var(--forge-content-muted,#697b97)}.forge-content-card dd{margin:0;font-weight:600}
 .forge-content-card__tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:12px}.forge-content-card__tags>span{border:1px solid var(--forge-content-border,#e8eaef);border-radius:3px;padding:2px 5px;font-size:10px}
-.forge-content-card__open:focus-visible,.forge-content-carousel button:focus-visible,.forge-card-rail button:focus-visible,.forge-filter-chips button:focus-visible{outline:2px solid var(--forge-content-accent,#009fda);outline-offset:-2px}
+.forge-content-card__open:focus-visible,.forge-content-carousel button:focus-visible,.forge-card-rail button:focus-visible{outline:2px solid var(--forge-content-accent,#009fda);outline-offset:-2px}
 @media(max-width:599px){.forge-content-carousel__copy{inset-inline-start:40px;inset-block:24px;width:calc(100% - 80px);max-width:none}.forge-content-carousel h2{font-size:28px}.forge-card-rail{padding:16px}.forge-card-rail__header{margin-bottom:16px}}
 .forge-content-carousel__graphic{position:absolute;inset-block:0;left:var(--forge-carousel-graphic-start,60%);right:0;display:flex;align-items:center;justify-content:flex-end;overflow:hidden;mask-image:linear-gradient(to right,transparent 0%,#000 40%);pointer-events:none}
 .forge-content-carousel__graphic-image{height:100%;width:auto;max-width:none;flex-shrink:0}
