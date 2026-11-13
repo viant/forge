@@ -68,6 +68,7 @@ export default defineConfig({
       'src/components/FormPanel.sizing.render.test.jsx',
       'src/components/table/basic/Toolbar.crossSource.render.test.jsx',
       'src/components/readerWorkbench/ReaderWorkbenchPanel.render.test.jsx',
+      'src/components/readerWorkbench/ReaderBuilder.conflict.test.js',
       'src/components/readerWorkbench/ReaderPreviewParameters.render.test.jsx',
       'src/components/readerWorkbench/ReaderCacheDialog.render.test.jsx',
       'src/components/readerWorkbench/ReaderFieldDialog.draft.render.test.jsx',

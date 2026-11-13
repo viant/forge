@@ -202,7 +202,7 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
         operation,
       });
     } catch (cause) {
-      if (cause?.code === 'conflict') setConflict(cause);
+      if (isReaderRevisionConflict(cause)) setConflict(cause);
       throw cause;
     }
     if (!result?.applied) {
@@ -697,4 +697,8 @@ function commandChangesColumns(operation) {
 
 export function ReaderBuilder(props) {
  return <div data-forge-primitive="readerWorkbench"><ReaderWorkbenchView {...props}/></div>;
+}
+
+export function isReaderRevisionConflict(cause) {
+  return cause?.code === 'conflict' && cause?.field === 'sourceRevision';
 }
