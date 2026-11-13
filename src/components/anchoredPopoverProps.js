@@ -1,6 +1,26 @@
 // Shared geometry for anchored panels, including library-owned Select popovers.
 export const FLOATING_PANEL_PADDING = 12;
 export const FLOATING_PANEL_GAP = 8;
+export const DROPDOWN_MENU_MAX_WIDTH = 320;
+
+function menuMinWidth(state) {
+    const viewport = state.elements.popper.ownerDocument.documentElement.clientWidth;
+    const referenceWidth = state.rects?.reference?.width ?? state.elements.reference.getBoundingClientRect().width;
+    return `${Math.max(0, Math.min(referenceWidth, DROPDOWN_MENU_MAX_WIDTH, viewport - FLOATING_PANEL_PADDING * 2))}px`;
+}
+
+// Let menu content grow beyond the trigger while retaining a usable lower bound.
+export const menuTriggerMinWidthModifier = {
+    name: 'forgeMenuTriggerMinWidth',
+    enabled: true,
+    phase: 'beforeWrite',
+    requires: ['computeStyles'],
+    fn: ({state}) => { state.styles.popper.minWidth = menuMinWidth(state); },
+    effect: ({state}) => {
+        state.elements.popper.style.minWidth = menuMinWidth(state);
+        return () => { state.elements.popper.style.minWidth = ''; };
+    },
+};
 
 export function anchoredPopoverProps({placement = 'bottom-start', popoverClassName = '', modifiers = {}, ...props} = {}) {
     const alignment = placement.split('-')[1];

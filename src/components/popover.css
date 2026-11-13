@@ -12,3 +12,8 @@
     overflow: auto;
     overscroll-behavior: contain;
 }
+.forge-dropdown-menu.bp6-popover { min-width: 100%; max-width: min(320px, calc(100dvw - 24px)); }
+.forge-dropdown-menu > .bp6-popover-content { width: 100%; overflow: hidden; }
+.forge-dropdown-menu .bp6-menu { box-sizing: border-box; min-width: 100%; width: max-content; max-width: 100%; padding-inline: 0; }
+.forge-dropdown-menu .bp6-menu-item { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+.forge-dropdown-menu .bp6-menu-item .bp6-text-overflow-ellipsis { overflow: visible; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }

@@ -2,6 +2,7 @@ import React, {createContext, useContext, useEffect, useLayoutEffect, useMemo, u
 import {Classes, PortalProvider} from '@blueprintjs/core';
 
 const ThemeContext = createContext(null);
+export const useForgeTheme = () => useContext(ThemeContext);
 const useClientLayoutEffect = typeof document === 'undefined' ? useEffect : useLayoutEffect;
 
 // The host owns selection and asset loading. Forge owns DOM/portal propagation.

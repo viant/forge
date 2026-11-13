@@ -108,6 +108,24 @@
     line-height: var(--forge-type-metadata-line-height, 16px);
     white-space: nowrap;
 }
+.forge-count-badge {
+    display: inline-grid;
+    place-items: center;
+    width: fit-content;
+    min-width: 20px;
+    min-height: 20px;
+    padding-inline: var(--forge-spacing-1, 4px);
+    border: 0;
+    border-radius: var(--forge-radius-pill, 999px);
+    background: var(--forge-surface-subtle, var(--forge-surface));
+    color: var(--forge-text-secondary, var(--forge-text));
+    font-family: var(--forge-type-caption-family, var(--forge-font-family, inherit));
+    font-size: var(--forge-type-caption-size, 11px);
+    font-weight: var(--forge-type-label-weight, 600);
+    line-height: var(--forge-type-caption-line-height, 16px);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
 :is(.agently-workspace, .agently-application) :is(.bp6-callout, .bp6-tag)[data-forge-status] { background: var(--forge-status-bg); color: var(--forge-status-fg); box-shadow: none; }
 .bp6-callout[data-forge-status] { padding: var(--forge-spacing-4, 16px); border-radius: var(--forge-radius-surface, 12px); }
 .bp6-callout[data-forge-status] .bp6-heading { color: inherit; }
@@ -122,11 +140,19 @@
 :is(.agently-workspace, .agently-application) .bp6-menu-item {
     border-radius: var(--forge-control-radius, 8px);
 }
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) :is(.bp6-date-input-popover > .bp6-popover-content, .bp6-popover .bp6-menu, .bp6-menu-item) {
+    border-radius: var(--forge-menu-radius, var(--forge-control-radius, 8px));
+}
 :is(.agently-workspace, .agently-application) .bp6-date-input-popover > .bp6-popover-content {
     overflow: hidden;
     background: var(--forge-surface-raised, var(--forge-surface));
     color: var(--forge-text);
 }
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .bp6-date-input-popover .bp6-popover-arrow { display: none; }
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .bp6-date-input-popover { max-width: min(320px, calc(100dvw - 24px)); }
+/* Native calendar dialogs follow the selected theme, even when the OS prefers Dark. */
+:is(.agently-workspace[data-forge-theme="design-system-2"][data-forge-color-mode="light"], .agently-application[data-agently-theme="design-system-2"][data-agently-color-mode="light"]) :is(input[type="date"], input[type="datetime-local"], input[type="month"], input[type="week"], .bp6-date-input-popover) { color-scheme: light; }
+:is(.agently-workspace[data-forge-theme="design-system-2"][data-forge-color-mode="dark"], .agently-application[data-agently-theme="design-system-2"][data-agently-color-mode="dark"]) :is(input[type="date"], input[type="datetime-local"], input[type="month"], input[type="week"], .bp6-date-input-popover) { color-scheme: dark; }
 :is(.agently-workspace, .agently-application) .bp6-date-input-popover .bp6-datepicker {
     background: var(--forge-surface-raised, var(--forge-surface));
     color: var(--forge-text);
@@ -137,6 +163,9 @@
 }
 :is(.agently-workspace, .agently-application) .bp6-date-input-popover .rdp-day {
     border-radius: var(--forge-control-radius, 8px);
+}
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .bp6-date-input-popover .rdp-day {
+    border-radius: var(--forge-menu-radius, var(--forge-control-radius, 8px));
 }
 :is(.agently-workspace, .agently-application) .bp6-date-input-popover .rdp-day:not([disabled], .rdp-day_selected):is(:hover, :focus) {
     background: var(--forge-surface-subtle);
@@ -150,6 +179,17 @@
 :is(.agently-workspace, .agently-application) .bp6-menu-item:not(.bp6-disabled):is(:hover, :focus) {
     background: var(--forge-surface-subtle);
 }
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .bp6-menu-item:not(.bp6-disabled):is(:hover, :focus, .bp6-active) {
+    background: var(--forge-menu-hover-background, var(--forge-surface-subtle));
+}
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .bp6-menu-item.bp6-selected,
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .bp6-menu-item[aria-selected="true"] {
+    background: var(--forge-menu-selected-background, var(--forge-selected-background));
+    color: var(--forge-text);
+}
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .bp6-menu-item .bp6-menu-item-selected-icon { display: none; }
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .bp6-menu-item.bp6-menu-item-is-selectable,
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .bp6-menu-item.bp6-menu-item-is-selectable.bp6-selected { padding-inline-start: var(--forge-spacing-3, 12px); }
 .forge-segmented-control[data-forge-type] { border-color: transparent; background: var(--forge-surface-subtle); gap: var(--forge-spacing-1, 4px); }
 .forge-segmented-control__option[data-forge-type] { transition-property: background-color, color, border-color; transition-duration: var(--forge-motion-fast, 120ms); transition-timing-function: var(--forge-motion-easing); }
 .forge-segmented-control__option[data-forge-type][aria-pressed="true"] { background: var(--forge-surface); color: var(--forge-interaction-color); font-weight: inherit; box-shadow: 0 1px 2px color-mix(in srgb, var(--forge-text) 8%, transparent); }

@@ -447,7 +447,7 @@
   position: relative;
   border-radius: 14px;
   padding: 10px 14px;
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--forge-text, rgb(0 0 0)) 8%, transparent);
+  box-shadow: 0 0 0 1px var(--forge-chat-bubble-border, transparent), 0 1px 3px color-mix(in srgb, var(--forge-text, rgb(0 0 0)) 8%, transparent);
   max-width: 80%;
   word-break: break-word;
   font-size: 0.9rem;
@@ -461,12 +461,13 @@
 }
 
 .chat-user {
-  background: var(--forge-selected-background);
-  color: var(--forge-text);
+  background: var(--forge-chat-user-background, var(--forge-selected-background));
+  color: var(--forge-chat-user-text, var(--forge-text));
 }
 
 .chat-bot {
-  background: var(--forge-surface-subtle);
+  background: var(--forge-chat-assistant-background, var(--forge-surface-subtle));
+  color: var(--forge-chat-assistant-text, inherit);
 }
 
 .chat-tool {
@@ -477,6 +478,7 @@
   width: 24px;
   height: 24px;
   border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--forge-chat-avatar-border, transparent);
   flex: none;
   margin-right: 6px;
   margin-top: 2px;
@@ -572,3 +574,10 @@
 }
 
 .chat-row.user,.chat-row.assistant,.chat-row.tool{ justify-content:flex-start;}
+
+/* Document conversations use one filled user message and an unboxed response. */
+.chat-row.is-document > div { width: 100%; min-width: 0; }
+.chat-row.is-document.user > div { justify-content: flex-end; }
+.chat-row.is-document .chat-bubble { max-width: 88%; padding: 10px 16px; border-radius: var(--forge-radius-surface, 16px); font: inherit; line-height: inherit; }
+.chat-row.is-document:not(.user) .chat-bubble { width: 100%; max-width: 100%; padding: 0; background: transparent; box-shadow: none; }
+.chat-row.is-document:not(.user) .chat-bubble::after { display: none; }

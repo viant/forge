@@ -18,7 +18,7 @@ export const componentCatalog = Object.freeze([
     entry('Button', 'actions', 'live', ['Primary', 'Secondary', 'Ghost', 'Link', 'Danger', 'Disabled', 'Loading'], ['Click', 'Keyboard focus', 'Busy feedback'], '#foundation-actions'),
     entry('Icon button', 'actions', 'live', ['Default', 'Compact icon', 'Ghost', 'Legacy minimal'], ['Square target', 'Hover', 'Keyboard focus', 'Touch target'], '#foundation-actions'),
     entry('Segmented choice', 'actions', 'live', ['Selected', 'Unselected', 'Disabled'], ['Single selection', 'Keyboard focus'], '#foundation-form'),
-    entry('Dropdown menu', 'actions', 'live', ['Enabled item', 'Disabled item'], ['Open', 'Choose', 'Escape', 'Keyboard focus'], '#ds2-menu'),
+    entry('Dropdown menu', 'actions', 'live', ['Action', 'Selected option', 'Trigger width', 'Long option', 'Disabled item'], ['Open', 'Choose', 'Escape', 'Keyboard focus'], '#ds2-menu'),
     entry('Toolbar', 'actions', 'review', ['Table controls', 'Composer controls'], ['Grouping', 'Responsive overflow'], '#foundation-data'),
 
     entry('Text field', 'forms', 'live', ['Default', 'Disabled', 'Invalid'], ['Type', 'Focus', 'Validation'], '#foundation-form'),
@@ -30,7 +30,7 @@ export const componentCatalog = Object.freeze([
     entry('Switch', 'forms', 'live', ['On', 'Off'], ['Toggle', 'Space key'], '#foundation-form'),
     entry('Radio choice', 'forms', 'live', ['Daily', 'Weekly'], ['Single selection', 'Keyboard focus'], '#foundation-form'),
     entry('Search field', 'forms', 'live', ['Empty', 'Query'], ['Filter rows', 'Clear'], '#foundation-data'),
-    entry('Date range', 'forms', 'review', ['Start', 'End', 'Preset'], ['Choose range', 'Validate order']),
+    entry('Date range', 'forms', 'live', ['Preset', 'Custom dates'], ['Choose range', 'Validate order', 'Match Light and Dark'], '#ds2-menu'),
     entry('Lookup', 'forms', 'review', ['Single', 'Multiple'], ['Search', 'Select', 'Clear']),
     entry('File input', 'forms', 'review', ['Idle', 'Uploading', 'Failed', 'Ready'], ['Choose', 'Drop', 'Retry', 'Remove'], '#foundation-overlays'),
 
@@ -40,7 +40,7 @@ export const componentCatalog = Object.freeze([
     entry('Progress', 'status', 'review', ['Inline meter', 'Legacy full bar', 'Full-width proposal'], ['Announce value', 'Update'], '#ds2-loading'),
     entry('Skeleton', 'status', 'review', ['Loading placeholder', 'Visibility proposal'], ['Loading announcement', 'Reduced motion'], '#ds2-loading'),
     entry('Empty state', 'status', 'live', ['Empty table', 'Error', 'Loading'], ['Recovery action', 'State announcement'], '#foundation-data'),
-    entry('Count badge', 'status', 'planned', ['Single digit', 'Overflow'], ['Read count'], '#ds2-filter-chips'),
+    entry('Count badge', 'status', 'live', ['Single digit', 'Overflow'], ['Read count'], '#ds2-filter-chips'),
 
     entry('Section tabs', 'navigation', 'live', ['Selected', 'Hover', 'Overflow'], ['Choose tab', 'Arrow keys', 'Scroll'], '#foundation-actions'),
     entry('Pagination', 'navigation', 'review', ['Previous', 'Next', 'Page size'], ['Navigate pages', 'Announce page'], '#foundation-data'),

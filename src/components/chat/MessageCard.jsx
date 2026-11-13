@@ -172,10 +172,10 @@ function messageTestID(msg, fallbackIndex, suffix) {
     return suffix ? `${base}-${suffix}` : base;
 }
 
-export default function MessageCard({ msg, context, resolveIcon, messageIndex = 0 }) {
+export default function MessageCard({ msg, context, resolveIcon, messageIndex = 0, appearance }) {
     const avatarColour =
         msg.role === "user"
-            ? "var(--forge-selected-background)"
+            ? "var(--forge-chat-user-background, var(--forge-selected-background))"
             : msg.role === "assistant"
                 ? "var(--forge-surface-subtle)"
                 : "var(--forge-status-warning-background)";
@@ -199,17 +199,17 @@ export default function MessageCard({ msg, context, resolveIcon, messageIndex = 
 
     return (
         <div
-            className={`chat-row ${msg.role}`}
+            className={`chat-row ${msg.role}${appearance === 'document' ? ' is-document' : ''}`}
             data-testid={messageTestID(msg, messageIndex, 'row')}
         >
             <div style={{ display: "flex", alignItems: "flex-start" }}>
-                <div
+                {appearance === 'document' ? null : <div
                     className="avatar"
                     style={{ background: avatarColour, display: 'flex', alignItems:'center', justifyContent:'center' }}
                     data-testid={messageTestID(msg, messageIndex, 'avatar')}
                 >
-                    <AvatarIcon name={iconName} size={14} color={"var(--black)"} weight="fill" />
-                </div>
+                    <AvatarIcon name={iconName} size={14} color={"var(--forge-chat-avatar-icon, var(--black))"} weight="fill" />
+                </div>}
                 <div
                     className={bubbleClass}
                     data-ts={formatDate(new Date(msg.createdAt), "HH:mm")}

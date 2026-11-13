@@ -2,10 +2,10 @@ import React, {useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {Menu, MenuItem} from '@blueprintjs/core';
 import '@blueprintjs/core/lib/css/blueprint.css';
-import '../../packs/blueprint/index.jsx';
+import {DateRangePresetInput} from '../../packs/blueprint/index.jsx';
 import {ForgeThemeBoundary, ForgeThemeProvider} from '../../components/ThemeBoundary.jsx';
 import Button from '../../components/Button.jsx';
-import Popover from '../../components/Popover.jsx';
+import DropdownMenu from '../../components/DropdownMenu.jsx';
 import MessageCard from '../../components/chat/MessageCard.jsx';
 import Composer from '../../components/chat/Composer.jsx';
 import FoundationSpecimen from './FoundationSpecimen.jsx';
@@ -19,6 +19,7 @@ import ProgressBar from '../../components/control/ProgressBar.jsx';
 import SoftSkeleton from '../../components/SoftSkeleton.jsx';
 import FilterChips from '../../components/content/FilterChips.jsx';
 import StatusChip from '../../components/StatusChip.jsx';
+import CountBadge from '../../components/CountBadge.jsx';
 import './ds2LibraryPreview.css';
 import '../../components/chat.css';
 
@@ -54,11 +55,19 @@ const messages = [
     {id: 'review-user', role: 'user', content: 'Which campaigns need attention?', createdAt: '2026-11-12T10:00:00Z'},
     {id: 'review-assistant', role: 'assistant', content: 'I found three pacing risks. The first campaign needs an approval before launch.', createdAt: '2026-11-12T10:00:01Z'},
 ];
+const calendarOptions = [
+    {value: 'recent', label: 'Recent period', range: {start: '2026-11-06', end: '2026-11-12'}},
+    {value: 'previous', label: 'Previous period', range: {start: '2026-10-30', end: '2026-11-05'}},
+    {value: 'custom', label: 'Custom dates'},
+];
 
 function App() {
     const [mode, setMode] = useState('light');
     const [draft, setDraft] = useState('');
     const [menuChoice, setMenuChoice] = useState('No action selected');
+    const [viewChoice, setViewChoice] = useState('List view');
+    const [periodChoice, setPeriodChoice] = useState('recent');
+    const [periodRange, setPeriodRange] = useState(calendarOptions[0].range);
     const [currentFilters, setCurrentFilters] = useState(['active']);
     const filterOptions = [
         {value: 'active', label: 'Active', count: 12},
@@ -106,25 +115,43 @@ function App() {
                     <p>Status is a label; filters are controls; counts are tallies. These examples use the shared semantic component recipes.</p>
                     <div className="ds2-library__chip-grid">
                         <div><h3>Status labels</h3><div className="ds2-library__chip-row"><StatusChip tone="success">Active</StatusChip><StatusChip tone="warning">Pending</StatusChip><StatusChip tone="neutral">Archived</StatusChip></div></div>
-                        <div><h3>Count badge candidate</h3><div className="ds2-library__count-examples"><span>Approvals <span className="ds2-library__count-badge">4</span></span><span>Messages <span className="ds2-library__count-badge">99+</span></span></div><p className="ds2-library__candidate-note">Visual proposal. Shared component pending review.</p></div>
+                        <div><h3>Count badges</h3><div className="ds2-library__count-examples"><span>Approvals <CountBadge count={4}/></span><span>Messages <CountBadge count={132}/></span></div><p className="ds2-library__candidate-note">Numeric tallies use one shared recipe. The label names what is counted.</p></div>
                         <div><h3>Interactive filters</h3><FilterChips aria-label="Example filters" value={currentFilters} options={filterOptions} onChange={setCurrentFilters}/></div>
                     </div>
                 </section>
                 <section className="ds2-library__family" id="ds2-menu" aria-label="Action menu">
                     <h2>Action menu</h2>
-                    <p>Open the menu to inspect item spacing, disabled state, focus, and the overlay surface.</p>
-                    <Popover content={<Menu aria-label="Campaign actions">
-                        <MenuItem text="Open campaign" onClick={() => setMenuChoice('Open campaign selected')}/>
-                        <MenuItem text="Duplicate campaign" onClick={() => setMenuChoice('Duplicate campaign selected')}/>
-                        <MenuItem text="Export data" disabled/>
-                    </Menu>}><Button variant="secondary">Campaign actions</Button></Popover>
-                    <span role="status">{menuChoice}</span>
+                    <p>Actions execute immediately; view options keep their selection. Every dropdown shares the same full-width row hover, rounded surface, and keyboard behavior.</p>
+                    <div className="ds2-library__menu-examples">
+                        <DropdownMenu content={<Menu aria-label="Quick actions">
+                            <MenuItem text="Open" onClick={() => setMenuChoice('Open selected')}/>
+                            <MenuItem text="Copy" onClick={() => setMenuChoice('Copy selected')}/>
+                        </Menu>}><Button variant="secondary">Quick actions</Button></DropdownMenu>
+                        <DropdownMenu content={<Menu aria-label="View options" role="listbox">
+                            {['List view', 'Grid view'].map(option => <MenuItem key={option} text={option} roleStructure="listoption" selected={viewChoice === option} onClick={() => setViewChoice(option)}/>)}
+                        </Menu>}><Button variant="secondary">View options</Button></DropdownMenu>
+                        <DropdownMenu content={<Menu aria-label="Item actions">
+                            <MenuItem text="Open item" onClick={() => setMenuChoice('Open item selected')}/>
+                            <MenuItem text="Duplicate item" onClick={() => setMenuChoice('Duplicate item selected')}/>
+                            <MenuItem text="Review item details and supporting information" onClick={() => setMenuChoice('Review details selected')}/>
+                            <MenuItem text="Export data" disabled/>
+                        </Menu>}><Button variant="secondary">Item actions</Button></DropdownMenu>
+                    </div>
+                    <span role="status">{menuChoice} · {viewChoice} selected</span>
+                    <div className="ds2-library__calendar-example">
+                        <h3>Calendar menu</h3>
+                        <p>Choose a period or enter custom dates. The popup and native calendar follow the selected Light or Dark theme.</p>
+                        <DateRangePresetInput item={{id: 'review-period', label: 'Review period'}} value={periodChoice} range={periodRange}
+                            options={calendarOptions} customApplyEnabled
+                            onPresetRequest={option => {setPeriodChoice(option.value); setPeriodRange(option.range); return true;}}
+                            onRangeChange={range => {setPeriodChoice('custom'); setPeriodRange(range);}}/>
+                    </div>
                 </section>
                 <section className="ds2-library__family" id="ds2-chat" aria-label="Chat thread">
                     <h2>Chat thread</h2>
                     <p>Forge message and composer primitives shown together. Agently owns their final shell composition.</p>
                     <div className="forge-document-chat ds2-library__conversation">
-                        {messages.map((message, index) => <MessageCard key={message.id} msg={message} messageIndex={index}/>)}
+                        {messages.map((message, index) => <MessageCard key={message.id} msg={message} messageIndex={index} appearance="document"/>)}
                         <Composer appearance="document" draftKey="ds2-review" draftValue={draft} onDraftChange={setDraft} onSubmit={() => setDraft('')}/>
                     </div>
                 </section>
