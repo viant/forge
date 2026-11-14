@@ -3,7 +3,7 @@ import donutFixture from '../../../doc/examples/donut-center.json';
 import signedRangeFixture from '../../../doc/examples/category-range-signed.json';
 import rangeFixture from '../../../doc/examples/category-range.json';
 import heatmapFixture from '../../../doc/examples/categorical-heatmap.json';
-import React, {useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {signal} from '@preact/signals-react';
 import Chart from '../../components/Chart.jsx';
 import Typography, {typographyProps} from '../../components/Typography.jsx';
@@ -11,6 +11,7 @@ import SelectControl from '../../components/SelectControl.jsx';
 import './chartSpecimen.css';
 import {buildExplicitReportBuilderChartContainer} from '../../components/dashboard/reportBuilderUtils.js';
 import {resolveReportRuntimeChartRowLimit} from '../../components/chartAppearance.js';
+import {useForgeTheme} from '../../components/ThemeBoundary.jsx';
 
 const days = ['2026-01-01', '2026-01-02', '2026-01-03', '2026-01-04', '2026-01-05'];
 const rows = days.map((date, index) => ({date, first: [12, 18, 14, 22, 16][index], second: [8, 11, 9, 14, 12][index]}));
@@ -33,7 +34,26 @@ export const chartExamples = [
 ];
 
 export function ChartExample({example, state = 'populated', onSelect}) {
-    const chart = example.chartSpec ? {...buildExplicitReportBuilderChartContainer({},example.config,{},example.chartSpec).chart,rowLimit:resolveReportRuntimeChartRowLimit(example)} : example.chart;
+    const ref=useRef(null),theme=useForgeTheme();
+    const [colors,setColors]=useState(null);
+    useEffect(()=>{
+        const css=ref.current&&getComputedStyle(ref.current);
+        if(!css)return;
+        const palette=Array.from({length:6},(_,index)=>css.getPropertyValue(`--forge-chart-series-${index+1}`).trim());
+        const surface=css.getPropertyValue('--forge-chart-surface').trim();
+        const noData=css.getPropertyValue('--forge-disabled-text').trim();
+        if([...palette,surface,noData].every(value=>/^#[0-9a-f]{6}$/i.test(value)))setColors({palette,surface,noData});
+    },[theme?.themeId,theme?.mode]);
+    // These authored specimens use the loaded library palette. The renderer's
+    // explicit producer palette contract and independent source fixtures stay intact.
+    const authored=example.chartSpec ? {...buildExplicitReportBuilderChartContainer({},example.config,{},example.chartSpec).chart,rowLimit:resolveReportRuntimeChartRowLimit(example)} : example.chart;
+    const chart=useMemo(()=>{
+        if(!colors)return authored;
+        const {palette,surface,noData}=colors;
+        return {...authored,paletteMode:undefined,series:{...authored.series,palette,categoryColors:undefined},
+            ...(authored.categoryRange?{categoryRange:{...authored.categoryRange,series:authored.categoryRange.series.map((entry,index)=>({...entry,color:palette[index%palette.length]}))}}:{}),
+            ...(authored.heatmap?{heatmap:{...authored.heatmap,noData:{...authored.heatmap.noData,color:noData},colorScale:{...authored.heatmap.colorScale,colors:authored.heatmap.colorScale.type==='diverging'?[palette[3],surface,palette[0]]:[surface,palette[0]]}}}:{})};
+    },[example,colors]);
     if (!chart?.type) throw new Error(`No chart model for ${example.id}`);
     const context = useMemo(() => {
         let data = example.rows;
@@ -42,7 +62,7 @@ export function ChartExample({example, state = 'populated', onSelect}) {
         const signals = {collection:signal(data),control:signal({loading:state==='loading',error:state==='error'?'Example chart could not load. Try again.':null}),selection:signal({}),input:signal({})};
         return {signals};
     }, [example, state]);
-    return <Chart key={state} container={{...(example.centerRows?{centerRows:["empty","loading","error"].includes(state)?[]:example.centerRows,centerInputs:example.centerInputs}:{}),id:`chart-example-${example.id}`,title:example.title,chart:{appearance:'document',showControls:false,...chart}}} context={context} embedded onDatumSelect={onSelect}/>;
+    return <div ref={ref} className="forge-chart-example"><Chart key={state} container={{...(example.centerRows?{centerRows:["empty","loading","error"].includes(state)?[]:example.centerRows,centerInputs:example.centerInputs}:{}),id:`chart-example-${example.id}`,title:example.title,chart:{appearance:'document',showControls:false,...chart}}} context={context} embedded onDatumSelect={onSelect}/></div>;
 }
 
 export default function ChartSpecimen() {

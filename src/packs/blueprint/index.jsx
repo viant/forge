@@ -5,6 +5,8 @@ import {useRegisteredControlActions} from '../../runtime/useRegisteredControlAct
 import {isLiveControlVisible,validateWidgetControlValue} from '../../core/ui/controlActions.js';
 import Typography, {typographyProps} from '../../components/Typography.jsx';
 import ForgeButton from '../../components/Button.jsx';
+import Popover from '../../components/Popover.jsx';
+import CalendarDropdown from './CalendarDropdown.jsx';
 import {useForgeTheme} from '../../components/ThemeBoundary.jsx';
 import {preserveSelectExternalFocus} from './selectCloseFocus.js';
 import {inheritFieldTrackSelectTokens} from './selectPortalTokens.js';
@@ -23,14 +25,17 @@ import './theme.css';
 import React from 'react';
 import {batch} from '@preact/signals-react';
 import {fileToMCPBlob} from './fileBlob.js';
-import {createPortal, flushSync} from 'react-dom';
+import {flushSync} from 'react-dom';
 import {
     InputGroup,
     Checkbox,
     Switch,
     Button,
     Icon,
+    Menu,
     MenuItem,
+    OverflowList,
+    Tag,
     TextArea,
     RadioGroup,
     Radio,
@@ -39,7 +44,6 @@ import {
     Tooltip,
     AnchorButton,
     FileInput,
-    Portal,
 } from '@blueprintjs/core';
 import TextLookup from './TextLookup.jsx';
 import { Select, MultiSelect } from '@blueprintjs/select';
@@ -53,7 +57,7 @@ import { registerWidget } from '../../runtime/widgetRegistry.jsx';
 import { registerEventAdapter } from '../../runtime/binding.js';
 import { registerClassifier } from '../../runtime/widgetClassifier.js';
 import { buildDateProps } from './dateUtils.js';
-import { normalizeDateInputValue, serializeDateInputValue } from './civilDate.js';
+import { normalizeDateInputValue, parseCivilDateInput, serializeDateInputValue } from './civilDate.js';
 import { registerWrapper } from '../../runtime/wrapperRegistry.js';
 import TreeMultiSelect from '../../components/TreeMultiSelect.jsx';
 import MarkdownView from '../../components/MarkdownView.jsx';
@@ -166,10 +170,6 @@ const formatDateRangeDay = (value) => {
     }).format(parsed);
 };
 
-function DateRangePresetPortal({themed, children}) {
-    return themed ? <Portal>{children}</Portal> : createPortal(children, document.body);
-}
-
 export function DateRangePresetInput({
     value = '',
     onChange,
@@ -200,7 +200,6 @@ export function DateRangePresetInput({
     const [open, setOpen] = React.useState(false);
     const [presetRequestError, setPresetRequestError] = React.useState('');
     const triggerRef = React.useRef(null);
-    const [popupPosition, setPopupPosition] = React.useState({top: 0, left: 0});
     const windowForm = controlled ? {[startField]: range.start, [endField]: range.end} : context?.signals?.windowForm?.value || {};
     const metrics = context?.signals?.metrics?.value || context?.signals?.metrics?.peek?.() || {};
     const resolvedTimeZone = timeZoneSelector
@@ -298,52 +297,25 @@ export function DateRangePresetInput({
             return choosePreset(option,true);
         }}
     }),`${disabled}:${readOnly}:${open}`);
-    const updatePopupPosition = React.useCallback(() => {
-        const rect = triggerRef.current?.getBoundingClientRect?.();
-        if (!rect || typeof window === 'undefined') return;
-        const width = Math.min(360, Math.max(280, window.innerWidth - 32));
-        setPopupPosition({
-            top: Math.min(rect.bottom + 6, Math.max(16, window.innerHeight - 430)),
-            left: Math.max(16, Math.min(rect.right - width, window.innerWidth - width - 16)),
-        });
-    }, []);
-    React.useLayoutEffect(() => {
-        if (!open || typeof window === 'undefined') return undefined;
-        updatePopupPosition();
-        window.addEventListener('resize', updatePopupPosition);
-        window.addEventListener('scroll', updatePopupPosition, true);
-        return () => {
-            window.removeEventListener('resize', updatePopupPosition);
-            window.removeEventListener('scroll', updatePopupPosition, true);
-        };
-    }, [open, updatePopupPosition]);
-
-    return (
-        <div className="forge-date-range-preset" style={{position: 'relative', minWidth: 0, width: '100%'}}>
-            <Button
-                ref={triggerRef}
-                type="button"
-                rightIcon={open ? 'chevron-up' : 'chevron-down'}
-                aria-haspopup="dialog"
-                aria-expanded={open}
-                disabled={readOnly || disabled}
-                onClick={toggleOpen}
-                style={{width: '100%', justifyContent: 'space-between'}}
-            >
-                {triggerLabel}
-            </Button>
-            {controlled && presetPending && <span role="status">Resolving date preset…</span>}
-            {presetRequestError && <span role="alert">{presetRequestError}</span>}
-            {open && typeof document !== 'undefined' ? <DateRangePresetPortal themed={themedCalendar}>
+    const renderCustomCalendar = (edge, label) => <DateInput3
+        {...buildDateProps({type:'date',dateFnsFormat:'yyyy-MM-dd',valueMode:'civil'}, {properties:{
+            inputProps:{'aria-label':label,leftIcon:<SharedIcon name="lucide:calendar" className="bp6-icon"/>},
+            ...(edge === 'start' && customDraft.end ? {maxDate:parseCivilDateInput(customDraft.end)} : {}),
+            ...(edge === 'end' && customDraft.start ? {minDate:parseCivilDateInput(customDraft.start)} : {}),
+        }})}
+        timezone="UTC" value={normalizeDateInputValue(customDraft[edge], 'civil') || null}
+        canClearSelection={false}
+        dayPickerProps={{components:{Dropdown:CalendarDropdown},classNames:{day:'rdp-day bp6-popover-dismiss'}}}
+        popoverProps={anchoredPopoverProps({minimal:true,captureDismiss:true,shouldReturnFocusOnClose:false})}
+        onError={() => {onDraftChange?.();setCustomDraft(previous => ({...previous,[edge]:''}));}}
+        onChange={(next,isUserChange) => {if(isUserChange){onDraftChange?.();setCustomDraft(previous => ({...previous,[edge]:serializeDateInputValue(next,'civil')}));}}}/>;
+    const ApplyButton = themedCalendar ? ForgeButton : Button;
+    const panel = (
                 <div
                     className={themedCalendar ? 'forge-date-range-preset-menu' : undefined}
                     role="dialog"
                     aria-label={`${item?.label || 'Date range'} options`}
                     style={{
-                        position: 'fixed',
-                        top: popupPosition.top,
-                        left: popupPosition.left,
-                        zIndex: 3000,
                         width: 360,
                         maxWidth: 'min(360px, calc(100vw - 32px))',
                         border: themedCalendar ? 'var(--forge-border-width, 1px) solid var(--forge-border-color)' : '1px solid #d7dbe5',
@@ -355,47 +327,43 @@ export function DateRangePresetInput({
                         padding: 12,
                     }}
                 >
-                    <div style={{display: 'grid', gridTemplateColumns: themedCalendar ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))', gap: themedCalendar ? 0 : 6}}>
-                        {options.filter((option) => String(option.value).toLowerCase() !== 'custom').map((option) => (
-                            <Button
-                                key={option.value}
-                                type="button"
-                                className={themedCalendar ? `forge-date-range-preset-option${String(option.value) === String(value) ? ' is-selected' : ''}` : undefined}
-                                minimal={themedCalendar || String(option.value) !== String(value)}
-                                intent={!themedCalendar && String(option.value) === String(value) ? 'primary' : 'none'}
-                                alignText="left"
-                                aria-pressed={themedCalendar ? String(option.value) === String(value) : undefined}
-                                disabled={option.disabled === true || controlled && typeof onPresetRequest !== 'function'}
-                                onClick={() => choosePreset(option)}
-                            >
-                                {option.label}
-                            </Button>
-                        ))}
-                    </div>
+                    {themedCalendar ? <Menu role="listbox" aria-label="Date presets">
+                        {options.filter(option => String(option.value).toLowerCase() !== 'custom').map(option => <MenuItem
+                            key={option.value} text={option.label} roleStructure="listoption"
+                            selected={String(option.value) === String(value)} shouldDismissPopover={false}
+                            disabled={option.disabled === true || controlled && typeof onPresetRequest !== 'function'}
+                            onClick={() => choosePreset(option)}/>)}
+                    </Menu> : <div style={{display:'grid',gridTemplateColumns:'repeat(2, minmax(0, 1fr))',gap:6}}>
+                        {options.filter(option => String(option.value).toLowerCase() !== 'custom').map(option => <Button
+                            key={option.value} type="button" minimal={String(option.value) !== String(value)}
+                            intent={String(option.value) === String(value) ? 'primary' : 'none'} alignText="left"
+                            disabled={option.disabled === true || controlled && typeof onPresetRequest !== 'function'}
+                            onClick={() => choosePreset(option)}>{option.label}</Button>)}
+                    </div>}
                     <div style={{margin: '12px -12px', borderTop: themedCalendar ? '1px solid var(--forge-border-color)' : '1px solid #e4e7ee'}} />
                     <div style={{fontSize: 12, fontWeight: 700, color: themedCalendar ? 'var(--forge-text)' : '#394257', marginBottom: 8}}>Custom dates</div>
                     <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8}}>
                         <label style={{display: 'grid', gap: 4, fontSize: 11, color: themedCalendar ? 'var(--forge-text-secondary)' : '#596579'}}>
                             Start
-                            <input
+                            {themedCalendar ? renderCustomCalendar('start','Custom start date') : <input
                                 className="bp6-input"
                                 type="date"
                                 aria-label="Custom start date"
                                 value={customDraft.start}
                                 max={customDraft.end || undefined}
                                 onChange={(event) => { onDraftChange?.(); setCustomDraft(previous => ({...previous, start: event.target.value})); }}
-                            />
+                            />}
                         </label>
                         <label style={{display: 'grid', gap: 4, fontSize: 11, color: themedCalendar ? 'var(--forge-text-secondary)' : '#596579'}}>
                             End
-                            <input
+                            {themedCalendar ? renderCustomCalendar('end','Custom end date') : <input
                                 className="bp6-input"
                                 type="date"
                                 aria-label="Custom end date"
                                 value={customDraft.end}
                                 min={customDraft.start || undefined}
                                 onChange={(event) => { onDraftChange?.(); setCustomDraft(previous => ({...previous, end: event.target.value})); }}
-                            />
+                            />}
                         </label>
                     </div>
                     {invalid ? <div role="alert" style={{color: themedCalendar ? 'var(--forge-status-danger-foreground)' : '#b42318', fontSize: 11, marginTop: 7}}>Start date must be on or before end date.</div> : null}
@@ -409,12 +377,23 @@ export function DateRangePresetInput({
                             />}
                             {customApplyEnabled ? null : customDisabledMessage}
                         </span>
-                        <Button type="button" intent="primary" disabled={!customApplyEnabled || !customDraft.start || !customDraft.end || invalid} onClick={applyCustom}>
+                        <ApplyButton type="button" {...(themedCalendar ? {variant:'primary'} : {intent:'primary'})} disabled={!customApplyEnabled || !customDraft.start || !customDraft.end || invalid} onClick={applyCustom}>
                             Apply dates
-                        </Button>
+                        </ApplyButton>
                     </div>
                 </div>
-            </DateRangePresetPortal> : null}
+    );
+    return (
+        <div className="forge-date-range-preset" style={{position:'relative',minWidth:0,width:'100%'}}>
+            <Popover minimal popupKind="dialog" isOpen={open} disabled={readOnly || disabled}
+                onInteraction={next => {if(next && !open)setCustomDraft({start,end});setOpen(next);}}
+                content={panel} targetProps={{onKeyDown:undefined}}>
+                <Button ref={triggerRef} type="button" rightIcon={open ? 'chevron-up' : 'chevron-down'}
+                    aria-haspopup="dialog" aria-expanded={open} disabled={readOnly || disabled}
+                    style={{width:'100%',justifyContent:'space-between'}}>{triggerLabel}</Button>
+            </Popover>
+            {controlled && presetPending && <span role="status">Resolving date preset…</span>}
+            {presetRequestError && <span role="alert">{presetRequestError}</span>}
         </div>
     );
 }
@@ -456,6 +435,7 @@ export function registerPack() {
     /* -------------------- Local file selector -------------------- */
     registerWidget('file', ({onChange, readOnly, disabled, value, item, style, context, adapter, options, ...rest}) => {
         const fileInputRef = React.useRef(null);
+        const themed = useForgeTheme()?.themeId === 'design-system-2';
         const multiple = item?.multiple === true || item?.properties?.multiple === true;
         const selectedName = Array.isArray(value) ? value.map(file => file?.filename || file?.name).filter(Boolean).join(', ') : value && typeof value === 'object' ? value.name : String(value || '');
         React.useEffect(() => {
@@ -469,7 +449,7 @@ export function registerPack() {
                 <FileInput
                     fill
                     className="forge-file-control__input"
-                    text={selectedName || 'No file selected'}
+                    text={themed ? <><SharedIcon className="forge-file-control__icon" name={selectedName ? 'lucide:file-text' : 'lucide:upload'}/><span className="forge-file-control__name" title={selectedName || undefined}>{selectedName || (multiple ? 'Choose files' : 'Choose a file')}</span></> : selectedName || 'No file selected'}
                     buttonText="Browse"
                     hasSelection={!!selectedName}
                     disabled={disabled || readOnly}
@@ -483,9 +463,12 @@ export function registerPack() {
                 />
                 {selectedName ? (
                     <Button
+                        className={themed ? 'forge-button forge-button--icon-only forge-file-control__clear' : undefined}
+                        data-forge-variant={themed ? 'ghost' : undefined}
+                        data-forge-size={themed ? 'compact' : undefined}
                         minimal
                         small
-                        icon="cross"
+                        icon={themed ? <SharedIcon name="lucide:x"/> : 'cross'}
                         aria-label="Clear selected file"
                         title="Clear selected file"
                         disabled={disabled || readOnly}
@@ -785,31 +768,13 @@ export function registerPack() {
                 && itemListPredicate === undefined
                 ? defaultSelectItemPredicate
                 : itemPredicate;
-            const defaultItemRenderer = (item, {handleClick, modifiers}) => (
-                <MenuItem
-                    key={item.value}
-                    text={item.label}
-                    htmlTitle={item.tooltip || undefined}
-                    active={modifiers.active}
-                    disabled={isSelectOptionDisabled(item)}
-                    onClick={isSelectOptionDisabled(item) ? undefined : handleClick}
-                />
-            );
-            const fieldTrackItemRenderer = (item, {handleClick, handleFocus, id: itemId, modifiers, ref}) => (
-                <MenuItem
-                    key={item.value}
-                    ref={ref}
-                    id={itemId}
-                    className="forge-field-track-select-option"
-                    text={item.label}
-                    htmlTitle={item.tooltip || undefined}
-                    active={modifiers.active}
-                    disabled={isSelectOptionDisabled(item)}
-                    roleStructure="listoption"
-                    selected={String(item.value) === String(value)}
-                    onFocus={handleFocus}
-                    onClick={isSelectOptionDisabled(item) ? undefined : handleClick}
-                />
+            const defaultItemRenderer = (item, {handleClick,handleFocus,id:itemId,modifiers,ref}) => (
+                <MenuItem key={item.value} ref={ref} id={itemId}
+                    className={isFieldTrack ? 'forge-field-track-select-option' : undefined}
+                    text={item.label} htmlTitle={item.tooltip || undefined} active={modifiers.active}
+                    disabled={isSelectOptionDisabled(item)} roleStructure="listoption"
+                    selected={String(item.value) === String(value)} onFocus={handleFocus}
+                    onClick={isSelectOptionDisabled(item) ? undefined : handleClick}/>
             );
             const resolvedNoResults = resolvedFilterable && noResults === undefined ? (
                 <MenuItem
@@ -824,7 +789,7 @@ export function registerPack() {
                     {...selectRest}
                     items={visibleOptions}
                     fill={resolvedFill}
-                    itemRenderer={isFieldTrack ? fieldTrackItemRenderer : (itemRenderer || defaultItemRenderer)}
+                    itemRenderer={isFieldTrack ? defaultItemRenderer : (itemRenderer || defaultItemRenderer)}
                     filterable={resolvedFilterable}
                     itemListPredicate={itemListPredicate}
                     itemPredicate={resolvedItemPredicate}
@@ -863,7 +828,7 @@ export function registerPack() {
                             if (['Enter', ' ', 'ArrowDown'].includes(event.key)) requestOptions('open');
                             onKeyDown?.(event);
                         }}
-                        rightIcon={isFieldTrack ? <SharedIcon name="lucide:chevron-down"/> : "caret-down"}
+                        rightIcon={<SharedIcon name="lucide:chevron-down"/>}
                         disabled={unavailable}
                     />
                 </Select>
@@ -901,6 +866,7 @@ export function registerPack() {
             context,
             ...rest
         }) {
+            const themed = useForgeTheme()?.themeId === 'design-system-2';
             const unavailable = !!(readOnly || disabled);
             const requestOptions = reason => { if (!unavailable) onOptionsRequest?.(reason); };
             const lazyGroup = onOptionsRequest ? {id, role: 'group', 'aria-label': ariaLabel,
@@ -913,6 +879,7 @@ export function registerPack() {
                 ? selectedValues.map(selected => normalizedOptions.find(opt => String(opt?.value ?? '') === selected)
                     || {value: selected, label: selected})
                 : normalizedOptions.filter((opt) => selectedSet.has(`${opt?.value ?? ''}`));
+            const availableOptions = themed ? normalizedOptions.filter(opt => !selectedSet.has(`${opt?.value ?? ''}`)) : normalizedOptions;
             const toggle = (option) => {
                 const optionValue = `${option?.value ?? ''}`;
                 if (!optionValue) return;
@@ -1012,20 +979,31 @@ export function registerPack() {
             return (
                 <MultiSelect
                     {...rest}
-                    items={normalizedOptions}
+                    items={availableOptions}
                     selectedItems={selectedItems}
+                    itemsEqual={rest.itemsEqual === undefined ? (themed?'value':undefined) : rest.itemsEqual}
                     disabled={unavailable}
                     fill
-                    resetOnSelect
+                    resetOnSelect={themed ? (rest.resetOnSelect === undefined ? false : rest.resetOnSelect) : true}
+                    itemPredicate={themed && rest.itemPredicate === undefined && rest.itemListPredicate === undefined ? defaultSelectItemPredicate : rest.itemPredicate}
+                    customTarget={themed && rest.customTarget === undefined ? selected => <div className={`forge-multi-select-trigger forge-token-summary${unavailable?' bp6-disabled':''}`} {...typographyProps('body')} title={selected.map(item=>item.label || item.value).join(', ')}>
+                        {selected.length ? <OverflowList tagName="span" items={selected.slice(0,3)} collapseFrom="end" alwaysRenderOverflow
+                            visibleItemRenderer={item=><Tag key={item.value}>{item.label || item.value}</Tag>}
+                            overflowRenderer={hidden=>selected.length>3||hidden.length ? <Tag className="forge-multi-select-overflow">+{Math.max(0,selected.length-3)+hidden.length}</Tag> : null}/>
+                            : <span className="forge-multi-select-placeholder">{placeholder || 'Select…'}</span>}
+                        <SharedIcon name="lucide:chevron-down"/>
+                    </div> : rest.customTarget}
+                    popoverTargetProps={themed ? {id,tabIndex:unavailable?-1:0,'aria-label':ariaLabel,'aria-labelledby':ariaLabelledBy,
+                        'aria-describedby':rest['aria-describedby'],'aria-required':rest['aria-required'],'aria-invalid':rest['aria-invalid'],...rest.popoverTargetProps} : rest.popoverTargetProps}
                     noResults={optionsFetchStatus === 'loading' || optionsFetchStatus === 'error'
                         ? <MenuItem disabled text={optionsFetchStatus === 'loading' ? 'Loading options…' : 'Options could not be loaded. Open again to retry.'}/>
-                        : rest.noResults}
-                    itemRenderer={(item, { handleClick, modifiers }) => (
+                        : !themed || rest.noResults !== undefined ? rest.noResults : <MenuItem disabled roleStructure="listoption" text={availableOptions.length?'No matching options':'All options selected'}/>}
+                    itemRenderer={(item, { handleClick, handleFocus, id:itemId, modifiers, ref }) => (
                         <MenuItem
-                            key={`${item?.value ?? ''}`}
+                            key={`${item?.value ?? ''}`} ref={ref} id={itemId} onFocus={handleFocus}
                             text={item?.label || item?.value}
                             active={modifiers.active}
-                            icon={selectedSet.has(`${item?.value ?? ''}`) ? 'tick' : 'blank'}
+                            roleStructure="listoption" selected={selectedSet.has(`${item?.value ?? ''}`)}
                             onClick={handleClick}
                             shouldDismissPopover={false}
                         />
@@ -1035,19 +1013,23 @@ export function registerPack() {
                         disabled: unavailable,
                         style: style || undefined,
                         inputProps: {
-                            id, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy,
+                            id:themed&&id?`${id}-query`:id, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy,
+                            'aria-describedby': rest['aria-describedby'],
+                            'aria-errormessage': rest['aria-errormessage'],
+                            'aria-required': rest['aria-required'],
+                            'aria-invalid': rest['aria-invalid'],
                             onFocus: event => { requestOptions('focus'); onFocus?.(event); },
                             onClick: event => { requestOptions('open'); onClick?.(event); },
                             onKeyDown: event => {
                                 if (['Enter', ' ', 'ArrowDown'].includes(event.key)) requestOptions('open');
                                 onKeyDown?.(event);
                             },
-                            placeholder: selectedItems.length ? '' : (placeholder || 'Select...'),
+                            placeholder: themed ? 'Search options…' : selectedItems.length ? '' : (placeholder || 'Select...'),
                         },
                     }}
                     onItemSelect={toggle}
                     onRemove={remove}
-                    popoverProps={anchoredPopoverProps({minimal: true, matchTargetWidth: true, placement: 'bottom-start', onOpening: () => requestOptions('open')})}
+                    popoverProps={anchoredPopoverProps({minimal: true, matchTargetWidth: true, placement: 'bottom-start', popoverClassName:themed?'forge-multi-select-popover':undefined, onOpening: () => requestOptions('open')})}
                 />
             );
         },
@@ -1069,6 +1051,7 @@ export function registerPack() {
     registerWidget(
         'link',
         ({ value = '', readOnly, context, link, text, appearance, className, style, title, ...rest }) => {
+            const themed = useForgeTheme()?.themeId === 'design-system-2';
             const resolved = resolveLinkTarget({
                 linkConfig: link,
                 value,
@@ -1076,9 +1059,9 @@ export function registerPack() {
             });
             const isInline = String(appearance || '').trim().toLowerCase() === 'inline';
             const inlineStyle = {
-                color: '#2f6de1',
+                color: themed ? 'var(--forge-interaction-color)' : '#2f6de1',
                 cursor: readOnly ? 'default' : 'pointer',
-                fontWeight: 500,
+                fontWeight: themed ? 'var(--forge-type-body-weight, 400)' : 500,
                 textDecoration: 'none',
                 ...(style || {}),
             };
@@ -1109,7 +1092,7 @@ export function registerPack() {
                     <button
                         type="button"
                         className={className}
-                        style={{ ...windowButtonStyle, ...(style || {}) }}
+                        style={{ ...windowButtonStyle, ...(themed ? {background:'transparent',borderColor:'transparent',borderRadius:'var(--forge-control-radius, 8px)',color:'var(--forge-interaction-color)',fontFamily:'inherit',fontSize:'inherit'} : {}), ...(style || {}) }}
                         title={title || resolved.title || buttonText}
                         onClick={(event) => {
                             event.preventDefault();
@@ -1145,7 +1128,7 @@ export function registerPack() {
                     text={resolved?.text || text || href}
                     minimal
                     className={className}
-                    style={style}
+                    style={themed ? {color:'var(--forge-interaction-color)',fontWeight:'var(--forge-type-body-weight, 400)',...style} : style}
                     title={title || resolved?.title || resolved?.text || text || href}
                     {...rest}
                 />
@@ -1231,14 +1214,32 @@ export function registerPack() {
     const registerDateKind = (kind) => {
         registerWidget(
             kind,
-            ({ value, onChange, readOnly, dateFnsFormat, valueMode, ...rest }) => (
-                <DateInput3
-                    {...buildDateProps({ type: kind, dateFnsFormat, valueMode }, { readOnly, properties: rest })}
+            ({ value, onChange, readOnly, dateFnsFormat, valueMode, ...rest }) => {
+                const themed = useForgeTheme()?.themeId === 'design-system-2';
+                const dateProps = buildDateProps({ type: kind, dateFnsFormat: dateFnsFormat ?? (themed ? kind === 'datetime' ? 'MM/dd/yyyy HH:mm' : 'MM/dd/yyyy' : undefined), valueMode }, { readOnly, properties: rest });
+                return <DateInput3
+                    {...dateProps}
+                    inputProps={{
+                        ...(themed ? {leftIcon:<SharedIcon name="lucide:calendar" className="bp6-icon"/>} : {}),
+                        id:rest.id,'aria-label':rest['aria-label'],'aria-labelledby':rest['aria-labelledby'],
+                        'aria-describedby':rest['aria-describedby'],'aria-invalid':rest['aria-invalid'],
+                        'aria-required':rest['aria-required'],required:rest.required,'data-forge-type':rest['data-forge-type'],
+                        ...dateProps.inputProps,
+                    }}
+                    canClearSelection={dateProps.canClearSelection ?? (themed ? false : undefined)}
+                    dayPickerProps={{...dateProps.dayPickerProps,
+                        ...(themed ? {components:{Dropdown:CalendarDropdown,...dateProps.dayPickerProps?.components}} : {}),
+                        ...(kind === 'date' && dateProps.closeOnSelection !== false ? {classNames:{
+                            ...dateProps.dayPickerProps?.classNames,
+                            day:`${dateProps.dayPickerProps?.classNames?.day || 'rdp-day'} bp6-popover-dismiss`,
+                        }} : {}),
+                    }}
+                    popoverProps={anchoredPopoverProps({captureDismiss:true,shouldReturnFocusOnClose:false,...dateProps.popoverProps})}
                     timezone={valueMode === 'civil' ? 'UTC' : rest.timezone}
-                    value={normalizeDateInputValue(value, valueMode)}
-                    onChange={(sel) => onChange?.(serializeDateInputValue(sel, valueMode))}
-                />
-            ),
+                    value={normalizeDateInputValue(value, valueMode) || null}
+                    onChange={(sel,isUserChange) => {if(isUserChange)onChange?.(serializeDateInputValue(sel, valueMode));}}
+                />;
+            },
             { framework: 'blueprint' }
         );
 
@@ -1586,15 +1587,14 @@ registerWrapper('blueprint', (item, container, children, context, accessibility 
             {...(item?.properties?.typographyRole ? typographyProps('metadata') : {})}
             id={accessibility.helperId} data-forge-part="validation-message" role="alert">{item.validationError}</div>}</>;
 
-        let labelContent = item.hideLabel ? undefined : (
-            item.tooltip ? (
-                <Tooltip content={item.tooltip} hoverOpenDelay={250}>
-                    <span>{item.label}</span>
-                </Tooltip>
-            ) : (
-                item.label
-            )
-        );
+        const helpName = `Help for ${typeof item.label === 'string' ? item.label : 'this field'}`;
+        let labelContent = item.hideLabel ? undefined : item.tooltip ? <span className="forge-field-label-content">
+            <Tooltip content={item.tooltip} hoverOpenDelay={250}><span>{item.label}{required&&<span aria-hidden="true"> *</span>}</span></Tooltip>
+            <Popover popupKind="dialog" autoFocus targetProps={{onKeyDown:undefined}}
+                content={<div className="forge-field-help" role="dialog" aria-label={helpName} tabIndex={-1}><Typography typeRole="body">{item.tooltip}</Typography></div>}>
+                <ForgeButton variant="ghost" size="compact" icon="lucide:circle-help" hideLabel aria-label={helpName}/>
+            </Popover>
+        </span> : item.label;
 
         if (item?.properties?.typographyRole && labelContent) {
             labelContent = <Typography typeRole="label">{labelContent}</Typography>;
@@ -1607,7 +1607,7 @@ registerWrapper('blueprint', (item, container, children, context, accessibility 
                     item?.requiredState ? `forge-required-${item.requiredState}` : '',
                 ].filter(Boolean).join(' ') || undefined}
                 label={labelContent}
-                labelInfo={required ? <span aria-hidden="true">*</span> : undefined}
+                labelInfo={required && !item.tooltip ? <span aria-hidden="true">*</span> : undefined}
                 inline={inline}
                 labelFor={accessibility.controlId || item.id}
                 labelId={accessibility.labelId}

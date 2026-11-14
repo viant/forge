@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     include: [
+      'src/demos/theme/ComponentCatalog.render.test.jsx',
       'src/reporting/useReportDatePresetDraft.render.test.jsx',
       'src/components/primitives/DraftForm.validation.render.test.jsx',
       'src/components/primitives/DraftForm.lifecycle.render.test.jsx',

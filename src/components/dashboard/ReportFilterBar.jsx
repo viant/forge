@@ -1,6 +1,7 @@
 import React, {useEffect, useRef, useState} from 'react';
 import Button from '../Button.jsx';
 import SelectControl from '../SelectControl.jsx';
+import {useForgeTheme} from '../ThemeBoundary.jsx';
 import ArrayFields from '../primitives/ArrayFields.jsx';
 import {typographyProps} from '../Typography.jsx';
 import {getWidget, listWidgets} from '../../runtime/widgetRegistry.js';
@@ -95,6 +96,8 @@ function DatePresets({control, values, context, busy, onDatePreset, onDateRange,
 // transport. This component never constructs resource URIs or permission grants.
 export default function ReportFilterBar({controls = [], values = {}, onChange, onApply, onReset, loadChoices,
     scopeKey = '', context, onChoices, onDatePreset, onDateRange, onDateDraft, onDateTimeZone, busy = false, applyDisabled = false, error = '', placement = 'top', className = ''}) {
+    const themed = useForgeTheme()?.themeId === 'design-system-2';
+    const DateField = getWidget('date');
     if (!controls.length) return null;
     const apply=()=>{if(!busy&&!applyDisabled)onApply?.();};
     return <form className={`forge-report-filter-bar ${className}`.trim()} data-filter-placement={['left','rail-left'].includes(placement)?'left':['right','rail-right'].includes(placement)?'right':'top'} aria-label="Report filters"
@@ -104,7 +107,7 @@ export default function ReportFilterBar({controls = [], values = {}, onChange, o
             if (control.kind === 'dateRange') return <fieldset key={control.id} className="forge-report-filter-date-range"><legend>{control.label}</legend>
                 <DatePresets {...{control, values, context, busy, onDatePreset, onDateRange, onDateDraft, onDateTimeZone}}/>
                 <div className="forge-report-filter-date-fields">{[['from', control.start], ['to', control.end]].map(([edge, alias]) => <label key={alias}>{edge === 'from' ? 'From' : 'To'}
-                    <FilterControl context={context} controlId={alias} type="date" value={values[alias] ?? ''} required={control.required} disabled={busy} change={value=>onChange(alias,value)}><input type="date" aria-label={`${control.label} ${edge}`} required={control.required} aria-required={control.required || undefined} value={values[alias] ?? ''} onChange={event => onChange(alias, event.target.value)}/></FilterControl></label>)}</div>
+                    <FilterControl context={context} controlId={alias} type="date" value={values[alias] ?? ''} required={control.required} disabled={busy} change={value=>onChange(alias,value)}>{themed ? <DateField valueMode="civil" dateFnsFormat="MM/dd/yyyy" fill aria-label={`${control.label} ${edge}`} required={control.required} aria-required={control.required || undefined} disabled={busy} value={values[alias] ?? ''} onChange={value => onChange(alias, value)}/> : <input type="date" aria-label={`${control.label} ${edge}`} required={control.required} aria-required={control.required || undefined} value={values[alias] ?? ''} onChange={event => onChange(alias, event.target.value)}/>}</FilterControl></label>)}</div>
                 {control.datePresetError && <span role="alert">{control.datePresetError} Enter dates manually.</span>}
             </fieldset>;
             if (control.kind === 'boolean') return <FilterControl key={control.id} context={context} controlId={control.id} type="checkbox" value={values[control.id]===true} disabled={busy} change={value=>onChange(control.id,value)}><label><input aria-label={control.label} type="checkbox" checked={values[control.id] === true}

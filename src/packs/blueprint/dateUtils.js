@@ -48,7 +48,7 @@ export function buildDateProps(item, { readOnly, properties = {} } = {}) {
     };
 
     merged.locale = enUS;
-    merged.disabled = readOnly;
+    merged.disabled = readOnly || merged.disabled;
 
     return merged;
 }

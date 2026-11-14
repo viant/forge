@@ -7,7 +7,7 @@ const rows = [
     {name: 'No change', value: 0},
     {name: 'Not measured', value: null},
 ];
-const series = {value: 'value', color: '#2563eb'};
+const series = {value: 'value', color: 'var(--forge-chart-series-1, #2563eb)'};
 const format = value => `${value} units`;
 
 export default function ComparisonWidthSpecimen() {

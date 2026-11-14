@@ -139,3 +139,8 @@
     .forge-chart-comparison-track { grid-column:1/-1; grid-row:2; }
 }
 @media(pointer:coarse) { .forge-chart-document-legend button,.forge-chart-comparisons button { min-height:44px; } }
+
+/* Design System 2.0 appearance is opt-in; other profiles retain their recipes. */
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) [data-dashboard-chart-id] :is(.recharts-legend-item-text,.recharts-tooltip-item){color:var(--forge-chart-text,var(--forge-text))!important}
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) [data-dashboard-chart-id] .recharts-pie-label-text{fill:var(--forge-chart-text,var(--forge-text))}
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .forge-chart-document-legend button{font-family:var(--forge-type-small-family,var(--forge-font-family));font-size:var(--forge-type-small-size,12px);font-weight:var(--forge-type-small-weight,400);line-height:var(--forge-type-small-line-height,18px);letter-spacing:var(--forge-type-small-letter-spacing,0em)}

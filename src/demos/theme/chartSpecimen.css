@@ -5,3 +5,5 @@
 .forge-chart-specimen-grid > section { min-width:0; padding-top:var(--forge-spacing-4,16px); border-top:var(--forge-border-width,1px) solid var(--forge-border); }
 .forge-chart-specimen-grid h3 { margin:0 0 var(--forge-spacing-3,12px); }
 .forge-chart-specimen > [role=status] { margin-top:var(--forge-spacing-6,24px); overflow-wrap:anywhere; }
+.forge-chart-example { width:100%; min-width:0; }
+.forge-metrics-example > div { width:100%; min-width:0; }

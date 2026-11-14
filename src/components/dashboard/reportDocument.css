@@ -104,3 +104,10 @@ button.forge-report-document-map-tile[aria-pressed="true"] { box-shadow: inset 0
 .forge-report-document-board :is(h3,h4) { margin: 0; }
 .forge-report-document-board article { display: grid; gap: var(--forge-spacing-2, 8px); margin-top: var(--forge-spacing-3, 12px); }
 .forge-report-document-stage-label { color: var(--forge-text-muted); }
+
+/* Design System 2.0 appearance is opt-in; other profiles retain their recipes. */
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) [data-forge-report-appearance="document"]{container-type:inline-size}
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .forge-report-document-metric{max-width:100%;container-type:inline-size;overflow-wrap:anywhere}
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .forge-report-document-metric dt{color:var(--forge-text-secondary,var(--forge-text))}
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .forge-report-document-metric dd{font-size:min(var(--forge-type-metric-size,28px),max(1rem,10cqi));color:var(--forge-text)}
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .forge-report-document-comparison{gap:var(--forge-spacing-1,4px) var(--forge-spacing-2,8px);color:var(--forge-text-secondary,var(--forge-text))}

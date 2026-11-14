@@ -4,6 +4,8 @@ import {useSignals} from '@preact/signals-react/runtime';
 import {Icon} from '@blueprintjs/core';
 import {useDataSourceState} from "../../hooks/useDataSourceState.js";
 import Chart from "../Chart.jsx";
+import {useForgeTheme} from "../ThemeBoundary.jsx";
+import {getWidget} from "../../runtime/widgetRegistry.js";
 import SelectControl from "../SelectControl.jsx";
 import Typography from "../Typography.jsx";
 import WorldCountryMap from "./WorldCountryMap.jsx";
@@ -406,6 +408,8 @@ export function DashboardKPITable({container, context}) {
 }
 
 export function DashboardFilters({container, context}) {
+    const themed = useForgeTheme()?.themeId === "design-system-2";
+    const DateField = getWidget("date");
     const items = container.dashboard?.filters?.items || container.items || [];
     const dashboardKey = context?.dashboardKey;
     const [filters, setFilters] = useState(dashboardKey ? getDashboardFilterSignal(dashboardKey).peek() : {});
@@ -470,19 +474,19 @@ export function DashboardFilters({container, context}) {
                             <div key={field} style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
                                 <div style={{fontSize: '12px', fontWeight: 600, color: "var(--forge-text-secondary, #5f6b7c)"}}>{item.label}</div>
                                 <div style={{display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center'}}>
-                                    <input
+                                    {themed ? <DateField valueMode="civil" dateFnsFormat="MM/dd/yyyy" aria-label={`${item.label} start`} value={range.start || ''} onChange={value => setDateRange(item, 'start', value)}/> : <input
                                         type="date"
                                         value={range.start || ''}
                                         onChange={(e) => setDateRange(item, 'start', e.target.value)}
                                         style={{border: "1px solid var(--forge-border-color, #ced9e0)", borderRadius: '6px', padding: '4px 8px', fontSize: '12px', color: "var(--forge-text, #30404d)"}}
-                                    />
+                                    />}
                                     <span style={{fontSize: '12px', color: "var(--forge-text-secondary, #5f6b7c)"}}>to</span>
-                                    <input
+                                    {themed ? <DateField valueMode="civil" dateFnsFormat="MM/dd/yyyy" aria-label={`${item.label} end`} value={range.end || ''} onChange={value => setDateRange(item, 'end', value)}/> : <input
                                         type="date"
                                         value={range.end || ''}
                                         onChange={(e) => setDateRange(item, 'end', e.target.value)}
                                         style={{border: "1px solid var(--forge-border-color, #ced9e0)", borderRadius: '6px', padding: '4px 8px', fontSize: '12px', color: "var(--forge-text, #30404d)"}}
-                                    />
+                                    />}
                                 </div>
                             </div>
                         );

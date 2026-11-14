@@ -1,3 +1,4 @@
+import {useForgeTheme} from '../ThemeBoundary.jsx';
 import React, {useState,useId} from 'react';
 import Button from '../Button.jsx';
 import Typography from '../Typography.jsx';
@@ -5,6 +6,7 @@ import {kpiSparklineGeometry,kpiSparklineColorSegments} from '../../reporting/re
 import {valueColorAt} from '../valueColorScale.js';
 
 export default function KpiSparkline({content,label='Trend over the selected period'}){
+ const primaryColor=useForgeTheme()?.themeId==='design-system-2'?'var(--forge-chart-series-1, var(--forge-report-chart-primary, #2868a9))':'var(--forge-report-chart-primary, #2868a9)';
  const [active,setActive]=useState(null);const detailId=useId();
  const points=content?.details?.points||[];
  const selected=points.find(point=>point.series===active?.series&&point.index===active?.index);
@@ -27,9 +29,9 @@ export default function KpiSparkline({content,label='Trend over the selected per
  const description=label+(content.comparisonValues?' (solid: selected period; dashed: prior period)':'');
  const graphic=<svg role={content.details?"group":"img"} aria-label={description} preserveAspectRatio={content.details?"none":undefined} viewBox={`0 0 ${geometry.width} ${geometry.height}`} width="100%" height={content.details?44:36} onPointerMove={content.details?pointer:undefined} onPointerDown={content.details?pointer:undefined} style={{display:'block',maxWidth:'100%',overflow:'hidden'}}>
   <title>{description}</title>
-  {geometry.paths.map((path,i)=>path&&!(i===0&&colored)?<path key={i} d={path} fill="none" stroke={i?'var(--forge-report-text-muted, #6d7e8c)':'var(--forge-report-chart-primary, #2868a9)'} strokeWidth={i?1.25:1.75} strokeDasharray={i?'3 2':undefined}/>:null)}
+  {geometry.paths.map((path,i)=>path&&!(i===0&&colored)?<path key={i} d={path} fill="none" stroke={i?'var(--forge-report-text-muted, #6d7e8c)':primaryColor} strokeWidth={i?1.25:1.75} strokeDasharray={i?'3 2':undefined}/>:null)}
   {colored?.map((s,i)=><path key={`color-${i}`} d={`M${s.x1},${s.y1}L${s.x2},${s.y2}`} fill="none" stroke={s.color} strokeOpacity={content.valueColor.opacity} strokeWidth="1.75"/>)}
-  {geometry.points.flatMap((points,i)=>points.filter(p=>p.isolated).map((p,j)=><circle key={`${i}:${j}`} cx={p.x} cy={p.y} r="1.75" fillOpacity={i?1:content.valueColor?.opacity??1} fill={i?'var(--forge-report-text-muted, #6d7e8c)':content.valueColor?valueColorAt(content.valueColor,content.values[p.index]):'var(--forge-report-chart-primary, #2868a9)'}/>))}
+  {geometry.points.flatMap((points,i)=>points.filter(p=>p.isolated).map((p,j)=><circle key={`${i}:${j}`} cx={p.x} cy={p.y} r="1.75" fillOpacity={i?1:content.valueColor?.opacity??1} fill={i?'var(--forge-report-text-muted, #6d7e8c)':content.valueColor?valueColorAt(content.valueColor,content.values[p.index]):primaryColor}/>))}
   {selected?geometry.points[selected.series]?.filter(point=>point.index===selected.index).map(point=><circle key="active" cx={point.x} cy={point.y} r="3" fill="var(--forge-report-surface, #fff)" stroke="var(--forge-report-text, #182026)" strokeWidth="1.5" pointerEvents="none"/>):null}
   {content.details?geometry.points.map((seriesPoints,series)=>{
    const entries=points.filter(point=>point.series===series);if(!entries.length)return null;

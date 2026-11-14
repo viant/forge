@@ -84,6 +84,39 @@
 .forge-button[data-forge-variant].forge-button--icon-only { width: var(--forge-control-height, 36px); min-width: var(--forge-control-height, 36px); padding-inline: 0; justify-content: center; }
 .forge-button[data-forge-variant][data-forge-size="compact"].forge-button--icon-only { width: 28px; min-width: 28px; }
 .forge-button[data-forge-variant]:focus-visible { outline: var(--forge-focus-width, 2px) solid var(--forge-focus-color); outline-offset: var(--forge-focus-offset, 2px); }
+
+/* Design System 2.0 focus policy. The root theme provider uses Blueprint's
+ * FocusStyleManager; component selection never substitutes for keyboard focus. */
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) {
+    --forge-focus-offset: calc(-1 * var(--forge-focus-width, 2px));
+}
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) :is(:focus, :focus-within) {
+    outline: none !important;
+}
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) :is(button, input, select, textarea, [role="button"], [role="tab"], [tabindex]):focus,
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) :is(.bp6-input-group, .bp6-numeric-input, .bp6-select, .bp6-tag-input, .bp6-timepicker, .catalog-search, .forge-report-catalog__search, .forge-report-builder__design-source-search, .forge-lookup-selection-input__control, .cm-editor.cm-focused):focus-within {
+    box-shadow: none !important;
+}
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .bp6-control input:focus ~ .bp6-control-indicator,
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .bp6-file-input input:focus + .bp6-file-upload-input,
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .bp6-tag.bp6-active {
+    outline: none !important;
+}
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]):not(.bp6-focus-disabled, .bp6-focus-disabled *) :is(button, a[href], input, select, textarea, summary, [tabindex], [role="button"], [role="tab"]):focus-visible:not(.forge-document-textarea, .bp6-tag-input input, .catalog-search input, .forge-report-catalog__search input, .forge-report-builder__design-source-search input, .forge-lookup-selection-input__control input, .bp6-timepicker-input, .forge-time-picker-panel select),
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]):not(.bp6-focus-disabled, .bp6-focus-disabled *) .bp6-control input:focus-visible ~ .bp6-control-indicator,
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]):not(.bp6-focus-disabled, .bp6-focus-disabled *) .bp6-file-input input:focus-visible + .bp6-file-upload-input,
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]):not(.bp6-focus-disabled, .bp6-focus-disabled *) :is(.forge-document-composer-shell, .bp6-tag-input, .catalog-search, .forge-report-catalog__search, .forge-report-builder__design-source-search, .forge-lookup-selection-input__control, .forge-time-picker-panel .bp6-timepicker, .bp6-datepicker-content .bp6-timepicker-input-row):has(:is(input, select, textarea):focus-visible) {
+    outline: var(--forge-focus-width, 2px) solid var(--forge-focus-color, currentColor) !important;
+    outline-offset: calc(-1 * var(--forge-focus-width, 2px)) !important;
+}
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]):not(.bp6-focus-disabled, .bp6-focus-disabled *) :is(.forge-button[data-forge-variant="primary"], .forge-button[data-forge-variant="danger"], .bp6-button.bp6-intent-primary, .bp6-button.bp6-intent-danger, .rdp-day_selected, .rdp-selected .rdp-day_button):focus-visible {
+    --forge-focus-color: currentColor;
+}
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]):not(.bp6-focus-disabled, .bp6-focus-disabled *) .bp6-control input:checked:focus-visible ~ .bp6-control-indicator,
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]):not(.bp6-focus-disabled, .bp6-focus-disabled *) .forge-switch[aria-checked="true"]:focus-visible {
+    outline-color: var(--forge-text-inverse, var(--forge-surface)) !important;
+    --forge-focus-color: var(--forge-text-inverse, var(--forge-surface));
+}
 .forge-button__busy { width: var(--forge-icon-size, 16px); height: var(--forge-icon-size, 16px); border: 2px solid currentColor; border-inline-end-color: transparent; border-radius: 50%; animation: forge-busy 800ms linear infinite; }
 @keyframes forge-busy { to { transform: rotate(360deg); } }
 /* Existing Blueprint components opt into semantic status appearance. */
@@ -253,3 +286,28 @@
 :is(.agently-application, .agently-workspace) .bp6-button.bp6-minimal:not(:disabled):active { background: var(--forge-selected-background, var(--agently-theme-selected-background)); border-color: transparent; }
 :is(.agently-application, .agently-workspace) .bp6-button.bp6-minimal:focus:not(:focus-visible) { outline: 0; box-shadow: none; }
 :is(.agently-application, .agently-workspace) .bp6-button.bp6-minimal:focus-visible { outline: var(--forge-focus-width, 2px) solid var(--forge-focus-color, var(--agently-theme-focus)); outline-offset: var(--forge-focus-offset, 2px); box-shadow: none; }
+/* Click-open ghost triggers use the menu owner's expanded state, including
+ * Select's native target wrapper. Hover-only hints never expose this state. */
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) :is(.forge-button[data-forge-variant="ghost"], .bp6-button.bp6-minimal)[aria-haspopup][aria-expanded="true"]:not(:disabled):not([aria-disabled="true"]),
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .bp6-popover-target[aria-haspopup][aria-expanded="true"] > :is(.forge-button[data-forge-variant="ghost"], .bp6-button.bp6-minimal):not(:disabled):not([aria-disabled="true"]) {
+    background: var(--forge-button-active-bg, var(--forge-selected-background, var(--agently-theme-selected-background)));
+    color: var(--forge-interaction-color, var(--agently-theme-interaction));
+    border-color: transparent;
+    box-shadow: none;
+}
+
+/* Design System 2.0 appearance is opt-in; other profiles retain their recipes. */
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .bp6-toast .bp6-button-group:empty{display:none}
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .bp6-toast .bp6-button-group .bp6-button.forge-toast-dismiss{background:transparent!important;color:var(--forge-text-secondary,var(--forge-text))!important}
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .bp6-toast .bp6-button-group .bp6-button.forge-toast-dismiss:hover{background:var(--forge-menu-hover-background,var(--forge-surface-subtle))!important}
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .bp6-toast .bp6-button-group .forge-toast-dismiss .bp6-icon{color:inherit!important}
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .agently-application[data-agently-theme] :is(.forge-button[data-forge-variant],.forge-select-control):not(.agently-workspace *){--forge-border-width:var(--agently-theme-border-width);--forge-control-height:var(--agently-theme-control-height);--forge-control-radius:var(--agently-theme-control-radius);--forge-control-padding-inline:var(--agently-theme-control-padding-inline);--forge-focus-width:var(--agently-theme-focus-width);--forge-focus-offset:var(--agently-theme-focus-offset);--forge-motion-fast:var(--agently-theme-motion-fast)}
+@keyframes forge-text-shimmer{from{background-position:150% 50%}to{background-position:-50% 50%}}
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .bp6-toast{display:flex;align-items:center;gap:var(--forge-spacing-3);width:min(400px,100%);padding:var(--forge-spacing-3);border:var(--forge-border-width) solid var(--forge-border-color);border-radius:var(--forge-radius-surface);box-shadow:none!important;background:var(--forge-surface-raised,var(--forge-surface));color:var(--forge-text)}
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .bp6-toast .bp6-icon{flex:none;width:var(--forge-spacing-5);height:var(--forge-spacing-5);margin:0}
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .bp6-toast.bp6-intent-primary>.bp6-icon{color:var(--forge-status-info-foreground)}
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .bp6-toast.bp6-intent-success>.bp6-icon{color:var(--forge-status-success-foreground)}
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .bp6-toast.bp6-intent-warning>.bp6-icon{color:var(--forge-status-warning-foreground)}
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .bp6-toast.bp6-intent-danger>.bp6-icon{color:var(--forge-status-danger-foreground)}
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .bp6-toast .bp6-toast-message{flex:1;min-width:0;padding:0;font-family:var(--forge-type-body-family);font-size:var(--forge-type-body-size);line-height:var(--forge-type-body-line-height)}
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .bp6-toast .bp6-button-group .bp6-button{width:var(--forge-icon-button-small-size);height:var(--forge-icon-button-small-size);min-width:var(--forge-icon-button-small-size);min-height:var(--forge-icon-button-small-size);padding:0;background:transparent;color:var(--forge-text-secondary);box-shadow:none}

@@ -17,3 +17,13 @@
 .forge-dropdown-menu .bp6-menu { box-sizing: border-box; min-width: 100%; width: max-content; max-width: 100%; padding-inline: 0; }
 .forge-dropdown-menu .bp6-menu-item { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
 .forge-dropdown-menu .bp6-menu-item .bp6-text-overflow-ellipsis { overflow: visible; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
+
+/* Design System 2.0 appearance is opt-in; other profiles retain their recipes. */
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .forge-anchored-popover{border-radius:var(--forge-radius-surface,12px);max-width:calc(100vw - 24px);max-height:calc(100vh - 24px)}
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .forge-anchored-popover>.bp6-popover-content{border-radius:inherit}
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .forge-hover-card,:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .forge-hover-card>.bp6-popover-content{border-radius:var(--forge-radius-surface,12px)}
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) :is(.forge-anchored-popover:not(.forge-dropdown-menu),.bp6-tooltip){--forge-modal-shadow:none;--forge-overlay-shadow:none;box-shadow:none!important}
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .forge-anchored-popover:not(.forge-dropdown-menu)>.bp6-popover-content{border:var(--forge-border-width,1px) solid var(--forge-border-color,var(--forge-border));box-shadow:none}
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .forge-tooltip-copy{--forge-type-label-weight:var(--forge-type-heading-weight,600);--forge-type-small-line-height:var(--forge-type-label-line-height,18px)}
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .forge-tooltip-copy>span{opacity:.8}
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .forge-tooltip-copy>a{--forge-type-small-weight:var(--forge-type-heading-weight,600);margin-block-start:var(--forge-spacing-1,4px)}

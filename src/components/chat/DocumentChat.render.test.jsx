@@ -9,6 +9,7 @@ import Chat from '../Chat.jsx';
 import {signal} from '@preact/signals-react';
 import StarterTaskBrowser from './StarterTaskBrowser.jsx';
 import useComposerDraft from './useComposerDraft.js';
+import {ForgeThemeProvider, ForgeThemeBoundary} from '../ThemeBoundary.jsx';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 let host, root;
@@ -20,6 +21,45 @@ const click = node => act(async () => node.click());
 const press = (node, key, options = {}) => act(async () => node.dispatchEvent(new KeyboardEvent('keydown', {key, bubbles: true, cancelable: true, ...options})));
 
 describe('document composer and task discovery', () => {
+    it('reveals nested chat scrollbars through native scroll capture only for the opted-in theme', async () => {
+        const media = vi.fn(() => ({matches: false}));
+        vi.stubGlobal('matchMedia', media);
+        const context = {
+            identity: {windowId: 'example-scroll'},
+            signals: {collection: signal([]), control: signal({}), selection: signal(null), message: signal('')},
+            handlers: {chat: {}}, Context: () => null,
+            lookupHandler: name => name === 'chat.renderFeed' ? () => null : undefined,
+        };
+        const fixture = theme => <div className="agently-application" data-agently-theme={theme}>
+            <Chat context={context} container={{chat: {appearance: 'document'}}}/>
+        </div>;
+        try {
+            await render(fixture('design-system-2'));
+            const scroller = document.createElement('pre');
+            scroller.style.setProperty('--forge-border-strong', '#667788');
+            host.querySelector('.chat-feed-stage').append(scroller);
+            const own = {id: 'forge-scrollbar-activity', cancel: vi.fn()};
+            const unrelated = {id: 'example-content-animation', cancel: vi.fn()};
+            scroller.getAnimations = () => [own, unrelated];
+            const animation = {};
+            scroller.animate = vi.fn(() => animation);
+            await act(async () => scroller.dispatchEvent(new Event('scroll')));
+            expect(scroller.animate).toHaveBeenCalledOnce();
+            expect(scroller.animate.mock.calls[0][0][0].scrollbarColor).toBe('#667788 transparent');
+            expect(scroller.animate.mock.calls[0][0].at(-1).scrollbarColor).toBe('transparent transparent');
+            expect(animation.id).toBe('forge-scrollbar-activity');
+            expect(own.cancel).toHaveBeenCalledOnce();
+            expect(unrelated.cancel).not.toHaveBeenCalled();
+            media.mockReturnValue({matches: true});
+            await act(async () => scroller.dispatchEvent(new Event('scroll')));
+            expect(scroller.animate).toHaveBeenCalledOnce();
+            media.mockReturnValue({matches: false});
+            await render(fixture('baseline'));
+            await act(async () => scroller.dispatchEvent(new Event('scroll')));
+            expect(scroller.animate).toHaveBeenCalledOnce();
+        } finally {vi.unstubAllGlobals();}
+    });
+
     it('keeps IME and newline entry, rejects blank/invalid sends and clears a sent draft', async () => {
         const submit = vi.fn();
         await render(<Composer appearance="document" draftKey="a" onSubmit={submit}/>);
@@ -244,6 +284,53 @@ describe('document composer and task discovery', () => {
         await click(host.querySelector('button[aria-label="Add photos or files"]'));
         await click([...document.querySelectorAll('[role=dialog].forge-composer-options button')].find(button => button.textContent === 'Add photos or files'));
         expect(attach).toHaveBeenCalledOnce();
+    });
+
+    it('opens themed Tools options with native selection callbacks and keeps other profiles on their existing pickers', async () => {
+        const agent = vi.fn(), model = vi.fn(), reasoning = vi.fn();
+        const fixture = themeId => <ForgeThemeProvider themeId={themeId} mode="light"><ForgeThemeBoundary>
+            <Composer appearance="document" draftKey="themed-tools"
+                agentOptions={[{value: 'a', label: 'Agent A'}, {value: 'b', label: 'Agent B'}, {value: 'c', label: 'Unavailable agent', disabled: true}]} agentValue="a" onAgentChange={agent}
+                modelOptions={[{value: 'm', label: 'Model M'}, {value: 'n', label: 'Model N'}]} modelValue="m" onModelChange={model}
+                reasoningOptions={[{value: 'low', label: 'Low'}, {value: 'high', label: 'High'}]} onReasoningChange={reasoning}/>
+        </ForgeThemeBoundary></ForgeThemeProvider>;
+        await render(fixture('design-system-2'));
+        await change(host.querySelector('textarea'), 'Keep this draft');
+        const tools = host.querySelector('button[aria-label=Tools]');
+        await click(tools);
+        const panel = () => document.querySelector('[role=dialog][aria-label=Tools]');
+        const menu = label => document.querySelector(`.forge-dropdown-menu [role=listbox][aria-label="${label}"]`);
+        const trigger = label => panel().querySelector(`button[aria-label="${label}"]`);
+        expect(panel().querySelector('select')).toBeNull();
+        await click(trigger('Agent'));
+        expect(menu('Agent').closest('[data-forge-theme="design-system-2"]')).not.toBeNull();
+        expect(menu('Agent').querySelector('[aria-selected=true]').textContent).toBe('Agent A');
+        expect([...menu('Agent').querySelectorAll('[role=option]')].find(option => option.textContent === 'Unavailable agent').querySelector('[aria-disabled=true]')).not.toBeNull();
+        await click([...menu('Agent').querySelectorAll('[role=option]')].find(option => option.textContent === 'Agent B').querySelector('a'));
+        expect(agent).toHaveBeenCalledExactlyOnceWith('b');
+        expect(tools.getAttribute('aria-expanded')).toBe('true');
+        await click(trigger('Model'));
+        await press(menu('Model'), 'ArrowDown', {keyCode: 40, which: 40});
+        await press(menu('Model'), 'Enter', {keyCode: 13, which: 13});
+        await act(async () => menu('Model').dispatchEvent(new KeyboardEvent('keyup', {key: 'Enter', keyCode: 13, which: 13, bubbles: true})));
+        expect(model).toHaveBeenCalledExactlyOnceWith('n');
+        expect(tools.getAttribute('aria-expanded')).toBe('true');
+        await click(trigger('Reasoning'));
+        expect(menu('Reasoning').querySelector('[aria-selected=true]').textContent).toBe('Default');
+        await click([...menu('Reasoning').querySelectorAll('[role=option]')].find(option => option.textContent === 'High').querySelector('a'));
+        expect(reasoning).toHaveBeenCalledExactlyOnceWith('high');
+        expect(host.querySelector('textarea').value).toBe('Keep this draft');
+        await press(trigger('Reasoning'), 'Escape', {keyCode: 27, which: 27});
+        await act(() => new Promise(resolve => setTimeout(resolve, 350)));
+        expect(tools.getAttribute('aria-expanded')).toBe('false');
+        for (const themeId of ['baseline', 'steward-neutral-preview', 'steward-verification-preview', 'viant-2026-preview']) {
+            await render(fixture(themeId));
+            await click(tools);
+            expect(panel().querySelectorAll('select')).toHaveLength(3);
+            expect(panel().querySelector('select[aria-label=Agent]').value).toBe('a');
+            await press(panel().querySelector('select'), 'Escape', {keyCode: 27, which: 27});
+            await act(() => new Promise(resolve => setTimeout(resolve, 350)));
+        }
     });
 
     it('preserves stop and queue callbacks while allowing the next draft', async () => {

@@ -4,6 +4,7 @@ import {createRoot} from 'react-dom/client';
 import {signal} from '@preact/signals-react';
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {DateRangePresetInput} from './index.jsx';
+import {ForgeThemeBoundary,ForgeThemeProvider} from '../../components/ThemeBoundary.jsx';
 let host,root;
 beforeEach(()=>{globalThis.IS_REACT_ACT_ENVIRONMENT=true;host=document.createElement('div');document.body.append(host);root=createRoot(host);});
 afterEach(async()=>{await act(async()=>root.unmount());host.remove();});
@@ -29,4 +30,20 @@ it('a rejected context operation leaves manual entry available without an unhand
  await act(async()=>root.render(<DateRangePresetInput value="custom" range={{}} options={options} onRangeChange={()=>{}} onPresetRequest={()=>Promise.reject(new Error('unavailable'))} customApplyEnabled/>));
  await act(async()=>host.querySelector('button').click());await act(async()=>button('Yesterday').click());
  expect(document.querySelector('[role=alert]').textContent).toContain('Enter dates manually');expect(document.querySelector('input[aria-label="Custom start date"]')).toBeTruthy();
+});
+
+it('uses the themed calendar while keeping the custom pair uncommitted until Apply',async()=>{
+ const range=vi.fn();
+ await act(async()=>root.render(<ForgeThemeProvider themeId="design-system-2" mode="light"><ForgeThemeBoundary windowKey="range-test">
+  <DateRangePresetInput value="custom" range={{start:'2026-01-02',end:'2026-01-03'}} options={options} onRangeChange={range} customApplyEnabled/>
+ </ForgeThemeBoundary></ForgeThemeProvider>));
+ await act(async()=>host.querySelector('button').click());
+ const start=document.querySelector('input[aria-label="Custom start date"]');
+ expect(start.type).toBe('text');expect(start.getAttribute('role')).toBe('combobox');
+ expect(start.closest('.bp6-input-group').querySelector('svg')).toBeTruthy();
+ expect(button('Apply dates').dataset.forgeVariant).toBe('primary');
+ await date('Custom end date','2026-01-05');await date('Custom start date','2026-01-04');
+ expect(range).not.toHaveBeenCalled();
+ await act(async()=>button('Apply dates').click());
+ expect(range).toHaveBeenCalledExactlyOnceWith({start:'2026-01-04',end:'2026-01-05'});
 });
