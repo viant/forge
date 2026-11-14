@@ -6,7 +6,10 @@ assert.deepEqual(normalizeReportTableLink({ kind: "external", urlField: "creativ
   kind: "external",
   urlField: "creativeUrl",
 });
-assert.equal(normalizeReportTableLink({ kind: "external", hrefTemplate: "javascript:alert(1)" }), null);
+// Template metadata is admitted; the resolved destination retains HTTP(S) validation.
+assert.deepEqual(normalizeReportTableLink({ kind: "external", hrefTemplate: "javascript:alert(1)" }), {
+  kind: "external", hrefTemplate: "javascript:alert(1)",
+});
 assert.equal(normalizeReportTableLink({ kind: "entityDetail", handler: "creative" }), null);
 
 assert.deepEqual(resolveReportTableLink({

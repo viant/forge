@@ -22,12 +22,18 @@ function normalizeLinkText(value, fallbackText = '') {
     return fallbackText;
 }
 
-function resolveTemplateText(template = '', holder = null) {
+const templateSelectorPattern = /\{\{\s*([^}]+?)\s*\}\}/g;
+
+export function getTemplateSelectors(template = '') {
+    return [...new Set(Array.from(normalizeString(template).matchAll(templateSelectorPattern), match => match[1].trim()))];
+}
+
+export function resolveTemplateText(template = '', holder = null) {
     const source = normalizeString(template);
     if (!source) {
         return '';
     }
-    return source.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_, selector) => {
+    return source.replace(templateSelectorPattern, (_, selector) => {
         const value = resolveKey(holder || {}, String(selector || '').trim());
         return value == null ? '' : String(value);
     }).replace(/\s{2,}/g, ' ').trim();

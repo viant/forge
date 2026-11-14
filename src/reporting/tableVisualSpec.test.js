@@ -176,10 +176,10 @@ assert.deepEqual(normalizeReportTableBlockColumn({
   link: { kind: "entityDetail", handler: "entity", idField: "entityId" },
 });
 
-assert.equal("link" in normalizeReportTableBlockColumn({
-  key: "unsafe",
-  link: { kind: "external", hrefTemplate: "javascript:alert(1)" },
-}), false);
+assert.deepEqual(normalizeReportTableBlockColumn({
+  key: "record",
+  link: { kind: "external", hrefTemplate: "https://example.invalid/records/{{recordId}}" },
+}).link, { kind: "external", hrefTemplate: "https://example.invalid/records/{{recordId}}" });
 
 assert.deepEqual(normalizeReportDocumentTableBlock({
   id: "comparisonTable",

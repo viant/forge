@@ -29,6 +29,7 @@ import {
   normalizeRefinementBarText,
 } from "./refinementBarModel.js";
 import { normalizeReportDocumentTableBlock } from "./tableVisualSpec.js";
+import { getReportTableLinkFields } from "./reportTableLink.js";
 import { buildReportBuilderCalculatedFieldConfig } from "../components/dashboard/reportBuilderCalculatedFieldAuthoring.js";
 import { normalizeReportBuilderStaticDatasets } from "../components/dashboard/reportBuilderStaticDatasets.js";
 import {
@@ -269,8 +270,8 @@ function buildAuthoredTableBlock(block = {}, fieldCatalog = {}) {
     if (!normalizedColumn) {
       return column;
     }
-    const linkField = normalizeString(normalizedColumn?.link?.urlField || normalizedColumn?.link?.idField);
-    const hasValidLinkField = !linkField || !!resolveReportBuilderCatalogEntry(fieldCatalog, linkField);
+    const hasValidLinkField = getReportTableLinkFields(normalizedColumn.link)
+      .every(field => !!resolveReportBuilderCatalogEntry(fieldCatalog, field));
     if (!hasValidLinkField) {
       delete normalizedColumn.link;
     }
@@ -705,8 +706,7 @@ function augmentReportRequestForAuthoredBlocks(baseSpec, blocks, config, express
           enableField(column?.key, normalizedDatasetRef, request);
           enableField(column?.cellVisual?.valueField, normalizedDatasetRef, request);
           enableField(column?.cellVisual?.colorField, normalizedDatasetRef, request);
-          enableField(column?.link?.urlField, normalizedDatasetRef, request);
-          enableField(column?.link?.idField, normalizedDatasetRef, request);
+          getReportTableLinkFields(column?.link).forEach(field => enableField(field, normalizedDatasetRef, request));
         });
         break;
       case "geoMapBlock":

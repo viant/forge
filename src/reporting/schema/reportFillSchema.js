@@ -435,10 +435,12 @@ export const reportFillSchema = {
         {
           type: "object",
           additionalProperties: false,
-          required: ["kind", "urlField"],
+          required: ["kind"],
+          anyOf: [{ required: ["urlField"] }, { required: ["hrefTemplate"] }],
           properties: {
             kind: { const: "external" },
             urlField: { type: "string", minLength: 1 },
+            hrefTemplate: { type: "string", minLength: 1 },
           },
         },
         {

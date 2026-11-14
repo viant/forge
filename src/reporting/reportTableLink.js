@@ -1,5 +1,6 @@
 import { resolveKey } from "../utils/selector.js";
 import { normalizePresentationText } from "../utils/presentationText.js";
+import { getTemplateSelectors, resolveTemplateText } from "../utils/linkTarget.js";
 
 function normalizeString(value = "") {
   return String(value ?? "").trim();
@@ -22,7 +23,9 @@ export function normalizeReportTableLink(link = null) {
   const kind = normalizeString(link.kind).toLowerCase();
   if (kind === "external") {
     const urlField = normalizeString(link.urlField);
-    return urlField ? { kind: "external", urlField } : null;
+    if (urlField) return { kind: "external", urlField };
+    const hrefTemplate = normalizeString(link.hrefTemplate);
+    return hrefTemplate ? { kind: "external", hrefTemplate } : null;
   }
   if (kind === "entitydetail") {
     const handler = normalizeString(link.handler);
@@ -32,13 +35,31 @@ export function normalizeReportTableLink(link = null) {
   return null;
 }
 
+export function getReportTableLinkFields(config = null) {
+  const link = normalizeReportTableLink(config);
+  if (!link) return [];
+  if (link.urlField || link.idField) return [link.urlField || link.idField];
+  return getTemplateSelectors(link.hrefTemplate);
+}
+
 export function resolveReportTableLink({ row, column, value, entityDetailHandlers = null } = {}) {
   const link = normalizeReportTableLink(column?.link);
   const text = normalizePresentationText(value);
   if (!link || !text) return null;
   if (link.kind === "external") {
-    if (!hasField(row, link.urlField)) return null;
-    const rawUrl = normalizeString(resolveKey(row, link.urlField));
+    let rawUrl;
+    if (link.hrefTemplate) {
+      const fields = getTemplateSelectors(link.hrefTemplate);
+      if (fields.some(field => {
+        if (!hasField(row, field)) return true;
+        const destinationValue = resolveKey(row, field);
+        return destinationValue == null || normalizeString(destinationValue) === "";
+      })) return null;
+      rawUrl = resolveTemplateText(link.hrefTemplate, row);
+    } else {
+      if (!hasField(row, link.urlField)) return null;
+      rawUrl = normalizeString(resolveKey(row, link.urlField));
+    }
     let url;
     try {
       url = new URL(rawUrl);

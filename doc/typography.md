@@ -691,6 +691,16 @@ table or when splitting a wide table for print. Existing compiler/schema/backend
 round-trip tests cover this optional field. Existing external table links use
 `link: {kind: 'external', urlField: 'url'}`; shared validation admits HTTP/HTTPS
 only and keeps missing/invalid destinations inert.
+For row-derived destinations, `link: {kind: 'external', hrefTemplate:
+'https://example.invalid/records/{{recordId}}'}` uses the shared table-link
+template grammar. Nested row selectors are supported. Substitutions are literal:
+they do not evaluate expressions or URL-encode components. Template fields must belong
+to the table's dataset catalog and are retained by its existing request planner.
+A previously unselected identifier therefore requests that native field. Destination
+formatting creates no computed URL fields in exported rows. Missing/null/blank fields
+and non-HTTP(S) resolved destinations remain inert. When both destination forms
+are supplied, `urlField` retains precedence. Report templates use row data;
+window-form template sources remain part of the ordinary window-table contract.
 
 ### Selectable review reports
 

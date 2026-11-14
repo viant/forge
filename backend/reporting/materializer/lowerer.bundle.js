@@ -43418,23 +43418,267 @@ Please __addLocaleData before adding additional unit data`);
     };
   }
 
+  // src/utils/linkTarget.js
+  function normalizeString(value) {
+    if (typeof value !== "string") {
+      return "";
+    }
+    return value.trim();
+  }
+  function isObjectValue(value) {
+    return value != null && typeof value === "object" && !Array.isArray(value);
+  }
+  function normalizeLinkText(value, fallbackText = "") {
+    if (value == null) {
+      return fallbackText;
+    }
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      const text4 = String(value);
+      return text4 || fallbackText;
+    }
+    return fallbackText;
+  }
+  var templateSelectorPattern = /\{\{\s*([^}]+?)\s*\}\}/g;
+  function getTemplateSelectors(template = "") {
+    return [...new Set(Array.from(normalizeString(template).matchAll(templateSelectorPattern), (match2) => match2[1].trim()))];
+  }
+  function resolveTemplateText(template = "", holder = null) {
+    const source = normalizeString(template);
+    if (!source) {
+      return "";
+    }
+    return source.replace(templateSelectorPattern, (_2, selector2) => {
+      const value = resolveKey(holder || {}, String(selector2 || "").trim());
+      return value == null ? "" : String(value);
+    }).replace(/\s{2,}/g, " ").trim();
+  }
+  function resolveContextSourceValue({ source = "value", selector: selector2 = "", context = null, row = null, value = null } = {}) {
+    var _a5, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X;
+    switch (String(source || "value").trim().toLowerCase()) {
+      case "row":
+        return selector2 ? resolveKey(row || {}, selector2) : row;
+      case "value":
+        return selector2 ? resolveKey(value || {}, selector2) : value;
+      case "form":
+        return selector2 ? resolveKey(((_c = (_b = (_a5 = context == null ? void 0 : context.handlers) == null ? void 0 : _a5.dataSource) == null ? void 0 : _b.getFormData) == null ? void 0 : _c.call(_b)) || {}, selector2) : ((_f = (_e = (_d = context == null ? void 0 : context.handlers) == null ? void 0 : _d.dataSource) == null ? void 0 : _e.getFormData) == null ? void 0 : _f.call(_e)) || {};
+      case "windowform":
+        return selector2 ? resolveKey(((_i = (_h = (_g = context == null ? void 0 : context.signals) == null ? void 0 : _g.windowForm) == null ? void 0 : _h.peek) == null ? void 0 : _i.call(_h)) || ((_k = (_j = context == null ? void 0 : context.signals) == null ? void 0 : _j.windowForm) == null ? void 0 : _k.value) || {}, selector2) : ((_n = (_m = (_l = context == null ? void 0 : context.signals) == null ? void 0 : _l.windowForm) == null ? void 0 : _m.peek) == null ? void 0 : _n.call(_m)) || ((_p = (_o = context == null ? void 0 : context.signals) == null ? void 0 : _o.windowForm) == null ? void 0 : _p.value) || {};
+      case "metrics":
+        return selector2 ? resolveKey(((_s = (_r = (_q = context == null ? void 0 : context.signals) == null ? void 0 : _q.metrics) == null ? void 0 : _r.peek) == null ? void 0 : _s.call(_r)) || ((_u = (_t = context == null ? void 0 : context.signals) == null ? void 0 : _t.metrics) == null ? void 0 : _u.value) || {}, selector2) : ((_x = (_w = (_v = context == null ? void 0 : context.signals) == null ? void 0 : _v.metrics) == null ? void 0 : _w.peek) == null ? void 0 : _x.call(_w)) || ((_z = (_y = context == null ? void 0 : context.signals) == null ? void 0 : _y.metrics) == null ? void 0 : _z.value) || {};
+      case "filter":
+        return selector2 ? resolveKey(((_C = (_B = (_A = context == null ? void 0 : context.handlers) == null ? void 0 : _A.dataSource) == null ? void 0 : _B.peekFilter) == null ? void 0 : _C.call(_B)) || {}, selector2) : ((_F = (_E = (_D = context == null ? void 0 : context.handlers) == null ? void 0 : _D.dataSource) == null ? void 0 : _E.peekFilter) == null ? void 0 : _F.call(_E)) || {};
+      case "selection": {
+        const selection = ((_I = (_H = (_G = context == null ? void 0 : context.handlers) == null ? void 0 : _G.dataSource) == null ? void 0 : _H.getSelection) == null ? void 0 : _I.call(_H)) || ((_L = (_K = (_J = context == null ? void 0 : context.handlers) == null ? void 0 : _J.dataSource) == null ? void 0 : _K.peekSelection) == null ? void 0 : _L.call(_K)) || {};
+        const selected = (_N = (_M = selection == null ? void 0 : selection.selected) != null ? _M : selection == null ? void 0 : selection.selection) != null ? _N : selection;
+        return selector2 ? resolveKey(selected || {}, selector2) : selected;
+      }
+      case "input":
+        return selector2 ? resolveKey(((_Q = (_P = (_O = context == null ? void 0 : context.signals) == null ? void 0 : _O.input) == null ? void 0 : _P.peek) == null ? void 0 : _Q.call(_P)) || ((_S = (_R = context == null ? void 0 : context.signals) == null ? void 0 : _R.input) == null ? void 0 : _S.value) || {}, selector2) : ((_V = (_U = (_T = context == null ? void 0 : context.signals) == null ? void 0 : _T.input) == null ? void 0 : _U.peek) == null ? void 0 : _V.call(_U)) || ((_X = (_W = context == null ? void 0 : context.signals) == null ? void 0 : _W.input) == null ? void 0 : _X.value) || {};
+      case "const":
+        return value;
+      default:
+        return void 0;
+    }
+  }
+  function resolveParameterSpecValue(spec, runtime = {}) {
+    if (isObjectValue(spec)) {
+      const source = spec.source || (spec.selector ? "row" : Object.prototype.hasOwnProperty.call(spec, "value") ? "const" : "value");
+      const selector2 = normalizeString(spec.selector || spec.path || spec.location);
+      const resolved = resolveContextSourceValue({
+        source,
+        selector: selector2,
+        context: runtime.context,
+        row: runtime.row,
+        value: Object.prototype.hasOwnProperty.call(spec, "value") ? spec.value : runtime.value
+      });
+      if (spec.wrap === "array") {
+        return Array.isArray(resolved) ? resolved : [resolved];
+      }
+      return resolved;
+    }
+    return spec;
+  }
+  function resolveWindowParameters(parameters = {}, runtime = {}) {
+    if (!isObjectValue(parameters)) {
+      return {};
+    }
+    const result = {};
+    Object.entries(parameters).forEach(([key2, spec]) => {
+      if (!key2) return;
+      result[key2] = resolveParameterSpecValue(spec, runtime);
+    });
+    return result;
+  }
+  function resolveLinkTarget({ linkConfig = null, row = null, value = null, context = null } = {}) {
+    var _a5, _b, _c, _d, _e, _f, _g;
+    const objectValue = isObjectValue(value) ? value : null;
+    if (!isObjectValue(linkConfig)) {
+      if (!(objectValue == null ? void 0 : objectValue.href)) {
+        return null;
+      }
+      return {
+        kind: "external",
+        href: normalizeString(objectValue.href),
+        text: normalizeLinkText((_a5 = objectValue == null ? void 0 : objectValue.label) != null ? _a5 : objectValue == null ? void 0 : objectValue.text, normalizeString(objectValue.href)),
+        target: normalizeString(objectValue == null ? void 0 : objectValue.target) || "_blank",
+        rel: normalizeString(objectValue == null ? void 0 : objectValue.rel) || "noopener noreferrer",
+        title: normalizeString(objectValue == null ? void 0 : objectValue.title)
+      };
+    }
+    const kind = normalizeString(linkConfig.kindSelector ? resolveContextSourceValue({ source: linkConfig.kindSource || "windowForm", selector: linkConfig.kindSelector, context, row, value }) : "") || normalizeString(linkConfig.kind || "");
+    const windowKey = normalizeString(linkConfig.windowKey || "");
+    const dialogId = normalizeString(linkConfig.dialogId || linkConfig.dialog || "");
+    if (kind === "association") {
+      const associations = Array.isArray(value) ? value.filter((entry) => entry != null) : [];
+      if (associations.length === 0) {
+        return null;
+      }
+      if (associations.length === 1 && windowKey) {
+        return resolveLinkTarget({
+          linkConfig: { ...linkConfig, kind: "window", dialogId: "", dialog: "" },
+          row,
+          value: associations[0],
+          context
+        });
+      }
+      if (!dialogId) {
+        return null;
+      }
+      return {
+        kind: "dialog",
+        text: normalizeLinkText(value, dialogId),
+        title: normalizeString(linkConfig.title),
+        dialogId,
+        awaitResult: linkConfig.awaitResult === true,
+        parameters: {
+          associations,
+          associationIds: associations.map((entry) => {
+            var _a6, _b2;
+            return Number((_b2 = (_a6 = entry == null ? void 0 : entry.id) != null ? _a6 : entry == null ? void 0 : entry.adOrderId) != null ? _b2 : entry);
+          }).filter((id) => Number.isInteger(id) && id > 0)
+        }
+      };
+    }
+    if (kind === "dialog" || !kind && dialogId) {
+      if (!dialogId) {
+        return null;
+      }
+      const textSource2 = linkConfig.textSelector ? resolveContextSourceValue({
+        source: linkConfig.textSource || "row",
+        selector: linkConfig.textSelector,
+        context,
+        row,
+        value
+      }) : linkConfig.label ? resolveKey(row || {}, linkConfig.label) : (_b = linkConfig.text) != null ? _b : value;
+      return {
+        kind: "dialog",
+        text: normalizeLinkText(textSource2, dialogId),
+        title: normalizeString(linkConfig.title),
+        dialogId,
+        awaitResult: linkConfig.awaitResult === true,
+        parameters: resolveWindowParameters(linkConfig.parameters, { row, value, context })
+      };
+    }
+    if (kind === "window" || !kind && windowKey) {
+      if (!windowKey) {
+        return null;
+      }
+      const textSource2 = linkConfig.textSelector ? resolveContextSourceValue({
+        source: linkConfig.textSource || "row",
+        selector: linkConfig.textSelector,
+        context,
+        row,
+        value
+      }) : linkConfig.label ? resolveKey(row || {}, linkConfig.label) : (_c = linkConfig.text) != null ? _c : value;
+      const text5 = normalizeLinkText(textSource2, normalizeString(linkConfig.windowTitle) || windowKey);
+      const hasDynamicWindowTitleSource = Boolean(linkConfig.windowTitleSelector) || Boolean(linkConfig.windowTitleSource);
+      const titleSource = hasDynamicWindowTitleSource ? resolveContextSourceValue({
+        source: linkConfig.windowTitleSource || "row",
+        selector: linkConfig.windowTitleSelector || "",
+        context,
+        row,
+        value
+      }) : linkConfig.windowTitle;
+      const titleTemplate = normalizeString(linkConfig.windowTitleTemplate);
+      const titleTemplateSource = titleTemplate ? resolveContextSourceValue({
+        source: linkConfig.windowTitleSource || "row",
+        selector: "",
+        context,
+        row,
+        value
+      }) : null;
+      const windowTitle = titleTemplate ? resolveTemplateText(titleTemplate, titleTemplateSource) : normalizeLinkText(titleSource, "");
+      return {
+        kind: "window",
+        text: text5,
+        title: normalizeString(linkConfig.title),
+        windowKey,
+        ...normalizeString(linkConfig.revision) ? { revision: normalizeString(linkConfig.revision) } : {},
+        ...Array.isArray(linkConfig.identityParameters) && linkConfig.identityParameters.length > 0 ? { identityParameters: [...linkConfig.identityParameters] } : {},
+        windowTitle,
+        ...normalizeString(linkConfig.chipName) ? { chipName: normalizeString(linkConfig.chipName) } : {},
+        ...normalizeString(linkConfig.chipIcon) ? { chipIcon: normalizeString(linkConfig.chipIcon) } : {},
+        inTab: linkConfig.inTab !== false,
+        newInstance: linkConfig.newInstance === true,
+        autoIndexTitle: linkConfig.autoIndexTitle === true,
+        awaitResult: linkConfig.awaitResult === true,
+        modal: linkConfig.modal === true,
+        size: isObjectValue(linkConfig.size) ? linkConfig.size : void 0,
+        width: linkConfig.width,
+        height: linkConfig.height,
+        footer: linkConfig.footer,
+        parameters: resolveWindowParameters(linkConfig.parameters, { row, value, context })
+      };
+    }
+    let href = normalizeString(
+      (linkConfig == null ? void 0 : linkConfig.hrefTemplate) ? resolveTemplateText(linkConfig.hrefTemplate, linkConfig.hrefTemplateSource ? resolveContextSourceValue({ source: linkConfig.hrefTemplateSource, context, row, value }) : row || {}) : (linkConfig == null ? void 0 : linkConfig.href) ? resolveKey(row || {}, linkConfig.href) : (_d = objectValue == null ? void 0 : objectValue.href) != null ? _d : ""
+    );
+    if (!href) {
+      return null;
+    }
+    const baseUrl = normalizeString(linkConfig.baseUrlSelector ? resolveContextSourceValue({ source: linkConfig.baseUrlSource || "windowForm", selector: linkConfig.baseUrlSelector, context, row, value }) : "") || normalizeString(linkConfig.baseUrl);
+    if (baseUrl && !/^[a-z][a-z0-9+.-]*:/i.test(href)) {
+      try {
+        const base = new URL(baseUrl);
+        if (!["http:", "https:"].includes(base.protocol)) return null;
+        href = new URL(href.replace(/^\/+/, ""), base.href.replace(/\/?$/, "/")).href;
+      } catch (e3) {
+        return null;
+      }
+    }
+    const textSource = (linkConfig == null ? void 0 : linkConfig.label) ? resolveKey(row || {}, linkConfig.label) : (_g = (_f = (_e = linkConfig == null ? void 0 : linkConfig.text) != null ? _e : objectValue == null ? void 0 : objectValue.label) != null ? _f : objectValue == null ? void 0 : objectValue.text) != null ? _g : value;
+    const text4 = normalizeLinkText(textSource, href);
+    const target = normalizeString((objectValue == null ? void 0 : objectValue.target) || (linkConfig == null ? void 0 : linkConfig.target)) || "_blank";
+    const rel = normalizeString((objectValue == null ? void 0 : objectValue.rel) || (linkConfig == null ? void 0 : linkConfig.rel)) || "noopener noreferrer";
+    const title = normalizeString(objectValue == null ? void 0 : objectValue.title);
+    return { kind: "external", href, text: text4, target, rel, title };
+  }
+
   // src/reporting/reportTableLink.js
-  function normalizeString(value = "") {
+  function normalizeString2(value = "") {
     return String(value != null ? value : "").trim();
   }
   function normalizeReportTableLink(link = null) {
     if (!link || typeof link !== "object" || Array.isArray(link)) return null;
-    const kind = normalizeString(link.kind).toLowerCase();
+    const kind = normalizeString2(link.kind).toLowerCase();
     if (kind === "external") {
-      const urlField = normalizeString(link.urlField);
-      return urlField ? { kind: "external", urlField } : null;
+      const urlField = normalizeString2(link.urlField);
+      if (urlField) return { kind: "external", urlField };
+      const hrefTemplate = normalizeString2(link.hrefTemplate);
+      return hrefTemplate ? { kind: "external", hrefTemplate } : null;
     }
     if (kind === "entitydetail") {
-      const handler = normalizeString(link.handler);
-      const idField = normalizeString(link.idField);
+      const handler = normalizeString2(link.handler);
+      const idField = normalizeString2(link.idField);
       return handler && idField ? { kind: "entityDetail", handler, idField } : null;
     }
     return null;
+  }
+  function getReportTableLinkFields(config = null) {
+    const link = normalizeReportTableLink(config);
+    if (!link) return [];
+    if (link.urlField || link.idField) return [link.urlField || link.idField];
+    return getTemplateSelectors(link.hrefTemplate);
   }
 
   // src/reporting/reportRowVisibility.js
@@ -48065,7 +48309,7 @@ ${indent}${end}`;
   };
 
   // src/reporting/reportBlockRuntimeModel.js
-  function normalizeString2(value = "") {
+  function normalizeString3(value = "") {
     return String(value || "").trim();
   }
   function cloneValue(value) {
@@ -48080,7 +48324,7 @@ ${indent}${end}`;
     if (Object.prototype.hasOwnProperty.call(normalized, "all")) {
       normalized.all = Array.isArray(normalized.all) && normalized.all.length <= 32 ? normalized.all.map((child) => normalizeReportRuntimeCondition(child, depth + 1) || { all: [] }) : [];
     }
-    const selector2 = normalizeString2((normalized == null ? void 0 : normalized.selector) || (normalized == null ? void 0 : normalized.field) || (normalized == null ? void 0 : normalized.key));
+    const selector2 = normalizeString3((normalized == null ? void 0 : normalized.selector) || (normalized == null ? void 0 : normalized.field) || (normalized == null ? void 0 : normalized.key));
     if (selector2.startsWith("dashboard.selection.")) {
       normalized.source = "selection";
       normalized.selector = selector2.slice("dashboard.selection.".length);
@@ -48099,7 +48343,7 @@ ${indent}${end}`;
   function resolveReportRuntimeFilterValues(scopeParams = []) {
     const entries2 = scopeParams instanceof Map ? Array.from(scopeParams.entries()).map(([id, entry]) => ({ id, ...entry || {} })) : Array.isArray(scopeParams) ? scopeParams : [];
     return entries2.reduce((result, entry) => {
-      const id = normalizeString2((entry == null ? void 0 : entry.id) || (entry == null ? void 0 : entry.field));
+      const id = normalizeString3((entry == null ? void 0 : entry.id) || (entry == null ? void 0 : entry.field));
       if (id) {
         result[id] = cloneValue(entry == null ? void 0 : entry.value);
       }
@@ -48196,7 +48440,7 @@ ${indent}${end}`;
   function cloneValue2(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
   }
-  function normalizeString3(value = "") {
+  function normalizeString4(value = "") {
     return String(value || "").trim();
   }
   var REPORT_CALCULATED_FIELD_FUNCTION_SPECS = Object.freeze({
@@ -48284,31 +48528,31 @@ ${indent}${end}`;
     }
   ]);
   function listReportCalculatedFieldTableCalculationSpecs() {
-    return REPORT_CALCULATED_FIELD_TABLE_CALC_SPECS.map((entry) => cloneValue2(entry)).sort((left, right) => normalizeString3(left.name).localeCompare(normalizeString3(right.name)));
+    return REPORT_CALCULATED_FIELD_TABLE_CALC_SPECS.map((entry) => cloneValue2(entry)).sort((left, right) => normalizeString4(left.name).localeCompare(normalizeString4(right.name)));
   }
 
   // src/reporting/calculatedFieldModel.js
-  function normalizeString4(value = "") {
+  function normalizeString5(value = "") {
     return String(value || "").trim();
   }
   function cloneValue3(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
   }
   function normalizeStringArray(values = []) {
-    return (Array.isArray(values) ? values : []).map((value) => normalizeString4(value)).filter(Boolean);
+    return (Array.isArray(values) ? values : []).map((value) => normalizeString5(value)).filter(Boolean);
   }
   function normalizeOrderBy(orderBy = []) {
     return (Array.isArray(orderBy) ? orderBy : []).map((entry) => {
       if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
         return null;
       }
-      const field2 = normalizeString4(entry.field);
+      const field2 = normalizeString5(entry.field);
       if (!field2) {
         return null;
       }
       return {
         field: field2,
-        direction: normalizeString4(entry.direction).toLowerCase() === "desc" ? "desc" : "asc"
+        direction: normalizeString5(entry.direction).toLowerCase() === "desc" ? "desc" : "asc"
       };
     }).filter(Boolean);
   }
@@ -48576,7 +48820,7 @@ ${indent}${end}`;
       return dependencies;
     }
     if (node.type === "identifier") {
-      dependencies.add(normalizeString4(node.name));
+      dependencies.add(normalizeString5(node.name));
       return dependencies;
     }
     if (node.type === "unary") {
@@ -48611,7 +48855,7 @@ ${indent}${end}`;
       return;
     }
     if (node.type === "call") {
-      const normalizedCallee = normalizeString4(node.callee).toLowerCase();
+      const normalizedCallee = normalizeString5(node.callee).toLowerCase();
       const spec = REPORT_CALCULATED_FIELD_FUNCTION_SPECS[normalizedCallee];
       if (!spec) {
         throw buildExpressionError(`unsupported function "${node.callee}"`);
@@ -48631,7 +48875,7 @@ ${indent}${end}`;
     throw buildExpressionError(`unsupported expression node "${String(node.type || "unknown")}"`);
   }
   function parseReportCalculatedFieldExpression(expression = "") {
-    const normalizedExpression = normalizeString4(expression);
+    const normalizedExpression = normalizeString5(expression);
     if (!normalizedExpression) {
       return null;
     }
@@ -48664,7 +48908,7 @@ ${indent}${end}`;
     if (typeof value === "number") {
       return value !== 0;
     }
-    const trimmed = normalizeString4(value);
+    const trimmed = normalizeString5(value);
     if (!trimmed) {
       return false;
     }
@@ -48724,7 +48968,7 @@ ${indent}${end}`;
     }
   }
   function evaluateReportCalculatedFieldFunction(node = {}, row = {}) {
-    const callee = normalizeString4(node == null ? void 0 : node.callee).toLowerCase();
+    const callee = normalizeString5(node == null ? void 0 : node.callee).toLowerCase();
     const args = Array.isArray(node == null ? void 0 : node.args) ? node.args : [];
     switch (callee) {
       case "if": {
@@ -48900,8 +49144,8 @@ ${indent}${end}`;
     }
   }
   function normalizeRatioCalculation(compute = {}) {
-    const numerator = normalizeString4(compute == null ? void 0 : compute.numerator);
-    const denominator = normalizeString4(compute == null ? void 0 : compute.denominator);
+    const numerator = normalizeString5(compute == null ? void 0 : compute.numerator);
+    const denominator = normalizeString5(compute == null ? void 0 : compute.denominator);
     if (!numerator || !denominator) {
       return null;
     }
@@ -48919,7 +49163,7 @@ ${indent}${end}`;
     return next;
   }
   function normalizePercentOfTotalCalculation(compute = {}) {
-    const sourceField = normalizeString4(compute == null ? void 0 : compute.sourceField);
+    const sourceField = normalizeString5(compute == null ? void 0 : compute.sourceField);
     if (!sourceField) {
       return null;
     }
@@ -48948,7 +49192,7 @@ ${indent}${end}`;
     return next;
   }
   function normalizeDeltaFromPreviousCalculation(compute = {}) {
-    const sourceField = normalizeString4(compute == null ? void 0 : compute.sourceField);
+    const sourceField = normalizeString5(compute == null ? void 0 : compute.sourceField);
     const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
     if (!sourceField || orderBy.length === 0) {
       return null;
@@ -48965,7 +49209,7 @@ ${indent}${end}`;
     return next;
   }
   function normalizeLagCalculation(compute = {}) {
-    const sourceField = normalizeString4(compute == null ? void 0 : compute.sourceField);
+    const sourceField = normalizeString5(compute == null ? void 0 : compute.sourceField);
     const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
     const offset = (compute == null ? void 0 : compute.offset) == null ? 1 : Number(compute.offset);
     if (!sourceField || !orderBy.length || !Number.isSafeInteger(offset) || offset < 1 || offset > 1e4) return null;
@@ -48974,10 +49218,10 @@ ${indent}${end}`;
   }
   function normalizeWindowMaxCalculation(compute = {}) {
     var _a5;
-    const sourceField = normalizeString4(compute == null ? void 0 : compute.sourceField);
+    const sourceField = normalizeString5(compute == null ? void 0 : compute.sourceField);
     const partitionBy = normalizePartitionBy(compute == null ? void 0 : compute.partitionBy);
     const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
-    const type = normalizeString4((_a5 = compute == null ? void 0 : compute.frame) == null ? void 0 : _a5.type);
+    const type = normalizeString5((_a5 = compute == null ? void 0 : compute.frame) == null ? void 0 : _a5.type);
     if (!sourceField || !["full", "rows"].includes(type)) return null;
     let frame = { type };
     if (type === "rows") {
@@ -48988,7 +49232,7 @@ ${indent}${end}`;
     return { type: "windowMax", sourceField, frame, ...partitionBy.length ? { partitionBy } : {}, ...orderBy.length ? { orderBy } : {} };
   }
   function normalizeRunningTotalCalculation(compute = {}) {
-    const sourceField = normalizeString4(compute == null ? void 0 : compute.sourceField);
+    const sourceField = normalizeString5(compute == null ? void 0 : compute.sourceField);
     const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
     if (!sourceField || orderBy.length === 0) {
       return null;
@@ -49005,7 +49249,7 @@ ${indent}${end}`;
     return next;
   }
   function normalizeMovingAverageCalculation(compute = {}) {
-    const sourceField = normalizeString4(compute == null ? void 0 : compute.sourceField);
+    const sourceField = normalizeString5(compute == null ? void 0 : compute.sourceField);
     const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
     const windowSize = Math.max(1, Number((compute == null ? void 0 : compute.windowSize) || 0) || 0);
     if (!sourceField || orderBy.length === 0 || !windowSize) {
@@ -49028,9 +49272,9 @@ ${indent}${end}`;
   }
   function normalizeRankCalculation(compute = {}) {
     var _a5;
-    const sourceField = normalizeString4(compute == null ? void 0 : compute.sourceField);
+    const sourceField = normalizeString5(compute == null ? void 0 : compute.sourceField);
     const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
-    const tieMode = normalizeString4(compute == null ? void 0 : compute.tieMode).toLowerCase();
+    const tieMode = normalizeString5(compute == null ? void 0 : compute.tieMode).toLowerCase();
     if (!sourceField || orderBy.length === 0 || ((_a5 = orderBy[0]) == null ? void 0 : _a5.field) !== sourceField) {
       return null;
     }
@@ -49056,7 +49300,7 @@ ${indent}${end}`;
     ]));
   }
   function normalizeReportCalculatedFieldExpressionDefinition(definition = {}, expressionDependencies = null) {
-    const expr = normalizeString4(definition == null ? void 0 : definition.expr);
+    const expr = normalizeString5(definition == null ? void 0 : definition.expr);
     if (!expr) {
       return null;
     }
@@ -49076,7 +49320,7 @@ ${indent}${end}`;
   }
   function normalizeReportCalculatedFieldCompute(definition = {}) {
     var _a5;
-    const computeType = normalizeString4((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type).toLowerCase();
+    const computeType = normalizeString5((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type).toLowerCase();
     let compute = null;
     if (computeType === "ratio") {
       compute = normalizeRatioCalculation(definition.compute);
@@ -49111,7 +49355,7 @@ ${indent}${end}`;
     if (!definition || typeof definition !== "object" || Array.isArray(definition)) {
       return null;
     }
-    const id = normalizeString4((definition == null ? void 0 : definition.id) || (definition == null ? void 0 : definition.key));
+    const id = normalizeString5((definition == null ? void 0 : definition.id) || (definition == null ? void 0 : definition.key));
     if (!id) {
       return null;
     }
@@ -49120,18 +49364,18 @@ ${indent}${end}`;
     if (!normalizedExpression && !normalizedCompute) {
       return null;
     }
-    const kind = normalizedExpression ? "rowCalc" : normalizeString4((_a5 = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _a5.type).toLowerCase() === "percentoftotal" || normalizeString4((_b = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _b.type).toLowerCase() === "deltafromprevious" || normalizeString4((_c = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _c.type).toLowerCase() === "runningtotal" || normalizeString4((_d = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _d.type).toLowerCase() === "movingaverage" || normalizeString4((_e = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _e.type).toLowerCase() === "rank" || normalizeString4((_f = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _f.type).toLowerCase() === "lag" || normalizeString4((_g = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _g.type).toLowerCase() === "windowmax" ? "tableCalc" : "rowCalc";
-    if (normalizedExpression && normalizeString4(definition == null ? void 0 : definition.kind) && normalizeString4(definition.kind) !== "rowCalc") {
+    const kind = normalizedExpression ? "rowCalc" : normalizeString5((_a5 = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _a5.type).toLowerCase() === "percentoftotal" || normalizeString5((_b = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _b.type).toLowerCase() === "deltafromprevious" || normalizeString5((_c = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _c.type).toLowerCase() === "runningtotal" || normalizeString5((_d = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _d.type).toLowerCase() === "movingaverage" || normalizeString5((_e = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _e.type).toLowerCase() === "rank" || normalizeString5((_f = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _f.type).toLowerCase() === "lag" || normalizeString5((_g = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _g.type).toLowerCase() === "windowmax" ? "tableCalc" : "rowCalc";
+    if (normalizedExpression && normalizeString5(definition == null ? void 0 : definition.kind) && normalizeString5(definition.kind) !== "rowCalc") {
       return null;
     }
     return {
       id,
-      key: normalizeString4((definition == null ? void 0 : definition.key) || id),
+      key: normalizeString5((definition == null ? void 0 : definition.key) || id),
       kind,
-      label: normalizeString4((definition == null ? void 0 : definition.label) || id),
-      dataType: normalizeString4((definition == null ? void 0 : definition.dataType) || "number") || "number",
-      ...normalizeString4(definition == null ? void 0 : definition.format) ? { format: normalizeString4(definition.format) } : {},
-      ...normalizeString4((definition == null ? void 0 : definition.datasetRef) || datasetRef) ? { datasetRef: normalizeString4((definition == null ? void 0 : definition.datasetRef) || datasetRef) } : {},
+      label: normalizeString5((definition == null ? void 0 : definition.label) || id),
+      dataType: normalizeString5((definition == null ? void 0 : definition.dataType) || "number") || "number",
+      ...normalizeString5(definition == null ? void 0 : definition.format) ? { format: normalizeString5(definition.format) } : {},
+      ...normalizeString5((definition == null ? void 0 : definition.datasetRef) || datasetRef) ? { datasetRef: normalizeString5((definition == null ? void 0 : definition.datasetRef) || datasetRef) } : {},
       dependencies: (normalizedExpression == null ? void 0 : normalizedExpression.dependencies) || (normalizedCompute == null ? void 0 : normalizedCompute.dependencies) || [],
       ...normalizedExpression ? { expr: normalizedExpression.expr } : { compute: normalizedCompute.compute }
     };
@@ -49168,7 +49412,7 @@ ${indent}${end}`;
     });
   }
   function resolveReportCalculatedFieldReference(definitions, reference, { datasetRef } = {}) {
-    const candidates = definitions.filter((definition) => (datasetRef === void 0 || !definition.datasetRef || definition.datasetRef === datasetRef) && [definition.id, definition.key].includes(normalizeString4(reference)));
+    const candidates = definitions.filter((definition) => (datasetRef === void 0 || !definition.datasetRef || definition.datasetRef === datasetRef) && [definition.id, definition.key].includes(normalizeString5(reference)));
     if (candidates.length > 1) throw new Error(`Ambiguous calculated field reference '${reference}' in dataset '${datasetRef != null ? datasetRef : "unspecified"}'. Use a unique id or declare datasetRef.`);
     return candidates[0] || null;
   }
@@ -49184,9 +49428,9 @@ ${indent}${end}`;
   function topologicallySortCalculatedFields(definitions = []) {
     validateCalculatedFieldAliases(definitions);
     const byKey = new Map(
-      definitions.map((definition) => [normalizeString4((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id)), definition]).filter(([key2]) => !!key2)
+      definitions.map((definition) => [normalizeString5((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id)), definition]).filter(([key2]) => !!key2)
     );
-    const aliases2 = new Map([...byKey].map(([key2, definition]) => [normalizeString4(definition.id), key2]));
+    const aliases2 = new Map([...byKey].map(([key2, definition]) => [normalizeString5(definition.id), key2]));
     const pending = new Set(byKey.keys());
     const sorted = [];
     let progressed = true;
@@ -49224,11 +49468,11 @@ ${indent}${end}`;
     datasetRef = ""
   } = {}) {
     const applicableFields = normalizeReportCalculatedFields(calculatedFields).filter((definition) => {
-      const targetDatasetRef = normalizeString4(definition == null ? void 0 : definition.datasetRef);
+      const targetDatasetRef = normalizeString5(definition == null ? void 0 : definition.datasetRef);
       if (!targetDatasetRef) {
         return true;
       }
-      return targetDatasetRef === normalizeString4(datasetRef);
+      return targetDatasetRef === normalizeString5(datasetRef);
     });
     if (applicableFields.length === 0) {
       return Array.isArray(rows) ? rows : [];
@@ -49242,23 +49486,23 @@ ${indent}${end}`;
     var _a5, _b;
     const applicableFields = [definition];
     const compiledExpressions = new Map(
-      applicableFields.filter((definition2) => normalizeString4(definition2 == null ? void 0 : definition2.expr)).map((definition2) => {
+      applicableFields.filter((definition2) => normalizeString5(definition2 == null ? void 0 : definition2.expr)).map((definition2) => {
         var _a6;
-        return [normalizeString4((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id)), ((_a6 = parseReportCalculatedFieldExpression(definition2.expr)) == null ? void 0 : _a6.ast) || null];
+        return [normalizeString5((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id)), ((_a6 = parseReportCalculatedFieldExpression(definition2.expr)) == null ? void 0 : _a6.ast) || null];
       })
     );
     rows.forEach((next) => {
       applicableFields.filter((definition2) => definition2.kind === "rowCalc").forEach((definition2) => {
         var _a6, _b2, _c;
-        const outputKey = normalizeString4((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
+        const outputKey = normalizeString5((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
         if (!outputKey) {
           return;
         }
-        if (normalizeString4(definition2 == null ? void 0 : definition2.expr)) {
+        if (normalizeString5(definition2 == null ? void 0 : definition2.expr)) {
           next[outputKey] = evaluateReportCalculatedFieldExpression(compiledExpressions.get(outputKey), next);
           return;
         }
-        if (normalizeString4((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "ratio") {
+        if (normalizeString5((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "ratio") {
           const numerator = Number(resolveKey(next, definition2.compute.numerator));
           const denominator = Number(resolveKey(next, definition2.compute.denominator));
           const scale = Number.isFinite(Number((_b2 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _b2.scale)) ? Number(definition2.compute.scale) : 1;
@@ -49277,11 +49521,11 @@ ${indent}${end}`;
     const withTableCalcs = rows;
     applicableFields.filter((definition2) => {
       var _a6;
-      return normalizeString4((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "percentOfTotal";
+      return normalizeString5((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "percentOfTotal";
     }).forEach((definition2) => {
       var _a6, _b2, _c, _d;
-      const outputKey = normalizeString4((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
-      const sourceField = normalizeString4((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.sourceField);
+      const outputKey = normalizeString5((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
+      const sourceField = normalizeString5((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.sourceField);
       if (!outputKey || !sourceField) {
         return;
       }
@@ -49307,11 +49551,11 @@ ${indent}${end}`;
     });
     applicableFields.filter((definition2) => {
       var _a6;
-      return normalizeString4((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "deltaFromPrevious";
+      return normalizeString5((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "deltaFromPrevious";
     }).forEach((definition2) => {
       var _a6, _b2, _c;
-      const outputKey = normalizeString4((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
-      const sourceField = normalizeString4((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.sourceField);
+      const outputKey = normalizeString5((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
+      const sourceField = normalizeString5((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.sourceField);
       const orderBy = normalizeOrderBy((_b2 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _b2.orderBy);
       if (!outputKey || !sourceField || orderBy.length === 0) {
         return;
@@ -49332,11 +49576,11 @@ ${indent}${end}`;
     });
     applicableFields.filter((definition2) => {
       var _a6;
-      return normalizeString4((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "runningTotal";
+      return normalizeString5((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "runningTotal";
     }).forEach((definition2) => {
       var _a6, _b2, _c;
-      const outputKey = normalizeString4((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
-      const sourceField = normalizeString4((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.sourceField);
+      const outputKey = normalizeString5((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
+      const sourceField = normalizeString5((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.sourceField);
       const orderBy = normalizeOrderBy((_b2 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _b2.orderBy);
       if (!outputKey || !sourceField || orderBy.length === 0) {
         return;
@@ -49355,11 +49599,11 @@ ${indent}${end}`;
     });
     applicableFields.filter((definition2) => {
       var _a6;
-      return normalizeString4((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "movingAverage";
+      return normalizeString5((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "movingAverage";
     }).forEach((definition2) => {
       var _a6, _b2, _c, _d;
-      const outputKey = normalizeString4((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
-      const sourceField = normalizeString4((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.sourceField);
+      const outputKey = normalizeString5((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
+      const sourceField = normalizeString5((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.sourceField);
       const orderBy = normalizeOrderBy((_b2 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _b2.orderBy);
       const windowSize = Math.max(1, Number(((_c = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _c.windowSize) || 0) || 0);
       if (!outputKey || !sourceField || orderBy.length === 0 || !windowSize) {
@@ -49385,13 +49629,13 @@ ${indent}${end}`;
     });
     applicableFields.filter((definition2) => {
       var _a6;
-      return normalizeString4((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "rank";
+      return normalizeString5((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.type) === "rank";
     }).forEach((definition2) => {
       var _a6, _b2, _c, _d, _e;
-      const outputKey = normalizeString4((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
-      const sourceField = normalizeString4((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.sourceField);
+      const outputKey = normalizeString5((definition2 == null ? void 0 : definition2.key) || (definition2 == null ? void 0 : definition2.id));
+      const sourceField = normalizeString5((_a6 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _a6.sourceField);
       const orderBy = normalizeOrderBy((_b2 = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _b2.orderBy);
-      const tieMode = normalizeString4((_c = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _c.tieMode).toLowerCase();
+      const tieMode = normalizeString5((_c = definition2 == null ? void 0 : definition2.compute) == null ? void 0 : _c.tieMode).toLowerCase();
       if (!outputKey || !sourceField || orderBy.length === 0 || ((_d = orderBy[0]) == null ? void 0 : _d.field) !== sourceField) {
         return;
       }
@@ -50065,7 +50309,7 @@ ${indent}${end}`;
   }
 
   // src/reporting/reportExportValueFormatter.js
-  function normalizeString5(value = "") {
+  function normalizeString6(value = "") {
     return String(value || "").trim();
   }
   function isPlainObject(value) {
@@ -50117,7 +50361,7 @@ ${indent}${end}`;
   } = {}) {
     const numeric = normalizeFiniteNumber(value);
     if (numeric == null) {
-      return normalizeString5(value);
+      return normalizeString6(value);
     }
     return formatExportDecimal(numeric, {
       minimumFractionDigits,
@@ -50128,11 +50372,11 @@ ${indent}${end}`;
   function formatExportNumericValue(value, format2 = "", {
     axis = false
   } = {}) {
-    const normalizedFormat = normalizeString5(format2).toLowerCase();
+    const normalizedFormat = normalizeString6(format2).toLowerCase();
     if (["id", "raw", "plain", "text"].includes(normalizedFormat)) return String(value);
     const numeric = normalizeFiniteNumber(value);
     if (numeric == null) {
-      return normalizeString5(value);
+      return normalizeString6(value);
     }
     switch (normalizedFormat) {
       case "currency":
@@ -50210,8 +50454,8 @@ ${indent}${end}`;
       return value.map((entry) => formatExportValue(entry, format2, options)).join(", ");
     }
     if (isPlainObject(value)) {
-      const start = normalizeString5(value == null ? void 0 : value.start);
-      const end = normalizeString5(value == null ? void 0 : value.end);
+      const start = normalizeString6(value == null ? void 0 : value.start);
+      const end = normalizeString6(value == null ? void 0 : value.end);
       if (start || end) {
         if (start && end) {
           return `${start} to ${end}`;
@@ -50220,7 +50464,7 @@ ${indent}${end}`;
       }
       return JSON.stringify(value);
     }
-    const normalizedFormat = normalizeString5(format2).toLowerCase();
+    const normalizedFormat = normalizeString6(format2).toLowerCase();
     if (["id", "raw", "plain", "text"].includes(normalizedFormat)) return String(value);
     if (normalizedFormat === "date" || normalizedFormat === "datetime") {
       return formatExportDateValue(value, { includeTime: normalizedFormat === "datetime" });
@@ -51729,12 +51973,12 @@ ${indent}${end}`;
   }
 
   // src/reporting/reportDatasetRefModel.js
-  function normalizeString6(value = "") {
+  function normalizeString7(value = "") {
     return String(value || "").trim();
   }
   function normalizeDatasetRefs(datasetRefs = []) {
     const seen = /* @__PURE__ */ new Set();
-    return (Array.isArray(datasetRefs) ? datasetRefs : []).map((entry) => normalizeString6(entry)).filter((entry) => {
+    return (Array.isArray(datasetRefs) ? datasetRefs : []).map((entry) => normalizeString7(entry)).filter((entry) => {
       if (!entry || seen.has(entry)) {
         return false;
       }
@@ -51773,7 +52017,7 @@ ${indent}${end}`;
     availableDatasetRefs = [],
     fallbackDatasetRef = "primary"
   } = {}) {
-    const explicitDatasetRef = normalizeString6(preferredDatasetRef);
+    const explicitDatasetRef = normalizeString7(preferredDatasetRef);
     if (explicitDatasetRef) {
       return {
         datasetRef: explicitDatasetRef,
@@ -51788,7 +52032,7 @@ ${indent}${end}`;
       };
     }
     return {
-      datasetRef: normalizeString6(fallbackDatasetRef || "primary") || "primary",
+      datasetRef: normalizeString7(fallbackDatasetRef || "primary") || "primary",
       source: "fallback"
     };
   }
@@ -52439,23 +52683,23 @@ ${indent}${end}`;
   }
 
   // src/reporting/tableVisualSpec.js
-  function normalizeString7(value = "") {
+  function normalizeString8(value = "") {
     return String(value || "").trim();
   }
   function isTruncatedPlaceholder(value = "") {
-    return normalizeString7(value) === "[MaxDepth]";
+    return normalizeString8(value) === "[MaxDepth]";
   }
   function cloneValue5(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
   }
   function normalizeStringArray2(values = []) {
-    return (Array.isArray(values) ? values : []).map((value) => normalizeString7(value)).filter(Boolean);
+    return (Array.isArray(values) ? values : []).map((value) => normalizeString8(value)).filter(Boolean);
   }
   function normalizeRange(range = {}) {
     if (!range || typeof range !== "object" || Array.isArray(range)) {
       return null;
     }
-    const mode = normalizeString7(range.mode);
+    const mode = normalizeString8(range.mode);
     const next = {
       ...mode ? { mode } : {},
       ...Number.isFinite(Number(range.min)) ? { min: Number(range.min) } : {},
@@ -52470,10 +52714,10 @@ ${indent}${end}`;
       }
       const next = {
         ..."value" in rule ? { value: cloneValue5(rule.value) } : {},
-        ...normalizeString7(rule.tone) ? { tone: normalizeString7(rule.tone) } : {},
-        ...normalizeString7(rule.label) ? { label: normalizeString7(rule.label) } : {},
-        ...normalizeString7(rule.color) ? { color: normalizeString7(rule.color) } : {},
-        ...normalizeString7(rule.background) ? { background: normalizeString7(rule.background) } : {}
+        ...normalizeString8(rule.tone) ? { tone: normalizeString8(rule.tone) } : {},
+        ...normalizeString8(rule.label) ? { label: normalizeString8(rule.label) } : {},
+        ...normalizeString8(rule.color) ? { color: normalizeString8(rule.color) } : {},
+        ...normalizeString8(rule.background) ? { background: normalizeString8(rule.background) } : {}
       };
       return Object.keys(next).length > 0 ? next : null;
     }).filter(Boolean);
@@ -52483,14 +52727,14 @@ ${indent}${end}`;
       if (!segment || typeof segment !== "object" || Array.isArray(segment)) {
         return null;
       }
-      const valueField = normalizeString7(segment.valueField);
+      const valueField = normalizeString8(segment.valueField);
       if (!valueField) {
         return null;
       }
       const next = {
         valueField,
-        ...normalizeString7(segment.label) ? { label: normalizeString7(segment.label) } : {},
-        ...normalizeString7(segment.color) ? { color: normalizeString7(segment.color) } : {}
+        ...normalizeString8(segment.label) ? { label: normalizeString8(segment.label) } : {},
+        ...normalizeString8(segment.color) ? { color: normalizeString8(segment.color) } : {}
       };
       return next;
     }).filter(Boolean);
@@ -52499,18 +52743,18 @@ ${indent}${end}`;
     if (!cellVisual || typeof cellVisual !== "object" || Array.isArray(cellVisual)) {
       return null;
     }
-    const kind = normalizeString7(cellVisual.kind);
+    const kind = normalizeString8(cellVisual.kind);
     if (!["dataBar", "progressBar", "sparkBar", "shareBar", "tone", "badge", "delta", "rank"].includes(kind)) {
       return null;
     }
     const next = {
       kind,
-      ...normalizeString7(cellVisual.valueField) ? { valueField: normalizeString7(cellVisual.valueField) } : {},
-      ...normalizeString7(cellVisual.colorField) ? { colorField: normalizeString7(cellVisual.colorField) } : {},
+      ...normalizeString8(cellVisual.valueField) ? { valueField: normalizeString8(cellVisual.valueField) } : {},
+      ...normalizeString8(cellVisual.colorField) ? { colorField: normalizeString8(cellVisual.colorField) } : {},
       ...normalizeRange(cellVisual.range) ? { range: normalizeRange(cellVisual.range) } : {},
       ...normalizeStringArray2(cellVisual.palette).length > 0 ? { palette: normalizeStringArray2(cellVisual.palette) } : {},
       ...normalizeSegments(cellVisual.segments).length > 0 ? { segments: normalizeSegments(cellVisual.segments) } : {},
-      ...normalizeString7(cellVisual.nullBehavior) ? { nullBehavior: normalizeString7(cellVisual.nullBehavior) } : {},
+      ...normalizeString8(cellVisual.nullBehavior) ? { nullBehavior: normalizeString8(cellVisual.nullBehavior) } : {},
       ...normalizeRules(cellVisual.rules).length > 0 ? { rules: normalizeRules(cellVisual.rules) } : {},
       ...(cellVisual == null ? void 0 : cellVisual.positiveIsGood) === false ? { positiveIsGood: false } : {}
     };
@@ -52520,7 +52764,7 @@ ${indent}${end}`;
     if (!column || typeof column !== "object" || Array.isArray(column)) {
       return null;
     }
-    const key2 = normalizeString7(column.key);
+    const key2 = normalizeString8(column.key);
     if (!key2 || isTruncatedPlaceholder(key2)) {
       return null;
     }
@@ -52534,14 +52778,14 @@ ${indent}${end}`;
     }
     return {
       key: key2,
-      ...normalizeString7(column.sourceKey) ? { sourceKey: normalizeString7(column.sourceKey) } : {},
-      ...normalizeString7(column.displayKey) ? { displayKey: normalizeString7(column.displayKey) } : {},
+      ...normalizeString8(column.sourceKey) ? { sourceKey: normalizeString8(column.sourceKey) } : {},
+      ...normalizeString8(column.displayKey) ? { displayKey: normalizeString8(column.displayKey) } : {},
       ...(column == null ? void 0 : column.displayValueMap) && typeof column.displayValueMap === "object" && !Array.isArray(column.displayValueMap) ? { displayValueMap: cloneValue5(column.displayValueMap) } : {},
       ...(column == null ? void 0 : column.displayIconMap) && typeof column.displayIconMap === "object" && !Array.isArray(column.displayIconMap) ? { displayIconMap: cloneValue5(column.displayIconMap) } : {},
-      ...normalizeString7(column.kind) ? { kind: normalizeString7(column.kind) } : {},
-      ...normalizeString7(column.label) ? { label: normalizeString7(column.label) } : {},
-      ...normalizeString7(column.format) || normalizeString7(column.valueFormat) ? { format: normalizeString7(column.format) || normalizeString7(column.valueFormat) } : {},
-      ...normalizeString7(column.align) ? { align: normalizeString7(column.align) } : {},
+      ...normalizeString8(column.kind) ? { kind: normalizeString8(column.kind) } : {},
+      ...normalizeString8(column.label) ? { label: normalizeString8(column.label) } : {},
+      ...normalizeString8(column.format) || normalizeString8(column.valueFormat) ? { format: normalizeString8(column.format) || normalizeString8(column.valueFormat) } : {},
+      ...normalizeString8(column.align) ? { align: normalizeString8(column.align) } : {},
       ...column.width !== void 0 ? { width: column.width } : {},
       ...column.minWidth !== void 0 ? { minWidth: column.minWidth } : {},
       ...column.flex === true ? { flex: true } : {},
@@ -52567,9 +52811,9 @@ ${indent}${end}`;
     };
   }
   function normalizeReportDocumentTableBlock(block = {}) {
-    const id = normalizeString7((block == null ? void 0 : block.id) || "tableBlock");
-    const title = normalizeString7((block == null ? void 0 : block.title) || "Table");
-    const datasetRef = normalizeString7((block == null ? void 0 : block.datasetRef) || "primary");
+    const id = normalizeString8((block == null ? void 0 : block.id) || "tableBlock");
+    const title = normalizeString8((block == null ? void 0 : block.title) || "Table");
+    const datasetRef = normalizeString8((block == null ? void 0 : block.datasetRef) || "primary");
     const rawColumns = Array.isArray(block == null ? void 0 : block.columns) ? block.columns : [];
     const rawColumnKeys = Array.isArray(block == null ? void 0 : block.columnKeys) ? block.columnKeys : [];
     const explicitColumns = (Array.isArray(block == null ? void 0 : block.columns) ? block.columns : []).map((column) => normalizeReportTableBlockColumn(column)).filter(Boolean);
@@ -52577,9 +52821,9 @@ ${indent}${end}`;
     if (columns.length === 0 && (rawColumns.some((column) => isTruncatedPlaceholder(column == null ? void 0 : column.key)) || rawColumnKeys.some((key2) => isTruncatedPlaceholder(key2)))) {
       return null;
     }
-    const accentTone = normalizeString7(block == null ? void 0 : block.accentTone).toLowerCase();
+    const accentTone = normalizeString8(block == null ? void 0 : block.accentTone).toLowerCase();
     const labelClamp = normalizePresentationClampConfig(block == null ? void 0 : block.labelClamp);
-    const recordTitleField = normalizeString7(block == null ? void 0 : block.recordTitleField);
+    const recordTitleField = normalizeString8(block == null ? void 0 : block.recordTitleField);
     if (recordTitleField && !columns.some((column) => column.key === recordTitleField)) {
       throw new Error("Record presentation requires an existing table column as recordTitleField");
     }
@@ -52588,7 +52832,7 @@ ${indent}${end}`;
       kind: "tableBlock",
       ...normalizeTableAnalytics({ ...block, columns }),
       title,
-      ...normalizeString7(block == null ? void 0 : block.description) ? { description: normalizeString7(block.description) } : {},
+      ...normalizeString8(block == null ? void 0 : block.description) ? { description: normalizeString8(block.description) } : {},
       datasetRef,
       columns,
       ...block.selection !== void 0 ? { selection: normalizeReportTableSelection(block.selection) } : {},
@@ -52601,7 +52845,7 @@ ${indent}${end}`;
   }
 
   // src/components/dashboard/reportBuilderCalculatedFieldAuthoring.js
-  function normalizeString8(value = "") {
+  function normalizeString9(value = "") {
     return String(value || "").trim();
   }
   function cloneValue6(value) {
@@ -52610,8 +52854,8 @@ ${indent}${end}`;
   function normalizeMeasureSections(measureSections = []) {
     return (Array.isArray(measureSections) ? measureSections : []).filter((section) => section && typeof section === "object" && !Array.isArray(section)).map((section, index) => ({
       ...cloneValue6(section),
-      id: normalizeString8(section == null ? void 0 : section.id),
-      label: normalizeString8(section == null ? void 0 : section.label),
+      id: normalizeString9(section == null ? void 0 : section.id),
+      label: normalizeString9(section == null ? void 0 : section.label),
       order: Number.isFinite(Number(section == null ? void 0 : section.order)) ? Number(section.order) : index
     })).filter((section) => section.id);
   }
@@ -52634,7 +52878,7 @@ ${indent}${end}`;
     ];
   }
   function normalizeReportBuilderLocalCalculatedFields(calculatedFields = []) {
-    return normalizeReportCalculatedFields(calculatedFields).filter((field2) => (field2 == null ? void 0 : field2.kind) === "rowCalc" && normalizeString8(field2 == null ? void 0 : field2.expr)).map((field2) => cloneValue6(field2));
+    return normalizeReportCalculatedFields(calculatedFields).filter((field2) => (field2 == null ? void 0 : field2.kind) === "rowCalc" && normalizeString9(field2 == null ? void 0 : field2.expr)).map((field2) => cloneValue6(field2));
   }
   function normalizeReportBuilderLocalTableCalculations(calculatedFields = []) {
     return normalizeReportCalculatedFields(calculatedFields).filter((field2) => (field2 == null ? void 0 : field2.kind) === "tableCalc" && (field2 == null ? void 0 : field2.compute)).map((field2) => cloneValue6(field2));
@@ -52645,12 +52889,12 @@ ${indent}${end}`;
     defaultSection = "calculated"
   } = {}) {
     const localById = new Map(
-      (Array.isArray(localFields) ? localFields : []).map((field2) => [normalizeString8((field2 == null ? void 0 : field2.id) || (field2 == null ? void 0 : field2.key)), field2]).filter(([id, field2]) => !!id && !!field2)
+      (Array.isArray(localFields) ? localFields : []).map((field2) => [normalizeString9((field2 == null ? void 0 : field2.id) || (field2 == null ? void 0 : field2.key)), field2]).filter(([id, field2]) => !!id && !!field2)
     );
     const merged = [];
     const seen = /* @__PURE__ */ new Set();
     (Array.isArray(baseFields) ? baseFields : []).forEach((field2) => {
-      const fieldId = normalizeString8((field2 == null ? void 0 : field2.id) || (field2 == null ? void 0 : field2.key));
+      const fieldId = normalizeString9((field2 == null ? void 0 : field2.id) || (field2 == null ? void 0 : field2.key));
       if (!fieldId || seen.has(fieldId)) {
         return;
       }
@@ -52658,7 +52902,7 @@ ${indent}${end}`;
       if (localOverride) {
         merged.push({
           ...localOverride,
-          section: normalizeString8(localOverride == null ? void 0 : localOverride.section) || defaultSection,
+          section: normalizeString9(localOverride == null ? void 0 : localOverride.section) || defaultSection,
           authoringScope,
           authoringEditable: true,
           ...authoringKind ? { authoringKind } : {}
@@ -52669,13 +52913,13 @@ ${indent}${end}`;
       seen.add(fieldId);
     });
     (Array.isArray(localFields) ? localFields : []).forEach((field2) => {
-      const fieldId = normalizeString8((field2 == null ? void 0 : field2.id) || (field2 == null ? void 0 : field2.key));
+      const fieldId = normalizeString9((field2 == null ? void 0 : field2.id) || (field2 == null ? void 0 : field2.key));
       if (!fieldId || seen.has(fieldId)) {
         return;
       }
       merged.push({
         ...field2,
-        section: normalizeString8(field2 == null ? void 0 : field2.section) || defaultSection,
+        section: normalizeString9(field2 == null ? void 0 : field2.section) || defaultSection,
         authoringScope,
         authoringEditable: true,
         ...authoringKind ? { authoringKind } : {}
@@ -52714,13 +52958,13 @@ ${indent}${end}`;
     };
   }
   var REPORT_BUILDER_TABLE_CALC_FUNCTIONS = listReportCalculatedFieldTableCalculationSpecs().map((entry) => ({
-    value: normalizeString8(entry == null ? void 0 : entry.name),
-    label: normalizeString8((entry == null ? void 0 : entry.label) || (entry == null ? void 0 : entry.name)),
+    value: normalizeString9(entry == null ? void 0 : entry.name),
+    label: normalizeString9((entry == null ? void 0 : entry.label) || (entry == null ? void 0 : entry.name)),
     supportsPartition: (entry == null ? void 0 : entry.supportsPartition) === true,
     // Rank always orders by its source field in the current authoring UX,
     // so it only needs a direction/tie-breaker control rather than a
     // separate order-by field selector.
-    requiresOrder: (entry == null ? void 0 : entry.requiresOrder) === true && normalizeString8(entry == null ? void 0 : entry.name) !== "rank",
+    requiresOrder: (entry == null ? void 0 : entry.requiresOrder) === true && normalizeString9(entry == null ? void 0 : entry.name) !== "rank",
     supportsRankDirection: (entry == null ? void 0 : entry.supportsRankDirection) === true,
     supportsTieBreaker: (entry == null ? void 0 : entry.supportsTieBreaker) === true,
     requiresWindowSize: (entry == null ? void 0 : entry.requiresWindowSize) === true,
@@ -52728,43 +52972,43 @@ ${indent}${end}`;
     requiresExplicitFrame: (entry == null ? void 0 : entry.requiresExplicitFrame) === true,
     boundedFrameRequiresOrder: (entry == null ? void 0 : entry.boundedFrameRequiresOrder) === true,
     supportsDecimals: (entry == null ? void 0 : entry.supportsDecimals) === true,
-    defaultFormat: normalizeString8(entry == null ? void 0 : entry.defaultFormat)
+    defaultFormat: normalizeString9(entry == null ? void 0 : entry.defaultFormat)
   })).filter((entry) => entry.value && entry.label);
 
   // src/reporting/reportBuilderBlockModel.js
-  function normalizeString9(value = "") {
+  function normalizeString10(value = "") {
     return String(value || "").trim();
   }
   function resolveReportBuilderBlock(document = null) {
     const blocks = Array.isArray(document == null ? void 0 : document.blocks) ? document.blocks : [];
-    return blocks.find((block) => normalizeString9(block == null ? void 0 : block.kind) === "reportBuilderBlock") || null;
+    return blocks.find((block) => normalizeString10(block == null ? void 0 : block.kind) === "reportBuilderBlock") || null;
   }
 
   // src/reporting/reportSections.js
-  var normalizeString10 = (value) => String(value || "").trim();
+  var normalizeString11 = (value) => String(value || "").trim();
   function buildRuntimeSections(blocks = [], hiddenBlockIds = /* @__PURE__ */ new Set()) {
     var _a5, _b, _c, _d;
     const normalizedBlocks = Array.isArray(blocks) ? blocks : [];
-    const explicitTabGroup = normalizedBlocks.find((block) => normalizeString10(block == null ? void 0 : block.kind) === "tabGroupBlock") || null;
-    const explicitSectionIds = Array.isArray((_a5 = explicitTabGroup == null ? void 0 : explicitTabGroup.content) == null ? void 0 : _a5.sectionIds) ? explicitTabGroup.content.sectionIds.map((sectionId) => normalizeString10(sectionId)).filter(Boolean) : Array.isArray(explicitTabGroup == null ? void 0 : explicitTabGroup.sectionIds) ? explicitTabGroup.sectionIds.map((sectionId) => normalizeString10(sectionId)).filter(Boolean) : [];
+    const explicitTabGroup = normalizedBlocks.find((block) => normalizeString11(block == null ? void 0 : block.kind) === "tabGroupBlock") || null;
+    const explicitSectionIds = Array.isArray((_a5 = explicitTabGroup == null ? void 0 : explicitTabGroup.content) == null ? void 0 : _a5.sectionIds) ? explicitTabGroup.content.sectionIds.map((sectionId) => normalizeString11(sectionId)).filter(Boolean) : Array.isArray(explicitTabGroup == null ? void 0 : explicitTabGroup.sectionIds) ? explicitTabGroup.sectionIds.map((sectionId) => normalizeString11(sectionId)).filter(Boolean) : [];
     const includeUnlistedSections = (_d = (_c = (_b = explicitTabGroup == null ? void 0 : explicitTabGroup.content) == null ? void 0 : _b.includeUnlistedSections) != null ? _c : explicitTabGroup == null ? void 0 : explicitTabGroup.includeUnlistedSections) != null ? _d : true;
     const sections = [];
     let current = null;
     normalizedBlocks.forEach((block, index) => {
       var _a6, _b2, _c2;
-      const kind = normalizeString10(block == null ? void 0 : block.kind);
+      const kind = normalizeString11(block == null ? void 0 : block.kind);
       if (kind === "tabGroupBlock") {
         return;
       }
-      if (hiddenBlockIds.has(normalizeString10(block == null ? void 0 : block.id))) {
+      if (hiddenBlockIds.has(normalizeString11(block == null ? void 0 : block.id))) {
         return;
       }
       if (kind === "sectionBlock") {
-        const ownedBlockIds = (Array.isArray((_a6 = block == null ? void 0 : block.content) == null ? void 0 : _a6.blockIds) ? block.content.blockIds : Array.isArray(block == null ? void 0 : block.blockIds) ? block.blockIds : []).map((ownedBlockId) => normalizeString10(ownedBlockId)).filter(Boolean);
+        const ownedBlockIds = (Array.isArray((_a6 = block == null ? void 0 : block.content) == null ? void 0 : _a6.blockIds) ? block.content.blockIds : Array.isArray(block == null ? void 0 : block.blockIds) ? block.blockIds : []).map((ownedBlockId) => normalizeString11(ownedBlockId)).filter(Boolean);
         current = {
-          id: normalizeString10((block == null ? void 0 : block.id) || `section_${index + 1}`) || `section_${index + 1}`,
-          title: normalizeString10((block == null ? void 0 : block.title) || ((_b2 = block == null ? void 0 : block.content) == null ? void 0 : _b2.title) || `Section ${sections.length + 1}`) || `Section ${sections.length + 1}`,
-          navigationLabel: normalizeString10(((_c2 = block == null ? void 0 : block.content) == null ? void 0 : _c2.navigationLabel) || (block == null ? void 0 : block.navigationLabel) || (block == null ? void 0 : block.title) || `Section ${sections.length + 1}`) || `Section ${sections.length + 1}`,
+          id: normalizeString11((block == null ? void 0 : block.id) || `section_${index + 1}`) || `section_${index + 1}`,
+          title: normalizeString11((block == null ? void 0 : block.title) || ((_b2 = block == null ? void 0 : block.content) == null ? void 0 : _b2.title) || `Section ${sections.length + 1}`) || `Section ${sections.length + 1}`,
+          navigationLabel: normalizeString11(((_c2 = block == null ? void 0 : block.content) == null ? void 0 : _c2.navigationLabel) || (block == null ? void 0 : block.navigationLabel) || (block == null ? void 0 : block.title) || `Section ${sections.length + 1}`) || `Section ${sections.length + 1}`,
           block,
           items: [],
           ownedBlockIds
@@ -52783,7 +53027,7 @@ ${indent}${end}`;
         };
         sections.push(current);
       }
-      if (includeUnlistedSections === false && current.ownedBlockIds.length > 0 && !current.ownedBlockIds.includes(normalizeString10(block == null ? void 0 : block.id))) {
+      if (includeUnlistedSections === false && current.ownedBlockIds.length > 0 && !current.ownedBlockIds.includes(normalizeString11(block == null ? void 0 : block.id))) {
         return;
       }
       current.items.push(block);
@@ -52792,16 +53036,16 @@ ${indent}${end}`;
       for (const section of sections) {
         if (!section.ownedBlockIds.length) continue;
         const owned = new Set(section.ownedBlockIds);
-        section.items = normalizedBlocks.filter((block) => owned.has(normalizeString10(block == null ? void 0 : block.id)) && !hiddenBlockIds.has(normalizeString10(block == null ? void 0 : block.id)) && normalizeString10(block == null ? void 0 : block.kind) !== "sectionBlock" && normalizeString10(block == null ? void 0 : block.kind) !== "tabGroupBlock");
+        section.items = normalizedBlocks.filter((block) => owned.has(normalizeString11(block == null ? void 0 : block.id)) && !hiddenBlockIds.has(normalizeString11(block == null ? void 0 : block.id)) && normalizeString11(block == null ? void 0 : block.kind) !== "sectionBlock" && normalizeString11(block == null ? void 0 : block.kind) !== "tabGroupBlock");
       }
     }
     const filteredSections = sections.filter((section) => section.block || section.items.length > 0);
     if (explicitSectionIds.length === 0) {
       return filteredSections;
     }
-    const sectionById = new Map(filteredSections.map((section) => [normalizeString10(section == null ? void 0 : section.id), section]));
+    const sectionById = new Map(filteredSections.map((section) => [normalizeString11(section == null ? void 0 : section.id), section]));
     const orderedSections = explicitSectionIds.map((sectionId) => sectionById.get(sectionId) || null).filter(Boolean);
-    const trailingSections = filteredSections.filter((section) => !explicitSectionIds.includes(normalizeString10(section == null ? void 0 : section.id)));
+    const trailingSections = filteredSections.filter((section) => !explicitSectionIds.includes(normalizeString11(section == null ? void 0 : section.id)));
     return includeUnlistedSections === false ? orderedSections : [...orderedSections, ...trailingSections];
   }
 
@@ -52814,7 +53058,7 @@ ${indent}${end}`;
     { span: 4, label: "Third" },
     { span: 3, label: "Quarter" }
   ]);
-  function normalizeString11(value = "") {
+  function normalizeString12(value = "") {
     return String(value || "").trim();
   }
   function normalizeReportLayoutSpanValue(value = null) {
@@ -52825,7 +53069,7 @@ ${indent}${end}`;
     return numeric;
   }
   function normalizeLegacyReportLayoutSize(value = "") {
-    const normalized = normalizeString11(value).toLowerCase();
+    const normalized = normalizeString12(value).toLowerCase();
     if (normalized === "quarter" || normalized === "1/4") {
       return 3;
     }
@@ -52871,13 +53115,13 @@ ${indent}${end}`;
     omitDefaultSpan = true,
     preserveLegacyHalf = false
   } = {}) {
-    const normalizedBlockId = normalizeString11(blockId);
+    const normalizedBlockId = normalizeString12(blockId);
     if (!normalizedBlockId) {
       return null;
     }
     const normalizedSource = source && typeof source === "object" && !Array.isArray(source) ? source : {
       span: normalizeReportLayoutSpanValue(source),
-      size: normalizeString11(source)
+      size: normalizeString12(source)
     };
     const explicitSpan = normalizeReportLayoutSpanValue(normalizedSource == null ? void 0 : normalizedSource.span);
     if (explicitSpan) {
@@ -53560,21 +53804,21 @@ ${indent}${end}`;
   }
 
   // src/components/dashboard/reportBuilderStaticDatasets.js
-  function normalizeString12(value = "") {
+  function normalizeString13(value = "") {
     return String(value || "").trim();
   }
   function cloneValue7(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
   }
   function humanizeLabel(value = "") {
-    const normalized = normalizeString12(value);
+    const normalized = normalizeString13(value);
     if (!normalized) {
       return "";
     }
     return normalized.replace(/[_-]+/g, " ").replace(/\s+/g, " ").split(" ").filter(Boolean).map((segment) => segment.slice(0, 1).toUpperCase() + segment.slice(1)).join(" ");
   }
   function normalizeStaticDatasetFormat(value = "") {
-    const normalized = normalizeString12(value).toLowerCase();
+    const normalized = normalizeString13(value).toLowerCase();
     return normalized === "json" || normalized === "forge-data" || normalized === "forge_data" ? "json" : "csv";
   }
   function buildStaticDatasetKindLabel(format2 = "csv") {
@@ -53589,7 +53833,7 @@ ${indent}${end}`;
     return normalizeStaticDatasetFormat(format2) === "json" ? "staticJson" : "staticCsv";
   }
   function sanitizeId(value = "") {
-    return normalizeString12(value).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+    return normalizeString13(value).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
   }
   function inferColumnKind(rows = [], key2 = "") {
     const values = (Array.isArray(rows) ? rows : []).map((row) => row && typeof row === "object" && !Array.isArray(row) ? row[key2] : void 0).filter((value) => value !== null && value !== void 0 && value !== "");
@@ -53603,16 +53847,16 @@ ${indent}${end}`;
     const explicit = Array.isArray(columns) ? columns : [];
     const seen = /* @__PURE__ */ new Set();
     const normalized = explicit.map((column) => {
-      const key2 = normalizeString12((column == null ? void 0 : column.key) || (column == null ? void 0 : column.id) || (column == null ? void 0 : column.value));
+      const key2 = normalizeString13((column == null ? void 0 : column.key) || (column == null ? void 0 : column.id) || (column == null ? void 0 : column.value));
       if (!key2 || seen.has(key2)) {
         return null;
       }
       seen.add(key2);
       return {
         key: key2,
-        label: normalizeString12((column == null ? void 0 : column.label) || humanizeLabel(key2)) || key2,
-        kind: normalizeString12((column == null ? void 0 : column.kind) || inferColumnKind(rows, key2)) || inferColumnKind(rows, key2),
-        ...normalizeString12(column == null ? void 0 : column.format) ? { format: normalizeString12(column.format) } : {}
+        label: normalizeString13((column == null ? void 0 : column.label) || humanizeLabel(key2)) || key2,
+        kind: normalizeString13((column == null ? void 0 : column.kind) || inferColumnKind(rows, key2)) || inferColumnKind(rows, key2),
+        ...normalizeString13(column == null ? void 0 : column.format) ? { format: normalizeString13(column.format) } : {}
       };
     }).filter(Boolean);
     if (normalized.length > 0) {
@@ -53629,9 +53873,9 @@ ${indent}${end}`;
     }));
   }
   function buildFieldOptions(columns = [], kind = "") {
-    return (Array.isArray(columns) ? columns : []).filter((column) => normalizeString12(column == null ? void 0 : column.kind) === kind).map((column) => ({
-      value: normalizeString12(column == null ? void 0 : column.key),
-      label: normalizeString12((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key))
+    return (Array.isArray(columns) ? columns : []).filter((column) => normalizeString13(column == null ? void 0 : column.kind) === kind).map((column) => ({
+      value: normalizeString13(column == null ? void 0 : column.key),
+      label: normalizeString13((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key))
     })).filter((entry) => entry.value && entry.label);
   }
   function buildDatasetDescription(label = "", rows = [], columns = [], format2 = "csv") {
@@ -53658,9 +53902,9 @@ ${indent}${end}`;
       seen.add(id);
       const columns = normalizeColumns(dataset == null ? void 0 : dataset.columns, rows);
       const format2 = normalizeStaticDatasetFormat((dataset == null ? void 0 : dataset.sourceFormat) || (dataset == null ? void 0 : dataset.format) || (dataset == null ? void 0 : dataset.kindLabel));
-      const label = normalizeString12((dataset == null ? void 0 : dataset.label) || fallbackLabel || id) || id;
-      const description = normalizeString12((dataset == null ? void 0 : dataset.description) || buildDatasetDescription(label, rows, columns, format2));
-      const dataSourceRef = normalizeString12((dataset == null ? void 0 : dataset.dataSourceRef) || buildStaticDatasetDataSourceRef(id, format2)) || buildStaticDatasetDataSourceRef(id, format2);
+      const label = normalizeString13((dataset == null ? void 0 : dataset.label) || fallbackLabel || id) || id;
+      const description = normalizeString13((dataset == null ? void 0 : dataset.description) || buildDatasetDescription(label, rows, columns, format2));
+      const dataSourceRef = normalizeString13((dataset == null ? void 0 : dataset.dataSourceRef) || buildStaticDatasetDataSourceRef(id, format2)) || buildStaticDatasetDataSourceRef(id, format2);
       return {
         id,
         label,
@@ -53673,17 +53917,17 @@ ${indent}${end}`;
         rowCount: rows.length,
         columnCount: columns.length,
         columnOptions: columns.map((column) => ({
-          key: normalizeString12(column == null ? void 0 : column.key),
-          label: normalizeString12((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
-          kind: normalizeString12((column == null ? void 0 : column.kind) || "dimension") || "dimension",
+          key: normalizeString13(column == null ? void 0 : column.key),
+          label: normalizeString13((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
+          kind: normalizeString13((column == null ? void 0 : column.kind) || "dimension") || "dimension",
           ...column.format ? { format: column.format } : {}
         })),
         valueFieldOptions: buildFieldOptions(columns, "measure"),
         secondaryFieldOptions: buildFieldOptions(columns, "dimension"),
         chartFieldOptions: columns.map((column) => ({
-          key: normalizeString12(column == null ? void 0 : column.key),
-          label: normalizeString12((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
-          kind: normalizeString12((column == null ? void 0 : column.kind) || "dimension") || "dimension",
+          key: normalizeString13(column == null ? void 0 : column.key),
+          label: normalizeString13((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
+          kind: normalizeString13((column == null ? void 0 : column.kind) || "dimension") || "dimension",
           ...column.format ? { format: column.format } : {}
         }))
       };
@@ -53703,22 +53947,22 @@ ${indent}${end}`;
   }
 
   // src/components/dashboard/reportBuilderSemantic.js
-  function normalizeString13(value = "") {
+  function normalizeString14(value = "") {
     return String(value || "").trim();
   }
   function semanticLookupKeys(field2 = {}) {
     const keys3 = [
-      normalizeString13(field2 == null ? void 0 : field2.semanticRef),
-      normalizeString13(field2 == null ? void 0 : field2.id),
-      normalizeString13(field2 == null ? void 0 : field2.key)
+      normalizeString14(field2 == null ? void 0 : field2.semanticRef),
+      normalizeString14(field2 == null ? void 0 : field2.id),
+      normalizeString14(field2 == null ? void 0 : field2.key)
     ].filter(Boolean);
     return Array.from(new Set(keys3));
   }
   function semanticFieldId(field2 = {}) {
-    return normalizeString13(field2 == null ? void 0 : field2.semanticRef);
+    return normalizeString14(field2 == null ? void 0 : field2.semanticRef);
   }
   function isLocalComputedMeasure(field2 = {}) {
-    return !!field2 && typeof field2 === "object" && !Array.isArray(field2) && (!!field2.compute && typeof field2.compute === "object" && !Array.isArray(field2.compute) || normalizeString13(field2 == null ? void 0 : field2.expr)) && !semanticFieldId(field2);
+    return !!field2 && typeof field2 === "object" && !Array.isArray(field2) && (!!field2.compute && typeof field2.compute === "object" && !Array.isArray(field2.compute) || normalizeString14(field2 == null ? void 0 : field2.expr)) && !semanticFieldId(field2);
   }
   function semanticSelectableMeasureFields(config = {}) {
     return [
@@ -53736,20 +53980,20 @@ ${indent}${end}`;
   }
   function buildSemanticSelectionIds(fields2 = [], selectedIds = []) {
     const fieldIndex = new Map(
-      (Array.isArray(fields2) ? fields2 : []).map((field2) => [normalizeString13((field2 == null ? void 0 : field2.id) || (field2 == null ? void 0 : field2.key)), field2]).filter(([, field2]) => !!field2)
+      (Array.isArray(fields2) ? fields2 : []).map((field2) => [normalizeString14((field2 == null ? void 0 : field2.id) || (field2 == null ? void 0 : field2.key)), field2]).filter(([, field2]) => !!field2)
     );
     return Array.from(new Set(
-      (Array.isArray(selectedIds) ? selectedIds : []).map((id) => fieldIndex.get(normalizeString13(id))).map((field2) => semanticFieldId(field2)).filter(Boolean)
+      (Array.isArray(selectedIds) ? selectedIds : []).map((id) => fieldIndex.get(normalizeString14(id))).map((field2) => semanticFieldId(field2)).filter(Boolean)
     ));
   }
   function normalizeFieldSelectionIds(selectedIds = []) {
     return Array.from(new Set(
-      (Array.isArray(selectedIds) ? selectedIds : []).map((id) => normalizeString13(id)).filter(Boolean)
+      (Array.isArray(selectedIds) ? selectedIds : []).map((id) => normalizeString14(id)).filter(Boolean)
     ));
   }
   function hasConfiguredSemanticParameterValue(field2 = {}, value = null) {
     if ((field2 == null ? void 0 : field2.type) === "dateRange") {
-      return !!normalizeString13(value == null ? void 0 : value.start) || !!normalizeString13(value == null ? void 0 : value.end);
+      return !!normalizeString14(value == null ? void 0 : value.start) || !!normalizeString14(value == null ? void 0 : value.end);
     }
     if (Array.isArray(value)) {
       return value.length > 0;
@@ -53757,7 +54001,7 @@ ${indent}${end}`;
     if (value && typeof value === "object") {
       return Object.keys(value).length > 0;
     }
-    return value !== void 0 && value !== null && normalizeString13(value) !== "";
+    return value !== void 0 && value !== null && normalizeString14(value) !== "";
   }
   function cloneValue8(value = null) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -53789,12 +54033,12 @@ ${indent}${end}`;
   }
   function resolveGroupByDimensionId(config = {}, state = {}) {
     var _a5;
-    const groupByValue = normalizeString13(state == null ? void 0 : state.groupBy);
+    const groupByValue = normalizeString14(state == null ? void 0 : state.groupBy);
     if (!groupByValue) {
       return "";
     }
-    const option = (Array.isArray((_a5 = config == null ? void 0 : config.groupBy) == null ? void 0 : _a5.options) ? config.groupBy.options : []).find((entry) => normalizeString13(entry == null ? void 0 : entry.value) === groupByValue);
-    return normalizeString13((option == null ? void 0 : option.dimensionId) || groupByValue);
+    const option = (Array.isArray((_a5 = config == null ? void 0 : config.groupBy) == null ? void 0 : _a5.options) ? config.groupBy.options : []).find((entry) => normalizeString14(entry == null ? void 0 : entry.value) === groupByValue);
+    return normalizeString14((option == null ? void 0 : option.dimensionId) || groupByValue);
   }
   function resolveTableCalculationDimensionIds(config = {}, state = {}) {
     const selectedMeasureIds = new Set(normalizeFieldSelectionIds(state == null ? void 0 : state.selectedMeasures));
@@ -53802,7 +54046,7 @@ ${indent}${end}`;
       ...Array.isArray(config == null ? void 0 : config.calculatedFields) ? config.calculatedFields : [],
       ...Array.isArray(config == null ? void 0 : config.computedMeasures) ? config.computedMeasures : [],
       ...Array.isArray(config == null ? void 0 : config.tableCalculations) ? config.tableCalculations : []
-    ].filter((field2) => selectedMeasureIds.has(normalizeString13((field2 == null ? void 0 : field2.id) || (field2 == null ? void 0 : field2.key))));
+    ].filter((field2) => selectedMeasureIds.has(normalizeString14((field2 == null ? void 0 : field2.id) || (field2 == null ? void 0 : field2.key))));
     const next = [];
     calculations.forEach((field2) => {
       const compute = (field2 == null ? void 0 : field2.compute) && typeof field2.compute === "object" ? field2.compute : {};
@@ -53810,12 +54054,12 @@ ${indent}${end}`;
         ...Array.isArray(compute.partitionBy) ? compute.partitionBy : [],
         ...Array.isArray(compute.orderBy) ? compute.orderBy.map((entry) => entry == null ? void 0 : entry.field) : []
       ].forEach((fieldKey) => {
-        const normalizedFieldKey = normalizeString13(fieldKey);
+        const normalizedFieldKey = normalizeString14(fieldKey);
         if (!normalizedFieldKey) {
           return;
         }
         const dimension = (Array.isArray(config == null ? void 0 : config.dimensions) ? config.dimensions : []).find((entry) => semanticLookupKeys(entry).includes(normalizedFieldKey));
-        const dimensionId = normalizeString13((dimension == null ? void 0 : dimension.id) || (dimension == null ? void 0 : dimension.key));
+        const dimensionId = normalizeString14((dimension == null ? void 0 : dimension.id) || (dimension == null ? void 0 : dimension.key));
         if (dimensionId && !next.includes(dimensionId)) {
           next.push(dimensionId);
         }
@@ -53832,7 +54076,7 @@ ${indent}${end}`;
     ]).filter((field2) => isLocalComputedMeasure(field2));
     const calculatedFieldIndex = /* @__PURE__ */ new Map();
     localCalculatedFields.forEach((field2) => {
-      [normalizeString13(field2 == null ? void 0 : field2.id), normalizeString13(field2 == null ? void 0 : field2.key)].filter(Boolean).forEach((alias) => {
+      [normalizeString14(field2 == null ? void 0 : field2.id), normalizeString14(field2 == null ? void 0 : field2.key)].filter(Boolean).forEach((alias) => {
         if (!calculatedFieldIndex.has(alias)) {
           calculatedFieldIndex.set(alias, field2);
         }
@@ -53842,14 +54086,14 @@ ${indent}${end}`;
     const dimensionIds = /* @__PURE__ */ new Set();
     const visited = /* @__PURE__ */ new Set();
     const resolveDependency = (fieldKey = "") => {
-      const normalizedFieldKey = normalizeString13(fieldKey);
+      const normalizedFieldKey = normalizeString14(fieldKey);
       if (!normalizedFieldKey || visited.has(normalizedFieldKey)) {
         return;
       }
       visited.add(normalizedFieldKey);
       const measure = (Array.isArray(config == null ? void 0 : config.measures) ? config.measures : []).find((entry) => semanticLookupKeys(entry).includes(normalizedFieldKey));
       if (measure) {
-        const measureId = normalizeString13((measure == null ? void 0 : measure.id) || (measure == null ? void 0 : measure.key));
+        const measureId = normalizeString14((measure == null ? void 0 : measure.id) || (measure == null ? void 0 : measure.key));
         if (measureId) {
           measureIds.add(measureId);
         }
@@ -53857,7 +54101,7 @@ ${indent}${end}`;
       }
       const dimension = (Array.isArray(config == null ? void 0 : config.dimensions) ? config.dimensions : []).find((entry) => semanticLookupKeys(entry).includes(normalizedFieldKey));
       if (dimension) {
-        const dimensionId = normalizeString13((dimension == null ? void 0 : dimension.id) || (dimension == null ? void 0 : dimension.key));
+        const dimensionId = normalizeString14((dimension == null ? void 0 : dimension.id) || (dimension == null ? void 0 : dimension.key));
         if (dimensionId) {
           dimensionIds.add(dimensionId);
         }
@@ -53870,7 +54114,7 @@ ${indent}${end}`;
         });
       }
     };
-    localCalculatedFields.filter((field2) => selectedMeasureIds.has(normalizeString13((field2 == null ? void 0 : field2.id) || (field2 == null ? void 0 : field2.key)))).forEach((field2) => {
+    localCalculatedFields.filter((field2) => selectedMeasureIds.has(normalizeString14((field2 == null ? void 0 : field2.id) || (field2 == null ? void 0 : field2.key)))).forEach((field2) => {
       (field2.dependencies || []).forEach((dependencyId) => {
         resolveDependency(dependencyId);
       });
@@ -53902,19 +54146,19 @@ ${indent}${end}`;
     ignoreIds = []
   } = {}) {
     const fieldIndex = new Map(
-      (Array.isArray(fields2) ? fields2 : []).map((field2) => [normalizeString13((field2 == null ? void 0 : field2.id) || (field2 == null ? void 0 : field2.key)), field2]).filter(([, field2]) => !!field2)
+      (Array.isArray(fields2) ? fields2 : []).map((field2) => [normalizeString14((field2 == null ? void 0 : field2.id) || (field2 == null ? void 0 : field2.key)), field2]).filter(([, field2]) => !!field2)
     );
     const ignored = new Set(
-      (Array.isArray(ignoreIds) ? ignoreIds : []).map((id) => normalizeString13(id)).filter(Boolean)
+      (Array.isArray(ignoreIds) ? ignoreIds : []).map((id) => normalizeString14(id)).filter(Boolean)
     );
     return Array.from(new Set(
-      (Array.isArray(selectedIds) ? selectedIds : []).map((id) => normalizeString13(id)).filter(Boolean).filter((id) => !ignored.has(id)).filter((id) => !semanticFieldId(fieldIndex.get(id)))
+      (Array.isArray(selectedIds) ? selectedIds : []).map((id) => normalizeString14(id)).filter(Boolean).filter((id) => !ignored.has(id)).filter((id) => !semanticFieldId(fieldIndex.get(id)))
     ));
   }
   function buildRawFieldSelection(fields2 = [], semanticIds = []) {
     const rawIndex = /* @__PURE__ */ new Map();
     (Array.isArray(fields2) ? fields2 : []).forEach((field2) => {
-      const rawId = normalizeString13((field2 == null ? void 0 : field2.id) || (field2 == null ? void 0 : field2.key));
+      const rawId = normalizeString14((field2 == null ? void 0 : field2.id) || (field2 == null ? void 0 : field2.key));
       const semanticRef = semanticFieldId(field2);
       if (!rawId) {
         return;
@@ -53925,7 +54169,7 @@ ${indent}${end}`;
       rawIndex.set(semanticRef, rawId);
     });
     return Array.from(new Set(
-      (Array.isArray(semanticIds) ? semanticIds : []).map((id) => rawIndex.get(normalizeString13(id))).filter(Boolean)
+      (Array.isArray(semanticIds) ? semanticIds : []).map((id) => rawIndex.get(normalizeString14(id))).filter(Boolean)
     ));
   }
   function resolveReportBuilderSemanticSelections(config = {}, binding = null) {
@@ -53946,7 +54190,7 @@ ${indent}${end}`;
     if (!normalizedBinding || normalizedBinding.mode !== "semantic") {
       return null;
     }
-    const localComputedMeasureIds = (Array.isArray(config == null ? void 0 : config.computedMeasures) ? config.computedMeasures : []).concat(Array.isArray(config == null ? void 0 : config.calculatedFields) ? config.calculatedFields : []).concat(Array.isArray(config == null ? void 0 : config.tableCalculations) ? config.tableCalculations : []).filter((field2) => isLocalComputedMeasure(field2)).map((field2) => normalizeString13((field2 == null ? void 0 : field2.id) || (field2 == null ? void 0 : field2.key))).filter(Boolean);
+    const localComputedMeasureIds = (Array.isArray(config == null ? void 0 : config.computedMeasures) ? config.computedMeasures : []).concat(Array.isArray(config == null ? void 0 : config.calculatedFields) ? config.calculatedFields : []).concat(Array.isArray(config == null ? void 0 : config.tableCalculations) ? config.tableCalculations : []).filter((field2) => isLocalComputedMeasure(field2)).map((field2) => normalizeString14((field2 == null ? void 0 : field2.id) || (field2 == null ? void 0 : field2.key))).filter(Boolean);
     const localCalculatedDependencies = resolveLocalCalculatedFieldDependencies(config, state);
     const selectedDimensionIds = resolveSemanticSelectedDimensions(config, state);
     const selectedDimensions = buildSemanticSelectionIds(config.dimensions, selectedDimensionIds);
@@ -53999,15 +54243,15 @@ ${indent}${end}`;
   function cloneValue9(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
   }
-  function normalizeString14(value = "") {
+  function normalizeString15(value = "") {
     return String(value || "").trim();
   }
   function isEntityOptionName(name = "") {
-    const normalized = normalizeString14(name).replace(/[^a-zA-Z0-9]/g, "");
+    const normalized = normalizeString15(name).replace(/[^a-zA-Z0-9]/g, "");
     return /^(account|agency|advertiser|campaign|order|line(item)?|audience|creative|pixel)(id|ids)?$/i.test(normalized);
   }
   function normalizedType(value = "") {
-    const type = normalizeString14(value).toLowerCase();
+    const type = normalizeString15(value).toLowerCase();
     if (["bool", "boolean"].includes(type)) return "boolean";
     if (["int", "integer"].includes(type)) return "integer";
     if (["number", "float", "double"].includes(type)) return "number";
@@ -54038,7 +54282,7 @@ ${indent}${end}`;
     const rawValue = entry && typeof entry === "object" && !Array.isArray(entry) ? entry.value : entry;
     const value = coerceValue(rawValue, type);
     if (value === void 0) return null;
-    const label = entry && typeof entry === "object" && !Array.isArray(entry) ? normalizeString14(entry.label) : "";
+    const label = entry && typeof entry === "object" && !Array.isArray(entry) ? normalizeString15(entry.label) : "";
     return {
       value,
       label: label || String(value)
@@ -54048,7 +54292,7 @@ ${indent}${end}`;
     const seen = /* @__PURE__ */ new Set();
     return (Array.isArray(values) ? values : []).map((entry) => {
       if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
-      const name = normalizeString14(entry.name);
+      const name = normalizeString15(entry.name);
       if (!name || seen.has(name) || isEntityOptionName(name)) return null;
       seen.add(name);
       const type = normalizedType(entry.type);
@@ -54061,9 +54305,9 @@ ${indent}${end}`;
       return {
         ...anchorBlockId && (presentation == null ? void 0 : presentation.placement) === "header" ? { presentation: { anchorBlockId, placement: "header" } } : {},
         name,
-        label: normalizeString14(entry.label) || name,
+        label: normalizeString15(entry.label) || name,
         type,
-        description: normalizeString14(entry.description),
+        description: normalizeString15(entry.description),
         values: optionValues,
         ...defaultValue !== void 0 ? { default: defaultValue } : {}
       };
@@ -54085,7 +54329,7 @@ ${indent}${end}`;
   }
 
   // src/components/dashboard/reportBuilderExplorationSession.js
-  function normalizeString15(value = "") {
+  function normalizeString16(value = "") {
     return String(value || "").trim();
   }
   function cloneValue10(value) {
@@ -54120,7 +54364,7 @@ ${indent}${end}`;
     if (!session || typeof session !== "object" || Array.isArray(session)) {
       return null;
     }
-    const sessionId = normalizeString15(session == null ? void 0 : session.sessionId);
+    const sessionId = normalizeString16(session == null ? void 0 : session.sessionId);
     const sourceRef = (session == null ? void 0 : session.sourceRef) && typeof session.sourceRef === "object" && !Array.isArray(session.sourceRef) ? cloneValue10(session.sourceRef) : null;
     const baseSnapshot = (session == null ? void 0 : session.baseSnapshot) && typeof session.baseSnapshot === "object" && !Array.isArray(session.baseSnapshot) ? cloneValue10(session.baseSnapshot) : null;
     const history = (Array.isArray(session == null ? void 0 : session.history) ? session.history : []).filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry)).map((entry) => ({
@@ -54167,7 +54411,7 @@ ${indent}${end}`;
 
   // src/reporting/drillMetadataProvider.js
   var SUPPORTED_REFINEMENT_ACTION_KINDS = /* @__PURE__ */ new Set(["keep", "exclude", "drill", "detail"]);
-  function normalizeString16(value = "") {
+  function normalizeString17(value = "") {
     return String(value || "").trim();
   }
   function cloneValue11(value) {
@@ -54184,8 +54428,8 @@ ${indent}${end}`;
     if (!detailTarget || typeof detailTarget !== "object" || Array.isArray(detailTarget)) {
       return null;
     }
-    const targetRef = normalizeString16(detailTarget.targetRef);
-    const navigationMode = normalizeString16(detailTarget.navigationMode);
+    const targetRef = normalizeString17(detailTarget.targetRef);
+    const navigationMode = normalizeString17(detailTarget.navigationMode);
     if (!targetRef || !navigationMode) {
       return null;
     }
@@ -54193,8 +54437,8 @@ ${indent}${end}`;
       targetRef,
       navigationMode,
       parameters: detailTarget.parameters && typeof detailTarget.parameters === "object" && !Array.isArray(detailTarget.parameters) ? cloneValue11(detailTarget.parameters) : {},
-      ...normalizeString16(detailTarget.title) ? { title: normalizeString16(detailTarget.title) } : {},
-      ...normalizeString16(detailTarget.description) ? { description: normalizeString16(detailTarget.description) } : {}
+      ...normalizeString17(detailTarget.title) ? { title: normalizeString17(detailTarget.title) } : {},
+      ...normalizeString17(detailTarget.description) ? { description: normalizeString17(detailTarget.description) } : {}
     };
   }
   function normalizeRefinementActions(payload = {}) {
@@ -54203,9 +54447,9 @@ ${indent}${end}`;
       if (!action || typeof action !== "object" || Array.isArray(action)) {
         return null;
       }
-      const id = normalizeString16(action.id);
-      const label = normalizeString16(action.label);
-      const kind = normalizeString16(action.kind).toLowerCase();
+      const id = normalizeString17(action.id);
+      const label = normalizeString17(action.label);
+      const kind = normalizeString17(action.kind).toLowerCase();
       if (!id || !label || !SUPPORTED_REFINEMENT_ACTION_KINDS.has(kind)) {
         return null;
       }
@@ -54213,23 +54457,23 @@ ${indent}${end}`;
         id,
         label,
         kind,
-        ...normalizeString16(action.targetRef) ? { targetRef: normalizeString16(action.targetRef) } : {},
-        ...normalizeString16(action.nextFieldRef) ? { nextFieldRef: normalizeString16(action.nextFieldRef) } : {}
+        ...normalizeString17(action.targetRef) ? { targetRef: normalizeString17(action.targetRef) } : {},
+        ...normalizeString17(action.nextFieldRef) ? { nextFieldRef: normalizeString17(action.nextFieldRef) } : {}
       };
     }).filter(Boolean);
   }
 
   // src/reporting/reportBuilderDrillHierarchy.js
-  function normalizeString17(value = "") {
+  function normalizeString18(value = "") {
     return String(value || "").trim();
   }
   function normalizeReportBuilderDrillLevel(level = {}, index = 0) {
     if (!level || typeof level !== "object" || Array.isArray(level)) {
       return null;
     }
-    const field2 = normalizeString17(level.field || level.fieldRef || level.id);
-    const label = normalizeString17(level.label || field2);
-    const id = normalizeString17(level.id || field2 || `level_${index + 1}`);
+    const field2 = normalizeString18(level.field || level.fieldRef || level.id);
+    const label = normalizeString18(level.label || field2);
+    const id = normalizeString18(level.id || field2 || `level_${index + 1}`);
     if (!field2 || !label || !id) {
       return null;
     }
@@ -54248,13 +54492,13 @@ ${indent}${end}`;
     if (levels.length < 2) {
       return null;
     }
-    const id = normalizeString17(hierarchy.id || hierarchy.fieldRef || ((_a5 = levels[0]) == null ? void 0 : _a5.field));
+    const id = normalizeString18(hierarchy.id || hierarchy.fieldRef || ((_a5 = levels[0]) == null ? void 0 : _a5.field));
     if (!id) {
       return null;
     }
     return {
       id,
-      ...normalizeString17(hierarchy.label) ? { label: normalizeString17(hierarchy.label) } : {},
+      ...normalizeString18(hierarchy.label) ? { label: normalizeString18(hierarchy.label) } : {},
       levels
     };
   }
@@ -54263,7 +54507,7 @@ ${indent}${end}`;
   }
 
   // src/reporting/reportBuilderDrillMetadata.js
-  function normalizeString18(value = "") {
+  function normalizeString19(value = "") {
     return String(value || "").trim();
   }
   function resolveDrillMetadataSource(config = {}) {
@@ -54278,7 +54522,7 @@ ${indent}${end}`;
       if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
         return null;
       }
-      const fieldRef = normalizeString18(entry.fieldRef || entry.field || entry.id);
+      const fieldRef = normalizeString19(entry.fieldRef || entry.field || entry.id);
       if (!fieldRef) {
         return null;
       }
@@ -54354,7 +54598,7 @@ ${indent}${end}`;
   }
 
   // src/reporting/reportRefinementModel.js
-  function normalizeString19(value = "") {
+  function normalizeString20(value = "") {
     return String(value || "").trim();
   }
   function cloneValue12(value) {
@@ -54363,25 +54607,25 @@ ${indent}${end}`;
   var SUPPORTED_REFINEMENT_OPS = /* @__PURE__ */ new Set(["keep", "exclude", "drill", "detail"]);
   function resolveDefaultRefinementId({ op = "", field: field2 = "", sourceBlockId = "" } = {}) {
     return [
-      normalizeString19(op),
-      normalizeString19(field2),
-      normalizeString19(sourceBlockId)
+      normalizeString20(op),
+      normalizeString20(field2),
+      normalizeString20(sourceBlockId)
     ].filter(Boolean).join(":");
   }
   function normalizeReportRefinement(refinement = {}) {
     if (!refinement || typeof refinement !== "object" || Array.isArray(refinement)) {
       return null;
     }
-    const op = normalizeString19(refinement.op).toLowerCase();
+    const op = normalizeString20(refinement.op).toLowerCase();
     if (!SUPPORTED_REFINEMENT_OPS.has(op)) {
       return null;
     }
-    const field2 = normalizeString19(refinement.field);
+    const field2 = normalizeString20(refinement.field);
     if (!field2) {
       return null;
     }
-    const sourceBlockId = normalizeString19(refinement.sourceBlockId);
-    const id = normalizeString19(refinement.id || resolveDefaultRefinementId({ op, field: field2, sourceBlockId }));
+    const sourceBlockId = normalizeString20(refinement.sourceBlockId);
+    const id = normalizeString20(refinement.id || resolveDefaultRefinementId({ op, field: field2, sourceBlockId }));
     if (!id) {
       return null;
     }
@@ -54391,8 +54635,8 @@ ${indent}${end}`;
       field: field2,
       values: Array.isArray(refinement.values) ? refinement.values.map((value) => cloneValue12(value)) : [],
       ...sourceBlockId ? { sourceBlockId } : {},
-      ...normalizeString19(refinement.label) ? { label: normalizeString19(refinement.label) } : {},
-      ...normalizeString19(refinement.targetRef) ? { targetRef: normalizeString19(refinement.targetRef) } : {}
+      ...normalizeString20(refinement.label) ? { label: normalizeString20(refinement.label) } : {},
+      ...normalizeString20(refinement.targetRef) ? { targetRef: normalizeString20(refinement.targetRef) } : {}
     };
   }
   function normalizeReportRefinements(refinements = []) {
@@ -54410,16 +54654,16 @@ ${indent}${end}`;
   }
 
   // src/components/dashboard/reportRuntimeDrillState.js
-  function normalizeString20(value = "") {
+  function normalizeString21(value = "") {
     return String(value || "").trim();
   }
   function normalizeReportRuntimeDrillTransition(transition = {}) {
     if (!transition || typeof transition !== "object" || Array.isArray(transition)) {
       return null;
     }
-    const refinementId = normalizeString20(transition.refinementId);
-    const sourceField = normalizeString20(transition.sourceField);
-    const nextFieldRef = normalizeString20(transition.nextFieldRef);
+    const refinementId = normalizeString21(transition.refinementId);
+    const sourceField = normalizeString21(transition.sourceField);
+    const nextFieldRef = normalizeString21(transition.nextFieldRef);
     if (!refinementId || !sourceField || !nextFieldRef) {
       return null;
     }
@@ -54427,12 +54671,12 @@ ${indent}${end}`;
       refinementId,
       sourceField,
       nextFieldRef,
-      ...normalizeString20(transition.sourceBlockId) ? { sourceBlockId: normalizeString20(transition.sourceBlockId) } : {}
+      ...normalizeString21(transition.sourceBlockId) ? { sourceBlockId: normalizeString21(transition.sourceBlockId) } : {}
     };
   }
 
   // src/reporting/reportRuntimeHostIntent.js
-  function normalizeString21(value = "") {
+  function normalizeString22(value = "") {
     return String(value || "").trim();
   }
   function cloneValue13(value) {
@@ -54443,9 +54687,9 @@ ${indent}${end}`;
     if (!intent || typeof intent !== "object" || Array.isArray(intent)) {
       return null;
     }
-    const intentKind = normalizeString21(intent.intentKind).trim();
-    const targetRef = normalizeString21(intent.targetRef);
-    const navigationMode = normalizeString21(intent.navigationMode);
+    const intentKind = normalizeString22(intent.intentKind).trim();
+    const targetRef = normalizeString22(intent.targetRef);
+    const navigationMode = normalizeString22(intent.navigationMode);
     if (!SUPPORTED_REPORT_RUNTIME_HOST_INTENT_KINDS.has(intentKind) || !targetRef || !navigationMode) {
       return null;
     }
@@ -54454,8 +54698,8 @@ ${indent}${end}`;
       targetRef,
       navigationMode,
       parameters: intent.parameters && typeof intent.parameters === "object" && !Array.isArray(intent.parameters) ? cloneValue13(intent.parameters) : {},
-      ...normalizeString21(intent.title) ? { title: normalizeString21(intent.title) } : {},
-      ...normalizeString21(intent.description) ? { description: normalizeString21(intent.description) } : {}
+      ...normalizeString22(intent.title) ? { title: normalizeString22(intent.title) } : {},
+      ...normalizeString22(intent.description) ? { description: normalizeString22(intent.description) } : {}
     };
   }
 
@@ -56045,7 +56289,7 @@ ${indent}${end}`;
   }
 
   // src/reporting/reportDatasetSourceModel.js
-  function normalizeString22(value = "") {
+  function normalizeString23(value = "") {
     return String(value || "").trim();
   }
   function cloneValue15(value) {
@@ -56055,7 +56299,7 @@ ${indent}${end}`;
     return !!value && typeof value === "object" && !Array.isArray(value);
   }
   function normalizeKnownSourceKind(value = "") {
-    const normalized = normalizeString22(value).toLowerCase();
+    const normalized = normalizeString23(value).toLowerCase();
     if (!normalized) {
       return "";
     }
@@ -56085,7 +56329,7 @@ ${indent}${end}`;
       if (!Object.prototype.hasOwnProperty.call(next, key2)) {
         return;
       }
-      const normalized = normalizeString22(next[key2]);
+      const normalized = normalizeString23(next[key2]);
       if (!normalized) {
         delete next[key2];
         return;
@@ -56137,7 +56381,7 @@ ${indent}${end}`;
         if (!Object.prototype.hasOwnProperty.call(next.requestModel, key2)) {
           return;
         }
-        const normalized = normalizeString22(next.requestModel[key2]);
+        const normalized = normalizeString23(next.requestModel[key2]);
         if (!normalized) {
           delete next.requestModel[key2];
           return;
@@ -56157,7 +56401,7 @@ ${indent}${end}`;
   }
 
   // src/reporting/reportDatasetScopeModel.js
-  function normalizeString23(value = "") {
+  function normalizeString24(value = "") {
     return String(value || "").trim();
   }
   function cloneValue16(value) {
@@ -56169,12 +56413,12 @@ ${indent}${end}`;
   var DATASET_SCOPE_MODES = /* @__PURE__ */ new Set(["inherit", "append", "override", "exclude"]);
   var RELATIVE_DATE_PRESETS = /* @__PURE__ */ new Set(["today", "yesterday", "last3days", "last7days", "last30days", "3d", "7d", "30d", "previousperiod"]);
   function normalizeDatasetScopeMode(value = "") {
-    const normalized = normalizeString23(value).toLowerCase();
+    const normalized = normalizeString24(value).toLowerCase();
     return DATASET_SCOPE_MODES.has(normalized) ? normalized : "";
   }
   function normalizeStringArray4(values = []) {
     const seen = /* @__PURE__ */ new Set();
-    return (Array.isArray(values) ? values : []).map((value) => normalizeString23(value)).filter((value) => {
+    return (Array.isArray(values) ? values : []).map((value) => normalizeString24(value)).filter((value) => {
       if (!value || seen.has(value)) {
         return false;
       }
@@ -56187,7 +56431,7 @@ ${indent}${end}`;
       return null;
     }
     const next = cloneValue16(value);
-    const rawMode = normalizeString23(next == null ? void 0 : next.mode);
+    const rawMode = normalizeString24(next == null ? void 0 : next.mode);
     const normalizedMode = normalizeDatasetScopeMode(next == null ? void 0 : next.mode);
     if (normalizedMode) {
       next.mode = normalizedMode;
@@ -56214,11 +56458,11 @@ ${indent}${end}`;
     }
     if (Object.prototype.hasOwnProperty.call(next, "relativeDateRange")) {
       const relativeDateRange = isPlainObject5(next.relativeDateRange) ? cloneValue16(next.relativeDateRange) : null;
-      const preset = normalizeString23(relativeDateRange == null ? void 0 : relativeDateRange.preset).toLowerCase().replaceAll("_", "");
-      const startExpression = normalizeString23(relativeDateRange == null ? void 0 : relativeDateRange.startExpression);
-      const endExpression = normalizeString23(relativeDateRange == null ? void 0 : relativeDateRange.endExpression);
-      const startParamPath = normalizeString23(relativeDateRange == null ? void 0 : relativeDateRange.startParamPath);
-      const endParamPath = normalizeString23(relativeDateRange == null ? void 0 : relativeDateRange.endParamPath);
+      const preset = normalizeString24(relativeDateRange == null ? void 0 : relativeDateRange.preset).toLowerCase().replaceAll("_", "");
+      const startExpression = normalizeString24(relativeDateRange == null ? void 0 : relativeDateRange.startExpression);
+      const endExpression = normalizeString24(relativeDateRange == null ? void 0 : relativeDateRange.endExpression);
+      const startParamPath = normalizeString24(relativeDateRange == null ? void 0 : relativeDateRange.startParamPath);
+      const endParamPath = normalizeString24(relativeDateRange == null ? void 0 : relativeDateRange.endParamPath);
       if (!RELATIVE_DATE_PRESETS.has(preset) && (!startExpression || !endExpression) || !startParamPath || !endParamPath) {
         throw new Error("Dataset relativeDateRange requires a supported preset or start/end expressions, plus startParamPath and endParamPath.");
       }
@@ -56229,7 +56473,7 @@ ${indent}${end}`;
         ...preset ? { preset } : {},
         ...startExpression ? { startExpression } : {},
         ...endExpression ? { endExpression } : {},
-        ...normalizeString23(relativeDateRange == null ? void 0 : relativeDateRange.format) ? { format: normalizeString23(relativeDateRange.format) } : {},
+        ...normalizeString24(relativeDateRange == null ? void 0 : relativeDateRange.format) ? { format: normalizeString24(relativeDateRange.format) } : {},
         startParamPath,
         endParamPath
       };
@@ -56301,7 +56545,7 @@ ${indent}${end}`;
   }
 
   // src/reporting/reportBuilderPublishedDatasetModel.js
-  function normalizeString24(value = "") {
+  function normalizeString25(value = "") {
     return String(value || "").trim();
   }
   function cloneValue17(value) {
@@ -56317,7 +56561,7 @@ ${indent}${end}`;
     if (!isPlainObject6(value)) {
       return null;
     }
-    const derivedFrom = normalizeString24(value.derivedFrom);
+    const derivedFrom = normalizeString25(value.derivedFrom);
     return derivedFrom ? { derivedFrom } : null;
   }
   function normalizePublishedDatasetPresentation(value) {
@@ -56325,9 +56569,9 @@ ${indent}${end}`;
       return null;
     }
     const version = Math.max(1, Number(value.version || 1) || 1);
-    const icon = normalizeString24(value.icon);
-    const tone = normalizeString24(value.tone);
-    const summary = normalizeString24(value.summary);
+    const icon = normalizeString25(value.icon);
+    const tone = normalizeString25(value.tone);
+    const summary = normalizeString25(value.summary);
     if (!icon && !tone && !summary) {
       return null;
     }
@@ -56339,48 +56583,48 @@ ${indent}${end}`;
     };
   }
   function buildDerivedDimensionOptions(entry = {}) {
-    const key2 = normalizeString24((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id));
+    const key2 = normalizeString25((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id));
     if (!key2) {
       return null;
     }
     return {
       key: key2,
-      label: normalizeString24((entry == null ? void 0 : entry.label) || key2) || key2,
+      label: normalizeString25((entry == null ? void 0 : entry.label) || key2) || key2,
       kind: "dimension",
-      ...normalizeString24((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) ? { sourceKey: normalizeString24((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) } : {},
-      ...normalizeString24(entry == null ? void 0 : entry.displayKey) ? { displayKey: normalizeString24(entry.displayKey) } : {},
+      ...normalizeString25((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) ? { sourceKey: normalizeString25((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) } : {},
+      ...normalizeString25(entry == null ? void 0 : entry.displayKey) ? { displayKey: normalizeString25(entry.displayKey) } : {},
       ...(entry == null ? void 0 : entry.displayValueMap) && typeof entry.displayValueMap === "object" && !Array.isArray(entry.displayValueMap) ? { displayValueMap: cloneValue17(entry.displayValueMap) } : {},
-      ...normalizeString24(entry == null ? void 0 : entry.format) ? { format: normalizeString24(entry.format) } : {},
-      ...normalizeString24(entry == null ? void 0 : entry.tickFormat) ? { tickFormat: normalizeString24(entry.tickFormat) } : {},
-      ...["civil", "instant"].includes(normalizeString24(entry == null ? void 0 : entry.valueMode)) ? { valueMode: normalizeString24(entry.valueMode) } : {},
+      ...normalizeString25(entry == null ? void 0 : entry.format) ? { format: normalizeString25(entry.format) } : {},
+      ...normalizeString25(entry == null ? void 0 : entry.tickFormat) ? { tickFormat: normalizeString25(entry.tickFormat) } : {},
+      ...["civil", "instant"].includes(normalizeString25(entry == null ? void 0 : entry.valueMode)) ? { valueMode: normalizeString25(entry.valueMode) } : {},
       ...(entry == null ? void 0 : entry.default) === true ? { default: true } : {},
       ...(entry == null ? void 0 : entry.chartAxis) === true ? { chartAxis: true } : {},
       ...(entry == null ? void 0 : entry.runtimeFilter) && typeof entry.runtimeFilter === "object" && !Array.isArray(entry.runtimeFilter) ? { runtimeFilter: cloneValue17(entry.runtimeFilter) } : {},
-      ...normalizeString24(entry == null ? void 0 : entry.rawId) ? { rawId: normalizeString24(entry.rawId) } : {},
-      ...normalizeString24(entry == null ? void 0 : entry.description) ? { description: normalizeString24(entry.description) } : {},
-      ...normalizeString24(entry == null ? void 0 : entry.category) ? { category: normalizeString24(entry.category) } : {},
-      ...normalizeString24(entry == null ? void 0 : entry.definitionRef) ? { definitionRef: normalizeString24(entry.definitionRef) } : {},
-      ...normalizeString24(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: normalizeString24(entry.semanticRef) } : {},
+      ...normalizeString25(entry == null ? void 0 : entry.rawId) ? { rawId: normalizeString25(entry.rawId) } : {},
+      ...normalizeString25(entry == null ? void 0 : entry.description) ? { description: normalizeString25(entry.description) } : {},
+      ...normalizeString25(entry == null ? void 0 : entry.category) ? { category: normalizeString25(entry.category) } : {},
+      ...normalizeString25(entry == null ? void 0 : entry.definitionRef) ? { definitionRef: normalizeString25(entry.definitionRef) } : {},
+      ...normalizeString25(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: normalizeString25(entry.semanticRef) } : {},
       ...(entry == null ? void 0 : entry.governance) && typeof entry.governance === "object" && !Array.isArray(entry.governance) ? { governance: cloneValue17(entry.governance) } : {}
     };
   }
   function buildDerivedMeasureOptions(entry = {}) {
-    const key2 = normalizeString24((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id));
+    const key2 = normalizeString25((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id));
     if (!key2) {
       return null;
     }
     return {
       key: key2,
-      label: normalizeString24((entry == null ? void 0 : entry.label) || key2) || key2,
+      label: normalizeString25((entry == null ? void 0 : entry.label) || key2) || key2,
       kind: "measure",
-      ...normalizeString24((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) ? { sourceKey: normalizeString24((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) } : {},
-      ...normalizeString24(entry == null ? void 0 : entry.format) ? { format: normalizeString24(entry.format) } : {},
+      ...normalizeString25((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) ? { sourceKey: normalizeString25((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) } : {},
+      ...normalizeString25(entry == null ? void 0 : entry.format) ? { format: normalizeString25(entry.format) } : {},
       ...(entry == null ? void 0 : entry.default) === true ? { default: true } : {},
-      ...normalizeString24(entry == null ? void 0 : entry.rawId) ? { rawId: normalizeString24(entry.rawId) } : {},
-      ...normalizeString24(entry == null ? void 0 : entry.description) ? { description: normalizeString24(entry.description) } : {},
-      ...normalizeString24(entry == null ? void 0 : entry.category) ? { category: normalizeString24(entry.category) } : {},
-      ...normalizeString24(entry == null ? void 0 : entry.definitionRef) ? { definitionRef: normalizeString24(entry.definitionRef) } : {},
-      ...normalizeString24(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: normalizeString24(entry.semanticRef) } : {},
+      ...normalizeString25(entry == null ? void 0 : entry.rawId) ? { rawId: normalizeString25(entry.rawId) } : {},
+      ...normalizeString25(entry == null ? void 0 : entry.description) ? { description: normalizeString25(entry.description) } : {},
+      ...normalizeString25(entry == null ? void 0 : entry.category) ? { category: normalizeString25(entry.category) } : {},
+      ...normalizeString25(entry == null ? void 0 : entry.definitionRef) ? { definitionRef: normalizeString25(entry.definitionRef) } : {},
+      ...normalizeString25(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: normalizeString25(entry.semanticRef) } : {},
       ...(entry == null ? void 0 : entry.governance) && typeof entry.governance === "object" && !Array.isArray(entry.governance) ? { governance: cloneValue17(entry.governance) } : {}
     };
   }
@@ -56398,31 +56642,31 @@ ${indent}${end}`;
     return [...dimensions, ...measures, ...calculated];
   }
   function deriveValueFieldOptions(entry = {}) {
-    const columns = (Array.isArray(entry == null ? void 0 : entry.columnOptions) ? entry.columnOptions : []).filter((item) => ["measure", "computedMeasure"].includes(normalizeString24(item == null ? void 0 : item.kind)));
+    const columns = (Array.isArray(entry == null ? void 0 : entry.columnOptions) ? entry.columnOptions : []).filter((item) => ["measure", "computedMeasure"].includes(normalizeString25(item == null ? void 0 : item.kind)));
     return [...Array.isArray(entry == null ? void 0 : entry.measures) ? entry.measures : [], ...calculatedMeasures(entry), ...columns].map((item) => {
-      const key2 = normalizeString24((item == null ? void 0 : item.key) || (item == null ? void 0 : item.id));
+      const key2 = normalizeString25((item == null ? void 0 : item.key) || (item == null ? void 0 : item.id));
       if (!key2) {
         return null;
       }
       return {
         value: key2,
-        label: normalizeString24((item == null ? void 0 : item.label) || key2) || key2,
-        ...normalizeString24(item == null ? void 0 : item.format) ? { format: normalizeString24(item.format) } : {},
+        label: normalizeString25((item == null ? void 0 : item.label) || key2) || key2,
+        ...normalizeString25(item == null ? void 0 : item.format) ? { format: normalizeString25(item.format) } : {},
         ...(item == null ? void 0 : item.default) === true ? { default: true } : {}
       };
     }).filter(Boolean).filter((item, index, items) => items.findIndex((candidate) => candidate.value === item.value) === index);
   }
   function deriveSecondaryFieldOptions(entry = {}) {
-    const columns = (Array.isArray(entry == null ? void 0 : entry.columnOptions) ? entry.columnOptions : []).filter((item) => normalizeString24(item == null ? void 0 : item.kind) === "dimension");
+    const columns = (Array.isArray(entry == null ? void 0 : entry.columnOptions) ? entry.columnOptions : []).filter((item) => normalizeString25(item == null ? void 0 : item.kind) === "dimension");
     return [...Array.isArray(entry == null ? void 0 : entry.dimensions) ? entry.dimensions : [], ...columns].map((item) => {
-      const key2 = normalizeString24((item == null ? void 0 : item.key) || (item == null ? void 0 : item.id));
+      const key2 = normalizeString25((item == null ? void 0 : item.key) || (item == null ? void 0 : item.id));
       if (!key2) {
         return null;
       }
       return {
         value: key2,
-        label: normalizeString24((item == null ? void 0 : item.label) || key2) || key2,
-        ...normalizeString24(item == null ? void 0 : item.format) ? { format: normalizeString24(item.format) } : {},
+        label: normalizeString25((item == null ? void 0 : item.label) || key2) || key2,
+        ...normalizeString25(item == null ? void 0 : item.format) ? { format: normalizeString25(item.format) } : {},
         ...(item == null ? void 0 : item.default) === true ? { default: true } : {}
       };
     }).filter(Boolean).filter((item, index, items) => items.findIndex((candidate) => candidate.value === item.value) === index);
@@ -56434,20 +56678,20 @@ ${indent}${end}`;
     return columns.map((item) => {
       var _a5;
       return {
-        key: normalizeString24((item == null ? void 0 : item.displayKey) || (item == null ? void 0 : item.key)),
-        aliases: [normalizeString24(item == null ? void 0 : item.key)].filter(Boolean),
-        label: normalizeString24((item == null ? void 0 : item.label) || (item == null ? void 0 : item.key)),
-        kind: (item == null ? void 0 : item.kind) === "computedMeasure" || (item == null ? void 0 : item.kind) === "calculated" && ((_a5 = derivedByKey.get(item.key)) == null ? void 0 : _a5.kind) === "computedMeasure" ? "measure" : normalizeString24(item == null ? void 0 : item.kind),
-        ...normalizeString24(item == null ? void 0 : item.format) ? { format: normalizeString24(item.format) } : {},
-        ...normalizeString24(item == null ? void 0 : item.tickFormat) ? { tickFormat: normalizeString24(item.tickFormat) } : {},
-        ...["civil", "instant"].includes(normalizeString24(item == null ? void 0 : item.valueMode)) ? { valueMode: normalizeString24(item.valueMode) } : {},
+        key: normalizeString25((item == null ? void 0 : item.displayKey) || (item == null ? void 0 : item.key)),
+        aliases: [normalizeString25(item == null ? void 0 : item.key)].filter(Boolean),
+        label: normalizeString25((item == null ? void 0 : item.label) || (item == null ? void 0 : item.key)),
+        kind: (item == null ? void 0 : item.kind) === "computedMeasure" || (item == null ? void 0 : item.kind) === "calculated" && ((_a5 = derivedByKey.get(item.key)) == null ? void 0 : _a5.kind) === "computedMeasure" ? "measure" : normalizeString25(item == null ? void 0 : item.kind),
+        ...normalizeString25(item == null ? void 0 : item.format) ? { format: normalizeString25(item.format) } : {},
+        ...normalizeString25(item == null ? void 0 : item.tickFormat) ? { tickFormat: normalizeString25(item.tickFormat) } : {},
+        ...["civil", "instant"].includes(normalizeString25(item == null ? void 0 : item.valueMode)) ? { valueMode: normalizeString25(item.valueMode) } : {},
         ...(item == null ? void 0 : item.default) === true ? { default: true } : {},
         ...(item == null ? void 0 : item.chartAxis) === true ? { chartAxis: true } : {},
-        ...normalizeString24(item == null ? void 0 : item.rawId) ? { rawId: normalizeString24(item.rawId) } : {},
-        ...normalizeString24(item == null ? void 0 : item.description) ? { description: normalizeString24(item.description) } : {},
-        ...normalizeString24(item == null ? void 0 : item.category) ? { category: normalizeString24(item.category) } : {},
-        ...normalizeString24(item == null ? void 0 : item.definitionRef) ? { definitionRef: normalizeString24(item.definitionRef) } : {},
-        ...normalizeString24(item == null ? void 0 : item.semanticRef) ? { semanticRef: normalizeString24(item.semanticRef) } : {},
+        ...normalizeString25(item == null ? void 0 : item.rawId) ? { rawId: normalizeString25(item.rawId) } : {},
+        ...normalizeString25(item == null ? void 0 : item.description) ? { description: normalizeString25(item.description) } : {},
+        ...normalizeString25(item == null ? void 0 : item.category) ? { category: normalizeString25(item.category) } : {},
+        ...normalizeString25(item == null ? void 0 : item.definitionRef) ? { definitionRef: normalizeString25(item.definitionRef) } : {},
+        ...normalizeString25(item == null ? void 0 : item.semanticRef) ? { semanticRef: normalizeString25(item.semanticRef) } : {},
         ...(item == null ? void 0 : item.governance) && typeof item.governance === "object" && !Array.isArray(item.governance) ? { governance: cloneValue17(item.governance) } : {}
       };
     });
@@ -56456,7 +56700,7 @@ ${indent}${end}`;
     const normalizedSources = (Array.isArray(sources) ? sources : []).filter(isPlainObject6);
     const index = /* @__PURE__ */ new Map();
     normalizedSources.forEach((source) => {
-      const id = normalizeString24(source == null ? void 0 : source.id);
+      const id = normalizeString25(source == null ? void 0 : source.id);
       if (id && !index.has(id)) {
         index.set(id, source);
       }
@@ -56464,7 +56708,7 @@ ${indent}${end}`;
     const declaredIds = new Set(index.keys());
     const sourcesByDataSourceRef = /* @__PURE__ */ new Map();
     normalizedSources.forEach((source) => {
-      const dataSourceRef = normalizeString24(source == null ? void 0 : source.dataSourceRef);
+      const dataSourceRef = normalizeString25(source == null ? void 0 : source.dataSourceRef);
       if (!dataSourceRef) {
         return;
       }
@@ -56490,17 +56734,17 @@ ${indent}${end}`;
       if (!isPlainObject6(entry)) {
         return null;
       }
-      const dataSourceRef = normalizeString24((entry == null ? void 0 : entry.dataSourceRef) || (entry == null ? void 0 : entry.value) || (entry == null ? void 0 : entry.id));
-      const id = normalizeString24((entry == null ? void 0 : entry.id) || dataSourceRef);
+      const dataSourceRef = normalizeString25((entry == null ? void 0 : entry.dataSourceRef) || (entry == null ? void 0 : entry.value) || (entry == null ? void 0 : entry.id));
+      const id = normalizeString25((entry == null ? void 0 : entry.id) || dataSourceRef);
       if (!dataSourceRef || !id) {
         return null;
       }
       return {
         id,
         dataSourceRef,
-        label: normalizeString24((entry == null ? void 0 : entry.label) || dataSourceRef),
-        description: normalizeString24(entry == null ? void 0 : entry.description),
-        kindLabel: normalizeString24((entry == null ? void 0 : entry.kindLabel) || (entry == null ? void 0 : entry.kind) || "published"),
+        label: normalizeString25((entry == null ? void 0 : entry.label) || dataSourceRef),
+        description: normalizeString25(entry == null ? void 0 : entry.description),
+        kindLabel: normalizeString25((entry == null ? void 0 : entry.kindLabel) || (entry == null ? void 0 : entry.kind) || "published"),
         ...normalizePublishedDatasetLineage(entry == null ? void 0 : entry.lineage) ? { lineage: normalizePublishedDatasetLineage(entry.lineage) } : {},
         ...normalizePublishedDatasetPresentation(entry == null ? void 0 : entry.presentation) ? { presentation: normalizePublishedDatasetPresentation(entry.presentation) } : {},
         scope: normalizeReportDatasetScope(entry == null ? void 0 : entry.scope),
@@ -56529,7 +56773,7 @@ ${indent}${end}`;
   }
 
   // src/reporting/reportBuilderScopeParamModel.js
-  function normalizeString25(value = "") {
+  function normalizeString26(value = "") {
     return String(value || "").trim();
   }
   function cloneValue18(value) {
@@ -56540,12 +56784,12 @@ ${indent}${end}`;
     if (!filterId) {
       return null;
     }
-    const normalizedDatasetRef = normalizeString25(datasetRef);
+    const normalizedDatasetRef = normalizeString26(datasetRef);
     const datasetScopedValues = normalizedDatasetRef && runtimeDatasetScopeParams && typeof runtimeDatasetScopeParams === "object" && !Array.isArray(runtimeDatasetScopeParams) && runtimeDatasetScopeParams[normalizedDatasetRef] && typeof runtimeDatasetScopeParams[normalizedDatasetRef] === "object" && !Array.isArray(runtimeDatasetScopeParams[normalizedDatasetRef]) ? runtimeDatasetScopeParams[normalizedDatasetRef] : null;
     const rawValue = datasetScopedValues && Object.prototype.hasOwnProperty.call(datasetScopedValues, filterId) ? datasetScopedValues[filterId] : getScopeParamValue(state, filterId);
     if ((filter == null ? void 0 : filter.type) === "dateRange") {
-      const start = normalizeString25(rawValue == null ? void 0 : rawValue.start);
-      const end = normalizeString25(rawValue == null ? void 0 : rawValue.end);
+      const start = normalizeString26(rawValue == null ? void 0 : rawValue.start);
+      const end = normalizeString26(rawValue == null ? void 0 : rawValue.end);
       return start || end ? { start, end } : null;
     }
     if (Array.isArray(rawValue)) {
@@ -56562,11 +56806,11 @@ ${indent}${end}`;
       return {
         id: predicate.id,
         kind: predicate.kind === "dateRange" ? "dateRange" : predicate.multiple === true ? "multiSelect" : "value",
-        label: normalizeString25(predicate.label || predicate.id),
+        label: normalizeString26(predicate.label || predicate.id),
         ...predicate.description ? { description: predicate.description } : {},
         required: predicate.required === true,
         ...predicate.multiple === true ? { multiple: true } : {},
-        ...predicate.presentation ? { presentation: normalizeString25(predicate.presentation) } : {},
+        ...predicate.presentation ? { presentation: normalizeString26(predicate.presentation) } : {},
         ...Array.isArray(predicate.options) ? { options: cloneValue18(predicate.options) } : {},
         value
       };
@@ -56574,20 +56818,20 @@ ${indent}${end}`;
   }
   function collectLegacyStaticFilterScopeParams(config = {}, state = {}, excludedIds = /* @__PURE__ */ new Set()) {
     return resolveReportBuilderScopeParamFilters(config).map((filter) => {
-      const id = normalizeString25((filter == null ? void 0 : filter.id) || (filter == null ? void 0 : filter.field));
+      const id = normalizeString26((filter == null ? void 0 : filter.id) || (filter == null ? void 0 : filter.field));
       if (!id || excludedIds.has(id)) {
         return null;
       }
       const value = resolveScopeParamValue(filter, state);
-      const description = normalizeString25(filter == null ? void 0 : filter.description);
+      const description = normalizeString26(filter == null ? void 0 : filter.description);
       return {
         id,
-        kind: normalizeString25((filter == null ? void 0 : filter.type) || ((filter == null ? void 0 : filter.multiple) ? "multiSelect" : "value")) || "value",
-        label: normalizeString25((filter == null ? void 0 : filter.label) || id),
+        kind: normalizeString26((filter == null ? void 0 : filter.type) || ((filter == null ? void 0 : filter.multiple) ? "multiSelect" : "value")) || "value",
+        label: normalizeString26((filter == null ? void 0 : filter.label) || id),
         ...description ? { description } : {},
         required: (filter == null ? void 0 : filter.required) === true,
         ...(filter == null ? void 0 : filter.multiple) === true ? { multiple: true } : {},
-        ...normalizeString25(filter == null ? void 0 : filter.presentation) ? { presentation: normalizeString25(filter.presentation) } : {},
+        ...normalizeString26(filter == null ? void 0 : filter.presentation) ? { presentation: normalizeString26(filter.presentation) } : {},
         ...Array.isArray(filter == null ? void 0 : filter.options) ? { options: cloneValue18(filter.options) } : {},
         value
       };
@@ -56597,17 +56841,17 @@ ${indent}${end}`;
     const seen = new Set(excludedIds instanceof Set ? [...excludedIds] : []);
     const params = [];
     normalizeReportBuilderPublishedDataSources2(config).forEach((source) => {
-      const datasetRef = normalizeString25((source == null ? void 0 : source.id) || (source == null ? void 0 : source.dataSourceRef) || (source == null ? void 0 : source.value));
+      const datasetRef = normalizeString26((source == null ? void 0 : source.id) || (source == null ? void 0 : source.dataSourceRef) || (source == null ? void 0 : source.value));
       if (!datasetRef) {
         return;
       }
       (Array.isArray(source == null ? void 0 : source.scopeParamOptions) ? source.scopeParamOptions : []).forEach((option) => {
-        const id = normalizeString25((option == null ? void 0 : option.id) || (option == null ? void 0 : option.value));
+        const id = normalizeString26((option == null ? void 0 : option.id) || (option == null ? void 0 : option.value));
         if (!id || seen.has(id)) {
           return;
         }
         seen.add(id);
-        const kind = normalizeString25((option == null ? void 0 : option.kind) || "value") || "value";
+        const kind = normalizeString26((option == null ? void 0 : option.kind) || "value") || "value";
         const value = resolveScopeParamValue({
           id,
           ...kind === "dateRange" ? { type: "dateRange" } : {},
@@ -56616,11 +56860,11 @@ ${indent}${end}`;
         params.push({
           id,
           kind,
-          label: normalizeString25((option == null ? void 0 : option.label) || id),
-          ...normalizeString25(option == null ? void 0 : option.description) ? { description: normalizeString25(option.description) } : {},
+          label: normalizeString26((option == null ? void 0 : option.label) || id),
+          ...normalizeString26(option == null ? void 0 : option.description) ? { description: normalizeString26(option.description) } : {},
           required: (option == null ? void 0 : option.required) === true,
           ...(option == null ? void 0 : option.multiple) === true ? { multiple: true } : {},
-          ...normalizeString25(option == null ? void 0 : option.presentation) ? { presentation: normalizeString25(option.presentation) } : {},
+          ...normalizeString26(option == null ? void 0 : option.presentation) ? { presentation: normalizeString26(option.presentation) } : {},
           ...Array.isArray(option == null ? void 0 : option.options) ? { options: cloneValue18(option.options) } : {},
           datasetRef,
           value
@@ -56647,12 +56891,12 @@ ${indent}${end}`;
   }
 
   // src/reporting/reportPrimaryDatasetModel.js
-  function normalizeString26(value = "") {
+  function normalizeString27(value = "") {
     return String(value || "").trim();
   }
   function normalizeStringList(values = []) {
     const seen = /* @__PURE__ */ new Set();
-    return (Array.isArray(values) ? values : []).map((value) => normalizeString26(value)).filter((value) => {
+    return (Array.isArray(values) ? values : []).map((value) => normalizeString27(value)).filter((value) => {
       if (!value || seen.has(value)) {
         return false;
       }
@@ -56682,16 +56926,16 @@ ${indent}${end}`;
   }
 
   // src/reporting/reportBlockKindModel.js
-  function normalizeString27(value = "") {
+  function normalizeString28(value = "") {
     return String(value || "").trim();
   }
   function isReportDatasetBackedBlockKind(kind = "") {
-    const normalizedKind = normalizeString27(kind);
+    const normalizedKind = normalizeString28(kind);
     return normalizedKind === "tableBlock" || normalizedKind === "chartBlock" || normalizedKind === "kpiBlock" || normalizedKind === "collectionBlock" || normalizedKind === "geoMapBlock" || normalizedKind === "badgesBlock" || normalizedKind === "timelineBlock" || normalizedKind === "filterBarBlock";
   }
 
   // src/reporting/reportContextPresetModel.js
-  function normalizeString28(value = "") {
+  function normalizeString29(value = "") {
     return String(value || "").trim();
   }
   function hasMeaningfulScopeParamValue(value = null) {
@@ -56700,21 +56944,21 @@ ${indent}${end}`;
     }
     if (value && typeof value === "object") {
       const keys3 = Object.keys(value);
-      const start = normalizeString28(value == null ? void 0 : value.start);
-      const end = normalizeString28(value == null ? void 0 : value.end);
+      const start = normalizeString29(value == null ? void 0 : value.start);
+      const end = normalizeString29(value == null ? void 0 : value.end);
       if (Object.prototype.hasOwnProperty.call(value, "start") || Object.prototype.hasOwnProperty.call(value, "end")) {
         return !!(start || end);
       }
       return keys3.length > 0;
     }
     if (typeof value === "string") {
-      return normalizeString28(value).length > 0;
+      return normalizeString29(value).length > 0;
     }
     return value != null;
   }
   function normalizeParamIds(values = []) {
     const seen = /* @__PURE__ */ new Set();
-    return (Array.isArray(values) ? values : []).map((value) => normalizeString28(value)).filter((value) => {
+    return (Array.isArray(values) ? values : []).map((value) => normalizeString29(value)).filter((value) => {
       if (!value || seen.has(value)) {
         return false;
       }
@@ -56728,7 +56972,7 @@ ${indent}${end}`;
     if (!value || typeof value !== "object" || Array.isArray(value)) {
       return null;
     }
-    const id = normalizeString28(value == null ? void 0 : value.id);
+    const id = normalizeString29(value == null ? void 0 : value.id);
     if (!id) {
       return null;
     }
@@ -56750,15 +56994,15 @@ ${indent}${end}`;
     });
   }
   function listMeaningfulReportScopeParamIds(scopeParams = []) {
-    return (Array.isArray(scopeParams) ? scopeParams : []).filter((param) => hasMeaningfulScopeParamValue(param == null ? void 0 : param.value)).map((param) => normalizeString28(param == null ? void 0 : param.id)).filter(Boolean);
+    return (Array.isArray(scopeParams) ? scopeParams : []).filter((param) => hasMeaningfulScopeParamValue(param == null ? void 0 : param.value)).map((param) => normalizeString29(param == null ? void 0 : param.id)).filter(Boolean);
   }
 
   // src/reporting/reportSpecModel.js
-  function normalizeString29(value = "") {
+  function normalizeString30(value = "") {
     return String(value || "").trim();
   }
   function resolveContainerIdentity(container = {}) {
-    return normalizeString29(
+    return normalizeString30(
       (container == null ? void 0 : container.id) || (container == null ? void 0 : container.stateKey) || (container == null ? void 0 : container.windowKey) || (container == null ? void 0 : container.windowId)
     );
   }
@@ -56769,7 +57013,7 @@ ${indent}${end}`;
     return !!value && typeof value === "object" && !Array.isArray(value);
   }
   function setNestedValue2(target, path2, value) {
-    const segments = normalizeString29(path2).split(".").filter(Boolean);
+    const segments = normalizeString30(path2).split(".").filter(Boolean);
     if (!target || typeof target !== "object" || Array.isArray(target) || segments.length === 0) {
       return;
     }
@@ -56784,7 +57028,7 @@ ${indent}${end}`;
     cursor[segments[segments.length - 1]] = value;
   }
   function getNestedValue(target, path2) {
-    const segments = normalizeString29(path2).split(".").filter(Boolean);
+    const segments = normalizeString30(path2).split(".").filter(Boolean);
     if (!target || typeof target !== "object" || Array.isArray(target) || segments.length === 0) {
       return void 0;
     }
@@ -56798,7 +57042,7 @@ ${indent}${end}`;
     return cursor;
   }
   function deleteNestedValue(target, path2) {
-    const segments = normalizeString29(path2).split(".").filter(Boolean);
+    const segments = normalizeString30(path2).split(".").filter(Boolean);
     if (!target || typeof target !== "object" || Array.isArray(target) || segments.length === 0) {
       return;
     }
@@ -56833,19 +57077,19 @@ ${indent}${end}`;
     return result;
   }
   function normalizeStringArray5(values = []) {
-    return (Array.isArray(values) ? values : []).map((value) => normalizeString29(value)).filter(Boolean);
+    return (Array.isArray(values) ? values : []).map((value) => normalizeString30(value)).filter(Boolean);
   }
   function buildReportSpecColumns(columns = []) {
     return (Array.isArray(columns) ? columns : []).map((column) => ({
-      key: normalizeString29(column == null ? void 0 : column.key),
-      sourceKey: normalizeString29((column == null ? void 0 : column.sourceKey) || (column == null ? void 0 : column.key)),
-      displayKey: normalizeString29((column == null ? void 0 : column.displayKey) || (column == null ? void 0 : column.key)),
+      key: normalizeString30(column == null ? void 0 : column.key),
+      sourceKey: normalizeString30((column == null ? void 0 : column.sourceKey) || (column == null ? void 0 : column.key)),
+      displayKey: normalizeString30((column == null ? void 0 : column.displayKey) || (column == null ? void 0 : column.key)),
       ...(column == null ? void 0 : column.displayValueMap) && typeof column.displayValueMap === "object" && !Array.isArray(column.displayValueMap) ? { displayValueMap: cloneValue19(column.displayValueMap) } : {},
       ...(column == null ? void 0 : column.displayIconMap) && typeof column.displayIconMap === "object" && !Array.isArray(column.displayIconMap) ? { displayIconMap: cloneValue19(column.displayIconMap) } : {},
-      label: normalizeString29((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
-      kind: normalizeString29(column == null ? void 0 : column.kind),
-      ...normalizeString29(column == null ? void 0 : column.format) ? { format: normalizeString29(column.format) } : {},
-      ...normalizeString29(column == null ? void 0 : column.align) ? { align: normalizeString29(column.align) } : {},
+      label: normalizeString30((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
+      kind: normalizeString30(column == null ? void 0 : column.kind),
+      ...normalizeString30(column == null ? void 0 : column.format) ? { format: normalizeString30(column.format) } : {},
+      ...normalizeString30(column == null ? void 0 : column.align) ? { align: normalizeString30(column.align) } : {},
       ...column.width !== void 0 ? { width: column.width } : {},
       ...column.minWidth !== void 0 ? { minWidth: column.minWidth } : {},
       ...column.flex === true ? { flex: true } : {},
@@ -56856,10 +57100,10 @@ ${indent}${end}`;
     })).filter((column) => column.key);
   }
   function resolveReportSpecTitle(container = {}, config = {}) {
-    return normalizeString29((container == null ? void 0 : container.title) || (config == null ? void 0 : config.title) || "Report");
+    return normalizeString30((container == null ? void 0 : container.title) || (config == null ? void 0 : config.title) || "Report");
   }
   function resolveReportSpecDataSourceRef(container = {}, config = {}) {
-    return normalizeString29((container == null ? void 0 : container.dataSourceRef) || (config == null ? void 0 : config.dataSourceRef));
+    return normalizeString30((container == null ? void 0 : container.dataSourceRef) || (config == null ? void 0 : config.dataSourceRef));
   }
   function normalizeReportBuilderPublishedDataSources(config = {}) {
     return normalizeReportBuilderPublishedDataSources2(config);
@@ -56870,42 +57114,42 @@ ${indent}${end}`;
     if (scopeParams.length === 0) {
       return [];
     }
-    if (scopeParams.every((entry) => normalizeString29(entry == null ? void 0 : entry.label) && normalizeString29(entry == null ? void 0 : entry.kind))) {
+    if (scopeParams.every((entry) => normalizeString30(entry == null ? void 0 : entry.label) && normalizeString30(entry == null ? void 0 : entry.kind))) {
       return scopeParams;
     }
-    const reportBuilderBlock = (Array.isArray(reportSpec == null ? void 0 : reportSpec.blocks) ? reportSpec.blocks : []).find((entry) => normalizeString29(entry == null ? void 0 : entry.kind) === "reportBuilderBlock") || null;
+    const reportBuilderBlock = (Array.isArray(reportSpec == null ? void 0 : reportSpec.blocks) ? reportSpec.blocks : []).find((entry) => normalizeString30(entry == null ? void 0 : entry.kind) === "reportBuilderBlock") || null;
     const reportBuilderConfig = isPlainObject7(reportBuilderBlock == null ? void 0 : reportBuilderBlock.config) ? reportBuilderBlock.config : {};
-    const primaryDataset = (Array.isArray(reportSpec == null ? void 0 : reportSpec.datasets) ? reportSpec.datasets : []).find((dataset) => normalizeString29(dataset == null ? void 0 : dataset.id) === "primary" && !Array.isArray(dataset == null ? void 0 : dataset.rows)) || null;
+    const primaryDataset = (Array.isArray(reportSpec == null ? void 0 : reportSpec.datasets) ? reportSpec.datasets : []).find((dataset) => normalizeString30(dataset == null ? void 0 : dataset.id) === "primary" && !Array.isArray(dataset == null ? void 0 : dataset.rows)) || null;
     const filterIndex = new Map(
       [
         ...resolveReportBuilderScopeParamFilters(reportBuilderConfig),
         ...Array.isArray(primaryDataset == null ? void 0 : primaryDataset.scopeParamOptions) ? primaryDataset.scopeParamOptions.map((entry) => ({
-          id: normalizeString29((entry == null ? void 0 : entry.value) || (entry == null ? void 0 : entry.id)),
-          label: normalizeString29((entry == null ? void 0 : entry.label) || (entry == null ? void 0 : entry.value) || (entry == null ? void 0 : entry.id)),
-          type: normalizeString29((entry == null ? void 0 : entry.kind) || "value"),
+          id: normalizeString30((entry == null ? void 0 : entry.value) || (entry == null ? void 0 : entry.id)),
+          label: normalizeString30((entry == null ? void 0 : entry.label) || (entry == null ? void 0 : entry.value) || (entry == null ? void 0 : entry.id)),
+          type: normalizeString30((entry == null ? void 0 : entry.kind) || "value"),
           ...(entry == null ? void 0 : entry.multiple) === true ? { multiple: true } : {},
-          ...normalizeString29(entry == null ? void 0 : entry.presentation) ? { presentation: normalizeString29(entry.presentation) } : {},
+          ...normalizeString30(entry == null ? void 0 : entry.presentation) ? { presentation: normalizeString30(entry.presentation) } : {},
           ...(entry == null ? void 0 : entry.required) === true ? { required: true } : {},
           ...Array.isArray(entry == null ? void 0 : entry.options) ? { options: cloneValue19(entry.options) } : {},
-          ...normalizeString29(entry == null ? void 0 : entry.description) ? { description: normalizeString29(entry.description) } : {}
+          ...normalizeString30(entry == null ? void 0 : entry.description) ? { description: normalizeString30(entry.description) } : {}
         })) : []
       ].map((filter) => [resolveScopeParamId(filter), filter]).filter(([id]) => !!id)
     );
     return scopeParams.map((scopeParam) => {
-      const paramId = normalizeString29(scopeParam == null ? void 0 : scopeParam.id);
+      const paramId = normalizeString30(scopeParam == null ? void 0 : scopeParam.id);
       const filter = filterIndex.get(paramId) || null;
       if (!filter) {
         return scopeParam;
       }
       return {
         ...scopeParam,
-        ...normalizeString29((scopeParam == null ? void 0 : scopeParam.label) || (filter == null ? void 0 : filter.label) || paramId) ? { label: normalizeString29((scopeParam == null ? void 0 : scopeParam.label) || (filter == null ? void 0 : filter.label) || paramId) } : {},
-        ...normalizeString29((scopeParam == null ? void 0 : scopeParam.kind) || (filter == null ? void 0 : filter.type)) ? { kind: normalizeString29((scopeParam == null ? void 0 : scopeParam.kind) || (filter == null ? void 0 : filter.type)) } : {},
+        ...normalizeString30((scopeParam == null ? void 0 : scopeParam.label) || (filter == null ? void 0 : filter.label) || paramId) ? { label: normalizeString30((scopeParam == null ? void 0 : scopeParam.label) || (filter == null ? void 0 : filter.label) || paramId) } : {},
+        ...normalizeString30((scopeParam == null ? void 0 : scopeParam.kind) || (filter == null ? void 0 : filter.type)) ? { kind: normalizeString30((scopeParam == null ? void 0 : scopeParam.kind) || (filter == null ? void 0 : filter.type)) } : {},
         ...(scopeParam == null ? void 0 : scopeParam.multiple) === true || (filter == null ? void 0 : filter.multiple) === true ? { multiple: true } : {},
-        ...normalizeString29((scopeParam == null ? void 0 : scopeParam.presentation) || (filter == null ? void 0 : filter.presentation)) ? { presentation: normalizeString29((scopeParam == null ? void 0 : scopeParam.presentation) || (filter == null ? void 0 : filter.presentation)) } : {},
+        ...normalizeString30((scopeParam == null ? void 0 : scopeParam.presentation) || (filter == null ? void 0 : filter.presentation)) ? { presentation: normalizeString30((scopeParam == null ? void 0 : scopeParam.presentation) || (filter == null ? void 0 : filter.presentation)) } : {},
         ...(scopeParam == null ? void 0 : scopeParam.required) === true || (filter == null ? void 0 : filter.required) === true ? { required: true } : {},
         ...Array.isArray(scopeParam == null ? void 0 : scopeParam.options) ? { options: cloneValue19(scopeParam.options) } : Array.isArray(filter == null ? void 0 : filter.options) ? { options: cloneValue19(filter.options) } : {},
-        ...normalizeString29((scopeParam == null ? void 0 : scopeParam.description) || (filter == null ? void 0 : filter.description)) ? { description: normalizeString29((scopeParam == null ? void 0 : scopeParam.description) || (filter == null ? void 0 : filter.description)) } : {}
+        ...normalizeString30((scopeParam == null ? void 0 : scopeParam.description) || (filter == null ? void 0 : filter.description)) ? { description: normalizeString30((scopeParam == null ? void 0 : scopeParam.description) || (filter == null ? void 0 : filter.description)) } : {}
       };
     });
   }
@@ -56925,8 +57169,8 @@ ${indent}${end}`;
         if (!isPlainObject7(option)) {
           return;
         }
-        const key2 = normalizeString29((option == null ? void 0 : option.key) || (option == null ? void 0 : option.sourceKey));
-        const kind = normalizeString29(option == null ? void 0 : option.kind);
+        const key2 = normalizeString30((option == null ? void 0 : option.key) || (option == null ? void 0 : option.sourceKey));
+        const kind = normalizeString30(option == null ? void 0 : option.kind);
         if (!key2 || !kind) {
           return;
         }
@@ -56940,26 +57184,26 @@ ${indent}${end}`;
       return entries2;
     })();
     const inheritRuntimeFieldCatalog = ((_a5 = normalizedSource == null ? void 0 : normalizedSource.capabilities) == null ? void 0 : _a5.inheritRuntimeFieldCatalog) === true && fieldOptions.length === 0;
-    const dimensions = inheritRuntimeFieldCatalog ? cloneValue19((baseConfig == null ? void 0 : baseConfig.dimensions) || []) : fieldOptions.filter((column) => normalizeString29(column == null ? void 0 : column.kind) === "dimension").map((column) => ({
-      id: normalizeString29(column == null ? void 0 : column.key),
-      key: normalizeString29((column == null ? void 0 : column.sourceKey) || (column == null ? void 0 : column.key)) || normalizeString29(column == null ? void 0 : column.key),
-      label: normalizeString29((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
-      ...normalizeString29(column == null ? void 0 : column.displayKey) ? { displayKey: normalizeString29(column.displayKey) } : {},
+    const dimensions = inheritRuntimeFieldCatalog ? cloneValue19((baseConfig == null ? void 0 : baseConfig.dimensions) || []) : fieldOptions.filter((column) => normalizeString30(column == null ? void 0 : column.kind) === "dimension").map((column) => ({
+      id: normalizeString30(column == null ? void 0 : column.key),
+      key: normalizeString30((column == null ? void 0 : column.sourceKey) || (column == null ? void 0 : column.key)) || normalizeString30(column == null ? void 0 : column.key),
+      label: normalizeString30((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
+      ...normalizeString30(column == null ? void 0 : column.displayKey) ? { displayKey: normalizeString30(column.displayKey) } : {},
       ...(column == null ? void 0 : column.displayValueMap) && typeof column.displayValueMap === "object" && !Array.isArray(column.displayValueMap) ? { displayValueMap: cloneValue19(column.displayValueMap) } : {},
-      ...normalizeString29(column == null ? void 0 : column.format) ? { format: normalizeString29(column.format) } : {},
-      ...normalizeString29(column == null ? void 0 : column.tickFormat) ? { tickFormat: normalizeString29(column.tickFormat) } : {},
-      ...["civil", "instant"].includes(normalizeString29(column == null ? void 0 : column.valueMode)) ? { valueMode: normalizeString29(column.valueMode) } : {},
+      ...normalizeString30(column == null ? void 0 : column.format) ? { format: normalizeString30(column.format) } : {},
+      ...normalizeString30(column == null ? void 0 : column.tickFormat) ? { tickFormat: normalizeString30(column.tickFormat) } : {},
+      ...["civil", "instant"].includes(normalizeString30(column == null ? void 0 : column.valueMode)) ? { valueMode: normalizeString30(column.valueMode) } : {},
       ...isPlainObject7(column == null ? void 0 : column.runtimeFilter) ? { runtimeFilter: cloneValue19(column.runtimeFilter) } : {}
     })).filter((entry) => entry.id && entry.key && entry.label);
     const calculatedIds = /* @__PURE__ */ new Set([
-      ...fieldOptions.filter((column) => normalizeString29(column == null ? void 0 : column.kind) === "computedMeasure").map((column) => normalizeString29(column == null ? void 0 : column.key)),
-      ...["calculatedFields", "computedMeasures", "tableCalculations"].flatMap((key2) => Array.isArray(normalizedSource == null ? void 0 : normalizedSource[key2]) ? normalizedSource[key2] : []).flatMap((field2) => [normalizeString29(field2 == null ? void 0 : field2.id), normalizeString29(field2 == null ? void 0 : field2.key)]).filter(Boolean)
+      ...fieldOptions.filter((column) => normalizeString30(column == null ? void 0 : column.kind) === "computedMeasure").map((column) => normalizeString30(column == null ? void 0 : column.key)),
+      ...["calculatedFields", "computedMeasures", "tableCalculations"].flatMap((key2) => Array.isArray(normalizedSource == null ? void 0 : normalizedSource[key2]) ? normalizedSource[key2] : []).flatMap((field2) => [normalizeString30(field2 == null ? void 0 : field2.id), normalizeString30(field2 == null ? void 0 : field2.key)]).filter(Boolean)
     ]);
-    const measures = inheritRuntimeFieldCatalog ? cloneValue19((baseConfig == null ? void 0 : baseConfig.measures) || []) : fieldOptions.filter((column) => normalizeString29(column == null ? void 0 : column.kind) === "measure" && !calculatedIds.has(normalizeString29(column == null ? void 0 : column.key))).map((column) => ({
-      id: normalizeString29(column == null ? void 0 : column.key),
-      key: normalizeString29((column == null ? void 0 : column.sourceKey) || (column == null ? void 0 : column.key)) || normalizeString29(column == null ? void 0 : column.key),
-      label: normalizeString29((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
-      ...normalizeString29(column == null ? void 0 : column.format) ? { format: normalizeString29(column.format) } : {}
+    const measures = inheritRuntimeFieldCatalog ? cloneValue19((baseConfig == null ? void 0 : baseConfig.measures) || []) : fieldOptions.filter((column) => normalizeString30(column == null ? void 0 : column.kind) === "measure" && !calculatedIds.has(normalizeString30(column == null ? void 0 : column.key))).map((column) => ({
+      id: normalizeString30(column == null ? void 0 : column.key),
+      key: normalizeString30((column == null ? void 0 : column.sourceKey) || (column == null ? void 0 : column.key)) || normalizeString30(column == null ? void 0 : column.key),
+      label: normalizeString30((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
+      ...normalizeString30(column == null ? void 0 : column.format) ? { format: normalizeString30(column.format) } : {}
     })).filter((entry) => entry.id && entry.key && entry.label);
     return {
       // The authored lowerer only reads its invocation-local builder config.
@@ -56967,7 +57211,7 @@ ${indent}${end}`;
       // callers can borrow the base instead of serializing the entire builder
       // once for every published dataset and authored block.
       ...isPlainObject7(baseConfig) ? borrowBase ? baseConfig : cloneValue19(baseConfig) : {},
-      dataSourceRef: normalizeString29((normalizedSource == null ? void 0 : normalizedSource.dataSourceRef) || (baseConfig == null ? void 0 : baseConfig.dataSourceRef)),
+      dataSourceRef: normalizeString30((normalizedSource == null ? void 0 : normalizedSource.dataSourceRef) || (baseConfig == null ? void 0 : baseConfig.dataSourceRef)),
       dimensions,
       measures,
       ...Object.fromEntries(["calculatedFields", "computedMeasures", "tableCalculations"].filter((key2) => Array.isArray(normalizedSource == null ? void 0 : normalizedSource[key2]) && normalizedSource[key2].length > 0).map((key2) => [key2, cloneValue19(normalizedSource[key2])]))
@@ -56982,25 +57226,25 @@ ${indent}${end}`;
     const excludedParamIds = new Set(Array.isArray(scopePolicy == null ? void 0 : scopePolicy.exclude) ? scopePolicy.exclude : []);
     let contextPatch = isPlainObject7(inheritedRequestContext) ? cloneValue19(inheritedRequestContext) : {};
     (Array.isArray(source == null ? void 0 : source.scopeParamOptions) ? source.scopeParamOptions : []).forEach((option) => {
-      const paramId = normalizeString29((option == null ? void 0 : option.id) || (option == null ? void 0 : option.value));
+      const paramId = normalizeString30((option == null ? void 0 : option.id) || (option == null ? void 0 : option.value));
       if (!paramId) {
         return;
       }
-      const paramPath = normalizeString29(option == null ? void 0 : option.paramPath);
+      const paramPath = normalizeString30(option == null ? void 0 : option.paramPath);
       if (excludedParamIds.has(paramId)) {
-        for (const excludedPath of [paramPath, option == null ? void 0 : option.startParamPath, option == null ? void 0 : option.endParamPath].map(normalizeString29).filter(Boolean)) {
+        for (const excludedPath of [paramPath, option == null ? void 0 : option.startParamPath, option == null ? void 0 : option.endParamPath].map(normalizeString30).filter(Boolean)) {
           deleteNestedValue(contextPatch, excludedPath);
         }
         return;
       }
       const hasDatasetScopedValue = datasetScopeParamValues && Object.prototype.hasOwnProperty.call(datasetScopeParamValues, paramId);
       let rawValue = hasDatasetScopedValue ? datasetScopeParamValues[paramId] : getScopeParamValue(state, paramId);
-      const kind = normalizeString29((option == null ? void 0 : option.kind) || "");
+      const kind = normalizeString30((option == null ? void 0 : option.kind) || "");
       if (kind.toLowerCase() === "daterange") {
-        const startParamPath = normalizeString29(option == null ? void 0 : option.startParamPath);
-        const endParamPath = normalizeString29(option == null ? void 0 : option.endParamPath);
-        const startValue = normalizeString29(rawValue == null ? void 0 : rawValue.start) || normalizeString29(getNestedValue(primaryRequestContext, startParamPath));
-        const endValue = normalizeString29(rawValue == null ? void 0 : rawValue.end) || normalizeString29(getNestedValue(primaryRequestContext, endParamPath));
+        const startParamPath = normalizeString30(option == null ? void 0 : option.startParamPath);
+        const endParamPath = normalizeString30(option == null ? void 0 : option.endParamPath);
+        const startValue = normalizeString30(rawValue == null ? void 0 : rawValue.start) || normalizeString30(getNestedValue(primaryRequestContext, startParamPath));
+        const endValue = normalizeString30(rawValue == null ? void 0 : rawValue.end) || normalizeString30(getNestedValue(primaryRequestContext, endParamPath));
         if (startValue && startParamPath) {
           setNestedValue2(contextPatch, startParamPath, startValue);
         }
@@ -57057,7 +57301,7 @@ ${indent}${end}`;
       const matchedRef = referencedDatasetRefs.has(source.id) ? source.id : source.dataSourceRef;
       const runtimeScopeParamsByRef = runtimeDatasetScopeParams && typeof runtimeDatasetScopeParams === "object" && !Array.isArray(runtimeDatasetScopeParams) ? runtimeDatasetScopeParams : null;
       const scopedValues = runtimeScopeParamsByRef ? runtimeScopeParamsByRef[source.id] || (resolvesByDataSourceRef(source) ? runtimeScopeParamsByRef[source.dataSourceRef] : null) || null : null;
-      const sameDataSource = normalizeString29(source == null ? void 0 : source.dataSourceRef) && normalizeString29(source == null ? void 0 : source.dataSourceRef) === normalizeString29(primaryRequestContext == null ? void 0 : primaryRequestContext.dataSourceRef);
+      const sameDataSource = normalizeString30(source == null ? void 0 : source.dataSourceRef) && normalizeString30(source == null ? void 0 : source.dataSourceRef) === normalizeString30(primaryRequestContext == null ? void 0 : primaryRequestContext.dataSourceRef);
       const inheritedRequestContext = {
         ...isPlainObject7((_a5 = primaryRequestContext == null ? void 0 : primaryRequestContext.request) == null ? void 0 : _a5.options) ? { options: cloneValue19(primaryRequestContext.request.options) } : {},
         ...sameDataSource ? {
@@ -57091,7 +57335,7 @@ ${indent}${end}`;
     if (explicit) {
       return explicit;
     }
-    if (normalizeString29(state == null ? void 0 : state.viewMode).toLowerCase() === "table") {
+    if (normalizeString30(state == null ? void 0 : state.viewMode).toLowerCase() === "table") {
       return null;
     }
     const defaults = buildReportBuilderDefaultChartSpecs(config, state);
@@ -57113,12 +57357,12 @@ ${indent}${end}`;
   } = {}) {
     const normalizedChartSpec = normalizeReportBuilderChartSpec({
       ...chartSpec && typeof chartSpec === "object" && !Array.isArray(chartSpec) ? chartSpec : {},
-      ...normalizeString29(title) ? { title: normalizeString29(title) } : {}
+      ...normalizeString30(title) ? { title: normalizeString30(title) } : {}
     });
     if (!normalizedChartSpec) {
       onChartValidation == null ? void 0 : onChartValidation({
-        blockId: normalizeString29(blockId || "primaryChart"),
-        datasetRef: normalizeString29(datasetRef || "primary"),
+        blockId: normalizeString30(blockId || "primaryChart"),
+        datasetRef: normalizeString30(datasetRef || "primary"),
         chartSpec: null,
         validation: { valid: false, errors: [{ field: "chartSpec", code: "missing" }] }
       });
@@ -57127,8 +57371,8 @@ ${indent}${end}`;
     const chartFields = buildReportBuilderChartFields(config, state);
     const validation = validateReportBuilderChartSpec(config, normalizedChartSpec, chartFields);
     onChartValidation == null ? void 0 : onChartValidation({
-      blockId: normalizeString29(blockId || "primaryChart"),
-      datasetRef: normalizeString29(datasetRef || "primary"),
+      blockId: normalizeString30(blockId || "primaryChart"),
+      datasetRef: normalizeString30(datasetRef || "primary"),
       chartSpec: cloneValue19(normalizedChartSpec),
       validation: cloneValue19(validation)
     });
@@ -57139,9 +57383,9 @@ ${indent}${end}`;
     }, config, state, normalizedChartSpec);
     const normalizedRowLimit = Math.trunc(Number(rowLimit) || 0);
     return {
-      id: normalizeString29(blockId || "primaryChart"),
+      id: normalizeString30(blockId || "primaryChart"),
       kind: "chartBlock",
-      datasetRef: normalizeString29(datasetRef || "primary"),
+      datasetRef: normalizeString30(datasetRef || "primary"),
       chartSpec: normalizedChartSpec,
       chartModel: validation.valid ? cloneValue19((chartContainer == null ? void 0 : chartContainer.chart) || null) : null,
       ...Number.isInteger(normalizedRowLimit) && normalizedRowLimit > 0 ? { rowLimit: normalizedRowLimit } : {}
@@ -57192,11 +57436,11 @@ ${indent}${end}`;
     if (!governance || typeof governance !== "object" || Array.isArray(governance)) {
       return null;
     }
-    const status = normalizeString29(governance.status).toLowerCase();
-    const certification = normalizeString29(governance.certification).toLowerCase();
-    const ownerRef = normalizeString29(governance.ownerRef);
-    const classification = normalizeString29(governance.classification);
-    const deprecation = normalizeString29(governance.deprecation);
+    const status = normalizeString30(governance.status).toLowerCase();
+    const certification = normalizeString30(governance.certification).toLowerCase();
+    const ownerRef = normalizeString30(governance.ownerRef);
+    const classification = normalizeString30(governance.classification);
+    const deprecation = normalizeString30(governance.deprecation);
     const next = {};
     if (status) {
       next.status = status;
@@ -57219,16 +57463,16 @@ ${indent}${end}`;
     if (!field2 || typeof field2 !== "object" || Array.isArray(field2)) {
       return null;
     }
-    const id = normalizeString29(field2 == null ? void 0 : field2.id);
-    const label = normalizeString29((field2 == null ? void 0 : field2.label) || id);
+    const id = normalizeString30(field2 == null ? void 0 : field2.id);
+    const label = normalizeString30((field2 == null ? void 0 : field2.label) || id);
     if (!id || !label) {
       return null;
     }
-    const rawId = normalizeString29(field2 == null ? void 0 : field2.rawId);
-    const description = normalizeString29(field2 == null ? void 0 : field2.description);
-    const format2 = normalizeString29(field2 == null ? void 0 : field2.format);
-    const category = normalizeString29(field2 == null ? void 0 : field2.category);
-    const definitionRef = normalizeString29(field2 == null ? void 0 : field2.definitionRef);
+    const rawId = normalizeString30(field2 == null ? void 0 : field2.rawId);
+    const description = normalizeString30(field2 == null ? void 0 : field2.description);
+    const format2 = normalizeString30(field2 == null ? void 0 : field2.format);
+    const category = normalizeString30(field2 == null ? void 0 : field2.category);
+    const definitionRef = normalizeString30(field2 == null ? void 0 : field2.definitionRef);
     const governance = normalizeSemanticSummaryGovernance(field2 == null ? void 0 : field2.governance);
     return {
       id,
@@ -57245,12 +57489,12 @@ ${indent}${end}`;
     if (!summary || typeof summary !== "object" || Array.isArray(summary)) {
       return null;
     }
-    const kind = normalizeString29(summary.kind).toLowerCase();
+    const kind = normalizeString30(summary.kind).toLowerCase();
     if (kind !== "semantic") {
       return null;
     }
-    const modelRef = normalizeString29(summary.modelRef);
-    const entity = normalizeString29(summary.entity);
+    const modelRef = normalizeString30(summary.modelRef);
+    const entity = normalizeString30(summary.entity);
     if (!modelRef || !entity) {
       return null;
     }
@@ -57258,11 +57502,11 @@ ${indent}${end}`;
     return {
       kind: "semantic",
       modelRef,
-      ...normalizeString29(summary.modelLabel) ? { modelLabel: normalizeString29(summary.modelLabel) } : {},
-      ...normalizeString29(summary.modelDescription) ? { modelDescription: normalizeString29(summary.modelDescription) } : {},
+      ...normalizeString30(summary.modelLabel) ? { modelLabel: normalizeString30(summary.modelLabel) } : {},
+      ...normalizeString30(summary.modelDescription) ? { modelDescription: normalizeString30(summary.modelDescription) } : {},
       entity,
-      ...normalizeString29(summary.entityLabel) ? { entityLabel: normalizeString29(summary.entityLabel) } : {},
-      ...normalizeString29(summary.entityDescription) ? { entityDescription: normalizeString29(summary.entityDescription) } : {},
+      ...normalizeString30(summary.entityLabel) ? { entityLabel: normalizeString30(summary.entityLabel) } : {},
+      ...normalizeString30(summary.entityDescription) ? { entityDescription: normalizeString30(summary.entityDescription) } : {},
       selectedDimensions: (Array.isArray(summary.selectedDimensions) ? summary.selectedDimensions : []).map((field2) => normalizeSemanticSummaryField(field2)).filter(Boolean),
       selectedMeasures: (Array.isArray(summary.selectedMeasures) ? summary.selectedMeasures : []).map((field2) => normalizeSemanticSummaryField(field2)).filter(Boolean),
       ...selectedParameters.length > 0 ? { selectedParameters } : {}
@@ -57296,7 +57540,7 @@ ${indent}${end}`;
     const scopeParams = buildReportBuilderScopeParams(effectiveConfig, normalizedState);
     const contextPreset = resolveReportScopeContextPresetFromState(normalizedState, scopeParams);
     const referencedDatasetRefs = new Set(
-      (Array.isArray(normalizedState == null ? void 0 : normalizedState.reportDocumentBlocks) ? normalizedState.reportDocumentBlocks : []).flatMap((block) => [normalizeString29(block == null ? void 0 : block.datasetRef), normalizeString29(block == null ? void 0 : block.secondaryDatasetRef)]).filter((datasetRef) => !!datasetRef && datasetRef !== "primary")
+      (Array.isArray(normalizedState == null ? void 0 : normalizedState.reportDocumentBlocks) ? normalizedState.reportDocumentBlocks : []).flatMap((block) => [normalizeString30(block == null ? void 0 : block.datasetRef), normalizeString30(block == null ? void 0 : block.secondaryDatasetRef)]).filter((datasetRef) => !!datasetRef && datasetRef !== "primary")
     );
     const authoredDatasetBackedBlocks = (Array.isArray(normalizedState == null ? void 0 : normalizedState.reportDocumentBlocks) ? normalizedState.reportDocumentBlocks : []).filter((block) => isReportDatasetBackedBlockKind(block == null ? void 0 : block.kind));
     const primaryDataSourceRef = resolveReportSpecDataSourceRef(container, config);
@@ -57311,13 +57555,13 @@ ${indent}${end}`;
       }
     );
     const staticDatasets = buildReportBuilderStaticDatasetDeclarations(normalizedState == null ? void 0 : normalizedState.reportStaticDatasets);
-    const explicitDatasetRefs = authoredDatasetBackedBlocks.map((block) => normalizeString29(block == null ? void 0 : block.datasetRef)).filter(Boolean);
+    const explicitDatasetRefs = authoredDatasetBackedBlocks.map((block) => normalizeString30(block == null ? void 0 : block.datasetRef)).filter(Boolean);
     const shouldIncludePrimaryDataset = shouldKeepPrimaryDataset({
       includePrimaryBlocks,
       datasetBackedBlockDatasetRefs: explicitDatasetRefs.length === authoredDatasetBackedBlocks.length ? explicitDatasetRefs : [],
       availableNonPrimaryDatasetRefs: [
-        ...publishedDatasets.map((dataset) => normalizeString29(dataset == null ? void 0 : dataset.id)),
-        ...staticDatasets.map((dataset) => normalizeString29(dataset == null ? void 0 : dataset.id))
+        ...publishedDatasets.map((dataset) => normalizeString30(dataset == null ? void 0 : dataset.id)),
+        ...staticDatasets.map((dataset) => normalizeString30(dataset == null ? void 0 : dataset.id))
       ]
     });
     const chartBlock = chartSpec ? buildReportSpecChartBlock({
@@ -57343,18 +57587,18 @@ ${indent}${end}`;
       source: {
         kind: "dashboard.reportBuilder",
         containerId: resolveContainerIdentity(container),
-        stateKey: normalizeString29((container == null ? void 0 : container.stateKey) || resolveContainerIdentity(container)),
+        stateKey: normalizeString30((container == null ? void 0 : container.stateKey) || resolveContainerIdentity(container)),
         dataSourceRef: primaryDataSourceRef
       },
       title: resolveReportSpecTitle(container, config),
       ...(normalizedState == null ? void 0 : normalizedState.binding) ? { binding: cloneValue19(normalizedState.binding) } : {},
       ...normalizedSemanticSummary ? { semanticSummary: cloneValue19(normalizedSemanticSummary) } : {},
       parameters: {
-        viewMode: normalizeString29((normalizedState == null ? void 0 : normalizedState.viewMode) || "table"),
-        groupBy: normalizeString29(normalizedState == null ? void 0 : normalizedState.groupBy),
+        viewMode: normalizeString30((normalizedState == null ? void 0 : normalizedState.viewMode) || "table"),
+        groupBy: normalizeString30(normalizedState == null ? void 0 : normalizedState.groupBy),
         pageSize: Math.max(1, Number((normalizedState == null ? void 0 : normalizedState.pageSize) || 0) || 0) || 50,
-        orderField: normalizeString29(normalizedState == null ? void 0 : normalizedState.orderField),
-        orderDir: normalizeString29((normalizedState == null ? void 0 : normalizedState.orderDir) || "desc")
+        orderField: normalizeString30(normalizedState == null ? void 0 : normalizedState.orderField),
+        orderDir: normalizeString30((normalizedState == null ? void 0 : normalizedState.orderDir) || "desc")
       },
       layoutIntent: {
         kind: "single",
@@ -57387,14 +57631,14 @@ ${indent}${end}`;
   }
 
   // src/reporting/refinementBarModel.js
-  function normalizeString30(value = "") {
+  function normalizeString31(value = "") {
     return String(value || "").trim();
   }
   function normalizeRefinementBarText(value, defaultValue = null) {
     if (value == null) {
       return defaultValue;
     }
-    return normalizeString30(value);
+    return normalizeString31(value);
   }
   var SUPPORTED_REFINEMENT_BAR_ACTIONS = /* @__PURE__ */ new Set(["remove", "clearAll", "undo", "redo"]);
   function normalizeRefinementBarActionKinds(actionKinds, {
@@ -57407,7 +57651,7 @@ ${indent}${end}`;
     const next = [];
     const seen = /* @__PURE__ */ new Set();
     source.forEach((entry) => {
-      const normalized = normalizeString30(entry);
+      const normalized = normalizeString31(entry);
       if (!SUPPORTED_REFINEMENT_BAR_ACTIONS.has(normalized) || seen.has(normalized)) {
         return;
       }
@@ -57418,19 +57662,19 @@ ${indent}${end}`;
   }
 
   // src/reporting/reportDocumentModel.js
-  function normalizeString31(value = "") {
+  function normalizeString32(value = "") {
     return String(value || "").trim();
   }
   function isTruncatedPlaceholder2(value = "") {
-    return normalizeString31(value) === "[MaxDepth]";
+    return normalizeString32(value) === "[MaxDepth]";
   }
   function resolveContainerIdentity2(container = {}) {
-    return normalizeString31(
+    return normalizeString32(
       (container == null ? void 0 : container.id) || (container == null ? void 0 : container.stateKey) || (container == null ? void 0 : container.windowKey) || (container == null ? void 0 : container.windowId)
     );
   }
   function normalizeFilterBarTitle(value = "") {
-    const normalized = normalizeString31(value);
+    const normalized = normalizeString32(value);
     const lowered = normalized.toLowerCase();
     if (!normalized || lowered === "scope" || lowered === "report scope") {
       return "Filters";
@@ -57441,12 +57685,12 @@ ${indent}${end}`;
     return value == null ? value : JSON.parse(JSON.stringify(value));
   }
   function normalizeStringArray6(values = []) {
-    return (Array.isArray(values) ? values : []).map((value) => normalizeString31(value)).filter(Boolean);
+    return (Array.isArray(values) ? values : []).map((value) => normalizeString32(value)).filter(Boolean);
   }
   function normalizeReportDocumentTheme(theme = null) {
     const source = theme && typeof theme === "object" && !Array.isArray(theme) ? theme : {};
-    const accentTone = normalizeString31((source == null ? void 0 : source.accentTone) || (source == null ? void 0 : source.accent) || "").toLowerCase();
-    const badgePalette = normalizeString31((source == null ? void 0 : source.badgePalette) || "").toLowerCase();
+    const accentTone = normalizeString32((source == null ? void 0 : source.accentTone) || (source == null ? void 0 : source.accent) || "").toLowerCase();
+    const badgePalette = normalizeString32((source == null ? void 0 : source.badgePalette) || "").toLowerCase();
     const next = {
       ...["blue", "green", "amber", "rose", "slate"].includes(accentTone) ? { accentTone } : {},
       ...["soft", "bold"].includes(badgePalette) ? { badgePalette } : {}
@@ -57454,7 +57698,7 @@ ${indent}${end}`;
     return Object.keys(next).length > 0 ? next : null;
   }
   function normalizeGeoFormat2(value = "") {
-    const normalized = normalizeString31(value);
+    const normalized = normalizeString32(value);
     if (normalized === "compactNumber") {
       return "compact";
     }
@@ -57491,11 +57735,11 @@ ${indent}${end}`;
         return;
       }
       const aliases2 = [
-        normalizeString31(normalizedEntry == null ? void 0 : normalizedEntry.id),
-        normalizeString31(normalizedEntry == null ? void 0 : normalizedEntry.key),
-        normalizeString31(normalizedEntry == null ? void 0 : normalizedEntry.chartKey),
-        normalizeString31(normalizedEntry == null ? void 0 : normalizedEntry.displayKey),
-        normalizeString31(normalizedEntry == null ? void 0 : normalizedEntry.displayPath)
+        normalizeString32(normalizedEntry == null ? void 0 : normalizedEntry.id),
+        normalizeString32(normalizedEntry == null ? void 0 : normalizedEntry.key),
+        normalizeString32(normalizedEntry == null ? void 0 : normalizedEntry.chartKey),
+        normalizeString32(normalizedEntry == null ? void 0 : normalizedEntry.displayKey),
+        normalizeString32(normalizedEntry == null ? void 0 : normalizedEntry.displayPath)
       ].filter(Boolean);
       aliases2.forEach((alias) => {
         if (!result.has(alias)) {
@@ -57506,7 +57750,7 @@ ${indent}${end}`;
     return result;
   }
   function resolveReportBuilderFieldId(entry = {}) {
-    return normalizeString31((entry == null ? void 0 : entry.id) || (entry == null ? void 0 : entry.key));
+    return normalizeString32((entry == null ? void 0 : entry.id) || (entry == null ? void 0 : entry.key));
   }
   function buildReportBuilderFieldCatalog(config, datasetRef, expressionDependencies) {
     const lookup = /* @__PURE__ */ new Map();
@@ -57529,7 +57773,7 @@ ${indent}${end}`;
     return { lookup };
   }
   function resolveReportBuilderCatalogEntry(fieldCatalog = {}, fieldKey = "") {
-    const normalizedFieldKey = normalizeString31(fieldKey);
+    const normalizedFieldKey = normalizeString32(fieldKey);
     if (!normalizedFieldKey) {
       return null;
     }
@@ -57583,13 +57827,12 @@ ${indent}${end}`;
     for (const field2 of tableAnalyticsFields(normalizedBlock)) if (!resolveReportBuilderCatalogEntry(fieldCatalog, field2)) throw new Error(`Analytical table field ${field2} must be declared by its dataset catalog.`);
     const columns = Array.isArray(normalizedBlock == null ? void 0 : normalizedBlock.columns) ? normalizedBlock.columns : [];
     normalizedBlock.columns = columns.map((column) => {
-      var _a5, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
+      var _a5, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
       const normalizedColumn = column && typeof column === "object" && !Array.isArray(column) ? cloneValue20(column) : null;
       if (!normalizedColumn) {
         return column;
       }
-      const linkField = normalizeString31(((_a5 = normalizedColumn == null ? void 0 : normalizedColumn.link) == null ? void 0 : _a5.urlField) || ((_b = normalizedColumn == null ? void 0 : normalizedColumn.link) == null ? void 0 : _b.idField));
-      const hasValidLinkField = !linkField || !!resolveReportBuilderCatalogEntry(fieldCatalog, linkField);
+      const hasValidLinkField = getReportTableLinkFields(normalizedColumn.link).every((field2) => !!resolveReportBuilderCatalogEntry(fieldCatalog, field2));
       if (!hasValidLinkField) {
         delete normalizedColumn.link;
       }
@@ -57598,17 +57841,17 @@ ${indent}${end}`;
       if (!catalogEntry || !fieldId) {
         return normalizedColumn;
       }
-      const sourceKey = normalizeString31(((_c = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _c.key) || ((_d = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _d.id) || fieldId) || fieldId;
-      const displayKey = normalizeString31(((_e = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _e.displayKey) || ((_f = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _f.displayPath) || sourceKey) || sourceKey;
+      const sourceKey = normalizeString32(((_a5 = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _a5.key) || ((_b = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _b.id) || fieldId) || fieldId;
+      const displayKey = normalizeString32(((_c = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _c.displayKey) || ((_d = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _d.displayPath) || sourceKey) || sourceKey;
       return {
         ...normalizedColumn,
         sourceKey,
         displayKey,
-        ...(normalizedColumn == null ? void 0 : normalizedColumn.displayValueMap) || ((_g = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _g.displayValueMap) ? { displayValueMap: cloneValue20((normalizedColumn == null ? void 0 : normalizedColumn.displayValueMap) || ((_h = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _h.displayValueMap)) } : {},
-        ...(normalizedColumn == null ? void 0 : normalizedColumn.displayIconMap) || ((_i = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _i.displayIconMap) ? { displayIconMap: cloneValue20((normalizedColumn == null ? void 0 : normalizedColumn.displayIconMap) || ((_j = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _j.displayIconMap)) } : {},
-        ...normalizeString31((normalizedColumn == null ? void 0 : normalizedColumn.label) || ((_k = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _k.label) || fieldId) ? { label: normalizeString31((normalizedColumn == null ? void 0 : normalizedColumn.label) || ((_l = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _l.label) || fieldId) } : {},
-        ...normalizeString31((normalizedColumn == null ? void 0 : normalizedColumn.format) || ((_m = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _m.format)) ? { format: normalizeString31((normalizedColumn == null ? void 0 : normalizedColumn.format) || ((_n = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _n.format)) } : {},
-        ...catalogEntry.kind === "dimension" && ((_o = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _o.runtimeFilter) && typeof catalogEntry.entry.runtimeFilter === "object" && !Array.isArray(catalogEntry.entry.runtimeFilter) ? { runtimeFilterable: true } : {}
+        ...(normalizedColumn == null ? void 0 : normalizedColumn.displayValueMap) || ((_e = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _e.displayValueMap) ? { displayValueMap: cloneValue20((normalizedColumn == null ? void 0 : normalizedColumn.displayValueMap) || ((_f = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _f.displayValueMap)) } : {},
+        ...(normalizedColumn == null ? void 0 : normalizedColumn.displayIconMap) || ((_g = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _g.displayIconMap) ? { displayIconMap: cloneValue20((normalizedColumn == null ? void 0 : normalizedColumn.displayIconMap) || ((_h = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _h.displayIconMap)) } : {},
+        ...normalizeString32((normalizedColumn == null ? void 0 : normalizedColumn.label) || ((_i = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _i.label) || fieldId) ? { label: normalizeString32((normalizedColumn == null ? void 0 : normalizedColumn.label) || ((_j = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _j.label) || fieldId) } : {},
+        ...normalizeString32((normalizedColumn == null ? void 0 : normalizedColumn.format) || ((_k = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _k.format)) ? { format: normalizeString32((normalizedColumn == null ? void 0 : normalizedColumn.format) || ((_l = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _l.format)) } : {},
+        ...catalogEntry.kind === "dimension" && ((_m = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _m.runtimeFilter) && typeof catalogEntry.entry.runtimeFilter === "object" && !Array.isArray(catalogEntry.entry.runtimeFilter) ? { runtimeFilterable: true } : {}
       };
     });
     return normalizedBlock;
@@ -57624,36 +57867,36 @@ ${indent}${end}`;
     const nextBlock = {
       ...normalizedBlock
     };
-    if (!normalizeString31(nextBlock == null ? void 0 : nextBlock.valueLabel)) {
+    if (!normalizeString32(nextBlock == null ? void 0 : nextBlock.valueLabel)) {
       const valueFieldId = resolveReportBuilderFieldId(valueFieldEntry == null ? void 0 : valueFieldEntry.entry);
-      const valueLabel = normalizeString31(((_a5 = valueFieldEntry == null ? void 0 : valueFieldEntry.entry) == null ? void 0 : _a5.label) || valueFieldId);
+      const valueLabel = normalizeString32(((_a5 = valueFieldEntry == null ? void 0 : valueFieldEntry.entry) == null ? void 0 : _a5.label) || valueFieldId);
       if (valueLabel) {
         nextBlock.valueLabel = valueLabel;
       }
     }
-    if (!normalizeString31(nextBlock == null ? void 0 : nextBlock.valueFormat) && normalizeString31((_b = valueFieldEntry == null ? void 0 : valueFieldEntry.entry) == null ? void 0 : _b.format)) {
-      nextBlock.valueFormat = normalizeString31(valueFieldEntry.entry.format);
+    if (!normalizeString32(nextBlock == null ? void 0 : nextBlock.valueFormat) && normalizeString32((_b = valueFieldEntry == null ? void 0 : valueFieldEntry.entry) == null ? void 0 : _b.format)) {
+      nextBlock.valueFormat = normalizeString32(valueFieldEntry.entry.format);
     }
-    if (normalizeString31(nextBlock == null ? void 0 : nextBlock.secondaryField) && (secondaryFieldEntry == null ? void 0 : secondaryFieldEntry.entry)) {
+    if (normalizeString32(nextBlock == null ? void 0 : nextBlock.secondaryField) && (secondaryFieldEntry == null ? void 0 : secondaryFieldEntry.entry)) {
       const secondaryFieldId = resolveReportBuilderFieldId(secondaryFieldEntry.entry);
-      const secondaryDisplayKey = normalizeString31(
+      const secondaryDisplayKey = normalizeString32(
         (nextBlock == null ? void 0 : nextBlock.secondaryDisplayKey) || ((_c = secondaryFieldEntry == null ? void 0 : secondaryFieldEntry.entry) == null ? void 0 : _c.displayKey) || ((_d = secondaryFieldEntry == null ? void 0 : secondaryFieldEntry.entry) == null ? void 0 : _d.displayPath) || ((_e = secondaryFieldEntry == null ? void 0 : secondaryFieldEntry.entry) == null ? void 0 : _e.key) || secondaryFieldId
       );
       const secondaryDisplayValueMap = !(nextBlock == null ? void 0 : nextBlock.secondaryDisplayValueMap) && ((_f = secondaryFieldEntry == null ? void 0 : secondaryFieldEntry.entry) == null ? void 0 : _f.displayValueMap) && typeof secondaryFieldEntry.entry.displayValueMap === "object" && !Array.isArray(secondaryFieldEntry.entry.displayValueMap) ? cloneValue20(secondaryFieldEntry.entry.displayValueMap) : null;
-      if (secondaryDisplayKey && (secondaryDisplayKey !== normalizeString31(nextBlock == null ? void 0 : nextBlock.secondaryField) || secondaryDisplayValueMap)) {
+      if (secondaryDisplayKey && (secondaryDisplayKey !== normalizeString32(nextBlock == null ? void 0 : nextBlock.secondaryField) || secondaryDisplayValueMap)) {
         nextBlock.secondaryDisplayKey = secondaryDisplayKey;
       }
       if (secondaryDisplayValueMap) {
         nextBlock.secondaryDisplayValueMap = secondaryDisplayValueMap;
       }
-      if (!normalizeString31(nextBlock == null ? void 0 : nextBlock.secondaryLabel)) {
-        const secondaryLabel = normalizeString31(((_g = secondaryFieldEntry == null ? void 0 : secondaryFieldEntry.entry) == null ? void 0 : _g.label) || secondaryFieldId);
+      if (!normalizeString32(nextBlock == null ? void 0 : nextBlock.secondaryLabel)) {
+        const secondaryLabel = normalizeString32(((_g = secondaryFieldEntry == null ? void 0 : secondaryFieldEntry.entry) == null ? void 0 : _g.label) || secondaryFieldId);
         if (secondaryLabel) {
           nextBlock.secondaryLabel = secondaryLabel;
         }
       }
-      if (!normalizeString31(nextBlock == null ? void 0 : nextBlock.secondaryFormat) && normalizeString31((_h = secondaryFieldEntry == null ? void 0 : secondaryFieldEntry.entry) == null ? void 0 : _h.format)) {
-        nextBlock.secondaryFormat = normalizeString31(secondaryFieldEntry.entry.format);
+      if (!normalizeString32(nextBlock == null ? void 0 : nextBlock.secondaryFormat) && normalizeString32((_h = secondaryFieldEntry == null ? void 0 : secondaryFieldEntry.entry) == null ? void 0 : _h.format)) {
+        nextBlock.secondaryFormat = normalizeString32(secondaryFieldEntry.entry.format);
       }
     }
     return nextBlock;
@@ -57664,8 +57907,8 @@ ${indent}${end}`;
     if (!(catalogEntry == null ? void 0 : catalogEntry.entry) || !fieldId) {
       return null;
     }
-    const sourceKey = normalizeString31(catalogEntry.entry.key || catalogEntry.entry.id || fieldId) || fieldId;
-    const displayKey = normalizeString31(
+    const sourceKey = normalizeString32(catalogEntry.entry.key || catalogEntry.entry.id || fieldId) || fieldId;
+    const displayKey = normalizeString32(
       catalogEntry.entry.displayKey || catalogEntry.entry.displayPath || sourceKey
     ) || sourceKey;
     const displayValueMap = catalogEntry.entry.displayValueMap && typeof catalogEntry.entry.displayValueMap === "object" && !Array.isArray(catalogEntry.entry.displayValueMap) ? cloneValue20(catalogEntry.entry.displayValueMap) : null;
@@ -57682,7 +57925,7 @@ ${indent}${end}`;
     const mappings = cloneValue20(authored || {});
     const matches = String(template || "").matchAll(/\brow\.([A-Za-z_][A-Za-z0-9_.]*)/g);
     for (const match2 of matches) {
-      const field2 = normalizeString31(match2 == null ? void 0 : match2[1]);
+      const field2 = normalizeString32(match2 == null ? void 0 : match2[1]);
       const descriptor = resolveAuthoredFieldDisplayDescriptor(fieldCatalog, field2);
       if (field2 && descriptor) {
         mappings[field2] = { ...mappings[field2], ...descriptor };
@@ -57725,23 +57968,23 @@ ${indent}${end}`;
       }
       const valueFieldEntry = resolveReportBuilderCatalogEntry(fieldCatalog, normalizedItem == null ? void 0 : normalizedItem.valueField);
       const valueFieldId = resolveReportBuilderFieldId(valueFieldEntry == null ? void 0 : valueFieldEntry.entry);
-      if (!normalizeString31(normalizedItem == null ? void 0 : normalizedItem.valueField) || !(valueFieldEntry == null ? void 0 : valueFieldEntry.entry) || !valueFieldId) {
+      if (!normalizeString32(normalizedItem == null ? void 0 : normalizedItem.valueField) || !(valueFieldEntry == null ? void 0 : valueFieldEntry.entry) || !valueFieldId) {
         return normalizedItem;
       }
-      const displayKey = normalizeString31(
+      const displayKey = normalizeString32(
         (normalizedItem == null ? void 0 : normalizedItem.displayKey) || ((_a5 = valueFieldEntry == null ? void 0 : valueFieldEntry.entry) == null ? void 0 : _a5.displayKey) || ((_b = valueFieldEntry == null ? void 0 : valueFieldEntry.entry) == null ? void 0 : _b.displayPath) || ((_c = valueFieldEntry == null ? void 0 : valueFieldEntry.entry) == null ? void 0 : _c.key) || valueFieldId
       );
-      if (displayKey && displayKey !== normalizeString31(normalizedItem == null ? void 0 : normalizedItem.valueField)) {
+      if (displayKey && displayKey !== normalizeString32(normalizedItem == null ? void 0 : normalizedItem.valueField)) {
         normalizedItem.displayKey = displayKey;
       }
       if (!(normalizedItem == null ? void 0 : normalizedItem.displayValueMap) && ((_d = valueFieldEntry == null ? void 0 : valueFieldEntry.entry) == null ? void 0 : _d.displayValueMap) && typeof valueFieldEntry.entry.displayValueMap === "object" && !Array.isArray(valueFieldEntry.entry.displayValueMap)) {
         normalizedItem.displayValueMap = cloneValue20(valueFieldEntry.entry.displayValueMap);
       }
-      if (!normalizeString31(normalizedItem == null ? void 0 : normalizedItem.format) && normalizeString31((_e = valueFieldEntry == null ? void 0 : valueFieldEntry.entry) == null ? void 0 : _e.format)) {
-        normalizedItem.format = normalizeString31(valueFieldEntry.entry.format);
+      if (!normalizeString32(normalizedItem == null ? void 0 : normalizedItem.format) && normalizeString32((_e = valueFieldEntry == null ? void 0 : valueFieldEntry.entry) == null ? void 0 : _e.format)) {
+        normalizedItem.format = normalizeString32(valueFieldEntry.entry.format);
       }
-      if (!normalizeString31(normalizedItem == null ? void 0 : normalizedItem.label)) {
-        const label = normalizeString31(((_f = valueFieldEntry == null ? void 0 : valueFieldEntry.entry) == null ? void 0 : _f.label) || valueFieldId);
+      if (!normalizeString32(normalizedItem == null ? void 0 : normalizedItem.label)) {
+        const label = normalizeString32(((_f = valueFieldEntry == null ? void 0 : valueFieldEntry.entry) == null ? void 0 : _f.label) || valueFieldId);
         if (label) {
           normalizedItem.label = label;
         }
@@ -57758,24 +58001,24 @@ ${indent}${end}`;
     }
     const columnOptions = Array.isArray(normalizedDataset == null ? void 0 : normalizedDataset.columnOptions) ? normalizedDataset.columnOptions : [];
     const inheritRuntimeFieldCatalog = ((_a5 = normalizedDataset == null ? void 0 : normalizedDataset.capabilities) == null ? void 0 : _a5.inheritRuntimeFieldCatalog) === true && columnOptions.length === 0;
-    const dimensions = inheritRuntimeFieldCatalog ? cloneValue20((baseConfig == null ? void 0 : baseConfig.dimensions) || []) : columnOptions.filter((column) => normalizeString31(column == null ? void 0 : column.kind) === "dimension").map((column) => ({
-      id: normalizeString31(column == null ? void 0 : column.key),
-      key: normalizeString31(column == null ? void 0 : column.key),
-      label: normalizeString31((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
-      ...normalizeString31(column == null ? void 0 : column.format) ? { format: normalizeString31(column.format) } : {},
+    const dimensions = inheritRuntimeFieldCatalog ? cloneValue20((baseConfig == null ? void 0 : baseConfig.dimensions) || []) : columnOptions.filter((column) => normalizeString32(column == null ? void 0 : column.kind) === "dimension").map((column) => ({
+      id: normalizeString32(column == null ? void 0 : column.key),
+      key: normalizeString32(column == null ? void 0 : column.key),
+      label: normalizeString32((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
+      ...normalizeString32(column == null ? void 0 : column.format) ? { format: normalizeString32(column.format) } : {},
       ...(column == null ? void 0 : column.rowIdentity) === true ? { rowIdentity: true } : {},
       ...isPlainObject8(column == null ? void 0 : column.runtimeFilter) ? { runtimeFilter: cloneValue20(column.runtimeFilter) } : {}
     })).filter((entry) => entry.id && entry.key && entry.label);
-    const measures = inheritRuntimeFieldCatalog ? cloneValue20((baseConfig == null ? void 0 : baseConfig.measures) || []) : columnOptions.filter((column) => normalizeString31(column == null ? void 0 : column.kind) === "measure").map((column) => ({
-      id: normalizeString31(column == null ? void 0 : column.key),
-      key: normalizeString31(column == null ? void 0 : column.key),
-      label: normalizeString31((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
-      ...normalizeString31(column == null ? void 0 : column.format) ? { format: normalizeString31(column.format) } : {},
+    const measures = inheritRuntimeFieldCatalog ? cloneValue20((baseConfig == null ? void 0 : baseConfig.measures) || []) : columnOptions.filter((column) => normalizeString32(column == null ? void 0 : column.kind) === "measure").map((column) => ({
+      id: normalizeString32(column == null ? void 0 : column.key),
+      key: normalizeString32(column == null ? void 0 : column.key),
+      label: normalizeString32((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
+      ...normalizeString32(column == null ? void 0 : column.format) ? { format: normalizeString32(column.format) } : {},
       ...(column == null ? void 0 : column.rowIdentity) === true ? { rowIdentity: true } : {}
     })).filter((entry) => entry.id && entry.key && entry.label);
     return {
       ...isPlainObject8(baseConfig) ? cloneValue20(baseConfig) : {},
-      dataSourceRef: normalizeString31((normalizedDataset == null ? void 0 : normalizedDataset.dataSourceRef) || (baseConfig == null ? void 0 : baseConfig.dataSourceRef)),
+      dataSourceRef: normalizeString32((normalizedDataset == null ? void 0 : normalizedDataset.dataSourceRef) || (baseConfig == null ? void 0 : baseConfig.dataSourceRef)),
       dimensions,
       measures
     };
@@ -57848,18 +58091,18 @@ ${indent}${end}`;
     const calculatedFieldIds = new Set(
       calculatedFields.map((field2) => {
         const fieldId = resolveReportBuilderFieldId(field2);
-        return fieldId ? JSON.stringify([normalizeString31((field2 == null ? void 0 : field2.datasetRef) || "primary") || "primary", fieldId]) : "";
+        return fieldId ? JSON.stringify([normalizeString32((field2 == null ? void 0 : field2.datasetRef) || "primary") || "primary", fieldId]) : "";
       }).filter(Boolean)
     );
     const visitingCalculatedFields = /* @__PURE__ */ new Set();
     const enableField = (fieldKey = "", datasetRef = "primary", request = null) => {
       var _a5;
-      const normalizedDatasetRef = normalizeString31(datasetRef || "primary") || "primary";
+      const normalizedDatasetRef = normalizeString32(datasetRef || "primary") || "primary";
       if (!request || typeof request !== "object" || Array.isArray(request)) {
         return false;
       }
       if (["staticJson", "staticCsv"].includes(request.kind)) {
-        return Array.isArray(request.columnKeys) && request.columnKeys.includes(normalizeString31(fieldKey));
+        return Array.isArray(request.columnKeys) && request.columnKeys.includes(normalizeString32(fieldKey));
       }
       const catalogEntry = resolveReportBuilderCatalogEntry(datasetFieldCatalogs.get(normalizedDatasetRef) || fieldCatalog, fieldKey);
       if (!catalogEntry) {
@@ -57889,8 +58132,8 @@ ${indent}${end}`;
       }
       setNestedValue3(
         request,
-        normalizeString31(
-          ((_a5 = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _a5.paramPath) || `${catalogEntry.kind === "measure" ? "measures" : "dimensions"}.${resolveReportBuilderFieldId(catalogEntry == null ? void 0 : catalogEntry.entry) || normalizeString31(fieldKey)}`
+        normalizeString32(
+          ((_a5 = catalogEntry == null ? void 0 : catalogEntry.entry) == null ? void 0 : _a5.paramPath) || `${catalogEntry.kind === "measure" ? "measures" : "dimensions"}.${resolveReportBuilderFieldId(catalogEntry == null ? void 0 : catalogEntry.entry) || normalizeString32(fieldKey)}`
         ),
         true
       );
@@ -57902,13 +58145,13 @@ ${indent}${end}`;
       if (!normalizedBlock) {
         return;
       }
-      const normalizedDatasetRef = normalizeString31((normalizedBlock == null ? void 0 : normalizedBlock.datasetRef) || "primary") || "primary";
-      const dataset = nextSpec.datasets.find((entry) => normalizeString31(entry == null ? void 0 : entry.id) === normalizedDatasetRef) || null;
+      const normalizedDatasetRef = normalizeString32((normalizedBlock == null ? void 0 : normalizedBlock.datasetRef) || "primary") || "primary";
+      const dataset = nextSpec.datasets.find((entry) => normalizeString32(entry == null ? void 0 : entry.id) === normalizedDatasetRef) || null;
       const request = dataset == null ? void 0 : dataset.request;
       if (!request || typeof request !== "object" || Array.isArray(request)) {
         return;
       }
-      switch (normalizeString31(normalizedBlock == null ? void 0 : normalizedBlock.kind)) {
+      switch (normalizeString32(normalizedBlock == null ? void 0 : normalizedBlock.kind)) {
         case "chartBlock":
           for (const action of resolveReportRuntimeExternalActions(normalizedBlock)) {
             if (!enableField(action.urlField, normalizedDatasetRef, request)) {
@@ -57920,7 +58163,7 @@ ${indent}${end}`;
           if ((_c = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _c.categoryRange) for (const field2 of [normalizedBlock.chartSpec.categoryRange.categoryField, ...categoryRangeFields(normalizedBlock.chartSpec.categoryRange)]) enableField(field2, normalizedDatasetRef, request);
           if ((_d = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _d.center) {
             const center = normalizedBlock.chartSpec.center, ref = center.datasetRef || normalizedDatasetRef;
-            const target = nextSpec.datasets.find((entry) => normalizeString31(entry.id) === ref);
+            const target = nextSpec.datasets.find((entry) => normalizeString32(entry.id) === ref);
             if (!target) throw new Error(`Donut center dataset '${ref}' is unavailable.`);
             for (const field2 of donutCenterFields(center)) {
               const catalog = resolveReportBuilderCatalogEntry(datasetFieldCatalogs.get(ref) || fieldCatalog, field2);
@@ -57931,7 +58174,7 @@ ${indent}${end}`;
           for (const key2 of ["rowField", "columnField", "valueField"]) enableField((_g = (_f = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _f.heatmap) == null ? void 0 : _g[key2], normalizedDatasetRef, request);
           enableField((_i = (_h = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _h.sliceLabel) == null ? void 0 : _i.field, normalizedDatasetRef, request);
           enableField((_j = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _j.xField, normalizedDatasetRef, request);
-          normalizeString31((_k = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _k.seriesField) && enableField(normalizedBlock.chartSpec.seriesField, normalizedDatasetRef, request);
+          normalizeString32((_k = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _k.seriesField) && enableField(normalizedBlock.chartSpec.seriesField, normalizedDatasetRef, request);
           (Array.isArray((_l = normalizedBlock == null ? void 0 : normalizedBlock.chartSpec) == null ? void 0 : _l.yFields) ? normalizedBlock.chartSpec.yFields : []).forEach((fieldKey) => enableField(fieldKey, normalizedDatasetRef, request));
           break;
         case "kpiBlock":
@@ -57939,15 +58182,15 @@ ${indent}${end}`;
           if (normalizedBlock.sparkline) {
             const sparkline = normalizeKpiSparkline(normalizedBlock.sparkline);
             for (const ref of [sparkline.datasetRef, sparkline.comparisonDatasetRef].filter(Boolean)) {
-              const targetDataset = nextSpec.datasets.find((entry) => normalizeString31(entry == null ? void 0 : entry.id) === ref);
+              const targetDataset = nextSpec.datasets.find((entry) => normalizeString32(entry == null ? void 0 : entry.id) === ref);
               if (!targetDataset) throw new Error(`KPI sparkline dataset '${ref}' is unavailable.`);
               const target = targetDataset.request;
               if (target && (!enableField(sparkline.valueField, ref, target) || !enableField(sparkline.categoryField, ref, target))) throw new Error("KPI sparkline fields must be declared by their dataset.");
             }
           }
           {
-            const secondaryRef = normalizeString31(normalizedBlock == null ? void 0 : normalizedBlock.secondaryDatasetRef) || normalizedDatasetRef;
-            const secondaryRequest = (_m = nextSpec.datasets.find((entry) => normalizeString31(entry == null ? void 0 : entry.id) === secondaryRef)) == null ? void 0 : _m.request;
+            const secondaryRef = normalizeString32(normalizedBlock == null ? void 0 : normalizedBlock.secondaryDatasetRef) || normalizedDatasetRef;
+            const secondaryRequest = (_m = nextSpec.datasets.find((entry) => normalizeString32(entry == null ? void 0 : entry.id) === secondaryRef)) == null ? void 0 : _m.request;
             if (secondaryRequest) enableField(normalizedBlock == null ? void 0 : normalizedBlock.secondaryField, secondaryRef, secondaryRequest);
           }
           break;
@@ -57959,12 +58202,11 @@ ${indent}${end}`;
         case "tableBlock":
           tableAnalyticsFields(normalizedBlock).forEach((field2) => enableField(field2, normalizedDatasetRef, request));
           (Array.isArray(normalizedBlock == null ? void 0 : normalizedBlock.columns) ? normalizedBlock.columns : []).forEach((column) => {
-            var _a6, _b2, _c2, _d2;
+            var _a6, _b2;
             enableField(column == null ? void 0 : column.key, normalizedDatasetRef, request);
             enableField((_a6 = column == null ? void 0 : column.cellVisual) == null ? void 0 : _a6.valueField, normalizedDatasetRef, request);
             enableField((_b2 = column == null ? void 0 : column.cellVisual) == null ? void 0 : _b2.colorField, normalizedDatasetRef, request);
-            enableField((_c2 = column == null ? void 0 : column.link) == null ? void 0 : _c2.urlField, normalizedDatasetRef, request);
-            enableField((_d2 = column == null ? void 0 : column.link) == null ? void 0 : _d2.idField, normalizedDatasetRef, request);
+            getReportTableLinkFields(column == null ? void 0 : column.link).forEach((field2) => enableField(field2, normalizedDatasetRef, request));
           });
           break;
         case "geoMapBlock":
@@ -57983,18 +58225,18 @@ ${indent}${end}`;
     return resolveContainerIdentity2(container) || "reportDocument";
   }
   function resolveDocumentTitle(container = {}, config = {}) {
-    return normalizeString31((container == null ? void 0 : container.title) || (config == null ? void 0 : config.title) || "Report");
+    return normalizeString32((container == null ? void 0 : container.title) || (config == null ? void 0 : config.title) || "Report");
   }
   function resolveDocumentMetadataValue(value, fallback = "") {
-    const normalized = normalizeString31(value);
-    return normalized || normalizeString31(fallback);
+    const normalized = normalizeString32(value);
+    return normalized || normalizeString32(fallback);
   }
   function resolveDocumentDataSourceRef(container = {}, config = {}) {
-    return normalizeString31((container == null ? void 0 : container.dataSourceRef) || (config == null ? void 0 : config.dataSourceRef));
+    return normalizeString32((container == null ? void 0 : container.dataSourceRef) || (config == null ? void 0 : config.dataSourceRef));
   }
   function resolveDocumentTemplateIdentity(state = {}) {
-    const templateId = normalizeString31(state == null ? void 0 : state.reportDocumentTemplateId);
-    const templateLabel = normalizeString31(state == null ? void 0 : state.reportDocumentTemplateLabel);
+    const templateId = normalizeString32(state == null ? void 0 : state.reportDocumentTemplateId);
+    const templateLabel = normalizeString32(state == null ? void 0 : state.reportDocumentTemplateLabel);
     if (!templateId && !templateLabel) {
       return null;
     }
@@ -58004,12 +58246,12 @@ ${indent}${end}`;
     };
   }
   function buildPrimaryDatasetFieldContract(entry = {}) {
-    const paramPath = normalizeString31(entry == null ? void 0 : entry.paramPath);
-    const rawId = normalizeString31(entry == null ? void 0 : entry.rawId);
-    const semanticRef = normalizeString31(entry == null ? void 0 : entry.semanticRef);
-    const description = normalizeString31(entry == null ? void 0 : entry.description);
-    const category = normalizeString31(entry == null ? void 0 : entry.category);
-    const definitionRef = normalizeString31(entry == null ? void 0 : entry.definitionRef);
+    const paramPath = normalizeString32(entry == null ? void 0 : entry.paramPath);
+    const rawId = normalizeString32(entry == null ? void 0 : entry.rawId);
+    const semanticRef = normalizeString32(entry == null ? void 0 : entry.semanticRef);
+    const description = normalizeString32(entry == null ? void 0 : entry.description);
+    const category = normalizeString32(entry == null ? void 0 : entry.category);
+    const definitionRef = normalizeString32(entry == null ? void 0 : entry.definitionRef);
     return {
       ...paramPath ? { paramPath } : {},
       ...(entry == null ? void 0 : entry.rowIdentity) === true ? { rowIdentity: true } : {},
@@ -58063,16 +58305,16 @@ ${indent}${end}`;
       if (Array.isArray(presentation == null ? void 0 : presentation.defaultTablePresets) && presentation.defaultTablePresets.length > 0) {
         delete next.result.defaultTablePresets;
       }
-      if (normalizeString31(presentation == null ? void 0 : presentation.defaultMode)) {
+      if (normalizeString32(presentation == null ? void 0 : presentation.defaultMode)) {
         delete next.result.defaultMode;
       }
       if ((Number((presentation == null ? void 0 : presentation.pageSize) || 0) || 0) > 0) {
         delete next.result.pageSize;
       }
-      if (normalizeString31(presentation == null ? void 0 : presentation.chartCreationMode)) {
+      if (normalizeString32(presentation == null ? void 0 : presentation.chartCreationMode)) {
         delete next.result.chartCreationMode;
       }
-      if (normalizeString31(presentation == null ? void 0 : presentation.resultPanePosition)) {
+      if (normalizeString32(presentation == null ? void 0 : presentation.resultPanePosition)) {
         delete next.result.resultPanePosition;
       }
       if (Array.isArray(presentation == null ? void 0 : presentation.defaultChartSpecs) && presentation.defaultChartSpecs.length > 0) {
@@ -58103,58 +58345,58 @@ ${indent}${end}`;
     const primarySource = normalizeReportBuilderPublishedDataSources(config).find((dataset) => dataset.id === "primary" && dataset.dataSourceRef === dataSourceRef);
     const primaryResultContract = isPlainObject8(config == null ? void 0 : config.resultContract) ? config.resultContract : primarySource == null ? void 0 : primarySource.resultContract;
     const dimensions = (Array.isArray(effectiveConfig == null ? void 0 : effectiveConfig.dimensions) ? effectiveConfig.dimensions : []).map((entry) => {
-      const id = normalizeString31((entry == null ? void 0 : entry.id) || (entry == null ? void 0 : entry.key));
-      const key2 = normalizeString31((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id));
+      const id = normalizeString32((entry == null ? void 0 : entry.id) || (entry == null ? void 0 : entry.key));
+      const key2 = normalizeString32((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id));
       if (!id || !key2) {
         return null;
       }
       return {
         id,
         key: key2,
-        label: normalizeString31((entry == null ? void 0 : entry.label) || key2) || key2,
+        label: normalizeString32((entry == null ? void 0 : entry.label) || key2) || key2,
         kind: "dimension",
         ...(entry == null ? void 0 : entry.rowIdentity) === true ? { rowIdentity: true } : {},
-        ...normalizeString31((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) ? { sourceKey: normalizeString31((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) } : {},
-        ...normalizeString31(entry == null ? void 0 : entry.displayKey) ? { displayKey: normalizeString31(entry.displayKey) } : {},
+        ...normalizeString32((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) ? { sourceKey: normalizeString32((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) } : {},
+        ...normalizeString32(entry == null ? void 0 : entry.displayKey) ? { displayKey: normalizeString32(entry.displayKey) } : {},
         ...(entry == null ? void 0 : entry.displayValueMap) && typeof entry.displayValueMap === "object" && !Array.isArray(entry.displayValueMap) ? { displayValueMap: cloneValue20(entry.displayValueMap) } : {},
-        ...normalizeString31(entry == null ? void 0 : entry.format) ? { format: normalizeString31(entry.format) } : {},
-        ...normalizeString31(entry == null ? void 0 : entry.tickFormat) ? { tickFormat: normalizeString31(entry.tickFormat) } : {},
-        ...["civil", "instant"].includes(normalizeString31(entry == null ? void 0 : entry.valueMode)) ? { valueMode: normalizeString31(entry.valueMode) } : {},
-        ...normalizeString31(entry == null ? void 0 : entry.rawId) ? { rawId: normalizeString31(entry.rawId) } : {},
-        ...normalizeString31(entry == null ? void 0 : entry.description) ? { description: normalizeString31(entry.description) } : {},
-        ...normalizeString31(entry == null ? void 0 : entry.category) ? { category: normalizeString31(entry.category) } : {},
-        ...normalizeString31(entry == null ? void 0 : entry.definitionRef) ? { definitionRef: normalizeString31(entry.definitionRef) } : {},
-        ...normalizeString31(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: normalizeString31(entry.semanticRef) } : {},
+        ...normalizeString32(entry == null ? void 0 : entry.format) ? { format: normalizeString32(entry.format) } : {},
+        ...normalizeString32(entry == null ? void 0 : entry.tickFormat) ? { tickFormat: normalizeString32(entry.tickFormat) } : {},
+        ...["civil", "instant"].includes(normalizeString32(entry == null ? void 0 : entry.valueMode)) ? { valueMode: normalizeString32(entry.valueMode) } : {},
+        ...normalizeString32(entry == null ? void 0 : entry.rawId) ? { rawId: normalizeString32(entry.rawId) } : {},
+        ...normalizeString32(entry == null ? void 0 : entry.description) ? { description: normalizeString32(entry.description) } : {},
+        ...normalizeString32(entry == null ? void 0 : entry.category) ? { category: normalizeString32(entry.category) } : {},
+        ...normalizeString32(entry == null ? void 0 : entry.definitionRef) ? { definitionRef: normalizeString32(entry.definitionRef) } : {},
+        ...normalizeString32(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: normalizeString32(entry.semanticRef) } : {},
         ...(entry == null ? void 0 : entry.governance) && typeof entry.governance === "object" && !Array.isArray(entry.governance) ? { governance: cloneValue20(entry.governance) } : {},
         ...(entry == null ? void 0 : entry.default) === true ? { default: true } : {},
         ...(entry == null ? void 0 : entry.chartAxis) === true ? { chartAxis: true } : {},
-        ...normalizeString31(entry == null ? void 0 : entry.paramPath) ? { paramPath: normalizeString31(entry.paramPath) } : {},
+        ...normalizeString32(entry == null ? void 0 : entry.paramPath) ? { paramPath: normalizeString32(entry.paramPath) } : {},
         ...(entry == null ? void 0 : entry.runtimeFilter) && typeof entry.runtimeFilter === "object" && !Array.isArray(entry.runtimeFilter) ? { runtimeFilter: cloneValue20(entry.runtimeFilter) } : {}
       };
     }).filter(Boolean);
     const measures = [
       ...(Array.isArray(effectiveConfig == null ? void 0 : effectiveConfig.measures) ? effectiveConfig.measures : []).map((entry) => {
-        const id = normalizeString31((entry == null ? void 0 : entry.id) || (entry == null ? void 0 : entry.key));
-        const key2 = normalizeString31((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id));
+        const id = normalizeString32((entry == null ? void 0 : entry.id) || (entry == null ? void 0 : entry.key));
+        const key2 = normalizeString32((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id));
         if (!id || !key2) {
           return null;
         }
         return {
           id,
           key: key2,
-          label: normalizeString31((entry == null ? void 0 : entry.label) || key2) || key2,
+          label: normalizeString32((entry == null ? void 0 : entry.label) || key2) || key2,
           kind: "measure",
           ...(entry == null ? void 0 : entry.rowIdentity) === true ? { rowIdentity: true } : {},
-          ...normalizeString31(entry == null ? void 0 : entry.format) ? { format: normalizeString31(entry.format) } : {},
-          ...normalizeString31((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) ? { sourceKey: normalizeString31((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) } : {},
-          ...normalizeString31(entry == null ? void 0 : entry.rawId) ? { rawId: normalizeString31(entry.rawId) } : {},
-          ...normalizeString31(entry == null ? void 0 : entry.description) ? { description: normalizeString31(entry.description) } : {},
-          ...normalizeString31(entry == null ? void 0 : entry.category) ? { category: normalizeString31(entry.category) } : {},
-          ...normalizeString31(entry == null ? void 0 : entry.definitionRef) ? { definitionRef: normalizeString31(entry.definitionRef) } : {},
-          ...normalizeString31(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: normalizeString31(entry.semanticRef) } : {},
+          ...normalizeString32(entry == null ? void 0 : entry.format) ? { format: normalizeString32(entry.format) } : {},
+          ...normalizeString32((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) ? { sourceKey: normalizeString32((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) } : {},
+          ...normalizeString32(entry == null ? void 0 : entry.rawId) ? { rawId: normalizeString32(entry.rawId) } : {},
+          ...normalizeString32(entry == null ? void 0 : entry.description) ? { description: normalizeString32(entry.description) } : {},
+          ...normalizeString32(entry == null ? void 0 : entry.category) ? { category: normalizeString32(entry.category) } : {},
+          ...normalizeString32(entry == null ? void 0 : entry.definitionRef) ? { definitionRef: normalizeString32(entry.definitionRef) } : {},
+          ...normalizeString32(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: normalizeString32(entry.semanticRef) } : {},
           ...(entry == null ? void 0 : entry.governance) && typeof entry.governance === "object" && !Array.isArray(entry.governance) ? { governance: cloneValue20(entry.governance) } : {},
           ...(entry == null ? void 0 : entry.default) === true ? { default: true } : {},
-          ...normalizeString31(entry == null ? void 0 : entry.paramPath) ? { paramPath: normalizeString31(entry.paramPath) } : {}
+          ...normalizeString32(entry == null ? void 0 : entry.paramPath) ? { paramPath: normalizeString32(entry.paramPath) } : {}
         };
       }),
       ...normalizeReportCalculatedFields([
@@ -58164,25 +58406,25 @@ ${indent}${end}`;
       ], {
         datasetRef: "primary"
       }).map((entry) => {
-        const id = normalizeString31((entry == null ? void 0 : entry.id) || (entry == null ? void 0 : entry.key));
-        const key2 = normalizeString31((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id));
+        const id = normalizeString32((entry == null ? void 0 : entry.id) || (entry == null ? void 0 : entry.key));
+        const key2 = normalizeString32((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id));
         if (!id || !key2) {
           return null;
         }
         return {
           id,
           key: key2,
-          label: normalizeString31((entry == null ? void 0 : entry.label) || key2) || key2,
+          label: normalizeString32((entry == null ? void 0 : entry.label) || key2) || key2,
           kind: "measure",
           ...(entry == null ? void 0 : entry.rowIdentity) === true ? { rowIdentity: true } : {},
-          ...normalizeString31(entry == null ? void 0 : entry.format) ? { format: normalizeString31(entry.format) } : {}
+          ...normalizeString32(entry == null ? void 0 : entry.format) ? { format: normalizeString32(entry.format) } : {}
         };
       })
     ].filter(Boolean);
     const primaryDataset = dataSourceRef ? {
       id: "primary",
       dataSourceRef,
-      label: normalizeString31((config == null ? void 0 : config.title) || dataSourceRef) || dataSourceRef,
+      label: normalizeString32((config == null ? void 0 : config.title) || dataSourceRef) || dataSourceRef,
       description: "Primary report dataset",
       kindLabel: "primary",
       ...isPlainObject8(config == null ? void 0 : config.scope) ? { scope: cloneValue20(config.scope) } : {},
@@ -58261,7 +58503,7 @@ ${indent}${end}`;
       })),
       chartFieldOptions: [
         ...dimensions.map((entry) => ({
-          key: normalizeString31((entry == null ? void 0 : entry.displayKey) || (entry == null ? void 0 : entry.key)),
+          key: normalizeString32((entry == null ? void 0 : entry.displayKey) || (entry == null ? void 0 : entry.key)),
           aliases: [entry.key],
           label: entry.label,
           kind: "dimension",
@@ -58294,36 +58536,36 @@ ${indent}${end}`;
         }))
       ],
       scopeParamOptions: resolveReportBuilderScopeParamFilters(effectiveConfig).map((filter) => {
-        const value = normalizeString31((filter == null ? void 0 : filter.id) || (filter == null ? void 0 : filter.field));
+        const value = normalizeString32((filter == null ? void 0 : filter.id) || (filter == null ? void 0 : filter.field));
         if (!value) {
           return null;
         }
         return {
           value,
-          label: normalizeString31((filter == null ? void 0 : filter.label) || value),
-          ...normalizeString31(filter == null ? void 0 : filter.description) ? { description: normalizeString31(filter.description) } : {},
-          kind: normalizeString31((filter == null ? void 0 : filter.type) || ((filter == null ? void 0 : filter.multiple) ? "multiSelect" : "value")) || "value",
+          label: normalizeString32((filter == null ? void 0 : filter.label) || value),
+          ...normalizeString32(filter == null ? void 0 : filter.description) ? { description: normalizeString32(filter.description) } : {},
+          kind: normalizeString32((filter == null ? void 0 : filter.type) || ((filter == null ? void 0 : filter.multiple) ? "multiSelect" : "value")) || "value",
           required: (filter == null ? void 0 : filter.required) === true,
-          ...normalizeString31(filter == null ? void 0 : filter.semanticRef) ? { semanticRef: normalizeString31(filter.semanticRef) } : {},
+          ...normalizeString32(filter == null ? void 0 : filter.semanticRef) ? { semanticRef: normalizeString32(filter.semanticRef) } : {},
           ...(filter == null ? void 0 : filter.multiple) === true ? { multiple: true } : {},
-          ...normalizeString31(filter == null ? void 0 : filter.presentation) ? { presentation: normalizeString31(filter.presentation) } : {},
+          ...normalizeString32(filter == null ? void 0 : filter.presentation) ? { presentation: normalizeString32(filter.presentation) } : {},
           ...Array.isArray(filter == null ? void 0 : filter.options) ? { options: cloneValue20(filter.options) } : {},
-          ...normalizeString31(filter == null ? void 0 : filter.paramPath) ? { paramPath: normalizeString31(filter.paramPath) } : {},
-          ...normalizeString31(filter == null ? void 0 : filter.startParamPath) ? { startParamPath: normalizeString31(filter.startParamPath) } : {},
-          ...normalizeString31(filter == null ? void 0 : filter.endParamPath) ? { endParamPath: normalizeString31(filter.endParamPath) } : {}
+          ...normalizeString32(filter == null ? void 0 : filter.paramPath) ? { paramPath: normalizeString32(filter.paramPath) } : {},
+          ...normalizeString32(filter == null ? void 0 : filter.startParamPath) ? { startParamPath: normalizeString32(filter.startParamPath) } : {},
+          ...normalizeString32(filter == null ? void 0 : filter.endParamPath) ? { endParamPath: normalizeString32(filter.endParamPath) } : {}
         };
       }).filter(Boolean)
     } : null;
     const staticDatasets = normalizeReportBuilderStaticDatasets(state == null ? void 0 : state.reportStaticDatasets);
     const staticDatasetIds = new Set(
-      staticDatasets.map((dataset) => normalizeString31(dataset == null ? void 0 : dataset.id)).filter(Boolean)
+      staticDatasets.map((dataset) => normalizeString32(dataset == null ? void 0 : dataset.id)).filter(Boolean)
     );
     const publishedDatasets = normalizeReportBuilderPublishedDataSources(config).map((dataset) => ({
-      id: normalizeString31(dataset == null ? void 0 : dataset.id),
-      dataSourceRef: normalizeString31(dataset == null ? void 0 : dataset.dataSourceRef),
-      label: normalizeString31(dataset == null ? void 0 : dataset.label),
-      description: normalizeString31(dataset == null ? void 0 : dataset.description),
-      kindLabel: normalizeString31(dataset == null ? void 0 : dataset.kindLabel),
+      id: normalizeString32(dataset == null ? void 0 : dataset.id),
+      dataSourceRef: normalizeString32(dataset == null ? void 0 : dataset.dataSourceRef),
+      label: normalizeString32(dataset == null ? void 0 : dataset.label),
+      description: normalizeString32(dataset == null ? void 0 : dataset.description),
+      kindLabel: normalizeString32(dataset == null ? void 0 : dataset.kindLabel),
       ...normalizeReportDatasetScope(dataset == null ? void 0 : dataset.scope) ? { scope: normalizeReportDatasetScope(dataset == null ? void 0 : dataset.scope) } : {},
       ...isPlainObject8(dataset == null ? void 0 : dataset.source) ? { source: cloneValue20(dataset.source) } : {},
       ...isPlainObject8(dataset == null ? void 0 : dataset.resultContract) ? { resultContract: cloneValue20(dataset.resultContract) } : {},
@@ -58344,10 +58586,10 @@ ${indent}${end}`;
     const groupByOptions = Array.isArray((_a5 = config == null ? void 0 : config.groupBy) == null ? void 0 : _a5.options) ? cloneValue20(config.groupBy.options) : [];
     const orderFields = Array.isArray(result == null ? void 0 : result.orderFields) ? cloneValue20(result.orderFields) : Array.isArray(config == null ? void 0 : config.orderFields) ? cloneValue20(config.orderFields) : [];
     const defaultTablePresets = Array.isArray(result == null ? void 0 : result.defaultTablePresets) ? cloneValue20(result.defaultTablePresets) : [];
-    const defaultMode = normalizeString31((result == null ? void 0 : result.defaultMode) || "");
+    const defaultMode = normalizeString32((result == null ? void 0 : result.defaultMode) || "");
     const pageSize = Number((result == null ? void 0 : result.pageSize) || (state == null ? void 0 : state.pageSize) || 0) || 0;
-    const chartCreationMode = normalizeString31((result == null ? void 0 : result.chartCreationMode) || "");
-    const resultPanePosition = normalizeString31((result == null ? void 0 : result.resultPanePosition) || "");
+    const chartCreationMode = normalizeString32((result == null ? void 0 : result.chartCreationMode) || "");
+    const resultPanePosition = normalizeString32((result == null ? void 0 : result.resultPanePosition) || "");
     const defaultChartSpecs = Array.isArray(result == null ? void 0 : result.defaultChartSpecs) ? cloneValue20(result.defaultChartSpecs) : [];
     if (groupByOptions.length === 0 && orderFields.length === 0 && defaultTablePresets.length === 0 && !defaultMode && pageSize < 1 && !chartCreationMode && !resultPanePosition && defaultChartSpecs.length === 0) {
       return null;
@@ -58402,7 +58644,7 @@ ${indent}${end}`;
   function resolveReportDocumentPublishedDatasets(document = null, fallbackConfig = null) {
     const explicitDocumentDatasets = Array.isArray(document == null ? void 0 : document.datasets) ? document.datasets : [];
     const explicitPublishedDatasets = explicitDocumentDatasets.some((dataset) => !Array.isArray(dataset == null ? void 0 : dataset.rows)) ? normalizeReportBuilderPublishedDataSources({
-      datasets: explicitDocumentDatasets.filter((dataset) => !Array.isArray(dataset == null ? void 0 : dataset.rows) && normalizeString31(dataset == null ? void 0 : dataset.id) !== "primary")
+      datasets: explicitDocumentDatasets.filter((dataset) => !Array.isArray(dataset == null ? void 0 : dataset.rows) && normalizeString32(dataset == null ? void 0 : dataset.id) !== "primary")
     }) : [];
     if (explicitPublishedDatasets.length > 0) {
       return explicitPublishedDatasets;
@@ -58455,7 +58697,7 @@ ${indent}${end}`;
     return false;
   }
   function resolveReportDocumentPrimaryDataset(document = null) {
-    return (Array.isArray(document == null ? void 0 : document.datasets) ? document.datasets : []).find((dataset) => normalizeString31(dataset == null ? void 0 : dataset.id) === "primary" && !Array.isArray(dataset == null ? void 0 : dataset.rows)) || null;
+    return (Array.isArray(document == null ? void 0 : document.datasets) ? document.datasets : []).find((dataset) => normalizeString32(dataset == null ? void 0 : dataset.id) === "primary" && !Array.isArray(dataset == null ? void 0 : dataset.rows)) || null;
   }
   function buildPrimaryDatasetCatalogEntries(primaryDataset = {}, kind = "") {
     const explicitEntries = kind === "dimension" ? primaryDataset == null ? void 0 : primaryDataset.dimensions : primaryDataset == null ? void 0 : primaryDataset.measures;
@@ -58463,28 +58705,28 @@ ${indent}${end}`;
       return explicitEntries;
     }
     const columnOptions = Array.isArray(primaryDataset == null ? void 0 : primaryDataset.columnOptions) ? primaryDataset.columnOptions : [];
-    const matchingColumns = columnOptions.filter((entry) => normalizeString31(entry == null ? void 0 : entry.kind) === kind);
+    const matchingColumns = columnOptions.filter((entry) => normalizeString32(entry == null ? void 0 : entry.kind) === kind);
     if (matchingColumns.length > 0) {
       return matchingColumns;
     }
     if (kind === "dimension") {
       return [
         ...Array.isArray(primaryDataset == null ? void 0 : primaryDataset.secondaryFieldOptions) ? primaryDataset.secondaryFieldOptions : [],
-        ...(Array.isArray(primaryDataset == null ? void 0 : primaryDataset.chartFieldOptions) ? primaryDataset.chartFieldOptions : []).filter((entry) => normalizeString31(entry == null ? void 0 : entry.kind) === "dimension")
+        ...(Array.isArray(primaryDataset == null ? void 0 : primaryDataset.chartFieldOptions) ? primaryDataset.chartFieldOptions : []).filter((entry) => normalizeString32(entry == null ? void 0 : entry.kind) === "dimension")
       ];
     }
     return [
       ...Array.isArray(primaryDataset == null ? void 0 : primaryDataset.valueFieldOptions) ? primaryDataset.valueFieldOptions : [],
-      ...(Array.isArray(primaryDataset == null ? void 0 : primaryDataset.chartFieldOptions) ? primaryDataset.chartFieldOptions : []).filter((entry) => normalizeString31(entry == null ? void 0 : entry.kind) === "measure")
+      ...(Array.isArray(primaryDataset == null ? void 0 : primaryDataset.chartFieldOptions) ? primaryDataset.chartFieldOptions : []).filter((entry) => normalizeString32(entry == null ? void 0 : entry.kind) === "measure")
     ];
   }
   function mergePrimaryDatasetCatalogEntries(entries2 = [], persistedEntries = []) {
     const persistedByAlias = /* @__PURE__ */ new Map();
     (Array.isArray(persistedEntries) ? persistedEntries : []).forEach((entry) => {
-      [entry == null ? void 0 : entry.id, entry == null ? void 0 : entry.key, entry == null ? void 0 : entry.sourceKey, entry == null ? void 0 : entry.value, entry == null ? void 0 : entry.rawId].map((value) => normalizeString31(value)).filter(Boolean).forEach((alias) => persistedByAlias.set(alias, entry));
+      [entry == null ? void 0 : entry.id, entry == null ? void 0 : entry.key, entry == null ? void 0 : entry.sourceKey, entry == null ? void 0 : entry.value, entry == null ? void 0 : entry.rawId].map((value) => normalizeString32(value)).filter(Boolean).forEach((alias) => persistedByAlias.set(alias, entry));
     });
     return (Array.isArray(entries2) ? entries2 : []).map((entry) => {
-      const persisted = [entry == null ? void 0 : entry.id, entry == null ? void 0 : entry.key, entry == null ? void 0 : entry.sourceKey, entry == null ? void 0 : entry.value, entry == null ? void 0 : entry.rawId].map((value) => normalizeString31(value)).filter(Boolean).map((alias) => persistedByAlias.get(alias)).find(Boolean);
+      const persisted = [entry == null ? void 0 : entry.id, entry == null ? void 0 : entry.key, entry == null ? void 0 : entry.sourceKey, entry == null ? void 0 : entry.value, entry == null ? void 0 : entry.rawId].map((value) => normalizeString32(value)).filter(Boolean).map((alias) => persistedByAlias.get(alias)).find(Boolean);
       return persisted ? { ...cloneValue20(persisted), ...entry } : entry;
     });
   }
@@ -58503,55 +58745,55 @@ ${indent}${end}`;
     const primaryDatasetMeasureCatalog = buildPrimaryDatasetCatalogEntries(primaryDataset, "measure");
     const dimensionEntries = Array.isArray(normalizedBaseConfig == null ? void 0 : normalizedBaseConfig.dimensions) && normalizedBaseConfig.dimensions.length > 0 ? mergePrimaryDatasetCatalogEntries(normalizedBaseConfig.dimensions, primaryDatasetDimensionCatalog) : primaryDatasetDimensionCatalog;
     const dimensions = dimensionEntries.map((entry) => {
-      const key2 = normalizeString31((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.value) || (entry == null ? void 0 : entry.sourceKey));
+      const key2 = normalizeString32((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.value) || (entry == null ? void 0 : entry.sourceKey));
       if (!key2) {
         return null;
       }
       return {
         id: key2,
-        key: normalizeString31((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.value)) || key2,
-        label: normalizeString31((entry == null ? void 0 : entry.label) || key2) || key2,
-        ...normalizeString31(entry == null ? void 0 : entry.displayKey) ? { displayKey: normalizeString31(entry.displayKey) } : {},
+        key: normalizeString32((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.value)) || key2,
+        label: normalizeString32((entry == null ? void 0 : entry.label) || key2) || key2,
+        ...normalizeString32(entry == null ? void 0 : entry.displayKey) ? { displayKey: normalizeString32(entry.displayKey) } : {},
         ...(entry == null ? void 0 : entry.displayValueMap) && typeof entry.displayValueMap === "object" && !Array.isArray(entry.displayValueMap) ? { displayValueMap: cloneValue20(entry.displayValueMap) } : {},
-        ...normalizeString31(entry == null ? void 0 : entry.format) ? { format: normalizeString31(entry.format) } : {},
-        ...normalizeString31(entry == null ? void 0 : entry.tickFormat) ? { tickFormat: normalizeString31(entry.tickFormat) } : {},
-        ...["civil", "instant"].includes(normalizeString31(entry == null ? void 0 : entry.valueMode)) ? { valueMode: normalizeString31(entry.valueMode) } : {},
+        ...normalizeString32(entry == null ? void 0 : entry.format) ? { format: normalizeString32(entry.format) } : {},
+        ...normalizeString32(entry == null ? void 0 : entry.tickFormat) ? { tickFormat: normalizeString32(entry.tickFormat) } : {},
+        ...["civil", "instant"].includes(normalizeString32(entry == null ? void 0 : entry.valueMode)) ? { valueMode: normalizeString32(entry.valueMode) } : {},
         ...buildPrimaryDatasetFieldContract(entry)
       };
     }).filter(Boolean);
     const measureEntries = Array.isArray(normalizedBaseConfig == null ? void 0 : normalizedBaseConfig.measures) && normalizedBaseConfig.measures.length > 0 ? mergePrimaryDatasetCatalogEntries(normalizedBaseConfig.measures, primaryDatasetMeasureCatalog) : primaryDatasetMeasureCatalog;
     const measures = measureEntries.map((entry) => {
-      const key2 = normalizeString31((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.value) || (entry == null ? void 0 : entry.sourceKey));
+      const key2 = normalizeString32((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.value) || (entry == null ? void 0 : entry.sourceKey));
       if (!key2) {
         return null;
       }
       return {
         id: key2,
-        key: normalizeString31((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.value)) || key2,
-        label: normalizeString31((entry == null ? void 0 : entry.label) || key2) || key2,
-        ...normalizeString31(entry == null ? void 0 : entry.format) ? { format: normalizeString31(entry.format) } : {},
+        key: normalizeString32((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.value)) || key2,
+        label: normalizeString32((entry == null ? void 0 : entry.label) || key2) || key2,
+        ...normalizeString32(entry == null ? void 0 : entry.format) ? { format: normalizeString32(entry.format) } : {},
         ...buildPrimaryDatasetFieldContract(entry)
       };
     }).filter(Boolean);
     const staticFilters = Array.isArray(normalizedBaseConfig == null ? void 0 : normalizedBaseConfig.staticFilters) && normalizedBaseConfig.staticFilters.length > 0 ? normalizedBaseConfig.staticFilters : (Array.isArray(primaryDataset == null ? void 0 : primaryDataset.scopeParamOptions) ? primaryDataset.scopeParamOptions : []).map((entry) => {
-      const value = normalizeString31((entry == null ? void 0 : entry.value) || (entry == null ? void 0 : entry.id));
+      const value = normalizeString32((entry == null ? void 0 : entry.value) || (entry == null ? void 0 : entry.id));
       if (!value) {
         return null;
       }
-      const kind = normalizeString31((entry == null ? void 0 : entry.kind) || "value");
+      const kind = normalizeString32((entry == null ? void 0 : entry.kind) || "value");
       return {
         id: value,
-        label: normalizeString31((entry == null ? void 0 : entry.label) || value) || value,
-        ...normalizeString31(entry == null ? void 0 : entry.description) ? { description: normalizeString31(entry.description) } : {},
+        label: normalizeString32((entry == null ? void 0 : entry.label) || value) || value,
+        ...normalizeString32(entry == null ? void 0 : entry.description) ? { description: normalizeString32(entry.description) } : {},
         type: kind,
         required: (entry == null ? void 0 : entry.required) === true,
-        ...normalizeString31(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: normalizeString31(entry.semanticRef) } : {},
+        ...normalizeString32(entry == null ? void 0 : entry.semanticRef) ? { semanticRef: normalizeString32(entry.semanticRef) } : {},
         ...(entry == null ? void 0 : entry.multiple) === true ? { multiple: true } : {},
-        ...normalizeString31(entry == null ? void 0 : entry.presentation) ? { presentation: normalizeString31(entry.presentation) } : {},
+        ...normalizeString32(entry == null ? void 0 : entry.presentation) ? { presentation: normalizeString32(entry.presentation) } : {},
         ...Array.isArray(entry == null ? void 0 : entry.options) ? { options: cloneValue20(entry.options) } : {},
-        ...normalizeString31(entry == null ? void 0 : entry.paramPath) ? { paramPath: normalizeString31(entry.paramPath) } : {},
-        ...normalizeString31(entry == null ? void 0 : entry.startParamPath) ? { startParamPath: normalizeString31(entry.startParamPath) } : {},
-        ...normalizeString31(entry == null ? void 0 : entry.endParamPath) ? { endParamPath: normalizeString31(entry.endParamPath) } : {}
+        ...normalizeString32(entry == null ? void 0 : entry.paramPath) ? { paramPath: normalizeString32(entry.paramPath) } : {},
+        ...normalizeString32(entry == null ? void 0 : entry.startParamPath) ? { startParamPath: normalizeString32(entry.startParamPath) } : {},
+        ...normalizeString32(entry == null ? void 0 : entry.endParamPath) ? { endParamPath: normalizeString32(entry.endParamPath) } : {}
       };
     }).filter(Boolean);
     return {
@@ -58594,17 +58836,17 @@ ${indent}${end}`;
     if ((!Array.isArray(nextResult == null ? void 0 : nextResult.defaultTablePresets) || nextResult.defaultTablePresets.length === 0) && Array.isArray(presentation == null ? void 0 : presentation.defaultTablePresets) && presentation.defaultTablePresets.length > 0) {
       nextResult.defaultTablePresets = cloneValue20(presentation.defaultTablePresets);
     }
-    if (!normalizeString31(nextResult == null ? void 0 : nextResult.defaultMode) && normalizeString31(presentation == null ? void 0 : presentation.defaultMode)) {
-      nextResult.defaultMode = normalizeString31(presentation.defaultMode);
+    if (!normalizeString32(nextResult == null ? void 0 : nextResult.defaultMode) && normalizeString32(presentation == null ? void 0 : presentation.defaultMode)) {
+      nextResult.defaultMode = normalizeString32(presentation.defaultMode);
     }
     if ((Number((nextResult == null ? void 0 : nextResult.pageSize) || 0) || 0) < 1 && (Number((presentation == null ? void 0 : presentation.pageSize) || 0) || 0) > 0) {
       nextResult.pageSize = Number(presentation.pageSize || 0) || 0;
     }
-    if (!normalizeString31(nextResult == null ? void 0 : nextResult.chartCreationMode) && normalizeString31(presentation == null ? void 0 : presentation.chartCreationMode)) {
-      nextResult.chartCreationMode = normalizeString31(presentation.chartCreationMode);
+    if (!normalizeString32(nextResult == null ? void 0 : nextResult.chartCreationMode) && normalizeString32(presentation == null ? void 0 : presentation.chartCreationMode)) {
+      nextResult.chartCreationMode = normalizeString32(presentation.chartCreationMode);
     }
-    if (!normalizeString31(nextResult == null ? void 0 : nextResult.resultPanePosition) && normalizeString31(presentation == null ? void 0 : presentation.resultPanePosition)) {
-      nextResult.resultPanePosition = normalizeString31(presentation.resultPanePosition);
+    if (!normalizeString32(nextResult == null ? void 0 : nextResult.resultPanePosition) && normalizeString32(presentation == null ? void 0 : presentation.resultPanePosition)) {
+      nextResult.resultPanePosition = normalizeString32(presentation.resultPanePosition);
     }
     if ((!Array.isArray(nextResult == null ? void 0 : nextResult.defaultChartSpecs) || nextResult.defaultChartSpecs.length === 0) && Array.isArray(presentation == null ? void 0 : presentation.defaultChartSpecs) && presentation.defaultChartSpecs.length > 0) {
       nextResult.defaultChartSpecs = cloneValue20(presentation.defaultChartSpecs);
@@ -58655,7 +58897,7 @@ ${indent}${end}`;
     return {
       ...generated,
       id: "primary",
-      dataSourceRef: normalizeString31(
+      dataSourceRef: normalizeString32(
         (documentPrimaryDataset == null ? void 0 : documentPrimaryDataset.dataSourceRef) || (generated == null ? void 0 : generated.dataSourceRef) || (loweredContainer == null ? void 0 : loweredContainer.dataSourceRef)
       ),
       request: shouldPreferDocumentPrimaryRequest(documentRequest, generatedRequest) ? documentRequest : generatedRequest || documentRequest || {}
@@ -58671,7 +58913,7 @@ ${indent}${end}`;
     }));
     const predicateParamIds = new Set(predicateBindings.map((binding) => binding.paramId));
     const legacyBindings = resolveReportBuilderScopeParamFilters(config).map((filter) => {
-      const paramId = normalizeString31((filter == null ? void 0 : filter.id) || (filter == null ? void 0 : filter.field));
+      const paramId = normalizeString32((filter == null ? void 0 : filter.id) || (filter == null ? void 0 : filter.field));
       if (!paramId || predicateParamIds.has(paramId)) {
         return null;
       }
@@ -58682,7 +58924,7 @@ ${indent}${end}`;
     }).filter(Boolean);
     const seen = new Set([...predicateBindings, ...legacyBindings].map((binding) => binding.paramId));
     const configuredSourceBindings = normalizeReportBuilderPublishedDataSources(config).flatMap((source) => Array.isArray(source == null ? void 0 : source.scopeParamOptions) ? source.scopeParamOptions : []).map((option) => {
-      const paramId = normalizeString31((option == null ? void 0 : option.id) || (option == null ? void 0 : option.value));
+      const paramId = normalizeString32((option == null ? void 0 : option.id) || (option == null ? void 0 : option.value));
       if (!paramId || seen.has(paramId)) {
         return null;
       }
@@ -58703,13 +58945,13 @@ ${indent}${end}`;
     templateFieldDisplayMap
   } = {}) {
     return {
-      id: normalizeString31(id || "markdownBlock"),
+      id: normalizeString32(id || "markdownBlock"),
       kind: "markdownBlock",
-      title: normalizeString31(title),
+      title: normalizeString32(title),
       markdown: String(markdown || ""),
       ...templateRequestInputs ? { templateRequestInputs: normalizeTemplateRequestInputs(templateRequestInputs) } : {},
       ...templateFieldDisplayMap ? { templateFieldDisplayMap: cloneValue20(templateFieldDisplayMap) } : {},
-      ...normalizeString31(datasetRef) ? { datasetRef: normalizeString31(datasetRef) } : {}
+      ...normalizeString32(datasetRef) ? { datasetRef: normalizeString32(datasetRef) } : {}
     };
   }
   function buildReportDocumentFilterBarBlock({
@@ -58723,24 +58965,24 @@ ${indent}${end}`;
     visibleGroups = [],
     collapsedGroups = []
   } = {}) {
-    const normalizedParamIds = (Array.isArray(paramIds) ? paramIds : []).map((entry) => normalizeString31(entry)).filter((entry) => !!entry && !isTruncatedPlaceholder2(entry));
+    const normalizedParamIds = (Array.isArray(paramIds) ? paramIds : []).map((entry) => normalizeString32(entry)).filter((entry) => !!entry && !isTruncatedPlaceholder2(entry));
     const normalizedMode = (() => {
-      const candidate = normalizeString31(mode).toLowerCase();
+      const candidate = normalizeString32(mode).toLowerCase();
       return ["baseline", "unified"].includes(candidate) ? candidate : "";
     })();
     const normalizedPlacement = (() => {
-      const candidate = normalizeString31(placement).toLowerCase();
+      const candidate = normalizeString32(placement).toLowerCase();
       return ["inherit", "left", "right", "top", "inline", "rail-left", "hidden"].includes(candidate) ? candidate : "";
     })();
-    const normalizeIdList = (values = []) => (Array.isArray(values) ? values : []).map((entry) => normalizeString31(entry)).filter(Boolean);
+    const normalizeIdList = (values = []) => (Array.isArray(values) ? values : []).map((entry) => normalizeString32(entry)).filter(Boolean);
     if (normalizedParamIds.length === 0 && (Array.isArray(paramIds) ? paramIds : []).some((entry) => isTruncatedPlaceholder2(entry))) {
       return null;
     }
     return {
-      id: normalizeString31(id || "filterBar"),
+      id: normalizeString32(id || "filterBar"),
       kind: "filterBarBlock",
       title: normalizeFilterBarTitle(title || "Filters"),
-      datasetRef: normalizeString31(datasetRef || "primary") || "primary",
+      datasetRef: normalizeString32(datasetRef || "primary") || "primary",
       ...normalizedParamIds.length > 0 ? { paramIds: normalizedParamIds } : {},
       ...normalizedMode ? { mode: normalizedMode } : {},
       ...normalizedPlacement ? { placement: normalizedPlacement } : {},
@@ -58750,41 +58992,41 @@ ${indent}${end}`;
     };
   }
   function buildReportDocumentKpiBlock(block = {}) {
-    const valueField = normalizeString31((block == null ? void 0 : block.valueField) || "value");
-    const valueFormat = normalizeString31((block == null ? void 0 : block.valueFormat) || (block == null ? void 0 : block.format));
-    const suffix = normalizeString31(block == null ? void 0 : block.suffix);
-    const secondaryField = normalizeString31(block == null ? void 0 : block.secondaryField);
-    const presentationMode = normalizeString31(block == null ? void 0 : block.presentationMode).toLowerCase();
+    const valueField = normalizeString32((block == null ? void 0 : block.valueField) || "value");
+    const valueFormat = normalizeString32((block == null ? void 0 : block.valueFormat) || (block == null ? void 0 : block.format));
+    const suffix = normalizeString32(block == null ? void 0 : block.suffix);
+    const secondaryField = normalizeString32(block == null ? void 0 : block.secondaryField);
+    const presentationMode = normalizeString32(block == null ? void 0 : block.presentationMode).toLowerCase();
     const normalizedPresentationMode = ["card", "body", "both"].includes(presentationMode) ? presentationMode : "card";
-    const rowSelector = normalizeString31(block == null ? void 0 : block.rowSelector).toLowerCase();
+    const rowSelector = normalizeString32(block == null ? void 0 : block.rowSelector).toLowerCase();
     const normalizedRowSelector = ["firstrow", "maxbyvalue", "minbyvalue"].includes(rowSelector) ? rowSelector : "firstrow";
-    const bodyFormat = normalizeString31(block == null ? void 0 : block.bodyFormat).toLowerCase();
+    const bodyFormat = normalizeString32(block == null ? void 0 : block.bodyFormat).toLowerCase();
     const normalizedBodyFormat = bodyFormat === "markdown" ? "markdown" : "markdown";
     const bodyTemplate = String((block == null ? void 0 : block.bodyTemplate) || "");
     return withReportBlockRuntime({
-      id: normalizeString31((block == null ? void 0 : block.id) || "kpiBlock"),
+      id: normalizeString32((block == null ? void 0 : block.id) || "kpiBlock"),
       kind: "kpiBlock",
-      title: normalizeString31((block == null ? void 0 : block.title) || "KPI"),
-      datasetRef: normalizeString31((block == null ? void 0 : block.datasetRef) || "primary"),
+      title: normalizeString32((block == null ? void 0 : block.title) || "KPI"),
+      datasetRef: normalizeString32((block == null ? void 0 : block.datasetRef) || "primary"),
       valueField,
-      valueLabel: normalizeString31((block == null ? void 0 : block.valueLabel) || (block == null ? void 0 : block.title) || valueField || "Value"),
+      valueLabel: normalizeString32((block == null ? void 0 : block.valueLabel) || (block == null ? void 0 : block.title) || valueField || "Value"),
       ...valueFormat ? { valueFormat } : {},
       ...suffix ? { suffix } : {},
       ...block.sparkline ? { sparkline: normalizeKpiSparkline(block.sparkline) } : {},
       ...secondaryField ? {
         secondaryField,
-        ...normalizeString31(block == null ? void 0 : block.secondaryDatasetRef) ? { secondaryDatasetRef: normalizeString31(block.secondaryDatasetRef) } : {},
+        ...normalizeString32(block == null ? void 0 : block.secondaryDatasetRef) ? { secondaryDatasetRef: normalizeString32(block.secondaryDatasetRef) } : {},
         ...(block == null ? void 0 : block.secondaryCalculation) ? { secondaryCalculation: normalizeKpiSecondaryCalculation(block.secondaryCalculation) } : {},
         ...normalizeReportRuntimeCondition(block == null ? void 0 : block.secondaryVisibleWhen) ? { secondaryVisibleWhen: normalizeReportRuntimeCondition(block.secondaryVisibleWhen) } : {},
-        secondaryLabel: normalizeString31((block == null ? void 0 : block.secondaryLabel) || secondaryField),
-        ...normalizeString31(block == null ? void 0 : block.secondaryFormat) ? { secondaryFormat: normalizeString31(block.secondaryFormat) } : {},
+        secondaryLabel: normalizeString32((block == null ? void 0 : block.secondaryLabel) || secondaryField),
+        ...normalizeString32(block == null ? void 0 : block.secondaryFormat) ? { secondaryFormat: normalizeString32(block.secondaryFormat) } : {},
         ...(block == null ? void 0 : block.secondaryTrend) === true ? { secondaryTrend: true } : {},
-        ...normalizeString31(block == null ? void 0 : block.secondaryDisplayKey) ? { secondaryDisplayKey: normalizeString31(block.secondaryDisplayKey) } : {},
+        ...normalizeString32(block == null ? void 0 : block.secondaryDisplayKey) ? { secondaryDisplayKey: normalizeString32(block.secondaryDisplayKey) } : {},
         ...(block == null ? void 0 : block.secondaryDisplayValueMap) && typeof block.secondaryDisplayValueMap === "object" && !Array.isArray(block.secondaryDisplayValueMap) ? { secondaryDisplayValueMap: cloneValue20(block.secondaryDisplayValueMap) } : {}
       } : {},
-      ...normalizeString31(block == null ? void 0 : block.description) ? { description: normalizeString31(block.description) } : {},
-      ...normalizeString31(block == null ? void 0 : block.tone) ? { tone: normalizeString31(block.tone) } : {},
-      ...normalizeString31(block == null ? void 0 : block.emptyLabel) ? { emptyLabel: normalizeString31(block.emptyLabel) } : {},
+      ...normalizeString32(block == null ? void 0 : block.description) ? { description: normalizeString32(block.description) } : {},
+      ...normalizeString32(block == null ? void 0 : block.tone) ? { tone: normalizeString32(block.tone) } : {},
+      ...normalizeString32(block == null ? void 0 : block.emptyLabel) ? { emptyLabel: normalizeString32(block.emptyLabel) } : {},
       ...normalizedRowSelector !== "firstrow" ? { rowSelector: normalizedRowSelector } : {},
       ...normalizedPresentationMode !== "card" ? { presentationMode: normalizedPresentationMode } : {},
       ...normalizedPresentationMode !== "card" || bodyTemplate.trim() ? { bodyFormat: normalizedBodyFormat } : {},
@@ -58792,7 +59034,7 @@ ${indent}${end}`;
     }, block);
   }
   function normalizeCollectionLayout(value = "") {
-    const normalized = normalizeString31(value).toLowerCase();
+    const normalized = normalizeString32(value).toLowerCase();
     return ["grid", "list"].includes(normalized) ? normalized : "grid";
   }
   function normalizeCollectionColumns(value = 0) {
@@ -58810,40 +59052,40 @@ ${indent}${end}`;
       }
       return {
         value: cloneValue20(rule.value),
-        ...normalizeString31(rule == null ? void 0 : rule.tone) ? { tone: normalizeString31(rule.tone).toLowerCase() } : {},
-        ...normalizeString31(rule == null ? void 0 : rule.label) ? { label: normalizeString31(rule.label) } : {},
-        ...normalizeString31(rule == null ? void 0 : rule.color) ? { color: normalizeString31(rule.color) } : {},
-        ...normalizeString31(rule == null ? void 0 : rule.background) ? { background: normalizeString31(rule.background) } : {}
+        ...normalizeString32(rule == null ? void 0 : rule.tone) ? { tone: normalizeString32(rule.tone).toLowerCase() } : {},
+        ...normalizeString32(rule == null ? void 0 : rule.label) ? { label: normalizeString32(rule.label) } : {},
+        ...normalizeString32(rule == null ? void 0 : rule.color) ? { color: normalizeString32(rule.color) } : {},
+        ...normalizeString32(rule == null ? void 0 : rule.background) ? { background: normalizeString32(rule.background) } : {}
       };
     }).filter(Boolean);
   }
   function buildReportDocumentCollectionBlock(block = {}) {
-    const itemTitleField = normalizeString31(block == null ? void 0 : block.itemTitleField);
-    const valueField = normalizeString31(block == null ? void 0 : block.valueField);
-    const secondaryField = normalizeString31(block == null ? void 0 : block.secondaryField);
+    const itemTitleField = normalizeString32(block == null ? void 0 : block.itemTitleField);
+    const valueField = normalizeString32(block == null ? void 0 : block.valueField);
+    const secondaryField = normalizeString32(block == null ? void 0 : block.secondaryField);
     const bodyTemplate = String((block == null ? void 0 : block.bodyTemplate) || "");
-    const toneField = normalizeString31(block == null ? void 0 : block.toneField);
+    const toneField = normalizeString32(block == null ? void 0 : block.toneField);
     const toneRules = normalizeCollectionToneRules(block == null ? void 0 : block.toneRules);
     return {
-      id: normalizeString31((block == null ? void 0 : block.id) || "collectionBlock"),
+      id: normalizeString32((block == null ? void 0 : block.id) || "collectionBlock"),
       kind: "collectionBlock",
-      title: normalizeString31((block == null ? void 0 : block.title) || "Collection") || "Collection",
-      datasetRef: normalizeString31((block == null ? void 0 : block.datasetRef) || "primary"),
+      title: normalizeString32((block == null ? void 0 : block.title) || "Collection") || "Collection",
+      datasetRef: normalizeString32((block == null ? void 0 : block.datasetRef) || "primary"),
       ...itemTitleField ? { itemTitleField } : {},
       ...block.markerColors ? { markerColors: cloneValue20(block.markerColors) } : {},
-      ...normalizeString31(block == null ? void 0 : block.itemTitleLabel) ? { itemTitleLabel: normalizeString31(block.itemTitleLabel) } : {},
-      ...normalizeString31(block == null ? void 0 : block.itemTitleDisplayKey) ? { itemTitleDisplayKey: normalizeString31(block.itemTitleDisplayKey) } : {},
+      ...normalizeString32(block == null ? void 0 : block.itemTitleLabel) ? { itemTitleLabel: normalizeString32(block.itemTitleLabel) } : {},
+      ...normalizeString32(block == null ? void 0 : block.itemTitleDisplayKey) ? { itemTitleDisplayKey: normalizeString32(block.itemTitleDisplayKey) } : {},
       ...(block == null ? void 0 : block.itemTitleDisplayValueMap) && typeof block.itemTitleDisplayValueMap === "object" && !Array.isArray(block.itemTitleDisplayValueMap) ? { itemTitleDisplayValueMap: cloneValue20(block.itemTitleDisplayValueMap) } : {},
       ...valueField ? {
         valueField,
-        valueLabel: normalizeString31((block == null ? void 0 : block.valueLabel) || valueField || "Value"),
-        ...normalizeString31(block == null ? void 0 : block.valueFormat) ? { valueFormat: normalizeString31(block.valueFormat) } : {}
+        valueLabel: normalizeString32((block == null ? void 0 : block.valueLabel) || valueField || "Value"),
+        ...normalizeString32(block == null ? void 0 : block.valueFormat) ? { valueFormat: normalizeString32(block.valueFormat) } : {}
       } : {},
       ...secondaryField ? {
         secondaryField,
-        secondaryLabel: normalizeString31((block == null ? void 0 : block.secondaryLabel) || secondaryField),
-        ...normalizeString31(block == null ? void 0 : block.secondaryFormat) ? { secondaryFormat: normalizeString31(block.secondaryFormat) } : {},
-        ...normalizeString31(block == null ? void 0 : block.secondaryDisplayKey) ? { secondaryDisplayKey: normalizeString31(block.secondaryDisplayKey) } : {},
+        secondaryLabel: normalizeString32((block == null ? void 0 : block.secondaryLabel) || secondaryField),
+        ...normalizeString32(block == null ? void 0 : block.secondaryFormat) ? { secondaryFormat: normalizeString32(block.secondaryFormat) } : {},
+        ...normalizeString32(block == null ? void 0 : block.secondaryDisplayKey) ? { secondaryDisplayKey: normalizeString32(block.secondaryDisplayKey) } : {},
         ...(block == null ? void 0 : block.secondaryDisplayValueMap) && typeof block.secondaryDisplayValueMap === "object" && !Array.isArray(block.secondaryDisplayValueMap) ? { secondaryDisplayValueMap: cloneValue20(block.secondaryDisplayValueMap) } : {}
       } : {},
       layout: normalizeCollectionLayout(block == null ? void 0 : block.layout),
@@ -58854,27 +59096,27 @@ ${indent}${end}`;
       ...(block == null ? void 0 : block.templateFieldDisplayMap) && typeof block.templateFieldDisplayMap === "object" && !Array.isArray(block.templateFieldDisplayMap) ? { templateFieldDisplayMap: cloneValue20(block.templateFieldDisplayMap) } : {},
       ...toneField ? { toneField } : {},
       ...toneRules.length > 0 ? { toneRules } : {},
-      ...normalizeString31(block == null ? void 0 : block.description) ? { description: normalizeString31(block.description) } : {},
-      ...normalizeString31(block == null ? void 0 : block.emptyLabel) ? { emptyLabel: normalizeString31(block.emptyLabel) } : {}
+      ...normalizeString32(block == null ? void 0 : block.description) ? { description: normalizeString32(block.description) } : {},
+      ...normalizeString32(block == null ? void 0 : block.emptyLabel) ? { emptyLabel: normalizeString32(block.emptyLabel) } : {}
     };
   }
   function buildReportDocumentSectionBlock(block = {}) {
-    const navigationLabel = normalizeString31((block == null ? void 0 : block.navigationLabel) || (block == null ? void 0 : block.title) || "Section") || "Section";
-    const blockIds = Array.from(new Set((Array.isArray(block == null ? void 0 : block.blockIds) ? block.blockIds : []).map((blockId) => normalizeString31(blockId)).filter(Boolean)));
+    const navigationLabel = normalizeString32((block == null ? void 0 : block.navigationLabel) || (block == null ? void 0 : block.title) || "Section") || "Section";
+    const blockIds = Array.from(new Set((Array.isArray(block == null ? void 0 : block.blockIds) ? block.blockIds : []).map((blockId) => normalizeString32(blockId)).filter(Boolean)));
     return {
-      id: normalizeString31((block == null ? void 0 : block.id) || "sectionBlock"),
+      id: normalizeString32((block == null ? void 0 : block.id) || "sectionBlock"),
       kind: "sectionBlock",
-      title: normalizeString31((block == null ? void 0 : block.title) || "Section") || "Section",
-      ...normalizeString31(block == null ? void 0 : block.datasetRef) ? { datasetRef: normalizeString31(block.datasetRef) } : {},
-      ...normalizeString31(block == null ? void 0 : block.subtitle) ? { subtitle: normalizeString31(block.subtitle) } : {},
-      ...normalizeString31(block == null ? void 0 : block.description) ? { description: normalizeString31(block.description) } : {},
+      title: normalizeString32((block == null ? void 0 : block.title) || "Section") || "Section",
+      ...normalizeString32(block == null ? void 0 : block.datasetRef) ? { datasetRef: normalizeString32(block.datasetRef) } : {},
+      ...normalizeString32(block == null ? void 0 : block.subtitle) ? { subtitle: normalizeString32(block.subtitle) } : {},
+      ...normalizeString32(block == null ? void 0 : block.description) ? { description: normalizeString32(block.description) } : {},
       navigationLabel,
       ...blockIds.length > 0 ? { blockIds } : {}
     };
   }
   function normalizeReportDocumentTabGroupSectionIds(sectionIds = []) {
     const seen = /* @__PURE__ */ new Set();
-    return (Array.isArray(sectionIds) ? sectionIds : []).map((sectionId) => normalizeString31(sectionId)).filter((sectionId) => {
+    return (Array.isArray(sectionIds) ? sectionIds : []).map((sectionId) => normalizeString32(sectionId)).filter((sectionId) => {
       if (!sectionId || seen.has(sectionId)) {
         return false;
       }
@@ -58884,11 +59126,11 @@ ${indent}${end}`;
   }
   function buildReportDocumentTabGroupBlock(block = {}) {
     const sectionIds = normalizeReportDocumentTabGroupSectionIds(block == null ? void 0 : block.sectionIds);
-    const defaultSectionId = normalizeString31(block == null ? void 0 : block.defaultSectionId);
+    const defaultSectionId = normalizeString32(block == null ? void 0 : block.defaultSectionId);
     return {
-      id: normalizeString31((block == null ? void 0 : block.id) || "tabGroupBlock"),
+      id: normalizeString32((block == null ? void 0 : block.id) || "tabGroupBlock"),
       kind: "tabGroupBlock",
-      title: normalizeString31((block == null ? void 0 : block.title) || "Sections") || "Sections",
+      title: normalizeString32((block == null ? void 0 : block.title) || "Sections") || "Sections",
       sectionIds,
       ...typeof (block == null ? void 0 : block.includeUnlistedSections) === "boolean" ? { includeUnlistedSections: block.includeUnlistedSections } : {},
       ...defaultSectionId && sectionIds.includes(defaultSectionId) ? { defaultSectionId } : {}
@@ -58896,7 +59138,7 @@ ${indent}${end}`;
   }
   function normalizeReportDocumentCompositeChildBlockIds(childBlockIds = []) {
     const seen = /* @__PURE__ */ new Set();
-    return (Array.isArray(childBlockIds) ? childBlockIds : []).map((blockId) => normalizeString31(blockId)).filter((blockId) => {
+    return (Array.isArray(childBlockIds) ? childBlockIds : []).map((blockId) => normalizeString32(blockId)).filter((blockId) => {
       if (!blockId || seen.has(blockId)) {
         return false;
       }
@@ -58906,13 +59148,13 @@ ${indent}${end}`;
   }
   function buildReportDocumentCompositeBlock(block = {}) {
     const childBlockIds = normalizeReportDocumentCompositeChildBlockIds(block == null ? void 0 : block.childBlockIds);
-    const layout = normalizeString31(block == null ? void 0 : block.layout);
+    const layout = normalizeString32(block == null ? void 0 : block.layout);
     return {
-      id: normalizeString31((block == null ? void 0 : block.id) || "compositeBlock"),
+      id: normalizeString32((block == null ? void 0 : block.id) || "compositeBlock"),
       kind: "compositeBlock",
-      title: normalizeString31((block == null ? void 0 : block.title) || "Grouped Panel") || "Grouped Panel",
-      ...normalizeString31(block == null ? void 0 : block.datasetRef) ? { datasetRef: normalizeString31(block.datasetRef) } : {},
-      ...normalizeString31(block == null ? void 0 : block.description) ? { description: normalizeString31(block.description) } : {},
+      title: normalizeString32((block == null ? void 0 : block.title) || "Grouped Panel") || "Grouped Panel",
+      ...normalizeString32(block == null ? void 0 : block.datasetRef) ? { datasetRef: normalizeString32(block.datasetRef) } : {},
+      ...normalizeString32(block == null ? void 0 : block.description) ? { description: normalizeString32(block.description) } : {},
       ...["stack", "responsiveGrid"].includes(layout) ? { layout } : {},
       ...(block == null ? void 0 : block.runtime) && typeof block.runtime === "object" && !Array.isArray(block.runtime) ? { runtime: cloneValue20(block.runtime) } : {},
       childBlockIds
@@ -58923,14 +59165,14 @@ ${indent}${end}`;
       if (!step || typeof step !== "object" || Array.isArray(step)) {
         return null;
       }
-      const title = normalizeString31(step == null ? void 0 : step.title);
+      const title = normalizeString32(step == null ? void 0 : step.title);
       const body = String((step == null ? void 0 : step.body) || "");
-      const tone = normalizeString31(step == null ? void 0 : step.tone).toLowerCase();
+      const tone = normalizeString32(step == null ? void 0 : step.tone).toLowerCase();
       if (!title && !body.trim()) {
         return null;
       }
       return {
-        id: normalizeString31((step == null ? void 0 : step.id) || `step_${index + 1}`) || `step_${index + 1}`,
+        id: normalizeString32((step == null ? void 0 : step.id) || `step_${index + 1}`) || `step_${index + 1}`,
         title,
         body,
         ...tone ? { tone } : {}
@@ -58940,21 +59182,21 @@ ${indent}${end}`;
   function buildReportDocumentStepperBlock(block = {}) {
     const steps = normalizeReportDocumentStepperSteps(block == null ? void 0 : block.steps);
     return {
-      id: normalizeString31((block == null ? void 0 : block.id) || "stepperBlock"),
+      id: normalizeString32((block == null ? void 0 : block.id) || "stepperBlock"),
       kind: "stepperBlock",
-      title: normalizeString31((block == null ? void 0 : block.title) || "Stepper") || "Stepper",
-      ...normalizeString31(block == null ? void 0 : block.description) ? { description: normalizeString31(block.description) } : {},
+      title: normalizeString32((block == null ? void 0 : block.title) || "Stepper") || "Stepper",
+      ...normalizeString32(block == null ? void 0 : block.description) ? { description: normalizeString32(block.description) } : {},
       steps
     };
   }
   function buildReportDocumentInfoPanelBlock(block = {}) {
     return {
-      id: normalizeString31((block == null ? void 0 : block.id) || "infoPanelBlock"),
+      id: normalizeString32((block == null ? void 0 : block.id) || "infoPanelBlock"),
       kind: "infoPanelBlock",
-      title: normalizeString31((block == null ? void 0 : block.title) || "Info Panel") || "Info Panel",
-      ...normalizeString31(block == null ? void 0 : block.eyebrow) ? { eyebrow: normalizeString31(block.eyebrow) } : {},
-      ...normalizeString31(block == null ? void 0 : block.description) ? { description: normalizeString31(block.description) } : {},
-      ...normalizeString31(block == null ? void 0 : block.tone) ? { tone: normalizeString31(block.tone).toLowerCase() } : {},
+      title: normalizeString32((block == null ? void 0 : block.title) || "Info Panel") || "Info Panel",
+      ...normalizeString32(block == null ? void 0 : block.eyebrow) ? { eyebrow: normalizeString32(block.eyebrow) } : {},
+      ...normalizeString32(block == null ? void 0 : block.description) ? { description: normalizeString32(block.description) } : {},
+      ...normalizeString32(block == null ? void 0 : block.tone) ? { tone: normalizeString32(block.tone).toLowerCase() } : {},
       bodyFormat: "markdown",
       body: String((block == null ? void 0 : block.body) || "")
     };
@@ -58964,17 +59206,17 @@ ${indent}${end}`;
     if (explicitBadges.length > 0) {
       return explicitBadges;
     }
-    return String(badgesText || "").split(/[\n,]/).map((entry) => normalizeString31(entry)).filter(Boolean);
+    return String(badgesText || "").split(/[\n,]/).map((entry) => normalizeString32(entry)).filter(Boolean);
   }
   function buildReportDocumentCalloutBlock(block = {}) {
     const badges = normalizeReportDocumentCalloutBadges(block == null ? void 0 : block.badges, block == null ? void 0 : block.badgesText);
     return {
-      id: normalizeString31((block == null ? void 0 : block.id) || "calloutBlock"),
+      id: normalizeString32((block == null ? void 0 : block.id) || "calloutBlock"),
       kind: "calloutBlock",
-      title: normalizeString31((block == null ? void 0 : block.title) || "Callout") || "Callout",
-      ...normalizeString31(block == null ? void 0 : block.icon) ? { icon: normalizeString31(block.icon) } : {},
-      ...normalizeString31(block == null ? void 0 : block.description) ? { description: normalizeString31(block.description) } : {},
-      ...normalizeString31(block == null ? void 0 : block.tone) ? { tone: normalizeString31(block.tone).toLowerCase() } : {},
+      title: normalizeString32((block == null ? void 0 : block.title) || "Callout") || "Callout",
+      ...normalizeString32(block == null ? void 0 : block.icon) ? { icon: normalizeString32(block.icon) } : {},
+      ...normalizeString32(block == null ? void 0 : block.description) ? { description: normalizeString32(block.description) } : {},
+      ...normalizeString32(block == null ? void 0 : block.tone) ? { tone: normalizeString32(block.tone).toLowerCase() } : {},
       ...badges.length > 0 ? { badges } : {},
       bodyFormat: "markdown",
       body: String((block == null ? void 0 : block.body) || "")
@@ -58985,15 +59227,15 @@ ${indent}${end}`;
       if (!card || typeof card !== "object" || Array.isArray(card)) {
         return null;
       }
-      const title = normalizeString31(card == null ? void 0 : card.title);
+      const title = normalizeString32(card == null ? void 0 : card.title);
       const body = String((card == null ? void 0 : card.body) || "");
-      const badge = normalizeString31(card == null ? void 0 : card.badge);
-      const tone = normalizeString31(card == null ? void 0 : card.tone).toLowerCase();
+      const badge = normalizeString32(card == null ? void 0 : card.badge);
+      const tone = normalizeString32(card == null ? void 0 : card.tone).toLowerCase();
       if (!title && !body.trim() && !badge) {
         return null;
       }
       return {
-        id: normalizeString31((card == null ? void 0 : card.id) || `card_${index + 1}`) || `card_${index + 1}`,
+        id: normalizeString32((card == null ? void 0 : card.id) || `card_${index + 1}`) || `card_${index + 1}`,
         title,
         body,
         ...badge ? { badge } : {},
@@ -59006,14 +59248,14 @@ ${indent}${end}`;
       if (!column || typeof column !== "object" || Array.isArray(column)) {
         return null;
       }
-      const title = normalizeString31(column == null ? void 0 : column.title);
-      const tone = normalizeString31(column == null ? void 0 : column.tone).toLowerCase();
+      const title = normalizeString32(column == null ? void 0 : column.title);
+      const tone = normalizeString32(column == null ? void 0 : column.tone).toLowerCase();
       const cards = normalizeReportDocumentKanbanCards(column == null ? void 0 : column.cards);
       if (!title && cards.length === 0) {
         return null;
       }
       return {
-        id: normalizeString31((column == null ? void 0 : column.id) || `column_${index + 1}`) || `column_${index + 1}`,
+        id: normalizeString32((column == null ? void 0 : column.id) || `column_${index + 1}`) || `column_${index + 1}`,
         title,
         ...tone ? { tone } : {},
         cards
@@ -59022,10 +59264,10 @@ ${indent}${end}`;
   }
   function buildReportDocumentKanbanBlock(block = {}) {
     return {
-      id: normalizeString31((block == null ? void 0 : block.id) || "kanbanBlock"),
+      id: normalizeString32((block == null ? void 0 : block.id) || "kanbanBlock"),
       kind: "kanbanBlock",
-      title: normalizeString31((block == null ? void 0 : block.title) || "Pipeline") || "Pipeline",
-      ...normalizeString31(block == null ? void 0 : block.description) ? { description: normalizeString31(block.description) } : {},
+      title: normalizeString32((block == null ? void 0 : block.title) || "Pipeline") || "Pipeline",
+      ...normalizeString32(block == null ? void 0 : block.description) ? { description: normalizeString32(block.description) } : {},
       columns: normalizeReportDocumentKanbanColumns(block == null ? void 0 : block.columns)
     };
   }
@@ -59034,16 +59276,16 @@ ${indent}${end}`;
       if (!event || typeof event !== "object" || Array.isArray(event)) {
         return null;
       }
-      const title = normalizeString31(event == null ? void 0 : event.title);
+      const title = normalizeString32(event == null ? void 0 : event.title);
       const body = String((event == null ? void 0 : event.body) || "");
-      const date = normalizeString31(event == null ? void 0 : event.date);
-      const badge = normalizeString31(event == null ? void 0 : event.badge);
-      const tone = normalizeString31(event == null ? void 0 : event.tone).toLowerCase();
+      const date = normalizeString32(event == null ? void 0 : event.date);
+      const badge = normalizeString32(event == null ? void 0 : event.badge);
+      const tone = normalizeString32(event == null ? void 0 : event.tone).toLowerCase();
       if (!title && !body.trim() && !date && !badge) {
         return null;
       }
       return {
-        id: normalizeString31((event == null ? void 0 : event.id) || `event_${index + 1}`) || `event_${index + 1}`,
+        id: normalizeString32((event == null ? void 0 : event.id) || `event_${index + 1}`) || `event_${index + 1}`,
         ...date ? { date } : {},
         title,
         body,
@@ -59053,17 +59295,17 @@ ${indent}${end}`;
     }).filter(Boolean);
   }
   function buildReportDocumentTimelineBlock(block = {}) {
-    const datasetRef = normalizeString31(block == null ? void 0 : block.datasetRef);
-    const timeField = normalizeString31(block == null ? void 0 : block.timeField);
-    const titleField = normalizeString31(block == null ? void 0 : block.titleField);
-    const descriptionField = normalizeString31(block == null ? void 0 : block.descriptionField);
-    const badgeField = normalizeString31(block == null ? void 0 : block.badgeField);
-    const toneField = normalizeString31(block == null ? void 0 : block.toneField);
+    const datasetRef = normalizeString32(block == null ? void 0 : block.datasetRef);
+    const timeField = normalizeString32(block == null ? void 0 : block.timeField);
+    const titleField = normalizeString32(block == null ? void 0 : block.titleField);
+    const descriptionField = normalizeString32(block == null ? void 0 : block.descriptionField);
+    const badgeField = normalizeString32(block == null ? void 0 : block.badgeField);
+    const toneField = normalizeString32(block == null ? void 0 : block.toneField);
     return {
-      id: normalizeString31((block == null ? void 0 : block.id) || "timelineBlock"),
+      id: normalizeString32((block == null ? void 0 : block.id) || "timelineBlock"),
       kind: "timelineBlock",
-      title: normalizeString31((block == null ? void 0 : block.title) || "Timeline") || "Timeline",
-      ...normalizeString31(block == null ? void 0 : block.description) ? { description: normalizeString31(block.description) } : {},
+      title: normalizeString32((block == null ? void 0 : block.title) || "Timeline") || "Timeline",
+      ...normalizeString32(block == null ? void 0 : block.description) ? { description: normalizeString32(block.description) } : {},
       ...datasetRef ? { datasetRef } : {},
       ...timeField ? { timeField } : {},
       ...titleField ? { titleField } : {},
@@ -59074,43 +59316,43 @@ ${indent}${end}`;
     };
   }
   function humanizeReportDocumentFieldName(value = "") {
-    return normalizeString31(value).replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
+    return normalizeString32(value).replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
   }
   function normalizeReportDocumentBadgeItems(items = []) {
     return (Array.isArray(items) ? items : []).map((item, index) => {
       if (!item || typeof item !== "object" || Array.isArray(item)) {
         return null;
       }
-      const rawLegacyLabelField = normalizeString31(item == null ? void 0 : item.labelField);
+      const rawLegacyLabelField = normalizeString32(item == null ? void 0 : item.labelField);
       const legacyLabelField = isTruncatedPlaceholder2(rawLegacyLabelField) ? "" : rawLegacyLabelField;
-      const rawLabel = normalizeString31(
+      const rawLabel = normalizeString32(
         (item == null ? void 0 : item.label) || (legacyLabelField ? humanizeReportDocumentFieldName(legacyLabelField) : "")
       );
       const label = isTruncatedPlaceholder2(rawLabel) ? "" : rawLabel;
-      const rawValue = normalizeString31(item == null ? void 0 : item.value);
+      const rawValue = normalizeString32(item == null ? void 0 : item.value);
       const value = isTruncatedPlaceholder2(rawValue) ? "" : rawValue;
-      const rawValueField = normalizeString31((item == null ? void 0 : item.valueField) || legacyLabelField);
+      const rawValueField = normalizeString32((item == null ? void 0 : item.valueField) || legacyLabelField);
       const valueField = isTruncatedPlaceholder2(rawValueField) ? "" : rawValueField;
-      const format2 = normalizeString31(item == null ? void 0 : item.format);
-      const displayKey = normalizeString31(item == null ? void 0 : item.displayKey);
-      const labelMode = normalizeString31(item == null ? void 0 : item.labelMode).toLowerCase();
+      const format2 = normalizeString32(item == null ? void 0 : item.format);
+      const displayKey = normalizeString32(item == null ? void 0 : item.displayKey);
+      const labelMode = normalizeString32(item == null ? void 0 : item.labelMode).toLowerCase();
       const rules = (Array.isArray(item == null ? void 0 : item.rules) ? item.rules : []).map((rule) => {
         if (!rule || typeof rule !== "object" || Array.isArray(rule)) {
           return null;
         }
         const next = {
           ..."value" in rule ? { value: cloneValue20(rule.value) } : {},
-          ...normalizeString31(rule == null ? void 0 : rule.label) ? { label: normalizeString31(rule.label) } : {},
-          ...normalizeString31(rule == null ? void 0 : rule.tone) ? { tone: normalizeString31(rule.tone) } : {}
+          ...normalizeString32(rule == null ? void 0 : rule.label) ? { label: normalizeString32(rule.label) } : {},
+          ...normalizeString32(rule == null ? void 0 : rule.tone) ? { tone: normalizeString32(rule.tone) } : {}
         };
         return Object.keys(next).length > 0 ? next : null;
       }).filter(Boolean);
-      const tone = normalizeString31((item == null ? void 0 : item.tone) || (item == null ? void 0 : item.severity));
+      const tone = normalizeString32((item == null ? void 0 : item.tone) || (item == null ? void 0 : item.severity));
       if (!label && !value && !valueField) {
         return null;
       }
       return {
-        id: normalizeString31((item == null ? void 0 : item.id) || `badge_${index + 1}`) || `badge_${index + 1}`,
+        id: normalizeString32((item == null ? void 0 : item.id) || `badge_${index + 1}`) || `badge_${index + 1}`,
         ...label ? { label } : {},
         ...value ? { value } : {},
         ...valueField ? { valueField } : {},
@@ -59126,26 +59368,26 @@ ${indent}${end}`;
   function buildReportDocumentBadgesBlock(block = {}) {
     const items = normalizeReportDocumentBadgeItems(block == null ? void 0 : block.items);
     return {
-      id: normalizeString31((block == null ? void 0 : block.id) || "badgesBlock"),
+      id: normalizeString32((block == null ? void 0 : block.id) || "badgesBlock"),
       kind: "badgesBlock",
-      title: normalizeString31((block == null ? void 0 : block.title) || "Status Pills") || "Status Pills",
-      datasetRef: normalizeString31((block == null ? void 0 : block.datasetRef) || "primary") || "primary",
+      title: normalizeString32((block == null ? void 0 : block.title) || "Status Pills") || "Status Pills",
+      datasetRef: normalizeString32((block == null ? void 0 : block.datasetRef) || "primary") || "primary",
       items
     };
   }
   function buildReportDocumentChartBlock(block = {}) {
     var _a5;
-    const normalizedTitle = normalizeString31((block == null ? void 0 : block.title) || ((_a5 = block == null ? void 0 : block.chartSpec) == null ? void 0 : _a5.title) || "Chart") || "Chart";
+    const normalizedTitle = normalizeString32((block == null ? void 0 : block.title) || ((_a5 = block == null ? void 0 : block.chartSpec) == null ? void 0 : _a5.title) || "Chart") || "Chart";
     const normalizedChartSpec = normalizeReportBuilderChartSpec({
       ...(block == null ? void 0 : block.chartSpec) && typeof block.chartSpec === "object" && !Array.isArray(block.chartSpec) ? block.chartSpec : {},
       title: normalizedTitle
     });
     const rowLimit = Math.trunc(Number(block == null ? void 0 : block.rowLimit));
     return {
-      id: normalizeString31((block == null ? void 0 : block.id) || "chartBlock"),
+      id: normalizeString32((block == null ? void 0 : block.id) || "chartBlock"),
       kind: "chartBlock",
       title: normalizedTitle,
-      datasetRef: normalizeString31((block == null ? void 0 : block.datasetRef) || "primary"),
+      datasetRef: normalizeString32((block == null ? void 0 : block.datasetRef) || "primary"),
       chartSpec: normalizedChartSpec,
       ...Number.isInteger(rowLimit) && rowLimit > 0 ? { rowLimit } : {}
     };
@@ -59169,10 +59411,10 @@ ${indent}${end}`;
       delete geo.format;
     }
     return {
-      id: normalizeString31((block == null ? void 0 : block.id) || "geoMapBlock"),
+      id: normalizeString32((block == null ? void 0 : block.id) || "geoMapBlock"),
       kind: "geoMapBlock",
-      title: normalizeString31((block == null ? void 0 : block.title) || "Geo Map"),
-      datasetRef: normalizeString31((block == null ? void 0 : block.datasetRef) || "primary"),
+      title: normalizeString32((block == null ? void 0 : block.title) || "Geo Map"),
+      datasetRef: normalizeString32((block == null ? void 0 : block.datasetRef) || "primary"),
       geo
     };
   }
@@ -59215,7 +59457,7 @@ ${indent}${end}`;
     if (!isPlainObject8(block)) {
       return null;
     }
-    const normalizedKind = normalizeString31(block == null ? void 0 : block.kind);
+    const normalizedKind = normalizeString32(block == null ? void 0 : block.kind);
     if (normalizedKind === "markdownBlock") {
       return buildReportDocumentMarkdownBlock(block);
     }
@@ -59225,7 +59467,7 @@ ${indent}${end}`;
     if (normalizedKind === "refinementBarBlock") {
       const actionKinds = (block == null ? void 0 : block.actionKinds) != null ? normalizeRefinementBarActionKinds(block == null ? void 0 : block.actionKinds) : null;
       return {
-        id: normalizeString31((block == null ? void 0 : block.id) || "refinementTrail"),
+        id: normalizeString32((block == null ? void 0 : block.id) || "refinementTrail"),
         kind: "refinementBarBlock",
         ...(block == null ? void 0 : block.title) != null ? { title: normalizeRefinementBarText(block == null ? void 0 : block.title) } : {},
         ...actionKinds != null ? { actionKinds } : {},
@@ -59290,7 +59532,7 @@ ${indent}${end}`;
       if (!normalizedBlock) {
         return;
       }
-      const blockId = normalizeString31(normalizedBlock == null ? void 0 : normalizedBlock.id);
+      const blockId = normalizeString32(normalizedBlock == null ? void 0 : normalizedBlock.id);
       if (!blockId) {
         merged.push(normalizedBlock);
         return;
@@ -59308,20 +59550,20 @@ ${indent}${end}`;
     const items = Array.isArray(layout) ? layout : Array.isArray(layout == null ? void 0 : layout.items) ? layout.items : [];
     const knownIds = /* @__PURE__ */ new Set([
       "primaryBuilder",
-      ...(Array.isArray(blockIds) ? blockIds : []).map((entry) => normalizeString31(entry)).filter(Boolean)
+      ...(Array.isArray(blockIds) ? blockIds : []).map((entry) => normalizeString32(entry)).filter(Boolean)
     ]);
     const seen = /* @__PURE__ */ new Set();
     const normalized = [];
     items.forEach((item) => {
       const normalizedItem = buildLayoutItem((item == null ? void 0 : item.blockId) || item, item);
-      const blockId = normalizeString31(normalizedItem == null ? void 0 : normalizedItem.blockId);
+      const blockId = normalizeString32(normalizedItem == null ? void 0 : normalizedItem.blockId);
       if (!blockId || seen.has(blockId) || !knownIds.has(blockId) || !normalizedItem) {
         return;
       }
       seen.add(blockId);
       normalized.push(normalizedItem);
     });
-    const normalizedBlockIds = (Array.isArray(blockIds) ? blockIds : []).map((entry) => normalizeString31(entry)).filter(Boolean);
+    const normalizedBlockIds = (Array.isArray(blockIds) ? blockIds : []).map((entry) => normalizeString32(entry)).filter(Boolean);
     const preludeBlockIds = normalizedBlockIds.filter((blockId) => blockId !== "primaryBuilder" && ["scopeFilters", "sharedFilters", "activeRefinements", "activeDrillPath"].includes(blockId));
     const trailingBlockIds = normalizedBlockIds.filter((blockId) => blockId !== "primaryBuilder" && !preludeBlockIds.includes(blockId));
     [...preludeBlockIds, "primaryBuilder", ...trailingBlockIds].forEach((blockId) => {
@@ -59351,11 +59593,11 @@ ${indent}${end}`;
     const documentBlocks = mergeReportBuilderDocumentBlocks(
       normalizeReportBuilderDocumentBlocks(state == null ? void 0 : state.reportDocumentBlocks),
       additionalBlocks
-    ).map((block) => normalizeString31(block == null ? void 0 : block.kind) === "tableBlock" && (config == null ? void 0 : config.tablePresentation) && typeof config.tablePresentation === "object" ? normalizeReportDocumentTableBlock({ ...cloneValue20(config.tablePresentation), ...block }) : block).filter(Boolean);
+    ).map((block) => normalizeString32(block == null ? void 0 : block.kind) === "tableBlock" && (config == null ? void 0 : config.tablePresentation) && typeof config.tablePresentation === "object" ? normalizeReportDocumentTableBlock({ ...cloneValue20(config.tablePresentation), ...block }) : block).filter(Boolean);
     const source = {
       kind: "dashboard.reportBuilder",
       containerId: resolveContainerIdentity2(container),
-      stateKey: normalizeString31((container == null ? void 0 : container.stateKey) || resolveContainerIdentity2(container)),
+      stateKey: normalizeString32((container == null ? void 0 : container.stateKey) || resolveContainerIdentity2(container)),
       dataSourceRef: resolveDocumentDataSourceRef(container, config)
     };
     const presentation = buildReportBuilderReportDocumentPresentation(config, state);
@@ -59365,8 +59607,8 @@ ${indent}${end}`;
       ...normalizeReportViewerSettings(state == null ? void 0 : state.reportDocumentViewer) ? { viewer: normalizeReportViewerSettings(state.reportDocumentViewer) } : {},
       id: documentId,
       title: resolveDocumentMetadataValue(state == null ? void 0 : state.reportDocumentTitle, resolveDocumentTitle(container, config)),
-      subtitle: normalizeString31(state == null ? void 0 : state.reportDocumentSubtitle),
-      description: normalizeString31(state == null ? void 0 : state.reportDocumentDescription),
+      subtitle: normalizeString32(state == null ? void 0 : state.reportDocumentSubtitle),
+      description: normalizeString32(state == null ? void 0 : state.reportDocumentDescription),
       ...normalizeReportDocumentTheme({
         accentTone: state == null ? void 0 : state.reportDocumentThemeAccent,
         badgePalette: state == null ? void 0 : state.reportDocumentBadgePalette
@@ -59386,10 +59628,10 @@ ${indent}${end}`;
       ...presentation ? { presentation } : {},
       datasets: buildReportBuilderReportDocumentDatasets(container, config, state),
       layout: {
-        type: normalizeString31(((_a5 = state == null ? void 0 : state.reportDocumentLayout) == null ? void 0 : _a5.type) || "stack") || "stack",
+        type: normalizeString32(((_a5 = state == null ? void 0 : state.reportDocumentLayout) == null ? void 0 : _a5.type) || "stack") || "stack",
         items: normalizeReportBuilderDocumentLayoutItems(
           state == null ? void 0 : state.reportDocumentLayout,
-          documentBlocks.map((block) => normalizeString31(block == null ? void 0 : block.id)).filter(Boolean)
+          documentBlocks.map((block) => normalizeString32(block == null ? void 0 : block.id)).filter(Boolean)
         )
       },
       blocks: [
@@ -59414,11 +59656,11 @@ ${indent}${end}`;
   function applyReportBuilderBlockScope(document = {}, block = {}) {
     var _a5;
     const scopeParams = new Map(
-      (Array.isArray((_a5 = document == null ? void 0 : document.scope) == null ? void 0 : _a5.params) ? document.scope.params : []).map((param) => [normalizeString31(param == null ? void 0 : param.id), param]).filter(([id]) => !!id)
+      (Array.isArray((_a5 = document == null ? void 0 : document.scope) == null ? void 0 : _a5.params) ? document.scope.params : []).map((param) => [normalizeString32(param == null ? void 0 : param.id), param]).filter(([id]) => !!id)
     );
     const boundScopeValues = {};
     (Array.isArray(block == null ? void 0 : block.scopeBindings) ? block.scopeBindings : []).forEach((binding) => {
-      const paramId = normalizeString31(binding == null ? void 0 : binding.paramId);
+      const paramId = normalizeString32(binding == null ? void 0 : binding.paramId);
       const filterId = resolveScopeBindingFilterId(binding == null ? void 0 : binding.target);
       if (!paramId || !filterId) {
         return;
@@ -59436,11 +59678,11 @@ ${indent}${end}`;
   }
   function enrichLoweredScopeParams(documentParams = [], canonicalParams = []) {
     const canonicalById = new Map(
-      (Array.isArray(canonicalParams) ? canonicalParams : []).map((param) => [normalizeString31(param == null ? void 0 : param.id), param]).filter(([id]) => !!id)
+      (Array.isArray(canonicalParams) ? canonicalParams : []).map((param) => [normalizeString32(param == null ? void 0 : param.id), param]).filter(([id]) => !!id)
     );
     const seen = /* @__PURE__ */ new Set();
     const enriched = (Array.isArray(documentParams) ? documentParams : []).map((param) => {
-      const id = normalizeString31(param == null ? void 0 : param.id);
+      const id = normalizeString32(param == null ? void 0 : param.id);
       if (!id) {
         return null;
       }
@@ -59458,14 +59700,14 @@ ${indent}${end}`;
   function orderLoweredBlocksByDocumentLayout(document = {}, baseSpec = {}, allBlocks = []) {
     var _a5, _b;
     const blockIndex = new Map(
-      (Array.isArray(allBlocks) ? allBlocks : []).map((block) => [normalizeString31(block == null ? void 0 : block.id), block]).filter(([id]) => !!id)
+      (Array.isArray(allBlocks) ? allBlocks : []).map((block) => [normalizeString32(block == null ? void 0 : block.id), block]).filter(([id]) => !!id)
     );
     const ordered = [];
     const layoutItems = [];
     const seen = /* @__PURE__ */ new Set();
-    const primaryBuilderBlockIds = (Array.isArray((_a5 = baseSpec == null ? void 0 : baseSpec.layoutIntent) == null ? void 0 : _a5.blockOrder) ? baseSpec.layoutIntent.blockOrder : []).map((blockId) => normalizeString31(blockId)).filter(Boolean);
+    const primaryBuilderBlockIds = (Array.isArray((_a5 = baseSpec == null ? void 0 : baseSpec.layoutIntent) == null ? void 0 : _a5.blockOrder) ? baseSpec.layoutIntent.blockOrder : []).map((blockId) => normalizeString32(blockId)).filter(Boolean);
     const pushOrderedBlock = (blockId = "", layoutItem = null) => {
-      const normalizedBlockId = normalizeString31(blockId);
+      const normalizedBlockId = normalizeString32(blockId);
       const block = blockIndex.get(normalizedBlockId);
       if (!block || seen.has(normalizedBlockId)) {
         return;
@@ -59475,7 +59717,7 @@ ${indent}${end}`;
       layoutItems.push(buildLayoutItem(normalizedBlockId, layoutItem) || { blockId: normalizedBlockId });
     };
     (Array.isArray((_b = document == null ? void 0 : document.layout) == null ? void 0 : _b.items) ? document.layout.items : []).forEach((item) => {
-      const blockId = normalizeString31(item == null ? void 0 : item.blockId);
+      const blockId = normalizeString32(item == null ? void 0 : item.blockId);
       if (!blockId) {
         return;
       }
@@ -59485,7 +59727,7 @@ ${indent}${end}`;
       });
     });
     (Array.isArray(allBlocks) ? allBlocks : []).forEach((block) => {
-      const blockId = normalizeString31(block == null ? void 0 : block.id);
+      const blockId = normalizeString32(block == null ? void 0 : block.id);
       if (blockId && seen.has(blockId)) {
         return;
       }
@@ -59502,20 +59744,20 @@ ${indent}${end}`;
   }
   function buildExclusiveReportSectionOwnership(blocks = []) {
     const source = Array.isArray(blocks) ? blocks : [];
-    const tabGroup = source.find((block) => normalizeString31(block == null ? void 0 : block.kind) === "tabGroupBlock") || null;
+    const tabGroup = source.find((block) => normalizeString32(block == null ? void 0 : block.kind) === "tabGroupBlock") || null;
     if (!tabGroup || (tabGroup == null ? void 0 : tabGroup.includeUnlistedSections) !== false) {
       return /* @__PURE__ */ new Map();
     }
-    const declaredSectionIds = new Set((Array.isArray(tabGroup == null ? void 0 : tabGroup.sectionIds) ? tabGroup.sectionIds : []).map((sectionId) => normalizeString31(sectionId)).filter(Boolean));
+    const declaredSectionIds = new Set((Array.isArray(tabGroup == null ? void 0 : tabGroup.sectionIds) ? tabGroup.sectionIds : []).map((sectionId) => normalizeString32(sectionId)).filter(Boolean));
     const ownership = new Map(Array.from(declaredSectionIds, (sectionId) => [sectionId, []]));
     let activeSectionId = "";
     let inferActiveSectionOwnership = false;
     source.forEach((block) => {
-      const blockId = normalizeString31(block == null ? void 0 : block.id);
-      const kind = normalizeString31(block == null ? void 0 : block.kind);
+      const blockId = normalizeString32(block == null ? void 0 : block.id);
+      const kind = normalizeString32(block == null ? void 0 : block.kind);
       if (kind === "sectionBlock") {
         activeSectionId = declaredSectionIds.has(blockId) ? blockId : "";
-        const explicitBlockIds = (Array.isArray(block == null ? void 0 : block.blockIds) ? block.blockIds : []).map((ownedBlockId) => normalizeString31(ownedBlockId)).filter(Boolean);
+        const explicitBlockIds = (Array.isArray(block == null ? void 0 : block.blockIds) ? block.blockIds : []).map((ownedBlockId) => normalizeString32(ownedBlockId)).filter(Boolean);
         if (activeSectionId && explicitBlockIds.length > 0) {
           ownership.set(activeSectionId, Array.from(new Set(explicitBlockIds)));
           inferActiveSectionOwnership = false;
@@ -59536,13 +59778,13 @@ ${indent}${end}`;
       return Array.isArray(runtimeBlocks) ? runtimeBlocks : [];
     }
     const allowedBlockIds = new Set(
-      (Array.isArray(documentBlocks) ? documentBlocks : []).map((block) => normalizeString31(block == null ? void 0 : block.id)).filter(Boolean)
+      (Array.isArray(documentBlocks) ? documentBlocks : []).map((block) => normalizeString32(block == null ? void 0 : block.id)).filter(Boolean)
     );
     ownership.forEach((blockIds, sectionId) => {
-      if (normalizeString31(sectionId)) allowedBlockIds.add(normalizeString31(sectionId));
-      (Array.isArray(blockIds) ? blockIds : []).map((blockId) => normalizeString31(blockId)).filter(Boolean).forEach((blockId) => allowedBlockIds.add(blockId));
+      if (normalizeString32(sectionId)) allowedBlockIds.add(normalizeString32(sectionId));
+      (Array.isArray(blockIds) ? blockIds : []).map((blockId) => normalizeString32(blockId)).filter(Boolean).forEach((blockId) => allowedBlockIds.add(blockId));
     });
-    return (Array.isArray(runtimeBlocks) ? runtimeBlocks : []).filter((block) => allowedBlockIds.has(normalizeString31(block == null ? void 0 : block.id)));
+    return (Array.isArray(runtimeBlocks) ? runtimeBlocks : []).filter((block) => allowedBlockIds.has(normalizeString32(block == null ? void 0 : block.id)));
   }
   function lowerReportDocumentToReportSpec(document = {}, {
     includePrimaryBlocks = true,
@@ -59571,15 +59813,15 @@ ${indent}${end}`;
     const staticDatasets = Array.isArray(builderContext == null ? void 0 : builderContext.staticDatasets) ? builderContext.staticDatasets : [];
     const loweringState = effectiveScopedState;
     const staticDatasetIndex = new Map(
-      staticDatasets.map((dataset) => [normalizeString31(dataset == null ? void 0 : dataset.id), dataset]).filter(([datasetId]) => !!datasetId)
+      staticDatasets.map((dataset) => [normalizeString32(dataset == null ? void 0 : dataset.id), dataset]).filter(([datasetId]) => !!datasetId)
     );
     const publishedDatasetSources = resolveReportDocumentPublishedDatasets(document, effectiveScopedConfig);
     const publishedDatasetIndex = buildReportBuilderPublishedDatasetRefIndex(publishedDatasetSources);
     const loweredContainer = {
-      id: normalizeString31(source.containerId || (document == null ? void 0 : document.id)),
-      stateKey: normalizeString31(source.stateKey || source.containerId || (document == null ? void 0 : document.id)),
-      title: normalizeString31((document == null ? void 0 : document.title) || (reportBuilderBlock == null ? void 0 : reportBuilderBlock.title)),
-      dataSourceRef: normalizeString31(source.dataSourceRef || ((_a5 = document == null ? void 0 : document.scope) == null ? void 0 : _a5.dataSourceRef))
+      id: normalizeString32(source.containerId || (document == null ? void 0 : document.id)),
+      stateKey: normalizeString32(source.stateKey || source.containerId || (document == null ? void 0 : document.id)),
+      title: normalizeString32((document == null ? void 0 : document.title) || (reportBuilderBlock == null ? void 0 : reportBuilderBlock.title)),
+      dataSourceRef: normalizeString32(source.dataSourceRef || ((_a5 = document == null ? void 0 : document.scope) == null ? void 0 : _a5.dataSourceRef))
     };
     const baseSpec = buildReportBuilderReportSpec({
       container: loweredContainer,
@@ -59591,11 +59833,11 @@ ${indent}${end}`;
       onChartValidation
     });
     const primaryRequestContext = {
-      dataSourceRef: normalizeString31(((_b = baseSpec == null ? void 0 : baseSpec.source) == null ? void 0 : _b.dataSourceRef) || (loweredContainer == null ? void 0 : loweredContainer.dataSourceRef)),
+      dataSourceRef: normalizeString32(((_b = baseSpec == null ? void 0 : baseSpec.source) == null ? void 0 : _b.dataSourceRef) || (loweredContainer == null ? void 0 : loweredContainer.dataSourceRef)),
       request: cloneValue20(buildReportBuilderRequest(effectiveScopedConfig, effectiveScopedState))
     };
-    const datasetBackedBlocks = blocks.filter((block) => normalizeString31(block == null ? void 0 : block.kind) !== "reportBuilderBlock").filter((block) => isReportDatasetBackedBlockKind(block == null ? void 0 : block.kind));
-    const explicitDatasetRefs = datasetBackedBlocks.map((block) => normalizeString31(block == null ? void 0 : block.datasetRef)).filter(Boolean);
+    const datasetBackedBlocks = blocks.filter((block) => normalizeString32(block == null ? void 0 : block.kind) !== "reportBuilderBlock").filter((block) => isReportDatasetBackedBlockKind(block == null ? void 0 : block.kind));
+    const explicitDatasetRefs = datasetBackedBlocks.map((block) => normalizeString32(block == null ? void 0 : block.datasetRef)).filter(Boolean);
     const shouldOmitPrimaryDataset = !shouldKeepPrimaryDataset({
       includePrimaryBlocks,
       datasetBackedBlockDatasetRefs: explicitDatasetRefs.length === datasetBackedBlocks.length ? explicitDatasetRefs : [],
@@ -59605,11 +59847,11 @@ ${indent}${end}`;
       ]
     });
     if (shouldOmitPrimaryDataset) {
-      baseSpec.datasets = (Array.isArray(baseSpec == null ? void 0 : baseSpec.datasets) ? baseSpec.datasets : []).filter((dataset) => normalizeString31(dataset == null ? void 0 : dataset.id) !== "primary");
+      baseSpec.datasets = (Array.isArray(baseSpec == null ? void 0 : baseSpec.datasets) ? baseSpec.datasets : []).filter((dataset) => normalizeString32(dataset == null ? void 0 : dataset.id) !== "primary");
     }
     const buildDatasetSpecificRuntimeContext = (datasetRef = "") => {
       var _a6;
-      const normalizedDatasetRef = normalizeString31(datasetRef || "primary") || "primary";
+      const normalizedDatasetRef = normalizeString32(datasetRef || "primary") || "primary";
       const staticDataset = staticDatasetIndex.get(normalizedDatasetRef) || null;
       if (staticDataset) {
         const datasetConfig = buildStaticDatasetReportBuilderConfig(effectiveConfig, staticDataset);
@@ -59618,7 +59860,7 @@ ${indent}${end}`;
           fieldCatalog: buildReportBuilderFieldCatalog(datasetConfig, normalizedDatasetRef, expressionDependencies),
           container: {
             ...loweredContainer,
-            dataSourceRef: normalizeString31((staticDataset == null ? void 0 : staticDataset.dataSourceRef) || (loweredContainer == null ? void 0 : loweredContainer.dataSourceRef))
+            dataSourceRef: normalizeString32((staticDataset == null ? void 0 : staticDataset.dataSourceRef) || (loweredContainer == null ? void 0 : loweredContainer.dataSourceRef))
           }
         };
       }
@@ -59633,7 +59875,7 @@ ${indent}${end}`;
           fieldCatalog: buildReportBuilderFieldCatalog(datasetConfig, normalizedDatasetRef, expressionDependencies),
           container: {
             ...loweredContainer,
-            dataSourceRef: normalizeString31((publishedDataset == null ? void 0 : publishedDataset.dataSourceRef) || (loweredContainer == null ? void 0 : loweredContainer.dataSourceRef))
+            dataSourceRef: normalizeString32((publishedDataset == null ? void 0 : publishedDataset.dataSourceRef) || (loweredContainer == null ? void 0 : loweredContainer.dataSourceRef))
           }
         };
       }
@@ -59645,22 +59887,22 @@ ${indent}${end}`;
     };
     const datasetRuntimeContexts = /* @__PURE__ */ new Map();
     const resolveDatasetSpecificRuntimeContext = (datasetRef = "") => {
-      const key2 = normalizeString31(datasetRef || "primary") || "primary";
+      const key2 = normalizeString32(datasetRef || "primary") || "primary";
       if (!datasetRuntimeContexts.has(key2)) {
         datasetRuntimeContexts.set(key2, buildDatasetSpecificRuntimeContext(key2));
       }
       return datasetRuntimeContexts.get(key2);
     };
-    const additionalBlocks = blocks.filter((block) => normalizeString31(block == null ? void 0 : block.kind) !== "reportBuilderBlock").map((block) => {
+    const additionalBlocks = blocks.filter((block) => normalizeString32(block == null ? void 0 : block.kind) !== "reportBuilderBlock").map((block) => {
       const normalizedBlock = normalizeReportBuilderDocumentBlock(block);
-      if (normalizeString31(normalizedBlock == null ? void 0 : normalizedBlock.kind) === "sectionBlock" && exclusiveSectionOwnership.has(normalizeString31(normalizedBlock == null ? void 0 : normalizedBlock.id))) {
+      if (normalizeString32(normalizedBlock == null ? void 0 : normalizedBlock.kind) === "sectionBlock" && exclusiveSectionOwnership.has(normalizeString32(normalizedBlock == null ? void 0 : normalizedBlock.id))) {
         return {
           ...normalizedBlock,
-          blockIds: cloneValue20(exclusiveSectionOwnership.get(normalizeString31(normalizedBlock.id)))
+          blockIds: cloneValue20(exclusiveSectionOwnership.get(normalizeString32(normalizedBlock.id)))
         };
       }
       const datasetContext = resolveDatasetSpecificRuntimeContext(normalizedBlock == null ? void 0 : normalizedBlock.datasetRef);
-      if (normalizeString31(normalizedBlock == null ? void 0 : normalizedBlock.kind) === "chartBlock") {
+      if (normalizeString32(normalizedBlock == null ? void 0 : normalizedBlock.kind) === "chartBlock") {
         const chartState = buildAuthoredChartBlockState({
           ...cloneValue20(effectiveScopedState),
           selectedDimensions: [],
@@ -59680,19 +59922,19 @@ ${indent}${end}`;
           onChartValidation
         }), normalizedBlock);
       }
-      if (normalizeString31(normalizedBlock == null ? void 0 : normalizedBlock.kind) === "tableBlock") {
+      if (normalizeString32(normalizedBlock == null ? void 0 : normalizedBlock.kind) === "tableBlock") {
         return withReportBlockRuntime(buildAuthoredTableBlock(normalizedBlock, datasetContext.fieldCatalog), normalizedBlock);
       }
-      if (normalizeString31(normalizedBlock == null ? void 0 : normalizedBlock.kind) === "markdownBlock") {
+      if (normalizeString32(normalizedBlock == null ? void 0 : normalizedBlock.kind) === "markdownBlock") {
         return withReportBlockRuntime(buildAuthoredMarkdownBlock(normalizedBlock, datasetContext.fieldCatalog), normalizedBlock);
       }
-      if (normalizeString31(normalizedBlock == null ? void 0 : normalizedBlock.kind) === "kpiBlock") {
+      if (normalizeString32(normalizedBlock == null ? void 0 : normalizedBlock.kind) === "kpiBlock") {
         return withReportBlockRuntime(buildAuthoredKpiBlock(normalizedBlock, datasetContext.fieldCatalog), normalizedBlock);
       }
-      if (normalizeString31(normalizedBlock == null ? void 0 : normalizedBlock.kind) === "collectionBlock") {
+      if (normalizeString32(normalizedBlock == null ? void 0 : normalizedBlock.kind) === "collectionBlock") {
         return withReportBlockRuntime(buildAuthoredCollectionBlock(normalizedBlock, datasetContext.fieldCatalog), normalizedBlock);
       }
-      if (normalizeString31(normalizedBlock == null ? void 0 : normalizedBlock.kind) === "badgesBlock") {
+      if (normalizeString32(normalizedBlock == null ? void 0 : normalizedBlock.kind) === "badgesBlock") {
         return withReportBlockRuntime(buildAuthoredBadgesBlock(normalizedBlock, datasetContext.fieldCatalog), normalizedBlock);
       }
       return normalizedBlock;
@@ -59706,7 +59948,7 @@ ${indent}${end}`;
       const context = resolveDatasetSpecificRuntimeContext(block.datasetRef);
       return withDeclaredRuntimeRefinementFields(block, context.config, context.refinementDimensions);
     });
-    const nextBlockIds = new Set(nextBlocks.map((block) => normalizeString31(block == null ? void 0 : block.id)).filter(Boolean));
+    const nextBlockIds = new Set(nextBlocks.map((block) => normalizeString32(block == null ? void 0 : block.id)).filter(Boolean));
     const referencedDatasetRefs = new Set(
       nextBlocks.flatMap(getReportBlockDatasetRefs).filter((datasetRef) => !!datasetRef && datasetRef !== "primary")
     );
@@ -59718,25 +59960,25 @@ ${indent}${end}`;
       primaryRequestContext
     );
     const refreshedPublishedDatasetIndex = new Map(
-      additionalPublishedDatasets.map((dataset) => [normalizeString31(dataset == null ? void 0 : dataset.id), dataset]).filter(([datasetId]) => !!datasetId)
+      additionalPublishedDatasets.map((dataset) => [normalizeString32(dataset == null ? void 0 : dataset.id), dataset]).filter(([datasetId]) => !!datasetId)
     );
     const baseDatasets = Array.isArray(baseSpec == null ? void 0 : baseSpec.datasets) ? baseSpec.datasets : [];
     const mergedDatasets = [
-      ...baseDatasets.map((dataset) => refreshedPublishedDatasetIndex.get(normalizeString31(dataset == null ? void 0 : dataset.id)) || dataset),
-      ...additionalPublishedDatasets.filter((dataset) => !baseDatasets.some((entry) => normalizeString31(entry == null ? void 0 : entry.id) === normalizeString31(dataset == null ? void 0 : dataset.id)))
+      ...baseDatasets.map((dataset) => refreshedPublishedDatasetIndex.get(normalizeString32(dataset == null ? void 0 : dataset.id)) || dataset),
+      ...additionalPublishedDatasets.filter((dataset) => !baseDatasets.some((entry) => normalizeString32(entry == null ? void 0 : entry.id) === normalizeString32(dataset == null ? void 0 : dataset.id)))
     ];
     const resolvedPrimaryDataset = shouldOmitPrimaryDataset ? null : resolveLoweredPrimaryDataset(
       document,
-      mergedDatasets.find((dataset) => normalizeString31(dataset == null ? void 0 : dataset.id) === "primary") || null,
+      mergedDatasets.find((dataset) => normalizeString32(dataset == null ? void 0 : dataset.id) === "primary") || null,
       loweredContainer
     );
     const nextDatasets = [
       ...resolvedPrimaryDataset ? [resolvedPrimaryDataset] : [],
-      ...mergedDatasets.filter((dataset) => normalizeString31(dataset == null ? void 0 : dataset.id) !== "primary")
+      ...mergedDatasets.filter((dataset) => normalizeString32(dataset == null ? void 0 : dataset.id) !== "primary")
     ];
-    const nextDatasetIds = new Set(nextDatasets.map((dataset) => normalizeString31(dataset == null ? void 0 : dataset.id)).filter(Boolean));
+    const nextDatasetIds = new Set(nextDatasets.map((dataset) => normalizeString32(dataset == null ? void 0 : dataset.id)).filter(Boolean));
     const nextCalculatedFields = (Array.isArray(baseSpec == null ? void 0 : baseSpec.calculatedFields) ? baseSpec.calculatedFields : []).filter((field2) => {
-      const datasetRef = normalizeString31((field2 == null ? void 0 : field2.datasetRef) || "primary") || "primary";
+      const datasetRef = normalizeString32((field2 == null ? void 0 : field2.datasetRef) || "primary") || "primary";
       return nextDatasetIds.has(datasetRef);
     });
     const loweredScopeParams = enrichLoweredScopeParams(
@@ -59753,12 +59995,12 @@ ${indent}${end}`;
       scope: {
         ...loweredContextPreset ? { contextPreset: loweredContextPreset } : {},
         params: loweredScopeParams,
-        dataSourceRef: normalizeString31(((_e = document == null ? void 0 : document.scope) == null ? void 0 : _e.dataSourceRef) || source.dataSourceRef || ((_f = baseSpec == null ? void 0 : baseSpec.source) == null ? void 0 : _f.dataSourceRef))
+        dataSourceRef: normalizeString32(((_e = document == null ? void 0 : document.scope) == null ? void 0 : _e.dataSourceRef) || source.dataSourceRef || ((_f = baseSpec == null ? void 0 : baseSpec.source) == null ? void 0 : _f.dataSourceRef))
       },
       layoutIntent: {
         ...(baseSpec == null ? void 0 : baseSpec.layoutIntent) || {},
-        blockOrder: nextBlocks.map((block) => normalizeString31(block == null ? void 0 : block.id)).filter(Boolean),
-        items: (Array.isArray(loweredLayout.items) ? loweredLayout.items : []).filter((item) => nextBlockIds.has(normalizeString31(item == null ? void 0 : item.blockId)))
+        blockOrder: nextBlocks.map((block) => normalizeString32(block == null ? void 0 : block.id)).filter(Boolean),
+        items: (Array.isArray(loweredLayout.items) ? loweredLayout.items : []).filter((item) => nextBlockIds.has(normalizeString32(item == null ? void 0 : item.blockId)))
       },
       datasets: nextDatasets,
       calculatedFields: nextCalculatedFields,
@@ -59807,238 +60049,6 @@ ${indent}${end}`;
     });
     if (diagnostics.length) throw new AuthoredReportChartValidationError(diagnostics);
     return reportSpec;
-  }
-
-  // src/utils/linkTarget.js
-  function normalizeString32(value) {
-    if (typeof value !== "string") {
-      return "";
-    }
-    return value.trim();
-  }
-  function isObjectValue(value) {
-    return value != null && typeof value === "object" && !Array.isArray(value);
-  }
-  function normalizeLinkText(value, fallbackText = "") {
-    if (value == null) {
-      return fallbackText;
-    }
-    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-      const text4 = String(value);
-      return text4 || fallbackText;
-    }
-    return fallbackText;
-  }
-  function resolveTemplateText(template = "", holder = null) {
-    const source = normalizeString32(template);
-    if (!source) {
-      return "";
-    }
-    return source.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_2, selector2) => {
-      const value = resolveKey(holder || {}, String(selector2 || "").trim());
-      return value == null ? "" : String(value);
-    }).replace(/\s{2,}/g, " ").trim();
-  }
-  function resolveContextSourceValue({ source = "value", selector: selector2 = "", context = null, row = null, value = null } = {}) {
-    var _a5, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X;
-    switch (String(source || "value").trim().toLowerCase()) {
-      case "row":
-        return selector2 ? resolveKey(row || {}, selector2) : row;
-      case "value":
-        return selector2 ? resolveKey(value || {}, selector2) : value;
-      case "form":
-        return selector2 ? resolveKey(((_c = (_b = (_a5 = context == null ? void 0 : context.handlers) == null ? void 0 : _a5.dataSource) == null ? void 0 : _b.getFormData) == null ? void 0 : _c.call(_b)) || {}, selector2) : ((_f = (_e = (_d = context == null ? void 0 : context.handlers) == null ? void 0 : _d.dataSource) == null ? void 0 : _e.getFormData) == null ? void 0 : _f.call(_e)) || {};
-      case "windowform":
-        return selector2 ? resolveKey(((_i = (_h = (_g = context == null ? void 0 : context.signals) == null ? void 0 : _g.windowForm) == null ? void 0 : _h.peek) == null ? void 0 : _i.call(_h)) || ((_k = (_j = context == null ? void 0 : context.signals) == null ? void 0 : _j.windowForm) == null ? void 0 : _k.value) || {}, selector2) : ((_n = (_m = (_l = context == null ? void 0 : context.signals) == null ? void 0 : _l.windowForm) == null ? void 0 : _m.peek) == null ? void 0 : _n.call(_m)) || ((_p = (_o = context == null ? void 0 : context.signals) == null ? void 0 : _o.windowForm) == null ? void 0 : _p.value) || {};
-      case "metrics":
-        return selector2 ? resolveKey(((_s = (_r = (_q = context == null ? void 0 : context.signals) == null ? void 0 : _q.metrics) == null ? void 0 : _r.peek) == null ? void 0 : _s.call(_r)) || ((_u = (_t = context == null ? void 0 : context.signals) == null ? void 0 : _t.metrics) == null ? void 0 : _u.value) || {}, selector2) : ((_x = (_w = (_v = context == null ? void 0 : context.signals) == null ? void 0 : _v.metrics) == null ? void 0 : _w.peek) == null ? void 0 : _x.call(_w)) || ((_z = (_y = context == null ? void 0 : context.signals) == null ? void 0 : _y.metrics) == null ? void 0 : _z.value) || {};
-      case "filter":
-        return selector2 ? resolveKey(((_C = (_B = (_A = context == null ? void 0 : context.handlers) == null ? void 0 : _A.dataSource) == null ? void 0 : _B.peekFilter) == null ? void 0 : _C.call(_B)) || {}, selector2) : ((_F = (_E = (_D = context == null ? void 0 : context.handlers) == null ? void 0 : _D.dataSource) == null ? void 0 : _E.peekFilter) == null ? void 0 : _F.call(_E)) || {};
-      case "selection": {
-        const selection = ((_I = (_H = (_G = context == null ? void 0 : context.handlers) == null ? void 0 : _G.dataSource) == null ? void 0 : _H.getSelection) == null ? void 0 : _I.call(_H)) || ((_L = (_K = (_J = context == null ? void 0 : context.handlers) == null ? void 0 : _J.dataSource) == null ? void 0 : _K.peekSelection) == null ? void 0 : _L.call(_K)) || {};
-        const selected = (_N = (_M = selection == null ? void 0 : selection.selected) != null ? _M : selection == null ? void 0 : selection.selection) != null ? _N : selection;
-        return selector2 ? resolveKey(selected || {}, selector2) : selected;
-      }
-      case "input":
-        return selector2 ? resolveKey(((_Q = (_P = (_O = context == null ? void 0 : context.signals) == null ? void 0 : _O.input) == null ? void 0 : _P.peek) == null ? void 0 : _Q.call(_P)) || ((_S = (_R = context == null ? void 0 : context.signals) == null ? void 0 : _R.input) == null ? void 0 : _S.value) || {}, selector2) : ((_V = (_U = (_T = context == null ? void 0 : context.signals) == null ? void 0 : _T.input) == null ? void 0 : _U.peek) == null ? void 0 : _V.call(_U)) || ((_X = (_W = context == null ? void 0 : context.signals) == null ? void 0 : _W.input) == null ? void 0 : _X.value) || {};
-      case "const":
-        return value;
-      default:
-        return void 0;
-    }
-  }
-  function resolveParameterSpecValue(spec, runtime = {}) {
-    if (isObjectValue(spec)) {
-      const source = spec.source || (spec.selector ? "row" : Object.prototype.hasOwnProperty.call(spec, "value") ? "const" : "value");
-      const selector2 = normalizeString32(spec.selector || spec.path || spec.location);
-      const resolved = resolveContextSourceValue({
-        source,
-        selector: selector2,
-        context: runtime.context,
-        row: runtime.row,
-        value: Object.prototype.hasOwnProperty.call(spec, "value") ? spec.value : runtime.value
-      });
-      if (spec.wrap === "array") {
-        return Array.isArray(resolved) ? resolved : [resolved];
-      }
-      return resolved;
-    }
-    return spec;
-  }
-  function resolveWindowParameters(parameters = {}, runtime = {}) {
-    if (!isObjectValue(parameters)) {
-      return {};
-    }
-    const result = {};
-    Object.entries(parameters).forEach(([key2, spec]) => {
-      if (!key2) return;
-      result[key2] = resolveParameterSpecValue(spec, runtime);
-    });
-    return result;
-  }
-  function resolveLinkTarget({ linkConfig = null, row = null, value = null, context = null } = {}) {
-    var _a5, _b, _c, _d, _e, _f, _g;
-    const objectValue = isObjectValue(value) ? value : null;
-    if (!isObjectValue(linkConfig)) {
-      if (!(objectValue == null ? void 0 : objectValue.href)) {
-        return null;
-      }
-      return {
-        kind: "external",
-        href: normalizeString32(objectValue.href),
-        text: normalizeLinkText((_a5 = objectValue == null ? void 0 : objectValue.label) != null ? _a5 : objectValue == null ? void 0 : objectValue.text, normalizeString32(objectValue.href)),
-        target: normalizeString32(objectValue == null ? void 0 : objectValue.target) || "_blank",
-        rel: normalizeString32(objectValue == null ? void 0 : objectValue.rel) || "noopener noreferrer",
-        title: normalizeString32(objectValue == null ? void 0 : objectValue.title)
-      };
-    }
-    const kind = normalizeString32(linkConfig.kindSelector ? resolveContextSourceValue({ source: linkConfig.kindSource || "windowForm", selector: linkConfig.kindSelector, context, row, value }) : "") || normalizeString32(linkConfig.kind || "");
-    const windowKey = normalizeString32(linkConfig.windowKey || "");
-    const dialogId = normalizeString32(linkConfig.dialogId || linkConfig.dialog || "");
-    if (kind === "association") {
-      const associations = Array.isArray(value) ? value.filter((entry) => entry != null) : [];
-      if (associations.length === 0) {
-        return null;
-      }
-      if (associations.length === 1 && windowKey) {
-        return resolveLinkTarget({
-          linkConfig: { ...linkConfig, kind: "window", dialogId: "", dialog: "" },
-          row,
-          value: associations[0],
-          context
-        });
-      }
-      if (!dialogId) {
-        return null;
-      }
-      return {
-        kind: "dialog",
-        text: normalizeLinkText(value, dialogId),
-        title: normalizeString32(linkConfig.title),
-        dialogId,
-        awaitResult: linkConfig.awaitResult === true,
-        parameters: {
-          associations,
-          associationIds: associations.map((entry) => {
-            var _a6, _b2;
-            return Number((_b2 = (_a6 = entry == null ? void 0 : entry.id) != null ? _a6 : entry == null ? void 0 : entry.adOrderId) != null ? _b2 : entry);
-          }).filter((id) => Number.isInteger(id) && id > 0)
-        }
-      };
-    }
-    if (kind === "dialog" || !kind && dialogId) {
-      if (!dialogId) {
-        return null;
-      }
-      const textSource2 = linkConfig.textSelector ? resolveContextSourceValue({
-        source: linkConfig.textSource || "row",
-        selector: linkConfig.textSelector,
-        context,
-        row,
-        value
-      }) : linkConfig.label ? resolveKey(row || {}, linkConfig.label) : (_b = linkConfig.text) != null ? _b : value;
-      return {
-        kind: "dialog",
-        text: normalizeLinkText(textSource2, dialogId),
-        title: normalizeString32(linkConfig.title),
-        dialogId,
-        awaitResult: linkConfig.awaitResult === true,
-        parameters: resolveWindowParameters(linkConfig.parameters, { row, value, context })
-      };
-    }
-    if (kind === "window" || !kind && windowKey) {
-      if (!windowKey) {
-        return null;
-      }
-      const textSource2 = linkConfig.textSelector ? resolveContextSourceValue({
-        source: linkConfig.textSource || "row",
-        selector: linkConfig.textSelector,
-        context,
-        row,
-        value
-      }) : linkConfig.label ? resolveKey(row || {}, linkConfig.label) : (_c = linkConfig.text) != null ? _c : value;
-      const text5 = normalizeLinkText(textSource2, normalizeString32(linkConfig.windowTitle) || windowKey);
-      const hasDynamicWindowTitleSource = Boolean(linkConfig.windowTitleSelector) || Boolean(linkConfig.windowTitleSource);
-      const titleSource = hasDynamicWindowTitleSource ? resolveContextSourceValue({
-        source: linkConfig.windowTitleSource || "row",
-        selector: linkConfig.windowTitleSelector || "",
-        context,
-        row,
-        value
-      }) : linkConfig.windowTitle;
-      const titleTemplate = normalizeString32(linkConfig.windowTitleTemplate);
-      const titleTemplateSource = titleTemplate ? resolveContextSourceValue({
-        source: linkConfig.windowTitleSource || "row",
-        selector: "",
-        context,
-        row,
-        value
-      }) : null;
-      const windowTitle = titleTemplate ? resolveTemplateText(titleTemplate, titleTemplateSource) : normalizeLinkText(titleSource, "");
-      return {
-        kind: "window",
-        text: text5,
-        title: normalizeString32(linkConfig.title),
-        windowKey,
-        ...normalizeString32(linkConfig.revision) ? { revision: normalizeString32(linkConfig.revision) } : {},
-        ...Array.isArray(linkConfig.identityParameters) && linkConfig.identityParameters.length > 0 ? { identityParameters: [...linkConfig.identityParameters] } : {},
-        windowTitle,
-        ...normalizeString32(linkConfig.chipName) ? { chipName: normalizeString32(linkConfig.chipName) } : {},
-        ...normalizeString32(linkConfig.chipIcon) ? { chipIcon: normalizeString32(linkConfig.chipIcon) } : {},
-        inTab: linkConfig.inTab !== false,
-        newInstance: linkConfig.newInstance === true,
-        autoIndexTitle: linkConfig.autoIndexTitle === true,
-        awaitResult: linkConfig.awaitResult === true,
-        modal: linkConfig.modal === true,
-        size: isObjectValue(linkConfig.size) ? linkConfig.size : void 0,
-        width: linkConfig.width,
-        height: linkConfig.height,
-        footer: linkConfig.footer,
-        parameters: resolveWindowParameters(linkConfig.parameters, { row, value, context })
-      };
-    }
-    let href = normalizeString32(
-      (linkConfig == null ? void 0 : linkConfig.hrefTemplate) ? resolveTemplateText(linkConfig.hrefTemplate, linkConfig.hrefTemplateSource ? resolveContextSourceValue({ source: linkConfig.hrefTemplateSource, context, row, value }) : row || {}) : (linkConfig == null ? void 0 : linkConfig.href) ? resolveKey(row || {}, linkConfig.href) : (_d = objectValue == null ? void 0 : objectValue.href) != null ? _d : ""
-    );
-    if (!href) {
-      return null;
-    }
-    const baseUrl = normalizeString32(linkConfig.baseUrlSelector ? resolveContextSourceValue({ source: linkConfig.baseUrlSource || "windowForm", selector: linkConfig.baseUrlSelector, context, row, value }) : "") || normalizeString32(linkConfig.baseUrl);
-    if (baseUrl && !/^[a-z][a-z0-9+.-]*:/i.test(href)) {
-      try {
-        const base = new URL(baseUrl);
-        if (!["http:", "https:"].includes(base.protocol)) return null;
-        href = new URL(href.replace(/^\/+/, ""), base.href.replace(/\/?$/, "/")).href;
-      } catch (e3) {
-        return null;
-      }
-    }
-    const textSource = (linkConfig == null ? void 0 : linkConfig.label) ? resolveKey(row || {}, linkConfig.label) : (_g = (_f = (_e = linkConfig == null ? void 0 : linkConfig.text) != null ? _e : objectValue == null ? void 0 : objectValue.label) != null ? _f : objectValue == null ? void 0 : objectValue.text) != null ? _g : value;
-    const text4 = normalizeLinkText(textSource, href);
-    const target = normalizeString32((objectValue == null ? void 0 : objectValue.target) || (linkConfig == null ? void 0 : linkConfig.target)) || "_blank";
-    const rel = normalizeString32((objectValue == null ? void 0 : objectValue.rel) || (linkConfig == null ? void 0 : linkConfig.rel)) || "noopener noreferrer";
-    const title = normalizeString32(objectValue == null ? void 0 : objectValue.title);
-    return { kind: "external", href, text: text4, target, rel, title };
   }
 
   // src/utils/tableLink.js
