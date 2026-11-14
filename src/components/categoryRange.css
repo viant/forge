@@ -3,3 +3,7 @@
 .forge-category-range svg text { font:inherit; letter-spacing:inherit; }
 .forge-category-range svg g { font-size:inherit; }
 .forge-category-range [data-category]:focus-visible { outline:var(--forge-focus-width,2px) solid var(--forge-focus-color,#137cbd); outline-offset:var(--forge-focus-offset,2px); }
+
+/* Design System 2.0 appearance is opt-in; other profiles retain their recipes. */
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .forge-category-range svg text{fill:var(--forge-chart-text,var(--forge-text))}
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .forge-category-range svg>g>line{stroke:var(--forge-chart-grid,var(--forge-border-color))}

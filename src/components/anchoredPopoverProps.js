@@ -1,3 +1,5 @@
+import {revealScrollbar} from './scrollbarActivity.js';
+
 // Shared geometry for anchored panels, including library-owned Select popovers.
 export const FLOATING_PANEL_PADDING = 12;
 export const FLOATING_PANEL_GAP = 8;
@@ -22,7 +24,16 @@ export const menuTriggerMinWidthModifier = {
     },
 };
 
-export function anchoredPopoverProps({placement = 'bottom-start', popoverClassName = '', modifiers = {}, ...props} = {}) {
+const menuScrollbarModifier = {
+    name:'forgeMenuScrollbar', enabled:true, phase:'afterWrite',
+    effect:({state}) => {
+        const panel=state.elements.popper;
+        panel.addEventListener('scroll',revealScrollbar,true);
+        return () => panel.removeEventListener('scroll',revealScrollbar,true);
+    },
+};
+
+export function anchoredPopoverProps({placement = 'bottom-start', popoverClassName = '', modifiers = {}, modifiersCustom = [], ...props} = {}) {
     const alignment = placement.split('-')[1];
     const sides = [placement.split('-')[0], 'bottom', 'top', 'right', 'left'];
     const placements = [...new Set(sides)].map(side => alignment ? `${side}-${alignment}` : side);
@@ -35,6 +46,7 @@ export function anchoredPopoverProps({placement = 'bottom-start', popoverClassNa
         boundary: [],
         rootBoundary: 'viewport',
         popoverClassName: `forge-anchored-popover ${popoverClassName}`.trim(),
+        modifiersCustom:[...(modifiersCustom || []),menuScrollbarModifier],
         modifiers: {
             ...modifiers,
             offset: {enabled: true, options: {offset: [0, FLOATING_PANEL_GAP]}},

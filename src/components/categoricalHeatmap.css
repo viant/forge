@@ -4,3 +4,7 @@
 
 .forge-categorical-heatmap svg text { font:inherit; letter-spacing:inherit; }
 .forge-categorical-heatmap svg g { font-size:inherit; }
+
+/* Design System 2.0 appearance is opt-in; other profiles retain their recipes. */
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .forge-categorical-heatmap svg>g{fill:var(--forge-chart-text,var(--forge-text))}
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .forge-categorical-heatmap [data-cell]>rect{stroke:var(--forge-chart-surface,var(--forge-surface))}

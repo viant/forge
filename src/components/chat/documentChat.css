@@ -45,6 +45,12 @@
 .forge-composer-group-content { overflow: auto; overscroll-behavior: contain; }
 .forge-composer-measure { position: fixed; top: 0; left: 0; width: min(280px, calc(100vw - 24px)); height: 0; overflow: hidden; visibility: hidden; pointer-events: none; }
 .forge-composer-options > .forge-button { justify-content: flex-start; }
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .forge-composer-options:has(> .forge-composer-attachment-action) {
+    width: max-content;
+}
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .forge-composer-options > .forge-button[data-forge-type] {
+    font-weight: var(--forge-type-body-weight, 400);
+}
 .forge-composer-setting { display: flex; flex-direction: column; gap: var(--forge-spacing-1, 4px); }
 .forge-composer-setting select { width: 100%; }
 .forge-composer-auto-tools { display: flex; align-items: center; gap: var(--forge-spacing-2, 8px); }

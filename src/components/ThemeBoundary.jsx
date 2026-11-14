@@ -1,5 +1,5 @@
 import React, {createContext, useContext, useEffect, useLayoutEffect, useMemo, useState} from 'react';
-import {Classes, PortalProvider} from '@blueprintjs/core';
+import {Classes, FocusStyleManager, PortalProvider} from '@blueprintjs/core';
 
 const ThemeContext = createContext(null);
 export const useForgeTheme = () => useContext(ThemeContext);
@@ -14,6 +14,12 @@ export function ForgeThemeProvider({themeId, mode, scopeClassName, portalContain
     // Nested window providers keep the host's portal ownership unless explicitly overridden.
     const resolvedPortalContainer = portalContainer ?? inherited?.portalContainer;
     const value = useMemo(() => ({themeId, mode: mode === 'dark' ? 'dark' : 'light', scopeClassName, portalContainer: resolvedPortalContainer}), [themeId, mode, scopeClassName, resolvedPortalContainer]);
+    useEffect(() => {
+        if (inherited || themeId !== 'design-system-2') return;
+        const wasActive = FocusStyleManager.isActive();
+        if (!wasActive) FocusStyleManager.onlyShowFocusOnTabs();
+        return () => {if (!wasActive) FocusStyleManager.alwaysShowFocus();};
+    }, [themeId, !!inherited]);
     return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 

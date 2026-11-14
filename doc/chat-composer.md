@@ -108,18 +108,32 @@ font, task catalog or business decisions in Forge.
 
 The same Composer state and handlers serve both presentations. Document mode
 places the message field above an internal toolbar with Uploads, Tools, microphone,
-Send and a separate Stop action. Tools groups the existing agent/model/reasoning,
+Send or Stop in the same action position. Tools groups the existing agent/model/reasoning,
 auto-tool, toolset and settings callbacks. Camera uses the existing capture and
 upload lifecycle. Queued turns keep Steer, remove, move and edit callbacks.
-A shared SelectControl supplies selector anatomy and chevron spacing.
+Design System 2.0 reuses the installed Blueprint Select and shared anchored menu
+recipe for Agent, Model and Reasoning. It preserves their existing options,
+callbacks and default selection, with nested dropdown placement, keyboard
+navigation and focus return. Other profiles retain the native SelectControl.
 
 The message field grows to 200px, recalculates on text and width changes and when
 the current font-loading promise resolves, then scrolls. Enter sends, Shift+Enter
 adds a newline, and IME composition cannot send. A blank draft without attachments
 or lookup-invalid input cannot send. Escape closes a disclosure and returns
-focus to its trigger. Pointer focus remains quiet, keyboard focus visible, and
+focus to its trigger. In Design System 2.0, the root theme provider's native focus
+manager keeps pointer activation quiet and keyboard focus inset inside the
+field or action border. The transparent message field has no separate focus box.
+Other profiles retain their existing focus behavior, and
 phone actions retain 44px targets. Body/label/metadata roles supply all five type
 properties; the documented 16px phone text-input exception avoids browser zoom.
+The composer surface uses the quiet semantic border role in both modes.
+The message field stays transparent while enabled, focused or disabled,
+including in dark mode.
+
+Attachment cards align their file and remove icons at the top, keeping the
+remove button's square target intact.
+Long filenames and upload progress grow the content below without vertically
+recentering those controls.
 
 `Chat` keeps Home, task and conversation drafts in the existing per-session draft
 store, retaining whitespace and intentionally empty drafts. Task selection fills

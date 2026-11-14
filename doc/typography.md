@@ -38,6 +38,39 @@ New tables that reuse the native shared implementations inherit the same recipe.
 Custom or legacy renderers require explicit adoption; a package cannot change
 components that do not consume its roles.
 
+Design System 2.0 is an opt-in profile. Its visual overrides require the
+existing `design-system-2` theme boundary, including owned portals. Other
+profiles retain their existing recipes. Profile-specific chart caption sizing
+and menu selection treatments use the existing theme context; they do not
+change the defaults of Baseline or unthemed consumers. The host's theme picker
+selects the complete color, typography and component appearance together.
+
+Chat reuses the menu scrollbar activity handler through its native scroll
+capture. Design System 2.0 keeps native thumbs thin and transparent at rest,
+reveals the semantic thumb during scrolling and fades it afterward. The single
+Chat root covers regular, split, overlay and nested scrollers. Baseline and
+forced-color behavior retain their existing appearance; no scroll-following or
+reading-position model is added.
+
+Document composer Tools uses the installed Blueprint Select and shared anchored
+menu recipe for Agent, Model and Reasoning only in Design System 2.0. The existing
+options, selection callbacks, Default choice and disabled state remain owned by
+Composer. These nested listboxes reuse portal placement, keyboard selection,
+focus return, scrolling and selected-option styling. Other profiles keep the
+existing native SelectControl pickers.
+Composer menu actions, including file and camera attachments, use the regular
+body weight in Design System 2.0 rather than the button label weight.
+The attachment menu fits its content and existing padding, within the native
+viewport constraint. Tools retains its field width.
+
+Chart axes, values, legends and tooltip text consume chart text roles rather
+than series colors. Category-range labels and heatmap axes follow the same
+recipe; heatmap cell labels retain contrast against their individual cells.
+Default series consume the six chart-series roles supplied by the workspace.
+Explicit producer palettes keep their metadata contract and must be authored
+from the approved workspace library. Use the native Chart/Table switch when
+the exact values matter.
+
 Changing supported color, typography, spacing or state values does not require
 a Forge code release. Adding a new component, state or semantic capability does.
 Review that capability in its owning shared component, release it, then update
@@ -55,6 +88,49 @@ the label and value remain above a full-width track even on a wide screen.
 Wide panels retain the inline label/track/value layout; the existing phone
 layout and keyboard selection behavior are unchanged. The neutral comparison
 width specimen verifies signed, zero and unavailable values at both sizes.
+
+## Design System 2.0 focus policy
+
+Every existing and future component follows the same opt-in focus policy.
+Pointer clicks, touch activation and committed selection do not add a focus
+outline, outer ring or glow. Keyboard navigation keeps a visible indicator
+inset inside the existing component border, using the semantic focus width and
+color. Filled primary actions and checked controls use their contrasting
+semantic foreground so the inset remains visible.
+
+The root ForgeThemeProvider reuses Blueprint's installed FocusStyleManager.
+The shared foundations.css recipe covers controls and owned portals; do not add
+another modality tracker, wrapper or per-component switch. Compound fields and
+the chat composer use one indicator on their outer field border while editing,
+without a second ring on transparent inner inputs. Hover, selection, validation
+and disabled states remain separate. Other profiles keep their native behavior.
+The catalog includes this rule in every component's accessibility guidance.
+
+Ghost dropdown triggers remain visibly selected while their owning menu is
+open, using the semantic selected background and interaction foreground. The
+surface consumes the existing --forge-button-active-bg hook, which preserves
+the ghost pressed color when its default selected-background role is transparent.
+The
+shared recipe reads the native aria-expanded/aria-haspopup state, including
+Select's target wrapper; do not add another selected-state flag or click
+listener. Pointer movement into the menu does not clear the trigger state.
+Native dismissal, option activation and Escape clear it when that menu closes.
+Nested selection leaves a containing settings panel selected while it is open.
+Hover-only tooltips and disabled triggers do not acquire this treatment.
+This rule applies to existing and future Design System 2.0 ghost text and icon
+dropdown triggers. It is separate from the keyboard-only inset focus indicator;
+Baseline and legacy themes retain their existing appearance.
+
+Report date filters, dashboard date ranges and report rerun dialogs reuse the
+registered date widget when Design System 2.0 is selected. Civil dates retain
+YYYY-MM-DD values; required/disabled state and existing apply/run callbacks stay
+with their owning report. Other profiles keep their previous controls.
+Native single-select fields use the browser's customizable select popup where
+supported: the shared 8px menu inset, separated full-width options, semantic
+hover/selected/disabled colors and quiet rounded border. Their HTML select,
+refs, form validation and native keyboard contract remain unchanged. Browsers
+without customizable select retain their existing native popup. Listboxes and
+multi-select elements retain their own presentation.
 
 ## Foundation map
 
@@ -102,7 +178,7 @@ second breakpoint or touch-target vocabulary.
 
 | Implementation | Supported contract and scope |
 | --- | --- |
-| Button | primary, secondary, ghost, link, danger; default/compact sizes; hover, active, focus, disabled, readOnly and loading. Icon-only actions require a name. |
+| Button | primary, secondary, ghost, link, danger; one default catalog size; hover, active, focus, disabled, readOnly and loading. Icon-only actions require a name. |
 | WidgetRenderer/Blueprint pack | Text, number, textarea, select, checkbox, radio and SwitchControl bindings. Required/error/helper associations and availability remain intact. Select and segmented roles reach their controls. |
 | StatusChip/Blueprint Callout | Use `StatusChip` for compact status labels with neutral/info/success/warning/danger tones. Callouts retain data-forge-status and a typography role. Include text; dynamic results use role=status or role=alert. |
 | Card/AccessibleSection | Existing renderer container anatomy, semantic appearance and keyboard collapse. The same implementations are used by Container. |
@@ -120,6 +196,9 @@ surface and feedback roles in both modes. Automatic dashboard table status
 values and authored badge visuals now use this component. Other authored table
 visuals and report badges still have their own legacy recipes; migrate them
 after visual review instead of layering another page-level override.
+Semantic Callouts use the body typography role. Pass shared icons through the
+native `icon` slot with `className="bp6-icon"`; the shared recipe aligns the icon
+with the first text line and reserves the semantic gap before the message.
 The neutral chip mixes the semantic secondary text and surface roles so it
 remains a visible chip inside a subtle card without adding a hard border.
 Interactive `FilterChips` is a separate control with selected and disabled
@@ -147,15 +226,17 @@ Ghost/link hover and pressed states keep their transparent border. Hover uses a 
 The shared action corner is `--forge-control-radius` for primary, secondary,
 ghost, link and danger buttons, including their hover and focus surfaces.
 Blueprint minimal actions in a themed boundary use the same radius and
-`--forge-icon-size` glyph scale. Variant icon-only Forge buttons are square:
-the default side follows `--forge-control-height`, while the compact side is
-28px on desktop. Their icon remains the same shared 16px default size; compact
-changes the target, not the glyph. Coarse pointers raise both sides to the
-44px shared minimum. Legacy Blueprint icon-only actions keep their existing
-footprint until their consumers move to the shared Button contract.
+`--forge-icon-size` glyph scale. Regular buttons in the shared catalog use one default size. Icon buttons also
+provide a Small size.
+Variant icon-only Forge buttons are square, with the side following
+`--forge-control-height` and the shared 16px glyph size. Coarse pointers raise
+the target to the shared 44px minimum. FoundationSpecimen demonstrates these
+same default-size controls.
 
-Compact and icon-only variants retain a minimum 44px target on coarse pointers;
-the compact desktop height remains 28px. FoundationSpecimen includes both forms.
+The existing `compact` Button API selects the Small icon target through
+`--forge-icon-button-small-size` (28px neutral fallback). The reviewed semantic
+theme maps this to its 32px spacing value. Regular Button examples retain only
+the default size. Coarse pointers preserve the shared minimum touch target.
 
 Icon uses the installed `lucide-react` package with one currentColor stroke family. New authored icons must use explicit `lucide:` names from `iconNames`. Keep shared size/stroke tokens; do not mix another icon package or draw replacement control glyphs. The legacy avatar API retains its names using Lucide equivalents; decorative wink/sticker faces share Smile, nervous shares Frown, and group variants use UsersRound.
 
@@ -218,6 +299,15 @@ dimensions and callbacks. Danger actions can select `--forge-danger-hover-bg` fo
 state color; otherwise the existing neutral recipe remains.
 
 ## Anchored panels stay visible
+
+The Action catalog's **Dropdown Menu Option** page is the shared option specimen.
+It renders the same Blueprint `MenuItem` used by action menus, the calendar's
+month/year lists and Complex Selector. Review its leading/trailing icons,
+descriptions, scrolling, hover, selected and disabled states there. Workspace
+Global CSS owns the shared menu inset, option gap, full-width highlights and
+container/option radii; individual consumers must not copy those recipes.
+The native Select owns listbox navigation and selection. The native Popover
+owns dismissal; nested calendar menus use its existing `captureDismiss` option.
 
 Use `Popover` from `forge/components` (or `forge/theme`) for anchored menus,
 settings panels and contextual content. Library-owned Select panels receive
@@ -503,8 +593,8 @@ palette remain outside Forge. Existing legacy presentation remains available.
 
 The document Home question uses `Typography as="h1" typeRole="display"`.
 The starting canvas uses the canvas role; the composer keeps its surface role.
-Ordinary task rows use the quiet border role, selected categories use selected
-background, and fields/composer use the strong border role. Keep those meanings
+Ordinary task rows and the composer use the quiet border role, selected categories
+use selected background, and fields use the strong border role. Keep those meanings
 separate when supplying workspace tokens. Shared Home geometry uses 76px 36px
 50px padding, changing to 48px 24px 36px at 760px and below. Workspace assets may
 select a reviewed responsive display-role value without copying this geometry.
@@ -1147,3 +1237,18 @@ fail closed. A multi-release update is sequential; partial success is visible an
 a failure requires reload. Component IDs must not be passed as artifact identities.
 Reader workbenches may opt into the host-owned `onReleases` action; the framework
 does not map native component versions to managed resource roots.
+
+
+### Dropdown menu inset
+
+The existing `DropdownMenu` / menu popover recipe uses `--forge-spacing-2`
+for padding on all four sides of the menu container. In the reviewed semantic
+theme this resolves to 8px. The shared menu CSS owns this inset; callers do not
+add their own container padding.
+
+
+Dropdown selection examples use the native listbox/listoption API. The selected
+row retains the selected background and interaction foreground through hover
+and focus; the workspace theme maps those roles to the semantic menu selected
+pair. Text dropdown triggers include a trailing shared chevron icon. Icon-only
+More Menu triggers retain their ellipsis.

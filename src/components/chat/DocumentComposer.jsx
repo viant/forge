@@ -1,10 +1,14 @@
 import React, {useCallback, useEffect, useId, useLayoutEffect, useRef, useState} from 'react';
+import {Button as BlueprintButton, MenuItem} from '@blueprintjs/core';
+import {Select} from '@blueprintjs/select';
 import Button from '../Button.jsx';
 import Popover from '../Popover.jsx';
 import {composerMenuPlacement} from './composerMenuPlacement.js';
 import Icon from '../Icon.jsx';
 import SelectControl from '../SelectControl.jsx';
 import {typographyProps} from '../Typography.jsx';
+import {useForgeTheme} from '../ThemeBoundary.jsx';
+import {anchoredPopoverProps} from '../anchoredPopoverProps.js';
 import CameraCapture from './CameraCapture.jsx';
 import UploadChips from './UploadChips.jsx';
 import useFileDrop from './useFileDrop.js';
@@ -35,16 +39,32 @@ export default function DocumentComposer({renderInput, onSubmit, inputHostRef, d
     agentOptions = [], agentValue, onAgentChange, modelOptions = [], modelValue, onModelChange,
     reasoningOptions = [], reasoningValue, onReasoningChange, autoSelectTools, onAutoSelectToolsChange,
     hasToolsPicker, openBundles, bundlesDialog, showSettings, onOpenSettings}) {
-    const choice = (label, options, value, change) => options.length > 0 ? <label className="forge-composer-setting" {...typographyProps('label')}>
-        <span>{label}</span><SelectControl {...typographyProps('body')} aria-label={label} value={value || ''} disabled={disabled}
-            onChange={event => change?.(event.target.value)}>
-            {!options.some(option => String(option.value ?? option.id) === String(value || '')) ? <option value="">Default</option> : null}
-            {options.map(option => <option key={String(option.value ?? option.id)} value={String(option.value ?? option.id)}>{option.label || option.name || option.value || option.id}</option>)}
-        </SelectControl>
-    </label> : null;
+    const theme = useForgeTheme();
+    const choice = (label, options, value, change) => {
+        if (!options.length) return null;
+        const items = options.map(option => ({...option, value: String(option.value ?? option.id), label: option.label || option.name || option.value || option.id}));
+        if (!items.some(option => option.value === String(value || ''))) items.unshift({value: '', label: 'Default'});
+        const selected = items.find(option => option.value === String(value || ''));
+        return <label className="forge-composer-setting" {...typographyProps('label')}>
+            <span>{label}</span>{theme?.themeId === 'design-system-2' ? <Select items={items} itemsEqual="value" initialActiveItem={selected}
+                filterable={false} fill disabled={disabled} itemDisabled="disabled" menuProps={{'aria-label': label}}
+                popoverProps={anchoredPopoverProps({minimal: true, captureDismiss: true, matchTargetWidth: true, popoverClassName: 'forge-dropdown-menu'})}
+                itemRenderer={(item, {handleClick, handleFocus, id, modifiers, ref}) => <MenuItem key={item.value}
+                    ref={ref} id={id} text={item.label} active={modifiers.active} disabled={item.disabled}
+                    roleStructure="listoption" selected={item.value === String(value || '')} onClick={handleClick} onFocus={handleFocus}/>}
+                onItemSelect={item => change?.(item.value)}>
+                <BlueprintButton className="forge-button" data-forge-part="input" {...typographyProps('body')}
+                    fill alignText="left" aria-label={label} text={selected?.label || 'Default'}
+                    rightIcon={<Icon name="lucide:chevron-down"/>} disabled={disabled}/>
+            </Select> : <SelectControl {...typographyProps('body')} aria-label={label} value={value || ''} disabled={disabled}
+                onChange={event => change?.(event.target.value)}>
+                {items.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </SelectControl>}
+        </label>;
+    };
     const showTools = !!(agentOptions.length || modelOptions.length || reasoningOptions.length || hasToolsPicker || showSettings);
     const attachContent = <>
-        <Button variant="ghost" icon="lucide:paperclip" disabled={disabled} onClick={event => {
+        <Button variant="ghost" icon="lucide:paperclip" className="forge-composer-attachment-action" disabled={disabled} onClick={event => {
             const disclosure = event.currentTarget.closest('details');
             disclosure?.removeAttribute('open');
             disclosure?.querySelector('summary')?.focus();
@@ -97,13 +117,14 @@ export default function DocumentComposer({renderInput, onSubmit, inputHostRef, d
     const [keyboardFocus, setKeyboardFocus] = useState(false);
     const {fileDrag, dropHandlers} = useFileDrop(onDropFiles, showUpload && !disabled);
     useEffect(() => {
+        if (theme?.themeId === 'design-system-2') return;
         const key = event => {if (event.key === 'Tab') setKeyboardFocus(true);};
         document.addEventListener('keydown', key);
         return () => document.removeEventListener('keydown', key);
-    }, []);
+    }, [theme?.themeId]);
     const instructionsId = useId();
     const canSend = !disabled && !inputInvalid && (!!String(draft).trim() || attachments.length > 0);
-    return <form className={`chat-composer forge-document-composer${keyboardFocus ? ' is-keyboard-focus' : ''}`} onPointerDownCapture={() => setKeyboardFocus(false)} data-testid="chat-composer" onSubmit={onSubmit}>
+    return <form className={`chat-composer forge-document-composer${theme?.themeId !== 'design-system-2' && keyboardFocus ? ' is-keyboard-focus' : ''}`} onPointerDownCapture={theme?.themeId === 'design-system-2' ? undefined : () => setKeyboardFocus(false)} data-testid="chat-composer" onSubmit={onSubmit}>
         {queueTray}
         <div className={`forge-document-composer-shell${fileDrag ? ' is-file-dragging' : ''}`} data-testid="chat-composer-shell" {...dropHandlers}>
             {fileDrag ? <div className="forge-composer-file-drop" role="status" {...typographyProps('label')}>

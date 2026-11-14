@@ -255,9 +255,9 @@ try {
         assert.match(await foundation.getByRole('status').first().textContent(), /saved 1 time/);
         assert.equal(await foundation.getByRole('button', {name: 'Saving example', exact: true}).getAttribute('aria-busy'), 'true');
         assert.equal(await foundation.getByRole('button', {name: 'Unavailable action', exact: true}).isDisabled(), true);
-        const compactIcon = foundation.getByRole('button', {name:'Search examples',exact:true});
-        const legacyIcon = foundation.getByRole('button', {name:'Reset example count',exact:true});
-        assert.equal(await compactIcon.evaluate(node => getComputedStyle(node).minHeight), viewport.width < 500 ? '44px' : '28px');
+        const searchIcon = foundation.getByRole('button', {name:'Search examples',exact:true});
+        const resetIcon = foundation.getByRole('button', {name:'Reset example count',exact:true});
+        assert.equal(await searchIcon.evaluate(node => getComputedStyle(node).minHeight), await foundation.getByRole('button', {name:'Show example panel',exact:true}).evaluate(node => getComputedStyle(node).minHeight));
         const actionGeometry = await foundation.getByRole('region', {name:'Actions and icons',exact:true}).evaluate(section =>
             ['Save example','Ghost action','Link action','Show example panel','Search examples','Reset example count'].map(name => {
                 const node = [...section.querySelectorAll('button')].find(button => (button.getAttribute('aria-label') || button.textContent.trim()) === name);
@@ -265,7 +265,7 @@ try {
                 const icon = node.querySelector('svg')?.getBoundingClientRect();
                 return {name, radius:getComputedStyle(node).borderRadius, width:bounds.width, height:bounds.height, iconSize:icon ? [icon.width,icon.height] : null};
             }));
-        assert.equal(new Set(actionGeometry.map(action => action.radius)).size, 1, 'Shared and Blueprint minimal actions use one control radius');
+        assert.equal(new Set(actionGeometry.map(action => action.radius)).size, 1, 'Default actions use one control radius');
         assert.equal(new Set(actionGeometry.filter(action => action.iconSize).map(action => action.iconSize.join('x'))).size, 1, 'Action icons use one shared glyph size');
         for(const name of ['Show example panel','Search examples','Reset example count']) {
             const action = actionGeometry.find(item => item.name === name);
@@ -274,11 +274,11 @@ try {
         assert.deepEqual(actionGeometry.find(item => item.name === 'Reset example count'),
             actionGeometry.find(item => item.name === 'Search examples') &&
             {...actionGeometry.find(item => item.name === 'Search examples'), name:'Reset example count'},
-            'Blueprint minimal and compact icon actions use identical geometry');
+            'Default icon actions use identical geometry');
         if (viewport.width < 500) {
-            for (const action of [compactIcon, legacyIcon, foundation.getByRole('button', {name:'Show example panel',exact:true})]) {
+            for (const action of [searchIcon, resetIcon, foundation.getByRole('button', {name:'Show example panel',exact:true})]) {
                 const target = await action.boundingBox();
-                assert.ok(target.width >= 44 && target.height >= 44, 'Compact and icon-only buttons retain coarse-pointer targets');
+                assert.ok(target.width >= 44 && target.height >= 44, 'Default icon-only buttons retain coarse-pointer targets');
             }
         }
         await foundation.getByRole('switch', {name: 'Automatic refresh', exact: true}).press('Space');

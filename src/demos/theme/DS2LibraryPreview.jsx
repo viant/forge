@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {Menu, MenuItem} from '@blueprintjs/core';
 import '@blueprintjs/core/lib/css/blueprint.css';
@@ -61,8 +61,7 @@ const calendarOptions = [
     {value: 'custom', label: 'Custom dates'},
 ];
 
-function App() {
-    const [mode, setMode] = useState('light');
+function FoundationReview({mode, setMode}) {
     const [draft, setDraft] = useState('');
     const [menuChoice, setMenuChoice] = useState('No action selected');
     const [viewChoice, setViewChoice] = useState('List view');
@@ -80,10 +79,10 @@ function App() {
             <div className="ds2-library">
                 <header className="ds2-library__top">
                     <div>
-                        <strong>{themeLabel} · Component library</strong><strong className="ds2-library__mobile-title">Component library</strong>
+                        <strong>{themeLabel} · Foundation review</strong><strong className="ds2-library__mobile-title">Component library</strong>
                         <span>Live Forge component library · local review</span>
                     </div>
-                    <div className="ds2-library__top-actions">
+                    <div className="ds2-library__top-actions"><a href="#components">Back to component library</a>
                         <Button variant="secondary" onClick={() => setMode(current => current === 'light' ? 'dark' : 'light')}>
                             {mode === 'light' ? 'View dark theme' : 'View light theme'}
                         </Button>
@@ -94,7 +93,6 @@ function App() {
                     <p>Real Forge components using {themeLabel} semantic values in both themes.</p>
                     <p className="ds2-library__review-state" role="status">{mode === 'light' ? 'Light' : 'Dark'} theme · soft surface borders</p>
                 </div>
-                <ComponentCatalog/>
                 <FoundationSpecimen includeDocuments={false}/>
                 <section className="ds2-library__family" id="ds2-loading" aria-label="Loading and progress">
                     <h2>Loading and progress</h2>
@@ -171,6 +169,14 @@ function App() {
             </div>
         </ForgeThemeBoundary>
     </ForgeThemeProvider>;
+}
+
+function App() {
+    const [mode, setMode] = useState('light');
+    const [route, setRoute] = useState(() => window.location.hash.slice(1) || 'components');
+    useEffect(() => {const update = () => setRoute(window.location.hash.slice(1) || 'components'); window.addEventListener('hashchange', update); return () => window.removeEventListener('hashchange', update);}, []);
+    if (route === 'specimens' || route.startsWith('ds2-')) return <FoundationReview mode={mode} setMode={setMode}/>;
+    return <ComponentCatalog route={route} mode={mode} onModeChange={setMode} themeLabel={themeLabel}/>;
 }
 
 loadReviewTheme().then(() => createRoot(document.getElementById('root')).render(<App/>)).catch(error => {

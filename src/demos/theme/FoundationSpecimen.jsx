@@ -8,7 +8,7 @@ import ReportDocumentSpecimen from './ReportDocumentSpecimen.jsx';
 import TableWidthSpecimen from './TableWidthSpecimen.jsx';
 import ComparisonWidthSpecimen from './ComparisonWidthSpecimen.jsx';
 import {signal} from '@preact/signals-react';
-import {Button as BlueprintButton, Callout, Card, Dialog} from '@blueprintjs/core';
+import {Callout, Card, Dialog} from '@blueprintjs/core';
 import Button from '../../components/Button.jsx';
 import StatusChip from '../../components/StatusChip.jsx';
 import SectionTabRail from '../../components/SectionTabRail.jsx';
@@ -91,8 +91,8 @@ export default function FoundationSpecimen({includeDocuments = true, iconExample
             </div>
             <div className="forge-foundation-row" aria-label="Icon action comparison">
                 <span className="forge-foundation-action-sample"><Button variant="ghost" icon="lucide:panel-right" hideLabel aria-label="Show example panel" onClick={() => setDialog(true)}/><Typography typeRole="metadata">Default</Typography></span>
-                <span className="forge-foundation-action-sample"><Button variant="ghost" size="compact" icon="lucide:search" hideLabel aria-label="Search examples"/><Typography typeRole="metadata">Compact</Typography></span>
-                <span className="forge-foundation-action-sample"><BlueprintButton minimal icon={<Icon name="lucide:refresh-cw"/>} aria-label="Reset example count" onClick={() => setSaved(0)}/><Typography typeRole="metadata">Legacy minimal</Typography></span>
+                <span className="forge-foundation-action-sample"><Button variant="ghost" icon="lucide:search" hideLabel aria-label="Search examples"/><Typography typeRole="metadata">Search</Typography></span>
+                <span className="forge-foundation-action-sample"><Button variant="ghost" icon="lucide:refresh-cw" hideLabel aria-label="Reset example count" onClick={() => setSaved(0)}/><Typography typeRole="metadata">Reset</Typography></span>
                 <Typography typeRole="metadata">Hover each action to compare its control surface.</Typography>
             </div>
             <Typography as="p" typeRole="metadata" role="status">Example saved {saved} {saved === 1 ? 'time' : 'times'}.</Typography>

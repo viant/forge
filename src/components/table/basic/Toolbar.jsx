@@ -1,3 +1,4 @@
+import {useForgeTheme} from '../../ThemeBoundary.jsx';
 import UnifiedIcon from '../../Icon.jsx';
 import Popover from '../../Popover.jsx';
 import NativeControlTarget from '../../../runtime/NativeControlTarget.jsx';
@@ -257,6 +258,7 @@ const Toolbar = ({
 
     useSignals();
 
+    const isDesignSystem2=useForgeTheme()?.themeId==='design-system-2';
     const workspace = useWorkspacePresentation();
     const toolbarEvents = useToolbarControlEvents(context, toolbarItems);
     const { signals } = context;
@@ -433,8 +435,7 @@ const Toolbar = ({
                                     <MenuItem
                                         key={String(option.value)}
                                         text={option.label ?? option.text ?? String(option.value)}
-                                        active={String(option.value) === String(value ?? '')}
-                                        icon={(iconName => iconName ? <UnifiedIcon name={iconName}/> : iconName)(String(option.value) === String(value ?? '') ? 'tick' : undefined)}
+                                        {...(isDesignSystem2?{selected:String(option.value)===String(value??''),roleStructure:'listoption'}:{active:String(option.value)===String(value??''),icon:String(option.value)===String(value??'')?<UnifiedIcon name="tick"/>:undefined})}
                                         disabled={option.disabled===true}
                                         onClick={() => {const result=selectValue(option.value);close();return result;}}
                                     />

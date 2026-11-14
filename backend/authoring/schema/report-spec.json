@@ -1467,14 +1467,29 @@
           "type": "object",
           "additionalProperties": false,
           "required": [
-            "kind",
-            "urlField"
+            "kind"
+          ],
+          "anyOf": [
+            {
+              "required": [
+                "urlField"
+              ]
+            },
+            {
+              "required": [
+                "hrefTemplate"
+              ]
+            }
           ],
           "properties": {
             "kind": {
               "const": "external"
             },
             "urlField": {
+              "type": "string",
+              "minLength": 1
+            },
+            "hrefTemplate": {
               "type": "string",
               "minLength": 1
             }

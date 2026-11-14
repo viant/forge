@@ -34,3 +34,52 @@
 }
 .forge-select-control > select:disabled + .forge-icon { opacity: .5; }
 @media(pointer:coarse) { .forge-select-control > select { min-height:44px; } }
+
+/* Opt-in native popup anatomy; native value, validation, refs and keyboard remain intact. */
+@supports (appearance: base-select) {
+  :is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) select:not([multiple]):is(:not([size]), [size="0"], [size="1"]) {
+    appearance: base-select;
+    align-items: center;
+    min-block-size: var(--forge-control-height, 40px);
+    border-radius: var(--forge-control-radius, 8px);
+  }
+  :is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) select:not([multiple]):is(:not([size]), [size="0"], [size="1"])::picker(select) {
+    appearance: base-select;
+    padding: var(--forge-spacing-2, 8px);
+    border: var(--forge-border-width, 1px) solid var(--forge-border-color, var(--forge-control-border));
+    border-radius: var(--forge-menu-radius, var(--forge-control-radius, 8px));
+    background: var(--forge-surface-raised, var(--forge-surface));
+    color: var(--forge-text);
+    box-shadow: var(--forge-overlay-shadow, var(--forge-default-overlay-shadow));
+    font-family: var(--forge-type-body-family, inherit);
+    font-size: var(--forge-type-body-size, inherit);
+    font-weight: var(--forge-type-body-weight, 400);
+    line-height: var(--forge-type-body-line-height, 1.5);
+    max-block-size: min(320px, 60dvh);
+    max-inline-size: calc(100dvw - 24px);
+    overflow: auto;
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+  :is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) select:not([multiple]):is(:not([size]), [size="0"], [size="1"]) option {
+    display: flex;
+    align-items: center;
+    gap: var(--forge-spacing-2, 8px);
+    min-block-size: var(--forge-control-height, 40px);
+    padding: var(--forge-spacing-2, 8px) var(--forge-spacing-3, 12px);
+    border-radius: var(--forge-menu-radius, var(--forge-control-radius, 8px));
+    color: var(--forge-text);
+    background: transparent;
+    font-weight: var(--forge-type-body-weight, 400);
+    white-space: normal;
+  }
+  :is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) select:not([multiple]):is(:not([size]), [size="0"], [size="1"]) option + option { margin-block-start: 2px; }
+  :is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) select:not([multiple]):is(:not([size]), [size="0"], [size="1"]) option:where(:enabled:is(:hover, :focus)) { background: var(--forge-menu-hover-background, var(--forge-surface-subtle)); color: var(--forge-text); }
+  :is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) select:not([multiple]):is(:not([size]), [size="0"], [size="1"]) option:checked { background: var(--forge-menu-selected-background, var(--forge-selected-background)); color: var(--forge-interaction-color); }
+  :is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) select:not([multiple]):is(:not([size]), [size="0"], [size="1"]) option:disabled { color: var(--forge-disabled-text); cursor: default; }
+  :is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) select:not([multiple]):is(:not([size]), [size="0"], [size="1"]) option:checked:disabled {
+    background: color-mix(in srgb, var(--forge-menu-selected-background, var(--forge-selected-background)) 55%, var(--forge-surface));
+    color: color-mix(in srgb, var(--forge-interaction-color) 50%, var(--forge-disabled-text));
+  }
+  :is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .forge-select-control > select::picker-icon { display: none; }
+}

@@ -114,3 +114,37 @@ it('names date endpoints with their range while keeping concise visible captions
         expect([...group.querySelectorAll('input')].every(node=>node.required)).toBe(true);
     } finally {await act(async()=>root.unmount());}
 });
+
+it('uses the shared calendar only in DS2 and preserves civil date values and required state', async () => {
+    const {registerPack} = await import('../../packs/blueprint/index.jsx');
+    const {ForgeThemeProvider, ForgeThemeBoundary} = await import('../ThemeBoundary.jsx');
+    registerPack();
+    globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+    const host=document.createElement('div'),root=createRoot(host),change=vi.fn();
+    document.body.append(host);
+    const controls=[{id:'period',label:'Period',kind:'dateRange',start:'from',end:'to',required:true}];
+    const render=async(themeId,busy=false)=>act(async()=>root.render(
+        <ForgeThemeProvider themeId={themeId} mode="light"><ForgeThemeBoundary windowKey="date-filter-test">
+            <ReportFilterBar controls={controls} values={{from:'2026-11-12',to:'2026-11-13'}} onChange={change} busy={busy}/>
+        </ForgeThemeBoundary></ForgeThemeProvider>));
+    try {
+        await render('baseline');
+        expect(host.querySelector('input[aria-label="Period from"]').type).toBe('date');
+        await render('design-system-2');
+        const input=host.querySelector('input[aria-label="Period from"]');
+        expect(input.getAttribute('role')).toBe('combobox');
+        expect(input.value).toBe('11/12/2026');
+        expect(input.required).toBe(true);
+        expect(input.closest('.bp6-input-group').querySelector('svg')).toBeTruthy();
+        await act(async()=>{
+            Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'11/14/2026');
+            input.dispatchEvent(new Event('input',{bubbles:true}));
+            input.dispatchEvent(new Event('change',{bubbles:true}));
+        });
+        expect(change).toHaveBeenCalledWith('from','2026-11-14');
+        await render('design-system-2',true);
+        expect(host.querySelector('input[aria-label="Period from"]').disabled).toBe(true);
+        await render('baseline');
+        expect(host.querySelector('input[aria-label="Period from"]').type).toBe('date');
+    } finally {await act(async()=>root.unmount());host.remove();}
+});

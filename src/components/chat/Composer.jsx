@@ -1,3 +1,4 @@
+import {useForgeTheme} from '../ThemeBoundary.jsx';
 import Popover from '../Popover.jsx';
 // Composer.jsx – TextArea prompt with send/upload/tools controls
 import React, { useCallback, useEffect, useMemo, useRef, useState, useLayoutEffect } from "react";
@@ -173,6 +174,7 @@ export default function Composer({
 		};
 	}, [getMessageHistoryProp]);
 
+    const isDesignSystem2=useForgeTheme()?.themeId==='design-system-2';
     const documentAppearance = appearance === 'document';
     if (appearance && !documentAppearance) throw new Error(`Unsupported chat appearance: ${appearance}`);
     const inputHostRef = useRef(null);
@@ -960,7 +962,7 @@ export default function Composer({
 	                    <MenuItem
 	                        key={val}
 	                        text={label}
-	                        icon={checked ? "tick" : "blank"}
+	                        {...(isDesignSystem2?{selected:checked}:{icon:checked?'tick':'blank'})}
 	                        onClick={() => {
 	                            onChange?.(val);
 	                            close(false);
@@ -980,7 +982,7 @@ export default function Composer({
 		            <MenuItem
 		                text="Auto-select agent"
 		                intent={isAuto ? "success" : "primary"}
-		                active={isAuto}
+		                {...(isDesignSystem2?{selected:isAuto}:{active:isAuto})}
 		                icon={isAuto ? "tick" : "automatic-updates"}
 		                labelElement={isAuto ? <Tag minimal intent="success">On</Tag> : null}
 		                data-testid="chat-composer-auto-agent"
@@ -1014,7 +1016,7 @@ export default function Composer({
 		                    <MenuItem
 		                        key={val}
 		                        text={label}
-		                        icon={checked ? "tick" : (isAuto ? "lock" : "blank")}
+		                        {...(isDesignSystem2?{selected:checked,icon:isAuto?'lock':undefined}:{icon:checked?'tick':isAuto?'lock':'blank'})}
 		                        disabled={isAuto}
 		                        shouldDismissPopover={false}
 		                        onClick={() => {
@@ -1085,7 +1087,7 @@ export default function Composer({
 		        <MenuItem
 		            text="Auto tools"
 		            intent={autoSelectTools ? "success" : "primary"}
-		            active={!!autoSelectTools}
+		            {...(isDesignSystem2?{selected:!!autoSelectTools}:{active:!!autoSelectTools})}
 		            icon={autoSelectTools ? "tick" : "automatic-updates"}
 		            labelElement={autoSelectTools ? <Tag minimal intent="success">On</Tag> : null}
 		            data-testid="chat-composer-auto-tools"

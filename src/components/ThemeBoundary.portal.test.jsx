@@ -1,7 +1,37 @@
 import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {expect,it} from 'vitest';
+import {Classes, FocusStyleManager} from '@blueprintjs/core';
 import {ForgeThemeProvider,ForgeThemeBoundary} from './ThemeBoundary.jsx';
+
+it('uses the installed focus manager to distinguish pointer interaction from Tab navigation',()=>{
+ const wasActive=FocusStyleManager.isActive();
+ try {
+  FocusStyleManager.onlyShowFocusOnTabs();
+  document.documentElement.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
+  expect(document.documentElement.classList.contains(Classes.FOCUS_DISABLED)).toBe(true);
+  document.documentElement.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',bubbles:true}));
+  expect(document.documentElement.classList.contains(Classes.FOCUS_DISABLED)).toBe(false);
+ } finally {if(!wasActive)FocusStyleManager.alwaysShowFocus();}
+});
+
+it('enables native keyboard-only focus only for the selected root Design System 2.0 theme and restores prior behavior',async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ const wasActive=FocusStyleManager.isActive();
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ const view=themeId=><ForgeThemeProvider themeId={themeId}><ForgeThemeProvider><ForgeThemeBoundary><button>Action</button></ForgeThemeBoundary></ForgeThemeProvider></ForgeThemeProvider>;
+ try {
+  await act(async()=>root.render(view('baseline')));
+  expect(FocusStyleManager.isActive()).toBe(wasActive);
+  await act(async()=>root.render(view('design-system-2')));
+  expect(FocusStyleManager.isActive()).toBe(true);
+  host.querySelector('button').dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
+  expect(document.documentElement.classList.contains(Classes.FOCUS_DISABLED)).toBe(true);
+  await act(async()=>root.render(view('baseline')));
+  expect(FocusStyleManager.isActive()).toBe(wasActive);
+  if(!wasActive)expect(document.documentElement.classList.contains(Classes.FOCUS_DISABLED)).toBe(false);
+ }finally{await act(async()=>root.unmount());host.remove();if(!wasActive)FocusStyleManager.alwaysShowFocus();}
+});
 
 it('inherits host portal ownership, permits explicit overrides and preserves caller mounts',async()=>{
  globalThis.IS_REACT_ACT_ENVIRONMENT=true;

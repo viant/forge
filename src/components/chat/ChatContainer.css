@@ -10,3 +10,16 @@
 }
 .forge-chat-container.has-explicit-height { flex: 0 0 auto; }
 .forge-chat-container > [data-testid="chat-composer"] { flex: 0 0 auto; margin-top: auto; }
+
+/* The shared Chat root covers regular, split, overlay and nested chat scrollers. */
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .forge-chat-container,
+:is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .forge-chat-container * {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+}
+@media (forced-colors: active) {
+    :is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .forge-chat-container,
+    :is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .forge-chat-container * {
+        scrollbar-color: auto;
+    }
+}

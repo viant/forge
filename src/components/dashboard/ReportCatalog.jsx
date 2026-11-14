@@ -1,4 +1,6 @@
 import Popover from '../Popover.jsx';
+import {useForgeTheme} from '../ThemeBoundary.jsx';
+import {getWidget} from '../../runtime/widgetRegistry.js';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {
     Button,
@@ -194,6 +196,8 @@ export function ReportCard({
 }
 
 export default function ReportCatalog({container, context}) {
+    const themed = useForgeTheme()?.themeId === "design-system-2";
+    const DateField = getWidget("date");
     const config = container?.dashboard?.reportCatalog || container?.reportCatalog || {};
     const reportStore = context?.handlers?.reportStore || null;
     const reportExport = context?.handlers?.reportExport || null;
@@ -637,8 +641,8 @@ export default function ReportCatalog({container, context}) {
                 <DialogBody>
                     <p className="forge-report-catalog__dialog-copy">This run uses a temporary date override and does not change the saved report defaults.</p>
                     <div className="forge-report-catalog__date-fields">
-                        <label className="forge-report-catalog__field"><span>From</span><input type="date" value={rangeFrom} onInput={(event) => setRangeFrom(event.currentTarget.value)} /></label>
-                        <label className="forge-report-catalog__field"><span>To</span><input type="date" value={rangeTo} onInput={(event) => setRangeTo(event.currentTarget.value)} /></label>
+                        <label className="forge-report-catalog__field"><span>From</span>{themed ? <DateField valueMode="civil" dateFnsFormat="MM/dd/yyyy" fill aria-label="From date" value={rangeFrom} onChange={setRangeFrom}/> : <input type="date" value={rangeFrom} onInput={(event) => setRangeFrom(event.currentTarget.value)} />}</label>
+                        <label className="forge-report-catalog__field"><span>To</span>{themed ? <DateField valueMode="civil" dateFnsFormat="MM/dd/yyyy" fill aria-label="To date" value={rangeTo} onChange={setRangeTo}/> : <input type="date" value={rangeTo} onInput={(event) => setRangeTo(event.currentTarget.value)} />}</label>
                     </div>
                 </DialogBody>
                 <DialogFooter

@@ -30,7 +30,7 @@ async function style(locator) {
 try {
     const page = await browser.newPage({viewport: {width: 1280, height: 900}});
     for (const mode of ['light', 'dark']) {
-        await page.goto(url, {waitUntil: 'domcontentloaded'});
+        await page.goto(`${url.split('#')[0]}#specimens`, {waitUntil: 'domcontentloaded'});
         await page.getByRole('heading', {name: 'One library across the product'}).waitFor();
         if (mode === 'dark') await page.getByRole('button', {name: 'View dark theme'}).click();
         await page.waitForTimeout(200);
@@ -75,7 +75,7 @@ try {
         const calendarDay = await style(page.locator('.bp6-date-input-popover .rdp-day:not([disabled])').first());
         assert.equal(calendarDay.radius, '8px', `${mode}: calendar day radius`);
         await page.keyboard.press('Escape');
-        await page.getByRole('button', {name: 'Campaign actions'}).click();
+        await page.getByRole('button', {name: 'Quick actions'}).click();
         const menu = await style(page.locator('.bp6-popover:has(.bp6-menu) > .bp6-popover-content'));
         assert.equal(menu.radius, '8px', `${mode}: menu popup radius`);
         console.log(JSON.stringify({mode, icon: iconStyle, tabHover: tabStyle, fields: [input.height, select.height, search.height, dateInput.height], filterContrast: Number(ratio(channels(filterStyle.color), channels(filterStyle.background)).toFixed(2)), hoveredFilterContrast: Number(ratio(channels(hoveredFilter.color), channels(hoveredFilter.background)).toFixed(2)), groupingContrast: Number(ratio(channels(grouping.color), channels(grouping.background)).toFixed(2)), checkboxContrast: Number(ratio(channels(checkbox.mark), channels(checkbox.background)).toFixed(2)), calendarRadius: calendar.radius, menuRadius: menu.radius}));

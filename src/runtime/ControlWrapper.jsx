@@ -42,7 +42,7 @@ export default function ControlWrapper({ item, container, context, framework = '
         ...(children.props['aria-labelledby']?{'aria-labelledby':remapReferences(children.props['aria-labelledby'])}:{}),
         ...(item?.validationError?{'aria-errormessage':accessibility.errorId}:{}),
         'aria-describedby': [...new Set([remapReferences(children.props['aria-describedby']), hasHelper ? helperId : null].filter(Boolean).flatMap(value=>value.split(/\s+/)))].join(' ') || undefined,
-        ...(controlOnly && (item?.required || item?.properties?.required)
+        ...((item?.required || item?.properties?.required)
             ? {'aria-required': children.props['aria-required'] ?? true}
             : {}),
         ...(controlOnly && (item?.validationError || item?.requiredState === 'invalid' || item?.requiredState === 'missing')
