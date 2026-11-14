@@ -32,11 +32,40 @@ import { viewSQLResource } from './viewSQLResource.js';
 
 // ReaderBuilder renders the canonical structure returned by the Studio SDK's
 // Datly reader-builder bridge. It does not parse DQL or invent a browser graph.
-function ReaderWorkbenchView({ api, report, openResources = false, resourceAction = '', onReportUpdated, onResourcesClosed, onBack, onStateChange, onReleases, defaults = {} }) {
+function ReaderWorkbenchView({ api, report, openResources = false, resourceAction = '', onReportUpdated, onResourcesClosed, onBack, onStateChange, onReleases, subject, defaults = {} }) {
   const mutationState=React.useContext(WorkbenchMutationContext);
   const headingRef = useRef(null);
   const previewTriggerRef = useRef(null);
   const [inspection, setInspection] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [deleted, setDeleted] = useState(false);
+  const deletionPending = useRef(false);
+  const confirmVersionDeletion = () => {
+    setDeleteError('');
+    setDeleteTarget({id:report.id,title:report.title,versionNo:version.versionNo,sourceRevision:version.sourceRevision});
+  };
+  const returnToComponents = async () => {
+    setDeleteError('');
+    try { await onBack?.(); }
+    catch (cause) { setDeleteError(`Version deleted. Could not return to Components: ${cause.message}`); }
+  };
+  const deleteSelectedVersion = async () => {
+    if (!deleteTarget || deletionPending.current) return;
+    const target = deleteTarget;
+    deletionPending.current = true; setDeleting(true); setDeleteError('');
+    try {
+      await api.deleteVersion(target.id, target.versionNo, target.sourceRevision);
+    } catch (cause) {
+      setDeleteError(cause.message); setDeleteTarget(null);
+      deletionPending.current = false; setDeleting(false); return;
+    }
+    // Never reload through load(): it can select another draft or the deleted version.
+    setDeleted(true); setDeleteTarget(null);
+    try { await returnToComponents(); }
+    finally { deletionPending.current = false; setDeleting(false); }
+  };
   const [version, setVersion] = useState(null);
   const [creatingReader, setCreatingReader] = useState(true);
   const [rootDraftDirty, setRootDraftDirty] = useState(false);
@@ -93,7 +122,7 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
   const [showRawDQL, setShowRawDQL] = useState(false);
   const [dirtyTabs,setDirtyTabs]=useState(()=>new Set());
   const [contractEditing,setContractEditing]=useState(false);
-  useEffect(()=>{onStateChange?.({dirty:rootDraftDirty||dirtyTabs.size>0||contractEditing,busy:rootDraftSaving});},[rootDraftDirty,dirtyTabs,contractEditing,rootDraftSaving,onStateChange]);
+  useEffect(()=>{onStateChange?.({dirty:rootDraftDirty||dirtyTabs.size>0||contractEditing,busy:rootDraftSaving||deleting});},[rootDraftDirty,dirtyTabs,contractEditing,rootDraftSaving,deleting,onStateChange]);
   const [pendingTabAction,setPendingTabAction]=useState(null);
 
   const loadGeneration = useRef(0);
@@ -391,9 +420,11 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
     } catch (cause) { if (cause.code === 'conflict') setConflict(cause); throw cause; }
   };
 
+  if (deleted) return <main aria-label="Component editor"><Callout intent={deleteError?'warning':'success'} role="status">{deleteError || 'Version permanently deleted.'}</Callout><Button onClick={returnToComponents}>Components</Button></main>;
+
   return <main ref={headingRef} tabIndex={-1} aria-label="Component editor" className="studio-workspace studio-builder-workspace">
     <div className="studio-builder-header">
-      <div><Button minimal icon="arrow-left" disabled={rootDraftSaving||mutationState.busy} onClick={requestBack}>Components</Button></div>
+      <div><Button minimal icon="arrow-left" disabled={rootDraftSaving||deleting||mutationState.busy} onClick={requestBack}>Components</Button></div>
       {version && !needsReader && <div className="studio-builder-header-actions"><DownloadComponentButton api={api} report={report} versionNo={version.versionNo} disabled={!canUseDQL}/><div className="studio-builder-status" aria-label="Component revision status"><Tag minimal>{report?.namespace ?? 'general'}</Tag><Tag minimal>{version.state==='published'?'Published':version.state==='draft'||!version.state?'Draft':'Version'} v{version.versionNo}</Tag><Tag minimal>rev {version.sourceRevision}</Tag><Tag intent={version.compileStatus === 'valid' ? 'success' : version.compileStatus === 'invalid' ? 'danger' : 'warning'} minimal>{version.compileStatus}</Tag>{serverScoped&&<Tag minimal intent="warning" title="Server-owned access context narrows this reader at runtime">Scoped</Tag>}</div>{version.state&&version.state!=='draft'?<Button icon="duplicate" loading={cloningDraft} disabled={!ready || capabilities.canEdit===false} onClick={createDraft}>Create editable draft</Button>:<Button icon="edit" disabled={!canEdit} onClick={()=>setExposureDialogOpen(true)}>Edit component</Button>}</div>}
     </div>
     {version && !needsReader && <div className="studio-builder-actions" role="toolbar" aria-label="Component authoring commands">
@@ -412,6 +443,12 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
       </Menu>}><Button icon="more" aria-label="More actions">More</Button></Popover>
     </div>}
     {version && !needsReader && (!canEdit || serverScoped) && <p className="studio-muted">{!canEdit && 'Create an editable draft to validate or change this version. '}{serverScoped && 'Preview uses your verified runtime access; the server enforces entity scope.'}</p>}
+    {typeof api.deleteVersion==='function' && subject && report.ownerId===subject && version && <Button intent="danger" icon="trash" disabled={loading||deleting||mutationState.busy||rootDraftSaving} onClick={confirmVersionDeletion}>Delete version v{version.versionNo}</Button>}
+    {deleteError && <Callout intent="danger" role="alert">{deleteError}</Callout>}
+    <Alert portalClassName="forge-reader-workbench-dialog" isOpen={Boolean(deleteTarget)} intent="danger" icon="trash" confirmButtonText="Permanently delete version" cancelButtonText="Cancel" loading={deleting} onCancel={()=>{if(!deletionPending.current)setDeleteTarget(null);}} onConfirm={deleteSelectedVersion} canEscapeKeyCancel={!deleting} canOutsideClickCancel={!deleting}>
+      <p>Permanently delete <strong>{deleteTarget?.title} ({deleteTarget?.id}) · version {deleteTarget?.versionNo}</strong>?</p>
+      <p>Source, resources, and completed warmup evidence will be permanently removed. Retained publication and audit history survives. Unsaved edits for this version will also be discarded.</p>
+    </Alert>
     {error && <Callout intent="danger" title="Reader Builder request failed" role="alert">{error}<Button small minimal intent="danger" onClick={load}>Retry</Button></Callout>}
     {loading && <div className="studio-loading"><Spinner size={28} /></div>}
     {!loading && !error && needsReader && (creatingReader ? <ReaderCreateForm routePrefix={defaults.routePrefix} key={report.id} report={report} disabled={capabilities.canEdit===false} onCreate={createReader} onDirtyChange={setRootDraftDirty} onBusyChange={setRootDraftSaving} onCancel={()=>rootDraftDirty ? setPendingTabAction({kind:'cancel-root'}) : setCreatingReader(false)} importAction={<ImportComponentButton api={api} report={report} label="Load DQL" onImported={(updated)=>onReportUpdated ? onReportUpdated(updated) : load()}/>}/> : <Card className="studio-card studio-empty" elevation={0}><h2>No reader definition yet</h2><p>Create a reader from SQL, or load an existing DQL file or archive.</p><div className="studio-schema-actions"><Button intent="primary" icon="new-object" disabled={capabilities.canEdit===false} onClick={()=>setCreatingReader(true)}>Create reader</Button><ImportComponentButton api={api} report={report} label="Load DQL" onImported={(updated)=>onReportUpdated ? onReportUpdated(updated) : load()}/></div></Card>)}

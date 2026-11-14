@@ -1252,3 +1252,45 @@ row retains the selected background and interaction foreground through hover
 and focus; the workspace theme maps those roles to the semantic menu selected
 pair. Text dropdown triggers include a trailing shared chevron icon. Icon-only
 More Menu triggers retain their ellipsis.
+
+### Reader version deletion
+
+`ReaderBuilder` accepts the host's current `subject` alongside the existing
+component `report.ownerId`. It presents **Delete version vN** only for a matching
+owner when `api.deleteVersion` is declared. The authored `readerWorkbench` panel
+reads `subject` from its form (`subjectField` can select an existing host field).
+Omitting that operation preserves older Studio behavior.
+
+Hosts bind `deleteVersion(componentId, versionNo, expectedSourceRevision)` through
+`operations` with `mutation: true`; Forge does not import a Studio SDK or infer
+backend versions. Confirmation snapshots the displayed target and revision.
+Cancellation performs no request; pending submission is guarded; backend errors
+remain verbatim and do not enter the source-revision conflict dialog. Successful
+deletion invokes the existing `onBack` lifecycle so the host returns to and
+refreshes its catalog, including empty components, without selecting another
+draft. Direct React embedders must provide this same callback.
+
+The existing Blueprint workbench action and confirmation recipe remains in use.
+Catalog actions and whole-component confirmation belong to the consuming host's
+authored window metadata; older hosts omit them. Other workbench actions retain
+their existing legacy styling scope.
+
+For example, a host can declare the existing native version operation without
+adding an SDK dependency to Forge:
+
+```yaml
+readerWorkbench:
+  subjectField: subject
+  operations:
+    deleteVersion:
+      dataSourceRef: delete_version
+      mutation: true
+      parameters:
+        reportId: {arg: 0}
+        versionNo: {arg: 1}
+        expectedSourceRevision: {arg: 2}
+```
+
+The host owns `delete_version`'s transport and declares this binding only when
+its deployed Studio supports deletion. `ReaderBuilder.deletion.render.test.jsx`
+checks the confirmation, pending, error, owner and absent-operation states.
