@@ -25,7 +25,7 @@ import './theme.css';
 import React from 'react';
 import {batch} from '@preact/signals-react';
 import {fileToMCPBlob} from './fileBlob.js';
-import {flushSync} from 'react-dom';
+import {createPortal, flushSync} from 'react-dom';
 import {
     InputGroup,
     Checkbox,
@@ -200,6 +200,20 @@ export function DateRangePresetInput({
     const [open, setOpen] = React.useState(false);
     const [presetRequestError, setPresetRequestError] = React.useState('');
     const triggerRef = React.useRef(null);
+    const [popupPosition, setPopupPosition] = React.useState({top:0,left:0});
+    const updatePopupPosition = React.useCallback(() => {
+        const rect = triggerRef.current?.getBoundingClientRect?.();
+        if (!rect || typeof window === 'undefined') return;
+        const width = Math.min(360, Math.max(280, window.innerWidth - 32));
+        setPopupPosition({top:Math.min(rect.bottom+6,Math.max(16,window.innerHeight-430)),left:Math.max(16,Math.min(rect.right-width,window.innerWidth-width-16))});
+    }, []);
+    React.useLayoutEffect(() => {
+        if (themedCalendar || !open || typeof window === 'undefined') return;
+        updatePopupPosition();
+        window.addEventListener('resize',updatePopupPosition);
+        window.addEventListener('scroll',updatePopupPosition,true);
+        return () => {window.removeEventListener('resize',updatePopupPosition);window.removeEventListener('scroll',updatePopupPosition,true);};
+    }, [themedCalendar,open,updatePopupPosition]);
     const windowForm = controlled ? {[startField]: range.start, [endField]: range.end} : context?.signals?.windowForm?.value || {};
     const metrics = context?.signals?.metrics?.value || context?.signals?.metrics?.peek?.() || {};
     const resolvedTimeZone = timeZoneSelector
@@ -316,6 +330,7 @@ export function DateRangePresetInput({
                     role="dialog"
                     aria-label={`${item?.label || 'Date range'} options`}
                     style={{
+                        ...(!themedCalendar ? {position:'fixed',top:popupPosition.top,left:popupPosition.left,zIndex:3000} : {}),
                         width: 360,
                         maxWidth: 'min(360px, calc(100vw - 32px))',
                         border: themedCalendar ? 'var(--forge-border-width, 1px) solid var(--forge-border-color)' : '1px solid #d7dbe5',
@@ -385,13 +400,16 @@ export function DateRangePresetInput({
     );
     return (
         <div className="forge-date-range-preset" style={{position:'relative',minWidth:0,width:'100%'}}>
-            <Popover minimal popupKind="dialog" isOpen={open} disabled={readOnly || disabled}
+            {themedCalendar ? <Popover minimal popupKind="dialog" isOpen={open} disabled={readOnly || disabled}
                 onInteraction={next => {if(next && !open)setCustomDraft({start,end});setOpen(next);}}
                 content={panel} targetProps={{onKeyDown:undefined}}>
                 <Button ref={triggerRef} type="button" rightIcon={open ? 'chevron-up' : 'chevron-down'}
                     aria-haspopup="dialog" aria-expanded={open} disabled={readOnly || disabled}
                     style={{width:'100%',justifyContent:'space-between'}}>{triggerLabel}</Button>
-            </Popover>
+            </Popover> : <>
+                <Button ref={triggerRef} type="button" rightIcon={open ? 'chevron-up' : 'chevron-down'} aria-haspopup="dialog" aria-expanded={open} disabled={readOnly || disabled} onClick={toggleOpen} style={{width:'100%',justifyContent:'space-between'}}>{triggerLabel}</Button>
+                {open && typeof document !== 'undefined' ? createPortal(panel,document.body) : null}
+            </>}
             {controlled && presetPending && <span role="status">Resolving date preset…</span>}
             {presetRequestError && <span role="alert">{presetRequestError}</span>}
         </div>
@@ -694,6 +712,7 @@ export function registerPack() {
             'data-forge-field-track-control': fieldTrackControl,
             ...rest
         }) {
+            const themed = useForgeTheme()?.themeId === 'design-system-2';
             const triggerRef = React.useRef(null);
             const visibleOptions = permittedOptions(options, context);
             const selected = visibleOptions.find((o) => String(o.value) === String(value));
@@ -769,11 +788,11 @@ export function registerPack() {
                 ? defaultSelectItemPredicate
                 : itemPredicate;
             const defaultItemRenderer = (item, {handleClick,handleFocus,id:itemId,modifiers,ref}) => (
-                <MenuItem key={item.value} ref={ref} id={itemId}
+                <MenuItem key={item.value} ref={isFieldTrack || themed ? ref : undefined} id={isFieldTrack || themed ? itemId : undefined}
                     className={isFieldTrack ? 'forge-field-track-select-option' : undefined}
                     text={item.label} htmlTitle={item.tooltip || undefined} active={modifiers.active}
-                    disabled={isSelectOptionDisabled(item)} roleStructure="listoption"
-                    selected={String(item.value) === String(value)} onFocus={handleFocus}
+                    disabled={isSelectOptionDisabled(item)} roleStructure={isFieldTrack || themed ? 'listoption' : undefined}
+                    selected={isFieldTrack || themed ? String(item.value) === String(value) : undefined} onFocus={isFieldTrack || themed ? handleFocus : undefined}
                     onClick={isSelectOptionDisabled(item) ? undefined : handleClick}/>
             );
             const resolvedNoResults = resolvedFilterable && noResults === undefined ? (
@@ -828,7 +847,7 @@ export function registerPack() {
                             if (['Enter', ' ', 'ArrowDown'].includes(event.key)) requestOptions('open');
                             onKeyDown?.(event);
                         }}
-                        rightIcon={<SharedIcon name="lucide:chevron-down"/>}
+                        rightIcon={isFieldTrack || themed ? <SharedIcon name="lucide:chevron-down"/> : "caret-down"}
                         disabled={unavailable}
                     />
                 </Select>
@@ -1229,12 +1248,12 @@ export function registerPack() {
                     canClearSelection={dateProps.canClearSelection ?? (themed ? false : undefined)}
                     dayPickerProps={{...dateProps.dayPickerProps,
                         ...(themed ? {components:{Dropdown:CalendarDropdown,...dateProps.dayPickerProps?.components}} : {}),
-                        ...(kind === 'date' && dateProps.closeOnSelection !== false ? {classNames:{
+                        ...(themed && kind === 'date' && dateProps.closeOnSelection !== false ? {classNames:{
                             ...dateProps.dayPickerProps?.classNames,
                             day:`${dateProps.dayPickerProps?.classNames?.day || 'rdp-day'} bp6-popover-dismiss`,
                         }} : {}),
                     }}
-                    popoverProps={anchoredPopoverProps({captureDismiss:true,shouldReturnFocusOnClose:false,...dateProps.popoverProps})}
+                    popoverProps={anchoredPopoverProps({captureDismiss:true,...(themed ? {shouldReturnFocusOnClose:false} : {}),...dateProps.popoverProps})}
                     timezone={valueMode === 'civil' ? 'UTC' : rest.timezone}
                     value={normalizeDateInputValue(value, valueMode) || null}
                     onChange={(sel,isUserChange) => {if(isUserChange)onChange?.(serializeDateInputValue(sel, valueMode));}}
