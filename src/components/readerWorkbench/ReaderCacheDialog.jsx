@@ -1,13 +1,22 @@
 import {WorkbenchDialog as Dialog} from './WorkbenchMutationContext.jsx';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Button, Callout, Dialog as BlueprintDialog, DialogBody, DialogFooter, FormGroup, HTMLSelect, InputGroup, NumericInput, Tag, TextArea } from '@blueprintjs/core';
+import { Button, Callout, Dialog as BlueprintDialog, DialogBody, DialogFooter, FormGroup, HTMLSelect, HTMLTable, InputGroup, NumericInput, Tag, TextArea } from '@blueprintjs/core';
 import { parseWarmupCases, validateWarmupCases, warmupCaseCount, warmupCaseExpression } from './warmupPlan.js';
 
 export function ReaderCacheDialog({ api, report, version, canWarmup, isOpen, structure, onClose, onApply, onWarmup }) {
   const cache = structure?.component?.settings?.cache;
   const warmupConfig = cache?.warmup;
-  const [discoveredStructure, setDiscoveredStructure] = useState(null);
-  const [columnDiscoveryError, setColumnDiscoveryError] = useState('');
+  const inspectionKey = JSON.stringify([report?.id, version?.versionNo, version?.sourceRevision]);
+  const [inspectionResult, setInspectionResult] = useState({});
+  const [inspectionAttempt, setInspectionAttempt] = useState(0);
+  const currentInspection = inspectionResult.key === inspectionKey ? inspectionResult : {};
+  const inspecting = inspectionResult.key !== inspectionKey || currentInspection.loading === true;
+  const discoveredStructure = currentInspection.value?.structure;
+  const columnDiscoveryError = currentInspection.error || '';
+  const effectiveWarmup = currentInspection.value?.effectiveWarmup;
+  const effectiveResolved = effectiveWarmup?.status === 'resolved' && Array.isArray(effectiveWarmup.targets)
+    && effectiveWarmup.reportId === report?.id && effectiveWarmup.versionNo === version?.versionNo
+    && effectiveWarmup.sourceRevision === version?.sourceRevision;
   const inspectedStructure = discoveredStructure || structure;
   const columns = inspectedStructure?.component?.rootView?.columns ?? [];
   const connectors = inspectedStructure?.availableConnectors ?? structure?.availableConnectors ?? [];
@@ -33,7 +42,6 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, isOpen, str
 
   useEffect(() => {
     if (!isOpen) return;
-    setDiscoveredStructure(null); setColumnDiscoveryError('');
     setName(cache?.name ?? ''); setTTL(cache?.ttl ?? ''); setLocation(cache?.location ?? '');
     setBackend(cache?.provider ? 'aerospike' : cache?.location ? 'afs' : ''); setProvider(cache?.provider ?? '');
     setIndexColumn(warmupConfig?.indexColumn ?? '');
@@ -41,15 +49,23 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, isOpen, str
     setMaxCases(warmupConfig?.maxCases); setLimit(warmupConfig?.limit);
     setFieldNames((warmupConfig?.fieldNames ?? []).join(', ')); setCaseLines(renderCases(warmupConfig));
     setSaving(false); setError('');
-    if (!api?.inspectVersion || !report?.id || !version?.versionNo) return;
+  }, [isOpen, report?.id, version?.versionNo, version?.sourceRevision, cache, warmupConfig]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setInspectionResult({key:inspectionKey, loading:true});
+    if (!api?.inspectVersion || !report?.id || !version?.versionNo) {
+      setInspectionResult({key:inspectionKey, loading:false});
+      return;
+    }
     let cancelled = false;
     api.inspectVersion(report.id, version.versionNo, { discoverColumns: true }).then((inspected) => {
-      if (!cancelled) setDiscoveredStructure(inspected?.structure || null);
+      if (!cancelled) setInspectionResult({key:inspectionKey, loading:false, value:inspected});
     }).catch((cause) => {
-      if (!cancelled) setColumnDiscoveryError(cause.message);
+      if (!cancelled) setInspectionResult({key:inspectionKey, loading:false, error:cause.message});
     });
     return () => { cancelled = true; };
-  }, [isOpen, api, report?.id, version?.versionNo, cache, warmupConfig]);
+  }, [isOpen, api, inspectionKey, inspectionAttempt]);
 
   useEffect(() => {
     if (!isOpen || !api || !report?.id || !version?.versionNo) return undefined;
@@ -129,14 +145,23 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, isOpen, str
           <Button intent="primary" icon="floppy-disk" loading={saving} disabled={!ready} onClick={saveCache}>Save cache storage</Button></>}
       </section>
 
-      <section className="studio-cache-section"><div className="studio-panel-heading"><div><h3>Inline warmup plan</h3><p>This form edits the inline component plan. Run warmup executes all effective policies for the saved version, including host-named policies. Unsaved form changes are not included.</p></div><Tag minimal intent={maxCases == null || caseCount <= maxCases ? 'success' : 'danger'}>{caseCount} / {maxCasesLabel} cases</Tag></div>
+      <section className="studio-cache-section" aria-label="Effective warmup plans">
+        <h3>Effective warmup plans</h3>
+        <p>Resolved using current host configuration for the saved version. Host configuration may change before execution.</p>
+        {inspecting ? <p role="status">Loading effective warmup plans…</p> : effectiveResolved ? <EffectiveWarmupPlans targets={effectiveWarmup.targets}/> : <Callout intent="warning" role="status">Effective warmup plans are unavailable for this saved revision.</Callout>}
+        {(currentInspection.value?.diagnostics ?? []).map((item,index)=><Callout key={index} intent={item.severity==='error'?'danger':item.severity==='info'?'primary':'warning'} title={item.code}>{item.message}</Callout>)}
+        {!effectiveResolved && !inspecting && <Button icon="refresh" onClick={()=>setInspectionAttempt(attempt=>attempt+1)}>Retry</Button>}
+        <p>Run all effective plans uses the saved version and excludes unsaved edits.</p>
+        <div className="studio-warmup-actions"><Button icon="play" loading={warming||activeRun} disabled={!canWarmup||saving||activeRun} title={!canWarmup?'Publish permission is required to run warmup':''} onClick={executeWarmup}>Run all effective plans</Button></div>
+      </section>
+      <section className="studio-cache-section"><details key={inspectionKey} open={Boolean(warmupConfig)}><summary>Inline warmup plan</summary><div className="studio-panel-heading"><div><p>This form edits the inline component plan. Run all effective plans executes the saved version’s effective policies, including host-named policies. Unsaved form changes are not included.</p></div><Tag minimal intent={maxCases == null || caseCount <= maxCases ? 'success' : 'danger'}>{caseCount} / {maxCasesLabel} cases</Tag></div>
         <div className="studio-form-grid"><FormGroup label="Index column" labelFor="warmup-index"><HTMLSelect id="warmup-index" value={indexColumn} onChange={(event)=>setIndexColumn(event.target.value)} fill disabled={saving}><option value="">Select a column</option>{indexColumn && !columns.some((column)=>column.source===indexColumn || column.name===indexColumn) && <option value={indexColumn}>{indexColumn}</option>}{columns.map((column)=><option key={column.source||column.name} value={column.source||column.name}>{column.name}</option>)}</HTMLSelect></FormGroup><FormGroup label="Index parameter" labelFor="warmup-parameter"><InputGroup id="warmup-parameter" value={indexParameter} onChange={(event)=>setIndexParameter(event.target.value)} placeholder="TenantID" disabled={saving}/></FormGroup></div>
         <div className="studio-form-grid"><FormGroup label="Warmup connector" labelFor="warmup-connector"><HTMLSelect id="warmup-connector" value={connector} onChange={(event)=>setConnector(event.target.value)} fill disabled={saving}><option value="">Component connector</option>{connectors.map((name)=><option key={name} value={name}>{name}</option>)}</HTMLSelect></FormGroup><FormGroup label="Selected fields" labelFor="warmup-fields"><InputGroup id="warmup-fields" value={fieldNames} onChange={(event)=>setFieldNames(event.target.value)} placeholder="id, status, total" disabled={saving}/></FormGroup></div>
         <div className="studio-form-grid"><FormGroup label="Max cases" labelFor="warmup-max"><NumericInput id="warmup-max" min={0} value={maxCases ?? ''} onValueChange={(value)=>setMaxCases(Number.isNaN(value)?undefined:value)} fill disabled={saving}/></FormGroup><FormGroup label="Row limit" labelFor="warmup-limit"><NumericInput id="warmup-limit" min={0} value={limit ?? ''} onValueChange={(value)=>setLimit(Number.isNaN(value)?undefined:value)} fill disabled={saving}/></FormGroup></div>
         <FormGroup label="Case dimensions" labelFor="warmup-cases" helperText="One Name=value1,value2 dimension per line. Case count is the Cartesian product."><TextArea id="warmup-cases" value={caseLines} onChange={(event)=>setCaseLines(event.target.value)} fill rows={4} className="studio-code-input" placeholder={'Period=today,yesterday\nGranularity=hour,day'} disabled={saving}/></FormGroup>
         <div className={`studio-case-product ${caseErrors.length?'invalid':''}`}><strong>Inline warmup plan estimate: {caseExpression} = {caseCount} {caseCount===1?'case':'cases'}</strong><span>MaxCases {maxCasesLabel} · row limit {limitLabel}</span>{caseErrors.length>0&&<span>{caseErrors[0]}</span>}</div>
-        <div className="studio-warmup-actions"><Button intent="primary" icon="heatmap" loading={saving} disabled={!cache?.enabled || caseErrors.length>0} onClick={saveWarmup}>Save warmup plan</Button>{warmupConfig && <Button icon="trash" intent="danger" disabled={saving||warming||activeRun} onClick={removeWarmup}>Remove plan</Button>}<Button icon="play" loading={warming||activeRun} disabled={!canWarmup||saving||activeRun} title={!canWarmup?'Publish permission is required to run warmup':''} onClick={executeWarmup}>{history.length?'Run again':'Run warmup'}</Button></div>
-      </section>
+        <div className="studio-warmup-actions"><Button intent="primary" icon="heatmap" loading={saving} disabled={!cache?.enabled || caseErrors.length>0} onClick={saveWarmup}>Save warmup plan</Button>{warmupConfig && <Button icon="trash" intent="danger" disabled={saving||warming||activeRun} onClick={removeWarmup}>Remove plan</Button>}</div>
+      </details></section>
       </div><aside className="studio-warmup-evidence-panel" aria-label="Warmup operation evidence"><div className="studio-panel-heading"><div><h3>Operation evidence</h3><p>Server-owned runs survive this dialog and client disconnects.</p></div>{historyLoading&&<Tag minimal>Loading</Tag>}</div>
         {!warmup&&!historyLoading?<div className="studio-empty-compact">No warmup has been run for this version.</div>:warmup&&<WarmupEvidence run={warmup}/>}
         {history.length>0&&<div className="studio-warmup-history"><h4>Run history</h4>{history.slice(0,8).map((run)=><button type="button" key={run.runId} className={warmup?.runId===run.runId?'selected':''} onClick={()=>setSelectedRunId(run.runId)}><Tag minimal intent={runIntent(run.status)}>{run.status}</Tag><span><strong>{run.plannedCases||0} planned · {run.entries||0} prepared</strong><small>{formatDate(run.requestedAt)} · {run.requestedBy}</small></span></button>)}</div>}
@@ -144,6 +169,27 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, isOpen, str
     </DialogBody>
     <DialogFooter actions={<Button onClick={onClose} disabled={saving||warming}>Close</Button>}/>
   </Dialog>;
+}
+
+
+function EffectiveWarmupPlans({targets}) {
+  if (!targets.length) return <p>No effective warmup plans for this saved version.</p>;
+  return <div className="studio-column-table-wrap"><HTMLTable className="studio-data-table" aria-label="Effective warmup targets" striped>
+    <thead><tr><th scope="col">View path</th><th scope="col">Policy</th><th scope="col">Cache</th><th scope="col">Connector</th><th scope="col">Settings</th></tr></thead>
+    <tbody>{targets.map((target,index)=><tr key={index}>
+      <td>{target.view === '' ? 'Root' : target.view}</td><td>{target.policyName || 'Unnamed policy'}</td>
+      <td>{target.cacheName || 'Not supplied'}{target.cacheProvider && <small> · {target.cacheProvider}</small>}</td><td>{target.connectorName || 'Native default'}</td>
+      <td><details><summary>Settings</summary><dl>
+        <dt>Index column</dt><dd>{target.indexColumn || 'Not supplied'}</dd>
+        <dt>Index parameter</dt><dd>{target.indexParameter || 'Native default'}</dd>
+        <dt>Index metadata</dt><dd>{target.indexMeta ? 'Enabled' : 'Disabled'}</dd>
+        <dt>Max cases</dt><dd>{target.maxCases ?? 'Native default'}</dd>
+        <dt>Row limit</dt><dd>{target.rowLimit === 0 ? 'Unlimited' : target.rowLimit ?? 'Native default'}</dd>
+      </dl><h4>Case dimensions</h4>{target.cases?.length ? <ul>{target.cases.map((item,caseIndex)=><li key={caseIndex}>Case {caseIndex+1}<ul>{item.dimensions.map((dimension,dimensionIndex)=><li key={dimensionIndex}>{dimension.name}: {dimension.valueCount} values · Exclude default: {dimension.excludeDefault ? 'Yes' : 'No'}</li>)}</ul></li>)}</ul> : <p>No case dimensions supplied.</p>}
+      {target.work?.length>0 && <><h4>Population</h4><ul>{target.work.map((work,workIndex)=><li key={workIndex}>{work.view === '' ? 'Root' : work.view} · {work.policyName || 'Unnamed policy'} · {work.cacheName || 'Not supplied'} · {work.connectorName || 'Native default'}</li>)}</ul></>}
+      </details></td>
+    </tr>)}</tbody>
+  </HTMLTable></div>;
 }
 
 function renderCases(warmup) { return (warmup?.cases?.[0]?.set ?? []).map((item)=>`${item.name}=${(item.values??[]).join(',')}`).join('\n'); }

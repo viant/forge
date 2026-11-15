@@ -1298,7 +1298,7 @@ checks the confirmation, pending, error, owner and absent-operation states.
 ### Inline warmup authoring and execution
 
 ReaderCacheDialog labels its form and estimate **Inline warmup plan**. The form
-edits the inline component plan; **Run warmup** uses the existing host binding for
+edits the inline component plan; **Run all effective plans** uses the existing host binding for
 the inspected saved version and executes its effective policies, including
 host-named policies. Unsaved form values and inline case validation do not decide
 execution availability. Native initialization owns policy resolution and errors.
@@ -1311,3 +1311,27 @@ button loading state protects pending submissions. Mounted checks cover named
 root/child outcomes, inline plans, saved-version binding, permissions, submission,
 active history browsing and asynchronous failures. Cache storage and inline plan
 authoring retain their existing legacy workbench recipes.
+
+### Effective warmup inspection
+
+ReaderCacheDialog uses its existing `inspectVersion` call to display the native
+`effectiveWarmup` envelope before execution. Each scheduled target retains its
+own row, even when policies are shared between root and child views. Expand
+**Settings** to inspect supplied index settings, dimension names/value counts,
+exclude-default flags and limits. Explicit row limit zero is **Unlimited**;
+omitted limits and connector overrides are **Native default**. Nested population
+entries are details of a target, not additional scheduled calls. No origin or
+policy provenance is inferred, and case values are not reconstructed.
+
+Effective metadata is read-only and reflects current host configuration. The
+inline editor remains separate and starts collapsed when no inline plan exists.
+**Run all effective plans** uses the existing saved-version operation and omits
+unsaved edits. Loading, unavailable metadata with producer diagnostics and Retry,
+and a resolved empty target list remain distinct states. Component/version/source
+revision changes immediately hide old metadata; late responses are discarded.
+Retry reuses inspection without resetting the inline draft or run history.
+
+Mounted synthetic checks exercise root/child targets, shared policies, optional
+settings, read-only details, Retry, revision changes and stale responses through
+the existing dialog. The shared Blueprint table and native details elements reuse
+the existing workbench recipe; the surrounding cache editor remains legacy scope.

@@ -44,7 +44,7 @@ it('retains the configured index when discovery fails',async()=>{
 // resolved in Forge. All execution outcomes below come from the supplied producer.
 const noInlineStructure={component:{rootView:{name:'root',columns:[]},settings:{cache:{enabled:true,name:'host-cache'}}}};
 const run=(runId,status,extra={})=>({runId,status,versionNo:2,sourceRevision:4,requestedBy:runId,...extra});
-const runButton=()=>[...document.querySelectorAll('button')].find(button=>['Run warmup','Run again'].includes(button.textContent.trim()));
+const runButton=()=>[...document.querySelectorAll('button')].find(button=>['Run all effective plans'].includes(button.textContent.trim()));
 const click=async button=>act(async()=>button.click());
 async function mountRuns({structure=noInlineStructure,items=[],canWarmup=true,start=vi.fn().mockResolvedValue(run('new','accepted')),get=vi.fn().mockResolvedValue(run('new','completed')),apply=vi.fn(),list}={}){
  const api={inspectVersion:vi.fn().mockResolvedValue({structure}),listWarmupRuns:list||vi.fn().mockResolvedValue({items}),getWarmupRun:get};
@@ -143,6 +143,7 @@ it('submits the inspected saved version through Reader Builder bindings, excludi
  await mount(<ReaderBuilder api={api} report={{...report,versionNo:2}} onBack={vi.fn()}/>);
  await click(document.querySelector('[aria-label="More actions"]'));
  await click([...document.querySelectorAll('[role="menuitem"]')].find(item=>item.textContent.includes('Cache & warmup')));
+ await click([...document.querySelectorAll('summary')].find(summary=>summary.textContent==='Inline warmup plan'));
  const input=document.querySelector('#warmup-cases');
  await act(async()=>{
   Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(input,'Region=');
@@ -167,4 +168,92 @@ it('retains a newly submitted run when the initial history request finishes late
  expect(runButton().disabled).toBe(true);
  await act(async()=>vi.advanceTimersByTimeAsync(350));
  expect(get).toHaveBeenCalledWith('reader','new');expect(runButton().disabled).toBe(false);
+});
+
+// Synthetic native inspection envelopes. Policy provenance and case values are
+// intentionally absent, matching the public producer contract.
+const targets=[
+ {view:'',policyName:'shared-policy',cacheName:'root-cache',connectorName:'batch',indexColumn:'ID',indexParameter:'RecordID',indexMeta:true,maxCases:5,rowLimit:0,cases:[{dimensions:[{name:'Region',valueCount:2,excludeDefault:true}]}]},
+ {view:'root/children',policyName:'shared-policy',cacheName:'child-cache',indexColumn:'ChildID'},
+];
+const effective=(changes={})=>({status:'resolved',reportId:'reader',versionNo:2,sourceRevision:4,targets,...changes});
+async function mountMetadata({response={structure:noInlineStructure,effectiveWarmup:effective()},inspect,props={}}={}){
+ const api={inspectVersion:inspect||vi.fn().mockResolvedValue(response),listWarmupRuns:vi.fn().mockResolvedValue({items:[]})};
+ const onApply=vi.fn(),onWarmup=vi.fn().mockResolvedValue(run('effective','completed'));
+ const render=async overrides=>act(async()=>root.render(<ReaderCacheDialog api={api} report={report} version={version} structure={noInlineStructure} isOpen canWarmup onClose={vi.fn()} onApply={onApply} onWarmup={onWarmup} {...props} {...overrides}/>));
+ await mount(<ReaderCacheDialog api={api} report={report} version={version} structure={noInlineStructure} isOpen canWarmup onClose={vi.fn()} onApply={onApply} onWarmup={onWarmup} {...props}/>);
+ return {api,onApply,onWarmup,render};
+}
+const effectiveSection=()=>document.querySelector('[aria-label="Effective warmup plans"]');
+const inlineDetails=()=>[...document.querySelectorAll('details')].find(details=>details.querySelector(':scope > summary')?.textContent==='Inline warmup plan');
+
+it('displays distinct root and child targets with read-only native settings before execution',async()=>{
+ const {onApply,onWarmup}=await mountMetadata();
+ const rows=effectiveSection().querySelectorAll('tbody tr');expect(rows).toHaveLength(2);
+ expect(rows[0].textContent).toContain('Root');expect(rows[1].textContent).toContain('root/children');
+ for(const row of rows){expect(row.textContent).toContain('shared-policy');await click(row.querySelector('summary'));expect(row.querySelector('details').open).toBe(true);expect(row.querySelector('input,select,textarea')).toBeNull();}
+ expect(rows[0].textContent).toContain('root-cache');expect(rows[0].textContent).toContain('batch');
+ expect(rows[0].textContent).toContain('RecordID');expect(rows[0].textContent).toContain('Region: 2 values');expect(rows[0].textContent).toContain('Exclude default: Yes');
+ expect(rows[0].textContent).toContain('Unlimited');expect(rows[1].textContent).toContain('Native default');
+ expect(effectiveSection().textContent.toLowerCase()).not.toContain('origin');
+ expect(inlineDetails().open).toBe(false);
+ expect(onApply).not.toHaveBeenCalled();expect(onWarmup).not.toHaveBeenCalled();
+ await click(runButton());expect(onWarmup).toHaveBeenCalledExactlyOnceWith();expect(onApply).not.toHaveBeenCalled();
+});
+
+it('expands existing inline editing independently from read-only effective targets',async()=>{
+ await mountMetadata({props:{structure:namedStructure}});expect(inlineDetails().open).toBe(true);
+ expect(document.querySelector('#warmup-index').value).toBe('TenantID');
+ expect(effectiveSection().querySelector('input,select,textarea')).toBeNull();
+});
+
+it('distinguishes resolved empty metadata from unavailable metadata on older producers',async()=>{
+ const fixture=await mountMetadata({response:{structure:noInlineStructure,effectiveWarmup:effective({targets:[]})}});
+ expect(effectiveSection().textContent).toContain('No effective warmup plans');
+ await fixture.render({api:{...fixture.api,inspectVersion:vi.fn().mockResolvedValue({structure:noInlineStructure})}});
+ expect(effectiveSection().textContent).toContain('unavailable');
+ expect(effectiveSection().textContent).not.toContain('No effective warmup plans');
+ expect(runButton().disabled).toBe(false);
+});
+
+it('shows producer resolution diagnostics and retries inspection without resetting unsaved edits',async()=>{
+ const inspect=vi.fn().mockResolvedValueOnce({structure:noInlineStructure,effectiveWarmup:effective({status:'unavailable',targets:undefined}),diagnostics:[{severity:'warning',code:'warmup_inspection_unavailable',message:'Review the host policy configuration.'}]}).mockResolvedValueOnce({structure:noInlineStructure,effectiveWarmup:effective()});
+ const {onApply,onWarmup}=await mountMetadata({inspect});
+ expect(effectiveSection().textContent).toContain('Review the host policy configuration.');
+ expect(effectiveSection().textContent).not.toContain('No effective warmup plans');
+ await click(inlineDetails().querySelector('summary'));
+ const input=document.querySelector('#warmup-cases');await act(async()=>{Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(input,'Region=unsaved');input.dispatchEvent(new Event('input',{bubbles:true}));});
+ await click([...effectiveSection().querySelectorAll('button')].find(button=>button.textContent==='Retry'));
+ expect(inspect).toHaveBeenCalledTimes(2);expect(inspect).toHaveBeenLastCalledWith('reader',2,{discoverColumns:true});
+ expect(effectiveSection().querySelectorAll('tbody tr')).toHaveLength(2);expect(input.value).toBe('Region=unsaved');
+ expect(onApply).not.toHaveBeenCalled();expect(onWarmup).not.toHaveBeenCalled();
+});
+
+it('retains transport failures as unavailable inspection with Retry',async()=>{
+ await mountMetadata({inspect:vi.fn().mockRejectedValue(new Error('Inspection connection failed'))});
+ expect(document.body.textContent).toContain('Inspection connection failed');expect(effectiveSection().textContent).toContain('unavailable');
+ expect([...effectiveSection().querySelectorAll('button')].some(button=>button.textContent==='Retry')).toBe(true);
+ expect(runButton().disabled).toBe(false);
+});
+
+it.each([
+ ['component',{report:{id:'other'}},{reportId:'other'}],
+ ['version',{version:{versionNo:3,sourceRevision:4}},{versionNo:3}],
+ ['revision',{version:{versionNo:2,sourceRevision:5}},{sourceRevision:5}],
+])('clears stale plans immediately on a %s change',async(_,props,identity)=>{
+ let finish;const inspect=vi.fn().mockResolvedValueOnce({structure:noInlineStructure,effectiveWarmup:effective()}).mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));
+ const fixture=await mountMetadata({inspect});expect(effectiveSection().textContent).toContain('shared-policy');
+ await fixture.render(props);expect(effectiveSection().textContent).not.toContain('shared-policy');expect(effectiveSection().textContent).toContain('Loading');
+ await act(async()=>finish({structure:noInlineStructure,effectiveWarmup:effective({...identity,targets:[]})}));
+ expect(effectiveSection().textContent).toContain('No effective warmup plans');
+});
+
+it('ignores late inspection responses and mismatched producer revisions',async()=>{
+ let finishOld;const inspect=vi.fn().mockImplementationOnce(()=>new Promise(resolve=>{finishOld=resolve;})).mockResolvedValue({structure:noInlineStructure,effectiveWarmup:effective({sourceRevision:5,targets:[{...targets[0],policyName:'current-policy'}]})});
+ const fixture=await mountMetadata({inspect});await fixture.render({version:{versionNo:2,sourceRevision:5}});
+ expect(effectiveSection().textContent).toContain('current-policy');
+ await act(async()=>finishOld({structure:noInlineStructure,effectiveWarmup:effective()}));
+ expect(effectiveSection().textContent).toContain('current-policy');expect(effectiveSection().textContent).not.toContain('shared-policy');
+ await fixture.render({version:{versionNo:2,sourceRevision:6}});
+ expect(effectiveSection().textContent).not.toContain('current-policy');expect(effectiveSection().textContent).toContain('unavailable');
 });
