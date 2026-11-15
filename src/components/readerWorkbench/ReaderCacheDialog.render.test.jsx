@@ -10,14 +10,14 @@ afterEach(async()=>{if(root)await act(async()=>root.unmount());host?.remove();ro
 async function mount(node){globalThis.IS_REACT_ACT_ENVIRONMENT=true;host=document.createElement('div');document.body.append(host);root=createRoot(host);await act(async()=>root.render(node));}
 
 const report={id:'reader'};
-const version={versionNo:2,sourceRevision:4};
+const version={reportId:'reader',versionNo:2,sourceRevision:4};
 const namedStructure={availableConnectors:['main'],component:{rootView:{columns:[{name:'ID',source:'ID'}]},settings:{cache:{enabled:true,name:'aerospike',warmup:{indexColumn:'TenantID',limit:0,cases:[{set:[{name:'Region',values:['west'],excludeDefault:true}]}]}}}}};
 
-it('keeps a named cache host-owned and discovers columns without running warmup',async()=>{
- const api={inspectVersion:vi.fn().mockResolvedValue({structure:{availableConnectors:['main'],component:{rootView:{columns:[{name:'TenantID',source:'TenantID'}]}}}}),listWarmupRuns:vi.fn().mockResolvedValue({items:[]})};
+it('keeps a named cache host-owned and requests only warmup metadata without executing',async()=>{
+ const api={inspectVersion:vi.fn().mockResolvedValue({version,structure:{availableConnectors:['main'],component:{rootView:{columns:[{name:'TenantID',source:'TenantID'}]}}}}),listWarmupRuns:vi.fn().mockResolvedValue({items:[]})};
  const onApply=vi.fn().mockResolvedValue({}),onWarmup=vi.fn();
  await mount(<ReaderCacheDialog api={api} report={report} version={version} canWarmup structure={namedStructure} isOpen onClose={vi.fn()} onApply={onApply} onWarmup={onWarmup}/>);
- expect(api.inspectVersion).toHaveBeenCalledWith('reader',2,{discoverColumns:true});
+ expect(api.inspectVersion).toHaveBeenCalledWith('reader',2,{discoverColumns:false,includePreviewInput:false,includeEffectiveWarmup:true});
  expect(document.body.textContent).toContain('Host-configured cache: aerospike.');
  expect(document.body.querySelector('#cache-location')).toBeNull();
  expect(document.body.querySelector('#cache-backend')).toBeNull();
@@ -37,7 +37,7 @@ it('retains the configured index when discovery fails',async()=>{
  const api={inspectVersion:vi.fn().mockRejectedValue(new Error('discovery unavailable')),listWarmupRuns:vi.fn().mockResolvedValue({items:[]})};
  await mount(<ReaderCacheDialog api={api} report={report} version={version} canWarmup structure={namedStructure} isOpen onClose={vi.fn()} onApply={vi.fn()} onWarmup={vi.fn()}/>);
  expect(document.body.querySelector('#warmup-index').value).toBe('TenantID');
- expect(document.body.textContent).toContain('Column discovery failed');
+ expect(document.body.textContent).toContain('Warmup inspection failed');
 });
 
 // Independently authored synthetic inspection/run fixtures; no host policies are
@@ -243,7 +243,7 @@ it('shows producer resolution diagnostics and retries inspection without resetti
  await click(inlineDetails().querySelector('summary'));
  const input=document.querySelector('#warmup-cases');await act(async()=>{Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(input,'Region=unsaved');input.dispatchEvent(new Event('input',{bubbles:true}));});
  await click([...effectiveSection().querySelectorAll('button')].find(button=>button.textContent==='Retry'));
- expect(inspect).toHaveBeenCalledTimes(2);expect(inspect).toHaveBeenLastCalledWith('reader',2,{discoverColumns:true});
+ expect(inspect).toHaveBeenCalledTimes(2);expect(inspect).toHaveBeenLastCalledWith('reader',2,{discoverColumns:false,includePreviewInput:false,includeEffectiveWarmup:true});
  expect(effectiveSection().querySelectorAll('tbody tr')).toHaveLength(2);expect(input.value).toBe('Region=unsaved');
  expect(onApply).not.toHaveBeenCalled();expect(onWarmup).not.toHaveBeenCalled();
 });
@@ -389,7 +389,7 @@ it('uses Reader Builder source-revision concurrency and adopts the saved inline 
  await reviewReplacement();await click(byText('Replace root reference'));
  expect(apply).toHaveBeenCalledExactlyOnceWith('reader',2,{expectedSourceRevision:4,operation:rootBatch});
  expect(byText('Edit root inline warmup plan')).toBeDefined();expect(document.querySelector('#warmup-index').value).toBe('ID');
- expect(api.inspectVersion.mock.calls.some(args=>args[0]==='reader'&&args[1]===2&&args[2]?.discoverColumns===true)).toBe(true);
+ expect(api.inspectVersion.mock.calls.some(args=>args[0]==='reader'&&args[1]===2&&args[2]?.includeEffectiveWarmup===true&&args[2]?.includePreviewInput===false&&args[2]?.discoverColumns===false)).toBe(true);
  expect(savedStructure.functions).toEqual([referencedRoot.functions[0]]);expect(savedStructure.component.settings.cache.name).toBe('storage');
 });
 
@@ -407,4 +407,10 @@ it.each([{functions:undefined},{functions:[...referencedRoot.functions, {...refe
  await mountMetadata({response:{...rootResponse,structure},props:{structure}});
  expect(byText('Replace root reference with inline…')).toBeUndefined();expect(byText('Add root inline warmup plan')).toBeUndefined();
  expect(byText('Save warmup plan').disabled).toBe(true);
+});
+
+it('keeps a missing warmup projection with native diagnostics distinct from an empty resolved list',async()=>{
+ const inspect=vi.fn().mockResolvedValueOnce({version,diagnostics:[{code:'warmup_inspection_unavailable',message:'Native warmup resolution was denied.'}]}).mockResolvedValue({version,effectiveWarmup:effective({targets:[]})});
+ const {onWarmup,onApply}=await mountMetadata({inspect});expect(effectiveSection().textContent).toContain('Native warmup resolution was denied.');expect(effectiveSection().textContent).toContain('unavailable');expect(effectiveSection().textContent).not.toContain('No effective warmup plans');
+ await click(byText('Retry'));expect(effectiveSection().textContent).toContain('No effective warmup plans');expect(onWarmup).not.toHaveBeenCalled();expect(onApply).not.toHaveBeenCalled();
 });

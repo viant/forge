@@ -44,7 +44,7 @@ export function ReaderPublicationDialog({ isOpen, api, report, version, inspecti
     const specHash = publication?.specHash;
     if (!isOpen || !report?.id || !activeVersionNo || activeVersionNo === version?.versionNo) return;
     let cancelled = false;
-    api.inspectVersion(report.id, activeVersionNo).then((value) => {
+    api.inspectVersion(report.id, activeVersionNo, {discoverColumns:false,includePreviewInput:false,includeEffectiveWarmup:false}).then((value) => {
       if (!cancelled) setServingInspection({ versionNo: activeVersionNo, specHash, inspection: value });
     }).catch((cause) => {
       if (!cancelled) setContextError((current) => [current, `serving contract: ${cause.message}`].filter(Boolean).join(' · '));
@@ -59,7 +59,7 @@ export function ReaderPublicationDialog({ isOpen, api, report, version, inspecti
     setPromotionInspection(null);
     if (!isOpen || !selectedPromotion || selectedPromotion.versionNo === version?.versionNo) return;
     let cancelled=false;
-    api.inspectVersion(report.id, selectedPromotion.versionNo).then(value=>{if(!cancelled)setPromotionInspection(value);}).catch(cause=>{if(!cancelled)setContextError(cause.message);});
+    api.inspectVersion(report.id, selectedPromotion.versionNo, {discoverColumns:false,includePreviewInput:false,includeEffectiveWarmup:false}).then(value=>{if(!cancelled)setPromotionInspection(value);}).catch(cause=>{if(!cancelled)setContextError(cause.message);});
     return()=>{cancelled=true;};
   },[api,isOpen,report?.id,selectedPromotion?.versionNo,selectedPromotion?.specHash,version?.versionNo]);
   const publish = async () => {

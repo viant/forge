@@ -4,12 +4,12 @@ import {LazyEditor} from './LazyEditor.jsx';
 import {previewParameterKind, serializePreviewParameters} from './previewParameters.js';
 import './ReaderPreviewParameters.css';
 
-export function ReaderPreviewParameters({metadata, diagnostics = [], pending, onRun, onRefresh, onClose}) {
+export function ReaderPreviewParameters({metadata, diagnostics = [], status = metadata?.schema?.type==='object'?'resolved':'unavailable', pending, onRun, onRefresh, onClose}) {
   const [drafts, setDrafts] = useState({});
   const [errors, setErrors] = useState({});
   const schema = metadata?.schema;
   const properties = schema?.properties || {};
-  const available = schema?.type === 'object';
+  const available = status==='resolved' && schema?.type === 'object';
   const update = (name, patch) => {
     setDrafts(current => ({...current, [name]: {...current[name], ...patch}}));
     setErrors(current => ({...current, [name]: ''}));
@@ -22,7 +22,7 @@ export function ReaderPreviewParameters({metadata, diagnostics = [], pending, on
   };
   return <section aria-label="Preview parameters" className="studio-card studio-preview-parameters">
     <div className="studio-panel-heading"><h2>Preview parameters</h2><Button minimal icon="cross" aria-label="Close preview parameters" disabled={pending} onClick={onClose}/></div>
-    {!available ? <Callout intent="warning" role="alert">
+    {status==='loading' ? <p role="status">Loading preview parameter metadata…</p> : status==='notRequested' ? <p>Preview parameter metadata has not been requested. <Button onClick={onRefresh} disabled={pending}>Load parameters</Button></p> : !available ? <Callout intent="warning" role="alert">
       {diagnostics.find(item => item.code === 'preview_input_unavailable')?.message || 'Preview parameter metadata is unavailable. Refresh the reader to try again.'}
       <Button onClick={onRefresh} disabled={pending}>Refresh parameters</Button>
     </Callout> : <form onSubmit={run} noValidate className="studio-preview-parameters-form">

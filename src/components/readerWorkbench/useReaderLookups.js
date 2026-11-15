@@ -7,7 +7,7 @@ export function useReaderLookups(api,report,version,structure,enabled) {
  useEffect(()=>{
   if(!enabled||!supported)return;
   let cancelled=false;setState({key,loading:true});
-  fetchReaderDataSource(api,'definition',{reportId:report.id,versionNo:version.versionNo,discoverColumns:true}).then((result)=>{
+  fetchReaderDataSource(api,'definition',{reportId:report.id,versionNo:version.versionNo,discoverColumns:true,includePreviewInput:false,includeEffectiveWarmup:false}).then((result)=>{
    if(cancelled)return;
    if(result?.version?.versionNo!==version.versionNo||result?.version?.sourceRevision!==version.sourceRevision)throw new Error('The component changed while loading view and dimension lookups. Refresh the component.');
    setState({key,structure:result.structure,loading:false});

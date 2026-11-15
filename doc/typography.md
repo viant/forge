@@ -1415,3 +1415,40 @@ removal, deletes only the older version, and checks the surviving native list.
 Fixtures are independently authored; no host data or source is included.
 Screenshots stay in ignored `output/playwright/reader-versions`. The surrounding
 workbench retains its existing legacy layout and native control styling.
+
+### Deferred execution inspection
+
+Reader Builder graph inspection explicitly disables column discovery, preview
+input and effective warmup projections on open, reopen, refresh and version
+switch. Column/contract discovery requests columns only; release comparisons
+also omit both execution projections. The shared Studio inspection operation
+continues to own compilation, permissions and source redaction.
+
+Ordinary **Run preview** first requests only `includePreviewInput`. Loading has
+its own status, followed by the producer's parameter contract or unavailable
+diagnostic with **Refresh parameters**. Loading metadata never runs a preview.
+A resolved empty object schema still offers **Run with parameters**; after its
+contract has resolved, another Run preview can use the existing empty-input
+execution path. Execution retries retain the submitted input snapshot.
+
+Opening **Cache & warmup** requests only `includeEffectiveWarmup`, without column
+discovery. Loading, resolved plans (including an empty list) and unavailable
+producer diagnostics remain distinct. Retry, execution, polling and persisted
+history keep their existing lifecycle.
+
+Deferred responses are scoped to component, version and source revision; late
+or mismatched responses cannot display another revision's metadata. Projection
+responses update their own UI state without replacing graph/source metadata,
+so omitted fields in partial responses cannot clear unrelated data. Version or
+revision changes reset temporary preview inputs through the existing identity.
+
+Run `node scripts/test-reader-metadata-browser.mjs` for the synthetic browser
+proof. An optional `FORGE_METADATA_NATIVE_URL` points to the same disposable
+native SDK fixture contract used by the version browser proof, with native
+preview/warmup inspection configured. The proof records each inspection's
+selectors and elapsed time, checks open/reopen and delayed version switches,
+contrasts unavailable/empty contracts and verifies navigation neither executes
+preview/warmup nor changes stored source. Timing JSON and screenshots remain
+ignored under `output/playwright/reader-metadata`. Shared buttons, native status
+text and the existing workbench styles cover the new loading state; surrounding
+legacy layout remains unchanged.

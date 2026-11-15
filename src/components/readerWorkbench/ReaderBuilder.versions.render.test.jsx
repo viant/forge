@@ -7,7 +7,7 @@ import {WorkbenchMutationContext} from './WorkbenchMutationContext.jsx';
 vi.mock('./LazyEditor.jsx',()=>({LazyEditor:({value,onChange,ariaLabel,readOnly})=><textarea aria-label={ariaLabel} value={value} readOnly={readOnly} onChange={event=>onChange?.(event.target.value)}/>}));
 // Independent synthetic version definitions. No host or application captures.
 const report={id:'versions',title:'Versioned records',ownerId:'owner',versionNo:2,currentDraftVersion:2};
-const inspection=(number,state='draft')=>({version:{reportId:report.id,versionNo:number,state,sourceRevision:number+10,compileStatus:'valid'},dql:`SELECT ${number}`,previewInput:{schema:{type:'object',properties:{}}},capabilities:{canEdit:true,canRun:true,canPublish:true,canUseDql:true},structure:{component:{rootView:{name:`Records${number}`,namespace:'r',source:{sql:`SELECT ${number} AS id`},columns:[{name:'id'}]}}}});
+const inspection=(number,state='draft')=>({version:{reportId:report.id,versionNo:number,state,sourceRevision:number+10,compileStatus:'valid'},dql:`SELECT ${number}`,previewInput:{reportId:report.id,versionNo:number,sourceRevision:number+10,schema:{type:'object',properties:{}}},capabilities:{canEdit:true,canRun:true,canPublish:true,canUseDql:true},structure:{component:{rootView:{name:`Records${number}`,namespace:'r',source:{sql:`SELECT ${number} AS id`},columns:[{name:'id'}]}}}});
 let root,host;
 afterEach(async()=>{if(root)await act(async()=>root.unmount());host?.remove();root=null;});
 async function mount(overrides={},props={}){
@@ -25,10 +25,10 @@ async function editSQL(){await click(document.querySelector('#reader-tab-sql'));
 
 it('lists native state and designations and refreshes the exact selected version',async()=>{
  const {api}=await mount();expect(selector().textContent).toContain('v1 · draft · Published');expect(selector().textContent).toContain('v2 · draft · Current draft');
- await select(1);expect(selector().value).toBe('1');expect(api.inspectVersion).toHaveBeenLastCalledWith('versions',1,{discoverColumns:false});
+ await select(1);expect(selector().value).toBe('1');expect(api.inspectVersion).toHaveBeenLastCalledWith('versions',1,{discoverColumns:false,includePreviewInput:false,includeEffectiveWarmup:false});
  await click(document.querySelector('[aria-label="More actions"]'));await click([...document.querySelectorAll('[role="menuitem"]')].find(node=>node.textContent.includes('Refresh component')));
- expect(api.inspectVersion).toHaveBeenLastCalledWith('versions',1,{discoverColumns:false});expect(selector().value).toBe('1');
- await click(button('Run preview'));expect(api.previewReader).toHaveBeenLastCalledWith('versions',1,{},50,undefined,false);
+ expect(api.inspectVersion).toHaveBeenLastCalledWith('versions',1,{discoverColumns:false,includePreviewInput:false,includeEffectiveWarmup:false});expect(selector().value).toBe('1');
+ await click(button('Run preview'));await click(button('Run with parameters'));expect(api.previewReader).toHaveBeenLastCalledWith('versions',1,{},50,undefined,false);
 });
 it('loads additional pages using native offset metadata',async()=>{
  const listVersions=vi.fn().mockResolvedValueOnce({items:[inspection(2).version],limit:1,offset:0}).mockResolvedValueOnce({items:[inspection(1).version],limit:1,offset:1}).mockResolvedValueOnce({items:[],limit:1,offset:2});
@@ -46,10 +46,10 @@ it('preserves unsaved SQL on cancellation and failed switching, then resets afte
 it('retains a usable previous version on a failed switch and never falls back',async()=>{
  const f=await mount();f.api.inspectVersion.mockRejectedValueOnce(new Error('No access to v1'));await select(1);
  expect(selector().value).toBe('2');expect(f.api.inspectVersion).toHaveBeenCalledTimes(2);expect(button('Run preview').disabled).toBe(false);
- await click(button('Run preview'));expect(f.api.previewReader.mock.calls[0][1]).toBe(2);
+ await click(button('Run preview'));await click(button('Run with parameters'));expect(f.api.previewReader.mock.calls[0][1]).toBe(2);
 });
 it('ignores late preview responses from the previous version',async()=>{
- let finish;const previewReader=vi.fn(()=>new Promise(resolve=>{finish=resolve;}));await mount({previewReader});await click(button('Run preview'));await select(1);
+ let finish;const previewReader=vi.fn(()=>new Promise(resolve=>{finish=resolve;}));await mount({previewReader});await click(button('Run preview'));await click(button('Run with parameters'));await select(1);
  await act(async()=>finish({data:[{id:'OLD_RESPONSE'}]}));expect(document.body.textContent).not.toContain('OLD_RESPONSE');expect(selector().value).toBe('1');
 });
 it('keeps editing restrictions for historical published versions',async()=>{

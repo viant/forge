@@ -11,7 +11,7 @@ export function sqlInspection(api,context) {
  return ()=>{
   if(!api?.inspectVersion||!context?.reportId||!context?.versionNo)throw new Error('SQL column inspection is unavailable.');
   return pending??=(async()=>{
-   const inspected=await api.inspectVersion(context.reportId,context.versionNo,{discoverColumns:true});
+   const inspected=await api.inspectVersion(context.reportId,context.versionNo,{discoverColumns:true,includePreviewInput:false,includeEffectiveWarmup:false});
    if(context.sourceRevision!=null&&inspected?.version?.sourceRevision!==context.sourceRevision)throw new Error('The component changed. Reload before discovering columns.');
    if(inspected?.diagnostics?.some(item=>item.code==='column_inspection_unavailable'))throw new Error('SQL column discovery is unavailable; check the view SQL and connector.');
    return inspected?.structure?.component?.rootView;

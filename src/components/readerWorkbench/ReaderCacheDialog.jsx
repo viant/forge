@@ -14,7 +14,7 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, canEdit = t
   const currentInspection = inspectionResult.key === inspectionKey ? inspectionResult : {};
   const inspecting = inspectionResult.key !== inspectionKey || currentInspection.loading === true;
   const discoveredStructure = currentInspection.value?.structure;
-  const columnDiscoveryError = currentInspection.error || '';
+  const warmupInspectionError = currentInspection.error || '';
   const effectiveWarmup = currentInspection.value?.effectiveWarmup;
   const effectiveResolved = effectiveWarmup?.status === 'resolved' && Array.isArray(effectiveWarmup.targets)
     && effectiveWarmup.reportId === report?.id && effectiveWarmup.versionNo === version?.versionNo
@@ -80,8 +80,14 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, canEdit = t
       return;
     }
     let cancelled = false;
-    api.inspectVersion(report.id, version.versionNo, { discoverColumns: true }).then((inspected) => {
-      if (!cancelled) setInspectionResult({key:inspectionKey, loading:false, value:inspected});
+    api.inspectVersion(report.id, version.versionNo, { discoverColumns: false, includePreviewInput: false, includeEffectiveWarmup: true }).then((inspected) => {
+      if(cancelled)return;
+      const identities=[inspected?.version,inspected?.effectiveWarmup].filter(Boolean);
+      if(!identities.length||!identities.every(item=>item.reportId===report.id&&item.versionNo===version.versionNo&&item.sourceRevision===version.sourceRevision)) {
+        setInspectionResult({key:inspectionKey,loading:false,error:'Warmup metadata does not match the inspected saved revision. Refresh the reader and try again.'});
+        return;
+      }
+      setInspectionResult({key:inspectionKey, loading:false, value:inspected});
     }).catch((cause) => {
       if (!cancelled) setInspectionResult({key:inspectionKey, loading:false, error:cause.message});
     });
@@ -165,7 +171,7 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, canEdit = t
     <DialogBody className="studio-connector-dialog-body">
       <p className="studio-dialog-lead">Configure Datly’s native prepared-view cache and edit its inline warmup plan. Browser values never contain cache credentials.</p>
       {error && <Callout intent="danger" role="alert">{error}</Callout>}
-      {columnDiscoveryError && <Callout intent="warning">Column discovery failed; the configured index column was retained. {columnDiscoveryError}</Callout>}
+      {warmupInspectionError && <Callout intent="warning">Warmup inspection failed; the configured index column was retained. {warmupInspectionError}</Callout>}
       <div className="studio-cache-layout"><div className="studio-cache-configuration">
       <section className="studio-cache-section" aria-label="Effective warmup plans">
         <h3>Effective warmup plans</h3>

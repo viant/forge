@@ -10,7 +10,7 @@ test('requests native SQL discovery once and resolves exact views, including exp
  const [summary,detail]=await Promise.all([discoverViewColumns({namespace:'summary'},inspect),discoverViewColumns({name:'Detail'},inspect)]);
  assert.equal(summary.columns[0].source,'total_rows');
  assert.equal(detail.columns[0].source,'calculated');
- assert.deepEqual(calls,[['report',2,{discoverColumns:true}]]);
+ assert.deepEqual(calls,[['report',2,{discoverColumns:true,includePreviewInput:false,includeEffectiveWarmup:false}]]);
 });
 
 test('rejects stale discovery and native discovery diagnostics',async()=>{

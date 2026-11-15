@@ -21,7 +21,7 @@ try{
  const choose=async no=>{await picker.selectOption(String(no));await page.waitForFunction(no=>document.querySelector('[aria-label="Component version"]')?.value===String(no)&&!document.querySelector('.studio-loading'),no);};
  const calls=operation=>page.evaluate(op=>window.__readerVersionsProof.calls.filter(call=>call.operation===op),operation);
  await page.goto(url);await picker.waitFor();await choose(1);
- await page.getByRole('button',{name:'Run preview',exact:true}).click();await page.getByText('version-1',{exact:true}).first().waitFor();assert.equal((await calls('preview')).at(-1).parameters.versionNo,1);
+ await page.getByRole('button',{name:'Run preview',exact:true}).click();await page.getByRole('button',{name:'Run with parameters',exact:true}).click();await page.getByText('version-1',{exact:true}).first().waitFor();assert.equal((await calls('preview')).at(-1).parameters.versionNo,1);
  await page.getByRole('button',{name:'Validate',exact:true}).click();
  const validation=page.getByRole('dialog',{name:'Validate reader draft'});await validation.getByRole('button',{name:'Validate revision',exact:true}).click();assert.equal((await calls('validate')).at(-1).parameters.versionNo,1);await validation.getByRole('button',{name:'Close',exact:true}).last().click();
  await page.getByRole('button',{name:'More actions'}).click();await page.getByRole('menuitem',{name:'Cache & warmup'}).click();
@@ -39,7 +39,7 @@ try{
  await page.evaluate(()=>{window.__readerVersionsProof.failVersion=1;});await picker.selectOption('1');await page.getByRole('button',{name:'Discard changes',exact:true}).click();await page.getByText(/Could not open version v1/).waitFor();assert.equal(await picker.inputValue(),'2');assert.match(await editor.first().textContent(),/unsaved/);
  await page.evaluate(()=>{window.__readerVersionsProof.failVersion=null;});await picker.selectOption('1');await page.getByRole('button',{name:'Discard changes',exact:true}).click();await page.getByRole('tab',{name:'Graph',exact:true,selected:true}).waitFor();assert.equal(await picker.inputValue(),'1');
  // Late execution responses cannot populate another selected version.
- await page.evaluate(()=>{window.__readerVersionsProof.delayPreview=true;});await page.getByRole('button',{name:'Run preview',exact:true}).click();await choose(2);await page.evaluate(()=>window.__readerVersionsProof.finishPreview());assert.equal(await page.getByText('LATE_PREVIEW',{exact:true}).count(),0);
+ await page.evaluate(()=>{window.__readerVersionsProof.delayPreview=true;});await page.getByRole('button',{name:'Run preview',exact:true}).click();await page.getByRole('button',{name:'Run with parameters',exact:true}).click();await choose(2);await page.evaluate(()=>window.__readerVersionsProof.finishPreview());assert.equal(await page.getByText('LATE_PREVIEW',{exact:true}).count(),0);
  await page.evaluate(()=>window.__readerVersionsProof.publishOlder());await choose(1);assert.equal(await page.getByRole('button',{name:'Validate',exact:true}).isDisabled(),true);await page.getByRole('button',{name:'Create editable draft'}).waitFor();assert.match(await picker.locator('option:checked').textContent(),/published/);
  await page.screenshot({path:path.join(output,'published-version.png')});
  if(nativeURL){

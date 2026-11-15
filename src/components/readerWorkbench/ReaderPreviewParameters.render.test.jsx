@@ -65,3 +65,46 @@ it('runs a valid empty schema directly but does not run when metadata is unavail
  await click(button('Refresh parameters'));await click(button('Run preview'));
  expect(api.previewReader).toHaveBeenCalledWith('reader',1,{},50,'/records',false);
 });
+
+it('defers preview inspection, preserves graph fields omitted from its response, and never executes while loading',async()=>{
+ const graph=inspection();delete graph.previewInput;let finish;
+ const api=apiFor(graph);api.inspectVersion.mockImplementation(async(id,no,options)=>options.includePreviewInput?new Promise(resolve=>{finish=resolve;}):graph);
+ await mount(<ReaderBuilder api={api} report={report}/>);
+ expect(api.inspectVersion).toHaveBeenCalledExactlyOnceWith('reader',1,{discoverColumns:false,includePreviewInput:false,includeEffectiveWarmup:false});
+ expect(api.previewReader).not.toHaveBeenCalled();
+ await click(button('Run preview'));
+ expect(api.inspectVersion).toHaveBeenLastCalledWith('reader',1,{discoverColumns:false,includePreviewInput:true,includeEffectiveWarmup:false});
+ expect(host.textContent).toContain('Loading preview parameter metadata');expect(host.querySelector('[aria-label="Supply Limit"]')).toBeNull();expect(host.querySelector('[role="alert"]')).toBeNull();expect(api.previewReader).not.toHaveBeenCalled();
+ await act(async()=>finish({previewInput:metadata}));
+ expect(field('Limit')).not.toBeNull();expect(api.previewReader).not.toHaveBeenCalled();
+ await click(button('Run with parameters'));expect(api.previewReader).toHaveBeenLastCalledWith('reader',1,{},50,'/records',false);
+ expect(graph.structure.component.rootView.name).toBe('records');expect(graph.dql).toBe('SELECT records.* FROM records');
+});
+
+it('distinguishes unavailable preview metadata from a resolved empty schema and retries only the projection',async()=>{
+ const graph=inspection();delete graph.previewInput;let requests=0;
+ const api=apiFor(graph);api.inspectVersion.mockImplementation(async(id,no,options)=>!options.includePreviewInput?graph:++requests===1?{version:graph.version,diagnostics:[{code:'preview_input_unavailable',message:'Native preview policy is unavailable.'}]}:{version:graph.version,previewInput:{...metadata,schema:{type:'object',properties:{}}}});
+ await mount(<ReaderBuilder api={api} report={report}/>);await click(button('Run preview'));
+ expect(host.textContent).toContain('Native preview policy is unavailable.');expect(api.previewReader).not.toHaveBeenCalled();
+ await click(button('Refresh parameters'));expect(host.textContent).not.toContain('Native preview policy is unavailable.');expect(button('Run with parameters')).toBeTruthy();expect(api.previewReader).not.toHaveBeenCalled();
+ await click(button('Run with parameters'));expect(api.previewReader.mock.calls[0][1]).toBe(1);
+ expect(api.inspectVersion.mock.calls.slice(1).every(args=>args[2].includePreviewInput===true&&args[2].includeEffectiveWarmup===false&&args[2].discoverColumns===false)).toBe(true);
+});
+
+it.each(['component','version','revision'])('discards pending preview metadata after a %s change',async(change)=>{
+ const graph=inspection();delete graph.previewInput;let finish;
+ const oldApi=apiFor(graph);oldApi.inspectVersion.mockImplementation(async(id,no,options)=>options.includePreviewInput?new Promise(resolve=>{finish=resolve;}):graph);
+ await mount(<ReaderBuilder api={oldApi} report={report}/>);await click(button('Run preview'));
+ const nextReport={...report,...(change==='component'?{id:'other'}:{}),...(change==='version'?{versionNo:2}:{})};
+ const next=inspection(undefined,nextReport.versionNo);delete next.previewInput;next.version={...next.version,reportId:nextReport.id,sourceRevision:change==='revision'?5:4};
+ const nextApi=apiFor(next);nextApi.inspectVersion.mockImplementation(async(id,no,options)=>options.includePreviewInput?{version:next.version,previewInput:{reportId:id,versionNo:no,sourceRevision:next.version.sourceRevision,schema:{type:'object',properties:{Fresh:{type:'string'}}}}}:next);
+ await act(async()=>root.render(<ReaderBuilder api={nextApi} report={nextReport}/>));
+ await act(async()=>finish({version:graph.version,previewInput:{...metadata,schema:{type:'object',properties:{STALE:{type:'string'}}}}}));
+ expect(host.querySelector('[aria-label="Supply STALE"]')).toBeNull();await click(button('Run preview'));expect(host.querySelector('[aria-label="Supply Fresh"]')).not.toBeNull();expect(oldApi.previewReader).not.toHaveBeenCalled();expect(nextApi.previewReader).not.toHaveBeenCalled();
+});
+
+it('rejects mismatched deferred identity without accepting its contract',async()=>{
+ const graph=inspection();delete graph.previewInput;
+ const api=apiFor(graph);api.inspectVersion.mockImplementation(async(id,no,options)=>options.includePreviewInput?{version:{...graph.version,sourceRevision:5},previewInput:metadata}:graph);
+ await mount(<ReaderBuilder api={api} report={report}/>);await click(button('Run preview'));expect(host.textContent).toContain('does not match the inspected saved revision');expect(host.querySelector('[aria-label="Supply Limit"]')).toBeNull();expect(api.previewReader).not.toHaveBeenCalled();
+});
