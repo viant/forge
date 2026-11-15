@@ -1294,3 +1294,20 @@ readerWorkbench:
 The host owns `delete_version`'s transport and declares this binding only when
 its deployed Studio supports deletion. `ReaderBuilder.deletion.render.test.jsx`
 checks the confirmation, pending, error, owner and absent-operation states.
+
+### Inline warmup authoring and execution
+
+ReaderCacheDialog labels its form and estimate **Inline warmup plan**. The form
+edits the inline component plan; **Run warmup** uses the existing host binding for
+the inspected saved version and executes its effective policies, including
+host-named policies. Unsaved form values and inline case validation do not decide
+execution availability. Native initialization owns policy resolution and errors.
+
+Run history owns the persisted evidence. Selecting an older run changes the
+inspected evidence only: active work continues polling and keeps Run disabled
+until the producer reports a terminal state. Diagnostics remain producer-owned,
+including failures persisted after a run was accepted. The existing Blueprint
+button loading state protects pending submissions. Mounted checks cover named
+root/child outcomes, inline plans, saved-version binding, permissions, submission,
+active history browsing and asynchronous failures. Cache storage and inline plan
+authoring retain their existing legacy workbench recipes.

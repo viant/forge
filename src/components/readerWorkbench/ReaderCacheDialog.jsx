@@ -26,7 +26,7 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, isOpen, str
   const [caseLines, setCaseLines] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [warmup, setWarmup] = useState(null);
+  const [selectedRunId, setSelectedRunId] = useState(null);
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [warming, setWarming] = useState(false);
@@ -40,7 +40,7 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, isOpen, str
     setIndexParameter(warmupConfig?.indexParameter ?? ''); setConnector(warmupConfig?.connector ?? '');
     setMaxCases(warmupConfig?.maxCases); setLimit(warmupConfig?.limit);
     setFieldNames((warmupConfig?.fieldNames ?? []).join(', ')); setCaseLines(renderCases(warmupConfig));
-    setSaving(false); setError(''); setWarmup(null); setHistory([]); setWarming(false);
+    setSaving(false); setError('');
     if (!api?.inspectVersion || !report?.id || !version?.versionNo) return;
     let cancelled = false;
     api.inspectVersion(report.id, version.versionNo, { discoverColumns: true }).then((inspected) => {
@@ -54,8 +54,8 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, isOpen, str
   useEffect(() => {
     if (!isOpen || !api || !report?.id || !version?.versionNo) return undefined;
     let cancelled = false;
-    setHistoryLoading(true);
-    api.listWarmupRuns(report.id,version.versionNo,{limit:10}).then((page) => { if (!cancelled) { const items=page?.items??[]; setHistory(items); if(items[0]) setWarmup(items[0]); } }).catch((cause) => !cancelled && setError(cause.message)).finally(() => !cancelled && setHistoryLoading(false));
+    setHistory([]); setSelectedRunId(null); setHistoryLoading(true);
+    api.listWarmupRuns(report.id,version.versionNo,{limit:10}).then((page) => { if (!cancelled) { const items=page?.items??[]; setHistory(current=>[...current,...items.filter(item=>!current.some(existing=>existing.runId===item.runId))]); setSelectedRunId(current=>current??items[0]?.runId??null); } }).catch((cause) => !cancelled && setError(cause.message)).finally(() => !cancelled && setHistoryLoading(false));
     return () => { cancelled = true; };
   }, [api, isOpen, report?.id, version?.versionNo]);
 
@@ -63,7 +63,10 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, isOpen, str
   const caseErrors = useMemo(() => validateWarmupCases(cases), [cases]);
   const caseCount = useMemo(() => warmupCaseCount(cases), [cases]);
   const caseExpression = useMemo(() => warmupCaseExpression(cases), [cases]);
-  const activeRun = warmup && ['accepted','running'].includes(warmup.status);
+  const warmup = history.find(run=>run.runId===selectedRunId);
+  // Evidence selection must not change which persisted work is being polled.
+  const pollingRun = history.find(run=>['accepted','running'].includes(run.status));
+  const activeRun = Boolean(pollingRun);
   const maxCasesLabel = maxCases ?? 'native default';
   const limitLabel = limit ?? 'native default';
   const ready = namedCache || (name.trim() && /^\d+(ms|s|m|h)$/.test(ttl) && location.trim() && (backend === 'afs' || provider.trim()));
@@ -99,22 +102,22 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, isOpen, str
 
   const executeWarmup = async () => {
     setWarming(true); setError('');
-    try { const run=await onWarmup(); setWarmup(run); setHistory((current)=>[run,...current.filter((item)=>item.runId!==run.runId)]); }
+    try { const run=await onWarmup(); setSelectedRunId(run.runId); setHistory((current)=>[run,...current.filter((item)=>item.runId!==run.runId)]); }
     catch (cause) { setError(cause.message); }
     finally { setWarming(false); }
   };
 
   useEffect(() => {
-    if (!isOpen || !api || !report?.id || !warmup?.runId || !['accepted','running'].includes(warmup.status)) return undefined;
+    if (!isOpen || !api || !report?.id || !pollingRun?.runId) return undefined;
     let cancelled=false; let timer;
-    const poll=async()=>{try{const run=await api.getWarmupRun(report.id,warmup.runId);if(cancelled)return;setWarmup(run);setHistory((current)=>[run,...current.filter((item)=>item.runId!==run.runId)]);if(['accepted','running'].includes(run.status))timer=setTimeout(poll,500);}catch(cause){if(!cancelled)setError(cause.message);}};
+    const poll=async()=>{try{const run=await api.getWarmupRun(report.id,pollingRun.runId);if(cancelled)return;setHistory(current=>current.map(item=>item.runId===run.runId?run:item));if(['accepted','running'].includes(run.status))timer=setTimeout(poll,500);}catch(cause){if(!cancelled)setError(cause.message);}};
     timer=setTimeout(poll,350);
     return()=>{cancelled=true;clearTimeout(timer);};
-  },[api,isOpen,report?.id,warmup?.runId,warmup?.status]);
+  },[api,isOpen,report?.id,pollingRun?.runId,pollingRun?.status]);
 
   return <Dialog portalClassName="forge-reader-workbench-dialog" className="studio-connector-dialog studio-cache-dialog" isOpen={isOpen} onClose={onClose} title="Cache & warmup" icon="database" canOutsideClickClose={!saving && !warming}>
     <DialogBody className="studio-connector-dialog-body">
-      <p className="studio-dialog-lead">Configure Datly’s native prepared-view cache, then author a bounded server-owned warmup plan. Browser values never contain cache credentials.</p>
+      <p className="studio-dialog-lead">Configure Datly’s native prepared-view cache and edit its inline warmup plan. Browser values never contain cache credentials.</p>
       {error && <Callout intent="danger" role="alert">{error}</Callout>}
       {columnDiscoveryError && <Callout intent="warning">Column discovery failed; the configured index column was retained. {columnDiscoveryError}</Callout>}
       <div className="studio-cache-layout"><div className="studio-cache-configuration">
@@ -126,17 +129,17 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, isOpen, str
           <Button intent="primary" icon="floppy-disk" loading={saving} disabled={!ready} onClick={saveCache}>Save cache storage</Button></>}
       </section>
 
-      <section className="studio-cache-section"><div className="studio-panel-heading"><div><h3>Warmup plan</h3><p>Estimate the complete case product before authoring or execution.</p></div><Tag minimal intent={maxCases == null || caseCount <= maxCases ? 'success' : 'danger'}>{caseCount} / {maxCasesLabel} cases</Tag></div>
+      <section className="studio-cache-section"><div className="studio-panel-heading"><div><h3>Inline warmup plan</h3><p>This form edits the inline component plan. Run warmup executes all effective policies for the saved version, including host-named policies. Unsaved form changes are not included.</p></div><Tag minimal intent={maxCases == null || caseCount <= maxCases ? 'success' : 'danger'}>{caseCount} / {maxCasesLabel} cases</Tag></div>
         <div className="studio-form-grid"><FormGroup label="Index column" labelFor="warmup-index"><HTMLSelect id="warmup-index" value={indexColumn} onChange={(event)=>setIndexColumn(event.target.value)} fill disabled={saving}><option value="">Select a column</option>{indexColumn && !columns.some((column)=>column.source===indexColumn || column.name===indexColumn) && <option value={indexColumn}>{indexColumn}</option>}{columns.map((column)=><option key={column.source||column.name} value={column.source||column.name}>{column.name}</option>)}</HTMLSelect></FormGroup><FormGroup label="Index parameter" labelFor="warmup-parameter"><InputGroup id="warmup-parameter" value={indexParameter} onChange={(event)=>setIndexParameter(event.target.value)} placeholder="TenantID" disabled={saving}/></FormGroup></div>
         <div className="studio-form-grid"><FormGroup label="Warmup connector" labelFor="warmup-connector"><HTMLSelect id="warmup-connector" value={connector} onChange={(event)=>setConnector(event.target.value)} fill disabled={saving}><option value="">Component connector</option>{connectors.map((name)=><option key={name} value={name}>{name}</option>)}</HTMLSelect></FormGroup><FormGroup label="Selected fields" labelFor="warmup-fields"><InputGroup id="warmup-fields" value={fieldNames} onChange={(event)=>setFieldNames(event.target.value)} placeholder="id, status, total" disabled={saving}/></FormGroup></div>
         <div className="studio-form-grid"><FormGroup label="Max cases" labelFor="warmup-max"><NumericInput id="warmup-max" min={0} value={maxCases ?? ''} onValueChange={(value)=>setMaxCases(Number.isNaN(value)?undefined:value)} fill disabled={saving}/></FormGroup><FormGroup label="Row limit" labelFor="warmup-limit"><NumericInput id="warmup-limit" min={0} value={limit ?? ''} onValueChange={(value)=>setLimit(Number.isNaN(value)?undefined:value)} fill disabled={saving}/></FormGroup></div>
         <FormGroup label="Case dimensions" labelFor="warmup-cases" helperText="One Name=value1,value2 dimension per line. Case count is the Cartesian product."><TextArea id="warmup-cases" value={caseLines} onChange={(event)=>setCaseLines(event.target.value)} fill rows={4} className="studio-code-input" placeholder={'Period=today,yesterday\nGranularity=hour,day'} disabled={saving}/></FormGroup>
-        <div className={`studio-case-product ${caseErrors.length?'invalid':''}`}><strong>{caseExpression} = {caseCount} {caseCount===1?'case':'cases'}</strong><span>MaxCases {maxCasesLabel} · row limit {limitLabel}</span>{caseErrors.length>0&&<span>{caseErrors[0]}</span>}</div>
-        <div className="studio-warmup-actions"><Button intent="primary" icon="heatmap" loading={saving} disabled={!cache?.enabled || caseErrors.length>0} onClick={saveWarmup}>Save warmup plan</Button>{warmupConfig && <Button icon="trash" intent="danger" disabled={saving||warming||activeRun} onClick={removeWarmup}>Remove plan</Button>}<Button icon="play" loading={warming||activeRun} disabled={!canWarmup||!warmupConfig||saving||activeRun} title={!canWarmup?'Publish permission is required to run warmup':''} onClick={executeWarmup}>{history.length?'Run again':'Run warmup'}</Button></div>
+        <div className={`studio-case-product ${caseErrors.length?'invalid':''}`}><strong>Inline warmup plan estimate: {caseExpression} = {caseCount} {caseCount===1?'case':'cases'}</strong><span>MaxCases {maxCasesLabel} · row limit {limitLabel}</span>{caseErrors.length>0&&<span>{caseErrors[0]}</span>}</div>
+        <div className="studio-warmup-actions"><Button intent="primary" icon="heatmap" loading={saving} disabled={!cache?.enabled || caseErrors.length>0} onClick={saveWarmup}>Save warmup plan</Button>{warmupConfig && <Button icon="trash" intent="danger" disabled={saving||warming||activeRun} onClick={removeWarmup}>Remove plan</Button>}<Button icon="play" loading={warming||activeRun} disabled={!canWarmup||saving||activeRun} title={!canWarmup?'Publish permission is required to run warmup':''} onClick={executeWarmup}>{history.length?'Run again':'Run warmup'}</Button></div>
       </section>
       </div><aside className="studio-warmup-evidence-panel" aria-label="Warmup operation evidence"><div className="studio-panel-heading"><div><h3>Operation evidence</h3><p>Server-owned runs survive this dialog and client disconnects.</p></div>{historyLoading&&<Tag minimal>Loading</Tag>}</div>
         {!warmup&&!historyLoading?<div className="studio-empty-compact">No warmup has been run for this version.</div>:warmup&&<WarmupEvidence run={warmup}/>}
-        {history.length>0&&<div className="studio-warmup-history"><h4>Run history</h4>{history.slice(0,8).map((run)=><button type="button" key={run.runId} className={warmup?.runId===run.runId?'selected':''} onClick={()=>setWarmup(run)}><Tag minimal intent={runIntent(run.status)}>{run.status}</Tag><span><strong>{run.plannedCases||0} planned · {run.entries||0} prepared</strong><small>{formatDate(run.requestedAt)} · {run.requestedBy}</small></span></button>)}</div>}
+        {history.length>0&&<div className="studio-warmup-history"><h4>Run history</h4>{history.slice(0,8).map((run)=><button type="button" key={run.runId} className={warmup?.runId===run.runId?'selected':''} onClick={()=>setSelectedRunId(run.runId)}><Tag minimal intent={runIntent(run.status)}>{run.status}</Tag><span><strong>{run.plannedCases||0} planned · {run.entries||0} prepared</strong><small>{formatDate(run.requestedAt)} · {run.requestedBy}</small></span></button>)}</div>}
       </aside></div>
     </DialogBody>
     <DialogFooter actions={<Button onClick={onClose} disabled={saving||warming}>Close</Button>}/>
