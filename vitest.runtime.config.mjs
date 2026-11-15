@@ -70,6 +70,7 @@ export default defineConfig({
       'src/components/table/basic/Toolbar.crossSource.render.test.jsx',
       'src/components/readerWorkbench/ReaderWorkbenchPanel.render.test.jsx',
       'src/components/readerWorkbench/ReaderBuilder.conflict.test.js',
+      'src/components/readerWorkbench/ReaderBuilder.versions.render.test.jsx',
       'src/components/readerWorkbench/ReaderBuilder.deletion.render.test.jsx',
       'src/components/readerWorkbench/ReaderPreviewParameters.render.test.jsx',
       'src/components/readerWorkbench/ReaderCacheDialog.render.test.jsx',

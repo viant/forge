@@ -1380,3 +1380,35 @@ permission presentation and storage supplied only by a root view binding. A Read
 integration checks the guarded batch request and adoption of the saved inline
 revision. Existing shared Alert, native details and workbench controls retain
 their established appearance and pending behavior.
+
+### Reader Builder version selection
+
+The header's shared HTMLSelect opens the exact numbered version through the
+existing inspection loader. Options display native state, the component's
+current-draft designation and the active publication designation separately.
+An unpublished record's retained former version is not labeled Published.
+**Load older versions** uses the native page limit/offset; list failures remain
+visible and can be retried without disabling the loaded version.
+
+Refresh, conflict reload and unpublish preserve the selected version. Creating
+an editable draft deliberately opens the new version. Native creation/deletion
+refresh the list; deletion returns to Components without choosing a survivor.
+Version selection retains the existing owner, permission and mutation guards.
+
+Switching with SQL drafts or an open contract editor reuses the existing discard
+confirmation. Canceling preserves the selection and edits. The old editors stay
+mounted while inspection is pending; failure leaves their version and edits
+usable and names the requested version in the error. Successful switching resets
+editor tabs, dialogs, temporary execution inputs, results and errors. Preview
+and relation reads from the preceding selection cannot populate the new context.
+
+Run `node scripts/test-reader-versions-browser.mjs` for the synthetic browser
+proof of version-specific preview, validation, resources, warmup and publication,
+unsaved-edit handling, failures, published restrictions and delayed responses.
+`FORGE_VERSIONS_NATIVE_URL` may point at a disposable local Studio test fixture
+providing the existing SDK gateway and `/proof/component` bootstrap response;
+the native browser pass also inspects two distinguishable versions, cancels
+removal, deletes only the older version, and checks the surviving native list.
+Fixtures are independently authored; no host data or source is included.
+Screenshots stay in ignored `output/playwright/reader-versions`. The surrounding
+workbench retains its existing legacy layout and native control styling.

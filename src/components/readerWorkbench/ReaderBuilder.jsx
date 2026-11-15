@@ -63,10 +63,45 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
     }
     // Never reload through load(): it can select another draft or the deleted version.
     setDeleted(true); setDeleteTarget(null);
+    await refreshVersions();
     try { await returnToComponents(); }
     finally { deletionPending.current = false; setDeleting(false); }
   };
   const [version, setVersion] = useState(null);
+  const [versions, setVersions] = useState([]);
+  const [versionsLoading, setVersionsLoading] = useState(false);
+  const [versionsError, setVersionsError] = useState('');
+  const [versionsNextOffset, setVersionsNextOffset] = useState(null);
+  const [publication, setPublication] = useState(null);
+  const [switchingVersion, setSwitchingVersion] = useState(false);
+  const [versionSwitchError, setVersionSwitchError] = useState('');
+  const versionsGeneration = useRef(0);
+  const publicationGeneration = useRef(0);
+  const refreshVersions = async (offset = 0) => {
+    if (!api.listVersions) return;
+    const generation = ++versionsGeneration.current;
+    setVersionsLoading(true); setVersionsError('');
+    try {
+      const page = await api.listVersions(report.id, {limit:100, offset});
+      if (generation !== versionsGeneration.current) return;
+      const items = page?.items ?? [];
+      setVersions(current => offset ? [...current.filter(item=>!items.some(next=>next.versionNo===item.versionNo)), ...items] : items);
+      const limit = page?.limit || 100;
+      setVersionsNextOffset(items.length >= limit ? (page?.offset ?? offset) + limit : null);
+    } catch (cause) { if (generation === versionsGeneration.current) setVersionsError(cause.message); }
+    finally { if (generation === versionsGeneration.current) setVersionsLoading(false); }
+  };
+  const refreshPublication = async () => {
+    if (!api.getPublication) return;
+    const generation = ++publicationGeneration.current;
+    try { const value = await api.getPublication(report.id); if (generation === publicationGeneration.current) setPublication(value); }
+    catch (cause) { if (generation === publicationGeneration.current) { setPublication(null); if(cause.code!=='not_found')setVersionsError(cause.message); } }
+  };
+  useEffect(() => {
+    setVersions([]); setPublication(null); setVersionsNextOffset(null);
+    refreshVersions(); refreshPublication();
+    return () => { versionsGeneration.current++; publicationGeneration.current++; };
+  }, [api, report?.id, report?.currentDraftVersion]);
   const [creatingReader, setCreatingReader] = useState(true);
   const [rootDraftDirty, setRootDraftDirty] = useState(false);
   const [rootDraftSaving, setRootDraftSaving] = useState(false);
@@ -124,13 +159,18 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
   const [contractEditing,setContractEditing]=useState(false);
   useEffect(()=>{onStateChange?.({dirty:rootDraftDirty||dirtyTabs.size>0||contractEditing,busy:rootDraftSaving||deleting});},[rootDraftDirty,dirtyTabs,contractEditing,rootDraftSaving,deleting,onStateChange]);
   const [pendingTabAction,setPendingTabAction]=useState(null);
+  // Blueprint retains closing alert handlers during its exit transition.
+  const pendingTabActionRef=useRef(null);
+  pendingTabActionRef.current=pendingTabAction;
 
   const loadGeneration = useRef(0);
-  const load = async (preferredVersionNo = null) => {
+  const load = async (preferredVersionNo = version?.versionNo, switching = false) => {
     if (!report) return;
     const generation = ++loadGeneration.current;
     const current = () => generation === loadGeneration.current;
-    setLoading(true); setError(''); setPreview(null); setCubePreviewOpen(false); setTestedView(null); setTestedRelation(null);
+    setLoading(true); setSwitchingVersion(switching); setVersionSwitchError('');
+    previewGeneration.current++; setPreviewing(false); setTestingView(''); setTestingRelation('');
+    if (!switching) { setError(''); setPreview(null); setCubePreviewOpen(false); setTestedView(null); setTestedRelation(null); }
     try {
       const selectedVersionNo = Number.isInteger(preferredVersionNo) && preferredVersionNo > 0 ? preferredVersionNo : report.versionNo;
       let selected;
@@ -150,11 +190,15 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
           selected = await api.inspectVersion(report.id, version.versionNo, { discoverColumns: false });
         }
       }
-      if (current()) { setVersion(selected.version); setInspection(selected); }
-    } catch (cause) { if (current()) setError(cause.message); }
-    finally { if (current()) setLoading(false); }
+      if (current()) {
+        if (switching || (version && selected.version.versionNo!==version.versionNo)) resetVersionContext();
+        setVersion(selected.version); setInspection(selected);
+      }
+    } catch (cause) {
+      if (current()) { if (switching) setVersionSwitchError(`Could not open version v${preferredVersionNo}: ${cause.message}`); else setError(cause.message); }
+    } finally { if (current()) { setLoading(false); setSwitchingVersion(false); } }
   };
-  useEffect(() => { load(); return () => { loadGeneration.current++; }; }, [api, report?.id, report?.versionNo]);
+  useEffect(() => { load(report?.versionNo ?? null); return () => { loadGeneration.current++; }; }, [api, report?.id, report?.versionNo]);
 
   useEffect(() => { setCreatingReader(true);setWorkspaceTab('graph');setSQLTab('');setViewTabs([]);setDirtyTabs(new Set());setPreviewError(''); }, [report?.id]);
 
@@ -173,7 +217,9 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
   const canEdit = ready && capabilities.canEdit !== false && (!version?.state || version.state === 'draft');
   const canRun = ready && capabilities.canRun !== false;
   const canPublish = ready && capabilities.canPublish !== false;
-  const canUseDQL = ready && capabilities.canUseDql === true;
+  const canUseDQL = (ready || switchingVersion) && capabilities.canUseDql === true;
+  const versionOptions = versions.map(item=>item.versionNo===version?.versionNo ? version : item);
+  if(version && !versions.some(item=>item.versionNo===version.versionNo))versionOptions.push(version);
   useEffect(() => {
     let cancelled = false;
     setSQLFiles([]); setSQLResourceError('');
@@ -196,10 +242,8 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
     try {
       const draft = await cloneReaderDraft(api, report.id, version.versionNo);
       if (onReportUpdated) onReportUpdated({ ...report, versionNo: draft.versionNo, currentDraftVersion: draft.versionNo });
-      else {
-        const next = await api.inspectVersion(report.id, draft.versionNo);
-        setVersion(next.version); setInspection(next);
-      }
+      else await load(draft.versionNo, true);
+      await refreshVersions();
     } catch (cause) {
       setError(cause.message);
     } finally { setCloningDraft(false); }
@@ -208,6 +252,7 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
     const draft = version || await api.createVersion(report.id, { authoringMode: 'dql', notes: 'Created from source SQL.' });
     // Keep the empty draft for retry when compilation fails, including after cancel.
     setVersion(draft);
+    if (!version) await refreshVersions();
     const operation = visibility === 'internal' ? {type:'batch',operations:[
       {type:'createReader',reader:{...reader,package:`${report.componentScope}/${report.componentName}`,connector:report.defaultConnectorName}},
       {type:'setSetting',setting:{name:'internal',args:['true']}},
@@ -323,17 +368,17 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
     let result;
     try { result = await api.publishReader(report.id, inspection.version.versionNo, inspection.version.sourceRevision, reason); }
     catch (cause) { if (cause?.code === 'conflict') setConflict(cause); throw cause; }
-    await load(result.activeVersionNo || inspection.version.versionNo);
+    await load(inspection.version.versionNo); await refreshVersions(); await refreshPublication();
     return result;
   };
   const promoteVersion = async (selected,reason) => {
     const result=await api.publishReader(report.id,selected.versionNo,selected.sourceRevision,reason);
-    await load(result.activeVersionNo || selected.versionNo); return result;
+    await load(selected.versionNo, selected.versionNo!==version?.versionNo); await refreshVersions(); await refreshPublication(); return result;
   };
   const unpublishDraft = async (expectedActiveGeneration, reason) => {
     if (!report) throw new Error('Component is unavailable.');
     const result = await api.unpublishReader(report.id, expectedActiveGeneration, reason);
-    await load();
+    await load(); await refreshVersions(); await refreshPublication();
     return result;
   };
   const rollbackDraft = async (historicalVersion, reason) => {
@@ -341,7 +386,7 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
     let result;
     try { result = await api.rollbackReader(report.id, historicalVersion.versionNo, historicalVersion.sourceRevision, reason); }
     catch (cause) { if (cause?.code === 'conflict') setConflict(cause); throw cause; }
-    await load(result.activeVersionNo || historicalVersion.versionNo);
+    await load(historicalVersion.versionNo, historicalVersion.versionNo!==version?.versionNo); await refreshVersions(); await refreshPublication();
     return result;
   };
   const resourceChanged = (updated) => {
@@ -369,7 +414,23 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
     if(next==='sql'&&!sqlTab&&rootView)openSQLTab({type:'view',name:rootView.namespace||rootView.name,label:rootView.name,view:rootView});
     setWorkspaceTab(next);
   };
-  const discardPendingTab=()=>{const action=pendingTabAction;if(!action)return;if(action.kind==='close')closeViewTabNow(action.name,action.mode);else if(action.kind==='cancel-root'){setCreatingReader(false);}else if(action.kind==='back'){setDirtyTabs(new Set());onBack();}setPendingTabAction(null);};
+  const resetVersionContext = () => {
+    setViewTabs([]); setDirtyTabs(new Set()); setRootDraftDirty(false); setContractEditing(false);
+    setCreatingReader(true); setWorkspaceTab('graph'); setSQLTab(''); setInputTab('parameters'); setOutputTab('parameters');
+    setSelectedNode(null); setGraphBrowse({query:'',page:0}); setShowRawDQL(false); setToolsOpen(false);
+    setSubviewDialogOpen(false); setRemoveViewDialogOpen(false); setEditRelation(null); setEditFields(null);
+    setAnalyticsDialogOpen(false); setCacheDialogOpen(false); setExposureDialogOpen(false);
+    setValidationDialogOpen(false); setPublicationDialogOpen(false); setResourcesDialogOpen(false);
+    setACLDialogOpen(false); setEntityScopeOpen(false); setConflict(null); setDeleteTarget(null); setDeleteError('');
+    setPreview(null); setTestedView(null); setTestedRelation(null); setPreviewError(''); setPreviewTarget(null);
+    setCubePreviewOpen(false); setPreviewParametersOpen(false); lastPreviewRequest.current=null; setError('');
+  };
+  const requestVersion = (versionNo) => {
+    if (versionNo===version?.versionNo || loading || mutationState.busy || rootDraftSaving || deleting || cloningDraft) return;
+    if (rootDraftDirty || dirtyTabs.size || contractEditing) { setPendingTabAction({kind:'version',versionNo}); return; }
+    load(versionNo, true);
+  };
+  const discardPendingTab=()=>{const action=pendingTabActionRef.current;if(!action||action!==pendingTabAction)return;pendingTabActionRef.current=null;if(action.kind==='version')load(action.versionNo,true);else if(action.kind==='close')closeViewTabNow(action.name,action.mode);else if(action.kind==='cancel-root'){setCreatingReader(false);}else if(action.kind==='back'){setDirtyTabs(new Set());onBack();}setPendingTabAction(null);};
   const requestBack=()=>{if(rootDraftDirty||dirtyTabs.size||contractEditing){setPendingTabAction({kind:'back',reason:contractEditing?'contract':''});return;}onBack();};
   const runTool=(action)=>{setToolsOpen(false);action();};
   const retryPreview=()=>{const previous=lastPreviewRequest.current;if(previous?.view)runViewTest(previous.view);else if(previous)runPreview(previous.target,previous.input,previous.cube);else requestPreview();};
@@ -394,10 +455,11 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
   const testSelectedRelation = async (node) => {
     if (!inspection?.version || node?.type !== 'relation') return;
     const identity = `${node.parentName}->${node.child?.name || node.relation?.name}`;
+    const generation=previewGeneration.current;
     setTestingRelation(node.key); setError(''); setTestedRelation(null);
-    try { setTestedRelation(await api.testReaderRelation(report.id, inspection.version.versionNo, identity, {}, 50)); }
-    catch (cause) { setError(cause.message); }
-    finally { setTestingRelation(''); }
+    try { const result=await api.testReaderRelation(report.id, inspection.version.versionNo, identity, {}, 50);if(generation===previewGeneration.current)setTestedRelation(result); }
+    catch (cause) { if(generation===previewGeneration.current)setError(cause.message); }
+    finally { if(generation===previewGeneration.current)setTestingRelation(''); }
   };
   const removeSelectedView = (node) => {
     const target = selectedViewNode(node);
@@ -422,10 +484,10 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
 
   if (deleted) return <main aria-label="Component editor"><Callout intent={deleteError?'warning':'success'} role="status">{deleteError || 'Version permanently deleted.'}</Callout><Button onClick={returnToComponents}>Components</Button></main>;
 
-  return <main ref={headingRef} tabIndex={-1} aria-label="Component editor" className="studio-workspace studio-builder-workspace">
+  return <main key={`${report.id}:${version?.versionNo}`} ref={headingRef} tabIndex={-1} aria-label="Component editor" className="studio-workspace studio-builder-workspace">
     <div className="studio-builder-header">
       <div><Button minimal icon="arrow-left" disabled={rootDraftSaving||deleting||mutationState.busy} onClick={requestBack}>Components</Button></div>
-      {version && !needsReader && <div className="studio-builder-header-actions"><DownloadComponentButton api={api} report={report} versionNo={version.versionNo} disabled={!canUseDQL}/><div className="studio-builder-status" aria-label="Component revision status"><Tag minimal>{report?.namespace ?? 'general'}</Tag><Tag minimal>{version.state==='published'?'Published':version.state==='draft'||!version.state?'Draft':'Version'} v{version.versionNo}</Tag><Tag minimal>rev {version.sourceRevision}</Tag><Tag intent={version.compileStatus === 'valid' ? 'success' : version.compileStatus === 'invalid' ? 'danger' : 'warning'} minimal>{version.compileStatus}</Tag>{serverScoped&&<Tag minimal intent="warning" title="Server-owned access context narrows this reader at runtime">Scoped</Tag>}</div>{version.state&&version.state!=='draft'?<Button icon="duplicate" loading={cloningDraft} disabled={!ready || capabilities.canEdit===false} onClick={createDraft}>Create editable draft</Button>:<Button icon="edit" disabled={!canEdit} onClick={()=>setExposureDialogOpen(true)}>Edit component</Button>}</div>}
+      {version && <div className="studio-builder-header-actions"><DownloadComponentButton api={api} report={report} versionNo={version.versionNo} disabled={!canUseDQL}/><div className="studio-builder-status" aria-label="Component revision status"><Tag minimal>{report?.namespace ?? 'general'}</Tag><><HTMLSelect aria-label="Component version" value={version.versionNo} disabled={loading||deleting||mutationState.busy||rootDraftSaving||cloningDraft||Boolean(deleteTarget)||Boolean(pendingTabAction)} onChange={event=>requestVersion(Number(event.target.value))}>{versionOptions.map(item=><option key={item.versionNo} value={item.versionNo}>v{item.versionNo} · {item.state || 'Version'}{item.versionNo===report.currentDraftVersion?' · Current draft':''}{publication?.status!=='unpublished'&&item.versionNo===publication?.activeVersionNo?' · Published':''}</option>)}</HTMLSelect>{versionsNextOffset!==null&&<Button small loading={versionsLoading} disabled={loading||mutationState.busy} onClick={()=>refreshVersions(versionsNextOffset)}>Load older versions</Button>}</><Tag minimal>rev {version.sourceRevision}</Tag><Tag intent={version.compileStatus === 'valid' ? 'success' : version.compileStatus === 'invalid' ? 'danger' : 'warning'} minimal>{version.compileStatus}</Tag>{serverScoped&&<Tag minimal intent="warning" title="Server-owned access context narrows this reader at runtime">Scoped</Tag>}</div>{version.state&&version.state!=='draft'?<Button icon="duplicate" loading={cloningDraft} disabled={!ready || capabilities.canEdit===false} onClick={createDraft}>Create editable draft</Button>:<Button icon="edit" disabled={!canEdit} onClick={()=>setExposureDialogOpen(true)}>Edit component</Button>}</div>}
     </div>
     {version && !needsReader && <div className="studio-builder-actions" role="toolbar" aria-label="Component authoring commands">
       <Button intent="primary" icon="play" disabled={!canPreview} loading={previewing || Boolean(testingView)} onClick={()=>requestPreview()}>Run preview</Button>
@@ -440,7 +502,7 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
         <MenuItem text="Skills" icon="learning" disabled={!ready||capabilities.canView===false} onClick={()=>runTool(()=>{setResourceMode('skills');setResourcesDialogOpen(true);})}/>
         {capabilities.canManageAcl===true&&<MenuItem text="Permissions" icon="lock" disabled={!canPublish} onClick={()=>runTool(()=>setACLDialogOpen(true))}/>}
         <MenuItem text="Refresh component" icon="refresh" onClick={()=>runTool(load)}/>
-      </Menu>}><Button icon="more" aria-label="More actions">More</Button></Popover>
+      </Menu>}><Button icon="more" aria-label="More actions" disabled={loading}>More</Button></Popover>
     </div>}
     {version && !needsReader && (!canEdit || serverScoped) && <p className="studio-muted">{!canEdit && 'Create an editable draft to validate or change this version. '}{serverScoped && 'Preview uses your verified runtime access; the server enforces entity scope.'}</p>}
     {typeof api.deleteVersion==='function' && subject && report.ownerId===subject && version && <Button intent="danger" icon="trash" disabled={loading||deleting||mutationState.busy||rootDraftSaving} onClick={confirmVersionDeletion}>Delete version v{version.versionNo}</Button>}
@@ -449,10 +511,13 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
       <p>Permanently delete <strong>{deleteTarget?.title} ({deleteTarget?.id}) · version {deleteTarget?.versionNo}</strong>?</p>
       <p>Source, resources, and completed warmup evidence will be permanently removed. Retained publication and audit history survives. Unsaved edits for this version will also be discarded.</p>
     </Alert>
-    {error && <Callout intent="danger" title="Reader Builder request failed" role="alert">{error}<Button small minimal intent="danger" onClick={load}>Retry</Button></Callout>}
+    {versionsLoading && <span role="status">Loading versions…</span>}
+    {versionsError && <Callout intent="warning" title="Version list unavailable">{versionsError}<Button small onClick={()=>{refreshVersions();refreshPublication();}}>Retry version list</Button></Callout>}
+    {versionSwitchError && <Callout intent="danger" role="alert">{versionSwitchError}</Callout>}
+    {error && <Callout intent="danger" title="Reader Builder request failed" role="alert">{error}<Button small minimal intent="danger" onClick={()=>load()}>Retry</Button></Callout>}
     {loading && <div className="studio-loading"><Spinner size={28} /></div>}
-    {!loading && !error && needsReader && (creatingReader ? <ReaderCreateForm routePrefix={defaults.routePrefix} key={report.id} report={report} disabled={capabilities.canEdit===false} onCreate={createReader} onDirtyChange={setRootDraftDirty} onBusyChange={setRootDraftSaving} onCancel={()=>rootDraftDirty ? setPendingTabAction({kind:'cancel-root'}) : setCreatingReader(false)} importAction={<ImportComponentButton api={api} report={report} label="Load DQL" onImported={(updated)=>onReportUpdated ? onReportUpdated(updated) : load()}/>}/> : <Card className="studio-card studio-empty" elevation={0}><h2>No reader definition yet</h2><p>Create a reader from SQL, or load an existing DQL file or archive.</p><div className="studio-schema-actions"><Button intent="primary" icon="new-object" disabled={capabilities.canEdit===false} onClick={()=>setCreatingReader(true)}>Create reader</Button><ImportComponentButton api={api} report={report} label="Load DQL" onImported={(updated)=>onReportUpdated ? onReportUpdated(updated) : load()}/></div></Card>)}
-    {!loading && version && !needsReader && <>
+    {(!loading || switchingVersion) && !error && needsReader && (creatingReader ? <ReaderCreateForm routePrefix={defaults.routePrefix} key={report.id} report={report} disabled={loading||capabilities.canEdit===false} onCreate={createReader} onDirtyChange={setRootDraftDirty} onBusyChange={setRootDraftSaving} onCancel={()=>rootDraftDirty ? setPendingTabAction({kind:'cancel-root'}) : setCreatingReader(false)} importAction={<ImportComponentButton api={api} report={report} label="Load DQL" onImported={(updated)=>onReportUpdated ? onReportUpdated(updated) : load()}/>}/> : <Card className="studio-card studio-empty" elevation={0}><h2>No reader definition yet</h2><p>Create a reader from SQL, or load an existing DQL file or archive.</p><div className="studio-schema-actions"><Button intent="primary" icon="new-object" disabled={capabilities.canEdit===false} onClick={()=>setCreatingReader(true)}>Create reader</Button><ImportComponentButton api={api} report={report} label="Load DQL" onImported={(updated)=>onReportUpdated ? onReportUpdated(updated) : load()}/></div></Card>)}
+    {(!loading || switchingVersion) && version && !needsReader && <>
       <WorkspaceTabs value={workspaceTab} onSelect={navigateWorkspace} pending={previewing||Boolean(testingView)}/>
       <div className="studio-builder-content">
         <section className="studio-workspace-panel" role="tabpanel" id="reader-panel-graph" aria-labelledby="reader-tab-graph" hidden={workspaceTab!=='graph'}>
@@ -517,10 +582,10 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
     <ReaderExposureDialog isOpen={exposureDialogOpen} readOnly={!canEdit} onCache={()=>{setExposureDialogOpen(false);setCacheDialogOpen(true);}} api={api} structure={inspection?.structure} version={version} report={report} onReportUpdated={onReportUpdated} onClose={()=>setExposureDialogOpen(false)} onApply={applyCommand}/>
     <ReaderValidationDialog isOpen={validationDialogOpen} version={version} canUseDQL={canUseDQL} onClose={()=>setValidationDialogOpen(false)} onValidate={validateDraft} onOpenSource={()=>{setValidationDialogOpen(false);setWorkspaceTab('sql');setSQLTab('advanced');setShowRawDQL(true);}}/>
     <ReaderPublicationDialog isOpen={publicationDialogOpen} api={api} report={report} version={version} inspection={inspection} onClose={()=>setPublicationDialogOpen(false)} onPublish={publishDraft} onPromote={promoteVersion} onUnpublish={unpublishDraft} onRollback={rollbackDraft}/>
-    <ReaderResourcesDialog mode={resourceMode} isOpen={resourcesDialogOpen} initialAction={resourceAction} initialSkillId={report?.resourceSkillId || ''} api={api} report={report} version={version} structure={inspection?.structure} onClose={()=>{setResourcesDialogOpen(false);onResourcesClosed?.();}} onChanged={resourceChanged} onDraftCreated={(draft)=>onReportUpdated?.({...report,versionNo:draft.versionNo,currentDraftVersion:draft.versionNo})}/>
+    <ReaderResourcesDialog mode={resourceMode} isOpen={resourcesDialogOpen} initialAction={resourceAction} initialSkillId={report?.resourceSkillId || ''} api={api} report={report} version={version} structure={inspection?.structure} onClose={()=>{setResourcesDialogOpen(false);onResourcesClosed?.();}} onChanged={resourceChanged} onDraftCreated={async(draft)=>{if(onReportUpdated)onReportUpdated({...report,versionNo:draft.versionNo,currentDraftVersion:draft.versionNo});else await load(draft.versionNo,true);await refreshVersions();}}/>
     <ReaderACLDialog isOpen={aclDialogOpen} api={api} report={report} onClose={()=>setACLDialogOpen(false)}/>
     <ReaderConflictDialog conflict={conflict} reloading={conflictReloading} onReview={()=>setConflict(null)} onReload={reloadAfterConflict}/>
-    <Alert portalClassName="forge-reader-workbench-dialog" isOpen={Boolean(pendingTabAction)} intent="warning" icon="warning-sign" confirmButtonText="Discard changes" cancelButtonText="Keep editing" onCancel={()=>setPendingTabAction(null)} onConfirm={discardPendingTab} canEscapeKeyCancel canOutsideClickCancel><p>{pendingTabAction?.reason==='contract'?'An input or output editor is still open. Leaving now discards its unsaved changes.':needsReader ? 'Your root SQL has unsaved changes. Leaving now discards the query you entered.' : 'This SQL tab has unsaved changes. Leaving it now discards the draft; the saved Datly view remains unchanged.'}</p></Alert>
+    <Alert portalClassName="forge-reader-workbench-dialog" isOpen={Boolean(pendingTabAction)} intent="warning" icon="warning-sign" confirmButtonText="Discard changes" cancelButtonText="Keep editing" onCancel={()=>setPendingTabAction(null)} onConfirm={discardPendingTab} canEscapeKeyCancel canOutsideClickCancel><p>{pendingTabAction?.kind==='version'?`Open version v${pendingTabAction.versionNo}? Your unsaved edits will be discarded only after that version loads successfully.`:pendingTabAction?.reason==='contract'?'An input or output editor is still open. Leaving now discards its unsaved changes.':needsReader ? 'Your root SQL has unsaved changes. Leaving now discards the query you entered.' : 'This SQL tab has unsaved changes. Leaving it now discards the draft; the saved Datly view remains unchanged.'}</p></Alert>
   </main>;
 }
 
