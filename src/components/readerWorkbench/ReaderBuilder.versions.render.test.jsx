@@ -94,3 +94,18 @@ it('retains publication metadata that arrives after another version page',async(
  const listVersions=vi.fn().mockResolvedValueOnce({items:[inspection(2).version],limit:1,offset:0}).mockResolvedValueOnce({items:[inspection(1).version],limit:1,offset:1});
  await mount({getPublication,listVersions});await click(button('Load older versions'));await act(async()=>finish({activeVersionNo:1,status:'active'}));expect(selector().textContent).toContain('v1 · draft · Published');
 });
+it('retains initial root SQL and compilation diagnostics while allocating and reusing its first draft',async()=>{
+ let finish;const onStateChange=vi.fn();
+ const createVersion=vi.fn().mockResolvedValue(inspection(1).version);
+ const applyReaderCommand=vi.fn().mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;})).mockResolvedValue({applied:true,inspection:inspection(1)});
+ await mount({listVersions:vi.fn().mockResolvedValue({items:[]}),createVersion,applyReaderCommand},{report:{id:'versions',title:'New records'},onStateChange});
+ const editor=document.querySelector('textarea[aria-label="New reader SQL source"]');
+ await act(async()=>{Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(editor,'SELECT id FROM records');editor.dispatchEvent(new Event('input',{bubbles:true}));});
+ await click(button('Create reader'));
+ expect(createVersion).toHaveBeenCalledOnce();expect(editor.isConnected).toBe(true);expect(editor.value).toBe('SELECT id FROM records');expect(button('Create reader').disabled).toBe(true);expect(onStateChange.mock.lastCall[0].busy).toBe(true);
+ await act(async()=>finish({applied:false,inspection:{diagnostics:[{message:'Native compilation rejected the root SQL'}]}}));
+ expect(document.querySelector('[role="alert"]').textContent).toContain('Native compilation rejected the root SQL');expect(editor.isConnected).toBe(true);expect(editor.value).toBe('SELECT id FROM records');
+ await click(button('Create reader'));
+ expect(createVersion).toHaveBeenCalledOnce();expect(applyReaderCommand).toHaveBeenCalledTimes(2);expect(applyReaderCommand).toHaveBeenLastCalledWith('versions',1,{expectedSourceRevision:11,operation:{type:'createReader',reader:{name:'record',route:'/readers/versions',sql:'SELECT id FROM records'}}});
+ expect(document.querySelector('#reader-tab-graph')).not.toBeNull();
+});

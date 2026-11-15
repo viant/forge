@@ -1399,7 +1399,10 @@ Switching with SQL drafts or an open contract editor reuses the existing discard
 confirmation. Canceling preserves the selection and edits. The old editors stay
 mounted while inspection is pending; failure leaves their version and edits
 usable and names the requested version in the error. Successful switching resets
-editor tabs, dialogs, temporary execution inputs, results and errors. Preview
+editor tabs, dialogs, temporary execution inputs, results and errors. The reset
+identity follows the accepted inspection: allocating the first draft keeps the
+initial Root SQL form and pending submission mounted. Native compilation errors
+retain the SQL, and retry reuses that allocated draft. Preview
 and relation reads from the preceding selection cannot populate the new context.
 
 Run `node scripts/test-reader-versions-browser.mjs` for the synthetic browser
