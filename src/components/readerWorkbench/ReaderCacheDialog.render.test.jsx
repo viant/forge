@@ -56,7 +56,7 @@ it('allows native policy resolution without an inline plan and labels estimates 
  const {start}=await mountRuns({start:vi.fn().mockResolvedValue(run('named-root','completed'))});
  expect(runButton().disabled).toBe(false);
  await click(runButton());expect(start).toHaveBeenCalledOnce();
- expect(document.body.textContent).toContain('Inline warmup plan');
+ expect(document.body.textContent).toContain('Root inline warmup plan');
  expect(document.body.textContent).toContain('Unsaved form changes are not included.');
 });
 
@@ -143,7 +143,7 @@ it('submits the inspected saved version through Reader Builder bindings, excludi
  await mount(<ReaderBuilder api={api} report={{...report,versionNo:2}} onBack={vi.fn()}/>);
  await click(document.querySelector('[aria-label="More actions"]'));
  await click([...document.querySelectorAll('[role="menuitem"]')].find(item=>item.textContent.includes('Cache & warmup')));
- await click([...document.querySelectorAll('summary')].find(summary=>summary.textContent==='Inline warmup plan'));
+ await click([...document.querySelectorAll('summary')].find(summary=>summary.textContent==='Root inline warmup plan'));
  const input=document.querySelector('#warmup-cases');
  await act(async()=>{
   Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(input,'Region=');
@@ -170,8 +170,8 @@ it('retains a newly submitted run when the initial history request finishes late
  expect(get).toHaveBeenCalledWith('reader','new');expect(runButton().disabled).toBe(false);
 });
 
-// Synthetic native inspection envelopes. Policy provenance and case values are
-// intentionally absent, matching the public producer contract.
+// Independently authored synthetic native envelopes. This legacy fixture omits
+// optional provenance; case values are never supplied by inspection.
 const targets=[
  {view:'',policyName:'shared-policy',cacheName:'root-cache',connectorName:'batch',indexColumn:'ID',indexParameter:'RecordID',indexMeta:true,maxCases:5,rowLimit:0,cases:[{dimensions:[{name:'Region',valueCount:2,excludeDefault:true}]}]},
  {view:'root/children',policyName:'shared-policy',cacheName:'child-cache',indexColumn:'ChildID'},
@@ -185,7 +185,7 @@ async function mountMetadata({response={structure:noInlineStructure,effectiveWar
  return {api,onApply,onWarmup,render};
 }
 const effectiveSection=()=>document.querySelector('[aria-label="Effective warmup plans"]');
-const inlineDetails=()=>[...document.querySelectorAll('details')].find(details=>details.querySelector(':scope > summary')?.textContent==='Inline warmup plan');
+const inlineDetails=()=>[...document.querySelectorAll('details')].find(details=>details.querySelector(':scope > summary')?.textContent==='Root inline warmup plan');
 
 it('displays distinct root and child targets with read-only native settings before execution',async()=>{
  const {onApply,onWarmup}=await mountMetadata();
@@ -195,10 +195,29 @@ it('displays distinct root and child targets with read-only native settings befo
  expect(rows[0].textContent).toContain('root-cache');expect(rows[0].textContent).toContain('batch');
  expect(rows[0].textContent).toContain('RecordID');expect(rows[0].textContent).toContain('Region: 2 values');expect(rows[0].textContent).toContain('Exclude default: Yes');
  expect(rows[0].textContent).toContain('Unlimited');expect(rows[1].textContent).toContain('Native default');
- expect(effectiveSection().textContent.toLowerCase()).not.toContain('origin');
+ expect(rows[0].cells[2].textContent).toBe('Not supplied');
+ expect(rows[1].cells[2].textContent).toBe('Not supplied');
+ expect(rows[0].cells[1].textContent).toContain('Policy reference: Not supplied');
  expect(inlineDetails().open).toBe(false);
  expect(onApply).not.toHaveBeenCalled();expect(onWarmup).not.toHaveBeenCalled();
  await click(runButton());expect(onWarmup).toHaveBeenCalledExactlyOnceWith();expect(onApply).not.toHaveBeenCalled();
+});
+
+it('renders authoritative native provenance independently from policy names and storage',async()=>{
+ const supplied=[
+  {...targets[0],policyName:'display-name',origin:'host',policyRef:'logical-policy',work:[{view:'summary',policyName:'own-name',origin:'inline',cacheName:'summary-storage'}]},
+  {...targets[1],policyName:'named-but-inline',origin:'inline'},
+  {view:'other',policyName:'host-looking-name',cacheName:'logical-policy'},
+ ];
+ await mountMetadata({response:{structure:noInlineStructure,effectiveWarmup:effective({targets:supplied})}});
+ const rows=effectiveSection().querySelectorAll('tbody tr');
+ expect(rows[0].cells[2].textContent).toBe('host');expect(rows[0].cells[1].textContent).toContain('Policy reference: logical-policy');
+ expect(rows[1].cells[2].textContent).toBe('inline');expect(rows[1].cells[1].textContent).toContain('Policy reference: Not supplied');
+ expect(rows[2].cells[2].textContent).toBe('Not supplied');expect(rows[2].cells[1].textContent).toContain('Policy reference: Not supplied');
+ await click(rows[0].querySelector('summary'));
+ expect(rows[0].textContent).toContain('Origin: inline · Policy reference: Not supplied');
+ expect(effectiveSection().querySelector('input,select,textarea')).toBeNull();
+ expect(byText('Replace root reference with inline…')).toBeUndefined();
 });
 
 it('expands existing inline editing independently from read-only effective targets',async()=>{
@@ -256,4 +275,136 @@ it('ignores late inspection responses and mismatched producer revisions',async()
  expect(effectiveSection().textContent).toContain('current-policy');expect(effectiveSection().textContent).not.toContain('shared-policy');
  await fixture.render({version:{versionNo:2,sourceRevision:6}});
  expect(effectiveSection().textContent).not.toContain('current-policy');expect(effectiveSection().textContent).toContain('unavailable');
+});
+
+const referencedRoot={component:{rootView:{name:'Records',namespace:'records',columns:[{name:'ID',source:'ID'}],source:{bindings:{cacheWarmup:'shared'}}},settings:{cache:{enabled:true,name:'storage'}}},functions:[
+ {name:'cache_warmup',occurrence:0,args:['child',"'shared'"]},
+ {name:'cache_warmup',occurrence:1,args:['records',"'shared'"]},
+]};
+const rootResponse={structure:referencedRoot,effectiveWarmup:effective({targets:[{view:'',policyName:'resolved-display-name',indexColumn:'HOST_ID',cases:[{dimensions:[{name:'PrivateCases',valueCount:12}]}]},{view:'child',policyName:'shared'}]})};
+const byText=text=>[...document.querySelectorAll('button')].find(button=>button.textContent.trim()===text);
+async function selectIndex(){await act(async()=>{const input=document.querySelector('#warmup-index');input.value='ID';input.dispatchEvent(new Event('change',{bubbles:true}));});}
+async function reviewReplacement(){await click(byText('Replace root reference with inline…'));await selectIndex();await click(byText('Review root reference replacement'));}
+const rootBatch={type:'batch',operations:[
+ {type:'removeFunction',function:{name:'cache_warmup',occurrence:1,expectedArgs:['records',"'shared'"]}},
+ {type:'setSetting',setting:{name:'cache_warmup',args:["'ID'"]}},
+]};
+
+it('replaces only the authored root occurrence in one guarded native batch and refreshes inspection',async()=>{
+ let finish;const apply=vi.fn(()=>new Promise(resolve=>{finish=resolve;}));
+ const {api}=await mountMetadata({response:rootResponse,props:{structure:referencedRoot,onApply:apply}});
+ expect(byText('Add root inline warmup plan')).toBeUndefined();expect(inlineDetails().open).toBe(false);
+ await click(byText('Replace root reference with inline…'));
+ expect(inlineDetails().open).toBe(true);expect(document.querySelector('#warmup-index').value).toBe('');expect(document.querySelector('#warmup-cases').value).toBe('');
+ await selectIndex();await click(byText('Review root reference replacement'));
+ expect(apply).not.toHaveBeenCalled();expect(document.body.textContent).toContain('source revision 4');
+ expect(document.body.textContent).toContain('shared host policy, child references, and cache storage remain unchanged');
+ const confirm=byText('Replace root reference');await act(async()=>{confirm.click();confirm.click();});
+ expect(apply).toHaveBeenCalledExactlyOnceWith(rootBatch,{versionNo:2,sourceRevision:4});
+ expect(byText('Replace root reference').disabled).toBe(true);
+ await act(async()=>finish({applied:true}));expect(api.inspectVersion).toHaveBeenCalledTimes(2);
+ expect(referencedRoot.functions[0]).toEqual({name:'cache_warmup',occurrence:0,args:['child',"'shared'"]});
+ expect(referencedRoot.component.settings.cache).toEqual({enabled:true,name:'storage'});
+});
+
+it('cancels both replacement confirmation and root editing without writes',async()=>{
+ const {onApply}=await mountMetadata({response:rootResponse,props:{structure:referencedRoot}});
+ await reviewReplacement();await click(byText('Keep editing'));expect(onApply).not.toHaveBeenCalled();
+ expect(document.querySelector('#warmup-index').value).toBe('ID');
+ await click(byText('Cancel root edit'));expect(inlineDetails().open).toBe(false);expect(onApply).not.toHaveBeenCalled();
+});
+
+it('preserves the replacement draft and displays a native conflict without retrying',async()=>{
+ const apply=vi.fn().mockRejectedValue(Object.assign(new Error('Source revision conflict'),{code:'conflict',field:'sourceRevision'}));
+ const {api}=await mountMetadata({response:rootResponse,props:{structure:referencedRoot,onApply:apply}});
+ await reviewReplacement();await click(byText('Replace root reference'));
+ expect(document.body.textContent).toContain('Source revision conflict');expect(document.querySelector('#warmup-index').value).toBe('ID');
+ expect(apply).toHaveBeenCalledOnce();expect(api.inspectVersion).toHaveBeenCalledOnce();
+ await click(byText('Replace root reference'));expect(apply).toHaveBeenCalledOnce();expect(byText('Review root reference replacement')).toBeDefined();
+});
+
+it.each([{targets:[]},{targets:[{view:'child',policyName:'shared'}]}])('adds a root plan without removing any child reference when no root policy exists',async({targets})=>{
+ const structure={...noInlineStructure,component:{...noInlineStructure.component,rootView:{name:'Records',namespace:'records',columns:[{name:'ID'}]}}};
+ const apply=vi.fn().mockResolvedValue({applied:true});
+ await mountMetadata({response:{structure,effectiveWarmup:effective({targets})},props:{structure,onApply:apply}});
+ await click(byText('Add root inline warmup plan'));expect(inlineDetails().open).toBe(true);await selectIndex();await click(byText('Save warmup plan'));
+ expect(apply).toHaveBeenCalledExactlyOnceWith(rootBatch.operations[1]);
+});
+
+it('does not infer a replaceable reference or empty root from resolved names or missing metadata',async()=>{
+ const {render}=await mountMetadata({response:rootResponse});
+ expect(byText('Replace root reference with inline…')).toBeUndefined();expect(byText('Add root inline warmup plan')).toBeUndefined();
+ await render({api:{inspectVersion:vi.fn().mockResolvedValue({structure:noInlineStructure}),listWarmupRuns:vi.fn().mockResolvedValue({items:[]})}});
+ expect(byText('Add root inline warmup plan')).toBeUndefined();expect(byText('Save warmup plan').disabled).toBe(true);
+});
+
+it('reuses a root view cache binding for replacement without writing storage',async()=>{
+ const structure={...referencedRoot,component:{...referencedRoot.component,settings:{},rootView:{...referencedRoot.component.rootView,source:{bindings:{cacheWarmup:'shared',cacheName:'storage'}}}}};
+ const {onApply}=await mountMetadata({response:{...rootResponse,structure},props:{structure}});
+ expect(byText('Replace root reference with inline…').disabled).toBe(false);
+ expect(document.body.textContent).not.toContain('unsupported');
+ await reviewReplacement();await click(byText('Replace root reference'));
+ expect(onApply).toHaveBeenCalledExactlyOnceWith(rootBatch,{versionNo:2,sourceRevision:4});
+});
+
+it('adds, edits and removes an inline root plan using existing view-bound storage',async()=>{
+ const rootView={name:'Records',namespace:'records',columns:[{name:'ID'}],source:{bindings:{cacheName:'storage'}}};
+ const structure={component:{rootView,settings:{}}};
+ const {onApply,render,api}=await mountMetadata({response:{structure,effectiveWarmup:effective({targets:[]})},props:{structure}});
+ await click(byText('Add root inline warmup plan'));await selectIndex();await click(byText('Save warmup plan'));
+ expect(onApply).toHaveBeenLastCalledWith(rootBatch.operations[1]);
+ const saved={component:{rootView,settings:{cache:{enabled:true,warmup:{indexColumn:'ID'}}}}};
+ await render({structure:saved,api:{...api,inspectVersion:vi.fn().mockResolvedValue({structure:saved,effectiveWarmup:effective({targets:[{view:'',origin:'inline'}]})})}});
+ await click(byText('Edit root inline warmup plan'));await click(byText('Save warmup plan'));
+ expect(onApply).toHaveBeenLastCalledWith(rootBatch.operations[1]);
+ await click(byText('Remove inline plan'));
+ expect(onApply).toHaveBeenLastCalledWith({type:'setSetting',setting:{name:'cache_warmup',remove:true}});
+});
+
+it('preserves edit permissions and invalidates confirmation on source revision changes',async()=>{
+ const fixture=await mountMetadata({response:rootResponse,props:{structure:referencedRoot,canEdit:false}});
+ expect(byText('Replace root reference with inline…').disabled).toBe(true);
+ await fixture.render({canEdit:true});await reviewReplacement();const oldConfirmation=byText('Replace root reference');
+ await fixture.render({canEdit:true,version:{versionNo:2,sourceRevision:5}});
+ await click(oldConfirmation);expect(fixture.onApply).not.toHaveBeenCalled();
+});
+
+it('dismisses replacement confirmation when the cache dialog closes',async()=>{
+ const fixture=await mountMetadata({response:rootResponse,props:{structure:referencedRoot}});
+ await reviewReplacement();const confirmation=byText('Replace root reference');
+ await fixture.render({isOpen:false});
+ await click(confirmation);expect(fixture.onApply).not.toHaveBeenCalled();
+ await fixture.render({isOpen:true});
+ await click(confirmation);expect(fixture.onApply).not.toHaveBeenCalled();
+ expect(byText('Review root reference replacement')).toBeUndefined();
+});
+
+it('uses Reader Builder source-revision concurrency and adopts the saved inline revision',async()=>{
+ const savedStructure={...referencedRoot,component:{...referencedRoot.component,rootView:{...referencedRoot.component.rootView,source:{bindings:{}}},settings:{cache:{enabled:true,name:'storage',warmup:{indexColumn:'ID'}}}},functions:[referencedRoot.functions[0]]};
+ let current={version:{...version,state:'draft'},dql:'SELECT 1',structure:referencedRoot,capabilities:{canEdit:true,canPublish:true},effectiveWarmup:rootResponse.effectiveWarmup};
+ const apply=vi.fn(async()=>{current={...current,version:{...version,state:'draft',sourceRevision:5},structure:savedStructure,effectiveWarmup:effective({sourceRevision:5})};return {applied:true,inspection:current};});
+ const api={inspectVersion:vi.fn(async()=>current),listWarmupRuns:vi.fn().mockResolvedValue({items:[]}),applyReaderCommand:apply};
+ await mount(<ReaderBuilder api={api} report={{...report,versionNo:2}} onBack={vi.fn()}/>);
+ await click(document.querySelector('[aria-label="More actions"]'));await click([...document.querySelectorAll('[role="menuitem"]')].find(item=>item.textContent.includes('Cache & warmup')));
+ await reviewReplacement();await click(byText('Replace root reference'));
+ expect(apply).toHaveBeenCalledExactlyOnceWith('reader',2,{expectedSourceRevision:4,operation:rootBatch});
+ expect(byText('Edit root inline warmup plan')).toBeDefined();expect(document.querySelector('#warmup-index').value).toBe('ID');
+ expect(api.inspectVersion.mock.calls.some(args=>args[0]==='reader'&&args[1]===2&&args[2]?.discoverColumns===true)).toBe(true);
+ expect(savedStructure.functions).toEqual([referencedRoot.functions[0]]);expect(savedStructure.component.settings.cache.name).toBe('storage');
+});
+
+it('edits and removes an existing inline plan without constructing reference removals',async()=>{
+ const apply=vi.fn().mockResolvedValue({applied:true});
+ const {api}=await mountMetadata({props:{structure:namedStructure,onApply:apply}});
+ await click(byText('Edit root inline warmup plan'));expect(inlineDetails().open).toBe(true);
+ await click(byText('Remove inline plan'));
+ expect(apply).toHaveBeenCalledExactlyOnceWith({type:'setSetting',setting:{name:'cache_warmup',remove:true}});
+ expect(api.inspectVersion).toHaveBeenCalledTimes(2);
+});
+
+it.each([{functions:undefined},{functions:[...referencedRoot.functions, {...referencedRoot.functions[1],occurrence:2}]}])('does not guess a missing or ambiguous authored root occurrence',async({functions})=>{
+ const structure={...referencedRoot,functions};
+ await mountMetadata({response:{...rootResponse,structure},props:{structure}});
+ expect(byText('Replace root reference with inline…')).toBeUndefined();expect(byText('Add root inline warmup plan')).toBeUndefined();
+ expect(byText('Save warmup plan').disabled).toBe(true);
 });

@@ -1320,8 +1320,9 @@ own row, even when policies are shared between root and child views. Expand
 **Settings** to inspect supplied index settings, dimension names/value counts,
 exclude-default flags and limits. Explicit row limit zero is **Unlimited**;
 omitted limits and connector overrides are **Native default**. Nested population
-entries are details of a target, not additional scheduled calls. No origin or
-policy provenance is inferred, and case values are not reconstructed.
+entries are details of a target, not additional scheduled calls. Origin and
+policy reference display the supplied native metadata; absent provenance is
+**Not supplied** on older producers. Neither provenance nor case values are inferred.
 
 Effective metadata is read-only and reflects current host configuration. The
 inline editor remains separate and starts collapsed when no inline plan exists.
@@ -1335,3 +1336,34 @@ Mounted synthetic checks exercise root/child targets, shared policies, optional
 settings, read-only details, Retry, revision changes and stale responses through
 the existing dialog. The shared Blueprint table and native details elements reuse
 the existing workbench recipe; the surrounding cache editor remains legacy scope.
+
+### Root inline warmup actions
+
+The separate **Root inline warmup plan** editor offers Add only when effective
+inspection resolves successfully with no root target and authoring metadata has
+no root reference. An existing inline plan remains editable/removable. Missing
+or unavailable effective metadata is not treated as an empty root.
+
+**Replace root reference with inline…** requires an explicit authored root
+`source.bindings.cacheWarmup` plus one matching native `cache_warmup` function
+occurrence for the root namespace. Resolved policy names do not identify the
+reference. The user enters the inline definition; resolved summaries do not
+supply private case values. Review/confirmation captures the reference arguments
+and saved version/revision, then submits the existing native batch: remove that
+exact function with `expectedArgs`, and set component `cache_warmup`. Reader
+Builder supplies the existing source-revision concurrency token and edit
+capability (`canEdit`). No cache storage writer or child-reference removal is
+included. A successful save re-inspects the effective plans; errors retain the
+draft and do not retry. Cancellation does not write.
+
+Native authoring reuses either component-level cache settings or the existing
+root view cache binding. Forge preserves that binding and submits only the inline
+plan mutation; it does not duplicate storage into component settings. Older
+producers that lack native support report their existing authoring error.
+
+Mounted synthetic checks cover Add, Edit/Remove, exact root occurrence selection,
+confirmation cancellation, duplicate submissions, conflicts, revision changes,
+permission presentation and storage supplied only by a root view binding. A Reader Builder
+integration checks the guarded batch request and adoption of the saved inline
+revision. Existing shared Alert, native details and workbench controls retain
+their established appearance and pending behavior.
