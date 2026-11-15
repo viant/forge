@@ -6,6 +6,8 @@ import { parseWarmupCases, validateWarmupCases, warmupCaseCount, warmupCaseExpre
 export function ReaderCacheDialog({ api, report, version, canWarmup, canEdit = true, isOpen, structure, onClose, onApply, onWarmup }) {
   const cache = structure?.component?.settings?.cache;
   const warmupConfig = cache?.warmup;
+  const root = structure?.component?.rootView;
+  const rootCacheBinding = root?.source?.bindings?.cacheName;
   const inspectionKey = JSON.stringify([report?.id, version?.versionNo, version?.sourceRevision]);
   const [inspectionResult, setInspectionResult] = useState({});
   const [inspectionAttempt, setInspectionAttempt] = useState(0);
@@ -20,7 +22,8 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, canEdit = t
   const inspectedStructure = discoveredStructure || structure;
   const columns = inspectedStructure?.component?.rootView?.columns ?? [];
   const connectors = inspectedStructure?.availableConnectors ?? structure?.availableConnectors ?? [];
-  const namedCache = Boolean(cache?.name && !cache?.provider && !cache?.location);
+  const namedCache = Boolean(rootCacheBinding || (cache?.name && !cache?.provider && !cache?.location));
+  const hasRootCache = Boolean(rootCacheBinding || cache?.name || cache?.provider || cache?.location);
   const [name, setName] = useState('');
   const [ttl, setTTL] = useState('');
   const [location, setLocation] = useState('');
@@ -46,7 +49,6 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, canEdit = t
   // Blueprint can retain the closing alert's handlers during its exit transition.
   const replacementRef = useRef(null);
   replacementRef.current = isOpen && replacement?.key===inspectionKey ? replacement : null;
-  const root = structure?.component?.rootView;
   const rootBinding = root?.source?.bindings?.cacheWarmup;
   const reference = rootWarmupReference(structure);
   const rootHasNoPolicy = Boolean(root) && effectiveResolved && !warmupConfig && !rootBinding && !effectiveWarmup.targets.some(target=>target.view==='');
@@ -165,14 +167,6 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, canEdit = t
       {error && <Callout intent="danger" role="alert">{error}</Callout>}
       {columnDiscoveryError && <Callout intent="warning">Column discovery failed; the configured index column was retained. {columnDiscoveryError}</Callout>}
       <div className="studio-cache-layout"><div className="studio-cache-configuration">
-      <section className="studio-cache-section"><div className="studio-panel-heading"><div><h3>Cache storage</h3><p>One explicit backend; no automatic AFS/Aerospike fallback.</p></div>{cache?.enabled && <Tag minimal intent="success">enabled</Tag>}</div>
-        {namedCache ? <p role="status">Host-configured cache: {cache.name}.</p> : <><div className="studio-form-grid"><FormGroup label="Backend" labelFor="cache-backend"><HTMLSelect id="cache-backend" value={backend} onChange={(event)=>setBackend(event.target.value)} fill disabled={saving}><option value="">Select backend</option><option value="afs">AFS</option><option value="aerospike">Aerospike</option></HTMLSelect></FormGroup><FormGroup label="TTL" labelFor="cache-ttl" helperText="ms, s, m, or h"><InputGroup id="cache-ttl" value={ttl} onChange={(event)=>setTTL(event.target.value)} disabled={saving}/></FormGroup></div>
-          <FormGroup label="Cache name" labelFor="cache-name"><InputGroup id="cache-name" value={name} onChange={(event)=>setName(event.target.value)} placeholder="product-status" disabled={saving}/></FormGroup>
-          {backend === 'aerospike' && <FormGroup label="Approved provider" labelFor="cache-provider" helperText="Host-owned provider reference; never credentials."><InputGroup id="cache-provider" value={provider} onChange={(event)=>setProvider(event.target.value)} placeholder="aerospike://approved-provider" disabled={saving}/></FormGroup>}
-          <FormGroup label="Location" labelFor="cache-location"><InputGroup id="cache-location" value={location} onChange={(event)=>setLocation(event.target.value)} placeholder={backend==='afs'?'/var/cache/datly/products':'namespace/set'} disabled={saving}/></FormGroup>
-          <Button intent="primary" icon="floppy-disk" loading={saving} disabled={!ready} onClick={saveCache}>Save cache storage</Button></>}
-      </section>
-
       <section className="studio-cache-section" aria-label="Effective warmup plans">
         <h3>Effective warmup plans</h3>
         <p>Resolved using current host configuration for the saved version. Host configuration may change before execution.</p>
@@ -182,6 +176,14 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, canEdit = t
         <p>Run all effective plans uses the saved version and excludes unsaved edits.</p>
         <div className="studio-warmup-actions"><Button icon="play" loading={warming||activeRun} disabled={!canWarmup||saving||activeRun} title={!canWarmup?'Publish permission is required to run warmup':''} onClick={executeWarmup}>Run all effective plans</Button></div>
       </section>
+      <section className="studio-cache-section" aria-label="Root view cache"><div className="studio-panel-heading"><div><h3>Root view cache</h3></div>{rootStorage && <Tag minimal intent="success">enabled</Tag>}</div>
+        {namedCache ? <p role="status">Host-configured cache: {rootCacheBinding || cache.name}.</p> : <>{hasRootCache && <p>{cache.name || 'Inline cache'}{cache.provider && <> · {cache.provider}</>}{cache.location && <> · {cache.location}</>}{cache.ttl && <> · TTL {cache.ttl}</>}</p>}<details key={inspectionKey}><summary>{hasRootCache ? 'Inline cache settings' : 'Add root cache…'}</summary><div className="studio-form-grid"><FormGroup label="Backend" labelFor="cache-backend"><HTMLSelect id="cache-backend" value={backend} onChange={(event)=>setBackend(event.target.value)} fill disabled={saving}><option value="">Select backend</option><option value="afs">AFS</option><option value="aerospike">Aerospike</option></HTMLSelect></FormGroup><FormGroup label="TTL" labelFor="cache-ttl" helperText="ms, s, m, or h"><InputGroup id="cache-ttl" value={ttl} onChange={(event)=>setTTL(event.target.value)} disabled={saving}/></FormGroup></div>
+          <FormGroup label="Cache name" labelFor="cache-name"><InputGroup id="cache-name" value={name} onChange={(event)=>setName(event.target.value)} placeholder="product-status" disabled={saving}/></FormGroup>
+          {backend === 'aerospike' && <FormGroup label="Approved provider" labelFor="cache-provider" helperText="Host-owned provider reference; never credentials."><InputGroup id="cache-provider" value={provider} onChange={(event)=>setProvider(event.target.value)} placeholder="aerospike://approved-provider" disabled={saving}/></FormGroup>}
+          <FormGroup label="Location" labelFor="cache-location"><InputGroup id="cache-location" value={location} onChange={(event)=>setLocation(event.target.value)} placeholder={backend==='afs'?'/var/cache/datly/products':'namespace/set'} disabled={saving}/></FormGroup>
+          <Button intent="primary" icon="floppy-disk" loading={saving} disabled={!ready} onClick={saveCache}>Save cache storage</Button></details></>}
+      </section>
+
       <section className="studio-cache-section" aria-label="Root warmup authoring">
         <div className="studio-warmup-actions">
           {reference ? <Button disabled={!canEdit||!rootStorage||saving||warming||activeRun} onClick={openRootEditor}>Replace root reference with inline…</Button> : warmupConfig ? <Button disabled={!canEdit||saving} onClick={openRootEditor}>Edit root inline warmup plan</Button> : rootHasNoPolicy ? <Button disabled={!canEdit||!rootStorage||saving} onClick={openRootEditor}>Add root inline warmup plan</Button> : <p>Root policy authoring is unavailable without a resolved empty root or an exact authored reference.</p>}

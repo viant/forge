@@ -1337,6 +1337,19 @@ settings, read-only details, Retry, revision changes and stale responses through
 the existing dialog. The shared Blueprint table and native details elements reuse
 the existing workbench recipe; the surrounding cache editor remains legacy scope.
 
+The effective plans section appears first. **Root view cache** keeps an existing
+cache summary visible: authored named references are read-only, while inline
+storage settings expand through native details. With no root cache, **Add root
+cache…** reveals the existing form. Child plans do not imply root storage, and
+opening either storage details state performs no mutation. Save and execution
+continue through their existing callbacks.
+
+Run `node scripts/test-reader-cache-browser.mjs` for the mounted browser proof.
+Its independently authored synthetic child-plan metadata covers absent, inline,
+component-named and root-bound caches at desktop/tablet widths, read-only host
+settings, non-mutating disclosure and the existing save/run callback payloads.
+Screenshots stay in ignored `output/playwright/reader-cache`.
+
 ### Root inline warmup actions
 
 The separate **Root inline warmup plan** editor offers Add only when effective
