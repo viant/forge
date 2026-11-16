@@ -268,4 +268,45 @@ function quote(value) { return `'${String(value).replaceAll("'", "''")}'`; }
 function formatDuration(value) { const nanoseconds=Number(value);if(!Number.isFinite(nanoseconds))return'completed';if(nanoseconds<1e6)return`${Math.round(nanoseconds/1e3)}µs`;return`${(nanoseconds/1e6).toFixed(1)}ms`; }
 function formatDate(value){if(!value)return'—';const date=new Date(value);return Number.isNaN(date.valueOf())?value:new Intl.DateTimeFormat(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(date);}
 function runIntent(status){return status==='completed'?'success':status==='failed'?'danger':status==='partial'||status==='canceled'?'warning':'primary';}
-function WarmupEvidence({run}){const terminal=['completed','partial','failed','canceled'].includes(run.status);return <div className="studio-warmup-run" aria-live="polite"><div><Tag intent={runIntent(run.status)}>{run.status}</Tag><code>{run.runId}</code></div><dl><div><dt>Version</dt><dd>v{run.versionNo} · rev {run.sourceRevision}</dd></div><div><dt>Plan</dt><dd>{run.completedCases||0} / {run.plannedCases||0} cases</dd></div><div><dt>Plan key</dt><dd><code>{run.planKey?.slice(0,16)||'—'}</code></dd></div><div><dt>Budgets</dt><dd>MaxCases {run.maxCases??'—'} · rows {run.rowLimit??'—'}</dd></div><div><dt>Prepared</dt><dd>{run.entries||0} entries</dd></div><div><dt>Duration</dt><dd>{terminal?formatDuration(run.duration):'Running'}</dd></div><div><dt>Connector</dt><dd>{run.target?.connectorName||'Component connector'}</dd></div><div><dt>Cache</dt><dd>{run.target?.cacheName||'Resolving'} · {run.target?.cacheProvider||'—'}</dd></div><div><dt>Index</dt><dd>{run.target?.indexColumn||'—'}</dd></div><div><dt>Requested</dt><dd>{formatDate(run.requestedAt)} · {run.requestedBy}</dd></div></dl>{(run.diagnostics??[]).map((item,index)=><Callout key={`${item.code}-${index}`} intent="danger" title={item.code}>{item.message}</Callout>)}</div>;}
+function WarmupRecordedTarget({target}) {
+  const fields=[
+    ['View path',target.view===''?'Root':target.view],
+    ['Policy',target.policyName],['Policy reference',target.policyRef],['Origin',target.origin],
+    ['Connector override',target.connectorName],['Cache',target.cacheName],['Backend',target.cacheProvider],
+    ['Index column',target.indexColumn],['Index parameter',target.indexParameter],
+  ];
+  return <dl>{fields.map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value||'Not supplied'}</dd></div>)}</dl>;
+}
+function WarmupEvidence({run}) {
+  const terminal=['completed','partial','failed','canceled'].includes(run.status);
+  const targets=run.target?.scheduledTargets;
+  // The legacy root view alone does not establish resolved target settings.
+  const legacy=['connectorName','cacheName','cacheProvider','indexColumn','indexParameter'].some(name=>run.target?.[name]);
+  return <div className="studio-warmup-run" aria-live="polite">
+    <div><Tag intent={runIntent(run.status)}>{run.status}</Tag><code>{run.runId}</code></div>
+    <dl aria-label="Operation totals">
+      <div><dt>Version</dt><dd>v{run.versionNo} · rev {run.sourceRevision}</dd></div>
+      <div><dt>Plan</dt><dd>{run.completedCases||0} / {run.plannedCases||0} cases</dd></div>
+      <div><dt>Plan key</dt><dd><code>{run.planKey?.slice(0,16)||'—'}</code></dd></div>
+      <div><dt>Budgets</dt><dd>MaxCases {run.maxCases??'—'} · rows {run.rowLimit??'—'}</dd></div>
+      <div><dt>Prepared</dt><dd>{run.entries||0} entries</dd></div>
+      <div><dt>Duration</dt><dd>{terminal?formatDuration(run.duration):'Running'}</dd></div>
+      <div><dt>Requested</dt><dd>{formatDate(run.requestedAt)} · {run.requestedBy}</dd></div>
+    </dl>
+    {targets?.length ? <details aria-label="Run targets">
+      <summary>Run targets · {targets.length}</summary>
+      <ol className="studio-warmup-targets" aria-label="Scheduled warmup targets">{targets.map((target,index)=><li key={index}>
+        <details><summary>{target.view===''?'Root':target.view||'Not supplied'} · {target.policyName||target.policyRef||'Not supplied'}</summary>
+          <WarmupRecordedTarget target={target}/>
+          {target.work?.length>0 && <><h4>Population</h4><ul className="studio-warmup-work" aria-label="Target population">{target.work.map((work,workIndex)=><li key={workIndex}><WarmupRecordedTarget target={work}/></li>)}</ul></>}
+        </details>
+      </li>)}</ol>
+    </details> : legacy ? <dl aria-label="Legacy target evidence">
+      <div><dt>Connector</dt><dd>{run.target.connectorName||'Not supplied'}</dd></div>
+      <div><dt>Cache</dt><dd>{run.target.cacheName||'Not supplied'} · {run.target.cacheProvider||'Not supplied'}</dd></div>
+      <div><dt>Index</dt><dd>{run.target.indexColumn||'Not supplied'}</dd></div>
+      <div><dt>Index parameter</dt><dd>{run.target.indexParameter||'Not supplied'}</dd></div>
+    </dl> : <p>Target metadata unavailable.</p>}
+    {(run.diagnostics??[]).map((item,index)=><Callout key={`${item.code}-${index}`} intent="danger" title={item.code}>{item.message}</Callout>)}
+  </div>;
+}

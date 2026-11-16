@@ -414,3 +414,52 @@ it('keeps a missing warmup projection with native diagnostics distinct from an e
  const {onWarmup,onApply}=await mountMetadata({inspect});expect(effectiveSection().textContent).toContain('Native warmup resolution was denied.');expect(effectiveSection().textContent).toContain('unavailable');expect(effectiveSection().textContent).not.toContain('No effective warmup plans');
  await click(byText('Retry'));expect(effectiveSection().textContent).toContain('No effective warmup plans');expect(onWarmup).not.toHaveBeenCalled();expect(onApply).not.toHaveBeenCalled();
 });
+
+// Independently authored persisted evidence. Shared names intentionally repeat;
+// nested population is descriptive and carries no per-target completion counts.
+const storedTarget=(index=0)=>({view:index?`children/${index}`:'',policyName:'stored-policy',policyRef:'stored-reference',origin:'host',connectorName:`connector-${index}`,cacheName:`cache-${index}`,cacheProvider:'afs',indexColumn:`ID${index}`,indexParameter:`Input${index}`});
+const runEvidence=()=>document.querySelector('.studio-warmup-run');
+async function openRunTargets(){const details=runEvidence().querySelector('[aria-label="Run targets"]');if(!details.open)await click(details.querySelector(':scope > summary'));return details.querySelector('[aria-label="Scheduled warmup targets"]');}
+
+it('renders eight stored targets without collapsing shared policies or inventing target totals',async()=>{
+ const targets=Array.from({length:8},(_,index)=>storedTarget(index));targets[0].work=[{...storedTarget(0),view:'summary',cacheProvider:'aerospike'}];
+ await mountRuns({items:[run('eight','completed',{plannedCases:3,completedCases:3,entries:987,duration:1200000,target:{view:'reader',scheduledTargets:targets},diagnostics:[{code:'stored_notice',message:'Stored operation diagnostic'}]})]});
+ const evidence=runEvidence();expect(evidence.textContent).toContain('Run targets · 8');expect(evidence.textContent).not.toContain('Resolving');expect(evidence.textContent).not.toContain('Component connector');
+ const list=await openRunTargets();const rows=list.querySelectorAll(':scope > li');expect(rows).toHaveLength(8);
+ for(let index=0;index<rows.length;index++){await click(rows[index].querySelector('summary'));expect(rows[index].textContent).toContain(`connector-${index}`);expect(rows[index].textContent).toContain(`cache-${index}`);expect(rows[index].textContent).toContain(`Input${index}`);}
+ expect(rows[0].textContent).toContain('Root');expect(rows[0].querySelector('[aria-label="Target population"]').textContent).toContain('summary');expect(rows[0].textContent).toContain('aerospike');
+ expect(list.textContent).not.toContain('987 entries');for(const label of ['Prepared','Duration','Plan','Status'])expect([...list.querySelectorAll('dt')].map(node=>node.textContent)).not.toContain(label);
+ const totals=evidence.querySelector('[aria-label="Operation totals"]');expect(totals.textContent).toContain('3 / 3 cases');expect(totals.textContent).toContain('987 entries');expect(totals.textContent).toContain('1.2ms');expect(evidence.textContent).toContain('Stored operation diagnostic');
+});
+
+it('prefers one scheduled target with expanded work over contradictory singular fields',async()=>{
+ const target={...storedTarget(),work:[{...storedTarget(1),view:'summary/one'},{...storedTarget(2),view:'summary/two'}]};
+ await mountRuns({items:[run('single','completed',{target:{cacheName:'legacy-must-not-render',scheduledTargets:[target]}})]});
+ const list=await openRunTargets();expect(list.querySelectorAll(':scope > li')).toHaveLength(1);await click(list.querySelector('summary'));
+ expect(list.querySelectorAll('[aria-label="Target population"] > li')).toHaveLength(2);expect(list.textContent).toContain('summary/one');expect(list.textContent).toContain('summary/two');expect(runEvidence().textContent).not.toContain('legacy-must-not-render');expect(runEvidence().querySelector('[aria-label="Legacy target evidence"]')).toBeNull();
+});
+
+it.each([undefined,[]])('retains singular legacy evidence when scheduled targets are absent or empty',async(scheduledTargets)=>{
+ await mountRuns({items:[run('legacy','completed',{target:{view:'reader',cacheName:'old-cache',indexColumn:'OldID',indexParameter:'OldInput',scheduledTargets}})]});
+ const evidence=runEvidence();const legacy=evidence.querySelector('[aria-label="Legacy target evidence"]');expect(legacy.textContent).toContain('old-cache');expect(legacy.textContent).toContain('OldID');expect(legacy.textContent).toContain('OldInput');expect(legacy.textContent).toContain('Not supplied');expect(evidence.textContent).not.toContain('Resolving');expect(evidence.textContent).not.toContain('Component connector');expect(evidence.querySelector('[aria-label="Run targets"]')).toBeNull();
+});
+
+it.each(['accepted','running','completed','failed'])('does not infer target resolution from missing evidence on a %s run',async(status)=>{
+ await mountRuns({items:[run('absent',status,{target:{view:'reader',scheduledTargets:[]},diagnostics:[{code:'native_detail',message:'Native operation detail'}]})]});
+ const evidence=runEvidence();expect(evidence.textContent).toContain('Target metadata unavailable.');expect(evidence.textContent).toContain(status);expect(evidence.textContent).toContain('Native operation detail');expect(evidence.textContent).not.toContain('Resolving');expect(evidence.querySelector('[aria-label="Legacy target evidence"]')).toBeNull();
+});
+
+it('uses historical run settings rather than current inspection or another run',async()=>{
+ const latest=run('latest','completed',{entries:22,target:{scheduledTargets:[{...storedTarget(),cacheName:'recent-cache'}]}});
+ const historical=run('historical','completed',{entries:11,target:{scheduledTargets:[{...storedTarget(),cacheName:'historical-cache',connectorName:'historical-connector'}]}});
+ const api={inspectVersion:vi.fn().mockResolvedValue({version,effectiveWarmup:effective({targets:[{view:'',policyName:'current-policy',cacheName:'current-cache'}]})}),listWarmupRuns:vi.fn().mockResolvedValue({items:[latest,historical]})};
+ const onWarmup=vi.fn(),onApply=vi.fn();await mount(<ReaderCacheDialog api={api} report={report} version={version} structure={noInlineStructure} isOpen canWarmup onClose={vi.fn()} onWarmup={onWarmup} onApply={onApply}/>);
+ expect(effectiveSection().textContent).toContain('current-cache');await openRunTargets();
+ await click([...document.querySelectorAll('.studio-warmup-history button')].find(node=>node.textContent.includes('historical')));
+ const evidence=runEvidence();expect(evidence.textContent).toContain('historical-cache');expect(evidence.textContent).toContain('historical-connector');expect(evidence.textContent).not.toContain('current-cache');expect(evidence.textContent).not.toContain('recent-cache');expect(evidence.querySelector('[aria-label="Operation totals"]').textContent).toContain('11 entries');expect(onWarmup).not.toHaveBeenCalled();expect(onApply).not.toHaveBeenCalled();
+});
+
+it('does not infer missing scheduled fields from a policy or logical cache name',async()=>{
+ await mountRuns({items:[run('partial-fields','completed',{target:{scheduledTargets:[{view:'',policyName:'named-policy',cacheName:'named-cache'}]}})]});
+ const list=await openRunTargets();await click(list.querySelector('summary'));expect(list.textContent).toContain('named-policy');expect(list.textContent).toContain('named-cache');expect(list.textContent).toContain('Not supplied');expect(list.textContent).not.toContain('Component connector');expect(list.textContent).not.toContain('Resolving');
+});

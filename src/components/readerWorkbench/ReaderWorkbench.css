@@ -224,6 +224,11 @@
 [data-forge-primitive="readerWorkbench"] .studio-warmup-run dl>div,.forge-reader-workbench-dialog .studio-warmup-run dl>div{display:grid;grid-template-columns:90px minmax(0,1fr);gap:8px;padding:7px 0;border-top:1px solid var(--forge-border-color, #e4e7ec)}
 [data-forge-primitive="readerWorkbench"] .studio-warmup-run dt,.forge-reader-workbench-dialog .studio-warmup-run dt{color:var(--forge-text-muted, #667085)}
 [data-forge-primitive="readerWorkbench"] .studio-warmup-run dd,.forge-reader-workbench-dialog .studio-warmup-run dd{min-width:0;margin:0;overflow:hidden;font-weight:600;text-overflow:ellipsis;white-space:nowrap}
+[data-forge-primitive="readerWorkbench"] .studio-warmup-targets,.forge-reader-workbench-dialog .studio-warmup-targets{list-style:none;margin:10px 0 0;padding:0}
+[data-forge-primitive="readerWorkbench"] .studio-warmup-work,.forge-reader-workbench-dialog .studio-warmup-work{list-style:none;margin:8px 0 0;padding-left:12px;border-left:1px solid var(--forge-border-color, #d8e1ec)}
+[data-forge-primitive="readerWorkbench"] .studio-warmup-targets li+li,.forge-reader-workbench-dialog .studio-warmup-targets li+li{margin-top:8px;padding-top:8px;border-top:1px solid var(--forge-border-color, #d8e1ec)}
+[data-forge-primitive="readerWorkbench"] .studio-warmup-targets dd,.forge-reader-workbench-dialog .studio-warmup-targets dd{white-space:normal;overflow:visible;overflow-wrap:anywhere}
+[data-forge-primitive="readerWorkbench"] .studio-warmup-targets summary,.forge-reader-workbench-dialog .studio-warmup-targets summary{overflow-wrap:anywhere}
 [data-forge-primitive="readerWorkbench"] .studio-warmup-history,.forge-reader-workbench-dialog .studio-warmup-history{margin-top:18px}
 [data-forge-primitive="readerWorkbench"] .studio-warmup-history h4,.forge-reader-workbench-dialog .studio-warmup-history h4{margin:0 0 7px;font-size:14px}
 [data-forge-primitive="readerWorkbench"] .studio-warmup-history>button,.forge-reader-workbench-dialog .studio-warmup-history>button{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:8px;width:100%;padding:8px 7px;border:0;border-top:1px solid var(--forge-border-color, #e4e7ec);background:transparent;color:var(--forge-text, #344054);text-align:left;cursor:pointer}

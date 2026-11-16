@@ -1452,3 +1452,31 @@ preview/warmup nor changes stored source. Timing JSON and screenshots remain
 ignored under `output/playwright/reader-metadata`. Shared buttons, native status
 text and the existing workbench styles cover the new loading state; surrounding
 legacy layout remains unchanged.
+
+### Stored warmup run targets
+
+Operation evidence reads the selected persisted run, independently of current
+effective-plan inspection. Nonempty `target.scheduledTargets` always takes
+precedence, including a single target with multiple population entries. Native
+**Run targets** details retain separate scheduled rows and their nested
+**Population** work. Recorded view paths (empty means Root), policy names,
+references, origins, connector overrides, logical caches/backends and index
+settings are read-only. Missing fields are **Not supplied**; no resolved
+connector or per-target outcome is inferred. Detail values wrap in the existing
+narrow evidence panel instead of truncating the recorded settings.
+
+When scheduled evidence is empty/absent, supplied singular cache/connector/index
+fields retain their compact legacy summary. A root view name alone does not
+prove resolved target settings. Without either form of evidence, display
+**Target metadata unavailable**, regardless of operation status. Status, cases,
+entries, duration, budgets and diagnostics remain at operation level; work
+entries never become additional scheduled targets or execution counts.
+
+Mounted synthetic checks cover eight targets, single-target expanded work,
+legacy/partial fields, missing evidence on pending/terminal runs, and history
+whose settings differ from current inspection. Run
+`node scripts/test-warmup-evidence-browser.mjs` for the corresponding synthetic
+browser proof at desktop and tablet widths; screenshots remain ignored under
+`output/playwright/warmup-evidence`. Shared native details, lists and
+the existing workbench typography retain their established keyboard behavior;
+the surrounding cache editor remains legacy scope.
