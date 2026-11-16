@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
+import {applyReportBuilderStateHook} from "./reportBuilderHooks.js";
 
 import {
   partitionReportBuilderOptions,
   buildReportBuilderFilterToolbarModel,
   countModifiedReportBuilderOptions,
-  isDemandSideReportOptionName,
   normalizeReportBuilderOptionDefinitions,
   resolveEffectiveReportBuilderOptions,
   updateReportBuilderOptionValue,
@@ -25,43 +25,40 @@ import {
 const fieldCatalog = {
   columns: [
     { name: "day", role: "dimension", type: "date" },
-    { name: "impressions", role: "measure", type: "integer" },
+    { name: "count", role: "measure", type: "integer" },
   ],
   defaultDimensions: ["day"],
-  defaultMeasures: ["impressions"],
+  defaultMeasures: ["count"],
   options: [
-    { name: "attributionModel", label: "Attribution model", type: "string", default: "linear", values: [
+    { name: "calculationMode", label: "Calculation mode", type: "string", default: "linear", values: [
       { value: "linear", label: "Linear" },
-      { value: "last_touch", label: "Last touch" },
-    ], description: "Changes attribution semantics." },
+      { value: "weighted", label: "Weighted" },
+    ], description: "Changes the calculation method." },
     { name: "lookbackDays", label: "Lookback", type: "integer", default: 30, values: [7, 30, 90] },
-    { name: "includeOrganic", label: "Include organic", type: "boolean", default: false, values: [true, false] },
-    { name: "campaignIds", label: "Campaign", type: "string", default: "not-authorized", values: ["not-authorized"] },
+    { name: "includeArchived", label: "Include archived", type: "boolean", default: false, values: [true, false] },
   ],
 };
 
 const config = applyReportBuilderRuntimeFieldCatalog({
   runtimeFieldCatalog: { enabled: true },
-  dataSourceRef: "advanced_reporting_run",
+  dataSourceRef: "summary_rows",
   result: { defaultMode: "table", viewModes: ["table"] },
   dataSources: [{
     id: "summary",
-    dataSourceRef: "advanced_reporting_run_envelope",
+    dataSourceRef: "summary_rows_envelope",
     request: { dimensions: {}, measures: {}, filters: {}, limit: 1, offset: 0 },
     scope: { mode: "inherit" },
   }],
 }, { reportDefinition: { fieldCatalog } });
 
-assert.deepEqual(config.reportOptions.map((entry) => entry.name), ["attributionModel", "lookbackDays", "includeOrganic"]);
-assert.equal(isDemandSideReportOptionName("line_item_ids"), true);
-assert.equal(isDemandSideReportOptionName("attributionModel"), false);
+assert.deepEqual(config.reportOptions.map((entry) => entry.name), ["calculationMode", "lookbackDays", "includeArchived"]);
 
 const defaults = buildReportBuilderDefaultState(config);
-assert.deepEqual(defaults.reportOptions, { attributionModel: "linear", lookbackDays: 30, includeOrganic: false });
+assert.deepEqual(defaults.reportOptions, { calculationMode: "linear", lookbackDays: 30, includeArchived: false });
 const defaultRequest = buildReportBuilderRequest(config, defaults);
 assert.deepEqual(defaultRequest.options, defaults.reportOptions);
 
-const changedOptions = updateReportBuilderOptionValue(config.reportOptions, defaults.reportOptions, "attributionModel", "last_touch");
+const changedOptions = updateReportBuilderOptionValue(config.reportOptions, defaults.reportOptions, "calculationMode", "weighted");
 assert.equal(countModifiedReportBuilderOptions(config.reportOptions, defaults.reportOptions), 0);
 assert.equal(countModifiedReportBuilderOptions(config.reportOptions, changedOptions), 1);
 assert.deepEqual(buildReportBuilderFilterToolbarModel({
@@ -71,13 +68,13 @@ assert.deepEqual(buildReportBuilderFilterToolbarModel({
 assert.deepEqual(buildReportBuilderFilterToolbarModel({ allowedFilterCount: 2 }), { visible: true, activeNonDefaultCount: 0 });
 const changedState = mergeReportBuilderState(config, { ...defaults, reportOptions: changedOptions });
 const changedRequest = buildReportBuilderRequest(config, changedState);
-assert.equal(changedRequest.options.attributionModel, "last_touch");
+assert.equal(changedRequest.options.calculationMode, "weighted");
 assert.notEqual(JSON.stringify(defaultRequest), JSON.stringify(changedRequest), "option changes must separate datasource/cache request identity");
 assert.notEqual(buildReportBuilderSettingsHash(defaults), buildReportBuilderSettingsHash(changedState));
 
 const repaired = sanitizeReportBuilderState(config, {
   ...changedState,
-  reportOptions: { attributionModel: "invented", lookbackDays: 12, includeOrganic: "no" },
+  reportOptions: { calculationMode: "invented", lookbackDays: 12, includeArchived: "no" },
 });
 assert.deepEqual(repaired.reportOptions, defaults.reportOptions, "invalid persisted values fall back to registry defaults");
 assert.deepEqual(resolveEffectiveReportBuilderOptions(config.reportOptions, { unknown: "discarded" }), defaults.reportOptions);
@@ -92,11 +89,11 @@ assert.equal(Object.prototype.hasOwnProperty.call(buildReportBuilderRequest(lega
 const stateWithDocument = {
   ...changedState,
   reportDocumentTitle: "Option report",
-  reportDocumentBlocks: [{ id: "summaryTable", kind: "tableBlock", datasetRef: "summary", columns: [{ key: "impressions", label: "Impressions" }] }],
+  reportDocumentBlocks: [{ id: "summaryTable", kind: "tableBlock", datasetRef: "summary", columns: [{ key: "count", label: "Count" }] }],
   reportDocumentLayout: { type: "stack", items: [{ blockId: "summaryTable" }] },
 };
 const runtimeModel = buildReportBuilderRuntimePreviewModel({
-  container: { id: "optionReport", stateKey: "optionReport", dataSourceRef: "advanced_reporting_run" },
+  container: { id: "optionReport", stateKey: "optionReport", dataSourceRef: "summary_rows" },
   config,
   state: stateWithDocument,
   includePrimaryBlocks: true,
@@ -104,7 +101,7 @@ const runtimeModel = buildReportBuilderRuntimePreviewModel({
 assert.deepEqual(runtimeModel.reportSpec.datasets.find((entry) => entry.id === "primary")?.request?.options, changedOptions);
 assert.deepEqual(runtimeModel.reportSpec.datasets.find((entry) => entry.id === "summary")?.request?.options, changedOptions, "backend refetch datasets inherit effective options");
 assert.deepEqual(runtimeModel.document.blocks.find((entry) => entry.kind === "reportBuilderBlock")?.state?.reportOptions, changedOptions, "saved report state retains effective options");
-const runtimePreview = buildReportBuilderRuntimePreview({ model: runtimeModel, rows: [{ day: "2026-08-01", impressions: 7 }], hasMore: false });
+const runtimePreview = buildReportBuilderRuntimePreview({ model: runtimeModel, rows: [{ day: "2026-08-01", count: 7 }], datasetPayloads: {summary: {rows: [{count:7}]}}, hasMore: false });
 assert.deepEqual(runtimePreview.exportRequest?.reportSpec?.datasets?.find((entry) => entry.id === "primary")?.request?.options, changedOptions, "export request retains effective options");
 
 console.log("reportBuilderOptions ✓ defaults, validation, refresh identity, persistence, backend refetch, and compatibility");
@@ -130,3 +127,18 @@ assert.equal(phone.headers.size, 0);
 assert.deepEqual(resolveEffectiveReportBuilderOptions(contextual, { exposurePerspective: "First" }), { exposurePerspective: "First" });
 
 assert.deepEqual(runtimePreview.exportRequest.metadata.reportOptions, config.reportOptions);
+
+// A producer-declared identifier can be an option in one report and a filter in another.
+const declared = normalizeReportBuilderOptionDefinitions([{name:"accountId", label:"Account", type:"integer", default:7, values:[7,9]}]);
+assert.equal(declared.length,1);
+assert.deepEqual(resolveEffectiveReportBuilderOptions(declared, {accountId:9,undeclared:1}),{accountId:9});
+
+const scopedOptions = {
+  measures: [{id:"count",paramPath:"measures.count",default:true}],
+  reportOptions: declared,
+  predicates: [{id:"accountId", pinned:true, multiple:true, paramPath:"filters.accountId", prefill:{path:"accountId"}}],
+};
+const scopedState = applyReportBuilderStateHook(null, scopedOptions, buildReportBuilderDefaultState(scopedOptions), {prefill:{accountId:[23]}});
+const scopedRequest = buildReportBuilderRequest(scopedOptions, scopedState);
+assert.deepEqual(scopedRequest.filters.accountId,[23]);
+assert.equal(scopedRequest.options.accountId,7);

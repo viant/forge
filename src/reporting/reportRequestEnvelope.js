@@ -42,7 +42,7 @@ export function declaredReportRequestFields(config) {
 function typed(value,type,config) {
     if (type==='singlePositiveInteger') {
         if (Array.isArray(value)) {
-            if (value.length!==1) throw new Error('Select exactly one advertiser or entity for this report.');
+            if (value.length!==1) throw new Error('Select exactly one value for this report input.');
             value=value[0];
         }
         type='positiveInteger';

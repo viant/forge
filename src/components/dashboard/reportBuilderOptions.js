@@ -6,11 +6,6 @@ function normalizeString(value = "") {
   return String(value || "").trim();
 }
 
-function isEntityOptionName(name = "") {
-  const normalized = normalizeString(name).replace(/[^a-zA-Z0-9]/g, "");
-  return /^(account|agency|advertiser|campaign|order|line(item)?|audience|creative|pixel)(id|ids)?$/i.test(normalized);
-}
-
 function normalizedType(value = "") {
   const type = normalizeString(value).toLowerCase();
   if (["bool", "boolean"].includes(type)) return "boolean";
@@ -63,7 +58,7 @@ export function normalizeReportBuilderOptionDefinitions(values = []) {
     .map((entry) => {
       if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
       const name = normalizeString(entry.name);
-      if (!name || seen.has(name) || isEntityOptionName(name)) return null;
+      if (!name || seen.has(name) || ['__proto__', 'prototype', 'constructor'].includes(name)) return null;
       seen.add(name);
       const type = normalizedType(entry.type);
       const optionValues = (Array.isArray(entry.values) ? entry.values : [])
@@ -138,10 +133,6 @@ export function buildReportBuilderFilterToolbarModel({
     activeNonDefaultCount: Math.max(0, Number(modifiedFilterCount) || 0)
       + countModifiedReportBuilderOptions(normalizedDefinitions, optionValues),
   };
-}
-
-export function isDemandSideReportOptionName(name = "") {
-  return isEntityOptionName(name);
 }
 
 // Anchor availability is resolved by mounted runtime headers, after the document

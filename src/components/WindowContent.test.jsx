@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import {verifyPublishedPickerRoot} from './WindowContent.jsx';
+import { describe, expect, it, vi } from 'vitest';
+import {verifyPublishedPickerRoot,bindPublishedWindowNavigation} from './WindowContent.jsx';
 
 import { applyWindowPermissionMetadata, canUseInlineMetadataFallback, compilePermissionAppliedMetadata, formatWindowMetadataError, isAdmittedPublishedWindowResponse, isProtectedWindowMetadata, resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialDateRangePresetValues, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowDataSourceFetchFlag, resolveWindowMetadataDisplayState, resolveWindowMetadataForTarget, resolveWindowModelCacheScope, resolveWindowRootContainer, reuseShallowEqualRuntimeObject, scopedWindowHostServices, shouldPreserveMissingResolvedParameters, shouldPrimeDataSourceFetch, shouldResetWindowDashboardState } from './WindowContent.jsx';
 
@@ -13,6 +13,23 @@ describe('window-scoped host capability',()=>{
     expect(second.hostWindow.navigate()).toBe('second');
     expect(first.hostWindow.download()).toBe(true);
     expect(services.hostWindow.navigate).toBeUndefined();
+  });
+  it('binds only links from the admitted GET to this window and publisher', () => {
+    const factory = vi.fn(() => ({}));
+    const window = {windowId:'one',resourceRef:{uri:'window://example/source'},providerIdentity:'publisher',parameters:{navigation:{untrusted:{}}}};
+    const source={uri:window.resourceRef.uri,providerIdentity:window.providerIdentity};
+    const routes={detail:{resourceUri:'window://example/details',title:'Details'}};
+    const definition={resource:source,window:{navigation:routes}};
+    const services={createHostWindow:factory};
+    scopedWindowHostServices(services,window,bindPublishedWindowNavigation(definition,window,false));
+    expect(factory).toHaveBeenLastCalledWith(window,undefined);
+    const admitted=bindPublishedWindowNavigation(definition,window,true);
+    scopedWindowHostServices(services,window,admitted);
+    expect(factory).toHaveBeenLastCalledWith(window,{source,routes});
+    scopedWindowHostServices(services,window,JSON.parse(JSON.stringify(admitted)));
+    expect(factory).toHaveBeenLastCalledWith(window,undefined);
+    scopedWindowHostServices(services,window,bindPublishedWindowNavigation({...definition,resource:{...source,providerIdentity:'other'}},window,true));
+    expect(factory).toHaveBeenLastCalledWith(window,undefined);
   });
   it('prefers a verified host owner over reconnecting UI transport sessions for model reuse',()=>{
     const services={windowModelCacheScope:()=> 'verified-owner-A'};
@@ -509,7 +526,7 @@ describe('resolveDefaultDataSourceRef', () => {
 
 describe('bound window title resynchronization contract', () => {
   it('observes the active window title after a repeated open command', async () => {
-    const source = await import('node:fs/promises').then(({readFile}) => readFile(new URL('./WindowContent.jsx', import.meta.url), 'utf8'));
+    const source = await import('node:fs/promises').then(({readFile}) => readFile('src/components/WindowContent.jsx', 'utf8'));
     expect(source).toContain('[desiredWindowTitle, windowId, window?.windowTitle]');
   });
 });

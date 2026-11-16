@@ -2,7 +2,7 @@
 
 Standalone demo: `npm run dev:window-editor`, then open http://127.0.0.1:5187/window-editor-preview.html.
 
-Build static portable demo: `npm run build:window-editor`. Serve `dist-window-editor/` with any static server and open `window-editor-preview.html`. No Forge backend, AI Studio, authentication provider, or business services are required.
+Build static portable demo: `npm run build:window-editor`. Serve `dist-window-editor/` with any static server and open `window-editor-preview.html`. The portable demo runs as static files.
 
 ```jsx
 import { WindowYamlEditor } from 'forge/window-editor';

@@ -213,17 +213,17 @@ client select a server implementation.
 ```yaml
 kind: forge.reporting.group
 id: deliveryReports
-label: Delivery reports # `title` is accepted as an authoring alias
+label: Activity reports # `title` is accepted as an authoring alias
 description: Optional catalog copy
 icon: chart
 order: 20
 visibility: visible
-builderRef: deliveryBuilder
+builderRef: activityBuilder
 catalogRef: ./definitions.json
-definitionRef: deliveryCatalog
-catalogDataSourceRef: delivery_catalog
-definitionDataSourceRef: delivery_definition
-presetRefs: [delivery_overview]
+definitionRef: activityCatalog
+catalogDataSourceRef: activity_catalog
+definitionDataSourceRef: activity_definition
+presetRefs: [activity_overview]
 definitionRefs: [overview, detail]
 ```
 
@@ -258,28 +258,28 @@ Canonical example:
 ```json
 {
   "scope": "order-2680567",
-  "id": "delivery-brief",
+  "id": "activity-brief",
   "grammar": "report-document-v1",
   "status": "committed",
   "source": {
-    "title": "Delivery Brief",
+    "title": "Activity Brief",
     "datasets": [
       {
-        "id": "delivery",
+        "id": "activity",
         "kind": "workspaceRef",
-        "dataSourceRef": "metrics_delivery",
+        "dataSourceRef": "activity_rows",
         "request": { "orderId": 2680567 }
       }
     ],
     "blocks": [
       {
-        "id": "deliveryTable",
+        "id": "activityTable",
         "kind": "tableBlock",
-        "title": "Delivery",
-        "datasetRef": "delivery",
+        "title": "Activity",
+        "datasetRef": "activity",
         "columns": [
           { "key": "channel", "label": "Channel" },
-          { "key": "spend", "label": "Spend", "format": "currency" }
+          { "key": "cost", "label": "Cost", "format": "currency" }
         ]
       }
     ]
@@ -677,7 +677,7 @@ Formatter helpers:
 - `${fmt.currency(row.ecpm)}`
 - `${fmt.percent(row.winRate)}`
 - `${fmt.percentFraction(row.winRate)}`
-- `${fmt.number(row.impressions)}`
+- `${fmt.number(row.recordCount)}`
 
 Legacy formatter helper retained:
 
@@ -910,7 +910,7 @@ Print adds a clearly labeled `Row (print)` ordinal, numbered 1 through N from th
 complete, already filtered and ordered table. It repeats with the marked readable
 anchors in every band and keeps its number across vertical pages. Keep all
 business-key columns in the table, but mark only the readable anchors, such as
-campaign ID and publisher label; the remaining key fields and metrics print once
+a group ID and item label. The remaining key fields and metrics print once
 in their respective bands. The ordinal connects those bands within this printed
 table only. It is not a persisted business ID and restarts for each table.
 
@@ -1135,7 +1135,7 @@ Important constraint:
 That means request shape should be treated as metadata-driven:
 
 - if a workspace needs `filters.order_id`, configure that exact `paramPath`
-- if a workspace needs `filters.orderIds`, configure that exact `paramPath`
+- if a workspace needs `filters.groupIds`, configure that exact `paramPath`
 - if both are genuinely required, author both explicitly in workspace metadata
 
 This avoids fallback alias behavior leaking into the canonical report-builder
@@ -1154,8 +1154,8 @@ copies it to the generated chart `xAxis`:
 
 ```yaml
 dataSources:
-  - id: daily_delivery
-    dataSourceRef: dailyDeliverySource
+  - id: daily_activity
+    dataSourceRef: dailyActivitySource
     dimensions:
       - id: eventDate
         key: eventDate
@@ -1436,7 +1436,7 @@ and date/parameter invalidation remain responsible for data loading.
 
 ```yaml
 kind: dashboard.reportRuntime
-dataSourceRef: advertiser_overview
+dataSourceRef: collection_overview
 dashboard:
   reportRuntime:
     presentationMode: report
@@ -1451,7 +1451,7 @@ dashboard:
 Each binding accepts `dataSourceRef` (defaults to the surrounding datasource),
 `scope: collection|metrics`, and an optional selector. An object becomes one row;
 a missing value becomes an empty dataset. Loading/error states suppress previous
-rows so a pending scope change cannot display the preceding advertiser's values.
+rows so a pending scope change cannot display the previous collection's values.
 The containing tab should supply a normal `dataStateBoundary` with Retry.
 
 Use `sectionPresentation: stack` for an overview page that shows all report
@@ -1567,3 +1567,23 @@ The declared preset selection travels with endpoints in the applied request,
 including when manual dates equal a named range. See
 [calendar-backed report date drafts](report-date-presets.md#canonical-bound-windows)
 for declaration, binding, reset, optional-clear and export semantics.
+
+
+## Namespace report catalogs
+
+A `dashboard.reportCatalog` window lists authorized report resources from the namespace in its window URI. Set `reportCatalog.namespace` to select another namespace explicitly. A producer can offer a context tab by declaring the report parameter and its window input bindings.
+
+```yaml
+reportCatalog:
+  namespace: records
+  scope:
+    key: collection
+    label: Current collection
+    parameters: [selectedCollection]
+```
+
+Here the tab sends `{"namespace":"records","scope":{"key":"collection","value":"western"}}` to `reporting:list_reports` when the window parameter `selectedCollection` is `"western"`. Each report publishes its eligible values under `reportSpec.scope.params`, for example `{"id":"collection","value":["western","central"]}`. An authored report can supply `reportDocument.scope.params` when the compiled specification has no scope declaration. Matching uses JSON scalar types and accepts any shared array member. An undeclared parameter does not match. Authorization is still checked by the provider.
+
+Consume `nextCursor` even when a scoped page has zero matches. Subsequent requests use the same namespace, search and scope. A filter change starts a new search. Send scope filters in the named `scope` object. The report tool rejects unrecognized selector fields.
+
+Open and run use the report's current publisher and resource reference. Editing requires a producer-declared `builderWindow`, `builderWindowByRef`, or `defaultBuilderWindow`. Duplicating from the catalog requests a personal copy from the owning service.

@@ -29,7 +29,7 @@ import {
     formatReportCatalogDate,
     buildReportCatalogMutationRequest,
     buildReportCatalogResourceRequest,
-    filterReportCatalogResources,
+    reportCatalogContext,
     normalizeReportCatalogResources,
     readReportCatalogResource,
 } from "./reportCatalogResources.js";
@@ -37,7 +37,6 @@ import { REPORT_STORE_CHANGED_EVENT } from "./reportBuilderHostServices.js";
 import "./ReportCatalog.css";
 
 const SCOPES = [
-    { id: "order", label: "Current order", icon: "layers" },
     { id: "all", label: "All reports", icon: "folder-open" },
     { id: "user", label: "Current user", icon: "person" },
 ];
@@ -45,13 +44,6 @@ const DEFAULT_PAGE_SIZE_OPTIONS = [20, 50, 100];
 
 function normalizeString(value = "") {
     return String(value || "").trim();
-}
-
-function normalizeOrderId(value = "") {
-    if (Array.isArray(value)) {
-        return normalizeOrderId(value[0]);
-    }
-    return normalizeString(value);
 }
 
 function formatDate(value, options) {return formatReportCatalogDate(value,options);}
@@ -63,18 +55,12 @@ function dateRangeLabel(report = {}) {
     return "Uses report defaults";
 }
 
-function reportMatchesOrder(report = {}, orderId = "") {
-    const normalized = normalizeOrderId(orderId);
-    return !!normalized && report.orderIds.some((candidate) => candidate === normalized);
-}
-
 function resolveBuilderWindow(report = {}, config = {}) {
     return normalizeString(
         report.builderWindow
         || config.builderWindowByRef?.[report.builderRef]
-        || config.defaultBuilderWindow
-        || "metricReportBuilder",
-    ) || "metricReportBuilder";
+        || config.defaultBuilderWindow,
+    );
 }
 
 function reportEntryKey(report = {}) {
@@ -101,7 +87,8 @@ function downloadArtifact(artifact = null, title = "") {
 
 export function ReportCard({
     report,
-    currentOrderId,
+    scopeLabel,
+    canEdit = true,
     busyAction,
     onOpen,
     onRun,
@@ -113,8 +100,6 @@ export function ReportCard({
     onDelete,
 }) {
     const capabilities = report.capabilities || {};
-    const orderLabel = report.orderIds.length > 0
-        ? report.orderIds.map((id) => `Order ${id}`).join(", ") : "Cross-order report";
     const hasMenuActions = ["rename", "duplicate", "runRange", "export", "delete"].some((action) => capabilities[action]);
     return (
         <article className="forge-report-catalog-card">
@@ -127,8 +112,9 @@ export function ReportCard({
                     <h3>{report.title}</h3>
                     <div className="forge-report-catalog-card__tags">
                         <Tag minimal>{report.namespace}</Tag>
-                        {reportMatchesOrder(report, currentOrderId) ? (
-                            <Tag minimal intent="primary">Current order</Tag>
+                        {report.unavailable && <Tag minimal>Unavailable</Tag>}
+                        {scopeLabel ? (
+                            <Tag minimal intent="primary">{scopeLabel}</Tag>
                         ) : null}
                     </div>
                 </div>
@@ -149,11 +135,6 @@ export function ReportCard({
             </div>
 
             {report.description ? <p className="forge-report-catalog-card__description">{report.description}</p> : null}
-
-            <div className="forge-report-catalog-card__scope">
-                <Icon icon="layer" size={14} />
-                <span>{orderLabel}</span>
-            </div>
 
             <dl className="forge-report-catalog-card__metadata">
                 <div>
@@ -187,7 +168,7 @@ export function ReportCard({
                 <Button icon="folder-open" disabled={!capabilities.open} onClick={() => onOpen(report)}>
                     Open
                 </Button>
-                <Button minimal icon="edit" disabled={!capabilities.edit} onClick={() => onEdit(report)}>
+                <Button minimal icon="edit" disabled={!capabilities.edit || !canEdit} onClick={() => onEdit(report)}>
                     Edit
                 </Button>
             </div>
@@ -203,12 +184,8 @@ export default function ReportCatalog({container, context}) {
     const reportExport = context?.handlers?.reportExport || null;
     const windowHandler = context?.handlers?.window || null;
     const windowParameters = context?.windowState?.parameters || context?._globalServices?.windowState?.parameters || {};
-    const currentOrderId = normalizeOrderId(
-        windowParameters.orderId
-        || windowParameters.AdOrderId
-        || windowParameters.orderIds
-        || windowParameters.adOrderId,
-    );
+    const declared = reportCatalogContext(config,context?.windowState,windowParameters);
+    const scopeOptions = declared.scope ? [{id:"context",label:config.scope.label,icon:"layers"},...SCOPES] : SCOPES;
     const pageSizeOptions = useMemo(() => {
         const configured = Array.isArray(config.pageSizeOptions) ? config.pageSizeOptions : DEFAULT_PAGE_SIZE_OPTIONS;
         const normalized = configured
@@ -219,7 +196,7 @@ export default function ReportCatalog({container, context}) {
     }, [config.pageSizeOptions]);
     const catalogRef = useRef(null);
     const loadSequence = useRef(0);
-    const [scope, setScope] = useState(currentOrderId ? "order" : "all");
+    const [scope, setScope] = useState(declared.scope ? "context" : "all");
     const [query, setQuery] = useState("");
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(() => normalizeReportCatalogPageSize(
@@ -227,6 +204,7 @@ export default function ReportCatalog({container, context}) {
         pageSizeOptions,
     ));
     const [reports, setReports] = useState([]);
+    const [nextCursor,setNextCursor] = useState("");
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [feedback, setFeedback] = useState(null);
@@ -238,31 +216,48 @@ export default function ReportCatalog({container, context}) {
     const [rangeTo, setRangeTo] = useState("");
     const [deleteTarget, setDeleteTarget] = useState(null);
 
-    const loadReports = useCallback(async ({ silent = false } = {}) => {
-        const sequence = ++loadSequence.current;
-        if (typeof reportStore?.listReports !== "function") {
+    const requestKey=JSON.stringify(buildReportCatalogListRequest(scope,{...declared,query,limit:pageSize}));
+    const loadReports = useCallback(async ({silent=false,cursor=""}={})=>{
+        const sequence=++loadSequence.current;
+        const request=JSON.parse(requestKey);
+        if (!cursor) {
+            setNextCursor("");
+            if (!silent) setReports([]);
+        }
+        if (!request) {setReports([]);setLoading(false);return;}
+        if (typeof reportStore?.listReports!=="function") {
             setError("Reports are unavailable in this workspace.");
             setLoading(false);
             return;
         }
         if (!silent) setLoading(true);
         try {
-            const result = await reportStore.listReports(buildReportCatalogListRequest(scope));
-            if (sequence !== loadSequence.current) return;
-            setReports(normalizeReportCatalogResources(result));
+            const result=await reportStore.listReports(cursor ? {...request,cursor} : request);
+            if (sequence!==loadSequence.current) return;
+            const rows=normalizeReportCatalogResources(result);
+            setReports(previous=>cursor?[...previous,...rows]:rows);
+            setNextCursor(result?.nextCursor || "");
             setError("");
-        } catch (loadError) {
-            if (sequence !== loadSequence.current) return;
-            setReports([]);
-            setError(loadError?.message || "Could not load reports. Try Refresh.");
-        } finally {
-            if (sequence === loadSequence.current) setLoading(false);
-        }
-    }, [reportStore, scope]);
+        } catch (cause) {
+            if (sequence!==loadSequence.current) return;
+            setError(cause?.message || "Could not load reports. Try Refresh.");
+        } finally {if (sequence===loadSequence.current) setLoading(false);}
+    },[reportStore,requestKey]);
 
     useEffect(() => {
-        loadReports();
-    }, [loadReports]);
+        let timer;
+        if (query.trim()) {
+            setLoading(true);
+            setReports([]);
+            setNextCursor("");
+            timer = setTimeout(() => loadReports(), 180);
+        }
+        else loadReports();
+        return () => {
+            clearTimeout(timer);
+            loadSequence.current++;
+        };
+    }, [loadReports, query]);
 
     useEffect(() => {
         const refresh = () => loadReports({ silent: true });
@@ -270,9 +265,7 @@ export default function ReportCatalog({container, context}) {
         return () => globalThis.removeEventListener?.(REPORT_STORE_CHANGED_EVENT, refresh);
     }, [loadReports]);
 
-    const entries = useMemo(() => filterReportCatalogResources(reports, {
-        scope, orderId: currentOrderId, query,
-    }), [currentOrderId, query, reports, scope]);
+    const entries=reports;
     const pagination = useMemo(
         () => paginateReportCatalogEntries(entries, page, pageSize),
         [entries, page, pageSize],
@@ -284,7 +277,7 @@ export default function ReportCatalog({container, context}) {
 
     useEffect(() => {
         setPage(1);
-    }, [query, scope]);
+    }, [requestKey]);
 
     useEffect(() => {
         if (page !== pagination.currentPage) {
@@ -324,12 +317,20 @@ export default function ReportCatalog({container, context}) {
         const key = `${reportEntryKey(report)}:${action}`;
         setBusyAction(key);
         try {
-            report = await readReportCatalogResource(report, reportStore);
-            const builderWindow = resolveBuilderWindow(report, config);
-            const prefill = {
-                ...(from ? { from } : {}),
-                ...(to ? { to } : {}),
-            };
+            const builderWindow = resolveBuilderWindow(report,config);
+            const prefill = {...(from ? {from}:{}), ...(to ? {to}:{})};
+            if (!builderWindow) {
+                if (mode === "design") throw new Error("This report has no declared editor.");
+                if (!report.resource?.providerIdentity) throw new Error("Refresh the report before opening it.");
+                await windowHandler.openTarget({target:{
+                    kind:"window",windowKey:report.resourceUri,windowTitle:report.title,
+                    providerIdentity:report.resource.providerIdentity,resourceRef:buildReportCatalogResourceRequest(report).resource,
+                    presentation:"hosted",region:"chat.top",replaceHostedRegion:true,newInstance,
+                    conversationId:context?.windowState?.conversationId,parameters:{...prefill,executeOnOpen},
+                },context});
+                return;
+            }
+            report=await readReportCatalogResource(report,reportStore);
             const parameters = {
                 ...buildReportCatalogResourceRequest(report),
                 ...(report.resource ? { reportResource: report.resource } : {}),
@@ -346,7 +347,6 @@ export default function ReportCatalog({container, context}) {
                     runOverride: prefill,
                     ...(from ? { runFrom: from } : {}),
                     ...(to ? { runTo: to } : {}),
-                    ...(prefill.orderIds ? { runOrderIds: prefill.orderIds } : {}),
                 } : {}),
             };
             await windowHandler.openTarget({
@@ -368,7 +368,7 @@ export default function ReportCatalog({container, context}) {
         } finally {
             setBusyAction("");
         }
-    }, [config, context, currentOrderId, reportStore, windowHandler]);
+    }, [config, context,reportStore, windowHandler]);
 
     const renameReport = useCallback(async () => {
         if (!renameTarget?.capabilities.rename || typeof reportStore?.updateReport !== "function") return;
@@ -398,7 +398,7 @@ export default function ReportCatalog({container, context}) {
         const key = `${reportEntryKey(report)}:duplicate`;
         setBusyAction(key);
         try {
-            const selected = await readReportCatalogResource(report, reportStore);
+            const selected = report.resource ? report : await readReportCatalogResource(report, reportStore);
             const duplicated = await reportStore.duplicateReport(buildReportCatalogMutationRequest(selected, "duplicate"));
             setFeedback({ intent: "success", message: `Created ${duplicated?.title || `Copy of ${report.title}`}.` });
             await loadReports({ silent: true });
@@ -474,17 +474,15 @@ export default function ReportCatalog({container, context}) {
         setRangeTarget(null);
     }, [openBuilder, rangeFrom, rangeTarget, rangeTo]);
 
-    const emptyTitle = scope === "order"
-        ? `No reports for order ${currentOrderId || ""}`.trim()
-        : (scope === "user" ? "No reports owned by the current user" : "No reports available");
+    const emptyTitle=nextCursor ? "No matches on this page" : "No matching reports";
 
     return (
         <section className="forge-report-catalog" ref={catalogRef}>
             <header className="forge-report-catalog__hero">
                 <div className="forge-report-catalog__hero-icon"><Icon icon="projects" size={24} /></div>
                 <div>
-                    <h2>{currentOrderId ? `Reports for order ${currentOrderId}` : "Reports"}</h2>
-                    <p>Open, rerun, edit, export, and organize reusable reports without leaving the order workspace.</p>
+                    <h2>Reports</h2>
+                    <p>Open, rerun, edit, export, and organize reusable reports in your workspace.</p>
                 </div>
                 <div className="forge-report-catalog__hero-stat">
                     <strong>{entries.length}</strong>
@@ -494,23 +492,17 @@ export default function ReportCatalog({container, context}) {
 
             <div className="forge-report-catalog__toolbar">
                 <div className="forge-report-catalog__scopes" role="tablist" aria-label="Report catalog scope">
-                    {SCOPES.filter((entry) => entry.id !== "order" || currentOrderId).map((entry) => (
+                    {scopeOptions.map((entry) => (
                         <button
                             key={entry.id}
                             type="button"
                             role="tab"
                             aria-selected={scope === entry.id}
                             className={scope === entry.id ? "is-active" : ""}
-                            disabled={entry.id === "order" && !currentOrderId}
                             onClick={() => setScope(entry.id)}
                         >
                             <Icon icon={entry.icon} size={15} />
                             <span>{entry.label}</span>
-                            {entry.id === "order" && currentOrderId ? (
-                                <span className="forge-report-catalog__scope-count">
-                                    {reports.filter((report) => reportMatchesOrder(report, currentOrderId)).length}
-                                </span>
-                            ) : null}
                         </button>
                     ))}
                 </div>
@@ -543,7 +535,7 @@ export default function ReportCatalog({container, context}) {
                 <div className="forge-report-catalog__empty">
                     <div className="forge-report-catalog__empty-icon"><Icon icon="folder-new" size={26} /></div>
                     <h3>{emptyTitle}</h3>
-                    <p>{scope === "order" ? "Build or save a report for this order and it will appear here immediately." : "Adjust the scope or create a new report in the report builder."}</p>
+                    <p>{nextCursor ? "More reports are available to check." : "Adjust the scope or search."}</p>
 
                 </div>
             ) : (
@@ -553,7 +545,8 @@ export default function ReportCatalog({container, context}) {
                         <ReportCard
                             key={reportEntryKey(report)}
                             report={report}
-                            currentOrderId={currentOrderId}
+                            scopeLabel={scope === "context" ? config.scope?.label : ""}
+                            canEdit={Boolean(resolveBuilderWindow(report,config))}
                             busyAction={busyAction}
                             onOpen={(entry) => openBuilder(entry, { mode: "result", executeOnOpen: false })}
                             onRun={(entry) => openBuilder(entry, { mode: "result", executeOnOpen: true })}
@@ -619,6 +612,8 @@ export default function ReportCatalog({container, context}) {
                 ) : null}
                 </>
             )}
+
+            {nextCursor && !error ? <Button loading={loading} onClick={()=>loadReports({cursor:nextCursor})}>Load more reports</Button> : null}
 
             <Dialog isOpen={!!renameTarget} onClose={() => setRenameTarget(null)} title="Rename report" icon="edit">
                 <DialogBody>

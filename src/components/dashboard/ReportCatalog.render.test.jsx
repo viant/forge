@@ -11,6 +11,6 @@ assert.ok(!card.includes("More actions for"),"no menu when no server menu capabi
 for (const label of ["Built-in", "preset", "Customize", "Saved report"]) assert.ok(!card.includes(label));
 const catalog = renderToStaticMarkup(<ReportCatalog container={{reportCatalog:{presets:[{id:"unsupported",title:"Forbidden fallback entry"}]}}} context={{}} />);
 assert.ok(catalog.includes("All reports") && catalog.includes("Current user"));
-assert.ok(!catalog.includes("Current order"),"optional order filter is omitted without an order context");
+assert.ok(!catalog.includes("Current collection"),"context filter is omitted without a declaration");
 assert.ok(!catalog.includes("Forbidden fallback entry") && !catalog.includes("Built-in") && !catalog.includes("presets"));
-console.log("ReportCatalog.render ✓ unified naming/actions, capability denial, server-only source, optional order scope");
+console.log("ReportCatalog.render ✓ unified naming/actions, capability denial, server-only source, declared context scope");

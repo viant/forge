@@ -163,7 +163,10 @@ for (const name of ['thumbs-up', 'thumbs-down', 'ellipsis']) {
 }
 for (const file of ['../../components/Button.jsx', '../../components/Icon.jsx', '../../components/foundations.css', '../../demos/theme/FoundationSpecimen.jsx', '../../demos/theme/foundationSpecimen.css']) {
     const source = fs.readFileSync(new URL(file, import.meta.url), 'utf8');
-    assert.doesNotMatch(source, /(?:IBM Plex|Steward|Viant|#2d5bff|#1a1d24)/i, 'Workspace branding must stay in workspace-owned assets');
+    assert.doesNotMatch(source, /#[0-9a-f]{6}\b/i, 'Workspace theme colors belong to the active semantic roles');
+    for (const [,family] of source.matchAll(/font-family\s*:\s*([^;}]+)/g)) {
+        assert.match(family, /^(?:var\(--forge-|inherit\b)/, 'Use the inherited or semantic font family');
+    }
     assert.doesNotMatch(source, /(?:fontSize|fontWeight|lineHeight|letterSpacing|fontFamily)\s*:/, 'Shared examples must select roles');
 }
 console.log('shared action variants, icon names, unavailable states and workspace ownership passed');

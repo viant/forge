@@ -151,9 +151,9 @@ func TestMCPReferenceReaderFullLoadUsesKindScopedIndexWithoutChangingGenericInve
 	require.NoError(t, err)
 	localRaw := json.RawMessage(`{"name":"owned","transport":{"type":"streamable","url":"https://example.invalid/mcp"},"primitiveProviderIdentity":"producer","primitiveNamespaces":["ns://sampleui"],"resourceCacheScopes":{"*":"user"}}`)
 	localSource := &indexedWindowSource{uri: localURI, raw: localRaw}
-	unrelatedURI, err := identity.ParseResourceURI("mcp://workspace/datastudio")
+	unrelatedURI, err := identity.ParseResourceURI("mcp://workspace/secondary")
 	require.NoError(t, err)
-	unrelatedSource := &indexedWindowSource{uri: unrelatedURI, raw: json.RawMessage(`{"name":"datastudio","transport":{"type":"streamable","url":"https://unrelated.invalid/mcp"},"primitiveProviderIdentity":"datastudio-owner","primitiveNamespaces":["ns://datastudio"],"resourceCacheScopes":{"*":"user"}}`)}
+	unrelatedSource := &indexedWindowSource{uri: unrelatedURI, raw: json.RawMessage(`{"name":"secondary","transport":{"type":"streamable","url":"https://unrelated.invalid/mcp"},"primitiveProviderIdentity":"secondary-owner","primitiveNamespaces":["ns://secondary"],"resourceCacheScopes":{"*":"user"}}`)}
 	overlapURI, err := identity.ParseResourceURI("mcp://workspace/overlap")
 	require.NoError(t, err)
 	overlapSource := &indexedWindowSource{uri: overlapURI, raw: json.RawMessage(`{"name":"overlap","transport":{"type":"streamable","url":"https://overlap.invalid/mcp"},"primitiveProviderIdentity":"second-producer","primitiveNamespaces":["ns://sampleui"],"resourceCacheScopes":{"*":"user"}}`)}
@@ -167,14 +167,14 @@ func TestMCPReferenceReaderFullLoadUsesKindScopedIndexWithoutChangingGenericInve
 	}
 	localProvider, err := NewLocalProvider(LocalConfig{ProviderIdentity: "configuration", Actor: localActor, Verify: localVerify, Authorize: func(context.Context, identity.VerifiedActor, identity.ResourceURI, string) error { return nil }, Bindings: []LocalResourceBinding{binding(localURI, localSource), binding(unrelatedURI, unrelatedSource), binding(overlapURI, overlapSource)}, Validators: map[string]LocalResourceValidator{"mcp": ValidateMCPDefinition}})
 	require.NoError(t, err)
-	provider := &mcpReferenceTestProvider{names: []string{"owned", "datastudio", "overlap"}}
+	provider := &mcpReferenceTestProvider{names: []string{"owned", "secondary", "overlap"}}
 	unrelatedCalls := 0
 	overlapClient := &mcpOnlyDefinitionClient{t: t}
 	mgr, err := manager.New(provider, manager.WithClientFactory(func(_ context.Context, _, name string) (mcpclient.Interface, error) {
 		if name == "overlap" {
 			return overlapClient, nil
 		}
-		if name == "datastudio" {
+		if name == "secondary" {
 			unrelatedCalls++
 			return nil, errors.New("unrelated restricted provider contacted")
 		}
@@ -202,7 +202,7 @@ func TestMCPReferenceReaderFullLoadUsesKindScopedIndexWithoutChangingGenericInve
 	}
 	g := NewGateway(mgr, resolve, verify, "consumer")
 	defer g.Close()
-	reader, err := NewMCPReferenceReader(g, MCPDefinitionSource{ConnectionName: "configuration", ProviderIdentity: "configuration", Namespace: "workspace"}, []identity.ResourceRef{{URI: "mcp://workspace/datastudio"}, {URI: "mcp://workspace/owned"}})
+	reader, err := NewMCPReferenceReader(g, MCPDefinitionSource{ConnectionName: "configuration", ProviderIdentity: "configuration", Namespace: "workspace"}, []identity.ResourceRef{{URI: "mcp://workspace/secondary"}, {URI: "mcp://workspace/owned"}})
 	require.NoError(t, err)
 	// RegisterLocal is the only local definition source. The reader must own
 	// every dynamic external name after binding, as in Core startup.
@@ -217,7 +217,7 @@ func TestMCPReferenceReaderFullLoadUsesKindScopedIndexWithoutChangingGenericInve
 	require.Equal(t, "producer", definition.ResolvedIdentity.ProviderIdentity)
 	require.Equal(t, 1, remote.reads)
 	require.Positive(t, remote.filters)
-	require.Zero(t, unrelatedCalls, "an exact SAMPLEUI URI must skip the Data Studio namespace root")
+	require.Zero(t, unrelatedCalls, "an exact URI must skip an unrelated namespace root")
 	firstFilters := remote.filters
 	for i := 0; i < 100; i++ {
 		cached, err := reader.Load(alice, "mcp://sampleui/platform")

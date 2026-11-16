@@ -21,18 +21,18 @@ import (
 // ReportCatalogCandidate is trusted inventory metadata, never an authorization
 // result. An inventory's storage/provenance cannot grant describe or execution.
 type ReportCatalogCandidate struct {
-	URI           string   `json:"resourceUri"`
-	Title         string   `json:"title"`
-	Description   string   `json:"description,omitempty"`
-	OwnerID       string   `json:"ownerId,omitempty"`
-	BuilderRef    string   `json:"builderRef,omitempty"`
-	BuilderWindow string   `json:"builderWindow,omitempty"`
-	ReportID      string   `json:"reportId,omitempty"`
-	ArtifactID    string   `json:"artifactId,omitempty"`
-	OrderIDs      []string `json:"orderIds,omitempty"`
-	ReportType    string   `json:"reportType,omitempty"`
-	CreatedAt     string   `json:"createdAt,omitempty"`
-	UpdatedAt     string   `json:"updatedAt,omitempty"`
+	URI           string `json:"resourceUri"`
+	Title         string `json:"title"`
+	Description   string `json:"description,omitempty"`
+	OwnerID       string `json:"ownerId,omitempty"`
+	BuilderRef    string `json:"builderRef,omitempty"`
+	BuilderWindow string `json:"builderWindow,omitempty"`
+	ReportID      string `json:"reportId,omitempty"`
+	ArtifactID    string `json:"artifactId,omitempty"`
+
+	ReportType string `json:"reportType,omitempty"`
+	CreatedAt  string `json:"createdAt,omitempty"`
+	UpdatedAt  string `json:"updatedAt,omitempty"`
 }
 type ReportCapabilities struct {
 	Open      bool `json:"open"`
@@ -57,12 +57,13 @@ type ReportCatalogEntry struct {
 	Capabilities       ReportCapabilities         `json:"capabilities"`
 }
 type ReportCatalogQuery struct {
-	Search          string `json:"search,omitempty"`
-	Namespace       string `json:"namespace,omitempty"`
-	ResourceURI     string `json:"resourceUri,omitempty"`
-	CurrentUserOnly bool   `json:"currentUserOnly,omitempty"`
-	Cursor          string `json:"cursor,omitempty"`
-	Limit           int    `json:"limit,omitempty"`
+	Scope           *ScopeFilter `json:"scope,omitempty"`
+	Search          string       `json:"search,omitempty"`
+	Namespace       string       `json:"namespace,omitempty"`
+	ResourceURI     string       `json:"resourceUri,omitempty"`
+	CurrentUserOnly bool         `json:"currentUserOnly,omitempty"`
+	Cursor          string       `json:"cursor,omitempty"`
+	Limit           int          `json:"limit,omitempty"`
 }
 type ReportCatalogResult struct {
 	Reports    []ReportCatalogEntry `json:"reports"`
@@ -132,6 +133,14 @@ func (s *ReportCatalogService) list(ctx context.Context, input ReportCatalogQuer
 	if err != nil || resolver == nil {
 		return nil, identity.ErrResourceDenied
 	}
+	scope, err := input.Scope.Prepare(input.Namespace)
+	if err != nil {
+		return nil, err
+	}
+	input.Cursor, err = scope.Cursor(input.Cursor)
+	if err != nil {
+		return nil, err
+	}
 	var after string
 	if input.Cursor != "" {
 		raw, err := base64.RawURLEncoding.DecodeString(input.Cursor)
@@ -191,6 +200,9 @@ func (s *ReportCatalogService) list(ctx context.Context, input ReportCatalogQuer
 		if json.Unmarshal(raw, &envelope) != nil {
 			return nil, identity.ErrResource
 		}
+		if scope != nil && !scope.Matches(DeclaredScopeValues(envelope.ReportSpec, envelope.ReportDocument)) {
+			return nil, nil
+		}
 		if envelope.BuilderRef != "" {
 			if candidate.BuilderRef != envelope.BuilderRef {
 				candidate.BuilderWindow = ""
@@ -243,7 +255,7 @@ func (s *ReportCatalogService) list(ctx context.Context, input ReportCatalogQuer
 			result.Reports = append(result.Reports, *entry)
 			if len(result.Reports) > limit {
 				result.Reports = result.Reports[:limit]
-				result.NextCursor = base64.RawURLEncoding.EncodeToString([]byte(result.Reports[limit-1].URI))
+				result.NextCursor = scope.Next(base64.RawURLEncoding.EncodeToString([]byte(result.Reports[limit-1].URI)))
 				break
 			}
 		}

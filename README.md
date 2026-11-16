@@ -205,7 +205,7 @@ go mod download
 go test ./backend/...
 ```
 
-MCP providers and the UI bridge are implemented by Agently Core. YAML catalog authoring and import are owned by AI Studio.
+Agently Core implements MCP providers and the UI bridge. Producers own authoring and import of their YAML catalogs.
 
 ## Documentation path
 

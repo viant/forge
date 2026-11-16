@@ -211,3 +211,22 @@ Hosts may present ordinary links as adjacent tabs. They should honor an explicit
 old tab. Native hosted replacement carries the stable parent scope; a completed
 owner can then close without making the target disappear. These options control
 presentation and lifetime, not data authorization.
+
+## Published window links
+
+A producer can declare destinations on an individual window. The keys are names
+chosen by the producer. Each destination names a window in the same namespace.
+
+```yaml
+window:
+  navigation:
+    details:
+      resourceUri: window://example/details
+      title: Details
+```
+
+A window action can call `context.services.hostWindow.navigate('details',
+{recordId: selected.id})` in a host that provides placement. The host takes the
+publisher from the admitted source and opens the declared target through its
+ordinary window reader. The target checks current access. An explicit empty
+`navigation: {}` lets a window use local host actions with no navigation links.

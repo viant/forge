@@ -39,11 +39,12 @@ type Connection struct {
 	Generation       uint64 `json:"generation"`
 }
 type LocatedResource struct {
-	ReportBuilderRef string                     `json:"reportBuilderRef,omitempty"`
-	Unavailable      bool                       `json:"unavailable,omitempty"`
-	ResolvedResource *identity.ResolvedResource `json:"resolvedResource,omitempty"`
-	Connection       Connection                 `json:"connection"`
-	Resource         primitive.ResourceState    `json:"resource"`
+	ReportScopeValues map[string][]string        `json:"reportScopeValues,omitempty"`
+	ReportBuilderRef  string                     `json:"reportBuilderRef,omitempty"`
+	Unavailable       bool                       `json:"unavailable,omitempty"`
+	ResolvedResource  *identity.ResolvedResource `json:"resolvedResource,omitempty"`
+	Connection        Connection                 `json:"connection"`
+	Resource          primitive.ResourceState    `json:"resource"`
 }
 type capabilities struct {
 	published              bool

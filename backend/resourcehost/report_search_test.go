@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -113,4 +114,51 @@ func TestKnownPublishedReportDoesNotReadUnrelatedConnectionSettings(t *testing.T
 		require.Equal(t, "publisher", got.ResolvedResource.ProviderIdentity)
 	}
 	require.Zero(t, peer.calls)
+}
+
+func TestDeclaredReportScopeNarrowsPagesAndBindsCursor(t *testing.T) {
+	g, source, _, _ := publishedFixture(t)
+	for uri := range source.states {
+		delete(source.states, uri)
+	}
+	for _, item := range []struct{ name, value string }{{"a", "42"}, {"b", "[0,false,9007199254740993]"}} {
+		raw := []byte(`{"schemaVersion":1,"reportDocument":{"title":"Sample","unrelated":{"team":false}},"reportSpec":{"kind":"reportSpec","title":"Sample","scope":{"params":[{"id":"team","value":` + item.value + `}]}}}`)
+		uri := "report://example/" + item.name
+		source.states[uri] = primitive.ResourceState{URI: uri, Kind: "report", Namespace: "example", Name: item.name, Title: "Sample", FormatVersion: 1, DefinitionBytes: raw, ContentFingerprint: identity.ContentFingerprint(raw)}
+	}
+	c := &ReportGatewayCatalog{Gateway: g}
+	q := catalog.ReportCatalogQuery{Namespace: "example", Limit: 1, Scope: &catalog.ScopeFilter{Key: "team", Value: json.RawMessage("false")}}
+	first, err := c.List(t.Context(), q)
+	require.NoError(t, err)
+	require.Empty(t, first.Reports)
+	require.NotEmpty(t, first.NextCursor)
+	q.Cursor = first.NextCursor
+	next, err := c.List(t.Context(), q)
+	require.NoError(t, err)
+	require.Len(t, next.Reports, 1)
+	require.Equal(t, "b", next.Reports[0].Name)
+	require.Empty(t, next.NextCursor)
+	q.Scope.Value = json.RawMessage("0")
+	_, err = c.List(t.Context(), q)
+	require.Error(t, err)
+	q.Namespace = "different"
+	q.Scope.Value = json.RawMessage("false")
+	_, err = c.List(t.Context(), q)
+	require.Error(t, err)
+	q.Namespace = "example"
+	q.Cursor = ""
+	q.Limit = 10
+	for _, tc := range []struct {
+		value   string
+		matches int
+	}{{"0", 1}, {"0e7", 1}, {"9007199254740993", 1}, {"9007199254740992", 0}, {`"false"`, 0}, {`["missing",false]`, 1}} {
+		q.Scope.Value = json.RawMessage(tc.value)
+		found, err := c.List(t.Context(), q)
+		require.NoError(t, err)
+		require.Len(t, found.Reports, tc.matches, tc.value)
+	}
+	q.Scope.Key = "undeclared"
+	empty, err := c.List(t.Context(), q)
+	require.NoError(t, err)
+	require.Empty(t, empty.Reports)
 }

@@ -17,11 +17,6 @@ const NamespaceMeta = "com.viant.resources/namespace"
 const RevisionMeta = "com.viant.resources/revision"
 const AuthoringResourcesMeta = "com.viant.resources/authoringResources"
 const ResourcePinsMeta = "com.viant.resources/resourcePins"
-const LegacyAuthoringExtension = "com.viant.ai-studio/authoring"
-const LegacyNamespaceMeta = "com.viant.ai-studio/namespace"
-const LegacyRevisionMeta = "com.viant.ai-studio/revision"
-const LegacyAuthoringResourcesMeta = "com.viant.ai-studio/authoringResources"
-const LegacyResourcePinsMeta = "com.viant.ai-studio/resourcePins"
 
 type NamespaceListRequest struct {
 	Cursor string `json:"cursor,omitempty"`

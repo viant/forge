@@ -54246,10 +54246,6 @@ ${indent}${end}`;
   function normalizeString15(value = "") {
     return String(value || "").trim();
   }
-  function isEntityOptionName(name = "") {
-    const normalized = normalizeString15(name).replace(/[^a-zA-Z0-9]/g, "");
-    return /^(account|agency|advertiser|campaign|order|line(item)?|audience|creative|pixel)(id|ids)?$/i.test(normalized);
-  }
   function normalizedType(value = "") {
     const type = normalizeString15(value).toLowerCase();
     if (["bool", "boolean"].includes(type)) return "boolean";
@@ -54293,7 +54289,7 @@ ${indent}${end}`;
     return (Array.isArray(values) ? values : []).map((entry) => {
       if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
       const name = normalizeString15(entry.name);
-      if (!name || seen.has(name) || isEntityOptionName(name)) return null;
+      if (!name || seen.has(name) || ["__proto__", "prototype", "constructor"].includes(name)) return null;
       seen.add(name);
       const type = normalizedType(entry.type);
       const optionValues = (Array.isArray(entry.values) ? entry.values : []).map((value) => normalizeValueEntry(value, type)).filter(Boolean);
@@ -72293,7 +72289,7 @@ ${indent}${end}`;
     var _a5, _b;
     if (type === "singlePositiveInteger") {
       if (Array.isArray(value)) {
-        if (value.length !== 1) throw new Error("Select exactly one advertiser or entity for this report.");
+        if (value.length !== 1) throw new Error("Select exactly one value for this report input.");
         value = value[0];
       }
       type = "positiveInteger";

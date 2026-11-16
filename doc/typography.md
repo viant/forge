@@ -157,12 +157,12 @@ callback and retained draft; host browser proof exercises the real specimen.
 
 ### Shared pattern library
 
-Forge is the canonical component and pattern library for Steward AI. Import
+Forge implements shared components and patterns for workspace hosts. Import
 reusable components from `forge/components`; import composition patterns from
 `forge/patterns`. A pattern owns its markup, variants, interaction behavior,
 accessibility contract and semantic variable names. Agently composes these
-patterns into the application shell, while Steward AI selects them in product
-metadata and publishes the token values.
+patterns into the application shell. Each workspace selects them in its own
+metadata and publishes its token values.
 
 The first public pattern is `SectionPattern`, which supports the semantic
 `primary` and `quiet` appearances plus the `flush` content inset. New pages
@@ -173,8 +173,8 @@ contract checks land together.
 Responsive behavior is part of the same library. `responsive.js` owns the
 phone/tablet/desktop form-factor contract and the shared roles for touch
 targets, page gutters, section gaps and content width. Components use those
-roles with container-aware CSS; Agently and Steward AI should not create a
-second breakpoint or touch-target vocabulary.
+roles with container-aware CSS. Hosts can use the same roles in their own
+responsive compositions.
 
 | Implementation | Supported contract and scope |
 | --- | --- |

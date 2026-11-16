@@ -106,7 +106,7 @@ function requiredTextMarkup(value) {
 }
 
 const emptyRequiredTextHtml = requiredTextMarkup('');
-const filledRequiredTextHtml = requiredTextMarkup('AISTUDIO Site List Parity QA');
+const filledRequiredTextHtml = requiredTextMarkup('Example item');
 const emptyRequiredTextInput = emptyRequiredTextHtml.match(/<input\b[^>]*id="forge-control-[^"]+"[^>]*>/)?.[0];
 const filledRequiredTextInput = filledRequiredTextHtml.match(/<input\b[^>]*id="forge-control-[^"]+"[^>]*>/)?.[0];
 assert.ok(emptyRequiredTextInput, emptyRequiredTextHtml);
@@ -114,7 +114,7 @@ assert.ok(filledRequiredTextInput, filledRequiredTextHtml);
 assert.match(emptyRequiredTextHtml, /forge-required-input/);
 assert.match(emptyRequiredTextInput, /aria-invalid="true"/);
 assert.match(filledRequiredTextInput, /aria-invalid="false"/);
-assert.match(filledRequiredTextInput, /value="AISTUDIO Site List Parity QA"/);
+assert.match(filledRequiredTextInput, /value="Example item"/);
 assert.match(filledRequiredTextHtml, /Site List Name[\s\S]*?<span aria-hidden="true">\s*\*<\/span>/);
 
 const dividedSectionsHtml = renderToStaticMarkup(

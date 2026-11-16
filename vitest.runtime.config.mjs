@@ -73,6 +73,7 @@ export default defineConfig({
       'src/components/readerWorkbench/ReaderBuilder.versions.render.test.jsx',
       'src/components/readerWorkbench/ReaderBuilder.deletion.render.test.jsx',
       'src/components/readerWorkbench/ReaderPreviewParameters.render.test.jsx',
+      'src/components/readerWorkbench/ReaderEntityScopeDialog.render.test.jsx',
       'src/components/readerWorkbench/ReaderCacheDialog.render.test.jsx',
       'src/components/readerWorkbench/ReaderFieldDialog.draft.render.test.jsx',
       'src/components/ResourceWindow.scope.render.test.jsx',

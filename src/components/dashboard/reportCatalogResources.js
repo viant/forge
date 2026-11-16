@@ -1,13 +1,14 @@
 const text = (value) => String(value || "").trim();
 const object = (value) => value && typeof value === "object" && !Array.isArray(value);
+const canonicalSegment = value => /^[A-Za-z0-9._-]{1,64}$/.test(value) && value !== "." && value !== "..";
 const ACTIONS = ["open", "run", "edit", "rename", "duplicate", "runRange", "export", "delete"];
 
 export function normalizeReportCatalogResources(value) {
     const reports = Array.isArray(value) ? value : (Array.isArray(value?.reports) ? value.reports : []);
     return reports.filter(object).flatMap((entry) => {
         const resourceUri = text(entry.resourceUri || entry.resource?.uri);
-        const match = /^report:\/\/([A-Za-z0-9._-]{1,64})\/([A-Za-z0-9._-]{1,64})$/.exec(resourceUri);
-        if (!match || [match[1], match[2]].some((name) => name === "." || name === "..")
+        const match = /^report:\/\/([^/]+)\/(.+)$/.exec(resourceUri);
+        if (!match || !canonicalSegment(match[1]) || match[2].length > 512 || !match[2].split("/").every(canonicalSegment)
             || (entry.namespace && entry.namespace !== match[1]) || (entry.name && entry.name !== match[2])
             || (entry.resource?.uri && entry.resource.uri !== resourceUri)) return [];
         return [{
@@ -25,7 +26,6 @@ export function normalizeReportCatalogResources(value) {
             ownerId: text(entry.ownerId),
             builderRef: text(entry.builderRef),
             builderWindow: text(entry.builderWindow),
-            orderIds: (Array.isArray(entry.orderIds) ? entry.orderIds : []).map(text).filter(Boolean),
             defaultFrom: text(entry.defaultFrom),
             defaultTo: text(entry.defaultTo),
             createdAt: text(entry.createdAt),
@@ -35,18 +35,23 @@ export function normalizeReportCatalogResources(value) {
     });
 }
 
-export function buildReportCatalogListRequest(scope) {
-    return { limit: 0, currentUserOnly: scope === "user" };
+export function reportCatalogContext(config, windowState, parameters) {
+    const uri = text(windowState?.resourceRef?.uri || windowState?.windowKey);
+    const namespace = text(config.namespace) || /^window:\/\/([^/]+)\//.exec(uri)?.[1] || "";
+    const definition = config.scope;
+    const scalar = value => typeof value === "boolean" || Number.isFinite(value) || typeof value === "string" && value !== "";
+    const present = value => scalar(value) || Array.isArray(value) && value.length && value.every(scalar);
+    const keys = Array.isArray(definition?.parameters) ? definition.parameters : [definition?.key];
+    const parameter = keys.find(key => typeof key === "string" && Object.hasOwn(parameters,key) && present(parameters[key]));
+    const scope = namespace && definition?.key && definition?.label && parameter
+        ? {key:definition.key, value:parameters[parameter]} : null;
+    return {namespace, scope};
 }
 
-export function filterReportCatalogResources(reports, {scope = "all", orderId = "", query = ""} = {}) {
-    const search = text(query).toLowerCase();
-    return reports.filter((report) => {
-        if (scope === "user" && report.ownedByCurrentUser !== true) return false;
-        if (scope === "order" && (!orderId || !report.orderIds.includes(text(orderId)))) return false;
-        return !search || [report.title, report.description, report.namespace, report.name, ...report.orderIds]
-            .join(" ").toLowerCase().includes(search);
-    });
+export function buildReportCatalogListRequest(selection, {namespace="",scope=null,query="",limit=0,cursor=""}={}) {
+    if (selection === "context" && (!namespace || !scope)) return null;
+    return {limit,currentUserOnly:selection==="user",...(namespace ? {namespace}:{}),
+        ...(selection==="context" ? {scope}:{}),...(query.trim()?{search:query.trim()}:{}),...(cursor?{cursor}:{})};
 }
 
 // The report ref selects bytes. The resolved pin retains the server's authority,
@@ -67,7 +72,7 @@ export async function readReportCatalogResource(report, reportStore) {
     if (typeof reportStore?.getReport !== "function") {
         throw new Error("Report reading is unavailable in this workspace.");
     }
-    const result = await reportStore.getReport(buildReportCatalogResourceRequest(report));
+    const result = await reportStore.getReport({...buildReportCatalogResourceRequest(report), ...(report.resource?.providerIdentity ? {sourceProvider:report.resource.providerIdentity} : {})});
     const resolved = result?.resource;
     if (!object(resolved) || resolved.uri !== report.resourceUri
         || !["working", "stamped", "published"].includes(resolved.kind)
@@ -75,7 +80,7 @@ export async function readReportCatalogResource(report, reportStore) {
         || !resolved.contentFingerprint || !resolved.authorityBinding || !resolved.validUntil) {
         throw new Error("The report service did not return the selected resource. Refresh and try again.");
     }
-    if (report.resource && ["kind", "revision", "contentFingerprint", "authorityBinding"]
+    if (report.resource && ["providerIdentity", "kind", "revision", "contentFingerprint", "authorityBinding"]
         .some((field) => (report.resource[field] ?? "") !== (resolved[field] ?? ""))) {
         throw new Error("The selected report changed. Refresh and try again.");
     }
@@ -85,19 +90,13 @@ export async function readReportCatalogResource(report, reportStore) {
 export function buildReportCatalogMutationRequest(report, action, idempotencyKey = globalThis.crypto?.randomUUID?.()) {
     if (!idempotencyKey) throw new Error("Report mutation identity is unavailable.");
     const request = {...buildReportCatalogResourceRequest(report), idempotencyKey};
+    if (action === "duplicate") return {...request, title:`Copy of ${report.title}`};
     if (!Number.isSafeInteger(report.rowEtag) || report.rowEtag <= 0) throw new Error("Refresh the report before changing it.");
     request.expectedRowEtag = report.rowEtag;
     if (action === "update") {
         if (report.resource?.kind !== "working" || !Number.isSafeInteger(report.draftRevision) || report.draftRevision <= 0) throw new Error("Only a current report draft can be edited.");
         request.expectedDraftRevision = report.draftRevision;
         request.expectedContentFingerprint = report.resource.contentFingerprint;
-    }
-    if (action === "duplicate") {
-        if (!text(report.workspaceId)) throw new Error("The report workspace is unavailable.");
-        const suffix = `-copy-${idempotencyKey.replace(/[^A-Za-z0-9]/g, "").slice(0,12)}`;
-        request.targetUri = `report://${report.namespace}/${report.name.slice(0,64-suffix.length)}${suffix}`;
-        request.targetWorkspaceId = report.workspaceId;
-        request.title = `Copy of ${report.title}`;
     }
     return request;
 }

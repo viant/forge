@@ -280,7 +280,15 @@ func (c *ReportGatewayCatalog) List(ctx context.Context, input catalog.ReportCat
 	if err != nil {
 		return nil, err
 	}
-	query := CatalogQuery{Search: input.Search, Namespace: input.Namespace, Cursor: input.Cursor, Limit: input.Limit}
+	scope, err := input.Scope.Prepare(input.Namespace)
+	if err != nil {
+		return nil, err
+	}
+	cursor, err := scope.Cursor(input.Cursor)
+	if err != nil {
+		return nil, err
+	}
+	query := CatalogQuery{Search: input.Search, Namespace: input.Namespace, Cursor: cursor, Limit: input.Limit}
 	if query.Limit == 0 {
 		query.Limit = primitive.MaxCatalogPageSize
 	}
@@ -304,7 +312,7 @@ func (c *ReportGatewayCatalog) List(ctx context.Context, input catalog.ReportCat
 	if err != nil {
 		return nil, err
 	}
-	result := &catalog.ReportCatalogResult{Reports: []catalog.ReportCatalogEntry{}, NextCursor: page.NextCursor}
+	result := &catalog.ReportCatalogResult{Reports: []catalog.ReportCatalogEntry{}, NextCursor: scope.Next(page.NextCursor)}
 	owners := make(map[string]string, len(page.Items))
 	for _, row := range page.Items {
 		resource, pin := row.Resource, row.ResolvedResource
@@ -312,6 +320,9 @@ func (c *ReportGatewayCatalog) List(ctx context.Context, input catalog.ReportCat
 			return nil, ErrCollision
 		}
 		owners[resource.URI] = row.Connection.ProviderIdentity
+		if !scope.Matches(row.ReportScopeValues) {
+			continue
+		}
 		if row.Unavailable {
 			result.Reports = append(result.Reports, catalog.ReportCatalogEntry{Unavailable: true, ReportCatalogCandidate: catalog.ReportCatalogCandidate{URI: resource.URI, Title: resource.Title, OwnerID: resource.OwnerID, ReportID: resource.URI}, Namespace: resource.Namespace, Name: resource.Name, OwnedByCurrentUser: reportOwnedByCurrentUser(ctx, actor, resource.OwnerID)})
 			continue

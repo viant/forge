@@ -79,7 +79,7 @@ it('uses the published cohort GET admission without a second permission GET',asy
   }));
   try{
     await mount({applyPermission},{windowId,windowKey:'window://sampleui/orderList',
-      providerIdentity:'aistudio-local',resourceRef:{uri:'window://sampleui/orderList'}});
+      providerIdentity:'example-local',resourceRef:{uri:'window://sampleui/orderList'}});
     await flush();
     expect(element.querySelector('[data-authorized-renderer]')).not.toBeNull();
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
@@ -101,7 +101,7 @@ it('readmits a mounted published window through one refresh GET without legacy p
   try{
     activeWindows.value=[{windowId,windowKey:'window://sampleui/orderList'}];
     await mount({applyPermission,windowModelCacheScope:()=> 'verified-owner',workspaceRefresh:{loadMetadata:({load})=>load()}},
-      {windowId,windowKey:'window://sampleui/orderList',providerIdentity:'aistudio-local',resourceRef:{uri:'window://sampleui/orderList'}});
+      {windowId,windowKey:'window://sampleui/orderList',providerIdentity:'example-local',resourceRef:{uri:'window://sampleui/orderList'}});
     await flush();
     await act(async()=>{await runUICommand({method:'ui.workspace.refresh',params:{windowId,reloadMetadata:true}});});
     expect(globalThis.fetch).toHaveBeenCalledTimes(2); // Initial admission and one fresh readmission.
@@ -119,7 +119,7 @@ it('retains the separate permission preflight for legacy metadata',async()=>{
   }));
   try{
     await mount({applyPermission},{windowId,windowKey:'window://sampleui/orderList',
-      providerIdentity:'aistudio-local',resourceRef:{uri:'window://sampleui/orderList'}});
+      providerIdentity:'example-local',resourceRef:{uri:'window://sampleui/orderList'}});
     await flush();
     expect(applyPermission).toHaveBeenCalledTimes(1);
   }finally{globalThis.fetch=originalFetch;}
@@ -388,4 +388,28 @@ describe('canonical managing MCP denials on authnil window',()=>{
       else {expect(element.querySelector('[data-authorized-renderer]')).toBeNull();expect(getMetadataSignal(windowId).peek()).toBeNull();}
     });
   }
+});
+
+it.each([true,false])('passes published navigation to the host only after receipt admission (%s)',async admitted=>{
+ const originalFetch=globalThis.fetch;
+ const uri='window://example/source';
+ const providerIdentity='publisher';
+ const routes={detail:{resourceUri:'window://example/details',title:'Details'}};
+ const metadata={window:{navigation:routes},dataSource:{},view:{content:{id:'root',kind:'test.authorized'}}};
+ const headers={'Content-Type':'application/json'};
+ if(admitted){
+   const hash='b'.repeat(64);
+   headers['X-Artifact-Hash']=hash;headers.ETag=`"${hash}.cohort-v2"`;
+ }
+ globalThis.fetch=vi.fn(async()=>new Response(JSON.stringify({data:metadata}),{status:200,headers}));
+ const createHostWindow=vi.fn((_state,links)=>links?{navigate:()=>true}:null);
+ try{
+   await mount({createHostWindow},{windowId,windowKey:uri,providerIdentity,resourceRef:{uri},parameters:{navigation:routes}});
+   await flush();
+   expect(element.querySelector('[data-authorized-renderer]')).not.toBeNull();
+   const bound=createHostWindow.mock.calls.filter(([,links])=>links);
+   if(admitted)expect(bound.at(-1)?.[1]).toEqual({source:{uri,providerIdentity},routes});
+   else expect(bound).toHaveLength(0);
+   expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+ }finally{globalThis.fetch=originalFetch}
 });

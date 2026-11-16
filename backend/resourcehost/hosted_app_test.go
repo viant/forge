@@ -21,7 +21,7 @@ import (
 )
 
 func TestHostedAppInstallationBoundaries(t *testing.T) {
-	b := HostedAppBinding{WindowURI: "window://authoring/DatlyStudio", ProviderIdentity: "owned-studio", ResourceURI: "ui://owned-studio/datly-studio", RendererURL: "http://127.0.0.1:29391/datly-studio/index.html", Sandbox: HostedAppSandbox}
+	b := HostedAppBinding{WindowURI: "window://authoring/Workspace", ProviderIdentity: "owned-studio", ResourceURI: "ui://owned-studio/workspace", RendererURL: "http://127.0.0.1:29391/workspace/index.html", Sandbox: HostedAppSandbox}
 	if err := ValidateHostedAppBindings([]HostedAppBinding{b}); err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +34,7 @@ func TestHostedAppInstallationBoundaries(t *testing.T) {
 		{"query", func(b *HostedAppBinding) { b.RendererURL += "?token=caller" }},
 		{"sandbox", func(b *HostedAppBinding) { b.Sandbox = "allow-scripts allow-top-navigation" }},
 		{"network-resource", func(b *HostedAppBinding) { b.ResourceURI = "https://example.com/editor" }},
-		{"nonwindow", func(b *HostedAppBinding) { b.WindowURI = "report://authoring/DatlyStudio" }},
+		{"nonwindow", func(b *HostedAppBinding) { b.WindowURI = "report://authoring/Workspace" }},
 		{"wrong-provider", func(b *HostedAppBinding) { b.ProviderIdentity = "other" }},
 		{"missing-provider", func(b *HostedAppBinding) { b.ProviderIdentity = "" }},
 	} {
@@ -135,11 +135,11 @@ func TestHostedAppSelectedClosureAndActorFences(t *testing.T) {
 		t.Run(scenario, func(t *testing.T) {
 			lease := time.Now().Add(time.Minute)
 			actor := identity.VerifiedActor{Subject: "alice", Issuer: "owned-issuer", TenantID: "tenant", AccountID: "21", IdentityRevision: "1", ValidUntil: lease}
-			pin := identity.ResolvedResource{ProviderIdentity: "owned-studio", URI: "window://authoring/DatlyStudio", ResourceCandidate: identity.ResourceCandidate{Kind: "working", ContentFingerprint: identity.ContentFingerprint([]byte(`{}`))}, AuthorityBinding: "verified-alice", ValidUntil: lease}
+			pin := identity.ResolvedResource{ProviderIdentity: "owned-studio", URI: "window://authoring/Workspace", ResourceCandidate: identity.ResourceCandidate{Kind: "working", ContentFingerprint: identity.ContentFingerprint([]byte(`{}`))}, AuthorityBinding: "verified-alice", ValidUntil: lease}
 			if scenario == "zero-metadata" || scenario == "zero-execution-expiry" {
 				pin.ValidUntil = time.Time{}
 			}
-			binding := HostedAppBinding{WindowURI: pin.URI, ProviderIdentity: pin.ProviderIdentity, ResourceURI: "ui://owned-studio/datly-studio", RendererOrigin: "http://127.0.0.1:29391", RendererPathPrefix: "/api/embedded", Sandbox: HostedAppSandbox}
+			binding := HostedAppBinding{WindowURI: pin.URI, ProviderIdentity: pin.ProviderIdentity, ResourceURI: "ui://owned-studio/workspace", RendererOrigin: "http://127.0.0.1:29391", RendererPathPrefix: "/api/embedded", Sandbox: HostedAppSandbox}
 			html := "<!doctype html><main>Actual captured entry</main>"
 			digest := sha256.Sum256([]byte(html))
 			closure := primitive.MCPAppClosure{Fingerprint: identity.ContentFingerprint([]byte("complete compiled closure")), EntryPath: "index.html", EntrySHA256: hex.EncodeToString(digest[:])}

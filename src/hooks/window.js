@@ -506,6 +506,10 @@ export function useWindowHandlers(windowId) {
             return undefined;
         }
         const options = {};
+        if (typeof target.windowKey === "string" && target.windowKey.startsWith("report://") && target.resourceRef?.uri === target.windowKey) {
+            options.resourceRef = target.resourceRef;
+            options.providerIdentity = target.providerIdentity;
+        }
         if (target.revision !== undefined) options.linkedRevision = String(target.revision);
         if (target.awaitResult === true) options.awaitResult = true;
         if (target.newInstance === true) options.newInstance = true;

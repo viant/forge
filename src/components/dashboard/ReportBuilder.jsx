@@ -2699,20 +2699,16 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         || container?.parameters?.to
         || windowFormValue?.to,
     );
-    const hostedRunOrderIds = hostedWindowParameters?.runOrderIds
-        || container?.parameters?.runOrderIds
-        || windowFormValue?.runOrderIds;
     const hostedRunOverrideCandidate = [
         hostedWindowParameters?.runOverride,
         container?.parameters?.runOverride,
         windowFormValue?.runOverride,
     ].find((candidate) => candidate && typeof candidate === "object" && !Array.isArray(candidate))
-        || ((hostedRunFrom || hostedRunTo || hostedRunOrderIds) ? {} : null);
+        || ((hostedRunFrom || hostedRunTo) ? {} : null);
     const hostedRunOverride = resolveSavedReportRunScope(windowFormValue?.prefill, hostedRunOverrideCandidate ? {
         ...hostedRunOverrideCandidate,
         ...(hostedRunFrom ? { from: hostedRunFrom } : {}),
         ...(hostedRunTo ? { to: hostedRunTo } : {}),
-        ...(hostedRunOrderIds ? { orderIds: hostedRunOrderIds } : {}),
     } : null);
     const hostedRunOverrideSignature = hostedRunOverride ? JSON.stringify(hostedRunOverride) : "";
     const hostedActivationScopeOverride = hostedRunOverride;

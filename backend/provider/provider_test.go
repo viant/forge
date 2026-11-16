@@ -170,11 +170,11 @@ func portablePOC(report bool) (*PrimitiveProvider, *portableTestHost) {
 	h := &portableTestHost{authority: a, definition: definition}
 	return &PrimitiveProvider{Host: h, Authority: a}, h
 }
-func TestPortableDatlyWindowAndAIReportPOC(t *testing.T) {
+func TestPortableWindowAndReport(t *testing.T) {
 	for _, nativeReport := range []bool{false, true} {
-		name := "datly-studio-window"
+		name := "window"
 		if nativeReport {
-			name = "ai-studio-report"
+			name = "report"
 		}
 		t.Run(name, func(t *testing.T) {
 			p, h := portablePOC(nativeReport)

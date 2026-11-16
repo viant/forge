@@ -1743,7 +1743,7 @@ export function ReportBuilderCalculatedFieldDialog({
                             className={errorByField.has("expr") ? "forge-report-builder__calculated-field-textarea is-invalid" : "forge-report-builder__calculated-field-textarea"}
                             value={draft?.expr || ""}
                             onChange={(event) => setDraftPatch({ expr: event.target.value })}
-                            placeholder="if(impressions = 0, null, round((clicks / impressions) * 100, 2))"
+                            placeholder="if(total = 0, null, round((completed / total) * 100, 2))"
                             rows={4}
                         />
                     </label>
@@ -3233,7 +3233,7 @@ export function ReportBuilderDocumentBlockDialog({
                                     className="forge-report-builder-select"
                                     value={geoMetric?.label || ""}
                                     onChange={(event) => setGeoMetricPatch({ label: event.target.value })}
-                                    placeholder="Available Impressions"
+                                    placeholder="Available capacity"
                                 />
                             </label>
                             <label className="forge-report-builder__chart-field">
@@ -3891,7 +3891,7 @@ export function ReportBuilderDocumentBlockDialog({
                                     className="forge-report-builder-select"
                                     value={draft?.valueLabel || ""}
                                     onChange={(event) => setDraftPatch({ valueLabel: event.target.value })}
-                                    placeholder="Available Impressions"
+                                    placeholder="Available capacity"
                                 />
                             </label>
                             <label className="forge-report-builder__chart-field">
@@ -4033,7 +4033,7 @@ export function ReportBuilderDocumentBlockDialog({
                                     className="forge-report-builder-select"
                                     value={draft?.valueLabel || ""}
                                     onChange={(event) => setDraftPatch({ valueLabel: event.target.value })}
-                                    placeholder="Available Impressions"
+                                    placeholder="Available capacity"
                                 />
                             </label>
                             <label className="forge-report-builder__chart-field">

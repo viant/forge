@@ -73,9 +73,24 @@ export function reuseShallowEqualRuntimeObject(previous = null, candidate = null
     return candidateKeys.every((key) => Object.is(previous[key], candidate[key])) ? previous : candidate;
 }
 
-export function scopedWindowHostServices(services = {}, windowState = null) {
+// This marker exists only on the rendering signal produced by the admitted GET.
+// Serialized input, including a restored view or authored parameters, cannot supply it.
+const publishedNavigation = Symbol('published window navigation');
+
+export function bindPublishedWindowNavigation(metadata, window, admitted) {
+    const routes = metadata?.window?.navigation;
+    const uri = window?.resourceRef?.uri;
+    const providerIdentity = window?.providerIdentity;
+    if (!admitted || !routes || typeof routes !== 'object' || Array.isArray(routes) ||
+        typeof uri !== 'string' || !uri.startsWith('window://') || typeof providerIdentity !== 'string' || !providerIdentity ||
+        (metadata.resource?.uri && metadata.resource.uri !== uri) ||
+        (metadata.resource?.providerIdentity && metadata.resource.providerIdentity !== providerIdentity)) return metadata;
+    return {...metadata, [publishedNavigation]: {source:{uri, providerIdentity}, routes}};
+}
+
+export function scopedWindowHostServices(services = {}, windowState = null, metadata = null) {
     if (typeof services?.createHostWindow !== 'function') return services;
-    const hostWindow = services.createHostWindow(windowState);
+    const hostWindow = services.createHostWindow(windowState, metadata?.[publishedNavigation]);
     return hostWindow && typeof hostWindow === 'object'
         ? {...services, hostWindow: {...(services.hostWindow || {}), ...hostWindow}}
         : services;
@@ -1447,7 +1462,9 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
         conversationId: runtimeWindow?.conversationId,
         prepareRequest: prepareConnectorRequest,
     }), [services, endpoints, auth, service?.endpoint, runtimeWindow?.conversationId, prepareConnectorRequest]);
-    const scopedServices = useMemo(() => scopedWindowHostServices(reportBuilderServices, runtimeWindow), [reportBuilderServices, runtimeWindow]);
+    const metadata = metadataSignalHandle?.value;
+    const scopedServices = useMemo(() => scopedWindowHostServices(reportBuilderServices, runtimeWindow, metadata),
+        [reportBuilderServices, runtimeWindow, metadata]);
     const resolvedServices = useMemo(() => ({
         ...scopedServices,
         windowState: runtimeWindow,
@@ -1512,8 +1529,8 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
                 const admittedMetadata = compilePermissionAppliedMetadata(definition,
                     targetContext, window?.parameters || {}, admittedBinding);
                 injectActions(admittedMetadata);
-                metadataSignalHandle.value = {...admittedMetadata, __windowKey: baseKey,
-                    __targetKey: targetKey, __provisionalInline: false};
+                metadataSignalHandle.value = bindPublishedWindowNavigation({...admittedMetadata, __windowKey: baseKey,
+                    __targetKey: targetKey, __provisionalInline: false}, window, admittedBinding);
             };
             if (services.resourceFS) {
                 setLoading(true);
@@ -1587,7 +1604,8 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
                 // A signed delivery is emitted only after host OPEN admission. Its
                 // snapshot is a rendering hint, not a data-operation preflight.
                 const selectionBinding = canonicalSelectionBinding(window);
-                const permissionAppliedMetadata = selectionBinding || isAdmittedPublishedWindowResponse(admittedResponseInfo,window,completeMetadata)
+                const admittedSource = selectionBinding || isAdmittedPublishedWindowResponse(admittedResponseInfo,window,completeMetadata);
+                const permissionAppliedMetadata = admittedSource
                     ? completeMetadata : await applyWindowPermissionMetadata(completeMetadata, {
                     services,
                     windowId,
@@ -1614,7 +1632,7 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
                     __targetKey: targetKey,
                     __provisionalInline: false,
                 };
-                metadataSignalHandle.value = heldMetadata;
+                metadataSignalHandle.value = bindPublishedWindowNavigation(heldMetadata, window, admittedSource);
                 recordWindowPerfPhase('metadata-signal-published',windowId);
             });
         })
@@ -1654,7 +1672,6 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
         setSignalsReady(true);
     }, [windowId, metadataSignalHandle?.value, resolvedServices, window]);
 
-    const metadata = metadataSignalHandle?.peek?.();
     const protectedDenial = protectedWindowDenials.value[windowId];
     const displayState = resolveWindowMetadataDisplayState({loading, signalsReady: protectedDenial ? false : signalsReady, metadata, fetchError: protectedDenial || fetchError});
 
@@ -1728,7 +1745,7 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
             // Scope equality is verified against unmodified producer output by
             // the refresh hook before this compilation can retain delivery hints.
             const prepared=compilePermissionAppliedMetadata(applied,targetContext,window.parameters || {},binding);
-            return {...prepared,__windowKey:baseKey,__targetKey:normalizeTargetKey(targetContext),__provisionalInline:false};
+            return bindPublishedWindowNavigation({...prepared,__windowKey:baseKey,__targetKey:normalizeTargetKey(targetContext),__provisionalInline:false}, runtimeWindow, binding || admittedRefresh);
         },publishMetadata:definition=>{injectActions(definition);metadataSignalHandle.value=definition;},
     });
 

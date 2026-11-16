@@ -563,7 +563,7 @@ describe('document composer and task discovery', () => {
         await press(trigger('Reasoning'), 'Escape', {keyCode: 27, which: 27});
         await act(() => new Promise(resolve => setTimeout(resolve, 350)));
         expect(tools.getAttribute('aria-expanded')).toBe('false');
-        for (const themeId of ['baseline', 'steward-neutral-preview', 'steward-verification-preview', 'viant-2026-preview']) {
+        for (const themeId of ['baseline', 'example-neutral-preview', 'example-verification-preview', 'custom-2026-preview']) {
             await render(fixture(themeId));
             await click(tools);
             expect(panel().querySelectorAll('select')).toHaveLength(3);
@@ -704,7 +704,7 @@ describe('document composer and task discovery', () => {
         expect(bypass.test(css)).toBe(false); expect(bypass.test('.bad {font-size: 13px}')).toBe(true);
         for (const path of ['./DocumentComposer.jsx', './StarterTaskBrowser.jsx', './AttachmentDialog.jsx']) {
             const source = fs.readFileSync(`src/components/chat/${path.slice(2)}`, 'utf8');
-            expect(source).not.toMatch(/Viant|Steward|IBM Plex|fontSize\s*:|fontFamily\s*:/);
+            expect(source).not.toMatch(/IBM Plex|fontSize\s*:|fontFamily\s*:/);
             expect(source).toContain("typographyProps('body')");
         }
     });

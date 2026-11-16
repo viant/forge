@@ -9,6 +9,7 @@ import (
 	"time"
 
 	primitive "github.com/viant/forge/backend/provider/contract"
+	"github.com/viant/forge/backend/reporting/catalog"
 	identity "github.com/viant/forge/backend/resource"
 )
 
@@ -20,12 +21,19 @@ type ReportPagePreparation func(context.Context, []LocatedResource) (context.Con
 // against the full authorized bytes and exact opening still uses Get.
 func (row *LocatedResource) projectReportSummary() error {
 	var summary struct {
-		BuilderRef string `json:"builderRef"`
+		BuilderRef     string                  `json:"builderRef"`
+		ReportSpec     catalog.ScopeProjection `json:"reportSpec"`
+		ReportDocument catalog.ScopeProjection `json:"reportDocument"`
 	}
 	if err := json.Unmarshal(row.Resource.Definition, &summary); err != nil {
 		return err
 	}
 	row.ReportBuilderRef = summary.BuilderRef
+	if summary.ReportSpec.Scope != nil {
+		row.ReportScopeValues = summary.ReportSpec.Values()
+	} else {
+		row.ReportScopeValues = summary.ReportDocument.Values()
+	}
 	row.Resource.Definition = nil
 	row.Resource.DefinitionBytes = nil
 	return nil

@@ -37,4 +37,4 @@ public/window-editor/wasm_exec.js
 /ui-improvement.md
 
 # Private local captures and runtime state.
-/android/sdk/src/test/resources/steward-request-only.json
+/android/sdk/src/test/resources/*-request-only.json

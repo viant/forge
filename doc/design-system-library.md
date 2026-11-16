@@ -1,8 +1,7 @@
-# Steward AI design-system library
+# Forge design-system library
 
-Forge is the canonical implementation library for Steward AI. Agently and
-Steward AI are consumers and composers; they do not create competing versions
-of shared components or patterns.
+Forge implements the shared components and patterns. Host applications compose
+them into workspaces and publish their own style definitions.
 
 ## Layers
 
@@ -64,8 +63,8 @@ New patterns must include:
 
 Forge changes are reviewed visually first, then released as a versioned
 library. Agently updates its Forge dependency and composes the approved
-patterns into the application shell. Steward AI selects the patterns in
-product metadata and publishes the semantic catalog values. A token-value
+patterns into the application shell. The owning workspace selects patterns in
+its metadata and publishes the semantic catalog values. A token-value
 change can flow through the catalog without a Forge code release; a component
 or pattern behavior change requires a Forge release followed by consumer
 updates.
@@ -74,13 +73,9 @@ The installed Forge version must be treated as the production truth. Local
 worktree previews are review artifacts until the Forge package and consuming
 applications are released and verified together.
 
-The canonical Design System 2.0 variable visualizer is generated from
-Steward’s token export at
-`steward_ai/deployment/steward/extension/forge/styles/tokens/design-system.tokens.json`.
-It exposes the complete Global → Alias → Semantic graph, resolved Light/Dark
-values, typography and geometry scales, and a shared component recipe. It is a
-review artifact, not a second runtime token source.
-
+A host can supply its own style export to inspect its Global → Alias → Semantic
+graph, resolved Light/Dark values, typography, and geometry in a local preview.
+Keep host token exports and font assets with their owner.
 
 ## Local component documentation
 

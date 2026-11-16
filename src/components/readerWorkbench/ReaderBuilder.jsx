@@ -21,7 +21,7 @@ import { ReaderExposureDialog } from './ReaderExposureDialog.jsx';
 import { ReaderValidationDialog } from './ReaderValidationDialog.jsx';
 import { ReaderPublicationDialog } from './ReaderPublicationDialog.jsx';
 import { ReaderResourcesDialog } from './ReaderResourcesDialog.jsx';
-import { ReaderEntityScopeDialog } from './ReaderEntityScopeDialog.jsx';
+import { hasRowScopeBinding, ReaderEntityScopeDialog } from './ReaderEntityScopeDialog.jsx';
 import { ReaderACLDialog } from './ReaderACLDialog.jsx';
 import { ReaderConflictDialog } from './ReaderConflictDialog.jsx';
 import { ContractWorkspace } from './ContractWorkspace.jsx';
@@ -237,11 +237,8 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
     }).catch(cause => { if (!cancelled) setSQLResourceError(cause.message); }).finally(() => { if (!cancelled) setSQLResourcesLoading(false); });
     return () => { cancelled = true; };
   }, [api, report?.id, version?.versionNo, version?.sourceRevision, canUseDQL]);
-  const serverScoped = (inspection?.structure?.declarations ?? []).some(({parameter}) => {
-    const source = parameter?.source;
-    return (source?.kind === 'component' && String(source.name || '').includes('/_studio/access/context/'))
-      || (source?.kind === 'param' && String(source.name || '').startsWith('Auth.Scope.'));
-  });
+  const rowAccessScope = defaults.rowAccessScope;
+  const serverScoped = hasRowScopeBinding(inspection?.structure, rowAccessScope);
   const canPreview = canRun;
   const createDraft = async () => {
     if (!report?.id || !version?.versionNo || cloningDraft) return;
@@ -519,7 +516,7 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
       <Popover isOpen={toolsOpen} onInteraction={setToolsOpen} placement="bottom-start" content={<Menu>
         <MenuItem text="Composition lab" icon="heatmap" disabled={!canPreview} onClick={()=>runTool(()=>setAnalyticsDialogOpen(true))}/>
         <MenuItem text="Cache & warmup" icon="database" disabled={!canEdit} onClick={()=>runTool(()=>setCacheDialogOpen(true))}/>
-        <MenuItem text="Row access scope" icon="filter" disabled={!canEdit||serverScoped} onClick={()=>runTool(()=>setEntityScopeOpen(true))}/>
+        {rowAccessScope && <MenuItem text="Row access scope" icon="filter" disabled={!canEdit||serverScoped} onClick={()=>runTool(()=>setEntityScopeOpen(true))}/>}
         {onReleases&&<MenuItem text="Named release assignments" icon="tag" disabled={!ready||capabilities.canPublish===false} onClick={()=>runTool(()=>onReleases(version))}/>}
         <MenuItem text="Source resources" icon="folder-open" disabled={!ready||capabilities.canView===false} onClick={()=>runTool(()=>{setResourceMode('resources');setResourcesDialogOpen(true);})}/>
         <MenuItem text="Skills" icon="learning" disabled={!ready||capabilities.canView===false} onClick={()=>runTool(()=>{setResourceMode('skills');setResourcesDialogOpen(true);})}/>
@@ -595,7 +592,7 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
         </section>
       </div>
     </>}
-    <ReaderEntityScopeDialog isOpen={entityScopeOpen} report={report} root={rootView} structure={inspection?.structure} onClose={()=>setEntityScopeOpen(false)} onApply={applyCommand}/>
+    <ReaderEntityScopeDialog binding={rowAccessScope} isOpen={entityScopeOpen} report={report} root={rootView} structure={inspection?.structure} onClose={()=>setEntityScopeOpen(false)} onApply={applyCommand}/>
     <ReaderSubviewDialog isOpen={subviewDialogOpen} structure={inspection?.structure} initialParent={selectedNode?.type==='view'?selectedNode.name:''} onClose={() => setSubviewDialogOpen(false)} onApply={applyCommand} />
     <ReaderRemoveViewDialog isOpen={removeViewDialogOpen} structure={inspection?.structure} initialView={selectedNode?.type==='view'?selectedNode.name:''} onClose={() => setRemoveViewDialogOpen(false)} onApply={applyCommand} />
     <ReaderRelationDialog isOpen={Boolean(editRelation)} node={editRelation} structure={inspection?.structure} onClose={()=>setEditRelation(null)} onApply={async(operation)=>{await applyCommand(operation);setSelectedNode(null);}}/>

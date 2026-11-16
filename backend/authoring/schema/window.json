@@ -889,7 +889,7 @@
           "type": "integer"
         },
         "columns": {
-          "description": "Editable-table fields are first-class because authored dashboard.editableTable\nmetadata must survive YAML -> Go -> JSON without losing explicit false values.",
+          "description": "Editable-table fields are first-class because authored dashboard.editableTable\nmetadata must survive YAML -\u003e Go -\u003e JSON without losing explicit false values.",
           "items": {
             "$ref": "#/$defs/DashboardEditableTableColumn"
           },
@@ -3073,7 +3073,7 @@
           "type": "string"
         },
         "order": {
-          "description": "Ordering & grouping",
+          "description": "Ordering \u0026 grouping",
           "type": "integer"
         },
         "pattern": {
@@ -4517,6 +4517,9 @@
         "onBack": {
           "type": "string"
         },
+        "onReleases": {
+          "type": "string"
+        },
         "onReportUpdated": {
           "type": "string"
         },
@@ -5376,7 +5379,7 @@
           "type": "array"
         },
         "id": {
-          "description": "Optional name so other widgets can reference the answers via\n{{window.state.<Id>}}",
+          "description": "Optional name so other widgets can reference the answers via\n{{window.state.\u003cId\u003e}}",
           "type": "string"
         },
         "layout": {
@@ -6634,6 +6637,18 @@
       },
       "type": "object"
     },
+    "WindowNavigationTarget": {
+      "additionalProperties": true,
+      "properties": {
+        "resourceUri": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "WindowResourceEnvelope": {
       "additionalProperties": true,
       "properties": {
@@ -6693,6 +6708,13 @@
             "type": "string"
           },
           "type": "array"
+        },
+        "navigation": {
+          "additionalProperties": {
+            "$ref": "#/$defs/WindowNavigationTarget"
+          },
+          "description": "An explicit empty declaration supports local host actions without links.",
+          "type": "object"
         },
         "on": {
           "items": {
@@ -7535,10 +7557,11 @@
   "$ref": "#/$defs/Window",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "x-forge-provenance": {
-    "baseCommit": "719fc3b021cb4d646db5f10823ab6a3a2ad5ba5c",
+    "baseCommit": "9c24d5b7abae6da275fe44852db01befd9056271",
     "generator": "scripts/window-schema/main.go",
     "sha256": {
       "choice_browser.go": "935cbeddb231dd329374114c5f38454dc7c44c2ab70a45ea3c0f37ce7f3aee26",
+      "data_source_dependencies.go": "b0d50259b718bac8b7ff38b5df0cf44d5b64ac6f7510c2acfb359393f09c71be",
       "datasource_projection.go": "87f165b7c9558d0c43fadc6b006bb0f110bd905226b5301dcb5d8a06eb2a692e",
       "dialog_resource.go": "36dbaee1db9c979ba32359f29d61af006ae9bcb32e8b35e74c6fa0a4243466e8",
       "draft_lifecycle.go": "fc0cf313d1cc970e0401f211eaf6772a726419c90950ac6117f85a326b998692",
@@ -7550,14 +7573,18 @@
       "github.com/viant/forge/backend/datasource/contract.denial.go": "33f9f5fd666591f7b90392b410efe982051197652fa18881f8f2a238b7e24d05",
       "github.com/viant/forge/backend/datasource/contract.method_variants.go": "e4aa1178a31ee0f8ebd15dfd83c512dc8a8d84afb8ba5e6a856cc993870e682c",
       "github.com/viant/forge/backend/datasource/contract.operation.go": "92f01c7ca32a99ceaebde0e5aba2a3ba97168465f65003bca44344bc6dcdb99a",
-      "github.com/viant/forge/backend/provider/contract.ai.go": "071d8a38f9c8053870320205f7441e8db2673015b51932f5bed35a870bd49651",
-      "github.com/viant/forge/backend/provider/contract.catalog.go": "570746519947177f2681e7ce63da4461173f129149bdfdcb4d22eaf12d6fc1d7",
+      "github.com/viant/forge/backend/provider/contract.ai.go": "590ec84da2458a7d508dd5392f238ba83db4200b83dd9274c117c3b04de30f23",
+      "github.com/viant/forge/backend/provider/contract.catalog.go": "1a3a11687f7f1353de1da5d8ca391cfaadac2ecb7019aabd685c02d7d540d23c",
       "github.com/viant/forge/backend/provider/contract.datasource.go": "58b7fdcebae2a54f2650473e7454c2e4a1d3eb70f06aad57d6fb18aecad115fa",
-      "github.com/viant/forge/backend/provider/contract.lifecycle.go": "e4ffdcd8a6660bc325a894206df8f0162b88cd677d1f4ecd01f81c3d7b471bda",
+      "github.com/viant/forge/backend/provider/contract.document_carrier.go": "51a52b7f47a0e68cc96654b81104d78d6e9a36ad171feb40b8e6620c87aab187",
+      "github.com/viant/forge/backend/provider/contract.knowledge.go": "196d16a5bbb85094cfe75e56bd8868b6b1356c28b9b60b0a84d31affd7af7dca",
+      "github.com/viant/forge/backend/provider/contract.lifecycle.go": "ca3e7148d07bfb7f5678f61304779d2ddc8fa2620c6bb0253f5075a54bc6a707",
       "github.com/viant/forge/backend/provider/contract.mcp_app.go": "a52f98962f47f5766d96a451465297f2728a32504509514dbd511b4ab74a134d",
-      "github.com/viant/forge/backend/provider/contract.methods.go": "6e4a0230d460203501f3c9e64a4d20ed1b30dd45fa9ff5fbbe7adf5f0710b975",
-      "github.com/viant/forge/backend/provider/contract.model.go": "7c4ef67413d95c9d15d1b1fd64c5cb95608c251e7cc680599d94ec7b88d389cf",
+      "github.com/viant/forge/backend/provider/contract.methods.go": "e32d0d495084be5ecbba8d9cb9938647cc54acef511a33baabb5e3b6b9e74d15",
+      "github.com/viant/forge/backend/provider/contract.model.go": "2702d8112fd7358428c57bdbd897998b712c01fb1bbd32b8bee57e17a249d02c",
       "github.com/viant/forge/backend/provider/contract.namespace_sync.go": "4a113c3b2523b2c8c63cb3d3077879b8d239c975c9c53ef783abc05d7f4e5769",
+      "github.com/viant/forge/backend/provider/contract.routing_guide.go": "8425e1f70dfcc7018ce2c885e82ca64b08e6cff4749e85fa900f501d46edc84b",
+      "github.com/viant/forge/backend/provider/contract.starter_task.go": "fd7cb04466f1026e4799b2011c1fc9eda9fc1ca88b4c5be043db32ea722de6fa",
       "github.com/viant/forge/backend/provider/contract.toolfeed.go": "67049e40066c4f0594a8f799d202159cbe73ab224128612f73462897819db50f",
       "github.com/viant/forge/backend/resource.actor.go": "514487161fff419ba4a593e267eb6f997e67decaa18070fce8ef113449feeb2e",
       "github.com/viant/forge/backend/resource.authority.go": "1e4c2912a8a4f78e4db3d88f708b39703986999fcbd45256cdc14400faafbbd9",
@@ -7565,7 +7592,7 @@
       "github.com/viant/forge/backend/resource.metadata_expiry.go": "80024234c7390ec0f29edef05627019e70f703b3bf295dfeda5518d93cae7851",
       "github.com/viant/forge/backend/resource.policy_id.go": "d758c5d33930277b10e57938b989ed7c199999dd2a42a7014fc072891ac2c59e",
       "github.com/viant/forge/backend/resource.renewal.go": "8ec8a5ac014ea46027bc7af3f0da0e0fd55d58cf615dcd5092a5ba3266ed7bf8",
-      "github.com/viant/forge/backend/resource.resource.go": "f034588234379b03ab3f8a72968ca961523ea991780089674b07139d1fe681e6",
+      "github.com/viant/forge/backend/resource.resource.go": "c920c7fe0ceb7668bce53b604e0141adcf64dab03e5ebce85503ec7ab13943d0",
       "github.com/viant/forge/backend/resource.selection_binding.go": "a09f48c8aef6c4395435e1e73beba7cbeb47c4f803761da126a38d450926890b",
       "github.com/viant/forge/backend/window/contract.component.go": "1f3b9b0e6ff7b707dfbbae3d9ecafaa145c5a8eb682156da64290464717eb1d8",
       "github.com/viant/forge/backend/window/contract.model.go": "ba7b581c5a80d94fbd95b45d5b1a7d8c7971a5c207d02acc502afa9826a8070b",
@@ -7575,12 +7602,12 @@
       "host_content.go": "f9f870afe88756eb3abd04b79cc717f60a696a5dc2501dec11ffba0f87dbc0fd",
       "json_metadata_clone.go": "baa9bde7e567774737f28b87c45a2bb145d9c5b2fadc81da3024578b17c6c09c",
       "local_state_owner.go": "987402ce2487f4b7714a3991c405aab0dda74a573d8690f8f6561d4ce020ab8f",
-      "model.go": "dcf76f651cb09b19b5ea5447336cb57db3552a6ec708ce9f05ad0c551a17368f",
+      "model.go": "471c128d8c755c7b282d1229f9305bf887ea3b1b93f8cbc14f9e99681ae904b3",
       "parameter_editor.go": "a176f3b63d74714d216daf57ba5c3c3ee8e12aaf8ccf2c0ee1b663c95a657bf6",
       "predicate_composition_editor.go": "881bcf68a5f5e16cae2f58ef7495ac14582398236cfd263cc8585e89f97cab4b",
       "presentation_primitives.go": "4b2fdcf0fffb902dd8a8dee7c17d1075faa5d62ab74e1d2551f29935215905aa",
       "preview_workbench.go": "eccac81a142c97d69c2e86be4443a4c79719f57a195ca4270540baa1c15636d6",
-      "reader_workbench.go": "4c41b6e595a1152d9dd002144bb974057616338c1bf813a053d0dcb64e7895c0",
+      "reader_workbench.go": "6ff2f9e276b1dc7482960d14e8e8ba710374cee49e72efbbdc0dc05c20e32253",
       "resource_assignment.go": "80ad53f8050041d9e652f3954084f6148fc8e53c324510126904a5ab35e3507e",
       "resource_field_attributes.go": "fc2ef49fcc4e88a78849581a9ccbdf62d2968023a5c76282e8b42ec488653c70",
       "resource_model.go": "9a480c785535e3b485fefe5ddfaa4d6a1d276b22b267536e0051d6a2f799c6ed",
@@ -7588,12 +7615,12 @@
       "resource_policy_editor.go": "6f3a00bf5ac0751a133fe121e727f5aa2671489dfb07b98a29314cc7a380b8c2",
       "result_preview.go": "bd913237174dc663cf40a5cd30bf5e835ec077930e7f0916f7ce906671f3dbff",
       "rule_editor.go": "3eda2833f57c5a64adec603e42213423907151451998fa4ba538fe258273f6e6",
-      "window_compiled_resource.go": "674537675ed4f58a3f331541f443ed593bfe61eaced1a8e9c4624253cb5de881",
+      "window_compiled_resource.go": "12eddf7313e2a4a52f81fe5fa68b67e2c284f07b5947e9bdb2dea833cfd20cc1",
       "window_consumer.go": "68fb1c0e6023416f0f27420c0a5fcd0c08b1ce6502ca63cf97a96236e0918837",
       "window_descriptor.go": "99170237b79c06523e72302b7917e0f573ef5f54bbc4bf0b8a4625915274c789",
       "window_reference_legacy.go": "013864c78676878e1c2dc2af275ff6dbc55870ba355f3b27759f7af64c017b76",
       "window_reference_manifest.go": "e8245d783f99d3a59143fd1e37e364c040389fa409b457207da567d9112ddb5b",
-      "window_resource.go": "cf6b91b8d52a014de705e52b50bc9c1df07ec2c5eeffff1abb88c04297baaa61",
+      "window_resource.go": "a991b091b9b4b45a999cca138fa8f6c0fa90b9ed0dc63bfce2ace576700ca872",
       "window_target_proof.go": "53605c132aae2b8c8d6e377daaae416f347e0ff8c48a39fb2a0f15f95ad5faeb",
       "workflow_primitives.go": "ac24eb8d11331e9ddeeb97c3b5b3dcce17ec3be3b7fd253852bb39267e47d962",
       "workspace_summary.go": "d9cf3867d3d3bfa3f65c9fdeccad91d21bd9d2602e066823bb36cbff079c86c1"
