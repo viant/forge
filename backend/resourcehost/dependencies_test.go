@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -157,7 +158,13 @@ func (p *dependencyMCPProvider) CallTool(_ context.Context, request *schema.Call
 
 func dependencyToolError(err error) *schema.CallToolResult {
 	failed := true
-	return &schema.CallToolResult{IsError: &failed, StructuredContent: map[string]any{"message": "denied"}}
+	result := &schema.CallToolResult{IsError: &failed, StructuredContent: map[string]any{"message": "synthetic failure"}}
+	status := 400
+	if errors.Is(err, identity.ErrResourceDenied) {
+		status = 403
+	}
+	schema.SetToolErrorHTTPStatus(result, status)
+	return result
 }
 
 func dependencyCandidate(item *dependencyResource) identity.ResourceCandidate {

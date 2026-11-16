@@ -428,6 +428,41 @@ func (p *LocalProvider) List(ctx context.Context, kind string, input primitive.L
 		defer func() { span.End(observe.OutcomeFor(timingErr), observe.CacheUnknown) }()
 	}
 	plural := primitive.Plural(kind)
+	if input.MetadataOnly && len(p.bindings) == 0 && p.catalogSupports(kind, input.Namespace) {
+		if source, ok := p.catalog.(interface {
+			ListMetadataPage(context.Context, string, string, string, int) ([]primitive.ResourceState, string, error)
+		}); ok {
+			_, limit, err := pageRequest("", input.Limit)
+			if err != nil {
+				return nil, err
+			}
+			actor, err := p.currentActor(ctx)
+			if err != nil {
+				return nil, err
+			}
+			rows, next, err := source.ListMetadataPage(ctx, kind, input.Namespace, input.Cursor, limit)
+			if err != nil {
+				return nil, err
+			}
+			out := &primitive.ListResult{Resources: []*primitive.ResourceState{}}
+			for i := range rows {
+				row := &rows[i]
+				uri, err := identity.ParseResourceURI(row.URI)
+				if err != nil || uri.Kind != kind || row.Kind != kind || uri.Namespace != row.Namespace || uri.Name != row.Name || input.Namespace != "" && uri.Namespace != input.Namespace {
+					return nil, identity.ErrResource
+				}
+				if err = p.authorize(ctx, actor, uri, "resource.list"); err != nil {
+					if errors.Is(err, identity.ErrResourceDenied) {
+						continue
+					}
+					return nil, err
+				}
+				out.Resources = append(out.Resources, row)
+			}
+			out.NextCursor, out.Complete = next, next == ""
+			return out, p.finishActor(ctx, actor)
+		}
+	}
 	offset, limit, pageErr := pageRequest(input.Cursor, input.Limit)
 	if plural == "" || pageErr != nil {
 		return nil, identity.ErrResource
@@ -942,7 +977,13 @@ func NewMCPServer(provider *LocalProvider, compact ...bool) (*mcp.Server, error)
 			}
 			h.Registry.RegisterToolWithSchema(name, description, input, nil, func(ctx context.Context, r *schema.CallToolRequest) (*schema.CallToolResult, *jsonrpc.Error) {
 				serializeSpan := provider.timing(ctx, observe.Serialization, "", "")
-				raw, e := json.Marshal(r.Params.Arguments)
+				raw, retained := mcp.ToolArgumentsJSON(ctx, r)
+				var e error
+				if !retained {
+					raw, e = json.Marshal(r.Params.Arguments)
+				} else if len(raw) == 0 {
+					raw = json.RawMessage("null")
+				}
 				serializeSpan.End(observe.OutcomeFor(e), observe.CacheBypass)
 				if e != nil {
 					return nil, jsonrpc.NewInvalidParamsError("invalid resource request", nil)
@@ -953,7 +994,11 @@ func NewMCPServer(provider *LocalProvider, compact ...bool) (*mcp.Server, error)
 				}
 				failed := e != nil
 				if e != nil {
-					value = map[string]string{"code": "resource_unavailable", "message": "local resource operation denied or unavailable"}
+					code := "resource_error"
+					if errors.Is(e, identity.ErrStoredDefinition) {
+						code = "stored_definition_invalid"
+					}
+					value = map[string]string{"code": code, "message": resourceFailureMessage(resourceFailureStatus(e))}
 				}
 				compactGet := false
 				if compactNative && !failed {
@@ -976,7 +1021,11 @@ func NewMCPServer(provider *LocalProvider, compact ...bool) (*mcp.Server, error)
 				if marshalErr != nil {
 					return nil, jsonrpc.NewInternalError("resource response unavailable", nil)
 				}
-				return &schema.CallToolResult{IsError: &failed, StructuredContent: value, Content: []schema.CallToolResultContentElem{schema.TextContent{Type: "text", Text: string(encoded)}}}, nil
+				result := &schema.CallToolResult{IsError: &failed, StructuredContent: value, Content: []schema.CallToolResultContentElem{schema.TextContent{Type: "text", Text: string(encoded)}}}
+				if failed {
+					schema.SetToolErrorHTTPStatus(result, resourceFailureStatus(e))
+				}
+				return result, nil
 			})
 			entry, _ := h.ToolRegistry.Get(name)
 			entry.Metadata.Meta = map[string]interface{}{primitive.AuthoringExtension: map[string]interface{}{"version": 1, "providerIdentity": provider.identity, "transport": "tools/call"}}
@@ -1044,4 +1093,52 @@ func (p *LocalProvider) namespaceKinds(namespace string) []primitive.KindSupport
 		out = append(out, support)
 	}
 	return out
+}
+
+// Reuse the protocol's typed tool-error metadata; no customer/error text is
+// parsed or exposed as authority. The client can preserve the failure category.
+func resourceFailureStatus(err error) int {
+	switch {
+	case errors.Is(err, context.Canceled):
+		return 499
+	case errors.Is(err, context.DeadlineExceeded):
+		return http.StatusGatewayTimeout
+	case errors.Is(err, identity.ErrStoredDefinition):
+		return http.StatusInternalServerError
+	case errors.Is(err, identity.ErrResourceStale):
+		return http.StatusConflict
+	case errors.Is(err, identity.ErrResourceDenied):
+		return http.StatusForbidden
+	case errors.Is(err, identity.ErrResource):
+		return http.StatusBadRequest
+	case errors.Is(err, ErrCatalogNotFound):
+		return http.StatusNotFound
+	case errors.Is(err, ErrUnavailable):
+		return http.StatusServiceUnavailable
+	case errors.Is(err, errors.ErrUnsupported):
+		return http.StatusNotImplemented
+	}
+	var authentication *jsonrpc.UnauthorizedError
+	if errors.As(err, &authentication) && authentication.StatusCode >= 400 && authentication.StatusCode <= 599 {
+		return authentication.StatusCode
+	}
+	var nativeStatus interface{ StatusCode() int }
+	if errors.As(err, &nativeStatus) && nativeStatus.StatusCode() >= 400 && nativeStatus.StatusCode() <= 599 {
+		return nativeStatus.StatusCode()
+	}
+	var status interface{ HTTPStatusCode() int }
+	if errors.As(err, &status) && status.HTTPStatusCode() >= 400 && status.HTTPStatusCode() <= 599 {
+		return status.HTTPStatusCode()
+	}
+	return http.StatusInternalServerError
+}
+
+func resourceFailureMessage(status int) string {
+	if status == 499 {
+		return "Request cancelled"
+	}
+	if message := http.StatusText(status); message != "" {
+		return message
+	}
+	return "Resource operation failed"
 }

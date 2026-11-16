@@ -55,9 +55,9 @@ func lifecycleArguments(uri string, input any) (map[string]json.RawMessage, erro
 	if err != nil {
 		return nil, err
 	}
-	var args map[string]json.RawMessage
-	if err = json.Unmarshal(raw, &args); err != nil || args == nil {
-		return nil, identity.ErrResource
+	args, err := rawLifecycleArguments(input, raw)
+	if err != nil {
+		return nil, err
 	}
 	args["uri"], err = json.Marshal(uri)
 	return args, err
@@ -119,3 +119,39 @@ func (a *Authoring) GetResource(ctx context.Context, uri string) (*primitive.Res
 }
 
 var _ primitive.ResourceAuthoring = (*Authoring)(nil)
+
+// Retain explicit opaque DTO fields after the ordinary scalar encoding. JSON
+// Marshal compacts RawMessage values, which changes their byte fingerprints.
+func rawLifecycleArguments(input any, encoded []byte) (map[string]json.RawMessage, error) {
+	var args map[string]json.RawMessage
+	if err := json.Unmarshal(encoded, &args); err != nil {
+		return nil, err
+	}
+	if args == nil {
+		return nil, identity.ErrResource
+	}
+	var definition, manifest json.RawMessage
+	switch value := input.(type) {
+	case primitive.CreateResourceInput:
+		definition, manifest = value.Definition, value.SourceManifest
+	case *primitive.CreateResourceInput:
+		if value != nil {
+			definition, manifest = value.Definition, value.SourceManifest
+		}
+	case primitive.UpdateDraftInput:
+		definition, manifest = value.Definition, value.SourceManifest
+	case *primitive.UpdateDraftInput:
+		if value != nil {
+			definition, manifest = value.Definition, value.SourceManifest
+		}
+	case map[string]json.RawMessage:
+		definition, manifest = value["definition"], value["sourceManifest"]
+	}
+	if len(definition) > 0 {
+		args["definition"] = append(json.RawMessage(nil), definition...)
+	}
+	if len(manifest) > 0 {
+		args["sourceManifest"] = append(json.RawMessage(nil), manifest...)
+	}
+	return args, nil
+}

@@ -178,3 +178,40 @@ func TestResolvedResourceRejectsChangedAuthorityBinding(t *testing.T) {
 		t.Fatalf("missing binding=%v", err)
 	}
 }
+
+func TestResourceResolverPreservesCallerCancellation(t *testing.T) {
+	raw := json.RawMessage(`{"title":"Example"}`)
+	for _, phase := range []string{"before", "policy", "read"} {
+		t.Run(phase, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			source := &resourceFixture{content: map[string]json.RawMessage{WorkingCandidate: raw}}
+			resolver := &ResourceResolver{ProviderIdentity: "example", Source: source, Policy: revisionPolicyFunc(func(_ context.Context, _ ResourceRef, c []ResourceCandidate) (ResourceDecision, error) {
+				return ResourceDecision{Candidate: c[0], AuthorityBinding: "owner"}, nil
+			})}
+			pin, err := resolver.Resolve(context.Background(), ResourceRef{URI: "report://example/summary"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			switch phase {
+			case "before":
+				cancel()
+			case "read":
+				source.afterRead = cancel
+			case "policy":
+				resolver.Policy = revisionPolicyFunc(func(_ context.Context, _ ResourceRef, c []ResourceCandidate) (ResourceDecision, error) {
+					cancel()
+					return ResourceDecision{Candidate: c[0], AuthorityBinding: "owner"}, nil
+				})
+			}
+			_, _, err = resolver.ReadResolved(ctx, *pin)
+			if !errors.Is(err, context.Canceled) || errors.Is(err, ErrResourceDenied) {
+				t.Fatalf("phase %s: %v", phase, err)
+			}
+			_, err = resolver.Resolve(ctx, ResourceRef{URI: pin.URI})
+			if !errors.Is(err, context.Canceled) || errors.Is(err, ErrResourceDenied) {
+				t.Fatalf("resolve phase %s: %v", phase, err)
+			}
+		})
+	}
+}

@@ -5,6 +5,9 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"github.com/viant/jsonrpc"
+	"net/http"
 	"strings"
 
 	primitive "github.com/viant/forge/backend/provider/contract"
@@ -139,7 +142,9 @@ func (p *LocalProvider) callAuthoring(ctx context.Context, kind, operation strin
 		err := p.validators[kind](version, definition)
 		validationSpan.End(observe.OutcomeFor(err), observe.CacheBypass)
 		if err != nil {
-			return nil, err
+			// Keep a specific typed cause. Otherwise, failure in this phase
+			// describes the caller's invalid definition, not access denial.
+			return nil, errors.Join(err, jsonrpc.NewHTTPStatusError(http.StatusBadRequest))
 		}
 	}
 	actor, err := p.currentActor(ctx)

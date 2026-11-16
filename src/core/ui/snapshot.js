@@ -1,3 +1,4 @@
+import {listRegisteredControlActions} from './controlActions.js';
 import {getOperationRevision} from './operationRevision.js';
 import {buildSemanticUIContext} from './semanticContext.js';
 import {snapshotWindowResourceLocator} from '../../runtime/windowResourceLocator.js';
@@ -10,6 +11,8 @@ import {
   getControlSignal,
   getFormSignal,
   getViewSignal,
+  findViewSignal,
+  containsSnapshotSerializationMarker,
   getSelectionSignal,
   getCollectionSignal,
   getCollectionInfoSignal,
@@ -82,9 +85,9 @@ function toSerializableDefinition(value, seen = new WeakSet()) {
   if (seen.has(value)) return undefined;
   seen.add(value);
   if (Array.isArray(value)) {
-    return value
-      .map((entry) => toSerializableDefinition(entry, seen))
-      .filter((entry) => entry !== undefined);
+    const items = value.map(entry => toSerializableDefinition(entry, seen)).filter(entry => entry !== undefined);
+    seen.delete(value);
+    return items;
   }
   const result = {};
   for (const [key, entry] of Object.entries(value)) {
@@ -94,7 +97,40 @@ function toSerializableDefinition(value, seen = new WeakSet()) {
       result[key] = next;
     }
   }
+  seen.delete(value);
   return result;
+}
+
+// Only the bridge's reload snapshot carries this repair for clipped inputs.
+// The existing diagnostic window and its semantic projection remain bounded.
+export function snapshotForRestore(snapshot) {
+  if (!Array.isArray(snapshot?.windows)) return snapshot;
+  let liveWindows;
+  return {...snapshot, windows: snapshot.windows.map(win => {
+    if (!win?.windowKey?.startsWith('report://')) return win;
+    const inputs = {};
+    const summary = win.viewState?.report;
+    if (summary?.resourceUri === win.windowKey) {
+      const report = findViewSignal(win.windowId)?.peek()?.report;
+      if (report?.resourceUri === win.windowKey) {
+        const incompleteView = containsSnapshotSerializationMarker(win.viewState);
+        for (const key of ['parameters', 'draftParameters']) {
+          if (report[key] && (incompleteView || !summary[key] || containsSnapshotSerializationMarker(summary[key], true))) {
+            inputs[key] = toSerializableDefinition(report[key]);
+          }
+        }
+      }
+    }
+    // Launch parameters belong to the window and exist before its report loads.
+    if (containsSnapshotSerializationMarker(win.parameters, true)) {
+      if (!liveWindows) liveWindows = new Map((activeWindows.peek() || []).map(w => [w.windowId, w]));
+      const live = liveWindows.get(win.windowId);
+      if (live?.windowKey === win.windowKey && live.parameters) {
+        inputs.launchParameters = toSerializableDefinition(live.parameters);
+      }
+    }
+    return Object.keys(inputs).length ? {...win, reportRestoreInputs: {resourceUri: win.windowKey, ...inputs}} : win;
+  })};
 }
 
 export function serializeInlineMetadata(metadata) {
@@ -243,6 +279,10 @@ function getWindowMetadataSummary(windowId, options) {
       }
     };
     collectTabs(content);
+    const liveTabs = listRegisteredControlActions({windowId}).filter(control=>control.type==='tabs' && Array.isArray(control.tabs));
+    const liveContainers = new Set(liveTabs.map(control=>control.controlId));
+    for(let i=tabs.length-1;i>=0;i--)if(liveContainers.has(tabs[i].containerId))tabs.splice(i,1);
+    for(const control of liveTabs)if(control.visible && !control.disabled)for(const tab of control.tabs)tabs.push({containerId:control.controlId,...tab});
 
     return {
       loaded: true,

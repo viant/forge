@@ -235,3 +235,20 @@ func TestAuthoringDoesNotEnableReadOnlyYAMLNamespaces(t *testing.T) {
 	require.Error(t, err)
 	require.Zero(t, w.writes.Load())
 }
+
+func TestLocalMCPAuthoringPreservesOpaqueDefinition(t *testing.T) {
+	p, w, ctx := authoringFixture(t)
+	client, err := NewLocalMCPClient(p)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		if closer, ok := client.(interface{ Close() error }); ok {
+			_ = closer.Close()
+		}
+	})
+	definition := json.RawMessage(`{ "z": 9007199254740993, "a": {"y":1,"b":2}, "html": "<value>&" }`)
+	result, err := client.CallTool(ctx, &schema.CallToolRequestParams{Name: "reports/create", Arguments: map[string]any{"uri": "report://users/alice/opaque", "formatVersion": 1, "definition": definition}})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.False(t, *result.IsError)
+	require.Equal(t, string(definition), string(w.seenDefinition), "SDK decoding must not reorder opaque definitions or round numbers")
+}

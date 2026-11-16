@@ -1,5 +1,5 @@
 import { encodeSnapshotRequest } from './snapshotRequestEncoding.js';
-import { buildUISnapshot } from './snapshot.js';
+import { buildUISnapshot, snapshotForRestore } from './snapshot.js';
 import { runUICommand } from './commands.js';
 import { restoreWindowsFromSnapshot } from '../store/signals.js';
 
@@ -171,7 +171,7 @@ export function startUIBridge(options = {}) {
 
   const publishSnapshot = () => {
     if (!readyToPublish) return;
-    const snap = snapshotBuilder();
+    const snap = snapshotForRestore(snapshotBuilder());
     const text = snapshotFingerprint(snap);
     if (text === lastSnapshotText) return;
     lastSnapshotText = text;
@@ -232,7 +232,7 @@ export function startUIBridge(options = {}) {
     if (!method || typeof method !== 'string') return;
 
     try {
-      const result = await runUICommand({ method, params });
+      const result = await runUICommand({ method, params }, options);
       if (options.snapshotAfterCommand !== false) {
         publishSnapshot();
       }
@@ -404,7 +404,7 @@ export function startUIBridgeHTTP(options = {}) {
   const publishSnapshotOnce = async (publishOptions = {}, scope = generation) => {
     const strict = publishOptions.strict === true;
     if (!readyToPublish || !current(scope)) return false;
-    const snap = snapshotBuilder();
+    const snap = snapshotForRestore(snapshotBuilder());
     const text = snapshotFingerprint(snap);
     if (text === lastSnapshotText) return true;
     try {
@@ -635,7 +635,7 @@ export function startUIBridgeHTTP(options = {}) {
     const payload = normalizeCommand(msg.params);
     if (!payload || !payload.method || !payload.id) return;
     try {
-      const result = await runUICommand({ method: payload.method, params: payload.params || {} });
+      const result = await runUICommand({ method: payload.method, params: payload.params || {} }, options);
       requireCurrent(scope);
       if (options.snapshotAfterCommand !== false) {
         await publishSnapshot({ strict: true }, scope);

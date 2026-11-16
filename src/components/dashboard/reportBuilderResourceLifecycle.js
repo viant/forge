@@ -4,6 +4,9 @@ const clone = value => value == null ? value : JSON.parse(JSON.stringify(value))
 export function reportResourceFailureMessage(failure) {
     const envelopes = [failure, failure?.data, failure?.details, failure?.response?.data, failure?.responseEnvelope];
     const statuses = [failure?.response?.status, ...envelopes.flatMap(value => [value?.status, value?.statusCode])];
+    if (!statuses.includes(401) && statuses.includes(403) && envelopes.some(value => value?.code === "datasource_denied" && value?.scope === "dataset")) {
+        return "The report’s data source denied this request. Try different filters or ask an administrator to check data access.";
+    }
     if (statuses.some(status => status === 401 || status === 403)) return "This report could not be run. Please try again.";
     if (envelopes.some(value => Array.isArray(value?.diagnostics) && value.diagnostics.some(diagnostic => diagnostic?.code === "missing_report_parameter"))) {
         return "Enter all required report inputs before running the report. Date ranges need both a start and an end date.";

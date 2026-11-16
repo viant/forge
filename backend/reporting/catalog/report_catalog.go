@@ -48,6 +48,7 @@ type ReportCapabilities struct {
 	ChartMetricSelection bool `json:"chartMetricSelection,omitempty"`
 }
 type ReportCatalogEntry struct {
+	Unavailable bool `json:"unavailable,omitempty"`
 	ReportCatalogCandidate
 	Namespace          string                     `json:"namespace"`
 	Name               string                     `json:"name"`
@@ -56,6 +57,7 @@ type ReportCatalogEntry struct {
 	Capabilities       ReportCapabilities         `json:"capabilities"`
 }
 type ReportCatalogQuery struct {
+	Search          string `json:"search,omitempty"`
 	Namespace       string `json:"namespace,omitempty"`
 	ResourceURI     string `json:"resourceUri,omitempty"`
 	CurrentUserOnly bool   `json:"currentUserOnly,omitempty"`
@@ -110,6 +112,9 @@ func (s *ReportCatalogService) List(ctx context.Context, input ReportCatalogQuer
 	return s.list(ctx, input)
 }
 func (s *ReportCatalogService) list(ctx context.Context, input ReportCatalogQuery) (*ReportCatalogResult, error) {
+	if strings.TrimSpace(input.Search) != "" {
+		return nil, fmt.Errorf("ranked report search requires the indexed resource catalog: %w", identity.ErrResource)
+	}
 	if s == nil || s.Identity == nil || s.Resolver == nil || len(s.Inventories) == 0 || ctx == nil || ctx.Err() != nil || input.Limit < 0 || input.Limit > 1000 {
 		return nil, identity.ErrResourceDenied
 	}

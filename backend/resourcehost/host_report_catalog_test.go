@@ -3,6 +3,8 @@ package resource
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	reportcatalog "github.com/viant/forge/backend/reporting/catalog"
 
 	"sync/atomic"
 	"testing"
@@ -69,4 +71,68 @@ func reportGatewayFixture(t *testing.T) (*ReportGatewayCatalog, *localFixtureSou
 	gateway := NewGateway(mgr, actorFn, verify, "aggregate")
 	t.Cleanup(gateway.Close)
 	return &ReportGatewayCatalog{Gateway: gateway}, source, actor, allowed, provider
+}
+
+func TestReportListPreservesOperationAndCleanupErrors(t *testing.T) {
+	service, _, _, _, _ := reportGatewayFixture(t)
+	primary, cleanup := errors.New("capabilities unavailable"), errors.New("metadata scope close failed")
+	service.Capabilities = func(context.Context, identity.VerifiedActor, reportcatalog.ReportCatalogCandidate, identity.ResolvedResource) (reportcatalog.ReportCapabilities, error) {
+		return reportcatalog.ReportCapabilities{}, primary
+	}
+	service.BeginMetadataRead = func(ctx context.Context) (context.Context, func() error, error) {
+		return ctx, func() error { return cleanup }, nil
+	}
+	page, err := service.List(context.Background(), reportcatalog.ReportCatalogQuery{})
+	require.Nil(t, page)
+	require.ErrorIs(t, err, primary)
+	require.ErrorIs(t, err, cleanup)
+}
+func TestReportListPreservesCallerCancellation(t *testing.T) {
+	service, _, _, _, _ := reportGatewayFixture(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	service.BeginMetadataRead = func(ctx context.Context) (context.Context, func() error, error) {
+		return ctx, func() error { cancel(); return nil }, nil
+	}
+	page, err := service.List(ctx, reportcatalog.ReportCatalogQuery{})
+	require.Nil(t, page)
+	require.ErrorIs(t, err, context.Canceled)
+	require.NotErrorIs(t, err, identity.ErrResourceDenied)
+}
+
+func TestRetiredReportPublisherDoesNotInitializeReplacementEndpoint(t *testing.T) {
+	for _, declared := range []bool{true, false} {
+		t.Run(map[bool]string{true: "configured", false: "discovered"}[declared], func(t *testing.T) {
+			fixture, source, _, _, provider := reportGatewayFixture(t)
+			config := &mcpcfg.MCPClient{ClientOptions: &mcp.ClientOptions{}}
+			if declared {
+				config.PrimitiveProviderIdentity = "internal"
+			}
+			var opened, reads atomic.Int32
+			source.onRead = func() { reads.Add(1) }
+			mgr, err := manager.New(fixtureOptions{"fixture-endpoint": config}, manager.WithClientFactory(func(context.Context, string, string) (mcpclient.Interface, error) {
+				opened.Add(1)
+				return NewLocalMCPClient(provider)
+			}))
+			require.NoError(t, err)
+			t.Cleanup(func() { mgr.CloseConversation("") })
+			g := NewGateway(mgr, fixture.Gateway.Actor, fixture.Gateway.Verify, "host")
+			t.Cleanup(g.Close)
+			ref := identity.ResourceRef{URI: "report://example/sales"}
+			reader := &gatewayReportReader{catalog: &ReportGatewayCatalog{Gateway: g}}
+			_, err = reader.ReportReaderForProvider(t.Context(), ref, "retired")
+			require.ErrorIs(t, err, identity.ErrResourceDenied)
+			require.Zero(t, opened.Load(), "even replacement discovery must not run")
+			if !declared {
+				_, err = g.Discover(t.Context())
+				require.NoError(t, err)
+			}
+			selected, err := reader.ReportReaderForProvider(t.Context(), ref, "internal")
+			require.NoError(t, err)
+			result, err := selected.(*gatewayReportReader).ReadDefinition(t.Context(), ref, nil)
+			require.NoError(t, err)
+			require.Equal(t, "internal", result.ResolvedResource.ProviderIdentity)
+			require.EqualValues(t, 1, reads.Load(), "owner-qualified selection and delivery share one definition read")
+		})
+	}
 }

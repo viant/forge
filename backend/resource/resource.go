@@ -15,6 +15,10 @@ import (
 
 var ErrResource = errors.New("invalid resource identity")
 var ErrResourceDenied = sharedcatalog.ErrResourceDenied
+
+// ErrStoredDefinition marks unreadable content in an existing resource record.
+var ErrStoredDefinition = errors.New("stored resource definition is unreadable")
+
 var ErrResourceStale = errors.New("resolved resource content changed")
 
 const WorkingCandidate = "working"
@@ -179,8 +183,11 @@ func (r *ResourceResolver) now() time.Time {
 	return time.Now()
 }
 func (r *ResourceResolver) Resolve(ctx context.Context, ref ResourceRef) (*ResolvedResource, error) {
-	if r == nil || r.Source == nil || r.Policy == nil || ctx == nil || ctx.Err() != nil {
+	if r == nil || r.Source == nil || r.Policy == nil || ctx == nil {
 		return nil, ErrResourceDenied
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	uri, err := ParseResourceURI(ref.URI)
 	if err != nil {
@@ -216,7 +223,10 @@ func (r *ResourceResolver) selectCandidate(ctx context.Context, ref ResourceRef,
 	if err != nil {
 		return nil, err
 	}
-	if ctx.Err() != nil || decision.AuthorityBinding == "" || strings.TrimSpace(decision.AuthorityBinding) != decision.AuthorityBinding || !MetadataExpiryValid(decision.ValidUntil, r.now()) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if decision.AuthorityBinding == "" || strings.TrimSpace(decision.AuthorityBinding) != decision.AuthorityBinding || !MetadataExpiryValid(decision.ValidUntil, r.now()) {
 		return nil, ErrResourceDenied
 	}
 	for _, candidate := range candidates {
@@ -230,8 +240,11 @@ func (r *ResourceResolver) selectCandidate(ctx context.Context, ref ResourceRef,
 // ReadResolved reauthorizes only the pinned identity. It detects mutable-file
 // drift and never silently switches an open window/run to a different stamp.
 func (r *ResourceResolver) ReadResolved(ctx context.Context, pinned ResolvedResource) (json.RawMessage, *ResolvedResource, error) {
-	if r == nil || r.Source == nil || r.Policy == nil || ctx == nil || ctx.Err() != nil {
+	if r == nil || r.Source == nil || r.Policy == nil || ctx == nil {
 		return nil, nil, ErrResourceDenied
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
 	}
 	uri, err := ParseResourceURI(pinned.URI)
 	if err != nil || !pinned.ResourceCandidate.Valid() || pinned.AuthorityBinding == "" {
@@ -266,8 +279,11 @@ func (r *ResourceResolver) ReadResolved(ctx context.Context, pinned ResolvedReso
 	if fresh.AuthorityBinding != pinned.AuthorityBinding || fresh.ProviderIdentity != pinned.ProviderIdentity {
 		return nil, nil, ErrResourceDenied
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
 	// Recheck after potentially slow I/O. The previous lease remains a cap.
-	if !MetadataExpiryValid(pinned.ValidUntil, r.now()) || !MetadataExpiryValid(fresh.ValidUntil, r.now()) || ctx.Err() != nil {
+	if !MetadataExpiryValid(pinned.ValidUntil, r.now()) || !MetadataExpiryValid(fresh.ValidUntil, r.now()) {
 		return nil, nil, ErrResourceDenied
 	}
 	fresh.ValidUntil = MinimumMetadataExpiry(fresh.ValidUntil, pinned.ValidUntil)

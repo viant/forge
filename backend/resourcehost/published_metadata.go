@@ -62,6 +62,28 @@ type publishedMetadataRegistration struct {
 	aliases    map[string]bool
 }
 
+// scopedConnection resolves an admitted registry name or alias without
+// consulting other endpoints. Multiple matching roots are ambiguous.
+func (s publishedMetadataRegistration) scopedConnection(ctx context.Context) (Connection, bool, error) {
+	connection := s.connection
+	roots, scoped := ctx.Value(catalogRootsKey{}).([]Connection)
+	if !scoped {
+		return connection, true, nil
+	}
+	matched := false
+	for _, root := range roots {
+		if !s.matchesName(root.Name) || root.ProviderIdentity != "" && root.ProviderIdentity != connection.ProviderIdentity {
+			continue
+		}
+		if matched {
+			return Connection{}, false, ErrCollision
+		}
+		connection.Name = root.Name
+		matched = true
+	}
+	return connection, matched, nil
+}
+
 // RegisterPublishedMetadataSource is trusted setup before serving requests.
 // Claims remain authoritative even when the source subsequently loses a root.
 func (g *Gateway) RegisterPublishedMetadataSource(connection Connection, namespaces []string, source PublishedMetadataSource, aliases ...string) error {

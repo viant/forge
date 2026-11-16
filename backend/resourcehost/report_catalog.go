@@ -11,7 +11,7 @@ import (
 	"github.com/viant/forge/backend/policy"
 	catalog "github.com/viant/forge/backend/reporting/catalog"
 	"github.com/viant/forge/backend/reporting/engine"
-	"github.com/viant/forge/backend/reporting/registry"
+
 	identity "github.com/viant/forge/backend/resource"
 )
 
@@ -19,6 +19,7 @@ import (
 // paths to the same gateway as windows. It never rewrites provider authority,
 // fingerprints, revision or lease, and never grants mutation capabilities.
 type ReportGatewayCatalog struct {
+	PreparePage       ReportPagePreparation
 	Gateway           *Gateway
 	BeginMetadataRead func(context.Context) (context.Context, func() error, error)
 	BuilderWindows    map[string]string
@@ -86,7 +87,8 @@ func (c *ReportGatewayCatalog) Read(ctx context.Context, ref identity.ResourceRe
 }
 
 type gatewayReportReader struct {
-	catalog *ReportGatewayCatalog
+	catalog    *ReportGatewayCatalog
+	connection *Connection // selected route for one provider-qualified read
 }
 
 func readReport[T any](ctx context.Context, r *gatewayReportReader, ref identity.ResourceRef, pin *identity.ResolvedResource, ownerHint string, refresh ...bool) (*Result[T], error) {
@@ -106,7 +108,15 @@ func readReport[T any](ctx context.Context, r *gatewayReportReader, ref identity
 		}
 	}
 	var connection Connection
-	if owner != "" {
+	if r.connection != nil {
+		connection = *r.connection
+		if connection.Generation != r.catalog.Gateway.generation(connection.Name) {
+			return nil, identity.ErrResourceStale
+		}
+		if owner != "" && owner != connection.ProviderIdentity {
+			return nil, identity.ErrResourceDenied
+		}
+	} else if owner != "" {
 		var found bool
 		connection, found, err = r.catalog.Gateway.configuredOwnerNamespaceConnection(ctx, owner, uri.Namespace)
 		if err == nil && !found {
@@ -136,7 +146,10 @@ func readReport[T any](ctx context.Context, r *gatewayReportReader, ref identity
 	if err = r.catalog.Gateway.final(ctx, captured); err != nil {
 		return nil, err
 	}
-	if ctx.Err() != nil || !identity.MetadataExpiryValid(got.ResolvedResource.ValidUntil, r.catalog.Gateway.now()) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if !identity.MetadataExpiryValid(got.ResolvedResource.ValidUntil, r.catalog.Gateway.now()) {
 		return nil, identity.ErrResourceDenied
 	}
 	if err = r.recordReportRead(ctx, connection, &got.GetResult); err != nil {
@@ -162,6 +175,43 @@ func (r *gatewayReportReader) ReadDefinition(ctx context.Context, ref identity.R
 		return nil, err
 	}
 	return &got.GetResult, nil
+}
+
+// ReportReaderForProvider restricts one read operation to the recorded publisher.
+// The read still performs ordinary resource, identity and lease checks.
+func (r *gatewayReportReader) ReportReaderForProvider(ctx context.Context, ref identity.ResourceRef, publisher string) (reporting.ResourceReader, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	uri, err := identity.ParseResourceURI(ref.URI)
+	if err != nil || uri.Kind != "report" || publisher == "" ||
+		r.connection != nil && r.connection.ProviderIdentity != publisher {
+		return nil, identity.ErrResourceDenied
+	}
+	g := r.catalog.Gateway
+	var connection Connection
+	var found bool
+	if published, ok := g.publishedNamespace(uri.Namespace); ok {
+		if published.connection.ProviderIdentity != publisher {
+			return nil, identity.ErrResourceDenied
+		}
+		connection, found, err = published.scopedConnection(ctx)
+		if found {
+			connection.Generation = g.generation(connection.Name)
+		}
+	} else {
+		connection, found, err = g.ownerNamespaceConnection(ctx, publisher, uri.Namespace, true)
+	}
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, identity.ErrResourceDenied
+	}
+	return &gatewayReportReader{catalog: r.catalog, connection: &connection}, nil
 }
 
 func (r *gatewayReportReader) ReadResource(ctx context.Context, ref identity.ResourceRef, pin *identity.ResolvedResource) (json.RawMessage, *identity.ResolvedResource, error) {
@@ -199,18 +249,24 @@ func (c *ReportGatewayCatalog) List(ctx context.Context, input catalog.ReportCat
 	if scoped == nil || finish == nil {
 		return nil, identity.ErrResourceDenied
 	}
+	requestContext := ctx
 	defer func() {
 		if err := finish(); err != nil {
 			out = nil
-			failure = err
+			failure = errors.Join(failure, err)
+		}
+		if err := requestContext.Err(); err != nil {
+			out = nil
+			if !errors.Is(failure, err) {
+				failure = errors.Join(failure, err)
+			}
+			return
 		}
 		if out != nil {
-			if ctx.Err() != nil {
-				out = nil
-				failure = identity.ErrResourceDenied
-				return
-			}
 			for _, entry := range out.Reports {
+				if entry.Unavailable {
+					continue
+				}
 				if entry.Resource == nil || !identity.MetadataExpiryValid(entry.Resource.ValidUntil, c.Gateway.now()) {
 					out = nil
 					failure = identity.ErrResourceDenied
@@ -224,7 +280,7 @@ func (c *ReportGatewayCatalog) List(ctx context.Context, input catalog.ReportCat
 	if err != nil {
 		return nil, err
 	}
-	query := CatalogQuery{Namespace: input.Namespace, Cursor: input.Cursor, Limit: input.Limit}
+	query := CatalogQuery{Search: input.Search, Namespace: input.Namespace, Cursor: input.Cursor, Limit: input.Limit}
 	if query.Limit == 0 {
 		query.Limit = primitive.MaxCatalogPageSize
 	}
@@ -244,7 +300,7 @@ func (c *ReportGatewayCatalog) List(ctx context.Context, input catalog.ReportCat
 			return &catalog.ReportCatalogResult{Reports: []catalog.ReportCatalogEntry{}}, nil
 		}
 	}
-	page, err := ListPage[registry.ReportEnvelope](ctx, c.Gateway, "report", query, true)
+	page, err := listCatalogPage[json.RawMessage](ctx, c.Gateway, "report", query, c, true)
 	if err != nil {
 		return nil, err
 	}
@@ -252,15 +308,18 @@ func (c *ReportGatewayCatalog) List(ctx context.Context, input catalog.ReportCat
 	owners := make(map[string]string, len(page.Items))
 	for _, row := range page.Items {
 		resource, pin := row.Resource, row.ResolvedResource
+		if owner, exists := owners[resource.URI]; exists && owner != row.Connection.ProviderIdentity {
+			return nil, ErrCollision
+		}
+		owners[resource.URI] = row.Connection.ProviderIdentity
+		if row.Unavailable {
+			result.Reports = append(result.Reports, catalog.ReportCatalogEntry{Unavailable: true, ReportCatalogCandidate: catalog.ReportCatalogCandidate{URI: resource.URI, Title: resource.Title, OwnerID: resource.OwnerID, ReportID: resource.URI}, Namespace: resource.Namespace, Name: resource.Name, OwnedByCurrentUser: reportOwnedByCurrentUser(ctx, actor, resource.OwnerID)})
+			continue
+		}
 		if pin == nil || pin.ContentFingerprint != resource.ContentFingerprint {
 			return nil, identity.ErrResourceStale
 		}
-		if owner, exists := owners[resource.URI]; exists && owner != pin.ProviderIdentity {
-			return nil, ErrCollision
-		}
-		owners[resource.URI] = pin.ProviderIdentity
-		envelope := row.Definition
-		candidate := catalog.ReportCatalogCandidate{URI: resource.URI, Title: resource.Title, OwnerID: resource.OwnerID, BuilderRef: envelope.BuilderRef, BuilderWindow: c.BuilderWindows[envelope.BuilderRef], ReportID: resource.URI}
+		candidate := catalog.ReportCatalogCandidate{URI: resource.URI, Title: resource.Title, OwnerID: resource.OwnerID, BuilderRef: row.ReportBuilderRef, BuilderWindow: c.BuilderWindows[row.ReportBuilderRef], ReportID: resource.URI}
 		capabilities := catalog.ReportCapabilities{}
 		if c.Capabilities != nil {
 			capabilities, err = c.Capabilities(ctx, actor, candidate, *pin)

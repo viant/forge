@@ -42,6 +42,8 @@ type StampResourceInput struct {
 }
 
 type CloneResourceInput struct {
+	// SourceProvider selects the source when more than one provider serves its URI.
+	SourceProvider            string               `json:"sourceProvider,omitempty"`
 	ExpectedSourceFingerprint string               `json:"expectedSourceFingerprint"`
 	Source                    identity.ResourceRef `json:"source"`
 	TargetURI                 string               `json:"targetUri"`

@@ -39,6 +39,8 @@ type Connection struct {
 	Generation       uint64 `json:"generation"`
 }
 type LocatedResource struct {
+	ReportBuilderRef string                     `json:"reportBuilderRef,omitempty"`
+	Unavailable      bool                       `json:"unavailable,omitempty"`
 	ResolvedResource *identity.ResolvedResource `json:"resolvedResource,omitempty"`
 	Connection       Connection                 `json:"connection"`
 	Resource         primitive.ResourceState    `json:"resource"`
@@ -267,6 +269,20 @@ func toolRaw(ctx context.Context, c mcpclient.Interface, method string, in any) 
 		encoding.End(observe.OutcomeFor(e), observe.CacheUnknown)
 		return nil, e
 	}
+	// Lifecycle definitions are opaque JSON with byte fingerprints. Keep the
+	// normal scalar arguments, while passing the definition through the SDK's
+	// existing arbitrary-JSON argument contract without map reserialization.
+	if _, hasDefinition := args["definition"]; hasDefinition {
+		original, originalErr := rawLifecycleArguments(in, raw)
+		if originalErr != nil {
+			e = originalErr
+			return nil, e
+		}
+		args["definition"] = original["definition"]
+		if manifest, ok := original["sourceManifest"]; ok {
+			args["sourceManifest"] = manifest
+		}
+	}
 	encoding.End(observe.OK, observe.CacheUnknown)
 	dispatch := observe.Start(ctx, observe.Phase("gateway.mcp.call"), labels)
 	result, e := c.CallTool(ctx, &schema.CallToolRequestParams{Name: method, Arguments: args}, mcpclient.WithNoRetry())
@@ -276,9 +292,10 @@ func toolRaw(ctx context.Context, c mcpclient.Interface, method string, in any) 
 		return nil, e
 	}
 	if result == nil || result.IsError != nil && *result.IsError {
-		markMCPReferenceFailure(ctx, "postcheck", "tool_result_error", identity.ErrResourceDenied)
-		dispatch.End(observe.Denied, observe.CacheUnknown)
-		return nil, identity.ErrResourceDenied
+		failure := resourceToolFailure(ctx, result)
+		markMCPReferenceFailure(ctx, "postcheck", "tool_result_error", failure)
+		dispatch.End(observe.OutcomeFor(failure), observe.CacheUnknown)
+		return nil, failure
 	}
 	dispatch.End(observe.OK, observe.CacheUnknown)
 	decoding := observe.Start(ctx, observe.Phase("gateway.response.decode"), labels)
@@ -881,7 +898,7 @@ func (g *Gateway) listExcludingLocalProvider(ctx context.Context, kind, namespac
 	return untypedLocations(rows), err
 }
 
-func list[T any](ctx context.Context, g *Gateway, kind, namespace, excludedLocal string) ([]Located[T], error) {
+func list[T any](ctx context.Context, g *Gateway, kind, namespace, excludedLocal string, metadataOnly ...bool) ([]Located[T], error) {
 	if !identity.ValidResourceKind(kind) {
 		return nil, identity.ErrResource
 	}
@@ -893,21 +910,12 @@ func list[T any](ctx context.Context, g *Gateway, kind, namespace, excludedLocal
 		if source.connection.Name == excludedLocal {
 			return []Located[T]{}, nil
 		}
-		connection := source.connection
-		if roots, explicit := ctx.Value(catalogRootsKey{}).([]Connection); explicit {
-			matched := false
-			for _, root := range roots {
-				if source.matchesName(root.Name) && (root.ProviderIdentity == "" || root.ProviderIdentity == source.connection.ProviderIdentity) {
-					if matched {
-						return nil, ErrCollision
-					}
-					connection.Name = root.Name
-					matched = true
-				}
-			}
-			if !matched {
-				return []Located[T]{}, nil
-			}
+		connection, matched, err := source.scopedConnection(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if !matched {
+			return []Located[T]{}, nil
 		}
 		ctx = context.WithValue(ctx, catalogRootsKey{}, []Connection{connection})
 	}
@@ -962,7 +970,7 @@ func list[T any](ctx context.Context, g *Gateway, kind, namespace, excludedLocal
 		}
 		cursor := ""
 		for page := 0; page < 100; page++ {
-			raw, e := toolRaw(ctx, ext, operationMethod(caps, ns.Namespace, kind, "list"), primitive.ListRequest{Namespace: ns.Namespace, Cursor: cursor, Limit: 100})
+			raw, e := toolRaw(ctx, ext, operationMethod(caps, ns.Namespace, kind, "list"), primitive.ListRequest{Namespace: ns.Namespace, Cursor: cursor, Limit: 100, MetadataOnly: len(metadataOnly) > 0 && metadataOnly[0] && g.Manager.IsLocalClient(ns.Connection.Name)})
 			if e != nil {
 				return nil, e
 			}
@@ -1016,11 +1024,15 @@ func (g *Gateway) Get(ctx context.Context, connection Connection, ref identity.R
 }
 
 func get[T any](ctx context.Context, g *Gateway, connection Connection, ref identity.ResourceRef, pin *identity.ResolvedResource, force, menuRead bool, decoders ...DefinitionDecoder[T]) (out *Result[T], err error) {
+	defer func() { poisonReadSequence(ctx, err) }()
+	return readResource(ctx, g, connection, ref, pin, force, menuRead, decoders...)
+}
+
+// readResource performs the same admission and postchecks for an exact read.
+// A caller enumerating independent entries owns the disposition of a damaged row.
+func readResource[T any](ctx context.Context, g *Gateway, connection Connection, ref identity.ResourceRef, pin *identity.ResolvedResource, force, menuRead bool, decoders ...DefinitionDecoder[T]) (out *Result[T], err error) {
 	span := observe.Start(ctx, "gateway.definition.read", observe.Labels{Provider: connection.Name})
 	defer func() { span.End(observe.OutcomeFor(err), observe.CacheUnknown) }()
-	// A failed read is part of this operation's provenance. Restoring authority
-	// later cannot revive its original selected metadata or release cached rows.
-	defer func() { poisonReadSequence(ctx, err) }()
 	var scopeErr error
 	ctx, scopeErr = ReadContext(ctx)
 	if scopeErr != nil {
@@ -1223,4 +1235,47 @@ func ResolveLocator(resources []LocatedResource, uri, provider string) (Connecti
 		return result, fmt.Errorf("%w: resource owner", ErrUnavailable)
 	}
 	return result, nil
+}
+
+// Reconstruct only typed status metadata. Legacy untyped tool failures are
+// unknown failures, never a fabricated authorization decision.
+func resourceToolFailure(ctx context.Context, result *schema.CallToolResult) error {
+	status, ok := schema.ToolErrorHTTPStatus(result)
+	if !ok {
+		return fmt.Errorf("resource operation failed without a typed status")
+	}
+	var cause error
+	if status == 500 {
+		var code string
+		switch v := result.StructuredContent.(type) {
+		case map[string]string:
+			code = v["code"]
+		case map[string]interface{}:
+			code, _ = v["code"].(string)
+		}
+		if code == "stored_definition_invalid" {
+			cause = identity.ErrStoredDefinition
+		}
+	}
+	switch status {
+	case 401:
+		cause = jsonrpc.NewUnauthorizedError(401, nil)
+	case 400, 422:
+		cause = identity.ErrResource
+	case 403:
+		cause = identity.ErrResourceDenied
+	case 409:
+		cause = identity.ErrResourceStale
+	case 404:
+		cause = producer.ErrCatalogNotFound
+	case 499:
+		cause = ctx.Err()
+	case 503:
+		cause = ErrUnavailable
+	case 504:
+		cause = ctx.Err()
+	case 501:
+		cause = errors.ErrUnsupported
+	}
+	return errors.Join(jsonrpc.NewHTTPStatusError(status), cause)
 }

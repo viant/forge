@@ -1,7 +1,8 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import Button from '../Button.jsx';
+import LookupPickerDialog from '../lookup/LookupPickerDialog.jsx';
+import {resolveSelector} from '../../utils/selector.js';
 import SelectControl from '../SelectControl.jsx';
-import {useForgeTheme} from '../ThemeBoundary.jsx';
 import ArrayFields from '../primitives/ArrayFields.jsx';
 import {typographyProps} from '../Typography.jsx';
 import {getWidget, listWidgets} from '../../runtime/widgetRegistry.js';
@@ -13,6 +14,58 @@ function FilterControl({context,controlId,type='text',value,options,disabled=fal
     const props={value,options,required};
     return <NativeControlTarget context={context} controlId={controlId} item={{id:controlId,type,scope:'windowForm',dataField:controlId}} value={value} options={options} disabled={disabled} constraints={{required}}
         validate={next=>validateWidgetControlValue(next,{item:{type},props})} actions={{...(change?{setValue:({value})=>change(value)}:{}),...(click?{click}: {})}}>{children}</NativeControlTarget>;
+}
+
+function ReportLookup({control, values, onChange, loadLookupRows, context, busy}) {
+    const {id, label, lookup, required} = control;
+    const value = values[id];
+    const [open, setOpen] = useState(false);
+    const [selection, setSelection] = useState(null);
+    const [resolution, setResolution] = useState('');
+    const inputs = Object.fromEntries((lookup.inputs || []).map(input =>
+        [input.name, values[input.location || input.name]]));
+    const inputKey = JSON.stringify(inputs);
+    const load = useCallback(async (input, query, signal) => {
+        const response = await loadLookupRows(lookup.dataSource, {...JSON.parse(inputKey), [input]: query}, {signal});
+        if (!Array.isArray(response?.data)) throw new Error('The list could not be loaded.');
+        const rows = response.data.map(row => ({
+            value: resolveSelector(row, lookup.valueField),
+            label: resolveSelector(row, lookup.display),
+        })).filter(row => ['number', 'string'].includes(typeof row.value) && typeof row.label === 'string' && row.label.trim());
+        return {rows, totalCount: response.dataInfo?.recordCount ?? rows.length};
+    }, [loadLookupRows, lookup, inputKey]);
+    const search = useCallback(({query, signal}) => load(lookup.queryInput, query, signal), [load, lookup.queryInput]);
+    const selected = selection?.key === inputKey && selection.value === value ? selection : null;
+    useEffect(() => {
+        if (selected || value == null || value === '' || !lookup.resolveInput) return;
+        const controller = new AbortController();
+        setResolution('loading');
+        load(lookup.resolveInput, String(value), controller.signal).then(({rows}) => {
+            if (controller.signal.aborted) return;
+            const match = rows.find(row => row.value === value);
+            if (match) setSelection({...match, key: inputKey});
+            setResolution(match ? '' : 'unavailable');
+        }).catch(() => { if (!controller.signal.aborted) setResolution('unavailable'); });
+        return () => controller.abort();
+    }, [value, selected, lookup.resolveInput, load, inputKey]);
+    return <fieldset className="forge-report-filter-choice">
+        <legend>{label}{required ? ' (required)' : ''}</legend>
+        <FilterControl context={context} controlId={id} type="button" value={value} required={required} disabled={busy} click={() => setOpen(true)}>
+            <Button type="button" disabled={busy} aria-label={`Choose ${label}`} onClick={() => setOpen(true)}>
+                {selected?.label || (value != null && value !== '' && resolution === 'loading' ? 'Loading selection…' : `Choose ${label.toLowerCase()}`)}
+            </Button>
+        </FilterControl>
+        {value != null && value !== '' && <Button type="button" variant="ghost" disabled={busy} aria-label={`Clear ${label}`}
+            onClick={() => { setSelection(null); setResolution(''); onChange(id, undefined); }}>Clear</Button>}
+        {!selected && value != null && resolution === 'unavailable' && <span role="status">Choose again to confirm the selection.</span>}
+        <LookupPickerDialog isOpen={open} title={`Choose ${label.toLowerCase()}`} searchPlaceholder={`Search ${label.toLowerCase()}`}
+            disabled={busy} loadRows={search} onCancel={() => setOpen(false)} onSelect={row => {
+                setSelection({...row, key: inputKey});
+                setResolution('');
+                onChange(id, row.value);
+                setOpen(false);
+            }}/>
+    </fieldset>;
 }
 
 function Choice({control, values, onChange, loadChoices, scopeKey, onChoices, context, busy}) {
@@ -94,20 +147,19 @@ function DatePresets({control, values, context, busy, onDatePreset, onDateRange,
 
 // Hosts normalize published metadata into controls and own authenticated choice
 // transport. This component never constructs resource URIs or permission grants.
-export default function ReportFilterBar({controls = [], values = {}, onChange, onApply, onReset, loadChoices,
+export default function ReportFilterBar({controls = [], values = {}, onChange, onApply, onReset, loadChoices, loadLookupRows,
     scopeKey = '', context, onChoices, onDatePreset, onDateRange, onDateDraft, onDateTimeZone, busy = false, applyDisabled = false, error = '', placement = 'top', className = ''}) {
-    const themed = useForgeTheme()?.themeId === 'design-system-2';
-    const DateField = getWidget('date');
     if (!controls.length) return null;
     const apply=()=>{if(!busy&&!applyDisabled)onApply?.();};
     return <form className={`forge-report-filter-bar ${className}`.trim()} data-filter-placement={['left','rail-left'].includes(placement)?'left':['right','rail-right'].includes(placement)?'right':'top'} aria-label="Report filters"
         onSubmit={event => {event.preventDefault(); apply();}} {...typographyProps('body')}>
         {controls.map(control => {
+            if (control.kind === 'lookup') return <ReportLookup key={JSON.stringify([scopeKey,control.id])} {...{control,values,onChange,loadLookupRows,context,busy}}/>;
             if (control.kind === 'choice') return <Choice key={control.id} {...{control, values, onChange, loadChoices, scopeKey, onChoices, context, busy}}/>;
             if (control.kind === 'dateRange') return <fieldset key={control.id} className="forge-report-filter-date-range"><legend>{control.label}</legend>
                 <DatePresets {...{control, values, context, busy, onDatePreset, onDateRange, onDateDraft, onDateTimeZone}}/>
                 <div className="forge-report-filter-date-fields">{[['from', control.start], ['to', control.end]].map(([edge, alias]) => <label key={alias}>{edge === 'from' ? 'From' : 'To'}
-                    <FilterControl context={context} controlId={alias} type="date" value={values[alias] ?? ''} required={control.required} disabled={busy} change={value=>onChange(alias,value)}>{themed ? <DateField valueMode="civil" dateFnsFormat="MM/dd/yyyy" fill aria-label={`${control.label} ${edge}`} required={control.required} aria-required={control.required || undefined} disabled={busy} value={values[alias] ?? ''} onChange={value => onChange(alias, value)}/> : <input type="date" aria-label={`${control.label} ${edge}`} required={control.required} aria-required={control.required || undefined} value={values[alias] ?? ''} onChange={event => onChange(alias, event.target.value)}/>}</FilterControl></label>)}</div>
+                    <FilterControl context={context} controlId={alias} type="date" value={values[alias] ?? ''} required={control.required} disabled={busy} change={value=>onChange(alias,value)}><input type="date" aria-label={`${control.label} ${edge}`} required={control.required} aria-required={control.required || undefined} value={values[alias] ?? ''} onChange={event => onChange(alias, event.target.value)}/></FilterControl></label>)}</div>
                 {control.datePresetError && <span role="alert">{control.datePresetError} Enter dates manually.</span>}
             </fieldset>;
             if (control.kind === 'boolean') return <FilterControl key={control.id} context={context} controlId={control.id} type="checkbox" value={values[control.id]===true} disabled={busy} change={value=>onChange(control.id,value)}><label><input aria-label={control.label} type="checkbox" checked={values[control.id] === true}

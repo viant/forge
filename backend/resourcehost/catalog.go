@@ -10,6 +10,7 @@ import (
 	"fmt"
 	requestctx "github.com/viant/forge/backend/requestctx"
 	"sort"
+	"strings"
 	"time"
 
 	primitive "github.com/viant/forge/backend/provider/contract"
@@ -258,26 +259,41 @@ func (g *Gateway) catalogCapability(ctx context.Context, actor identity.Verified
 // ListPage queries one cached visible metadata snapshot. Legacy List and all
 // Get/data execution paths remain fresh and do not consume this snapshot.
 func ListPage[T any](ctx context.Context, g *Gateway, kind string, query CatalogQuery, hydrateDefinitions ...bool) (*primitive.CatalogPage[Located[T]], error) {
+	return listCatalogPage[T](ctx, g, kind, query, nil, hydrateDefinitions...)
+}
+func listCatalogPage[T any](ctx context.Context, g *Gateway, kind string, query CatalogQuery, reports *ReportGatewayCatalog, hydrateDefinitions ...bool) (*primitive.CatalogPage[Located[T]], error) {
 	if !identity.ValidResourceKind(kind) {
 		return nil, identity.ErrResource
 	}
 	hydrated := len(hydrateDefinitions) > 0 && hydrateDefinitions[0]
 	catalogKind := kind
-	if hydrated {
+	if reports != nil {
+		catalogKind += ":summaries"
+	} else if hydrated {
 		catalogKind += ":definitions"
 	}
 	var definitionLease time.Time
 	index, actor, err := g.catalog(ctx, catalogKind, kind, func(ctx context.Context) ([]primitive.CatalogItem[json.RawMessage], error) {
-		rows, err := g.List(ctx, kind, "")
+		var rows []LocatedResource
+		var err error
+		if reports != nil {
+			projected, listErr := list[json.RawMessage](ctx, g, kind, "", "", true)
+			rows, err = untypedLocations(projected), listErr
+		} else {
+			rows, err = g.List(ctx, kind, "")
+		}
 		if err != nil {
 			return nil, err
 		}
-		if hydrated && len(rows) > primitive.MaxCatalogPageSize {
-			return nil, identity.ErrResource
-		}
+		eagerCount := 0
 		items := make([]primitive.CatalogItem[json.RawMessage], 0, len(rows))
 		for _, row := range rows {
-			if hydrated {
+			deferred := reports != nil && row.Resource.RowEtag > 0 && row.Resource.ContentFingerprint == "" && g.Manager != nil && g.Manager.IsLocalClient(row.Connection.Name)
+			if hydrated && !deferred {
+				eagerCount++
+				if eagerCount > primitive.MaxCatalogPageSize {
+					return nil, identity.ErrResource
+				}
 				fresh, e := Get[json.RawMessage](ctx, g, row.Connection, identity.ResourceRef{URI: row.Resource.URI, Revision: row.Resource.Revision}, nil)
 				if errors.Is(e, identity.ErrResourceDenied) && !resourceIdentityRejected(e) {
 					continue
@@ -298,12 +314,21 @@ func ListPage[T any](ctx context.Context, g *Gateway, kind string, query Catalog
 				row.Resource = *fresh.Resource
 				row.Resource.Definition = fresh.Definition
 				row.Resource.DefinitionBytes = nil // One exact definition carrier in the private snapshot.
+				if reports != nil {
+					if err := row.projectReportSummary(); err != nil {
+						return nil, err
+					}
+				}
 			}
 			raw, err := json.Marshal(row)
 			if err != nil {
 				return nil, err
 			}
-			items = append(items, primitive.CatalogItem[json.RawMessage]{Name: row.Resource.Name, Description: row.Resource.Description, Namespace: row.Resource.Namespace, URI: row.Resource.URI, Provider: row.Connection.ProviderIdentity, OwnerID: row.Resource.OwnerID, Value: raw})
+			description := row.Resource.Description
+			if kind == "report" {
+				description = strings.TrimSpace(row.Resource.Title + " " + description)
+			}
+			items = append(items, primitive.CatalogItem[json.RawMessage]{Name: row.Resource.Name, Description: description, Namespace: row.Resource.Namespace, URI: row.Resource.URI, Provider: row.Connection.ProviderIdentity, OwnerID: row.Resource.OwnerID, Value: raw})
 		}
 		return items, nil
 	}, func() time.Time { return definitionLease })
@@ -313,6 +338,12 @@ func ListPage[T any](ctx context.Context, g *Gateway, kind string, query Catalog
 	page, err := index.Page(ctx, query)
 	if err != nil {
 		return nil, err
+	}
+	if reports != nil {
+		page.Items, err = g.hydrateReportPage(ctx, page.Items, reports.PreparePage)
+		if err != nil {
+			return nil, err
+		}
 	}
 	result := &primitive.CatalogPage[Located[T]]{NextCursor: page.NextCursor, Complete: page.Complete, Total: page.Total, Items: make([]Located[T], 0, len(page.Items))}
 	for _, raw := range page.Items {

@@ -67,9 +67,10 @@ type NamespaceListResult struct {
 	Complete         bool        `json:"complete"`
 }
 type ListRequest struct {
-	Namespace string `json:"namespace,omitempty"`
-	Cursor    string `json:"cursor,omitempty"`
-	Limit     int    `json:"limit,omitempty"`
+	MetadataOnly bool   `json:"metadataOnly,omitempty"`
+	Namespace    string `json:"namespace,omitempty"`
+	Cursor       string `json:"cursor,omitempty"`
+	Limit        int    `json:"limit,omitempty"`
 }
 type GetRequest struct {
 	Parameters  map[string]any `json:"parameters,omitempty"`

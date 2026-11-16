@@ -74,7 +74,7 @@ func ValidateWindowBundle(formatVersion int64, raw json.RawMessage) error {
 
 // ValidateReportEnvelope validates the supported local report definition form.
 func ValidateReportEnvelope(formatVersion int64, raw json.RawMessage) error {
-	if formatVersion != 1 {
+	if formatVersion != 1 && formatVersion != 2 {
 		return fmt.Errorf("unsupported report format")
 	}
 	var envelope registry.ReportEnvelope
@@ -83,16 +83,26 @@ func ValidateReportEnvelope(formatVersion int64, raw json.RawMessage) error {
 	if err := d.Decode(&envelope); err != nil {
 		return err
 	}
-	if d.Decode(new(any)) != io.EOF || envelope.SchemaVersion != 1 ||
+	if d.Decode(new(any)) != io.EOF || int64(envelope.SchemaVersion) != formatVersion ||
 		len(envelope.ReportDocument) == 0 && len(envelope.ReportSpec) == 0 ||
 		len(envelope.ReportDocument) > 0 && !validJSONObject(envelope.ReportDocument) ||
 		len(envelope.ReportSpec) > 0 && !validJSONObject(envelope.ReportSpec) {
 		return fmt.Errorf("invalid report envelope")
 	}
+	if formatVersion == 2 && envelope.Format != registry.ResourceReportFormat {
+		return fmt.Errorf("version 2 requires report references format")
+	}
 	switch envelope.Format {
 	case "":
 		if len(envelope.ReportSpec) > 0 && !validJSONObject(envelope.ReportSpec) || len(envelope.BuilderDefinition) != 0 {
 			return fmt.Errorf("invalid native report envelope")
+		}
+	case registry.ResourceReportFormat:
+		if formatVersion != 2 || envelope.SourceFormat != "" && envelope.SourceFormat != registry.AuthoredReportFormat {
+			return fmt.Errorf("invalid report references envelope")
+		}
+		if envelope.SourceFormat == registry.AuthoredReportFormat && (!validJSONObject(envelope.ReportDocument) || envelope.BuilderRef == "" || !validJSONObject(envelope.BuilderDefinition)) {
+			return fmt.Errorf("invalid authored report references envelope")
 		}
 	case registry.AuthoredReportFormat:
 		if !validJSONObject(envelope.ReportDocument) || envelope.BuilderRef == "" || !validJSONObject(envelope.BuilderDefinition) {

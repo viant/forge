@@ -9,9 +9,10 @@ import {
   getMetadataSignal,
   getInputSignal,
   getViewSignal,
+  restoreWindowsFromSnapshot,
 } from '../store/signals.js';
 
-import { buildUISnapshot } from './snapshot.js';
+import { buildUISnapshot, snapshotForRestore } from './snapshot.js';
 
 function resetSignals() {
   activeWindows.value = [];
@@ -233,3 +234,46 @@ assert.deepEqual(browse.windows[0].metadata.view.controls, [{
   dataSourceRef: 'starred', bindingPath: null, dataField: 'Name', options: undefined,
 }]);
 console.log('Toolbar quick searches expose their active datasource and filter field');
+
+{
+  const windowId = 'report-filter-roundtrip', windowKey = 'report://example/orders';
+  const applied = Array.from({length: 120}, (_,i) => i + 1);
+  const draft = Array.from({length: 137}, (_,i) => i + 500);
+  activeWindows.value = [{windowId, windowKey, parameters: {ids: applied}}];
+  const shared = {nested:['[MaxDepth]'], valueOf:'user filter'};
+  getViewSignal(windowId).value = {report:{
+    resourceUri:windowKey, filterFingerprint:'scope-v1',
+    parameters:{ids:applied}, draftParameters:{ids:draft, first:shared, second:shared, localStateOwner:'private'},
+  }};
+  const diagnostic = buildUISnapshot();
+  const win = diagnostic.windows[0];
+  assert.equal(win.viewState.report.parameters.ids.items.length,100);
+  assert.equal(win.viewState.report.draftParameters.ids.items.length,100);
+  assert.equal(win.reportRestoreInputs,undefined);
+  const transport = JSON.parse(JSON.stringify(snapshotForRestore(diagnostic)));
+  assert.deepEqual(transport.windows[0].viewState,JSON.parse(JSON.stringify(win.viewState)));
+  assert.ok(!JSON.stringify(transport).includes('"localStateOwner"'));
+  restoreWindowsFromSnapshot(transport);
+  const restored = getViewSignal(windowId).peek().report;
+  assert.equal(restored.filterFingerprint,'scope-v1');
+  assert.deepEqual(restored.parameters,{ids:applied});
+  assert.deepEqual(restored.draftParameters,{ids:draft,first:shared,second:shared});
+  assert.deepEqual(activeWindows.peek()[0].parameters,{ids:applied});
+}
+
+{
+  const windowId = 'loading-report';
+  const windowKey = 'report://example/upcoming';
+  const ids = Array.from({length: 126}, (_, i) => 100 + i);
+  activeWindows.value = [{windowId, windowKey, parameters: {ids}}];
+  const diagnostic = buildUISnapshot();
+  assert.equal(diagnostic.windows[0].parameters.ids.items.length, 100);
+  const saved = JSON.parse(JSON.stringify(snapshotForRestore(diagnostic)));
+  restoreWindowsFromSnapshot(saved);
+  assert.deepEqual(activeWindows.peek()[0].parameters.ids, ids,
+    'launch selections survive reload while the report definition is loading');
+
+  // An older snapshot can arrive after a replacement reused the same slot.
+  activeWindows.value = [{windowId, windowKey: 'report://example/replacement', parameters: {ids: [9]}}];
+  assert.equal(snapshotForRestore(diagnostic).windows[0].reportRestoreInputs, undefined);
+}

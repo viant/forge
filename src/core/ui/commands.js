@@ -247,7 +247,7 @@ function findNodePathByUri(nodes, uri, path = []) {
   return null;
 }
 
-export async function runUICommand(cmd = {}) {
+export async function runUICommand(cmd = {}, host = {}) {
   const { method, params = {} } = cmd || {};
   requireString('method', method);
 
@@ -537,6 +537,9 @@ export async function runUICommand(cmd = {}) {
     // Windows
     // ------------------------------------------------------------------
     case 'ui.window.open': {
+      // An explicit existing-window open is fenced by the same live operation
+      // revision used by other UI commands. A closed/stale window is not recreated.
+      if (params.expectedRevision != null) assertOperationTarget(params);
       const windowKey = requireString('windowKey', params.windowKey);
       const windowTitle = params.windowTitle || params.title || windowKey;
       const options = params.options || {};
@@ -705,6 +708,12 @@ export async function runUICommand(cmd = {}) {
       });
       if (!ok) throw new Error(`unable to focus control: ${controlId}`);
       return { ok: true };
+    }
+
+    case 'ui.workspace.setVisibility': {
+      requireString('conversationId', params.conversationId);
+      if (typeof host.setWorkspaceVisibility !== 'function') throw new Error('Workspace visibility is unavailable.');
+      return host.setWorkspaceVisibility(params);
     }
 
     case 'ui.workspace.refresh':

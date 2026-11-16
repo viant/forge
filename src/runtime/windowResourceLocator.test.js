@@ -22,6 +22,8 @@ describe('published window locator in UI snapshots',()=>{
   });
 
   it('drops mismatched or noncanonical snapshot hints rather than treating them as grants',()=>{
+    expect(snapshotWindowResourceLocator({windowKey:'report://example/r', resourceRef:{uri:'report://example/r',revision:'7',authorityBinding:'expired'}}))
+      .toEqual({resourceRef:{uri:'report://example/r',revision:'7'}});
     expect(snapshotWindowResourceLocator({windowKey:'window://studio/reader',providerIdentity:'studio',
       resourceRef:{uri:'window://other/reader'}})).toEqual({});
     expect(snapshotWindowResourceLocator({windowKey:'reader',providerIdentity:'studio',

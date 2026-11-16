@@ -3,6 +3,7 @@ import {createRoot} from 'react-dom/client';
 import {Simulate} from 'react-dom/test-utils';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import fs from 'node:fs';
+import {createHash} from 'node:crypto';
 import AttachmentDialog from './AttachmentDialog.jsx';
 import Composer from './Composer.jsx';
 import Chat from '../Chat.jsx';
@@ -13,8 +14,8 @@ import {ForgeThemeProvider, ForgeThemeBoundary} from '../ThemeBoundary.jsx';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 let host, root;
-beforeEach(() => {sessionStorage.clear(); host = document.createElement('div'); document.body.append(host); root = createRoot(host);});
-afterEach(async () => {await act(async () => root.unmount()); host.remove();});
+beforeEach(() => {vi.stubGlobal('crypto', {subtle: {digest: vi.fn(async (_algorithm, bytes) => createHash('sha256').update(bytes).digest())}}); sessionStorage.clear(); host = document.createElement('div'); document.body.append(host); root = createRoot(host);});
+afterEach(async () => {await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals();});
 const render = value => act(async () => root.render(value));
 const change = (node, value) => act(async () => Simulate.change(node, {target: {value}}));
 const click = node => act(async () => node.click());
@@ -173,6 +174,245 @@ describe('document composer and task discovery', () => {
             await click(host.querySelector('.forge-task-back'));
             expect(host.querySelector('textarea').disabled).toBe(false);
             expect(new URLSearchParams(window.location.search).has('starterFingerprint')).toBe(false);
+        } finally {
+            window.history.replaceState(null, '', '/');
+        }
+    });
+
+    it.each(['local-task', 'custom#owned-task'])('restores %s only while it remains in the current task catalog', async id => {
+        const task = {id, title: 'Plan a summary', prompt: 'Plan a weekly summary.'};
+        let tasks = [task];
+        const context = {
+            identity: {windowId: 'local-starter'},
+            signals: {collection: signal([]), control: signal({}), selection: signal(null), message: signal('')},
+            handlers: {chat: {}}, Context: () => null,
+            lookupHandler: name => name === 'chat.renderFeed' ? () => null
+                : name === 'chat.resolveComposerProps' ? () => ({commandCenter: true, starterTasks: tasks}) : undefined,
+        };
+        const chat = () => <Chat context={context} container={{chat: {appearance: 'document'}}}/>;
+        try {
+            await render(chat());
+            await click(host.querySelector('.forge-task-row'));
+            await change(host.querySelector('textarea'), 'Edited local draft.');
+            await render(null);
+            await render(chat());
+            expect(host.querySelector('textarea').value).toBe('Edited local draft.');
+            expect(host.querySelector('textarea').disabled).toBe(false);
+            tasks = [];
+            await render(chat());
+            expect(host.querySelector('textarea').disabled).toBe(true);
+            expect(host.querySelector('textarea').value).toBe('');
+            expect(host.querySelector('[role="status"]').textContent).toContain('unavailable');
+        } finally {
+            window.history.replaceState(null, '', '/');
+        }
+    });
+
+    it.each(['Keep my draft', 'Use updated template'])('reviews changed local templates with %s without losing the prior draft', async choice => {
+        let task = {id: 'custom#summary', title: 'Plan a summary', prompt: 'Original template.'};
+        const submit = vi.fn().mockResolvedValue(undefined);
+        const context = {
+            identity: {windowId: 'versioned-local-task'},
+            signals: {collection: signal([]), control: signal({}), selection: signal(null), message: signal('')},
+            handlers: {chat: {}}, Context: () => null,
+            lookupHandler: name => name === 'chat.renderFeed' ? () => null
+                : name === 'chat.submitMessage' ? submit
+                : name === 'chat.resolveComposerProps' ? () => ({commandCenter: true, starterTasks: [task]}) : undefined,
+        };
+        const chat = () => <Chat context={context} container={{chat: {appearance: 'document', on: [{event: 'onSubmit', handler: 'chat.submitMessage'}]}}}/>;
+        try {
+            await render(chat());
+            await click(host.querySelector('.forge-task-row'));
+            const oldFingerprint = new URLSearchParams(window.location.search).get('starterFingerprint');
+            expect(oldFingerprint).toMatch(/^[a-f0-9]{64}$/);
+            await change(host.querySelector('textarea'), 'My edited draft.');
+            await click(host.querySelector('.forge-task-back'));
+            task = {...task, prompt: 'Updated template.'};
+            await render(chat());
+            await click(host.querySelector('.forge-task-row'));
+            expect(host.querySelector('textarea').value).toBe('My edited draft.');
+            expect(host.querySelector('textarea').disabled).toBe(true);
+            expect(host.textContent).toContain('This template has changed');
+            await render(null); await render(chat());
+            expect(host.querySelector('textarea').disabled).toBe(true);
+            await click(Array.from(host.querySelectorAll('button')).find(button => button.textContent === choice));
+            const expected = choice === 'Keep my draft' ? 'My edited draft.' : task.prompt;
+            expect(host.querySelector('textarea').value).toBe(expected);
+            expect(host.querySelector('textarea').disabled).toBe(false);
+            expect(JSON.parse(sessionStorage.getItem('forge.composerDrafts.v1'))[`starter:${task.id}:${oldFingerprint}`]).toBe('My edited draft.');
+            await render(null); await render(chat());
+            expect(host.querySelector('textarea').value).toBe(expected);
+            expect(host.querySelector('textarea').disabled).toBe(false);
+            const digests = crypto.subtle.digest.mock.calls.length;
+            await render(chat()); await render(chat());
+            expect(crypto.subtle.digest).toHaveBeenCalledTimes(digests);
+            await press(host.querySelector('textarea'), 'Enter');
+            expect(submit).toHaveBeenCalledTimes(1);
+            expect(submit.mock.calls[0][0].message.content).toBe(expected);
+            expect(submit.mock.calls[0][0].message).not.toHaveProperty('starterTask');
+            await change(host.querySelector('textarea'), 'Newer edited draft.');
+            await act(async () => {
+                window.history.replaceState(null, '', `/?starter=${encodeURIComponent(task.id)}&starterFingerprint=${oldFingerprint}`);
+                window.dispatchEvent(new PopStateEvent('popstate'));
+            });
+            expect(host.querySelector('textarea').disabled).toBe(true);
+            expect(host.textContent).not.toContain('Keep my draft');
+            await click(Array.from(host.querySelectorAll('button')).find(button => button.textContent === 'Continue saved draft'));
+            expect(host.querySelector('textarea').value).toBe('Newer edited draft.');
+            task = {...task, prompt: 'Original template.'};
+            await render(chat());
+            await click(Array.from(host.querySelectorAll('button')).find(button => button.textContent === 'Continue saved draft'));
+            expect(host.querySelector('textarea').value).toBe('My edited draft.');
+            const newer = JSON.parse(sessionStorage.getItem('forge.composerDrafts.v1'));
+            expect(Object.values(newer)).toContain('Newer edited draft.');
+        } finally {window.history.replaceState(null, '', '/');}
+    });
+
+    it.each([false, true])('initializes a versioned local URL with no saved draft (changed: %s)', async changed => {
+        const task = {id: 'local-task', title: 'Plan', prompt: 'Current template.'};
+        const fingerprint = createHash('sha256').update(JSON.stringify([task.id, '', task.title, task.prompt])).digest('hex');
+        window.history.replaceState(null, '', `/?starter=local-task&starterFingerprint=${changed ? 'f'.repeat(64) : fingerprint}`);
+        const context = {
+            identity: {windowId: 'new-session-local-task'},
+            signals: {collection: signal([]), control: signal({}), selection: signal(null), message: signal('')},
+            handlers: {chat: {}}, Context: () => null,
+            lookupHandler: name => name === 'chat.renderFeed' ? () => null
+                : name === 'chat.resolveComposerProps' ? () => ({commandCenter: true, starterTasks: [task]}) : undefined,
+        };
+        try {
+            await render(<Chat context={context} container={{chat: {appearance: 'document'}}}/>);
+            if (changed) {
+                expect(host.textContent).toContain('No earlier draft');
+                expect(host.textContent).not.toContain('Keep my draft');
+                await click(Array.from(host.querySelectorAll('button')).find(button => button.textContent === 'Use updated template'));
+            }
+            expect(host.querySelector('textarea').value).toBe(task.prompt);
+            expect(host.querySelector('textarea').disabled).toBe(false);
+        } finally {window.history.replaceState(null, '', '/');}
+    });
+
+    it('offers recovery for an unversioned local draft and keeps an intentionally emptied draft', async () => {
+        const task = {id: 'custom#legacy', title: 'Legacy task', prompt: 'New template.'};
+        sessionStorage.setItem('forge.composerDrafts.v1', JSON.stringify({[`starter:${task.id}`]: ''}));
+        window.history.replaceState(null, '', '/?starter=custom%23legacy');
+        const context = {
+            identity: {windowId: 'legacy-local-task'},
+            signals: {collection: signal([]), control: signal({}), selection: signal(null), message: signal('')},
+            handlers: {chat: {}}, Context: () => null,
+            lookupHandler: name => name === 'chat.renderFeed' ? () => null
+                : name === 'chat.resolveComposerProps' ? () => ({commandCenter: true, starterTasks: [task]}) : undefined,
+        };
+        try {
+            await render(<Chat context={context} container={{chat: {appearance: 'document'}}}/>);
+            expect(host.textContent).toContain('Choose which prompt');
+            await click(Array.from(host.querySelectorAll('button')).find(button => button.textContent === 'Keep my draft'));
+            expect(host.querySelector('textarea').value).toBe('');
+            expect(host.querySelector('textarea').disabled).toBe(false);
+            expect(new URLSearchParams(window.location.search).get('starterFingerprint')).toMatch(/^[a-f0-9]{64}$/);
+        } finally {window.history.replaceState(null, '', '/');}
+    });
+
+    it('prepares only the current selected local template and ignores a superseded digest', async () => {
+        const pending = [];
+        crypto.subtle.digest.mockImplementation((_algorithm, bytes) => new Promise(resolve => pending.push(() => resolve(createHash('sha256').update(bytes).digest()))));
+        let task = {id: 'local-task', title: 'Plan', prompt: 'First template.'};
+        const context = {
+            identity: {windowId: 'pending-local-task'},
+            signals: {collection: signal([]), control: signal({}), selection: signal(null), message: signal('')},
+            handlers: {chat: {}}, Context: () => null,
+            lookupHandler: name => name === 'chat.renderFeed' ? () => null
+                : name === 'chat.resolveComposerProps' ? () => ({commandCenter: true, starterTasks: [task]}) : undefined,
+        };
+        const chat = () => <Chat context={context} container={{chat: {appearance: 'document'}}}/>;
+        try {
+            await render(chat()); expect(crypto.subtle.digest).not.toHaveBeenCalled();
+            await click(host.querySelector('.forge-task-row'));
+            expect(host.querySelector('textarea').disabled).toBe(true);
+            expect(host.textContent).toContain('Loading this task');
+            task = {...task, prompt: 'Second template.'}; await render(chat());
+            expect(pending).toHaveLength(2);
+            await act(async () => pending[0]());
+            expect(host.querySelector('textarea').disabled).toBe(true);
+            await act(async () => pending[1]());
+            expect(host.querySelector('textarea').value).toBe(task.prompt);
+            expect(host.querySelector('textarea').disabled).toBe(false);
+        } finally {window.history.replaceState(null, '', '/');}
+    });
+
+    it('keeps the existing in-memory draft usable when session storage cannot be written', async () => {
+        const storage = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {throw new Error('Storage unavailable');});
+        const task = {id: 'local-task', title: 'Plan', prompt: 'Plan a summary.'};
+        const context = {
+            identity: {windowId: 'memory-local-task'},
+            signals: {collection: signal([]), control: signal({}), selection: signal(null), message: signal('')},
+            handlers: {chat: {}}, Context: () => null,
+            lookupHandler: name => name === 'chat.renderFeed' ? () => null
+                : name === 'chat.resolveComposerProps' ? () => ({commandCenter: true, starterTasks: [task]}) : undefined,
+        };
+        try {
+            await render(<Chat context={context} container={{chat: {appearance: 'document'}}}/>);
+            await click(host.querySelector('.forge-task-row'));
+            expect(host.querySelector('textarea').value).toBe(task.prompt);
+            expect(host.querySelector('textarea').disabled).toBe(false);
+            await change(host.querySelector('textarea'), 'Memory draft.');
+            await click(host.querySelector('.forge-task-back'));
+            await click(host.querySelector('.forge-task-row'));
+            expect(host.querySelector('textarea').value).toBe('Memory draft.');
+            expect(host.querySelector('textarea').disabled).toBe(false);
+        } finally {storage.mockRestore(); window.history.replaceState(null, '', '/');}
+    });
+
+    it('explains missing Web Crypto instead of suggesting an ineffective reload', async () => {
+        vi.stubGlobal('crypto', {});
+        const context = {
+            identity: {windowId: 'insecure-local-task'},
+            signals: {collection: signal([]), control: signal({}), selection: signal(null), message: signal('')},
+            handlers: {chat: {}}, Context: () => null,
+            lookupHandler: name => name === 'chat.renderFeed' ? () => null
+                : name === 'chat.resolveComposerProps' ? () => ({commandCenter: true, starterTasks: [{id: 'local-task', title: 'Plan', prompt: 'Plan a summary.'}]}) : undefined,
+        };
+        try {
+            await render(<Chat context={context} container={{chat: {appearance: 'document'}}}/>);
+            await click(host.querySelector('.forge-task-row'));
+            expect(host.querySelector('textarea').disabled).toBe(true);
+            expect(host.querySelector('[role=alert]').textContent).toContain('HTTPS or localhost');
+        } finally {window.history.replaceState(null, '', '/');}
+    });
+
+    it('keeps local task submission disabled when fingerprint preparation fails', async () => {
+        crypto.subtle.digest.mockRejectedValue(new Error('Unavailable crypto'));
+        const context = {
+            identity: {windowId: 'failed-local-task'},
+            signals: {collection: signal([]), control: signal({}), selection: signal(null), message: signal('')},
+            handlers: {chat: {}}, Context: () => null,
+            lookupHandler: name => name === 'chat.renderFeed' ? () => null
+                : name === 'chat.resolveComposerProps' ? () => ({commandCenter: true, starterTasks: [{id: 'local-task', title: 'Plan', prompt: 'Plan a summary.'}]}) : undefined,
+        };
+        try {
+            await render(<Chat context={context} container={{chat: {appearance: 'document'}}}/>);
+            await click(host.querySelector('.forge-task-row'));
+            expect(host.querySelector('textarea').disabled).toBe(true);
+            expect(host.querySelector('[role=alert]').textContent).toContain('Could not prepare this task');
+        } finally {window.history.replaceState(null, '', '/');}
+    });
+
+    it('distinguishes a pending task catalog from an unavailable selected task', async () => {
+        const form = signal({starterTaskPresentationReady: false});
+        const meta = {signals: {form}};
+        const context = {
+            identity: {windowId: 'pending-starter'},
+            signals: {collection: signal([]), control: signal({}), selection: signal(null), message: signal('')},
+            handlers: {chat: {}}, Context: name => name === 'meta' ? meta : null,
+            lookupHandler: name => name === 'chat.renderFeed' ? () => null
+                : name === 'chat.resolveComposerProps' ? () => ({commandCenter: true, starterTasks: []}) : undefined,
+        };
+        try {
+            window.history.replaceState(null, '', '/?starter=custom%23owned-task');
+            await render(<Chat context={context} container={{chat: {appearance: 'document'}}}/>);
+            expect(host.querySelector('textarea').disabled).toBe(true);
+            expect(host.querySelector('[role="status"]').textContent).toBe('Loading this task…');
+            await act(async () => {form.value = {starterTaskPresentationReady: true, starterTasks: []};});
+            expect(host.querySelector('[role="status"]').textContent).toContain('unavailable');
         } finally {
             window.history.replaceState(null, '', '/');
         }
@@ -382,6 +622,30 @@ describe('document composer and task discovery', () => {
         await render(<StarterTaskBrowser tasks={[{id: 'report', title: 'Example', resultLabel: 'Saved output'}]} onSelect={select}/>);
         await change(host.querySelector('input[type=search]'), 'saved output');
         expect(host.querySelectorAll('.forge-task-row')).toHaveLength(1);
+    });
+
+    it('keeps uncategorized tasks visible beside declared categories in suggestions and the library', async () => {
+        const tasks = [
+            {id: 'declared', categoryId: 'published', title: 'Published task', prompt: 'Review a summary.'},
+            {id: 'loose', title: 'Loose note', prompt: 'Plan a summary.'},
+            {id: 'unmatched', categoryId: 'missing', title: 'Unmatched task', prompt: 'Review a document.'},
+        ];
+        const select = vi.fn();
+        await render(<StarterTaskBrowser tasks={tasks} categories={[{id: 'published', title: 'Published'}]} onSelect={select}/>);
+        expect(host.querySelectorAll('.forge-task-row')).toHaveLength(2);
+        expect(host.textContent).toContain('Loose note');
+        await click([...host.querySelectorAll('button')].find(button => button.textContent === 'Browse all 3 tasks'));
+        expect(host.querySelectorAll('.forge-task-row')).toHaveLength(3);
+        expect([...host.querySelectorAll('.forge-task-group h2')].map(node => node.textContent)).toEqual(['Published', 'More']);
+        await change(host.querySelector('input[type=search]'), 'Loose note');
+        expect(host.querySelectorAll('.forge-task-row')).toHaveLength(1);
+        await click(host.querySelector('.forge-task-row'));
+        expect(select).toHaveBeenCalledWith(tasks[1], expect.objectContaining({library: true, search: 'Loose note'}));
+        await change(host.querySelector('input[type=search]'), 'More');
+        expect(host.querySelectorAll('.forge-task-row')).toHaveLength(2);
+        await click([...host.querySelectorAll('.forge-task-filters button')].find(button => button.textContent.startsWith('More')));
+        expect(host.querySelectorAll('.forge-task-row')).toHaveLength(2);
+        expect(host.querySelector('.forge-task-note').textContent).toBe('2 tasks');
     });
 
     it('shows preparation, progress, failure recovery and blocks Send until files are ready', async () => {

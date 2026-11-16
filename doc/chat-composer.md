@@ -42,6 +42,12 @@ prove the model received the file contents. A separate Generate report starter c
 from conversation data without any configured workspace report. See
 [inline reporting](reporting.md#inline-report-transactions).
 
+Local starter links carry the fingerprint of the selected template. When its
+title, prompt, or assigned agent changes, the composer offers **Keep my draft**
+and **Use updated template**. **Continue saved draft** opens a draft already
+saved for the new version. Earlier drafts remain available in session storage.
+Computing the local fingerprint requires Web Crypto on HTTPS or localhost.
+
 ## File picker versus camera
 
 The image/file action calls the host's `onOpenAttach` flow. Camera opens a live

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/tidwall/sjson"
 	"io"
 
 	"github.com/viant/forge/backend/provider/contract/observe"
@@ -87,14 +88,9 @@ func (s *Service) compileResolved(ctx context.Context, request *CompileRequest, 
 	if windowBuilder {
 		raw = append(json.RawMessage(nil), admitted.windowEnvelope...)
 	}
-	var definition registry.ReportEnvelope
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&definition); err != nil {
-		return nil, nil, nil, compileStageError(CompileStageEnvelope, fmt.Errorf("invalid resolved report envelope"))
-	}
-	if decoder.Decode(new(any)) != io.EOF || (len(definition.ReportDocument) == 0 && len(definition.ReportSpec) == 0) || !(definition.SchemaVersion == 1 && definition.Format != registry.ResourceReportFormat && len(definition.DataSourceResources) == 0 && definition.SourceFormat == "" || definition.SchemaVersion == 2 && definition.Format == registry.ResourceReportFormat && len(definition.DataSourceResources) > 0) {
-		return nil, nil, nil, compileStageError(CompileStageEnvelope, fmt.Errorf("invalid resolved report definition"))
+	definition, err := decodeReportDefinition(raw)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 	bindTiming := observe.Start(ctx, "report.compile.bind", observe.Labels{Kind: "report"})
 	dependencyPins, dependencyToken, err := s.bindOperationDependencies(ctx, request.ResolvedResource, pin, definition, request.DependencyPins, request.DependencyToken)
@@ -102,48 +98,9 @@ func (s *Service) compileResolved(ctx context.Context, request *CompileRequest, 
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	if definition.Format == registry.ResourceReportFormat {
-		if definition.SourceFormat != "" && definition.SourceFormat != registry.AuthoredReportFormat {
-			return nil, nil, nil, identity.ErrResourceDenied
-		}
-		definition.SchemaVersion, definition.Format, definition.SourceFormat = 1, definition.SourceFormat, ""
-		definition.DataSourceResources = nil
-		raw, err = json.Marshal(definition)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-	}
-	var spec json.RawMessage
-	switch definition.Format {
-	case "":
-		if len(definition.ReportSpec) == 0 || len(definition.BuilderDefinition) != 0 || len(definition.Dependencies) != 0 {
-			return nil, nil, nil, compileStageError(CompileStageEnvelope, fmt.Errorf("invalid native report definition"))
-		}
-		spec = definition.ReportSpec
-	case registry.AuthoredReportFormat:
-		for _, dependency := range definition.Dependencies {
-			if (dependency.Kind == "report" || dependency.Kind == "window") && dependency.ID != pin.URI {
-				return nil, nil, nil, identity.ErrResourceDenied
-			}
-		}
-		requestBase, bindErr := bindAuthoredCompileParameters(raw, request.Parameters)
-		if bindErr != nil {
-			return nil, nil, nil, compileStageError(CompileStageBind, bindErr)
-		}
-		lowerTiming := observe.Start(ctx, "report.compile.lower", observe.Labels{Kind: "report"})
-		if windowBuilder {
-			spec, err = materializer.LowerWindowBuilderWithRequestBase(ctx, raw, requestBase)
-		} else if sourceValidation {
-			spec, err = materializer.LowerForValidation(ctx, raw)
-		} else {
-			spec, err = materializer.LowerWithRequestBase(ctx, raw, requestBase)
-		}
-		lowerTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
-		if err != nil {
-			return nil, nil, nil, compileStageError(CompileStageLower, err)
-		}
-	default:
-		return nil, nil, nil, compileStageError(CompileStageEnvelope, fmt.Errorf("unsupported resolved report format"))
+	spec, err := lowerReportDefinition(ctx, pin.URI, raw, definition, request.Parameters, windowBuilder, sourceValidation)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 	boundRef := identity.ResourceRef{URI: pin.URI, Revision: pin.Selector()}
 	return &CompileRequest{DependencyPins: dependencyPins, DependencyToken: dependencyToken, ResolvedResource: cloneResolvedResource(pin), Resource: &boundRef, ArtifactRef: pin.URI, SourceKind: SourceKindReportSpec, Document: append(json.RawMessage(nil), spec...)}, pin, resolver, nil
@@ -172,3 +129,116 @@ func cloneResolvedResource(value *identity.ResolvedResource) *identity.ResolvedR
 
 // UsesResourceResolution identifies explicitly configured unified report mode.
 func (s *Service) UsesResourceResolution() bool { return s != nil && s.hasResourceReader() }
+
+// These internal phases are shared by admitted execution and candidate validation.
+func decodeReportDefinition(raw json.RawMessage) (registry.ReportEnvelope, error) {
+	var definition registry.ReportEnvelope
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&definition); err != nil {
+		return definition, compileStageError(CompileStageEnvelope, fmt.Errorf("invalid resolved report envelope: %w", err))
+	}
+	if decoder.Decode(new(any)) != io.EOF || (len(definition.ReportDocument) == 0 && len(definition.ReportSpec) == 0) || !(definition.SchemaVersion == 1 && definition.Format != registry.ResourceReportFormat && len(definition.DataSourceResources) == 0 && definition.SourceFormat == "" || definition.SchemaVersion == 2 && definition.Format == registry.ResourceReportFormat && len(definition.DataSourceResources) > 0) {
+		return definition, compileStageError(CompileStageEnvelope, fmt.Errorf("invalid resolved report definition"))
+	}
+	return definition, nil
+}
+func lowerReportDefinition(ctx context.Context, reportURI string, raw json.RawMessage, definition registry.ReportEnvelope, parameters map[string]interface{}, windowBuilder, sourceValidation bool) (json.RawMessage, error) {
+	var err error
+	if definition.Format == registry.ResourceReportFormat {
+		if definition.SourceFormat != "" && definition.SourceFormat != registry.AuthoredReportFormat {
+			return nil, identity.ErrResourceDenied
+		}
+		definition.SchemaVersion, definition.Format, definition.SourceFormat = 1, definition.SourceFormat, ""
+		definition.DataSourceResources = nil
+		// Only the transport header changes. Re-encoding the complete envelope
+		// would invalidate byte fingerprints inside untouched authored sections.
+		raw, err = sjson.SetBytes(raw, "schemaVersion", 1)
+		if err == nil {
+			if definition.Format == "" {
+				raw, err = sjson.DeleteBytes(raw, "format")
+			} else {
+				raw, err = sjson.SetBytes(raw, "format", definition.Format)
+			}
+		}
+		for _, key := range []string{"sourceFormat", "dataSourceResources"} {
+			if err == nil {
+				raw, err = sjson.DeleteBytes(raw, key)
+			}
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	var spec json.RawMessage
+	switch definition.Format {
+	case "":
+		if len(definition.ReportSpec) == 0 || len(definition.BuilderDefinition) != 0 || len(definition.Dependencies) != 0 {
+			return nil, compileStageError(CompileStageEnvelope, fmt.Errorf("invalid native report definition"))
+		}
+		spec = definition.ReportSpec
+	case registry.AuthoredReportFormat:
+		for _, dependency := range definition.Dependencies {
+			if (dependency.Kind == "report" || dependency.Kind == "window") && dependency.ID != reportURI {
+				return nil, identity.ErrResourceDenied
+			}
+		}
+		requestBase, bindErr := bindAuthoredCompileParameters(raw, parameters)
+		if bindErr != nil {
+			return nil, compileStageError(CompileStageBind, bindErr)
+		}
+		lowerTiming := observe.Start(ctx, "report.compile.lower", observe.Labels{Kind: "report"})
+		if windowBuilder {
+			spec, err = materializer.LowerWindowBuilderWithRequestBase(ctx, raw, requestBase)
+		} else if sourceValidation {
+			spec, err = materializer.LowerForValidation(ctx, raw)
+		} else {
+			spec, err = materializer.LowerWithRequestBase(ctx, raw, requestBase)
+		}
+		lowerTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
+		if err != nil {
+			return nil, compileStageError(CompileStageLower, err)
+		}
+	default:
+		return nil, compileStageError(CompileStageEnvelope, fmt.Errorf("unsupported resolved report format"))
+	}
+	return spec, nil
+}
+
+// ValidateDefinition checks a candidate using the same envelope/lowering/compiler
+// phases as execution. It grants no resource or datasource authority, performs
+// no resource reads, and persists no report or audit row.
+func (s *Service) ValidateDefinition(ctx context.Context, reportURI string, definition json.RawMessage) error {
+	if ctx == nil {
+		return fmt.Errorf("report validation context required")
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	uri, err := identity.ParseResourceURI(reportURI)
+	if err != nil || uri.Kind != "report" {
+		return identity.ErrResource
+	}
+	if s == nil || s.compiler == nil {
+		return fmt.Errorf("report compiler unavailable")
+	}
+	envelope, err := decodeReportDefinition(definition)
+	if err != nil {
+		return err
+	}
+	spec, err := lowerReportDefinition(ctx, reportURI, definition, envelope, nil, false, true)
+	if err != nil {
+		return err
+	}
+	result, err := s.compiler.Compile(ctx, &CompileRequest{ArtifactRef: reportURI, SourceKind: SourceKindReportSpec, Document: cloneJSON(spec)})
+	if err != nil {
+		return compileStageError(CompileStageCompiler, err)
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if result == nil {
+		return fmt.Errorf("report compiler returned no result")
+	}
+	return nil
+}

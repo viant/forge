@@ -10,7 +10,7 @@ import "./chat/ChatContainer.css";
 import StarterTaskBrowser from './chat/StarterTaskBrowser.jsx';
 import Typography, {typographyProps} from './Typography.jsx';
 import SharedButton from './Button.jsx';
-import useStarterSelection from './chat/useStarterSelection.js';
+import useStarterSelection, {isNamespaceStarterTask, useLocalStarterFingerprint} from './chat/useStarterSelection.js';
 import useComposerDraft from './chat/useComposerDraft.js';
 import Composer     from "./chat/Composer.jsx";
 import MessageCard  from "./chat/MessageCard.jsx";
@@ -681,16 +681,45 @@ export default function Chat({
     const [selectedStarter, setSelectedStarter] = useStarterSelection(documentAppearance && !holdStarter ? conversationID : '');
     const [taskLibrary, setTaskLibrary] = useState(selectedStarter?.source.library || false);
     const selectedStarterTask = selectedStarter && starterTasks.find(task => task.id === selectedStarter.id);
-    const starterFingerprint = selectedStarter?.fingerprint || selectedStarterTask?.lookupFingerprint;
-    const staleStarter = !!starterFingerprint && selectedStarterTask?.lookupFingerprint !== starterFingerprint;
-    const starterLookup = starterFingerprint && !staleStarter
+    const namespaceStarter = isNamespaceStarterTask(selectedStarter?.id || '');
+    const localTemplate = useLocalStarterFingerprint(selectedStarterTask);
+    const localPending = !!selectedStarterTask && !namespaceStarter && !localTemplate;
+    const starterFingerprint = selectedStarter?.fingerprint || (namespaceStarter ? selectedStarterTask?.lookupFingerprint : undefined);
+    const staleStarter = !!selectedStarter && (!selectedStarterTask || namespaceStarter && !!starterFingerprint && selectedStarterTask.lookupFingerprint !== starterFingerprint);
+    const starterCatalogPending = !!metaCtx && (metaSnapshot?.starterTaskPresentationReady === false
+        || metaSnapshot?.starterTaskPresentationReady !== true && !Array.isArray(metaSnapshot?.starterTasks));
+    const starterLookup = namespaceStarter && starterFingerprint && !staleStarter
         ? {id: selectedStarter.id, fingerprint: starterFingerprint, prompt: selectedStarterTask.prompt}
         : null;
-    const starterKey = selectedStarter ? starterDraftKey(selectedStarter.id, starterFingerprint) : '';
+    const starterKey = selectedStarterTask ? starterDraftKey(selectedStarter.id, starterFingerprint) : '';
     const draftKey = (holdStarter && starterKey) || conversationID || starterKey || '__pending__';
     const activeStarterKey = useRef(starterKey);
     activeStarterKey.current = starterKey;
-    const [composerDraft, setComposerDraft, moveComposerDraft] = useComposerDraft(draftKey);
+    const [composerDraft, setComposerDraft, moveComposerDraft, writeComposerDraft, readComposerDraft] = useComposerDraft(draftKey);
+    const localNeedsReview = !!localTemplate?.fingerprint && !namespaceStarter && !!selectedStarterTask
+        && (starterFingerprint ? starterFingerprint !== localTemplate.fingerprint : readComposerDraft(starterKey) !== undefined);
+    useEffect(() => {
+        if (!selectedStarterTask || namespaceStarter || !localTemplate?.fingerprint || localNeedsReview) return;
+        const key = starterDraftKey(selectedStarter.id, localTemplate.fingerprint);
+        if (readComposerDraft(key) === undefined) writeComposerDraft(key, previous => previous ?? chatService.resolveStarterPrompt?.(selectedStarterTask.prompt) ?? String(selectedStarterTask.prompt || ''));
+        // Remember the selected version in the existing draft store, so selecting
+        // a changed template later can offer recovery of the prior draft.
+        if (readComposerDraft(`starterVersion:${selectedStarter.id}`) !== localTemplate.fingerprint) writeComposerDraft(`starterVersion:${selectedStarter.id}`, localTemplate.fingerprint);
+        if (!selectedStarter.fingerprint) setSelectedStarter({...selectedStarter, fingerprint: localTemplate.fingerprint}, true);
+    }, [selectedStarterTask, namespaceStarter, localTemplate, selectedStarter, localNeedsReview, writeComposerDraft, readComposerDraft]);
+    const currentLocalKey = localTemplate?.fingerprint && selectedStarterTask ? starterDraftKey(selectedStarterTask.id, localTemplate.fingerprint) : '';
+    const currentLocalDraft = currentLocalKey ? readComposerDraft(currentLocalKey) : undefined;
+    const hasPriorLocalDraft = !!starterKey && readComposerDraft(starterKey) !== undefined;
+    const localInitializing = !!selectedStarterTask && !namespaceStarter && !localNeedsReview && (!selectedStarter?.fingerprint || currentLocalDraft === undefined);
+    const reviewLocalTemplate = keepDraft => {
+        if (!localTemplate?.fingerprint || !selectedStarterTask) return;
+        const key = starterDraftKey(selectedStarter.id, localTemplate.fingerprint);
+        // Browser history or a reverted template may already have a newer draft
+        // at this destination. Re-admit it without overwriting either draft.
+        writeComposerDraft(key, previous => previous ?? (keepDraft ? composerDraft : chatService.resolveStarterPrompt?.(selectedStarterTask.prompt) || String(selectedStarterTask.prompt || '')));
+        writeComposerDraft(`starterVersion:${selectedStarter.id}`, localTemplate.fingerprint);
+        setSelectedStarter({...selectedStarter, fingerprint: localTemplate.fingerprint}, true);
+    };
 
     const backendConversationRunning = effectiveBackendConversationRunning(conversationSnapshot);
     const queuedTurns = Array.isArray(conversationSnapshot?.queuedTurns) ? conversationSnapshot.queuedTurns : [];
@@ -734,7 +763,8 @@ export default function Chat({
         lastUserIndex: lastIndexByRole(messages, 'user'),
         lastAssistantIndex: lastIndexByRole(messages, 'assistant'),
         isTerminalTurnStatus,
-        starterTaskCount: starterTasks.length,
+        // A withdrawn selected task still needs the existing recovery controls.
+        starterTaskCount: starterTasks.length || (selectedStarter ? 1 : 0),
         conversationID,
         effectiveShowAbort: (showAbortProp !== undefined)
             ? showAbortProp
@@ -1105,7 +1135,7 @@ export default function Chat({
                     }}
                     onAbort={handleAbort}
                     showAbort={effectiveShowAbortWhileRunning}
-                    disabled={composerDisabled || staleStarter}
+                    disabled={composerDisabled || staleStarter || localPending || localInitializing || !!localTemplate?.error || localNeedsReview}
                     attachments={pendingAttachments}
                     uploads={documentAppearance ? uploader.items.map(upload => upload.status === UploadStatus.DONE && !announcedDone.current.has(upload.id)
                         ? {...upload, status: UploadStatus.UPLOADING} : upload) : []}
@@ -1151,7 +1181,19 @@ export default function Chat({
         >
 
             {documentAppearance && showStarterTasks ? <>
-                {selectedStarter ? <div className="forge-chat-task-back"><SharedButton className="forge-task-back" variant="link" {...typographyProps('small')} icon="lucide:arrow-left" onClick={() => setSelectedStarter(null)}>{selectedStarter.source.library ? 'All tasks' : 'New Chat'}</SharedButton>{staleStarter ? <p role="status">This task has changed or is unavailable. Return to the task list to reopen it.</p> : null}</div> : null}
+                {selectedStarter ? <div className="forge-chat-task-back">
+                    <SharedButton className="forge-task-back" variant="link" {...typographyProps('small')} icon="lucide:arrow-left" onClick={() => setSelectedStarter(null)}>{selectedStarter.source.library ? 'All tasks' : 'New Chat'}</SharedButton>
+                    {staleStarter ? <p role="status">{starterCatalogPending ? 'Loading this task…' : 'This task has changed or is unavailable. Return to the task list to reopen it.'}</p> : null}
+                    {localPending ? <p role="status">Loading this task…</p>
+                        : localTemplate?.error ? <p role="alert">{localTemplate.error === 'secureContext' ? 'Task drafts require a secure browser context. Open this workspace over HTTPS or localhost.' : 'Could not prepare this task. Reload and try again.'}</p>
+                        : localNeedsReview ? <div role="status">
+                            <p>{currentLocalDraft !== undefined ? 'You already have a draft for the updated template. Continue it without replacing either saved draft.' : hasPriorLocalDraft ? 'This template has changed. Choose which prompt to use. Your saved draft is kept.' : 'This template has changed. No earlier draft is saved in this browser.'}</p>
+                            {currentLocalDraft !== undefined ? <SharedButton onClick={() => reviewLocalTemplate(true)}>Continue saved draft</SharedButton> : <>
+                                {hasPriorLocalDraft ? <SharedButton onClick={() => reviewLocalTemplate(true)}>Keep my draft</SharedButton> : null}
+                                <SharedButton onClick={() => reviewLocalTemplate(false)}>Use updated template</SharedButton>
+                            </>}
+                        </div> : null}
+                </div> : null}
                 <Typography className="forge-chat-welcome" as="h1" typeRole="display">Start a new conversation</Typography>
             </> : null}
             {/* Optional toolbar */}
@@ -1192,11 +1234,13 @@ export default function Chat({
                     const assignedAgent = String(task.agentId || '').trim();
                     if (assignedAgent) handleAgentChange(assignedAgent);
                     const prompt = chatService.resolveStarterPrompt?.(task.prompt) || String(task.prompt || '');
-                    setSelectedStarter({id: task.id, source, fingerprint: task.lookupFingerprint});
+                    const namespaceTask = isNamespaceStarterTask(task.id);
+                    const savedVersion = readComposerDraft(`starterVersion:${task.id}`);
+                    setSelectedStarter({id: task.id, source, fingerprint: namespaceTask ? task.lookupFingerprint : /^[0-9a-f]{64}$/.test(savedVersion || '') ? savedVersion : undefined});
                     try {
                         const raw = JSON.parse(sessionStorage.getItem(COMPOSER_DRAFTS_KEY) || '{}');
                         const key = starterDraftKey(task.id, task.lookupFingerprint);
-                        if (raw[key] === undefined) raw[key] = prompt;
+                        if (namespaceTask && raw[key] === undefined) raw[key] = prompt;
                         sessionStorage.setItem(COMPOSER_DRAFTS_KEY, JSON.stringify(raw));
                     } catch {}
                     requestAnimationFrame(() => chatRootRef.current?.querySelector('[data-testid="chat-composer-input"]')?.focus({preventScroll: true}));

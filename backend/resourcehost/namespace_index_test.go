@@ -126,7 +126,9 @@ func namespaceIndexServer(t *testing.T, counts *namespaceIndexCounters, extra ..
 			counts.definition.Add(1)
 			if counts.denied.Load() {
 				yes := true
-				return &schema.CallToolResult{IsError: &yes, Content: []schema.CallToolResultContentElem{schema.TextContent{Type: "text", Text: "Owning MCP denied"}}}, nil
+				result := &schema.CallToolResult{IsError: &yes, Content: []schema.CallToolResultContentElem{schema.TextContent{Type: "text", Text: "Owning MCP denied"}}}
+				schema.SetToolErrorHTTPStatus(result, 403)
+				return result, nil
 			}
 			raw, ok := definitions[in.URI]
 			if counts.personal.Load() {

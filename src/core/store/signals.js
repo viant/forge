@@ -545,21 +545,22 @@ function isSnapshotSerializationMarker(value) {
     return value === '[MaxDepth]' || value === '[Circular]';
 }
 
-function containsSnapshotSerializationMarker(value, seen = new WeakSet()) {
-    if (isSnapshotSerializationMarker(value)) {
+export function containsSnapshotSerializationMarker(value, includeLimits = false, seen = new WeakSet()) {
+    if (isSnapshotSerializationMarker(value) || (includeLimits && typeof value === 'string' && value.endsWith('…'))) {
         return true;
     }
     if (!value || typeof value !== 'object') {
         return false;
     }
+    if (includeLimits && value.truncated === true) return true;
     if (seen.has(value)) {
         return false;
     }
     seen.add(value);
     if (Array.isArray(value)) {
-        return value.some((entry) => containsSnapshotSerializationMarker(entry, seen));
+        return value.some((entry) => containsSnapshotSerializationMarker(entry, includeLimits, seen));
     }
-    return Object.values(value).some((entry) => containsSnapshotSerializationMarker(entry, seen));
+    return Object.values(value).some((entry) => containsSnapshotSerializationMarker(entry, includeLimits, seen));
 }
 
 function restoreWindowSignalsFromSnapshot(win) {
@@ -578,8 +579,25 @@ function restoreWindowSignalsFromSnapshot(win) {
         getFormSignal(`${windowId}:windowForm`).value = win.windowForm;
     }
 
-    if (win?.viewState && typeof win.viewState === 'object' && !containsSnapshotSerializationMarker(win.viewState)) {
-        getViewSignal(windowId).value = win.viewState;
+    const view = win?.viewState;
+    if (view && typeof view === 'object') {
+        const report = view.report;
+        const saved = win.reportRestoreInputs;
+        if (saved?.resourceUri && saved.resourceUri === win.windowKey && report?.resourceUri === win.windowKey && win.windowKey.startsWith('report://')) {
+            const restoredReport = {...report};
+            for (const key of ['parameters','draftParameters']) {
+                if (saved[key] && typeof saved[key] === 'object' && !Array.isArray(saved[key])) {
+                    restoredReport[key] = saved[key];
+                }
+            }
+            // Only the report input values bypass diagnostic marker checks.
+            const {parameters, draftParameters, ...rest} = restoredReport;
+            const cleanView = containsSnapshotSerializationMarker({...view,report:rest}) ? {} : view;
+            const cleanReport = cleanView.report || {resourceUri:report.resourceUri,filterFingerprint:report.filterFingerprint};
+            getViewSignal(windowId).value = {...cleanView, report:{...cleanReport,parameters,draftParameters}};
+        } else if (!containsSnapshotSerializationMarker(view)) {
+            getViewSignal(windowId).value = view;
+        }
     }
 
     const dataSources = win?.dataSources && typeof win.dataSources === 'object'
@@ -715,7 +733,9 @@ export const restoreWindowsFromSnapshot = (snapshot) => {
         workspaceCollapsed: win?.workspaceCollapsed === true,
         windowData: containsSnapshotSerializationMarker(win?.windowData) ? '' : (win?.windowData || ''),
         inTab: win?.inTab !== false,
-        parameters: containsSnapshotSerializationMarker(win?.parameters) ? {} : (win?.parameters || {}),
+        parameters: win?.reportRestoreInputs?.resourceUri === win?.windowKey && win?.windowKey?.startsWith('report://') && win.reportRestoreInputs?.launchParameters
+            ? win.reportRestoreInputs.launchParameters
+            : (containsSnapshotSerializationMarker(win?.parameters) ? {} : (win?.parameters || {})),
         isModal: !!win?.isModal,
         isMinimized: !!win?.isMinimized,
         zIndex: win?.zIndex ?? null,

@@ -78,6 +78,12 @@ func (g *Gateway) configuredOwnerConnection(ctx context.Context, owner string) (
 // A provider may expose separate namespace endpoints. Unscoped lookups must
 // remain ambiguous when more than one connection claims the same owner.
 func (g *Gateway) configuredOwnerNamespaceConnection(ctx context.Context, owner, namespace string) (Connection, bool, error) {
+	return g.ownerNamespaceConnection(ctx, owner, namespace, false)
+}
+
+// A previously advertised owner may route an explicit bookmark when no owner
+// was configured. get still checks the selected connection, actor and resource.
+func (g *Gateway) ownerNamespaceConnection(ctx context.Context, owner, namespace string, allowObserved bool) (Connection, bool, error) {
 	if g == nil || g.Manager == nil || owner == "" || ctx == nil || ctx.Err() != nil {
 		return Connection{}, true, identity.ErrResourceDenied
 	}
@@ -97,7 +103,16 @@ func (g *Gateway) configuredOwnerNamespaceConnection(ctx context.Context, owner,
 			if err != nil {
 				return Connection{}, true, err
 			}
-			if options == nil || options.PrimitiveProviderIdentity != owner {
+			if options == nil {
+				continue
+			}
+			declared := options.PrimitiveProviderIdentity
+			if declared == "" && allowObserved {
+				g.mu.Lock()
+				declared = g.observedOwners[name]
+				g.mu.Unlock()
+			}
+			if declared != owner {
 				continue
 			}
 			if namespace != "" && len(options.PrimitiveNamespaces) > 0 {
