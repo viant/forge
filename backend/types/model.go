@@ -307,11 +307,20 @@ type AuthorizationBehavior struct {
 	ClearProtectedStateOnChange   bool `json:"clearProtectedStateOnChange,omitempty" yaml:"clearProtectedStateOnChange,omitempty"`
 }
 
+// WindowNavigationTarget is a destination declared by the source window's
+// publisher. Opening it still requires normal admission of the target.
+type WindowNavigationTarget struct {
+	ResourceURI string `json:"resourceUri" yaml:"resourceUri"`
+	Title       string `json:"title" yaml:"title"`
+}
+
 type WindowSettings struct {
-	ConfirmDiscardOnClose string              `json:"confirmDiscardOnClose,omitempty" yaml:"confirmDiscardOnClose,omitempty"`
-	DirtyDataSourceRefs   []string            `json:"dirtyDataSourceRefs,omitempty" yaml:"dirtyDataSourceRefs,omitempty"`
-	TitleBinding          *WindowTitleBinding `json:"titleBinding,omitempty" yaml:"titleBinding,omitempty"`
-	On                    []*Execute          `json:"on,omitempty" yaml:"on,omitempty"`
+	// An explicit empty declaration supports local host actions without links.
+	Navigation            *map[string]WindowNavigationTarget `json:"navigation,omitempty" yaml:"navigation,omitempty"`
+	ConfirmDiscardOnClose string                             `json:"confirmDiscardOnClose,omitempty" yaml:"confirmDiscardOnClose,omitempty"`
+	DirtyDataSourceRefs   []string                           `json:"dirtyDataSourceRefs,omitempty" yaml:"dirtyDataSourceRefs,omitempty"`
+	TitleBinding          *WindowTitleBinding                `json:"titleBinding,omitempty" yaml:"titleBinding,omitempty"`
+	On                    []*Execute                         `json:"on,omitempty" yaml:"on,omitempty"`
 }
 
 type WindowTitleBinding struct {
