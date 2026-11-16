@@ -211,10 +211,10 @@ view:
     dashboard:
       reportCatalog:
         title: Reports
-        orderID: 2637055
+        sampleLimit: 7
         presets:
           - id: performance
-            title: Performance Delivery Command Center
+            title: Activity summary
 `
 	var window Window
 	if err := yaml.Unmarshal([]byte(source), &window); err != nil {
@@ -241,10 +241,10 @@ view:
     kind: dashboard.reportCatalog
     reportCatalog:
       title: Reports
-      orderID: 2637055
+      sampleLimit: 7
       presets:
         - id: performance
-          title: Performance Delivery Command Center
+          title: Activity summary
 `
 	var window Window
 	if err := yaml.Unmarshal([]byte(source), &window); err != nil {
@@ -415,7 +415,7 @@ func TestDashboardFilterCompactShapePreservesDefaults(t *testing.T) {
 	const source = `
 view:
   content:
-    id: orderPerformanceDashboard
+    id: activityDashboard
     kind: dashboard
     containers:
       - id: periodSelector
@@ -499,10 +499,10 @@ func TestDashboardKPIRowPreservesTimeZoneSelector(t *testing.T) {
 	const source = `
 view:
   content:
-    id: orderPerformanceDashboard
+    id: activityDashboard
     kind: dashboard
     containers:
-      - id: orderSnapshot
+      - id: activitySnapshot
         kind: dashboard.kpiTable
         rows:
           - label: Flight Start
@@ -512,7 +512,7 @@ view:
       - id: points
         kind: dashboard.table
         columns:
-          - key: advertiserTime
+          - key: localTime
             label: Hour
             format: wallClockHour
             timeZoneSelector: ianaTimezone
