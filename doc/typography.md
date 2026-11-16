@@ -1480,3 +1480,35 @@ browser proof at desktop and tablet widths; screenshots remain ignored under
 `output/playwright/warmup-evidence`. Shared native details, lists and
 the existing workbench typography retain their established keyboard behavior;
 the surrounding cache editor remains legacy scope.
+
+### Explicit schema refresh for ordinary preview
+
+**Refresh schema and run preview** sits beside ordinary Run preview and reuses
+its parameter-entry component. The submit label retains the selected action;
+supplied values use the existing serializer. Only the explicit action supplies
+`{refreshSchema: true}` as the seventh `previewReader` argument. Ordinary preview
+omits the option, and cube preview/selected-view testing keep their existing
+operations and controls. Existing run permissions and pending states apply.
+
+The submitted values and refresh choice share the existing retry snapshot;
+retry does not reinterpret those values against a later schema. Refresh starts
+by invalidating preceding parameter-metadata requests. Once the explicit attempt
+succeeds or fails, the current request reloads only preview-input metadata with
+column discovery and effective warmup disabled. Results/execution errors stay
+independent from metadata loading or failure; the latter exposes the existing
+metadata retry without rerunning preview. Version/revision changes and newer
+execution generations fence both results and trailing inspection. A canceled
+inspection cannot leave the header permanently loading.
+
+Mounted checks cover request shape, parameter values, changed contracts,
+execution/inspection failure, retry, pending metadata invalidation, version
+switches and cube/view isolation. Run
+`node scripts/test-reader-refresh-browser.mjs` for the synthetic UI proof.
+`FORGE_REFRESH_NATIVE_URL` can select an isolated Studio fixture at bd3425b or
+later providing the existing SDK gateway and test-only schema controls. Its
+native proof compares discovery counts and stored artifact digests before and
+after schema changes: ordinary execution reuses the artifact, explicit refresh
+discovers the changed schema, and failed refresh/retry retain native guarantees.
+Evidence JSON and screenshots remain ignored under
+`output/playwright/reader-refresh`. No artifact store, cache or backend endpoint
+is added to Forge. Shared workbench controls retain their existing styles.

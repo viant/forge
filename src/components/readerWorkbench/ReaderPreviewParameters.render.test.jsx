@@ -108,3 +108,71 @@ it('rejects mismatched deferred identity without accepting its contract',async()
  const api=apiFor(graph);api.inspectVersion.mockImplementation(async(id,no,options)=>options.includePreviewInput?{version:{...graph.version,sourceRevision:5},previewInput:metadata}:graph);
  await mount(<ReaderBuilder api={api} report={report}/>);await click(button('Run preview'));expect(host.textContent).toContain('does not match the inspected saved revision');expect(host.querySelector('[aria-label="Supply Limit"]')).toBeNull();expect(api.previewReader).not.toHaveBeenCalled();
 });
+
+const refreshFormSubmit=()=>host.querySelector('[aria-label="Preview parameters"] button[type="submit"]');
+async function requestRefresh(){await click(button('Refresh schema and run preview'));}
+
+it('carries explicit refresh through parameter entry and retries the unchanged submitted values and mode',async()=>{
+ let parameters=metadata;const api=apiFor(inspection());
+ api.inspectVersion.mockImplementation(async(id,no,options)=>options.includePreviewInput?{version:inspection().version,previewInput:parameters}:inspection());
+ const requests=[];api.previewReader.mockImplementation(async(...args)=>{requests.push(structuredClone(args));args[2].Limit=999;parameters={...metadata,schema:{type:'object',properties:{Changed:{type:'string'}}}};if(requests.length===1)throw new Error('Native execution failed after refresh');return {data:[{id:3}],duration:1};});
+ await mount(<ReaderBuilder api={api} report={report}/>);await requestRefresh();expect(refreshFormSubmit().textContent).toBe('Refresh schema and run preview');
+ await click(supply('Limit'));await fill(field('Limit'),'10');await click(supply('Enabled'));await click(refreshFormSubmit());
+ expect(requests[0]).toEqual(['reader',1,{Limit:10,Enabled:false},50,'/records',false,{refreshSchema:true}]);expect(host.textContent).toContain('Native execution failed after refresh');
+ expect(api.inspectVersion.mock.calls.at(-1)).toEqual(['reader',1,{discoverColumns:false,includePreviewInput:true,includeEffectiveWarmup:false}]);
+ await click(button('Retry preview'));expect(requests[1]).toEqual(requests[0]);expect(host.textContent).not.toContain('Native execution failed after refresh');
+ await click(button('Run preview'));expect(refreshFormSubmit().textContent).toBe('Run with parameters');expect(supply('Changed')).toBeTruthy();await click(refreshFormSubmit());expect(requests[2]).toEqual(['reader',1,{},50,'/records',false]);
+});
+
+it.each([false,true])('keeps the %s execution outcome when follow-up parameter inspection fails and exposes metadata-only retry',async(failed)=>{
+ let metadataRequests=0;const api=apiFor(inspection());
+ api.inspectVersion.mockImplementation(async(id,no,options)=>{if(!options.includePreviewInput)return inspection();if(++metadataRequests===2)throw new Error('Parameter inspection unavailable');return {version:inspection().version,previewInput:metadata};});
+ api.previewReader.mockImplementation(async()=>{if(failed)throw new Error('Original execution failure');return {data:[{id:'KEPT_RESULT'}],duration:1};});
+ await mount(<ReaderBuilder api={api} report={report}/>);await requestRefresh();await click(refreshFormSubmit());
+ expect(host.textContent).toContain('Parameter inspection unavailable');expect(host.textContent).toContain(failed?'Original execution failure':'KEPT_RESULT');expect(api.previewReader).toHaveBeenCalledOnce();
+ await click(button('Refresh parameters'));expect(api.previewReader).toHaveBeenCalledOnce();expect(host.textContent).not.toContain('Parameter inspection unavailable');expect(host.textContent).toContain(failed?'Original execution failure':'KEPT_RESULT');
+});
+
+it('invalidates a preview metadata request that predates explicit refresh at the same revision',async()=>{
+ const empty={...metadata,schema:{type:'object',properties:{}}};let metadataRequests=0,finishOld;const api=apiFor(inspection(empty));
+ api.inspectVersion.mockImplementation(async(id,no,options)=>{if(!options.includePreviewInput)return inspection(empty);metadataRequests++;if(metadataRequests===2)return new Promise(resolve=>{finishOld=resolve;});return {version:inspection().version,previewInput:metadataRequests===1?empty:{...metadata,schema:{type:'object',properties:{Fresh:{type:'string'}}}}};});
+ api.previewReader.mockRejectedValueOnce(new Error('First refresh failed')).mockResolvedValue({data:[{id:1}],duration:1});
+ await mount(<ReaderBuilder api={api} report={report}/>);await requestRefresh();await click(refreshFormSubmit());
+ expect(host.textContent).toContain('Refreshing preview parameter metadata');await click(button('Retry preview'));
+ await act(async()=>finishOld({version:inspection().version,previewInput:{...metadata,schema:{type:'object',properties:{STALE:{type:'string'}}}}}));
+ await click(button('Run preview'));expect(supply('Fresh')).toBeTruthy();expect(host.querySelector('[aria-label="Supply STALE"]')).toBeNull();
+});
+
+it.each(['execution','metadata'])('does not apply refresh results after switching versions during %s',async(stage)=>{
+ let finish;let metadataRequests=0;const api=apiFor(inspection());
+ api.inspectVersion.mockImplementation(async(id,no,options)=>{
+  if(!options.includePreviewInput)return inspection({...metadata,versionNo:no},no);
+  if(stage==='metadata'&&++metadataRequests===2)return new Promise(resolve=>{finish=resolve;});
+  return {version:inspection(undefined,no).version,previewInput:{...metadata,versionNo:no}};
+ });
+ api.previewReader.mockImplementation(async()=>stage==='execution'?new Promise(resolve=>{finish=resolve;}):{data:[{id:'REFRESHED_V1'}],duration:1});
+ await mount(<ReaderBuilder api={api} report={report}/>);await requestRefresh();await click(refreshFormSubmit());
+ await act(async()=>root.render(<ReaderBuilder api={api} report={{...report,versionNo:2}}/>));
+ await act(async()=>finish(stage==='execution'?{data:[{id:'STALE_RESULT'}],duration:1}:{version:inspection().version,previewInput:{...metadata,schema:{type:'object',properties:{STALE:{type:'string'}}}}}));
+ expect(host.textContent).not.toContain('STALE_RESULT');expect(host.textContent).not.toContain('REFRESHED_V1');expect(host.querySelector('[aria-label="Supply STALE"]')).toBeNull();
+ if(stage==='execution')expect(api.inspectVersion.mock.calls.filter(args=>args[2].includePreviewInput)).toHaveLength(1);
+ await click(button('Run preview'));expect(supply('Limit')).toBeTruthy();
+});
+
+it('cancels a follow-up inspection on same-revision graph reload without leaving metadata stuck loading',async()=>{
+ let finish;let requests=0;const api=apiFor(inspection());api.inspectVersion.mockImplementation(async(id,no,options)=>{if(!options.includePreviewInput)return inspection();if(++requests===2)return new Promise(resolve=>{finish=resolve;});return {version:inspection().version,previewInput:metadata};});
+ await mount(<ReaderBuilder api={api} report={report}/>);await requestRefresh();await click(refreshFormSubmit());
+ await click(host.querySelector('[aria-label="More actions"]'));await act(async()=>[...document.querySelectorAll('[role="menuitem"]')].find(node=>node.textContent.includes('Refresh component')).click());
+ await act(async()=>finish({version:inspection().version,previewInput:metadata}));expect(button('Run preview').disabled).toBe(false);await click(button('Run preview'));expect(supply('Limit')).toBeTruthy();
+});
+
+it('omits the refresh action for cube previews',async()=>{
+ const value=inspection();value.structure.component.settings={report:{enabled:true}};await mount(<ReaderBuilder api={apiFor(value)} report={report}/>);
+ expect([...host.querySelectorAll('button')].find(node=>node.textContent==='Refresh schema and run preview')).toBeUndefined();
+});
+
+it('leaves selected-view testing on its existing operation without refresh options',async()=>{
+ const api=apiFor(inspection());api.testReaderView=vi.fn(async()=>({view:'records',data:[],duration:1}));await mount(<ReaderBuilder api={api} report={report}/>);
+ await click(host.querySelector('[aria-label="Actions for Records"]'));await act(async()=>[...document.querySelectorAll('[role="menuitem"]')].find(node=>node.textContent==='Test view').click());
+ expect(api.testReaderView).toHaveBeenCalledExactlyOnceWith('reader',1,'records');expect(api.previewReader).not.toHaveBeenCalled();
+});

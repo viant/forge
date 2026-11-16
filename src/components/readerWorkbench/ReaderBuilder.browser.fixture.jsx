@@ -5,13 +5,13 @@ import '@blueprintjs/core/lib/css/blueprint.css';
 import {ReaderBuilder} from './ReaderBuilder.jsx';
 
 const native = new URLSearchParams(location.search).has('native');
-const proof = window.__readerVersionsProof = {calls:[],failVersion:null,delayPreview:false,finishPreview:null,delayMetadata:false,pendingMetadata:[],metadataUnavailable:'',timings:[]};
+const proof = window.__readerVersionsProof = {calls:[],failVersion:null,delayPreview:false,finishPreview:null,delayMetadata:false,pendingMetadata:[],metadataUnavailable:'',failNextPreview:false,timings:[]};
 const inspection = (no,state='draft') => ({version:{reportId:'version-proof',versionNo:no,sourceRevision:7,state,compileStatus:'valid'},dql:`SELECT ${no} AS id`,previewInput:{reportId:'version-proof',versionNo:no,sourceRevision:7,schema:{type:'object',properties:{}}},capabilities:{canEdit:true,canRun:true,canPublish:true,canUseDql:true},structure:{component:{rootView:{name:`Records${no}`,namespace:'r',source:{sql:`SELECT ${no} AS id`},columns:[{name:'id'}]}}}});
 const records = new Map([[1,inspection(1)],[2,inspection(2)]]);
 const invoke = async (operation,parameters) => {
-  proof.calls.push({operation,parameters:structuredClone(parameters)});
+  const call={operation,parameters:structuredClone(parameters)};proof.calls.push(call);
   const response=await fetch(`/v1/studio/sdk/${operation}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(parameters)});
-  const value=await response.json();if(!response.ok)throw Object.assign(new Error(value.message||'Native operation failed'),value);return value;
+  const value=await response.json();if(!response.ok){call.error=value.message;proof.lastNativeError=value.message;throw Object.assign(new Error(value.message||'Native operation failed'),value);}return value;
 };
 const api = {
   listVersions: async (id,input) => {if(native)return invoke('versions.list',{reportId:id,input});proof.calls.push({operation:'versions.list',parameters:{reportId:id,input}});return {items:[...records.values()].map(item=>item.version),limit:100,offset:0};},
@@ -34,8 +34,10 @@ const api = {
   },
   getPublication: async id => native ? invoke('publications.get',{reportId:id}) : {activeVersionNo:1,status:'active'},
   getResources: async (id,no) => {proof.calls.push({operation:'resources',parameters:{reportId:id,versionNo:no}});return {files:[]};},
-  previewReader: async (id,no,input) => {
-    proof.calls.push({operation:'preview',parameters:{reportId:id,versionNo:no,input}});
+  previewReader: async (id,no,input,limit=50,routePath,cube=false,options={}) => {
+    if(native)return invoke('preview.execute',{reportId:id,versionNo:no,input:{input,limit,cube,...options}});
+    proof.calls.push({operation:'preview',parameters:{reportId:id,versionNo:no,input,cube,...options}});
+    if(proof.failNextPreview){proof.failNextPreview=false;throw new Error('Native refresh execution failed.');}
     if(proof.delayPreview)return new Promise(resolve=>{proof.finishPreview=()=>resolve({data:[{id:'LATE_PREVIEW'}]});});
     return {data:[{id:`version-${no}`}],evidence:{versionNo:no,sourceRevision:7}};
   },

@@ -4,7 +4,7 @@ import {LazyEditor} from './LazyEditor.jsx';
 import {previewParameterKind, serializePreviewParameters} from './previewParameters.js';
 import './ReaderPreviewParameters.css';
 
-export function ReaderPreviewParameters({metadata, diagnostics = [], status = metadata?.schema?.type==='object'?'resolved':'unavailable', pending, onRun, onRefresh, onClose}) {
+export function ReaderPreviewParameters({metadata, diagnostics = [], status = metadata?.schema?.type==='object'?'resolved':'unavailable', pending, onRun, onRefresh, onClose, runLabel = 'Run with parameters'}) {
   const [drafts, setDrafts] = useState({});
   const [errors, setErrors] = useState({});
   const schema = metadata?.schema;
@@ -47,7 +47,7 @@ export function ReaderPreviewParameters({metadata, diagnostics = [], status = me
       </div>
       <div className="studio-preview-parameters-actions">
       {Object.values(errors).some(Boolean) && <Callout role="alert" intent="danger">Correct the values that cannot be serialized before running.</Callout>}
-      <Button type="submit" intent="primary" icon="play" disabled={pending} loading={pending}>Run with parameters</Button>
+      <Button type="submit" intent="primary" icon="play" disabled={pending} loading={pending}>{runLabel}</Button>
       </div>
     </form>}
   </section>;

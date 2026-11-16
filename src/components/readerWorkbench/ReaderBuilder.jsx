@@ -147,6 +147,7 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
   const [toolsOpen,setToolsOpen] = useState(false);
   const [previewError,setPreviewError] = useState('');
   const [previewOrigin,setPreviewOrigin] = useState('graph');
+  const [previewRefreshSchema,setPreviewRefreshSchema]=useState(false);
   const lastPreviewRequest=useRef(null);
   const previewGeneration=useRef(0);
   const previewRevisionKey = JSON.stringify([report?.id, inspection?.version?.versionNo, inspection?.version?.sourceRevision]);
@@ -155,8 +156,12 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
   const previewMetadataGeneration = useRef(0);
   const [previewProjection,setPreviewProjection]=useState({});
   const currentPreview = previewProjection.key===previewRevisionKey ? previewProjection : {status:'notRequested'};
+  const cancelPendingPreviewMetadata = () => {
+    previewMetadataGeneration.current++;
+    setPreviewProjection(current=>current.status==='loading'?{}:current);
+  };
   const previewContractKey = JSON.stringify([previewRevisionKey,currentPreview.metadata]);
-  useEffect(() => { lastPreviewRequest.current=null; setPreviewParametersOpen(false); }, [previewRevisionKey]);
+  useEffect(() => { lastPreviewRequest.current=null; setPreviewParametersOpen(false); setPreviewRefreshSchema(false); }, [previewRevisionKey]);
   useEffect(() => { setPreviewProjection({}); return () => { previewMetadataGeneration.current++; }; }, [api,previewRevisionKey]);
   const inputSelection=useMemo(()=>({type:'input'}),[]);
   const outputSelection=useMemo(()=>({type:'output'}),[]);
@@ -176,7 +181,7 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
     const generation = ++loadGeneration.current;
     const current = () => generation === loadGeneration.current;
     setLoading(true); setSwitchingVersion(switching); setVersionSwitchError('');
-    previewGeneration.current++; setPreviewing(false); setTestingView(''); setTestingRelation('');
+    previewGeneration.current++; cancelPendingPreviewMetadata(); setPreviewing(false); setTestingView(''); setTestingRelation('');
     if (!switching) { setError(''); setPreview(null); setCubePreviewOpen(false); setTestedView(null); setTestedRelation(null); }
     try {
       const selectedVersionNo = Number.isInteger(preferredVersionNo) && preferredVersionNo > 0 ? preferredVersionNo : report.versionNo;
@@ -304,17 +309,28 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
     setPreview(null);setPreviewError(''); setTestedView(null); setTestedRelation(null);
     return result;
   };
-  const runPreview = async (target = null, input = {}, cube = false) => {
+  const runPreview = async (target = null, input = {}, cube = false, refreshSchema = false) => {
     if (!inspection?.version) return;
-    const generation=++previewGeneration.current;
+    const key=previewRevisionKey,generation=++previewGeneration.current;
+    const current=()=>generation===previewGeneration.current&&previewRevisionRef.current===key;
+    cancelPendingPreviewMetadata();
     const submitted = structuredClone(input);
-    lastPreviewRequest.current={target,input:submitted,cube};
+    lastPreviewRequest.current={target,input:submitted,cube,refreshSchema};
+    setPreviewRefreshSchema(refreshSchema);
+    if(refreshSchema)setPreviewProjection({key,status:'notRequested'});
     if(workspaceTab!=='preview')setPreviewOrigin(workspaceTab);
     setWorkspaceTab('preview');setCubePreviewOpen(false);setPreviewParametersOpen(false);
     setPreviewing(true); setPreviewError(''); setPreview(null);setTestedView(null); setPreviewTarget(target);
-    try { const result=await api.previewReader(report.id, inspection.version.versionNo, structuredClone(submitted), 50, inspection?.structure?.component?.routes?.[0]?.path, cube);if(generation===previewGeneration.current)setPreview(result); }
-    catch (cause) { if(generation===previewGeneration.current)setPreviewError(cause.message); }
-    finally { if(generation===previewGeneration.current)setPreviewing(false); }
+    const args=[report.id,inspection.version.versionNo,structuredClone(submitted),50,inspection?.structure?.component?.routes?.[0]?.path,cube];
+    if(refreshSchema)args.push({refreshSchema:true});
+    try { const result=await api.previewReader(...args);if(current())setPreview(result); }
+    catch (cause) { if(current())setPreviewError(cause.message); }
+    finally {
+      if(current()){
+        setPreviewing(false);
+        if(refreshSchema)await loadPreviewInput(generation);
+      }
+    }
   };
   const openCubePreview = () => {
     previewTriggerRef.current = document.activeElement;
@@ -325,11 +341,11 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
     setCubePreviewOpen(false);
     previewTriggerRef.current?.focus();
   };
-  const loadPreviewInput = async () => {
+  const loadPreviewInput = async (executionGeneration = null) => {
     if (!inspection?.version) return;
     const key=previewRevisionKey, target=inspection.version, componentId=report.id;
     const generation=++previewMetadataGeneration.current;
-    const current=()=>generation===previewMetadataGeneration.current&&previewRevisionRef.current===key;
+    const current=()=>generation===previewMetadataGeneration.current&&previewRevisionRef.current===key&&(executionGeneration===null||executionGeneration===previewGeneration.current);
     setPreviewProjection({key,status:'loading'});
     try {
       const result=await api.inspectVersion(componentId,target.versionNo,{discoverColumns:false,includePreviewInput:true,includeEffectiveWarmup:false});
@@ -342,12 +358,13 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
       if(current())setPreviewProjection({key,status:'unavailable',diagnostics:[{code:'preview_input_unavailable',message:cause.message}]});
     }
   };
-  const requestPreview = (target = null) => {
+  const requestPreview = (target = null, refreshSchema = false) => {
     if (!target && inspection?.structure?.component?.settings?.report?.enabled) openCubePreview();
     else if (target) runPreview(target);
     else {
+      setPreviewRefreshSchema(refreshSchema);
       const schema=currentPreview.metadata?.schema;
-      if(currentPreview.status==='resolved'&&Object.keys(schema.properties||{}).length===0) { runPreview(); return; }
+      if(currentPreview.status==='resolved'&&Object.keys(schema.properties||{}).length===0) { runPreview(null,{},false,refreshSchema); return; }
       if(workspaceTab!=='preview')setPreviewOrigin(workspaceTab);
       setWorkspaceTab('preview');setCubePreviewOpen(false);setPreviewParametersOpen(true);
       if(currentPreview.status==='notRequested')loadPreviewInput();
@@ -361,6 +378,7 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
     if(workspaceTab!=='preview')setPreviewOrigin(workspaceTab);
     setWorkspaceTab('preview');setCubePreviewOpen(false);setPreviewParametersOpen(false);setPreview(null);
     const generation=++previewGeneration.current;
+    cancelPendingPreviewMetadata();
     lastPreviewRequest.current={view};
     setTestingView(view); setPreviewError(''); setTestedView(null);
     try { const result=await api.testReaderView(report.id, inspection.version.versionNo, view);if(generation===previewGeneration.current)setTestedView(result); }
@@ -443,7 +461,7 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
     setValidationDialogOpen(false); setPublicationDialogOpen(false); setResourcesDialogOpen(false);
     setACLDialogOpen(false); setEntityScopeOpen(false); setConflict(null); setDeleteTarget(null); setDeleteError('');
     setPreview(null); setTestedView(null); setTestedRelation(null); setPreviewError(''); setPreviewTarget(null);
-    setCubePreviewOpen(false); setPreviewParametersOpen(false); lastPreviewRequest.current=null; setError('');
+    setCubePreviewOpen(false); setPreviewParametersOpen(false); setPreviewRefreshSchema(false); lastPreviewRequest.current=null; setError('');
   };
   const requestVersion = (versionNo) => {
     if (versionNo===version?.versionNo || loading || mutationState.busy || rootDraftSaving || deleting || cloningDraft) return;
@@ -453,7 +471,7 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
   const discardPendingTab=()=>{const action=pendingTabActionRef.current;if(!action||action!==pendingTabAction)return;pendingTabActionRef.current=null;if(action.kind==='version')load(action.versionNo,true);else if(action.kind==='close')closeViewTabNow(action.name,action.mode);else if(action.kind==='cancel-root'){setCreatingReader(false);}else if(action.kind==='back'){setDirtyTabs(new Set());onBack();}setPendingTabAction(null);};
   const requestBack=()=>{if(rootDraftDirty||dirtyTabs.size||contractEditing){setPendingTabAction({kind:'back',reason:contractEditing?'contract':''});return;}onBack();};
   const runTool=(action)=>{setToolsOpen(false);action();};
-  const retryPreview=()=>{const previous=lastPreviewRequest.current;if(previous?.view)runViewTest(previous.view);else if(previous)runPreview(previous.target,previous.input,previous.cube);else requestPreview();};
+  const retryPreview=()=>{const previous=lastPreviewRequest.current;if(previous?.view)runViewTest(previous.view);else if(previous)runPreview(previous.target,previous.input,previous.cube,previous.refreshSchema);else requestPreview();};
   const reloadAfterConflict = async () => {
     setConflictReloading(true);
     setSubviewDialogOpen(false); setRemoveViewDialogOpen(false);
@@ -511,6 +529,7 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
     </div>
     {version && !needsReader && <div className="studio-builder-actions" role="toolbar" aria-label="Component authoring commands">
       <Button intent="primary" icon="play" disabled={!canPreview} loading={previewing || Boolean(testingView) || currentPreview.status==='loading'} onClick={()=>requestPreview()}>Run preview</Button>
+      {!inspection?.structure?.component?.settings?.report?.enabled && <Button icon="refresh" disabled={!canPreview} loading={previewing || Boolean(testingView) || currentPreview.status==='loading'} onClick={()=>requestPreview(null,true)}>Refresh schema and run preview</Button>}
       <Button icon="endorsed" disabled={!canEdit} onClick={()=>setValidationDialogOpen(true)}>Validate</Button>
       <Button icon="rocket-slant" disabled={!canPublish} onClick={()=>setPublicationDialogOpen(true)}>Release</Button>
       <Popover isOpen={toolsOpen} onInteraction={setToolsOpen} placement="bottom-start" content={<Menu>
@@ -570,10 +589,15 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
           {inspection?.structure?.component?.settings?.report?.enabled&&<div className="studio-cube-configuration" hidden={!cubePreviewOpen}><ReaderCubePreview key={`${report.id}:${version.versionNo}`} structure={inspection?.structure} pending={previewing} onRun={(input)=>runPreview(null,input,true)} onClose={closeCubePreview}/></div>}
           {!inspection?.structure?.component?.settings?.report?.enabled && <div className="studio-preview-parameters-slot" hidden={!previewParametersOpen}>
             <ReaderPreviewParameters key={previewContractKey} metadata={currentPreview.metadata} status={currentPreview.status} diagnostics={currentPreview.diagnostics} pending={previewing || !canPreview}
-              onRun={input=>runPreview(null,input)} onClose={()=>setPreviewParametersOpen(false)}
-              onRefresh={loadPreviewInput}/>
+              runLabel={previewRefreshSchema?'Refresh schema and run preview':'Run with parameters'} onRun={input=>runPreview(null,input,false,previewRefreshSchema)} onClose={()=>setPreviewParametersOpen(false)}
+              onRefresh={()=>loadPreviewInput()}/>
           </div>}
           <div className="studio-preview-results" hidden={cubePreviewOpen || previewParametersOpen}>
+            {lastPreviewRequest.current?.refreshSchema && currentPreview.status==='loading' && <p role="status">Refreshing preview parameter metadata…</p>}
+            {lastPreviewRequest.current?.refreshSchema && currentPreview.status==='unavailable' && <Callout intent="warning" title="Preview parameter metadata unavailable" role="status">
+              {currentPreview.diagnostics?.find(item=>item.code==='preview_input_unavailable')?.message||'Preview parameter metadata is unavailable.'}
+              <Button small onClick={()=>loadPreviewInput()}>Refresh parameters</Button>
+            </Callout>}
             {dirtyTabs.size>0&&<Callout compact intent="warning">Preview uses the saved revision. Save SQL to include your edits.</Callout>}
             {(previewing||testingView)&&<div className="studio-loading" role="status"><Spinner size={24}/><span>{testingView?`Testing ${testingView}…`:'Running preview…'}</span></div>}
             {previewError&&<Callout intent="danger" role="alert" title="Preview failed">{previewError}<Button small intent="danger" onClick={retryPreview}>Retry preview</Button></Callout>}
