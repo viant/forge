@@ -889,7 +889,7 @@
           "type": "integer"
         },
         "columns": {
-          "description": "Editable-table fields are first-class because authored dashboard.editableTable\nmetadata must survive YAML -\u003e Go -\u003e JSON without losing explicit false values.",
+          "description": "Editable-table fields are first-class because authored dashboard.editableTable\nmetadata must survive YAML -> Go -> JSON without losing explicit false values.",
           "items": {
             "$ref": "#/$defs/DashboardEditableTableColumn"
           },
@@ -3073,7 +3073,7 @@
           "type": "string"
         },
         "order": {
-          "description": "Ordering \u0026 grouping",
+          "description": "Ordering & grouping",
           "type": "integer"
         },
         "pattern": {
@@ -5379,7 +5379,7 @@
           "type": "array"
         },
         "id": {
-          "description": "Optional name so other widgets can reference the answers via\n{{window.state.\u003cId\u003e}}",
+          "description": "Optional name so other widgets can reference the answers via\n{{window.state.<Id>}}",
           "type": "string"
         },
         "layout": {

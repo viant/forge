@@ -311,3 +311,63 @@
 :is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .bp6-toast.bp6-intent-danger>.bp6-icon{color:var(--forge-status-danger-foreground)}
 :is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .bp6-toast .bp6-toast-message{flex:1;min-width:0;padding:0;font-family:var(--forge-type-body-family);font-size:var(--forge-type-body-size);line-height:var(--forge-type-body-line-height)}
 :is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) .bp6-toast .bp6-button-group .bp6-button{width:var(--forge-icon-button-small-size);height:var(--forge-icon-button-small-size);min-width:var(--forge-icon-button-small-size);min-height:var(--forge-icon-button-small-size);padding:0;background:transparent;color:var(--forge-text-secondary);box-shadow:none}
+
+/* The DS2 drawer keeps one independently scrolling body between its header and
+   footer. DialogBody's viewport cap must not constrain a full-height Drawer. */
+.agently-workspace[data-forge-theme="design-system-2"] .bp6-drawer.forge-drawer {
+    padding: 0 !important;
+    border-radius: 0 !important;
+    max-width: min(1200px, 100vw);
+}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-drawer>.forge-drawer-body {
+    min-height: 0;
+    max-height: none !important;
+    flex: 1 1 auto;
+    overflow: auto;
+}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-drawer>.forge-drawer-actions {
+    flex: 0 0 auto;
+    margin-block-start: auto !important;
+    padding-inline: var(--forge-spacing-6) !important;
+    background: var(--forge-surface-raised, var(--forge-surface)) !important;
+    border-block-start-color: var(--forge-drawer-border, var(--forge-border-color)) !important;
+}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-drawer>.bp6-drawer-header {
+    position: relative;
+    margin: 0;
+    border-radius: 0;
+    box-shadow: none;
+    border-block-end: var(--forge-border-width, 1px) solid var(--forge-drawer-border, var(--forge-border-color)) !important;
+    padding-block: var(--forge-spacing-4) !important;
+    padding-inline: var(--forge-spacing-6) !important;
+}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-drawer>.bp6-drawer-header .bp6-heading {
+    padding-inline-end: calc(var(--forge-spacing-5) + var(--forge-spacing-2));
+    font-size: var(--forge-drawer-title-size, var(--forge-type-title-size)) !important;
+    line-height: var(--forge-drawer-title-line-height, var(--forge-type-title-line-height)) !important;
+    font-weight: var(--forge-drawer-title-weight, var(--forge-type-title-weight)) !important;
+}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-drawer>.bp6-drawer-header .bp6-dialog-close-button {
+    top: 50% !important;
+    right: var(--forge-spacing-6) !important;
+    transform: translateY(-50%) !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 !important;
+}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-drawer>.bp6-drawer-header .bp6-dialog-close-button>.bp6-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--forge-spacing-5);
+    height: var(--forge-spacing-5);
+    margin: 0 !important;
+    line-height: 0;
+}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-drawer>.bp6-drawer-header .bp6-dialog-close-button svg {
+    display: block;
+    width: var(--forge-spacing-5) !important;
+    height: var(--forge-spacing-5) !important;
+    margin: 0 !important;
+}

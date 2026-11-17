@@ -36,6 +36,9 @@ import {resetPaginationScroll} from './paginationScroll.js';
 import PaginationBar from './basic/PaginationBar.jsx';
 import {shouldInitializeEmptyTable} from './tableInitialization.js';
 import {tableLoadingMode} from './tableLoadingState.js';
+import {useForgeTheme} from '../ThemeBoundary.jsx';
+import ListPagePattern from '../patterns/ListPagePattern.jsx';
+import {collectionCountValue} from './basic/Toolbar.jsx';
 
 const defaultCellWidth = 30; // Adjust as needed
 
@@ -148,6 +151,8 @@ export function reconcileConfiguredColumns(savedColumns = [], sourceColumns = []
 
 const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, columns, pagination, children, renderRows }) => {
     useSignals();
+    const theme = useForgeTheme();
+    const listPage = container.table?.presentation === 'list-page' && theme?.themeId === 'design-system-2';
     const catalogPresentation = container.table?.presentation === 'catalog';
     trackVisibleWhen(container?.table?.queryDisabledWhen, context);
     const queryDisabled = !!container?.table?.queryDisabledWhen && evaluatePlainVisibleWhen(container.table.queryDisabledWhen, context);
@@ -279,7 +284,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
             ...col,
             visible: col.visible !== false,
             displayName: col.displayName || col.name,
-            nonExcludable: !(col.displayName || col.name),
+            nonExcludable: !(col.displayName || col.name) || (listPage && col.nonExcludable === true),
         }));
     };
 
@@ -559,7 +564,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
         savePreferences(configuredColumns,{sort:{columnId,direction:newDirection}});
     };
 
-    const rowSlots = tableRowSlots(container.table, renderedCollection.length);
+    const rowSlots = tableRowSlots(listPage ? {...container.table, minRows: 0, rowHeight: 56} : container.table, renderedCollection.length);
     const backfillCount = rowSlots.minRows > 0 && !loading && !error ? Math.max(rowSlots.blanks, renderedCollection.length === 0 ? 1 : 0) : tableBackfillCount(pagingSize, renderedCollection.length, loading);
 
     const tableTitle = container?.table?.title || "";
@@ -580,7 +585,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
     });
     const toolbarItems = container?.table?.toolbar?.items || [];
     const primaryToolbarItems = filterEmptyStateToolbarItems(
-        tablePrimaryToolbarItems(toolbarItems),
+        tablePrimaryToolbarItems(toolbarItems.filter(item => item.placement !== 'header')),
         resolvedEmptyState,
         showEmptyState,
     );
@@ -651,19 +656,19 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
         });
     };
 
-    return (
+    const tableSurface = (
         <div
             className={`basic-table-wrapper${catalogPresentation ? ' is-catalog-presentation' : ''}${!catalogPresentation && container.table?.fullWidth !== true && !container.table?.width ? ' is-content-width' : ''}${rowSlots.rowHeight ? ' has-fixed-row-slots' : ''}${String(effectiveDensity || '').toLowerCase() === 'compact' ? " is-compact-density" : ""}${loadingMode === 'refresh' ? " is-refreshing" : ""}${showEmptyState ? " has-metadata-empty-state" : ""}${horizontalOverflow.left ? " has-table-overflow-left" : ""}${horizontalOverflow.right ? " has-table-overflow-right" : ""}`}
             style={{
                 flex: sizingMode === 'fill' && !rowSlots.rowHeight ? '0 1 auto' : '0 0 auto',
-                width: catalogPresentation ? '100%' : tableDisplayWidth,
+                width: catalogPresentation || listPage ? '100%' : tableDisplayWidth,
                 boxSizing: "border-box",
                 '--forge-table-available-height': availableHeight ? `${availableHeight}px` : undefined,
                 '--forge-table-row-height': rowSlots.rowHeight ? `${rowSlots.rowHeight}px` : undefined,
             }}
             ref={tableRef}
         >
-                <div
+                {!listPage && <div
                     className={`basic-table-filterbar${(tablePreferences.preferences?.density || toolbarConfig.density) === 'compact' ? ' is-compact' : ''}${toolbarConfig.className ? ` ${toolbarConfig.className}` : ''}`}
                     style={toolbarConfig.style || undefined}
                 >
@@ -680,7 +685,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
                         density={tablePreferences.preferences?.density || toolbarConfig.density}
                         layout={toolbarConfig.layout}
                     />
-                </div>
+                </div>}
 
             {tablePreferences.error ? <div className="forge-table-preference-error" role="alert">Table preferences could not be loaded or saved. Changes may not survive reload.</div> : null}
 
@@ -744,6 +749,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
 
             {/* Filter Dialog */}
             <FilterDialog
+                presentation={listPage ? 'drawer' : 'dialog'}
                 context={context}
                 isOpen={isFilterOpen}
                 onClose={handleCloseFilter}
@@ -754,6 +760,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
 
             {/* Settings Dialog */}
             <SettingsDialog
+                presentation={listPage ? 'drawer' : 'dialog'}
                 isOpen={isSettingsOpen}
                 onClose={handleCloseSettings}
                 columns={configuredColumns}
@@ -765,6 +772,24 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
             />
         </div>
     );
+    if (!listPage) return tableSurface;
+    const pageItems = primaryToolbarItems.filter(item => !['tableExport','refresh'].includes(item.type) && item.id !== 'refresh').map(item => {
+        if (item.appearance === 'starred-toggle' || item.type === 'quickSearch') return {...item, align: 'right'};
+        if (['settings','filterList'].includes(item.id)) return {...item, align: 'right', appearance: 'minimal', icon: item.id === 'settings' ? 'lucide:sliders-horizontal' : 'lucide:funnel'};
+        return item;
+    }).sort((left,right)=>{
+        const order=item=>item.appearance==='starred-toggle'?1:item.id==='settings'?2:item.id==='filterList'?3:item.type==='quickSearch'?4:0;
+        return order(left)-order(right);
+    });
+    const headerItems = toolbarItems.filter(item => item.placement === 'header');
+    const info = toolbarContext.handlers.dataSource.getCollectionInfo?.() || {};
+    const selectedCount=context.signals.selection?.value?.selection?.length || 0;
+    return <ListPagePattern title={container.title || tableTitle || 'Records'}
+        period={headerItems.length ? <Toolbar context={toolbarContext} toolbarItems={headerItems}/> : null}
+        actions={<Toolbar context={toolbarContext} toolbarItems={pageItems} leftContent={toolbarActions} className="forge-list-page__actions" exportRows={sortedCollection} exportPageRows={renderedCollection} exportColumns={exportColumns}/>}
+        summary={!loading && !error && <div className="forge-list-page__summary"><span>Summary: {collectionCountValue(info, sortedCollection, {properties: {pluralLabel: container.title || 'records', singularLabel: container.title || 'record'}})}{selectedCount?` · ${selectedCount} selected`:''}</span>{pagingEnabled && <PaginationBar context={toolbarContext} pagingEnabled pageSize={pagingSize} pageSizeOptions={pagination?.pageSizeOptions}/>}</div>}>
+        {tableSurface}
+    </ListPagePattern>;
 };
 
 export default Basic;

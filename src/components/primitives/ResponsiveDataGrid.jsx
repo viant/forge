@@ -16,6 +16,7 @@ import {isolateButtonCellProps} from '../table/basic/buttonCellEvents.js';
 import {resolveButtonIcon, resolveButtonPressed} from '../table/basic/buttonIcon.js';
 import {resolveTableCellBadge} from '../table/basic/tableCellBadge.js';
 import ImageLabelCell from '../table/basic/ImageLabelCell.jsx';
+import {useForgeTheme} from '../ThemeBoundary.jsx';
 
 function openCardTarget(target, context) {
   if (target?.kind === 'dialog') return context?.handlers?.window?.openDialog?.({context, execution: {args: [target.dialogId, {awaitResult: target.awaitResult === true}]}, parameters: target.parameters});
@@ -126,6 +127,7 @@ export function ResponsiveCardRows({rows, columns, context, identityColumns = ['
 
 export default function ResponsiveDataGrid({toolbarActions, sizingMode = 'fill', container, context, isActive}) {
   useSignals();
+  const listPage=useForgeTheme()?.themeId==='design-system-2'&&container.table?.presentation==='list-page';
   const host = React.useRef(null);
   const [target, setTarget] = React.useState('desktop');
   React.useEffect(() => {
@@ -138,8 +140,9 @@ export default function ResponsiveDataGrid({toolbarActions, sizingMode = 'fill',
   const responsiveStyle = {...responsiveGridStyle(state), ...containerSizingStyle(container,sizingMode,{chrome:true})};
   const dataContext = container.dataSourceRef && context?.identity?.dataSourceRef !== container.dataSourceRef ? context.Context?.(container.dataSourceRef) || context : context;
   const authoredColumns = container.table?.columns || [];
-  const projected = projectResponsiveColumns(authoredColumns, state.columns);
-  const columns = applyResponsiveColumnState(projected, state);
+  const projected = projectResponsiveColumns(authoredColumns, listPage?[]:state.columns);
+  const identityColumns=new Set(container.responsiveDataGrid?.identityColumns || []);
+  const columns = applyResponsiveColumnState(projected, state).map(column=>listPage&&identityColumns.has(column.id)?{...column,nonExcludable:true}:column);
   const table = {...container.table, columns, density: state.density || container.table?.density};
   if (container.table?.fillRemainingWidth !== true && !(Number(container.table?.minRows) > 0 || Number(container.table?.rowHeight) > 0) && target === 'phone' && state.rowLayout === 'cards' && state.readOnlyCards === true && responsiveCardsSupported(container.table, dataContext?.dataSource)) {
     return <div ref={host} className="forge-responsive-grid forge-responsive-grid--phone" data-forge-primitive="responsiveDataGrid" data-row-layout="cards" style={responsiveStyle}>

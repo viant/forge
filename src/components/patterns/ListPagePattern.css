@@ -1,0 +1,68 @@
+.forge-list-page{box-sizing:border-box;container-type:inline-size;display:flex;flex-direction:column;gap:var(--forge-spacing-4);width:100%;min-width:0;min-height:560px;padding:calc(var(--forge-spacing-4)*2);background:var(--forge-canvas);color:var(--forge-text);font-family:var(--forge-type-body-family)}
+.forge-list-page__header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--forge-spacing-4);margin-block-end:var(--forge-spacing-4)}
+.forge-list-page__header h1{margin:0;font-weight:var(--forge-type-title-weight)}
+.forge-list-page__period{width:300px;max-width:100%}
+.forge-list-page__period .bp6-button-text{font-size:var(--forge-type-small-size);font-weight:var(--forge-type-body-weight);color:var(--forge-text-secondary)}
+.forge-list-page__period .toolbar-left:empty,.forge-list-page__period .toolbar-center:empty,.forge-list-page__period .toolbar-feedback:empty,.forge-list-page__actions .toolbar-center:empty,.forge-list-page__actions .toolbar-feedback:empty{display:none}
+.forge-list-page__period .toolbar-right{width:100%;margin:0}
+.forge-list-page__period .toolbar-right>span{flex:1;min-width:0!important;margin:0!important}
+.forge-list-page__period .bp6-button{height:var(--forge-control-height)!important;min-height:var(--forge-control-height)!important}
+.forge-list-page__actions{gap:var(--forge-spacing-6);flex-wrap:wrap;z-index:auto}
+.forge-list-page__actions .toolbar-left,.forge-list-page__actions .toolbar-right{gap:var(--forge-spacing-4);flex-wrap:wrap}
+.forge-list-page__actions .toolbar-right{margin-inline-start:auto}
+.forge-list-page__actions .forge-toolbar-action{height:var(--forge-control-height)!important;min-height:var(--forge-control-height)!important;border-radius:var(--forge-control-radius)!important;font-family:var(--forge-type-label-family);font-size:var(--forge-type-label-size)}
+.forge-list-page__actions .toolbar-left .forge-toolbar-action[aria-haspopup]{min-width:160px;justify-content:space-between}
+.forge-list-page__actions button.is-icon-only{width:var(--forge-control-height)!important;min-width:var(--forge-control-height)!important;min-height:var(--forge-control-height)!important;background:transparent!important;border-color:transparent!important;box-shadow:none!important}
+.forge-list-page__actions button.is-icon-only:hover{background:var(--forge-button-hover-bg,var(--forge-surface-subtle))!important}
+.forge-list-page__actions .toolbar-left>.bp6-popover-target>.forge-button{min-width:160px;justify-content:space-between}
+.forge-list-page__search{width:220px;max-width:100%}
+.forge-list-page__search>.bp6-input-left-container,.forge-list-page-drawer .bp6-input-left-container{position:absolute;inset-block:0;inset-inline-start:0;display:flex;align-items:center;justify-content:center;width:var(--forge-control-height);height:100%;pointer-events:none}
+.forge-list-page__search>.bp6-input-left-container>.forge-icon,.forge-list-page-drawer .bp6-input-left-container>.forge-icon{margin:0!important;color:var(--forge-text-secondary)}
+.forge-list-page__search>input,.forge-list-page-drawer .bp6-input-left-container+input{padding-inline-start:var(--forge-control-height)!important}
+.forge-list-page .forge-list-page__actions .forge-button[data-forge-variant=ghost][aria-label="Starred view"][aria-pressed=true]{background:var(--forge-button-active-bg,var(--forge-selected-background))!important;color:var(--forge-interaction-color)!important;border-color:transparent!important}
+.forge-list-page__actions [aria-label="Starred view"][aria-pressed=true] .lucide-star{fill:currentColor}
+.forge-list-page__table{overflow:hidden;min-width:0;border:var(--forge-border-width,1px) solid var(--forge-border-color);border-radius:var(--forge-radius-surface);background:var(--forge-surface)}
+section.forge-list-page .forge-list-page__table .basic-table-wrapper{border:0!important;border-radius:0!important;width:100%!important}
+.forge-list-page__table .basic-table-filterbar{display:none}
+.forge-list-page__table .basic-table-scroll{max-height:none;overflow:auto}
+section.forge-list-page .forge-list-page__table .basic-table-wrapper table{min-width:1100px!important;width:100%!important;table-layout:fixed!important;border-collapse:collapse}
+.forge-list-page .forge-list-page__table .basic-table-wrapper table thead th{height:calc(var(--forge-control-height) + var(--forge-spacing-2))!important;background:var(--forge-selected-background)!important;color:var(--forge-text)!important;vertical-align:middle}
+.forge-list-page .forge-list-page__table .basic-table-wrapper table tbody td{height:calc(var(--forge-control-height) + var(--forge-spacing-4))!important;padding-block:var(--forge-spacing-3)!important;vertical-align:middle;background:var(--forge-surface)!important;border-block-end:var(--forge-border-width,1px) solid var(--forge-border-color)!important}
+.forge-list-page .forge-list-page__table .basic-table-wrapper table tbody tr:hover td{background:var(--forge-surface-subtle)!important}
+.forge-list-page .forge-list-page__table .basic-table-wrapper table tbody tr[aria-selected=true] td,.forge-list-page .forge-list-page__table .basic-table-wrapper table tbody td.selected-cell{background:var(--forge-selected-background)!important}
+.forge-list-page__table .basic-table-wrapper table tbody tr:last-child td{border-block-end:0!important}
+.forge-list-page__table button[aria-pressed=true] .lucide-star{fill:currentColor}
+section.forge-list-page .forge-list-page__table .basic-table-wrapper button.bp6-button.bp6-minimal[aria-pressed]{background:transparent!important;border-color:transparent!important;box-shadow:none!important}
+section.forge-list-page .forge-list-page__table .basic-table-wrapper button.bp6-button.bp6-minimal[aria-pressed=true]{color:var(--forge-interaction-color)!important}
+.forge-list-page__summary{display:flex;justify-content:space-between;align-items:center;gap:var(--forge-spacing-4);min-height:var(--forge-control-height);padding:var(--forge-spacing-2) var(--forge-spacing-4);background:var(--forge-selected-background);color:var(--forge-text);font-size:var(--forge-type-small-size);line-height:var(--forge-type-small-line-height)}
+.forge-list-page__summary>span:last-child{font-variant-numeric:tabular-nums;white-space:nowrap}
+.forge-list-page-drawer .forge-drawer-body{display:flex;flex-direction:column;gap:var(--forge-spacing-6)}
+.forge-list-page-drawer .forge-drawer-body h3{margin-block:var(--forge-spacing-2)}
+.forge-list-page-drawer .forge-filter-dialog__fields{grid-template-columns:minmax(0,1fr);width:100%}
+.forge-list-page-drawer .forge-list-page__columns{display:grid;gap:var(--forge-spacing-3)}
+.forge-list-page-drawer .forge-list-page__columns .bp6-control{margin:0}
+.forge-list-page-drawer .forge-drawer-body:has(>.forge-drawer-scroll){overflow:hidden}
+.forge-drawer-scroll{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:var(--forge-spacing-4);overscroll-behavior:contain}
+.forge-drawer-search{flex:0 0 auto}
+.forge-drawer-section{display:flex;flex-direction:column;gap:var(--forge-spacing-2)}
+.forge-drawer-section .forge-drawer-section-label{margin:0;padding:var(--forge-spacing-1);color:var(--forge-text-secondary);font-weight:var(--forge-type-title-weight)}
+.forge-drawer-options.bp6-menu{padding:0;background:transparent;box-shadow:none}
+.forge-drawer-option{padding:var(--forge-spacing-1-5,6px) var(--forge-spacing-2)}
+.forge-drawer-scroll>hr{flex:0 0 auto;width:100%;margin:0;border:0;border-block-start:var(--forge-border-width,1px) solid var(--forge-drawer-border,var(--forge-border-color))}
+.forge-list-page-drawer .forge-drawer-actions .bp6-button{height:var(--forge-control-height);min-height:var(--forge-control-height)}
+/* Shared table drawers have the same anatomy. Keep document typography and
+   generic popup menu surfaces from changing their in-place navigation. */
+.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page-drawer .forge-drawer-body .forge-drawer-section{flex:0 0 auto;gap:var(--forge-spacing-2)}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page-drawer .forge-drawer-section>.forge-drawer-section-label{margin:0!important;padding:var(--forge-spacing-1);font-family:var(--forge-type-label-family);font-size:var(--forge-type-label-size)!important;line-height:var(--forge-type-label-line-height)!important;font-weight:var(--forge-type-label-weight)!important;color:var(--forge-text-secondary)!important}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page-drawer .forge-drawer-options{margin:0!important;padding:0!important;border:0!important;border-radius:0;background:transparent!important;box-shadow:none!important;flex:0 0 auto}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page-drawer .forge-drawer-scroll>hr{margin:0!important}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page-drawer .forge-drawer-search>input.bp6-input{padding-inline-start:var(--forge-control-height)!important}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page-drawer .forge-drawer-options>:is(.forge-button,.bp6-menu-item){min-height:var(--forge-control-height);font-family:var(--forge-type-body-family);font-size:var(--forge-type-body-size);font-weight:var(--forge-type-body-weight);color:var(--forge-text)}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page-drawer .forge-filter-dialog__label{text-align:start;padding:0}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page-drawer .forge-drawer-choice-list{display:grid;gap:var(--forge-spacing-2)}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page-drawer .forge-drawer-choice-list .bp6-control{margin:0}
+.forge-list-page__details{display:grid;gap:var(--forge-spacing-5);margin:0}
+.forge-list-page__details dt{color:var(--forge-text-secondary);font-size:var(--forge-type-small-size)}
+.forge-list-page__details dd{margin:var(--forge-spacing-1) 0 0;overflow-wrap:anywhere}
+@container(max-width:700px){.forge-list-page__actions .toolbar-right{width:100%;margin:0}.forge-list-page__search{flex:1;min-width:160px}.forge-list-page__period{width:100%}.forge-list-page__header{align-items:flex-start}}
+@media(max-width:600px){.forge-list-page{padding:var(--forge-spacing-4)}.forge-list-page__actions .toolbar-left,.forge-list-page__actions .toolbar-right{gap:var(--forge-spacing-2)}}

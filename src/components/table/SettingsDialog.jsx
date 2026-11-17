@@ -2,11 +2,13 @@ import UnifiedIcon from '../Icon.jsx';
 import React, { useState, useEffect } from "react";
 import './SettingsDialog.css';
 import TableViewPresets from './TableViewPresets.jsx';
+import Typography from '../Typography.jsx';
 import {
     Button,
     Checkbox,
     Classes,
     Dialog,
+    Drawer,
     DialogBody,
     DialogFooter,
     Menu,
@@ -28,15 +30,18 @@ const SettingsDialog = ({
                             density = 'normal',
                             onSaveColumnSettings,
                             onResetColumns,
+                            presentation = 'dialog',
                         }) => {
     const [localColumns, setLocalColumns] = useState(columns || []);
     const [selectedTabId, setSelectedTabId] = useState('visibility');
     const [localDensity,setLocalDensity] = useState(density);
+    const [columnQuery,setColumnQuery] = useState('');
 
     useEffect(() => {
         if (isOpen && columns) {
             setLocalColumns(columns);
             setLocalDensity(density);
+            setColumnQuery('');
         }
     }, [isOpen, columns, density]);
 
@@ -170,37 +175,53 @@ const SettingsDialog = ({
         </div>
     );
 
+    const drawer = presentation === 'drawer';
+    const Frame = drawer ? Drawer : Dialog;
+    const changed=JSON.stringify(localColumns)!==JSON.stringify(columns)||localDensity!==density;
+    const defaultView=JSON.stringify(localColumns)===JSON.stringify(baseColumns);
+    const allColumnsView=!defaultView&&localColumns.length>0&&localColumns.every(column=>column.nonExcludable||column.visible!==false);
     return (
-        <Dialog
+        <Frame
             isOpen={isOpen}
             onClose={onClose}
-            title="Table Settings"
-            className="forge-table-settings"
+            title={drawer?'Customize View':'Table Settings'}
+            className={`forge-table-settings${drawer?' forge-drawer forge-list-page-drawer':''}`}
+            {...(drawer ? {position:'right',size:360,transitionDuration:200,shouldReturnFocusOnClose:true} : {})}
         >
-            <DialogBody>
-                {savedViews && <TableViewPresets model={savedViews} columns={localColumns} baseColumns={baseColumns} density={localDensity}
+            <DialogBody className={drawer?'forge-drawer-body':undefined}>
+                {drawer && <InputGroup type="search" className="forge-drawer-search" data-forge-part="input" aria-label="Search columns" placeholder="Search" leftElement={<UnifiedIcon name="lucide:search" className="bp6-icon"/>} value={columnQuery} onChange={event=>setColumnQuery(event.target.value)}/>}
+                {!drawer && savedViews && <TableViewPresets model={savedViews} columns={localColumns} baseColumns={baseColumns} density={localDensity}
                     onApply={(nextColumns, preferences) => {setLocalColumns(nextColumns); setLocalDensity(preferences.density || density);}}/>}
-                <FormGroup label="Density" labelFor="table-preference-density"><HTMLSelect id="table-preference-density" value={localDensity} onChange={event=>setLocalDensity(event.target.value)} options={[{label:'Compact',value:'compact'},{label:'Normal',value:'normal'}]}/></FormGroup>
-                <Tabs id="settings-tabs" selectedTabId={selectedTabId} onChange={handleTabChange} animate={false}>
+                {!drawer && <FormGroup label="Density" labelFor="table-preference-density"><HTMLSelect id="table-preference-density" value={localDensity} onChange={event=>setLocalDensity(event.target.value)} options={[{label:'Compact',value:'compact'},{label:'Normal',value:'normal'}]}/></FormGroup>}
+                {drawer ? <div className="forge-drawer-scroll">
+                    <section className="forge-drawer-section"><Typography as="h3" typeRole="label" className="forge-drawer-section-label">Views</Typography><Menu className="forge-drawer-options" role="listbox" aria-label="Column views"><MenuItem text="Default" roleStructure="listoption" selected={defaultView} onClick={()=>setLocalColumns(baseColumns.map(column=>({...column})))}/><MenuItem text="All Columns" roleStructure="listoption" selected={allColumnsView} onClick={()=>setLocalColumns(current=>current.map(column=>({...column,visible:true})))}/></Menu>
+                    {savedViews && <TableViewPresets model={savedViews} columns={localColumns} baseColumns={baseColumns} density={localDensity} onApply={(next,preferences)=>{setLocalColumns(next);setLocalDensity(preferences.density||density);}}/>}</section>
+                    <hr/>
+                    <section className="forge-drawer-section"><Typography as="h3" typeRole="label" className="forge-drawer-section-label">Columns</Typography><div className="forge-list-page__columns">{localColumns.filter(column=>(column.name || column.displayName)&&String(column.displayName||column.name).toLowerCase().includes(columnQuery.toLowerCase())).map(column=><div className="forge-drawer-option" key={column.id}><Checkbox label={column.displayName || column.name} checked={column.visible || column.nonExcludable} disabled={column.nonExcludable} onChange={()=>handleToggleVisible(column.id)}/></div>)}</div></section>
+                    <details><summary>Advanced column settings</summary>{renderColumnsPanel()}</details>
+                </div> : <Tabs id="settings-tabs" selectedTabId={selectedTabId} onChange={handleTabChange} animate={false}>
                     <Tab id="visibility" title="Visibility" panel={renderVisibilityPanel()} />
                     <Tab id="columns" title="Columns" panel={renderColumnsPanel()} />
-                </Tabs>
+                </Tabs>}
             </DialogBody>
             <DialogFooter
+                className={drawer?'forge-drawer-actions':undefined}
                 actions={[
                     <Button
                         key="reset"
                         text="Reset"
+                        minimal={drawer}
                         onClick={() => {
                             onResetColumns();
                             onClose();
                         }}
                     />,
-                    <Button key="cancel" text="Cancel" onClick={onClose} />,
+                    <Button key="cancel" text="Cancel" minimal={drawer} onClick={onClose} />,
                     <Button
                         key="save"
                         intent="primary"
-                        text="Save"
+                        disabled={drawer&&!changed}
+                        text={drawer?'Apply':'Save'}
                         onClick={() => {
                             onSaveColumnSettings(localColumns,{density:localDensity,frozenColumnIds:localColumns.filter(column=>column.sticky==='left').map(column=>column.id)});
                             onClose();
@@ -208,7 +229,7 @@ const SettingsDialog = ({
                     />,
                 ]}
             />
-        </Dialog>
+        </Frame>
     );
 };
 
