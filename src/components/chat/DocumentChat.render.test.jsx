@@ -39,25 +39,25 @@ describe('document composer and task discovery', () => {
             const scroller = document.createElement('pre');
             scroller.style.setProperty('--forge-border-color', '#667788');
             host.querySelector('.chat-feed-stage').append(scroller);
-            const own = {id: 'forge-scrollbar-activity', cancel: vi.fn()};
+            const own = {id: 'forge-scrollbar-activity', currentTime: 700, effect: {setKeyframes: vi.fn()}, play: vi.fn(), cancel: vi.fn()};
             const unrelated = {id: 'example-content-animation', cancel: vi.fn()};
             scroller.getAnimations = () => [own, unrelated];
-            const animation = {};
-            scroller.animate = vi.fn(() => animation);
+            scroller.animate = vi.fn();
             await act(async () => scroller.dispatchEvent(new Event('scroll')));
-            expect(scroller.animate).toHaveBeenCalledOnce();
-            expect(scroller.animate.mock.calls[0][0][0].scrollbarColor).toBe('#667788 transparent');
-            expect(scroller.animate.mock.calls[0][0].at(-1).scrollbarColor).toBe('transparent transparent');
-            expect(animation.id).toBe('forge-scrollbar-activity');
-            expect(own.cancel).toHaveBeenCalledOnce();
+            expect(scroller.animate).not.toHaveBeenCalled();
+            expect(own.effect.setKeyframes.mock.calls[0][0][0].scrollbarColor).toBe('#667788 transparent');
+            expect(own.effect.setKeyframes.mock.calls[0][0].at(-1).scrollbarColor).toBe('transparent transparent');
+            expect(own.currentTime).toBe(0);
+            expect(own.play).toHaveBeenCalledOnce();
+            expect(own.cancel).not.toHaveBeenCalled();
             expect(unrelated.cancel).not.toHaveBeenCalled();
             media.mockReturnValue({matches: true});
             await act(async () => scroller.dispatchEvent(new Event('scroll')));
-            expect(scroller.animate).toHaveBeenCalledOnce();
+            expect(own.play).toHaveBeenCalledOnce();
             media.mockReturnValue({matches: false});
             await render(fixture('baseline'));
             await act(async () => scroller.dispatchEvent(new Event('scroll')));
-            expect(scroller.animate).toHaveBeenCalledOnce();
+            expect(own.play).toHaveBeenCalledOnce();
         } finally {vi.unstubAllGlobals();}
     });
 
