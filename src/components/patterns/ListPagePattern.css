@@ -68,3 +68,17 @@ section.forge-list-page .forge-list-page__table .basic-table-wrapper button.bp6-
 @media(max-width:600px){.forge-list-page{padding:var(--forge-spacing-4)}.forge-list-page__actions .toolbar-left,.forge-list-page__actions .toolbar-right{gap:var(--forge-spacing-2)}}
 
 .agently-workspace[data-forge-theme="design-system-2"] section.forge-list-page .forge-list-page__table .basic-table-wrapper tbody tr:is(.selected-row,[aria-selected="true"]):hover>td{background:var(--forge-table-selected-hover-surface,var(--forge-selected-background))!important}
+
+/* List drawers retain the same geometry when navigating to a filter field. */
+.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page-drawer .bp6-drawer-header{box-sizing:border-box;block-size:calc(var(--forge-control-height) + var(--forge-spacing-6));min-block-size:calc(var(--forge-control-height) + var(--forge-spacing-6));flex:0 0 auto;align-items:center;gap:var(--forge-spacing-2);padding-block:0!important;box-shadow:none!important}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page-drawer .bp6-drawer-header>.bp6-heading{display:flex;align-items:center;min-width:0;min-height:var(--forge-icon-control-size,32px);padding:0!important;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page-drawer .bp6-drawer-header>.bp6-dialog-close-button{position:static!important;flex:0 0 auto;margin:0!important}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page-drawer .forge-drawer-heading{min-width:0;max-width:100%}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page-drawer .forge-drawer-heading>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page-drawer .forge-drawer-options :is(.bp6-menu-item,.forge-button){align-items:center!important;min-height:var(--forge-control-height);padding-block:0!important}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page-drawer .forge-drawer-option{display:flex;align-items:center;min-height:var(--forge-control-height);padding-block:0}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page .basic-table-wrapper.has-table-overflow-left .is-sticky-left.is-sticky-edge{box-shadow:none!important;border-inline-end:var(--forge-border-width,1px) solid var(--forge-border-color)!important}
+
+/* Header and summary are one semantic surface and typography recipe. */
+.agently-workspace[data-forge-theme="design-system-2"] section.forge-list-page .forge-list-page__table .basic-table-wrapper{--forge-table-header-surface:inherit!important}
+.agently-workspace[data-forge-theme="design-system-2"] section.forge-list-page .forge-list-page__table :is(thead th,.forge-list-page__summary){background:var(--forge-table-header-surface)!important;color:var(--forge-text)!important;font-family:var(--forge-type-body-family)!important;font-size:var(--forge-type-body-size)!important;line-height:var(--forge-type-body-line-height)!important;font-weight:var(--forge-type-label-weight)!important}

@@ -45,8 +45,8 @@ and menu selection treatments use the existing theme context; they do not
 change the defaults of Baseline or unthemed consumers. The host's theme picker
 selects the complete color, typography and component appearance together.
 
-Chat reuses the menu scrollbar activity handler through its native scroll
-capture. Design System 2.0 keeps native thumbs thin and transparent at rest,
+The root theme provider reuses the shared scrollbar activity handler through
+one native scroll capture listener. Design System 2.0 keeps native thumbs thin and transparent at rest,
 reveals the semantic thumb during scrolling and fades it afterward. The single
 Chat root covers regular, split, overlay and nested scrollers. Baseline and
 forced-color behavior retain their existing appearance; no scroll-following or
@@ -1539,3 +1539,8 @@ uses the table selected-hover role. Surface values belong to the host package.
 DS2 control and popup surfaces use quiet borders without box shadows. Keyboard
 focus remains the shared inset outline. Default borders, dividers and scrollbar
 thumbs follow the same semantic border role as fields; validation remains distinct.
+
+List Page drawers use one fixed header height in root and detail views. Center
+option labels inside their existing row height for default, selected and hover
+states. Frozen table columns use an opaque row surface and a thin semantic
+divider at the frozen edge; never add an elevation shadow on horizontal scroll.

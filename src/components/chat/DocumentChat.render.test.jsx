@@ -31,13 +31,13 @@ describe('document composer and task discovery', () => {
             handlers: {chat: {}}, Context: () => null,
             lookupHandler: name => name === 'chat.renderFeed' ? () => null : undefined,
         };
-        const fixture = theme => <div className="agently-application" data-agently-theme={theme}>
+        const fixture = theme => <ForgeThemeProvider themeId={theme}><ForgeThemeBoundary>
             <Chat context={context} container={{chat: {appearance: 'document'}}}/>
-        </div>;
+        </ForgeThemeBoundary></ForgeThemeProvider>;
         try {
             await render(fixture('design-system-2'));
             const scroller = document.createElement('pre');
-            scroller.style.setProperty('--forge-border-strong', '#667788');
+            scroller.style.setProperty('--forge-border-color', '#667788');
             host.querySelector('.chat-feed-stage').append(scroller);
             const own = {id: 'forge-scrollbar-activity', cancel: vi.fn()};
             const unrelated = {id: 'example-content-animation', cancel: vi.fn()};

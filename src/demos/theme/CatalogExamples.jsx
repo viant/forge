@@ -18,6 +18,7 @@ import Popover from '../../components/Popover.jsx';
 import DropdownMenu from '../../components/DropdownMenu.jsx';
 import SwitchControl from '../../components/SwitchControl.jsx';
 import SectionTabRail from '../../components/SectionTabRail.jsx';
+import {WorkspaceRuntimeTabs,workspaceTabID,workspacePanelID} from '../../components/WorkspaceRuntimeSurface.jsx';
 import {SectionPattern} from '../../components/patterns/index.js';
 import ContentCarousel from '../../components/content/ContentCarousel.jsx';
 import ChipList from '../../components/ChipList.jsx';
@@ -197,6 +198,7 @@ function ToolbarExample({variant,state,thumbnail}) {
 function LocalTabs({variant='Default',disabled=false}) {
     const [selected,setSelected]=useState('overview');const base=useId().replace(/:/g,'');
     const items=[{id:'overview',label:'Overview',icon:'lucide:file-text'},{id:'activity',label:'Activity',icon:'lucide:activity'},{id:'settings',label:'Settings',icon:'lucide:settings'}].map(item=>({...item,disabled}));
+    if(variant==='Workspace')return <div className="catalog-full"><WorkspaceRuntimeTabs id={base} entries={items.map(item=>({windowId:item.id,label:item.label,disabled}))} selectedId={selected} onSelect={setSelected} ariaLabel="Open example workspaces" className="forge-window-manager-tablist" itemClassName="forge-window-manager-tab" tabClassName="bp6-tab" renderLabel={item=><><Icon name={items.find(entry=>entry.id===item.windowId).icon}/>{item.label}</>}/><div className="catalog-tab-panel" role="tabpanel" id={workspacePanelID(base,selected)} aria-labelledby={workspaceTabID(base,selected)}>{items.find(item=>item.id===selected).label} workspace</div></div>;
     return <div className="catalog-full"><SectionTabRail ariaLabel="Example views" items={items} showIcons={variant==='With icons'} selectedId={selected} onChange={setSelected} idPrefix={base} panelId={`${base}-panel`}/><div className="catalog-tab-panel" role="tabpanel" id={`${base}-panel`} aria-labelledby={`${base}-tab-${items.findIndex(item=>item.id===selected)}`}>{selected==='overview'?'A clear view of the current document.':selected==='activity'?'Recent updates appear here.':'Choose how this document behaves.'}</div></div>;
 }
 
