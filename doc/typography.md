@@ -1337,18 +1337,36 @@ settings, read-only details, Retry, revision changes and stale responses through
 the existing dialog. The shared Blueprint table and native details elements reuse
 the existing workbench recipe; the surrounding cache editor remains legacy scope.
 
-The effective plans section appears first. **Root view cache** keeps an existing
-cache summary visible: authored named references are read-only, while inline
-storage settings expand through native details. With no root cache, **Add root
-cache…** reveals the existing form. Child plans do not imply root storage, and
-opening either storage details state performs no mutation. Save and execution
-continue through their existing callbacks.
+The effective plans section appears first. **Target view** selects the root or a
+child for separate storage-reference and inline-plan actions. **Cache storage**
+lists only Studio’s supplied `availableCaches` names. An unchanged selection
+submits nothing; an existing editable `use_cache` uses its native occurrence and
+exact expected arguments, while an absent binding uses `addFunction`. Ambiguous
+or unaddressable bindings remain read-only. Multiple views can reference the
+same name without copying host configuration. A component-level named reference
+is displayed without automatically adding a duplicate root binding.
 
-Run `node scripts/test-reader-cache-browser.mjs` for the mounted browser proof.
-Its independently authored synthetic child-plan metadata covers absent, inline,
-component-named and root-bound caches at desktop/tablet widths, read-only host
-settings, non-mutating disclosure and the existing save/run callback payloads.
-Screenshots stay in ignored `output/playwright/reader-cache`.
+Existing component cache declarations, including inline settings, are visible
+read-only under **Authored component cache**. This form does not create or edit
+providers, locations, TTLs or backend settings. Resolved cache name/backend come
+only from the matching saved-version effective evidence; configuration names
+never imply backend, connectivity or capacity. An empty supplied catalog offers
+an explanation and no fallback. A current name missing from the catalog stays
+visible as authored metadata and is not inserted into the selectable inventory.
+
+Storage and plan edits have separate save/cancel controls and preserve each
+other. Pending saves prevent duplicate submission and dialog dismissal. Source
+revision checks, conflicts, native validation, saved-version execution and
+revision-scoped metadata refresh keep their existing owners and lifecycle.
+The component-level root plan editor remains a separate legacy form.
+
+Run `node scripts/test-reader-cache-browser.mjs` for the synthetic desktop/tablet
+proof. `FORGE_CACHE_NATIVE_URL` may point at an isolated Studio ea15902-or-later
+fixture with the existing SDK gateway and test-only component/source, reset,
+cache-revocation and conflict controls. Native verification covers root/child
+save and reopen, shared bindings, plan preservation, existing component/inline
+declarations, empty catalogs, denied edits, conflicts and native validation
+failures. Screenshots stay in ignored `output/playwright/reader-cache`.
 
 ### Root inline warmup actions
 
