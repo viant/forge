@@ -87,8 +87,9 @@ export function consumeDataSourceFetchRequest(input = {}, request = "fetch") {
     if (current?.[requestedFlag] !== true) {
         return null;
     }
+    const {appendPage: _appendPage, ...rest} = current;
     return {
-        ...current,
+        ...rest,
         fetch: false,
         refresh: false,
     };

@@ -45,6 +45,8 @@ jobs:
       - run: node --no-warnings src/components/valueColorScale.test.js
       - run: node --no-warnings src/reporting/reportTableQuickFilter.test.js
       - run: node --no-warnings src/reporting/reportPrintChoiceLabels.test.js
+      - name: Verify native list loading and paging
+        run: npx vitest run --config vitest.runtime.config.mjs src/components/table/Basic.listPageLoading.render.test.jsx src/components/table/Basic.clientPaging.render.test.jsx src/components/DataSource.loaderOwnership.render.test.jsx src/components/DataSource.aggregateOffset.render.test.jsx
       - run: npm run test:workspace-theme
       - run: npm run build
       - name: Check contributor entry points

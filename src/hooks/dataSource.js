@@ -25,7 +25,7 @@ function isPlainObject(value) {
 
 export function buildFetchCollectionSignal(current = {}, props = {}) {
     const {filter = {}, replaceFilter = false, cache = null, invocationId = null, bindingGeneration = null, formSynchronization = null} = props || {};
-    const {formSynchronization: _previousSynchronization, ...rest} = current || {};
+    const {formSynchronization: _previousSynchronization, appendPage: _appendPage, ...rest} = current || {};
     return {
         ...rest,
         filter: replaceFilter ? {...filter} : {...((current || {}).filter || {}), ...filter},
@@ -38,8 +38,9 @@ export function buildFetchCollectionSignal(current = {}, props = {}) {
 }
 
 export function buildSetFilterSignal(current = {}, filter = {}, filterMode) {
+    const {appendPage: _appendPage, ...rest} = current || {};
     return {
-        ...current,
+        ...rest,
         page: 1,
         filter,
         fetch: filterMode !== 'client',
@@ -741,10 +742,13 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector,
         };
     };
 
-    const setPage = (page) => {
+    const setPage = (page, {append = false, cache = null} = {}) => {
+        const {appendPage: _appendPage, ...previous} = input.peek() || {};
         input.value = {
-            ...input.peek(),
+            ...previous,
             page,
+            ...(append ? {appendPage: true} : {}),
+            ...(cache ? {cache} : {}),
             fetch: String(dataSource?.paginationMode || '').toLowerCase() !== 'client',
         };
     };
@@ -764,6 +768,7 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector,
             ...input.peek(),
             page: 1,
             pageSize,
+            appendPage: false,
             fetch: String(dataSource?.paginationMode || '').toLowerCase() !== 'client',
         };
         return true;
@@ -775,6 +780,7 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector,
         const next = {
             ...input.peek(),
             page: 1,
+            appendPage: false,
             fetch: fetch === true,
         };
         if (destination) {

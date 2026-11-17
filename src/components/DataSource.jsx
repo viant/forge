@@ -290,7 +290,7 @@ export default function DataSource({context}) {
         const consumed = consumeDataSourceFetchRequest(input.peek(), "fetch");
         if (!consumed) return;
         input.value = consumed;
-        void doFetchRecords().finally(() => {
+        void doFetchRecords(inputVal.appendPage === true).finally(() => {
             try { log.debug('[watch] fetch flag consumed', { ds: context?.identity?.dataSourceRef }); } catch(_) {}
         });
         return;
@@ -485,7 +485,7 @@ export default function DataSource({context}) {
      *  - Calls connector.getRecords
      *  - Then calls postFetchHook
      */
-    async function doFetchRecords() {
+    async function doFetchRecords(appendRequested = false) {
         const authorizationEpoch = protectedWindowEpoch(identity?.windowId);
         const datasetEpoch = protectedDataSourceEpoch(identity?.dataSourceId);
         const authorizationIsCurrent = () => protectedWindowEpoch(identity?.windowId) === authorizationEpoch && protectedDataSourceEpoch(identity?.dataSourceId) === datasetEpoch;
@@ -530,7 +530,7 @@ export default function DataSource({context}) {
         // the result). If unchanged, we keep existing collection; otherwise
         // we optimistically clear.
         // ------------------------------------------------------------------
-        const requestSig = JSON.stringify({filter, parameters, page, pageSize: requestPaging?.size, sort});
+        let requestSig = JSON.stringify({filter, parameters, page, pageSize: requestPaging?.size, sort});
         const previousFailure = control.peek() || {};
         if (suppressRepeatedFailedFetch(previousFailure, requestSig, cache)) {
             flagReadDone();
@@ -551,7 +551,11 @@ export default function DataSource({context}) {
             page = page || 1;
         }
 
-        control.value = beginDataSourceFetch(control.peek());
+        // A continuous list refresh always starts from its first page. Other
+        // callers retain the existing replacement-page contract.
+        if (!appendRequested && control.peek()?.appended === true) page = 1;
+        let append = false;
+        control.value = {...beginDataSourceFetch(control.peek()), appending: false};
         setLoading(true);
         try {
             page = resolveFetchPage({
@@ -565,6 +569,17 @@ export default function DataSource({context}) {
             if (!cursorMode) cursorSessionRef.current = null;
             const cursorRequest = cursorMode ? cursorSessionRef.current.begin(page, cursorPagingAssociation(context, {filter, parameters, sort})) : null;
             if (cursorRequest) page = cursorRequest.page;
+            requestSig = JSON.stringify({filter, parameters, page, pageSize: requestPaging?.size, sort});
+            const previousRequest = prevQuerySig.current ? JSON.parse(prevQuerySig.current) : null;
+            append = appendRequested && pagingEnabled && !requestPaging?.aggregate
+                && pageSelectionPolicy(prevQuerySig.current, requestSig).retainMissing
+                && Number(page) === Number(previousRequest?.page || 1) + 1;
+            if (appendRequested && !append) {
+                // A filter/parameter/size change must never append another query.
+                page = 1;
+                requestSig = JSON.stringify({filter, parameters, page, pageSize: requestPaging?.size, sort});
+            }
+            control.value = {...control.peek(), appending: append};
             prevFilterRef.current = snapshotFilter(filter);
 
             // 2) Merge into filter
@@ -597,6 +612,10 @@ export default function DataSource({context}) {
             if (aggregate) page = 1;
             const payload = aggregate ? collected.payload : await fetchPage(page);
             if (!authorizationIsCurrent()) return;
+            if (append && stableSnapshotSignature(snapshotFilter({filter, parameters, sort})) !== stableSnapshotSignature(snapshotFilter({filter: input.peek()?.filter || {}, parameters: input.peek()?.parameters, sort: input.peek()?.sort || []}))) {
+                settleDataSourceRequest(requestDataSourceId, requestId, null, payload);
+                return;
+            }
             if (!mountedRef.current) {
                 settleDataSourceRequest(requestDataSourceId, requestId, new Error('Datasource unmounted before request completion.'));
                 return;
@@ -651,6 +670,25 @@ export default function DataSource({context}) {
                 }
             }
             const previousPageRecords = collection.peek() || [];
+            if (append) {
+                // Reuse the datasource's optional identity contract. Unkeyed
+                // records remain valid; overlapping keyed rows update in place.
+                const combined = [...previousPageRecords];
+                const indices = new Map();
+                combined.forEach((row, index) => {
+                    const key = safeUniqueKey(getUniqueKeyValue, row);
+                    if (key) indices.set(key, index);
+                });
+                for (const row of records) {
+                    const key = safeUniqueKey(getUniqueKeyValue, row);
+                    if (key && indices.has(key)) combined[indices.get(key)] = row;
+                    else {
+                        if (key) indices.set(key, combined.length);
+                        combined.push(row);
+                    }
+                }
+                records = combined;
+            }
             collection.value = records;
             try {
                 log.debug('[doFetchRecords] set collection', {
@@ -659,13 +697,13 @@ export default function DataSource({context}) {
                 });
             } catch (_) {
             }
-            collectionInfo.value = aggregate ? info : cursorRequest ? markCompletedCursorAssociation({...info, returnedCount: records.length, pageSize: requestPaging?.size}, cursorRequest.signature) : withFetchedPageInfo(info, page, pagingEnabled, {
+            collectionInfo.value = aggregate ? info : cursorRequest ? markCompletedCursorAssociation({...info, returnedCount: append ? fetchedPageResult.returnedCount : records.length, pageSize: requestPaging?.size}, cursorRequest.signature) : withFetchedPageInfo(info, page, pagingEnabled, {
                 ...fetchedPageResult,
                 mode: paging?.mode,
                 hasMoreSelector: paging?.dataInfoSelectors?.hasMore,
             });
             metrics.value = stats;
-            control.value = { ...control.peek(), loaded: true, error: null, stale: false, failedRequestSignature: null };
+            control.value = { ...control.peek(), loaded: true, error: null, stale: false, failedRequestSignature: null, appended: append };
             if (selectionMode === 'multi') {
                 let reconciledSelection;
                 if (dataSource.selectionRetention === 'pages') {
@@ -700,7 +738,7 @@ export default function DataSource({context}) {
             }
             if (pagingEnabled) {
                 const currentInput = input.peek() || {};
-                if (Number(currentInput.page || 1) !== Number(page || 1)) {
+                if (!currentInput.fetch && !currentInput.refresh && Number(currentInput.page || 1) !== Number(page || 1)) {
                     input.value = {
                         ...currentInput,
                         page,
@@ -781,11 +819,12 @@ export default function DataSource({context}) {
                 input.value = {...input.peek(), cache: null};
             }
             if (mountedRef.current && finalization === 'continue') {
-                input.value = {...nextInput, fetch: false, refresh: false};
+                const {appendPage: _appendPage, ...consumedInput} = nextInput;
+                input.value = {...consumedInput, fetch: false, refresh: false};
                 queueMicrotask(() => {
                     if (!mountedRef.current) return;
                     if (dataSource.dataSourceRef) handleUpstream();
-                    else void doFetchRecords();
+                    else void doFetchRecords(nextInput.appendPage === true);
                 });
             }
         }

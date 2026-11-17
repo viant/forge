@@ -19,18 +19,22 @@ const TableBody = ({
                        backfillCount,
                        loading,
                        error,
+                       rowSkeletons = false,
+                       appending = false,
                        enforceColumnSize,
                        onShowFullContent,
                    }) => {
     const rowsCollection = Array.isArray(collection) ? collection : [];
 
-    if (error || (loading && rowsCollection.length === 0)) {
+    const skeletonCount = Math.max(3, Math.min(10, rowsCollection.length || backfillCount || 5));
+    if ((error && !appending) || (loading && (!appending && rowSkeletons || rowsCollection.length === 0))) {
         return (
             <tbody>
             <TableBackfill
                 fixedRowHeight={fixedRowHeight}
                 context={context}
-                rowCount={error ? Math.max(1, backfillCount || 0) : backfillCount}
+                rowCount={error ? Math.max(1, backfillCount || 0) : rowSkeletons ? skeletonCount : backfillCount}
+                skeletonColumns={rowSkeletons ? columns : undefined}
                 colSpan={columns.length + (fillerWidth > 0 ? 1 : 0)}
                 loading={loading}
                 error={error}
@@ -70,7 +74,8 @@ const TableBody = ({
         <TableBackfill
                 fixedRowHeight={fixedRowHeight}
             context={context}
-            rowCount={backfillCount}
+            rowCount={appending && (loading || error) ? loading ? 3 : 1 : backfillCount}
+            skeletonColumns={rowSkeletons ? columns : undefined}
             colSpan={columns.length + (fillerWidth > 0 ? 1 : 0)}
             loading={loading}
             collection={collection}

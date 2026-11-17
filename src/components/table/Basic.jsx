@@ -34,6 +34,8 @@ import {useTableColumnTimeZones, withBoundColumnTimeZones} from './columnFormatt
 import {applyClientFilters} from './clientFilters.js';
 import {resetPaginationScroll} from './paginationScroll.js';
 import PaginationBar from './basic/PaginationBar.jsx';
+import {canNavigateNext, resolvePaginationState} from './basic/PaginationState.js';
+import Button from '../Button.jsx';
 import {shouldInitializeEmptyTable} from './tableInitialization.js';
 import {tableLoadingMode} from './tableLoadingState.js';
 import {useForgeTheme} from '../ThemeBoundary.jsx';
@@ -243,7 +245,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
         && String(dataSource?.paginationMode || '').toLowerCase() === 'client'
         && pagingSize > 0;
     const requestedClientPage = Number(context?.signals?.input?.value?.page || 1);
-    const clientPageState = resolveClientPagination(displayedCollection, requestedClientPage, pagingSize, clientPagination);
+    const clientPageState = resolveClientPagination(displayedCollection, requestedClientPage, pagingSize, clientPagination && !listPage);
     const clientPage = clientPageState.page;
     const pageScrollStateRef = useRef({
         page: requestedClientPage,
@@ -364,16 +366,21 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
     }, [displayedCollection, sortColumnId, sortDirection, dataSource?.sortMode]);
 
     const renderedCollection = useMemo(() => {
-        return resolveClientPagination(sortedCollection, clientPage, pagingSize, clientPagination).rows;
-    }, [sortedCollection, clientPagination, clientPage, pagingSize]);
+        return resolveClientPagination(sortedCollection, clientPage, pagingSize, clientPagination && !listPage).rows;
+    }, [sortedCollection, clientPagination, clientPage, pagingSize, listPage]);
 
     useEffect(() => {
-        if (!clientPagination || requestedClientPage === clientPage) return;
+        if (listPage || !clientPagination || requestedClientPage === clientPage) return;
         handlers?.dataSource?.setPage?.(clientPage);
-    }, [clientPagination, requestedClientPage, clientPage, handlers]);
+    }, [listPage, clientPagination, requestedClientPage, clientPage, handlers]);
 
     useEffect(() => {
         const state = pageScrollStateRef.current;
+        if (listPage) {
+            if (state.collection !== collection && !context.signals.control?.peek()?.appending) resetPaginationScroll(scrollRef.current, false);
+            state.page = requestedClientPage; state.collection = collection; state.pending = false;
+            return;
+        }
         const pageChanged = state.page !== requestedClientPage;
         const collectionChanged = state.collection !== collection;
         state.page = requestedClientPage;
@@ -386,6 +393,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
         );
         if (clientPagination || collectionChanged) state.pending = false;
     }, [
+        listPage,
         requestedClientPage,
         collection,
         clientPagination,
@@ -591,6 +599,25 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
     );
     const loadingMode = tableLoadingMode({loading, error, rowCount: sortedCollection.length});
 
+    const continuousPaging = listPage && pagingEnabled && !clientPagination && !dataSource?.paging?.aggregate;
+    const listPageRef = useRef(listPage);
+    useEffect(() => {
+        if (listPageRef.current && !listPage && context.signals.control?.peek()?.appended) handlers.dataSource.setPage(1);
+        listPageRef.current = listPage;
+    }, [listPage, context, handlers]);
+    const loadNextRows = (retry = false) => {
+        const state = context.signals.control?.peek() || {};
+        const input = context.signals.input?.peek() || {};
+        if (!continuousPaging || queryDisabled || state.loading || state.inactive || input.fetch || input.refresh || state.error && !retry) return;
+        const rows = context.signals.collection?.peek() || [];
+        const info = context.signals.collectionInfo?.peek() || {};
+        const page = resolvePaginationState({info, inputPage: info.currentPage || info.page, loadedRowCount: rows.length});
+        if (state.loaded !== true && !retry || !rows.length || !canNavigateNext(page)) return;
+        handlers.dataSource.setPage(page.currentPage + 1, {append: true, ...(retry ? {cache: {bypassCache: true}} : {})});
+    };
+    const appending = listPage && context.signals.control?.value?.appending === true
+        && !(context.signals.input?.value?.fetch && !context.signals.input?.value?.appendPage);
+
     useEffect(() => {
         const scroller = scrollRef.current;
         if (!scroller || showEmptyState) {
@@ -630,6 +657,8 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
                     ? Math.round((scrollRect.top - wrapperRect.top) + scrollRect.height / 2)
                     : null,
             };
+            if (continuousPaging && visible && scroller.clientHeight > 0
+                && scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <= 112) loadNextRows();
             setHorizontalOverflow((previous) => (
                 previous.left === next.left && previous.right === next.right && previous.cueTop === next.cueTop ? previous : next
             ));
@@ -645,7 +674,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
             scroller.removeEventListener('scroll', update);
             observer?.disconnect();
         };
-    }, [showEmptyState, resolvedTableWidth, columnsToUse.length, renderedCollection.length]);
+    }, [showEmptyState, resolvedTableWidth, columnsToUse.length, renderedCollection.length, continuousPaging, loading, error, queryDisabled]);
 
     const scrollTableHorizontally = (direction) => {
         const scroller = scrollRef.current;
@@ -692,7 +721,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
             {showEmptyState ? (
                 <TableEmptyState context={context} config={resolvedEmptyState}/>
             ) : (
-                <div className={`basic-table-scroll${renderRows ? ' has-responsive-cards' : ''}`} ref={scrollRef} tabIndex={0} aria-label="Table data; scroll horizontally for more columns">
+                <div aria-busy={listPage && loading || undefined} className={`basic-table-scroll${renderRows ? ' has-responsive-cards' : ''}`} ref={scrollRef} tabIndex={0} aria-label="Table data; scroll horizontally for more columns">
                     {renderRows ? renderRows({
                         rows: renderedCollection,
                         columns: columnsToUse,
@@ -724,6 +753,8 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
                         backfillCount={backfillCount}
                         loading={loading}
                         error={error}
+                        rowSkeletons={listPage}
+                        appending={appending}
                         enforceColumnSize={enforceColumnSize}
                         onShowFullContent={handleShowFullContent}
                     />
@@ -733,7 +764,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
                 </div>
             )}
 
-            {loadingMode === 'refresh' ? (
+            {!listPage && loadingMode === 'refresh' ? (
                 <div className="table-refresh-indicator" role="status" aria-live="polite">
                     <Spinner size={14} />
                     <span>Refreshing rows…</span>
@@ -787,7 +818,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
     return <ListPagePattern title={container.title || tableTitle || 'Records'}
         period={headerItems.length ? <Toolbar context={toolbarContext} toolbarItems={headerItems}/> : null}
         actions={<Toolbar context={toolbarContext} toolbarItems={pageItems} leftContent={toolbarActions} className="forge-list-page__actions" exportRows={sortedCollection} exportPageRows={renderedCollection} exportColumns={exportColumns}/>}
-        summary={!loading && !error && <div className="forge-list-page__summary"><span>Summary: {collectionCountValue(info, sortedCollection, {properties: {pluralLabel: container.title || 'records', singularLabel: container.title || 'record'}})}{selectedCount?` · ${selectedCount} selected`:''}</span>{pagingEnabled && <PaginationBar context={toolbarContext} pagingEnabled pageSize={pagingSize} pageSizeOptions={pagination?.pageSizeOptions}/>}</div>}>
+        summary={<div className="forge-list-page__summary"><span role="status" aria-live="polite">{loading ? appending ? 'Loading more rows…' : 'Loading rows…' : error && !appending ? 'Rows could not be loaded' : <>Summary: {collectionCountValue(info, sortedCollection, {properties: {pluralLabel: container.title || 'records', singularLabel: container.title || 'record'}})}{selectedCount?` · ${selectedCount} selected`:''}</>}</span>{error && appending ? <Button variant="ghost" onClick={() => loadNextRows(true)}>Retry loading rows</Button> : null}</div>}>
         {tableSurface}
     </ListPagePattern>;
 };
