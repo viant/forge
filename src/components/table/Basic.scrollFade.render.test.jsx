@@ -18,15 +18,17 @@ it.each(['baseline','design-system-2'])('uses existing scroll activity only in D
   const scroller=host.querySelector('.basic-table-scroll');
   Object.defineProperties(scroller,{clientWidth:{value:500},getClientRects:{value:()=>[{}]}});
   const animations=[];
-  const animate=vi.fn(()=>{const animation={id:'',cancelled:false};animation.cancel=vi.fn(()=>{animation.cancelled=true;});animations.push(animation);return animation;});
+  const animate=vi.fn(()=>{const animation={id:'',currentTime:700,cancelled:false,effect:{setKeyframes:vi.fn()},play:vi.fn()};animation.cancel=vi.fn(()=>{animation.cancelled=true;});animations.push(animation);return animation;});
   scroller.animate=animate;scroller.getAnimations=()=>animations.filter(animation=>!animation.cancelled);
   await act(async()=>scroller.dispatchEvent(new Event('scroll')));
   await act(async()=>scroller.dispatchEvent(new Event('scroll')));
   await act(async()=>scroller.dispatchEvent(new Event('scroll')));
-  expect(animate.mock.calls.length).toBe(theme==='design-system-2'?3:0);
+  expect(animate.mock.calls.length).toBe(theme==='design-system-2'?1:0);
   if(theme==='design-system-2'){
-   expect(animations[0].cancel).toHaveBeenCalledOnce();
-   expect(animations[1].id).toBe('forge-scrollbar-activity');
+   expect(animations[0].cancel).not.toHaveBeenCalled();
+   expect(animations[0].currentTime).toBe(0);
+   expect(animations[0].play).toHaveBeenCalledTimes(2);
+   expect(animations[0].id).toBe('forge-scrollbar-activity');
    expect(animate.mock.calls[0][0].at(-1).scrollbarColor).toBe('transparent transparent');
   }
  }finally{await act(async()=>root.unmount());host.remove();}
@@ -36,7 +38,7 @@ it('covers future scroll regions and owned portals once, and removes activity on
  globalThis.IS_REACT_ACT_ENVIRONMENT=true;
  const host=document.createElement('div');document.body.append(host);const root=createRoot(host);const animations=[];
  const original=document.getAnimations;document.getAnimations=()=>animations.filter(x=>!x.cancelled);
- const decorate=element=>{element.getAnimations=()=>animations.filter(x=>x.target===element&&!x.cancelled);element.animate=vi.fn(()=>{const a={target:element,id:'',cancelled:false};a.cancel=vi.fn(()=>{a.cancelled=true;});animations.push(a);return a;});return element;};
+ const decorate=element=>{element.getAnimations=()=>animations.filter(x=>x.target===element&&!x.cancelled);element.animate=vi.fn(()=>{const a={target:element,id:'',cancelled:false,effect:{setKeyframes:vi.fn()},play:vi.fn()};a.cancel=vi.fn(()=>{a.cancelled=true;});animations.push(a);return a;});return element;};
  const view=theme=><ForgeThemeProvider themeId={theme}><ForgeThemeProvider><ForgeThemeBoundary windowKey="scroll-pattern"><div data-scroll-example="future"/></ForgeThemeBoundary></ForgeThemeProvider></ForgeThemeProvider>;
  try{
   await act(async()=>root.render(view('design-system-2')));
