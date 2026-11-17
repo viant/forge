@@ -36,6 +36,7 @@ it.each(['page','offset','cursor'])('appends %s pages through the existing datas
   expect(f.host.querySelector('.table-refresh-indicator')).toBeNull();
   await f.complete(data.slice(0,10),mode==='cursor'?{nextCursor:'second',hasMore:true}:{});
   const scroll=f.host.querySelector('.basic-table-scroll');
+  scroll.getAnimations=()=>[];scroll.animate=()=>({id:''});
   Object.defineProperties(scroll,{clientHeight:{configurable:true,value:200},scrollHeight:{configurable:true,get:()=>f.context.signals.collection.peek().length*56+48},clientWidth:{configurable:true,value:800},getClientRects:{configurable:true,value:()=>[{}]}});
   await settle(()=>scroll.dispatchEvent(new Event('scroll')));
   await settle(()=>{scroll.scrollTop=480;scroll.dispatchEvent(new Event('scroll'));});

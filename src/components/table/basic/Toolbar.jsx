@@ -273,7 +273,13 @@ const Toolbar = ({
         [item.visibleWhen,item.hiddenWhen,item.disabledWhen,item.readOnlyWhen].forEach(guard=>trackVisibleWhen(guard,guardContext));
         const {events = {}, stateEvents} = toolbarEvents[item.id] || {};
         const isVisible = stateEvents?.onVisible ? stateEvents.onVisible() : true;
-        if (!toolbarItemShouldRender(item, context, isVisible)) return null;
+        const allowed = toolbarItemShouldRender(item, context, isVisible);
+        const unavailablePrimary = !allowed && isDesignSystem2
+            && className.split(' ').includes('forge-list-page__actions')
+            && (item.intent === 'primary' || item.variant === 'primary');
+        if (!allowed && !unavailablePrimary) return null;
+        if (unavailablePrimary) item = {...item, disabled: true,
+            tooltip: item.tooltip || 'This action is unavailable with your current access.'};
         const isReadonly = stateEvents?.onReadonly ? stateEvents.onReadonly() : false;
         if (item.type === 'quickSearch') {
             return <QuickSearch key={item.id} context={context} item={item} disabled={queryDisabled || toolbarItemShouldDisable(item, context) || disabled} onCommit={events.onChange}/>;

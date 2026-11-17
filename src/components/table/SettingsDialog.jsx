@@ -198,7 +198,7 @@ const SettingsDialog = ({
                     {savedViews && <TableViewPresets model={savedViews} columns={localColumns} baseColumns={baseColumns} density={localDensity} onApply={(next,preferences)=>{setLocalColumns(next);setLocalDensity(preferences.density||density);}}/>}</section>
                     <hr/>
                     <section className="forge-drawer-section"><Typography as="h3" typeRole="label" className="forge-drawer-section-label">Columns</Typography><div className="forge-list-page__columns">{localColumns.filter(column=>(column.name || column.displayName)&&String(column.displayName||column.name).toLowerCase().includes(columnQuery.toLowerCase())).map(column=><div className="forge-drawer-option" key={column.id}><Checkbox label={column.displayName || column.name} checked={column.visible || column.nonExcludable} disabled={column.nonExcludable} onChange={()=>handleToggleVisible(column.id)}/></div>)}</div></section>
-                    <details><summary>Advanced column settings</summary>{renderColumnsPanel()}</details>
+                    <details><summary className="forge-drawer-section-label"><UnifiedIcon name="lucide:chevron-right"/><span>Advanced column settings</span></summary>{renderColumnsPanel()}</details>
                 </div> : <Tabs id="settings-tabs" selectedTabId={selectedTabId} onChange={handleTabChange} animate={false}>
                     <Tab id="visibility" title="Visibility" panel={renderVisibilityPanel()} />
                     <Tab id="columns" title="Columns" panel={renderColumnsPanel()} />

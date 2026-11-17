@@ -16,9 +16,9 @@ import FilterChips from '../../components/content/FilterChips.jsx';
 import Avatar from '../../components/Avatar.jsx';
 import Popover from '../../components/Popover.jsx';
 import DropdownMenu from '../../components/DropdownMenu.jsx';
-import {revealScrollbar} from '../../components/scrollbarActivity.js';
 import SwitchControl from '../../components/SwitchControl.jsx';
 import SectionTabRail from '../../components/SectionTabRail.jsx';
+import {WorkspaceRuntimeTabs,workspaceTabID,workspacePanelID} from '../../components/WorkspaceRuntimeSurface.jsx';
 import {SectionPattern} from '../../components/patterns/index.js';
 import ContentCarousel from '../../components/content/ContentCarousel.jsx';
 import ChipList from '../../components/ChipList.jsx';
@@ -198,6 +198,7 @@ function ToolbarExample({variant,state,thumbnail}) {
 function LocalTabs({variant='Default',disabled=false}) {
     const [selected,setSelected]=useState('overview');const base=useId().replace(/:/g,'');
     const items=[{id:'overview',label:'Overview',icon:'lucide:file-text'},{id:'activity',label:'Activity',icon:'lucide:activity'},{id:'settings',label:'Settings',icon:'lucide:settings'}].map(item=>({...item,disabled}));
+    if(variant==='Workspace')return <div className="catalog-full"><WorkspaceRuntimeTabs id={base} entries={items.map(item=>({windowId:item.id,label:item.label,disabled}))} selectedId={selected} onSelect={setSelected} ariaLabel="Open example workspaces" className="forge-window-manager-tablist" itemClassName="forge-window-manager-tab" tabClassName="bp6-tab" renderLabel={item=><><Icon name={items.find(entry=>entry.id===item.windowId).icon}/>{item.label}</>}/><div className="catalog-tab-panel" role="tabpanel" id={workspacePanelID(base,selected)} aria-labelledby={workspaceTabID(base,selected)}>{items.find(item=>item.id===selected).label} workspace</div></div>;
     return <div className="catalog-full"><SectionTabRail ariaLabel="Example views" items={items} showIcons={variant==='With icons'} selectedId={selected} onChange={setSelected} idPrefix={base} panelId={`${base}-panel`}/><div className="catalog-tab-panel" role="tabpanel" id={`${base}-panel`} aria-labelledby={`${base}-tab-${items.findIndex(item=>item.id===selected)}`}>{selected==='overview'?'A clear view of the current document.':selected==='activity'?'Recent updates appear here.':'Choose how this document behaves.'}</div></div>;
 }
 
@@ -312,7 +313,7 @@ export default function CatalogExample({spec,variant=spec.variants[0],state='Def
         const leading=variant==='Leading icon'||variant==='Leading and trailing icons';
         const trailing=variant==='Trailing icon'||variant==='Leading and trailing icons';
         const labels=variant==='Scrollable'?['Design foundations','Component library','Usage guidelines','Color variables','Typography','Spacing','Icons','Accessibility','Motion','Layout','Patterns','Resources']:['Design foundations','Component library'];
-        return <div className="catalog-stack catalog-example-field"><div className="forge-dropdown-menu catalog-full"><Menu aria-label="Example menu options" role="listbox" onScroll={revealScrollbar}>
+        return <div className="catalog-stack catalog-example-field"><div className="forge-dropdown-menu catalog-full"><Menu aria-label="Example menu options" role="listbox">
             {labels.map((label,index)=><MenuItem key={label} roleStructure="listoption" selected={count>0?value===label:pressed&&index===0} disabled={disabled} active={state==='Hover'&&index===0}
                 icon={leading?<Icon name={index===0?'lucide:file-text':'lucide:layers'}/>:undefined}
                 labelElement={trailing?<Icon name="lucide:chevron-right"/>:undefined}
