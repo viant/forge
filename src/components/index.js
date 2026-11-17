@@ -85,3 +85,5 @@ export {default as ReviewTable} from './dashboard/ReviewTable.jsx';
 export {default as Popover} from './Popover.jsx';
 export {default as DropdownMenu} from './DropdownMenu.jsx';
 export {anchoredPopoverProps} from './anchoredPopoverProps.js';
+
+export {default as GuidedResult} from './GuidedResult.jsx';

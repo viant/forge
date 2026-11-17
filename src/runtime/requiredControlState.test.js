@@ -16,4 +16,8 @@ assert.equal(usesResolvedRequiredPastel({widgetKey: 'text', item: {optionsDataSo
 assert.equal(usesResolvedRequiredPastel({widgetKey: 'text', item: {type: 'text'}}), false);
 assert.equal(usesResolvedRequiredPastel({widgetKey: 'number', item: {type: 'number'}}), false);
 
+assert.equal(resolveRequiredControlState({required: true, widgetKey: 'radio', value: undefined}), '');
+assert.equal(resolveRequiredControlState({required: true, widgetKey: 'radio', value: undefined, validationError: 'Required'}), 'invalid');
+assert.equal(resolveRequiredControlState({required: true, widgetKey: 'radio', value: 'weekly'}), 'resolved');
+
 console.log('requiredControlState ✓ distinguishes resolved, missing, invalid, and neutral controls');

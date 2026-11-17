@@ -359,7 +359,8 @@ function WidgetRendererContent({
         readOnly: widgetProps.readOnly,
         disabled: widgetProps.disabled,
         value: safeValue,
-        validationError: validationMsg,
+        validationError: validationMsg || item?.validationError,
+        widgetKey,
     });
     const renderRequiredState = requiredState && (
         requiredState !== 'resolved' || usesResolvedRequiredPastel({widgetKey, item})

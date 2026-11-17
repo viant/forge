@@ -8,6 +8,7 @@ import {useForgeTheme} from "../ThemeBoundary.jsx";
 import {getWidget} from "../../runtime/widgetRegistry.js";
 import SelectControl from "../SelectControl.jsx";
 import Typography from "../Typography.jsx";
+import GuidedResult from '../GuidedResult.jsx';
 import WorldCountryMap from "./WorldCountryMap.jsx";
 import {WORLD_COUNTRY_PATHS} from "./worldCountryModel.js";
 import {resolveKey} from "../../utils/selector.js";
@@ -2029,9 +2030,12 @@ export function DashboardLookupChips({container, context}) {
     );
 }
 
-export function DashboardBlock({container, context, isActive, children}) {
+export function DashboardBlock({container, context, isActive, children, onAction}) {
     let content = null;
     switch (container.kind) {
+        case 'dashboard.guidedResult':
+            content = <GuidedResult {...container.guidedResult} onAction={onAction}/>;
+            break;
         case 'dashboard.summary':
             content = <DashboardSummary container={container} context={context}/>;
             break;

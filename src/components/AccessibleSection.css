@@ -1,0 +1,40 @@
+/* The existing section can also host an in-flow form and its actions. */
+.forge-section.bp6-section[data-forge-appearance="document"] {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: var(--forge-border-width, 1px) solid var(--forge-border-color, #d8dfe6);
+    border-radius: var(--forge-control-radius, 8px);
+    background: var(--forge-surface, #fff);
+    color: var(--forge-text, inherit);
+    box-shadow: none;
+}
+.forge-section[data-forge-appearance="document"] > [data-forge-part="section-header"] {
+    --forge-section-header-font-size: var(--forge-type-section-size, var(--forge-default-type-section-size));
+    --forge-section-header-line-height: var(--forge-type-section-line-height, var(--forge-default-type-section-line-height));
+    padding: var(--forge-spacing-4, 16px);
+    border: 0;
+    background: transparent;
+}
+.forge-section[data-forge-appearance="document"] .bp6-section-header-left { padding: 0; min-width: 0; }
+.forge-section[data-forge-appearance="document"] [data-forge-part="section-title"] { margin: 0; overflow-wrap: anywhere; color: var(--forge-text, inherit); }
+.forge-section[data-forge-appearance="document"] .bp6-section-header-sub-title { color: var(--forge-text-muted, inherit); }
+.forge-section.bp6-section[data-forge-appearance="document"] .bp6-section-header-collapse-caret { color: var(--forge-text-secondary, inherit); }
+.forge-section.bp6-section[data-forge-appearance="document"] .bp6-section-header-collapse-caret .bp6-icon { color: inherit; }
+.forge-section[data-forge-appearance="document"] [data-forge-part="section-content"] {
+    padding: 0 var(--forge-spacing-4, 16px) var(--forge-spacing-4, 16px);
+    gap: var(--forge-spacing-3, 12px);
+}
+.forge-section[data-forge-appearance="document"] > [data-forge-part="section-actions"] {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--forge-spacing-2, 8px);
+    padding: 0 var(--forge-spacing-4, 16px) var(--forge-spacing-4, 16px);
+}
+@media (pointer: coarse) {
+    .forge-section[data-forge-appearance="document"] .bp6-section-header-collapse-caret {
+        min-width: 44px;
+        min-height: 44px;
+    }
+}

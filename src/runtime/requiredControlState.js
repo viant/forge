@@ -6,9 +6,10 @@ export function hasRequiredControlValue(value) {
     return true;
 }
 
-export function resolveRequiredControlState({required, readOnly, disabled, value, validationError} = {}) {
+export function resolveRequiredControlState({required, readOnly, disabled, value, validationError, widgetKey} = {}) {
     if (!required || readOnly || disabled) return '';
     if (validationError) return 'invalid';
+    if (widgetKey === 'radio' && !hasRequiredControlValue(value)) return '';
     return hasRequiredControlValue(value) ? 'resolved' : 'missing';
 }
 
