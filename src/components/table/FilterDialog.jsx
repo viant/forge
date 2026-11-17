@@ -6,7 +6,8 @@ import './FilterDialog.css';
 import Button from '../Button.jsx';
 import SelectControl from '../SelectControl.jsx';
 import {typographyProps} from '../Typography.jsx';
-import { Checkbox, Classes, Dialog, DialogBody, DialogFooter, InputGroup } from "@blueprintjs/core";
+import Icon from '../Icon.jsx';
+import { Checkbox, Dialog, Drawer, DialogBody, DialogFooter, InputGroup, Menu, MenuItem } from "@blueprintjs/core";
 import {normalizeSubmittedFilterValue} from './filterValue.js';
 
 const FilterDialog = ({
@@ -16,6 +17,7 @@ const FilterDialog = ({
                           filter = {},
                           onApplyFilters,
                           context,
+                          presentation = 'dialog',
                       }) => {
     useSignals();
     const visible = item => {
@@ -29,6 +31,8 @@ const FilterDialog = ({
     const visibleSets = filterSets.filter(visible);
     const [selectedSet, setSelectedSet] = useState({});
     const [filterValues, setFilterValues] = useState({});
+    const [fieldId,setFieldId] = useState(null);
+    const [query,setQuery] = useState('');
 
     const activeSet = visibleSets.find(set => set.name === selectedSet.name) || visibleSets[0] || {};
     const visibleTemplate = (activeSet.template || []).filter(visible).map(field => ({...field,
@@ -36,6 +40,8 @@ const FilterDialog = ({
 
     useEffect(() => {
         if (isOpen && visibleSets.length > 0) {
+            setFieldId(null);
+            setQuery('');
             const defSet = visibleSets.find((fs) => fs.default) || visibleSets[0];
             setSelectedSet(defSet);
             setFilterValues(
@@ -64,8 +70,8 @@ const FilterDialog = ({
             || '';
         for (const field of visibleTemplate) {
             const value = filterValues[field.id];
-            if (value === '' || value === undefined) continue;
-            if (Array.isArray(field.options) && !field.options.some(option => String(option.value) === String(value))) continue;
+            if (value === '' || value === undefined || Array.isArray(value)&&value.length===0) continue;
+            if (Array.isArray(field.options) && !(Array.isArray(value)?value:[value]).every(candidate=>field.options.some(option => String(option.value) === String(candidate)))) continue;
             appliedFilter[field.id] = normalizeSubmittedFilterValue(field, value, filterMode, {textInput: !Array.isArray(field.options)});
         }
         onApplyFilters({...activeSet, filter: appliedFilter});
@@ -77,14 +83,35 @@ const FilterDialog = ({
         onClose();
     };
 
+    const drawer = presentation === 'drawer';
+    const Frame = drawer ? Drawer : Dialog;
+    const activeField=visibleTemplate.find(field=>field.id===fieldId);
+    const changed=visibleTemplate.some(field=>JSON.stringify(filterValues[field.id]??(field.type==='boolean'?false:''))!==JSON.stringify(filter[field.id]??(field.type==='boolean'?false:'')));
+    const hasAppliedFilters=Object.values(filter).some(value=>value!==''&&value!=null&&String(value)!=='');
+    const renderFieldControl=field=>{
+        const controlId=`forge-filter-${field.id}`;
+        if(field.type==='boolean')return <Checkbox id={controlId} label={field.label} checked={filterValues[field.id]===true} onChange={event=>handleInputChange(field.id,event.target.checked)}/>;
+        if(Array.isArray(field.options)) {
+            const multiple=String(field.type||'').endsWith('[]')||field.operator==='in';
+            if(drawer&&multiple) {
+                const selected=Array.isArray(filterValues[field.id])?filterValues[field.id]:filterValues[field.id]?[filterValues[field.id]]:[];
+                const options=field.options.filter(option=>String(option.label??option.value).toLowerCase().includes(query.toLowerCase()));
+                const all=options.length>0&&options.every(option=>selected.includes(option.value));
+                return <div className="forge-drawer-choice-list"><div className="forge-drawer-option"><Checkbox label="Select all" checked={all} indeterminate={!all&&options.some(option=>selected.includes(option.value))} onChange={()=>handleInputChange(field.id,all?selected.filter(value=>!options.some(option=>option.value===value)):[...new Set([...selected,...options.map(option=>option.value)])])}/></div>{options.map(option=><div className="forge-drawer-option" key={String(option.value)}><Checkbox label={option.label??String(option.value)} checked={selected.includes(option.value)} onChange={()=>handleInputChange(field.id,selected.includes(option.value)?selected.filter(value=>value!==option.value):[...selected,option.value])}/></div>)}</div>;
+            }
+            return <SelectControl id={controlId} {...typographyProps('body')} value={filterValues[field.id]??''} onChange={event=>handleInputChange(field.id,event.target.value)}><option value="">All</option>{field.options.map(option=><option key={String(option.value)} value={option.value}>{option.label??option.value}</option>)}</SelectControl>;
+        }
+        return <InputGroup id={controlId} data-forge-part="input" {...typographyProps('body')} placeholder={field.operator} value={filterValues[field.id]??''} onChange={event=>handleInputChange(field.id,event.target.value)}/>;
+    };
     return (
-        <Dialog
+        <Frame
             isOpen={isOpen}
             onClose={onClose}
-            title="Filter"
-            className="forge-filter-dialog forge-foundation-overlay"
+            title={drawer ? activeField?<span className="forge-drawer-heading"><Button variant="ghost" size="compact" icon="lucide:chevron-left" hideLabel aria-label="Back to filters" onClick={()=>{setFieldId(null);setQuery('');}}/><span>{activeField.label}</span></span>:'Filter View' : 'Filter'}
+            className={`forge-filter-dialog${drawer ? ' forge-drawer forge-list-page-drawer' : ' forge-foundation-overlay'}`}
+            {...(drawer ? {position:'right',size:360,transitionDuration:200,shouldReturnFocusOnClose:true} : {})}
         >
-            <DialogBody>
+            <DialogBody className={drawer ? 'forge-drawer-body' : undefined}>
                 {visibleSets.length > 1 && (
                     <>
                         <h5>Available Filter Sets</h5>
@@ -108,52 +135,29 @@ const FilterDialog = ({
                     </>
                 )}
 
-                <div className="forge-filter-dialog__fields">
+                {drawer ? <>
+                    {(!activeField||Array.isArray(activeField.options))&&<InputGroup className="forge-drawer-search" type="search" data-forge-part="input" placeholder="Search" aria-label={activeField?'Search filter options':'Search filters'} leftElement={<Icon name="lucide:search" className="bp6-icon"/>} value={query} onChange={event=>setQuery(event.target.value)}/>}
+                    <div className="forge-drawer-scroll">{activeField?<div className="forge-filter-dialog__fields"><label className="forge-filter-dialog__label" {...typographyProps('label')} htmlFor={`forge-filter-${activeField.id}`}>{Array.isArray(activeField.options)?'Options':'Value'}</label>{renderFieldControl(activeField)}</div>:<Menu className="forge-drawer-options" aria-label="Available filters">{visibleTemplate.filter(field=>String(field.label||field.id).toLowerCase().includes(query.toLowerCase())).map(field=><MenuItem tagName="button" key={field.id} text={field.label} labelElement={<Icon name="lucide:chevron-right"/>} onClick={()=>{setFieldId(field.id);setQuery('');}}/>)}{!visibleTemplate.length&&<MenuItem disabled text="No filters are available."/>}</Menu>}</div>
+                </> : <div className="forge-filter-dialog__fields">
                     {visibleTemplate.map((tpl) => (
                         <React.Fragment key={tpl.id}>
                             <label {...typographyProps('label')} htmlFor={`forge-filter-${tpl.id}`} className="forge-filter-dialog__label">
                                 {tpl.label}
                             </label>
-                            {tpl.type === 'boolean' ? (
-                                <Checkbox
-                                    id={`forge-filter-${tpl.id}`}
-                                    checked={filterValues[tpl.id] === true}
-                                    onChange={(e) => handleInputChange(tpl.id, e.target.checked)}
-                                />
-                            ) : Array.isArray(tpl.options) ? (
-                                <SelectControl
-                                    id={`forge-filter-${tpl.id}`}
-                                    {...typographyProps('body')}
-                                    value={filterValues[tpl.id] ?? ''}
-                                    onChange={(e) => handleInputChange(tpl.id, e.target.value)}
-                                >
-                                    <option value="">All</option>
-                                    {tpl.options.map((option) => (
-                                        <option key={String(option.value)} value={option.value}>{option.label ?? option.value}</option>
-                                    ))}
-                                </SelectControl>
-                            ) : (
-                                <InputGroup
-                                    data-forge-part="input"
-                                    {...typographyProps('body')}
-                                    id={`forge-filter-${tpl.id}`}
-                                    placeholder={tpl.operator}
-                                    value={filterValues[tpl.id] ?? ""}
-                                    onChange={(e) => handleInputChange(tpl.id, e.target.value)}
-                                />
-                            )}
+                            {renderFieldControl(tpl)}
                         </React.Fragment>
                     ))}
-                </div>
+                </div>}
             </DialogBody>
-            <DialogFooter
+            {(!drawer||activeField||changed||hasAppliedFilters)&&<DialogFooter
+                className={drawer ? 'forge-drawer-actions' : undefined}
                 actions={[
-                    <Button key="cancel" variant="secondary" onClick={onClose}>Cancel</Button>,
-                    <Button key="clear" variant="ghost" onClick={handleClearFilters}>Clear filters</Button>,
-                    <Button key="ok" variant="primary" onClick={handleApplyFilters}>OK</Button>,
+                    <Button key="cancel" variant={drawer?'ghost':'secondary'} onClick={onClose}>Cancel</Button>,
+                    !drawer||hasAppliedFilters?<Button key="clear" variant="ghost" onClick={handleClearFilters}>Clear filters</Button>:null,
+                    <Button key="ok" variant="primary" disabled={drawer&&!changed} onClick={handleApplyFilters}>{drawer?'Apply':'OK'}</Button>,
                 ]}
-            />
-        </Dialog>
+            />}
+        </Frame>
     );
 };
 

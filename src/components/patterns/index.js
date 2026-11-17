@@ -5,6 +5,7 @@
  * by the active workspace/application theme.
  */
 export {default as SectionPattern} from './SectionPattern.jsx';
+export {default as ListPagePattern} from './ListPagePattern.jsx';
 export {
     resolveSectionAppearance,
     resolveSectionContentInset,
@@ -14,6 +15,10 @@ export {
 } from '../containerChrome.js';
 
 export const patternCatalog = Object.freeze({
+    listPage: Object.freeze({
+        component: 'ListPagePattern',
+        regions: Object.freeze(['title', 'period', 'actions', 'table', 'summary']),
+    }),
     section: Object.freeze({
         component: 'SectionPattern',
         appearances: Object.freeze(['primary', 'quiet']),

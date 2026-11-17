@@ -73,6 +73,10 @@ function resolveCivilDateRangePreset(value, today, lifetimeStart, range) {
         case 'yesterday': start = end = addDays(-1); break;
         case 'week': start = addDays(-6); break;
         case 'month': start = sameDayPreviousMonth; break;
+        case 'current_month':
+            start = monthStart;
+            end = civilDate(today.getUTCFullYear(), today.getUTCMonth() + 1, 0);
+            break;
         case 'month_to_date': start = monthStart; break;
         case 'last_month':
             start = civilDate(today.getUTCFullYear(), today.getUTCMonth() - 1, 1);

@@ -312,7 +312,7 @@ export function DateRangePresetInput({
         }}
     }),`${disabled}:${readOnly}:${open}`);
     const renderCustomCalendar = (edge, label) => <DateInput3
-        {...buildDateProps({type:'date',dateFnsFormat:'yyyy-MM-dd',valueMode:'civil'}, {properties:{
+        {...buildDateProps({type:'date',dateFnsFormat:'MMM d, yyyy',valueMode:'civil'}, {properties:{
             inputProps:{'aria-label':label,leftIcon:<SharedIcon name="lucide:calendar" className="bp6-icon"/>},
             ...(edge === 'start' && customDraft.end ? {maxDate:parseCivilDateInput(customDraft.end)} : {}),
             ...(edge === 'end' && customDraft.start ? {minDate:parseCivilDateInput(customDraft.start)} : {}),
@@ -331,7 +331,7 @@ export function DateRangePresetInput({
                     aria-label={`${item?.label || 'Date range'} options`}
                     style={{
                         ...(!themedCalendar ? {position:'fixed',top:popupPosition.top,left:popupPosition.left,zIndex:3000} : {}),
-                        width: 360,
+                        width: themedCalendar ? '100%' : 360,
                         maxWidth: 'min(360px, calc(100vw - 32px))',
                         border: themedCalendar ? 'var(--forge-border-width, 1px) solid var(--forge-border-color)' : '1px solid #d7dbe5',
                         borderRadius: themedCalendar ? 'var(--forge-menu-radius, 6px)' : 10,
@@ -400,7 +400,7 @@ export function DateRangePresetInput({
     );
     return (
         <div className="forge-date-range-preset" style={{position:'relative',minWidth:0,width:'100%'}}>
-            {themedCalendar ? <Popover minimal popupKind="dialog" isOpen={open} disabled={readOnly || disabled}
+            {themedCalendar ? <Popover minimal matchTargetWidth popupKind="dialog" isOpen={open} disabled={readOnly || disabled}
                 onInteraction={next => {if(next && !open)setCustomDraft({start,end});setOpen(next);}}
                 content={panel} targetProps={{onKeyDown:undefined}}>
                 <Button ref={triggerRef} type="button" rightIcon={open ? 'chevron-up' : 'chevron-down'}

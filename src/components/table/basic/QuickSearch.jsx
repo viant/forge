@@ -3,6 +3,7 @@ import NativeControlTarget from '../../../runtime/NativeControlTarget.jsx';
 import React, {useLayoutEffect, useRef, useState} from 'react';
 import {Button, InputGroup} from '@blueprintjs/core';
 import {useSignals} from '@preact/signals-react/runtime';
+import {useForgeTheme} from '../../ThemeBoundary.jsx';
 
 export function updateQuickSearch(context, field, value) {
     const current = context?.signals?.input?.peek?.() || {};
@@ -16,10 +17,11 @@ export function updateQuickSearch(context, field, value) {
 
 export default function QuickSearch({context, item, disabled = false, onCommit}) {
     useSignals();
+    const fieldAppearance = useForgeTheme()?.themeId === 'design-system-2' && item?.appearance === 'field';
     const field = String(item?.dataField || item?.properties?.field || '').trim();
     const windowFormBinding = item?.scope === 'windowForm';
     const label = item?.properties?.label || 'Name contains';
-    const trigger = item?.properties?.requestTrigger === 'change' ? 'change' : 'blur';
+    const trigger = fieldAppearance || item?.properties?.requestTrigger === 'change' ? 'change' : 'blur';
     const [expanded, setExpanded] = useState(false);
     const input = useRef(null), button = useRef(null);
     const value = String((windowFormBinding ? context?.signals?.windowForm?.value?.[field] : context?.signals?.input?.value?.filter?.[field]) ?? '');
@@ -39,19 +41,20 @@ export default function QuickSearch({context, item, disabled = false, onCommit})
         setDraft('');
         commit('');
         setExpanded(false);
-        button.current?.focus();
+        if (fieldAppearance) input.current?.focus(); else button.current?.focus();
     };
     return <NativeControlTarget context={context} item={{...item,scope:windowFormBinding?'windowForm':'filter',dataField:field}} disabled={disabled} value={value}
         validate={next=>typeof next==='string'?null:'search text must be a string'} actions={{setValue:({value:next})=>{setDraft(next);setExpanded(true);return commit(next,true);},click:()=>expanded?close():setExpanded(true)}}><div className="forge-quick-search">
-        <Button type="button" icon={<UnifiedIcon name="search"/>} minimal elementRef={button}
+        {!fieldAppearance && <Button type="button" icon={<UnifiedIcon name="search"/>} minimal elementRef={button}
             className="forge-toolbar-action is-icon-only"
             disabled={disabled} aria-label={expanded ? 'Close quick search' : `Search: ${label}`}
             title={expanded ? 'Clear and close quick search' : label}
             aria-expanded={expanded} aria-pressed={expanded || !!value}
-            onClick={() => expanded ? close() : setExpanded(true)}/>
-        {expanded ? <InputGroup inputRef={input} type="search" value={draft}
-            className="forge-quick-search-input" data-forge-part="input"
-            aria-label={label} placeholder={`${label}…`} disabled={disabled}
+            onClick={() => expanded ? close() : setExpanded(true)}/>}
+        {expanded || fieldAppearance ? <InputGroup inputRef={input} type="search" value={draft}
+            className={`forge-quick-search-input${fieldAppearance?' forge-list-page__search':''}`} data-forge-part="input"
+            leftElement={fieldAppearance?<UnifiedIcon name="lucide:search" className="bp6-icon"/>:undefined}
+            aria-label={fieldAppearance ? item?.properties?.placeholder || label : label} placeholder={fieldAppearance ? item?.properties?.placeholder || label : `${label}…`} disabled={disabled}
             onChange={event => { setDraft(event.target.value); if (trigger === 'change') commit(event.target.value); }}
             onBlur={event => { if (event.relatedTarget !== button.current) commit(event.target.value); }}
             onKeyDown={event => {if (event.key === 'Enter') {event.preventDefault(); commit(draft);} if (event.key === 'Escape') {event.preventDefault(); close();}}}/> : null}

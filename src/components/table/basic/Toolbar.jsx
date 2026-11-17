@@ -320,7 +320,7 @@ const Toolbar = ({
                         <Button
                             type="button"
                             icon={toolbarItemIcon(item.icon)}
-                            rightIcon={(iconName => iconName ? <UnifiedIcon name={iconName}/> : iconName)(actionIconOnly({...item, icon: item.icon || 'export'}) ? undefined : "caret-down")}
+                            rightIcon={(isDesignSystem2 ? actionIconOnly(item) : actionIconOnly({...item, icon: item.icon || 'export'})) ? undefined : <UnifiedIcon name={isDesignSystem2 ? 'lucide:chevron-down' : 'caret-down'}/>}
                             className={['forge-toolbar-action', actionIconOnly(item) ? 'is-icon-only' : '', item.className].filter(Boolean).join(' ')}
                             disabled={menuDisabled}
                             aria-label={actionAccessibleName(item)}
@@ -406,8 +406,8 @@ const Toolbar = ({
         if (isSelect) {
             const ctx = item.dataSourceRef ? context?.Context?.(item.dataSourceRef) || context : context;
             const form = item.scope === 'windowForm'
-                ? (ctx?.handlers?.dataSource?.peekWindowFormData?.() || {})
-                : (ctx?.handlers?.dataSource?.peekFormData?.() || {});
+                ? (ctx?.signals?.windowForm?.value || ctx?.handlers?.dataSource?.peekWindowFormData?.() || {})
+                : (ctx?.signals?.form?.value || ctx?.handlers?.dataSource?.peekFormData?.() || {});
             const field = item.field || item.bind || item.id;
             const value = (form && field && form[field] !== undefined) ? form[field] : item.value;
             const directChange = (event) => {
@@ -422,6 +422,16 @@ const Toolbar = ({
                 targetSignal.value = {...previous, [field]: nextValue};
             };
             const selectValue=(next,strict=false)=>dispatchToolbarSelectChange({target:{value:next}},directChange,strict?(events.onChange?.operate || events.onChange):events.onChange);
+            if (isDesignSystem2 && item.appearance === 'starred-toggle' && item.options?.length === 2) {
+                const pressed = String(value ?? '') === String(item.options[1].value);
+                const toggle = () => selectValue(item.options[pressed ? 0 : 1].value);
+                return <span key={`toggle-${item.id}-${align}`}><NativeControlTarget context={ctx} item={{...item, type:'select', dataField:field}} value={value} options={item.options}
+                    disabled={toolbarItemShouldDisable(item,context,isReadonly)||disabled}
+                    actions={{click:toggle,setValue:({value:next})=>selectValue(next,true)}}>
+                    <ForgeButton variant="ghost" icon="lucide:star" hideLabel aria-label={item.ariaLabel || 'Starred view'} title={item.tooltip || 'Starred view'} aria-pressed={pressed}
+                        disabled={toolbarItemShouldDisable(item,context,isReadonly)||disabled} onClick={toggle}/>
+                </NativeControlTarget></span>;
+            }
             const spanStyle = align === 'center'
                 ? { margin: "0 10px", display: 'inline-flex', alignItems: 'center', gap: 6 }
                 : (align === 'right' ? { marginLeft: "10px", display: 'inline-flex', alignItems: 'center', gap: 6 } : { marginRight: "10px", display: 'inline-flex', alignItems: 'center', gap: 6 });
