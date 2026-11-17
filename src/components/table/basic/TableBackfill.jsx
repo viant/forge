@@ -7,7 +7,7 @@ import {Colors} from '@blueprintjs/core';
 import SoftSkeleton from '../../SoftSkeleton.jsx';
 import { formatDataSourceError } from "../../../utils/dataSourceError.js";
 
-const TableBackfill = ({context, fixedRowHeight, rowCount, colSpan, collection}) => {
+const TableBackfill = ({context, fixedRowHeight, rowCount, colSpan, collection, skeletonColumns}) => {
     if (rowCount <= 0) return null;
     const {signals} = context;
     const {control} = signals;
@@ -17,6 +17,15 @@ const TableBackfill = ({context, fixedRowHeight, rowCount, colSpan, collection})
 
     const errorMessage = formatDataSourceError(error);
     const rows = [];
+    if (loading && !error && skeletonColumns?.length) {
+        return <>{Array.from({length: Math.max(1, rowCount)}, (_, rowIndex) =>
+            <tr key={`skeleton-${rowIndex}`} className="table-skeleton-row" aria-hidden="true">
+                {skeletonColumns.map((column, index) => <td key={column.id || index}>
+                    <SoftSkeleton lines={1} height={10} style={{width: column.multiSelect || !column.name ? 18 : `${60 + ((rowIndex + index) % 4) * 10}%`, maxWidth: '100%'}}/>
+                </td>)}
+                {colSpan > skeletonColumns.length ? <td/> : null}
+            </tr>)}</>;
+    }
     const stateClassName = error ? " is-error" : loading ? " is-loading" : " is-empty";
     for (let i = 0; i < rowCount; i++) {
         if (i === 0 && (noData || loading || error)) {

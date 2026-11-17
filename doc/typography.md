@@ -1481,34 +1481,36 @@ browser proof at desktop and tablet widths; screenshots remain ignored under
 the existing workbench typography retain their established keyboard behavior;
 the surrounding cache editor remains legacy scope.
 
-### Explicit schema refresh for ordinary preview
 
-**Refresh schema and run preview** sits beside ordinary Run preview and reuses
-its parameter-entry component. The submit label retains the selected action;
-supplied values use the existing serializer. Only the explicit action supplies
-`{refreshSchema: true}` as the seventh `previewReader` argument. Ordinary preview
-omits the option, and cube preview/selected-view testing keep their existing
-operations and controls. Existing run permissions and pending states apply.
+## DS2 List Page loading
 
-The submitted values and refresh choice share the existing retry snapshot;
-retry does not reinterpret those values against a later schema. Refresh starts
-by invalidating preceding parameter-metadata requests. Once the explicit attempt
-succeeds or fails, the current request reloads only preview-input metadata with
-column discovery and effective warmup disabled. Results/execution errors stay
-independent from metadata loading or failure; the latter exposes the existing
-metadata retry without rerunning preview. Version/revision changes and newer
-execution generations fence both results and trailing inspection. A canceled
-inspection cannot leave the header permanently loading.
+`ListPagePattern` composes a title, optional period control, action bar, native
+table and summary. A native Basic table opts in with `table.presentation:
+list-page` only under Design System 2.0. Its existing data context, permissions,
+selection, search, sorting and column preferences remain authoritative. Header
+toolbar items use `placement: header`; the existing two-option View selector can
+use `appearance: starred-toggle`, and quick search can use `appearance: field`.
+Customize and Filter both use the same 360px right-side Drawer, with 24px side
+padding, a fixed header, independently scrolling content and a footer pinned to
+the bottom when actions are present. Filter categories drill down through the
+producer's declared fields and options; the pattern does not invent filters or
+change authorization. The catalog's List Page and table drawer examples use
+these native implementations. Generic drawers retain 360/560/920/1200px sizes.
+DS2 List Pages use the native table scroll container to request the next admitted
+page as the reader approaches the end. The datasource's existing collection owns
+appended records; transport, cursor admission, authorization, selection and query
+bindings remain authoritative. Page/offset/cursor modes use the existing completed
+page metadata to stop. Client-paged collections already in memory render together.
+A new search, filter or view query replaces the collection from its first page;
+leaving DS2 restores replacement paging. A failed append retains loaded rows and
+offers a retry inside the table summary.
 
-Mounted checks cover request shape, parameter values, changed contracts,
-execution/inspection failure, retry, pending metadata invalidation, version
-switches and cube/view isolation. Run
-`node scripts/test-reader-refresh-browser.mjs` for the synthetic UI proof.
-`FORGE_REFRESH_NATIVE_URL` can select an isolated Studio fixture at bd3425b or
-later providing the existing SDK gateway and test-only schema controls. Its
-native proof compares discovery counts and stored artifact digests before and
-after schema changes: ordinary execution reuses the artifact, explicit refresh
-discovers the changed schema, and failed refresh/retry retain native guarantees.
-Evidence JSON and screenshots remain ignored under
-`output/playwright/reader-refresh`. No artifact store, cache or backend endpoint
-is added to Forge. Shared workbench controls retain their existing styles.
+Search, Starred view, filters and first loads show content-shaped skeleton cells
+inside the existing table. Headers, the action bar and the search field stay
+mounted. Appended loads retain existing rows and put skeletons beneath them.
+The summary remains inside the table card and announces loading once; no floating
+refresh badge is shown. Shared skeletons consume semantic surface roles and the
+existing reduced-motion policy. A disabled period control is appropriate when a
+host has no date-filter binding; it must not imply that data has been filtered.
+Keyboard focus follows the shared inset-border policy; pointer activation adds
+no focus ring. Other themes retain the original table layout and dialogs.
