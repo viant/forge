@@ -674,7 +674,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
             scroller.removeEventListener('scroll', update);
             observer?.disconnect();
         };
-    }, [showEmptyState, resolvedTableWidth, columnsToUse.length, renderedCollection.length, continuousPaging, loading, error, queryDisabled]);
+    }, [showEmptyState, resolvedTableWidth, columnsToUse.length, renderedCollection.length, continuousPaging, loading, error, queryDisabled, context]);
 
     const scrollTableHorizontally = (direction) => {
         const scroller = scrollRef.current;
