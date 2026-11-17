@@ -463,3 +463,52 @@ it('does not infer missing scheduled fields from a policy or logical cache name'
  await mountRuns({items:[run('partial-fields','completed',{target:{scheduledTargets:[{view:'',policyName:'named-policy',cacheName:'named-cache'}]}})]});
  const list=await openRunTargets();await click(list.querySelector('summary'));expect(list.textContent).toContain('named-policy');expect(list.textContent).toContain('named-cache');expect(list.textContent).toContain('Not supplied');expect(list.textContent).not.toContain('Component connector');expect(list.textContent).not.toContain('Resolving');
 });
+
+// Synthetic native contributor metadata; plans are not associated by Forge.
+const targetedStructure={component:{rootView:{name:'records',namespace:'r',relations:[{view:{name:'children',namespace:'c'}}]}},targetedWarmups:[{view:'r',editable:false,diagnostic:'Native contributor coverage is incomplete.',settings:{indexColumn:'ID'},contributors:[]}]};
+it('keeps incomplete native provenance read-only and honors denied authoring',async()=>{
+ const api={inspectVersion:vi.fn().mockResolvedValue({version}),listWarmupRuns:vi.fn().mockResolvedValue({items:[]})},apply=vi.fn();
+ await mount(<ReaderCacheDialog api={api} report={report} version={version} isOpen canEdit={false} canWarmup structure={targetedStructure} onClose={vi.fn()} onApply={apply} onWarmup={vi.fn()}/>);
+ expect(document.body.textContent).toContain('Native contributor coverage is incomplete.');
+ for(const text of ['Edit inline plan 1','Remove inline plan 1','Add view inline plan'])expect([...document.querySelectorAll('button')].find(button=>button.textContent===text).disabled).toBe(true);
+ expect(apply).not.toHaveBeenCalled();
+});
+
+it('discards stale targeted removal confirmation when the inspected revision changes',async()=>{
+ const contributor={name:'cache_warmup',occurrence:0,args:['r',"'ID'","'Limit=0'"]};
+ const structure={...targetedStructure,targetedWarmups:[{view:'r',editable:true,settings:{indexColumn:'ID',limit:0},contributors:[contributor]}]};
+ const api={inspectVersion:vi.fn().mockResolvedValue({version}),listWarmupRuns:vi.fn().mockResolvedValue({items:[]})},apply=vi.fn();
+ const dialog=value=><ReaderCacheDialog api={api} report={report} version={value} isOpen canEdit canWarmup structure={structure} onClose={vi.fn()} onApply={apply} onWarmup={vi.fn()}/>;
+ await mount(dialog(version));
+ await click([...document.querySelectorAll('button')].find(button=>button.textContent==='Remove inline plan 1'));
+ const staleConfirm=[...document.querySelectorAll('button')].find(button=>button.textContent==='Remove targeted plan');
+ await act(async()=>root.render(dialog({...version,sourceRevision:5})));
+ await click(staleConfirm);
+ expect(apply).not.toHaveBeenCalled();
+});
+
+it('edits a repeated native option without collapsing the other authored arguments',async()=>{
+ const args=['r',"'ID'","'CaseRefs=recent'","'case_refs=archived'","'FieldNames=ID'","'fields=parent_id'"];
+ const structure={component:{rootView:{name:'records',namespace:'r'}},targetedWarmups:[{view:'r',editable:true,settings:{indexColumn:'ID',caseRefs:['recent','archived'],fieldNames:['ID','parent_id']},contributors:[{name:'cache_warmup',occurrence:0,args}]}]};
+ const api={inspectVersion:vi.fn().mockResolvedValue({version}),listWarmupRuns:vi.fn().mockResolvedValue({items:[]})},apply=vi.fn().mockResolvedValue({});
+ await mount(<ReaderCacheDialog api={api} report={report} version={version} isOpen canEdit canWarmup structure={structure} onClose={vi.fn()} onApply={apply} onWarmup={vi.fn()}/>);
+ await click([...document.querySelectorAll('button')].find(button=>button.textContent==='Edit inline plan 1'));
+ const field=text=>document.getElementById([...document.querySelectorAll('label')].find(label=>label.textContent.trim()===text).htmlFor);
+ expect(field('Shared case references 1').value).toBe('recent');
+ expect(field('Shared case references 2').value).toBe('archived');
+ expect(field('Selected fields 2').value).toBe('parent_id');
+ await act(async()=>{const input=field('Shared case references 1');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'updated');input.dispatchEvent(new Event('input',{bubbles:true}));});
+ await click([...document.querySelectorAll('button')].find(button=>button.textContent==='Save view inline plan'));
+ expect(apply).toHaveBeenCalledWith({type:'batch',operations:[{type:'updateFunction',function:{name:'cache_warmup',occurrence:0,expectedArgs:args,args:['r',"'ID'","'CaseRefs=updated'","'case_refs=archived'","'FieldNames=ID'","'fields=parent_id'"]}}]},version);
+});
+
+it('matches nested effective evidence by the supplied view key rather than a constructed tree path',async()=>{
+ const structure={component:{rootView:{name:'records',namespace:'r',relations:[{view:{name:'children',namespace:'c',relations:[{view:{name:'grandchildren',namespace:'g',key:{name:'scheduled-grandchild'}}}]}}]}}};
+ const effectiveWarmup={...version,status:'resolved',targets:[{view:'scheduled-grandchild',policyName:'supplied-grandchild-plan'}]};
+ const api={inspectVersion:vi.fn().mockResolvedValue({version,effectiveWarmup}),listWarmupRuns:vi.fn().mockResolvedValue({items:[]})};
+ await mount(<ReaderCacheDialog api={api} report={report} version={version} isOpen canEdit canWarmup structure={structure} onClose={vi.fn()} onApply={vi.fn()} onWarmup={vi.fn()}/>);
+ await act(async()=>{const select=document.querySelector('#warmup-target');select.value='g';select.dispatchEvent(new Event('change',{bubbles:true}));});
+ const evidence=document.querySelector('[aria-label="Selected view effective plans"]');
+ expect(evidence.textContent).toContain('supplied-grandchild-plan');
+ expect(evidence.textContent).not.toContain('No effective plans');
+});

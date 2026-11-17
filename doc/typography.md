@@ -1548,3 +1548,36 @@ divider at the frozen edge; never add an elevation shadow on horizontal scroll.
 The native advanced column disclosure uses the shared Lucide chevron and the
 same section-label typography as Views and Columns. Native details/open owns
 its expanded state; do not replace it with another click or selection model.
+
+### Targeted inline warmup authoring
+
+Reader Builder’s Cache & warmup dialog uses the inspected view tree for the
+Target view selector, including views with no inline plan. View inline warmup
+plans consumes native `structure.targetedWarmups`: authored settings are shown
+separately from effective policies, and the producer’s `editable` and diagnostic
+fields control contributor-based editing. A definition reuses the existing
+index, connector, optional budget and case-dimension form controls. Multiple
+contributing definitions remain separate so case groups and shared `CaseRefs`
+are never flattened from effective metadata. Empty budgets retain native
+defaults; explicit zero remains zero. An empty index is supported.
+
+For example, select a child view, choose Add view inline plan, enter its index
+and options, then Save view inline plan. Existing plans offer Edit and Remove;
+removal requires confirmation and removes only producer-associated contributors
+in descending native occurrence order. Existing source-revision checks and
+native option validation remain authoritative. Cancellation submits nothing.
+Conflicts retain the editor’s entered values. Read-only provenance displays the
+native diagnostic; unavailable effective metadata retains authored editing and
+the existing metadata Retry action. Saving preserves the selected view and
+refreshes metadata for the returned saved revision.
+
+Run all effective plans remains independent from this editor and uses the saved
+version, excluding unsaved edits. Cache storage, host references, shared case
+definitions and component-level plans are independent. The existing
+component-level root plan editor remains a separate legacy form; this change
+does not migrate that form or other workbench controls to a new theme API.
+
+`test-targeted-warmup-browser.mjs` exercises the actual Reader Builder controls.
+Its optional isolated Studio gateway mode verifies native contributor round
+trips, fallback restoration and root/child execution; generated evidence stays
+untracked under `output/playwright`.

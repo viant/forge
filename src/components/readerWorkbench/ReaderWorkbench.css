@@ -426,3 +426,7 @@
 [data-forge-primitive="readerWorkbench"] .studio-forge-contract-window,.forge-reader-workbench-dialog .studio-forge-contract-window{min-width:0;min-height:0;height:100%;overflow:auto}
 
 [data-forge-primitive="readerWorkbench"] .studio-contract-list>button>span,.forge-reader-workbench-dialog .studio-contract-list>button>span{min-width:0;overflow-wrap:anywhere}
+
+/* Targeted definitions retain separate native case groups inside the existing dialog. */
+.forge-reader-workbench-dialog .studio-targeted-warmup-definition{min-width:0;margin:12px 0;padding:12px;border:1px solid var(--forge-border-color, #d8e1ec);border-radius:var(--forge-control-radius, 6px)}
+.forge-reader-workbench-dialog .studio-targeted-warmup-definition legend{color:var(--forge-text, #172b4d)}
