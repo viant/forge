@@ -82,3 +82,12 @@ section.forge-list-page .forge-list-page__table .basic-table-wrapper button.bp6-
 /* Header and summary are one semantic surface and typography recipe. */
 .agently-workspace[data-forge-theme="design-system-2"] section.forge-list-page .forge-list-page__table .basic-table-wrapper{--forge-table-header-surface:inherit!important}
 .agently-workspace[data-forge-theme="design-system-2"] section.forge-list-page .forge-list-page__table :is(thead th,.forge-list-page__summary){background:var(--forge-table-header-surface)!important;color:var(--forge-text)!important;font-family:var(--forge-type-body-family)!important;font-size:var(--forge-type-body-size)!important;line-height:var(--forge-type-body-line-height)!important;font-weight:var(--forge-type-title-weight)!important}
+
+.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page-drawer details>summary.forge-drawer-section-label{display:flex;align-items:center;gap:var(--forge-spacing-2);padding:var(--forge-spacing-1);margin:0;color:var(--forge-text-secondary);font-family:var(--forge-type-label-family);font-size:var(--forge-type-label-size);line-height:var(--forge-type-label-line-height);font-weight:var(--forge-type-label-weight);list-style:none;cursor:pointer}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page-drawer details>summary::marker{content:""}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page-drawer details>summary::-webkit-details-marker{display:none}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page-drawer details>summary .forge-icon{width:var(--forge-spacing-4);height:var(--forge-spacing-4);flex:0 0 auto}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page-drawer details[open]>summary .forge-icon{transform:rotate(90deg)}
+
+.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page__actions .toolbar-left .forge-toolbar-action[aria-haspopup]:not(.bp6-minimal):not(.bp6-intent-primary){border:var(--forge-border-width,1px) solid var(--forge-border-color)!important;box-shadow:none!important}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page__actions .toolbar-left .forge-toolbar-action[aria-haspopup]:disabled{border-color:var(--steward-semantic-component-input-disabled-border,var(--forge-border-color))!important}

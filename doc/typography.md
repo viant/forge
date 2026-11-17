@@ -1544,3 +1544,7 @@ List Page drawers use one fixed header height in root and detail views. Center
 option labels inside their existing row height for default, selected and hover
 states. Frozen table columns use an opaque row surface and a thin semantic
 divider at the frozen edge; never add an elevation shadow on horizontal scroll.
+
+The native advanced column disclosure uses the shared Lucide chevron and the
+same section-label typography as Views and Columns. Native details/open owns
+its expanded state; do not replace it with another click or selection model.
