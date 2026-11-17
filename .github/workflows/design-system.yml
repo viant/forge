@@ -46,7 +46,7 @@ jobs:
       - run: node --no-warnings src/reporting/reportTableQuickFilter.test.js
       - run: node --no-warnings src/reporting/reportPrintChoiceLabels.test.js
       - name: Verify native list loading and paging
-        run: npx vitest run --config vitest.runtime.config.mjs src/components/table/Basic.listPageLoading.render.test.jsx src/components/table/Basic.clientPaging.render.test.jsx src/components/DataSource.loaderOwnership.render.test.jsx src/components/DataSource.aggregateOffset.render.test.jsx
+        run: npx vitest run --config vitest.runtime.config.mjs src/components/table/Basic.listPageLoading.render.test.jsx src/components/table/Basic.scrollFade.render.test.jsx src/components/table/basic/Toolbar.crossSource.render.test.jsx src/components/ThemeBoundary.portal.test.jsx src/components/table/Basic.clientPaging.render.test.jsx src/components/DataSource.loaderOwnership.render.test.jsx src/components/DataSource.aggregateOffset.render.test.jsx
       - run: npm run test:workspace-theme
       - run: npm run build
       - name: Check contributor entry points

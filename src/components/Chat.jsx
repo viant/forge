@@ -1,5 +1,4 @@
 import SharedIcon from './Icon.jsx';
-import {revealScrollbar} from './scrollbarActivity.js';
 import React, { useState, useCallback } from "react";
 import { useDataSourceState } from "../hooks/useDataSourceState.js";
 
@@ -1174,7 +1173,6 @@ export default function Chat({
             ref={chatRootRef}
             className={`forge-chat-container${documentAppearance ? ` forge-document-chat${showStarterTasks ? " is-starting" : ""}${showStarterTasks && taskLibrary && !selectedStarter ? " is-task-library" : ""}` : " px-4 pt-4 gap-3"}${effectiveHeight !== undefined ? " has-explicit-height" : ""}`}
             data-testid="chat-root"
-            onScrollCapture={revealScrollbar}
             style={{
                 ...heightStyle,
             }}

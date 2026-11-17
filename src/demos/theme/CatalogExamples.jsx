@@ -16,7 +16,6 @@ import FilterChips from '../../components/content/FilterChips.jsx';
 import Avatar from '../../components/Avatar.jsx';
 import Popover from '../../components/Popover.jsx';
 import DropdownMenu from '../../components/DropdownMenu.jsx';
-import {revealScrollbar} from '../../components/scrollbarActivity.js';
 import SwitchControl from '../../components/SwitchControl.jsx';
 import SectionTabRail from '../../components/SectionTabRail.jsx';
 import {SectionPattern} from '../../components/patterns/index.js';
@@ -312,7 +311,7 @@ export default function CatalogExample({spec,variant=spec.variants[0],state='Def
         const leading=variant==='Leading icon'||variant==='Leading and trailing icons';
         const trailing=variant==='Trailing icon'||variant==='Leading and trailing icons';
         const labels=variant==='Scrollable'?['Design foundations','Component library','Usage guidelines','Color variables','Typography','Spacing','Icons','Accessibility','Motion','Layout','Patterns','Resources']:['Design foundations','Component library'];
-        return <div className="catalog-stack catalog-example-field"><div className="forge-dropdown-menu catalog-full"><Menu aria-label="Example menu options" role="listbox" onScroll={revealScrollbar}>
+        return <div className="catalog-stack catalog-example-field"><div className="forge-dropdown-menu catalog-full"><Menu aria-label="Example menu options" role="listbox">
             {labels.map((label,index)=><MenuItem key={label} roleStructure="listoption" selected={count>0?value===label:pressed&&index===0} disabled={disabled} active={state==='Hover'&&index===0}
                 icon={leading?<Icon name={index===0?'lucide:file-text':'lucide:layers'}/>:undefined}
                 labelElement={trailing?<Icon name="lucide:chevron-right"/>:undefined}

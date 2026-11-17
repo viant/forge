@@ -25,6 +25,7 @@ export default defineConfig({
       'src/components/table/Basic.autoFetch.render.test.jsx',
       'src/components/table/Basic.clientPaging.render.test.jsx',
       'src/components/table/Basic.listPageLoading.render.test.jsx',
+      'src/components/table/Basic.scrollFade.render.test.jsx',
       'src/components/DataSource.loaderOwnership.render.test.jsx',
       'src/components/table/Basic.serverSort.render.test.jsx',
       'src/components/table/basic/QuickSearch.clientPaging.render.test.jsx',

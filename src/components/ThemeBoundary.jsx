@@ -1,3 +1,4 @@
+import {revealScrollbar} from './scrollbarActivity.js';
 import React, {createContext, useContext, useEffect, useLayoutEffect, useMemo, useState} from 'react';
 import {Classes, FocusStyleManager, PortalProvider} from '@blueprintjs/core';
 
@@ -18,7 +19,12 @@ export function ForgeThemeProvider({themeId, mode, scopeClassName, portalContain
         if (inherited || themeId !== 'design-system-2') return;
         const wasActive = FocusStyleManager.isActive();
         if (!wasActive) FocusStyleManager.onlyShowFocusOnTabs();
-        return () => {if (!wasActive) FocusStyleManager.alwaysShowFocus();};
+        document.addEventListener('scroll', revealScrollbar, {capture: true, passive: true});
+        return () => {
+            document.removeEventListener('scroll', revealScrollbar, true);
+            document.getAnimations?.().filter(animation => animation.id === 'forge-scrollbar-activity').forEach(animation => animation.cancel());
+            if (!wasActive) FocusStyleManager.alwaysShowFocus();
+        };
     }, [themeId, !!inherited]);
     return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

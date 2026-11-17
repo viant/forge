@@ -371,3 +371,11 @@
     height: var(--forge-spacing-5) !important;
     margin: 0 !important;
 }
+
+/* One scroll treatment for the selected theme, including owned portals. */
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]),
+:is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) * { scrollbar-width:thin;scrollbar-color:transparent transparent; }
+@media(forced-colors:active){
+ :is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]),
+ :is(.agently-workspace[data-forge-theme="design-system-2"],.agently-application[data-agently-theme="design-system-2"]) * { scrollbar-color:auto; }
+}

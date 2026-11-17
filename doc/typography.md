@@ -1514,3 +1514,28 @@ existing reduced-motion policy. A disabled period control is appropriate when a
 host has no date-filter binding; it must not imply that data has been filtered.
 Keyboard focus follows the shared inset-border policy; pointer activation adds
 no focus ring. Other themes retain the original table layout and dialogs.
+
+
+### Shared DS2 scroll activity and List Page availability
+
+The root ForgeThemeProvider installs the existing scroll-activity recipe once
+while DS2 is selected. It covers arbitrary scrollable elements, the document,
+and owned portals; components must not attach their own activity listeners.
+The native thumb consumes the shared border color, appears during scrolling
+and fades after activity stops. Keep the track transparent. Forced colors use
+the native scrollbar. Switching profiles removes the listener and cancels its
+active animations. Preserve native keyboard, pointer and touch scrolling.
+
+A DS2 List Page keeps its declared primary action visible but disabled when its
+existing visibility guard makes it unavailable. The native toolbar still owns
+availability, disabled event admission and permission-dependent presentation;
+the producer retains business authorization. Other themes and ordinary toolbars
+keep their existing hide behavior. Authors must disable unbound actions.
+
+The page owns 32px desktop padding on every side. Its workspace wrapper adds no
+extra gutter or bottom padding. The header and summary share a distinct semantic
+surface, selected rows retain their selection surface, and selected-row hover
+uses the table selected-hover role. Surface values belong to the host package.
+DS2 control and popup surfaces use quiet borders without box shadows. Keyboard
+focus remains the shared inset outline. Default borders, dividers and scrollbar
+thumbs follow the same semantic border role as fields; validation remains distinct.
