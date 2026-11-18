@@ -131,6 +131,10 @@ func (s *NativeSkillSource) CatalogScope(ctx context.Context, conversation strin
 				parts = append(parts, name, source.connection.ProviderIdentity, "denied")
 				continue
 			}
+			if purePublishedUnavailable(err) {
+				parts = append(parts, name, source.connection.ProviderIdentity, "unavailable")
+				continue
+			}
 			if err != nil || admission == "" {
 				if err == nil {
 					err = identity.ErrResourceDenied
