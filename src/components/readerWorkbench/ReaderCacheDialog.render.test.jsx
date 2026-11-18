@@ -18,7 +18,7 @@ it('keeps a named cache host-owned and requests only warmup metadata without exe
  const onApply=vi.fn().mockResolvedValue({}),onWarmup=vi.fn();
  await mount(<ReaderCacheDialog api={api} report={report} version={version} canWarmup structure={namedStructure} isOpen onClose={vi.fn()} onApply={onApply} onWarmup={onWarmup}/>);
  expect(api.inspectVersion).toHaveBeenCalledWith('reader',2,{discoverColumns:false,includePreviewInput:false,includeEffectiveWarmup:true});
- expect(document.body.textContent).toContain('Host-configured cache: aerospike.');
+ expect(document.body.textContent).toContain('Component-level cache declaration: aerospike.');
  expect(document.body.querySelector('#cache-location')).toBeNull();
  expect(document.body.querySelector('#cache-backend')).toBeNull();
  expect(document.body.querySelector('#warmup-index').value).toBe('TenantID');
@@ -462,4 +462,143 @@ it('uses historical run settings rather than current inspection or another run',
 it('does not infer missing scheduled fields from a policy or logical cache name',async()=>{
  await mountRuns({items:[run('partial-fields','completed',{target:{scheduledTargets:[{view:'',policyName:'named-policy',cacheName:'named-cache'}]}})]});
  const list=await openRunTargets();await click(list.querySelector('summary'));expect(list.textContent).toContain('named-policy');expect(list.textContent).toContain('named-cache');expect(list.textContent).toContain('Not supplied');expect(list.textContent).not.toContain('Component connector');expect(list.textContent).not.toContain('Resolving');
+});
+
+// Synthetic native contributor metadata; plans are not associated by Forge.
+const targetedStructure={component:{rootView:{name:'records',namespace:'r',relations:[{view:{name:'children',namespace:'c'}}]}},targetedWarmups:[{view:'r',editable:false,diagnostic:'Native contributor coverage is incomplete.',settings:{indexColumn:'ID'},contributors:[]}]};
+it('keeps incomplete native provenance read-only and honors denied authoring',async()=>{
+ const api={inspectVersion:vi.fn().mockResolvedValue({version}),listWarmupRuns:vi.fn().mockResolvedValue({items:[]})},apply=vi.fn();
+ await mount(<ReaderCacheDialog api={api} report={report} version={version} isOpen canEdit={false} canWarmup structure={targetedStructure} onClose={vi.fn()} onApply={apply} onWarmup={vi.fn()}/>);
+ expect(document.body.textContent).toContain('Native contributor coverage is incomplete.');
+ for(const text of ['Edit inline plan 1','Remove inline plan 1','Add view inline plan'])expect([...document.querySelectorAll('button')].find(button=>button.textContent===text).disabled).toBe(true);
+ expect(apply).not.toHaveBeenCalled();
+});
+
+it('discards stale targeted removal confirmation when the inspected revision changes',async()=>{
+ const contributor={name:'cache_warmup',occurrence:0,args:['r',"'ID'","'Limit=0'"]};
+ const structure={...targetedStructure,targetedWarmups:[{view:'r',editable:true,settings:{indexColumn:'ID',limit:0},contributors:[contributor]}]};
+ const api={inspectVersion:vi.fn().mockResolvedValue({version}),listWarmupRuns:vi.fn().mockResolvedValue({items:[]})},apply=vi.fn();
+ const dialog=value=><ReaderCacheDialog api={api} report={report} version={value} isOpen canEdit canWarmup structure={structure} onClose={vi.fn()} onApply={apply} onWarmup={vi.fn()}/>;
+ await mount(dialog(version));
+ await click([...document.querySelectorAll('button')].find(button=>button.textContent==='Remove inline plan 1'));
+ const staleConfirm=[...document.querySelectorAll('button')].find(button=>button.textContent==='Remove targeted plan');
+ await act(async()=>root.render(dialog({...version,sourceRevision:5})));
+ await click(staleConfirm);
+ expect(apply).not.toHaveBeenCalled();
+});
+
+it('edits a repeated native option without collapsing the other authored arguments',async()=>{
+ const args=['r',"'ID'","'CaseRefs=recent'","'case_refs=archived'","'FieldNames=ID'","'fields=parent_id'"];
+ const structure={component:{rootView:{name:'records',namespace:'r'}},targetedWarmups:[{view:'r',editable:true,settings:{indexColumn:'ID',caseRefs:['recent','archived'],fieldNames:['ID','parent_id']},contributors:[{name:'cache_warmup',occurrence:0,args}]}]};
+ const api={inspectVersion:vi.fn().mockResolvedValue({version}),listWarmupRuns:vi.fn().mockResolvedValue({items:[]})},apply=vi.fn().mockResolvedValue({});
+ await mount(<ReaderCacheDialog api={api} report={report} version={version} isOpen canEdit canWarmup structure={structure} onClose={vi.fn()} onApply={apply} onWarmup={vi.fn()}/>);
+ await click([...document.querySelectorAll('button')].find(button=>button.textContent==='Edit inline plan 1'));
+ const field=text=>document.getElementById([...document.querySelectorAll('label')].find(label=>label.textContent.trim()===text).htmlFor);
+ expect(field('Shared case references 1').value).toBe('recent');
+ expect(field('Shared case references 2').value).toBe('archived');
+ expect(field('Selected fields 2').value).toBe('parent_id');
+ await act(async()=>{const input=field('Shared case references 1');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'updated');input.dispatchEvent(new Event('input',{bubbles:true}));});
+ await click([...document.querySelectorAll('button')].find(button=>button.textContent==='Save view inline plan'));
+ expect(apply).toHaveBeenCalledWith({type:'batch',operations:[{type:'updateFunction',function:{name:'cache_warmup',occurrence:0,expectedArgs:args,args:['r',"'ID'","'CaseRefs=updated'","'case_refs=archived'","'FieldNames=ID'","'fields=parent_id'"]}}]},version);
+});
+
+it('matches nested effective evidence by the supplied view key rather than a constructed tree path',async()=>{
+ const structure={component:{rootView:{name:'records',namespace:'r',relations:[{view:{name:'children',namespace:'c',relations:[{view:{name:'grandchildren',namespace:'g',key:{name:'scheduled-grandchild'}}}]}}]}}};
+ const effectiveWarmup={...version,status:'resolved',targets:[{view:'scheduled-grandchild',policyName:'supplied-grandchild-plan'}]};
+ const api={inspectVersion:vi.fn().mockResolvedValue({version,effectiveWarmup}),listWarmupRuns:vi.fn().mockResolvedValue({items:[]})};
+ await mount(<ReaderCacheDialog api={api} report={report} version={version} isOpen canEdit canWarmup structure={structure} onClose={vi.fn()} onApply={vi.fn()} onWarmup={vi.fn()}/>);
+ await act(async()=>{const select=document.querySelector('#warmup-target');select.value='g';select.dispatchEvent(new Event('change',{bubbles:true}));});
+ const evidence=document.querySelector('[aria-label="Selected view effective plans"]');
+ expect(evidence.textContent).toContain('supplied-grandchild-plan');
+ expect(evidence.textContent).not.toContain('No effective plans');
+});
+
+async function mountStorage({binding='old',calls,cache,catalog=['shared'],canEdit=true,apply=vi.fn().mockResolvedValue({})}={}){
+ const structure={availableCaches:catalog,functions:calls??(binding?[{name:'use_cache',occurrence:3,args:['r',"'"+binding+"'"]}]:[]),component:{rootView:{name:'records',namespace:'r',source:{bindings:binding?{cacheName:binding}:{}},relations:[{view:{name:'children',namespace:'c',source:{bindings:{cacheName:'child-storage'}}}}]},settings:cache?{cache}:{}}};
+ const api={inspectVersion:vi.fn().mockResolvedValue({version}),listWarmupRuns:vi.fn().mockResolvedValue({items:[]})};
+ await mount(<ReaderCacheDialog api={api} report={report} version={version} isOpen canEdit={canEdit} canWarmup structure={structure} onClose={vi.fn()} onApply={apply} onWarmup={vi.fn()}/>);
+ return {apply,structure};
+}
+const storageButton=()=>byText('Save storage reference');
+async function chooseStorage(name){await act(async()=>{const input=document.querySelector('#view-cache-storage');input.value=name;input.dispatchEvent(new Event('change',{bubbles:true}));});}
+
+it('updates exactly one guarded storage occurrence without changing other bindings or plans',async()=>{
+ const {apply}=await mountStorage();
+ await chooseStorage('shared');
+ expect(document.querySelector('#warmup-target').disabled).toBe(true);
+ await click(storageButton());
+ expect(apply).toHaveBeenCalledExactlyOnceWith({type:'updateFunction',function:{name:'use_cache',occurrence:3,expectedArgs:['r',"'old'"],args:['r',"'shared'"]}},version);
+});
+
+it('adds a view reference without creating storage or rewriting the component declaration',async()=>{
+ const {apply}=await mountStorage({binding:'',cache:{enabled:true,name:'inline',provider:'authored-provider',location:'authored-location',ttl:'2m'}});
+ for(const selector of ['#cache-backend','#cache-name','#cache-ttl','#cache-provider','#cache-location'])expect(document.querySelector(selector)).toBeNull();
+ const authored=document.querySelector('[aria-label="Authored component cache"]');
+ expect(authored.textContent).toContain('authored-location');expect(authored.querySelector('input,select,textarea,button')).toBeNull();
+ await chooseStorage('shared');await click(storageButton());
+ expect(apply).toHaveBeenCalledExactlyOnceWith({type:'addFunction',function:{name:'use_cache',args:['r',"'shared'"]}},version);
+});
+
+it('keeps an unchanged inherited component reference as a no-op',async()=>{
+ const {apply}=await mountStorage({binding:'',cache:{enabled:true,name:'shared'}});
+ expect(document.querySelector('#view-cache-storage').value).toBe('shared');
+ expect(storageButton().disabled).toBe(true);await click(storageButton());expect(apply).not.toHaveBeenCalled();
+});
+
+it.each([
+ {calls:[],binding:'opaque'},
+ {calls:[{name:'use_cache',occurrence:0,args:['r',"'old'"]},{name:'use_cache',occurrence:1,args:['r',"'old'"]}],binding:'old'},
+])('keeps unaddressable or ambiguous storage bindings read-only',async config=>{
+ const {apply}=await mountStorage(config);
+ expect(document.querySelector('#view-cache-storage').disabled).toBe(true);expect(storageButton().disabled).toBe(true);
+ expect(document.body.textContent).toContain('not represented by one guarded editable function');
+ expect(apply).not.toHaveBeenCalled();
+});
+
+it('keeps missing current storage outside the selectable catalog and preserves it when the catalog is empty',async()=>{
+ const {apply}=await mountStorage({binding:'retired',catalog:[]});
+ expect(document.body.textContent).toContain('retired');
+ expect(document.body.textContent).toContain('No host cache storage configurations');
+ expect(document.querySelector('#view-cache-storage')).toBeNull();expect(storageButton().disabled).toBe(true);
+ expect(apply).not.toHaveBeenCalled();
+});
+
+it('retains native storage errors and selections, and cancels without another submission',async()=>{
+ const apply=vi.fn().mockRejectedValue(new Error('Native cache configuration is no longer available.'));
+ await mountStorage({apply});await chooseStorage('shared');await click(storageButton());
+ expect(document.body.textContent).toContain('Native cache configuration is no longer available.');
+ expect(document.querySelector('#view-cache-storage').value).toBe('shared');
+ await click(byText('Cancel storage edit'));expect(document.querySelector('#view-cache-storage').value).toBe('');
+ expect(document.querySelector('#warmup-target').disabled).toBe(false);expect(apply).toHaveBeenCalledOnce();
+});
+
+it('prevents duplicate storage submissions and dismissal while pending',async()=>{
+ let reject;
+ const apply=vi.fn().mockImplementation(()=>new Promise((_resolve,fail)=>{reject=fail;}));
+ await mountStorage({apply});await chooseStorage('shared');
+ await act(async()=>{storageButton().click();storageButton().click();});
+ expect(apply).toHaveBeenCalledOnce();expect(document.querySelector('#view-cache-storage').disabled).toBe(true);
+ expect([...document.querySelectorAll('button')].find(button=>button.textContent==='Close').disabled).toBe(true);
+ expect(document.querySelector('button[aria-label="Close"]')).toBeNull();
+ await act(async()=>reject(new Error('Native denied edit')));
+ expect(document.body.textContent).toContain('Native denied edit');expect(document.querySelector('#view-cache-storage').value).toBe('shared');
+});
+
+it('honors the producer edit permission for storage selection',async()=>{
+ const {apply}=await mountStorage({canEdit:false});
+ expect(document.querySelector('#view-cache-storage').disabled).toBe(true);expect(storageButton().disabled).toBe(true);
+ expect(apply).not.toHaveBeenCalled();
+});
+
+it('retains the storage draft but disables saving if a refreshed catalog becomes empty',async()=>{
+ const {apply,structure}=await mountStorage();
+ await chooseStorage('shared');
+ const api={inspectVersion:vi.fn().mockResolvedValue({version}),listWarmupRuns:vi.fn().mockResolvedValue({items:[]})};
+ await act(async()=>root.render(<ReaderCacheDialog api={api} report={report} version={version} isOpen canEdit canWarmup structure={{...structure,availableCaches:[]}} onClose={vi.fn()} onApply={apply} onWarmup={vi.fn()}/>));
+ expect(document.querySelector('#view-cache-storage')).toBeNull();
+ expect(document.body.textContent).toContain('Your unsaved storage reference, shared, is no longer in the supplied host catalog.');
+ expect(storageButton().disabled).toBe(true);
+ await click(storageButton());expect(apply).not.toHaveBeenCalled();
+ await click(byText('Cancel storage edit'));
+ expect(document.querySelector('#warmup-target').disabled).toBe(false);
 });

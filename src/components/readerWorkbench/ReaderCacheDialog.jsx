@@ -1,13 +1,13 @@
 import {WorkbenchDialog as Dialog, WorkbenchAlert as Alert} from './WorkbenchMutationContext.jsx';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Callout, Dialog as BlueprintDialog, DialogBody, DialogFooter, FormGroup, HTMLSelect, HTMLTable, InputGroup, NumericInput, Tag, TextArea } from '@blueprintjs/core';
+import { Button, Callout, DialogBody, DialogFooter, FormGroup, HTMLSelect, HTMLTable, InputGroup, NumericInput, Tag, TextArea } from '@blueprintjs/core';
+import {TargetedWarmupEditor} from './TargetedWarmupEditor.jsx';
 import { parseWarmupCases, validateWarmupCases, warmupCaseCount, warmupCaseExpression } from './warmupPlan.js';
 
 export function ReaderCacheDialog({ api, report, version, canWarmup, canEdit = true, isOpen, structure, onClose, onApply, onWarmup }) {
   const cache = structure?.component?.settings?.cache;
   const warmupConfig = cache?.warmup;
   const root = structure?.component?.rootView;
-  const rootCacheBinding = root?.source?.bindings?.cacheName;
   const inspectionKey = JSON.stringify([report?.id, version?.versionNo, version?.sourceRevision]);
   const [inspectionResult, setInspectionResult] = useState({});
   const [inspectionAttempt, setInspectionAttempt] = useState(0);
@@ -22,13 +22,6 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, canEdit = t
   const inspectedStructure = discoveredStructure || structure;
   const columns = inspectedStructure?.component?.rootView?.columns ?? [];
   const connectors = inspectedStructure?.availableConnectors ?? structure?.availableConnectors ?? [];
-  const namedCache = Boolean(rootCacheBinding || (cache?.name && !cache?.provider && !cache?.location));
-  const hasRootCache = Boolean(rootCacheBinding || cache?.name || cache?.provider || cache?.location);
-  const [name, setName] = useState('');
-  const [ttl, setTTL] = useState('');
-  const [location, setLocation] = useState('');
-  const [backend, setBackend] = useState('');
-  const [provider, setProvider] = useState('');
   const [indexColumn, setIndexColumn] = useState('');
   const [indexParameter, setIndexParameter] = useState('');
   const [connector, setConnector] = useState('');
@@ -37,6 +30,8 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, canEdit = t
   const [fieldNames, setFieldNames] = useState('');
   const [caseLines, setCaseLines] = useState('');
   const [saving, setSaving] = useState(false);
+  const [warmupTarget,setWarmupTarget]=useState('');
+  useEffect(()=>setWarmupTarget(''),[isOpen,report?.id,version?.versionNo]);
   const [error, setError] = useState('');
   const [selectedRunId, setSelectedRunId] = useState(null);
   const [history, setHistory] = useState([]);
@@ -63,8 +58,6 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, canEdit = t
 
   useEffect(() => {
     if (!isOpen) { setRootEdit(null); setReplacement(null); return; }
-    setName(cache?.name ?? ''); setTTL(cache?.ttl ?? ''); setLocation(cache?.location ?? '');
-    setBackend(cache?.provider ? 'aerospike' : cache?.location ? 'afs' : ''); setProvider(cache?.provider ?? '');
     setIndexColumn(warmupConfig?.indexColumn ?? '');
     setIndexParameter(warmupConfig?.indexParameter ?? ''); setConnector(warmupConfig?.connector ?? '');
     setMaxCases(warmupConfig?.maxCases); setLimit(warmupConfig?.limit);
@@ -112,26 +105,13 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, canEdit = t
   const activeRun = Boolean(pollingRun);
   const maxCasesLabel = maxCases ?? 'native default';
   const limitLabel = limit ?? 'native default';
-  const ready = namedCache || (name.trim() && /^\d+(ms|s|m|h)$/.test(ttl) && location.trim() && (backend === 'afs' || provider.trim()));
-
-  const saveCache = async () => {
-    if (namedCache) return;
-    if (!ready || location.includes("'")) { setError('Provide a cache name, duration, location, and host-approved provider reference for Aerospike.'); return; }
-    setSaving(true); setError('');
-    const options = [{ name: 'WithLocation', args: [quote(location.trim())] }];
-    if (backend === 'aerospike') options.unshift({ name: 'WithProvider', args: [quote(provider.trim())] });
-    try { await onApply({ type: 'setSetting', setting: { name: 'cache', args: [quote(name.trim()), quote(ttl)], options } }); }
-    catch (cause) { setError(cause.message); }
-    finally { setSaving(false); }
-  };
-
   const submitWarmup = async (operation, targetVersion) => {
     if (mutationPending.current) return;
     mutationPending.current=true; setSaving(true); setError('');
     try {
       if(targetVersion)await onApply(operation,targetVersion);else await onApply(operation);
       setRootEdit(null); setInspectionAttempt(attempt=>attempt+1);
-    } catch (cause) { setError(cause.message); }
+    }
     finally { setReplacement(null); mutationPending.current=false; setSaving(false); }
   };
   const saveWarmup = async () => {
@@ -147,10 +127,10 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, canEdit = t
       ]}});
       return;
     }
-    await submitWarmup(setting);
+    try { await submitWarmup(setting); } catch (cause) { setError(cause.message); }
   };
 
-  const removeWarmup = () => submitWarmup({type:'setSetting',setting:{name:'cache_warmup',remove:true}});
+  const removeWarmup = () => submitWarmup({type:'setSetting',setting:{name:'cache_warmup',remove:true}}).catch(cause=>setError(cause.message));
 
   const executeWarmup = async () => {
     setWarming(true); setError('');
@@ -167,11 +147,11 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, canEdit = t
     return()=>{cancelled=true;clearTimeout(timer);};
   },[api,isOpen,report?.id,pollingRun?.runId,pollingRun?.status]);
 
-  return <Dialog portalClassName="forge-reader-workbench-dialog" className="studio-connector-dialog studio-cache-dialog" isOpen={isOpen} onClose={onClose} title="Cache & warmup" icon="database" canOutsideClickClose={!saving && !warming}>
+  return <Dialog portalClassName="forge-reader-workbench-dialog" className="studio-connector-dialog studio-cache-dialog" isOpen={isOpen} onClose={onClose} title="Cache & warmup" icon="database" canOutsideClickClose={!saving && !warming} canEscapeKeyClose={!saving && !warming} isCloseButtonShown={!saving && !warming}>
     <DialogBody className="studio-connector-dialog-body">
-      <p className="studio-dialog-lead">Configure Datly’s native prepared-view cache and edit its inline warmup plan. Browser values never contain cache credentials.</p>
+      <p className="studio-dialog-lead">Configure Datly’s native prepared-view cache and author root or child inline warmup plans. Browser values never contain cache credentials.</p>
       {error && <Callout intent="danger" role="alert">{error}</Callout>}
-      {warmupInspectionError && <Callout intent="warning">Warmup inspection failed; the configured index column was retained. {warmupInspectionError}</Callout>}
+      {warmupInspectionError && <Callout intent="warning">Warmup inspection failed; authored definitions were retained. {warmupInspectionError}</Callout>}
       <div className="studio-cache-layout"><div className="studio-cache-configuration">
       <section className="studio-cache-section" aria-label="Effective warmup plans">
         <h3>Effective warmup plans</h3>
@@ -182,13 +162,12 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, canEdit = t
         <p>Run all effective plans uses the saved version and excludes unsaved edits.</p>
         <div className="studio-warmup-actions"><Button icon="play" loading={warming||activeRun} disabled={!canWarmup||saving||activeRun} title={!canWarmup?'Publish permission is required to run warmup':''} onClick={executeWarmup}>Run all effective plans</Button></div>
       </section>
-      <section className="studio-cache-section" aria-label="Root view cache"><div className="studio-panel-heading"><div><h3>Root view cache</h3></div>{rootStorage && <Tag minimal intent="success">enabled</Tag>}</div>
-        {namedCache ? <p role="status">Host-configured cache: {rootCacheBinding || cache.name}.</p> : <>{hasRootCache && <p>{cache.name || 'Inline cache'}{cache.provider && <> · {cache.provider}</>}{cache.location && <> · {cache.location}</>}{cache.ttl && <> · TTL {cache.ttl}</>}</p>}<details key={inspectionKey}><summary>{hasRootCache ? 'Inline cache settings' : 'Add root cache…'}</summary><div className="studio-form-grid"><FormGroup label="Backend" labelFor="cache-backend"><HTMLSelect id="cache-backend" value={backend} onChange={(event)=>setBackend(event.target.value)} fill disabled={saving}><option value="">Select backend</option><option value="afs">AFS</option><option value="aerospike">Aerospike</option></HTMLSelect></FormGroup><FormGroup label="TTL" labelFor="cache-ttl" helperText="ms, s, m, or h"><InputGroup id="cache-ttl" value={ttl} onChange={(event)=>setTTL(event.target.value)} disabled={saving}/></FormGroup></div>
-          <FormGroup label="Cache name" labelFor="cache-name"><InputGroup id="cache-name" value={name} onChange={(event)=>setName(event.target.value)} placeholder="product-status" disabled={saving}/></FormGroup>
-          {backend === 'aerospike' && <FormGroup label="Approved provider" labelFor="cache-provider" helperText="Host-owned provider reference; never credentials."><InputGroup id="cache-provider" value={provider} onChange={(event)=>setProvider(event.target.value)} placeholder="aerospike://approved-provider" disabled={saving}/></FormGroup>}
-          <FormGroup label="Location" labelFor="cache-location"><InputGroup id="cache-location" value={location} onChange={(event)=>setLocation(event.target.value)} placeholder={backend==='afs'?'/var/cache/datly/products':'namespace/set'} disabled={saving}/></FormGroup>
-          <Button intent="primary" icon="floppy-disk" loading={saving} disabled={!ready} onClick={saveCache}>Save cache storage</Button></details></>}
-      </section>
+      {isOpen && <TargetedWarmupEditor key={inspectionKey} structure={structure} availableCaches={inspectedStructure?.availableCaches??[]} version={version} selectedView={warmupTarget} onSelectView={setWarmupTarget} canEdit={canEdit} saving={saving} onApply={submitWarmup} effectiveWarmup={effectiveWarmup} effectiveResolved={effectiveResolved} inspecting={inspecting}/>}
+      {(cache?.enabled || cache?.name || cache?.provider || cache?.location || cache?.ttl) && <section className="studio-cache-section" aria-label="Authored component cache">
+        <h3>Authored component cache</h3>
+        <p>Component-level cache declaration: {cache.name || 'Unnamed'}. This authored configuration is outside this form’s editing scope and is preserved when selecting view storage.</p>
+        <dl>{[['Name',cache.name],['Provider',cache.provider],['Location',cache.location],['TTL',cache.ttl]].filter(([,value])=>value!==undefined&&value!=='').map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+      </section>}
 
       <section className="studio-cache-section" aria-label="Root warmup authoring">
         <div className="studio-warmup-actions">
@@ -207,7 +186,7 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, canEdit = t
         {history.length>0&&<div className="studio-warmup-history"><h4>Run history</h4>{history.slice(0,8).map((run)=><button type="button" key={run.runId} className={warmup?.runId===run.runId?'selected':''} onClick={()=>setSelectedRunId(run.runId)}><Tag minimal intent={runIntent(run.status)}>{run.status}</Tag><span><strong>{run.plannedCases||0} planned · {run.entries||0} prepared</strong><small>{formatDate(run.requestedAt)} · {run.requestedBy}</small></span></button>)}</div>}
       </aside></div>
     </DialogBody>
-    <Alert portalClassName="forge-reader-workbench-dialog" isOpen={Boolean(isOpen && replacement && replacement.key===inspectionKey)} intent="warning" confirmButtonText="Replace root reference" cancelButtonText="Keep editing" loading={saving} onCancel={()=>setReplacement(null)} onConfirm={()=>{const pending=replacementRef.current;if(pending&&pending===replacement)return submitWarmup(pending.operation,pending.version);}} canEscapeKeyCancel={!saving} canOutsideClickCancel={!saving}>
+    <Alert portalClassName="forge-reader-workbench-dialog" isOpen={Boolean(isOpen && replacement && replacement.key===inspectionKey)} intent="warning" confirmButtonText="Replace root reference" cancelButtonText="Keep editing" loading={saving} onCancel={()=>setReplacement(null)} onConfirm={()=>{const pending=replacementRef.current;if(pending&&pending===replacement)return submitWarmup(pending.operation,pending.version).catch(cause=>setError(cause.message));}} canEscapeKeyCancel={!saving} canOutsideClickCancel={!saving}>
       <p>Replace root reference <strong>{replacement?.binding}</strong> on <strong>{report?.title||report?.id}</strong>, version {replacement?.version.versionNo}, source revision {replacement?.version.sourceRevision}, with the inline plan you entered?</p>
       <p>The shared host policy, child references, and cache storage remain unchanged.</p>
     </Alert>

@@ -80,6 +80,7 @@ anatomy, active semantic bindings, states, usage and keyboard guidance aligned
 with every component change, alongside its actual shared example.
 
 
+
 Document composer Tools uses the installed Blueprint Select and shared anchored
 menu recipe for Agent, Model and Reasoning only in Design System 2.0. The existing
 options, selection callbacks, Default choice and disabled state remain owned by
@@ -1365,18 +1366,36 @@ settings, read-only details, Retry, revision changes and stale responses through
 the existing dialog. The shared Blueprint table and native details elements reuse
 the existing workbench recipe; the surrounding cache editor remains legacy scope.
 
-The effective plans section appears first. **Root view cache** keeps an existing
-cache summary visible: authored named references are read-only, while inline
-storage settings expand through native details. With no root cache, **Add root
-cache…** reveals the existing form. Child plans do not imply root storage, and
-opening either storage details state performs no mutation. Save and execution
-continue through their existing callbacks.
+The effective plans section appears first. **Target view** selects the root or a
+child for separate storage-reference and inline-plan actions. **Cache storage**
+lists only Studio’s supplied `availableCaches` names. An unchanged selection
+submits nothing; an existing editable `use_cache` uses its native occurrence and
+exact expected arguments, while an absent binding uses `addFunction`. Ambiguous
+or unaddressable bindings remain read-only. Multiple views can reference the
+same name without copying host configuration. A component-level named reference
+is displayed without automatically adding a duplicate root binding.
 
-Run `node scripts/test-reader-cache-browser.mjs` for the mounted browser proof.
-Its independently authored synthetic child-plan metadata covers absent, inline,
-component-named and root-bound caches at desktop/tablet widths, read-only host
-settings, non-mutating disclosure and the existing save/run callback payloads.
-Screenshots stay in ignored `output/playwright/reader-cache`.
+Existing component cache declarations, including inline settings, are visible
+read-only under **Authored component cache**. This form does not create or edit
+providers, locations, TTLs or backend settings. Resolved cache name/backend come
+only from the matching saved-version effective evidence; configuration names
+never imply backend, connectivity or capacity. An empty supplied catalog offers
+an explanation and no fallback. A current name missing from the catalog stays
+visible as authored metadata and is not inserted into the selectable inventory.
+
+Storage and plan edits have separate save/cancel controls and preserve each
+other. Pending saves prevent duplicate submission and dialog dismissal. Source
+revision checks, conflicts, native validation, saved-version execution and
+revision-scoped metadata refresh keep their existing owners and lifecycle.
+The component-level root plan editor remains a separate legacy form.
+
+Run `node scripts/test-reader-cache-browser.mjs` for the synthetic desktop/tablet
+proof. `FORGE_CACHE_NATIVE_URL` may point at an isolated Studio ea15902-or-later
+fixture with the existing SDK gateway and test-only component/source, reset,
+cache-revocation and conflict controls. Native verification covers root/child
+save and reopen, shared bindings, plan preservation, existing component/inline
+declarations, empty catalogs, denied edits, conflicts and native validation
+failures. Screenshots stay in ignored `output/playwright/reader-cache`.
 
 ### Root inline warmup actions
 
@@ -1576,6 +1595,39 @@ divider at the frozen edge; never add an elevation shadow on horizontal scroll.
 The native advanced column disclosure uses the shared Lucide chevron and the
 same section-label typography as Views and Columns. Native details/open owns
 its expanded state; do not replace it with another click or selection model.
+
+### Targeted inline warmup authoring
+
+Reader Builder’s Cache & warmup dialog uses the inspected view tree for the
+Target view selector, including views with no inline plan. View inline warmup
+plans consumes native `structure.targetedWarmups`: authored settings are shown
+separately from effective policies, and the producer’s `editable` and diagnostic
+fields control contributor-based editing. A definition reuses the existing
+index, connector, optional budget and case-dimension form controls. Multiple
+contributing definitions remain separate so case groups and shared `CaseRefs`
+are never flattened from effective metadata. Empty budgets retain native
+defaults; explicit zero remains zero. An empty index is supported.
+
+For example, select a child view, choose Add view inline plan, enter its index
+and options, then Save view inline plan. Existing plans offer Edit and Remove;
+removal requires confirmation and removes only producer-associated contributors
+in descending native occurrence order. Existing source-revision checks and
+native option validation remain authoritative. Cancellation submits nothing.
+Conflicts retain the editor’s entered values. Read-only provenance displays the
+native diagnostic; unavailable effective metadata retains authored editing and
+the existing metadata Retry action. Saving preserves the selected view and
+refreshes metadata for the returned saved revision.
+
+Run all effective plans remains independent from this editor and uses the saved
+version, excluding unsaved edits. Cache storage, host references, shared case
+definitions and component-level plans are independent. The existing
+component-level root plan editor remains a separate legacy form; this change
+does not migrate that form or other workbench controls to a new theme API.
+
+`test-targeted-warmup-browser.mjs` exercises the actual Reader Builder controls.
+Its optional isolated Studio gateway mode verifies native contributor round
+trips, fallback restoration and root/child execution; generated evidence stays
+untracked under `output/playwright`.
 
 ## Overlay scroll areas in Design System 2.0
 
