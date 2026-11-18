@@ -1,6 +1,7 @@
 import Popover from './Popover.jsx';
 import React from 'react';
-import {Button, Callout} from '@blueprintjs/core';
+import {Button, Callout, Tooltip} from '@blueprintjs/core';
+import {useForgeTheme} from './ThemeBoundary.jsx';
 import './DisabledActionShell.css';
 
 export function nextDisabledReasonOpen(current, eventType) {
@@ -15,11 +16,12 @@ export function shouldOpenDisabledReasonOnFocus(focusVisible) {
 }
 
 export default function DisabledActionShell({reason = '', label = 'Action', className = '', style, children}) {
+  const isDesignSystem2 = useForgeTheme()?.themeId === 'design-system-2';
   const explanation = String(reason || '').trim();
   const [open, setOpen] = React.useState(false);
   if (!explanation) return <span className={className || undefined} style={style}>{children}</span>;
   const update = (eventType) => setOpen((current) => nextDisabledReasonOpen(current, eventType));
-  return (
+  const control = (
     <Popover
       isOpen={open}
       onInteraction={(nextOpen) => setOpen(nextOpen)}
@@ -36,7 +38,7 @@ export default function DisabledActionShell({reason = '', label = 'Action', clas
       <span
         className={`forge-disabled-action-shell${className ? ` ${className}` : ''}`}
         style={style}
-        title={explanation}
+        title={isDesignSystem2 ? undefined : explanation}
         tabIndex={0}
         aria-label={`${label}. ${explanation}`}
         aria-expanded={open}
@@ -53,4 +55,5 @@ export default function DisabledActionShell({reason = '', label = 'Action', clas
       </span>
     </Popover>
   );
+  return isDesignSystem2 ? <Tooltip minimal content={explanation} disabled={open}>{control}</Tooltip> : control;
 }

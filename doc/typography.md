@@ -47,10 +47,38 @@ selects the complete color, typography and component appearance together.
 
 The root theme provider reuses the shared scrollbar activity handler through
 one native scroll capture listener. Design System 2.0 keeps native thumbs thin and transparent at rest,
-reveals the semantic thumb during scrolling and fades it afterward. The single
-Chat root covers regular, split, overlay and nested scrollers. Baseline and
+reveals the semantic thumb during scrolling and fades it afterward. The shared
+theme owner covers ordinary, split, overlay and nested scrollers. Baseline and
 forced-color behavior retain their existing appearance; no scroll-following or
 reading-position model is added.
+
+While scroll events continue, refresh the existing native fade animation instead
+of cancelling it and briefly exposing the hidden base style between events.
+Overlay thumbs follow native scroll coordinates without a position transition.
+Thumb dragging reads the current native range on every pointer move, so appended
+rows cannot leave the handle attached to the previous page's range. Hover keeps
+an already visible overlay thumb available to grab; leaving it restores the
+current shared activity state. The native viewport retains its reading position
+and keyboard use.
+
+Primary-button border, fill and label bindings follow the component's own
+default, hover, pressed and disabled semantic roles. Enabled borders match their
+state fill; disabled retains its independent border. Shared Button and native
+toolbar primary actions consume the same mapping, 40px height, 16px inline
+padding and button typography. Document the boundary in Button anatomy and show
+the active border source alongside fill and label in the catalog variables.
+
+DS2 table-toolbar buttons and header hints reuse Blueprint Tooltip instead of
+HTML title popups. Keep native accessible names, sort and menu callbacks and
+disabled explanations intact. The shared owned portal supplies the dark hint,
+quiet border and typography in either color mode. Other profiles retain their
+existing title behavior.
+List Page icon hints use “Starred view” and “Filter view”. Its native Customize
+and Filter drawers use only Cancel and Apply in the footer; omit Reset and Clear
+filters in DS2 while preserving other theme presentations. Keep the catalog's
+anatomy, active semantic bindings, states, usage and keyboard guidance aligned
+with every component change, alongside its actual shared example.
+
 
 Document composer Tools uses the installed Blueprint Select and shared anchored
 menu recipe for Agent, Model and Reasoning only in Design System 2.0. The existing
@@ -1548,3 +1576,22 @@ divider at the frozen edge; never add an elevation shadow on horizontal scroll.
 The native advanced column disclosure uses the shared Lucide chevron and the
 same section-label typography as Views and Columns. Native details/open owns
 its expanded state; do not replace it with another click or selection model.
+
+## Overlay scroll areas in Design System 2.0
+
+Use the shared `ScrollArea` for a named region that needs draggable scrollbars
+without a reserved gutter. List Pages use this same component.
+
+```jsx
+<ScrollArea className="records-viewport" tabIndex={0} aria-label="Records">
+  {children}
+</ScrollArea>
+```
+
+The viewport keeps native wheel, trackpad and keyboard scrolling. The theme
+provider owns one activity listener; components must not add their own timers
+or activity listeners. Both thumbs use current native geometry as content grows,
+stay available during hover or a captured drag, and otherwise follow the shared
+activity fade. Semantic border/text roles style the thumb. Forced colors retain
+native scrollbars, and other themes retain the prior native viewport. Pointer
+activation has no focus ring; keyboard focus stays inside the existing border.

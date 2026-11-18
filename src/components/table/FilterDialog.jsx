@@ -7,6 +7,7 @@ import Button from '../Button.jsx';
 import SelectControl from '../SelectControl.jsx';
 import {typographyProps} from '../Typography.jsx';
 import Icon from '../Icon.jsx';
+import {useForgeTheme} from '../ThemeBoundary.jsx';
 import { Checkbox, Dialog, Drawer, DialogBody, DialogFooter, InputGroup, Menu, MenuItem } from "@blueprintjs/core";
 import {normalizeSubmittedFilterValue} from './filterValue.js';
 
@@ -20,6 +21,7 @@ const FilterDialog = ({
                           presentation = 'dialog',
                       }) => {
     useSignals();
+    const isDesignSystem2 = useForgeTheme()?.themeId === 'design-system-2';
     const visible = item => {
         if (isOpen) {
             trackVisibleWhen(item?.visibleWhen, context);
@@ -153,7 +155,7 @@ const FilterDialog = ({
                 className={drawer ? 'forge-drawer-actions' : undefined}
                 actions={[
                     <Button key="cancel" variant={drawer?'ghost':'secondary'} onClick={onClose}>Cancel</Button>,
-                    !drawer||hasAppliedFilters?<Button key="clear" variant="ghost" onClick={handleClearFilters}>Clear filters</Button>:null,
+                    (!drawer || !isDesignSystem2) && (!drawer || hasAppliedFilters)?<Button key="clear" variant="ghost" onClick={handleClearFilters}>Clear filters</Button>:null,
                     <Button key="ok" variant="primary" disabled={drawer&&!changed} onClick={handleApplyFilters}>{drawer?'Apply':'OK'}</Button>,
                 ]}
             />}

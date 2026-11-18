@@ -10,7 +10,7 @@ import {useWorkspacePresentation, workspaceToolbarItem} from '../../../core/cont
 import React from 'react';
 import ForgeButton from '../../Button.jsx';
 import ForgeIcon from '../../Icon.jsx';
-import {Button, Checkbox, Menu, MenuItem, Switch} from '@blueprintjs/core';
+import {Button, Checkbox, Menu, MenuItem, Switch, Tooltip} from '@blueprintjs/core';
 import { useSignals } from '@preact/signals-react/runtime';
 import QuickFilterInputs from './QuickFilterInputs.jsx';
 import QuickFilterToggle from './QuickFilterToggle.jsx';
@@ -168,6 +168,7 @@ function ToolbarStatus({item, context, align}) {
 }
 
 export function TableExportControl({context, item, align, disabled = false, rows = [], columns = []}) {
+    const isDesignSystem2 = useForgeTheme()?.themeId === 'design-system-2';
     item = workspaceToolbarItem(item, useWorkspacePresentation());
     const [busy, setBusy] = React.useState(false);
     const [error, setError] = React.useState('');
@@ -231,7 +232,7 @@ export function TableExportControl({context, item, align, disabled = false, rows
                     loading={busy}
                     disabled={exportDisabled}
                     aria-label={item.ariaLabel || item.tooltip || item.label || 'Export'}
-                    title={item.tooltip || item.label || 'Export'}
+                    title={isDesignSystem2 ? undefined : item.tooltip || item.label || 'Export'}
                 >
                     {toolbarItemLabel({...item, icon: item.icon || 'export'}) || ''}
                 </Button>
@@ -330,7 +331,7 @@ const Toolbar = ({
                             className={['forge-toolbar-action', actionIconOnly(item) ? 'is-icon-only' : '', item.className].filter(Boolean).join(' ')}
                             disabled={menuDisabled}
                             aria-label={actionAccessibleName(item)}
-                            title={item.tooltip || item.label || item.id}
+                            title={isDesignSystem2 ? undefined : item.tooltip || item.label || item.id}
                         >
                             {toolbarItemLabel(item)}
                         </Button>
@@ -434,7 +435,7 @@ const Toolbar = ({
                 return <span key={`toggle-${item.id}-${align}`}><NativeControlTarget context={ctx} item={{...item, type:'select', dataField:field}} value={value} options={item.options}
                     disabled={toolbarItemShouldDisable(item,context,isReadonly)||disabled}
                     actions={{click:toggle,setValue:({value:next})=>selectValue(next,true)}}>
-                    <ForgeButton variant="ghost" icon="lucide:star" hideLabel aria-label={item.ariaLabel || 'Starred view'} title={item.tooltip || 'Starred view'} aria-pressed={pressed}
+                    <ForgeButton variant="ghost" icon="lucide:star" hideLabel aria-label={item.ariaLabel || 'Starred view'} title={isDesignSystem2 ? undefined : item.tooltip || 'Starred view'} aria-pressed={pressed}
                         disabled={toolbarItemShouldDisable(item,context,isReadonly)||disabled} onClick={toggle}/>
                 </NativeControlTarget></span>;
             }
@@ -463,7 +464,7 @@ const Toolbar = ({
                             rightIcon={<UnifiedIcon name="caret-down"/>}
                             disabled={toolbarItemShouldDisable(item, context, isReadonly) || disabled}
                             aria-label={`${item.label || item.id || 'Select'}: ${toolbarSelectLabel(item.options, value)}`}
-                            title={item.tooltip || item.label || item.id}
+                            title={isDesignSystem2 ? undefined : item.tooltip || item.label || item.id}
                             className={`forge-toolbar-select-trigger${item.className ? ` ${item.className}` : ''}`}
                         >
                             {toolbarSelectLabel(item.options, value)}
@@ -510,7 +511,7 @@ const Toolbar = ({
                     {...(item.variant ? {variant: item.variant, hideLabel: actionIconOnly(item)} : {minimal: item.appearance === 'minimal', outlined: item.appearance === 'outlined'})}
                     data-testid={testID}
                     aria-label={actionAccessibleName(item)}
-                    title={item.tooltip || item.label || item.id}
+                    title={isDesignSystem2 ? undefined : item.tooltip || item.label || item.id}
                     className={['forge-toolbar-action', actionIconOnly(item) ? 'is-icon-only' : '', item.className].filter(Boolean).join(' ')}
                     style={item.style}
                 >
@@ -530,7 +531,14 @@ const Toolbar = ({
             .filter((item) => (align === 'right'
                 ? item.align !== 'left' && item.align !== 'center'
                 : item.align === align))
-            .map((item) => renderToolbarItem(item, align));
+            .map((item) => {
+                const control = renderToolbarItem(item, align);
+                if (!isDesignSystem2 || !control || control.type === DisabledActionShell) return control;
+                const isField = ['quickSearch','dateRangePreset','checkbox','switch','pagination','status','label','collectionCount'].includes(item.type || item.widget)
+                    || ['quickFilter','quickFilterInputs','quickFilterToggle','pagination','refresh'].includes(item.id);
+                const hint = !isField && (item.appearance === 'starred-toggle' ? 'Starred view' : item.tooltip || item.ariaLabel || item.label || item.id);
+                return hint ? <Tooltip key={control.key || item.id} minimal content={hint}>{control}</Tooltip> : control;
+            });
     };
 
     return (
