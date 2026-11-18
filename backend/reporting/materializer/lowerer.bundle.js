@@ -55022,6 +55022,10 @@ ${indent}${end}`;
     if (dataLabels) result.dataLabels = dataLabels;
     const pointColorMode = String(option.pointColorMode || "").trim().toLowerCase();
     if (pointColorMode) result.pointColorMode = pointColorMode === "bysign" ? "bySign" : pointColorMode;
+    for (const key2 of ["positiveColor", "negativeColor"]) {
+      const color = String(option[key2] || "").trim();
+      if (color) result[key2] = color;
+    }
     return Object.keys(result).length > 0 ? result : null;
   }
   function normalizeChartSeriesOptions(input) {
@@ -55218,8 +55222,11 @@ ${indent}${end}`;
           if (["auto", "always", "none"].includes(option.dataLabels)) {
             next.dataLabels = option.dataLabels;
           }
-          if (["series", "bysign"].includes(option.pointColorMode)) {
+          if (["series", "bySign", "bysign"].includes(option.pointColorMode)) {
             next.pointColorMode = option.pointColorMode === "bysign" ? "bySign" : option.pointColorMode;
+          }
+          for (const colorKey of ["positiveColor", "negativeColor"]) {
+            if (option[colorKey]) next[colorKey] = option[colorKey];
           }
           if (Object.keys(next).length > 0) cleaned[key2] = next;
         });
@@ -56265,6 +56272,8 @@ ${indent}${end}`;
       if (option.stackId) entry.stackId = option.stackId;
       if (option.dataLabels) entry.dataLabels = option.dataLabels;
       if (option.pointColorMode) entry.pointColorMode = option.pointColorMode;
+      if (option.positiveColor) entry.positiveColor = option.positiveColor;
+      if (option.negativeColor) entry.negativeColor = option.negativeColor;
       return entry;
     });
     return {
@@ -62414,6 +62423,8 @@ ${indent}${end}`;
           axis: (matched == null ? void 0 : matched.axis) === "right" ? "right" : "left",
           dataLabels: normalizeString39(matched == null ? void 0 : matched.dataLabels).toLowerCase(),
           pointColorMode: normalizeString39(matched == null ? void 0 : matched.pointColorMode),
+          positiveColor: printColor(matched == null ? void 0 : matched.positiveColor),
+          negativeColor: printColor(matched == null ? void 0 : matched.negativeColor),
           strokeDasharray: normalizeString39(matched == null ? void 0 : matched.strokeDasharray)
         };
       }).filter(Boolean);
@@ -62502,10 +62513,10 @@ ${indent}${end}`;
       return fallbackColor || (series == null ? void 0 : series.color) || "#137cbd";
     }
     if (numericValue > 0) {
-      return "#0f9960";
+      return (series == null ? void 0 : series.positiveColor) || "#0f9960";
     }
     if (numericValue < 0) {
-      return "#db3737";
+      return (series == null ? void 0 : series.negativeColor) || "#db3737";
     }
     return "#98a2b3";
   }

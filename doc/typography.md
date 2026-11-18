@@ -47,10 +47,39 @@ selects the complete color, typography and component appearance together.
 
 The root theme provider reuses the shared scrollbar activity handler through
 one native scroll capture listener. Design System 2.0 keeps native thumbs thin and transparent at rest,
-reveals the semantic thumb during scrolling and fades it afterward. The single
-Chat root covers regular, split, overlay and nested scrollers. Baseline and
+reveals the semantic thumb during scrolling and fades it afterward. The shared
+theme owner covers ordinary, split, overlay and nested scrollers. Baseline and
 forced-color behavior retain their existing appearance; no scroll-following or
 reading-position model is added.
+
+While scroll events continue, refresh the existing native fade animation instead
+of cancelling it and briefly exposing the hidden base style between events.
+Overlay thumbs follow native scroll coordinates without a position transition.
+Thumb dragging reads the current native range on every pointer move, so appended
+rows cannot leave the handle attached to the previous page's range. Hover keeps
+an already visible overlay thumb available to grab; leaving it restores the
+current shared activity state. The native viewport retains its reading position
+and keyboard use.
+
+Primary-button border, fill and label bindings follow the component's own
+default, hover, pressed and disabled semantic roles. Enabled borders match their
+state fill; disabled retains its independent border. Shared Button and native
+toolbar primary actions consume the same mapping, 40px height, 16px inline
+padding and button typography. Document the boundary in Button anatomy and show
+the active border source alongside fill and label in the catalog variables.
+
+DS2 table-toolbar buttons and header hints reuse Blueprint Tooltip instead of
+HTML title popups. Keep native accessible names, sort and menu callbacks and
+disabled explanations intact. The shared owned portal supplies the dark hint,
+quiet border and typography in either color mode. Other profiles retain their
+existing title behavior.
+List Page icon hints use “Starred view” and “Filter view”. Its native Customize
+and Filter drawers use only Cancel and Apply in the footer; omit Reset and Clear
+filters in DS2 while preserving other theme presentations. Keep the catalog's
+anatomy, active semantic bindings, states, usage and keyboard guidance aligned
+with every component change, alongside its actual shared example.
+
+
 
 Document composer Tools uses the installed Blueprint Select and shared anchored
 menu recipe for Agent, Model and Reasoning only in Design System 2.0. The existing
@@ -68,8 +97,12 @@ than series colors. Category-range labels and heatmap axes follow the same
 recipe; heatmap cell labels retain contrast against their individual cells.
 Default series consume the six chart-series roles supplied by the workspace.
 Explicit producer palettes keep their metadata contract and must be authored
-from the approved workspace library. Use the native Chart/Table switch when
-the exact values matter.
+from the approved workspace library. Signed series can optionally declare
+`positiveColor` and `negativeColor` beside `pointColorMode: "bySign"`; use
+six-digit hex values for matching UI, print/PDF and native XLSX fills. Each
+omitted side retains its existing theme/default color. See the
+[signed-series example](reporting.md) for authoring and zero/missing states.
+Use the native Chart/Table switch when the exact values matter.
 
 Changing supported color, typography, spacing or state values does not require
 a Forge code release. Adding a new component, state or semantic capability does.
@@ -1405,18 +1438,36 @@ settings, read-only details, Retry, revision changes and stale responses through
 the existing dialog. The shared Blueprint table and native details elements reuse
 the existing workbench recipe; the surrounding cache editor remains legacy scope.
 
-The effective plans section appears first. **Root view cache** keeps an existing
-cache summary visible: authored named references are read-only, while inline
-storage settings expand through native details. With no root cache, **Add root
-cache…** reveals the existing form. Child plans do not imply root storage, and
-opening either storage details state performs no mutation. Save and execution
-continue through their existing callbacks.
+The effective plans section appears first. **Target view** selects the root or a
+child for separate storage-reference and inline-plan actions. **Cache storage**
+lists only Studio’s supplied `availableCaches` names. An unchanged selection
+submits nothing; an existing editable `use_cache` uses its native occurrence and
+exact expected arguments, while an absent binding uses `addFunction`. Ambiguous
+or unaddressable bindings remain read-only. Multiple views can reference the
+same name without copying host configuration. A component-level named reference
+is displayed without automatically adding a duplicate root binding.
 
-Run `node scripts/test-reader-cache-browser.mjs` for the mounted browser proof.
-Its independently authored synthetic child-plan metadata covers absent, inline,
-component-named and root-bound caches at desktop/tablet widths, read-only host
-settings, non-mutating disclosure and the existing save/run callback payloads.
-Screenshots stay in ignored `output/playwright/reader-cache`.
+Existing component cache declarations, including inline settings, are visible
+read-only under **Authored component cache**. This form does not create or edit
+providers, locations, TTLs or backend settings. Resolved cache name/backend come
+only from the matching saved-version effective evidence; configuration names
+never imply backend, connectivity or capacity. An empty supplied catalog offers
+an explanation and no fallback. A current name missing from the catalog stays
+visible as authored metadata and is not inserted into the selectable inventory.
+
+Storage and plan edits have separate save/cancel controls and preserve each
+other. Pending saves prevent duplicate submission and dialog dismissal. Source
+revision checks, conflicts, native validation, saved-version execution and
+revision-scoped metadata refresh keep their existing owners and lifecycle.
+The component-level root plan editor remains a separate legacy form.
+
+Run `node scripts/test-reader-cache-browser.mjs` for the synthetic desktop/tablet
+proof. `FORGE_CACHE_NATIVE_URL` may point at an isolated Studio ea15902-or-later
+fixture with the existing SDK gateway and test-only component/source, reset,
+cache-revocation and conflict controls. Native verification covers root/child
+save and reopen, shared bindings, plan preservation, existing component/inline
+declarations, empty catalogs, denied edits, conflicts and native validation
+failures. Screenshots stay in ignored `output/playwright/reader-cache`.
 
 ### Root inline warmup actions
 
@@ -1649,6 +1700,7 @@ does not migrate that form or other workbench controls to a new theme API.
 Its optional isolated Studio gateway mode verifies native contributor round
 trips, fallback restoration and root/child execution; generated evidence stays
 untracked under `output/playwright`.
+
 ## Inline section composition
 
 `AccessibleSection` is exported from `forge/components`. Use the existing
@@ -1674,3 +1726,22 @@ required label and `aria-required` remain present. The existing form validation
 marks the group invalid after an attempted submission or an explicit authored
 validation error; an unanswered initial question is not an error state. This
 shared state treatment applies to every radio widget without page-specific CSS.
+
+## Overlay scroll areas in Design System 2.0
+
+Use the shared `ScrollArea` for a named region that needs draggable scrollbars
+without a reserved gutter. List Pages use this same component.
+
+```jsx
+<ScrollArea className="records-viewport" tabIndex={0} aria-label="Records">
+  {children}
+</ScrollArea>
+```
+
+The viewport keeps native wheel, trackpad and keyboard scrolling. The theme
+provider owns one activity listener; components must not add their own timers
+or activity listeners. Both thumbs use current native geometry as content grows,
+stay available during hover or a captured drag, and otherwise follow the shared
+activity fade. Semantic border/text roles style the thumb. Forced colors retain
+native scrollbars, and other themes retain the prior native viewport. Pointer
+activation has no focus ring; keyboard focus stays inside the existing border.

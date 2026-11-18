@@ -37,6 +37,9 @@ it.each(['page','offset','cursor'])('appends %s pages through the existing datas
   await f.complete(data.slice(0,10),mode==='cursor'?{nextCursor:'second',hasMore:true}:{});
   const scroll=f.host.querySelector('.basic-table-scroll');
   scroll.getAnimations=()=>[];scroll.animate=()=>({id:''});
+  for (const thumb of f.host.querySelectorAll('.forge-scroll-area__thumb')) {
+   thumb.getAnimations=()=>[];thumb.animate=()=>({id:''});
+  }
   Object.defineProperties(scroll,{clientHeight:{configurable:true,value:200},scrollHeight:{configurable:true,get:()=>f.context.signals.collection.peek().length*56+48},clientWidth:{configurable:true,value:800},getClientRects:{configurable:true,value:()=>[{}]}});
   await settle(()=>scroll.dispatchEvent(new Event('scroll')));
   await settle(()=>{scroll.scrollTop=480;scroll.dispatchEvent(new Event('scroll'));});
@@ -107,5 +110,21 @@ it('retains rows after a failed append, retries that page and replaces the colle
   const request=await f.complete([{id:100,name:'Changed query'}]);
   expect(request.options.inputParameters).toMatchObject({Page:1,Limit:10});
   expect(f.context.signals.collection.peek()).toEqual([{id:100,name:'Changed query'}]);
+ } finally {await f.cleanup();}
+});
+
+it('keeps the admitted total in the summary while additional pages append',async()=>{
+ const f=await fixture();
+ try {
+  await settle(()=>f.context.handlers.dataSource.fetchCollection());
+  await f.complete(data.slice(0,10),{totalCount:25,pageCount:3});
+  expect(f.host.querySelectorAll('td[data-col="id"]')).toHaveLength(10);
+  expect(f.host.querySelector('.forge-list-page__summary').textContent).toContain('25 Records');
+  await settle(()=>f.context.handlers.dataSource.setPage(2,{append:true}));
+  expect(f.host.querySelector('.forge-list-page__summary').textContent).toContain('25 Records');
+  expect(f.host.querySelectorAll('.table-skeleton-row')).toHaveLength(3);
+  await f.complete(data.slice(10,20),{totalCount:25,pageCount:3});
+  expect(f.host.querySelectorAll('td[data-col="id"]')).toHaveLength(20);
+  expect(f.host.querySelector('.forge-list-page__summary').textContent).toContain('25 Records');
  } finally {await f.cleanup();}
 });

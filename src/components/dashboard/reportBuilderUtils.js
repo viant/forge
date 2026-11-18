@@ -458,6 +458,10 @@ function normalizeChartSeriesOption(option) {
     if (dataLabels) result.dataLabels = dataLabels;
     const pointColorMode = String(option.pointColorMode || "").trim().toLowerCase();
     if (pointColorMode) result.pointColorMode = pointColorMode === "bysign" ? "bySign" : pointColorMode;
+    for (const key of ["positiveColor", "negativeColor"]) {
+        const color = String(option[key] || "").trim();
+        if (color) result[key] = color;
+    }
     return Object.keys(result).length > 0 ? result : null;
 }
 
@@ -666,8 +670,11 @@ function sanitizeChartSpecAgainstConfig(config = {}, chartSpec = null) {
                 if (["auto", "always", "none"].includes(option.dataLabels)) {
                     next.dataLabels = option.dataLabels;
                 }
-                if (["series", "bysign"].includes(option.pointColorMode)) {
+                if (["series", "bySign", "bysign"].includes(option.pointColorMode)) {
                     next.pointColorMode = option.pointColorMode === "bysign" ? "bySign" : option.pointColorMode;
+                }
+                for (const colorKey of ["positiveColor", "negativeColor"]) {
+                    if (option[colorKey]) next[colorKey] = option[colorKey];
                 }
                 if (Object.keys(next).length > 0) cleaned[key] = next;
             });
@@ -2512,6 +2519,8 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
         if (option.stackId) entry.stackId = option.stackId;
         if (option.dataLabels) entry.dataLabels = option.dataLabels;
         if (option.pointColorMode) entry.pointColorMode = option.pointColorMode;
+        if (option.positiveColor) entry.positiveColor = option.positiveColor;
+        if (option.negativeColor) entry.negativeColor = option.negativeColor;
         return entry;
     });
 

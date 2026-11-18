@@ -29,7 +29,7 @@ var dashboardChartTypes = map[string]excelize.ChartType{
 type nativeChartDecoration struct {
 	PointColors  []string
 	Mini         bool
-	SignedSeries map[string][]string // series-name formula -> explicit category overrides
+	SignedSeries map[string]nativeSignedSeriesStyle // series-name formula -> signed fills and category overrides
 }
 
 func nativeSignedBar(kind string) bool {
@@ -500,7 +500,7 @@ func dashboardNativeChart(source string, block reportfill.Block) (*excelize.Char
 			color = authored
 		}
 		if chartString(entry["pointColorMode"]) == "bySign" && nativeSignedBar(firstText(chartString(entry["type"]), resolved.Type)) {
-			color = "0F9960"
+			color = firstText(excelChartColor(chartString(entry["positiveColor"])), "0F9960")
 		}
 		series := excelize.ChartSeries{Name: fmt.Sprintf("%s$%s$4", quoted, column), Categories: fmt.Sprintf("%s$A$5:$A$%d", quoted, len(rows)+4), Values: fmt.Sprintf("%s$%s$5:$%s$%d", quoted, column, column, len(rows)+4), Fill: excelize.Fill{Type: "pattern", Pattern: 1, Color: []string{color}}}
 		series.Marker = excelize.ChartMarker{Symbol: "circle", Size: 4, Fill: excelize.Fill{Type: "pattern", Pattern: 1, Color: []string{color}}}

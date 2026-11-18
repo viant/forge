@@ -119,6 +119,8 @@ function resolveCartesianSeriesDescriptors(chartModel = {}, resolvedChart = {}) 
           axis: matched?.axis === "right" ? "right" : "left",
           dataLabels: normalizeString(matched?.dataLabels).toLowerCase(),
           pointColorMode: normalizeString(matched?.pointColorMode),
+          positiveColor: printColor(matched?.positiveColor),
+          negativeColor: printColor(matched?.negativeColor),
           strokeDasharray: normalizeString(matched?.strokeDasharray),
         };
       })
@@ -226,10 +228,10 @@ function resolveSeriesPointColor(series = {}, value, fallbackColor = "") {
     return fallbackColor || series?.color || "#137cbd";
   }
   if (numericValue > 0) {
-    return "#0f9960";
+    return series?.positiveColor || "#0f9960";
   }
   if (numericValue < 0) {
-    return "#db3737";
+    return series?.negativeColor || "#db3737";
   }
   return "#98a2b3";
 }

@@ -41,7 +41,7 @@ const validPointColors = validateReportBuilderChartSpec(config, {
     xField: "eventDate",
     yFields: ["profit", "delta"],
     seriesOptions: {
-        profit: { pointColorMode: "bySign" },
+        profit: { pointColorMode: "bySign", positiveColor: "#123456", negativeColor: "#654321" },
         delta: { type: "line", axis: "right", pointColorMode: "series" },
     },
 }, fields);
@@ -59,7 +59,7 @@ const container = buildExplicitReportBuilderChartContainer(
         xField: "eventDate",
         yFields: ["profit", "delta"],
         seriesOptions: {
-            profit: { pointColorMode: "bySign" },
+            profit: { pointColorMode: "bySign", positiveColor: "#123456", negativeColor: "#654321" },
             delta: { type: "line", axis: "right", pointColorMode: "series" },
         },
     },
@@ -67,5 +67,7 @@ const container = buildExplicitReportBuilderChartContainer(
 
 assert.equal(container.chart.series.values[0].pointColorMode, "bySign");
 assert.equal(container.chart.series.values[1].pointColorMode, "series");
+assert.equal(container.chart.series.values[0].positiveColor, "#123456");
+assert.equal(container.chart.series.values[0].negativeColor, "#654321");
 
 console.log("reportBuilderComboPointColors ✓ validates and lowers conditional point color rules");

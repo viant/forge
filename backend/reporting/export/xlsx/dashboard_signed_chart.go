@@ -13,7 +13,13 @@ import (
 // The name formula is stable across combo grouping and print-page slicing.
 // Only authored category overrides become point styles; ordinary observations
 // inherit the series' positive/negative fills even after editing source values.
-func nativeSignedSeries(source string, block reportfill.Block, offset, count int) map[string][]string {
+type nativeSignedSeriesStyle struct {
+	Positive    string
+	Negative    string
+	PointColors []string
+}
+
+func nativeSignedSeries(source string, block reportfill.Block, offset, count int) map[string]nativeSignedSeriesStyle {
 	columns, rows, err := chartDisplayTable(block)
 	if count == -1 {
 		count = len(rows) - offset
@@ -28,7 +34,7 @@ func nativeSignedSeries(source string, block reportfill.Block, offset, count int
 		keys[key] = true
 	}
 	ordered := sortedKeys(keys)
-	result := map[string][]string{}
+	result := map[string]nativeSignedSeriesStyle{}
 	for i := 1; i < len(columns); i++ {
 		entry := chartSeriesModel(model, columns[i].Key)
 		if chartString(entry["pointColorMode"]) != "bySign" || !nativeSignedBar(firstText(chartString(entry["type"]), block.ChartContent.ResolvedChart.Type)) {
@@ -44,7 +50,11 @@ func nativeSignedSeries(source string, block reportfill.Block, offset, count int
 			}
 		}
 		column, _ := excelize.ColumnNumberToName(i + 1)
-		result[fmt.Sprintf("%s$%s$4", sheetReference(source), column)] = colors
+		result[fmt.Sprintf("%s$%s$4", sheetReference(source), column)] = nativeSignedSeriesStyle{
+			Positive:    firstText(excelChartColor(chartString(entry["positiveColor"])), "0F9960"),
+			Negative:    firstText(excelChartColor(chartString(entry["negativeColor"])), "DB3737"),
+			PointColors: colors,
+		}
 	}
 	return result
 }
@@ -52,7 +62,7 @@ func nativeSignedSeries(source string, block reportfill.Block, offset, count int
 // MS-ODRAWXML 2.2.1 / 2.7.3.3 defines the series negative solid-fill extension.
 // It requires a solid series fill and no invertIfNegative child. Excelize has no
 // public field for this extension, so augment only its known generated series.
-func applySignedSeries(content []byte, signed map[string][]string) ([]byte, error) {
+func applySignedSeries(content []byte, signed map[string]nativeSignedSeriesStyle) ([]byte, error) {
 	seen := map[string]bool{}
 	var failure error
 	result := nativeSeriesXML.ReplaceAllFunc(content, func(series []byte) []byte {
@@ -63,12 +73,12 @@ func applySignedSeries(content []byte, signed map[string][]string) ([]byte, erro
 			failure = err
 			return series
 		}
-		colors, ok := signed[parsed.Name]
+		style, ok := signed[parsed.Name]
 		if !ok {
 			return series
 		}
 		invert := []byte(`<invertIfNegative val="0"></invertIfNegative>`)
-		if seen[parsed.Name] || bytes.Contains(series, []byte("<extLst>")) || bytes.Count(series, invert) != 1 || !bytes.Contains(series, []byte(`<a:srgbClr val="0F9960">`)) {
+		if seen[parsed.Name] || bytes.Contains(series, []byte("<extLst>")) || bytes.Count(series, invert) != 1 || !bytes.Contains(series, []byte(`<a:srgbClr val="`+style.Positive+`">`)) {
 			failure = fmt.Errorf("xlsx signed chart has an unexpected series structure")
 			return series
 		}
@@ -76,7 +86,7 @@ func applySignedSeries(content []byte, signed map[string][]string) ([]byte, erro
 		series = bytes.Replace(series, invert, nil, 1)
 		series = nativePointXML.ReplaceAll(series, nil)
 		var points strings.Builder
-		for index, color := range colors {
+		for index, color := range style.PointColors {
 			if color != "" {
 				fmt.Fprintf(&points, `<dPt><idx val="%d"></idx><spPr><a:solidFill><a:srgbClr val="%s"></a:srgbClr></a:solidFill></spPr></dPt>`, index, color)
 			}
@@ -90,7 +100,7 @@ func applySignedSeries(content []byte, signed map[string][]string) ([]byte, erro
 			return series
 		}
 		series = bytes.Replace(series, anchor, append([]byte(points.String()), anchor...), 1)
-		extension := `<extLst><ext uri="{6F2FDCE9-48DA-4B69-8628-5D25D57E5C99}"><c14:invertSolidFillFmt xmlns:c14="http://schemas.microsoft.com/office/drawing/2007/8/2/chart"><c14:spPr><a:solidFill><a:srgbClr val="DB3737"></a:srgbClr></a:solidFill></c14:spPr></c14:invertSolidFillFmt></ext></extLst>`
+		extension := `<extLst><ext uri="{6F2FDCE9-48DA-4B69-8628-5D25D57E5C99}"><c14:invertSolidFillFmt xmlns:c14="http://schemas.microsoft.com/office/drawing/2007/8/2/chart"><c14:spPr><a:solidFill><a:srgbClr val="` + style.Negative + `"></a:srgbClr></a:solidFill></c14:spPr></c14:invertSolidFillFmt></ext></extLst>`
 		return bytes.Replace(series, []byte("</ser>"), []byte(extension+"</ser>"), 1)
 	})
 	if failure != nil {

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import './SettingsDialog.css';
 import TableViewPresets from './TableViewPresets.jsx';
 import Typography from '../Typography.jsx';
+import {useForgeTheme} from '../ThemeBoundary.jsx';
 import {
     Button,
     Checkbox,
@@ -32,6 +33,7 @@ const SettingsDialog = ({
                             onResetColumns,
                             presentation = 'dialog',
                         }) => {
+    const isDesignSystem2 = useForgeTheme()?.themeId === 'design-system-2';
     const [localColumns, setLocalColumns] = useState(columns || []);
     const [selectedTabId, setSelectedTabId] = useState('visibility');
     const [localDensity,setLocalDensity] = useState(density);
@@ -207,7 +209,7 @@ const SettingsDialog = ({
             <DialogFooter
                 className={drawer?'forge-drawer-actions':undefined}
                 actions={[
-                    <Button
+                    !(drawer && isDesignSystem2) && <Button
                         key="reset"
                         text="Reset"
                         minimal={drawer}

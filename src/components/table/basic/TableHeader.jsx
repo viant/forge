@@ -1,9 +1,11 @@
 import UnifiedIcon from '../../Icon.jsx';
 import React from "react";
 import {Tooltip, Position} from '@blueprintjs/core';
+import {useForgeTheme} from '../../ThemeBoundary.jsx';
 
 const TableHeader = ({ context,
                        fillerWidth = 0, columns, tableTitle, sortConfig }) => {
+    const isDesignSystem2 = useForgeTheme()?.themeId === 'design-system-2';
     const { onSort, sortColumnId, sortDirection, disabled = false } = sortConfig;
     const handlers = context?.handlers || {};
     const dataSourceConfig = context?.dataSource || {};
@@ -81,7 +83,7 @@ const TableHeader = ({ context,
         );
 
         // If tooltip is provided, wrap the content in a Tooltip component
-        if (col.tooltip) {
+        if (col.tooltip && !isDesignSystem2) {
             return (
                 <Tooltip content={col.tooltip} position={Position.TOP}>
                     <span className="forge-table-header-content">{content}</span>
@@ -105,9 +107,11 @@ const TableHeader = ({ context,
                     ...(minWidth && { width: minWidth }),
                     ...(String(col?.sticky || '').toLowerCase() === 'left' ? {left: col.stickyOffset || 0} : {}),
                 };
+                const hint = [col.multiSelect ? 'Select all rows' : col.displayName || col.name, col.tooltip].filter(Boolean).join(' — ') || undefined;
+                const control = sortable ? <button type="button" disabled={disabled} className="forge-table-header-sort" aria-label={`Sort by ${col.displayName || col.name || col.id}`} onClick={() => handleSort(col)}>{renderHeaderContent(col)}</button> : renderHeaderContent(col);
                 return (
-                    <th key={id} data-forge-cell-kind={col.multiSelect ? 'selection' : col.type} className={`${String(col?.sticky || '').toLowerCase() === 'left' ? 'is-sticky-left' : ''}${col?.stickyEdge ? ' is-sticky-edge' : ''}`} style={style} title={[col.multiSelect ? 'Select all rows' : col.displayName || col.name, col.tooltip].filter(Boolean).join(' — ') || undefined} aria-sort={sortable ? sortColumnId === id ? sortDirection === 'asc' ? 'ascending' : 'descending' : 'none' : undefined}>
-                        {sortable ? <button type="button" disabled={disabled} className="forge-table-header-sort" aria-label={`Sort by ${col.displayName || col.name || col.id}`} onClick={() => handleSort(col)}>{renderHeaderContent(col)}</button> : renderHeaderContent(col)}
+                    <th key={id} data-forge-cell-kind={col.multiSelect ? 'selection' : col.type} className={`${String(col?.sticky || '').toLowerCase() === 'left' ? 'is-sticky-left' : ''}${col?.stickyEdge ? ' is-sticky-edge' : ''}`} style={style} title={isDesignSystem2 ? undefined : hint} aria-sort={sortable ? sortColumnId === id ? sortDirection === 'asc' ? 'ascending' : 'descending' : 'none' : undefined}>
+                        {isDesignSystem2 && hint ? <Tooltip minimal content={hint} position={Position.TOP}>{control}</Tooltip> : control}
                     </th>
                 );
             })}

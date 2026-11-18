@@ -2665,6 +2665,12 @@
             "series",
             "bySign"
           ]
+        },
+        "positiveColor": {
+          "type": "string"
+        },
+        "negativeColor": {
+          "type": "string"
         }
       }
     },
@@ -2714,6 +2720,12 @@
             "series",
             "bySign"
           ]
+        },
+        "positiveColor": {
+          "type": "string"
+        },
+        "negativeColor": {
+          "type": "string"
         }
       }
     },
@@ -4438,6 +4450,12 @@
                   "series",
                   "bySign"
                 ]
+              },
+              "positiveColor": {
+                "type": "string"
+              },
+              "negativeColor": {
+                "type": "string"
               }
             }
           }
@@ -8032,6 +8050,12 @@
             "series",
             "bySign"
           ]
+        },
+        "positiveColor": {
+          "type": "string"
+        },
+        "negativeColor": {
+          "type": "string"
         }
       }
     },
@@ -8075,6 +8099,12 @@
             "series",
             "bySign"
           ]
+        },
+        "positiveColor": {
+          "type": "string"
+        },
+        "negativeColor": {
+          "type": "string"
         }
       }
     },
@@ -9583,6 +9613,12 @@
                   "series",
                   "bySign"
                 ]
+              },
+              "positiveColor": {
+                "type": "string"
+              },
+              "negativeColor": {
+                "type": "string"
               }
             }
           }

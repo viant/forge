@@ -59,3 +59,22 @@ assert.throws(() => lowerValidatedReportDocument(bad), error => {
   return true;
 });
 console.log('PASS explicit wrong-kind fields remain invalid instead of inheriting or inventing schema');
+
+// Independently invented signed observations exercise the complete authoring path.
+for (const options of [{positiveColor: '#123456', negativeColor: '#654321'}, {positiveColor: '#123456'}, {negativeColor: '#654321'}, {}]) {
+  const document = buildReportBuilderReportDocument({
+    container: {id: 'signed', dataSourceRef: 'synthetic'},
+    config: {dimensions: [{id: 'category', key: 'category', paramPath: 'dimensions.category', default: true}], measures: [{id: 'change', key: 'change', paramPath: 'measures.change', default: true}], result: {defaultMode: 'chart'}},
+    state: {viewMode: 'chart', selectedDimensions: ['category'], selectedMeasures: ['change'], chartSpec: {type: 'horizontal_bar', xField: 'category', yFields: ['change'], preserveCategoryOrder: true, seriesOptions: {change: {pointColorMode: 'bySign', ...options}}}},
+  });
+  const spec = lowerValidatedReportDocument(document);
+  const chart = spec.blocks.find(block => block.kind === 'chartBlock');
+  assert.equal(chart.chartModel.series.values[0].pointColorMode, 'bySign');
+  assert.equal(chart.chartModel.series.values[0].positiveColor, options.positiveColor);
+  assert.equal(chart.chartModel.series.values[0].negativeColor, options.negativeColor);
+  const rows = [{category: 'A', change: 12}, {category: 'B', change: -7}, {category: 'C', change: 0}];
+  const fill = buildReportFillFromReportSpec(spec, {primary: {rows}});
+  const filledChart = fill.blocks.find(block => block.kind === 'chartBlock');
+  assert.equal(filledChart.content.chartModel.series.values[0].positiveColor, options.positiveColor);
+  assert.deepEqual(filledChart.content.resolvedChart.rows.map(row => row.change), [12, -7, 0]);
+}

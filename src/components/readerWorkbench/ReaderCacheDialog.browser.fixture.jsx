@@ -12,9 +12,12 @@ const cache = {
   inline: {enabled: true, name: 'records', ttl: '1m', location: '/synthetic/cache'},
   named: {enabled: true, name: 'host-storage'},
 }[scenario];
+const cacheNames=scenario==='empty'?[]:['bound-storage','host-storage','shared'];
 const structure = {
+  availableCaches:cacheNames,
+  functions:scenario==='bound'?[{name:'use_cache',occurrence:0,args:['records',"'bound-storage'"]}]:[],
   component: {
-    rootView: {name: 'records', columns: [{name: 'ID'}], ...(scenario === 'bound' ? {source: {bindings: {cacheName: 'bound-storage'}}} : {})},
+    rootView: {name: 'records', relations:[{view:{name:'children',namespace:'items'}}], columns: [{name: 'ID'}], ...(scenario === 'bound' ? {source: {bindings: {cacheName: 'bound-storage'}}} : {})},
     settings: cache ? {cache} : {},
   },
 };
@@ -34,7 +37,7 @@ const recordedHistory={
 const api = {
   inspectVersion: async () => ({structure, effectiveWarmup: {
     status: 'resolved', reportId: report.id, ...version,
-    targets: [{view: 'children', policyName: 'child-plan', origin: 'host', policyRef: 'child-policy', cacheName: 'child-storage', indexColumn: 'ID', rowLimit: 0}],
+    targets: [{view: 'children', policyName: 'child-plan', origin: 'host', policyRef: 'child-policy', cacheName: 'child-storage', cacheProvider:'afs', indexColumn: 'ID', rowLimit: 0}],
   }}),
   listWarmupRuns: async () => ({items: recordedHistory[evidenceScenario] || []}),
 };

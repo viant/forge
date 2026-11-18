@@ -1,6 +1,7 @@
 export { default as WindowManager } from './WindowManager.jsx';
 export { default as WindowContent } from './WindowContent.jsx';
 export { default as Splitter } from './Splitter.jsx';
+export { default as ScrollArea } from './ScrollArea.jsx';
 export { default as Editor } from './Editor.jsx';
 export { default as Container } from './Container.jsx';
 export { default as FileBrowser } from './FileBrowser.jsx';
