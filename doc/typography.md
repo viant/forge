@@ -97,8 +97,12 @@ than series colors. Category-range labels and heatmap axes follow the same
 recipe; heatmap cell labels retain contrast against their individual cells.
 Default series consume the six chart-series roles supplied by the workspace.
 Explicit producer palettes keep their metadata contract and must be authored
-from the approved workspace library. Use the native Chart/Table switch when
-the exact values matter.
+from the approved workspace library. Signed series can optionally declare
+`positiveColor` and `negativeColor` beside `pointColorMode: "bySign"`; use
+six-digit hex values for matching UI, print/PDF and native XLSX fills. Each
+omitted side retains its existing theme/default color. See the
+[signed-series example](reporting.md) for authoring and zero/missing states.
+Use the native Chart/Table switch when the exact values matter.
 
 Changing supported color, typography, spacing or state values does not require
 a Forge code release. Adding a new component, state or semantic capability does.

@@ -869,6 +869,8 @@ export const reportSpecSchema = {
               stackId: { type: "string" },
               dataLabels: { enum: ["auto", "always", "none"] },
               pointColorMode: { enum: ["series", "bySign"] },
+              positiveColor: { type: "string" },
+              negativeColor: { type: "string" },
             },
           },
         },
@@ -921,6 +923,8 @@ export const reportSpecSchema = {
         stackId: { type: "string" },
         dataLabels: { enum: ["auto", "always", "none"] },
         pointColorMode: { enum: ["series", "bySign"] },
+        positiveColor: { type: "string" },
+        negativeColor: { type: "string" },
       },
     },
     chartSeriesGrouped: {
@@ -978,6 +982,8 @@ export const reportSpecSchema = {
         stackId: { type: "string" },
         dataLabels: { enum: ["auto", "always", "none"] },
         pointColorMode: { enum: ["series", "bySign"] },
+        positiveColor: { type: "string" },
+        negativeColor: { type: "string" },
       },
     },
     chartSeriesNativeDirect: {

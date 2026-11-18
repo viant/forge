@@ -649,3 +649,15 @@ const repeatedHorizontal = buildReportPrintChartSvg({
 });
 assert.match(repeatedHorizontal.svg, /Alpha \[x2\]/);
 assert.match(repeatedHorizontal.svg, /3 touchpoints/);
+
+for (const options of [{positiveColor: '#123456', negativeColor: '#654321'}, {positiveColor: '#123456'}, {negativeColor: '#654321'}, {}]) {
+  const rows = [{category: 'A', change: 12}, {category: 'B', change: -7}, {category: 'C', change: 0}];
+  const result = buildReportPrintChartSvg({
+    chartModel: {type: 'horizontal_bar', preserveCategoryOrder: true, series: {values: [{value: 'change', label: 'Change', type: 'horizontal_bar', pointColorMode: 'bySign', ...options}]}},
+    resolvedChart: {kind: 'directSeries', type: 'horizontal_bar', xAxisKey: 'category', seriesKeys: ['change'], rows}, width: 640,
+  });
+  assert.deepEqual(result.diagnostics, []);
+  assert.ok(result.svg.includes(`fill="${options.positiveColor || '#0f9960'}"`));
+  assert.ok(result.svg.includes(`fill="${options.negativeColor || '#db3737'}"`));
+  assert.deepEqual(rows.map(row => row.change), [12, -7, 0]);
+}

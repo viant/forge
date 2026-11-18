@@ -848,6 +848,7 @@ Supported per-series options in `chartSpec.seriesOptions`:
 - `stackId`
 - `dataLabels`
 - `pointColorMode`
+- `positiveColor` and `negativeColor` (optional colors for `bySign`)
 
 Supported `dataLabels` values:
 
@@ -859,6 +860,41 @@ Supported `pointColorMode` values:
 
 - `series`
 - `bySign`
+
+For a signed bar, declare the mode and either or both colors on its measure:
+
+```json
+{
+  "type": "horizontal_bar",
+  "xField": "category",
+  "yFields": ["change"],
+  "preserveCategoryOrder": true,
+  "seriesOptions": {
+    "change": {
+      "pointColorMode": "bySign",
+      "positiveColor": "#123456",
+      "negativeColor": "#654321"
+    }
+  }
+}
+```
+
+The independently invented rows `A: 12`, `B: -7`, `C: 0` retain their
+labels, numeric values, signs and declared order. Positive horizontal bars extend
+right of zero and negative bars extend left. These options change color only;
+they do not reverse axes, negate values or create a stack.
+
+Each omitted color retains its existing positive or negative default independently.
+Without either option, UI theme roles retain their green/red fallbacks; canonical
+print/PDF and native XLSX retain green `#0f9960` and red `#db3737`.
+Use six-digit hex colors for matching browser, print/PDF and XLSX output.
+The options use the existing series-color string contract and are copied to
+`chartModel.series.values[]` during lowering. They have no effect in `series`
+mode. Explicit category colors retain precedence. Zero and missing-value behavior
+is unchanged: the browser omits zero-area bars, print uses its neutral zero mark,
+and native Excel uses the nonnegative series fill and keeps missing cells blank.
+XLSX stores a positive series fill and an editable negative-fill extension, so
+changing a source cell across zero retains sign-dependent coloring.
 
 Runtime behavior:
 

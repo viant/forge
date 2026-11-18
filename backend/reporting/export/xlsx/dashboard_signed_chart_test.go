@@ -152,3 +152,74 @@ func TestSignedSeriesAreTargetedByBindingAfterComboGroupingAndSlicing(t *testing
 type anyXML struct {
 	XMLName xml.Name
 }
+
+func TestSignedPaletteNativeExports(t *testing.T) {
+	for _, options := range []map[string]any{{"positiveColor": "#123456", "negativeColor": "#654321"}, {"positiveColor": "#123456"}, {"negativeColor": "#654321"}, {}} {
+		artifacts := printExample(t, func(spec map[string]any, inputs map[string]json.RawMessage) {
+			option := map[string]any{"pointColorMode": "bySign"}
+			for key, value := range options {
+				option[key] = value
+			}
+			entry := map[string]any{"value": "change", "label": "Change", "type": "horizontal_bar", "pointColorMode": "bySign"}
+			for key, value := range options {
+				entry[key] = value
+			}
+			spec["layoutIntent"] = map[string]any{"kind": "single", "blockOrder": []string{"signed"}}
+			spec["blocks"] = []any{map[string]any{"chartModel": map[string]any{"type": "horizontal_bar", "preserveCategoryOrder": true, "xAxis": map[string]any{"dataKey": "category"}, "series": map[string]any{"values": []any{entry}}}, "id": "signed", "kind": "chartBlock", "title": "Change", "datasetRef": "primary", "chartSpec": map[string]any{"type": "horizontal_bar", "xField": "category", "yFields": []string{"change"}, "seriesOptions": map[string]any{"change": option}}}}
+			inputs["primary"] = json.RawMessage(`{"rows":[{"category":"A","change":12},{"category":"B","change":-7},{"category":"C","change":0}]}`)
+		})
+		positive, negative := "123456", "654321"
+		if options["positiveColor"] == nil {
+			positive = "0F9960"
+		}
+		if options["negativeColor"] == nil {
+			negative = "DB3737"
+		}
+		printed, err := reportprint.DecodeJSON(artifacts.ReportPrint)
+		require.NoError(t, err)
+		var svg string
+		for _, page := range printed.Pages {
+			for _, element := range page.Elements {
+				svg += element.SVG
+			}
+		}
+		require.Contains(t, strings.ToLower(svg), "#"+strings.ToLower(positive))
+		require.Contains(t, strings.ToLower(svg), "#"+strings.ToLower(negative))
+		fill, err := reportfill.DecodeJSON(artifacts.ReportFill)
+		require.NoError(t, err)
+		for _, withPrint := range []bool{false, true} {
+			var data []byte
+			if withPrint {
+				data, err = RenderDashboardWithPrint(artifacts.ReportFill, artifacts.ReportPrint)
+			} else {
+				data, err = RenderDashboard(fill)
+			}
+			require.NoError(t, err)
+			chart := workbookZIP(t, data)["xl/charts/chart1.xml"]
+			series := nativeSeriesXML.FindAllString(chart, -1)
+			require.Len(t, series, 1)
+			var fills struct {
+				Positive struct {
+					Value string `xml:"val,attr"`
+				} `xml:"spPr>solidFill>srgbClr"`
+				Negative struct {
+					Value string `xml:"val,attr"`
+				} `xml:"extLst>ext>invertSolidFillFmt>spPr>solidFill>srgbClr"`
+			}
+			require.NoError(t, xml.Unmarshal([]byte(series[0]), &fills))
+			require.Equal(t, positive, fills.Positive.Value)
+			require.Equal(t, negative, fills.Negative.Value)
+			require.Contains(t, chart, "invertSolidFillFmt")
+			require.NotContains(t, chart, "<invertIfNegative")
+			book, err := excelize.OpenReader(bytes.NewReader(data))
+			require.NoError(t, err)
+			for cell, want := range map[string]string{"B5": "12", "B6": "-7", "B7": "0"} {
+				require.Equal(t, want, mustCellValue(t, book, "Chart Change", cell))
+				kind, err := book.GetCellType("Chart Change", cell)
+				require.NoError(t, err)
+				require.Contains(t, []excelize.CellType{excelize.CellTypeNumber, excelize.CellTypeUnset}, kind)
+			}
+			require.NoError(t, book.Close())
+		}
+	}
+}

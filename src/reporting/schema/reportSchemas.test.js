@@ -1966,3 +1966,16 @@ const declaredFill=buildReportFillFromReportSpec(declaredFixture.reportSpec,decl
 assert.equal(validateReportFill(declaredFill).valid,true,JSON.stringify(validateReportFill(declaredFill)));
 assert.deepEqual(declaredFill.datasets.find(d=>d.id==='primary').rows.map(r=>r.fraction),[.48,.32,.2]);
 const invalidDeclared=JSON.parse(JSON.stringify(declaredFill));invalidDeclared.blocks[0].chartModel.paletteMode='guess';assert.equal(validateReportFill(invalidDeclared).valid,false);
+
+for (const schema of [reportSpecSchema, reportFillSchema]) {
+  const check = (name, value) => validateReportSchema({$defs: schema.$defs, $ref: `#/$defs/${name}`}, value);
+  const options = {pointColorMode: 'bySign', positiveColor: '#123456', negativeColor: '#654321'};
+  assert.equal(check('chartSpec', {type: 'horizontal_bar', xField: 'category', yFields: ['change'], seriesOptions: {change: options}}).valid, true);
+  for (const name of ['chartSeriesValue', 'chartSeriesNativeValue']) {
+    const series = {value: 'change', label: 'Change', type: 'horizontal_bar', color: '#137cbd', ...options};
+    assert.equal(check(name, series).valid, true);
+    assert.equal(check(name, {...series, positiveColor: 12}).valid, false);
+    assert.equal(check(name, {...series, negativeColor: false}).valid, false);
+    assert.equal(check(name, {...series, zeroColor: '#123456'}).valid, false);
+  }
+}

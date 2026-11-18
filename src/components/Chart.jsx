@@ -360,10 +360,10 @@ export function resolveConditionalSeriesColor(series = {}, value, fallbackColor 
         return fallbackColor || series?.color || chartSeriesColor(1, "#137cbd");
     }
     if (numericValue > 0) {
-        return "var(--forge-chart-positive, #0f9960)";
+        return String(series?.positiveColor || "").trim() || "var(--forge-chart-positive, #0f9960)";
     }
     if (numericValue < 0) {
-        return "var(--forge-chart-negative, #db3737)";
+        return String(series?.negativeColor || "").trim() || "var(--forge-chart-negative, #db3737)";
     }
     return "var(--forge-chart-neutral, #98a2b3)";
 }
