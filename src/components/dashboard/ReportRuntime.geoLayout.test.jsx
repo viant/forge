@@ -3,6 +3,8 @@ import React from "react";
 import {JSDOM} from "jsdom";
 import {renderToStaticMarkup} from "react-dom/server";
 import ReportRuntime from "./ReportRuntime.jsx";
+import {DashboardGeoMap} from "./DashboardBlocks.jsx";
+import {buildReportFillGeoPayload} from "../../reporting/reportFillGeoPayload.js";
 
 // Widget sizing must retain the complete map, selected value and ranking.
 const syntheticMapRegions = [
@@ -42,3 +44,21 @@ assert.match(documentDefault,/2 regions · 18 total/);
 const documentSuppressed=renderSyntheticMap({...documentGeo,summary:null},{appearance:'document'});
 assert.doesNotMatch(documentSuppressed,/forge-report-document-geo-summary/);
 assert.match(documentSuppressed,/West sample/);
+
+// Exercise the native fill -> tile/title -> document Top regions path.
+const unavailableAndZero = buildReportFillGeoPayload({geo: {key: 'region', metric: {key: 'amount', label: 'Amount'}}}, [
+  {region: 'WA', amount: 5}, {region: 'CA', amount: 0}, {region: 'NY', amount: null},
+]);
+const missingDOM = new JSDOM(renderSyntheticMap(unavailableAndZero, {appearance: 'document'})).window.document;
+const rankedKeys = [...missingDOM.querySelectorAll('.forge-report-document-map-ranking li')].map(item => item.firstChild.textContent);
+assert.deepEqual(rankedKeys, ['WA', 'CA']);
+assert.equal(missingDOM.querySelector('[aria-label="NY (NY): -"]').textContent, 'NY');
+assert.equal(missingDOM.querySelector('[aria-label="CA (CA): 0"]').textContent, 'CA');
+
+const legacyMap = new JSDOM(renderToStaticMarkup(React.createElement(DashboardGeoMap, {
+  container: {kind: 'dashboard.geoMap', geo: {key: 'region', metric: {key: 'amount'}}},
+  context: {signals: {collection: {value: [{region: 'WA', amount: 5}, {region: 'CA', amount: 0}, {region: 'NY', amount: null}]}}},
+}))).window.document;
+assert.equal(legacyMap.querySelector('[title="New York (NY): -"]').classList.contains('is-empty'), true);
+assert.equal(legacyMap.querySelector('[title="California (CA): 0"]').classList.contains('is-empty'), false);
+assert.match(legacyMap.querySelector('.forge-dashboard-geo-summary').textContent, /2.*Regions/);

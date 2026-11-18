@@ -511,7 +511,11 @@ const groupedModel = buildDashboardExportModel({
           signals: {
             ...this.signals,
             collection: {
-              peek: () => [{ stateCode: 'CA', stateName: 'California', spend: 10, status: 'critical' }],
+              peek: () => [
+                { stateCode: 'CA', stateName: 'California', spend: 10, status: 'critical' },
+                { stateCode: 'WA', stateName: 'Washington', spend: 0 },
+                { stateCode: 'NY', stateName: 'New York', spend: null },
+              ],
             },
           },
           Context: this.Context,
@@ -529,6 +533,12 @@ assert.equal(groupedModel.blocks[1].rows[0].label, 'US');
 assert.equal(groupedModel.blocks[2].ranking.length, 1);
 assert.equal(groupedModel.blocks[2].ranking[0].key, 'CA');
 assert.equal(groupedModel.blocks[2].activeRegion.statusLabel, 'Critical');
+assert.equal(groupedModel.blocks[2].summary.regionCount, 2);
+assert.equal(groupedModel.blocks[2].regions.find(region => region.key === 'NY').rawValue, null);
+assert.equal(groupedModel.blocks[2].regions.find(region => region.key === 'NY').empty, true);
+assert.equal(groupedModel.blocks[2].regions.find(region => region.key === 'NY').value, '-');
+assert.equal(groupedModel.blocks[2].regions.find(region => region.key === 'WA').rawValue, 0);
+assert.equal(groupedModel.blocks[2].regions.find(region => region.key === 'WA').empty, false);
 assert.equal(groupedModel.blocks[3].sections[0].title, 'Grouped 123000');
 
 const fieldBasedDimensionsModel = buildDashboardExportModel({

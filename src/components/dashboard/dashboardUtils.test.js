@@ -374,3 +374,32 @@ assert.equal(
   }),
   '#c23030',
 );
+
+// Invented rows distinguish missing observations from measured zero at every rollup.
+for (const aggregate of ['sum', 'avg', 'min', 'max', 'first']) {
+  const rows = [
+    {stateCode: 'WA', spend: null},
+    {stateCode: 'WA'},
+    {stateCode: 'WA', spend: '6'},
+    {stateCode: 'WA', spend: 2},
+    {stateCode: 'NY', spend: null},
+    {stateCode: 'NY', spend: 'unavailable'},
+    {stateCode: 'CA', spend: 0},
+    {stateCode: 'TX', spend: '0'},
+    {stateCode: 'OR', spend: null},
+    {stateCode: 'OR', spend: -6},
+    {stateCode: 'OR', spend: '-2'},
+  ];
+  const snapshot = JSON.stringify(rows);
+  const grouped = aggregateGeoRows(rows, {...geoConfig, aggregate});
+  assert.equal(grouped.get('WA').value, {sum: 8, avg: 4, min: 2, max: 6, first: 6}[aggregate]);
+  assert.equal(grouped.get('WA').count, 4);
+  assert.equal(grouped.get('WA').valueCount, 2);
+  assert.equal(grouped.get('NY').value, null);
+  assert.equal(grouped.get('NY').count, 2);
+  assert.equal(grouped.get('NY').valueCount, 0);
+  assert.equal(grouped.get('CA').value, 0);
+  assert.equal(grouped.get('TX').value, 0);
+  assert.equal(grouped.get('OR').value, {sum: -8, avg: -4, min: -6, max: -2, first: -6}[aggregate]);
+  assert.equal(JSON.stringify(rows), snapshot);
+}

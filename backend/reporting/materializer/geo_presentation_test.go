@@ -147,3 +147,50 @@ func TestGeoObservedLegendAndDistinctSummary(t *testing.T) {
 	require.Len(t, suppressedFill.Blocks[0].GeoContent.ResolvedGeo.Regions, 2)
 
 }
+
+// Invented readings verify absence through the bundled native fill and print path.
+func TestTileGeoUnavailableMetricsPreserveZero(t *testing.T) {
+	raw, err := os.ReadFile("testdata/presentation-report.json")
+	require.NoError(t, err)
+	var spec map[string]any
+	require.NoError(t, json.Unmarshal(raw, &spec))
+	spec["blocks"] = []any{map[string]any{"id": "map", "kind": "geoMapBlock", "title": "Readings", "datasetRef": "primary", "geo": map[string]any{"key": "region", "metric": map[string]any{"key": "value", "label": "Reading", "format": "number"}}}}
+	spec["layoutIntent"] = map[string]any{"kind": "single", "blockOrder": []string{"map"}}
+	source, err := json.Marshal(spec)
+	require.NoError(t, err)
+	for _, allUnavailable := range []bool{false, true} {
+		t.Run(map[bool]string{false: "mixed", true: "unavailable"}[allUnavailable], func(t *testing.T) {
+			rows := []map[string]any{{"region": "NY", "value": nil}}
+			if !allUnavailable {
+				rows = append(rows, map[string]any{"region": "CA", "value": float64(0)}, map[string]any{"region": "WA", "value": float64(5)})
+			}
+			dataset, err := json.Marshal(map[string]any{"rows": rows, "hasMore": false})
+			require.NoError(t, err)
+			artifacts, err := Materialize(t.Context(), source, map[string]json.RawMessage{"primary": dataset})
+			require.NoError(t, err)
+			fill, err := reportfill.DecodeJSON(artifacts.ReportFill)
+			require.NoError(t, err)
+			geo := fill.Blocks[0].GeoContent.ResolvedGeo
+			require.Equal(t, rows, fill.Datasets[0].Rows, "map aggregation must not rewrite table source values")
+			for _, region := range geo.Regions {
+				if region.Key == "NY" {
+					require.Nil(t, region.RawValue)
+					require.Equal(t, "-", region.DisplayValue)
+				}
+			}
+			if allUnavailable {
+				require.Empty(t, geo.Ranking)
+				require.Empty(t, geo.Summary.TopKey)
+			} else {
+				require.Len(t, geo.Ranking, 2)
+				require.Equal(t, "WA", geo.Ranking[0].Key)
+				require.Equal(t, float64(0), geo.Ranking[1].RawValue)
+				require.Equal(t, "0", geo.Ranking[1].DisplayValue)
+				geo.Summary.TopKey = ""
+				require.ErrorContains(t, fill.Validate(), "summary.topKey")
+				geo.Ranking = geo.Ranking[:0]
+				require.ErrorContains(t, fill.Validate(), "summary.topKey", "numeric regions including zero cannot masquerade as an unavailable map")
+			}
+		})
+	}
+}

@@ -551,7 +551,7 @@ export function DashboardGeoMap({container, context}) {
     );
 
     const valueRange = useMemo(() => {
-        const values = Array.from(geoRows.values()).map((entry) => Number(entry.value)).filter(Number.isFinite);
+        const values = Array.from(geoRows.values()).map((entry) => entry.value).filter(Number.isFinite);
         if (!values.length) {
             return {min: 0, max: 0};
         }
@@ -567,7 +567,7 @@ export function DashboardGeoMap({container, context}) {
             const dataRow = entry?.row || null;
             const label = config.labelKey && dataRow ? resolveKey(dataRow, config.labelKey) : tile.label;
             const value = entry ? entry.value : null;
-            const color = entry
+            const color = Number.isFinite(value)
                 ? resolveGeoColor({row: dataRow, value, minValue: valueRange.min, maxValue: valueRange.max, colorConfig: config.color})
                 : config.color.empty;
             return {
@@ -585,7 +585,7 @@ export function DashboardGeoMap({container, context}) {
     const selectedKey = normalizeGeoKey(dashboardSelection?.entityKey, config.shape);
     const sortedRegions = useMemo(
         () => regions
-            .filter((region) => Number.isFinite(Number(region.value)))
+            .filter((region) => Number.isFinite(region.value))
             .sort((a, b) => Number(b.value) - Number(a.value)),
         [regions],
     );
@@ -651,7 +651,7 @@ export function DashboardGeoMap({container, context}) {
                     <>{config.shape === 'world' ? <WorldCountryMap title={container.title || 'Country map'} regions={regions.filter(region => region.dataRow).map(region => ({...region, displayValue:region.formattedValue}))} onSelect={region => {setHoveredKey(region.key);onSelect(region);}}/> : <div className="forge-dashboard-geo-map" role="list" aria-label={container.title || 'Geo map'}>
                         {regions.map((region, index) => {
                             const isSelected = selectedKey === region.key;
-                            const isEmpty = !region.dataRow;
+                            const isEmpty = !Number.isFinite(region.value);
                             return (
                                 <button
                                     key={region.key}

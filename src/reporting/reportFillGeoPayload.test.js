@@ -122,3 +122,31 @@ assert.deepEqual(fullNamePayload.regions.map(({ key, label, rawValue }) => ({ ke
 ]);
 
 console.log("reportFillGeoPayload ✓ builds deterministic resolved geo payloads for ReportFill");
+
+const missingAndZero = buildReportFillGeoPayload({geo: {
+  key: 'region', metric: {key: 'amount', format: 'number'}, aggregate: 'sum',
+  color: {empty: '#eeeeee'},
+}}, [
+  {region: 'NY', amount: null}, {region: 'MA'},
+  {region: 'CA', amount: 0}, {region: 'TX', amount: '0'},
+  {region: 'WA', amount: null}, {region: 'WA', amount: '6'},
+]);
+assert.deepEqual(missingAndZero.ranking.map(({key, rawValue}) => ({key, rawValue})), [
+  {key: 'WA', rawValue: 6}, {key: 'CA', rawValue: 0}, {key: 'TX', rawValue: 0},
+]);
+for (const key of ['NY', 'MA']) {
+  const region = missingAndZero.regions.find(region => region.key === key);
+  assert.equal(region.rawValue, null);
+  assert.equal(region.displayValue, '-');
+  assert.equal(region.color, '#eeeeee');
+  assert.equal(region.rowCount, 1);
+}
+assert.equal(missingAndZero.regions.find(region => region.key === 'CA').displayValue, '0');
+const negativeOnly = buildReportFillGeoPayload({geo: {key: 'region', metric: {key: 'amount'}}}, [
+  {region: 'NY', amount: null}, {region: 'WA', amount: -4},
+]);
+assert.equal(negativeOnly.legend.min, '-4');
+assert.equal(negativeOnly.legend.max, '-4');
+const unavailableOnly = buildReportFillGeoPayload({geo: {key: 'region', metric: {key: 'amount'}}}, [{region: 'NY', amount: null}]);
+assert.deepEqual(unavailableOnly.ranking, []);
+assert.equal(unavailableOnly.activeRegion.rawValue, null);

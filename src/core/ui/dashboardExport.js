@@ -1347,7 +1347,7 @@ function buildGeoMapBlock(container, blockContext) {
     blockContext.dashboardSelection,
   );
   const geoRows = aggregateGeoRows(filteredRows, config);
-  const values = Array.from(geoRows.values()).map((entry) => Number(entry.value)).filter(Number.isFinite);
+  const values = Array.from(geoRows.values()).map((entry) => entry.value).filter(Number.isFinite);
   const range = values.length
     ? {min: Math.min(...values), max: Math.max(...values)}
     : {min: 0, max: 0};
@@ -1358,14 +1358,14 @@ function buildGeoMapBlock(container, blockContext) {
     const label = config.labelKey && row ? resolveKey(row, config.labelKey) : tile.label;
     const rawValue = entry ? entry.value : null;
     const colorRule = entry ? findGeoColorRule(row, config.color) : null;
-    const color = entry
+    const color = Number.isFinite(rawValue)
       ? resolveGeoColor({row, value: rawValue, minValue: range.min, maxValue: range.max, colorConfig: config.color})
       : config.color.empty;
     return {
       ...tile,
       label,
       color,
-      empty: !entry,
+      empty: !Number.isFinite(rawValue),
       selected: selectedKey === tile.key,
       rawValue,
       statusColor: colorRule?.color || '',
@@ -1374,14 +1374,14 @@ function buildGeoMapBlock(container, blockContext) {
     };
   });
   const ranking = regions
-    .filter((region) => Number.isFinite(Number(region.rawValue)))
+    .filter((region) => Number.isFinite(region.rawValue))
     .sort((a, b) => Number(b.rawValue) - Number(a.rawValue))
     .slice(0, geoLimit)
     .map((region) => ({
       ...region,
       width: range.max > 0 ? `${Math.max((Number(region.rawValue) / range.max) * 100, 4)}%` : '4%',
     }));
-  const valuedRegions = regions.filter((region) => Number.isFinite(Number(region.rawValue)));
+  const valuedRegions = regions.filter((region) => Number.isFinite(region.rawValue));
   const totalValue = valuedRegions.reduce((sum, region) => sum + (Number(region.rawValue) || 0), 0);
   const colorRules = config.color.field && Array.isArray(config.color.rules)
     ? config.color.rules.filter((rule) => rule?.color)

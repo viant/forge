@@ -45,7 +45,7 @@ export function buildReportFillGeoPayload(block = {}, rows = [], { locale = "en-
   const config = buildGeoConfig({ geo: block?.geo || {} });
   const geoRows = aggregateGeoRows(Array.isArray(rows) ? rows : [], config);
   const values = Array.from(geoRows.values())
-    .map((entry) => Number(entry.value))
+    .map((entry) => entry.value)
     .filter(Number.isFinite);
   const range = values.length > 0
     ? { min: Math.min(...values), max: Math.max(...values) }
@@ -57,7 +57,7 @@ export function buildReportFillGeoPayload(block = {}, rows = [], { locale = "en-
       const sourceKey = resolveKey(row, config.key);
       const key = normalizeGeoKey(sourceKey, config.shape);
       const label = config.labelKey ? resolveKey(row, config.labelKey) : sourceKey;
-      const rawValue = Number.isFinite(Number(entry?.value)) ? Number(entry.value) : null;
+      const rawValue = Number.isFinite(entry?.value) ? entry.value : null;
       const colorRule = row ? findGeoColorRule(row, config.color) : null;
       return {
         key,

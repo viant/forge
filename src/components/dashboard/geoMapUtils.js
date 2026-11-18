@@ -152,7 +152,7 @@ export function aggregateGeoRows(collection = [], config) {
             continue;
         }
         const rawValue = resolveKey(row, config.metricKey);
-        const value = Number(rawValue);
+        const value = rawValue == null ? null : Number(rawValue);
         const current = byKey.get(key) || {
             key,
             row,
@@ -164,7 +164,7 @@ export function aggregateGeoRows(collection = [], config) {
         current.rows.push(row);
         current.count += 1;
 
-        if (Number.isFinite(value)) {
+        if (value != null && Number.isFinite(value)) {
             if (config.aggregate === 'max') {
                 current.value = current.valueCount === 0 ? value : Math.max(current.value, value);
             } else if (config.aggregate === 'min') {
@@ -182,9 +182,11 @@ export function aggregateGeoRows(collection = [], config) {
         byKey.set(key, current);
     }
 
-    if (config.aggregate === 'avg') {
-        for (const entry of byKey.values()) {
-            entry.value = entry.valueCount > 0 ? entry.value / entry.valueCount : 0;
+    for (const entry of byKey.values()) {
+        if (entry.valueCount === 0) {
+            entry.value = null;
+        } else if (config.aggregate === 'avg') {
+            entry.value /= entry.valueCount;
         }
     }
 

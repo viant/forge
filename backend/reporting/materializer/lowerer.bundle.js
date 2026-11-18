@@ -60433,7 +60433,7 @@ ${indent}${end}`;
         continue;
       }
       const rawValue = resolveKey(row, config.metricKey);
-      const value = Number(rawValue);
+      const value = rawValue == null ? null : Number(rawValue);
       const current = byKey.get(key2) || {
         key: key2,
         row,
@@ -60444,7 +60444,7 @@ ${indent}${end}`;
       };
       current.rows.push(row);
       current.count += 1;
-      if (Number.isFinite(value)) {
+      if (value != null && Number.isFinite(value)) {
         if (config.aggregate === "max") {
           current.value = current.valueCount === 0 ? value : Math.max(current.value, value);
         } else if (config.aggregate === "min") {
@@ -60460,9 +60460,11 @@ ${indent}${end}`;
       }
       byKey.set(key2, current);
     }
-    if (config.aggregate === "avg") {
-      for (const entry of byKey.values()) {
-        entry.value = entry.valueCount > 0 ? entry.value / entry.valueCount : 0;
+    for (const entry of byKey.values()) {
+      if (entry.valueCount === 0) {
+        entry.value = null;
+      } else if (config.aggregate === "avg") {
+        entry.value /= entry.valueCount;
       }
     }
     return byKey;
@@ -60652,14 +60654,14 @@ ${indent}${end}`;
     if (((_a5 = block.geo) == null ? void 0 : _a5.shape) === "geojson") return buildReportFillGeoGeometry(block, Array.isArray(rows) ? rows : [], locale2);
     const config = buildGeoConfig({ geo: (block == null ? void 0 : block.geo) || {} });
     const geoRows = aggregateGeoRows(Array.isArray(rows) ? rows : [], config);
-    const values = Array.from(geoRows.values()).map((entry) => Number(entry.value)).filter(Number.isFinite);
+    const values = Array.from(geoRows.values()).map((entry) => entry.value).filter(Number.isFinite);
     const range = values.length > 0 ? { min: Math.min(...values), max: Math.max(...values) } : { min: 0, max: 0 };
     const regions2 = Array.from(geoRows.values()).map((entry) => {
       const row = (entry == null ? void 0 : entry.row) || null;
       const sourceKey = resolveKey(row, config.key);
       const key2 = normalizeGeoKey(sourceKey, config.shape);
       const label = config.labelKey ? resolveKey(row, config.labelKey) : sourceKey;
-      const rawValue = Number.isFinite(Number(entry == null ? void 0 : entry.value)) ? Number(entry.value) : null;
+      const rawValue = Number.isFinite(entry == null ? void 0 : entry.value) ? entry.value : null;
       const colorRule = row ? findGeoColorRule(row, config.color) : null;
       return {
         key: key2,

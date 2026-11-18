@@ -2024,7 +2024,9 @@ func (r *ReportFill) Validate() error {
 			if block.GeoContent.ResolvedGeo.Ranking == nil {
 				return fmt.Errorf("reportFill.blocks[%d].content.resolvedGeo.ranking is required for geoMapBlock", index)
 			}
+			hasValuedRegion := len(block.GeoContent.ResolvedGeo.Ranking) > 0
 			for regionIndex, region := range block.GeoContent.ResolvedGeo.Regions {
+				hasValuedRegion = hasValuedRegion || region.RawValue != nil
 				if err := validateResolvedGeoRegion(region, fmt.Sprintf("reportFill.blocks[%d].content.resolvedGeo.regions[%d]", index, regionIndex)); err != nil {
 					return err
 				}
@@ -2053,7 +2055,7 @@ func (r *ReportFill) Validate() error {
 				if strings.TrimSpace(block.GeoContent.ResolvedGeo.Summary.TotalValue) == "" {
 					return fmt.Errorf("reportFill.blocks[%d].content.resolvedGeo.summary.totalValue is required for geoMapBlock", index)
 				}
-				if strings.TrimSpace(block.GeoContent.ResolvedGeo.Summary.TopKey) == "" && !(block.GeoContent.ResolvedGeo.Shape == "geojson" && len(block.GeoContent.ResolvedGeo.Ranking) == 0) {
+				if strings.TrimSpace(block.GeoContent.ResolvedGeo.Summary.TopKey) == "" && hasValuedRegion {
 					return fmt.Errorf("reportFill.blocks[%d].content.resolvedGeo.summary.topKey is required for geoMapBlock", index)
 				}
 			}
