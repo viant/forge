@@ -40,6 +40,7 @@ import {shouldInitializeEmptyTable} from './tableInitialization.js';
 import {tableLoadingMode} from './tableLoadingState.js';
 import {useForgeTheme} from '../ThemeBoundary.jsx';
 import ListPagePattern from '../patterns/ListPagePattern.jsx';
+import ScrollArea from '../ScrollArea.jsx';
 import {collectionCountValue} from './basic/Toolbar.jsx';
 
 const defaultCellWidth = 30; // Adjust as needed
@@ -407,7 +408,9 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
             ? convertWidthsToPct(visibleColumns, tableWidth)
             : preserveDeclaredColumnWidths(visibleColumns);
         const hasColumnOverflow = tableWidth > 0 && scrollableTableWidth(sizedColumns) > tableWidth + 1;
-        const nextColumns = withStickyColumnOffsets(hasColumnOverflow ? sizedColumns : sizedColumns.map(column => ({...column, sticky: false})), tableWidth);
+        // List pages honor the producer's identity-column group at every width.
+        // Their responsive metadata owns which columns remain in narrow layouts.
+        const nextColumns = withStickyColumnOffsets(hasColumnOverflow ? sizedColumns : sizedColumns.map(column => ({...column, sticky: false})), listPage ? 0 : tableWidth);
         const nextSignature = stableColumnsSignature(nextColumns);
         if (enforceColumnSize && tableWidth > 0) {
             setColumnsToUse((previousColumns) => (
@@ -422,7 +425,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
                 ? previousColumns
                 : nextColumns
         ));
-    }, [enforceColumnSize, tableWidth, visibleColumns]);
+    }, [enforceColumnSize, tableWidth, visibleColumns, listPage]);
     const trailingSpace = container.table?.fillRemainingWidth === true ? tableTrailingSpace(columnsToUse,tableWidth) : null;
     const fillerWidth = trailingSpace?.fillerWidth || 0;
     const resolvedTableWidth = enforceColumnSize ? '100%' : `${scrollableTableWidth(columnsToUse, tableWidth)}px`;
@@ -685,6 +688,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
         });
     };
 
+    const TableScrollArea = listPage ? ScrollArea : 'div';
     const tableSurface = (
         <div
             className={`basic-table-wrapper${catalogPresentation ? ' is-catalog-presentation' : ''}${!catalogPresentation && container.table?.fullWidth !== true && !container.table?.width ? ' is-content-width' : ''}${rowSlots.rowHeight ? ' has-fixed-row-slots' : ''}${String(effectiveDensity || '').toLowerCase() === 'compact' ? " is-compact-density" : ""}${loadingMode === 'refresh' ? " is-refreshing" : ""}${showEmptyState ? " has-metadata-empty-state" : ""}${horizontalOverflow.left ? " has-table-overflow-left" : ""}${horizontalOverflow.right ? " has-table-overflow-right" : ""}`}
@@ -721,7 +725,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
             {showEmptyState ? (
                 <TableEmptyState context={context} config={resolvedEmptyState}/>
             ) : (
-                <div aria-busy={listPage && loading || undefined} className={`basic-table-scroll${renderRows ? ' has-responsive-cards' : ''}`} ref={scrollRef} tabIndex={0} aria-label="Table data; scroll horizontally for more columns">
+                <TableScrollArea aria-busy={listPage && loading || undefined} className={`basic-table-scroll${renderRows ? ' has-responsive-cards' : ''}`} ref={scrollRef} tabIndex={0} aria-label="Table data; scroll horizontally for more columns">
                     {renderRows ? renderRows({
                         rows: renderedCollection,
                         columns: columnsToUse,
@@ -761,7 +765,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
 
                     </HTMLTable>
                     )}
-                </div>
+                </TableScrollArea>
             )}
 
             {!listPage && loadingMode === 'refresh' ? (
@@ -805,8 +809,9 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
     );
     if (!listPage) return tableSurface;
     const pageItems = primaryToolbarItems.filter(item => !['tableExport','refresh'].includes(item.type) && item.id !== 'refresh').map(item => {
+        if (item.intent === 'primary' && item.label && item.hideLabel !== true) return {...item, hideLabel: false, icon: ['add', 'plus', 'lucide:plus'].includes(item.icon) ? undefined : item.icon};
         if (item.appearance === 'starred-toggle' || item.type === 'quickSearch') return {...item, align: 'right'};
-        if (['settings','filterList'].includes(item.id)) return {...item, align: 'right', appearance: 'minimal', icon: item.id === 'settings' ? 'lucide:sliders-horizontal' : 'lucide:funnel'};
+        if (['settings','filterList'].includes(item.id)) return {...item, align: 'right', appearance: 'minimal', tooltip: item.id === 'filterList' ? 'Filter view' : item.tooltip, icon: item.id === 'settings' ? 'lucide:sliders-horizontal' : 'lucide:funnel'};
         return item;
     }).sort((left,right)=>{
         const order=item=>item.appearance==='starred-toggle'?1:item.id==='settings'?2:item.id==='filterList'?3:item.type==='quickSearch'?4:0;
@@ -818,7 +823,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
     return <ListPagePattern title={container.title || tableTitle || 'Records'}
         period={headerItems.length ? <Toolbar context={toolbarContext} toolbarItems={headerItems}/> : null}
         actions={<Toolbar context={toolbarContext} toolbarItems={pageItems} leftContent={toolbarActions} className="forge-list-page__actions" exportRows={sortedCollection} exportPageRows={renderedCollection} exportColumns={exportColumns}/>}
-        summary={<div className="forge-list-page__summary"><span role="status" aria-live="polite">{loading ? appending ? 'Loading more rows…' : 'Loading rows…' : error && !appending ? 'Rows could not be loaded' : <>Summary: {collectionCountValue(info, sortedCollection, {properties: {pluralLabel: container.title || 'records', singularLabel: container.title || 'record'}})}{selectedCount?` · ${selectedCount} selected`:''}</>}</span>{error && appending ? <Button variant="ghost" onClick={() => loadNextRows(true)}>Retry loading rows</Button> : null}</div>}>
+        summary={<div className="forge-list-page__summary"><span role="status" aria-live="polite">{loading && !appending ? 'Loading rows…' : error && !appending ? 'Rows could not be loaded' : <>Summary: {collectionCountValue(info, sortedCollection, {properties: {pluralLabel: container.title || 'records', singularLabel: container.title || 'record'}})}{selectedCount?` · ${selectedCount} selected`:''}</>}</span>{error && appending ? <Button variant="ghost" onClick={() => loadNextRows(true)}>Retry loading rows</Button> : null}</div>}>
         {tableSurface}
     </ListPagePattern>;
 };
