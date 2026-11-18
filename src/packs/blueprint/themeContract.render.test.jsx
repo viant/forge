@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import './index.jsx';
+import AccessibleSection from '../../components/AccessibleSection.jsx';
 import {getWidget} from '../../runtime/widgetRegistry.jsx';
 
 for (const key of ['text', 'password', 'number', 'textarea', 'button']) {
@@ -336,3 +337,18 @@ const lockedReview=renderToStaticMarkup(<ReviewTable id="locked" rows={[{name:'E
 assert.match(lockedReview,/<input[^>]*disabled/);
 assert.doesNotMatch(lockedReview,/Download CSV/);
 console.log('shared resolved review disables native selection without introducing an export action');
+
+const inlineSection = renderToStaticMarkup(<AccessibleSection appearance="document" role="region" title="Next check" collapsible={false} actions={<button type="button">Continue</button>}>Question</AccessibleSection>);
+assert.match(inlineSection, /role="region"/);
+assert.match(inlineSection, /<h3[^>]*data-forge-type="section"/);
+assert.match(inlineSection, /data-forge-part="section-actions"[^>]*><button/);
+assert.doesNotMatch(inlineSection, /(?<!data-forge-)appearance="document"|aria-expanded/);
+
+const radioQuestion = {id:'update-choice',widget:'radio',required:true,label:'Update frequency',options:[{value:'daily',label:'Daily'},{value:'weekly',label:'Weekly'}],wrapper:'control-only'};
+const emptyRadio = renderToStaticMarkup(<WidgetRenderer item={radioQuestion} state={[{},()=>{}]}/>);
+assert.doesNotMatch(emptyRadio, /forge-required-missing|aria-invalid="true"/);
+assert.match(emptyRadio, /aria-required="true"/);
+const invalidRadio = renderToStaticMarkup(<WidgetRenderer item={{...radioQuestion,validationError:'Choose an option'}} state={[{},()=>{}]}/>);
+assert.match(invalidRadio, /forge-required-invalid/);
+assert.match(invalidRadio, /aria-invalid="true"/);
+assert.match(invalidRadio, /Choose an option/);

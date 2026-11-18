@@ -16,6 +16,8 @@ import SelectControl from '../../components/SelectControl.jsx';
 import Icon from '../../components/Icon.jsx';
 import Typography, {typographyProps} from '../../components/Typography.jsx';
 import {SectionPattern} from '../../components/patterns/index.js';
+import AccessibleSection from '../../components/AccessibleSection.jsx';
+import GuidedResult from '../../components/GuidedResult.jsx';
 import DashboardTableContent from '../../components/dashboard/DashboardTableContent.jsx';
 import {DashboardEditableTable} from '../../components/dashboard/DashboardBlocks.jsx';
 import '../../components/dashboard/Dashboard.css';
@@ -78,6 +80,32 @@ export default function FoundationSpecimen({includeDocuments = true, iconExample
             <div className="forge-foundation-row">{[1, 2, 3, 4, 5, 6].map(step => <div className="forge-foundation-space" key={step}><span className="forge-foundation-space__sample" style={{width: `var(--forge-spacing-${step}, ${step * 4}px)`}}/><Typography typeRole="metadata">Step {step}</Typography></div>)}</div>
             <Card className="forge-foundation-card" data-forge-part="container-card"><Typography as="h3" typeRole="section">Surface with a quiet border</Typography><Typography as="p" typeRole="body">Shared border, radius and inset roles. Elevation is reserved for overlays.</Typography></Card>
             <SectionPattern title="Reusable section" appearance="quiet" collapsible data-forge-part="container-section"><Typography as="p" typeRole="body">The section retains its keyboard control and expanded state.</Typography></SectionPattern>
+        </section>
+        <section id="foundation-inline-section" aria-label="Inline sections">
+            <Typography as="h2" typeRole="section">Inline sections</Typography>
+            <AccessibleSection appearance="document" title="Choose the next check" collapsible={false}
+                actions={<><Button variant="secondary" onClick={() => setSaved(0)}>Skip example</Button><Button variant="primary" onClick={() => setSaved(saved + 1)}>Continue example</Button></>}>
+                <Typography as="p" typeRole="body">A section can keep an existing form and its actions in the reading flow.</Typography>
+            </AccessibleSection>
+            <AccessibleSection appearance="document" title="Example evidence" collapseProps={{defaultIsOpen:false}}>
+                <Typography as="p" typeRole="body">Supporting details expand with the same section control.</Typography>
+            </AccessibleSection>
+        </section>
+        <section id="foundation-guided-result" aria-label="Guided result">
+            <Typography as="h2" typeRole="section">Guided result</Typography>
+            <GuidedResult title="A submitted value needs review" scope="Synthetic historical example"
+                status={{label:'Needs review',tone:'warning'}}
+                checks={[{label:'Record received',status:'Confirmed',tone:'success'},{label:'Value mapping',status:'Needs review',tone:'warning'},{label:'Outcome',status:'Not verified',tone:'info'}]}
+                example={{label:'Recorded fields, October 5 at 18:21:05 UTC',code:'https://example.test/collect?amount=[Amount]&currency=[Currency]',highlights:['[Amount]','[Currency]'],note:'Synthetic example, not a live tracking request.'}}
+                nextStep={{title:'Provide the missing evidence',description:'1. Ask the source owner for one approved test record.\n2. Share its expected values so they can be compared.',action:{label:'Show the next check',prompt:'Help me review the mapping.'}}}
+                evidence={{title:'What was checked',items:[{label:'Source',value:'Synthetic component data.'},{label:'Limit',value:'No successful outcome or repair has been verified.'}]}}
+                onAction={async () => setSaved(saved + 1)}/>
+            <GuidedResult receipt={{title:'Source checked',subject:'public.example.test',detail:'Synthetic public settings review',tone:'success'}}
+                title="A value is still placeholder text" scope="Found the expected item in the published setup." status={{tone:'warning'}}
+                values={[{label:'Amount in the published setup',value:'[Amount]',tone:'warning'},{label:'Unit in the published setup',value:'[Unit]',tone:'warning'}]}
+                summary="These fields need the actual amount and unit." limit="A completed transaction was not tested."
+                nextStep={{title:'How to fix this',collapsible:true,description:'1. Replace the placeholder text with the verified source values.\n2. Validate the result in an approved test environment.'}}
+                evidence={{title:'Check details',items:[{label:'Source inspected',value:'Synthetic public definition. No live service was contacted.'},{label:'Limit',value:'Inspection completion does not establish a successful transaction.'}]}}/>
         </section>
         <section id="foundation-actions" aria-label="Actions and icons">
             <Typography as="h2" typeRole="section">Actions and icons</Typography>

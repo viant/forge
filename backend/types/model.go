@@ -546,11 +546,12 @@ type TableRowDetails struct {
 }
 
 type Container struct {
-	Appearance                 string             `json:"appearance,omitempty" yaml:"appearance,omitempty"`
-	TablePresentation          *TablePresentation `json:"tablePresentation,omitempty" yaml:"tablePresentation,omitempty"`
-	MCPApp                     *MCPAppSpec        `json:"mcpApp,omitempty" yaml:"mcpApp,omitempty"`
-	ID                         string             `json:"id" yaml:"id"`
-	ClassName                  string             `json:"className,omitempty" yaml:"className,omitempty"`
+	GuidedResult               map[string]interface{} `json:"guidedResult,omitempty" yaml:"guidedResult,omitempty"`
+	Appearance                 string                 `json:"appearance,omitempty" yaml:"appearance,omitempty"`
+	TablePresentation          *TablePresentation     `json:"tablePresentation,omitempty" yaml:"tablePresentation,omitempty"`
+	MCPApp                     *MCPAppSpec            `json:"mcpApp,omitempty" yaml:"mcpApp,omitempty"`
+	ID                         string                 `json:"id" yaml:"id"`
+	ClassName                  string                 `json:"className,omitempty" yaml:"className,omitempty"`
 	Binding                    `yaml:",inline"`
 	Target                     *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
 	TargetOverrides            map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`

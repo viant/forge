@@ -208,6 +208,74 @@ phone/tablet/desktop form-factor contract and the shared roles for touch
 targets, page gutters, section gaps and content width. Components use those
 roles with container-aware CSS. Hosts can use the same roles in their own
 responsive compositions.
+### Guided results
+
+Use `GuidedResult` for an authored finding that needs structured checks and a
+next step. It composes the existing AccessibleSection, semantic Tag,
+Typography, Icon and Button. `dashboard.guidedResult` exposes the same component
+through metadata under `guidedResult`; the Go container and window schema retain
+that payload. It does not execute data reads, interpret a result or apply changes.
+
+Supply `title`, `scope`, optional one-sentence `summary`, `status: {label,tone}`,
+and `checks: [{id,label,status,tone}]`. Producers own the evidence and status
+meaning. Unknown checks use the information tone and explicit unknown text;
+color always has a label. `nextStep` has a title, optional description and one
+optional `{label,prompt}` action. The host supplies `onAction`; without it, the
+action stays disabled. Busy actions prevent duplicate clicks, and errors retain
+the result and allow retry. Agently sends the prompt through its existing chat
+submission path, including its normal authorization and execution rules.
+
+Descriptions and evidence values reuse the report runtime's existing escaped
+Markdown body under document presentation. Write a numbered procedure as one
+item per line; it renders semantic `ol`/`li` elements with the shared typography
+and spacing. Flat lists, emphasis and literal code retain the report renderer's
+current coverage. There is no second parser, step schema, new page CSS or
+tracking/link execution. FoundationSpecimen and the mounted regression include
+actual list items; ordinary descriptions keep their paragraph behavior.
+
+`example: {label,code,copyValue,highlights,note}` displays escaped, non-clickable
+source text. Literal `highlights` are escaped before matching. Copy uses
+`copyValue` when display formatting differs, otherwise the displayed code, and
+announces success or failure. Supply provenance and explicit redactions rather
+than inventing an observed example. The example title wraps while Copy keeps
+its full width, including in narrow hosts that wrap long text.
+`evidence: {title,items:[{label,value}]}` uses
+the existing keyboard-accessible section disclosure, collapsed initially.
+
+For an executed inspection, optional `receipt: {title,subject,detail,tone}`
+separates the check header from the finding. The existing `title` remains the
+finding beneath it; `scope` can state the supported observation. Supply
+`values: [{label,value,tone}]` for compact escaped observed values and `limit`
+for a material unchecked stage that stays visible. Values wrap in the host
+width; an omitted tone is neutral. Producers supply the actual source/date,
+completion state and finding. A success receipt means only that the named
+inspection completed. Partial/failed attempts need their own accurate receipt
+title/tone; the renderer never infers health or an applied repair.
+
+Set `nextStep.collapsible: true` for already supplied instructions. It reuses
+the native section disclosure, independently collapsed alongside evidence;
+expansion invokes no host action. Section controls are named from their titles.
+Keep actual `{label,prompt}` actions for work or input that has not occurred.
+Omitted receipt and collapsible metadata preserve existing saved-result layout
+and action behavior. FoundationSpecimen demonstrates both presentations with
+neutral synthetic content; the mounted test covers independent disclosures,
+value escaping, the visible limit and an incomplete-check state.
+The receipt body retains its semantic top inset below the header. Collapsible
+supplied steps reuse the native section layout and collapsed geometry; the
+ordinary inline next-step grid applies only to non-collapsible steps.
+Disclosure headers retain a spacing-1 end inset so the native caret focus
+outline fits inside the section's clipping boundary.
+
+FoundationSpecimen mounts a neutral synthetic example with confirmed, warning
+and unknown checks, Copy, an action and evidence. The required workspace-theme
+runner includes the mounted GuidedResult test for disclosure, escaped content,
+copy, action/busy/error states. Host rich-content tests cover canonical saved
+parts, the ordinary-chat action and passive foreign backends. No legacy HTML
+download is offered for this widget; reports retain their own export action.
+
+Document sections keep their semantic surface, foreground and quiet border
+inside a legacy dark ancestor, including when Blueprint CSS loads afterward.
+The host typography browser check covers this cascade with the real stylesheet.
 
 | Implementation | Supported contract and scope |
 | --- | --- |
@@ -1632,6 +1700,32 @@ does not migrate that form or other workbench controls to a new theme API.
 Its optional isolated Studio gateway mode verifies native contributor round
 trips, fallback restoration and root/child execution; generated evidence stays
 untracked under `output/playwright`.
+
+## Inline section composition
+
+`AccessibleSection` is exported from `forge/components`. Use the existing
+section with `appearance="document"`, `collapsible={false}` and an optional
+`actions` React-node slot to place a form in a reading flow. Compose the
+existing `SchemaBasedForm`, `Button` and `Typography` inside it. A collapsible
+evidence section may use `collapseProps={{defaultIsOpen:false}}`; its button
+retains expanded state, keyboard activation and the controlled/uncontrolled API.
+Titles use the section typography role, while the owning form supplies labels,
+validation, busy/disabled controls and errors. Actions wrap at narrow widths.
+Omitting appearance and actions preserves existing container behavior.
+
+FoundationSpecimen shows the actual static form section, wrapping actions and
+collapsed evidence. The existing section and grid render checks cover semantic
+titles and the action slot. Agently's ordinary-question consumer exercises
+unselected answers, validation, submit/skip/cancel, failures and continuation.
+No workspace brand values or business schemas are part of this component.
+
+### Unanswered radio choices
+
+Required radio groups start on the neutral surface with no selection. The
+required label and `aria-required` remain present. The existing form validation
+marks the group invalid after an attempted submission or an explicit authored
+validation error; an unanswered initial question is not an error state. This
+shared state treatment applies to every radio widget without page-specific CSS.
 
 ## Overlay scroll areas in Design System 2.0
 

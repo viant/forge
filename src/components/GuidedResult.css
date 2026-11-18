@@ -1,0 +1,40 @@
+.forge-guided-result { min-width: 0; }
+.forge-guided-result p,
+.forge-guided-result h4,
+.forge-guided-result dl,
+.forge-guided-result dd { margin: 0; }
+.forge-guided-result__scope { color: var(--forge-text-muted, inherit); }
+.forge-guided-result--receipt.forge-section[data-forge-appearance="document"] > [data-forge-part="section-header"] { border-block-end: var(--forge-border-width, 1px) solid var(--forge-border-color, currentColor); }
+.forge-guided-result--receipt > [data-forge-part="section-header"] .bp6-section-header-left { align-items: flex-start; gap: var(--forge-spacing-3, 12px); }
+.forge-guided-result--receipt.forge-section[data-forge-appearance="document"] > [data-forge-part="section-content"] { padding-block-start: var(--forge-spacing-4, 16px); }
+.forge-guided-result__receipt-icon { display: grid; place-items: center; flex-shrink: 0; padding: var(--forge-spacing-2, 8px); border-radius: var(--forge-control-radius, 8px); color: var(--forge-text-secondary, inherit); background: var(--forge-surface-subtle, transparent); }
+.forge-guided-result__receipt-icon[data-forge-status="success"] { color: var(--forge-status-success-foreground, inherit); background: var(--forge-status-success-background, transparent); }
+.forge-guided-result__receipt-icon[data-forge-status="warning"] { color: var(--forge-status-warning-foreground, inherit); background: var(--forge-status-warning-background, transparent); }
+.forge-guided-result__receipt-icon[data-forge-status="danger"] { color: var(--forge-status-danger-foreground, inherit); background: var(--forge-status-danger-background, transparent); }
+.forge-guided-result__subject { color: var(--forge-text, inherit); overflow-wrap: anywhere; }
+.forge-guided-result--receipt .forge-guided-result__scope { color: var(--forge-text, inherit); }
+.forge-guided-result__finding { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--forge-spacing-2, 8px); }
+.forge-guided-result__finding h4[data-forge-status="warning"] { color: var(--forge-status-warning-foreground, inherit); }
+.forge-guided-result__values { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: var(--forge-spacing-3, 12px); }
+.forge-guided-result__values > div { display: grid; align-content: start; justify-items: start; gap: var(--forge-spacing-2, 8px); min-width: 0; }
+.forge-guided-result__values code { max-width: 100%; padding: var(--forge-spacing-1, 4px); background: var(--forge-surface-subtle, transparent); overflow-wrap: anywhere; }
+.forge-guided-result__values code[data-forge-status="warning"] { color: var(--forge-status-warning-foreground, inherit); background: var(--forge-status-warning-background, transparent); }
+.forge-guided-result__limit { color: var(--forge-text-muted, inherit); }
+.forge-guided-result__checks { display: grid; gap: var(--forge-spacing-2, 8px); }
+.forge-guided-result__checks > div { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--forge-spacing-2, 8px) var(--forge-spacing-3, 12px); padding-block: var(--forge-spacing-2, 8px); }
+.forge-guided-result__checks dt { display: flex; align-items: center; gap: var(--forge-spacing-2, 8px); min-width: 0; }
+.forge-guided-result__checks dd { max-width: 100%; }
+.forge-guided-result__checks .bp6-tag { max-width: 100%; }
+.forge-guided-result__checks .bp6-text-overflow-ellipsis { white-space: normal; overflow-wrap: anywhere; }
+.forge-guided-result__checks dt > .forge-icon { color: var(--forge-text-secondary, inherit); }
+.forge-guided-result__example { min-width: 0; display: grid; gap: var(--forge-spacing-2, 8px); }
+.forge-guided-result__example-header { display: flex; align-items: center; justify-content: space-between; gap: var(--forge-spacing-2, 8px); }
+.forge-guided-result__example-header > .forge-button { flex-shrink: 0; }
+.forge-guided-result__example pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; min-width: 0; padding: var(--forge-spacing-3, 12px); border-radius: var(--forge-control-radius, 8px); background: var(--forge-surface-subtle, transparent); }
+.forge-guided-result__example mark { color: var(--forge-status-warning-foreground, inherit); background: var(--forge-status-warning-background, transparent); }
+.forge-guided-result__next:not(.forge-guided-result__disclosure) { display: grid; justify-items: start; gap: var(--forge-spacing-2, 8px); border-block-start: var(--forge-border-width, 1px) solid var(--forge-border-color, currentColor); padding-block-start: var(--forge-spacing-4, 16px); }
+.forge-guided-result__disclosure.forge-section[data-forge-appearance="document"] { border: 0; border-radius: 0; padding: 0; }
+.forge-guided-result__disclosure.forge-section[data-forge-appearance="document"] > [data-forge-part="section-header"] { padding: var(--forge-spacing-2, 8px) 0; padding-inline-end: var(--forge-spacing-1, 4px); }
+.forge-guided-result__disclosure.forge-section[data-forge-appearance="document"] [data-forge-part="section-content"] { padding: var(--forge-spacing-2, 8px) 0; }
+.forge-guided-result__evidence dl { display: grid; gap: var(--forge-spacing-3, 12px); }
+.forge-guided-result__evidence dd { margin-block-start: var(--forge-spacing-1, 4px); overflow-wrap: anywhere; }

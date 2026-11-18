@@ -14,6 +14,7 @@ export const DASHBOARD_BLOCK_KINDS = [
   'dashboard.table',
   'dashboard.report',
   'dashboard.reportRuntime',
+  'dashboard.guidedResult',
   'dashboard.reportCatalog',
   'dashboard.detail',
 ];
@@ -45,12 +46,27 @@ export const DASHBOARD_METADATA_SCHEMA = {
     report: { $ref: '#/$defs/reportConfig' },
     dashboard: { $ref: '#/$defs/dashboardConfig' },
     reportRuntime: { $ref: '#/$defs/reportRuntimeConfig' },
+    guidedResult: { $ref: '#/$defs/guidedResultConfig' },
     containers: {
       type: 'array',
       items: { $ref: '#/$defs/block' },
     },
   },
   $defs: {
+    guidedResultConfig: {
+      type: 'object', additionalProperties: true,
+      properties: {
+        title: {type: 'string'}, scope: {type: 'string'}, summary: {type: 'string'},
+        receipt: {type: 'object', properties: {title: {type: 'string'}, subject: {type: 'string'}, detail: {type: 'string'}, tone: {enum: ['info', 'success', 'warning', 'danger']}}},
+        values: {type: 'array', items: {type: 'object', properties: {label: {type: 'string'}, value: {type: 'string'}, tone: {enum: ['info', 'success', 'warning', 'danger']}}}},
+        limit: {type: 'string'},
+        status: {type: 'object', properties: {label: {type: 'string'}, tone: {enum: ['info', 'success', 'warning', 'danger']}}},
+        checks: {type: 'array', items: {type: 'object', properties: {id: {type: 'string'}, label: {type: 'string'}, status: {type: 'string'}, tone: {enum: ['info', 'success', 'warning', 'danger']}}}},
+        example: {type: 'object', properties: {label: {type: 'string'}, code: {type: 'string'}, copyValue: {type: 'string'}, note: {type: 'string'}, highlights: {type: 'array', items: {type: 'string'}}}},
+        nextStep: {type: 'object', properties: {title: {type: 'string'}, description: {type: 'string'}, collapsible: {type: 'boolean'}, action: {type: 'object', properties: {label: {type: 'string'}, prompt: {type: 'string'}}}}},
+        evidence: {type: 'object', properties: {title: {type: 'string'}, items: {type: 'array', items: {type: 'object', properties: {label: {type: 'string'}, value: {type: 'string'}}}}}},
+      },
+    },
     reportConfig: {
       type: 'object',
       additionalProperties: true,
@@ -79,6 +95,7 @@ export const DASHBOARD_METADATA_SCHEMA = {
       type: 'object',
       additionalProperties: true,
       properties: {
+        guidedResult: {$ref: '#/$defs/guidedResultConfig'},
         id: { type: 'string' },
         kind: { enum: DASHBOARD_BLOCK_KINDS },
         title: { type: 'string' },

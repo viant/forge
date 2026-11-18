@@ -956,6 +956,11 @@
         "groupedSelection": {
           "$ref": "#/$defs/GroupedSelectionSpec"
         },
+        "guidedResult": {
+          "additionalProperties": {},
+          "description": "Shared guided-result presentation metadata. The renderer owns its status, example, next-step and evidence controls.",
+          "type": "object"
+        },
         "hiddenWhen": {
           "additionalProperties": {},
           "type": "object"

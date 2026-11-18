@@ -1,10 +1,12 @@
 import React from 'react';
 import {Card, Collapse, Icon} from '@blueprintjs/core';
 import Typography from './Typography.jsx';
+import './AccessibleSection.css';
 import {DocumentPresentationContext} from './documentPresentation.js';
 
-export default function AccessibleSection({title = '', subtitle = '', icon, rightElement, compact = false, collapsible = true, collapseProps = {}, children, className = '', ...cardProps}) {
-    const documentPresentation = React.useContext(DocumentPresentationContext);
+export default function AccessibleSection({title = '', subtitle = '', icon, rightElement, compact = false, collapsible = true, collapseProps = {}, appearance, actions, children, className = '', ...cardProps}) {
+    const inheritedDocumentPresentation = React.useContext(DocumentPresentationContext);
+    const documentPresentation = appearance === 'document' || inheritedDocumentPresentation;
     const generatedId = React.useId().replace(/:/g, '');
     const contentId = `forge-section-${generatedId}`;
     const titleId = `${contentId}-title`;
@@ -12,6 +14,7 @@ export default function AccessibleSection({title = '', subtitle = '', icon, righ
     const controlled = typeof collapseProps?.isOpen === 'boolean';
     const [localOpen, setLocalOpen] = React.useState(collapseProps?.defaultIsOpen !== false);
     const isOpen = !collapsible || (controlled ? collapseProps.isOpen : localOpen);
+    const collapseLabel = `${isOpen ? 'Collapse' : 'Expand'} ${typeof title === 'string' && title.trim() ? title : 'section'}`;
     const toggle = () => {
         if (!controlled) setLocalOpen((current) => !current);
         collapseProps?.onToggle?.();
@@ -23,8 +26,8 @@ export default function AccessibleSection({title = '', subtitle = '', icon, righ
     delete safeCardProps.properties;
     const {isOpen: _isOpen, defaultIsOpen: _defaultIsOpen, onToggle: _onToggle, ...collapseRest} = collapseProps || {};
     return (
-        <Card {...safeCardProps} data-forge-component="section" data-forge-state={collapsible ? (isOpen ? 'open' : 'closed') : 'static'} aria-labelledby={title ? titleId : undefined} className={`bp6-section${compact ? ' bp6-compact' : ''}${!isOpen ? ' bp6-section-collapsed' : ''}${className ? ` ${className}` : ''}`}>
-            {title ? <div data-forge-part="section-header" data-forge-state={collapsible ? (isOpen ? 'open' : 'closed') : 'static'} aria-expanded={collapsible ? isOpen : undefined} aria-controls={collapsible ? contentId : undefined} className={`bp6-section-header${collapsible ? ' bp6-interactive' : ''}`} onClick={collapsible ? toggle : undefined}>
+        <Card {...safeCardProps} data-forge-appearance={appearance} data-forge-component="section" data-forge-state={collapsible ? (isOpen ? 'open' : 'closed') : 'static'} aria-labelledby={title ? titleId : undefined} className={`forge-section bp6-section${compact ? ' bp6-compact' : ''}${!isOpen ? ' bp6-section-collapsed' : ''}${className ? ` ${className}` : ''}`}>
+            {title ? <div data-forge-part="section-header" data-forge-state={collapsible ? (isOpen ? 'open' : 'closed') : 'static'} aria-expanded={collapsible ? isOpen : undefined} aria-controls={collapsible ? contentId : undefined} className={`forge-section bp6-section-header${collapsible ? ' bp6-interactive' : ''}`} onClick={collapsible ? toggle : undefined}>
                 <div className="bp6-section-header-left">
                     {icon ? <Icon icon={icon} aria-hidden="true" className="bp6-text-muted"/> : null}
                     <div>
@@ -35,7 +38,7 @@ export default function AccessibleSection({title = '', subtitle = '', icon, righ
                 {rightElement || collapsible ? <div className="bp6-section-header-right">
                     {rightElement}
                     {collapsible ? <button type="button" className="bp6-button bp6-minimal bp6-small bp6-section-header-collapse-caret"
-                        aria-expanded={isOpen} aria-controls={contentId} aria-label={isOpen ? 'collapse section' : 'expand section'}
+                        aria-expanded={isOpen} aria-controls={contentId} aria-label={collapseLabel}
                         onClick={(event) => { event.stopPropagation(); toggle(); }}>
                         <Icon icon={isOpen ? 'chevron-up' : 'chevron-down'} aria-hidden="true"/>
                     </button> : null}
@@ -44,6 +47,7 @@ export default function AccessibleSection({title = '', subtitle = '', icon, righ
             {collapsible ? <Collapse {...collapseRest} isOpen={isOpen} keepChildrenMounted={collapseProps?.keepChildrenMounted === true}>
                 {content}
             </Collapse> : content}
+            {actions ? <div data-forge-part="section-actions">{actions}</div> : null}
         </Card>
     );
 }
