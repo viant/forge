@@ -122,6 +122,13 @@ export function formatExportNumericValue(value, format = "", {
         maximumFractionDigits: axis ? (Number.isInteger(numeric) ? 0 : 1) : 5,
         useGrouping: true,
       });
+    case "number0":
+    case "number1":
+      return formatExportDecimal(numeric, {
+        minimumFractionDigits: normalizedFormat === "number1" ? 1 : 0,
+        maximumFractionDigits: normalizedFormat === "number1" ? 1 : 0,
+        useGrouping: true,
+      });
     case "number2":
       return formatExportDecimal(numeric, {
         minimumFractionDigits: 0,

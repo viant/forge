@@ -48175,6 +48175,13 @@ ${indent}${end}`;
           maximumFractionDigits: 5,
           useGrouping: true
         }).format(numeric);
+      case "number0":
+      case "number1":
+        return new Intl.NumberFormat(locale2, {
+          minimumFractionDigits: format2 === "number1" ? 1 : 0,
+          maximumFractionDigits: format2 === "number1" ? 1 : 0,
+          useGrouping: true
+        }).format(numeric);
       case "number2":
         return new Intl.NumberFormat(locale2, {
           minimumFractionDigits: 0,
@@ -50418,6 +50425,13 @@ ${indent}${end}`;
         return formatExportDecimal(numeric, {
           minimumFractionDigits: 0,
           maximumFractionDigits: axis ? Number.isInteger(numeric) ? 0 : 1 : 5,
+          useGrouping: true
+        });
+      case "number0":
+      case "number1":
+        return formatExportDecimal(numeric, {
+          minimumFractionDigits: normalizedFormat === "number1" ? 1 : 0,
+          maximumFractionDigits: normalizedFormat === "number1" ? 1 : 0,
           useGrouping: true
         });
       case "number2":
