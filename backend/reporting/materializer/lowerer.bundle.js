@@ -56148,7 +56148,7 @@ ${indent}${end}`;
     return [...selectedDimensions, ...selectedMeasures];
   }
   function buildExplicitReportBuilderChartContainer(container = {}, config = {}, state = {}, chartSpec = null) {
-    var _a5, _b, _c;
+    var _a5, _b, _c, _d, _e;
     const normalized = normalizeReportBuilderChartSpec(chartSpec);
     if (!normalized) {
       return container;
@@ -56276,20 +56276,29 @@ ${indent}${end}`;
       if (option.negativeColor) entry.negativeColor = option.negativeColor;
       return entry;
     });
+    const chart = applyChartMetricSelection({
+      ...baseChart,
+      ...typeof normalized.allowTableSwitch === "boolean" ? { allowTableSwitch: normalized.allowTableSwitch } : {},
+      ...normalized.metricSelection ? { metricSelection: normalized.metricSelection } : {},
+      series: {
+        values,
+        palette,
+        ...normalized.categoryColors ? { categoryColors: normalized.categoryColors } : {}
+      }
+    });
+    const rightAxis = (_d = chart.axes) == null ? void 0 : _d.right;
+    if (chart.appearance === "document" && !Object.hasOwn(rightAxis || {}, "format")) {
+      const rightSeries = chart.series.values.filter((entry) => entry.axis === "right");
+      const format2 = (_e = rightSeries[0]) == null ? void 0 : _e.format;
+      if (typeof format2 === "string" && format2.trim() && rightSeries.every((entry) => entry.format === format2)) {
+        chart.axes = { ...chart.axes, right: { ...rightAxis, format: format2 } };
+      }
+    }
     return {
       ...container,
       dataSourceRef: container.dataSourceRef,
       collection: container.collection,
-      chart: applyChartMetricSelection({
-        ...baseChart,
-        ...typeof normalized.allowTableSwitch === "boolean" ? { allowTableSwitch: normalized.allowTableSwitch } : {},
-        ...normalized.metricSelection ? { metricSelection: normalized.metricSelection } : {},
-        series: {
-          values,
-          palette,
-          ...normalized.categoryColors ? { categoryColors: normalized.categoryColors } : {}
-        }
-      })
+      chart
     };
   }
 

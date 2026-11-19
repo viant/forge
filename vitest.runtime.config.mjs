@@ -42,6 +42,7 @@ export default defineConfig({
       'src/components/Chart.categoryRange.render.test.jsx',
             'src/components/Chart.twoSetOverlap.render.test.jsx',
       'src/components/Chart.measurements.render.test.jsx',
+      'src/components/Chart.authoredRightAxis.render.test.jsx',
       'src/components/Chart.barIdentity.render.test.jsx',
       'src/components/Chart.axisLabels.render.test.jsx',
       'src/components/Chart.legend.render.test.jsx',

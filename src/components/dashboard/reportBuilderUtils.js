@@ -2524,20 +2524,30 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
         return entry;
     });
 
+    const chart = applyChartMetricSelection({
+        ...baseChart,
+        ...(typeof normalized.allowTableSwitch === "boolean" ? {allowTableSwitch:normalized.allowTableSwitch} : {}),
+        ...(normalized.metricSelection ? {metricSelection: normalized.metricSelection} : {}),
+        series: {
+            values,
+            palette,
+            ...(normalized.categoryColors ? {categoryColors: normalized.categoryColors} : {}),
+        },
+    });
+    const rightAxis = chart.axes?.right;
+    if (chart.appearance === "document" && !Object.hasOwn(rightAxis || {}, "format")) {
+        const rightSeries = chart.series.values.filter(entry => entry.axis === "right");
+        const format = rightSeries[0]?.format;
+        if (typeof format === "string" && format.trim()
+            && rightSeries.every(entry => entry.format === format)) {
+            chart.axes = {...chart.axes, right: {...rightAxis, format}};
+        }
+    }
     return {
         ...container,
         dataSourceRef: container.dataSourceRef,
         collection: container.collection,
-        chart: applyChartMetricSelection({
-            ...baseChart,
-            ...(typeof normalized.allowTableSwitch === "boolean" ? {allowTableSwitch:normalized.allowTableSwitch} : {}),
-            ...(normalized.metricSelection ? {metricSelection: normalized.metricSelection} : {}),
-            series: {
-                values,
-                palette,
-                ...(normalized.categoryColors ? {categoryColors: normalized.categoryColors} : {}),
-            },
-        }),
+        chart,
     };
 }
 
