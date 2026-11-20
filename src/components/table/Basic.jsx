@@ -8,12 +8,14 @@ import {useTableViews} from './useTableViews.js';
 import {tablePrimaryToolbarItems} from './tableToolbarLayout.js';
 import { getViewSignal } from '../../core/store/signals.js';
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { HTMLTable, Spinner } from "@blueprintjs/core";
-import numeral from "numeral";
+import { HTMLTable, Spinner, Tag } from "@blueprintjs/core";
+import RemovableChip from '../RemovableChip.jsx';
+import {formatTableNumber} from './basic/tableNumericFormat.js';
 import { useColumnsHandlers, tableHandlers } from "../../hooks/event.js";
 import { useDataSourceState } from "../../hooks/useDataSourceState.js";
 import TableBody from "./basic/TableBody.jsx";
 import TableHeader from "./basic/TableHeader.jsx";
+import TableSummary from "./basic/TableSummary.jsx";
 import FilterDialog from "./FilterDialog.jsx";
 import SettingsDialog from "./SettingsDialog.jsx";
 import "./Basic.css";
@@ -41,7 +43,8 @@ import {tableLoadingMode} from './tableLoadingState.js';
 import {useForgeTheme} from '../ThemeBoundary.jsx';
 import ListPagePattern from '../patterns/ListPagePattern.jsx';
 import ScrollArea from '../ScrollArea.jsx';
-import {collectionCountValue} from './basic/Toolbar.jsx';
+import {resolveTableThemeOverrides} from './tableThemeOverrides.js';
+import {collectionCountParts} from './basic/Toolbar.jsx';
 
 const defaultCellWidth = 30; // Adjust as needed
 
@@ -51,6 +54,7 @@ function stableColumnsSignature(columns = []) {
         (Array.isArray(columns) ? columns : []).map((col) => ({
             id: col?.id,
             visible: col?.visible,
+            hiddenInThemes: col?.hiddenInThemes,
             align: col?.align,
             tooltip: col?.tooltip,
             displayName: col?.displayName,
@@ -59,6 +63,12 @@ function stableColumnsSignature(columns = []) {
             widthPct: col?.widthPct,
             minWidth: col?.minWidth,
             type: col?.type,
+            sortable: col?.sortable,
+            icon: col?.icon,
+            on: col?.on,
+            numericFormat: col?.numericFormat,
+            readOnlyWhen: col?.readOnlyWhen,
+            disabledWhen: col?.disabledWhen,
             format: col?.format,
 	        timeZone: col?.timeZone,
 	        timeZoneSelector: col?.timeZoneSelector,
@@ -152,10 +162,14 @@ export function reconcileConfiguredColumns(savedColumns = [], sourceColumns = []
     });
 }
 
-const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, columns, pagination, children, renderRows }) => {
+const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, columns, pagination, children, renderRows, renderSummaryCell }) => {
     useSignals();
     const theme = useForgeTheme();
-    const listPage = container.table?.presentation === 'list-page' && theme?.themeId === 'design-system-2';
+    const themed = useMemo(() => resolveTableThemeOverrides(container.table, columns, theme?.themeId), [container.table, columns, theme?.themeId]);
+    container = {...container, table: themed.table};
+    columns = themed.columns;
+    const isDesignSystem2 = theme?.themeId === 'design-system-2';
+    const listPage = container.table?.presentation === 'list-page' && isDesignSystem2;
     const catalogPresentation = container.table?.presentation === 'catalog';
     trackVisibleWhen(container?.table?.queryDisabledWhen, context);
     const queryDisabled = !!container?.table?.queryDisabledWhen && evaluatePlainVisibleWhen(container.table.queryDisabledWhen, context);
@@ -232,7 +246,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
         }}
     }),`${loading}:${!!error}:${selectionEnabled}:${queryDisabled}`);
 
-    const filterSets = handlers?.dataSource?.getFilterSets?.()
+    const filterSets = container.table?.filterSets || handlers?.dataSource?.getFilterSets?.()
         || handlers?.dataSource?.getFilterSet?.()
         || [...(dataSource?.filterSet || [])];
     const activeFilterSet = filterSets.find((entry) => entry?.default) || filterSets[0];
@@ -313,10 +327,17 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
         setSortColumnId(columnId);setSortDirection(direction);
     }, [tablePreferences.preferences?.sort, initialSortColumnId, initialSortDirection, resolvedColumns, queryDisabled]);
 
-    // Ensure non-excludable columns are always visible
+    // Theme exclusions are metadata, not user visibility preferences. Keep the
+    // complete configuration so other themes retain their column preferences.
+    const availableColumns = useMemo(
+        () => configuredColumns.filter(col => !Array.isArray(col.hiddenInThemes) || !col.hiddenInThemes.includes(theme?.themeId)),
+        [configuredColumns, theme?.themeId]
+    );
+
+    // Ensure non-excludable columns are always visible within the active theme.
     const visibleColumns = useMemo(
-        () => configuredColumns.filter((col) => col.visible || col.nonExcludable),
-        [configuredColumns]
+        () => availableColumns.filter((col) => col.visible || col.nonExcludable),
+        [availableColumns]
     );
 
     const [columnsToUse, setColumnsToUse] = useState(visibleColumns);
@@ -469,14 +490,6 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
         };
     }, [tableRef]);
 
-    const numeralFormats = {
-        int: "0,0",
-        numeric: "0,0.00",
-        precision: "0,0.00000000",
-        usdCurrency: "$0,0.00",
-        percent: "0.00%",
-    };
-
     const columnTimeZones = useTableColumnTimeZones(columnsToUse, context);
     const exportColumns = useMemo(() => withBoundColumnTimeZones(columnsToUse, columnTimeZones), [columnsToUse, columnTimeZones]);
 
@@ -495,17 +508,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
                 const rawValue = resolveKey(item, col.id);
                 let displayedText = resolveTableCellText({row: item, column: col, value: rawValue, timeZone: columnTimeZones[colIndex]});
                 if (col.numericFormat && rawValue != null && rawValue !== "") {
-                    const format = numeralFormats[col.numericFormat] || col.numericFormat
-                    let numeralValue = 0.0
-                    if (typeof rawValue !== 'number') {
-                        numeralValue = parseFloat(rawValue).toFixed(10);
-                    } else {
-                        numeralValue = rawValue.toFixed(10)
-                    }
-                    displayedText = numeral(numeralValue).format(format)
-                    if(displayedText === "NaN") {
-                        displayedText = numeralValue + ''
-                    }
+                    displayedText = formatTableNumber(rawValue, col.numericFormat);
                 }
                 const cellKey = `${rowIndex}-${col.id}`;
                 let align = col.align;
@@ -538,6 +541,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
     const handleCloseSettings = () => setIsSettingsOpen(false);
 
     const handleApplyFilters = (args) => {
+        if (queryDisabled) return false;
         return events.onApplyFilter.execute(args);
     };
 
@@ -549,8 +553,26 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
         ...overrides,
     }));
     const handleSaveColumnSettings = (updatedColumns, presentation = {}) => {
-        setConfiguredColumns(updatedColumns);
-        savePreferences(updatedColumns,presentation);
+        const availableIds = new Set(availableColumns.map(column => column.id));
+        const excludedColumns = configuredColumns.filter(column => !availableIds.has(column.id));
+        const orderedColumns = updatedColumns.filter(column => availableIds.has(column.id));
+        let nextIndex = 0;
+        const nextColumns = configuredColumns.map(column => availableIds.has(column.id) ? orderedColumns[nextIndex++] : column);
+        const nextPresentation = presentation.frozenColumnIds ? {
+            ...presentation,
+            frozenColumnIds: [...presentation.frozenColumnIds, ...excludedColumns.filter(column => column.sticky === 'left').map(column => column.id)],
+        } : presentation;
+        setConfiguredColumns(nextColumns);
+        savePreferences(nextColumns,nextPresentation);
+    };
+    const handleColumnReorder = (sourceId, targetId) => {
+        const from = configuredColumns.findIndex(column => column.id === sourceId);
+        const to = configuredColumns.findIndex(column => column.id === targetId);
+        if (from < 0 || to < 0 || from === to) return;
+        if (String(configuredColumns[from].sticky || '').toLowerCase() !== String(configuredColumns[to].sticky || '').toLowerCase()) return;
+        const next = [...configuredColumns];
+        next.splice(to, 0, next.splice(from, 1)[0]);
+        handleSaveColumnSettings(next);
     };
     const handleResetSettings = () => {
         tablePreferences.reset();
@@ -688,6 +710,11 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
         });
     };
 
+    const info = toolbarContext.handlers.dataSource.getCollectionInfo?.() || {};
+    const selectedCount=context.signals.selection?.value?.selection?.length || 0;
+    const countParts=collectionCountParts(info,sortedCollection,{properties:{pluralLabel:container.title || 'records',singularLabel:container.title || 'record'}});
+    const summaryLabel = loading && !appending ? 'Loading rows…' : error && !appending ? 'Rows could not be loaded' : <>Summary: <span data-forge-value-type="number">{countParts.count}</span> {countParts.label}{selectedCount?<>{' · '}<span data-forge-value-type="number">{selectedCount}</span> selected</>:''}</>;
+    const columnSummary = listPage && typeof renderSummaryCell === 'function' && !renderRows && !showEmptyState;
     const TableScrollArea = listPage ? ScrollArea : 'div';
     const tableSurface = (
         <div
@@ -739,6 +766,8 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
                     <TableHeader
                         fillerWidth={fillerWidth}
                         context={context}
+                        onColumnReorder={listPage && !queryDisabled ? handleColumnReorder : undefined}
+                        columnReorderRegions={Object.fromEntries(configuredColumns.map(column => [column.id, String(column.sticky || '').toLowerCase()]))}
                         columns={columnsToUse}
                         tableTitle={tableTitle}
                         sortConfig={{ onSort: handleSort, sortColumnId, sortDirection, disabled: queryDisabled }}
@@ -763,6 +792,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
                         onShowFullContent={handleShowFullContent}
                     />
 
+                    {columnSummary && <TableSummary columns={columnsToUse} rows={sortedCollection} info={info} label={summaryLabel} renderCell={renderSummaryCell} ready={!loading && !error} fillerWidth={fillerWidth}/>}
                     </HTMLTable>
                     )}
                 </TableScrollArea>
@@ -798,8 +828,8 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
                 presentation={listPage ? 'drawer' : 'dialog'}
                 isOpen={isSettingsOpen}
                 onClose={handleCloseSettings}
-                columns={configuredColumns}
-                baseColumns={initConfiguredColumns(resolvedColumns)}
+                columns={availableColumns}
+                baseColumns={initConfiguredColumns(resolvedColumns).filter(column => !Array.isArray(column.hiddenInThemes) || !column.hiddenInThemes.includes(theme?.themeId))}
                 savedViews={container.table?.savedViews ? savedViews : undefined}
                 density={effectiveDensity === 'compact' ? 'compact' : 'normal'}
                 onSaveColumnSettings={handleSaveColumnSettings}
@@ -818,12 +848,24 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
         return order(left)-order(right);
     });
     const headerItems = toolbarItems.filter(item => item.placement === 'header');
-    const info = toolbarContext.handlers.dataSource.getCollectionInfo?.() || {};
-    const selectedCount=context.signals.selection?.value?.selection?.length || 0;
+    const appliedFilters = (activeFilterSet?.template || []).filter(field => {
+        const value = currentFilter[field.id];
+        return value !== undefined && value !== null && value !== '' && (!Array.isArray(value) || value.length > 0);
+    });
+    const filterChips = appliedFilters.length ? appliedFilters.map(field => {
+        const values = Array.isArray(currentFilter[field.id]) ? currentFilter[field.id] : [currentFilter[field.id]];
+        const options = Array.isArray(field.options) ? field.options : [];
+        const label = values.length > 1 ? `${values.length} Selected` : options.find(option => String(option.value) === String(values[0]))?.label ?? String(values[0]);
+        return <RemovableChip key={field.id} className="forge-list-page__filter-chip"
+            category={field.label || field.id} label={label} disabled={queryDisabled}
+            removeLabel={`Remove ${field.label || field.id} filter`}
+            onRemove={() => {const next = {...currentFilter}; delete next[field.id]; handleApplyFilters({...activeFilterSet, filter: next});}}/>;
+    }) : null;
     return <ListPagePattern title={container.title || tableTitle || 'Records'}
+        filters={filterChips}
         period={headerItems.length ? <Toolbar context={toolbarContext} toolbarItems={headerItems}/> : null}
         actions={<Toolbar context={toolbarContext} toolbarItems={pageItems} leftContent={toolbarActions} className="forge-list-page__actions" exportRows={sortedCollection} exportPageRows={renderedCollection} exportColumns={exportColumns}/>}
-        summary={<div className="forge-list-page__summary"><span role="status" aria-live="polite">{loading && !appending ? 'Loading rows…' : error && !appending ? 'Rows could not be loaded' : <>Summary: {collectionCountValue(info, sortedCollection, {properties: {pluralLabel: container.title || 'records', singularLabel: container.title || 'record'}})}{selectedCount?` · ${selectedCount} selected`:''}</>}</span>{error && appending ? <Button variant="ghost" onClick={() => loadNextRows(true)}>Retry loading rows</Button> : null}</div>}>
+        summary={(!columnSummary || error && appending) ? <div className="forge-list-page__summary">{!columnSummary && <span role="status" aria-live="polite">{summaryLabel}</span>}{error && appending ? <Button variant="ghost" onClick={() => loadNextRows(true)}>Retry loading rows</Button> : null}</div> : null}>
         {tableSurface}
     </ListPagePattern>;
 };

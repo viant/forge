@@ -219,3 +219,42 @@ dividers and toolbar surfaces. Keep reviewed brand values in the workspace.
 Explicit cell/row formatting continues to carry producer-declared meaning.
 Responsive cards retain their authored field order and behavior; export and
 print layouts are separate renderers and are not restyled by this web recipe.
+
+
+## Profile-specific List Page composition
+
+Authored tables reuse targetOverrides["theme:design-system-2"] for reviewed DS2
+settings. Column overrides match existing IDs; they cannot add or reorder
+producer columns. Nested maps use the native metadata merge and preserve
+unspecified validation, links and read-only settings; arrays replace. Device
+selection retains theme targets for the live table. Switching profiles restores
+the original producer settings.
+
+List Page headers reuse saved preferences for dragging and Alt+Left/Right
+reordering while retaining frozen and selection groups. Icon-only headers have
+accessible labels. Only the sorted header shows its directional indicator.
+Applied filter chips remove their category through the native filter handler
+and honor its query-disabled predicate.
+
+Editable cells use existing native fields and constraints. A pencil opens the
+field; row hover exposes pencils on editable cells. Unchanged historical values
+remain ordinary content. Invalid edits use the existing red border and an owned
+floating hint without changing row height. Producers own required, length,
+email, phone, numeric and other business constraints; servers remain authoritative.
+Read-only fields may retain native detail links; disabled cells cannot open links.
+Header, cell and summary alignment reuse each column's alignment and numeric roles.
+
+Authored actions reuse validation.controlValue, validation.cellValue,
+validation.resource, resources.marshal, resources.prepare, mutations.execute
+and mutations.state. Do not copy validation, marshalling, permissions or mutation
+admission into a page. Stage edits in the native window-form draft and resource
+model, retain only changed fields, and clear drafts after confirmed command
+success. Reads needing returned records use the existing fetchCollection
+completion contract with result "records" and an invocationId.
+
+Keep colors, typography, geometry and states in the exported host style package.
+The catalog and consuming page load that same definition and retain a hash.
+Pointer interaction adds no focus ring. Keyboard navigation retains the shared
+inset indicator, including owned hints and menus. Check light/dark, Tab/Shift+Tab,
+disabled/read-only admission and switching back to the original profile.
+Private producer schemas and data stay outside this public framework.

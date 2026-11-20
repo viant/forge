@@ -105,7 +105,7 @@ function matchesTarget(spec, targetContext = {}) {
     return true;
 }
 
-function deepMerge(base, override) {
+export function deepMerge(base, override) {
     if (Array.isArray(override)) {
         return override.map((item) => cloneValue(item));
     }
@@ -217,7 +217,11 @@ function resolveValue(node, targetContext = {}) {
         Object.keys(working.targetOverrides).length > 0 &&
         Object.values(working.targetOverrides).every((value) => isPlainObject(value))
     ) {
-        delete working.targetOverrides;
+        // Device overrides are resolved here; theme targets are owned by the
+        // live component so switching profiles can restore the base definition.
+        const themes = Object.fromEntries(Object.entries(working.targetOverrides).filter(([key]) => key.startsWith('theme:')));
+        if (Object.keys(themes).length) working.targetOverrides = themes;
+        else delete working.targetOverrides;
     }
 
     const result = {};

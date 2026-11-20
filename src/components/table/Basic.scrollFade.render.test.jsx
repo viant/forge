@@ -14,12 +14,13 @@ it.each(['baseline','design-system-2'])('uses existing scroll activity only in D
  const signals={collection:signal([{id:1}]),input:signal({fetch:false,page:1}),control:signal({loaded:true}),selection:signal({selection:[]}),message:signal([]),form:signal({}),formStatus:signal({}),windowForm:signal({}),metrics:signal({})};
  const context={identity:{windowId:`scroll-fade-${theme}`,dataSourceRef:'rows'},dataSource:{autoFetch:false,selectionMode:'none'},signals,handlers:{dataSource:{fetchCollection(){},getCollection:()=>signals.collection.value,peekCollection:()=>signals.collection.peek(),getCollectionInfo:()=>({}),isInactive:()=>false,getSelection:()=>signals.selection.peek(),isSelected:()=>false,getPage:()=>1,getFilterSets:()=>[],getFilterSet:()=>[],peekFilter:()=>({}),getUniqueKeyValue:row=>row.id}},tableSettingKey:()=>`scroll-fade-${theme}`};
  try{
-  await act(async()=>root.render(<SettingProvider endpoints={{}} connectorConfig={{}} services={{tablePreferences:{get:async()=>null}}}><ForgeThemeProvider themeId={theme}><ForgeThemeBoundary><Basic context={context} container={{id:'records',fetchData:false,table:{toolbar:{items:[]}}}} columns={[{id:'id',name:'ID',width:100}]}/></ForgeThemeBoundary></ForgeThemeProvider></SettingProvider>));
+  await act(async()=>root.render(<SettingProvider endpoints={{}} connectorConfig={{}} services={{tablePreferences:{get:async()=>null}}}><ForgeThemeProvider themeId={theme}><ForgeThemeBoundary><Basic context={context} container={{id:'records',fetchData:false,table:{presentation:'list-page',toolbar:{items:[]}} }} columns={[{id:'id',name:'ID',width:100}]}/></ForgeThemeBoundary></ForgeThemeProvider></SettingProvider>));
   const scroller=host.querySelector('.basic-table-scroll');
-  Object.defineProperties(scroller,{clientWidth:{value:500},getClientRects:{value:()=>[{}]}});
+  Object.defineProperties(scroller,{clientWidth:{value:500},scrollWidth:{value:1000},clientHeight:{value:100},scrollHeight:{value:100},getClientRects:{value:()=>[{}]}});
+  const activityTarget=theme==='design-system-2'?scroller.parentElement.querySelector('[data-forge-scrollbar=horizontal]>.forge-scroll-area__thumb'):scroller;
   const animations=[];
   const animate=vi.fn(()=>{const animation={id:'',currentTime:700,cancelled:false,effect:{setKeyframes:vi.fn()},play:vi.fn()};animation.cancel=vi.fn(()=>{animation.cancelled=true;});animations.push(animation);return animation;});
-  scroller.animate=animate;scroller.getAnimations=()=>animations.filter(animation=>!animation.cancelled);
+  activityTarget.animate=animate;activityTarget.getAnimations=()=>animations.filter(animation=>!animation.cancelled);
   await act(async()=>scroller.dispatchEvent(new Event('scroll')));
   await act(async()=>scroller.dispatchEvent(new Event('scroll')));
   await act(async()=>scroller.dispatchEvent(new Event('scroll')));
@@ -29,7 +30,8 @@ it.each(['baseline','design-system-2'])('uses existing scroll activity only in D
    expect(animations[0].currentTime).toBe(0);
    expect(animations[0].play).toHaveBeenCalledTimes(2);
    expect(animations[0].id).toBe('forge-scrollbar-activity');
-   expect(animate.mock.calls[0][0].at(-1).scrollbarColor).toBe('transparent transparent');
+   expect(animate.mock.calls[0][0].at(-1)).toEqual({opacity:0,visibility:'hidden'});
+   expect(host.querySelector('.forge-scroll-area')).not.toBeNull();
   }
  }finally{await act(async()=>root.unmount());host.remove();}
 });
