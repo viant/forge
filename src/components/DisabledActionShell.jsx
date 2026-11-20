@@ -1,6 +1,6 @@
 import Popover from './Popover.jsx';
 import React from 'react';
-import {Button, Callout, Tooltip} from '@blueprintjs/core';
+import {Button, Callout} from '@blueprintjs/core';
 import {useForgeTheme} from './ThemeBoundary.jsx';
 import './DisabledActionShell.css';
 
@@ -24,6 +24,7 @@ export default function DisabledActionShell({reason = '', label = 'Action', clas
   const control = (
     <Popover
       isOpen={open}
+      {...(isDesignSystem2 ? {autoFocus: false, enforceFocus: false, shouldReturnFocusOnClose: false} : {})}
       onInteraction={(nextOpen) => setOpen(nextOpen)}
       interactionKind="click"
       placement="bottom"
@@ -55,5 +56,5 @@ export default function DisabledActionShell({reason = '', label = 'Action', clas
       </span>
     </Popover>
   );
-  return isDesignSystem2 ? <Tooltip minimal content={explanation} disabled={open}>{control}</Tooltip> : control;
+  return control;
 }

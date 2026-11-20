@@ -2,9 +2,17 @@ import {toUTC, fromUTC, getZoneOffset, timeAt} from "../utils/datetime.js";
 import {format, parse, parseISO} from "date-fns";
 import {parseDocument} from "yaml";
 import {transferFileChunks} from '../packs/blueprint/fileChunks.js';
+import {validateWidgetControlValue} from '../core/ui/controlValueValidation.js';
+import {validateResource} from '../validation/index.js';
+import {marshalResource, prepareResourcePayload} from '../components/primitives/resourceModel.js';
+import {executeCommand, getCommandState} from '../components/primitives/commandExecutor.js';
+import {editableCellError} from '../components/table/basic/editableCellValue.js';
 
 
 const utilities = {
+    validation: {controlValue: validateWidgetControlValue, cellValue: editableCellError, resource: validateResource},
+    resources: {marshal: marshalResource, prepare: prepareResourcePayload},
+    mutations: {execute: executeCommand, state: getCommandState},
     files: {transferChunks: transferFileChunks},
     yaml: {
         parse(source) {

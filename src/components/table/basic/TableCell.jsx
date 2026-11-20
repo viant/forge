@@ -1,7 +1,7 @@
 import UnifiedIcon from '../../Icon.jsx';
 import StatusChip, {statusChipTones} from '../../StatusChip.jsx';
 import NativeControlTarget from '../../../runtime/NativeControlTarget.jsx';
-import {navigateNativeLink} from '../../../runtime/nativeNavigation.js';
+import {renderTableLink} from './renderTableLink.jsx';
 import MediaPreviewPopover from "../../MediaPreviewPopover.jsx";
 import {normalizeMediaPreview} from "../../mediaPreview.js";
 import {useSignals} from '@preact/signals-react/runtime';
@@ -22,6 +22,7 @@ import {isolateButtonCellProps} from './buttonCellEvents.js';
 import {applyDynamicCellProperties} from './cellProperties.js';
 import TableCellMutation from './TableCellMutation.jsx';
 import {tableCellMutation} from './tableCellMutation.js';
+import {isTableNumericColumn} from './tableNumericFormat.js';
 
 const defaultCellProperties = (item) => {
     const properties = {};
@@ -236,58 +237,7 @@ const TableCell = ({
                 cellContent = displayedText;
                 break;
             }
-            if (link.kind === 'window') {
-                cellContent = (
-                    <button
-                        type="button"
-                        title={link.title || displayedText || link.text}
-                        className="forge-table-link"
-                        style={{background: 'none', border: 'none', padding: 0, margin: 0, cursor: 'pointer'}}
-                        onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            return context?.handlers?.window?.openTarget?.({ target: link, context });
-                        }}
-                    >
-                        {col?.format === 'relationCount' ? displayedText : link.text}
-                    </button>
-                );
-                break;
-            }
-            if (link.kind === 'dialog') {
-                cellContent = (
-                    <button
-                        type="button"
-                        title={link.title || displayedText || link.text}
-                        className="forge-table-link"
-                        style={{background: 'none', border: 'none', padding: 0, margin: 0, cursor: 'pointer'}}
-                        onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            return context?.handlers?.window?.openDialog?.({
-                                context,
-                                execution: {args: [link.dialogId, {awaitResult: link.awaitResult}]},
-                                parameters: link.parameters,
-                            });
-                        }}
-                    >
-                        {col?.format === 'relationCount' ? displayedText : link.text}
-                    </button>
-                );
-                break;
-            }
-            cellContent = (
-                <a
-                    href={link.href}
-                    target={link.target}
-                    rel={link.rel}
-                    title={link.title || link.text}
-                    className="forge-table-link"
-                    onClick={(event) => {event.preventDefault();event.stopPropagation();return navigateNativeLink(link);}}
-                >
-                    {link.text}
-                </a>
-            );
+            cellContent = renderTableLink({link, context, text: col?.format === 'relationCount' ? displayedText : link.text});
             break;
         }
         case "stacked": {
@@ -438,6 +388,7 @@ const TableCell = ({
     }
     if (col.id) dataAttrs['data-col'] = col.id;
     if (type) dataAttrs['data-type'] = type;
+    if (isTableNumericColumn(col,value)) dataAttrs['data-forge-value-type'] = 'number';
     if (col.link) dataAttrs['data-link-kind'] = col.link.kind || (col.link.href || col.link.hrefTemplate ? 'external' : 'configured');
 
     return (

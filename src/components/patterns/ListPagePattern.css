@@ -1,4 +1,10 @@
 .forge-list-page{box-sizing:border-box;container-type:inline-size;display:flex;flex-direction:column;gap:var(--forge-spacing-4);width:100%;min-width:0;min-height:560px;padding:calc(var(--forge-spacing-4)*2);background:var(--forge-canvas);color:var(--forge-text);font-family:var(--forge-type-body-family)}
+.forge-list-page__filters{display:flex;flex-wrap:wrap;align-items:center;gap:var(--forge-spacing-2)}
+.forge-list-page__filter-chip.bp6-tag{display:inline-flex;align-items:center;gap:var(--forge-spacing-2);min-height:calc(var(--forge-spacing-4)*2);padding:0 var(--forge-spacing-2);border:var(--forge-border-width,1px) solid var(--forge-interaction-color);border-radius:var(--forge-control-radius);background:var(--forge-selected-background,var(--forge-surface-subtle));color:var(--forge-interaction-color);font-family:var(--forge-type-body-family);font-size:var(--forge-type-body-size);font-weight:var(--forge-type-body-weight);line-height:var(--forge-type-body-line-height)}
+.forge-list-page__filter-chip .forge-button{--forge-control-height:var(--forge-spacing-6);--forge-control-padding-inline:0px;flex:0 0 auto}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page .basic-table-wrapper th[draggable=true] .forge-table-header-sort{cursor:grab}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page .basic-table-wrapper th[draggable=true] .forge-table-header-sort:active{cursor:grabbing}
+.agently-workspace[data-forge-theme="design-system-2"] section.forge-list-page .forge-list-page__table .basic-table-wrapper thead th.is-column-drop-target{background:var(--forge-selected-background,var(--forge-surface-subtle))!important;color:var(--forge-interaction-color)!important}
 .forge-list-page__header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--forge-spacing-4);margin-block-end:var(--forge-spacing-4)}
 .forge-list-page__header h1{margin:0;font-weight:var(--forge-type-title-weight)}
 .forge-list-page__period{width:300px;max-width:100%}
@@ -83,9 +89,9 @@ section.forge-list-page .forge-list-page__table .basic-table-wrapper button.bp6-
 .agently-workspace[data-forge-theme="design-system-2"] section.forge-list-page .forge-list-page__table .basic-table-wrapper{--forge-table-header-surface:inherit!important}
 .agently-workspace[data-forge-theme="design-system-2"] section.forge-list-page .forge-list-page__table :is(thead th,.forge-list-page__summary){background:var(--forge-table-header-surface)!important;color:var(--forge-text)!important;font-family:var(--forge-type-body-family)!important;font-size:var(--forge-type-body-size)!important;line-height:var(--forge-type-body-line-height)!important;font-weight:var(--forge-type-title-weight)!important}
 
-.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page-drawer details>summary.forge-drawer-section-label{display:flex;align-items:center;gap:var(--forge-spacing-2);padding:var(--forge-spacing-1);margin:0;color:var(--forge-text-secondary);font-family:var(--forge-type-label-family);font-size:var(--forge-type-label-size);line-height:var(--forge-type-label-line-height);font-weight:var(--forge-type-label-weight);list-style:none;cursor:pointer}
-.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page-drawer details>summary::marker{content:""}
-.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page-drawer details>summary::-webkit-details-marker{display:none}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page-drawer details>summary{display:flex;align-items:center;gap:var(--forge-spacing-2);padding:var(--forge-spacing-1);margin:0;color:var(--forge-text-secondary);font-family:var(--forge-type-label-family);font-size:var(--forge-type-label-size);line-height:var(--forge-type-label-line-height);font-weight:var(--forge-type-label-weight);list-style:none;cursor:pointer}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page-drawer details>summary:has(>.forge-icon)::marker{content:""}
+.agently-workspace[data-forge-theme="design-system-2"] .forge-list-page-drawer details>summary:has(>.forge-icon)::-webkit-details-marker{display:none}
 .agently-workspace[data-forge-theme="design-system-2"] .forge-list-page-drawer details>summary .forge-icon{width:var(--forge-spacing-4);height:var(--forge-spacing-4);flex:0 0 auto}
 .agently-workspace[data-forge-theme="design-system-2"] .forge-list-page-drawer details[open]>summary .forge-icon{transform:rotate(90deg)}
 

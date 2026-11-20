@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {useSignals} from '@preact/signals-react/runtime';
 import {evaluatePlainVisibleWhen, trackVisibleWhen} from '../visibleWhen.js';
 import './FilterDialog.css';
@@ -8,8 +8,25 @@ import SelectControl from '../SelectControl.jsx';
 import {typographyProps} from '../Typography.jsx';
 import Icon from '../Icon.jsx';
 import {useForgeTheme} from '../ThemeBoundary.jsx';
-import { Checkbox, Dialog, Drawer, DialogBody, DialogFooter, InputGroup, Menu, MenuItem } from "@blueprintjs/core";
+import { Checkbox, Dialog, Drawer, DialogBody, DialogFooter, InputGroup, Menu, MenuItem, ResizeSensor, Tooltip } from "@blueprintjs/core";
 import {normalizeSubmittedFilterValue} from './filterValue.js';
+
+// Reuse the table's overflow measurement and Blueprint's resize/tooltip owners.
+// The full label remains the native checkbox's accessible name.
+function TruncatedDrawerChoice({label, ...props}) {
+    const text = useRef(null);
+    const [overflowing, setOverflowing] = useState(false);
+    const measure = useCallback(() => {
+        const node = text.current;
+        setOverflowing(!!node && node.scrollWidth > node.clientWidth);
+    }, []);
+    useEffect(measure, [measure, label]);
+    return <Tooltip content={label} disabled={!overflowing} minimal position="bottom-left" targetTagName="div" className="forge-drawer-choice-tooltip" popoverClassName="forge-drawer-choice-hint">
+        <Checkbox {...props} labelElement={<ResizeSensor targetRef={text} onResize={measure}>
+            <span ref={text} className="forge-drawer-choice-label">{label}</span>
+        </ResizeSensor>}/>
+    </Tooltip>;
+}
 
 const FilterDialog = ({
                           isOpen,
@@ -96,10 +113,11 @@ const FilterDialog = ({
         if(Array.isArray(field.options)) {
             const multiple=String(field.type||'').endsWith('[]')||field.operator==='in';
             if(drawer&&multiple) {
+                const Choice = isDesignSystem2 ? TruncatedDrawerChoice : Checkbox;
                 const selected=Array.isArray(filterValues[field.id])?filterValues[field.id]:filterValues[field.id]?[filterValues[field.id]]:[];
                 const options=field.options.filter(option=>String(option.label??option.value).toLowerCase().includes(query.toLowerCase()));
                 const all=options.length>0&&options.every(option=>selected.includes(option.value));
-                return <div className="forge-drawer-choice-list"><div className="forge-drawer-option"><Checkbox label="Select all" checked={all} indeterminate={!all&&options.some(option=>selected.includes(option.value))} onChange={()=>handleInputChange(field.id,all?selected.filter(value=>!options.some(option=>option.value===value)):[...new Set([...selected,...options.map(option=>option.value)])])}/></div>{options.map(option=><div className="forge-drawer-option" key={String(option.value)}><Checkbox label={option.label??String(option.value)} checked={selected.includes(option.value)} onChange={()=>handleInputChange(field.id,selected.includes(option.value)?selected.filter(value=>value!==option.value):[...selected,option.value])}/></div>)}</div>;
+                return <div className="forge-drawer-choice-list"><div className="forge-drawer-option"><Choice label="Select all" checked={all} indeterminate={!all&&options.some(option=>selected.includes(option.value))} onChange={()=>handleInputChange(field.id,all?selected.filter(value=>!options.some(option=>option.value===value)):[...new Set([...selected,...options.map(option=>option.value)])])}/></div>{options.map(option=><div className="forge-drawer-option" key={String(option.value)}><Choice label={option.label??String(option.value)} checked={selected.includes(option.value)} onChange={()=>handleInputChange(field.id,selected.includes(option.value)?selected.filter(value=>value!==option.value):[...selected,option.value])}/></div>)}</div>;
             }
             return <SelectControl id={controlId} {...typographyProps('body')} value={filterValues[field.id]??''} onChange={event=>handleInputChange(field.id,event.target.value)}><option value="">All</option>{field.options.map(option=><option key={String(option.value)} value={option.value}>{option.label??option.value}</option>)}</SelectControl>;
         }

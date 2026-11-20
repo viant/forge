@@ -4,8 +4,14 @@ import {Tooltip, Position} from '@blueprintjs/core';
 import {useForgeTheme} from '../../ThemeBoundary.jsx';
 
 const TableHeader = ({ context,
-                       fillerWidth = 0, columns, tableTitle, sortConfig }) => {
+                       fillerWidth = 0, columns, tableTitle, sortConfig, onColumnReorder, columnReorderRegions = {} }) => {
     const isDesignSystem2 = useForgeTheme()?.themeId === 'design-system-2';
+    const dragging = React.useRef(null);
+    const [dropTarget, setDropTarget] = React.useState(null);
+    const reorderable = column => isDesignSystem2 && !!onColumnReorder && !column.multiSelect && !!(column.displayName || column.name);
+    const region = column => columnReorderRegions[column.id] ?? String(column.sticky || '').toLowerCase();
+    const sameRegion = (left, right) => region(left) === region(right);
+    const finishDrag = () => {dragging.current = null; setDropTarget(null);};
     const { onSort, sortColumnId, sortDirection, disabled = false } = sortConfig;
     const handlers = context?.handlers || {};
     const dataSourceConfig = context?.dataSource || {};
@@ -65,9 +71,10 @@ const TableHeader = ({ context,
                         onChange={handleHeaderCheckboxClick}
                     />
                 ) : null}
-                <span className="forge-table-header-label">{displayName || name}</span>
-                {col.sortable && (
+                {(!multiSelect || !isDesignSystem2) && <span className="forge-table-header-label">{isDesignSystem2 && !multiSelect && !(displayName || name) && col.icon ? <UnifiedIcon name={col.icon} aria-hidden="true"/> : displayName || name}</span>}
+                {col.sortable && (!isDesignSystem2 || sortColumnId === col.id) && (
                     <UnifiedIcon
+                        className="forge-table-sort-indicator"
                         name={
                             sortColumnId === col.id
                                 ? sortDirection === "asc"
@@ -91,7 +98,7 @@ const TableHeader = ({ context,
             );
         }
 
-        return <span className="forge-table-header-content">{content}</span>;
+        return <span className="forge-table-header-content" tabIndex={isDesignSystem2 && multiSelect ? -1 : reorderable(col) && !col.sortable && !disabled ? 0 : undefined}>{content}</span>;
     };
 
     return (
@@ -108,10 +115,17 @@ const TableHeader = ({ context,
                     ...(String(col?.sticky || '').toLowerCase() === 'left' ? {left: col.stickyOffset || 0} : {}),
                 };
                 const hint = [col.multiSelect ? 'Select all rows' : col.displayName || col.name, col.tooltip].filter(Boolean).join(' — ') || undefined;
-                const control = sortable ? <button type="button" disabled={disabled} className="forge-table-header-sort" aria-label={`Sort by ${col.displayName || col.name || col.id}`} onClick={() => handleSort(col)}>{renderHeaderContent(col)}</button> : renderHeaderContent(col);
+                const control = sortable ? <button type="button" disabled={disabled} className="forge-table-header-sort" aria-label={`Sort by ${col.displayName || col.name || (isDesignSystem2 && col.tooltip) || col.id}`} onClick={() => handleSort(col)}>{renderHeaderContent(col)}</button> : renderHeaderContent(col);
                 return (
-                    <th key={id} data-forge-cell-kind={col.multiSelect ? 'selection' : col.type} className={`${String(col?.sticky || '').toLowerCase() === 'left' ? 'is-sticky-left' : ''}${col?.stickyEdge ? ' is-sticky-edge' : ''}`} style={style} title={isDesignSystem2 ? undefined : hint} aria-sort={sortable ? sortColumnId === id ? sortDirection === 'asc' ? 'ascending' : 'descending' : 'none' : undefined}>
-                        {isDesignSystem2 && hint ? <Tooltip minimal content={hint} position={Position.TOP}>{control}</Tooltip> : control}
+                    <th key={id} data-column-id={id} data-forge-cell-kind={col.multiSelect ? 'selection' : col.type} className={`${String(col?.sticky || '').toLowerCase() === 'left' ? 'is-sticky-left' : ''}${col?.stickyEdge ? ' is-sticky-edge' : ''}${dropTarget === id ? ' is-column-drop-target' : ''}`} style={style} title={isDesignSystem2 ? undefined : hint} aria-sort={sortable ? sortColumnId === id ? sortDirection === 'asc' ? 'ascending' : 'descending' : 'none' : undefined}
+                        aria-keyshortcuts={reorderable(col) && !disabled ? 'Alt+ArrowLeft Alt+ArrowRight' : undefined}
+                        draggable={isDesignSystem2 && onColumnReorder ? reorderable(col) && !disabled : undefined}
+                        onDragStart={event => {if (!reorderable(col) || disabled) return; dragging.current = col; event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', String(id));}}
+                        onDragOver={event => {if (!dragging.current || !reorderable(col) || !sameRegion(dragging.current, col)) return; event.preventDefault(); event.dataTransfer.dropEffect = 'move'; setDropTarget(id);}}
+                        onDrop={event => {if (!dragging.current || !reorderable(col) || !sameRegion(dragging.current, col)) return; event.preventDefault(); if (dragging.current.id !== id) onColumnReorder(dragging.current.id, id); finishDrag();}}
+                        onDragEnd={finishDrag}
+                        onKeyDown={event => {if (!event.altKey || !['ArrowLeft','ArrowRight'].includes(event.key) || !reorderable(col) || disabled) return; event.preventDefault(); const group = columns.filter(entry => reorderable(entry) && sameRegion(entry, col)); const index = group.findIndex(entry => entry.id === id); const next = group[index + (event.key === 'ArrowLeft' ? -1 : 1)]; if (next) onColumnReorder(id, next.id);}}>
+                        {control}
                     </th>
                 );
             })}

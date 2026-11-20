@@ -116,21 +116,28 @@ export function toolbarHasSelection(selectionState = {}) {
     return selectedRows.length > 0 || !!selectionState?.selected;
 }
 
-export function collectionCountValue(info = {}, rows = [], item = {}) {
+export function collectionCountParts(info = {}, rows = [], item = {}) {
     const loadedRows = Array.isArray(rows) ? rows.length : 0;
     const candidate = Number(info?.totalCount ?? info?.recordCount ?? info?.cnt);
     const count = Number.isSafeInteger(candidate) && candidate >= 0 && !(candidate === 0 && loadedRows > 0) ? candidate : loadedRows;
     const properties = item?.properties || {};
     const label = count === 1 ? properties.singularLabel || 'item' : properties.pluralLabel || 'items';
-    return `${count.toLocaleString('en-US')} ${label}`;
+    return {count:count.toLocaleString('en-US'),label};
+}
+
+export function collectionCountValue(info = {}, rows = [], item = {}) {
+    const {count,label}=collectionCountParts(info,rows,item);
+    return `${count} ${label}`;
 }
 
 function CollectionCountStatus({item, context, align}) {
     useSignals();
+    const isDesignSystem2=useForgeTheme()?.themeId==='design-system-2';
     const ctx = item.dataSourceRef ? context?.Context?.(item.dataSourceRef) || context : context;
     const rows = ctx?.signals?.collection?.value || [];
     const info = ctx?.handlers?.dataSource?.getCollectionInfo?.() || {};
-    const value = collectionCountValue(info, rows, item);
+    const parts=collectionCountParts(info,rows,item);
+    const value = isDesignSystem2 ? <><span data-forge-value-type="number">{parts.count}</span> {parts.label}</> : collectionCountValue(info, rows, item);
     const spanStyle = align === 'right' ? {marginLeft: 10} : {marginRight: 10};
     return <span className="forge-toolbar-status is-muted" style={{...spanStyle, ...(item.style || {})}} role="status" aria-live="polite">{value}</span>;
 }
@@ -536,8 +543,10 @@ const Toolbar = ({
                 if (!isDesignSystem2 || !control || control.type === DisabledActionShell) return control;
                 const isField = ['quickSearch','dateRangePreset','checkbox','switch','pagination','status','label','collectionCount'].includes(item.type || item.widget)
                     || ['quickFilter','quickFilterInputs','quickFilterToggle','pagination','refresh'].includes(item.id);
-                const hint = !isField && (item.appearance === 'starred-toggle' ? 'Starred view' : item.tooltip || item.ariaLabel || item.label || item.id);
-                return hint ? <Tooltip key={control.key || item.id} minimal content={hint}>{control}</Tooltip> : control;
+                const ghostIcon = item.appearance === 'starred-toggle'
+                    || (actionIconOnly(item) && (item.variant === 'ghost' || item.appearance === 'minimal'));
+                const hint = !isField && ghostIcon && (item.appearance === 'starred-toggle' ? 'Starred view' : item.tooltip || item.ariaLabel || item.label || item.id);
+                return hint ? <Tooltip key={control.key || item.id} minimal content={hint} position="bottom">{control}</Tooltip> : control;
             });
     };
 

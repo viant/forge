@@ -1,0 +1,7 @@
+.forge-removable-chip.bp6-tag{display:inline-flex;align-items:center;gap:var(--forge-spacing-2);min-height:var(--forge-spacing-7,28px);max-width:100%;padding:0 var(--forge-spacing-2);border:var(--forge-border-width,1px) solid transparent;border-radius:var(--forge-control-radius);background:var(--forge-removable-chip-background,var(--forge-surface-subtle));color:var(--forge-text);font-family:var(--forge-type-body-family);font-size:var(--forge-type-small-size);font-weight:var(--forge-type-body-weight);line-height:var(--forge-type-body-line-height)}
+.forge-removable-chip>.bp6-fill{display:flex;align-items:center;gap:var(--forge-spacing-1);min-width:0}
+.forge-removable-chip__category{flex-shrink:0;color:var(--forge-text-secondary)}
+.forge-removable-chip__value{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.forge-removable-chip .forge-button{--forge-control-height:var(--forge-spacing-6);--forge-control-padding-inline:0px;flex:0 0 auto}
+.forge-removable-chip[data-disabled] :is(.forge-removable-chip__category,.forge-removable-chip__value){color:inherit}
+.forge-removable-chip .forge-button:disabled{background:transparent}

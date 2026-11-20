@@ -5,6 +5,9 @@ export default defineConfig({
     environment: 'jsdom',
     include: [
       'src/components/table/Basic.listPage.render.test.jsx',
+      'src/components/table/TableThemeOverrides.render.test.jsx',
+      'src/components/table/Basic.listPageInteractions.render.test.jsx',
+      'src/components/table/FilterDialog.visibility.test.jsx',
       'src/demos/theme/ComponentCatalog.render.test.jsx',
       'src/components/GuidedResult.render.test.jsx',
       'src/reporting/useReportDatePresetDraft.render.test.jsx',
