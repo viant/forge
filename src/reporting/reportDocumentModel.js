@@ -15,6 +15,7 @@ import {normalizeReportRowVisibility} from './reportRowVisibility.js';
 import { normalizeKpiSecondaryCalculation } from "./reportKpiComparisonModel.js";
 import {
   buildReportBuilderPublishedDatasetConfig,
+  buildReportBuilderPrimaryDatasetRequest,
   buildReportBuilderPublishedDatasetDeclarations,
   buildReportBuilderReportSpec,
   buildReportSpecChartBlock,
@@ -968,7 +969,7 @@ function buildReportBuilderReportDocumentDatasets(container = {}, config = {}, s
       ...(isPlainObject(config?.source) ? { source: cloneValue(config.source) } : {}),
       ...(isPlainObject(primaryResultContract) ? { resultContract: cloneValue(primaryResultContract) } : {}),
       ...(isPlainObject(config?.capabilities) ? { capabilities: cloneValue(config.capabilities) } : {}),
-      request: cloneValue(buildReportBuilderRequest(config, state)),
+      request: cloneValue(buildReportBuilderPrimaryDatasetRequest(config, state)),
       ...(primaryDimensions.length > 0 ? { dimensions: primaryDimensions } : {}),
       ...(primaryMeasures.length > 0 ? { measures: primaryMeasures } : {}),
       ...(primaryCalculatedFields.length > 0 ? { calculatedFields: primaryCalculatedFields } : {}),
@@ -1511,7 +1512,7 @@ export function resolveReportDocumentBuilderContext(document = null, baseConfig 
   };
 }
 
-function resolveLoweredPrimaryDataset(document = null, generatedDataset = null, loweredContainer = {}) {
+function resolveLoweredPrimaryDataset(document = null, generatedDataset = null, loweredContainer = {}, config = {}, state = {}) {
   const documentPrimaryDataset = resolveReportDocumentPrimaryDataset(document);
   if (!documentPrimaryDataset) {
     return generatedDataset;
@@ -1530,7 +1531,7 @@ function resolveLoweredPrimaryDataset(document = null, generatedDataset = null, 
       || loweredContainer?.dataSourceRef,
     ),
     request: shouldPreferDocumentPrimaryRequest(documentRequest, generatedRequest)
-      ? documentRequest
+      ? buildReportBuilderPrimaryDatasetRequest(config, state, documentRequest)
       : (generatedRequest || documentRequest || {}),
   };
 }
@@ -2803,6 +2804,8 @@ export function lowerReportDocumentToReportSpec(document = {}, {
       document,
       mergedDatasets.find((dataset) => normalizeString(dataset?.id) === "primary") || null,
       loweredContainer,
+      effectiveScopedConfig,
+      effectiveScopedState,
     );
   const nextDatasets = [
     ...(resolvedPrimaryDataset ? [resolvedPrimaryDataset] : []),

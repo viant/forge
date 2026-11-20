@@ -60,3 +60,41 @@ assert.equal(lowered.datasets.find(d=>d.id==='primary').request.filters.tag,unde
 assert.deepEqual(lowered.datasets.find(d=>d.id==='detail').request.filters.tag,['beta']);
 assert.equal(JSON.stringify({config:publishedConfig,state}),before);
 console.log('primary dataset scope preserves fixed requests, independent aliases, dates and semantic bindings');
+
+// Documents capture generated requests; an old capture must not revive excluded defaults.
+const noBaseFilters={...config,scope:excluded,request:{baseParameters:{resultSet:'summary'}}};
+const noBaseState=buildReportBuilderDefaultState(noBaseFilters);
+const captured=buildReportBuilderReportDocument({container,config:noBaseFilters,state:noBaseState});
+assert.equal(captured.datasets.find(d=>d.id==='primary').request.filters?.tag,undefined);
+const oldCapture=structuredClone(captured);
+oldCapture.datasets.find(d=>d.id==='primary').request.filters={tag:['beta']};
+assert.equal(lowerReportDocumentToReportSpec(oldCapture).datasets.find(d=>d.id==='primary').request.filters?.tag,undefined);
+const fixedConfig={...noBaseFilters,request:{baseParameters:{filters:{account:17,tag:['fixed']}}}};
+const fixedDocument=buildReportBuilderReportDocument({container,config:fixedConfig,state:buildReportBuilderDefaultState(fixedConfig)});
+assert.deepEqual(lowerReportDocumentToReportSpec(fixedDocument).datasets.find(d=>d.id==='primary').request.filters,{account:17,tag:['fixed']});
+
+const aliases= config.predicates.map(p=>({id:p.id,paramPath:p.paramPath}));
+const independent={...noBaseFilters,dataSources:[
+ {id:'overview',dataSourceRef:'records',request:{limit:10},scopeParamOptions:aliases,scope:{mode:'exclude',exclude:['detailTag']}},
+ {id:'detail',dataSourceRef:'records',request:{limit:10},scopeParamOptions:aliases,scope:{mode:'exclude',exclude:['overviewTag']}},
+]};
+for(const [values,overview,detail] of [
+ [{},['alpha'],['beta']],
+ [{overviewTag:[],detailTag:['gamma']},undefined,['gamma']],
+ [{overviewTag:null,detailTag:['gamma']},undefined,['gamma']],
+ [{overviewTag:['gamma'],detailTag:[]},['gamma'],undefined],
+ [{overviewTag:[],detailTag:[]},undefined,undefined],
+]){
+ const effectiveState={...buildReportBuilderDefaultState(independent),scopeParams:{...buildReportBuilderDefaultState(independent).scopeParams,...values},reportDocumentBlocks:[
+  {id:'overviewTable',kind:'tableBlock',datasetRef:'overview',columns:[{key:'quantity',label:'Quantity'}]},
+  {id:'detailTable',kind:'tableBlock',datasetRef:'detail',columns:[{key:'quantity',label:'Quantity'}]},
+ ]};
+ const result=lowerReportDocumentToReportSpec(buildReportBuilderReportDocument({container,config:independent,state:effectiveState}));
+ assert.equal(result.datasets.find(d=>d.id==='primary').request.filters?.tag,undefined);
+ assert.deepEqual(result.datasets.find(d=>d.id==='overview').request.filters?.tag,overview);
+ assert.deepEqual(result.datasets.find(d=>d.id==='detail').request.filters?.tag,detail);
+ assert.equal(validateReportSpec(result).valid,true);
+}
+const clearDateConfig={...config,predicates:dateConfig.predicates,scope:{mode:'inherit'},request:{baseParameters:{filters:{account:17}}}};
+const clearDateState={...buildReportBuilderDefaultState(clearDateConfig),scopeParams:{period:null}};
+assert.deepEqual(buildReportBuilderReportSpec({container,config:clearDateConfig,state:clearDateState}).datasets[0].request.filters,{account:17});

@@ -18,7 +18,7 @@ import {
   normalizeReportBuilderPublishedDataSources as normalizePublishedDataSources,
 } from "./reportBuilderPublishedDatasetModel.js";
 import { buildReportBuilderScopeParams } from "./reportBuilderScopeParamModel.js";
-import { getScopeParamValue, resolveScopeParamId } from "./scopeStateModel.js";
+import { getScopeParamValue, listScopeParamValues, resolveScopeParamId } from "./scopeStateModel.js";
 import { normalizeReportRefinements } from "./reportRefinementModel.js";
 import { normalizeReportCalculatedFields, validateReportCalculatedFieldDependencies, resolveReportCalculatedFieldReference } from "./calculatedFieldModel.js";
 import { resolveReportBuilderDrillMetadata } from "./reportBuilderDrillMetadata.js";
@@ -342,10 +342,17 @@ function buildReportBuilderPublishedDatasetRequest(
     const paramPath = normalizeString(option?.paramPath);
     if (excludedParamIds.has(paramId)) return;
     const hasDatasetScopedValue = datasetScopeParamValues && Object.prototype.hasOwnProperty.call(datasetScopeParamValues, paramId);
+    const hasValue = hasDatasetScopedValue || Object.prototype.hasOwnProperty.call(listScopeParamValues(state), paramId);
     let rawValue = hasDatasetScopedValue
       ? datasetScopeParamValues[paramId]
       : getScopeParamValue(state, paramId);
     const kind = normalizeString(option?.kind || "");
+    // An explicit clear belongs to this control; never borrow a sibling alias.
+    if (hasValue && (rawValue == null || rawValue === "" || Array.isArray(rawValue) && rawValue.length === 0)) {
+      for (const clearedPath of [paramPath, option?.startParamPath, option?.endParamPath].map(normalizeString).filter(Boolean)) deleteNestedValue(contextPatch, clearedPath);
+      if (option?.semanticRef && isPlainObject(contextPatch.semanticSelection?.parameters)) delete contextPatch.semanticSelection.parameters[option.semanticRef];
+      return;
+    }
     if (option?.semanticRef && rawValue != null && rawValue !== "" && (!Array.isArray(rawValue) || rawValue.length > 0)
       && isPlainObject(contextPatch.semanticSelection?.parameters)) {
       contextPatch.semanticSelection.parameters[option.semanticRef] = cloneValue(rawValue);
@@ -354,9 +361,13 @@ function buildReportBuilderPublishedDatasetRequest(
       const startParamPath = normalizeString(option?.startParamPath);
       const endParamPath = normalizeString(option?.endParamPath);
       const startValue = normalizeString(rawValue?.start)
-        || normalizeString(getNestedValue(primaryRequestContext, startParamPath));
+        || (!hasValue ? normalizeString(getNestedValue(primaryRequestContext, startParamPath)) : "");
       const endValue = normalizeString(rawValue?.end)
-        || normalizeString(getNestedValue(primaryRequestContext, endParamPath));
+        || (!hasValue ? normalizeString(getNestedValue(primaryRequestContext, endParamPath)) : "");
+      if (hasValue) {
+        if (!startValue) deleteNestedValue(contextPatch, startParamPath);
+        if (!endValue) deleteNestedValue(contextPatch, endParamPath);
+      }
       if (startValue && startParamPath) {
         setNestedValue(contextPatch, startParamPath, startValue);
       }
@@ -668,6 +679,15 @@ function normalizeSemanticSummary(summary = {}) {
   };
 }
 
+// Share primary projection with document capture and request fallback.
+export function buildReportBuilderPrimaryDatasetRequest(config = {}, state = {}, request = buildReportBuilderRequest(config, state)) {
+  return config?.scope ? buildReportBuilderPublishedDatasetRequest({
+    request: isPlainObject(config.request?.baseParameters) ? config.request.baseParameters : {},
+    scope: config.scope,
+    scopeParamOptions: resolveReportBuilderScopeParamFilters(config).map(filter => ({...filter, kind: filter.type || filter.kind})),
+  }, state, null, request, request) : request;
+}
+
 export function buildReportBuilderReportSpec({
   container = {},
   config = {},
@@ -687,11 +707,7 @@ export function buildReportBuilderReportSpec({
   if (normalizedRefinements.length > 0) {
     request.refinements = cloneValue(normalizedRefinements);
   }
-  const primaryRequest = config?.scope ? buildReportBuilderPublishedDatasetRequest({
-    request: isPlainObject(config.request?.baseParameters) ? config.request.baseParameters : {},
-    scope: config.scope,
-    scopeParamOptions: resolveReportBuilderScopeParamFilters(effectiveConfig).map(filter => ({...filter, kind: filter.type || filter.kind})),
-  }, normalizedState, null, request, request) : request;
+  const primaryRequest = buildReportBuilderPrimaryDatasetRequest(config, normalizedState, request);
   const tableColumns = buildReportSpecColumns(buildReportBuilderColumns(effectiveConfig, normalizedState));
   const chartSpec = resolveReportBuilderChartSpecForReportSpec(effectiveConfig, normalizedState);
   const calculatedFields = buildReportSpecCalculatedFields(effectiveConfig, normalizedState);

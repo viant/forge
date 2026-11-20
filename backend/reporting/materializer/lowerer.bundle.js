@@ -57277,7 +57277,7 @@ ${indent}${end}`;
       contextPatch.semanticSelection.unmapped.parameters = contextPatch.semanticSelection.unmapped.parameters.filter((id) => !excludedParamIds.has(id));
     }
     scopeParamOptions.forEach((option) => {
-      var _a6;
+      var _a6, _b2;
       const paramId = normalizeString30((option == null ? void 0 : option.id) || (option == null ? void 0 : option.value));
       if (!paramId) {
         return;
@@ -57285,16 +57285,26 @@ ${indent}${end}`;
       const paramPath = normalizeString30(option == null ? void 0 : option.paramPath);
       if (excludedParamIds.has(paramId)) return;
       const hasDatasetScopedValue = datasetScopeParamValues && Object.prototype.hasOwnProperty.call(datasetScopeParamValues, paramId);
+      const hasValue = hasDatasetScopedValue || Object.prototype.hasOwnProperty.call(listScopeParamValues(state), paramId);
       let rawValue = hasDatasetScopedValue ? datasetScopeParamValues[paramId] : getScopeParamValue(state, paramId);
       const kind = normalizeString30((option == null ? void 0 : option.kind) || "");
-      if ((option == null ? void 0 : option.semanticRef) && rawValue != null && rawValue !== "" && (!Array.isArray(rawValue) || rawValue.length > 0) && isPlainObject7((_a6 = contextPatch.semanticSelection) == null ? void 0 : _a6.parameters)) {
+      if (hasValue && (rawValue == null || rawValue === "" || Array.isArray(rawValue) && rawValue.length === 0)) {
+        for (const clearedPath of [paramPath, option == null ? void 0 : option.startParamPath, option == null ? void 0 : option.endParamPath].map(normalizeString30).filter(Boolean)) deleteNestedValue(contextPatch, clearedPath);
+        if ((option == null ? void 0 : option.semanticRef) && isPlainObject7((_a6 = contextPatch.semanticSelection) == null ? void 0 : _a6.parameters)) delete contextPatch.semanticSelection.parameters[option.semanticRef];
+        return;
+      }
+      if ((option == null ? void 0 : option.semanticRef) && rawValue != null && rawValue !== "" && (!Array.isArray(rawValue) || rawValue.length > 0) && isPlainObject7((_b2 = contextPatch.semanticSelection) == null ? void 0 : _b2.parameters)) {
         contextPatch.semanticSelection.parameters[option.semanticRef] = cloneValue19(rawValue);
       }
       if (kind.toLowerCase() === "daterange") {
         const startParamPath = normalizeString30(option == null ? void 0 : option.startParamPath);
         const endParamPath = normalizeString30(option == null ? void 0 : option.endParamPath);
-        const startValue = normalizeString30(rawValue == null ? void 0 : rawValue.start) || normalizeString30(getNestedValue(primaryRequestContext, startParamPath));
-        const endValue = normalizeString30(rawValue == null ? void 0 : rawValue.end) || normalizeString30(getNestedValue(primaryRequestContext, endParamPath));
+        const startValue = normalizeString30(rawValue == null ? void 0 : rawValue.start) || (!hasValue ? normalizeString30(getNestedValue(primaryRequestContext, startParamPath)) : "");
+        const endValue = normalizeString30(rawValue == null ? void 0 : rawValue.end) || (!hasValue ? normalizeString30(getNestedValue(primaryRequestContext, endParamPath)) : "");
+        if (hasValue) {
+          if (!startValue) deleteNestedValue(contextPatch, startParamPath);
+          if (!endValue) deleteNestedValue(contextPatch, endParamPath);
+        }
         if (startValue && startParamPath) {
           setNestedValue2(contextPatch, startParamPath, startValue);
         }
@@ -57562,6 +57572,14 @@ ${indent}${end}`;
       ...selectedParameters.length > 0 ? { selectedParameters } : {}
     };
   }
+  function buildReportBuilderPrimaryDatasetRequest(config = {}, state = {}, request = buildReportBuilderRequest(config, state)) {
+    var _a5;
+    return (config == null ? void 0 : config.scope) ? buildReportBuilderPublishedDatasetRequest({
+      request: isPlainObject7((_a5 = config.request) == null ? void 0 : _a5.baseParameters) ? config.request.baseParameters : {},
+      scope: config.scope,
+      scopeParamOptions: resolveReportBuilderScopeParamFilters(config).map((filter) => ({ ...filter, kind: filter.type || filter.kind }))
+    }, state, null, request, request) : request;
+  }
   function buildReportBuilderReportSpec({
     container = {},
     config = {},
@@ -57571,7 +57589,7 @@ ${indent}${end}`;
     includePrimaryBlocks = true,
     onChartValidation = null
   } = {}) {
-    var _a5, _b;
+    var _a5;
     const normalizedState = sanitizeReportBuilderState(config, state);
     const effectiveConfig = buildReportBuilderCalculatedFieldConfig(config, normalizedState);
     const request = buildReportBuilderRequest(config, normalizedState);
@@ -57582,11 +57600,7 @@ ${indent}${end}`;
     if (normalizedRefinements.length > 0) {
       request.refinements = cloneValue19(normalizedRefinements);
     }
-    const primaryRequest = (config == null ? void 0 : config.scope) ? buildReportBuilderPublishedDatasetRequest({
-      request: isPlainObject7((_b = config.request) == null ? void 0 : _b.baseParameters) ? config.request.baseParameters : {},
-      scope: config.scope,
-      scopeParamOptions: resolveReportBuilderScopeParamFilters(effectiveConfig).map((filter) => ({ ...filter, kind: filter.type || filter.kind }))
-    }, normalizedState, null, request, request) : request;
+    const primaryRequest = buildReportBuilderPrimaryDatasetRequest(config, normalizedState, request);
     const tableColumns = buildReportSpecColumns(buildReportBuilderColumns(effectiveConfig, normalizedState));
     const chartSpec = resolveReportBuilderChartSpecForReportSpec(effectiveConfig, normalizedState);
     const calculatedFields = buildReportSpecCalculatedFields(effectiveConfig, normalizedState);
@@ -58486,7 +58500,7 @@ ${indent}${end}`;
       ...isPlainObject8(config == null ? void 0 : config.source) ? { source: cloneValue20(config.source) } : {},
       ...isPlainObject8(primaryResultContract) ? { resultContract: cloneValue20(primaryResultContract) } : {},
       ...isPlainObject8(config == null ? void 0 : config.capabilities) ? { capabilities: cloneValue20(config.capabilities) } : {},
-      request: cloneValue20(buildReportBuilderRequest(config, state)),
+      request: cloneValue20(buildReportBuilderPrimaryDatasetRequest(config, state)),
       ...primaryDimensions.length > 0 ? { dimensions: primaryDimensions } : {},
       ...primaryMeasures.length > 0 ? { measures: primaryMeasures } : {},
       ...primaryCalculatedFields.length > 0 ? { calculatedFields: primaryCalculatedFields } : {},
@@ -58939,7 +58953,7 @@ ${indent}${end}`;
       ...resolvedStaticDatasets.length > 0 ? { staticDatasets: cloneValue20(resolvedStaticDatasets) } : {}
     };
   }
-  function resolveLoweredPrimaryDataset(document = null, generatedDataset = null, loweredContainer = {}) {
+  function resolveLoweredPrimaryDataset(document = null, generatedDataset = null, loweredContainer = {}, config = {}, state = {}) {
     const documentPrimaryDataset = resolveReportDocumentPrimaryDataset(document);
     if (!documentPrimaryDataset) {
       return generatedDataset;
@@ -58955,7 +58969,7 @@ ${indent}${end}`;
       dataSourceRef: normalizeString32(
         (documentPrimaryDataset == null ? void 0 : documentPrimaryDataset.dataSourceRef) || (generated == null ? void 0 : generated.dataSourceRef) || (loweredContainer == null ? void 0 : loweredContainer.dataSourceRef)
       ),
-      request: shouldPreferDocumentPrimaryRequest(documentRequest, generatedRequest) ? documentRequest : generatedRequest || documentRequest || {}
+      request: shouldPreferDocumentPrimaryRequest(documentRequest, generatedRequest) ? buildReportBuilderPrimaryDatasetRequest(config, state, documentRequest) : generatedRequest || documentRequest || {}
     };
   }
   function buildReportDocumentScopeParams(config = {}, state = {}, runtimeDatasetScopeParams = null) {
@@ -60025,7 +60039,9 @@ ${indent}${end}`;
     const resolvedPrimaryDataset = shouldOmitPrimaryDataset ? null : resolveLoweredPrimaryDataset(
       document,
       mergedDatasets.find((dataset) => normalizeString32(dataset == null ? void 0 : dataset.id) === "primary") || null,
-      loweredContainer
+      loweredContainer,
+      effectiveScopedConfig,
+      effectiveScopedState
     );
     const nextDatasets = [
       ...resolvedPrimaryDataset ? [resolvedPrimaryDataset] : [],
