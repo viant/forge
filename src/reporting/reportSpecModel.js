@@ -717,7 +717,7 @@ export function buildReportBuilderReportSpec({
   const contextPreset = resolveReportScopeContextPresetFromState(normalizedState, scopeParams);
   const referencedDatasetRefs = new Set(
     (Array.isArray(normalizedState?.reportDocumentBlocks) ? normalizedState.reportDocumentBlocks : [])
-      .flatMap((block) => [normalizeString(block?.datasetRef), normalizeString(block?.secondaryDatasetRef)])
+      .flatMap((block) => [normalizeString(block?.datasetRef), normalizeString(block?.secondaryDatasetRef), normalizeString(block?.summaryRow?.datasetRef)])
       .filter((datasetRef) => !!datasetRef && datasetRef !== "primary"),
   );
   const authoredDatasetBackedBlocks = (Array.isArray(normalizedState?.reportDocumentBlocks) ? normalizedState.reportDocumentBlocks : [])
@@ -735,11 +735,11 @@ export function buildReportBuilderReportSpec({
   );
   const staticDatasets = buildReportBuilderStaticDatasetDeclarations(normalizedState?.reportStaticDatasets);
   const explicitDatasetRefs = authoredDatasetBackedBlocks
-    .map((block) => normalizeString(block?.datasetRef))
+    .flatMap((block) => [normalizeString(block?.datasetRef), normalizeString(block?.summaryRow?.datasetRef)])
     .filter(Boolean);
   const shouldIncludePrimaryDataset = shouldKeepPrimaryDataset({
     includePrimaryBlocks,
-    datasetBackedBlockDatasetRefs: explicitDatasetRefs.length === authoredDatasetBackedBlocks.length ? explicitDatasetRefs : [],
+    datasetBackedBlockDatasetRefs: authoredDatasetBackedBlocks.every(block => normalizeString(block?.datasetRef)) ? explicitDatasetRefs : [],
     availableNonPrimaryDatasetRefs: [
       ...publishedDatasets.map((dataset) => normalizeString(dataset?.id)),
       ...staticDatasets.map((dataset) => normalizeString(dataset?.id)),

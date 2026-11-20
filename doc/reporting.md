@@ -918,6 +918,7 @@ Authoring fields:
 - `title`
 - `datasetRef`
 - `columns[]`
+- `summaryRow` (optional `{datasetRef, label?}`)
 - `runtime.quickFilter` (optional boolean, enabled only when `true`)
 
 Plain `tableBlock` authors can set `runtime.quickFilter: true` to expose the
@@ -928,6 +929,43 @@ existing search behavior. This local presentation filter does not issue a source
 query, change authorization, or search unloaded pages. It reuses the shared table's
 page reset and empty/recovery behavior. The setting survives report-document
 normalization and lowering into the runtime ReportSpec.
+
+A `summaryRow` binds one complete row from an **existing report dataset** to
+this table's columns. It does not sum visible detail rows or issue an aggregation
+query. Repeated tables and KPIs share one declared summary dataset within an
+execution; binding the row does not add a second read of that same dataset.
+For example:
+
+```json
+{"id":"observations","kind":"tableBlock","datasetRef":"details",
+ "columns":[{"key":"day","label":"Date","format":"date"},
+            {"key":"count","label":"Count","format":"number"}],
+ "summaryRow":{"datasetRef":"summary","label":"Grand Total"}}
+```
+
+The summary uses each column's existing key/source/display mappings and native
+formatters. An optional `label` replaces the first column with plain text, even
+when that column ordinarily formats dates, IDs or links. With no label, its
+source value is used. Genuine zero and null values retain their normal cell
+semantics. [The neutral runnable data example](examples/report-table-summary.json)
+intentionally gives the summary a different value from the detail-row sum.
+
+The footer stays outside detail sorting, quick filtering, row counts, selection
+and paging. It describes the summary dataset's declared scope, including when the
+detail table displays a partial page. Author the appropriate scope on that
+existing dataset. A missing, failed, partial, empty or multirow summary is omitted
+with a distinct block-scoped diagnostic; other source errors retain their causes.
+The framework does not pick an arbitrary row or fabricate zero. Table exports
+require a usable bound summary. CSV, editable table XLSX and print include it;
+raw dataset XLSX sheets retain the original source rows. Rendering/exporting an
+already complete fill uses its existing resolved summary with no producer read.
+A fresh or stateless selected-table execution must retrieve both its detail and
+summary dependencies; compared with an unbound table, this can add one source
+read. A host that deliberately reexecutes exports for fresh authorization/data
+retains that behavior. This feature adds no cross-operation data cache or
+authority reuse. The XLSX table filter
+excludes the footer. `BuildTableSnapshot`, which receives only detail rows,
+requires full report execution for summary-bound tables.
 
 Runtime behavior:
 

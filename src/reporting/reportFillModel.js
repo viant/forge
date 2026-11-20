@@ -25,7 +25,7 @@ import {
 } from "./calculatedFieldModel.js";
 import { buildReportFillChartPayload } from "./reportFillChartPayload.js";
 import { buildReportFillGeoPayload } from "./reportFillGeoPayload.js";
-import { buildReportFillTableRows } from "./reportFillTablePayload.js";
+import { buildReportFillTableRows, buildReportFillTableSummary } from "./reportFillTablePayload.js";
 import {
   normalizeReportDatasetCapabilities,
   normalizeReportDatasetSource,
@@ -1023,6 +1023,7 @@ function buildReportFillBlocks(reportSpec = {}, datasetsById = new Map(), {
   unifiedFilterContent = null,
   runtimeSelection = {},
   datasetPayloads = {},
+  summaryDiagnostics = [],
 } = {}) {
   const scopeParams = Array.isArray(reportSpec?.scope?.params) ? reportSpec.scope.params : [];
   const runtimeFilterValues = scopeParams.reduce((result, param) => {
@@ -1088,12 +1089,15 @@ function buildReportFillBlocks(reportSpec = {}, datasetsById = new Map(), {
         tableRows=filtered.map(node=>node.row);sourceIndexes=filtered.map(node=>analytic.sourceIndexes[node.sourceIndex]);
       }
       const columns=cloneValue(analytic.columns || []);
+      const {row:summary,diagnostic:summaryDiagnostic} = buildReportFillTableSummary(columns, block.summaryRow, datasetsById.get(block.summaryRow?.datasetRef), datasetPayloads[block.summaryRow?.datasetRef]);
+      if (summaryDiagnostic) summaryDiagnostics.push({...summaryDiagnostic,blockId:block.id});
       return {
         ...normalizedBlock,
         content: {
           columns,
           ...(analytic.columnGroups.length?{columnGroups:analytic.columnGroups}:{}),
           rowCount: tableRows.length,
+          ...(summary ? {summaryRow:summary} : {}),
           resolvedRows: buildReportFillTableRows(block.selection && !columns.some(column => column.key === block.selection.field)
             ? [...columns,{key:block.selection.field,label:'Selected'}] : columns, tableRows).map((row,index)=>sourceIndexes?{...row,rowIndex:sourceIndexes[index]}:row),
         },
@@ -1320,6 +1324,7 @@ export function buildReportFillFromReportSpec(reportSpec = {}, datasetPayloads =
     buildReportFillDataset(dataset, datasetPayloads?.[normalizeString(dataset?.id)] || {}, calculatedFields)
   ));
   const datasetsById = new Map(datasets.map((dataset) => [dataset.id, dataset]));
+  const summaryDiagnostics = [];
   return applyReportTablePresentations({
     version: 1,
     kind: "reportFill",
@@ -1334,8 +1339,9 @@ export function buildReportFillFromReportSpec(reportSpec = {}, datasetPayloads =
       unifiedFilterContent,
       runtimeSelection,
       datasetPayloads,
+      summaryDiagnostics,
     }),
-    diagnostics: datasets.flatMap((dataset) => dataset?.provenance?.diagnostics || []),
+    diagnostics: [...datasets.flatMap((dataset) => dataset?.provenance?.diagnostics || []), ...summaryDiagnostics],
   }, tablePresentations);
 }
 

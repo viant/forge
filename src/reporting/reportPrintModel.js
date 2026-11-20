@@ -2324,7 +2324,7 @@ function renderReportPrintTableHeader(state = {}, block = {}, columns = [], rowY
 function renderReportPrintTableRow(state = {}, block = {}, columns = [], row = {}, rowPosition = 0, rowSequence = 0, columnLayout = {}, rowHeight = REPORT_PRINT_THEME.tableRowHeight, dataBarRanges = new Map(), resolveText = resolveReportPrintTableCellText) {
   const widths = Array.isArray(columnLayout?.widths) ? columnLayout.widths : [];
   const offsets = Array.isArray(columnLayout?.offsets) ? columnLayout.offsets : [];
-  const rowKey = `row_${normalizePositiveInteger(row?.rowIndex + 1) || rowSequence}`;
+  const rowKey = row._summary === true ? "summary" : `row_${normalizePositiveInteger(row?.rowIndex + 1) || rowSequence}`;
   const cellByKey = new Map(
     (Array.isArray(row?.cells) ? row.cells : [])
       .map((cell) => [normalizeString(cell?.key), cell])
@@ -2521,6 +2521,7 @@ function renderReportPrintTableRow(state = {}, block = {}, columns = [], row = {
       rowKey,
       columnKey,
       text: resolveText(column, cell),
+      ...(row._summary ? {fontWeight:"600"} : {}),
       ...(normalizeString(column?.format) ? { format: normalizeString(column.format) } : {}),
       align: resolveReportPrintTableColumnAlign(column, cell),
       fontSize: 9,
@@ -2553,7 +2554,7 @@ function withReportPrintRowReference(block, columns, rows) {
       resolvedRows: rows.map((row, index) => ({
         ...row,
         rowIndex: index,
-        cells: [{ key, sourceKey: key, displayKey: key, value: index + 1, displayValue: index + 1 }, ...(row?.cells || [])],
+        cells: [{ key, sourceKey: key, displayKey: key, value: row._summary ? null : index + 1, displayValue: row._summary ? null : index + 1 }, ...(row?.cells || [])],
       })),
     },
   };
@@ -2597,6 +2598,12 @@ function renderReportPrintTableBlock(state = {}, block = {}, {
   const authoredColumns = Array.isArray(block?.content?.columns) ? block.content.columns : [];
   let columns = block.selection && !authoredColumns.some(column => column.key === block.selection.field)
     ? [...authoredColumns,{key:block.selection.field,label:'Selected'}] : authoredColumns;
+  if (block?.content?.summaryRow) {
+    const summary = {...block.content.summaryRow,_summary:true};
+    // Consume once before column-band or page planning, retaining native cell
+    // values and the same row-height/wrapping path as ordinary table rows.
+    block = {...block,content:{...block.content,summaryRow:undefined,resolvedRows:[...(block.content.resolvedRows || []),summary]}};
+  }
   let rows = Array.isArray(block?.content?.resolvedRows) ? block.content.resolvedRows : [];
   if (!columnBand && block?.runtime?.printRowReference === true && columns.length > 0 && rows.length > 0) {
     block = withReportPrintRowReference(block, columns, rows);

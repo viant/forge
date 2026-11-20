@@ -455,14 +455,21 @@ func (w *visualDashboardWriter) rawDataset(dataset reportfill.Dataset) error {
 	return w.finishSheet(sheet, lastRow, len(columns), false)
 }
 
-func (w *visualDashboardWriter) filteredTable(sheet string, row int, columns []reportfill.TableColumn, rows [][]any) error {
+func (w *visualDashboardWriter) filteredTable(sheet string, row int, columns []reportfill.TableColumn, rows [][]any, footerRows ...int) error {
 	if err := w.table(sheet, row, columns, rows); err != nil {
 		return err
 	}
 	if len(columns) == 0 || len(rows) == 0 {
 		return nil
 	}
-	end, err := excelize.CoordinatesToCellName(len(columns), row+len(rows))
+	count := len(rows)
+	if len(footerRows) > 0 {
+		count -= footerRows[0]
+	}
+	if count <= 0 {
+		return nil
+	}
+	end, err := excelize.CoordinatesToCellName(len(columns), row+count)
 	if err != nil {
 		return err
 	}

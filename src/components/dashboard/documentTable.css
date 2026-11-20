@@ -188,3 +188,7 @@
 
 .forge-table-hierarchy-label { display:flex; align-items:center; gap:var(--forge-spacing-1,4px); }
 .forge-table-hierarchy-spacer { display:inline-block; width:32px; flex-shrink:0; }
+
+.forge-dashboard-table-summary { font-weight: var(--forge-type-label-weight, 600); }
+.forge-dashboard-table .forge-dashboard-table-summary td { background: var(--forge-table-header-surface, var(--forge-surface-subtle, #f7f8fa)); border-top: 1px solid var(--forge-table-border, var(--forge-border-color, #d8dce2)); white-space: pre-wrap; }
+.forge-dashboard-table-summary-card { font-weight: 600; white-space: pre-wrap; }

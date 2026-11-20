@@ -52852,6 +52852,7 @@ ${indent}${end}`;
       ...normalizeString8(block == null ? void 0 : block.description) ? { description: normalizeString8(block.description) } : {},
       datasetRef,
       columns,
+      ...block.summaryRow !== void 0 ? { summaryRow: normalizeReportTableSummaryRow(block.summaryRow) } : {},
       ...block.selection !== void 0 ? { selection: normalizeReportTableSelection(block.selection) } : {},
       ...recordTitleField ? { recordTitleField } : {},
       ...["blue", "green", "amber", "rose", "slate"].includes(accentTone) ? { accentTone } : {},
@@ -52859,6 +52860,11 @@ ${indent}${end}`;
       ...(block == null ? void 0 : block.collapsible) === true && typeof (block == null ? void 0 : block.defaultCollapsed) === "boolean" ? { defaultCollapsed: block.defaultCollapsed } : {},
       ...labelClamp ? { labelClamp } : {}
     };
+  }
+  function normalizeReportTableSummaryRow(binding) {
+    if (!binding || typeof binding !== "object" || Array.isArray(binding) || !normalizeString8(binding.datasetRef)) throw new Error("Table summaryRow requires an existing datasetRef.");
+    if (binding.label !== void 0 && typeof binding.label !== "string") throw new Error("Table summaryRow.label must be text.");
+    return { datasetRef: normalizeString8(binding.datasetRef), ...binding.label !== void 0 ? { label: binding.label } : {} };
   }
 
   // src/components/dashboard/reportBuilderCalculatedFieldAuthoring.js
@@ -57609,7 +57615,10 @@ ${indent}${end}`;
     const scopeParams = buildReportBuilderScopeParams(effectiveConfig, normalizedState);
     const contextPreset = resolveReportScopeContextPresetFromState(normalizedState, scopeParams);
     const referencedDatasetRefs = new Set(
-      (Array.isArray(normalizedState == null ? void 0 : normalizedState.reportDocumentBlocks) ? normalizedState.reportDocumentBlocks : []).flatMap((block) => [normalizeString30(block == null ? void 0 : block.datasetRef), normalizeString30(block == null ? void 0 : block.secondaryDatasetRef)]).filter((datasetRef) => !!datasetRef && datasetRef !== "primary")
+      (Array.isArray(normalizedState == null ? void 0 : normalizedState.reportDocumentBlocks) ? normalizedState.reportDocumentBlocks : []).flatMap((block) => {
+        var _a6;
+        return [normalizeString30(block == null ? void 0 : block.datasetRef), normalizeString30(block == null ? void 0 : block.secondaryDatasetRef), normalizeString30((_a6 = block == null ? void 0 : block.summaryRow) == null ? void 0 : _a6.datasetRef)];
+      }).filter((datasetRef) => !!datasetRef && datasetRef !== "primary")
     );
     const authoredDatasetBackedBlocks = (Array.isArray(normalizedState == null ? void 0 : normalizedState.reportDocumentBlocks) ? normalizedState.reportDocumentBlocks : []).filter((block) => isReportDatasetBackedBlockKind(block == null ? void 0 : block.kind));
     const primaryDataSourceRef = resolveReportSpecDataSourceRef(container, config);
@@ -57624,10 +57633,13 @@ ${indent}${end}`;
       }
     );
     const staticDatasets = buildReportBuilderStaticDatasetDeclarations(normalizedState == null ? void 0 : normalizedState.reportStaticDatasets);
-    const explicitDatasetRefs = authoredDatasetBackedBlocks.map((block) => normalizeString30(block == null ? void 0 : block.datasetRef)).filter(Boolean);
+    const explicitDatasetRefs = authoredDatasetBackedBlocks.flatMap((block) => {
+      var _a6;
+      return [normalizeString30(block == null ? void 0 : block.datasetRef), normalizeString30((_a6 = block == null ? void 0 : block.summaryRow) == null ? void 0 : _a6.datasetRef)];
+    }).filter(Boolean);
     const shouldIncludePrimaryDataset = shouldKeepPrimaryDataset({
       includePrimaryBlocks,
-      datasetBackedBlockDatasetRefs: explicitDatasetRefs.length === authoredDatasetBackedBlocks.length ? explicitDatasetRefs : [],
+      datasetBackedBlockDatasetRefs: authoredDatasetBackedBlocks.every((block) => normalizeString30(block == null ? void 0 : block.datasetRef)) ? explicitDatasetRefs : [],
       availableNonPrimaryDatasetRefs: [
         ...publishedDatasets.map((dataset) => normalizeString30(dataset == null ? void 0 : dataset.id)),
         ...staticDatasets.map((dataset) => normalizeString30(dataset == null ? void 0 : dataset.id))
@@ -59906,10 +59918,13 @@ ${indent}${end}`;
       request: cloneValue20(buildReportBuilderRequest(effectiveScopedConfig, effectiveScopedState))
     };
     const datasetBackedBlocks = blocks.filter((block) => normalizeString32(block == null ? void 0 : block.kind) !== "reportBuilderBlock").filter((block) => isReportDatasetBackedBlockKind(block == null ? void 0 : block.kind));
-    const explicitDatasetRefs = datasetBackedBlocks.map((block) => normalizeString32(block == null ? void 0 : block.datasetRef)).filter(Boolean);
+    const explicitDatasetRefs = datasetBackedBlocks.flatMap((block) => {
+      var _a6;
+      return [normalizeString32(block == null ? void 0 : block.datasetRef), normalizeString32((_a6 = block == null ? void 0 : block.summaryRow) == null ? void 0 : _a6.datasetRef)];
+    }).filter(Boolean);
     const shouldOmitPrimaryDataset = !shouldKeepPrimaryDataset({
       includePrimaryBlocks,
-      datasetBackedBlockDatasetRefs: explicitDatasetRefs.length === datasetBackedBlocks.length ? explicitDatasetRefs : [],
+      datasetBackedBlockDatasetRefs: datasetBackedBlocks.every((block) => normalizeString32(block == null ? void 0 : block.datasetRef)) ? explicitDatasetRefs : [],
       availableNonPrimaryDatasetRefs: [
         ...Array.from(staticDatasetIndex.keys()),
         ...Array.from(publishedDatasetIndex.keys())
@@ -61044,6 +61059,22 @@ ${indent}${end}`;
       })
     }));
   }
+  function buildReportFillTableSummary(columns, binding, dataset, payload) {
+    var _a5, _b, _c, _d, _e, _f;
+    if (!binding) return { row: null };
+    const unavailable = (code, message, severity = "warning") => ({ row: null, diagnostic: { code, severity, path: "summaryRow", message } });
+    if (!payload || !dataset) return unavailable("table_summary_missing", "The summary dataset was not returned.");
+    const diagnostics = [...((_a5 = dataset.provenance) == null ? void 0 : _a5.diagnostics) || [], ...payload.diagnostics || []];
+    if (diagnostics.some((diagnostic) => (diagnostic == null ? void 0 : diagnostic.severity) === "error")) return unavailable("table_summary_unavailable", "The summary dataset is unavailable. See the source diagnostic.");
+    if (((_b = dataset.provenance) == null ? void 0 : _b.hasMore) || ((_c = dataset.provenance) == null ? void 0 : _c.truncated) || Number((_d = dataset.request) == null ? void 0 : _d.offset) > 0) return unavailable("table_summary_partial", "A complete summary dataset is required.");
+    if (((_e = dataset.rows) == null ? void 0 : _e.length) === 0) return unavailable("table_summary_empty", "No summary row is available for this scope.", "info");
+    if (((_f = dataset.rows) == null ? void 0 : _f.length) !== 1) return unavailable("table_summary_ambiguous", "The summary dataset must contain exactly one row.");
+    const row = buildReportFillTableRows(columns, dataset.rows)[0];
+    if (binding.label !== void 0 && row.cells.length) {
+      row.cells[0] = { ...row.cells[0], value: binding.label, displayValue: binding.label, visualState: null };
+    }
+    return { row };
+  }
 
   // src/reporting/reportFillModel.js
   var import_fast_deep_equal = __toESM(require_fast_deep_equal());
@@ -61889,7 +61920,8 @@ ${indent}${end}`;
   function buildReportFillBlocks(reportSpec = {}, datasetsById = /* @__PURE__ */ new Map(), {
     unifiedFilterContent = null,
     runtimeSelection = {},
-    datasetPayloads = {}
+    datasetPayloads = {},
+    summaryDiagnostics = []
   } = {}) {
     var _a5;
     const scopeParams = Array.isArray((_a5 = reportSpec == null ? void 0 : reportSpec.scope) == null ? void 0 : _a5.params) ? reportSpec.scope.params : [];
@@ -61901,7 +61933,7 @@ ${indent}${end}`;
     const availableDatasetRefs = Array.from(datasetsById.keys());
     const datasetsByAlias = buildReportFillDatasetAliasMap(datasetsById);
     return (Array.isArray(reportSpec == null ? void 0 : reportSpec.blocks) ? reportSpec.blocks : []).map((block) => {
-      var _a6, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r;
+      var _a6, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t;
       const normalizedBlock = cloneValue25(block);
       delete normalizedBlock.templateFieldDisplayMap;
       delete normalizedBlock.markerColors;
@@ -61945,12 +61977,15 @@ ${indent}${end}`;
           sourceIndexes = filtered.map((node) => analytic.sourceIndexes[node.sourceIndex]);
         }
         const columns = cloneValue25(analytic.columns || []);
+        const { row: summary, diagnostic: summaryDiagnostic } = buildReportFillTableSummary(columns, block.summaryRow, datasetsById.get((_i = block.summaryRow) == null ? void 0 : _i.datasetRef), datasetPayloads[(_j = block.summaryRow) == null ? void 0 : _j.datasetRef]);
+        if (summaryDiagnostic) summaryDiagnostics.push({ ...summaryDiagnostic, blockId: block.id });
         return {
           ...normalizedBlock,
           content: {
             columns,
             ...analytic.columnGroups.length ? { columnGroups: analytic.columnGroups } : {},
             rowCount: tableRows.length,
+            ...summary ? { summaryRow: summary } : {},
             resolvedRows: buildReportFillTableRows(block.selection && !columns.some((column) => column.key === block.selection.field) ? [...columns, { key: block.selection.field, label: "Selected" }] : columns, tableRows).map((row, index) => sourceIndexes ? { ...row, rowIndex: sourceIndexes[index] } : row)
           }
         };
@@ -61958,8 +61993,8 @@ ${indent}${end}`;
       if (normalizeString37(block == null ? void 0 : block.kind) === "chartBlock") {
         if (block.chartModel && (!dataset || dataset.rows.length === 0)) {
           const payload = datasetPayloads[datasetResolution.datasetRef];
-          const diagnostics = [...(payload == null ? void 0 : payload.diagnostics) || [], ...((_i = payload == null ? void 0 : payload.provenance) == null ? void 0 : _i.diagnostics) || []];
-          if (!sourceDataset || !Array.isArray(payload == null ? void 0 : payload.rows) || sourceDataset.provenance.hasMore || sourceDataset.provenance.truncated || Number((_j = sourceDataset.request) == null ? void 0 : _j.offset) > 0 || diagnostics.length > 0) {
+          const diagnostics = [...(payload == null ? void 0 : payload.diagnostics) || [], ...((_k = payload == null ? void 0 : payload.provenance) == null ? void 0 : _k.diagnostics) || []];
+          if (!sourceDataset || !Array.isArray(payload == null ? void 0 : payload.rows) || sourceDataset.provenance.hasMore || sourceDataset.provenance.truncated || Number((_l = sourceDataset.request) == null ? void 0 : _l.offset) > 0 || diagnostics.length > 0) {
             throw new Error(`Chart '${block.id}' requires complete empty dataset input for '${block.datasetRef}'.`);
           }
         }
@@ -61970,8 +62005,8 @@ ${indent}${end}`;
           content: {
             chartSpec,
             chartModel,
-            rowCount: Number(((_k = dataset == null ? void 0 : dataset.provenance) == null ? void 0 : _k.rowCount) || 0),
-            resolvedChart: buildReportFillChartPayload(chartModel, (dataset == null ? void 0 : dataset.rows) || [], ((_l = chartModel == null ? void 0 : chartModel.center) == null ? void 0 : _l.datasetRef) ? validateDonutCenterDataset(datasetsById.get(chartModel.center.datasetRef)) : void 0, ((_m = chartModel == null ? void 0 : chartModel.center) == null ? void 0 : _m.datasetRef) ? (_o = (_n = datasetsById.get(chartModel.center.datasetRef)) == null ? void 0 : _n.request) == null ? void 0 : _o.filters : (_p = dataset == null ? void 0 : dataset.request) == null ? void 0 : _p.filters, (_q = dataset == null ? void 0 : dataset.request) == null ? void 0 : _q.filters)
+            rowCount: Number(((_m = dataset == null ? void 0 : dataset.provenance) == null ? void 0 : _m.rowCount) || 0),
+            resolvedChart: buildReportFillChartPayload(chartModel, (dataset == null ? void 0 : dataset.rows) || [], ((_n = chartModel == null ? void 0 : chartModel.center) == null ? void 0 : _n.datasetRef) ? validateDonutCenterDataset(datasetsById.get(chartModel.center.datasetRef)) : void 0, ((_o = chartModel == null ? void 0 : chartModel.center) == null ? void 0 : _o.datasetRef) ? (_q = (_p = datasetsById.get(chartModel.center.datasetRef)) == null ? void 0 : _p.request) == null ? void 0 : _q.filters : (_r = dataset == null ? void 0 : dataset.request) == null ? void 0 : _r.filters, (_s = dataset == null ? void 0 : dataset.request) == null ? void 0 : _s.filters)
           }
         };
       }
@@ -61980,7 +62015,7 @@ ${indent}${end}`;
           ...normalizedBlock,
           content: {
             geo: cloneValue25((block == null ? void 0 : block.geo) || {}),
-            rowCount: Number(((_r = dataset == null ? void 0 : dataset.provenance) == null ? void 0 : _r.rowCount) || 0),
+            rowCount: Number(((_t = dataset == null ? void 0 : dataset.provenance) == null ? void 0 : _t.rowCount) || 0),
             resolvedGeo: buildReportFillGeoPayload(block, (dataset == null ? void 0 : dataset.rows) || [])
           }
         };
@@ -62160,6 +62195,7 @@ ${indent}${end}`;
     }
     const datasets = (Array.isArray(normalizedReportSpec == null ? void 0 : normalizedReportSpec.datasets) ? normalizedReportSpec.datasets : []).map((dataset) => buildReportFillDataset(dataset, (datasetPayloads == null ? void 0 : datasetPayloads[normalizeString37(dataset == null ? void 0 : dataset.id)]) || {}, calculatedFields));
     const datasetsById = new Map(datasets.map((dataset) => [dataset.id, dataset]));
+    const summaryDiagnostics = [];
     return applyReportTablePresentations({
       version: 1,
       kind: "reportFill",
@@ -62173,12 +62209,13 @@ ${indent}${end}`;
       blocks: buildReportFillBlocks(normalizedReportSpec, datasetsById, {
         unifiedFilterContent,
         runtimeSelection,
-        datasetPayloads
+        datasetPayloads,
+        summaryDiagnostics
       }),
-      diagnostics: datasets.flatMap((dataset) => {
+      diagnostics: [...datasets.flatMap((dataset) => {
         var _a6;
         return ((_a6 = dataset == null ? void 0 : dataset.provenance) == null ? void 0 : _a6.diagnostics) || [];
-      })
+      }), ...summaryDiagnostics]
     }, tablePresentations);
   }
 
@@ -71578,7 +71615,7 @@ ${indent}${end}`;
   function renderReportPrintTableRow(state = {}, block = {}, columns = [], row = {}, rowPosition = 0, rowSequence = 0, columnLayout = {}, rowHeight = REPORT_PRINT_THEME.tableRowHeight, dataBarRanges = /* @__PURE__ */ new Map(), resolveText = resolveReportPrintTableCellText) {
     const widths = Array.isArray(columnLayout == null ? void 0 : columnLayout.widths) ? columnLayout.widths : [];
     const offsets = Array.isArray(columnLayout == null ? void 0 : columnLayout.offsets) ? columnLayout.offsets : [];
-    const rowKey = `row_${normalizePositiveInteger((row == null ? void 0 : row.rowIndex) + 1) || rowSequence}`;
+    const rowKey = row._summary === true ? "summary" : `row_${normalizePositiveInteger((row == null ? void 0 : row.rowIndex) + 1) || rowSequence}`;
     const cellByKey = new Map(
       (Array.isArray(row == null ? void 0 : row.cells) ? row.cells : []).map((cell) => [normalizeString41(cell == null ? void 0 : cell.key), cell]).filter(([key2]) => !!key2)
     );
@@ -71764,6 +71801,7 @@ ${indent}${end}`;
         rowKey,
         columnKey,
         text: resolveText(column, cell),
+        ...row._summary ? { fontWeight: "600" } : {},
         ...normalizeString41(column == null ? void 0 : column.format) ? { format: normalizeString41(column.format) } : {},
         align: resolveReportPrintTableColumnAlign(column, cell),
         fontSize: 9,
@@ -71790,7 +71828,7 @@ ${indent}${end}`;
         resolvedRows: rows.map((row, index) => ({
           ...row,
           rowIndex: index,
-          cells: [{ key: key2, sourceKey: key2, displayKey: key2, value: index + 1, displayValue: index + 1 }, ...(row == null ? void 0 : row.cells) || []]
+          cells: [{ key: key2, sourceKey: key2, displayKey: key2, value: row._summary ? null : index + 1, displayValue: row._summary ? null : index + 1 }, ...(row == null ? void 0 : row.cells) || []]
         }))
       }
     };
@@ -71823,19 +71861,23 @@ ${indent}${end}`;
     columnBand = false,
     firstRowProbe = false
   } = {}) {
-    var _a5, _b, _c, _d;
+    var _a5, _b, _c, _d, _e;
     const description = normalizeString41(block == null ? void 0 : block.description);
     if (description && !layoutNote.includes(description)) layoutNote = [description, layoutNote].filter(Boolean).join("\n");
     const authoredColumns = Array.isArray((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.columns) ? block.content.columns : [];
     let columns = block.selection && !authoredColumns.some((column) => column.key === block.selection.field) ? [...authoredColumns, { key: block.selection.field, label: "Selected" }] : authoredColumns;
-    let rows = Array.isArray((_b = block == null ? void 0 : block.content) == null ? void 0 : _b.resolvedRows) ? block.content.resolvedRows : [];
-    if (!columnBand && ((_c = block == null ? void 0 : block.runtime) == null ? void 0 : _c.printRowReference) === true && columns.length > 0 && rows.length > 0) {
+    if ((_b = block == null ? void 0 : block.content) == null ? void 0 : _b.summaryRow) {
+      const summary = { ...block.content.summaryRow, _summary: true };
+      block = { ...block, content: { ...block.content, summaryRow: void 0, resolvedRows: [...block.content.resolvedRows || [], summary] } };
+    }
+    let rows = Array.isArray((_c = block == null ? void 0 : block.content) == null ? void 0 : _c.resolvedRows) ? block.content.resolvedRows : [];
+    if (!columnBand && ((_d = block == null ? void 0 : block.runtime) == null ? void 0 : _d.printRowReference) === true && columns.length > 0 && rows.length > 0) {
       block = withReportPrintRowReference(block, columns, rows);
       columns = block.content.columns;
       rows = block.content.resolvedRows;
     }
     if (!columnBand) {
-      const groups = ((_d = block.content) == null ? void 0 : _d.columnGroups) || block.columnGroups || [];
+      const groups = ((_e = block.content) == null ? void 0 : _e.columnGroups) || block.columnGroups || [];
       columns = columns.map((column, index) => prepareReportPrintTableColumn(column, groups, index));
     }
     block = { ...block, columnGroups: void 0, content: { ...block.content, columnGroups: void 0 } };

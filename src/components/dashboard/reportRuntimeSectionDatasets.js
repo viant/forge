@@ -34,6 +34,7 @@ export function reportRuntimeSectionDatasets(document, reportSpec, requestedSect
     const refs=source?getReportBlockDatasetRefs(source):[
       name(block?.datasetRef||content?.datasetRef),...ids(block?.datasetRefs||content?.datasetRefs),
       name(block?.secondaryDatasetRef||content?.secondaryDatasetRef),
+      name(block?.summaryRow?.datasetRef),
       name(block?.sparkline?.datasetRef||content?.sparkline?.datasetRef),
       name(block?.sparkline?.comparisonDatasetRef||content?.sparkline?.comparisonDatasetRef),
       name(block?.chartSpec?.center?.datasetRef||content?.chartSpec?.center?.datasetRef),

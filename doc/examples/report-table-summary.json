@@ -1,0 +1,151 @@
+{
+  "provenance": "Independently invented neutral observations; totals intentionally differ from visible detail aggregation.",
+  "spec": {
+    "version": 1,
+    "kind": "reportSpec",
+    "source": {
+      "kind": "report",
+      "containerId": "observations",
+      "stateKey": "observations",
+      "dataSourceRef": "source"
+    },
+    "title": "Observations",
+    "parameters": {
+      "viewMode": "table",
+      "groupBy": "",
+      "pageSize": 1,
+      "orderField": "",
+      "orderDir": "asc"
+    },
+    "layoutIntent": {
+      "kind": "stack",
+      "resultPanePosition": "bottom",
+      "blockOrder": [
+        "details",
+        "second"
+      ]
+    },
+    "refinements": [],
+    "calculatedFields": [],
+    "datasets": [
+      {
+        "id": "primary",
+        "dataSourceRef": "source",
+        "request": {
+          "limit": 50,
+          "offset": 0
+        }
+      },
+      {
+        "id": "summary",
+        "dataSourceRef": "source",
+        "request": {
+          "resultSet": "summary",
+          "limit": 1,
+          "offset": 0
+        }
+      }
+    ],
+    "blocks": [
+      {
+        "id": "details",
+        "kind": "tableBlock",
+        "title": "Observations",
+        "datasetRef": "primary",
+        "columns": [
+          {
+            "key": "day",
+            "label": "Observation date",
+            "format": "date"
+          },
+          {
+            "key": "count",
+            "label": "Count",
+            "format": "number"
+          },
+          {
+            "key": "rate",
+            "label": "Rate",
+            "format": "percentFraction2"
+          },
+          {
+            "key": "optional",
+            "label": "Optional",
+            "format": "number2"
+          }
+        ],
+        "summaryRow": {
+          "datasetRef": "summary",
+          "label": "Grand Total"
+        },
+        "runtime": {
+          "quickFilter": true
+        }
+      },
+      {
+        "id": "second",
+        "kind": "tableBlock",
+        "title": "Repeated observations",
+        "datasetRef": "primary",
+        "columns": [
+          {
+            "key": "day",
+            "label": "Observation date",
+            "format": "date"
+          },
+          {
+            "key": "count",
+            "label": "Count",
+            "format": "number"
+          },
+          {
+            "key": "rate",
+            "label": "Rate",
+            "format": "percentFraction2"
+          },
+          {
+            "key": "optional",
+            "label": "Optional",
+            "format": "number2"
+          }
+        ],
+        "summaryRow": {
+          "datasetRef": "summary",
+          "label": "Grand Total"
+        },
+        "runtime": {
+          "quickFilter": true
+        }
+      }
+    ]
+  },
+  "datasets": {
+    "primary": {
+      "rows": [
+        {
+          "day": "2026-01-01",
+          "count": 2,
+          "rate": 0.2,
+          "optional": 5
+        },
+        {
+          "day": "2026-01-02",
+          "count": 3,
+          "rate": 0.3,
+          "optional": null
+        }
+      ],
+      "hasMore": false
+    },
+    "summary": {
+      "rows": [
+        {
+          "count": 40,
+          "rate": 0,
+          "optional": null
+        }
+      ],
+      "hasMore": false
+    }
+  }
+}

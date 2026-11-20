@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/viant/forge/backend/reporting/tablemeta"
 	"io"
+	"iter"
 	"math"
 	"reflect"
 	"sort"
@@ -115,6 +116,7 @@ type Block struct {
 	LabelClamp               *TextClamp            `json:"labelClamp,omitempty"`
 	DatasetRef               string                `json:"datasetRef,omitempty"`
 	Columns                  []TableColumn         `json:"columns,omitempty"`
+	SummaryRow               *TableSummaryRow      `json:"summaryRow,omitempty"`
 	Content                  *TableContent         `json:"content,omitempty"`
 	ChartSpec                map[string]any        `json:"chartSpec,omitempty"`
 	ChartModel               map[string]any        `json:"chartModel,omitempty"`
@@ -206,7 +208,11 @@ type TableColumn struct {
 	LabelClamp        *TextClamp        `json:"labelClamp,omitempty"`
 }
 
+// TableSummaryRow retains the authored binding in the filled table.
+type TableSummaryRow = reportspec.TableSummaryRow
+
 type TableContent struct {
+	SummaryRow   *ResolvedTableRow       `json:"summaryRow,omitempty"`
 	ColumnGroups []tablemeta.ColumnGroup `json:"columnGroups,omitempty"`
 	Columns      []TableColumn           `json:"columns"`
 	RowCount     int                     `json:"rowCount"`
@@ -623,17 +629,18 @@ type rawTableBlock struct {
 	Pivot        *tablemeta.Pivot        `json:"pivot,omitempty"`
 	ColumnGroups []tablemeta.ColumnGroup `json:"columnGroups,omitempty"`
 
-	ID               string        `json:"id"`
-	Kind             string        `json:"kind"`
-	Title            string        `json:"title,omitempty"`
-	Description      string        `json:"description,omitempty"`
-	AccentTone       string        `json:"accentTone,omitempty"`
-	Collapsible      bool          `json:"collapsible,omitempty"`
-	DefaultCollapsed *bool         `json:"defaultCollapsed,omitempty"`
-	LabelClamp       *TextClamp    `json:"labelClamp,omitempty"`
-	DatasetRef       string        `json:"datasetRef"`
-	Columns          []TableColumn `json:"columns"`
-	Content          TableContent  `json:"content"`
+	ID               string           `json:"id"`
+	Kind             string           `json:"kind"`
+	Title            string           `json:"title,omitempty"`
+	Description      string           `json:"description,omitempty"`
+	AccentTone       string           `json:"accentTone,omitempty"`
+	Collapsible      bool             `json:"collapsible,omitempty"`
+	DefaultCollapsed *bool            `json:"defaultCollapsed,omitempty"`
+	LabelClamp       *TextClamp       `json:"labelClamp,omitempty"`
+	DatasetRef       string           `json:"datasetRef"`
+	Columns          []TableColumn    `json:"columns"`
+	SummaryRow       *TableSummaryRow `json:"summaryRow,omitempty"`
+	Content          TableContent     `json:"content"`
 }
 
 type rawChartBlock struct {
@@ -954,6 +961,7 @@ func decodeJSON(data []byte, datasourceRequests bool) (*ReportFill, error) {
 				LabelClamp:       tableBlock.LabelClamp,
 				DatasetRef:       tableBlock.DatasetRef,
 				Columns:          tableBlock.Columns,
+				SummaryRow:       tableBlock.SummaryRow,
 				Content:          &tableBlock.Content,
 			})
 		case "chartBlock":
@@ -1479,7 +1487,7 @@ func (r *ReportFill) Validate() error {
 			if len(block.Content.Columns) == 0 {
 				return fmt.Errorf("reportFill.blocks[%d].content.columns must not be empty for tableBlock", index)
 			}
-			for rowIndex, row := range block.Content.ResolvedRows {
+			for rowIndex, row := range block.Content.DisplayRows() {
 				if row.RowIndex < 0 {
 					return fmt.Errorf("reportFill.blocks[%d].content.resolvedRows[%d].rowIndex must be >= 0 for tableBlock", index, rowIndex)
 				}
@@ -1498,7 +1506,7 @@ func (r *ReportFill) Validate() error {
 					}
 				}
 			}
-			for rowIndex, row := range block.Content.ResolvedRows {
+			for rowIndex, row := range block.Content.DisplayRows() {
 				for cellIndex, cell := range row.Cells {
 					if cell.VisualState == nil {
 						continue
@@ -2371,4 +2379,22 @@ func (d Dataset) MarshalJSON() ([]byte, error) {
 		plain
 		Request json.RawMessage `json:"request"`
 	}{plain: plain(d), Request: d.requestPayload})
+}
+
+// DisplayRows yields the bound summary after detail rows without copying source
+// slices. The footer is never part of detail sorting, paging or raw datasets.
+func (t *TableContent) DisplayRows() iter.Seq2[int, ResolvedTableRow] {
+	return func(yield func(int, ResolvedTableRow) bool) {
+		if t == nil {
+			return
+		}
+		for i, row := range t.ResolvedRows {
+			if !yield(i, row) {
+				return
+			}
+		}
+		if t.SummaryRow != nil {
+			yield(len(t.ResolvedRows), *t.SummaryRow)
+		}
+	}
 }

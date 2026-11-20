@@ -13,6 +13,8 @@ export function authoredReportCsvTables(reportDocument, reportFill) {
     let unavailable = '';
     if (!table || !Array.isArray(table.content?.resolvedRows) || !table.content?.columns?.length) {
       unavailable = 'The table has not finished loading.';
+    } else if (block.summaryRow && !table.content?.summaryRow) {
+      unavailable = 'Complete summary data is required for export.';
     } else if (!dataset || dataset.provenance?.hasMore || dataset.provenance?.truncated) {
       unavailable = 'Complete table data is required for export.';
     } else if ([...(table.diagnostics || []), ...(dataset.provenance?.diagnostics || [])]
@@ -35,8 +37,10 @@ function escape(value) {
 }
 
 export function renderReportTableCsv(table) {
+  if (table?.summaryRow && !table?.content?.summaryRow) throw new Error('Complete summary data is required for export.');
   const columns = table?.content?.columns;
-  const rows = table?.content?.resolvedRows;
+  const detailRows = table?.content?.resolvedRows;
+  const rows = Array.isArray(detailRows) && table?.content?.summaryRow ? [...detailRows,table.content.summaryRow] : detailRows;
   if (!Array.isArray(columns) || !columns.length || !Array.isArray(rows)) throw new Error('A loaded report table is required.');
   const keys = columns.map(column => text(column.key));
   if (keys.some(key => !key) || new Set(keys).size !== keys.length) throw new Error('The table has ambiguous columns.');

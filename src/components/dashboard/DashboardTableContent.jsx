@@ -79,6 +79,8 @@ export default function DashboardTableContent({
     const renderDashboardTableCell = (cell, row, column, cellLocale, cellContext) =>
         renderLegacyDashboardTableCell(cell, row, column, cellLocale, cellContext, formatValue);
     const {collection, loading, error, selection} = useDataSourceState(context);
+    const summaryRow = !loading && !error ? container.dashboard?.table?.summaryRow : null;
+    const summaryLabel = container.dashboard?.table?.summaryLabel;
     const hierarchy=container.dashboard?.table?.hierarchy || container.hierarchy;
     const columnGroups=container.dashboard?.table?.columnGroups || container.columnGroups || [];
     const [expandedKeys,setExpandedKeys]=useState(()=>new Set(initialPresentationState?.expandedKeys || hierarchy?.defaultExpandedKeys || []));
@@ -275,7 +277,7 @@ export default function DashboardTableContent({
             {sortError ? <div role="alert">{sortError}</div> : null}
             {loading ? <div role="status" style={subtitleStyle}>Loading…</div> : null}
             {error ? <div role="alert" style={{...subtitleStyle, color: 'var(--forge-status-danger-foreground, #a82a2a)'}}>{formatDataSourceError(error)}</div> : null}
-            {!loading && !error && sortedRows.length === 0 ? <div role="status" style={subtitleStyle}>No data.</div> : null}
+            {!loading && !error && sortedRows.length === 0 ? <div role="status" style={subtitleStyle}>{summaryRow ? 'No detail rows.' : 'No data.'}</div> : null}
             {quickFilterEnabled ? (
                 <div className="forge-dashboard-table-tools">
                     <input
@@ -289,7 +291,7 @@ export default function DashboardTableContent({
                     <span style={subtitleStyle}>{allSortedRows.length} rows</span>
                 </div>
             ) : null}
-            {sortedRows.length > 0 ? (
+            {sortedRows.length > 0 || summaryRow ? (
                 <>
                 {recordTitleColumn ? <div className="forge-document-record-list">
                     {sortedRows.map(row => <details key={uniqueFields.length ? rowIdentity(row) : JSON.stringify(row)}>
@@ -485,6 +487,15 @@ export default function DashboardTableContent({
                             );
                         })}
                         </tbody>
+                        {summaryRow ? <tfoot className="forge-dashboard-table-summary"><tr>
+                            {multiSelect ? <td/> : null}
+                            {displayColumns.map((column,index) => <td key={column.key} style={{textAlign:column.align || 'left'}}>
+                                {summaryLabel !== undefined && column.key === runtimeColumns[0]?.key
+                                  ? <span style={{whiteSpace:'pre-wrap'}}>{summaryLabel}</span>
+                                  : renderDashboardTableCell(resolveDashboardTableColumnValue(summaryRow,column,{preferDisplay:true}),summaryRow,column,locale,context)}
+                            </td>)}
+                            {rowActions.length > 0 ? <td/> : null}
+                        </tr></tfoot> : null}
                     </table>
                 </div>
                 {mobileCards ? (
@@ -546,6 +557,9 @@ export default function DashboardTableContent({
                     </div>
                 ) : null}
                 </>}
+                {summaryRow && (mobileCards || recordTitleColumn) ? <dl className={`forge-dashboard-table-summary-card${mobileCards ? ' forge-dashboard-table-cards' : ''}`}>
+                    {displayColumns.map(column => <div key={column.key}><dt>{column.label || column.key}</dt><dd>{summaryLabel !== undefined && column.key===runtimeColumns[0]?.key ? <span style={{whiteSpace:'pre-wrap'}}>{summaryLabel}</span> : renderDashboardTableCell(resolveDashboardTableColumnValue(summaryRow,column,{preferDisplay:true}),summaryRow,column,locale,context)}</dd></div>)}
+                </dl> : null}
                 </>
             ) : null}
             {pagingEnabled && pageCount > 1 ? (

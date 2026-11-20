@@ -26,6 +26,9 @@ func BuildTableSnapshot(specJSON json.RawMessage, blockID string, rows []map[str
 	if selected == nil || selected.Kind != "tableBlock" {
 		return nil, fmt.Errorf("table snapshot requires an explicit tableBlock ID")
 	}
+	if selected.SummaryRow != nil {
+		return nil, fmt.Errorf("summary-bound table snapshots require full report execution with the declared summary dataset")
+	}
 	var dataset *reportspec.Dataset
 	for i := range specification.Datasets {
 		if specification.Datasets[i].ID == selected.DatasetRef {

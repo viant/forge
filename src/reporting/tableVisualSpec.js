@@ -188,6 +188,7 @@ export function normalizeReportDocumentTableBlock(block = {}) {
     ...(normalizeString(block?.description) ? {description: normalizeString(block.description)} : {}),
     datasetRef,
     columns,
+    ...(block.summaryRow !== undefined ? {summaryRow: normalizeReportTableSummaryRow(block.summaryRow)} : {}),
     ...(block.selection !== undefined ? {selection:normalizeReportTableSelection(block.selection)} : {}),
     ...(recordTitleField ? {recordTitleField} : {}),
     ...(["blue", "green", "amber", "rose", "slate"].includes(accentTone) ? { accentTone } : {}),
@@ -206,4 +207,10 @@ export function mergeReportTableSelections(sourceRows, visibleRows, choices, fie
     next[sourceIndex] = Boolean(choices[index]?.[field]);
   });
   return next;
+}
+
+export function normalizeReportTableSummaryRow(binding) {
+  if (!binding || typeof binding !== 'object' || Array.isArray(binding) || !normalizeString(binding.datasetRef)) throw new Error('Table summaryRow requires an existing datasetRef.');
+  if (binding.label !== undefined && typeof binding.label !== 'string') throw new Error('Table summaryRow.label must be text.');
+  return {datasetRef:normalizeString(binding.datasetRef), ...(binding.label !== undefined ? {label:binding.label} : {})};
 }

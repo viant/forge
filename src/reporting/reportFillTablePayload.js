@@ -289,3 +289,21 @@ export function buildReportFillTableRows(columns = [], rows = []) {
     })),
   }));
 }
+
+// Summary rows bind an already admitted scalar dataset; never aggregate detail
+// pages or change the dataset's typed source records.
+export function buildReportFillTableSummary(columns, binding, dataset, payload) {
+  if (!binding) return {row:null};
+  const unavailable = (code, message, severity='warning') => ({row:null,diagnostic:{code,severity,path:'summaryRow',message}});
+  if (!payload || !dataset) return unavailable('table_summary_missing','The summary dataset was not returned.');
+  const diagnostics = [...(dataset.provenance?.diagnostics || []), ...(payload.diagnostics || [])];
+  if (diagnostics.some(diagnostic => diagnostic?.severity === 'error')) return unavailable('table_summary_unavailable','The summary dataset is unavailable. See the source diagnostic.');
+  if (dataset.provenance?.hasMore || dataset.provenance?.truncated || Number(dataset.request?.offset)>0) return unavailable('table_summary_partial','A complete summary dataset is required.');
+  if (dataset.rows?.length===0) return unavailable('table_summary_empty','No summary row is available for this scope.','info');
+  if (dataset.rows?.length!==1) return unavailable('table_summary_ambiguous','The summary dataset must contain exactly one row.');
+  const row = buildReportFillTableRows(columns, dataset.rows)[0];
+  if (binding.label !== undefined && row.cells.length) {
+    row.cells[0] = {...row.cells[0], value:binding.label, displayValue:binding.label, visualState:null};
+  }
+  return {row};
+}

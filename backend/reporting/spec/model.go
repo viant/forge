@@ -301,6 +301,7 @@ type Block struct {
 	LabelClamp               *TextClamp                      `json:"labelClamp,omitempty"`
 	DatasetRef               string                          `json:"datasetRef,omitempty"`
 	Columns                  []TableColumn                   `json:"columns,omitempty"`
+	SummaryRow               *TableSummaryRow                `json:"summaryRow,omitempty"`
 	ChartSpec                map[string]any                  `json:"chartSpec,omitempty"`
 	ChartModel               map[string]any                  `json:"chartModel,omitempty"`
 	ValueField               string                          `json:"valueField,omitempty"`
@@ -403,18 +404,19 @@ type rawTableBlock struct {
 	Pivot        *tablemeta.Pivot        `json:"pivot,omitempty"`
 	ColumnGroups []tablemeta.ColumnGroup `json:"columnGroups,omitempty"`
 
-	Selection        *TableSelection `json:"selection,omitempty"`
-	ID               string          `json:"id"`
-	Kind             string          `json:"kind"`
-	Title            string          `json:"title,omitempty"`
-	Description      string          `json:"description,omitempty"`
-	RecordTitleField string          `json:"recordTitleField,omitempty"`
-	AccentTone       string          `json:"accentTone,omitempty"`
-	Collapsible      bool            `json:"collapsible,omitempty"`
-	DefaultCollapsed *bool           `json:"defaultCollapsed,omitempty"`
-	LabelClamp       *TextClamp      `json:"labelClamp,omitempty"`
-	DatasetRef       string          `json:"datasetRef"`
-	Columns          []TableColumn   `json:"columns"`
+	Selection        *TableSelection  `json:"selection,omitempty"`
+	ID               string           `json:"id"`
+	Kind             string           `json:"kind"`
+	Title            string           `json:"title,omitempty"`
+	Description      string           `json:"description,omitempty"`
+	RecordTitleField string           `json:"recordTitleField,omitempty"`
+	AccentTone       string           `json:"accentTone,omitempty"`
+	Collapsible      bool             `json:"collapsible,omitempty"`
+	DefaultCollapsed *bool            `json:"defaultCollapsed,omitempty"`
+	LabelClamp       *TextClamp       `json:"labelClamp,omitempty"`
+	DatasetRef       string           `json:"datasetRef"`
+	Columns          []TableColumn    `json:"columns"`
+	SummaryRow       *TableSummaryRow `json:"summaryRow,omitempty"`
 }
 
 type rawChartBlock struct {
@@ -769,6 +771,10 @@ func (r *ReportSpec) Validate() error {
 	if len(r.Blocks) == 0 {
 		return fmt.Errorf("reportSpec.blocks must not be empty")
 	}
+	datasetIDs := make(map[string]bool, len(r.Datasets))
+	for _, dataset := range r.Datasets {
+		datasetIDs[dataset.ID] = true
+	}
 	blockIDs := make(map[string]struct{}, len(r.Blocks))
 	sectionIDs := make(map[string]struct{}, len(r.Blocks))
 	for _, block := range r.Blocks {
@@ -789,6 +795,9 @@ func (r *ReportSpec) Validate() error {
 		}
 		switch kind {
 		case "tableBlock":
+			if block.SummaryRow != nil && !datasetIDs[block.SummaryRow.DatasetRef] {
+				return fmt.Errorf("reportSpec.blocks[%d].summaryRow.datasetRef must reference a declared dataset", index)
+			}
 			{
 				keys := make([]string, len(block.Columns))
 				for i, column := range block.Columns {
@@ -1150,6 +1159,7 @@ func decodeBlock(payload json.RawMessage, index int) (result Block, resultErr er
 			LabelClamp:       block.LabelClamp,
 			DatasetRef:       block.DatasetRef,
 			Columns:          block.Columns,
+			SummaryRow:       block.SummaryRow,
 		}, nil
 	case "chartBlock":
 		block := rawChartBlock{}
@@ -1529,4 +1539,10 @@ func isAllowedCollectionLayout(value string) bool {
 	default:
 		return false
 	}
+}
+
+// TableSummaryRow binds one complete, already admitted summary dataset row.
+type TableSummaryRow struct {
+	DatasetRef string  `json:"datasetRef"`
+	Label      *string `json:"label,omitempty"`
 }

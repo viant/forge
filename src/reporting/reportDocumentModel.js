@@ -2651,11 +2651,11 @@ export function lowerReportDocumentToReportSpec(document = {}, {
     .filter((block) => normalizeString(block?.kind) !== "reportBuilderBlock")
     .filter((block) => isReportDatasetBackedBlockKind(block?.kind));
   const explicitDatasetRefs = datasetBackedBlocks
-    .map((block) => normalizeString(block?.datasetRef))
+    .flatMap((block) => [normalizeString(block?.datasetRef), normalizeString(block?.summaryRow?.datasetRef)])
     .filter(Boolean);
   const shouldOmitPrimaryDataset = !shouldKeepPrimaryDataset({
     includePrimaryBlocks,
-    datasetBackedBlockDatasetRefs: explicitDatasetRefs.length === datasetBackedBlocks.length ? explicitDatasetRefs : [],
+    datasetBackedBlockDatasetRefs: datasetBackedBlocks.every(block => normalizeString(block?.datasetRef)) ? explicitDatasetRefs : [],
     availableNonPrimaryDatasetRefs: [
       ...Array.from(staticDatasetIndex.keys()),
       ...Array.from(publishedDatasetIndex.keys()),

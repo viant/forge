@@ -22,12 +22,15 @@ func dashboardNumberFormat(format string) string {
 }
 
 func dashboardTableValues(block reportfill.Block) ([]reportfill.TableColumn, [][]any, error) {
+	if block.SummaryRow != nil && block.Content.SummaryRow == nil {
+		return nil, nil, fmt.Errorf("table summary data is unavailable; retry after the summary dataset succeeds")
+	}
 	columns := append([]reportfill.TableColumn{}, block.Content.Columns...)
 	for i := range columns {
 		columns[i].Label = tablemeta.Header(columns[i].Label, columns[i].Key, block.Content.ColumnGroups)
 	}
 	rows := make([][]any, 0, len(block.Content.ResolvedRows))
-	for _, resolved := range block.Content.ResolvedRows {
+	for _, resolved := range block.Content.DisplayRows() {
 		cells := map[string]reportfill.ResolvedTableCell{}
 		for _, cell := range resolved.Cells {
 			cells[cell.Key] = cell
@@ -60,7 +63,11 @@ func (w *visualDashboardWriter) tableSource(block reportfill.Block) (string, err
 	if err = w.note(sheet, 2, "Resolved report values, including authored calculations and totals. Filters explore this snapshot; complete underlying records remain on dataset worksheets."); err != nil {
 		return "", err
 	}
-	if err = w.filteredTable(sheet, 4, columns, rows); err != nil {
+	footerRows := 0
+	if block.Content.SummaryRow != nil {
+		footerRows = 1
+	}
+	if err = w.filteredTable(sheet, 4, columns, rows, footerRows); err != nil {
 		return "", err
 	}
 	return sheet, w.finishSheet(sheet, len(rows)+4, len(columns), false)

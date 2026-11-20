@@ -2279,6 +2279,9 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, on
   const columns = Array.isArray(block?.content?.columns)
     ? block.content.columns
     : (Array.isArray(block?.columns) ? block.columns : []);
+  const summaryRow = block.content?.summaryRow
+    ? buildRuntimeTableRows({content:{resolvedRows:[block.content.summaryRow]}}, {rows:[]})[0] : null;
+  const summaryPresentation = summaryRow ? {summaryRow,summaryLabel:block.summaryRow?.label} : {};
   const collapsible = block?.content?.collapsible === true || block?.collapsible === true;
   const authoredDefaultCollapsed = block?.content?.defaultCollapsed ?? block?.defaultCollapsed;
   const defaultCollapsed = collapsible && authoredDefaultCollapsed !== false;
@@ -2469,7 +2472,7 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, on
         onRowsChange={runtimeHandlers?.onTableReviewChange ? rows => runtimeHandlers.onTableReviewChange({
           blockId:block.id, selection:authoredBlock.hierarchy?mergeHierarchySelections(sourceRows,rows,authoredBlock.hierarchy,authoredBlock.selection.field):mergeReportTableSelections(sourceRows, dataset.rows, rows, authoredBlock.selection.field),
         }) : undefined} locale={locale} onPresentationStateChange={handleTablePresentationChange}
-        container={{dashboard:{table:{rowActions,quickFilter:true,hierarchy:authoredBlock.hierarchy,analyticsMaterialized:true,hierarchyRootLimit:collapsed&&!localPaging?5:undefined,forceHierarchyExpansion:dataset.rows.length<sourceRows.length,columnGroups:block.content?.columnGroups || authoredBlock.columnGroups}}}}/>
+        container={{dashboard:{table:{...summaryPresentation,rowActions,quickFilter:true,hierarchy:authoredBlock.hierarchy,analyticsMaterialized:true,hierarchyRootLimit:collapsed&&!localPaging?5:undefined,forceHierarchyExpansion:dataset.rows.length<sourceRows.length,columnGroups:block.content?.columnGroups || authoredBlock.columnGroups}}}}/>
         : <DashboardTableContent
         formatValue={formatDashboardValue}
         container={{
@@ -2480,6 +2483,7 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, on
           ...(documentPresentation ? {tablePresentation:{variant:'document',recordTitleField:authoredBlock.recordTitleField}} : {}),
           dashboard: {
             table: {
+              ...summaryPresentation,
               columns,
               quickFilter:!!(authoredBlock.hierarchy || authoredBlock.pivot || authoredBlock.runtime?.quickFilter === true),
               hierarchy:authoredBlock.hierarchy,

@@ -25,7 +25,7 @@ export default function ReviewTable({id = 'review', title, description, rows = [
     const download = () => {
         try {
             if (onDownload) onDownload(currentRows);
-            else downloadTableExport({rows: currentRows, filename: id, columns: [
+            else downloadTableExport({rows: container.dashboard?.table?.summaryRow ? [...currentRows,container.dashboard.table.summaryRow] : currentRows, filename: id, columns: [
                 ...columns.map(column => ({...column, id: column.key, exportLabel: qualifiedTableColumnLabel(column,container.dashboard?.table?.columnGroups || [])})),
                 ...(!columns.some(column => column.key === selectionField) ? [{id:selectionField, exportLabel:'Selected'}] : []),
             ]});

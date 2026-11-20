@@ -35,6 +35,9 @@ func Render(report *reportfill.ReportFill) ([]byte, error) {
 	if block.Content == nil {
 		return nil, fmt.Errorf("csv export requires tableBlock content")
 	}
+	if block.SummaryRow != nil && block.Content.SummaryRow == nil {
+		return nil, fmt.Errorf("table summary data is unavailable; retry after the summary dataset succeeds")
+	}
 	columns := block.Content.Columns
 	if len(columns) == 0 {
 		return nil, fmt.Errorf("csv export requires tableBlock content columns")
@@ -49,7 +52,7 @@ func Render(report *reportfill.ReportFill) ([]byte, error) {
 	if err := writer.Write(header); err != nil {
 		return nil, err
 	}
-	for rowIndex, row := range block.Content.ResolvedRows {
+	for rowIndex, row := range block.Content.DisplayRows() {
 		cellByKey := make(map[string]reportfill.ResolvedTableCell, len(row.Cells))
 		for _, cell := range row.Cells {
 			cellByKey[strings.TrimSpace(cell.Key)] = cell
