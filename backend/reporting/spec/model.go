@@ -1476,9 +1476,14 @@ func rejectTrailingJSON(decoder *json.Decoder, label string) error {
 	return nil
 }
 
-// KPI display can format source dates without changing their raw values.
+// KPI display formats preserve the raw source values.
 func isAllowedKPIValueFormat(value string) bool {
-	return strings.TrimSpace(value) == "date" || isAllowedReportValueFormat(value)
+	switch strings.TrimSpace(value) {
+	case "date", "number0", "number1":
+		return true
+	default:
+		return isAllowedReportValueFormat(value)
+	}
 }
 
 func isAllowedReportValueFormat(value string) bool {

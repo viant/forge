@@ -602,6 +602,13 @@ Supported KPI and collection value formats:
 - `percent`
 - `percentFraction`
 
+KPI `valueFormat` and `secondaryFormat` accept `number0` for grouped whole
+numbers and `number1` for grouped numbers with exactly one decimal place,
+including a trailing zero. For example, `1234.26` displays as `1,234` or
+`1,234.3`, while `0` displays as `0` or `0.0`. These display formats preserve
+source precision in ReportFill and native XLSX numeric cells. Null values keep
+the existing unavailable presentation.
+
 KPI `valueFormat` and `secondaryFormat` also accept `date`. They reuse the
 calendar-date formatter for date-only and timestamp strings (for example,
 `2040-02-29T00:00:00Z` displays as `Feb 29, 2040`). This changes display only:

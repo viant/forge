@@ -48175,6 +48175,13 @@ ${indent}${end}`;
           maximumFractionDigits: 5,
           useGrouping: true
         }).format(numeric);
+      case "number0":
+      case "number1":
+        return new Intl.NumberFormat(locale2, {
+          minimumFractionDigits: format2 === "number1" ? 1 : 0,
+          maximumFractionDigits: format2 === "number1" ? 1 : 0,
+          useGrouping: true
+        }).format(numeric);
       case "number2":
         return new Intl.NumberFormat(locale2, {
           minimumFractionDigits: 0,
@@ -50418,6 +50425,13 @@ ${indent}${end}`;
         return formatExportDecimal(numeric, {
           minimumFractionDigits: 0,
           maximumFractionDigits: axis ? Number.isInteger(numeric) ? 0 : 1 : 5,
+          useGrouping: true
+        });
+      case "number0":
+      case "number1":
+        return formatExportDecimal(numeric, {
+          minimumFractionDigits: normalizedFormat === "number1" ? 1 : 0,
+          maximumFractionDigits: normalizedFormat === "number1" ? 1 : 0,
           useGrouping: true
         });
       case "number2":
@@ -56148,7 +56162,7 @@ ${indent}${end}`;
     return [...selectedDimensions, ...selectedMeasures];
   }
   function buildExplicitReportBuilderChartContainer(container = {}, config = {}, state = {}, chartSpec = null) {
-    var _a5, _b, _c;
+    var _a5, _b, _c, _d, _e;
     const normalized = normalizeReportBuilderChartSpec(chartSpec);
     if (!normalized) {
       return container;
@@ -56276,20 +56290,29 @@ ${indent}${end}`;
       if (option.negativeColor) entry.negativeColor = option.negativeColor;
       return entry;
     });
+    const chart = applyChartMetricSelection({
+      ...baseChart,
+      ...typeof normalized.allowTableSwitch === "boolean" ? { allowTableSwitch: normalized.allowTableSwitch } : {},
+      ...normalized.metricSelection ? { metricSelection: normalized.metricSelection } : {},
+      series: {
+        values,
+        palette,
+        ...normalized.categoryColors ? { categoryColors: normalized.categoryColors } : {}
+      }
+    });
+    const rightAxis = (_d = chart.axes) == null ? void 0 : _d.right;
+    if (chart.appearance === "document" && !Object.hasOwn(rightAxis || {}, "format")) {
+      const rightSeries = chart.series.values.filter((entry) => entry.axis === "right");
+      const format2 = (_e = rightSeries[0]) == null ? void 0 : _e.format;
+      if (typeof format2 === "string" && format2.trim() && rightSeries.every((entry) => entry.format === format2)) {
+        chart.axes = { ...chart.axes, right: { ...rightAxis, format: format2 } };
+      }
+    }
     return {
       ...container,
       dataSourceRef: container.dataSourceRef,
       collection: container.collection,
-      chart: applyChartMetricSelection({
-        ...baseChart,
-        ...typeof normalized.allowTableSwitch === "boolean" ? { allowTableSwitch: normalized.allowTableSwitch } : {},
-        ...normalized.metricSelection ? { metricSelection: normalized.metricSelection } : {},
-        series: {
-          values,
-          palette,
-          ...normalized.categoryColors ? { categoryColors: normalized.categoryColors } : {}
-        }
-      })
+      chart
     };
   }
 

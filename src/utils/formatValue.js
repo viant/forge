@@ -118,6 +118,13 @@ export const formatDisplayValue = (value, format, locale = 'en-US', options = {}
                 maximumFractionDigits: 5,
                 useGrouping: true,
             }).format(numeric);
+        case 'number0':
+        case 'number1':
+            return new Intl.NumberFormat(locale, {
+                minimumFractionDigits: format === 'number1' ? 1 : 0,
+                maximumFractionDigits: format === 'number1' ? 1 : 0,
+                useGrouping: true,
+            }).format(numeric);
         case 'number2':
             return new Intl.NumberFormat(locale, {
                 minimumFractionDigits: 0,

@@ -9,6 +9,9 @@ const repoRoot = path.resolve(__dirname, "..");
 const viteNodePath = path.join(repoRoot, "node_modules", "vite-node", "vite-node.mjs");
 
 const runtimeUnitTests = [
+  "src/reporting/schema/kpiNumberFormat.test.js",
+  "src/components/dashboard/ReportRuntime.kpiNumber.render.test.jsx",
+  "src/components/dashboard/reportBuilderRightAxisFormat.test.js",
   "src/components/dashboard/reportBuilderRuntimePreview.pending.test.js",
   "src/reporting/reportEmptyChart.test.js",
   "src/reporting/reportPrintCompositePagination.test.js",
