@@ -48009,35 +48009,6 @@ ${indent}${end}`;
   var flowIndicatorChars = new Set(",[]{}");
   var invalidAnchorChars = new Set(" ,[]{}\n\r	");
 
-  // src/core/store/signals.js
-  var inputSignals = d({});
-  var dataSignals = d({});
-  var selectionSignals = d({});
-  var formSignals = d({});
-  var collectionInfoSignals = d({});
-  var metricsSignals = d({});
-  var dialogSignals = d({});
-  var viewSignals = d({});
-  var messageSignals = d({});
-  var appStatusSignal = d({});
-  var windowStatusSignals = d({});
-  var busSignals = d({});
-  var dashboardFilterSignals = d({});
-  var dashboardSelectionSignals = d({});
-  var findDashboardFilterSignal = (dashboardKey) => {
-    return dashboardFilterSignals.value[dashboardKey] || null;
-  };
-  var findDashboardSelectionSignal = (dashboardKey) => {
-    return dashboardSelectionSignals.value[dashboardKey] || null;
-  };
-  var controlSignals = d({});
-  var metadataSignals = d({});
-  var protectedWindowDenials = d({});
-  var formStatusSignals = d({});
-  var activeWindows = d([]);
-  var selectedWindowId = d(null);
-  var selectedTabId = d(null);
-
   // src/utils/resourceTimeFormat.js
   var layouts = /* @__PURE__ */ new Set(["2006-01-02", "2006-01-02 15:04", "2006-01-02 15:04:05", "2006-01-02T15:04:05Z07:00"]);
   function formatResourceTime(value, metadata = {}) {
@@ -48070,6 +48041,38 @@ ${indent}${end}`;
     const suffix = offset === 0 ? "Z" : `${offset < 0 ? "-" : "+"}${String(Math.floor(Math.abs(offset) / 60)).padStart(2, "0")}:${String(Math.abs(offset) % 60).padStart(2, "0")}`;
     return `${day}T${clock}:${parts.second}${suffix}`;
   }
+
+  // src/components/primitives/resourceModel.js
+  var OMIT = Symbol("forge-resource-model-omit");
+
+  // src/core/store/signals.js
+  var inputSignals = d({});
+  var dataSignals = d({});
+  var selectionSignals = d({});
+  var formSignals = d({});
+  var collectionInfoSignals = d({});
+  var metricsSignals = d({});
+  var dialogSignals = d({});
+  var viewSignals = d({});
+  var messageSignals = d({});
+  var appStatusSignal = d({});
+  var windowStatusSignals = d({});
+  var busSignals = d({});
+  var dashboardFilterSignals = d({});
+  var dashboardSelectionSignals = d({});
+  var findDashboardFilterSignal = (dashboardKey) => {
+    return dashboardFilterSignals.value[dashboardKey] || null;
+  };
+  var findDashboardSelectionSignal = (dashboardKey) => {
+    return dashboardSelectionSignals.value[dashboardKey] || null;
+  };
+  var controlSignals = d({});
+  var metadataSignals = d({});
+  var protectedWindowDenials = d({});
+  var formStatusSignals = d({});
+  var activeWindows = d([]);
+  var selectedWindowId = d(null);
+  var selectedTabId = d(null);
 
   // src/utils/formatValue.js
   var formatUtcWallClock = (date, locale2, kind) => {
@@ -57075,13 +57078,19 @@ ${indent}${end}`;
       return;
     }
     let cursor = target;
+    const parents = [];
     for (let index = 0; index < segments.length - 1; index += 1) {
+      parents.push([cursor, segments[index]]);
       cursor = isPlainObject7(cursor == null ? void 0 : cursor[segments[index]]) ? cursor[segments[index]] : null;
       if (!cursor) {
         return;
       }
     }
     delete cursor[segments[segments.length - 1]];
+    for (const [parent, key2] of parents.reverse()) {
+      if (Object.keys(parent[key2]).length > 0) break;
+      delete parent[key2];
+    }
   }
   function mergeReportDatasetRequestValues(base = {}, patch = {}, {
     patchWins = true
@@ -57246,6 +57255,7 @@ ${indent}${end}`;
     };
   }
   function buildReportBuilderPublishedDatasetRequest(source = {}, state = {}, datasetScopeParamValues = null, inheritedRequestContext = null, primaryRequestContext = null) {
+    var _a5, _b;
     const request = isPlainObject7(source == null ? void 0 : source.request) ? cloneValue19(source.request) : null;
     if (!request) {
       return null;
@@ -57253,21 +57263,33 @@ ${indent}${end}`;
     const scopePolicy = resolveReportDatasetScopePolicy(source == null ? void 0 : source.scope);
     const excludedParamIds = new Set(Array.isArray(scopePolicy == null ? void 0 : scopePolicy.exclude) ? scopePolicy.exclude : []);
     let contextPatch = isPlainObject7(inheritedRequestContext) ? cloneValue19(inheritedRequestContext) : {};
-    (Array.isArray(source == null ? void 0 : source.scopeParamOptions) ? source.scopeParamOptions : []).forEach((option) => {
+    const scopeParamOptions = Array.isArray(source == null ? void 0 : source.scopeParamOptions) ? source.scopeParamOptions : [];
+    scopeParamOptions.filter((option) => excludedParamIds.has(normalizeString30((option == null ? void 0 : option.id) || (option == null ? void 0 : option.value)))).forEach((option) => {
+      var _a6;
+      for (const excludedPath of [option == null ? void 0 : option.paramPath, option == null ? void 0 : option.startParamPath, option == null ? void 0 : option.endParamPath].map(normalizeString30).filter(Boolean)) {
+        deleteNestedValue(contextPatch, excludedPath);
+      }
+      if ((option == null ? void 0 : option.semanticRef) && isPlainObject7((_a6 = contextPatch.semanticSelection) == null ? void 0 : _a6.parameters)) {
+        delete contextPatch.semanticSelection.parameters[option.semanticRef];
+      }
+    });
+    if (Array.isArray((_b = (_a5 = contextPatch.semanticSelection) == null ? void 0 : _a5.unmapped) == null ? void 0 : _b.parameters)) {
+      contextPatch.semanticSelection.unmapped.parameters = contextPatch.semanticSelection.unmapped.parameters.filter((id) => !excludedParamIds.has(id));
+    }
+    scopeParamOptions.forEach((option) => {
+      var _a6;
       const paramId = normalizeString30((option == null ? void 0 : option.id) || (option == null ? void 0 : option.value));
       if (!paramId) {
         return;
       }
       const paramPath = normalizeString30(option == null ? void 0 : option.paramPath);
-      if (excludedParamIds.has(paramId)) {
-        for (const excludedPath of [paramPath, option == null ? void 0 : option.startParamPath, option == null ? void 0 : option.endParamPath].map(normalizeString30).filter(Boolean)) {
-          deleteNestedValue(contextPatch, excludedPath);
-        }
-        return;
-      }
+      if (excludedParamIds.has(paramId)) return;
       const hasDatasetScopedValue = datasetScopeParamValues && Object.prototype.hasOwnProperty.call(datasetScopeParamValues, paramId);
       let rawValue = hasDatasetScopedValue ? datasetScopeParamValues[paramId] : getScopeParamValue(state, paramId);
       const kind = normalizeString30((option == null ? void 0 : option.kind) || "");
+      if ((option == null ? void 0 : option.semanticRef) && rawValue != null && rawValue !== "" && (!Array.isArray(rawValue) || rawValue.length > 0) && isPlainObject7((_a6 = contextPatch.semanticSelection) == null ? void 0 : _a6.parameters)) {
+        contextPatch.semanticSelection.parameters[option.semanticRef] = cloneValue19(rawValue);
+      }
       if (kind.toLowerCase() === "daterange") {
         const startParamPath = normalizeString30(option == null ? void 0 : option.startParamPath);
         const endParamPath = normalizeString30(option == null ? void 0 : option.endParamPath);
@@ -57549,7 +57571,7 @@ ${indent}${end}`;
     includePrimaryBlocks = true,
     onChartValidation = null
   } = {}) {
-    var _a5;
+    var _a5, _b;
     const normalizedState = sanitizeReportBuilderState(config, state);
     const effectiveConfig = buildReportBuilderCalculatedFieldConfig(config, normalizedState);
     const request = buildReportBuilderRequest(config, normalizedState);
@@ -57560,6 +57582,11 @@ ${indent}${end}`;
     if (normalizedRefinements.length > 0) {
       request.refinements = cloneValue19(normalizedRefinements);
     }
+    const primaryRequest = (config == null ? void 0 : config.scope) ? buildReportBuilderPublishedDatasetRequest({
+      request: isPlainObject7((_b = config.request) == null ? void 0 : _b.baseParameters) ? config.request.baseParameters : {},
+      scope: config.scope,
+      scopeParamOptions: resolveReportBuilderScopeParamFilters(effectiveConfig).map((filter) => ({ ...filter, kind: filter.type || filter.kind }))
+    }, normalizedState, null, request, request) : request;
     const tableColumns = buildReportSpecColumns(buildReportBuilderColumns(effectiveConfig, normalizedState));
     const chartSpec = resolveReportBuilderChartSpecForReportSpec(effectiveConfig, normalizedState);
     const calculatedFields = buildReportSpecCalculatedFields(effectiveConfig, normalizedState);
@@ -57649,7 +57676,7 @@ ${indent}${end}`;
           ...isPlainObject7(config == null ? void 0 : config.source) ? { source: cloneValue19(config.source) } : {},
           ...isPlainObject7(config == null ? void 0 : config.resultContract) ? { resultContract: cloneValue19(config.resultContract) } : {},
           ...isPlainObject7(config == null ? void 0 : config.capabilities) ? { capabilities: cloneValue19(config.capabilities) } : {},
-          request: cloneValue19(request)
+          request: cloneValue19(primaryRequest)
         }] : [],
         ...publishedDatasets,
         ...staticDatasets

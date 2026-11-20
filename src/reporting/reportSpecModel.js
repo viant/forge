@@ -89,13 +89,19 @@ function deleteNestedValue(target, path) {
     return;
   }
   let cursor = target;
+  const parents = [];
   for (let index = 0; index < segments.length - 1; index += 1) {
+    parents.push([cursor, segments[index]]);
     cursor = isPlainObject(cursor?.[segments[index]]) ? cursor[segments[index]] : null;
     if (!cursor) {
       return;
     }
   }
   delete cursor[segments[segments.length - 1]];
+  for (const [parent, key] of parents.reverse()) {
+    if (Object.keys(parent[key]).length > 0) break;
+    delete parent[key];
+  }
 }
 
 function mergeReportDatasetRequestValues(base = {}, patch = {}, {
@@ -315,23 +321,35 @@ function buildReportBuilderPublishedDatasetRequest(
   const scopePolicy = resolveReportDatasetScopePolicy(source?.scope);
   const excludedParamIds = new Set(Array.isArray(scopePolicy?.exclude) ? scopePolicy.exclude : []);
   let contextPatch = isPlainObject(inheritedRequestContext) ? cloneValue(inheritedRequestContext) : {};
-  (Array.isArray(source?.scopeParamOptions) ? source.scopeParamOptions : []).forEach((option) => {
+  const scopeParamOptions = Array.isArray(source?.scopeParamOptions) ? source.scopeParamOptions : [];
+  // Remove excluded bindings before assigning surviving aliases of the same path.
+  scopeParamOptions.filter(option => excludedParamIds.has(normalizeString(option?.id || option?.value))).forEach(option => {
+    for (const excludedPath of [option?.paramPath, option?.startParamPath, option?.endParamPath].map(normalizeString).filter(Boolean)) {
+      deleteNestedValue(contextPatch, excludedPath);
+    }
+    if (option?.semanticRef && isPlainObject(contextPatch.semanticSelection?.parameters)) {
+      delete contextPatch.semanticSelection.parameters[option.semanticRef];
+    }
+  });
+  if (Array.isArray(contextPatch.semanticSelection?.unmapped?.parameters)) {
+    contextPatch.semanticSelection.unmapped.parameters = contextPatch.semanticSelection.unmapped.parameters.filter(id => !excludedParamIds.has(id));
+  }
+  scopeParamOptions.forEach((option) => {
     const paramId = normalizeString(option?.id || option?.value);
     if (!paramId) {
       return;
     }
     const paramPath = normalizeString(option?.paramPath);
-    if (excludedParamIds.has(paramId)) {
-      for (const excludedPath of [paramPath, option?.startParamPath, option?.endParamPath].map(normalizeString).filter(Boolean)) {
-        deleteNestedValue(contextPatch, excludedPath);
-      }
-      return;
-    }
+    if (excludedParamIds.has(paramId)) return;
     const hasDatasetScopedValue = datasetScopeParamValues && Object.prototype.hasOwnProperty.call(datasetScopeParamValues, paramId);
     let rawValue = hasDatasetScopedValue
       ? datasetScopeParamValues[paramId]
       : getScopeParamValue(state, paramId);
     const kind = normalizeString(option?.kind || "");
+    if (option?.semanticRef && rawValue != null && rawValue !== "" && (!Array.isArray(rawValue) || rawValue.length > 0)
+      && isPlainObject(contextPatch.semanticSelection?.parameters)) {
+      contextPatch.semanticSelection.parameters[option.semanticRef] = cloneValue(rawValue);
+    }
     if (kind.toLowerCase() === "daterange") {
       const startParamPath = normalizeString(option?.startParamPath);
       const endParamPath = normalizeString(option?.endParamPath);
@@ -669,6 +687,11 @@ export function buildReportBuilderReportSpec({
   if (normalizedRefinements.length > 0) {
     request.refinements = cloneValue(normalizedRefinements);
   }
+  const primaryRequest = config?.scope ? buildReportBuilderPublishedDatasetRequest({
+    request: isPlainObject(config.request?.baseParameters) ? config.request.baseParameters : {},
+    scope: config.scope,
+    scopeParamOptions: resolveReportBuilderScopeParamFilters(effectiveConfig).map(filter => ({...filter, kind: filter.type || filter.kind})),
+  }, normalizedState, null, request, request) : request;
   const tableColumns = buildReportSpecColumns(buildReportBuilderColumns(effectiveConfig, normalizedState));
   const chartSpec = resolveReportBuilderChartSpecForReportSpec(effectiveConfig, normalizedState);
   const calculatedFields = buildReportSpecCalculatedFields(effectiveConfig, normalizedState);
@@ -768,7 +791,7 @@ export function buildReportBuilderReportSpec({
         ...(isPlainObject(config?.source) ? { source: cloneValue(config.source) } : {}),
         ...(isPlainObject(config?.resultContract) ? { resultContract: cloneValue(config.resultContract) } : {}),
         ...(isPlainObject(config?.capabilities) ? { capabilities: cloneValue(config.capabilities) } : {}),
-        request: cloneValue(request),
+        request: cloneValue(primaryRequest),
       }] : []),
       ...publishedDatasets,
       ...staticDatasets,
