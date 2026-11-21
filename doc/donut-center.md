@@ -137,3 +137,28 @@ The same emphasis is retained in SVG/PDF and in the visible fallback description
 Fit checks use the selected typography; a label that does not fit is retained in
 the details rather than clipped. Source-specific size-to-role mappings belong in
 authored conversion metadata, not the chart renderer.
+
+A donut label can opt into division by the existing resolved center:
+
+```json
+"sliceLabel": {
+  "field": "numerator",
+  "format": {"scale": 100, "decimals": 1, "suffix": "%"},
+  "divideBy": "center",
+  "hideExactOne": true
+}
+```
+
+`divideBy: "center"` requires a declared donut center and uses its raw numeric
+value before display formatting. The numerator remains the explicit label field
+(it is not inferred from slice size). The existing center may be resolved from
+the same rows or an already bound independent dataset. This adds no request or
+dataset. A zero numerator remains `0.0%`; null numerator, null center or zero
+center suppresses the label. Values above 100% and negative ratios are retained.
+Optional `hideExactOne: true` suppresses only an exact quotient of 1, before
+formatting; a near-one quotient that rounds to 100% is still shown. Omitting it
+keeps exact-one labels. Omitting both options preserves direct-field labels.
+The [invented capacity example](examples/donut-center-ratio.json) exercises raw
+versus formatted centers, zero/null, exact and near-one, and above-one values
+through browser rendering and canonical native fill/print. Source rows, slice
+sizes and existing raw exports are unchanged.

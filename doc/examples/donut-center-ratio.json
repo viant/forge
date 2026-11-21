@@ -1,0 +1,21 @@
+{
+  "provenance": "Independently invented capacity measurements; no external records.",
+  "chartSpec": {
+    "type": "donut",
+    "appearance": "document",
+    "xField": "category",
+    "yFields": ["items"],
+    "center": {"datasetRef": "summary", "label": "Capacity", "value": {"field": "capacity", "operation": "scalar"}, "format": {"decimals": 0}},
+    "sliceLabel": {"field": "numerator", "format": {"scale": 100, "decimals": 1, "suffix": "%"}, "divideBy": "center", "hideExactOne": true}
+  },
+  "summaryRows": [{"capacity": 4.004}],
+  "rows": [
+    {"category": "Cedar", "items": 10, "numerator": 2.002},
+    {"category": "Birch", "items": 0, "numerator": 0},
+    {"category": "Maple", "items": 30, "numerator": null},
+    {"category": "Elm", "items": 40, "numerator": 4.004},
+    {"category": "Oak", "items": 50, "numerator": 6.006},
+    {"category": "Ash", "items": 60, "numerator": 4.003999}
+  ],
+  "expectedLabels": ["50.0%", "0.0%", null, null, "150.0%", "100.0%"]
+}

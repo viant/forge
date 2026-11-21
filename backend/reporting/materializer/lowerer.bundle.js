@@ -52290,16 +52290,26 @@ ${indent}${end}`;
   // src/components/pieSliceLabel.js
   function normalizePieSliceLabel(input, type) {
     if (input === void 0) return void 0;
-    if (!["pie", "donut"].includes(type) || !input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some((key2) => !["field", "format"].includes(key2)) || typeof input.field !== "string" || !input.field.trim() || !input.format) throw new Error("Slice labels require an explicit numeric field and format on a pie or donut.");
+    if (!["pie", "donut"].includes(type) || !input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some((key2) => !["field", "format", "divideBy", "hideExactOne"].includes(key2)) || typeof input.field !== "string" || !input.field.trim() || !input.format) throw new Error("Slice labels require an explicit numeric field and format on a pie or donut.");
+    if (input.divideBy !== void 0 && (input.divideBy !== "center" || type !== "donut")) throw new Error("Slice label division requires the resolved center of a donut.");
+    if (input.hideExactOne !== void 0 && (typeof input.hideExactOne !== "boolean" || input.divideBy !== "center")) throw new Error("Slice label hideExactOne requires center division and a boolean.");
     validateNumericDisplayFormat(input.format);
-    return { field: input.field, format: { ...input.format } };
+    return { field: input.field, format: { ...input.format }, ...input.divideBy ? { divideBy: input.divideBy } : {}, ...input.hideExactOne !== void 0 ? { hideExactOne: input.hideExactOne } : {} };
   }
-  function resolvePieSliceLabel(config, rows) {
+  function resolvePieSliceLabel(config, rows, center) {
     if (!config) return null;
     const values = rows.map((row) => readChartDataValue(row, config.field));
-    if (values.some((value) => value === void 0 || value !== null && (typeof value !== "number" || !Number.isFinite(value)))) throw new Error("Slice label field must contain finite numbers or explicit null.");
-    if (values.some((value) => value !== values[0])) throw new Error("Slice label values must agree within a category.");
-    return values[0] == null ? null : formatRangeValue(values[0], config);
+    if (values.some((value2) => value2 === void 0 || value2 !== null && (typeof value2 !== "number" || !Number.isFinite(value2)))) throw new Error("Slice label field must contain finite numbers or explicit null.");
+    if (values.some((value2) => value2 !== values[0])) throw new Error("Slice label values must agree within a category.");
+    let value = values[0];
+    if (config.divideBy === "center") {
+      if (!center) throw new Error("Slice label requires a resolved donut center.");
+      if (value == null || center.value == null || center.value === 0) return null;
+      value /= center.value;
+      if (!Number.isFinite(value)) throw new Error("Slice label ratio exceeds the finite numeric range.");
+      if (config.hideExactOne === true && value === 1) return null;
+    }
+    return value == null ? null : formatRangeValue(value, config);
   }
 
   // src/components/chartAppearance.js
@@ -55098,6 +55108,7 @@ ${indent}${end}`;
     if (chartSpec.paletteMode === "declared" && ["pie", "donut"].includes(type) && (!chartSpec.categoryColors || !Object.keys(chartSpec.categoryColors).length)) throw new Error("Declared category palette requires explicit category colors.");
     const center = normalizeDonutCenter(chartSpec.center, type);
     const sliceLabel = normalizePieSliceLabel(chartSpec.sliceLabel, type);
+    if ((sliceLabel == null ? void 0 : sliceLabel.divideBy) === "center" && !center) throw new Error("Slice label division requires a declared donut center.");
     if (type === "two-set-overlap" && ["seriesField", "seriesOptions", "metricSelection", "layout", "stacked"].some((key2) => chartSpec[key2] != null)) throw new Error("Two-set overlap uses independently declared scalar regions.");
     const overlap = type === "two-set-overlap" ? normalizeTwoSetOverlap(chartSpec.twoSetOverlap) : null;
     const categoryRange = type === "category-range" ? normalizeCategoryRange(chartSpec.categoryRange) : null;
@@ -60316,7 +60327,7 @@ ${indent}${end}`;
         return null;
       }
       const resolvedRows = buildPieChartData(chartRows, nameKey2, valueKey2, chartCategoryRowOptions(chart));
-      if (chart.sliceLabel) for (const row of resolvedRows) row.sliceLabel = resolvePieSliceLabel(chart.sliceLabel, row.__chartSelectionRows || []);
+      if (chart.sliceLabel) for (const row of resolvedRows) row.sliceLabel = resolvePieSliceLabel(chart.sliceLabel, row.__chartSelectionRows || [], center);
       return {
         kind: "category",
         ...center ? { center } : {},

@@ -58,7 +58,7 @@ function buildBaseReportFillChartPayload(chart = {}, rows = [], centerRows, cent
       return null;
     }
     const resolvedRows = buildPieChartData(chartRows, nameKey, valueKey, chartCategoryRowOptions(chart));
-    if(chart.sliceLabel)for(const row of resolvedRows)row.sliceLabel=resolvePieSliceLabel(chart.sliceLabel,row.__chartSelectionRows||[]);
+    if(chart.sliceLabel)for(const row of resolvedRows)row.sliceLabel=resolvePieSliceLabel(chart.sliceLabel,row.__chartSelectionRows||[],center);
     return {
       kind: "category",
       ...(center?{center}:{}),

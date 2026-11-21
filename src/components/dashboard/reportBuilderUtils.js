@@ -515,6 +515,7 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
     if(chartSpec.paletteMode==='declared'&&['pie','donut'].includes(type)&&(!chartSpec.categoryColors||!Object.keys(chartSpec.categoryColors).length))throw new Error('Declared category palette requires explicit category colors.');
     const center=normalizeDonutCenter(chartSpec.center,type);
     const sliceLabel=normalizePieSliceLabel(chartSpec.sliceLabel,type);
+    if(sliceLabel?.divideBy==='center'&&!center)throw new Error('Slice label division requires a declared donut center.');
     if(type === "two-set-overlap" && ["seriesField","seriesOptions","metricSelection","layout","stacked"].some(key=>chartSpec[key]!=null)) throw new Error("Two-set overlap uses independently declared scalar regions.");
     const overlap=type === "two-set-overlap" ? normalizeTwoSetOverlap(chartSpec.twoSetOverlap) : null;
     const categoryRange = type === "category-range" ? normalizeCategoryRange(chartSpec.categoryRange) : null;

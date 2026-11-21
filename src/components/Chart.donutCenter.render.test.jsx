@@ -92,3 +92,23 @@ it('uses the complete explicit body role and independent numeric/label emphasis'
  expect(measure).toHaveBeenCalledWith(center.formattedValue,14,'value','bold italic');
  }finally{await act(async()=>root.unmount());host.remove();}
 });
+
+import ratioFixture from '../../doc/examples/donut-center-ratio.json';
+it('uses the existing raw center for optional slice ratios, retaining zero and over-one labels',async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ vi.spyOn(HTMLElement.prototype,'clientWidth','get').mockReturnValue(800);vi.spyOn(HTMLElement.prototype,'clientHeight','get').mockReturnValue(400);
+ vi.spyOn(HTMLCanvasElement.prototype,'getContext').mockReturnValue({measureText:text=>({width:String(text).length*6})});
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ const chart={type:'donut',appearance:'document',animation:false,center:ratioFixture.chartSpec.center,sliceLabel:ratioFixture.chartSpec.sliceLabel,series:{nameKey:'category',valueKey:'items'}};
+ const rows=structuredClone(ratioFixture.rows), before=JSON.stringify(rows);
+ try {
+  for(const capacity of [4.004,0,null]) {
+   await act(async()=>root.render(<Chart container={{id:'capacity',chart,centerRows:[{capacity}]}} context={{signals:{collection:{value:rows},control:{value:{}},metrics:{value:{}},windowForm:{value:{}}}}}/>));
+   const labels=[...host.querySelectorAll('.recharts-pie-labels text')].map(node=>node.textContent);
+   expect(labels).toEqual(capacity===4.004?ratioFixture.expectedLabels.map(value=>value??''):rows.map(()=>''));
+   expect(host.querySelector('[data-forge-donut-center]').getAttribute('aria-label')).toContain(capacity===null?'Unavailable':capacity===0?'0':'4');
+   expect(host.querySelectorAll('.recharts-pie-sector')).toHaveLength(rows.length);
+   expect(JSON.stringify(rows)).toBe(before);
+  }
+ }finally{await act(async()=>root.unmount());host.remove();vi.restoreAllMocks();}
+});

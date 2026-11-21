@@ -1359,7 +1359,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
 
     if(isPieChart&&chart.paletteMode==='declared'&&chartData.some(row=>!Object.hasOwn(chart.series?.categoryColors||{},String(row.name))))throw new Error('Declared category palettes require a color for every category.');
     const pieFilteredData = isPieChart
-        ? chartData.filter((row) => selectedDataKeys.includes(row.name)).map(row=>chart.sliceLabel?{...row,sliceLabel:resolvePieSliceLabel(chart.sliceLabel,row.__chartSelectionRows||[])}:row)
+        ? chartData.filter((row) => selectedDataKeys.includes(row.name)).map(row=>chart.sliceLabel&&(chart.sliceLabel.divideBy!=='center'||!centerState.error)?{...row,sliceLabel:resolvePieSliceLabel(chart.sliceLabel,row.__chartSelectionRows||[],centerState.resolved)}:row)
         : [];
     const piePalette = palette.length > 0
         ? palette
