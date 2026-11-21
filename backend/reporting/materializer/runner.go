@@ -14,6 +14,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/viant/forge/backend/provider/contract/observe"
+	"github.com/viant/forge/backend/reporting/internal/invocation"
 	"github.com/viant/forge/backend/reporting/registry"
 	identity "github.com/viant/forge/backend/resource"
 )
@@ -79,9 +80,14 @@ func lowerWithSourceKind(ctx context.Context, raw json.RawMessage, requestBase m
 	if sourceValidation {
 		entry = "lowerForValidation"
 	}
-	if requestBase != nil {
+	scopeParameters, hasScopeParameters := invocation.FromContext(ctx)
+	if !sourceValidation && (requestBase != nil || hasScopeParameters) {
 		var err error
-		input, err = json.Marshal(map[string]interface{}{"envelope": json.RawMessage(raw), "requestBaseParameters": requestBase})
+		invocationInput := map[string]interface{}{"envelope": json.RawMessage(raw), "requestBaseParameters": requestBase}
+		if hasScopeParameters {
+			invocationInput["scopeParameters"] = scopeParameters
+		}
+		input, err = json.Marshal(invocationInput)
 		if err != nil || len(input) > 8<<20 {
 			return nil, fmt.Errorf("invalid bound report request")
 		}

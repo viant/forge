@@ -40,7 +40,7 @@ func TestAuthoredPreviousPeriodBindsSelectedDatesBeforeLowering(t *testing.T) {
 		{"2026-09-21", "2026-10-20", "2026-08-22", "2026-09-20"},
 		{"2026-10-01", "2026-10-07", "2026-09-24", "2026-09-30"},
 	} {
-		bound, err := bindAuthoredCompileParameters(raw, map[string]interface{}{"from": window.from, "to": window.to})
+		bound, _, err := bindAuthoredCompileParameters(raw, map[string]interface{}{"from": window.from, "to": window.to})
 		require.NoError(t, err)
 		spec, err := materializer.LowerWithRequestBase(context.Background(), raw, bound)
 		require.NoError(t, err)
@@ -92,7 +92,7 @@ func TestAuthoredPreviousPeriodBindsSelectedDatesBeforeLowering(t *testing.T) {
 	_, err = service.ExecuteResource(context.Background(), request)
 	require.Error(t, err)
 	require.Empty(t, seen)
-	invalid, err := bindAuthoredCompileParameters(raw, map[string]interface{}{"from": "invalid", "to": "2026-10-20"})
+	invalid, _, err := bindAuthoredCompileParameters(raw, map[string]interface{}{"from": "invalid", "to": "2026-10-20"})
 	require.NoError(t, err)
 	_, err = materializer.LowerWithRequestBase(context.Background(), raw, invalid)
 	require.ErrorContains(t, err, "bounded civil date range")
@@ -124,7 +124,7 @@ func TestAuthoredSelectedMetricDrivesScopeAndPrintWithoutChangingSource(t *testi
 	require.NoError(t, err)
 	original := string(raw)
 	for _, metric := range []string{"CPM", "Spend"} {
-		bound, bindErr := bindAuthoredCompileParameters(raw, map[string]interface{}{"rankingMetric": metric, "unpublished": "ignored"})
+		bound, _, bindErr := bindAuthoredCompileParameters(raw, map[string]interface{}{"rankingMetric": metric, "unpublished": "ignored"})
 		require.NoError(t, bindErr)
 		spec, lowerErr := materializer.LowerWithRequestBase(context.Background(), raw, bound)
 		require.NoError(t, lowerErr)

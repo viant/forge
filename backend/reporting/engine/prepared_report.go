@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/viant/forge/backend/reporting/internal/invocation"
 	"github.com/viant/forge/backend/reporting/materializer"
 	"github.com/viant/forge/backend/reporting/registry"
 	identity "github.com/viant/forge/backend/resource"
@@ -104,10 +105,11 @@ func (s *Service) compilePreparedReport(ctx context.Context, prepared *PreparedR
 	}
 	spec := cloneJSON(definition.ReportSpec)
 	if definition.Format == registry.AuthoredReportFormat {
-		base, err := bindAuthoredCompileParameters(raw, parameters)
+		base, scopeParameters, err := bindAuthoredCompileParameters(raw, parameters)
 		if err != nil {
 			return nil, compileStageError(CompileStageBind, err)
 		}
+		ctx = invocation.WithParameters(ctx, scopeParameters)
 		if prepared.window {
 			spec, err = materializer.LowerWindowBuilderWithRequestBase(ctx, raw, base)
 		} else {

@@ -9,6 +9,7 @@ import (
 	"io"
 
 	"github.com/viant/forge/backend/provider/contract/observe"
+	"github.com/viant/forge/backend/reporting/internal/invocation"
 	"github.com/viant/forge/backend/reporting/materializer"
 	"github.com/viant/forge/backend/reporting/registry"
 	identity "github.com/viant/forge/backend/resource"
@@ -183,10 +184,11 @@ func lowerReportDefinition(ctx context.Context, reportURI string, raw json.RawMe
 				return nil, identity.ErrResourceDenied
 			}
 		}
-		requestBase, bindErr := bindAuthoredCompileParameters(raw, parameters)
+		requestBase, scopeParameters, bindErr := bindAuthoredCompileParameters(raw, parameters)
 		if bindErr != nil {
 			return nil, compileStageError(CompileStageBind, bindErr)
 		}
+		ctx = invocation.WithParameters(ctx, scopeParameters)
 		lowerTiming := observe.Start(ctx, "report.compile.lower", observe.Labels{Kind: "report"})
 		if windowBuilder {
 			spec, err = materializer.LowerWindowBuilderWithRequestBase(ctx, raw, requestBase)

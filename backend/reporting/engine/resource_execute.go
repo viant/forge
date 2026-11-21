@@ -645,22 +645,38 @@ func reportDatasetArguments(base, parameters map[string]interface{}, descriptor 
 	if err != nil {
 		return nil, err
 	}
+
 	// Compilation may already have copied global predicate values into the
 	// request. Exclusion applies to those values as well as incoming aliases;
 	// retain explicitly authored dataset-local values at the same paths.
-	if scope != nil {
+	if scope != nil && len(scope.Exclude) > 0 {
+		excluded := map[string]bool{}
+		for _, id := range scope.Exclude {
+			excluded[id] = true
+		}
+		retainedPaths, excludedPaths := map[string]bool{}, map[string]bool{}
 		for _, declaration := range declarations {
-			if _, authoredLocal := scope.Local[declaration.ID]; authoredLocal {
-				continue
+			_, local := scope.Local[declaration.ID]
+			if !excluded[declaration.ID] || local {
+				retainedPaths[declaration.Path] = true
+			} else {
+				excludedPaths[declaration.Path] = true
 			}
-			for _, excluded := range scope.Exclude {
-				if excluded == declaration.ID {
-					removeExcludedReportParameter(args, scope.Local, declaration.Path)
-					break
-				}
+		}
+		for path := range excludedPaths {
+			// A surviving alias owns its compiled value, including a saved
+			// default when the invocation omits that control.
+			if !retainedPaths[path] {
+				removeExcludedReportParameter(args, scope.Local, path)
 			}
 		}
 	}
+	return bindReportDatasetParameters(args, parameters, declarations, scope)
+}
+
+// The caller owns whether the base is authored or already compiled. Bind the
+// admitted aliases through the same scope rules without replacing local values.
+func bindReportDatasetParameters(args, parameters map[string]interface{}, declarations map[string]reportParameterDeclaration, scope *reportExecutionDatasetScope) (map[string]interface{}, error) {
 	assigned := map[string]interface{}{}
 	for key, value := range parameters {
 		if strings.HasPrefix(key, "_") || key == "backend" || key == "source" || key == "service" || key == "method" || key == "filters" || key == "options" {

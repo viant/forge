@@ -7,10 +7,11 @@ import (
 )
 
 type reportParameterDeclaration struct {
-	Path     string
-	ID       string
-	Multiple bool
-	Required bool
+	Path      string
+	ID        string
+	Multiple  bool
+	Required  bool
+	ValuePath string
 }
 
 // Aliases and destination paths are declared by the approved builder, rather
@@ -86,6 +87,11 @@ func reportParameterDeclarations(raw json.RawMessage) (map[string]reportParamete
 			if d.ID == "" && (d.Path == p.Path || d.Path == p.Start || d.Path == p.End) {
 				d.ID = p.ID
 				d.Required = p.Required
+				if d.Path == p.Start {
+					d.ValuePath = "start"
+				} else if d.Path == p.End {
+					d.ValuePath = "end"
+				}
 				result[alias] = d
 			}
 		}

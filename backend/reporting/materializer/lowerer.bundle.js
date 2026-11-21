@@ -72868,8 +72868,8 @@ ${indent}${end}`;
     });
     return result;
   }
-  function bindInvocationScope(config, state, request) {
-    if (!request) return state;
+  function bindInvocationScope(config, state, request, invocation = null) {
+    if (!request && !invocation) return state;
     const safe = (name) => typeof name === "string" && /^[A-Za-z][A-Za-z0-9_]*$/.test(name) && !["constructor", "prototype", "__proto__"].includes(name);
     const read3 = (path2) => {
       const parts = typeof path2 === "string" ? path2.split(".") : [];
@@ -72877,7 +72877,7 @@ ${indent}${end}`;
       return parts.reduce((value, key2) => isObject(value) && Object.prototype.hasOwnProperty.call(value, key2) ? value[key2] : void 0, request);
     };
     const params = { ...isObject(state.scopeParams) ? state.scopeParams : {} };
-    for (const predicate of normalizeReportBuilderPredicates(config)) {
+    for (const predicate of invocation ? [] : normalizeReportBuilderPredicates(config)) {
       if (!safe(predicate == null ? void 0 : predicate.id)) continue;
       if (predicate.kind === "dateRange") {
         const start = read3(predicate.startParamPath), end = read3(predicate.endParamPath);
@@ -72892,7 +72892,15 @@ ${indent}${end}`;
         if (value !== void 0) params[predicate.id] = clone7(value);
       }
     }
-    return { ...state, scopeParams: params };
+    for (const [id, edges] of Object.entries(isObject(invocation == null ? void 0 : invocation.dateRanges) ? invocation.dateRanges : {})) {
+      if (!safe(id) || !isObject(edges)) continue;
+      let value = isObject(params[id]) ? clone7(params[id]) : {};
+      for (const edge of ["start", "end"]) {
+        if (Object.prototype.hasOwnProperty.call(edges, edge)) value = updateReportDateRangeValue(value, edge, edges[edge]);
+      }
+      params[id] = value;
+    }
+    return mergeScopeParamValues(state, { ...params, ...isObject(invocation == null ? void 0 : invocation.values) ? invocation.values : {} });
   }
   function normalizeDataSources(dataSources) {
     if (dataSources == null) return [];
@@ -72906,7 +72914,7 @@ ${indent}${end}`;
       });
     });
   }
-  function authoredReportDocument(envelope, requestBaseParameters = null, sourceValidation = false) {
+  function authoredReportDocument(envelope, requestBaseParameters = null, sourceValidation = false, scopeParameters = null) {
     var _a5;
     if (!isObject(envelope) || envelope.schemaVersion !== 1 || envelope.format !== "forge.authoredReport") {
       throw new Error("Expected a schema version 1 forge.authoredReport envelope.");
@@ -72954,7 +72962,7 @@ ${indent}${end}`;
     const generated = buildReportBuilderReportDocument({
       container,
       config,
-      state: bindInvocationScope(config, state, requestBaseParameters),
+      state: bindInvocationScope(config, state, requestBaseParameters, scopeParameters),
       additionalBlocks: authoredBlocks,
       refinements: Array.isArray(sourceDocument.refinements) ? sourceDocument.refinements : [],
       semanticSummary: isObject(sourceDocument.semanticSummary) ? sourceDocument.semanticSummary : null
@@ -72985,7 +72993,7 @@ ${indent}${end}`;
   }
   function lowerWithRequestBase(inputJSON) {
     const input = JSON.parse(inputJSON);
-    const document = authoredReportDocument(input.envelope, input.requestBaseParameters);
+    const document = authoredReportDocument(input.envelope, input.requestBaseParameters, false, input.scopeParameters);
     return JSON.stringify(lowerValidatedReportDocument(document));
   }
   function materialize(inputJSON, stage) {

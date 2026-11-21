@@ -40,8 +40,8 @@ import {mapReportRequestEnvelope, reportRequestWindowIdentity} from "../../../..
     });
     return result;
   }
-  function bindInvocationScope(config, state, request) {
-    if (!request) return state;
+  function bindInvocationScope(config, state, request, invocation = null) {
+    if (!request && !invocation) return state;
     const safe = (name) => typeof name === "string" && /^[A-Za-z][A-Za-z0-9_]*$/.test(name)
       && !["constructor", "prototype", "__proto__"].includes(name);
     const read = (path) => {
@@ -50,7 +50,9 @@ import {mapReportRequestEnvelope, reportRequestWindowIdentity} from "../../../..
       return parts.reduce((value, key) => isObject(value) && Object.prototype.hasOwnProperty.call(value, key) ? value[key] : undefined, request);
     };
     const params = {...(isObject(state.scopeParams) ? state.scopeParams : {})};
-    for (const predicate of normalizeReportBuilderPredicates(config)) {
+    // Admitted control values preserve identity and omission. A producer path
+    // shared by two controls cannot supply the missing sibling's state.
+    for (const predicate of invocation ? [] : normalizeReportBuilderPredicates(config)) {
       if (!safe(predicate?.id)) continue;
       if (predicate.kind === "dateRange") {
         const start = read(predicate.startParamPath), end = read(predicate.endParamPath);
@@ -65,7 +67,15 @@ import {mapReportRequestEnvelope, reportRequestWindowIdentity} from "../../../..
         if (value !== undefined) params[predicate.id] = clone(value);
       }
     }
-    return {...state, scopeParams: params};
+    for (const [id, edges] of Object.entries(isObject(invocation?.dateRanges) ? invocation.dateRanges : {})) {
+      if (!safe(id) || !isObject(edges)) continue;
+      let value = isObject(params[id]) ? clone(params[id]) : {};
+      for (const edge of ["start", "end"]) {
+        if (Object.prototype.hasOwnProperty.call(edges, edge)) value = updateReportDateRangeValue(value, edge, edges[edge]);
+      }
+      params[id] = value;
+    }
+    return mergeScopeParamValues(state, {...params, ...(isObject(invocation?.values) ? invocation.values : {})});
   }
   function normalizeDataSources(dataSources) {
     if (dataSources == null) return [];
@@ -79,7 +89,7 @@ import {mapReportRequestEnvelope, reportRequestWindowIdentity} from "../../../..
       });
     });
   }
-  function authoredReportDocument(envelope, requestBaseParameters = null, sourceValidation = false) {
+  function authoredReportDocument(envelope, requestBaseParameters = null, sourceValidation = false, scopeParameters = null) {
     var _a5;
     if (!isObject(envelope) || envelope.schemaVersion !== 1 || envelope.format !== "forge.authoredReport") {
       throw new Error("Expected a schema version 1 forge.authoredReport envelope.");
@@ -133,7 +143,7 @@ import {mapReportRequestEnvelope, reportRequestWindowIdentity} from "../../../..
     const generated = buildReportBuilderReportDocument({
       container,
       config,
-      state: bindInvocationScope(config, state, requestBaseParameters),
+      state: bindInvocationScope(config, state, requestBaseParameters, scopeParameters),
       additionalBlocks: authoredBlocks,
       refinements: Array.isArray(sourceDocument.refinements) ? sourceDocument.refinements : [],
       semanticSummary: isObject(sourceDocument.semanticSummary) ? sourceDocument.semanticSummary : null
@@ -164,7 +174,7 @@ import {mapReportRequestEnvelope, reportRequestWindowIdentity} from "../../../..
   }
   export function lowerWithRequestBase(inputJSON) {
     const input = JSON.parse(inputJSON);
-    const document = authoredReportDocument(input.envelope, input.requestBaseParameters);
+    const document = authoredReportDocument(input.envelope, input.requestBaseParameters, false, input.scopeParameters);
     return JSON.stringify(lowerValidatedReportDocument(document));
   }
   export function materialize(inputJSON, stage) {
