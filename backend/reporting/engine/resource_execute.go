@@ -298,6 +298,9 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 		}
 	}()
 	var spec struct {
+		Scope struct {
+			Params []authoredScopeParameter `json:"params"`
+		} `json:"scope"`
 		Blocks []struct {
 			ID         string `json:"id"`
 			Kind       string `json:"kind"`
@@ -338,6 +341,20 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 	if decodeSpec(executionSpec, &spec) != nil || len(spec.Datasets) == 0 {
 		return nil, fmt.Errorf("report has no executable datasets")
 	}
+	declarations, err := reportParameterDeclarations(envelope.BuilderDefinition)
+	if err != nil {
+		return nil, err
+	}
+	var providedParameters map[string]bool
+	if len(envelope.BuilderDefinition) > 0 {
+		datasetParameters, providedParameters, err = authoredDatasetParameters(datasetParameters, declarations, spec.Scope.Params)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		providedParameters = providedReportParameterIDs(datasetParameters, declarations)
+	}
+
 	if err := materializer.ValidateTablePresentations(executionSpec, request.TablePresentations); err != nil {
 		return nil, err
 	}
@@ -409,7 +426,10 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 		if len(descriptorRaw) == 0 || decodeReportDatasource(descriptorRaw, descriptor) != nil || descriptor.ID != dataset.DataSourceRef || descriptor.Backend == nil {
 			return nil, identity.ErrResourceDenied
 		}
-		args, err := reportDatasetArguments(dataset.Request, datasetParameters, descriptor, envelope.BuilderDefinition, dataset.Scope)
+		args, err := cloneReportDatasetArguments(dataset.Request, descriptor)
+		if err == nil {
+			args, err = bindScopedReportDatasetParameters(args, datasetParameters, declarations, providedParameters, dataset.Scope)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -627,6 +647,18 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 	return &ExecuteResourceResult{DependencyPins: cloneDependencyPins(compiled.DependencyPins), DependencyToken: compiled.DependencyToken, Resource: cloneResolvedResource(pin), ReportSpec: cloneJSON(materializationSpec), ReportFill: artifacts.ReportFill, ReportPrint: artifacts.ReportPrint, Datasets: results}, nil
 }
 func reportDatasetArguments(base, parameters map[string]interface{}, descriptor *dsproto.DataSource, builderRaw json.RawMessage, scope *reportExecutionDatasetScope) (map[string]interface{}, error) {
+	args, err := cloneReportDatasetArguments(base, descriptor)
+	if err != nil {
+		return nil, err
+	}
+	declarations, err := reportParameterDeclarations(builderRaw)
+	if err != nil {
+		return nil, err
+	}
+	return bindScopedReportDatasetParameters(args, parameters, declarations, providedReportParameterIDs(parameters, declarations), scope)
+}
+
+func cloneReportDatasetArguments(base map[string]interface{}, descriptor *dsproto.DataSource) (map[string]interface{}, error) {
 	raw, err := json.Marshal(base)
 	if err != nil {
 		return nil, err
@@ -641,11 +673,10 @@ func reportDatasetArguments(base, parameters map[string]interface{}, descriptor 
 			return nil, identity.ErrResourceDenied
 		}
 	}
-	declarations, err := reportParameterDeclarations(builderRaw)
-	if err != nil {
-		return nil, err
-	}
+	return args, nil
+}
 
+func bindScopedReportDatasetParameters(args, parameters map[string]interface{}, declarations map[string]reportParameterDeclaration, provided map[string]bool, scope *reportExecutionDatasetScope) (map[string]interface{}, error) {
 	// Compilation may already have copied global predicate values into the
 	// request. Exclusion applies to those values as well as incoming aliases;
 	// retain explicitly authored dataset-local values at the same paths.
@@ -657,7 +688,7 @@ func reportDatasetArguments(base, parameters map[string]interface{}, descriptor 
 		retainedPaths, excludedPaths := map[string]bool{}, map[string]bool{}
 		for _, declaration := range declarations {
 			_, local := scope.Local[declaration.ID]
-			if !excluded[declaration.ID] || local {
+			if (!excluded[declaration.ID] || local) && (!declaration.Shared || local || provided[declaration.ID]) {
 				retainedPaths[declaration.Path] = true
 			} else {
 				excludedPaths[declaration.Path] = true

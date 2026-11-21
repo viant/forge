@@ -12,6 +12,7 @@ type reportParameterDeclaration struct {
 	Multiple  bool
 	Required  bool
 	ValuePath string
+	Shared    bool
 }
 
 // Aliases and destination paths are declared by the approved builder, rather
@@ -96,7 +97,29 @@ func reportParameterDeclarations(raw json.RawMessage) (map[string]reportParamete
 			}
 		}
 	}
+	owners, shared := map[string]string{}, map[string]bool{}
+	for _, declaration := range result {
+		if owner, found := owners[declaration.Path]; found && owner != declaration.ID {
+			shared[declaration.Path] = true
+		} else {
+			owners[declaration.Path] = declaration.ID
+		}
+	}
+	for alias, declaration := range result {
+		declaration.Shared = shared[declaration.Path]
+		result[alias] = declaration
+	}
 	return result, nil
+}
+
+func providedReportParameterIDs(parameters map[string]interface{}, declarations map[string]reportParameterDeclaration) map[string]bool {
+	provided := map[string]bool{}
+	for alias := range parameters {
+		if declaration, ok := declarations[alias]; ok {
+			provided[declaration.ID] = true
+		}
+	}
+	return provided
 }
 func setReportParameterPath(args map[string]interface{}, path string, value interface{}) error {
 	parts := strings.Split(path, ".")
@@ -144,18 +167,10 @@ type reportExecutionDatasetScope struct {
 func removeExcludedReportParameter(args, local map[string]interface{}, path string) {
 	parts := strings.Split(path, ".")
 	// Local values have already been materialized into the compiled request.
-	current := local
-	for i, part := range parts {
-		value, exists := current[part]
-		if !exists {
-			break
-		}
-		if i == len(parts)-1 {
-			return
-		}
-		current, _ = value.(map[string]interface{})
+	if localReportParameterPath(local, path) {
+		return
 	}
-	current = args
+	current := args
 	for i, part := range parts {
 		if i == len(parts)-1 {
 			delete(current, part)
@@ -166,6 +181,22 @@ func removeExcludedReportParameter(args, local map[string]interface{}, path stri
 			return
 		}
 	}
+
+}
+
+func localReportParameterPath(local map[string]interface{}, path string) bool {
+	parts, current := strings.Split(path, "."), local
+	for i, part := range parts {
+		value, exists := current[part]
+		if !exists {
+			return false
+		}
+		if i == len(parts)-1 {
+			return true
+		}
+		current, _ = value.(map[string]interface{})
+	}
+	return false
 }
 
 func (scope *reportExecutionDatasetScope) preserves(declaration reportParameterDeclaration) bool {
@@ -184,7 +215,7 @@ func (scope *reportExecutionDatasetScope) preserves(declaration reportParameterD
 		return true
 	}
 	_, local := scope.Local[declaration.ID]
-	return local
+	return local || declaration.Shared && localReportParameterPath(scope.Local, declaration.Path)
 }
 
 func (scope *reportExecutionDatasetScope) previousPeriod() bool {

@@ -326,3 +326,150 @@ func TestAuthoredPartialScopedAliasRetainsSavedClear(t *testing.T) {
 	require.Empty(t, seen["detail"], "an omitted saved clear must not borrow the edited sibling")
 	assertAliasScope(t, out.ReportSpec, []interface{}{"beta"}, []interface{}{})
 }
+
+func TestAuthoredOmittedAliasesWithoutDatasetOptions(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		parameters  map[string]interface{}
+		saved       map[string]interface{}
+		defaults    bool
+		left, right interface{}
+	}{
+		{"only overview no default", map[string]interface{}{"overviewTag": []interface{}{"beta"}}, nil, false, []interface{}{"beta"}, nil},
+		{"only detail no default", map[string]interface{}{"detailTag": []interface{}{"beta"}}, nil, false, nil, []interface{}{"beta"}},
+		{"only overview saved default", map[string]interface{}{"overviewTag": []interface{}{"beta"}}, nil, true, []interface{}{"beta"}, []interface{}{"alpha"}},
+		{"only detail saved default", map[string]interface{}{"detailTag": []interface{}{"beta"}}, nil, true, []interface{}{"alpha"}, []interface{}{"beta"}},
+		{"overview clear", map[string]interface{}{"overviewTag": []interface{}{}}, nil, false, []interface{}{}, nil},
+		{"detail clear", map[string]interface{}{"detailTag": []interface{}{}}, nil, false, nil, []interface{}{}},
+		{"both omitted", nil, nil, true, []interface{}{"alpha"}, []interface{}{"alpha"}},
+		{"saved value", map[string]interface{}{"overviewTag": []interface{}{"beta"}}, map[string]interface{}{"detailTag": []interface{}{"gamma"}}, true, []interface{}{"beta"}, []interface{}{"gamma"}},
+		{"saved clear", map[string]interface{}{"overviewTag": []interface{}{"beta"}}, map[string]interface{}{"detailTag": []interface{}{}}, true, []interface{}{"beta"}, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := scopedAliasEnvelope(t, []string{"detailTag"}, false)
+			var envelope registry.ReportEnvelope
+			require.NoError(t, json.Unmarshal(raw, &envelope))
+			var builder map[string]interface{}
+			require.NoError(t, json.Unmarshal(envelope.BuilderDefinition, &builder))
+			config := builder["reportBuilder"].(map[string]interface{})
+			for _, source := range config["dataSources"].([]interface{}) {
+				delete(source.(map[string]interface{}), "scopeParamOptions")
+			}
+			if !tc.defaults {
+				for _, predicate := range config["predicates"].([]interface{}) {
+					delete(predicate.(map[string]interface{}), "default")
+				}
+			}
+			envelope.BuilderDefinition, _ = json.Marshal(builder)
+			if tc.saved != nil {
+				envelope.State, _ = json.Marshal(map[string]interface{}{"selectedMeasures": []string{"value"}, "scopeParams": tc.saved})
+			}
+			for i := range envelope.Dependencies {
+				if envelope.Dependencies[i].Kind == "builder" {
+					envelope.Dependencies[i].ContentFingerprint = identity.ContentFingerprint(envelope.BuilderDefinition)
+				}
+			}
+			raw, _ = json.Marshal(envelope)
+			original := string(raw)
+			service, _ := scopedAliasService(t, raw)
+			seen := map[string]interface{}{}
+			var mu sync.Mutex
+			service.SetResourceDatasetExecutor(NewResourceDatasetExecutor(reportFixtureTransport(func(_ context.Context, _ string, args map[string]interface{}) (string, error) {
+				id, _ := args["resultSet"].(string)
+				if id == "" {
+					id = "primary"
+				}
+				filters, _ := args["filters"].(map[string]interface{})
+				mu.Lock()
+				seen[id] = filters["tag"]
+				mu.Unlock()
+				return `{"rows":[{"value":4}]}`, nil
+			}), service.AuthorizeResourceDataset))
+			out, err := service.ExecuteResource(t.Context(), &ExecuteResourceRequest{Resource: &identity.ResourceRef{URI: "report://example/selections"}, Parameters: tc.parameters})
+			require.NoError(t, err)
+			require.Len(t, seen, 3)
+			require.Equal(t, tc.left, seen["overview"])
+			require.Equal(t, tc.right, seen["detail"])
+			require.Equal(t, tc.left, seen["primary"])
+			left, right := tc.left, tc.right
+			if left == nil {
+				left = []interface{}{}
+			}
+			if right == nil {
+				right = []interface{}{}
+			}
+			assertAliasScope(t, out.ReportSpec, left, right)
+			require.Equal(t, original, string(raw))
+		})
+	}
+}
+
+func TestAuthoredSharedNumericDefaultRetainsCallerRepresentation(t *testing.T) {
+	raw := scopedAliasEnvelope(t, nil, false)
+	var envelope registry.ReportEnvelope
+	require.NoError(t, json.Unmarshal(raw, &envelope))
+	var builder map[string]interface{}
+	require.NoError(t, json.Unmarshal(envelope.BuilderDefinition, &builder))
+	config := builder["reportBuilder"].(map[string]interface{})
+	for _, p := range config["predicates"].([]interface{}) {
+		p.(map[string]interface{})["multiple"] = false
+		p.(map[string]interface{})["default"] = 1
+	}
+	for _, source := range config["dataSources"].([]interface{}) {
+		delete(source.(map[string]interface{}), "scopeParamOptions")
+	}
+	envelope.BuilderDefinition, _ = json.Marshal(builder)
+	for i := range envelope.Dependencies {
+		if envelope.Dependencies[i].Kind == "builder" {
+			envelope.Dependencies[i].ContentFingerprint = identity.ContentFingerprint(envelope.BuilderDefinition)
+		}
+	}
+	raw, _ = json.Marshal(envelope)
+	service, _ := scopedAliasService(t, raw)
+	calls := 0
+	var mu sync.Mutex
+	service.SetResourceDatasetExecutor(NewResourceDatasetExecutor(reportFixtureTransport(func(_ context.Context, _ string, args map[string]interface{}) (string, error) {
+		require.EqualValues(t, 1, args["filters"].(map[string]interface{})["tag"])
+		mu.Lock()
+		calls++
+		mu.Unlock()
+		return `{"rows":[{"value":4}]}`, nil
+	}), service.AuthorizeResourceDataset))
+	_, err := service.ExecuteResource(t.Context(), &ExecuteResourceRequest{Resource: &identity.ResourceRef{URI: "report://example/selections"}, Parameters: map[string]interface{}{"overviewTag": 1}})
+	require.NoError(t, err)
+	require.Equal(t, 3, calls)
+}
+
+func TestAuthoredSharedDefaultRetainsLocalProducerValue(t *testing.T) {
+	raw := scopedAliasEnvelope(t, []string{"detailTag"}, false)
+	var envelope registry.ReportEnvelope
+	require.NoError(t, json.Unmarshal(raw, &envelope))
+	var builder map[string]interface{}
+	require.NoError(t, json.Unmarshal(envelope.BuilderDefinition, &builder))
+	config := builder["reportBuilder"].(map[string]interface{})
+	source := config["dataSources"].([]interface{})[1].(map[string]interface{})
+	delete(source, "scopeParamOptions")
+	source["request"].(map[string]interface{})["filters"] = map[string]interface{}{"tag": []interface{}{"local"}}
+	source["scope"].(map[string]interface{})["local"] = map[string]interface{}{"filters": map[string]interface{}{"tag": []interface{}{"local"}}}
+	envelope.BuilderDefinition, _ = json.Marshal(builder)
+	for i := range envelope.Dependencies {
+		if envelope.Dependencies[i].Kind == "builder" {
+			envelope.Dependencies[i].ContentFingerprint = identity.ContentFingerprint(envelope.BuilderDefinition)
+		}
+	}
+	raw, _ = json.Marshal(envelope)
+	service, _ := scopedAliasService(t, raw)
+	var mu sync.Mutex
+	seen := map[string]interface{}{}
+	service.SetResourceDatasetExecutor(NewResourceDatasetExecutor(reportFixtureTransport(func(_ context.Context, _ string, args map[string]interface{}) (string, error) {
+		id, _ := args["resultSet"].(string)
+		filters, _ := args["filters"].(map[string]interface{})
+		mu.Lock()
+		seen[id] = filters["tag"]
+		mu.Unlock()
+		return `{"rows":[{"value":4}]}`, nil
+	}), service.AuthorizeResourceDataset))
+	_, err := service.ExecuteResource(t.Context(), &ExecuteResourceRequest{Resource: &identity.ResourceRef{URI: "report://example/selections"}, Parameters: map[string]interface{}{"overviewTag": []interface{}{"beta"}}})
+	require.NoError(t, err)
+	require.Equal(t, []interface{}{"local"}, seen["detail"])
+}

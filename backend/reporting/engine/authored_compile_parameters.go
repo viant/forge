@@ -92,3 +92,95 @@ func bindAuthoredCompileParameters(raw json.RawMessage, parameters map[string]in
 	}
 	return bound, state, nil
 }
+
+// Only shared destinations need completion here: compiled requests can carry a
+// sibling's inherited criterion when a dataset has no scopeParamOptions. The
+// lowered control state owns saved/default values; an empty omitted control owns
+// no criterion. Explicit invocation values remain untouched.
+type authoredScopeParameter struct {
+	ID    string          `json:"id"`
+	Value json.RawMessage `json:"value"`
+}
+
+func authoredDatasetParameters(parameters map[string]interface{}, declarations map[string]reportParameterDeclaration, scope []authoredScopeParameter) (map[string]interface{}, map[string]bool, error) {
+	provided := providedReportParameterIDs(parameters, declarations)
+	sharedIDs := map[string]bool{}
+	for _, declaration := range declarations {
+		if declaration.Shared {
+			sharedIDs[declaration.ID] = true
+		}
+	}
+	if len(sharedIDs) == 0 {
+		return parameters, provided, nil
+	}
+	values := map[string]interface{}{}
+	for _, parameter := range scope {
+		if !sharedIDs[parameter.ID] || provided[parameter.ID] || len(parameter.Value) == 0 {
+			continue
+		}
+		var value interface{}
+		if err := decodeNativeScopeJSON(parameter.Value, &value); err != nil {
+			return nil, nil, err
+		}
+		values[parameter.ID] = value
+	}
+	// Preserve an existing caller representation when it has exactly the same
+	// JSON value as a default, without changing ordinary conflict validation.
+	wireValues := map[string]map[string]interface{}{}
+	for alias, value := range parameters {
+		declaration, ok := declarations[alias]
+		if !ok || !declaration.Shared {
+			continue
+		}
+		encoded, err := json.Marshal(value)
+		if err != nil {
+			return nil, nil, err
+		}
+		if wireValues[declaration.Path] == nil {
+			wireValues[declaration.Path] = map[string]interface{}{}
+		}
+		wireValues[declaration.Path][string(encoded)] = value
+	}
+	var completed map[string]interface{}
+	for alias, declaration := range declarations {
+		if !declaration.Shared || provided[declaration.ID] {
+			continue
+		}
+		value := values[declaration.ID]
+		if declaration.ValuePath != "" {
+			object, _ := value.(map[string]interface{})
+			value = object[declaration.ValuePath]
+		}
+		empty := value == nil
+		switch v := value.(type) {
+		case string:
+			empty = v == ""
+		case []interface{}:
+			empty = len(v) == 0
+		case map[string]interface{}:
+			empty = len(v) == 0
+		}
+		if empty {
+			continue
+		}
+		encoded, err := json.Marshal(value)
+		if err != nil {
+			return nil, nil, err
+		}
+		if callerValue, ok := wireValues[declaration.Path][string(encoded)]; ok {
+			value = callerValue
+		}
+		if completed == nil {
+			completed = map[string]interface{}{}
+			for key, original := range parameters {
+				completed[key] = original
+			}
+		}
+		completed[alias] = value
+	}
+	if completed != nil {
+		parameters = completed
+		provided = providedReportParameterIDs(parameters, declarations)
+	}
+	return parameters, provided, nil
+}
