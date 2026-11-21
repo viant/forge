@@ -561,6 +561,7 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
         ...(chartSpec.categoryColors && typeof chartSpec.categoryColors === "object" && !Array.isArray(chartSpec.categoryColors) ? {categoryColors: {...chartSpec.categoryColors}} : {}),
         ...(seriesOptions ? { seriesOptions } : {}),
         ...(categoryLabel ? { categoryLabel } : {}),
+        ...(typeof chartSpec.showZeroCategories === "boolean" ? {showZeroCategories:chartSpec.showZeroCategories} : {}),
         ...(chartSpec.preserveCategoryOrder === true ? {preserveCategoryOrder:true} : {}),
         ...(metricSelection ? {metricSelection} : {}),
         ...(typeof chartSpec.allowTableSwitch === "boolean" ? {allowTableSwitch:chartSpec.allowTableSwitch} : {}),
@@ -2448,6 +2449,7 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
         ...(normalized.tooltip ? {tooltip:normalized.tooltip} : {}),
         ...(normalized.layout ? {layout:normalized.layout} : {}),
         ...(typeof normalized.stacked === 'boolean' ? {stacked:normalized.stacked} : {}),
+        ...(typeof normalized.showZeroCategories === "boolean" ? {showZeroCategories:normalized.showZeroCategories} : {}),
         ...(normalized.preserveCategoryOrder === true ? {preserveCategoryOrder:true} : {}),
         xAxis: {
             dataKey: xDisplayKey || xSourceKey,

@@ -1745,3 +1745,15 @@ stay available during hover or a captured drag, and otherwise follow the shared
 activity fade. Semantic border/text roles style the thumb. Forced colors retain
 native scrollbars, and other themes retain the prior native viewport. Pointer
 activation has no focus ring; keyboard focus stays inside the existing border.
+
+## Zero-valued bar categories
+
+Bar and horizontal bar charts may declare `chartSpec.showZeroCategories: true`
+(native `chart.showZeroCategories`) to keep category labels and values visible
+when all measured values are zero. The default remains the all-zero message.
+For example, `{type: "horizontal_bar", xField: "category", yFields: ["rate"],
+showZeroCategories: true}` uses the declared measure format unchanged;
+`percentFraction` displays a genuine zero as `0.0%`. This presentation option
+does not create rows or turn missing/null values into zero. Empty, loading,
+error, mixed-value and non-bar charts retain their existing behavior.
+It does not change data retrieval, table data or export values.

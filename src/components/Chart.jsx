@@ -1465,7 +1465,9 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     const hasNonZeroRenderableSeriesValues = isPieChart
         ? pieFilteredData.some((entry) => isChartNumericValue(entry?.value) && Number(entry.value) !== 0)
         : hasNonZeroChartSeriesValue(normalizedChartData, selectedSeriesDefinitions.map((entry) => entry.value));
-    const showZeroDataMessage = !effectiveLoading
+    const showZeroCategories = chart.showZeroCategories === true && ["bar", "horizontal_bar"].includes(type);
+    const showZeroDataMessage = !showZeroCategories
+        && !effectiveLoading
         && !error
         && hasChartRows
         && hasRenderableSeriesValues
