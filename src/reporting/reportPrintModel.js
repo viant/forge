@@ -1454,6 +1454,18 @@ function renderReportPrintKpiBlock(state = {}, block = {}, {
   const content = block?.content || {};
   const tone = resolveReportPrintKpiTone(content?.tone || block?.tone);
   const presentationMode = normalizeReportPrintKpiPresentationMode(block);
+  // Older persisted filled blocks may omit rowCount; their present value remains usable.
+  const hasPrimaryValue = content?.value !== undefined && content?.value !== null;
+  if (presentationMode !== "card" && (!hasPrimaryValue
+    || (content?.rowCount !== undefined && !(Number(content.rowCount) > 0)))) {
+    renderReportPrintSectionTitle(state, block, { layoutNote });
+    renderReportPrintTextLines(state, {
+      idPrefix: `${normalizeString(block?.id || block?.kind || "block")}__kpi_empty`,
+      lines: [normalizeString(content?.emptyLabel || "No KPI value available.")],
+    });
+    finishReportPrintBlock(state);
+    return;
+  }
   const showCard = presentationMode !== "body";
   const bodyLines = presentationMode !== "card" ? buildReportPrintKpiBodyLines(block) : [];
   const valueFormat = inferReportPrintNumericFormat(

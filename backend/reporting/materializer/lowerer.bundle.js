@@ -70809,6 +70809,16 @@ ${indent}${end}`;
     const content = (block == null ? void 0 : block.content) || {};
     const tone = resolveReportPrintKpiTone((content == null ? void 0 : content.tone) || (block == null ? void 0 : block.tone));
     const presentationMode = normalizeReportPrintKpiPresentationMode(block);
+    const hasPrimaryValue = (content == null ? void 0 : content.value) !== void 0 && (content == null ? void 0 : content.value) !== null;
+    if (presentationMode !== "card" && (!hasPrimaryValue || (content == null ? void 0 : content.rowCount) !== void 0 && !(Number(content.rowCount) > 0))) {
+      renderReportPrintSectionTitle(state, block, { layoutNote });
+      renderReportPrintTextLines(state, {
+        idPrefix: `${normalizeString41((block == null ? void 0 : block.id) || (block == null ? void 0 : block.kind) || "block")}__kpi_empty`,
+        lines: [normalizeString41((content == null ? void 0 : content.emptyLabel) || "No KPI value available.")]
+      });
+      finishReportPrintBlock(state);
+      return;
+    }
     const showCard = presentationMode !== "body";
     const bodyLines = presentationMode !== "card" ? buildReportPrintKpiBodyLines(block) : [];
     const valueFormat = inferReportPrintNumericFormat(
