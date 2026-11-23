@@ -65,16 +65,25 @@ type ResourceWriteBinding struct {
 }
 
 type ResourceFieldBinding struct {
-	Read            string                     `json:"read,omitempty" yaml:"read,omitempty"`
-	Write           string                     `json:"write,omitempty" yaml:"write,omitempty"`
-	Codec           string                     `json:"codec,omitempty" yaml:"codec,omitempty"`
-	Trim            bool                       `json:"trim,omitempty" yaml:"trim,omitempty"`
-	Empty           EmptyPolicy                `json:"empty,omitempty" yaml:"empty,omitempty"` // preserve|null|omit
-	Default         interface{}                `json:"default,omitempty" yaml:"default,omitempty"`
-	AlwaysWrite     bool                       `json:"alwaysWrite,omitempty" yaml:"alwaysWrite,omitempty"`
-	OmitIfUnchanged bool                       `json:"omitIfUnchanged,omitempty" yaml:"omitIfUnchanged,omitempty"`
-	ModelRef        string                     `json:"modelRef,omitempty" yaml:"modelRef,omitempty"`
-	Collection      *ResourceCollectionBinding `json:"collection,omitempty" yaml:"collection,omitempty"`
+	Read             string                           `json:"read,omitempty" yaml:"read,omitempty"`
+	Write            string                           `json:"write,omitempty" yaml:"write,omitempty"`
+	Codec            string                           `json:"codec,omitempty" yaml:"codec,omitempty"`
+	Trim             bool                             `json:"trim,omitempty" yaml:"trim,omitempty"`
+	Empty            EmptyPolicy                      `json:"empty,omitempty" yaml:"empty,omitempty"` // preserve|null|omit
+	Default          interface{}                      `json:"default,omitempty" yaml:"default,omitempty"`
+	AlwaysWrite      bool                             `json:"alwaysWrite,omitempty" yaml:"alwaysWrite,omitempty"`
+	OmitIfUnchanged  bool                             `json:"omitIfUnchanged,omitempty" yaml:"omitIfUnchanged,omitempty"`
+	ModelRef         string                           `json:"modelRef,omitempty" yaml:"modelRef,omitempty"`
+	Collection       *ResourceCollectionBinding       `json:"collection,omitempty" yaml:"collection,omitempty"`
+	AssociationDelta *ResourceAssociationDeltaBinding `json:"associationDelta,omitempty" yaml:"associationDelta,omitempty"`
+}
+
+// ResourceAssociationDeltaBinding maps one canonical field to two sparse ID lists.
+type ResourceAssociationDeltaBinding struct {
+	Mode             string `json:"mode" yaml:"mode"` // diff | explicit
+	Added            string `json:"added" yaml:"added"`
+	Deleted          string `json:"deleted" yaml:"deleted"`
+	BaselineComplete string `json:"baselineComplete,omitempty" yaml:"baselineComplete,omitempty"`
 }
 
 func (r *ResourceFieldBinding) UnmarshalYAML(unmarshal func(interface{}) error) error {

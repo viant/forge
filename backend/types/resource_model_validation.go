@@ -54,6 +54,9 @@ func validateResourceModels(window *Window, validateDataSources bool) error {
 				return err
 			}
 		}
+		if err := validateAssociationDestinations(name, schema, model); err != nil {
+			return err
+		}
 		mode := normalizedResourceMode(model.Write)
 		if mode != "" && mode != "full" && mode != "overlaybaseline" && mode != "changed" {
 			return fmt.Errorf("resource model %s has unsupported write mode %s", name, model.Write.Mode)
@@ -163,6 +166,9 @@ func validateResourceFieldSchema(schemas map[string]ResourceSchema, path string,
 
 func validateResourceFieldBinding(window *Window, modelName, fieldName string, fieldSchema ResourceFieldSchema, binding ResourceFieldBinding) error {
 	path := modelName + "." + fieldName
+	if binding.AssociationDelta != nil {
+		return validateAssociationDelta(path, fieldSchema, binding)
+	}
 	codec := strings.ToLower(strings.TrimSpace(binding.Codec))
 	if codec != "" && codec != "int" && codec != "integer" && codec != "float" && codec != "number" && codec != "bool" && codec != "boolean" && codec != "string" {
 		return fmt.Errorf("resource model field %s has unsupported codec %s", path, binding.Codec)
@@ -218,6 +224,104 @@ func validateResourceFieldBinding(window *Window, modelName, fieldName string, f
 		}
 	} else if fieldSchema.Ref != "" && fieldSchema.Ref != nested.SchemaRef {
 		return fmt.Errorf("resource model field %s model schema %s does not match field schema %s", path, nested.SchemaRef, fieldSchema.Ref)
+	}
+	return nil
+}
+
+func validAssociationPath(path string) bool {
+	for _, part := range strings.Split(path, ".") {
+		if part == "" || strings.TrimSpace(part) != part || strings.ContainsAny(part, ":/[]") {
+			return false
+		}
+		switch part {
+		case "__proto__", "constructor", "prototype":
+			return false
+		}
+	}
+	return true
+}
+
+func associationIDArrayType(schema ResourceFieldSchema) string {
+	if schema.Type != "array" || schema.Nullable || schema.Default != nil || schema.Items == nil || schema.Items.Nullable {
+		return ""
+	}
+	switch schema.Items.Type {
+	case "integer", "string":
+		return schema.Items.Type
+	}
+	return ""
+}
+
+func validateAssociationDelta(path string, schema ResourceFieldSchema, binding ResourceFieldBinding) error {
+	delta := binding.AssociationDelta
+	if binding.Write != "" || binding.ModelRef != "" || binding.Collection != nil ||
+		binding.Codec != "" || binding.Trim || binding.Empty != "" || binding.Default != nil ||
+		binding.AlwaysWrite || binding.OmitIfUnchanged || schema.ReadOnly || schema.Nullable || schema.Default != nil {
+		return fmt.Errorf("resource model field %s associationDelta cannot combine with another write mapping, transformation, or nullable field", path)
+	}
+	if !validAssociationPath(delta.Added) || !validAssociationPath(delta.Deleted) {
+		return fmt.Errorf("resource model field %s associationDelta requires safe added and deleted paths", path)
+	}
+	switch delta.Mode {
+	case "diff":
+		if !validAssociationPath(delta.BaselineComplete) || associationIDArrayType(schema) == "" {
+			return fmt.Errorf("resource model field %s diff associationDelta requires a baselineComplete path and an integer or string ID array", path)
+		}
+	case "explicit":
+		added := associationIDArrayType(schema.Properties["added"])
+		deleted := associationIDArrayType(schema.Properties["deleted"])
+		if delta.BaselineComplete != "" || schema.Type != "object" || len(schema.Properties) != 2 ||
+			added == "" || added != deleted || len(schema.Required) != 0 {
+			return fmt.Errorf("resource model field %s explicit associationDelta requires an object with matching optional added and deleted ID arrays and no baselineComplete path", path)
+		}
+	default:
+		return fmt.Errorf("resource model field %s associationDelta mode must be diff or explicit", path)
+	}
+	return nil
+}
+
+func validateAssociationDestinations(name string, schema ResourceSchema, model ResourceModel) error {
+	for field, binding := range model.Fields {
+		delta := binding.AssociationDelta
+		if delta == nil {
+			continue
+		}
+		for _, identity := range schema.Identity {
+			if identity == field {
+				return fmt.Errorf("resource model field %s.%s cannot be both identity and associationDelta", name, field)
+			}
+		}
+		for _, required := range schema.Required {
+			if required == field {
+				return fmt.Errorf("resource model field %s.%s associationDelta must be optional for sparse writes", name, field)
+			}
+		}
+		conflicts := func(path, other string) bool {
+			return path == other || strings.HasPrefix(path, other+".") || strings.HasPrefix(other, path+".")
+		}
+		if conflicts(delta.Added, delta.Deleted) {
+			return fmt.Errorf("resource model field %s.%s associationDelta destinations overlap", name, field)
+		}
+		for otherField, otherSchema := range schema.Properties {
+			if otherField == field {
+				continue
+			}
+			other := model.Fields[otherField]
+			if other.Write == "-" || (otherSchema.ReadOnly && other.Write == "") {
+				continue
+			}
+			paths := []string{other.Write}
+			if other.AssociationDelta != nil {
+				paths = []string{other.AssociationDelta.Added, other.AssociationDelta.Deleted}
+			} else if other.Write == "" {
+				paths[0] = otherField
+			}
+			for _, path := range paths {
+				if conflicts(delta.Added, path) || conflicts(delta.Deleted, path) {
+					return fmt.Errorf("resource model field %s.%s associationDelta destination overlaps field %s", name, field, otherField)
+				}
+			}
+		}
 	}
 	return nil
 }
