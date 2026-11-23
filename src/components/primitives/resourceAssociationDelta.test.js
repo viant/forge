@@ -106,3 +106,28 @@ test('reordered nested parents use their own persisted association IDs', () => {
   prior.rows[0].complete = 'true';
   assert.throws(() => marshalResource(draft, nested, 'group', prior), /complete association baseline/);
 });
+
+test('a marked collection row carries only its identity while a sibling projects its association delta', () => {
+  const nested = structuredClone(context);
+  const {schemas, resourceModels} = nested.metadata;
+  schemas.membership.properties.removed = {type: 'boolean'};
+  schemas.group = schema('rows', {type: 'array', items: {$ref: 'membership'}});
+  resourceModels.group = {
+    schemaRef: 'group',
+    write: {mode: 'changed'},
+    fields: {rows: {write: 'Rows', collection: {modelRef: 'membership', mode: 'merge', deleteMarker: 'removed'}}},
+  };
+  const prior = {id: 1, rows: [
+    {id: 3, complete: false, members: [4, 9]},
+    {id: 6, complete: true, members: [8, 15]},
+    {id: 10, complete: false, members: [7]},
+  ]};
+  const draft = {id: 1, rows: [
+    {id: 6, members: [15, 16]},
+    {id: 3, removed: true, members: []},
+  ]};
+  assert.deepEqual(marshalResource(draft, nested, 'group', prior), {id: 1, Rows: [
+    {id: 6, associations: {include: [16], exclude: [8]}},
+    {id: 3, removed: true},
+  ]});
+});
