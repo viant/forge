@@ -41,12 +41,22 @@ public enum ResourceModelRuntime {
     public static func marshal(draft: JSONValue, baseline: JSONValue?, modelRef: String, mode requestedMode: String? = nil, target requestedTarget: String? = nil, schemas: [String: ResourceSchemaDef], models: [String: ResourceModelDef], hook: ResourceModelHook? = nil) throws -> [String: JSONValue] {
         guard let model = models[modelRef], let write = model.write else { throw ResourceModelError.message("Resource model \(modelRef) requires a write binding") }
         let mode = normalizeResourceMode(requestedMode ?? write.mode ?? "changed")
-        var canonical: JSONValue
-        if mode == "overlaybaseline" { canonical = overlayResource(base: baseline ?? .object([:]), patch: draft) } else { canonical = draft }
+        let associationModels = associationCollectionModels(from: modelRef, models: models)
+        let associationFields = model.fields.filter { $0.value.associationDelta != nil }.keys
+        var overlayBase = baseline ?? .object([:])
+        if !associationFields.isEmpty {
+            guard draft.objectValue != nil else { throw ResourceModelError.message("Association delta requires one canonical resource object") }
+            if let object = overlayBase.objectValue {
+                overlayBase = .object(object.filter { !associationFields.contains($0.key) })
+            }
+        }
+        var canonical = mode == "overlaybaseline" ? overlayResource(base: overlayBase, patch: draft) : draft
         canonical = try applyResourceHook(model.hooks?.beforeMarshal, value: canonical, hook: hook)
         try validate(value: canonical, schemaRef: model.schemaRef, schemas: schemas)
-        try validateImmutableIdentity(draft: canonical, baseline: baseline, schema: schemas[model.schemaRef])
-        var wire = try marshalValue(canonical, baseline: baseline, model: model, mode: mode, schemas: schemas, models: models, hook: hook)
+        if associationFields.isEmpty || baseline != nil {
+            try validateImmutableIdentity(draft: canonical, baseline: baseline, schema: schemas[model.schemaRef])
+        }
+        var wire = try marshalValue(canonical, baseline: baseline, model: model, mode: mode, schemas: schemas, models: models, associationModels: associationModels, hook: hook)
         wire = try applyResourceHook(model.hooks?.afterMarshal, value: wire, hook: hook)
         let target = requestedTarget?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? requestedTarget! : (write.inputPath ?? "")
         if target == "$" || target.isEmpty {
@@ -54,7 +64,8 @@ public enum ResourceModelRuntime {
             return object
         }
         var result: [String: JSONValue] = [:]
-        setResourcePath(&result, path: target, value: wire)
+        let payload = !associationFields.isEmpty && write.collection == true ? JSONValue.array([wire]) : wire
+        setResourcePath(&result, path: target, value: payload)
         return result
     }
 
@@ -84,6 +95,7 @@ public enum ResourceModelRuntime {
         guard let input = value.objectValue else { throw ResourceModelError.message("Resource reader value must be an object") }
         var output = model.read?.preserveUnbound == true ? input : [:]
         for (field, binding) in model.fields {
+            if binding.associationDelta?.mode == "explicit" { output.removeValue(forKey: field); continue }
             let raw = resourceResolve(input, path: binding.read ?? field) ?? binding.defaultValue
             guard let raw else { continue }
             output[field] = try transformRead(raw, binding: binding, schemas: schemas, models: models, hook: hook)
@@ -100,16 +112,24 @@ public enum ResourceModelRuntime {
         return try applyResourceCodec(value, codec: binding.codec, trim: binding.trim == true, empty: binding.empty)
     }
 
-    private static func marshalValue(_ value: JSONValue, baseline: JSONValue?, model: ResourceModelDef, mode: String, schemas: [String: ResourceSchemaDef], models: [String: ResourceModelDef], hook: ResourceModelHook?) throws -> JSONValue {
+    private static func marshalValue(_ value: JSONValue, baseline: JSONValue?, model: ResourceModelDef, mode: String, schemas: [String: ResourceSchemaDef], models: [String: ResourceModelDef], associationModels: Set<String>, hook: ResourceModelHook?) throws -> JSONValue {
         if case .array(let values) = value {
             let baselineValues = baseline?.arrayValue ?? []
-            return .array(try values.enumerated().map { index, item in try marshalValue(item, baseline: baselineValues.indices.contains(index) ? baselineValues[index] : nil, model: model, mode: mode, schemas: schemas, models: models, hook: hook) })
+            return .array(try values.enumerated().map { index, item in try marshalValue(item, baseline: baselineValues.indices.contains(index) ? baselineValues[index] : nil, model: model, mode: mode, schemas: schemas, models: models, associationModels: associationModels, hook: hook) })
         }
         guard let object = value.objectValue else { throw ResourceModelError.message("Canonical resource must be an object") }
         let baselineObject = baseline?.objectValue ?? [:]
         let schema = schemas[model.schemaRef]
         var output: [String: JSONValue] = [:]
         for (field, binding) in model.fields {
+            if let delta = binding.associationDelta {
+                if let current = object[field] {
+                    guard let fieldSchema = schema?.properties[field] else { throw ResourceModelError.message("Missing association schema for \(field)") }
+                    try validateImmutableIdentity(draft: value, baseline: baseline, schema: schema)
+                    try projectAssociationDelta(current, prior: baselineObject, field: field, schema: fieldSchema, delta: delta, output: &output)
+                }
+                continue
+            }
             guard binding.write != "-" else { continue }
             let current = object[field] ?? binding.defaultValue
             let previous = baselineObject[field]
@@ -119,11 +139,17 @@ public enum ResourceModelRuntime {
             let transformed: JSONValue
             if let modelRef = binding.modelRef, let nested = models[modelRef] {
                 let prepared = try applyResourceHook(nested.hooks?.beforeMarshal, value: current, hook: hook)
-                transformed = try applyResourceHook(nested.hooks?.afterMarshal, value: marshalValue(prepared, baseline: previous, model: nested, mode: mode, schemas: schemas, models: models, hook: hook), hook: hook)
+                transformed = try applyResourceHook(nested.hooks?.afterMarshal, value: marshalValue(prepared, baseline: previous, model: nested, mode: mode, schemas: schemas, models: models, associationModels: associationModels, hook: hook), hook: hook)
             } else if let collection = binding.collection, let modelRef = collection.modelRef, let nested = models[modelRef] {
-                let merged = try mergeResourceCollection(draft: current, baseline: previous, binding: collection, nestedSchema: schemas[nested.schemaRef])
-                let prepared = try applyResourceHook(nested.hooks?.beforeMarshal, value: merged, hook: hook)
-                transformed = try applyResourceHook(nested.hooks?.afterMarshal, value: marshalValue(prepared, baseline: previous, model: nested, mode: mode, schemas: schemas, models: models, hook: hook), hook: hook)
+                let pairByIdentity = associationModels.contains(modelRef)
+                let associationFields = pairByIdentity ? Set(nested.fields.filter { $0.value.associationDelta != nil }.keys) : []
+                let rows = try mergeResourceCollection(draft: current, baseline: previous, binding: collection, nestedSchema: schemas[nested.schemaRef], associationFields: associationFields, pairByIdentity: pairByIdentity)
+                let prepared = try applyResourceHook(nested.hooks?.beforeMarshal, value: rows.draft, hook: hook)
+                if pairByIdentity, prepared != rows.draft {
+                    throw ResourceModelError.message("Collection hooks cannot replace association draft rows before identity pairing")
+                }
+                let priorRows = pairByIdentity ? rows.baseline : previous
+                transformed = try applyResourceHook(nested.hooks?.afterMarshal, value: marshalValue(prepared, baseline: priorRows, model: nested, mode: mode, schemas: schemas, models: models, associationModels: associationModels, hook: hook), hook: hook)
             } else {
                 transformed = try applyResourceCodec(current, codec: binding.codec, trim: binding.trim == true, empty: binding.empty)
             }
@@ -131,6 +157,74 @@ public enum ResourceModelRuntime {
             setResourcePath(&output, path: binding.write ?? field, value: transformed)
         }
         return .object(output)
+    }
+
+    private static func associationCollectionModels(from root: String, models: [String: ResourceModelDef]) -> Set<String> {
+        var reachable: Set<String> = []
+        var pending = [root]
+        var parents: [String: Set<String>] = [:]
+        var affected: Set<String> = []
+        while let ref = pending.popLast() {
+            guard reachable.insert(ref).inserted, let model = models[ref] else { continue }
+            for binding in model.fields.values {
+                if binding.associationDelta != nil { affected.insert(ref) }
+                if let child = binding.modelRef ?? binding.collection?.modelRef {
+                    parents[child, default: []].insert(ref)
+                    pending.append(child)
+                }
+            }
+        }
+        pending = Array(affected)
+        while let child = pending.popLast() {
+            for parent in parents[child] ?? [] where affected.insert(parent).inserted { pending.append(parent) }
+        }
+        return affected
+    }
+
+    private static func projectAssociationDelta(_ current: JSONValue, prior: [String: JSONValue], field: String, schema: ResourceFieldSchemaDef, delta: ResourceAssociationDeltaBindingDef, output: inout [String: JSONValue]) throws {
+        // JSONValue is not Hashable. Use the exact typed ID as the membership key,
+        // preserving the first occurrence of each ID on each source list.
+        func ids(_ value: JSONValue?, type: String?, path: String) throws -> [(key: [UInt8], value: JSONValue)] {
+            guard let values = value?.arrayValue else { throw ResourceModelError.message("\(path) must be an ID array") }
+            var seen = Set<[UInt8]>()
+            return try values.compactMap { id in
+                let key: [UInt8]
+                switch (type, id) {
+                case ("string", .string(let item)): key = Array(item.utf8)
+                case ("integer", .number(let item)) where item.rounded(.towardZero) == item && abs(item) < 9_007_199_254_740_992:
+                    key = Array(String(Int64(item)).utf8)
+                default: throw ResourceModelError.message("\(path) contains an invalid association ID")
+                }
+                return seen.insert(key).inserted ? (key, id) : nil
+            }
+        }
+        let additions: [JSONValue]
+        let removals: [JSONValue]
+        switch delta.mode {
+        case "diff":
+            guard let marker = delta.baselineComplete, resourceResolve(prior, path: marker) == .bool(true) else {
+                throw ResourceModelError.message("\(field) requires a complete association baseline")
+            }
+            let before = try ids(prior[field], type: schema.items?.type, path: "\(field).baseline")
+            let after = try ids(current, type: schema.items?.type, path: field)
+            let beforeKeys = Set(before.map(\.key))
+            let afterKeys = Set(after.map(\.key))
+            additions = after.filter { !beforeKeys.contains($0.key) }.map(\.value)
+            removals = before.filter { !afterKeys.contains($0.key) }.map(\.value)
+        case "explicit":
+            guard let intent = current.objectValue, intent.keys.allSatisfy({ $0 == "added" || $0 == "deleted" }) else {
+                throw ResourceModelError.message("\(field) must contain explicit added or deleted ID lists")
+            }
+            let added = try ids(intent["added"] ?? .array([]), type: schema.properties["added"]?.items?.type, path: "\(field).added")
+            let deleted = try ids(intent["deleted"] ?? .array([]), type: schema.properties["deleted"]?.items?.type, path: "\(field).deleted")
+            let addedKeys = Set(added.map(\.key))
+            guard !deleted.contains(where: { addedKeys.contains($0.key) }) else { throw ResourceModelError.message("\(field) cannot add and delete the same ID") }
+            additions = added.map(\.value)
+            removals = deleted.map(\.value)
+        default: throw ResourceModelError.message("Unknown association delta mode: \(delta.mode)")
+        }
+        if !additions.isEmpty { setResourcePath(&output, path: delta.added, value: .array(additions)) }
+        if !removals.isEmpty { setResourcePath(&output, path: delta.deleted, value: .array(removals)) }
     }
 
     private static func resolve(source: ResourceValueSourceDef, environment: ResourceValueEnvironment) throws -> JSONValue? {
@@ -264,33 +358,58 @@ private func resourceFilterMatches(_ value: JSONValue, filter: ResourceValueFilt
     return false
 }
 
-private func mergeResourceCollection(draft: JSONValue, baseline: JSONValue?, binding: ResourceCollectionBindingDef, nestedSchema: ResourceSchemaDef?) throws -> JSONValue {
+private func mergeResourceCollection(draft: JSONValue, baseline: JSONValue?, binding: ResourceCollectionBindingDef, nestedSchema: ResourceSchemaDef?, associationFields: Set<String>, pairByIdentity: Bool) throws -> (draft: JSONValue, baseline: JSONValue) {
     guard let draftRows = draft.arrayValue else { throw ResourceModelError.message("Nested resource collection must be an array") }
     let baselineRows = baseline?.arrayValue ?? []
     let identities = binding.identity?.isEmpty == false ? binding.identity! : (nestedSchema?.identity ?? [])
     guard !identities.isEmpty else { throw ResourceModelError.message("Nested resource collection requires identity fields") }
     func key(_ value: JSONValue, index: Int) throws -> String {
         guard let row = value.objectValue else { throw ResourceModelError.message("Nested resource row must be an object") }
-        let identity = identities.compactMap { field -> String? in
-            if let text = row[field]?.stringValue { return text }
-            if let number = resourceNumber(row[field] ?? .null) { return number.rounded() == number ? String(Int(number)) : String(number) }
-            return nil
-        }
         let isNewIdentity = identities.allSatisfy { field in
             guard let value = row[field] else { return true }
             if value == .null || value.stringValue == "" { return true }
             return resourceNumber(value) == 0
         }
-        if isNewIdentity, let clientKey = binding.clientKey, let value = row[clientKey]?.stringValue, !value.isEmpty { return "client:\(value)" }
-        if identity.count == identities.count, !identity.contains("") { return identity.joined(separator: "\u{001f}") }
+        if isNewIdentity, let clientKey = binding.clientKey, let value = row[clientKey]?.stringValue, !value.isEmpty {
+            return pairByIdentity ? "client:" + Data(value.utf8).base64EncodedString() : "client:\(value)"
+        }
+        if pairByIdentity {
+            let parts = identities.compactMap { field -> String? in
+                switch row[field] {
+                case .string(let value) where !value.isEmpty: return "s:" + Data(value.utf8).base64EncodedString()
+                case .number(let value) where value.isFinite: return "n:" + String(value == 0 ? 0 : value)
+                case .bool(let value): return "b:" + String(value)
+                default: return nil
+                }
+            }
+            if parts.count == identities.count { return parts.joined(separator: "|") }
+        } else {
+            let identity = identities.compactMap { field -> String? in
+                if let text = row[field]?.stringValue { return text }
+                if let number = resourceNumber(row[field] ?? .null) { return number.rounded() == number ? String(Int(number)) : String(number) }
+                return nil
+            }
+            if identity.count == identities.count, !identity.contains("") { return identity.joined(separator: "\u{001f}") }
+        }
         throw ResourceModelError.message("Nested resource row \(index) is missing identity fields")
     }
+    func overlayBase(_ value: JSONValue?) -> JSONValue {
+        guard let value else { return .object([:]) }
+        guard !associationFields.isEmpty, let object = value.objectValue else { return value }
+        return .object(object.filter { !associationFields.contains($0.key) })
+    }
     var baselineByKey: [String: JSONValue] = [:]
-    for (index, row) in baselineRows.enumerated() { baselineByKey[try key(row, index: index)] = row }
+    for (index, row) in baselineRows.enumerated() {
+        let identity = try key(row, index: index)
+        if pairByIdentity, baselineByKey[identity] != nil {
+            throw ResourceModelError.message("Duplicate nested baseline resource identity: \(identity)")
+        }
+        baselineByKey[identity] = row
+    }
     var seen: Set<String> = []; var result: [JSONValue] = []
     for (index, row) in draftRows.enumerated() {
         let identity = try key(row, index: index); guard seen.insert(identity).inserted else { throw ResourceModelError.message("Duplicate nested resource identity: \(identity)") }
-        result.append(overlayResource(base: baselineByKey[identity] ?? .object([:]), patch: row))
+        result.append(overlayResource(base: overlayBase(baselineByKey[identity]), patch: row))
     }
     if binding.mode?.lowercased() == "merge" {
         if binding.preserveOrder == false {
@@ -300,13 +419,14 @@ private func mergeResourceCollection(draft: JSONValue, baseline: JSONValue?, bin
             for (index, row) in baselineRows.enumerated() {
                 let identity = try key(row, index: index)
                 baselineKeys.insert(identity)
-                ordered.append(draftByKey[identity] ?? row)
+                ordered.append(draftByKey[identity] ?? overlayBase(row))
             }
             for (index, row) in result.enumerated() where !baselineKeys.contains(try key(row, index: index)) { ordered.append(row) }
             result = ordered
         } else {
-            for (index, row) in baselineRows.enumerated() where !seen.contains(try key(row, index: index)) { result.append(row) }
+            for (index, row) in baselineRows.enumerated() where !seen.contains(try key(row, index: index)) { result.append(overlayBase(row)) }
         }
     }
-    return .array(result)
+    let aligned = !pairByIdentity ? baselineRows : try result.enumerated().map { index, row in baselineByKey[try key(row, index: index)] ?? .null }
+    return (.array(result), .array(aligned))
 }

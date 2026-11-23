@@ -69,8 +69,14 @@ public struct ResourceModelDef: Codable, Sendable {
 public struct ResourceReadBindingDef: Codable, Sendable { public let dataSourceRef: String?; public let preserveUnbound: Bool? }
 public struct ResourceWriteBindingDef: Codable, Sendable { public let dataSourceRef: String?; public let inputPath: String?; public let mode: String?; public let collection: Bool? }
 public struct ResourceFieldBindingDef: Codable, Sendable {
-    public let read: String?; public let write: String?; public let codec: String?; public let trim: Bool?; public let empty: String?; public let defaultValue: JSONValue?; public let alwaysWrite: Bool?; public let omitIfUnchanged: Bool?; public let modelRef: String?; public let collection: ResourceCollectionBindingDef?
-    private enum CodingKeys: String, CodingKey { case read, write, codec, trim, empty, defaultValue = "default", alwaysWrite, omitIfUnchanged, modelRef, collection }
+    public let read: String?; public let write: String?; public let codec: String?; public let trim: Bool?; public let empty: String?; public let defaultValue: JSONValue?; public let alwaysWrite: Bool?; public let omitIfUnchanged: Bool?; public let modelRef: String?; public let collection: ResourceCollectionBindingDef?; public let associationDelta: ResourceAssociationDeltaBindingDef?
+    private enum CodingKeys: String, CodingKey { case read, write, codec, trim, empty, defaultValue = "default", alwaysWrite, omitIfUnchanged, modelRef, collection, associationDelta }
+}
+public struct ResourceAssociationDeltaBindingDef: Codable, Sendable {
+    public let mode: String
+    public let added: String
+    public let deleted: String
+    public let baselineComplete: String?
 }
 public struct ResourceCollectionBindingDef: Codable, Sendable { public let modelRef: String?; public let identity: [String]?; public let clientKey: String?; public let mode: String?; public let preserveOrder: Bool? }
 public struct ResourceModelHooksDef: Codable, Sendable { public let beforeUnmarshal: String?; public let afterUnmarshal: String?; public let beforeMarshal: String?; public let afterMarshal: String? }

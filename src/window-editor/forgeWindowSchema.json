@@ -958,7 +958,6 @@
         },
         "guidedResult": {
           "additionalProperties": {},
-          "description": "Shared guided-result presentation metadata. The renderer owns its status, example, next-step and evidence controls.",
           "type": "object"
         },
         "hiddenWhen": {
@@ -4690,6 +4689,24 @@
       },
       "type": "object"
     },
+    "ResourceAssociationDeltaBinding": {
+      "additionalProperties": true,
+      "properties": {
+        "added": {
+          "type": "string"
+        },
+        "baselineComplete": {
+          "type": "string"
+        },
+        "deleted": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "ResourceCollectionBinding": {
       "additionalProperties": true,
       "properties": {
@@ -4719,6 +4736,9 @@
       "properties": {
         "alwaysWrite": {
           "type": "boolean"
+        },
+        "associationDelta": {
+          "$ref": "#/$defs/ResourceAssociationDeltaBinding"
         },
         "codec": {
           "type": "string"
@@ -7562,7 +7582,7 @@
   "$ref": "#/$defs/Window",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "x-forge-provenance": {
-    "baseCommit": "9c24d5b7abae6da275fe44852db01befd9056271",
+    "baseCommit": "1b7ad8f068edb17a8945d7261455bd7b9b0e8dca",
     "generator": "scripts/window-schema/main.go",
     "sha256": {
       "choice_browser.go": "935cbeddb231dd329374114c5f38454dc7c44c2ab70a45ea3c0f37ce7f3aee26",
@@ -7607,7 +7627,7 @@
       "host_content.go": "f9f870afe88756eb3abd04b79cc717f60a696a5dc2501dec11ffba0f87dbc0fd",
       "json_metadata_clone.go": "baa9bde7e567774737f28b87c45a2bb145d9c5b2fadc81da3024578b17c6c09c",
       "local_state_owner.go": "987402ce2487f4b7714a3991c405aab0dda74a573d8690f8f6561d4ce020ab8f",
-      "model.go": "471c128d8c755c7b282d1229f9305bf887ea3b1b93f8cbc14f9e99681ae904b3",
+      "model.go": "be0dd424f1de4e8b43a9c7ae40354bce5d02193592655f06f5ec2ede08728c74",
       "parameter_editor.go": "a176f3b63d74714d216daf57ba5c3c3ee8e12aaf8ccf2c0ee1b663c95a657bf6",
       "predicate_composition_editor.go": "881bcf68a5f5e16cae2f58ef7495ac14582398236cfd263cc8585e89f97cab4b",
       "presentation_primitives.go": "4b2fdcf0fffb902dd8a8dee7c17d1075faa5d62ab74e1d2551f29935215905aa",
@@ -7615,8 +7635,8 @@
       "reader_workbench.go": "6ff2f9e276b1dc7482960d14e8e8ba710374cee49e72efbbdc0dc05c20e32253",
       "resource_assignment.go": "80ad53f8050041d9e652f3954084f6148fc8e53c324510126904a5ab35e3507e",
       "resource_field_attributes.go": "fc2ef49fcc4e88a78849581a9ccbdf62d2968023a5c76282e8b42ec488653c70",
-      "resource_model.go": "9a480c785535e3b485fefe5ddfaa4d6a1d276b22b267536e0051d6a2f799c6ed",
-      "resource_model_validation.go": "5fc795950cc92aa29db822a0a6850bd11fe1abf78e991c79e137b281c15251d5",
+      "resource_model.go": "797925b7ca79e631ff07740ee25fc66d4e79d913790a549e31edc6667a7faf72",
+      "resource_model_validation.go": "6d03b543e6c84a94e084cba766d53f8ccd23a2111aae0a09df4c8c8795b97d6f",
       "resource_policy_editor.go": "6f3a00bf5ac0751a133fe121e727f5aa2671489dfb07b98a29314cc7a380b8c2",
       "result_preview.go": "bd913237174dc663cf40a5cd30bf5e835ec077930e7f0916f7ce906671f3dbff",
       "rule_editor.go": "3eda2833f57c5a64adec603e42213423907151451998fa4ba538fe258273f6e6",

@@ -129,9 +129,9 @@ function unmarshalObject(value, contract, context) {
   if (typeof value !== 'object' || Array.isArray(value)) throw new Error(`${contract.modelRef} read value must be an object.`);
   const result = contract.model.read?.preserveUnbound === true ? clone(value) : {};
   for (const [field, fieldSchema] of Object.entries(schemaProperties(contract.schema))) {
-    if (fieldSchema?.writeOnly) continue;
     const binding = contract.model.fields?.[field] || {};
-    if (binding.read === '-') continue;
+    if (binding.associationDelta?.mode === 'explicit') delete result[field];
+    if (fieldSchema?.writeOnly || binding.read === '-' || binding.associationDelta?.mode === 'explicit') continue;
     const sourcePath = binding.read || field;
     let next = resolveSelector(value, sourcePath);
     if (next === undefined && Object.prototype.hasOwnProperty.call(binding, 'default')) next = binding.default;
@@ -204,7 +204,10 @@ function overlayCanonical(draft, baseline, context, modelRef, path = '$') {
   if (!draft || typeof draft !== 'object' || Array.isArray(draft)) return clone(draft);
   const result = {...(baseline || {}), ...draft};
   for (const [field, binding] of Object.entries(contract.model.fields || {})) {
-    if (!Object.prototype.hasOwnProperty.call(draft, field)) continue;
+    if (!Object.prototype.hasOwnProperty.call(draft, field)) {
+      if (binding.associationDelta) delete result[field];
+      continue;
+    }
     const next = draft[field];
     const previous = baseline?.[field];
     if (binding.modelRef && next && typeof next === 'object' && !Array.isArray(next)) {
@@ -225,8 +228,15 @@ function overlayCanonical(draft, baseline, context, modelRef, path = '$') {
       result[field] = overlaidDraft;
       continue;
     }
+    const pairedFields = Object.entries(resolveResourceContract(context, binding.collection.modelRef).model.fields || {})
+      .filter(([, nested]) => nested.associationDelta).map(([name]) => name);
+    const retainOmittedRow = row => {
+      const retained = clone(row);
+      for (const name of pairedFields) delete retained[name];
+      return retained;
+    };
     if (binding.collection.preserveOrder !== false) {
-      const omitted = baselineRows.filter((row, index) => !draftByID.has(identityKey(row, identities, `${path}.${field}.baseline.${index}`, clientKey))).map(clone);
+      const omitted = baselineRows.filter((row, index) => !draftByID.has(identityKey(row, identities, `${path}.${field}.baseline.${index}`, clientKey))).map(retainOmittedRow);
       result[field] = [...overlaidDraft, ...omitted];
       continue;
     }
@@ -235,7 +245,7 @@ function overlayCanonical(draft, baseline, context, modelRef, path = '$') {
     const merged = baselineRows.map((row, index) => {
       const key = identityKey(row, identities, `${path}.${field}.baseline.${index}`, clientKey);
       baselineKeys.add(key);
-      return clone(overlaidByID.get(key) || row);
+      return overlaidByID.has(key) ? clone(overlaidByID.get(key)) : retainOmittedRow(row);
     });
     const appended = overlaidDraft.filter((row, index) => !baselineKeys.has(identityKey(row, identities, `${path}.${field}.overlaid.${index}`, clientKey)));
     result[field] = [...merged, ...appended];
@@ -243,12 +253,55 @@ function overlayCanonical(draft, baseline, context, modelRef, path = '$') {
   return result;
 }
 
-function normalizeCanonical(value, contract, context, path = '$') {
+function associationIDs(value, type, path) {
+  if (!Array.isArray(value)) throw new Error(`${path} must be an ID array.`);
+  for (const id of value) {
+    const valid = type === 'string' ? typeof id === 'string' : Number.isSafeInteger(id);
+    if (!valid) throw new Error(`${path} must contain only ${type === 'string' ? 'string' : 'safe integer'} IDs.`);
+  }
+  return new Set(value);
+}
+
+function projectAssociationDelta(value, baseline, completenessSource, field, schema, binding, result, path) {
+  let added, deleted;
+  if (binding.mode === 'diff') {
+    if (resolveSelector(completenessSource, binding.baselineComplete) !== true) {
+      throw new Error(`${path} requires a complete association baseline.`);
+    }
+    const type = schema.items.type;
+    const before = associationIDs(baseline[field], type, `${path}.baseline`);
+    const after = associationIDs(value, type, path);
+    added = [...after].filter(id => !before.has(id));
+    deleted = [...before].filter(id => !after.has(id));
+  } else if (binding.mode === 'explicit') {
+    if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(key => key !== 'added' && key !== 'deleted')) {
+      throw new Error(`${path} must contain explicit added or deleted ID lists.`);
+    }
+    const type = schema.properties.added.items.type;
+    const additions = associationIDs(value.added === undefined ? [] : value.added, type, `${path}.added`);
+    const deletions = associationIDs(value.deleted === undefined ? [] : value.deleted, type, `${path}.deleted`);
+    for (const id of additions) {
+      if (deletions.has(id)) throw new Error(`${path} cannot add and delete the same ID.`);
+    }
+    added = [...additions];
+    deleted = [...deletions];
+  } else {
+    throw new Error(`Unknown association delta mode: ${binding.mode}`);
+  }
+  if (added.length) Object.assign(result, setSelector(result, binding.added, added));
+  if (deleted.length) Object.assign(result, setSelector(result, binding.deleted, deleted));
+}
+
+function normalizeCanonical(value, contract, context, path = '$', baseline = false) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return clone(value);
   const result = clone(value);
   for (const [field, fieldSchema] of Object.entries(schemaProperties(contract.schema))) {
     const binding = contract.model.fields?.[field] || {};
     let next = value[field];
+    if (binding.associationDelta) {
+      if (next === undefined || (baseline && binding.associationDelta.mode === 'explicit')) delete result[field];
+      continue;
+    }
     if ((next === undefined || next === null) && Object.prototype.hasOwnProperty.call(binding, 'default')) next = clone(binding.default);
     if ((next === undefined || next === null) && Object.prototype.hasOwnProperty.call(fieldSchema || {}, 'default')) next = clone(fieldSchema.default);
     if (binding.trim === true && typeof next === 'string') next = next.trim();
@@ -260,10 +313,10 @@ function normalizeCanonical(value, contract, context, path = '$') {
     if (binding.collection?.modelRef && next !== null) {
       if (!Array.isArray(next)) throw new Error(`${path}.${field} must be an array.`);
       const nested = resolveResourceContract(context, binding.collection.modelRef);
-      next = next.map((entry, index) => normalizeCanonical(entry, nested, context, `${path}.${field}.${index}`));
+      next = next.map((entry, index) => normalizeCanonical(entry, nested, context, `${path}.${field}.${index}`, baseline));
     } else if (binding.modelRef && next !== null) {
       const nested = resolveResourceContract(context, binding.modelRef);
-      next = normalizeCanonical(next, nested, context, `${path}.${field}`);
+      next = normalizeCanonical(next, nested, context, `${path}.${field}`, baseline);
     } else if (String(fieldSchema?.type || '').toLowerCase() === 'array' && Array.isArray(next)) {
       const itemSchema = schemaForField(fieldSchema.items || {}, contract.schemas);
       next = next.map((entry, index) => coerceScalar(entry, itemSchema, {}, `${path}.${field}.${index}`));
@@ -272,15 +325,30 @@ function normalizeCanonical(value, contract, context, path = '$') {
     }
     result[field] = next;
   }
+  if (baseline) {
+    for (const binding of Object.values(contract.model.fields || {})) {
+      const marker = binding.associationDelta?.baselineComplete;
+      if (marker && resolveSelector(result, marker) === true && resolveSelector(value, marker) !== true) {
+        Object.assign(result, setSelector(result, marker, false));
+      }
+    }
+  }
   return result;
 }
 
-function marshalObject(draft, baseline, contract, context, mode, changedFields = null) {
+function marshalObject(draft, baseline, completenessSource, contract, context, mode, changedFields = null) {
   if (!draft || typeof draft !== 'object' || Array.isArray(draft)) throw new Error(`${contract.modelRef} draft must be an object.`);
   const source = draft;
   const result = {};
   for (const [field, fieldSchema] of Object.entries(schemaProperties(contract.schema))) {
     const binding = contract.model.fields?.[field] || {};
+    if (binding.associationDelta) {
+      const value = source[field];
+      if (value !== undefined) {
+        projectAssociationDelta(value, baseline, completenessSource, field, fieldSchema, binding.associationDelta, result, `${contract.modelRef}.${field}`);
+      }
+      continue;
+    }
     const identityField = Array.isArray(contract.schema.identity) && contract.schema.identity.includes(field);
     if (binding.write === '-') {
       if (mode === 'changed' && identityField) throw new Error(`${contract.modelRef}.${field} identity cannot be omitted by a changed writer.`);
@@ -321,10 +389,10 @@ export function marshalResource(draft, context, modelRef, baseline = null, modeO
   const contract = resolveResourceContract(context, modelRef);
   const mode = String(modeOverride || contract.model.write?.mode || 'changed').replace(/[_-]/g, '').toLowerCase();
   if (!['full', 'overlaybaseline', 'changed'].includes(mode)) throw new Error(`Unsupported resource marshal mode: ${modeOverride || contract.model.write?.mode}`);
-  let normalizedBaseline = baseline == null ? baseline : normalizeCanonical(baseline, contract, context);
+  let normalizedBaseline = baseline == null ? baseline : normalizeCanonical(baseline, contract, context, '$', true);
   if (mode === 'changed' && normalizedBaseline != null && contract.model.hooks?.beforeMarshal) {
     const preparedBaseline = invokeModelHook(context, contract.model.hooks.beforeMarshal, 'beforeMarshalBaseline', normalizedBaseline, contract, {baseline: freeze(clone(normalizedBaseline))});
-    normalizedBaseline = normalizeCanonical(preparedBaseline, contract, context);
+    normalizedBaseline = normalizeCanonical(preparedBaseline, contract, context, '$', true);
   }
   const candidate = mode === 'full' ? clone(draft) : overlayCanonical(draft, normalizedBaseline, context, modelRef);
   const before = invokeModelHook(context, contract.model.hooks?.beforeMarshal, 'beforeMarshal', candidate, contract, {baseline: freeze(clone(normalizedBaseline))});
@@ -341,7 +409,7 @@ export function marshalResource(draft, context, modelRef, baseline = null, modeO
     : null;
   const errors = validateResource(normalized, contract.schema, contract.schemas);
   if (errors.length) throw new Error(`Invalid ${contract.modelRef} write model: ${errors.join('; ')}`);
-  const marshalled = marshalObject(normalized, normalizedBaseline, contract, context, mode, changedFields);
+  const marshalled = marshalObject(normalized, normalizedBaseline, baseline, contract, context, mode, changedFields);
   return invokeModelHook(context, contract.model.hooks?.afterMarshal, 'afterMarshal', marshalled, contract, {baseline: freeze(clone(normalizedBaseline))});
 }
 

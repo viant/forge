@@ -29,14 +29,23 @@ object ResourceModelRuntime {
         val model = models[modelRef] ?: error("Unknown resource model: $modelRef")
         val write = model.write ?: error("Resource model $modelRef requires a write binding")
         val mode = normalizeMode(requestedMode ?: write.mode ?: "changed")
-        var canonical = if (mode == "overlaybaseline") overlayResource(baseline, draft) else draft
+        val associationModels = associationCollectionModels(modelRef, models)
+        val associationFields = model.fields.filterValues { it.associationDelta != null }.keys
+        val overlayBase = if (associationFields.isEmpty()) baseline else {
+            require(draft is Map<*, *>) { "Association delta requires one canonical resource object" }
+            JsonUtil.asStringMap(baseline).filterKeys { it !in associationFields }
+        }
+        var canonical = if (mode == "overlaybaseline") overlayResource(overlayBase, draft) else draft
         canonical = applyHook(model.hooks?.beforeMarshal, canonical, hook)
         validate(canonical, model.schemaRef, schemas)
-        validateImmutableIdentity(canonical, baseline, schemas[model.schemaRef])
-        val wire = applyHook(model.hooks?.afterMarshal, marshalValue(canonical, baseline, model, mode, schemas, models, hook), hook)
+        if (associationFields.isEmpty() || baseline != null) validateImmutableIdentity(canonical, baseline, schemas[model.schemaRef])
+        val wire = applyHook(model.hooks?.afterMarshal, marshalValue(canonical, baseline, model, mode, schemas, models, associationModels, hook), hook)
         val target = requestedTarget?.trim().orEmpty().ifBlank { write.inputPath.orEmpty() }
         if (target.isEmpty() || target == "\$") return JsonUtil.asStringMap(wire).ifEmpty { error("Root resource payload must be an object") }
-        val output = linkedMapOf<String, Any?>(); setPath(output, target, wire); return output
+        val payload = if (associationFields.isNotEmpty() && write.collection) listOf(wire) else wire
+        val output = linkedMapOf<String, Any?>()
+        setPath(output, target, payload)
+        return output
     }
 
     suspend fun prepare(payload: ResourcePayloadPreparationDef, environment: ResourceValueEnvironment, schemas: Map<String, ResourceSchemaDef>, models: Map<String, ResourceModelDef>, hook: ResourceModelHook? = null): Map<String, Any?> {
@@ -56,6 +65,10 @@ object ResourceModelRuntime {
         val input = JsonUtil.asStringMap(value).ifEmpty { if (value is Map<*, *>) emptyMap() else error("Resource reader value must be an object") }
         val output = if (model.read?.preserveUnbound == true) input.toMutableMap() else linkedMapOf()
         model.fields.forEach { (field, binding) ->
+            if (binding.associationDelta?.mode == "explicit") {
+                output.remove(field)
+                return@forEach
+            }
             val raw = resolvePath(input, binding.read ?: field) ?: binding.defaultValue?.let(JsonUtil::elementToAny) ?: return@forEach
             output[field] = transformRead(raw, binding, schemas, models, hook)
         }
@@ -69,16 +82,24 @@ object ResourceModelRuntime {
         else -> applyCodec(value, binding.codec, binding.trim, binding.empty)
     }
 
-    private suspend fun marshalValue(value: Any?, baseline: Any?, model: ResourceModelDef, mode: String, schemas: Map<String, ResourceSchemaDef>, models: Map<String, ResourceModelDef>, hook: ResourceModelHook?): Any? {
+    private suspend fun marshalValue(value: Any?, baseline: Any?, model: ResourceModelDef, mode: String, schemas: Map<String, ResourceSchemaDef>, models: Map<String, ResourceModelDef>, associationModels: Set<String>, hook: ResourceModelHook?): Any? {
         if (value is List<*>) {
             val prior = baseline as? List<*> ?: emptyList<Any?>()
-            return value.mapIndexed { index, item -> marshalValue(item, prior.getOrNull(index), model, mode, schemas, models, hook) }
+            return value.mapIndexed { index, item -> marshalValue(item, prior.getOrNull(index), model, mode, schemas, models, associationModels, hook) }
         }
         val source = JsonUtil.asStringMap(value)
         val prior = JsonUtil.asStringMap(baseline)
         val schema = schemas[model.schemaRef]
         val output = linkedMapOf<String, Any?>()
         model.fields.forEach { (field, binding) ->
+            binding.associationDelta?.let { delta ->
+                if (source.containsKey(field)) {
+                    val fieldSchema = schema?.properties?.get(field) ?: error("Missing association schema for $field")
+                    if (baseline != null) validateImmutableIdentity(value, baseline, schema)
+                    projectAssociationDelta(source[field], prior, field, fieldSchema, delta, output)
+                }
+                return@forEach
+            }
             if (binding.write == "-") return@forEach
             val current = if (source.containsKey(field)) source[field] else binding.defaultValue?.let(JsonUtil::elementToAny)
             val previous = prior[field]
@@ -88,12 +109,19 @@ object ResourceModelRuntime {
                 binding.modelRef != null -> {
                     val nested = models[binding.modelRef] ?: error("Unknown nested model: ${binding.modelRef}")
                     val prepared = applyHook(nested.hooks?.beforeMarshal, current, hook)
-                    applyHook(nested.hooks?.afterMarshal, marshalValue(prepared, previous, nested, mode, schemas, models, hook), hook)
+                    applyHook(nested.hooks?.afterMarshal, marshalValue(prepared, previous, nested, mode, schemas, models, associationModels, hook), hook)
                 }
                 binding.collection?.modelRef != null -> {
                     val nested = models[binding.collection.modelRef] ?: error("Unknown nested model: ${binding.collection.modelRef}")
-                    val prepared = applyHook(nested.hooks?.beforeMarshal, mergeCollection(current, previous, binding.collection, schemas[nested.schemaRef]), hook)
-                    applyHook(nested.hooks?.afterMarshal, marshalValue(prepared, previous, nested, mode, schemas, models, hook), hook)
+                    val pairByIdentity = binding.collection.modelRef in associationModels
+                    val associationFields = if (pairByIdentity) nested.fields.filterValues { it.associationDelta != null }.keys else emptySet()
+                    val (rows, aligned) = mergeCollection(current, previous, binding.collection, schemas[nested.schemaRef], associationFields, pairByIdentity)
+                    val prepared = applyHook(nested.hooks?.beforeMarshal, rows, hook)
+                    require(!pairByIdentity || prepared == rows) {
+                        "Collection hooks cannot replace association draft rows before identity pairing"
+                    }
+                    val priorRows = if (pairByIdentity) aligned else previous
+                    applyHook(nested.hooks?.afterMarshal, marshalValue(prepared, priorRows, nested, mode, schemas, models, associationModels, hook), hook)
                 }
                 else -> applyCodec(current, binding.codec, binding.trim, binding.empty)
             }
@@ -101,6 +129,68 @@ object ResourceModelRuntime {
             setPath(output, binding.write ?: field, transformed)
         }
         return output
+    }
+
+    private fun associationCollectionModels(root: String, models: Map<String, ResourceModelDef>): Set<String> {
+        val reachable = mutableSetOf<String>()
+        val pending = mutableListOf(root)
+        val parents = mutableMapOf<String, MutableSet<String>>()
+        val affected = mutableSetOf<String>()
+        while (pending.isNotEmpty()) {
+            val ref = pending.removeAt(pending.lastIndex)
+            if (!reachable.add(ref)) continue
+            models[ref]?.fields?.values.orEmpty().forEach { binding ->
+                if (binding.associationDelta != null) affected += ref
+                val child = binding.modelRef ?: binding.collection?.modelRef ?: return@forEach
+                parents.getOrPut(child) { mutableSetOf() } += ref
+                pending += child
+            }
+        }
+        pending.addAll(affected)
+        while (pending.isNotEmpty()) {
+            val child = pending.removeAt(pending.lastIndex)
+            parents[child].orEmpty().forEach { parent -> if (affected.add(parent)) pending += parent }
+        }
+        return affected
+    }
+
+    private fun projectAssociationDelta(current: Any?, prior: Map<String, Any?>, field: String, schema: ResourceFieldSchemaDef, delta: ResourceAssociationDeltaBindingDef, output: MutableMap<String, Any?>) {
+        fun ids(value: Any?, type: String?, path: String): Set<Any> {
+            require(value is List<*>) { "$path must be an ID array" }
+            return value.mapTo(linkedSetOf()) { id ->
+                when {
+                    type == "string" && id is String -> id
+                    type == "integer" && id is Number -> {
+                        val number = id.toDouble()
+                        require(kotlin.math.abs(number) < 9_007_199_254_740_992.0 && number == number.toLong().toDouble()) {
+                            "$path contains an invalid association ID"
+                        }
+                        number.toLong()
+                    }
+                    else -> error("$path contains an invalid association ID")
+                }
+            }
+        }
+        val (added, deleted) = when (delta.mode) {
+            "diff" -> {
+                require(delta.baselineComplete?.let { resolvePath(prior, it) } == true) { "$field requires a complete association baseline" }
+                val before = ids(prior[field], schema.items?.type, "$field.baseline")
+                val after = ids(current, schema.items?.type, field)
+                (after - before) to (before - after)
+            }
+            "explicit" -> {
+                require(current is Map<*, *> && current.keys.all { it == "added" || it == "deleted" }) {
+                    "$field must contain explicit added or deleted ID lists"
+                }
+                val additions = ids(if (current.containsKey("added")) current["added"] else emptyList<Any>(), schema.properties["added"]?.items?.type, "$field.added")
+                val removals = ids(if (current.containsKey("deleted")) current["deleted"] else emptyList<Any>(), schema.properties["deleted"]?.items?.type, "$field.deleted")
+                require(additions.none { it in removals }) { "$field cannot add and delete the same ID" }
+                additions to removals
+            }
+            else -> error("Unknown association delta mode: ${delta.mode}")
+        }
+        if (added.isNotEmpty()) setPath(output, delta.added, added.toList())
+        if (deleted.isNotEmpty()) setPath(output, delta.deleted, deleted.toList())
     }
 
     private fun resolveSource(source: ResourceValueSourceDef, environment: ResourceValueEnvironment): Any? {
@@ -159,7 +249,7 @@ object ResourceModelRuntime {
         return value
     }
 
-    private fun mergeCollection(draft: Any?, baseline: Any?, binding: ResourceCollectionBindingDef, schema: ResourceSchemaDef?): List<Any?> {
+    private fun mergeCollection(draft: Any?, baseline: Any?, binding: ResourceCollectionBindingDef, schema: ResourceSchemaDef?, associationFields: Set<String>, pairByIdentity: Boolean): Pair<List<Any?>, List<Any?>> {
         val draftRows = draft as? List<*> ?: error("Nested resource collection must be an array")
         val baselineRows = baseline as? List<*> ?: emptyList<Any?>()
         val identities = binding.identity.ifEmpty { schema?.identity.orEmpty() }
@@ -169,26 +259,56 @@ object ResourceModelRuntime {
             val values = identities.map { row[it] }
             val newIdentity = values.all { it == null || it == "" || (it as? Number)?.toDouble() == 0.0 || it == "0" }
             if (newIdentity) binding.clientKey?.let { row[it]?.toString()?.takeIf(String::isNotBlank)?.let { key -> return "client:$key" } }
+            if (pairByIdentity) {
+                val typed = values.mapNotNull {
+                    when (it) {
+                        is String -> it.takeUnless(String::isEmpty)?.let { value -> "s:${value.length}:$value" }
+                        is Number -> it.toDouble().takeIf(Double::isFinite)?.let { value -> "n:${if (value == 0.0) 0.0 else value}" }
+                        is Boolean -> "b:$it"
+                        else -> null
+                    }
+                }
+                if (typed.size == identities.size) return typed.joinToString("|")
+                error("Nested resource row $index is missing identity fields")
+            }
             val identity = values.mapNotNull { it?.toString()?.takeIf(String::isNotBlank) }
             if (identity.size == identities.size) return identity.joinToString("\u001f")
             error("Nested resource row $index is missing identity fields")
         }
-        val baselineByKey = baselineRows.mapIndexed { index, row -> key(row, index) to row }.toMap()
-        val seen = mutableSetOf<String>()
-        val result = draftRows.mapIndexed { index, row -> val id = key(row, index); require(seen.add(id)) { "Duplicate nested resource identity: $id" }; overlayResource(baselineByKey[id], row) }.toMutableList()
-        if (binding.mode.equals("merge", true)) {
-            if (binding.preserveOrder == false) {
-                val draftByKey = result.mapIndexed { index, row -> key(row, index) to row }.toMap()
-                val baselineKeys = mutableSetOf<String>()
-                val ordered = baselineRows.mapIndexed { index, row ->
-                    val id = key(row, index); baselineKeys += id; draftByKey[id] ?: row
-                }.toMutableList()
-                result.forEachIndexed { index, row -> if (key(row, index) !in baselineKeys) ordered += row }
-                return ordered
-            }
-            baselineRows.forEachIndexed { index, row -> if (key(row, index) !in seen) result += row }
+        fun overlayBase(value: Any?): Any? {
+            if (associationFields.isEmpty() || value == null) return value
+            return JsonUtil.asStringMap(value).filterKeys { it !in associationFields }
         }
-        return result
+        val baselineByKey = mutableMapOf<String, Any?>()
+        baselineRows.forEachIndexed { index, row ->
+            val id = key(row, index)
+            require(!pairByIdentity || !baselineByKey.containsKey(id)) { "Duplicate nested baseline resource identity: $id" }
+            baselineByKey[id] = row
+        }
+        val seen = mutableSetOf<String>()
+        val result = draftRows.mapIndexed { index, row ->
+            val id = key(row, index)
+            require(seen.add(id)) { "Duplicate nested resource identity: $id" }
+            overlayResource(overlayBase(baselineByKey[id]), row)
+        }.toMutableList()
+        val ordered = if (binding.mode.equals("merge", true) && binding.preserveOrder == false) {
+            val draftByKey = result.mapIndexed { index, row -> key(row, index) to row }.toMap()
+            val baselineKeys = mutableSetOf<String>()
+            val inBaselineOrder = baselineRows.mapIndexed { index, row ->
+                val id = key(row, index)
+                baselineKeys += id
+                draftByKey[id] ?: overlayBase(row)
+            }.toMutableList()
+            result.forEachIndexed { index, row -> if (key(row, index) !in baselineKeys) inBaselineOrder += row }
+            inBaselineOrder
+        } else {
+            if (binding.mode.equals("merge", true)) {
+                baselineRows.forEachIndexed { index, row -> if (key(row, index) !in seen) result += overlayBase(row) }
+            }
+            result
+        }
+        val aligned = if (!pairByIdentity) baselineRows else ordered.mapIndexed { index, row -> baselineByKey[key(row, index)] }
+        return ordered to aligned
     }
 
     private fun validateImmutableIdentity(draft: Any?, baseline: Any?, schema: ResourceSchemaDef?) {

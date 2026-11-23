@@ -124,6 +124,84 @@ mutationCommand:
   refresh: [{dataSourceRef: record_read, bypassCache: true}]
 ```
 
+### Paired association IDs
+
+Use `associationDelta` on a resource-model field when one writer accepts separate
+add and delete ID lists. The writer declares both relative paths, including any
+nesting. The canonical field is optional and omitted from the wire. Forge sends
+each nonempty list in first-occurrence order. IDs must be strings or safe
+integers, as declared by the array item schema.
+
+```yaml
+schemas:
+  membership:
+    type: object
+    identity: [id]
+    properties:
+      id: {type: integer}
+      members: {type: array, items: {type: integer}}
+      completeMembership: {type: boolean, readOnly: true}
+resourceModels:
+  membership:
+    schemaRef: membership
+    write: {dataSourceRef: membership_patch, inputPath: records, collection: true}
+    fields:
+      id: {write: id}
+      members:
+        associationDelta:
+          mode: diff
+          added: associations.attachIds
+          deleted: associations.detachIds
+          baselineComplete: completeMembership
+```
+
+With `diff`, the draft field is the desired membership. The command must supply
+a baseline of the same resource, with its entire persisted ID list and the
+configured baseline selector set to boolean `true`. Set that marker only after
+loading all usable membership IDs. A paged or filtered set cannot serve as a
+complete baseline. An omitted draft field leaves membership untouched. A
+present empty array removes all IDs from the complete baseline. Unchanged
+membership, including reordered IDs and draft additions removed before Save,
+emits neither list. In a nested collection Forge uses the model's declared
+identity to match each draft row to its own baseline.
+
+Use `explicit` when the editor tracks user intent without loading a full
+baseline. Define the canonical field as an object containing two optional ID
+arrays with the same item type.
+
+```yaml
+schemas:
+  membershipEdit:
+    type: object
+    identity: [id]
+    properties:
+      id: {type: integer}
+      edits:
+        type: object
+        writeOnly: true
+        properties:
+          added: {type: array, items: {type: integer}}
+          deleted: {type: array, items: {type: integer}}
+resourceModels:
+  membershipEdit:
+    schemaRef: membershipEdit
+    write: {dataSourceRef: membership_patch, inputPath: records, collection: true}
+    fields:
+      id: {write: id}
+      edits:
+        associationDelta:
+          mode: explicit
+          added: associations.attachIds
+          deleted: associations.detachIds
+```
+
+Explicit mode uses only the supplied draft lists. Omitted and empty lists emit
+no changes. If a user reverses an uncommitted addition, remove it from
+`added` without adding it to `deleted`. Duplicates on the same list collapse.
+An ID on both lists rejects the payload. Both modes leave unrelated fields
+under the existing write policy. The command and producer continue to own
+dispatch, authorization and validation of the resulting operation.
+
 When one writer object is composed from several declarative sources, use
 `payload.fields`. Each map key is a canonical model path. This is mutually
 exclusive with the single `source` form:
