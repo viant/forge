@@ -217,6 +217,17 @@ func validateResourceFieldBinding(window *Window, modelName, fieldName string, f
 				return fmt.Errorf("resource model collection %s references undeclared identity %s", path, identity)
 			}
 		}
+		if marker := binding.Collection.DeleteMarker; marker != "" {
+			field, ok := nestedSchema.Properties[marker]
+			if !ok || field.Type != "boolean" || field.ReadOnly || field.Default != nil || nested.Fields[marker].Default != nil || nested.Fields[marker].Write == "-" {
+				return fmt.Errorf("resource model collection %s requires a writable boolean deleteMarker field without a default %s", path, marker)
+			}
+			for _, identity := range identities {
+				if identity == marker || nested.Fields[identity].Write == "-" {
+					return fmt.Errorf("resource model collection %s deleteMarker requires writable identity %s", path, identity)
+				}
+			}
+		}
 		if clientKey := strings.TrimSpace(binding.Collection.ClientKey); clientKey != "" {
 			if _, ok := nestedSchema.Properties[clientKey]; !ok {
 				return fmt.Errorf("resource model collection %s references undeclared clientKey %s", path, clientKey)

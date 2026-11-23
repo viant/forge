@@ -113,15 +113,54 @@ object ResourceModelRuntime {
                 }
                 binding.collection?.modelRef != null -> {
                     val nested = models[binding.collection.modelRef] ?: error("Unknown nested model: ${binding.collection.modelRef}")
+                    val collection = binding.collection
+                    val nestedSchema = schemas[nested.schemaRef]
                     val pairByIdentity = binding.collection.modelRef in associationModels
                     val associationFields = if (pairByIdentity) nested.fields.filterValues { it.associationDelta != null }.keys else emptySet()
-                    val (rows, aligned) = mergeCollection(current, previous, binding.collection, schemas[nested.schemaRef], associationFields, pairByIdentity)
-                    val prepared = applyHook(nested.hooks?.beforeMarshal, rows, hook)
-                    require(!pairByIdentity || prepared == rows) {
-                        "Collection hooks cannot replace association draft rows before identity pairing"
+                    val merged = mergeCollection(current, previous, collection, nestedSchema, associationFields, pairByIdentity)
+                    val marker = collection.deleteMarker
+                    if (marker == null) {
+                        val draftRows = merged.map { it.row }
+                        val prepared = applyHook(nested.hooks?.beforeMarshal, draftRows, hook)
+                        require(!pairByIdentity || prepared == draftRows) {
+                            "Collection hooks cannot replace association draft rows before identity pairing"
+                        }
+                        val priorRows = if (pairByIdentity) merged.map { it.prior } else previous
+                        applyHook(nested.hooks?.afterMarshal, marshalValue(prepared, priorRows, nested, mode, schemas, models, associationModels, hook), hook)
+                    } else {
+                        val identities = collection.identity.ifEmpty { nestedSchema?.identity.orEmpty() }
+                        val markerSchema = nestedSchema?.properties?.get(marker)
+                        require(markerSchema?.type == "boolean" && !markerSchema.readOnly && markerSchema.defaultValue == null &&
+                            nested.fields[marker]?.defaultValue == null && nested.fields[marker]?.write != "-") {
+                            "Collection deleteMarker must be a writable boolean"
+                        }
+                        val rows = mutableListOf<Any?>()
+                        for (entry in merged) {
+                            val row = JsonUtil.asStringMap(entry.row)
+                            require(!row.containsKey(marker) || row[marker] is Boolean) {
+                                "Collection removal requires an explicit boolean marker"
+                            }
+                            if (row[marker] == true) {
+                                val removed = linkedMapOf<String, Any?>()
+                                for (identity in identities) {
+                                    val value = row[identity]
+                                    val identityBinding = nested.fields[identity]
+                                    require(persistedCollectionIdentity(value) && identity != marker && identityBinding?.write != "-") {
+                                        "Collection removal requires a writable persisted identity"
+                                    }
+                                    setPath(removed, identityBinding?.write ?: identity, applyCodec(value, identityBinding?.codec, identityBinding?.trim == true, identityBinding?.empty))
+                                }
+                                setPath(removed, nested.fields[marker]?.write ?: marker, true)
+                                rows.add(removed)
+                            } else if (mode != "changed" || row != JsonUtil.asStringMap(entry.prior).filterKeys { it !in associationFields || row.containsKey(it) }) {
+                                val prepared = applyHook(nested.hooks?.beforeMarshal, entry.row, hook)
+                                val wire = marshalValue(prepared, entry.prior, nested, if (mode == "changed") "overlaybaseline" else mode, schemas, models, associationModels, hook)
+                                rows.add(applyHook(nested.hooks?.afterMarshal, wire, hook))
+                            }
+                        }
+                        if (mode == "changed" && rows.isEmpty()) return@forEach
+                        rows
                     }
-                    val priorRows = if (pairByIdentity) aligned else previous
-                    applyHook(nested.hooks?.afterMarshal, marshalValue(prepared, priorRows, nested, mode, schemas, models, associationModels, hook), hook)
                 }
                 else -> applyCodec(current, binding.codec, binding.trim, binding.empty)
             }
@@ -249,16 +288,33 @@ object ResourceModelRuntime {
         return value
     }
 
-    private fun mergeCollection(draft: Any?, baseline: Any?, binding: ResourceCollectionBindingDef, schema: ResourceSchemaDef?, associationFields: Set<String>, pairByIdentity: Boolean): Pair<List<Any?>, List<Any?>> {
+    private fun persistedCollectionIdentity(value: Any?): Boolean {
+        val number = when (value) {
+            is Number -> value.toDouble()
+            is String -> value.trim().toDoubleOrNull()
+            else -> return false
+        }
+        return if (number != null) number.isFinite() && number in 1.0..9_007_199_254_740_991.0 && number % 1.0 == 0.0
+        else value is String && value.isNotBlank()
+    }
+
+    private data class NestedRow(val row: Any?, val prior: Any?, val id: String?)
+
+    private fun mergeCollection(draft: Any?, baseline: Any?, binding: ResourceCollectionBindingDef, schema: ResourceSchemaDef?, associationFields: Set<String>, pairByIdentity: Boolean): List<NestedRow> {
         val draftRows = draft as? List<*> ?: error("Nested resource collection must be an array")
-        val baselineRows = baseline as? List<*> ?: emptyList<Any?>()
+        val baselineRows = (baseline as? List<*> ?: emptyList<Any?>()).map { row ->
+            if (binding.deleteMarker == null) row else JsonUtil.asStringMap(row) - binding.deleteMarker
+        }
         val identities = binding.identity.ifEmpty { schema?.identity.orEmpty() }
         require(identities.isNotEmpty()) { "Nested resource collection requires identity fields" }
-        fun key(value: Any?, index: Int): String {
+        fun key(value: Any?, index: Int): String? {
             val row = JsonUtil.asStringMap(value)
             val values = identities.map { row[it] }
             val newIdentity = values.all { it == null || it == "" || (it as? Number)?.toDouble() == 0.0 || it == "0" }
-            if (newIdentity) binding.clientKey?.let { row[it]?.toString()?.takeIf(String::isNotBlank)?.let { key -> return "client:$key" } }
+            if (newIdentity) {
+                binding.clientKey?.let { row[it]?.toString()?.takeIf(String::isNotBlank)?.let { key -> return "client:$key" } }
+                if (binding.clientKey == null && binding.deleteMarker != null) return null
+            }
             if (pairByIdentity) {
                 val typed = values.mapNotNull {
                     when (it) {
@@ -279,36 +335,25 @@ object ResourceModelRuntime {
             if (associationFields.isEmpty() || value == null) return value
             return JsonUtil.asStringMap(value).filterKeys { it !in associationFields }
         }
-        val baselineByKey = mutableMapOf<String, Any?>()
-        baselineRows.forEachIndexed { index, row ->
-            val id = key(row, index)
-            require(!pairByIdentity || !baselineByKey.containsKey(id)) { "Duplicate nested baseline resource identity: $id" }
-            baselineByKey[id] = row
-        }
+        val baselineEntries = baselineRows.mapIndexedNotNull { index, row -> key(row, index)?.let { it to row } }
+        val baselineByKey = baselineEntries.toMap()
+        require(!pairByIdentity || baselineByKey.size == baselineEntries.size) { "Duplicate nested baseline resource identity" }
         val seen = mutableSetOf<String>()
         val result = draftRows.mapIndexed { index, row ->
             val id = key(row, index)
-            require(seen.add(id)) { "Duplicate nested resource identity: $id" }
-            overlayResource(overlayBase(baselineByKey[id]), row)
+            if (id != null) require(seen.add(id)) { "Duplicate nested resource identity: $id" }
+            val prior = baselineByKey[id]
+            NestedRow(overlayResource(overlayBase(prior), row), prior, id)
         }.toMutableList()
-        val ordered = if (binding.mode.equals("merge", true) && binding.preserveOrder == false) {
-            val draftByKey = result.mapIndexed { index, row -> key(row, index) to row }.toMap()
-            val baselineKeys = mutableSetOf<String>()
-            val inBaselineOrder = baselineRows.mapIndexed { index, row ->
-                val id = key(row, index)
-                baselineKeys += id
-                draftByKey[id] ?: overlayBase(row)
-            }.toMutableList()
-            result.forEachIndexed { index, row -> if (key(row, index) !in baselineKeys) inBaselineOrder += row }
-            inBaselineOrder
-        } else {
-            if (binding.mode.equals("merge", true)) {
-                baselineRows.forEachIndexed { index, row -> if (key(row, index) !in seen) result += overlayBase(row) }
+        if (binding.mode.equals("merge", true)) {
+            if (binding.preserveOrder == false) {
+                val draftByKey = result.mapNotNull { entry -> entry.id?.let { it to entry } }.toMap()
+                return baselineEntries.map { (id, row) -> draftByKey[id] ?: NestedRow(overlayBase(row), row, id) } +
+                    result.filter { it.id == null || it.id !in baselineByKey }
             }
-            result
+            baselineEntries.forEach { (id, row) -> if (id !in seen) result += NestedRow(overlayBase(row), row, id) }
         }
-        val aligned = if (!pairByIdentity) baselineRows else ordered.mapIndexed { index, row -> baselineByKey[key(row, index)] }
-        return ordered to aligned
+        return result
     }
 
     private fun validateImmutableIdentity(draft: Any?, baseline: Any?, schema: ResourceSchemaDef?) {

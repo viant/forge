@@ -1,5 +1,6 @@
 import {validateResource} from '../../validation/index.js';
 import {resolveSelector, setSelector} from '../../utils/selector.js';
+import {isPersistedCollectionIdentity} from '../../utils/collectionIdentity.js';
 
 const OMIT = Symbol('forge-resource-model-omit');
 
@@ -173,7 +174,7 @@ function collectionIdentity(binding = {}, context) {
   return binding.collection.identity?.length ? binding.collection.identity : (nested.schema.identity || []);
 }
 
-function identityKey(row, identities, path, clientKey = '') {
+function identityKey(row, identities, path, clientKey = '', allowUnkeyed = false) {
   if (!identities.length) return '';
   const values = identities.map((field) => row?.[field]);
   const newIdentity = values.every((value) => value === undefined || value === null || value === '' || value === 0 || value === '0');
@@ -182,21 +183,32 @@ function identityKey(row, identities, path, clientKey = '') {
     if (clientValue === undefined || clientValue === null || clientValue === '') throw new Error(`${path} is missing collection clientKey: ${clientKey}`);
     return `client:${String(clientValue)}`;
   }
+  if (newIdentity && allowUnkeyed) return null;
   if (values.some((value) => value === undefined || value === null || value === '')) {
     throw new Error(`${path} is missing collection identity field(s): ${identities.join(', ')}`);
   }
   return values.map(String).join('\u001f');
 }
 
-function indexCollection(rows, identities, path, clientKey = '') {
+function indexCollection(rows, identities, path, clientKey = '', allowUnkeyed = false) {
   const result = new Map();
   if (!identities.length) return result;
   (rows || []).forEach((row, index) => {
-    const key = identityKey(row, identities, `${path}.${index}`, clientKey);
+    const key = identityKey(row, identities, `${path}.${index}`, clientKey, allowUnkeyed);
+    if (key === null) return;
     if (result.has(key)) throw new Error(`${path} contains duplicate collection identity: ${key}`);
     result.set(key, row);
   });
   return result;
+}
+
+function collectionBaselineRows(rows, marker) {
+  if (!Array.isArray(rows)) return [];
+  return !marker ? rows : rows.map(row => {
+    if (!row || !Object.hasOwn(row, marker)) return row;
+    const {[marker]: ignored, ...original} = row;
+    return original;
+  });
 }
 
 function overlayCanonical(draft, baseline, context, modelRef, path = '$') {
@@ -217,11 +229,12 @@ function overlayCanonical(draft, baseline, context, modelRef, path = '$') {
     if (!binding.collection?.modelRef || !Array.isArray(next)) continue;
     const identities = collectionIdentity(binding, context);
     const clientKey = String(binding.collection.clientKey || '').trim();
-    const baselineRows = Array.isArray(previous) ? previous : [];
-    const baselineByID = indexCollection(baselineRows, identities, `${path}.${field}.baseline`, clientKey);
-    const draftByID = indexCollection(next, identities, `${path}.${field}.draft`, clientKey);
+    const allowUnkeyed = Boolean(binding.collection.deleteMarker);
+    const baselineRows = collectionBaselineRows(previous, binding.collection.deleteMarker);
+    const baselineByID = indexCollection(baselineRows, identities, `${path}.${field}.baseline`, clientKey, allowUnkeyed);
+    const draftByID = indexCollection(next, identities, `${path}.${field}.draft`, clientKey, allowUnkeyed);
     const overlaidDraft = next.map((row, index) => {
-      const key = identityKey(row, identities, `${path}.${field}.${index}`, clientKey);
+      const key = identityKey(row, identities, `${path}.${field}.${index}`, clientKey, allowUnkeyed);
       return overlayCanonical(row, baselineByID.get(key), context, binding.collection.modelRef, `${path}.${field}.${index}`);
     });
     if (String(binding.collection.mode || 'replace').toLowerCase() !== 'merge') {
@@ -236,18 +249,21 @@ function overlayCanonical(draft, baseline, context, modelRef, path = '$') {
       return retained;
     };
     if (binding.collection.preserveOrder !== false) {
-      const omitted = baselineRows.filter((row, index) => !draftByID.has(identityKey(row, identities, `${path}.${field}.baseline.${index}`, clientKey))).map(retainOmittedRow);
+      const omitted = baselineRows.filter((row, index) => {
+        const key = identityKey(row, identities, `${path}.${field}.baseline.${index}`, clientKey, allowUnkeyed);
+        return key !== null && !draftByID.has(key);
+      }).map(retainOmittedRow);
       result[field] = [...overlaidDraft, ...omitted];
       continue;
     }
-    const overlaidByID = indexCollection(overlaidDraft, identities, `${path}.${field}.overlaid`, clientKey);
+    const overlaidByID = indexCollection(overlaidDraft, identities, `${path}.${field}.overlaid`, clientKey, allowUnkeyed);
     const baselineKeys = new Set();
     const merged = baselineRows.map((row, index) => {
-      const key = identityKey(row, identities, `${path}.${field}.baseline.${index}`, clientKey);
+      const key = identityKey(row, identities, `${path}.${field}.baseline.${index}`, clientKey, allowUnkeyed);
       baselineKeys.add(key);
       return overlaidByID.has(key) ? clone(overlaidByID.get(key)) : retainOmittedRow(row);
     });
-    const appended = overlaidDraft.filter((row, index) => !baselineKeys.has(identityKey(row, identities, `${path}.${field}.overlaid.${index}`, clientKey)));
+    const appended = overlaidDraft.filter((row, index) => !baselineKeys.has(identityKey(row, identities, `${path}.${field}.overlaid.${index}`, clientKey, allowUnkeyed)));
     result[field] = [...merged, ...appended];
   }
   return result;
@@ -313,6 +329,18 @@ function normalizeCanonical(value, contract, context, path = '$', baseline = fal
     if (binding.collection?.modelRef && next !== null) {
       if (!Array.isArray(next)) throw new Error(`${path}.${field} must be an array.`);
       const nested = resolveResourceContract(context, binding.collection.modelRef);
+      const marker = binding.collection.deleteMarker;
+      if (marker && !baseline) {
+        const markerSchema = schemaProperties(nested.schema)[marker];
+        if (markerSchema?.type !== 'boolean' || Object.hasOwn(markerSchema, 'default') ||
+          Object.hasOwn(nested.model.fields?.[marker] ?? {}, 'default')) {
+          throw new Error(`${path}.${field} requires a boolean collection deleteMarker without a default.`);
+        }
+        if (next.some(row => row && Object.hasOwn(row, marker) && typeof row[marker] !== 'boolean')) {
+          throw new Error(`${path}.${field} requires an explicit boolean collection deleteMarker.`);
+        }
+      }
+      if (baseline) next = collectionBaselineRows(next, marker);
       next = next.map((entry, index) => normalizeCanonical(entry, nested, context, `${path}.${field}.${index}`, baseline));
     } else if (binding.modelRef && next !== null) {
       const nested = resolveResourceContract(context, binding.modelRef);
@@ -334,6 +362,25 @@ function normalizeCanonical(value, contract, context, path = '$', baseline = fal
     }
   }
   return result;
+}
+
+function marshalCollectionRemoval(row, binding, identities, context, path) {
+  const marker = binding.deleteMarker;
+  if (!identities.length || !identities.every(field => isPersistedCollectionIdentity(row?.[field]))) {
+    throw new Error(`${path} requires a persisted collection identity for removal.`);
+  }
+  const nested = resolveResourceContract(context, binding.modelRef);
+  const markerSchema = schemaProperties(nested.schema)[marker];
+  if (markerSchema?.type !== 'boolean' || markerSchema.readOnly) {
+    throw new Error(`${path} requires a writable boolean collection deleteMarker.`);
+  }
+  const removal = {};
+  for (const field of [...identities, marker]) {
+    const target = nested.model.fields?.[field]?.write || field;
+    if (target === '-') throw new Error(`${path} cannot omit remove field ${field}.`);
+    Object.assign(removal, setSelector(removal, target, field === marker ? true : row[field]));
+  }
+  return removal;
 }
 
 function marshalObject(draft, baseline, completenessSource, contract, context, mode, changedFields = null) {
@@ -364,16 +411,29 @@ function marshalObject(draft, baseline, completenessSource, contract, context, m
     if (next === undefined) continue;
     if (binding.collection?.modelRef) {
       if (!Array.isArray(next)) throw new Error(`${field} must be an array.`);
-      const baselineRows = Array.isArray(baseline?.[field]) ? baseline[field] : [];
+      const deleteMarker = binding.collection.deleteMarker;
+      const baselineRows = collectionBaselineRows(baseline?.[field], deleteMarker);
       const identities = collectionIdentity(binding, context);
       const clientKey = String(binding.collection.clientKey || '').trim();
-      const baselineByIdentity = indexCollection(baselineRows, identities, `${field}.baseline`, clientKey);
-      indexCollection(next, identities, `${field}.draft`, clientKey);
-      next = next.map((entry, index) => {
-        const key = identityKey(entry, identities, `${field}.${index}`, clientKey);
+      const allowUnkeyed = Boolean(deleteMarker);
+      const baselineByIdentity = indexCollection(baselineRows, identities, `${field}.baseline`, clientKey, allowUnkeyed);
+      indexCollection(next, identities, `${field}.draft`, clientKey, allowUnkeyed);
+      next = next.flatMap((entry, index) => {
+        if (deleteMarker && entry?.[deleteMarker] === true) {
+          return [marshalCollectionRemoval(entry, binding.collection, identities, context, `${field}.${index}`)];
+        }
+        const key = identityKey(entry, identities, `${field}.${index}`, clientKey, allowUnkeyed);
+        const prior = baselineByIdentity.get(key);
+        if (deleteMarker && mode === 'changed' && prior) {
+          const fields = resolveResourceContract(context, binding.collection.modelRef).model.fields || {};
+          const comparison = Object.fromEntries(Object.entries(prior).filter(([name]) =>
+            !fields[name]?.associationDelta || Object.hasOwn(entry, name)));
+          if (same(entry, comparison)) return [];
+        }
         const nestedMode = mode === 'changed' ? 'overlayBaseline' : mode;
-        return marshalResource(entry, context, binding.collection.modelRef, baselineByIdentity.get(key), nestedMode);
+        return [marshalResource(entry, context, binding.collection.modelRef, prior, nestedMode)];
       });
+      if (deleteMarker && mode === 'changed' && next.length === 0) continue;
     } else if (binding.modelRef && next !== null) {
       next = marshalResource(next, context, binding.modelRef, baseline?.[field], mode === 'changed' ? 'overlayBaseline' : mode);
     } else {

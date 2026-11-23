@@ -143,13 +143,53 @@ public enum ResourceModelRuntime {
             } else if let collection = binding.collection, let modelRef = collection.modelRef, let nested = models[modelRef] {
                 let pairByIdentity = associationModels.contains(modelRef)
                 let associationFields = pairByIdentity ? Set(nested.fields.filter { $0.value.associationDelta != nil }.keys) : []
-                let rows = try mergeResourceCollection(draft: current, baseline: previous, binding: collection, nestedSchema: schemas[nested.schemaRef], associationFields: associationFields, pairByIdentity: pairByIdentity)
-                let prepared = try applyResourceHook(nested.hooks?.beforeMarshal, value: rows.draft, hook: hook)
-                if pairByIdentity, prepared != rows.draft {
-                    throw ResourceModelError.message("Collection hooks cannot replace association draft rows before identity pairing")
+                let merged = try mergeResourceCollection(draft: current, baseline: previous, binding: collection, nestedSchema: schemas[nested.schemaRef], associationFields: associationFields, pairByIdentity: pairByIdentity)
+                if let marker = collection.deleteMarker {
+                    let identities = collection.identity?.isEmpty == false ? collection.identity! : (schemas[nested.schemaRef]?.identity ?? [])
+                    guard let markerSchema = schemas[nested.schemaRef]?.properties[marker], markerSchema.type == "boolean", !markerSchema.readOnly, markerSchema.defaultValue == nil,
+                          nested.fields[marker]?.defaultValue == nil, nested.fields[marker]?.write != "-" else {
+                        throw ResourceModelError.message("Collection deleteMarker must be a writable boolean")
+                    }
+                    var rows: [JSONValue] = []
+                    for (row, prior) in merged {
+                        let markerValue = row.objectValue?[marker]
+                        if let markerValue {
+                            guard case .bool = markerValue else {
+                                throw ResourceModelError.message("Collection removal requires an explicit boolean marker")
+                            }
+                        }
+                        if markerValue == .bool(true) {
+                            var removed: [String: JSONValue] = [:]
+                            for identity in identities {
+                                guard let value = row.objectValue?[identity], persistedResourceIdentity(value),
+                                      identity != marker, nested.fields[identity]?.write != "-" else {
+                                    throw ResourceModelError.message("Collection removal requires a writable persisted identity")
+                                }
+                                let binding = nested.fields[identity]
+                                setResourcePath(&removed, path: binding?.write ?? identity, value: try applyResourceCodec(
+                                    value, codec: binding?.codec, trim: binding?.trim == true, empty: binding?.empty))
+                            }
+                            setResourcePath(&removed, path: nested.fields[marker]?.write ?? marker, value: .bool(true))
+                            rows.append(.object(removed))
+                            continue
+                        }
+                        if mode == "changed", let prior, let object = prior.objectValue,
+                           row == .object(object.filter({ !associationFields.contains($0.key) || row.objectValue?[$0.key] != nil })) { continue }
+                        let prepared = try applyResourceHook(nested.hooks?.beforeMarshal, value: row, hook: hook)
+                        let wire = try marshalValue(prepared, baseline: prior, model: nested, mode: mode == "changed" ? "overlaybaseline" : mode, schemas: schemas, models: models, associationModels: associationModels, hook: hook)
+                        rows.append(try applyResourceHook(nested.hooks?.afterMarshal, value: wire, hook: hook))
+                    }
+                    if mode == "changed", rows.isEmpty { continue }
+                    transformed = .array(rows)
+                } else {
+                    let draftRows = JSONValue.array(merged.map { $0.0 })
+                    let prepared = try applyResourceHook(nested.hooks?.beforeMarshal, value: draftRows, hook: hook)
+                    if pairByIdentity, prepared != draftRows {
+                        throw ResourceModelError.message("Collection hooks cannot replace association draft rows before identity pairing")
+                    }
+                    let priorRows = pairByIdentity ? JSONValue.array(merged.map { $0.1 ?? .null }) : previous
+                    transformed = try applyResourceHook(nested.hooks?.afterMarshal, value: marshalValue(prepared, baseline: priorRows, model: nested, mode: mode, schemas: schemas, models: models, associationModels: associationModels, hook: hook), hook: hook)
                 }
-                let priorRows = pairByIdentity ? rows.baseline : previous
-                transformed = try applyResourceHook(nested.hooks?.afterMarshal, value: marshalValue(prepared, baseline: priorRows, model: nested, mode: mode, schemas: schemas, models: models, associationModels: associationModels, hook: hook), hook: hook)
             } else {
                 transformed = try applyResourceCodec(current, codec: binding.codec, trim: binding.trim == true, empty: binding.empty)
             }
@@ -358,12 +398,23 @@ private func resourceFilterMatches(_ value: JSONValue, filter: ResourceValueFilt
     return false
 }
 
-private func mergeResourceCollection(draft: JSONValue, baseline: JSONValue?, binding: ResourceCollectionBindingDef, nestedSchema: ResourceSchemaDef?, associationFields: Set<String>, pairByIdentity: Bool) throws -> (draft: JSONValue, baseline: JSONValue) {
+private func persistedResourceIdentity(_ value: JSONValue) -> Bool {
+    if let number = resourceNumber(value) {
+        return number.isFinite && number > 0 && number.rounded() == number && number <= 9_007_199_254_740_991
+    }
+    return value.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+}
+
+private func mergeResourceCollection(draft: JSONValue, baseline: JSONValue?, binding: ResourceCollectionBindingDef, nestedSchema: ResourceSchemaDef?, associationFields: Set<String>, pairByIdentity: Bool) throws -> [(JSONValue, JSONValue?)] {
     guard let draftRows = draft.arrayValue else { throw ResourceModelError.message("Nested resource collection must be an array") }
-    let baselineRows = baseline?.arrayValue ?? []
+    let baselineRows = (baseline?.arrayValue ?? []).map { row -> JSONValue in
+        guard let marker = binding.deleteMarker, var original = row.objectValue else { return row }
+        original.removeValue(forKey: marker)
+        return .object(original)
+    }
     let identities = binding.identity?.isEmpty == false ? binding.identity! : (nestedSchema?.identity ?? [])
     guard !identities.isEmpty else { throw ResourceModelError.message("Nested resource collection requires identity fields") }
-    func key(_ value: JSONValue, index: Int) throws -> String {
+    func key(_ value: JSONValue, index: Int) throws -> String? {
         guard let row = value.objectValue else { throw ResourceModelError.message("Nested resource row must be an object") }
         let isNewIdentity = identities.allSatisfy { field in
             guard let value = row[field] else { return true }
@@ -373,6 +424,7 @@ private func mergeResourceCollection(draft: JSONValue, baseline: JSONValue?, bin
         if isNewIdentity, let clientKey = binding.clientKey, let value = row[clientKey]?.stringValue, !value.isEmpty {
             return pairByIdentity ? "client:" + Data(value.utf8).base64EncodedString() : "client:\(value)"
         }
+        if isNewIdentity, binding.clientKey == nil, binding.deleteMarker != nil { return nil }
         if pairByIdentity {
             let parts = identities.compactMap { field -> String? in
                 switch row[field] {
@@ -399,34 +451,35 @@ private func mergeResourceCollection(draft: JSONValue, baseline: JSONValue?, bin
         return .object(object.filter { !associationFields.contains($0.key) })
     }
     var baselineByKey: [String: JSONValue] = [:]
+    var baselineEntries: [(String, JSONValue)] = []
     for (index, row) in baselineRows.enumerated() {
-        let identity = try key(row, index: index)
-        if pairByIdentity, baselineByKey[identity] != nil {
-            throw ResourceModelError.message("Duplicate nested baseline resource identity: \(identity)")
+        guard let id = try key(row, index: index) else { continue }
+        if pairByIdentity, baselineByKey[id] != nil {
+            throw ResourceModelError.message("Duplicate nested baseline resource identity: \(id)")
         }
-        baselineByKey[identity] = row
+        baselineEntries.append((id, row))
+        baselineByKey[id] = row
     }
-    var seen: Set<String> = []; var result: [JSONValue] = []
+    var seen: Set<String> = []
+    var result: [(row: JSONValue, prior: JSONValue?, id: String?)] = []
     for (index, row) in draftRows.enumerated() {
-        let identity = try key(row, index: index); guard seen.insert(identity).inserted else { throw ResourceModelError.message("Duplicate nested resource identity: \(identity)") }
-        result.append(overlayResource(base: overlayBase(baselineByKey[identity]), patch: row))
+        let id = try key(row, index: index)
+        if let id, !seen.insert(id).inserted { throw ResourceModelError.message("Duplicate nested resource identity: \(id)") }
+        let prior = id.flatMap { baselineByKey[$0] }
+        result.append((overlayResource(base: overlayBase(prior), patch: row), prior, id))
     }
     if binding.mode?.lowercased() == "merge" {
         if binding.preserveOrder == false {
-            let draftByKey = Dictionary(uniqueKeysWithValues: try result.enumerated().map { index, row in (try key(row, index: index), row) })
-            var baselineKeys: Set<String> = []
-            var ordered: [JSONValue] = []
-            for (index, row) in baselineRows.enumerated() {
-                let identity = try key(row, index: index)
-                baselineKeys.insert(identity)
-                ordered.append(draftByKey[identity] ?? overlayBase(row))
+            var draftByKey: [String: (JSONValue, JSONValue?)] = [:]
+            for entry in result { if let id = entry.id { draftByKey[id] = (entry.row, entry.prior) } }
+            let ordered: [(JSONValue, JSONValue?)] = baselineEntries.map { id, row in
+                draftByKey[id] ?? (overlayBase(row), row)
             }
-            for (index, row) in result.enumerated() where !baselineKeys.contains(try key(row, index: index)) { ordered.append(row) }
-            result = ordered
-        } else {
-            for (index, row) in baselineRows.enumerated() where !seen.contains(try key(row, index: index)) { result.append(overlayBase(row)) }
+            return ordered + result.filter { entry in entry.id.flatMap { baselineByKey[$0] } == nil }.map { ($0.row, $0.prior) }
+        }
+        for (id, row) in baselineEntries where !seen.contains(id) {
+            result.append((overlayBase(row), row, id))
         }
     }
-    let aligned = !pairByIdentity ? baselineRows : try result.enumerated().map { index, row in baselineByKey[try key(row, index: index)] ?? .null }
-    return (.array(result), .array(aligned))
+    return result.map { ($0.row, $0.prior) }
 }

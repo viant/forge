@@ -210,3 +210,40 @@ assert.deepEqual(newRows, {Rows: [{Id: 0, Name: 'A'}, {Id: 0, Name: 'B'}]});
 assert.throws(() => marshalResource({rows: [{id: 0, clientKey: 'same', name: 'A'}, {id: 0, clientKey: 'same', name: 'B'}]}, clientKeyContext, 'root', {rows: []}, 'overlayBaseline'), /duplicate collection identity/);
 
 console.log('resourceModel ✓ typed read/write marshalling, hooks, validation, baseline overlay, and nesting');
+
+const markerContext = {
+  metadata: {
+    schemas: {
+      parent: {type:'object', identity:['id'], properties:{id:{type:'integer'}, items:{type:'array'}}},
+      child: {type:'object', identity:['id'], required:['name'], properties:{
+        id:{type:'integer',nullable:true}, name:{type:'string'}, remove:{type:'boolean'},
+      }},
+    },
+    resourceModels: {
+      parent: {schemaRef:'parent',write:{mode:'changed'},fields:{
+        items:{write:'items',collection:{modelRef:'child',deleteMarker:'remove'}},
+      }},
+      child: {schemaRef:'child',fields:{id:{write:'rowId'},remove:{write:'toBeDeleted'}}},
+    },
+  },
+};
+const markerBaseline={id:7,items:[{id:1,name:'Original'},{id:2,name:'Sibling'}]};
+const markerWrite=draft=>marshalResource(draft,markerContext,'parent',markerBaseline);
+assert.deepEqual(markerWrite({id:7}),{id:7});
+assert.deepEqual(markerWrite({id:7,items:[]}),{id:7});
+assert.deepEqual(markerWrite({id:7,items:[{id:2,name:'Sibling'}]}),{id:7});
+assert.deepEqual(markerWrite(markerBaseline),{id:7});
+const deleteDraft={id:7,items:[{id:1,remove:true},{id:2,name:'Sibling'},{id:null,name:'new'},{id:null,name:'second new'}]};
+const sparseDeletion={id:7,items:[{rowId:1,toBeDeleted:true},{rowId:null,name:'new'},{rowId:null,name:'second new'}]};
+assert.deepEqual(markerWrite(deleteDraft),sparseDeletion);
+assert.deepEqual(markerWrite(deleteDraft),sparseDeletion);
+assert.deepEqual(deleteDraft.items[0],{id:1,remove:true});
+assert.throws(()=>markerWrite({id:7,items:[{id:null,remove:true}]}),/persisted collection identity/);
+assert.throws(()=>markerWrite({id:7,items:[{id:1,remove:true},{id:1,name:'duplicate'}]}),/duplicate collection identity/);
+console.log('resourceModel ✓ explicit deletion, omitted sibling, partial projection and repeatable payload');
+const staleMarkerBaseline={id:7,items:[{id:1,name:'Original',remove:true},{id:2,name:'Sibling'}]};
+assert.deepEqual(marshalResource(markerBaseline,markerContext,'parent',staleMarkerBaseline),{id:7});
+assert.throws(()=>markerWrite({id:7,items:[{id:1,remove:'true'}]}),/explicit boolean/);
+const defaultedMarker=structuredClone(markerContext);
+defaultedMarker.metadata.schemas.child.properties.remove.default=true;
+assert.throws(()=>marshalResource(markerBaseline,defaultedMarker,'parent',markerBaseline),/without a default/);

@@ -78,7 +78,7 @@ public struct ResourceAssociationDeltaBindingDef: Codable, Sendable {
     public let deleted: String
     public let baselineComplete: String?
 }
-public struct ResourceCollectionBindingDef: Codable, Sendable { public let modelRef: String?; public let identity: [String]?; public let clientKey: String?; public let mode: String?; public let preserveOrder: Bool? }
+public struct ResourceCollectionBindingDef: Codable, Sendable { public let modelRef: String?; public let identity: [String]?; public let clientKey: String?; public let mode: String?; public let preserveOrder: Bool?; public let deleteMarker: String? }
 public struct ResourceModelHooksDef: Codable, Sendable { public let beforeUnmarshal: String?; public let afterUnmarshal: String?; public let beforeMarshal: String?; public let afterMarshal: String? }
 
 public struct ResourceValueSourceDef: Codable, Sendable {

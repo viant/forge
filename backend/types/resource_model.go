@@ -148,6 +148,7 @@ type ResourceCollectionBinding struct {
 	ClientKey     string   `json:"clientKey,omitempty" yaml:"clientKey,omitempty"`
 	Mode          string   `json:"mode,omitempty" yaml:"mode,omitempty"` // replace|merge
 	PreserveOrder *bool    `json:"preserveOrder,omitempty" yaml:"preserveOrder,omitempty"`
+	DeleteMarker  string   `json:"deleteMarker,omitempty" yaml:"deleteMarker,omitempty"`
 }
 
 type ResourceModelHooks struct {

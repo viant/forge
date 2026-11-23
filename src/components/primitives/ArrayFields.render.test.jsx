@@ -25,3 +25,26 @@ it('read-only arrays expose values without add/remove controls',async()=>{
  expect(host.querySelector('input').value).toBe('Read');expect(host.querySelectorAll('button')).toHaveLength(0);
  }finally{await act(async()=>root.unmount());host.remove();}
 });
+
+it('tracks explicit stored-row removal and discards unsaved rows; reset clears the intent',async()=>{
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ const baseline=[{id:1,name:'Original'},{id:2,name:'Sibling'},{id:null,name:'Unsaved'}];
+ let pending;
+ const render=rows=>act(async()=>root.render(<ArrayFields value={rows} fields={[{field:'name',label:'Name'}]}
+  onChange={next=>{pending=next;}} minRows={1} deleteMarker="remove" />));
+ const click=ordinal=>act(async()=>host.querySelector(`[aria-label="Remove row ${ordinal}"]`).click());
+ try{
+  await render(baseline);
+  await click(1);
+  expect(pending).toEqual([{...baseline[0],remove:true},baseline[1],baseline[2]]);
+  await render(pending);
+  expect(host.querySelector('[aria-label="Name 1"]').value).toBe('Sibling');
+  await click(2);
+  expect(pending).toEqual([{...baseline[0],remove:true},baseline[1]]);
+  await render(pending);
+  expect(host.querySelector('[aria-label="Remove row 1"]')).toBeNull();
+  await render(baseline);
+  expect(host.querySelector('[aria-label="Name 1"]').value).toBe('Original');
+  expect(baseline[0]).not.toHaveProperty('remove');
+ }finally{await act(async()=>root.unmount());host.remove();}
+});
