@@ -14,7 +14,7 @@ class ResourceAssociationDeltaTest {
             "id":{"type":"integer"},"complete":{"type":"boolean","readOnly":true},
             "ids":{"type":"array","items":{"type":"integer"}}
           }},
-          "group":{"type":"object","properties":{"rows":{"type":"array","items":{"$ref":"member"}}}},
+          "group":{"type":"object","properties":{"rows":{"type":"array","items":{"${'$'}ref":"member"}}}},
           "operation":{"type":"object","identity":["id"],"properties":{
             "id":{"type":"integer"},
             "edits":{"type":"object","properties":{
