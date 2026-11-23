@@ -57,7 +57,7 @@ it('keeps editing restrictions for historical published versions',async()=>{
  expect(selector().selectedOptions[0].textContent).toContain('published');expect(button('Validate').disabled).toBe(true);expect(button('Create editable draft')).toBeDefined();await click(document.querySelector('#reader-tab-sql'));expect(document.querySelector('textarea[aria-label="Records1 SQL source"]').readOnly).toBe(true);
 });
 it('blocks selection during mutation work',async()=>{
- const f=await mount();await f.render({});await act(async()=>root.render(<WorkbenchMutationContext.Provider value={{busy:true}}><ReaderBuilder api={f.api} report={report}/></WorkbenchMutationContext.Provider>));expect(selector().disabled).toBe(true);
+ const f=await mount();await f.render({});await act(async()=>root.render(<WorkbenchMutationContext.Provider value={{busy:true,setExternalBusy:vi.fn()}}><ReaderBuilder api={f.api} report={report}/></WorkbenchMutationContext.Provider>));expect(selector().disabled).toBe(true);
 });
 it('cancels then deletes only the selected historical version and refreshes before returning',async()=>{
  const back=vi.fn();const f=await mount({}, {onBack:back});await select(1);await click(button('Delete version v1'));await click(button('Cancel'));expect(f.api.deleteVersion).not.toHaveBeenCalled();

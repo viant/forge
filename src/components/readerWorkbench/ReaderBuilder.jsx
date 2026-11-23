@@ -534,7 +534,7 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
       <Button icon="rocket-slant" disabled={!canPublish} onClick={()=>setPublicationDialogOpen(true)}>Release</Button>
       <Popover isOpen={toolsOpen} onInteraction={setToolsOpen} placement="bottom-start" content={<Menu>
         <MenuItem text="Composition lab" icon="heatmap" disabled={!canPreview} onClick={()=>runTool(()=>setAnalyticsDialogOpen(true))}/>
-        <MenuItem text="Cache & warmup" icon="database" disabled={!canEdit} onClick={()=>runTool(()=>setCacheDialogOpen(true))}/>
+        <MenuItem text="Cache & warmup" icon="database" disabled={!canEdit&&!canPublish} onClick={()=>runTool(()=>setCacheDialogOpen(true))}/>
         {rowAccessScope && <MenuItem text="Row access scope" icon="filter" disabled={!canEdit||serverScoped} onClick={()=>runTool(()=>setEntityScopeOpen(true))}/>}
         {onReleases&&<MenuItem text="Named release assignments" icon="tag" disabled={!ready||capabilities.canPublish===false} onClick={()=>runTool(()=>onReleases(version))}/>}
         <MenuItem text="Source resources" icon="folder-open" disabled={!ready||capabilities.canView===false} onClick={()=>runTool(()=>{setResourceMode('resources');setResourcesDialogOpen(true);})}/>
@@ -622,7 +622,7 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
     <ReaderRelationDialog isOpen={Boolean(editRelation)} node={editRelation} structure={inspection?.structure} onClose={()=>setEditRelation(null)} onApply={async(operation)=>{await applyCommand(operation);setSelectedNode(null);}}/>
     <ReaderFieldDialog isOpen={Boolean(editFields)} node={editFields} columnContracts={inspection?.structure?.columnContracts ?? []} onClose={()=>setEditFields(null)} onApply={async(operation)=>{await applyCommand(operation);if(workspaceTab==='graph')setSelectedNode(null);}}/>
     <ReaderAnalyticsDialog isOpen={analyticsDialogOpen} structure={inspection?.structure} onClose={() => setAnalyticsDialogOpen(false)} onTestCompose={runCompose} />
-    <ReaderCacheDialog api={api} report={report} version={version} canWarmup={canPublish} canEdit={canEdit} isOpen={cacheDialogOpen} structure={inspection?.structure} onClose={() => setCacheDialogOpen(false)} onApply={applyCommand} onWarmup={runWarmup} />
+    <ReaderCacheDialog api={api} report={report} version={version} canWarmup={canPublish} canSchedule={inspection?.version?.reportId===report.id&&capabilities.canPublish!==false} canEdit={canEdit} isOpen={cacheDialogOpen} structure={inspection?.structure} onClose={() => setCacheDialogOpen(false)} onApply={applyCommand} onWarmup={runWarmup} />
     <ReaderExposureDialog isOpen={exposureDialogOpen} readOnly={!canEdit} onCache={()=>{setExposureDialogOpen(false);setCacheDialogOpen(true);}} api={api} structure={inspection?.structure} version={version} report={report} onReportUpdated={onReportUpdated} onClose={()=>setExposureDialogOpen(false)} onApply={applyCommand}/>
     <ReaderValidationDialog isOpen={validationDialogOpen} version={version} canUseDQL={canUseDQL} onClose={()=>setValidationDialogOpen(false)} onValidate={validateDraft} onOpenSource={()=>{setValidationDialogOpen(false);setWorkspaceTab('sql');setSQLTab('advanced');setShowRawDQL(true);}}/>
     <ReaderPublicationDialog isOpen={publicationDialogOpen} api={api} report={report} version={version} inspection={inspection} onClose={()=>setPublicationDialogOpen(false)} onPublish={publishDraft} onPromote={promoteVersion} onUnpublish={unpublishDraft} onRollback={rollbackDraft}/>
