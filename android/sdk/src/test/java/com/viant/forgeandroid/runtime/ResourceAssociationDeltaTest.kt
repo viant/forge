@@ -11,7 +11,7 @@ class ResourceAssociationDeltaTest {
     private val schemas = json.decodeFromString<Map<String, ResourceSchemaDef>>("""
         {
           "member":{"type":"object","identity":["id"],"properties":{
-            "id":{"type":"integer"},"complete":{"type":"boolean","readOnly":true},
+            "id":{"type":"integer"},"complete":{"type":"boolean","readOnly":true},"removed":{"type":"boolean"},
             "ids":{"type":"array","items":{"type":"integer"}}
           }},
           "group":{"type":"object","properties":{"rows":{"type":"array","items":{"${'$'}ref":"member"}}}},
@@ -33,6 +33,9 @@ class ResourceAssociationDeltaTest {
           "group":{"schemaRef":"group","write":{"inputPath":"$"},"fields":{
             "rows":{"write":"rows","collection":{"modelRef":"member","mode":"merge"}}
           }},
+          "markedGroup":{"schemaRef":"group","write":{"inputPath":"$"},"fields":{
+            "rows":{"write":"rows","collection":{"modelRef":"member","mode":"merge","deleteMarker":"removed"}}
+          }},
           "operation":{"schemaRef":"operation","write":{"inputPath":"records","collection":true},"fields":{
             "id":{"write":"id"},
             "edits":{"associationDelta":{"mode":"explicit","added":"include","deleted":"exclude"}}
@@ -51,6 +54,16 @@ class ResourceAssociationDeltaTest {
             """{"rows":[{"id":3,"complete":true,"ids":[4,9]},{"id":6,"complete":true,"ids":[8,15]},{"id":10,"complete":false,"ids":[7]}]}"""
         )
         val expected = """{"rows":[{"id":6,"changes":{"add":[16],"delete":[8]}},{"id":3,"changes":{"add":[12],"delete":[4]}},{"id":10}]}"""
+        assertEquals(json.parseToJsonElement(expected), JsonUtil.anyToElement(result))
+    }
+
+    @Test fun rowRemovalAndOrderedAssociationDeltasShareOneCollection() = runBlocking {
+        val result = project(
+            """{"rows":[{"id":6,"ids":[15,16]},{"id":3,"removed":true,"ids":[]}]}""",
+            "markedGroup",
+            """{"rows":[{"id":3,"complete":false,"ids":[4,9]},{"id":6,"complete":true,"ids":[8,15]},{"id":10,"complete":false,"ids":[7]}]}"""
+        )
+        val expected = """{"rows":[{"id":6,"changes":{"add":[16],"delete":[8]}},{"id":3,"removed":true}]}"""
         assertEquals(json.parseToJsonElement(expected), JsonUtil.anyToElement(result))
     }
 

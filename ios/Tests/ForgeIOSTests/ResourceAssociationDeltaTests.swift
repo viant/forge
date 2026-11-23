@@ -5,7 +5,7 @@ final class ResourceAssociationDeltaTests: XCTestCase {
     private let schema = #"""
     {
       "member": {"type":"object","identity":["id"],"properties":{
-        "id":{"type":"integer"}, "complete":{"type":"boolean","readOnly":true},
+        "id":{"type":"integer"}, "complete":{"type":"boolean","readOnly":true}, "removed":{"type":"boolean"},
         "ids":{"type":"array","items":{"type":"integer"}}
       }},
       "group": {"type":"object","properties":{"rows":{"type":"array","items":{"$ref":"member"}}}},
@@ -26,6 +26,9 @@ final class ResourceAssociationDeltaTests: XCTestCase {
       }},
       "group": {"schemaRef":"group","write":{"inputPath":"$"},"fields":{
         "rows":{"write":"rows","collection":{"modelRef":"member","mode":"merge"}}
+      }},
+      "markedGroup": {"schemaRef":"group","write":{"inputPath":"$"},"fields":{
+        "rows":{"write":"rows","collection":{"modelRef":"member","mode":"merge","deleteMarker":"removed"}}
       }},
       "operation": {"schemaRef":"operation","write":{"inputPath":"records","collection":true},"fields":{
         "id":{"write":"id"},
@@ -51,6 +54,15 @@ final class ResourceAssociationDeltaTests: XCTestCase {
             baseline: #"{"rows":[{"id":3,"complete":true,"ids":[4,9]},{"id":6,"complete":true,"ids":[8,15]},{"id":10,"complete":false,"ids":[7]}]}"#,
             model: "group")
         let expected = #"{"rows":[{"id":6,"changes":{"add":[16],"delete":[8]}},{"id":3,"changes":{"add":[12],"delete":[4]}},{"id":10}]}"#
+        XCTAssertEqual(result, try JSONDecoder().decode(JSONValue.self, from: Data(expected.utf8)))
+    }
+
+    func testRowRemovalAndOrderedAssociationDeltasShareOneCollection() throws {
+        let result = try project(
+            #"{"rows":[{"id":6,"ids":[15,16]},{"id":3,"removed":true,"ids":[]}]}"#,
+            baseline: #"{"rows":[{"id":3,"complete":false,"ids":[4,9]},{"id":6,"complete":true,"ids":[8,15]},{"id":10,"complete":false,"ids":[7]}]}"#,
+            model: "markedGroup")
+        let expected = #"{"rows":[{"id":6,"changes":{"add":[16],"delete":[8]}},{"id":3,"removed":true}]}"#
         XCTAssertEqual(result, try JSONDecoder().decode(JSONValue.self, from: Data(expected.utf8)))
     }
 
