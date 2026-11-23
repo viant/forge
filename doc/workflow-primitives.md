@@ -124,6 +124,50 @@ mutationCommand:
   refresh: [{dataSourceRef: record_read, bypassCache: true}]
 ```
 
+### Explicit collection row removal
+
+Set `collection.deleteMarker` to the canonical boolean field used to mark a
+persisted row for removal. Use the nested resource model to map that field and
+the declared identity fields to the writer contract.
+
+```yaml
+schemas:
+  record:
+    type: object
+    identity: [id]
+    properties:
+      id: {type: integer}
+      rows: {type: array, items: {$ref: row}}
+  row:
+    type: object
+    identity: [id]
+    properties:
+      id: {type: integer}
+      label: {type: string}
+      removed: {type: boolean}
+resourceModels:
+  row:
+    schemaRef: row
+    fields:
+      id: {write: id}
+      label: {write: label}
+      removed: {read: '-', write: toBeDeleted}
+  record:
+    schemaRef: record
+    fields:
+      rows:
+        write: records
+        collection: {modelRef: row, mode: merge, deleteMarker: removed}
+```
+
+For the Web `arrayFields` widget, set its `deleteMarker` property to the same
+canonical field and `rowKey` to the persisted row identifier. Removing a
+persisted row hides it and records the marker in the draft until Save.
+Removing an unsaved row drops it from the draft. Existing form Revert restores
+the persisted draft. On Save a marked row emits only its writable identity and
+the marker. An omitted persisted row never implies deletion. The producer
+continues to own validation and authorization for the removal.
+
 ### Paired association IDs
 
 Use `associationDelta` on a resource-model field when one writer accepts separate

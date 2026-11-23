@@ -168,10 +168,12 @@ export function unmarshalResourceCollection(records, context, modelRef) {
   return records.map((record) => unmarshalResource(record, context, modelRef));
 }
 
-function collectionIdentity(binding = {}, context) {
-  if (!binding.collection?.modelRef) return [];
-  const nested = resolveResourceContract(context, binding.collection.modelRef);
-  return binding.collection.identity?.length ? binding.collection.identity : (nested.schema.identity || []);
+function collectionIdentity(binding, nested) {
+  return binding.identity?.length ? binding.identity : (nested.schema.identity || []);
+}
+
+function associationFields(contract) {
+  return Object.entries(contract.model.fields || {}).filter(([, binding]) => binding.associationDelta).map(([name]) => name);
 }
 
 function identityKey(row, identities, path, clientKey = '', allowUnkeyed = false) {
@@ -227,7 +229,8 @@ function overlayCanonical(draft, baseline, context, modelRef, path = '$') {
       continue;
     }
     if (!binding.collection?.modelRef || !Array.isArray(next)) continue;
-    const identities = collectionIdentity(binding, context);
+    const nested = resolveResourceContract(context, binding.collection.modelRef);
+    const identities = collectionIdentity(binding.collection, nested);
     const clientKey = String(binding.collection.clientKey || '').trim();
     const allowUnkeyed = Boolean(binding.collection.deleteMarker);
     const baselineRows = collectionBaselineRows(previous, binding.collection.deleteMarker);
@@ -241,8 +244,7 @@ function overlayCanonical(draft, baseline, context, modelRef, path = '$') {
       result[field] = overlaidDraft;
       continue;
     }
-    const pairedFields = Object.entries(resolveResourceContract(context, binding.collection.modelRef).model.fields || {})
-      .filter(([, nested]) => nested.associationDelta).map(([name]) => name);
+    const pairedFields = associationFields(nested);
     const retainOmittedRow = row => {
       const retained = clone(row);
       for (const name of pairedFields) delete retained[name];
@@ -258,10 +260,11 @@ function overlayCanonical(draft, baseline, context, modelRef, path = '$') {
     }
     const overlaidByID = indexCollection(overlaidDraft, identities, `${path}.${field}.overlaid`, clientKey, allowUnkeyed);
     const baselineKeys = new Set();
-    const merged = baselineRows.map((row, index) => {
+    const merged = baselineRows.flatMap((row, index) => {
       const key = identityKey(row, identities, `${path}.${field}.baseline.${index}`, clientKey, allowUnkeyed);
+      if (key === null) return [];
       baselineKeys.add(key);
-      return overlaidByID.has(key) ? clone(overlaidByID.get(key)) : retainOmittedRow(row);
+      return [overlaidByID.has(key) ? clone(overlaidByID.get(key)) : retainOmittedRow(row)];
     });
     const appended = overlaidDraft.filter((row, index) => !baselineKeys.has(identityKey(row, identities, `${path}.${field}.overlaid.${index}`, clientKey, allowUnkeyed)));
     result[field] = [...merged, ...appended];
@@ -413,7 +416,9 @@ function marshalObject(draft, baseline, completenessSource, contract, context, m
       if (!Array.isArray(next)) throw new Error(`${field} must be an array.`);
       const deleteMarker = binding.collection.deleteMarker;
       const baselineRows = collectionBaselineRows(baseline?.[field], deleteMarker);
-      const identities = collectionIdentity(binding, context);
+      const nested = resolveResourceContract(context, binding.collection.modelRef);
+      const identities = collectionIdentity(binding.collection, nested);
+      const pairedFields = deleteMarker ? associationFields(nested) : [];
       const clientKey = String(binding.collection.clientKey || '').trim();
       const allowUnkeyed = Boolean(deleteMarker);
       const baselineByIdentity = indexCollection(baselineRows, identities, `${field}.baseline`, clientKey, allowUnkeyed);
@@ -425,9 +430,9 @@ function marshalObject(draft, baseline, completenessSource, contract, context, m
         const key = identityKey(entry, identities, `${field}.${index}`, clientKey, allowUnkeyed);
         const prior = baselineByIdentity.get(key);
         if (deleteMarker && mode === 'changed' && prior) {
-          const fields = resolveResourceContract(context, binding.collection.modelRef).model.fields || {};
-          const comparison = Object.fromEntries(Object.entries(prior).filter(([name]) =>
-            !fields[name]?.associationDelta || Object.hasOwn(entry, name)));
+          const omittedPairs = pairedFields.filter(name => !Object.hasOwn(entry, name) && Object.hasOwn(prior, name));
+          const comparison = omittedPairs.length ? {...prior} : prior;
+          for (const name of omittedPairs) delete comparison[name];
           if (same(entry, comparison)) return [];
         }
         const nestedMode = mode === 'changed' ? 'overlayBaseline' : mode;

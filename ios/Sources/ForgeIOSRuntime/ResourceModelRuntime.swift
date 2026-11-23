@@ -173,8 +173,15 @@ public enum ResourceModelRuntime {
                             rows.append(.object(removed))
                             continue
                         }
-                        if mode == "changed", let prior, let object = prior.objectValue,
-                           row == .object(object.filter({ !associationFields.contains($0.key) || row.objectValue?[$0.key] != nil })) { continue }
+                        if mode == "changed", let prior {
+                            let comparison: JSONValue
+                            if !associationFields.isEmpty, let object = prior.objectValue {
+                                comparison = .object(object.filter { !associationFields.contains($0.key) || row.objectValue?[$0.key] != nil })
+                            } else {
+                                comparison = prior
+                            }
+                            if row == comparison { continue }
+                        }
                         let prepared = try applyResourceHook(nested.hooks?.beforeMarshal, value: row, hook: hook)
                         let wire = try marshalValue(prepared, baseline: prior, model: nested, mode: mode == "changed" ? "overlaybaseline" : mode, schemas: schemas, models: models, associationModels: associationModels, hook: hook)
                         rows.append(try applyResourceHook(nested.hooks?.afterMarshal, value: wire, hook: hook))

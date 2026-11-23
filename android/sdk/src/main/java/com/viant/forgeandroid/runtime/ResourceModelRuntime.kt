@@ -152,7 +152,12 @@ object ResourceModelRuntime {
                                 }
                                 setPath(removed, nested.fields[marker]?.write ?: marker, true)
                                 rows.add(removed)
-                            } else if (mode != "changed" || row != JsonUtil.asStringMap(entry.prior).filterKeys { it !in associationFields || row.containsKey(it) }) {
+                            } else {
+                                if (mode == "changed" && entry.prior != null) {
+                                    val comparison = if (associationFields.isEmpty()) entry.prior else
+                                        JsonUtil.asStringMap(entry.prior).filterKeys { it !in associationFields || row.containsKey(it) }
+                                    if (entry.row == comparison) continue
+                                }
                                 val prepared = applyHook(nested.hooks?.beforeMarshal, entry.row, hook)
                                 val wire = marshalValue(prepared, entry.prior, nested, if (mode == "changed") "overlaybaseline" else mode, schemas, models, associationModels, hook)
                                 rows.add(applyHook(nested.hooks?.afterMarshal, wire, hook))
