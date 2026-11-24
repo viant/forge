@@ -80,7 +80,7 @@ try {
     const longValue = tightDesktop.values.at(-1);
     assert.ok(longValue.fontSize === tightDesktop.readableFloor && longValue.lines > 1, 'A long value can wrap at the readable size floor');
     for (const result of results.filter(result => result.width >= 390 && result.columns < 6)) {
-        assert.ok(result.values.every(value => value.lines === 1 && value.fontSize === result.themedSize), 'Roomy cards keep single-line values at the theme size');
+        assert.ok(result.values.every(value => value.lines === 1 && value.fontSize === result.themedSize), `Roomy cards keep single-line values at the theme size: ${JSON.stringify({width:result.width,themedSize:result.themedSize,values:result.values})}`);
     }
     assert.ok(results.every(result => result.pageFits && result.geometry.every(card => !card.overflows.length && !card.overlap)), `Metric card text must fit without overlap; inspect ${output}/geometry.json`);
     console.log('Metric cards preserve exact values and contain all text at desktop (six columns), tablet, and phone widths.');
