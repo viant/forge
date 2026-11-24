@@ -70,8 +70,10 @@ func (m *MemoryBacking) Has(_ context.Context, hash string) (bool, error) {
 }
 
 type Config struct {
-	SizeMB        int
-	MaxEntries    int
+	SizeMB     int
+	MaxEntries int
+	// MaxEntryBytes limits the complete encoded frame in hot memory.
+	// Artifacts above it remain available through compressed backing.
 	MaxEntryBytes int
 	Backing       CompressedStore
 }
@@ -126,19 +128,12 @@ func (s *Store) Put(ctx context.Context, value *artifactcohort.Artifact) (failur
 	if artifactcohort.ValidateArtifact(value) != nil {
 		return artifactcohort.ErrInvalid
 	}
-	frame, err := encodeFrame(value.Root.Hash, value.Payload)
-	if err != nil {
-		return err
-	}
-	if len(frame) > s.maxEntry {
-		return ErrOversize
-	}
 	var buf bytes.Buffer
 	zip := gzip.NewWriter(&buf)
-	if _, err = zip.Write(value.Payload); err != nil {
+	if _, err := zip.Write(value.Payload); err != nil {
 		return err
 	}
-	if err = zip.Close(); err != nil {
+	if err := zip.Close(); err != nil {
 		return err
 	}
 	s.mu.Lock()
@@ -150,7 +145,7 @@ func (s *Store) Put(ctx context.Context, value *artifactcohort.Artifact) (failur
 		}
 		return nil
 	}
-	if err = s.backing.Save(ctx, value.Root.Hash, buf.Bytes()); err != nil {
+	if err := s.backing.Save(ctx, value.Root.Hash, buf.Bytes()); err != nil {
 		return err
 	}
 	s.refs[key] = value.Root
@@ -158,7 +153,13 @@ func (s *Store) Put(ctx context.Context, value *artifactcohort.Artifact) (failur
 }
 func (s *Store) Get(ctx context.Context, ref artifactcohort.RootRef) (*artifactcohort.Artifact, error) {
 	var owned []byte
-	err := s.WithBorrowed(ctx, ref, func(payload []byte) error { owned = bytes.Clone(payload); return nil })
+	err := s.withPayload(ctx, ref, func(payload []byte, borrowed bool) error {
+		if borrowed {
+			payload = bytes.Clone(payload)
+		}
+		owned = payload
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +214,11 @@ func (s *Store) Has(ctx context.Context, ref artifactcohort.RootRef) (exists boo
 
 // WithBorrowed holds the store lock across Get, Bintly decode and callback.
 // The callback must not retain payload or reenter this Store.
-func (s *Store) WithBorrowed(ctx context.Context, ref artifactcohort.RootRef, fn func([]byte) error) (failure error) {
+func (s *Store) WithBorrowed(ctx context.Context, ref artifactcohort.RootRef, fn func([]byte) error) error {
+	return s.withPayload(ctx, ref, func(payload []byte, _ bool) error { return fn(payload) })
+}
+
+func (s *Store) withPayload(ctx context.Context, ref artifactcohort.RootRef, fn func(payload []byte, borrowed bool) error) (failure error) {
 	span := observe.Start(ctx, PhaseGet, cacheLabels)
 	state := observe.CacheUnknown
 	defer func() { span.End(observe.OutcomeFor(failure), state) }()
@@ -252,11 +257,12 @@ func (s *Store) WithBorrowed(ctx context.Context, ref artifactcohort.RootRef, fn
 	}
 	if err != nil {
 		miss := observe.Start(ctx, PhaseMiss, cacheLabels)
-		raw, err = s.hydrate(ctx, hash)
+		payload, err := s.hydrate(ctx, hash)
 		miss.End(observe.OutcomeFor(err), observe.CacheMiss)
 		if err != nil {
 			return err
 		}
+		return fn(payload, false)
 	}
 	decode := observe.Start(ctx, PhaseDecode, cacheLabels)
 	payload, err := decodeFrame(raw, hash)
@@ -264,7 +270,7 @@ func (s *Store) WithBorrowed(ctx context.Context, ref artifactcohort.RootRef, fn
 	if err != nil {
 		return err
 	}
-	return fn(payload)
+	return fn(payload, true)
 }
 func (s *Store) hydrate(ctx context.Context, hash string) ([]byte, error) {
 	compressed, err := s.backing.Load(ctx, hash)
@@ -278,30 +284,34 @@ func (s *Store) hydrate(ctx context.Context, hash string) ([]byte, error) {
 		return nil, err
 	}
 	defer zip.Close()
-	payload, err := io.ReadAll(io.LimitReader(zip, int64(s.maxEntry)+1))
+	payload, err := io.ReadAll(zip)
 	inflate.End(observe.OutcomeFor(err), observe.CacheMiss)
 	if err != nil {
 		return nil, err
 	}
-	if len(payload) > s.maxEntry {
-		return nil, ErrOversize
+	if err = ctx.Err(); err != nil {
+		return nil, err
 	}
 	if artifactcohort.Hash(payload) != hash {
 		return nil, errors.New("backing digest mismatch")
 	}
-	frame, err := encodeFrame(hash, payload)
-	if err != nil {
-		return nil, err
+	// A frame contains the payload plus its header. Avoid even building a
+	// frame when the payload alone already exhausts the hot entry budget.
+	if len(payload) < s.maxEntry && uint64(len(payload)) <= uint64(^uint32(0)) {
+		frame, err := encodeFrame(hash, payload)
+		if err != nil {
+			return nil, err
+		}
+		if len(frame) <= s.maxEntry {
+			if err = s.hot.Set(hash, frame); err != nil {
+				return nil, err
+			}
+			s.hydrates.Add(1)
+		}
 	}
-	if len(frame) > s.maxEntry {
-		return nil, ErrOversize
-	}
-	if err = s.hot.Set(hash, frame); err != nil {
-		return nil, err
-	}
-	s.hydrates.Add(1)
-	return s.hot.Get(hash)
+	return payload, nil
 }
+
 func (s *Store) Hydrations() uint64 { return s.hydrates.Load() }
 func (s *Store) Close() error       { s.mu.Lock(); defer s.mu.Unlock(); return s.hot.Close() }
 
@@ -315,7 +325,7 @@ func encodeFrame(hash string, payload []byte) ([]byte, error) {
 		return nil, err
 	}
 	arch := runtime.GOARCH
-	if len(arch) > 255 || len(meta) > int(^uint32(0)) {
+	if len(arch) > 255 || uint64(len(meta)) > uint64(^uint32(0)) {
 		return nil, ErrOversize
 	}
 	out := make([]byte, 0, 7+len(arch)+32+4+len(meta)+len(payload))

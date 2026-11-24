@@ -25,8 +25,11 @@ const (
 	PolicyAction            = "join"
 	NotificationListChanged = "notifications/resources/list_changed"
 	NotificationUpdated     = "notifications/resources/updated"
-	MaxPayloadBytes         = 4 << 20
 )
+
+// MaxPayloadBytes was the cohort payload acceptance limit.
+// Deprecated: payload acceptance is independent of size. Configure hot admission in cache.Config instead.
+const MaxPayloadBytes = 4 << 20
 
 var (
 	ErrDenied      = errors.New("artifact cohort denied")
@@ -66,7 +69,7 @@ type Artifact struct {
 }
 
 func ValidateArtifact(value *Artifact) error {
-	if value == nil || value.Root.URI == "" || !RootKind(value.Root.Kind) || value.Root.Version == 0 || len(value.Payload) == 0 || len(value.Payload) > MaxPayloadBytes || !json.Valid(value.Payload) || Hash(value.Payload) != value.Root.Hash {
+	if value == nil || value.Root.URI == "" || !RootKind(value.Root.Kind) || value.Root.Version == 0 || len(value.Payload) == 0 || !json.Valid(value.Payload) || Hash(value.Payload) != value.Root.Hash {
 		return ErrInvalid
 	}
 	if _, err := RootPartition(value.Root); err != nil {
