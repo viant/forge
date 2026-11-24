@@ -7,6 +7,7 @@ import Button from '../Button.jsx';
 import SelectControl from '../SelectControl.jsx';
 import {typographyProps} from '../Typography.jsx';
 import Icon from '../Icon.jsx';
+import SoftSkeleton, {SoftBlock} from '../SoftSkeleton.jsx';
 import {useForgeTheme} from '../ThemeBoundary.jsx';
 import { Checkbox, Dialog, Drawer, DialogBody, DialogFooter, InputGroup, Menu, MenuItem, ResizeSensor, Tooltip } from "@blueprintjs/core";
 import {normalizeSubmittedFilterValue} from './filterValue.js';
@@ -52,6 +53,7 @@ const FilterDialog = ({
     const [filterValues, setFilterValues] = useState({});
     const [fieldId,setFieldId] = useState(null);
     const [query,setQuery] = useState('');
+    const optionSearch = useRef(null);
 
     const activeSet = visibleSets.find(set => set.name === selectedSet.name) || visibleSets[0] || {};
     const visibleTemplate = (activeSet.template || []).filter(visible).map(field => ({...field,
@@ -105,10 +107,53 @@ const FilterDialog = ({
     const drawer = presentation === 'drawer';
     const Frame = drawer ? Drawer : Dialog;
     const activeField=visibleTemplate.find(field=>field.id===fieldId);
+    const optionSources = new Map();
+    if (isOpen && isDesignSystem2 && drawer) for (const field of visibleTemplate) {
+        if (field.optionsDataSourceRef && !optionSources.has(field.optionsDataSourceRef)) {
+            optionSources.set(field.optionsDataSourceRef, context.Context(field.optionsDataSourceRef));
+        }
+    }
+    const sourcePending = source => {
+        const control = source?.signals?.control?.value || {};
+        return !!source && (control.loading === true || source.signals?.input?.value?.fetch === true
+            || control.loaded !== true && !control.error);
+    };
+    const optionSource = optionSources.get(activeField?.optionsDataSourceRef);
+    const optionControl = optionSource?.signals?.control?.value || {};
+    const optionsPending = sourcePending(optionSource);
+    const hasKnownOptions = !!activeField?.options?.length;
+    // Back navigation keeps the same native requests and draft. It must not
+    // bypass the source readiness check on the drawer's shared Apply action.
+    const optionsUnavailable = visibleTemplate.some(field => {
+        const source = optionSources.get(field.optionsDataSourceRef);
+        return sourcePending(source) || !!source?.signals?.control?.value?.error && !field.options?.length;
+    });
+    const retryOptions = async event => {
+        if (!optionSource || optionSource.handlers.dataSource.peekLoading()) return;
+        // Keep focus on an existing, stable control before the retry action is
+        // replaced by pending content. Native Drawer still owns the focus trap.
+        if (event?.currentTarget === document.activeElement) optionSearch.current?.focus();
+        try {
+            await optionSource.handlers.dataSource.fetchCollection({result:'records',invocationId:crypto.randomUUID(),cache:{bypassCache:true}});
+        } catch (error) {
+            if (error?.name === 'AbortError' || error?.code === 'request_superseded') return;
+            context.handlers?.notifications?.show?.('Filter options could not be loaded. Please try again.', {
+                intent:'danger',key:`filter-options:${activeField.optionsDataSourceRef}`,ttlMs:4000,
+            });
+        }
+    };
     const changed=visibleTemplate.some(field=>JSON.stringify(filterValues[field.id]??(field.type==='boolean'?false:''))!==JSON.stringify(filter[field.id]??(field.type==='boolean'?false:'')));
     const hasAppliedFilters=Object.values(filter).some(value=>value!==''&&value!=null&&String(value)!=='');
     const renderFieldControl=field=>{
         const controlId=`forge-filter-${field.id}`;
+        if (optionSource && optionsPending && !hasKnownOptions) return <div role="status" aria-live="polite" aria-label="Loading filter options">
+            <span className="bp6-visually-hidden">Loading filter options…</span>
+            <div className="forge-filter-options-skeleton" aria-hidden="true">{Array.from({length:6},(_,index)=><div className="forge-filter-options-skeleton__row" key={index}>
+                <SoftBlock height="var(--forge-spacing-5)" className="forge-filter-options-skeleton__check"/>
+                <SoftSkeleton lines={1} height="var(--forge-spacing-4)" className="forge-filter-options-skeleton__label"/>
+            </div>)}</div>
+        </div>;
+        if (optionSource && optionControl.error && !hasKnownOptions) return <Button variant="ghost" icon="lucide:refresh-cw" aria-label="Retry filter options" onClick={retryOptions}>Try again</Button>;
         if(field.type==='boolean')return <Checkbox id={controlId} label={field.label} checked={filterValues[field.id]===true} onChange={event=>handleInputChange(field.id,event.target.checked)}/>;
         if(Array.isArray(field.options)) {
             const multiple=String(field.type||'').endsWith('[]')||field.operator==='in';
@@ -156,8 +201,8 @@ const FilterDialog = ({
                 )}
 
                 {drawer ? <>
-                    {(!activeField||Array.isArray(activeField.options))&&<InputGroup className="forge-drawer-search" type="search" data-forge-part="input" placeholder="Search" aria-label={activeField?'Search filter options':'Search filters'} leftElement={<Icon name="lucide:search" className="bp6-icon"/>} value={query} onChange={event=>setQuery(event.target.value)}/>}
-                    <div className="forge-drawer-scroll">{activeField?<div className="forge-filter-dialog__fields"><label className="forge-filter-dialog__label" {...typographyProps('label')} htmlFor={`forge-filter-${activeField.id}`}>{Array.isArray(activeField.options)?'Options':'Value'}</label>{renderFieldControl(activeField)}</div>:<Menu className="forge-drawer-options" aria-label="Available filters">{visibleTemplate.filter(field=>String(field.label||field.id).toLowerCase().includes(query.toLowerCase())).map(field=><MenuItem tagName="button" key={field.id} text={field.label} labelElement={<Icon name="lucide:chevron-right"/>} onClick={()=>{setFieldId(field.id);setQuery('');}}/>)}{!visibleTemplate.length&&<MenuItem disabled text="No filters are available."/>}</Menu>}</div>
+                    {(!activeField||Array.isArray(activeField.options))&&<InputGroup inputRef={optionSearch} className="forge-drawer-search" type="search" data-forge-part="input" placeholder="Search" aria-label={activeField?'Search filter options':'Search filters'} leftElement={<Icon name="lucide:search" className="bp6-icon"/>} value={query} onChange={event=>setQuery(event.target.value)}/>}
+                    <div className="forge-drawer-scroll">{activeField?<div className="forge-filter-dialog__fields" aria-busy={optionSource?optionsPending:undefined}><label className="forge-filter-dialog__label" {...typographyProps('label')} htmlFor={`forge-filter-${activeField.id}`}>{Array.isArray(activeField.options)?'Options':'Value'}</label>{renderFieldControl(activeField)}</div>:<Menu className="forge-drawer-options" aria-label="Available filters">{visibleTemplate.filter(field=>String(field.label||field.id).toLowerCase().includes(query.toLowerCase())).map(field=><MenuItem tagName="button" key={field.id} text={field.label} labelElement={<Icon name="lucide:chevron-right"/>} onClick={()=>{setFieldId(field.id);setQuery('');}}/>)}{!visibleTemplate.length&&<MenuItem disabled text="No filters are available."/>}</Menu>}</div>
                 </> : <div className="forge-filter-dialog__fields">
                     {visibleTemplate.map((tpl) => (
                         <React.Fragment key={tpl.id}>
@@ -174,7 +219,7 @@ const FilterDialog = ({
                 actions={[
                     <Button key="cancel" variant={drawer?'ghost':'secondary'} onClick={onClose}>Cancel</Button>,
                     (!drawer || !isDesignSystem2) && (!drawer || hasAppliedFilters)?<Button key="clear" variant="ghost" onClick={handleClearFilters}>Clear filters</Button>:null,
-                    <Button key="ok" variant="primary" disabled={drawer&&!changed} onClick={handleApplyFilters}>{drawer?'Apply':'OK'}</Button>,
+                    <Button key="ok" variant="primary" disabled={drawer&&(!changed||optionsUnavailable)} onClick={handleApplyFilters}>{drawer?'Apply':'OK'}</Button>,
                 ]}
             />}
         </Frame>

@@ -2,11 +2,14 @@ import NativeControlTarget from '../../runtime/NativeControlTarget.jsx';
 import React, {useCallback, useEffect, useId, useMemo, useRef, useState} from 'react';
 import {getViewSignal} from '../../core/store/signals.js';
 import ContentImage from './ContentImage.jsx';
+import Icon from '../Icon.jsx';
+import {useForgeTheme} from '../ThemeBoundary.jsx';
 import {contentAction, contentRecords} from './contentModel.js';
 import {copyDetailValue} from '../primitives/detailViewModel.js';
 import './content.css';
 
 function ContentCard({context,railId,row,position,onClick,onTagClick,disabled,cardRef,onFocus,onBlur}) {
+    const designSystem2=useForgeTheme()?.themeId==='design-system-2';
     const [copyStatus,setCopyStatus]=useState('');
     useEffect(()=>{if(!copyStatus)return;const timer=setTimeout(()=>setCopyStatus(''),1200);return()=>clearTimeout(timer);},[copyStatus]);
     const copy=async(strict=false)=>{const result=await copyDetailValue(typeof navigator==='undefined'?null:navigator.clipboard,row.copyLabel || 'identifier',row.copyValue);setCopyStatus(result);if(strict===true&&!result.startsWith('Copied'))throw new Error('Native clipboard copy failed');return {status:'copied'};};
@@ -15,7 +18,7 @@ function ContentCard({context,railId,row,position,onClick,onTagClick,disabled,ca
         {native('open',disabled||row.disabled,onClick?({event})=>(onClick.operate || onClick)(contentAction(row,event)):null,<button type="button" className="forge-content-card__open" disabled={disabled || row.disabled} onClick={event=>onClick?.(contentAction(row,event))} aria-label={row.title || `Open item ${position+1}`}/>)}
         <ContentImage src={row.image} fallbackSrc={row.fallbackImage} alt={row.imageAlt || ''} className={`forge-content-card__image${row.imageFit==='contain'?' is-contain':''}`}/>
         <div className="forge-content-card__body">
-            {row.copyValue!=null ? native('copy',disabled||row.disabled,()=>copy(true),<button type="button" className="forge-content-card__copy" aria-label={`Copy ${row.copyLabel || 'identifier'}`} disabled={disabled || row.disabled} onClick={()=>copy()}><span>{row.subtitle ?? row.copyValue}</span><span aria-hidden="true">{copyStatus.startsWith('Copied')?'✓':'⧉'}</span></button>) : row.subtitle ? <span className="forge-content-card__subtitle">{row.subtitle}</span> : null}
+            {row.copyValue!=null ? native('copy',disabled||row.disabled,()=>copy(true),<button type="button" className="forge-content-card__copy" aria-label={`Copy ${row.copyLabel || 'identifier'}`} disabled={disabled || row.disabled} onClick={()=>copy()}><span>{row.subtitle ?? row.copyValue}</span><span aria-hidden="true">{designSystem2?<Icon name={copyStatus.startsWith('Copied')?'lucide:check':'lucide:copy'}/>:copyStatus.startsWith('Copied')?'✓':'⧉'}</span></button>) : row.subtitle ? <span className="forge-content-card__subtitle">{row.subtitle}</span> : null}
             <h3 title={row.title}>{row.title}</h3>{row.description ? <p>{row.description}</p> : null}
             {Array.isArray(row.facts) ? <dl>{row.facts.map((fact,i)=><div key={i}><dt>{fact.label}</dt><dd>{fact.value}</dd></div>)}</dl> : null}
             {Array.isArray(row.tags) ? <span className="forge-content-card__tags">{row.tags.map((tag,i)=>onTagClick ? <NativeControlTarget key={`${tag.kind || ''}-${tag.id ?? i}`} context={context} item={{id:`${railId}:card:${row.id ?? position}:tag:${tag.id ?? tag.value ?? i}`,type:'button'}} disabled={disabled||row.disabled||tag.disabled} actions={{click:({event})=>(onTagClick.operate || onTagClick)({target:{value:tag.id ?? tag.value ?? tag},detail:{item:row,tag},originalEvent:event})}}><button key={`${tag.kind || ''}-${tag.id ?? i}`} type="button" disabled={disabled || row.disabled || tag.disabled} aria-pressed={typeof tag.selected==='boolean'?tag.selected:undefined} onClick={event=>onTagClick({target:{value:tag.id ?? tag.value ?? tag},detail:{item:row,tag},originalEvent:event})}>{typeof tag==='object'?tag.label:tag}</button></NativeControlTarget> : <span key={i}>{typeof tag==='object'?tag.label:tag}</span>)}</span> : null}
@@ -25,6 +28,7 @@ function ContentCard({context,railId,row,position,onClick,onTagClick,disabled,ca
 }
 
 export default function CardRail({id,context,value=[],heading,description,icon,totalCount,countHint,onCountClick,onClick,onTagClick,disabled,className='',style,emptyText='No items match these filters.','aria-label':ariaLabel}) {
+    const designSystem2=useForgeTheme()?.themeId==='design-system-2';
     const rows=useMemo(()=>contentRecords(value),[value]),generatedId=useId(),track=useRef(null),cards=useRef(new Map());
     const [edges,setEdges]=useState({start:true,end:true});
     const headingId=`${id || generatedId}-heading`,trackId=`${id || generatedId}-items`;
@@ -89,7 +93,7 @@ export default function CardRail({id,context,value=[],heading,description,icon,t
         <header className="forge-card-rail__header">
             {icon ? <ContentImage src={icon} className="forge-card-rail__icon"/> : null}
             <div className="forge-card-rail__heading">{heading?<h2 id={headingId}>{heading} {onCountClick?native('count',disabled,({event})=>(onCountClick.operate || onCountClick)(event),<button type="button" className="forge-card-rail__count" title={countHint} aria-label={countHint || `Show all ${heading}`} disabled={disabled} onClick={onCountClick}>{count}</button>):<span className="forge-card-rail__count" title={countHint}>{count}</span>}</h2>:null}{description?<p>{description}</p>:null}</div>
-            {rows.length?<div className="forge-card-rail__controls">{native('previous',edges.start||disabled,()=>scroll(-1),<button type="button" aria-label="Scroll left" aria-controls={trackId} disabled={edges.start || disabled} onClick={()=>scroll(-1)}>‹</button>)}{native('next',edges.end||disabled,()=>scroll(1),<button type="button" aria-label="Scroll right" aria-controls={trackId} disabled={edges.end || disabled} onClick={()=>scroll(1)}>›</button>)}</div>:null}
+            {rows.length?<div className="forge-card-rail__controls">{native('previous',edges.start||disabled,()=>scroll(-1),<button type="button" aria-label="Scroll left" aria-controls={trackId} disabled={edges.start || disabled} onClick={()=>scroll(-1)}>{designSystem2?<Icon name="lucide:chevron-left"/>:'‹'}</button>)}{native('next',edges.end||disabled,()=>scroll(1),<button type="button" aria-label="Scroll right" aria-controls={trackId} disabled={edges.end || disabled} onClick={()=>scroll(1)}>{designSystem2?<Icon name="lucide:chevron-right"/>:'›'}</button>)}</div>:null}
         </header>
         {rows.length?<div id={trackId} className="forge-card-rail__track" ref={track} role="list" onScroll={update}>{rows.map((row,position)=><ContentCard context={context} railId={railId} key={row.id ?? position} row={row} position={position} onClick={onClick} onTagClick={onTagClick} disabled={disabled} cardRef={node=>{if(node)cards.current.set(position,node);else cards.current.delete(position);}} onFocus={()=>focus(row,position)} onBlur={blur}/>)}</div>:emptyText?<p className="forge-card-rail__empty" role="status">{emptyText}</p>:null}
     </section>;

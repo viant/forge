@@ -82,3 +82,12 @@ for(const status of ['failed','cancelled']){
  const remove=registerControlActions({windowId:'receipt-window',controlId:'export'},()=>({visible:true,disabled:false,actions:{click:async()=>({status,error:{message:'Synthetic output failure'}})}}));
  await assert.rejects(invokeRegisteredControlAction({windowId:'receipt-window',controlId:'export'},'click'),/Synthetic output failure/);remove();
 }
+
+// Explicit email kind is opt-in; legacy text validation remains unchanged.
+for(const value of ['person@example.com','person+tag@sub.example.com','person@local'])assert.equal(validateWidgetControlValue(value,{item:{type:'email'}}),null);
+for(const value of ['missing-at','person@','person @example.com','a@example.com,b@example.com'])assert.equal(validateWidgetControlValue(value,{item:{type:'email'}}),'valid email address required');
+assert.equal(validateWidgetControlValue('',{item:{type:'email'}}),null);
+assert.equal(validateWidgetControlValue('',{item:{type:'email'},props:{required:true}}),'value is required');
+assert.equal(validateWidgetControlValue('a@example.com, b@example.com',{item:{type:'email'},props:{multiple:true}}),null);
+assert.equal(validateWidgetControlValue('not-an-email',{item:{type:'text'}}),null);
+assert.equal(validateWidgetControlValue('',{item:{type:'email'},props:{pattern:'.+@example\\.com',minLength:6}}),null);

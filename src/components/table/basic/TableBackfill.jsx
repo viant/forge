@@ -5,9 +5,11 @@ import UnifiedIcon from '../../Icon.jsx';
 import React from "react";
 import {Colors} from '@blueprintjs/core';
 import SoftSkeleton from '../../SoftSkeleton.jsx';
+import {useForgeTheme} from '../../ThemeBoundary.jsx';
 import { formatDataSourceError } from "../../../utils/dataSourceError.js";
 
 const TableBackfill = ({context, fixedRowHeight, rowCount, colSpan, collection, skeletonColumns}) => {
+    const isDesignSystem2=useForgeTheme()?.themeId==='design-system-2';
     if (rowCount <= 0) return null;
     const {signals} = context;
     const {control} = signals;
@@ -36,7 +38,7 @@ const TableBackfill = ({context, fixedRowHeight, rowCount, colSpan, collection, 
                     {noData && !disabled && !loading && !error ? (
                         <span style={{color: Colors.BLUE3}}><UnifiedIcon name="info-sign"></UnifiedIcon> No data. </span>) : null}
                     {error ?
-                        <span className="forge-table-error-message"><UnifiedIcon name="error"></UnifiedIcon> {errorMessage} </span> : null}
+                        <span className="forge-table-error-message"><UnifiedIcon name={isDesignSystem2?'lucide:info':'error'}></UnifiedIcon> {errorMessage} </span> : null}
                     </div>
                 </td>
             </tr>);

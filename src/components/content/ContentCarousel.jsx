@@ -4,11 +4,14 @@ import {useSignals} from '@preact/signals-react/runtime';
 import {getViewSignal} from '../../core/store/signals.js';
 import {useViewPartition} from '../useViewPartition.js';
 import ContentImage from './ContentImage.jsx';
+import Icon from '../Icon.jsx';
+import {useForgeTheme} from '../ThemeBoundary.jsx';
 import {contentRecords, contentAction} from './contentModel.js';
 import './content.css';
 
 export default function ContentCarousel({id, item, context, value = [], onClick, disabled, autoRotateMs = 0, wholeSlideAction = false, className = '', style, 'aria-label': ariaLabel = 'Featured content'}) {
     useSignals();
+    const designSystem2=useForgeTheme()?.themeId==='design-system-2';
     const slides = useMemo(() => contentRecords(value), [value]), generatedId = useId();
     const [activeId, setActiveId] = useState(null), [hovered, setHovered] = useState(false), [focused, setFocused] = useState(false), [paused, setPaused] = useState(false);
     const [reducedMotion, setReducedMotion] = useState(false);
@@ -76,10 +79,10 @@ export default function ContentCarousel({id, item, context, value = [], onClick,
             </div>
         </article>
         {slides.length > 1 ? <>
-            {native('previous',disabled,()=>choose(index-1),<button type="button" className="forge-content-carousel__previous" aria-label="Previous featured item" disabled={disabled} onClick={() => choose(index - 1)}>‹</button>)}
-            {native('next',disabled,()=>choose(index+1),<button type="button" className="forge-content-carousel__next" aria-label="Next featured item" disabled={disabled} onClick={() => choose(index + 1)}>›</button>)}
+            {native('previous',disabled,()=>choose(index-1),<button type="button" className="forge-content-carousel__previous" aria-label="Previous featured item" disabled={disabled} onClick={() => choose(index - 1)}>{designSystem2?<Icon name="lucide:chevron-left"/>:'‹'}</button>)}
+            {native('next',disabled,()=>choose(index+1),<button type="button" className="forge-content-carousel__next" aria-label="Next featured item" disabled={disabled} onClick={() => choose(index + 1)}>{designSystem2?<Icon name="lucide:chevron-right"/>:'›'}</button>)}
             <div className="forge-content-carousel__pages" role="group" aria-label="Choose featured item">{slides.map((slide, position) => <NativeControlTarget key={slide.id ?? position} context={context} item={{id:`${controlId}:page:${slide.id ?? position}`,type:'button'}} disabled={disabled} actions={{click:()=>choose(position)}}><button type="button" key={slide.id ?? position} aria-label={`Go to featured item ${position + 1}`} aria-current={position === index ? 'true' : undefined} aria-controls={panelId} disabled={disabled} onClick={() => choose(position)}/></NativeControlTarget>)}</div>
-            {interval >= 1000 && !reducedMotion ? native('pause',disabled,()=>setPaused(!paused),<button type="button" className="forge-content-carousel__pause" disabled={disabled} aria-label={paused ? 'Resume rotation' : 'Pause rotation'} onClick={() => setPaused(!paused)}>{paused ? '▶' : 'Ⅱ'}</button>) : null}
+            {interval >= 1000 && !reducedMotion ? native('pause',disabled,()=>setPaused(!paused),<button type="button" className="forge-content-carousel__pause" disabled={disabled} aria-label={paused ? 'Resume rotation' : 'Pause rotation'} onClick={() => setPaused(!paused)}>{designSystem2?<Icon name={paused?'lucide:play':'lucide:pause'}/>:paused ? '▶' : 'Ⅱ'}</button>) : null}
         </> : null}
     </section>;
 }

@@ -2353,6 +2353,20 @@
             "field",
             "format"
           ],
+          "allOf": [
+            {
+              "if": {
+                "required": [
+                  "hideExactOne"
+                ]
+              },
+              "then": {
+                "required": [
+                  "divideBy"
+                ]
+              }
+            }
+          ],
           "properties": {
             "field": {
               "type": "string",
@@ -2386,6 +2400,12 @@
                   ]
                 }
               }
+            },
+            "divideBy": {
+              "const": "center"
+            },
+            "hideExactOne": {
+              "type": "boolean"
             }
           }
         },
@@ -2403,6 +2423,9 @@
           ]
         },
         "stacked": {
+          "type": "boolean"
+        },
+        "showZeroCategories": {
           "type": "boolean"
         },
         "preserveCategoryOrder": {
@@ -4317,6 +4340,20 @@
             "field",
             "format"
           ],
+          "allOf": [
+            {
+              "if": {
+                "required": [
+                  "hideExactOne"
+                ]
+              },
+              "then": {
+                "required": [
+                  "divideBy"
+                ]
+              }
+            }
+          ],
           "properties": {
             "field": {
               "type": "string",
@@ -4350,6 +4387,12 @@
                   ]
                 }
               }
+            },
+            "divideBy": {
+              "const": "center"
+            },
+            "hideExactOne": {
+              "type": "boolean"
             }
           }
         },
@@ -4387,6 +4430,9 @@
         },
         "seriesField": {
           "type": "string"
+        },
+        "showZeroCategories": {
+          "type": "boolean"
         },
         "preserveCategoryOrder": {
           "type": "boolean"
@@ -7771,6 +7817,16 @@
         "sliceLabel": {
           "type": "object",
           "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "required": [
+                  "hideExactOne"
+                ]
+              },
+              "then": {}
+            }
+          ],
           "properties": {
             "field": {
               "type": "string",
@@ -7804,6 +7860,12 @@
                   ]
                 }
               }
+            },
+            "divideBy": {
+              "const": "center"
+            },
+            "hideExactOne": {
+              "type": "boolean"
             }
           }
         },
@@ -7821,6 +7883,9 @@
           ]
         },
         "stacked": {
+          "type": "boolean"
+        },
+        "showZeroCategories": {
           "type": "boolean"
         },
         "preserveCategoryOrder": {
@@ -9488,6 +9553,16 @@
         "sliceLabel": {
           "type": "object",
           "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "required": [
+                  "hideExactOne"
+                ]
+              },
+              "then": {}
+            }
+          ],
           "properties": {
             "field": {
               "type": "string",
@@ -9521,6 +9596,12 @@
                   ]
                 }
               }
+            },
+            "divideBy": {
+              "const": "center"
+            },
+            "hideExactOne": {
+              "type": "boolean"
             }
           }
         },
@@ -9558,6 +9639,9 @@
         },
         "seriesField": {
           "type": "string"
+        },
+        "showZeroCategories": {
+          "type": "boolean"
         },
         "preserveCategoryOrder": {
           "type": "boolean"
@@ -11358,9 +11442,6 @@
         "summaryRow": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "datasetRef"
-          ],
           "properties": {
             "datasetRef": {
               "type": "string",

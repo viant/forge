@@ -258,3 +258,14 @@ Pointer interaction adds no focus ring. Keyboard navigation retains the shared
 inset indicator, including owned hints and menus. Check light/dark, Tab/Shift+Tab,
 disabled/read-only admission and switching back to the original profile.
 Private producer schemas and data stay outside this public framework.
+
+
+### DS2 Actions and export
+
+A declared export composes into the List Page Actions menu as its native nested
+CSV/XLSX options. Actions remains available without selected rows; existing
+row-dependent operations retain their guards. Export and its formats use text
+labels without decorative icons, with the parent retaining a trailing Lucide
+chevron. Native focus, dismissal and actual download ownership remain intact.
+The producer-bound heading period updates its original field and invokes its
+existing change callback exactly once. Other themes retain their prior toolbar.

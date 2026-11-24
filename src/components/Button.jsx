@@ -7,8 +7,8 @@ export const buttonVariants = Object.freeze(['primary', 'secondary', 'ghost', 'l
 export const buttonSizes = Object.freeze(['default', 'compact']);
 
 // Absence of variant preserves the established widget appearance during migration.
-export default function Button({variant, size = 'default', loading = false, readOnly,
-    disabled, intent, children, className, title, item, icon, hideLabel, style, ...rest}) {
+const Button = React.forwardRef(function Button({variant, size = 'default', loading = false, readOnly,
+    disabled, intent, children, className, title, item, icon, hideLabel, style, ...rest}, ref) {
     if (variant && !buttonVariants.includes(variant)) throw new Error(`Unsupported button variant: ${variant}`);
     if (!buttonSizes.includes(size)) throw new Error(`Unsupported button size: ${size}`);
     if (variant && Object.keys(style || {}).some(key => /^(?:font|lineHeight|letterSpacing|color|background|border|boxShadow|padding|minHeight|height|gap|outline|transition)/.test(key))) {
@@ -20,7 +20,7 @@ export default function Button({variant, size = 'default', loading = false, read
         ? `forge-button--${legacyIntent}` : '';
     const name = rest['aria-label'] || children || item?.label || title;
     if (variant && hideLabel && !name) throw new Error('Icon-only buttons require an accessible name');
-    return <button type="button" {...(variant ? typographyProps('label') : {})} {...rest}
+    return <button ref={ref} type="button" {...(variant ? typographyProps('label') : {})} {...rest}
         className={['forge-button', hideLabel ? 'forge-button--icon-only' : '', intentClass, className].filter(Boolean).join(' ')}
         data-forge-variant={variant} data-forge-size={variant ? size : undefined}
         disabled={unavailable} aria-busy={loading || undefined}
@@ -28,4 +28,5 @@ export default function Button({variant, size = 'default', loading = false, read
         {loading ? <span className="forge-button__busy" aria-hidden="true"/> : icon ? <Icon name={icon}/> : null}
         {hideLabel ? null : (children || item?.label || title)}
     </button>;
-}
+});
+export default Button;
