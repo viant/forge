@@ -154,3 +154,122 @@ func TestParallelReportPageDoesNotReadPastLookahead(t *testing.T) {
 		})
 	}
 }
+
+func TestReportCatalogPreservesCanceledAndExpiredRequestsBeforeIdentityRead(t *testing.T) {
+	for _, deadline := range []bool{false, true} {
+		t.Run(fmt.Sprintf("deadline=%t", deadline), func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			expected := error(context.Canceled)
+			if deadline {
+				cancel()
+				ctx, cancel = context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+				expected = context.DeadlineExceeded
+			} else {
+				cancel()
+			}
+			defer cancel()
+			service := &ReportCatalogService{Identity: func(context.Context) (identity.VerifiedActor, error) {
+				t.Fatal("stopped request reached identity lookup")
+				return identity.VerifiedActor{}, nil
+			}}
+			result, err := service.List(ctx, ReportCatalogQuery{})
+			if result != nil || !errors.Is(err, expected) || errors.Is(err, identity.ErrResourceDenied) {
+				t.Fatalf("request failure was masked: result=%v err=%v", result, err)
+			}
+		})
+	}
+}
+
+func TestReportCatalogPreservesAuthorityFailureAlongsideScopeCleanup(t *testing.T) {
+	for _, phase := range []string{"identity", "resolver", "inventory"} {
+		t.Run(phase, func(t *testing.T) {
+			primary, cleanup := errors.New("authority unavailable"), errors.New("scope closed")
+			actor := identity.VerifiedActor{Subject: "reader", Issuer: "https://identity.example", TenantID: "tenant", AccountID: "account", IdentityRevision: "one", ValidUntil: time.Now().Add(time.Minute)}
+			service := &ReportCatalogService{
+				BeginMetadataRead: func(ctx context.Context) (context.Context, func() error, error) {
+					return ctx, func() error { return cleanup }, nil
+				},
+				Identity: func(context.Context) (identity.VerifiedActor, error) {
+					if phase == "identity" {
+						return identity.VerifiedActor{}, primary
+					}
+					return actor, nil
+				},
+				Resolver: func(context.Context) (*identity.ResourceResolver, error) {
+					if phase == "resolver" {
+						return nil, primary
+					}
+					return &identity.ResourceResolver{}, nil
+				},
+				Inventories: []ReportInventory{ReportInventoryFunc(func(context.Context, identity.VerifiedActor) ([]ReportCatalogCandidate, error) { return nil, primary })},
+			}
+			result, err := service.List(context.Background(), ReportCatalogQuery{})
+			if result != nil || !errors.Is(err, primary) || !errors.Is(err, cleanup) {
+				t.Fatalf("lost primary or cleanup cause: result=%v err=%v", result, err)
+			}
+		})
+	}
+}
+
+func TestReportReadPreservesIdentityAndResolverFailures(t *testing.T) {
+	for _, phase := range []string{"identity", "resolver", "final-identity", "caller-cancellation"} {
+		t.Run(phase, func(t *testing.T) {
+			primary := error(errors.New("identity dependency unavailable"))
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if phase == "caller-cancellation" {
+				primary = context.Canceled
+			}
+			actor := identity.VerifiedActor{Subject: "reader", Issuer: "https://identity.example", TenantID: "tenant", AccountID: "account", IdentityRevision: "one", ValidUntil: time.Now().Add(time.Minute)}
+			uri, _ := identity.ParseResourceURI("report://example/summary")
+			raw := json.RawMessage(`{"schemaVersion":1,"format":"forge.authoredReport","reportDocument":{}}`)
+			resolver := &identity.ResourceResolver{Source: &identity.LocalResource{URI: uri, Load: func(context.Context) (json.RawMessage, error) { return raw, nil }}, Policy: catalogScopePolicy(func(context.Context, identity.ResourceRef, []identity.ResourceCandidate) (identity.ResourceDecision, error) {
+				return identity.ResourceDecision{Candidate: identity.ResourceCandidate{Kind: identity.WorkingCandidate, ContentFingerprint: identity.ContentFingerprint(raw)}, AuthorityBinding: "reader", ValidUntil: actor.ValidUntil}, nil
+			})}
+			calls := 0
+			service := &ReportCatalogService{Identity: func(context.Context) (identity.VerifiedActor, error) {
+				calls++
+				if phase == "caller-cancellation" && calls > 1 {
+					cancel()
+				}
+				if phase == "identity" || phase == "final-identity" && calls > 1 {
+					return identity.VerifiedActor{}, primary
+				}
+				return actor, nil
+			}, Resolver: func(context.Context) (*identity.ResourceResolver, error) {
+				if phase == "resolver" {
+					return nil, primary
+				}
+				return resolver, nil
+			}}
+			value, pin, err := service.Read(ctx, identity.ResourceRef{URI: uri.String()}, nil)
+			if value != nil || pin != nil || !errors.Is(err, primary) {
+				t.Fatalf("read lost authority failure: bytes=%d pin=%v err=%v", len(value), pin, err)
+			}
+		})
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	service := &ReportCatalogService{Identity: func(context.Context) (identity.VerifiedActor, error) {
+		t.Fatal("canceled read reached identity")
+		return identity.VerifiedActor{}, nil
+	}, Resolver: func(context.Context) (*identity.ResourceResolver, error) { return nil, nil }}
+	_, _, err := service.Read(ctx, identity.ResourceRef{URI: "report://example/summary"}, nil)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("canceled read became denial: %v", err)
+	}
+}
+
+func TestReportCatalogDoesNotReturnEmptySuccessAfterCallerCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	actor := identity.VerifiedActor{Subject: "reader", Issuer: "https://identity.example", TenantID: "tenant", AccountID: "account", IdentityRevision: "one", ValidUntil: time.Now().Add(time.Minute)}
+	service := &ReportCatalogService{Identity: func(context.Context) (identity.VerifiedActor, error) { return actor, nil }, Resolver: func(context.Context) (*identity.ResourceResolver, error) { return &identity.ResourceResolver{}, nil }, Inventories: []ReportInventory{ReportInventoryFunc(func(context.Context, identity.VerifiedActor) ([]ReportCatalogCandidate, error) {
+		cancel()
+		return nil, nil
+	})}}
+	result, err := service.List(ctx, ReportCatalogQuery{})
+	if result != nil || !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancellation became empty success: result=%v err=%v", result, err)
+	}
+}

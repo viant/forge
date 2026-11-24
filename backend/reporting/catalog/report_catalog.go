@@ -91,9 +91,21 @@ type ReportCatalogService struct {
 }
 
 func (s *ReportCatalogService) List(ctx context.Context, input ReportCatalogQuery) (out *ReportCatalogResult, resultErr error) {
-	if ctx == nil || ctx.Err() != nil {
+	if ctx == nil {
 		return nil, identity.ErrResourceDenied
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	requestContext := ctx
+	defer func() {
+		if err := requestContext.Err(); err != nil {
+			out = nil
+			if !errors.Is(resultErr, err) {
+				resultErr = errors.Join(resultErr, err)
+			}
+		}
+	}()
 	if s != nil && s.BeginMetadataRead != nil {
 		scoped, finish, err := s.BeginMetadataRead(ctx)
 		if err != nil {
@@ -106,7 +118,7 @@ func (s *ReportCatalogService) List(ctx context.Context, input ReportCatalogQuer
 		defer func() {
 			if err := finish(); err != nil {
 				out = nil
-				resultErr = err
+				resultErr = errors.Join(resultErr, err)
 			}
 		}()
 	}
@@ -116,8 +128,11 @@ func (s *ReportCatalogService) list(ctx context.Context, input ReportCatalogQuer
 	if strings.TrimSpace(input.Search) != "" {
 		return nil, fmt.Errorf("ranked report search requires the indexed resource catalog: %w", identity.ErrResource)
 	}
-	if s == nil || s.Identity == nil || s.Resolver == nil || len(s.Inventories) == 0 || ctx == nil || ctx.Err() != nil || input.Limit < 0 || input.Limit > 1000 {
+	if s == nil || s.Identity == nil || s.Resolver == nil || len(s.Inventories) == 0 || ctx == nil || input.Limit < 0 || input.Limit > 1000 {
 		return nil, identity.ErrResourceDenied
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	if input.ResourceURI != "" {
 		uri, err := identity.ParseResourceURI(input.ResourceURI)
@@ -126,11 +141,17 @@ func (s *ReportCatalogService) list(ctx context.Context, input ReportCatalogQuer
 		}
 	}
 	actor, err := s.Identity(ctx)
-	if err != nil || !actor.Valid(time.Now()) {
+	if err != nil {
+		return nil, err
+	}
+	if !actor.Valid(time.Now()) {
 		return nil, identity.ErrResourceDenied
 	}
 	resolver, err := s.Resolver(ctx)
-	if err != nil || resolver == nil {
+	if err != nil {
+		return nil, err
+	}
+	if resolver == nil {
 		return nil, identity.ErrResourceDenied
 	}
 	scope, err := input.Scope.Prepare(input.Namespace)
@@ -265,7 +286,10 @@ func (s *ReportCatalogService) list(ctx context.Context, input ReportCatalogQuer
 		start = end
 	}
 	fresh, err := s.Identity(ctx)
-	if err != nil || !fresh.Valid(time.Now()) || fresh.Subject != actor.Subject || fresh.Issuer != actor.Issuer || fresh.TenantID != actor.TenantID || fresh.AccountID != actor.AccountID || fresh.IdentityRevision != actor.IdentityRevision {
+	if err != nil {
+		return nil, err
+	}
+	if !fresh.Valid(time.Now()) || fresh.Subject != actor.Subject || fresh.Issuer != actor.Issuer || fresh.TenantID != actor.TenantID || fresh.AccountID != actor.AccountID || fresh.IdentityRevision != actor.IdentityRevision {
 		return nil, identity.ErrResourceDenied
 	}
 	return result, nil
@@ -273,12 +297,26 @@ func (s *ReportCatalogService) list(ctx context.Context, input ReportCatalogQuer
 
 // Read returns the exact envelope and pin. A supplied opened pin is rechecked
 // without choosing a newer working copy; explicit requested stamps are checked.
-func (s *ReportCatalogService) Read(ctx context.Context, ref identity.ResourceRef, pinned *identity.ResolvedResource) ([]byte, *identity.ResolvedResource, error) {
+func (s *ReportCatalogService) Read(ctx context.Context, ref identity.ResourceRef, pinned *identity.ResolvedResource) (out []byte, resolved *identity.ResolvedResource, resultErr error) {
 	if s == nil || s.Identity == nil || s.Resolver == nil || ctx == nil {
 		return nil, nil, identity.ErrResourceDenied
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
+	defer func() {
+		if err := ctx.Err(); err != nil {
+			out, resolved = nil, nil
+			if !errors.Is(resultErr, err) {
+				resultErr = errors.Join(resultErr, err)
+			}
+		}
+	}()
 	actor, err := s.Identity(ctx)
-	if err != nil || !actor.Valid(time.Now()) {
+	if err != nil {
+		return nil, nil, err
+	}
+	if !actor.Valid(time.Now()) {
 		return nil, nil, identity.ErrResourceDenied
 	}
 	uri, err := identity.ParseResourceURI(ref.URI)
@@ -286,7 +324,10 @@ func (s *ReportCatalogService) Read(ctx context.Context, ref identity.ResourceRe
 		return nil, nil, identity.ErrResource
 	}
 	resolver, err := s.Resolver(ctx)
-	if err != nil || resolver == nil {
+	if err != nil {
+		return nil, nil, err
+	}
+	if resolver == nil {
 		return nil, nil, identity.ErrResourceDenied
 	}
 	pin := pinned
@@ -304,7 +345,10 @@ func (s *ReportCatalogService) Read(ctx context.Context, ref identity.ResourceRe
 		return nil, nil, err
 	}
 	current, err := s.Identity(ctx)
-	if err != nil || current.Subject != actor.Subject || current.AccountID != actor.AccountID || current.TenantID != actor.TenantID || current.Issuer != actor.Issuer || current.IdentityRevision != actor.IdentityRevision || !current.Valid(time.Now()) {
+	if err != nil {
+		return nil, nil, err
+	}
+	if current.Subject != actor.Subject || current.AccountID != actor.AccountID || current.TenantID != actor.TenantID || current.Issuer != actor.Issuer || current.IdentityRevision != actor.IdentityRevision || !current.Valid(time.Now()) {
 		return nil, nil, identity.ErrResourceDenied
 	}
 	return raw, fresh, nil

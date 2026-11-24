@@ -29,6 +29,11 @@ func projectIndependentDatasourceTransport(window *types.Window, references map[
 // ErrUnsupportedWindowTransport rejects unregistered browser HTTP transports.
 var ErrUnsupportedWindowTransport = errors.New("window datasource HTTP transport requires a host-registered native source")
 
+type nativeWindowSource struct {
+	provider string
+	uri      string
+}
+
 // RegisterNativeHTTPWindows is startup-only host configuration. Provider payloads
 // cannot register transports. Generations are checked by Get; this binding names
 // the configured connection, provider identity and exact canonical window URI.
@@ -36,22 +41,22 @@ func (c *WindowCatalog) RegisterNativeHTTPWindows(connection Connection, uris []
 	if c == nil || connection.Name == "" || connection.ProviderIdentity == "" {
 		return fmt.Errorf("native HTTP windows require an explicit connection and provider")
 	}
-	connection.Generation = 0
-	bindings := map[string]bool{}
 	for _, value := range uris {
 		uri, err := identity.ParseResourceURI(value)
 		if err != nil || uri.Kind != "window" || uri.String() != value {
 			return fmt.Errorf("invalid native HTTP window binding")
 		}
-		bindings[value] = true
 	}
 	if c.nativeHTTPWindows == nil {
-		c.nativeHTTPWindows = map[Connection]map[string]bool{}
+		c.nativeHTTPWindows = make(map[nativeWindowSource]map[string]bool)
 	}
-	for uri := range c.nativeHTTPWindows[connection] {
-		bindings[uri] = true
+	for _, value := range uris {
+		key := nativeWindowSource{connection.ProviderIdentity, value}
+		if c.nativeHTTPWindows[key] == nil {
+			c.nativeHTTPWindows[key] = make(map[string]bool)
+		}
+		c.nativeHTTPWindows[key][connection.Name] = true
 	}
-	c.nativeHTTPWindows[connection] = bindings
 	return nil
 }
 

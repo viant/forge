@@ -2,6 +2,7 @@ import {routingImpactSchema,stageAllocationSchema} from '../../components/scenar
 import {windowCalculationDefinitions} from "./windowCalculationSchema.js";
 import {numericDisplayFormatSchema} from '../../components/categoryRange.js';
 import {pieSliceLabelSchema} from '../../components/pieSliceLabel.js';
+import {tableSummaryRowSchema} from "../tableVisualSpec.js";
 import {hierarchySchema,pivotSchema,columnGroupsSchema} from '../reportTableAnalytics.js';
 import {chartTooltipSchema,chartTooltipEntrySchema} from '../../components/chartTooltip.js';
 import {donutCenterSchema,resolvedDonutCenterSchema} from '../../components/donutCenter.js';
@@ -923,6 +924,7 @@ export const reportFillSchema = {
           type: "array",
           items: { $ref: "#/$defs/tableColumn" },
         },
+        summaryRow: tableSummaryRowSchema,
         content: {
           type: "object",
           additionalProperties: false,
@@ -934,6 +936,7 @@ export const reportFillSchema = {
               items: { $ref: "#/$defs/tableColumn" },
             },
             rowCount: { type: "integer", minimum: 0 },
+            summaryRow: { $ref: "#/$defs/resolvedTableRow" },
             resolvedRows: {
               type: "array",
               items: { $ref: "#/$defs/resolvedTableRow" },

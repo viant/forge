@@ -658,6 +658,8 @@ type DashboardEditableTableColumn struct {
 	VisibleWhen map[string]interface{} `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
 }
 
+
+
 type DashboardEditableTableMobileCards struct {
 	Enabled        bool     `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	TitleField     string   `json:"titleField,omitempty" yaml:"titleField,omitempty"`

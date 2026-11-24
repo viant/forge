@@ -113,7 +113,34 @@ func TestKnownPublishedReportDoesNotReadUnrelatedConnectionSettings(t *testing.T
 		require.NoError(t, err)
 		require.Equal(t, "publisher", got.ResolvedResource.ProviderIdentity)
 	}
+	page, err := (&ReportGatewayCatalog{Gateway: g}).List(t.Context(), catalog.ReportCatalogQuery{Namespace: "example", Limit: 1})
+	require.NoError(t, err)
+	require.Len(t, page.Reports, 1)
+	require.Equal(t, ref.URI, page.Reports[0].URI)
 	require.Zero(t, peer.calls)
+}
+
+func TestPublishedReportNamespaceListKeepsCallerScopeAndCursor(t *testing.T) {
+	g, source, trap, _ := publishedFixture(t)
+	second := source.states["report://example/sample"]
+	second.URI, second.Name = "report://example/second", "second"
+	source.states[second.URI] = second
+	c := &ReportGatewayCatalog{Gateway: g}
+	query := catalog.ReportCatalogQuery{Namespace: "example", Limit: 1}
+	first, err := c.List(t.Context(), query)
+	require.NoError(t, err)
+	require.NotEmpty(t, first.NextCursor)
+	reads := source.gets.Load()
+	excluded := context.WithValue(t.Context(), catalogRootsKey{}, []Connection{{Name: "another", ProviderIdentity: "another-publisher"}})
+	page, err := c.List(excluded, query)
+	require.NoError(t, err)
+	require.Empty(t, page.Reports)
+	query.Cursor = first.NextCursor
+	page, err = c.List(excluded, query)
+	require.Nil(t, page)
+	require.ErrorIs(t, err, primitive.ErrCatalogCursor)
+	require.Equal(t, reads, source.gets.Load(), "an excluded publication cannot fetch its definitions")
+	require.Zero(t, trap.calls, "an excluded publication cannot fall through to remote discovery")
 }
 
 func TestDeclaredReportScopeNarrowsPagesAndBindsCursor(t *testing.T) {

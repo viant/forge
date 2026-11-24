@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	manager "github.com/viant/forge/backend/clientpool"
 	dsproto "github.com/viant/forge/backend/datasource/contract"
 	service "github.com/viant/forge/backend/provider"
 	identity "github.com/viant/forge/backend/resource"
@@ -77,4 +78,55 @@ func TestWindowHTTPTransportRequiresExactHostSourceBinding(t *testing.T) {
 	}
 	require.Error(t, (&WindowCatalog{}).RegisterNativeHTTPWindows(Connection{}, []string{"window://example/sales"}))
 	require.Error(t, (&WindowCatalog{}).RegisterNativeHTTPWindows(Connection{Name: "native", ProviderIdentity: "host"}, []string{"report://example/sales"}))
+}
+
+func TestRegisteredNativeWindowUsesItsConnectionWhenPeerSettingsFail(t *testing.T) {
+	ctx := context.Background()
+	base, _, revoked := fixtureGateway(t, map[string]*fixtureProvider{})
+	peer := &unavailablePeerSettings{}
+	mgr, err := manager.New(peer)
+	require.NoError(t, err)
+	t.Cleanup(func() { mgr.CloseConversation("") })
+	local := provider("native-owner")
+	local.definition = indexedWindowBytes(t, "root")
+	require.NoError(t, mgr.RegisterLocal(ctx, "native", &mcpcfg.MCPClient{ClientOptions: &mcp.ClientOptions{}, PrimitiveProviderIdentity: local.owner}, func(context.Context) (mcpclient.Interface, error) { return local, nil }))
+	g := NewGateway(mgr, base.Actor, base.Verify, "host")
+	t.Cleanup(g.Close)
+	proof, err := types.NewWindowTargetHMAC(make([]byte, 32))
+	require.NoError(t, err)
+	const uri = "window://example/sales"
+	catalog := &WindowCatalog{Gateway: g, TargetProof: proof, DefaultNamespace: "example", DefaultProviderIdentity: local.owner, Aliases: map[string]string{"summary": uri}}
+	require.NoError(t, catalog.RegisterNativeHTTPWindows(Connection{Name: "native", ProviderIdentity: local.owner}, []string{uri}))
+	for _, key := range []string{"summary", uri} {
+		result, err := catalog.GetForProvider(ctx, local.owner, &service.WindowDefinitionGetInput{WindowID: key})
+		require.NoError(t, err)
+		require.Equal(t, uri, result.Definition.Resource.URI)
+		require.Equal(t, local.owner, result.Definition.Resource.ProviderIdentity)
+	}
+	require.Zero(t, peer.calls, "opening an explicitly hosted definition must not resolve unrelated settings")
+	before, err := catalog.locate(ctx, "summary", local.owner)
+	require.NoError(t, err)
+	g.Invalidate("native")
+	after, err := catalog.locate(ctx, "summary", local.owner)
+	require.NoError(t, err)
+	require.Greater(t, after.Connection.Generation, before.Connection.Generation)
+	*revoked = true
+	_, err = catalog.GetForProvider(ctx, local.owner, &service.WindowDefinitionGetInput{WindowID: uri})
+	require.ErrorIs(t, err, identity.ErrResourceDenied)
+	*revoked = false
+	require.Zero(t, peer.calls)
+
+	scoped := context.WithValue(ctx, catalogRootsKey{}, []Connection{{Name: "unavailable-peer", ProviderIdentity: "public-owner"}})
+	_, err = catalog.GetForProvider(scoped, local.owner, &service.WindowDefinitionGetInput{WindowID: uri})
+	require.Error(t, err, "the native source cannot replace a caller's narrower routing scope")
+	require.Positive(t, peer.calls)
+	peer.calls = 0
+	_, err = catalog.GetForProvider(ctx, local.owner, &service.WindowDefinitionGetInput{WindowID: "window://example/undeclared"})
+	require.Error(t, err)
+	require.Positive(t, peer.calls, "an unregistered resource must use ordinary publisher resolution")
+	require.NoError(t, mgr.RegisterLocal(ctx, "second", &mcpcfg.MCPClient{ClientOptions: &mcp.ClientOptions{}, PrimitiveProviderIdentity: local.owner}, func(context.Context) (mcpclient.Interface, error) { return local, nil }))
+	require.NoError(t, catalog.RegisterNativeHTTPWindows(Connection{Name: "second", ProviderIdentity: local.owner}, []string{uri}))
+	_, err = catalog.GetForProvider(ctx, local.owner, &service.WindowDefinitionGetInput{WindowID: uri})
+	require.ErrorIs(t, err, ErrCollision)
+
 }

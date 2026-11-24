@@ -11,6 +11,7 @@ import (
 	"github.com/viant/authz"
 	"github.com/viant/forge/backend/artifactcohort"
 	primitive "github.com/viant/forge/backend/provider/contract"
+	catalog "github.com/viant/forge/backend/reporting/catalog"
 	identity "github.com/viant/forge/backend/resource"
 )
 
@@ -171,6 +172,9 @@ func TestRealUnavailablePublicReplicaDoesNotPoisonHealthyCatalogAndRecovers(t *t
 	}
 	_, err = ListPageFrom[json.RawMessage](ctx, g, []Connection{connection}, "style", CatalogQuery{}, false)
 	require.ErrorIs(t, err, artifactcohort.ErrUnavailable)
+	reports, err := (&ReportGatewayCatalog{Gateway: g}).List(ctx, catalog.ReportCatalogQuery{Namespace: "global", Limit: 1})
+	require.Nil(t, reports)
+	require.ErrorIs(t, err, artifactcohort.ErrUnavailable, "an explicit namespace cannot turn its unavailable replica into an empty success")
 	_, err = g.Get(ctx, connection, identity.ResourceRef{URI: "style://global/workspace"}, nil)
 	require.ErrorIs(t, err, artifactcohort.ErrUnavailable)
 	reader := &MCPReferenceReader{gateway: g}

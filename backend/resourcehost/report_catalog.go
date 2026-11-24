@@ -288,6 +288,21 @@ func (c *ReportGatewayCatalog) List(ctx context.Context, input catalog.ReportCat
 	if err != nil {
 		return nil, err
 	}
+	if source, claimed := c.Gateway.publishedNamespace(input.Namespace); claimed {
+		connection, matched, err := source.scopedConnection(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if !matched {
+			if input.Cursor != "" {
+				return nil, primitive.ErrCatalogCursor
+			}
+			return &catalog.ReportCatalogResult{Reports: []catalog.ReportCatalogEntry{}}, nil
+		}
+		// An explicitly addressed publication is mandatory for this query;
+		// failures in aggregate, optional discovery must not erase its status.
+		ctx = context.WithValue(ctx, catalogRootsKey{}, []Connection{connection})
+	}
 	query := CatalogQuery{Search: input.Search, Namespace: input.Namespace, Cursor: cursor, Limit: input.Limit}
 	if query.Limit == 0 {
 		query.Limit = primitive.MaxCatalogPageSize
