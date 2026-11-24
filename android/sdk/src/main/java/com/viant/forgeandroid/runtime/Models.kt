@@ -37,8 +37,21 @@ data class WindowMetadata(
     val targetOverrides: Map<String, JsonElement> = emptyMap(),
     val authorizationSnapshot: Map<String, JsonElement> = emptyMap(),
     val schemas: Map<String, ResourceSchemaDef> = emptyMap(),
-    val resourceModels: Map<String, ResourceModelDef> = emptyMap()
+    val resourceModels: Map<String, ResourceModelDef> = emptyMap(),
+    val resourceMappings: Map<String, ResourceMappingDef> = emptyMap()
 )
+
+@Serializable
+data class ResourceMappingDef(
+    val selectors: List<String>,
+    val cases: Map<String, ResourceMappingCase>,
+    val default: ResourceMappingCase? = null,
+    val fieldOrder: List<String> = emptyList(),
+    val uploads: Map<String, UploadCollectionSpec> = emptyMap()
+)
+
+@Serializable
+data class ResourceMappingCase(val modelRef: String, val values: Map<String, JsonElement> = emptyMap())
 
 @Serializable
 data class ActionsDef(

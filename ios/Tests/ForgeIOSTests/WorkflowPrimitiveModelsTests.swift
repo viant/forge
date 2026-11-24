@@ -2,6 +2,16 @@ import XCTest
 @testable import ForgeIOSRuntime
 
 final class WorkflowPrimitiveModelsTests: XCTestCase {
+    func testResourceMappingSelectsNativeCases() throws {
+        let source = #"{"schemas":{"record":{"type":"object","properties":{}}},"resourceModels":{"brief":{"schemaRef":"record"},"general":{"schemaRef":"record"}},"resourceMappings":{"inspection":{"selectors":["kind","old.kind"],"cases":{"brief":{"modelRef":"brief"}},"default":{"modelRef":"general"}}}}"#
+        let metadata = try JSONDecoder().decode(WindowMetadata.self, from: Data(source.utf8))
+        let row: [String: JSONValue] = ["kind": .string(""), "old": .object(["kind": .string("brief")])]
+        XCTAssertEqual(try ResourceModelRuntime.mappedCase("inspection", row: row, metadata: metadata).modelRef, "brief")
+        XCTAssertEqual(try ResourceModelRuntime.mappedCase("inspection", row: [:], metadata: metadata).modelRef, "general")
+        XCTAssertThrowsError(try ResourceModelRuntime.mappedCase("missing", row: row, metadata: metadata))
+    }
+
+
     func testPresentationPrimitiveContractsDecodeAndRoundTrip() throws {
         let source = #"""
         {

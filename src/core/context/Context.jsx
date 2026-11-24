@@ -1,3 +1,4 @@
+import {prepareResourceMappings} from '../../components/primitives/resourceModel.js';
 import {MissingDataSourceReferenceError} from './dataSourceReference.js';
 import {canonicalSelectionBinding} from '../../runtime/canonicalDelivery.js';
 import {useDataSourceHandlers} from "../../hooks/index.js";
@@ -143,6 +144,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
         authorization: services?.authorization || null,
         resources: {},
         metadata: metadata,
+        resolveMappedResource: prepareResourceMappings(metadata),
         dataSourceRef: dataSourceRef,
         _globalServices: services || {},
         services,

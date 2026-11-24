@@ -79,6 +79,35 @@ func validateResourceModels(window *Window, validateDataSources bool) error {
 			}
 		}
 	}
+	for name, mapping := range window.ResourceMappings {
+		if strings.TrimSpace(name) == "" || len(mapping.Selectors) == 0 || len(mapping.Cases) == 0 {
+			return fmt.Errorf("resource mapping %q requires a name, selectors and cases", name)
+		}
+		for _, selector := range mapping.Selectors {
+			if strings.TrimSpace(selector) == "" {
+				return fmt.Errorf("resource mapping %s has an empty selector", name)
+			}
+		}
+		validateCase := func(key string, entry ResourceMappingCase) error {
+			if strings.TrimSpace(key) == "" || strings.TrimSpace(entry.ModelRef) == "" {
+				return fmt.Errorf("resource mapping %s case %q requires a modelRef", name, key)
+			}
+			if _, ok := window.ResourceModels[entry.ModelRef]; validateDataSources && !ok {
+				return fmt.Errorf("resource mapping %s case %q references unknown model %s", name, key, entry.ModelRef)
+			}
+			return nil
+		}
+		for key, entry := range mapping.Cases {
+			if err := validateCase(key, entry); err != nil {
+				return err
+			}
+		}
+		if mapping.Default != nil {
+			if err := validateCase("default", *mapping.Default); err != nil {
+				return err
+			}
+		}
+	}
 	for name, dataSource := range window.DataSource {
 		if dataSource.ResourceModelRef == "" {
 			continue

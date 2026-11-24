@@ -798,3 +798,20 @@ Another row cannot release the lease. Separate windows and ungrouped commands
 keep their independent behavior. The existing target transport guard still
 serializes commands sharing one writer. This is optional concurrency control,
 not authorization, automatic queuing or retry.
+
+## Opt-in resource mappings
+
+A window can select a resource model from the first nonempty string at its declared selectors. Cases use exact matches. An optional default handles an unknown or absent discriminator. Each case references an existing resource model and can declare presentation values. The mapping adds no datasource or window-open request.
+
+```yaml
+resourceMappings:
+  inspection:
+    selectors: [kind]
+    cases:
+      brief: {modelRef: summaryRecord}
+      detailed: {modelRef: detailRecord}
+    default: {modelRef: summaryRecord}
+    fieldOrder: [title, description]
+```
+
+The web window context exposes `resolveMappedResource('inspection', row)`. Its result contains the selected resource contract, case values, and the mapping. The source compiler attaches referenced models and their schemas through the usual dependency resolution. A missing case without a default fails at selection. A missing model fails effective-window validation. The iOS and Android resource runtimes expose the same case selection through `ResourceModelRuntime.mappedCase`.

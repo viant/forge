@@ -79,11 +79,32 @@ func CollectWindowReferences(window *forgeTypes.Window) *WindowReferences {
 	if window == nil {
 		return result
 	}
-	result.YAML.merge(collectAssetReferences(window))
+	source := *window
+	source.ResourceMappings = nil
+	result.YAML.merge(collectAssetReferences(&source))
+	addMappingReferences(result.YAML, window.ResourceMappings)
 	if window.Actions != nil {
 		result.Code = collectCodeReferences(window.Actions.Code)
 	}
 	return result
+}
+
+// Case values are application metadata. Only model references and executable
+// upload declarations contribute dependencies.
+func addMappingReferences(refs *AssetReferences, mappings map[string]forgeTypes.ResourceMapping) {
+	for _, mapping := range mappings {
+		for _, entry := range mapping.Cases {
+			refs.ResourceModels[entry.ModelRef] = true
+		}
+		if mapping.Default != nil {
+			refs.ResourceModels[mapping.Default.ModelRef] = true
+		}
+		for _, spec := range mapping.Uploads {
+			if spec.Upload != nil {
+				refs.merge(collectAssetReferences(spec.Upload))
+			}
+		}
+	}
 }
 
 // collectAssetReferences walks the YAML projection of any Forge value.

@@ -78,11 +78,41 @@ export function resolveResourceContract(context, modelRef) {
   const ref = String(modelRef || '').trim();
   const models = context?.metadata?.resourceModels || {};
   const schemas = context?.metadata?.schemas || {};
-  const model = models[ref];
+  const model = Object.hasOwn(models, ref) ? models[ref] : undefined;
   if (!model) throw new Error(`Resource model not found: ${ref}`);
-  const schema = schemas[model.schemaRef];
+  const schema = Object.hasOwn(schemas, model.schemaRef) ? schemas[model.schemaRef] : undefined;
   if (!schema) throw new Error(`Resource schema not found: ${model.schemaRef || ref}`);
   return {modelRef: ref, model, schema, models, schemas};
+}
+
+// Context owns the prepared references for this metadata revision. Row values
+// and actor-dependent facts never enter this index.
+export function prepareResourceMappings(metadata) {
+  if (!metadata?.resourceMappings) return undefined;
+  const compiled = new Map();
+  const context = {metadata};
+  for (const [name, mapping] of Object.entries(metadata.resourceMappings)) {
+    const prepareCase = entry => ({...resolveResourceContract(context, entry.modelRef), values: entry.values, mapping});
+    compiled.set(name, {
+      selectors: mapping.selectors,
+      cases: new Map(Object.entries(mapping.cases).map(([key, entry]) => [key, prepareCase(entry)])),
+      fallback: mapping.default && prepareCase(mapping.default),
+    });
+  }
+  return (name, record) => {
+    const mapping = compiled.get(name);
+    if (!mapping) throw new Error(`Resource mapping not found: ${name}`);
+    let selected;
+    for (const selector of mapping.selectors) {
+      const value = resolveSelector(record, selector);
+      if (typeof value !== 'string' || !value.length) continue;
+      selected = mapping.cases.get(value);
+      break;
+    }
+    const result = selected || mapping.fallback;
+    if (!result) throw new Error(`Resource mapping ${name} has no matching case.`);
+    return result;
+  };
 }
 
 export function resourceModelRefForDataSource(context, explicitRef = '') {

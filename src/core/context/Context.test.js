@@ -32,6 +32,19 @@ const metadata = {
 const context = Context('W_ctx_override', metadata, 'lookup', {});
 context.init();
 
+const mappedWindow = Context('mapped_records', {
+  ...metadata,
+  schemas: {entry: {type: 'object', properties: {label: {type: 'string'}}}},
+  resourceModels: {short: {schemaRef: 'entry', fields: {label: {read: 'name'}}}, long: {schemaRef: 'entry', fields: {label: {read: 'description'}}}},
+  resourceMappings: {editor: {selectors: ['kind', 'legacy.kind'], cases: {summary: {modelRef: 'short', values: {editable: false}}}, default: {modelRef: 'long'}}},
+}, '', {});
+const short = mappedWindow.Context('lookup').resolveMappedResource('editor', {kind: '', legacy: {kind: 'summary'}});
+assert.equal(short.model.fields.label.read, 'name');
+assert.equal(short.values.editable, false);
+assert.strictEqual(short, mappedWindow.resolveMappedResource('editor', {kind: 'summary'}));
+assert.equal(mappedWindow.resolveMappedResource('editor', {kind: 'unrecognized'}).modelRef, 'long');
+assert.equal(mappedWindow.resolveMappedResource('editor', {kind: 'toString'}).modelRef, 'long');
+assert.throws(() => mappedWindow.resolveMappedResource('missing', {}), /mapping not found/);
 const staticWindow = Context('W_static_controls', {dataSource: {}, view: {}}, '', {});
 staticWindow.init();
 assert.equal(staticWindow.signals.form, staticWindow.signals.windowForm);

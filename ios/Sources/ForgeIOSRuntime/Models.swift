@@ -16,6 +16,8 @@ public struct WindowMetadata: Codable, Sendable {
     public let schemas: [String: ResourceSchemaDef]
     public let resourceModels: [String: ResourceModelDef]
 
+    public let resourceMappings: [String: ResourceMappingDef]?
+
     enum CodingKeys: String, CodingKey {
         case namespace
         case view
@@ -29,6 +31,7 @@ public struct WindowMetadata: Codable, Sendable {
         case authorizationSnapshot
         case schemas
         case resourceModels
+        case resourceMappings
     }
 
     enum LegacyCodingKeys: String, CodingKey {
@@ -48,7 +51,8 @@ public struct WindowMetadata: Codable, Sendable {
         targetOverrides: [String: JSONValue] = [:],
         authorizationSnapshot: [String: JSONValue] = [:],
         schemas: [String: ResourceSchemaDef] = [:],
-        resourceModels: [String: ResourceModelDef] = [:]
+        resourceModels: [String: ResourceModelDef] = [:],
+        resourceMappings: [String: ResourceMappingDef]? = nil
     ) {
         self.runtimeAuthoring = nil
         self.namespace = namespace
@@ -63,6 +67,7 @@ public struct WindowMetadata: Codable, Sendable {
         self.authorizationSnapshot = authorizationSnapshot
         self.schemas = schemas
         self.resourceModels = resourceModels
+        self.resourceMappings = resourceMappings
     }
 
     public init(from decoder: Decoder) throws {
@@ -82,6 +87,7 @@ public struct WindowMetadata: Codable, Sendable {
         targetOverrides = try container.decodeIfPresent([String: JSONValue].self, forKey: .targetOverrides) ?? [:]
         authorizationSnapshot = try container.decodeIfPresent([String: JSONValue].self, forKey: .authorizationSnapshot) ?? [:]
         schemas = try container.decodeIfPresent([String: ResourceSchemaDef].self, forKey: .schemas) ?? [:]
+        resourceMappings = try container.decodeIfPresent([String: ResourceMappingDef].self, forKey: .resourceMappings)
         resourceModels = try container.decodeIfPresent([String: ResourceModelDef].self, forKey: .resourceModels) ?? [:]
         if let decodedView,
            Self.isMeaningfulView(decodedView) {

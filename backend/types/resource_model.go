@@ -52,6 +52,21 @@ type ResourceModel struct {
 	Hooks     *ResourceModelHooks             `json:"hooks,omitempty" yaml:"hooks,omitempty"`
 }
 
+// ResourceMapping selects a named resource model by the first nonempty string
+// discriminator on a record. Omitted mappings have no effect on other windows.
+type ResourceMapping struct {
+	Selectors  []string                        `json:"selectors" yaml:"selectors"`
+	Cases      map[string]ResourceMappingCase  `json:"cases" yaml:"cases"`
+	Default    *ResourceMappingCase            `json:"default,omitempty" yaml:"default,omitempty"`
+	FieldOrder []string                        `json:"fieldOrder,omitempty" yaml:"fieldOrder,omitempty"`
+	Uploads    map[string]UploadCollectionSpec `json:"uploads,omitempty" yaml:"uploads,omitempty"`
+}
+
+type ResourceMappingCase struct {
+	ModelRef string                 `json:"modelRef" yaml:"modelRef"`
+	Values   map[string]interface{} `json:"values,omitempty" yaml:"values,omitempty"`
+}
+
 type ResourceReadBinding struct {
 	DataSourceRef   string `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
 	PreserveUnbound bool   `json:"preserveUnbound,omitempty" yaml:"preserveUnbound,omitempty"`

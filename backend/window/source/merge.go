@@ -232,6 +232,11 @@ func newAssignmentResolver(window *forgeTypes.Window, catalog *workspaceCatalog)
 		resolver.localSchemas[name] = true
 		resolver.enqueueReferences(collectAssetReferences(schema))
 	}
+	if len(window.ResourceMappings) > 0 {
+		refs := newAssetReferences()
+		addMappingReferences(refs, window.ResourceMappings)
+		resolver.enqueueReferences(refs)
+	}
 	for name, model := range window.ResourceModels {
 		resolver.localModels[name] = true
 		resolver.enqueueReferences(collectAssetReferences(model))
