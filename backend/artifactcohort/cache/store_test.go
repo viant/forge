@@ -91,7 +91,7 @@ func TestPutGetImmutableOwnedAndRotations(t *testing.T) {
 		t.Fatal("private conditional cache headers missing")
 	}
 }
-func TestOversizeAndBackingDigestFailure(t *testing.T) {
+func TestLargeArtifactsBypassHotCacheAndVerifyBacking(t *testing.T) {
 	backing := NewMemoryBacking()
 	s, err := New(Config{SizeMB: 1, MaxEntries: 8, MaxEntryBytes: 16 * 1024, Backing: backing})
 	if err != nil {
@@ -99,9 +99,35 @@ func TestOversizeAndBackingDigestFailure(t *testing.T) {
 	}
 	defer s.Close()
 	ctx := context.Background()
-	oversized := artifact("window://studio/large", 1, append(append([]byte{'"'}, bytes.Repeat([]byte{'a'}, 16*1024)...), '"'))
-	if err := s.Put(ctx, oversized); !errors.Is(err, ErrOversize) {
-		t.Fatalf("oversized artifact accepted: %v", err)
+	for _, size := range []int{16*1024 - 3, 16 * 1024, 5 << 20} {
+		large := artifact("window://studio/large", uint64(size), append(append([]byte{'"'}, bytes.Repeat([]byte{'a'}, size)...), '"'))
+		if err := s.Put(ctx, large); err != nil {
+			t.Fatalf("large artifact rejected: %v", err)
+		}
+		// A reopened cache recovers the immutable binding from backing.
+		reopened, err := New(Config{SizeMB: 1, MaxEntries: 8, MaxEntryBytes: 16 * 1024, Backing: backing})
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := reopened.Get(ctx, large.Root)
+		if err != nil || !bytes.Equal(got.Payload, large.Payload) {
+			t.Fatalf("large artifact backing read failed: %v", err)
+		}
+		got.Payload[1] = 'x'
+		if err := reopened.WithBorrowed(ctx, large.Root, func(payload []byte) error {
+			if !bytes.Equal(payload, large.Payload) {
+				t.Fatal("owned bytes modified immutable backing")
+			}
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if reopened.Hydrations() != 0 {
+			t.Fatal("large artifact consumed the hot arena")
+		}
+		if err := reopened.Close(); err != nil {
+			t.Fatal(err)
+		}
 	}
 	small := artifact("window://studio/small", 1, []byte(`{"ok":true}`))
 	if err := s.Put(ctx, small); err != nil {

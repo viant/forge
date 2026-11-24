@@ -1546,6 +1546,7 @@ type Column struct {
 	Sticky           string                 `json:"sticky,omitempty" yaml:"sticky,omitempty"`
 	Align            string                 `json:"align,omitempty" yaml:"align,omitempty"`
 	Format           string                 `json:"format,omitempty" yaml:"format,omitempty"`
+	CurrencyField    string                 `json:"currencyField,omitempty" yaml:"currencyField,omitempty"`
 	TimeZone         string                 `json:"timeZone,omitempty" yaml:"timeZone,omitempty"`
 	TimeZoneSelector string                 `json:"timeZoneSelector,omitempty" yaml:"timeZoneSelector,omitempty"`
 	TimeZoneBinding  *Binding               `json:"timeZoneBinding,omitempty" yaml:"timeZoneBinding,omitempty"`
