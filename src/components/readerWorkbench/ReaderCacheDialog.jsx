@@ -1,10 +1,11 @@
 import {WorkbenchDialog as Dialog, WorkbenchAlert as Alert} from './WorkbenchMutationContext.jsx';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useCallback, useState } from 'react';
 import { Button, Callout, DialogBody, DialogFooter, FormGroup, HTMLSelect, HTMLTable, InputGroup, NumericInput, Tag, TextArea } from '@blueprintjs/core';
+import {ReaderWarmupSchedule,useReaderWarmupSchedule} from './ReaderWarmupSchedule.jsx';
 import {TargetedWarmupEditor} from './TargetedWarmupEditor.jsx';
 import { parseWarmupCases, validateWarmupCases, warmupCaseCount, warmupCaseExpression } from './warmupPlan.js';
 
-export function ReaderCacheDialog({ api, report, version, canWarmup, canEdit = true, isOpen, structure, onClose, onApply, onWarmup }) {
+export function ReaderCacheDialog({ api, report, version, canWarmup, canSchedule = canWarmup, canEdit = true, isOpen, structure, onClose, onApply, onWarmup }) {
   const cache = structure?.component?.settings?.cache;
   const warmupConfig = cache?.warmup;
   const root = structure?.component?.rootView;
@@ -29,12 +30,13 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, canEdit = t
   const [limit, setLimit] = useState(undefined);
   const [fieldNames, setFieldNames] = useState('');
   const [caseLines, setCaseLines] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [authoringSaving, setSaving] = useState(false);
   const [warmupTarget,setWarmupTarget]=useState('');
   useEffect(()=>setWarmupTarget(''),[isOpen,report?.id,version?.versionNo]);
   const [error, setError] = useState('');
   const [selectedRunId, setSelectedRunId] = useState(null);
   const [history, setHistory] = useState([]);
+  const acceptScheduleRun=useCallback(run=>setHistory(current=>[run,...current.filter(item=>item.runId!==run.runId)]),[]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [warming, setWarming] = useState(false);
   const inlineEditor = useRef(null);
@@ -103,6 +105,8 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, canEdit = t
   // Evidence selection must not change which persisted work is being polled.
   const pollingRun = history.find(run=>['accepted','running'].includes(run.status));
   const activeRun = Boolean(pollingRun);
+  const scheduleModel=useReaderWarmupSchedule({api,reportId:report?.id,versionNo:version?.versionNo,namespace:api?.namespaceId??report?.namespace,isOpen,canWarmup:canSchedule,history,onRunLoaded:acceptScheduleRun,onSelectRun:setSelectedRunId});
+  const saving=authoringSaving||scheduleModel.busy;
   const maxCasesLabel = maxCases ?? 'native default';
   const limitLabel = limit ?? 'native default';
   const submitWarmup = async (operation, targetVersion) => {
@@ -162,6 +166,7 @@ export function ReaderCacheDialog({ api, report, version, canWarmup, canEdit = t
         <p>Run all effective plans uses the saved version and excludes unsaved edits.</p>
         <div className="studio-warmup-actions"><Button icon="play" loading={warming||activeRun} disabled={!canWarmup||saving||activeRun} title={!canWarmup?'Publish permission is required to run warmup':''} onClick={executeWarmup}>Run all effective plans</Button></div>
       </section>
+      {isOpen && <ReaderWarmupSchedule model={scheduleModel} versionNo={version?.versionNo} disabled={authoringSaving||warming}/>}
       {isOpen && <TargetedWarmupEditor key={inspectionKey} structure={structure} availableCaches={inspectedStructure?.availableCaches??[]} version={version} selectedView={warmupTarget} onSelectView={setWarmupTarget} canEdit={canEdit} saving={saving} onApply={submitWarmup} effectiveWarmup={effectiveWarmup} effectiveResolved={effectiveResolved} inspecting={inspecting}/>}
       {(cache?.enabled || cache?.name || cache?.provider || cache?.location || cache?.ttl) && <section className="studio-cache-section" aria-label="Authored component cache">
         <h3>Authored component cache</h3>

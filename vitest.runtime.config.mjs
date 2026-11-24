@@ -86,6 +86,7 @@ export default defineConfig({
       'src/components/readerWorkbench/ReaderPreviewParameters.render.test.jsx',
       'src/components/readerWorkbench/ReaderEntityScopeDialog.render.test.jsx',
       'src/components/readerWorkbench/ReaderCacheDialog.render.test.jsx',
+      'src/components/readerWorkbench/ReaderWarmupSchedule.render.test.jsx',
       'src/components/readerWorkbench/ReaderFieldDialog.draft.render.test.jsx',
       'src/components/ResourceWindow.scope.render.test.jsx',
       'src/packs/blueprint/selectCloseFocus.render.test.jsx',

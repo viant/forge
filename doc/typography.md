@@ -1701,6 +1701,51 @@ Its optional isolated Studio gateway mode verifies native contributor round
 trips, fallback restoration and root/child execution; generated evidence stays
 untracked under `output/playwright`.
 
+### Recurring warmup schedules
+
+Cache & warmup shows one **Schedule** section for the exact saved numbered
+version, outside the selected-view editor. Existing publish-level warmup
+capability admits schedule management and dialog access on published versions;
+authoring controls retain their own edit guards. A host without the three
+schedule operation bindings shows unavailable configuration, not an absent
+schedule. Only a successful schedule Get establishes absence and revision zero.
+
+The form reuses shared inputs, checkbox, buttons, status and confirmation
+controls. Intervals are authored in exact seconds. First-run input and next-due
+evidence are explicitly UTC ISO date/times. Keep the producer's loaded timestamp
+string unchanged, including fractional-second precision, when changing only the
+enabled preference or interval. No minute conversion, browser scheduling timer,
+credential storage or new client-side schedule validation is introduced.
+**Schedule enabled** records a preference and does not claim scheduler health.
+
+Schedule reads/mutations are owned by the dialog lifecycle so closing portal
+animations cannot retain live request state. Namespace/component/version scope
+and request generations reject stale responses. Reader source revision and view
+changes do not discard schedule drafts. Source and schedule revisions remain
+separate; native schedule admission can itself advance the schedule revision.
+Conflicts preserve entered values, offer an explicit discard/reload confirmation,
+and never resubmit automatically. Pending schedule mutations reuse the workbench
+busy lifecycle. Ignoring a late mutation response does not cancel its server
+commit: reopening always gets the persisted schedule again.
+
+The producer's exact `lastRunId` resolves through existing run lookup, history,
+evidence and active-run polling, even when absent from the first history page.
+Linked-run refresh cannot reload the schedule or change its draft/revision.
+Missing run evidence remains an error, not another run or a missing schedule.
+Manual **Run all effective plans** remains independent; saving does not execute
+warmup, and disable/removal does not cancel accepted work or clear run history.
+
+`ReaderWarmupSchedule.render.test.jsx` covers the state and request lifecycle.
+Run `node scripts/test-warmup-schedule-browser.mjs` for the synthetic browser
+flow. `FORGE_SCHEDULE_NATIVE_URL` may select an isolated migrated Studio fixture
+providing its authored Workbench bindings and SDK gateway, plus test-only source,
+reset and admission controls. Native proof checks cadence, revision conflicts,
+exact argument serialization, delayed committed save/removal, fresh reopen and
+unchanged reader source. Screenshots remain untracked under `output/playwright`.
+Studio deployment owns migration 030 and its service credential provider; this
+UI neither configures nor verifies that service. Surrounding legacy reader
+forms and layout remain outside this change's theme scope.
+
 ## Inline section composition
 
 `AccessibleSection` is exported from `forge/components`. Use the existing

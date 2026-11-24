@@ -77,12 +77,13 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
   const [versionSwitchError, setVersionSwitchError] = useState('');
   const versionsGeneration = useRef(0);
   const publicationGeneration = useRef(0);
-  const refreshVersions = async (offset = 0) => {
+  const initialVersionsRequest = useRef(null);
+  const refreshVersions = async (offset = 0, request) => {
     if (!api.listVersions) return;
     const generation = ++versionsGeneration.current;
     setVersionsLoading(true); setVersionsError('');
     try {
-      const page = await api.listVersions(report.id, {limit:100, offset});
+      const page = await (request ?? api.listVersions(report.id, {limit:100, offset}));
       if (generation !== versionsGeneration.current) return;
       const items = page?.items ?? [];
       setVersions(current => offset ? [...current.filter(item=>!items.some(next=>next.versionNo===item.versionNo)), ...items] : items);
@@ -99,8 +100,13 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
   };
   useEffect(() => {
     setVersions([]); setPublication(null); setVersionsNextOffset(null);
-    refreshVersions(); refreshPublication();
-    return () => { versionsGeneration.current++; publicationGeneration.current++; };
+    const request = api.listVersions ? Promise.resolve().then(() => api.listVersions(report.id, {limit:100})) : undefined;
+    initialVersionsRequest.current = request;
+    // Share only this initialization request; retain no resolved page cache.
+    const clearRequest = () => { if (initialVersionsRequest.current === request) initialVersionsRequest.current = null; };
+    request?.then(clearRequest, clearRequest);
+    refreshVersions(0, request); refreshPublication();
+    return () => { clearRequest(); versionsGeneration.current++; publicationGeneration.current++; };
   }, [api, report?.id, report?.currentDraftVersion]);
   const [creatingReader, setCreatingReader] = useState(true);
   const [rootDraftDirty, setRootDraftDirty] = useState(false);
@@ -176,7 +182,7 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
   pendingTabActionRef.current=pendingTabAction;
 
   const loadGeneration = useRef(0);
-  const load = async (preferredVersionNo = version?.versionNo, switching = false) => {
+  const load = async (preferredVersionNo = version?.versionNo, switching = false, initialPageRequest) => {
     if (!report) return;
     const generation = ++loadGeneration.current;
     const current = () => generation === loadGeneration.current;
@@ -195,7 +201,9 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
           if (draft.version.state === 'draft') selected = draft;
         }
         if (!selected) {
-          const page = await api.listVersions(report.id, { limit: 100 });
+          const request = initialPageRequest ?? api.listVersions(report.id, {limit:100, offset:0});
+          if (!initialPageRequest) refreshVersions(0, request);
+          const page = await request;
           if (!current()) return;
           const version = page?.items?.find(item => item.state === 'draft') || page?.items?.[0];
           if (!version) { setVersion(null); setInspection(null); return; }
@@ -210,7 +218,7 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
       if (current()) { if (switching) setVersionSwitchError(`Could not open version v${preferredVersionNo}: ${cause.message}`); else setError(cause.message); }
     } finally { if (current()) { setLoading(false); setSwitchingVersion(false); } }
   };
-  useEffect(() => { load(report?.versionNo ?? null); return () => { loadGeneration.current++; }; }, [api, report?.id, report?.versionNo]);
+  useEffect(() => { load(report?.versionNo ?? null, false, initialVersionsRequest.current); return () => { loadGeneration.current++; }; }, [api, report?.id, report?.versionNo]);
 
   useEffect(() => { setCreatingReader(true);setWorkspaceTab('graph');setSQLTab('');setViewTabs([]);setDirtyTabs(new Set());setPreviewError(''); }, [report?.id]);
 
@@ -534,7 +542,7 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
       <Button icon="rocket-slant" disabled={!canPublish} onClick={()=>setPublicationDialogOpen(true)}>Release</Button>
       <Popover isOpen={toolsOpen} onInteraction={setToolsOpen} placement="bottom-start" content={<Menu>
         <MenuItem text="Composition lab" icon="heatmap" disabled={!canPreview} onClick={()=>runTool(()=>setAnalyticsDialogOpen(true))}/>
-        <MenuItem text="Cache & warmup" icon="database" disabled={!canEdit} onClick={()=>runTool(()=>setCacheDialogOpen(true))}/>
+        <MenuItem text="Cache & warmup" icon="database" disabled={!canEdit&&!canPublish} onClick={()=>runTool(()=>setCacheDialogOpen(true))}/>
         {rowAccessScope && <MenuItem text="Row access scope" icon="filter" disabled={!canEdit||serverScoped} onClick={()=>runTool(()=>setEntityScopeOpen(true))}/>}
         {onReleases&&<MenuItem text="Named release assignments" icon="tag" disabled={!ready||capabilities.canPublish===false} onClick={()=>runTool(()=>onReleases(version))}/>}
         <MenuItem text="Source resources" icon="folder-open" disabled={!ready||capabilities.canView===false} onClick={()=>runTool(()=>{setResourceMode('resources');setResourcesDialogOpen(true);})}/>
@@ -622,7 +630,7 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
     <ReaderRelationDialog isOpen={Boolean(editRelation)} node={editRelation} structure={inspection?.structure} onClose={()=>setEditRelation(null)} onApply={async(operation)=>{await applyCommand(operation);setSelectedNode(null);}}/>
     <ReaderFieldDialog isOpen={Boolean(editFields)} node={editFields} columnContracts={inspection?.structure?.columnContracts ?? []} onClose={()=>setEditFields(null)} onApply={async(operation)=>{await applyCommand(operation);if(workspaceTab==='graph')setSelectedNode(null);}}/>
     <ReaderAnalyticsDialog isOpen={analyticsDialogOpen} structure={inspection?.structure} onClose={() => setAnalyticsDialogOpen(false)} onTestCompose={runCompose} />
-    <ReaderCacheDialog api={api} report={report} version={version} canWarmup={canPublish} canEdit={canEdit} isOpen={cacheDialogOpen} structure={inspection?.structure} onClose={() => setCacheDialogOpen(false)} onApply={applyCommand} onWarmup={runWarmup} />
+    <ReaderCacheDialog api={api} report={report} version={version} canWarmup={canPublish} canSchedule={inspection?.version?.reportId===report.id&&capabilities.canPublish!==false} canEdit={canEdit} isOpen={cacheDialogOpen} structure={inspection?.structure} onClose={() => setCacheDialogOpen(false)} onApply={applyCommand} onWarmup={runWarmup} />
     <ReaderExposureDialog isOpen={exposureDialogOpen} readOnly={!canEdit} onCache={()=>{setExposureDialogOpen(false);setCacheDialogOpen(true);}} api={api} structure={inspection?.structure} version={version} report={report} onReportUpdated={onReportUpdated} onClose={()=>setExposureDialogOpen(false)} onApply={applyCommand}/>
     <ReaderValidationDialog isOpen={validationDialogOpen} version={version} canUseDQL={canUseDQL} onClose={()=>setValidationDialogOpen(false)} onValidate={validateDraft} onOpenSource={()=>{setValidationDialogOpen(false);setWorkspaceTab('sql');setSQLTab('advanced');setShowRawDQL(true);}}/>
     <ReaderPublicationDialog isOpen={publicationDialogOpen} api={api} report={report} version={version} inspection={inspection} onClose={()=>setPublicationDialogOpen(false)} onPublish={publishDraft} onPromote={promoteVersion} onUnpublish={unpublishDraft} onRollback={rollbackDraft}/>
