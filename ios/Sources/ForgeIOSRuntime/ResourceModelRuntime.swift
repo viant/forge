@@ -387,7 +387,7 @@ private func applyResourceCodec(_ value: JSONValue, codec: String?, trim: Bool, 
 
 private func resourceNumber(_ value: JSONValue) -> Double? { switch value { case .number(let value): return value; case .string(let value): return Double(value); default: return nil } }
 private func resourceResolve(_ object: [String: JSONValue], path: String) -> JSONValue? { resourceResolveValue(.object(object), path: path) }
-private func resourceResolveValue(_ value: JSONValue, path: String) -> JSONValue? {
+func resourceResolveValue(_ value: JSONValue, path: String) -> JSONValue? {
     if path.isEmpty { return value }
     return path.split(separator: ".").reduce(Optional(value)) { current, part in
         guard let current else { return nil }

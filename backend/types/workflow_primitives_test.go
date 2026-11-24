@@ -252,3 +252,31 @@ func TestWizardStepValidationRoundTrip(t *testing.T) {
 		t.Fatalf("lost step validation: %s", data)
 	}
 }
+
+func TestMutationCommandResultState(t *testing.T) {
+	var window Window
+	err := yaml.Unmarshal([]byte(`dialogs:
+  - id: create
+    actions:
+      - id: save
+        mutationCommand:
+          dataSourceRef: writer
+          resultState: {createdId: ['0.entity.id', '0.id']}
+`), &window)
+	if err != nil {
+		t.Fatal(err)
+	}
+	command := window.Dialogs[0].Actions[0].MutationCommand
+	if command == nil || len(command.ResultState["createdId"]) != 2 {
+		t.Fatalf("lost result mapping: %#v", command)
+	}
+	if err := ValidateResourceModelStructure(&window); err != nil {
+		t.Fatal(err)
+	}
+	for _, mapping := range []map[string][]string{{"": {"0.id"}}, {"id": {}}, {"id": {"0..id"}}} {
+		command.ResultState = mapping
+		if err := ValidateResourceModelStructure(&window); err == nil {
+			t.Fatalf("accepted invalid command result mapping %v", mapping)
+		}
+	}
+}

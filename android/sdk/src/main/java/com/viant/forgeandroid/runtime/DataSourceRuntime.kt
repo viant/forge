@@ -897,6 +897,11 @@ class DataSourceContext(
         window.captureRequest(snapshot.preparedWindowForm ?: window.peekWindowForm(), snapshot.preparedMetadata ?: window.metadata.peek()),
         dataSourceRef, dataSource, collection, form, selection, Signal(snapshot), control, metrics, eventDispatcher, selectionHook, instanceRef, preparedAuthorization, preparedRegister, preparedAwait)
 
+    internal suspend fun fetchCommandResult(parameters: Map<String, Any?>): PreparedReportFetchResult {
+        val id = checkNotNull(setInputParametersValue(parameters, fetch = true, captureResult = true))
+        return preparedAwait(id)
+    }
+
     fun setPreparedInputParameters(parameters: Map<String, Any?>, permit: NativeReportReadPermit? = null, commitGuard: () -> Boolean): String? {
         if (!commitGuard()) return null
         return setInputParametersValue(parameters, fetch = true, commitGuard = commitGuard, permit = permit)
@@ -945,7 +950,7 @@ class DataSourceContext(
         setInputParametersValue(parameters, fetch)
     }
 
-    private fun setInputParametersValue(parameters: Map<String, Any?>, fetch: Boolean = false, commitGuard: (() -> Boolean)? = null, permit: NativeReportReadPermit? = null): String? {
+    private fun setInputParametersValue(parameters: Map<String, Any?>, fetch: Boolean = false, commitGuard: (() -> Boolean)? = null, permit: NativeReportReadPermit? = null, captureResult: Boolean = false): String? {
         val current = input.peek()
         val inputPayload = JsonUtil.asStringMap(parameters["input"])
         val query = JsonUtil.asStringMap(inputPayload["query"])
@@ -958,9 +963,9 @@ class DataSourceContext(
             preparedGuard = commitGuard,
             preparedWindowForm = if (commitGuard == null) null else JsonUtil.asStringMap(JsonUtil.elementToAny(JsonUtil.anyToElement(window.peekWindowForm()))),
             preparedMetadata = if (commitGuard == null) null else window.metadata.peek(),
-            preparedDispatchId = if (commitGuard == null) null else java.util.UUID.randomUUID().toString(), preparedReadPermit = permit)
+            preparedDispatchId = if (commitGuard == null && !captureResult) null else java.util.UUID.randomUUID().toString(), preparedReadPermit = permit)
         if (commitGuard != null && !preparedAuthorization(next)) return null
-        if (permit != null) next.preparedDispatchId?.let(preparedRegister)
+        if (permit != null || captureResult) next.preparedDispatchId?.let(preparedRegister)
         input.set(next)
         return next.preparedDispatchId
     }

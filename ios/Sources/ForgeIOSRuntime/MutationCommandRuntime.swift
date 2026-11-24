@@ -91,7 +91,7 @@ public struct MutationCommandResult: Sendable, Equatable {
 }
 
 private enum MutationWriterOutcome: Sendable {
-    case succeeded
+    case succeeded([[String: JSONValue]]?)
     case failed(String)
     case indeterminate
 }
@@ -235,7 +235,8 @@ extension ForgeRuntime {
         let writer = await awaitMutationWriter(
             windowID: windowID,
             dataSourceRef: targetRef,
-            timeoutMs: max(1_000, command.timeoutMs ?? 30_000)
+            timeoutMs: max(1_000, command.timeoutMs ?? 30_000),
+            requireRecords: !command.resultState.isEmpty
         )
         switch writer {
         case .failed(let error):
@@ -255,9 +256,18 @@ extension ForgeRuntime {
                 message: message, invocationId: invocationId, writerStatus: .indeterminate
             ))
             return MutationCommandResult(accepted: true, status: "indeterminate", invocationId: invocationId)
-        case .succeeded:
-            let warnings = await synchronizeMutationUI(windowID: windowID, targetDataSourceRef: targetRef, command: command)
-            await applyMutationWindowState(windowID: windowID, patch: command.successState)
+        case .succeeded(let rows):
+            var warnings = await synchronizeMutationUI(windowID: windowID, targetDataSourceRef: targetRef, command: command)
+            var patch = command.successState
+            let receipt = JSONValue.array((rows ?? []).map(JSONValue.object))
+            for (field, selectors) in command.resultState {
+                let value = selectors.lazy.compactMap { resourceResolveValue(receipt, path: $0) }.first
+                if value == nil {
+                    warnings.append(MutationCommandWarning(stage: "resultState", dataSourceRef: targetRef, message: "Writer receipt omitted the value for \(field)."))
+                }
+                patch[field] = value ?? .null
+            }
+            await applyMutationWindowState(windowID: windowID, patch: patch)
             guardedMutationTransports.remove(transportKey)
             guardedMutationCommands.remove(key)
             let syncStatus: MutationSyncStatus = warnings.isEmpty ? .succeeded : .partialFailure
@@ -270,15 +280,20 @@ extension ForgeRuntime {
         }
     }
 
-    private func awaitMutationWriter(windowID: String, dataSourceRef: String, timeoutMs: Int) async -> MutationWriterOutcome {
+    private func awaitMutationWriter(windowID: String, dataSourceRef: String, timeoutMs: Int, requireRecords: Bool = false) async -> MutationWriterOutcome {
         let race = MutationWriterRace()
         let writer = Task {
-            await self.refreshDataSourceCollection(windowID: windowID, dataSourceRef: dataSourceRef)
-            let control = await self.dataSourceControl(windowID: windowID, dataSourceRef: dataSourceRef)
-            if let error = control.error, !error.isEmpty {
-                await race.resolve(.failed(error))
+            let receipt = await self.refreshDataSourceRows(windowID: windowID, dataSourceRef: dataSourceRef)
+            if requireRecords {
+                switch receipt {
+                case .success(let rows): await race.resolve(.succeeded(rows))
+                case .failure(let error): await race.resolve(.failed(error.localizedDescription))
+                case nil: await race.resolve(.indeterminate)
+                }
             } else {
-                await race.resolve(.succeeded)
+                let control = await self.dataSourceControl(windowID: windowID, dataSourceRef: dataSourceRef)
+                if let error = control.error, !error.isEmpty { await race.resolve(.failed(error)) }
+                else { await race.resolve(.succeeded(nil)) }
             }
         }
         let timeout = Task {

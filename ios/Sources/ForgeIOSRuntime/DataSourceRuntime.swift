@@ -1,5 +1,7 @@
 import Foundation
 
+typealias DataSourceRowReceipt = Result<[[String: JSONValue]], Error>
+
 public actor DataSourceRuntime {
     private var collectionValues: [String: [[String: JSONValue]]] = [:]
     private var formValues: [String: [String: JSONValue]] = [:]
@@ -161,6 +163,21 @@ public actor DataSourceRuntime {
         additionalHeaders: [String: String] = [:],
         session: URLSession = .shared
     ) async {
+        _ = await fetchCollectionRows(dataSourceID: dataSourceID, baseURL: baseURL, path: path, method: method, staticParameters: staticParameters, inputParameters: inputParameters, selectors: selectors, paging: paging, additionalHeaders: additionalHeaders, session: session)
+    }
+
+    func fetchCollectionRows(
+        dataSourceID: String,
+        baseURL: String,
+        path: String,
+        method: String = "GET",
+        staticParameters: [String: String] = [:],
+        inputParameters: [String: JSONValue] = [:],
+        selectors: DataSourceSelectorDef? = nil,
+        paging: DataSourcePagingDef? = nil,
+        additionalHeaders: [String: String] = [:],
+        session: URLSession = .shared
+    ) async -> DataSourceRowReceipt? {
         setControl(dataSourceID: dataSourceID, control: ControlState(loading: true))
         do {
             let input = inputValues[dataSourceID] ?? InputState()
@@ -217,13 +234,15 @@ public actor DataSourceRuntime {
                 setMetrics(dataSourceID: dataSourceID, values: dataInfo)
             }
             setControl(dataSourceID: dataSourceID, control: ControlState())
+            return .success(rows)
         } catch {
             if Task.isCancelled || (error as? URLError)?.code == .cancelled || error is CancellationError {
                 setControl(dataSourceID: dataSourceID, control: ControlState())
-                return
+                return nil
             }
             setControl(dataSourceID: dataSourceID,
                        control: ControlState(error: error.localizedDescription))
+            return .failure(error)
         }
     }
 

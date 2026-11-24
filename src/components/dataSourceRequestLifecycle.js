@@ -40,7 +40,7 @@ export function settleDataSourceRequest(dataSourceId, requestId, error = null, v
   pending.delete(requestKey);
   if (error) entry.reject(error);
   else if (entry.result === 'records') {
-    if (!Array.isArray(records)) entry.reject(new Error('Datasource records were superseded before completion.'));
+    if (!Array.isArray(records)) entry.reject(Object.assign(new Error('Datasource records were superseded before completion.'), {code: 'request_superseded'}));
     else {
       try { entry.resolve(typeof structuredClone === 'function' ? structuredClone(records) : JSON.parse(JSON.stringify(records))); }
       catch (error) { entry.reject(error); }

@@ -25,6 +25,7 @@ data class MutationCommandDef(
     val validateWhen: DashboardConditionDef? = null,
     val pendingState: JsonObject = JsonObject(emptyMap()),
     val successState: JsonObject = JsonObject(emptyMap()),
+    val resultState: Map<String, List<String>> = emptyMap(),
     val errorState: JsonObject = JsonObject(emptyMap()),
     val indeterminateState: JsonObject = JsonObject(emptyMap()),
     val reconcile: ReconcileSpec? = null,

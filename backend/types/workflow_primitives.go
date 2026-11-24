@@ -22,11 +22,13 @@ type MutationCommand struct {
 	Payload             *ResourcePayloadPreparation `json:"payload,omitempty" yaml:"payload,omitempty"`
 	ValidateWhen        map[string]interface{}      `json:"validateWhen,omitempty" yaml:"validateWhen,omitempty"`
 	PendingState        map[string]interface{}      `json:"pendingState,omitempty" yaml:"pendingState,omitempty"`
-	SuccessState        map[string]interface{}      `json:"successState,omitempty" yaml:"successState,omitempty"`
-	ErrorState          map[string]interface{}      `json:"errorState,omitempty" yaml:"errorState,omitempty"`
-	IndeterminateState  map[string]interface{}      `json:"indeterminateState,omitempty" yaml:"indeterminateState,omitempty"`
-	Reconcile           *ReconcileSpec              `json:"reconcile,omitempty" yaml:"reconcile,omitempty"`
-	Refresh             []RefreshSpec               `json:"refresh,omitempty" yaml:"refresh,omitempty"`
+	// ResultState maps window form fields to ordered selectors in this invocation's normalized writer rows.
+	ResultState        map[string][]string    `json:"resultState,omitempty" yaml:"resultState,omitempty"`
+	SuccessState       map[string]interface{} `json:"successState,omitempty" yaml:"successState,omitempty"`
+	ErrorState         map[string]interface{} `json:"errorState,omitempty" yaml:"errorState,omitempty"`
+	IndeterminateState map[string]interface{} `json:"indeterminateState,omitempty" yaml:"indeterminateState,omitempty"`
+	Reconcile          *ReconcileSpec         `json:"reconcile,omitempty" yaml:"reconcile,omitempty"`
+	Refresh            []RefreshSpec          `json:"refresh,omitempty" yaml:"refresh,omitempty"`
 	// Prepare names an optional async handler that returns the final parameter map
 	// after confirmation and before the writer is invoked.
 	Prepare string `json:"prepare,omitempty" yaml:"prepare,omitempty"`

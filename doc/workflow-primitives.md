@@ -815,3 +815,17 @@ resourceMappings:
 ```
 
 The web window context exposes `resolveMappedResource('inspection', row)`. Its result contains the selected resource contract, case values, and the mapping. The source compiler attaches referenced models and their schemas through the usual dependency resolution. A missing case without a default fails at selection. A missing model fails effective-window validation. The iOS and Android resource runtimes expose the same case selection through `ResourceModelRuntime.mappedCase`.
+
+## Project a writer receipt into dialog state
+
+A command can declare `resultState`. Each key is a top-level window form field. Its selectors are evaluated in order against the normalized rows returned by that invocation. The first present value wins, including zero, false and explicit null.
+
+```yaml
+mutationCommand:
+  dataSourceRef: create_record
+  pendingState: {createdId: null}
+  successState: {saved: true}
+  resultState: {createdId: ['0.record.id', '0.id']}
+```
+
+After an acknowledged write the command applies the projected fields with its success state. If a selector list finds no value, the field becomes null and the command records a synchronization warning. A failed write never publishes a success projection. A timeout leaves the write outcome unknown and keeps the command guarded until reconciliation.

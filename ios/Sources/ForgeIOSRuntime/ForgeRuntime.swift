@@ -640,11 +640,21 @@ public actor ForgeRuntime {
         additionalHeaders: [String: String] = [:],
         lifecyclePath: [String] = []
     ) async {
+        _ = await refreshDataSourceRows(windowID: windowID, dataSourceRef: dataSourceRef, baseURL: baseURL, additionalHeaders: additionalHeaders, lifecyclePath: lifecyclePath)
+    }
+
+    func refreshDataSourceRows(
+        windowID: String,
+        dataSourceRef: String,
+        baseURL: String = "",
+        additionalHeaders: [String: String] = [:],
+        lifecyclePath: [String] = []
+    ) async -> DataSourceRowReceipt? {
         let signal = await signals.metadata(windowID: windowID)
-        guard let metadata = await signal.peek() else { return }
+        guard let metadata = await signal.peek() else { return nil }
         guard let dataSource = metadata.dataSources[dataSourceRef] else {
             print("ForgeRuntime datasource missing from metadata for \(dataSourceRef) on window \(windowID)")
-            return
+            return nil
         }
         let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
         let input = await dataSourceRuntime.input(dataSourceID: dataSourceID)
@@ -654,7 +664,7 @@ public actor ForgeRuntime {
             let control = ControlState(loading: false, error: error.localizedDescription)
             await dataSourceRuntime.setControl(dataSourceID: dataSourceID, control: control)
             await (await signals.control(dataSourceID: dataSourceID)).set(control)
-            return
+            return .failure(error)
         }
         let fetchGeneration = (dataSourceFetchGenerations[dataSourceID] ?? 0) &+ 1
         dataSourceFetchGenerations[dataSourceID] = fetchGeneration
@@ -665,7 +675,7 @@ public actor ForgeRuntime {
             let loadingSignal = await signals.control(dataSourceID: dataSourceID)
             await loadingSignal.set(loadingControl)
             do {
-                guard await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return }
+                guard await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return nil }
                 if let result = try await dataSourceLoader(
                     DataSourceFetchRequest(
                         windowID: windowID,
@@ -685,14 +695,14 @@ public actor ForgeRuntime {
                     )
                 ) {
                     guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else {
-                        return
+                        return nil
                     }
                     let baseRows = applyCollectionHook(metadata: metadata, rows: try unmarshalResourceRows(result.rows, dataSource: dataSource, metadata: metadata))
                     let hookedRows = await applyDataSourceFetchHooks(
                         windowID: windowID, dataSourceRef: dataSourceRef, metadata: metadata,
                         rows: baseRows, generation: fetchGeneration, path: lifecyclePath + [dataSourceRef]
                     )
-                    guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return }
+                    guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return nil }
                     await dataSourceRuntime.setCollection(dataSourceID: dataSourceID, rows: hookedRows)
                     await dataSourceRuntime.setMetrics(dataSourceID: dataSourceID, values: result.metrics)
                     await dataSourceRuntime.setControl(dataSourceID: dataSourceID, control: ControlState())
@@ -730,7 +740,7 @@ public actor ForgeRuntime {
                         event: "onSuccess", rows: hookedRows, generation: fetchGeneration,
                         path: lifecyclePath + [dataSourceRef]
                     )
-                    return
+                    return .success(hookedRows)
                 }
             } catch {
                 // SwiftUI restarts report tasks as restored filters and presets settle.
@@ -744,10 +754,10 @@ public actor ForgeRuntime {
                         let controlSignal = await signals.control(dataSourceID: dataSourceID)
                         await controlSignal.set(idleControl)
                     }
-                    return
+                    return nil
                 }
                 guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else {
-                    return
+                    return nil
                 }
                 print("ForgeRuntime datasource load failed for \(dataSourceRef): \(error)")
                 await dataSourceRuntime.setControl(
@@ -761,7 +771,7 @@ public actor ForgeRuntime {
                     event: "onError", rows: [], generation: fetchGeneration,
                     path: lifecyclePath + [dataSourceRef]
                 )
-                return
+                return .failure(error)
             }
         }
 
@@ -769,10 +779,10 @@ public actor ForgeRuntime {
             let control = ControlState(loading: false, error: "A prepared report requires its native datasource loader. No request was sent.")
             await dataSourceRuntime.setControl(dataSourceID: dataSourceID, control: control)
             await (await signals.control(dataSourceID: dataSourceID)).set(control)
-            return
+            return nil
         }
         let resolvedPath = dataSource.service?.uri ?? dataSource.uri
-        guard let path = resolvedPath, !path.isEmpty else { return }
+        guard let path = resolvedPath, !path.isEmpty else { return .failure(URLError(.resourceUnavailable)) }
         let resolvedMethod = dataSource.service?.method ?? dataSource.method ?? "GET"
         let resolvedInputs = ParameterResolver.resolve(
             parameters: dataSource.parameters,
@@ -789,9 +799,9 @@ public actor ForgeRuntime {
         } else if let defaultDataSourceBaseURL {
             resolvedBaseURL = defaultDataSourceBaseURL.absoluteString
         } else {
-            return
+            return .failure(URLError(.badURL))
         }
-        await dataSourceRuntime.fetchCollection(
+        let receipt = await dataSourceRuntime.fetchCollectionRows(
             dataSourceID: dataSourceID,
             baseURL: resolvedBaseURL,
             path: path,
@@ -803,13 +813,15 @@ public actor ForgeRuntime {
             additionalHeaders: additionalHeaders,
             session: session
         )
-        guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return }
-        let fetchedRows = await dataSourceRuntime.collection(dataSourceID: dataSourceID)
+        guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return nil }
+        let fetchedRows: [[String: JSONValue]]
+        if case let .success(rows) = receipt { fetchedRows = rows }
+        else { fetchedRows = await dataSourceRuntime.collection(dataSourceID: dataSourceID) }
         let hookedRows = await applyDataSourceFetchHooks(
             windowID: windowID, dataSourceRef: dataSourceRef, metadata: metadata,
             rows: fetchedRows, generation: fetchGeneration, path: lifecyclePath + [dataSourceRef]
         )
-        guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return }
+        guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return nil }
         await dataSourceRuntime.setCollection(dataSourceID: dataSourceID, rows: hookedRows)
         if dataSource.autoSelect != false,
            let first = hookedRows.first,
@@ -835,6 +847,7 @@ public actor ForgeRuntime {
             event: control.error == nil ? "onSuccess" : "onError", rows: hookedRows,
             generation: fetchGeneration, path: lifecyclePath + [dataSourceRef]
         )
+        return receipt?.map { _ in hookedRows }
     }
 
     private func applyDataSourceLifecycleHooks(windowID: String, dataSourceRef: String,

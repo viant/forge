@@ -1,5 +1,8 @@
 package com.viant.forgeandroid.runtime
 
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -8,6 +11,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
 import java.util.UUID
 
 enum class MutationCommandPhase { Idle, Validating, Confirming, Pending, Succeeded, Failed, Indeterminate }
@@ -42,7 +49,7 @@ data class MutationCommandResult(
 )
 
 private sealed interface MutationWriterOutcome {
-    data object Succeeded : MutationWriterOutcome
+    data class Succeeded(val records: JsonArray? = null) : MutationWriterOutcome
     data object Indeterminate : MutationWriterOutcome
     data class Failed(val message: String) : MutationWriterOutcome
 }
@@ -175,9 +182,31 @@ class MutationCommandRuntime {
             invocationId = invocationId,
             writerStatus = MutationWriterStatus.Pending
         ))
-        target.setInputParameters(parameters)
-
-        return when (val writer = awaitWriter(target, (command.timeoutMs ?: 30_000).coerceAtLeast(1_000))) {
+        val timeout = (command.timeoutMs ?: 30_000).coerceAtLeast(1_000)
+        val writer = if (command.resultState.isEmpty()) {
+            target.setInputParameters(parameters)
+            awaitWriter(target, timeout)
+        } else {
+            val result = try {
+                withTimeoutOrNull(timeout.toLong()) { target.fetchCommandResult(parameters) }
+            } catch (cancelled: CancellationException) {
+                withContext(NonCancellable) {
+                    publish(key, MutationCommandState(phase = MutationCommandPhase.Indeterminate, guarded = true,
+                        retryAllowed = false, invocationId = invocationId, writerStatus = MutationWriterStatus.Indeterminate,
+                        message = "Command was cancelled after dispatch. Verify its outcome."))
+                }
+                throw cancelled
+            } catch (superseded: IllegalStateException) {
+                // The owner could not deliver this dispatch's receipt.
+                null
+            }
+            when {
+                result == null -> MutationWriterOutcome.Indeterminate
+                result.error != null -> MutationWriterOutcome.Failed(result.error)
+                else -> MutationWriterOutcome.Succeeded(result.rows)
+            }
+        }
+        return when (writer) {
             is MutationWriterOutcome.Failed -> {
                 releaseTransportAndCommand(transport, key)
                 applyWindowState(runtime, window.windowId, command.errorState)
@@ -203,9 +232,15 @@ class MutationCommandRuntime {
                 ))
                 MutationCommandResult(true, "indeterminate", invocationId)
             }
-            MutationWriterOutcome.Succeeded -> {
-                val warnings = synchronize(window, target, command)
-                applyWindowState(runtime, window.windowId, command.successState)
+            is MutationWriterOutcome.Succeeded -> {
+                val warnings = synchronize(window, target, command).toMutableList()
+                val patch = command.successState.toMutableMap()
+                for ((field, selectors) in command.resultState) {
+                    val value = selectors.firstNotNullOfOrNull { SelectorUtil.resolve(writer.records, it) as? JsonElement }
+                    if (value == null) warnings += MutationCommandWarning("resultState", message = "Writer receipt omitted the value for $field.")
+                    patch[field] = value ?: JsonNull
+                }
+                applyWindowState(runtime, window.windowId, JsonObject(patch))
                 releaseTransportAndCommand(transport, key)
                 val sync = if (warnings.isEmpty()) MutationSyncStatus.Succeeded else MutationSyncStatus.PartialFailure
                 val message = if (warnings.isEmpty()) "Completed" else "Saved. Some related data could not be refreshed."
@@ -257,7 +292,7 @@ class MutationCommandRuntime {
         } else if (!control.error.isNullOrBlank()) {
             MutationWriterOutcome.Failed(control.error)
         } else {
-            MutationWriterOutcome.Succeeded
+            MutationWriterOutcome.Succeeded()
         }
     }
 
@@ -326,7 +361,7 @@ class MutationCommandRuntime {
         when (val outcome = awaitWriter(context, 30_000)) {
             is MutationWriterOutcome.Failed -> error(outcome.message)
             MutationWriterOutcome.Indeterminate -> error("Refresh outcome is unknown")
-            MutationWriterOutcome.Succeeded -> Unit
+            is MutationWriterOutcome.Succeeded -> Unit
         }
     }
 

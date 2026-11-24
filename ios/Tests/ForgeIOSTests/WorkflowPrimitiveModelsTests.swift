@@ -317,6 +317,26 @@ final class WorkflowPrimitiveModelsTests: XCTestCase {
         XCTAssertThrowsError(try ResourceModelRuntime.marshal(draft: .object(["id": .number(1), "name": .string("new")]), baseline: baseline, modelRef: "root", schemas: metadata.schemas, models: metadata.resourceModels, hook: identityChangingHook))
     }
 
+    func testCommandProjectsValuesFromItsReceipt() async throws {
+        let runtime = ForgeRuntime()
+        let metadata = WindowMetadata(view: ViewDef(content: ContentDef()),
+            dataSources: ["draft": DataSourceDef(), "writer": DataSourceDef()])
+        let window = await runtime.openWindowInline(key: "receipt", title: "Receipt", metadata: metadata)
+        await runtime.registerDataSourceLoader { _ in
+            ForgeRuntime.DataSourceFetchResult(rows: [["record": .object(["id": .number(17)]), "flag": .bool(false), "optional": .null]])
+        }
+        let command = MutationCommandDef(dataSourceRef: "writer", resultState: [
+            "recordId": ["0.record.id", "0.id"], "flag": ["0.flag"],
+            "optional": ["0.optional", "0.flag"], "missing": ["0.missing"]])
+        let result = await runtime.executeMutationCommand(windowID: window.id, sourceDataSourceRef: "draft", command: command)
+        XCTAssertEqual(result.status, "succeeded")
+        let form = await runtime.windowFormJSONValue(windowID: window.id)
+        XCTAssertEqual(form["recordId"], .number(17))
+        XCTAssertEqual(form["flag"], .bool(false))
+        XCTAssertEqual(form["optional"], .null)
+        XCTAssertEqual(result.warnings.map(\.stage), ["resultState"])
+    }
+
     func testMutationCommandExecutesOnceAndReconcilesCommittedRows() async throws {
         let runtime = ForgeRuntime()
         let metadata = WindowMetadata(

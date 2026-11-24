@@ -396,3 +396,46 @@ retryTarget.handlers.dataSource.fetchCollection = () => Promise.resolve();
 const sameFailure = await executeCommand(retryContext, {commandId: 'retry-terminal-error', dataSourceRef: 'retry-writer'});
 assert.equal(sameFailure.status, 'failed', 'resolved transport cannot hide a remaining terminal error');
 console.log('retry command ignores previous stale error, propagates current failures, and refreshes acknowledged success ✓');
+
+// Invocation receipts can complete independently of both visible collections.
+{
+  const makeWindow = name => {
+    const control = mutableSignal({loading: false});
+    const windowForm = mutableSignal({});
+    let complete, fail;
+    const transport = {signals: {control, collection: mutableSignal([{id: 999}])}, handlers: {dataSource: {
+      setInputParameters() {},
+      fetchCollection(options) {
+        assert.ok(options.invocationId);
+        assert.equal(options.result, 'records');
+        return new Promise((resolve, reject) => { complete = resolve; fail = reject; });
+      },
+    }}};
+    const context = {identity: {windowId: name}, signals: {windowForm}, Context: () => transport};
+    return {context, control, windowForm, complete: rows => complete(rows), fail: error => fail(error)};
+  };
+  const command = {dataSourceRef: 'writer', successState: {saved: true}, resultState: {
+    createdId: ['0.data.0.id', '0.id'], flag: ['0.flag'], optional: ['0.optional'],
+  }};
+  const a = makeWindow('a'), b = makeWindow('b');
+  const first = executeCommand(a.context, command), second = executeCommand(b.context, command);
+  a.control.value = {loading: true};
+  a.control.value = {loading: false};
+  assert.deepEqual(a.windowForm.value, {});
+  b.complete([{id: 2, flag: false, optional: null}]);
+  assert.equal((await second).status, 'succeeded');
+  a.complete([{data: [{id: 1}], flag: false, optional: null}]);
+  assert.equal((await first).status, 'succeeded');
+  assert.deepEqual(a.windowForm.value, {saved: true, createdId: 1, flag: false, optional: null});
+  assert.deepEqual(b.windowForm.value, {saved: true, createdId: 2, flag: false, optional: null});
+  const third = executeCommand(a.context, command);
+  a.complete([{}]);
+  const result = await third;
+  assert.equal(result.status, 'succeeded');
+  assert.equal(result.warnings.filter(warning => warning.stage === 'resultState').length, 3);
+  assert.equal(a.windowForm.value.createdId, null);
+  const denied = executeCommand(b.context, {...command, commandId: 'denied', resultState: {rejectedId: ['0.id']}});
+  b.fail(new Error('Denied by producer'));
+  assert.equal((await denied).status, 'failed');
+  assert.equal(Object.hasOwn(b.windowForm.value, 'rejectedId'), false);
+}

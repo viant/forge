@@ -118,7 +118,7 @@ async function prepareCommandParameters(context, command, parameters, extras) {
   } finally { clearTimeout(timer); }
 }
 
-function awaitWriter(target, invoke, timeoutMs) {
+function awaitWriter(target, invoke, timeoutMs, requireRecords = false) {
   return new Promise((resolve) => {
     let settled = false;
     let loadingSeen = false;
@@ -134,7 +134,7 @@ function awaitWriter(target, invoke, timeoutMs) {
     };
     const control = target?.signals?.control;
     const previousError = (control?.peek?.() || control?.value || {}).error;
-    const observed = typeof control?.subscribe === 'function';
+    const observed = !requireRecords && typeof control?.subscribe === 'function';
     if (observed) dispose = control.subscribe((value = {}) => {
       if (!invocationStarted) return;
       if (value.loading) { loadingSeen = true; return; }
@@ -150,7 +150,15 @@ function awaitWriter(target, invoke, timeoutMs) {
       invocationStarted = true;
       const result = invoke();
       if (result === false) settle({status: 'failed', error: new Error('The datasource rejected the command before invocation.')});
-      else if (result?.then) result.then(() => {
+      else if (requireRecords) {
+        // A control notification can belong to a different request. Only the
+        // invocation promise can supply its own normalized response rows.
+        if (!result?.then) settle({status: 'indeterminate', error: new Error('The writer did not provide an invocation receipt.')});
+        else result.then(records => {
+          if (Array.isArray(records)) settle({status: 'succeeded', records});
+          else settle({status: 'indeterminate', error: new Error('The writer did not return invocation records.')});
+        }, error => settle({status: error?.code === 'request_superseded' ? 'indeterminate' : 'failed', error}));
+      } else if (result?.then) result.then(() => {
         // Some datasource transports resolve their request promise without ever
         // publishing a loading pulse. Give the control signal one event-loop
         // turn to publish a terminal error, then use the resolved transport as
@@ -330,10 +338,11 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
     applyPrimitiveState(context, command.pendingState);
     publish(context, key, {phase: 'pending', guarded: true, pending: true, retryAllowed: false, error: null, message: 'Saving…', invocationId: id, writerStatus: 'pending', syncStatus: 'not_started'});
     target.handlers.dataSource.setInputParameters(parameters);
+    const mapsResult = Object.keys(command.resultState || {}).length > 0;
     const writer = await awaitWriter(target, () => {
       writerInvoked = true;
-      return target.handlers.dataSource.fetchCollection({cache: {bypassCache: true}, invocationId: id});
-    }, Math.max(1000, Number(command.timeoutMs) || 30000));
+      return target.handlers.dataSource.fetchCollection({cache: {bypassCache: true}, invocationId: id, ...(mapsResult ? {result: 'records'} : {})});
+    }, Math.max(1000, Number(command.timeoutMs) || 30000), mapsResult);
     if (!authorizationIsCurrent()) {
       releaseTransport(target, key);
       transportAcquired = false;
@@ -359,8 +368,18 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
     }
     writerSucceeded = true;
     let warnings = [];
-    try { applyPrimitiveState(context, command.successState); } catch (error) { warnings.push({stage: 'successState', error}); }
-    const writerResponse = parameterSnapshot(target?.signals?.collection?.peek?.() || target?.signals?.collection?.value || []);
+    const successState = mapsResult ? Object.assign(Object.create(null), command.successState) : command.successState;
+    for (const [field, selectors] of Object.entries(command.resultState || {})) {
+      let value;
+      for (const selector of selectors) {
+        value = resolveSelector(writer.records, selector);
+        if (value !== undefined) break;
+      }
+      if (value === undefined) warnings.push({stage: 'resultState', error: new Error(`Writer receipt omitted the value for ${field}.`)});
+      successState[field] = value ?? null;
+    }
+    try { applyPrimitiveState(context, successState); } catch (error) { warnings.push({stage: 'successState', error}); }
+    const writerResponse = writer.records ?? parameterSnapshot(target?.signals?.collection?.peek?.() || target?.signals?.collection?.value || []);
     // The writer transport is no longer in use once its terminal success is
     // acknowledged. Release it before potentially slow UI reconciliation so a
     // different command may use the same datasource. Keep this command's own

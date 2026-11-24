@@ -13,6 +13,31 @@ import kotlin.test.assertTrue
 
 class MutationCommandRuntimeTest {
     @Test
+    fun `window state receives the writer result and preserves false and null`() = runBlocking {
+        val runtime = ForgeRuntime(emptyMap(), CoroutineScope(Dispatchers.Unconfined))
+        val metadata = WindowMetadata(view = ViewDef(content = ContentDef()),
+            dataSources = mapOf("draft" to DataSourceDef(), "writer" to DataSourceDef()))
+        val state = runtime.openWindowInline("test", "Receipt", metadata = metadata)
+        val window = runtime.windowContext(state.windowId)
+        var requests = 0
+        runtime.registerDataSourceLoader {
+            requests++
+            ForgeRuntime.DataSourceFetchResult(rows = listOf(mapOf("record" to mapOf("id" to 17), "flag" to false, "optional" to null)))
+        }
+        val command = MutationCommandDef(dataSourceRef = "writer", timeoutMs = 8_000, resultState = mapOf(
+            "recordId" to listOf("0.record.id", "0.id"), "flag" to listOf("0.flag"),
+            "optional" to listOf("0.optional", "0.flag"), "missing" to listOf("0.missing")))
+        val result = runtime.mutationCommands.execute(runtime, window, window.context("draft"), command)
+        assertEquals("succeeded", result.status)
+        val form = window.peekWindowForm()
+        assertEquals(17, (form["recordId"] as Number).toInt())
+        assertEquals(false, form["flag"])
+        assertTrue(form.containsKey("optional") && form["optional"] == null)
+        assertEquals(listOf("resultState"), result.warnings.map { it.stage })
+        assertEquals(1, requests)
+    }
+
+    @Test
     fun `selection confirmation matches web contract`() = runBlocking {
         val runtime = MutationCommandRuntime()
         val command = MutationCommandDef(

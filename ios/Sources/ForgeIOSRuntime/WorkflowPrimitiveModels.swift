@@ -19,6 +19,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
     public let payload: ResourcePayloadPreparationDef?
     public let validateWhen: DashboardConditionDef?
     public let pendingState: [String: JSONValue]
+    public let resultState: [String: [String]]
     public let successState: [String: JSONValue]
     public let errorState: [String: JSONValue]
     public let indeterminateState: [String: JSONValue]
@@ -42,6 +43,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         validateWhen: DashboardConditionDef? = nil,
         pendingState: [String: JSONValue] = [:],
         successState: [String: JSONValue] = [:],
+        resultState: [String: [String]] = [:],
         errorState: [String: JSONValue] = [:],
         indeterminateState: [String: JSONValue] = [:],
         reconcile: ReconcileSpec? = nil,
@@ -62,6 +64,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         self.payload = payload
         self.validateWhen = validateWhen
         self.pendingState = pendingState
+        self.resultState = resultState
         self.successState = successState
         self.errorState = errorState
         self.indeterminateState = indeterminateState
@@ -72,7 +75,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
     private enum CodingKeys: String, CodingKey {
         case commandId, label, icon, hideLabel, intent, confirm, confirmSelection, invalidMessage, timeoutMs
         case invocationParameter, dataSourceRef, parameters, payload, validateWhen
-        case pendingState, successState, errorState, indeterminateState, reconcile, refresh
+        case pendingState, resultState, successState, errorState, indeterminateState, reconcile, refresh
     }
 
     public init(from decoder: Decoder) throws {
@@ -92,6 +95,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         payload = try values.decodeIfPresent(ResourcePayloadPreparationDef.self, forKey: .payload)
         validateWhen = try values.decodeIfPresent(DashboardConditionDef.self, forKey: .validateWhen)
         pendingState = try values.decodeIfPresent([String: JSONValue].self, forKey: .pendingState) ?? [:]
+        resultState = try values.decodeIfPresent([String: [String]].self, forKey: .resultState) ?? [:]
         successState = try values.decodeIfPresent([String: JSONValue].self, forKey: .successState) ?? [:]
         errorState = try values.decodeIfPresent([String: JSONValue].self, forKey: .errorState) ?? [:]
         indeterminateState = try values.decodeIfPresent([String: JSONValue].self, forKey: .indeterminateState) ?? [:]

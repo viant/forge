@@ -126,6 +126,11 @@ func validateResourceModels(window *Window, validateDataSources bool) error {
 		return err
 	}
 	for index := range window.Dialogs {
+		for _, action := range window.Dialogs[index].Actions {
+			if err := validateCommandResultState(action.MutationCommand); err != nil {
+				return fmt.Errorf("dialog %s action %s: %w", window.Dialogs[index].Id, action.ID, err)
+			}
+		}
 		if err := validateContainerResourceModels(window, window.Dialogs[index].Content, validateDataSources); err != nil {
 			return fmt.Errorf("dialog %s: %w", window.Dialogs[index].Id, err)
 		}
@@ -268,7 +273,24 @@ func validateResourceFieldBinding(window *Window, modelName, fieldName string, f
 	return nil
 }
 
-func validAssociationPath(path string) bool {
+func validateCommandResultState(command *MutationCommand) error {
+	if command == nil {
+		return nil
+	}
+	for field, selectors := range command.ResultState {
+		if !validResourceSelector(field) || strings.Contains(field, ".") || len(selectors) == 0 {
+			return fmt.Errorf("command resultState requires a window form field and at least one selector")
+		}
+		for _, selector := range selectors {
+			if !validResourceSelector(selector) {
+				return fmt.Errorf("command resultState field %s has an invalid selector", field)
+			}
+		}
+	}
+	return nil
+}
+
+func validResourceSelector(path string) bool {
 	for _, part := range strings.Split(path, ".") {
 		if part == "" || strings.TrimSpace(part) != part || strings.ContainsAny(part, ":/[]") {
 			return false
@@ -299,12 +321,12 @@ func validateAssociationDelta(path string, schema ResourceFieldSchema, binding R
 		binding.AlwaysWrite || binding.OmitIfUnchanged || schema.ReadOnly || schema.Nullable || schema.Default != nil {
 		return fmt.Errorf("resource model field %s associationDelta cannot combine with another write mapping, transformation, or nullable field", path)
 	}
-	if !validAssociationPath(delta.Added) || !validAssociationPath(delta.Deleted) {
+	if !validResourceSelector(delta.Added) || !validResourceSelector(delta.Deleted) {
 		return fmt.Errorf("resource model field %s associationDelta requires safe added and deleted paths", path)
 	}
 	switch delta.Mode {
 	case "diff":
-		if !validAssociationPath(delta.BaselineComplete) || associationIDArrayType(schema) == "" {
+		if !validResourceSelector(delta.BaselineComplete) || associationIDArrayType(schema) == "" {
 			return fmt.Errorf("resource model field %s diff associationDelta requires a baselineComplete path and an integer or string ID array", path)
 		}
 	case "explicit":
@@ -438,6 +460,9 @@ func validateContainerResourceModels(window *Window, container *Container, valid
 		}
 	}
 	for _, command := range commands {
+		if err := validateCommandResultState(command); err != nil {
+			return fmt.Errorf("container %s: %w", container.ID, err)
+		}
 		if command == nil || command.Payload == nil {
 			continue
 		}
