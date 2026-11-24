@@ -1,6 +1,6 @@
 import React, {act} from 'react';
 import {createRoot} from 'react-dom/client';
-import {afterEach,expect,it,vi} from 'vitest';
+import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {ReaderCacheDialog} from './ReaderCacheDialog.jsx';
 import {ReaderBuilder} from './ReaderBuilder.jsx';
 import {createWorkbenchAPI} from './apiBindings.js';
@@ -12,7 +12,11 @@ const first='2026-12-01T06:00:00.123456Z';
 const schedule=(extra={})=>({scheduleId:'schedule',reportId:'reader',versionNo:2,revision:3,intervalSeconds:3601,firstRunAt:first,nextDueAt:first,enabled:true,...extra});
 const structure={component:{rootView:{name:'records',namespace:'r',source:{sql:'SELECT 1 AS ID'},relations:[{name:'children',holder:'Children',view:{name:'children',namespace:'c'}}]}}};
 let host,root;
-afterEach(async()=>{if(root)await act(async()=>root.unmount());host?.remove();root=null;vi.useRealTimers();});
+beforeEach(()=>{
+ const original=Intl.DateTimeFormat.prototype.resolvedOptions;
+ vi.spyOn(Intl.DateTimeFormat.prototype,'resolvedOptions').mockImplementation(function(){return {...original.call(this),timeZone:'America/New_York'};});
+});
+afterEach(async()=>{if(root)await act(async()=>root.unmount());host?.remove();root=null;vi.useRealTimers();vi.restoreAllMocks();});
 const buttons=(text,node=document)=>[...node.querySelectorAll('button')].filter(button=>button.textContent.trim()===text);
 const section=()=>document.querySelector('[aria-label="Warmup schedule"]');
 const button=text=>buttons(text,section())[0];
@@ -32,19 +36,19 @@ async function setup(overrides={},initial={}){
 it('creates only after confirmed absence with revision zero and explicit false, without running or changing source',async()=>{
  const {api,apply,warmup}=await setup();
  expect(section().textContent).toContain('No schedule for this saved version.');
- await edit('first',first);await edit('interval','3601');await click(button('Save schedule'));
- expect(api.saveWarmupSchedule).toHaveBeenCalledExactlyOnceWith('reader',2,{expectedRevision:0,intervalSeconds:3601,firstRunAt:first,enabled:false});
+ await edit('date','2026-12-01');await edit('first','01:00');await edit('interval','3601');await click(button('Save schedule'));
+ expect(api.saveWarmupSchedule).toHaveBeenCalledExactlyOnceWith('reader',2,{expectedRevision:0,intervalSeconds:3601,firstRunAt:'2026-12-01T06:00:00.000Z',enabled:false});
  expect(section().textContent).toContain('Schedule disabled');expect(apply).not.toHaveBeenCalled();expect(warmup).not.toHaveBeenCalled();
 });
 
 it('retains exact seconds and the full first-run timestamp when disabling and enabling',async()=>{
  const {api}=await setup({getWarmupSchedule:vi.fn().mockResolvedValue({schedule:schedule()})});
- expect(input('interval').value).toBe('3601');expect(input('first').value).toBe(first);
+ expect(input('interval').value).toBe('3601');expect(input('first').value).toBe('01:00');
  await click(section().querySelector('input[type=checkbox]'));await click(button('Save schedule'));
  expect(api.saveWarmupSchedule.mock.calls[0][2]).toEqual({expectedRevision:3,intervalSeconds:3601,firstRunAt:first,enabled:false});
  await click(section().querySelector('input[type=checkbox]'));await click(button('Save schedule'));
  expect(api.saveWarmupSchedule.mock.calls[1][2]).toEqual({expectedRevision:4,intervalSeconds:3601,firstRunAt:first,enabled:true});
- expect(section().textContent).toContain('Next due (UTC)');expect(section().textContent).not.toContain('Scheduler running');
+ expect(section().textContent).toContain('Next due (America/New_York)');expect(section().textContent).not.toContain('Scheduler running');
 });
 
 it('edits an interval in exact seconds and removes only the schedule using its returned revision',async()=>{
@@ -67,7 +71,7 @@ it('keeps failed reads distinct from absence, retries explicitly, and never crea
 it('preserves the draft on native validation and permission failures without retrying',async()=>{
  const {api}=await setup({getWarmupSchedule:vi.fn().mockResolvedValue({schedule:schedule()}),saveWarmupSchedule:vi.fn().mockRejectedValue(new Error('Native schedule edit denied'))});
  await edit('interval','0');await click(button('Save schedule'));
- expect(input('interval').value).toBe('0');expect(input('first').value).toBe(first);expect(section().textContent).toContain('Native schedule edit denied');
+ expect(input('interval').value).toBe('0');expect(input('first').value).toBe('01:00');expect(section().textContent).toContain('Native schedule edit denied');
  expect(api.getWarmupSchedule).toHaveBeenCalledOnce();expect(api.saveWarmupSchedule).toHaveBeenCalledOnce();
 });
 
@@ -100,7 +104,7 @@ it('resolves an off-page linked run with an older source revision and reuses evi
 it('refreshes linked status without replacing the schedule draft or concurrency token',async()=>{
  const {api}=await setup({getWarmupSchedule:vi.fn().mockResolvedValue({schedule:schedule({lastRunId:'linked'})})});
  await edit('interval','4001');await click(button('Refresh linked run'));
- expect(input('interval').value).toBe('4001');expect(input('first').value).toBe(first);expect(api.getWarmupSchedule).toHaveBeenCalledOnce();
+ expect(input('interval').value).toBe('4001');expect(input('first').value).toBe('01:00');expect(api.getWarmupSchedule).toHaveBeenCalledOnce();
  await click(button('Save schedule'));expect(api.saveWarmupSchedule.mock.calls[0][2].expectedRevision).toBe(3);
 });
 
@@ -150,7 +154,7 @@ it('fences linked-run responses after closing the dialog and reloads on reopen',
 
 it('prevents duplicate schedule submission and dialog dismissal while pending',async()=>{
  let finish;
- const {api}=await setup({saveWarmupSchedule:vi.fn().mockImplementation(()=>new Promise(resolve=>{finish=resolve;}))});await edit('first',first);
+ const {api}=await setup({saveWarmupSchedule:vi.fn().mockImplementation(()=>new Promise(resolve=>{finish=resolve;}))});await edit('date','2026-12-01');await edit('first','01:00');
  const save=button('Save schedule');await act(async()=>{save.click();save.click();});
  expect(api.saveWarmupSchedule).toHaveBeenCalledOnce();expect(input('first').disabled).toBe(true);expect(document.querySelector('button[aria-label="Close"]')).toBeNull();
  await act(async()=>finish({schedule:schedule({revision:1})}));
@@ -211,4 +215,54 @@ it('keeps the schedule draft during a real Reader Builder loading transition for
  await act(async()=>finish({...snapshot,version:{...version,sourceRevision:8}}));
  expect(input('interval').value).toBe('4001');expect(api.getWarmupSchedule).toHaveBeenCalledOnce();
  await click(button('Save schedule'));expect(api.saveWarmupSchedule.mock.calls[0][2].expectedRevision).toBe(3);
+});
+
+
+it('interprets time-only entry using today in the browser timezone, even when the UTC day differs',async()=>{
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-25T02:00:00Z'));
+ const {api}=await setup();expect(input('date').value).toBe('2026-11-24');expect(section().textContent).toContain('America/New_York');
+ await edit('first','23:14');await click(button('Save schedule'));
+ expect(api.saveWarmupSchedule.mock.calls[0][2].firstRunAt).toBe('2026-11-25T04:14:00.000Z');
+});
+it('converts an explicit local date using its seasonal offset and displays saved times locally',async()=>{
+ const {api,render}=await setup();await edit('date','2026-07-15');await edit('first','23:14');await click(button('Save schedule'));
+ expect(api.saveWarmupSchedule.mock.calls[0][2].firstRunAt).toBe('2026-07-16T03:14:00.000Z');
+ api.getWarmupSchedule.mockResolvedValue({schedule:schedule({firstRunAt:'2026-07-16T03:14:00.000Z',nextDueAt:'2026-07-16T04:14:00.000Z'})});
+ await render({isOpen:false});await render({isOpen:true});expect(input('date').value).toBe('2026-07-15');expect(input('first').value).toBe('23:14');
+ expect(section().querySelector('time[datetime="2026-07-16T03:14:00.000Z"]').textContent).toContain('Jul 15');
+});
+it.each(['','23:','25:14'])('keeps incomplete or invalid time %s editable without submitting',async value=>{
+ const {api}=await setup();await edit('first',value);await click(button('Save schedule'));
+ expect(api.saveWarmupSchedule).not.toHaveBeenCalled();expect(section().textContent).toContain('Choose a complete first-run date and time.');expect(input('first').disabled).toBe(false);
+ await edit('first','23:14');await click(button('Save schedule'));expect(api.saveWarmupSchedule).toHaveBeenCalledOnce();
+});
+it('blocks a missing date and nonexistent spring-forward time without shifting the input',async()=>{
+ const {api}=await setup();await edit('date','');await edit('first','23:14');await click(button('Save schedule'));expect(api.saveWarmupSchedule).not.toHaveBeenCalled();
+ await edit('date','2026-03-08');await edit('first','02:30');await click(button('Save schedule'));
+ expect(input('date').value).toBe('2026-03-08');expect(input('first').value).toBe('02:30');expect(section().textContent).toContain('does not exist');expect(api.saveWarmupSchedule).not.toHaveBeenCalled();
+ await edit('first','03:30');await click(button('Save schedule'));expect(api.saveWarmupSchedule.mock.calls[0][2].firstRunAt).toBe('2026-03-08T07:30:00.000Z');
+});
+it.each([['earlier','2026-11-01T05:30:00.000Z'],['later','2026-11-01T06:30:00.000Z']])('requires the %s occurrence choice for an edited repeated local time',async(occurrence,expected)=>{
+ const {api}=await setup();await edit('date','2026-11-01');await edit('first','01:30');await click(button('Save schedule'));
+ expect(api.saveWarmupSchedule).not.toHaveBeenCalled();expect(section().textContent).toContain('occurs twice');
+ await act(async()=>{input('occurrence').value=occurrence;input('occurrence').dispatchEvent(new Event('change',{bubbles:true}));});
+ await click(button('Save schedule'));expect(api.saveWarmupSchedule.mock.calls[0][2].firstRunAt).toBe(expected);
+});
+it.each(['2026-11-01T05:30:12.123456Z','2026-11-01T06:30:12.123456Z'])('reopens and retains the exact loaded repeated-hour instant %s until date or time is edited',async original=>{
+ const {api,render}=await setup({getWarmupSchedule:vi.fn().mockResolvedValue({schedule:schedule({firstRunAt:original})})});
+ await render({isOpen:false});await render({isOpen:true});expect(input('first').value).toBe('01:30');expect(input('occurrence')).toBeNull();
+ await edit('interval','4001');await click(button('Save schedule'));expect(api.saveWarmupSchedule.mock.calls[0][2].firstRunAt).toBe(original);
+ await click(section().querySelector('input[type=checkbox]'));await click(button('Save schedule'));expect(api.saveWarmupSchedule.mock.calls[1][2].firstRunAt).toBe(original);
+ await edit('first','01:31');expect(input('occurrence')).not.toBeNull();await click(button('Save schedule'));expect(api.saveWarmupSchedule).toHaveBeenCalledTimes(2);
+});
+it('explains a past selection without changing the date, cadence or running warmup',async()=>{
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-12-02T12:00:00Z'));
+ const {api,warmup}=await setup();await edit('date','2026-12-01');await edit('first','23:14');expect(section().textContent).toContain('in the past');
+ await click(button('Save schedule'));expect(api.saveWarmupSchedule.mock.calls[0][2]).toMatchObject({firstRunAt:'2026-12-02T04:14:00.000Z',intervalSeconds:3600,enabled:false});expect(warmup).not.toHaveBeenCalled();
+});
+
+
+it('keeps native firstRunAt diagnostics visible after local conversion succeeds',async()=>{
+ const {api}=await setup({saveWarmupSchedule:vi.fn().mockRejectedValue(Object.assign(new Error('Native timestamp validation failed'),{field:'firstRunAt'}))});
+ await edit('first','23:14');await click(button('Save schedule'));expect(api.saveWarmupSchedule).toHaveBeenCalledOnce();expect(section().textContent).toContain('Native timestamp validation failed');expect(input('first').value).toBe('23:14');
 });

@@ -1738,11 +1738,22 @@ schedule operation bindings shows unavailable configuration, not an absent
 schedule. Only a successful schedule Get establishes absence and revision zero.
 
 The form reuses shared inputs, checkbox, buttons, status and confirmation
-controls. Intervals are authored in exact seconds. First-run input and next-due
-evidence are explicitly UTC ISO date/times. Keep the producer's loaded timestamp
-string unchanged, including fractional-second precision, when changing only the
-enabled preference or interval. No minute conversion, browser scheduling timer,
-credential storage or new client-side schedule validation is introduced.
+controls. Intervals are authored in exact seconds. First-run date/time uses
+native date and time inputs through Blueprint InputGroup, following the existing
+ScheduleEditor input pattern. The date defaults to today in the browser's named
+timezone; entering only a time retains that selected date. Saved first-run and
+next-due evidence display in local time with the timezone visible.
+
+Reuse `scheduleTimeZone` conversion for edited wall times. Incomplete input and
+nonexistent spring-forward times remain editable with an error and send no save.
+Repeated fall-back times require an explicit earlier/later occurrence choice.
+Past selections show an explanation without changing the date or executing work;
+native scheduling owns missed occurrences. The producer's loaded timestamp stays
+unchanged, including fractional seconds and its exact DST occurrence, until the
+date or time is edited. Interval/enabled-only saves never convert that timestamp
+through JavaScript Date. Backend schedule validation remains authoritative; local
+input checks do not replace native malformed-timestamp validation. No interval
+rounding, browser scheduling timer or credential storage is introduced.
 **Schedule enabled** records a preference and does not claim scheduler health.
 
 Schedule reads/mutations are owned by the dialog lifecycle so closing portal
