@@ -1167,6 +1167,15 @@ export const reportSpecSchema = {
           type: "array",
           items: { $ref: "#/$defs/tableColumn" },
         },
+        summaryRow: {
+          type: "object",
+          additionalProperties: false,
+          required: ["datasetRef"],
+          properties: {
+            datasetRef: { type: "string", minLength: 1 },
+            label: { type: "string", description: "Optional text in the first column; values otherwise use the table column mappings." },
+          },
+        },
       },
     },
     kpiBlock: {
