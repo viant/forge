@@ -1,9 +1,11 @@
 import React, {useEffect, useId, useMemo, useState} from 'react';
 import {signal} from '@preact/signals-react';
-import {Breadcrumbs, Button as BlueprintButton, ButtonGroup, Callout, Card, Checkbox, Dialog, Drawer, InputGroup, Menu, MenuDivider, MenuItem, NonIdealState, OverflowList, Radio, RadioCard, RadioGroup, Slider, Spinner, Tag, TagInput, TextArea, Toast, Tooltip, Tree} from '@blueprintjs/core';
+import {useSignals} from '@preact/signals-react/runtime';
+import {Breadcrumbs, Button as BlueprintButton, ButtonGroup, Callout, Card, Checkbox, Dialog, Drawer, InputGroup, Menu, MenuDivider, MenuItem, NonIdealState, OverflowList, Radio, RadioCard, RadioGroup, Slider, Spinner, Tab as BlueprintTab, Tabs as BlueprintTabs, Tag, TagInput, TextArea, Toast, Tooltip, Tree} from '@blueprintjs/core';
 import {DatePicker3,TimePicker,TimezoneSelect} from '@blueprintjs/datetime2';
 import {Select} from '@blueprintjs/select';
 import {DateRangePresetInput} from '../../packs/blueprint/index.jsx';
+import {resolveDateRangePreset} from '../../packs/blueprint/dateRangePreset.js';
 import CalendarDropdown from '../../packs/blueprint/CalendarDropdown.jsx';
 import {anchoredPopoverProps} from '../../components/anchoredPopoverProps.js';
 import Button from '../../components/Button.jsx';
@@ -11,18 +13,22 @@ import Icon from '../../components/Icon.jsx';
 import Typography, {typographyProps} from '../../components/Typography.jsx';
 import SelectControl from '../../components/SelectControl.jsx';
 import StatusChip from '../../components/StatusChip.jsx';
+import RemovableChip from '../../components/RemovableChip.jsx';
 import CountBadge from '../../components/CountBadge.jsx';
 import FilterChips from '../../components/content/FilterChips.jsx';
 import Avatar from '../../components/Avatar.jsx';
 import Popover from '../../components/Popover.jsx';
 import DropdownMenu from '../../components/DropdownMenu.jsx';
+import NavigationFlyout, {NavigationSubmenu} from '../../components/NavigationFlyout.jsx';
 import SwitchControl from '../../components/SwitchControl.jsx';
 import SectionTabRail from '../../components/SectionTabRail.jsx';
 import {WorkspaceRuntimeTabs,workspaceTabID,workspacePanelID} from '../../components/WorkspaceRuntimeSurface.jsx';
+import '../../components/WindowManager.css';
 import {SectionPattern} from '../../components/patterns/index.js';
-import ContentCarousel from '../../components/content/ContentCarousel.jsx';
+import {DiscoveryCarouselExample,CardRailExample,DiscoveryDataStateExample} from './DiscoveryExamples.jsx';
 import ChipList from '../../components/ChipList.jsx';
 import Splitter from '../../components/Splitter.jsx';
+import ScrollArea from '../../components/ScrollArea.jsx';
 import MarkdownView from '../../components/MarkdownView.jsx';
 import SoftSkeleton from '../../components/SoftSkeleton.jsx';
 import ProgressBar from '../../components/control/ProgressBar.jsx';
@@ -33,9 +39,12 @@ import DashboardTableContent from '../../components/dashboard/DashboardTableCont
 import {DashboardEditableTable} from '../../components/dashboard/DashboardBlocks.jsx';
 import {ChartExample,chartExamples} from './ChartSpecimen.jsx';
 import MetricsSpecimen from './MetricsSpecimen.jsx';
-import DocumentSpecimen from './DocumentSpecimen.jsx';
-import ReportDocumentSpecimen from './ReportDocumentSpecimen.jsx';
-import ComparisonWidthSpecimen from './ComparisonWidthSpecimen.jsx';
+import {DocumentFormExample, AnalyticalReportExample, ComparisonLayoutExample} from './PatternExamples.jsx';
+import FullScreenExample from './FullScreenExample.jsx';
+import ListPageSpecimen from './ListPageSpecimen.jsx';
+import BasicTableSpecimen,{tableEditorStates} from './BasicTableSpecimen.jsx';
+import SettingsDialog from '../../components/table/SettingsDialog.jsx';
+import FilterDialog from '../../components/table/FilterDialog.jsx';
 import '../../components/chat.css';
 import '../../components/chat/documentChat.css';
 import '../../components/dashboard/Dashboard.css';
@@ -114,9 +123,10 @@ function SelectorExample({variant, disabled, readOnly, invalid, searchable=false
     </div>;
 }
 function RangeExample({variant,disabled,readOnly}) {
-    const [preset,setPreset]=useState(variant==='Custom'?'custom':'recent');
-    const [range,setRange]=useState({start:'2026-11-06',end:'2026-11-12'});
-    return <div className={`catalog-example-field${readOnly?' forge-widget-readonly':''}`}><DateRangePresetInput item={{id:useId(),label:'Date range'}} value={preset} range={range} disabled={disabled} readOnly={readOnly} options={[{value:'recent',label:'Recent period',range:{start:'2026-11-06',end:'2026-11-12'}},{value:'custom',label:'Custom dates'}]} customApplyEnabled onPresetRequest={option=>{setPreset(option.value);if(option.range)setRange(option.range);return true;}} onRangeChange={next=>{setPreset('custom');setRange(next);}}/></div>;
+    const [preset,setPreset]=useState(variant==='Custom'?'custom':'current_month');
+    const [range,setRange]=useState(()=>resolveDateRangePreset('current_month'));
+    const presets=[['today','Today'],['yesterday','Yesterday'],['week','Last 7 days'],['month_to_date','Month to date'],['current_month','Month'],['last_month','Last Month'],['quarter_to_date','Quarter to date'],['year_to_date','Year to date'],['year','Year'],['lifetime','Lifetime'],['custom','Custom dates']].map(([value,label])=>({value,label}));
+    return <div className={`catalog-example-field${readOnly?' forge-widget-readonly':''}`} style={{maxWidth:300}}><DateRangePresetInput item={{id:useId(),label:'Date range'}} value={preset} range={range} disabled={disabled} readOnly={readOnly} options={presets} customApplyEnabled onPresetRequest={option=>{setPreset(option.value);setRange(resolveDateRangePreset(option.value));return true;}} onRangeChange={next=>{setPreset('custom');setRange(next);}}/></div>;
 }
 
 function FieldExample({spec,variant,state,thumbnail}) {
@@ -197,8 +207,30 @@ function ToolbarExample({variant,state,thumbnail}) {
 }
 function LocalTabs({variant='Default',disabled=false}) {
     const [selected,setSelected]=useState('overview');const base=useId().replace(/:/g,'');
+    const [closed,setClosed]=useState([]),[workspaceFeedback,setWorkspaceFeedback]=useState('');
     const items=[{id:'overview',label:'Overview',icon:'lucide:file-text'},{id:'activity',label:'Activity',icon:'lucide:activity'},{id:'settings',label:'Settings',icon:'lucide:settings'}].map(item=>({...item,disabled}));
-    if(variant==='Workspace')return <div className="catalog-full"><WorkspaceRuntimeTabs id={base} entries={items.map(item=>({windowId:item.id,label:item.label,disabled}))} selectedId={selected} onSelect={setSelected} ariaLabel="Open example workspaces" className="forge-window-manager-tablist" itemClassName="forge-window-manager-tab" tabClassName="bp6-tab" renderLabel={item=><><Icon name={items.find(entry=>entry.id===item.windowId).icon}/>{item.label}</>}/><div className="catalog-tab-panel" role="tabpanel" id={workspacePanelID(base,selected)} aria-labelledby={workspaceTabID(base,selected)}>{items.find(item=>item.id===selected).label} workspace</div></div>;
+    if(variant==='Contained')return <div className="catalog-full"><BlueprintTabs id={`contained-${base}`} className="forge-form-panel-tabs forge-form-panel-tabs--compact" selectedTabId={selected} onChange={setSelected} animate={false} renderActiveTabPanelOnly>{items.map(item=><BlueprintTab key={item.id} id={item.id} title={item.label} disabled={disabled} panelClassName="catalog-tab-panel" panel={<span>{item.id==='overview'?'A clear view of the current document.':item.id==='activity'?'Recent updates appear here.':'Choose how this document behaves.'}</span>}/>)}</BlueprintTabs></div>;
+    if(variant==='Workspace'){
+        const openItems=items.filter(item=>!closed.includes(item.id));
+        const active=openItems.find(item=>item.id===selected)||openItems[0];
+        const closeWorkspace=id=>{
+            const next=openItems.filter(item=>item.id!==id);
+            setClosed(previous=>[...previous,id]);
+            if(active?.id===id)setSelected(next[0]?.id||items[0].id);
+            setWorkspaceFeedback(`Closed ${items.find(item=>item.id===id).label}.`);
+            return true;
+        };
+        return <div className="catalog-full"><WorkspaceRuntimeTabs id={base}
+            entries={openItems.map(item=>({windowId:item.id,label:item.label,disabled}))}
+            selectedId={active?.id} onSelect={setSelected} onClose={closeWorkspace} canClose={()=>!disabled}
+            ariaLabel="Open example workspaces" className="forge-window-manager-tablist" itemClassName="forge-window-manager-tab" tabClassName="bp6-tab"
+            renderLabel={item=><><Icon name={items.find(entry=>entry.id===item.windowId).icon}/>{item.label}</>}
+            renderClose={(item,{close,disabled:closeDisabled})=><button type="button" className="forge-window-tab-action" aria-label={`Close ${item.label}`} disabled={closeDisabled} onClick={close}><Icon name="lucide:x"/></button>}
+            renderTrailing={item=><button type="button" className="forge-window-tab-action forge-window-tab-undock" aria-label={`Expand ${item.label}`} disabled={disabled} onClick={event=>{event.stopPropagation();setWorkspaceFeedback(`Expand requested for ${item.label}.`);}}><Icon name="lucide:maximize-2"/></button>}/>
+            {active?<div className="catalog-tab-panel" role="tabpanel" id={workspacePanelID(base,active.id)} aria-labelledby={workspaceTabID(base,active.id)}>{active.label} workspace</div>:<div className="catalog-tab-panel">All example tabs are closed. <Button variant="ghost" disabled={disabled} onClick={()=>{setClosed([]);setSelected(items[0].id);setWorkspaceFeedback('');}}>Restore example tabs</Button></div>}
+            {workspaceFeedback&&<Typography as="p" typeRole="small" className="catalog-muted" role="status">{workspaceFeedback}</Typography>}
+        </div>;
+    }
     return <div className="catalog-full"><SectionTabRail ariaLabel="Example views" items={items} showIcons={variant==='With icons'} selectedId={selected} onChange={setSelected} idPrefix={base} panelId={`${base}-panel`}/><div className="catalog-tab-panel" role="tabpanel" id={`${base}-panel`} aria-labelledby={`${base}-tab-${items.findIndex(item=>item.id===selected)}`}>{selected==='overview'?'A clear view of the current document.':selected==='activity'?'Recent updates appear here.':'Choose how this document behaves.'}</div></div>;
 }
 
@@ -273,6 +305,25 @@ function DialogExample({variant,disabled}) {
     </div>;
 }
 
+function TableDrawerExample({variant,disabled,state}) {
+    useSignals();
+    const baseColumns=useMemo(()=>['ID','Name','Owner','Status','Updated','Region','Notes'].map((name,index)=>({id:name.toLowerCase(),name,visible:index<5,nonExcludable:index<2})),[]);
+    const [open,setOpen]=useState(false),[columns,setColumns]=useState(baseColumns),[filter,setFilter]=useState({});
+    // Synthetic source state feeds the same FilterDialog contract as consumers.
+    const source=useMemo(()=>{const control=signal({loaded:!['Loading options','Load error'].includes(state),loading:state==='Loading options',error:state==='Load error'?'Synthetic lookup failure':null});return {signals:{control,input:signal({})},handlers:{dataSource:{peekLoading:()=>control.peek().loading,fetchCollection:async()=>{control.value={loaded:true,loading:false,error:null};return [];}}}};},[state]);
+    const context=useMemo(()=>({Context:()=>source}),[source]);
+    const nameOptions=source.signals.control.value.loaded?['Design foundations','Component inventory','Quarterly planning and cross-functional launch readiness review'].map(value=>({value,label:value})):[];
+    const close=()=>setOpen(false);
+    return <div className="catalog-stack"><Button variant="secondary" disabled={disabled} onClick={()=>setOpen(true)}>Open drawer</Button>
+        {variant==='Customize view'?<SettingsDialog isOpen={open} onClose={close} presentation="drawer" columns={columns} baseColumns={baseColumns} onSaveColumnSettings={next=>setColumns(next)} onResetColumns={()=>setColumns(baseColumns)}/>
+        :<FilterDialog isOpen={open} onClose={close} presentation="drawer" context={context} filter={filter} onApplyFilters={value=>setFilter(value.filter)} filterSets={[{name:'records',default:true,template:[{id:'name',label:'Name',type:'string[]',operator:'in',options:nameOptions,optionsDataSourceRef:'catalog_choices'},{id:'owner',label:'Owner',type:'string[]',operator:'in',options:['Design','Engineering','Research'].map(value=>({value,label:value}))},{id:'status',label:'Status',type:'string[]',operator:'in',options:['Draft','In review','Ready','Archived'].map(value=>({value,label:value}))}]}]}/>}
+    </div>;
+}
+
+export function FilterDrawerStateExample({state}) {
+    return <TableDrawerExample variant="Filter view" state={state}/>;
+}
+
 function DrawerExample({variant,disabled}) {
     const columns=['Name','Owner','Status','Created','Updated','Priority','Item count','Region','Tags','ID','Notes','Category','Visibility'];
     const initial={name:'Design foundations',columns:['Name','Owner','Status','ID'],values:[],condition:'Greater than or equal to',value:''};
@@ -287,11 +338,33 @@ function DrawerExample({variant,disabled}) {
     const valid=condition?!!draft.value.trim():customize||filter||!!draft.name.trim(),dirty=JSON.stringify(draft)!==JSON.stringify(saved);
     const search=<InputGroup type="search" aria-label={customize?'Search columns':'Search filters'} placeholder="Search" value={query} onChange={event=>setQuery(event.target.value)} leftIcon={<Icon name="lucide:search" className="bp6-icon"/>}/>;
     return <div className="catalog-stack"><Button variant="secondary" disabled={disabled} onClick={()=>{setDraft(saved);setGroup(variant==='Condition filter'?'Item count':null);setQuery('');setOpen(true);}}>Open drawer</Button>
-        <Drawer isOpen={open} onClose={()=>setOpen(false)} title={<span className="forge-drawer-heading">{filter&&group&&<Button variant="ghost" size="compact" icon="lucide:chevron-left" hideLabel aria-label="Back to filters" onClick={()=>{setGroup(null);setQuery('');}}/>}<span>{title}</span></span>} position="right" size={width} shouldReturnFocusOnClose onOpened={node=>node.querySelector('input')?.focus()}>
+        <Drawer className="forge-drawer forge-list-page-drawer" isOpen={open} onClose={()=>setOpen(false)} title={<span className="forge-drawer-heading">{filter&&group&&<Button variant="ghost" size="compact" icon="lucide:chevron-left" hideLabel aria-label="Back to filters" onClick={()=>{setGroup(null);setQuery('');}}/>}<span>{title}</span></span>} position="right" size={width} shouldReturnFocusOnClose onOpened={node=>node.querySelector('input')?.focus()}>
             <div className="forge-drawer-body">{customize?<>{search}<Typography as="h3" typeRole="label" className="catalog-muted">Views</Typography><div className="forge-drawer-options"><Button variant="ghost" onClick={()=>edit({columns:initial.columns})}>Default</Button><Button variant="ghost" onClick={()=>edit({columns})}>All columns</Button></div><hr/><Typography as="h3" typeRole="label" className="catalog-muted">Columns</Typography>{columns.filter(matches).map(label=><Checkbox key={label} label={label} checked={draft.columns.includes(label)} disabled={label==='Name'||label==='ID'} onChange={()=>edit({columns:draft.columns.includes(label)?draft.columns.filter(item=>item!==label):[...draft.columns,label]})}/>)}</>:filter?condition?<div className="catalog-stack"><label className="catalog-field-label" id={`${id}-condition`}>Condition</label><Select items={['Greater than or equal to','Equals','Less than or equal to']} filterable={false} initialActiveItem={draft.condition} onItemSelect={value=>edit({condition:value})} menuProps={{'aria-labelledby':`${id}-condition`}} popoverProps={anchoredPopoverProps({minimal:true,matchTargetWidth:true,popoverClassName:'forge-dropdown-menu'})} itemRenderer={(label,{handleClick,handleFocus,id:optionId,modifiers,ref})=><MenuItem key={label} ref={ref} id={optionId} roleStructure="listoption" selected={draft.condition===label} active={modifiers.active} onClick={handleClick} onFocus={handleFocus} text={label}/>}><BlueprintButton outlined className="forge-button catalog-selector-trigger" aria-labelledby={`${id}-condition`} text={draft.condition} endIcon={<Icon name="lucide:chevron-down"/>}/></Select><label className="catalog-field-label" htmlFor={`${id}-value`}>Value<InputGroup id={`${id}-value`} inputMode="decimal" placeholder="Enter a value" value={draft.value} onChange={event=>edit({value:event.target.value})}/></label></div>:<>{search}<div className="forge-drawer-options">{group?<><Checkbox label="Select all" checked={allVisible} onChange={()=>edit({values:allVisible?draft.values.filter(value=>!visibleValues.includes(value)):[...new Set([...draft.values,...visibleValues])]})}/>{visibleValues.map(label=><Checkbox key={label} label={label} checked={draft.values.includes(label)} onChange={()=>toggle(label)}/>)}</>:['Name','Owner','Status','Item count','Region','Priority','Updated'].filter(matches).map(label=><Button variant="ghost" key={label} onClick={()=>{setGroup(label);setQuery('');}}><span>{label}</span><Icon name="lucide:chevron-right"/></Button>)}</div></>:<><label className="catalog-field-label" htmlFor={id}>Document name<InputGroup id={id} value={draft.name} onChange={event=>edit({name:event.target.value})}/></label><Typography as="p" typeRole="body" className="catalog-muted">Update the document details, then apply your changes.</Typography></>}</div>
             <div className="forge-drawer-actions"><Button variant="ghost" onClick={()=>setOpen(false)}>Cancel</Button><Button variant="primary" disabled={!dirty||!valid} onClick={()=>{setSaved(draft);setResult('Example changes applied.');setOpen(false);}}>Apply</Button></div>
         </Drawer>{result&&<Typography typeRole="small" role="status" className="catalog-muted">{result}</Typography>}
     </div>;
+}
+
+function SideNavExample({variant, disabled}) {
+    const [destination, setDestination] = useState('Documents');
+    const documents = ['Overview', 'Documents', 'History'];
+    return <nav className="forge-navigation-example" aria-label="Example workspace destinations">
+      <NavigationFlyout title="Documents" icon="lucide:file-text" current={documents.includes(destination) || destination === 'Shared documents'} disabled={disabled}>
+        <Menu aria-label="Documents">{documents.map(name => <MenuItem key={name} text={name}
+          active={destination === name} aria-current={destination === name ? 'page' : undefined} onClick={() => setDestination(name)}/>)}
+          {variant === 'Nested menus' ? <NavigationSubmenu text="Collections">
+            <MenuItem text="Shared documents" active={destination === 'Shared documents'} aria-current={destination === 'Shared documents' ? 'page' : undefined} onClick={() => setDestination('Shared documents')}/>
+            <MenuItem text="Unavailable collection" disabled/>
+          </NavigationSubmenu> : null}
+          <MenuItem text="Unavailable destination" disabled/>
+        </Menu>
+      </NavigationFlyout>
+      <NavigationFlyout title="Settings" icon="lucide:settings" current={['Appearance', 'Preferences'].includes(destination)} disabled={disabled}>
+        <Menu aria-label="Settings">{['Appearance', 'Preferences'].map(name => <MenuItem key={name} text={name}
+          active={destination === name} aria-current={destination === name ? 'page' : undefined} onClick={() => setDestination(name)}/>)}</Menu>
+      </NavigationFlyout>
+      <span className="catalog-sr-only" role="status">Current destination: {destination}</span>
+    </nav>;
 }
 
 export default function CatalogExample({spec,variant=spec.variants[0],state='Default',thumbnail=false,iconSize='default'}) {
@@ -324,12 +397,14 @@ export default function CatalogExample({spec,variant=spec.variants[0],state='Def
     }
     if(['dropdown-menu','more-menu'].includes(id))return <div className="catalog-stack"><DropdownMenu disabled={disabled} content={<Menu aria-label={variant==='Selection'?'Document selection':'Document actions'} role={variant==='Selection'?'listbox':'menu'}>{['Open document','Duplicate','Archive'].map((label,index)=><MenuItem key={label} text={label} icon={variant==='With icons'?<Icon name={`lucide:${['file-text','copy','folder'][index]}`}/>:undefined} roleStructure={variant==='Selection'?'listoption':'menuitem'} selected={variant==='Selection'&&value===label} onClick={()=>{setValue(label);setCount(count+1);}}/>)}<MenuItem text="Delete document" disabled roleStructure={variant==='Selection'?'listoption':'menuitem'}/></Menu>}><Button variant={id==='more-menu'?'ghost':'secondary'} disabled={disabled} icon={id==='more-menu'?`lucide:${variant==='Vertical'?'ellipsis-vertical':'ellipsis'}`:undefined} hideLabel={id==='more-menu'} aria-label={id==='more-menu'?'More document actions':undefined}>{id==='more-menu'?'':<><span>Actions</span><Icon name="lucide:chevron-down"/></>}</Button></DropdownMenu>{count>0&&<span role="status" className="catalog-muted">{value} selected</span>}</div>;
     if(id==='link')return <a className="catalog-link" href={variant==='External'?'https://astryx.atmeta.com/components':'#foundations'} {...(variant==='External'?{target:'_blank',rel:'noreferrer'}:{})}>{variant==='Inline'?'Read the usage guidelines':variant==='External'?'Reference catalog':'Explore foundations'}{variant==='External'&&<Icon name="lucide:external-link"/>}</a>;
+    if(id==='filter-chips'&&variant==='Removable Chip')return toast?<RemovableChip category="Workspace" label="3 Selected" disabled={disabled} onRemove={()=>setToast(false)}/>:<Button variant="ghost" onClick={()=>setToast(true)}>Restore chip</Button>;
     if(['segmented-control','toggle-button-group','filter-chips'].includes(id))return <FilterChips aria-label="Example choices" value={selected} options={options.map(item=>({...item,label:id==='segmented-control'&&variant==='With icons'?<span className="catalog-row"><Icon name={choiceIcons[item.value]}/>{item.label}</span>:item.label,disabled,...(variant==='With counts'?{count:item.value==='design'?24:12}:{})}))} onChange={next=>setSelected(variant==='Multi select'?next:next.slice(-1))}/>;
     if(id==='toggle-button'){
         const ghost=variant.startsWith('Ghost'),iconOnly=variant==='Icon only'||variant==='Ghost icon only',withIcon=iconOnly||variant==='With icon'||variant==='Ghost with icon';
         return <Button variant={pressed?'primary':ghost?'ghost':'secondary'} disabled={disabled} aria-pressed={pressed} icon={withIcon?'lucide:bell':undefined} hideLabel={iconOnly} aria-label={iconOnly?'Notifications':undefined} onClick={()=>setPressed(!pressed)}>{iconOnly?'':'Notifications'}</Button>;
     }
     if(id==='toolbar')return <ToolbarExample variant={variant} state={state} thumbnail={thumbnail}/>;
+    if(id==='list-page')return <ListPageSpecimen variant={variant} state={state} thumbnail={thumbnail}/>;
     if(id==='chat-composer'||id==='chat-layout') {
         const chat=<div className="forge-document-chat catalog-chat">{id==='chat-layout'&&<><MessageCard appearance="document" messageIndex={0} msg={{id:'catalog-user',createdAt:'2026-11-12T18:29:00Z',role:'user',content:'Can you review the shared design and explain how it behaves in a narrower chat panel?'}}/><MessageCard appearance="document" messageIndex={1} msg={{id:'catalog-message',createdAt:'2026-11-12T18:30:00Z',role:'assistant',content:'The messages and composer share one centered content column. Text wraps within that column as the available space changes, and user messages stay aligned to its right edge.\n\nThe same spacing is preserved when chat appears beside a document or in an overlay.'}}/></>}<Composer appearance="document" draftKey={`catalog-${inputId}`} draftValue={text} onDraftChange={setText} disabled={disabled}
         showUpload showMic micOn={false} onToggleMic={()=>setCount(count+1)} onOpenAttach={()=>setCount(count+1)}
@@ -368,7 +443,9 @@ export default function CatalogExample({spec,variant=spec.variants[0],state='Def
         </details>;
     }
     if(id==='card')return <Card className={`catalog-native-card ${variant==='Subtle'?'catalog-subtle':''}`}><strong>Design foundations</strong><p>The shared language behind every product.</p></Card>;
-    if(id==='carousel')return <ContentCarousel disabled={disabled} aria-label="Example featured documents" value={[{id:'one',title:'Foundations',description:'Start with the shared visual language.'},{id:'two',title:'Components',description:'Build with consistent interactions.'},{id:'three',title:'Patterns',description:'Compose complete workflows.'}]}/>;
+    if(id==='carousel')return <DiscoveryCarouselExample variant={variant} state={state}/>;
+    if(id==='card-rail'||id==='card-rail-group')return <CardRailExample variant={variant} state={state} group={id==='card-rail-group'}/>;
+    if(id==='data-state')return <DiscoveryDataStateExample state={state}/>;
     if(id==='top-nav-mega-menu-featured-card')return <FeaturedGuide disabled={disabled} icon={variant==='With icon'}/>;
     if(id==='clickable-card')return <a className="catalog-clickable-card" href="#foundations">{variant==='With icon'&&<Icon name="lucide:layers"/>}<strong>Explore foundations</strong><span>Color, typography and spacing in one place.</span></a>;
     if(id==='collapsible'||id==='section')return <SectionPattern title={id==='section'?'Project details':'What is included?'} appearance={variant==='Primary'?'primary':'quiet'} collapsible={id==='collapsible'||variant==='Collapsible'}><p>Shared components, semantic variables and accessible interactions.</p></SectionPattern>;
@@ -381,7 +458,7 @@ export default function CatalogExample({spec,variant=spec.variants[0],state='Def
     if(id==='code-block')return <div className="catalog-code-example">{variant==='With copy action'&&<Button variant="ghost" icon="lucide:copy" onClick={async()=>{await navigator.clipboard.writeText(code);setCount(count+1);}}>{count?'Copied':'Copy'}</Button>}<pre><code>{code}</code></pre></div>;
     if(id==='empty-state')return <NonIdealState icon={<Icon name={variant==='Error'?'lucide:circle-alert':'lucide:file-text'}/>} title={variant==='Error'?'Unable to load documents':variant==='No results'?'No matching documents':'Create your first document'} description={variant==='No results'?'Try a different search or clear your filters.':'Your documents will appear here.'} action={<Button variant="secondary" onClick={()=>setCount(count+1)}>{variant==='Error'?'Try again':variant==='No results'?'Clear filters':'Create document'}</Button>}/>;
     if(id==='heading')return <Typography as={variant==='Title'?'h2':variant==='Heading'?'h3':'h4'} typeRole={variant.toLowerCase()}>A shared design language</Typography>;
-    if(id==='icon')return <div className="catalog-row">{['house','search','settings','calendar','message-square'].map(name=><Icon key={name} name={`lucide:${name}`} label={variant==='Informative'?name:undefined}/>)}</div>;
+    if(id==='icon')return <div className="catalog-row">{['house','search','settings','calendar','message-square'].map(name=><Icon key={name} name={`lucide:${name}`} label={variant==='Informative'?name:undefined}/>)}<Icon name="lucide:megaphone" label={variant==='Informative'?'Advertising workspace':undefined}/></div>;
     if(id==='kbd')return <div className="catalog-row">{variant==='Key combination'&&<><kbd>Shift</kbd><span>+</span></>}<kbd>Enter</kbd></div>;
     if(id==='markdown'||id==='rich-text-view')return <MarkdownView value={variant==='Code'?'Use `--forge-surface` for the shared surface.':variant==='With links'?'Read the [foundations](#foundations) before building.':markdown}/>;
     if(id==='text')return <Typography typeRole={variant==='Caption'?'caption':'body'} className={variant==='Secondary'?'catalog-muted':''}>Interfaces share one clear, consistent language.</Typography>;
@@ -401,7 +478,7 @@ export default function CatalogExample({spec,variant=spec.variants[0],state='Def
     if(id==='skeleton')return <div className="catalog-skeleton" role="status" aria-label="Loading document">{variant==='Card'?<Card className="catalog-native-card" aria-hidden="true"><div className="catalog-skeleton-media"/><SoftSkeleton lines={3}/></Card>:<div aria-hidden="true"><SoftSkeleton lines={3}/></div>}</div>;
     if(id==='spinner')return <span className="catalog-row" role="status"><Spinner size={28}/><span className="catalog-muted">Loading</span></span>;
     if(id==='status-dot')return <span className="catalog-status-dot" data-tone={toneFor(variant,state)}><span aria-hidden="true"/>{({Neutral:'Draft',Success:'Available',Warning:'Needs review',Danger:'Unavailable'})[variant]||'Available'}</span>;
-    if(id==='status-chip')return <StatusChip tone={state==='Default'?variant.toLowerCase():toneFor(variant,state)}>{state==='Default'?({Neutral:'Draft',Info:'In progress',Success:'Ready',Warning:'Needs review',Danger:'Failed'})[variant]:({Success:'Ready',Warning:'Needs review',Error:'Failed'})[state]}</StatusChip>;
+    if(id==='status-chip')return <StatusChip tone={state==='Default'?variant.toLowerCase():toneFor(variant,state)}>{state==='Default'?({Neutral:'Archived',Info:'Scheduled',Success:'Active',Warning:'Paused',Danger:'Failed'})[variant]:({Success:'Active',Warning:'Paused',Error:'Failed'})[state]}</StatusChip>;
     if(id==='calendar')return <CalendarExample variant={variant} disabled={disabled}/>;
     if(id==='checkbox-input')return <Checkbox label="Include archived documents" checked={state==='Disabled'?false:pressed} indeterminate={disabled?false:mixed} disabled={disabled} onChange={event=>{setMixed(false);setPressed(event.target.checked);}}/>;
     if(['date-input','date-time-input','field','file-input','multi-selector','number-input','text-area','text-input'].includes(id))return <FieldExample spec={spec} variant={variant} state={state} thumbnail={thumbnail}/>;
@@ -419,16 +496,16 @@ export default function CatalogExample({spec,variant=spec.variants[0],state='Def
     if(id==='form-layout')return <form className={`catalog-form-example ${variant==='Two columns'?'two-columns':''}`} onSubmit={event=>event.preventDefault()}><label className="catalog-field-label">First name<InputGroup placeholder="Alex"/></label><label className="catalog-field-label">Last name<InputGroup placeholder="Morgan"/></label><Button variant="primary" onClick={()=>setCount(count+1)}>Save profile</Button>{status}</form>;
     if(id==='grid'||id==='stack'||id==='layout')return <div className={`catalog-layout-example ${id==='stack'&&variant==='Vertical'?'vertical':''}`} style={{gridTemplateColumns:id==='grid'?`repeat(${variant==='Three columns'?3:2},minmax(0,1fr))`:id==='layout'&&variant==='Main and aside'?'2fr 1fr':undefined}}>{(id==='layout'?['Main content','Aside']:['First','Second','Third']).map(label=><div key={label}>{label}</div>)}</div>;
     if(id==='resize-handle')return <div className="catalog-splitter"><Splitter orientation={variant.toLowerCase()} divider={{visible:true}}><div className="catalog-panel">First panel</div><div className="catalog-panel">Second panel</div></Splitter></div>;
-    if(id==='scrollable-area')return <div className={`catalog-scroll-area ${variant==='Horizontal'?'horizontal':''}`} tabIndex={0} role="region" aria-label="Scrollable example documents">{Array.from({length:8},(_,index)=><div key={index}>Document {index+1}<span className="catalog-muted">Shared library</span></div>)}</div>;
+    if(id==='scrollable-area')return <ScrollArea className={`catalog-scroll-area ${variant==='Horizontal'?'horizontal':''}`} tabIndex={0} role="region" aria-label="Scrollable example documents">{Array.from({length:8},(_,index)=><div key={index}>Document {index+1}<span className="catalog-muted">Shared library</span></div>)}</ScrollArea>;
     if(id==='breadcrumbs')return <BreadcrumbsExample variant={variant} disabled={disabled}/>;
     if(id==='outline')return <nav className="catalog-outline" aria-label="Example document outline"><a href="#foundations">Foundations</a><a href="#components/button">Components</a>{variant==='Nested'&&<a className="is-nested" href="#components/button">Button</a>}<a href="#components/analytical-report">Patterns</a></nav>;
     if(id==='pagination')return <nav className="forge-pagination" aria-label="Example result pages"><Button variant="ghost" size="compact" disabled={disabled||page===1} aria-label="Previous page" icon="lucide:chevron-left" hideLabel onClick={()=>setPage(page-1)}/>{variant==='Numbered'?<>{[1,2,3].map(n=><BlueprintButton minimal small key={n} active={page===n} aria-current={page===n?'page':undefined} aria-label={`Page ${n}`} disabled={disabled} onClick={()=>setPage(n)} {...typographyProps('small')}>{n}</BlueprintButton>)}<span className="catalog-sr-only" role="status">Page {page} of 3</span></>:<Typography typeRole="small" role="status" aria-live="polite">{page} / 3</Typography>}<Button variant="ghost" size="compact" disabled={disabled||page===3} aria-label="Next page" icon="lucide:chevron-right" hideLabel onClick={()=>setPage(page+1)}/></nav>;
     if(id==='top-nav')return <TopNavExample variant={variant} disabled={disabled}/>;
-    if(id==='side-nav')return <nav className="catalog-nav-example vertical" aria-label="Example workspace destinations">{[{name:'Overview',icon:'house'},{name:'Documents',icon:'file-text'},{name:'Settings',icon:'settings'}].map((item,index)=><a href={`#components/${['form-layout','table','switch'][index]}`} key={item.name} aria-current={index===0?'page':undefined}><Icon name={`lucide:${item.icon}`}/>{variant!=='Collapsed'&&item.name}</a>)}</nav>;
+    if(id==='side-nav')return <SideNavExample variant={variant} disabled={disabled}/>;
     if(id==='stepper')return <StepperExample variant={variant} state={state}/>;
     if(id==='tab-list')return <LocalTabs variant={variant} disabled={disabled}/>;
     if(id==='dialog')return <DialogExample variant={variant} disabled={disabled}/>;
-    if(id==='drawer')return <DrawerExample variant={variant} disabled={disabled}/>;
+    if(id==='drawer')return ['Customize view','Filter view'].includes(variant)?<TableDrawerExample variant={variant} disabled={disabled} state={state}/>:<DrawerExample variant={variant} disabled={disabled}/>;
     if(id==='toast'){
         const automatic=variant.endsWith('auto dismiss'),type=variant.replace(' auto dismiss','');
         const tone=type==='Danger'?'danger':type==='Warning'?'warning':type==='Success'?'success':'primary';
@@ -443,7 +520,8 @@ export default function CatalogExample({spec,variant=spec.variants[0],state='Def
     if(id==='list')return <ul className="catalog-simple-list">{records.slice(0,thumbnail?2:3).map(item=><li key={item.id}><span>{item.name}</span>{variant==='With actions'&&<Button variant="ghost" icon="lucide:ellipsis" hideLabel aria-label={`More actions for ${item.name}`} onClick={()=>setCount(count+1)}/>}</li>)}</ul>;
     if(id==='metadata-list')return <dl className={`catalog-metadata ${variant==='Two columns'?'two-columns':''}`}><div><dt>Owner</dt><dd>Design team</dd></div><div><dt>Status</dt><dd><StatusChip tone="success">Ready</StatusChip></dd></div><div><dt>Updated</dt><dd>November 12, 2026</dd></div></dl>;
     if(id==='overflow-list')return <ChipList value={['Foundations','Components','Patterns','Accessibility','Content']} readOnly maxVisible={variant==='Expanded'?10:2}/>;
-    if(id==='table'||id==='editable-table')return <TableExample thumbnail={thumbnail} selection={variant==='With selection'} state={state} editable={id==='editable-table'} variant={variant}/>;
+    if(id==='table')return <BasicTableSpecimen variant={tableEditorStates.includes(state)?'Editable cells':variant} state={state} thumbnail={thumbnail}/>;
+    if(id==='report-table'||id==='editable-table')return <TableExample thumbnail={thumbnail} selection={variant==='With selection'} state={state} editable={id==='editable-table'} variant={variant}/>;
     if(id==='table-selection-toolbar')return <div className="catalog-stack catalog-full"><div className="catalog-toolbar"><span>{selected.length} selected</span><Button variant="secondary" disabled={!selected.length} onClick={()=>setSelected([])}>Clear selection</Button></div>{records.map(item=><Checkbox key={item.id} checked={selected.includes(item.id)} label={item.name} onChange={event=>setSelected(event.target.checked?[...selected,item.id]:selected.filter(entry=>entry!==item.id))}/>)}</div>;
     if(id==='tree-list')return <Tree contents={[{id:'root',label:'Design system',hasCaret:true,isExpanded:expanded,icon:<Icon name="lucide:folder"/>,childNodes:records.map(item=>({id:item.id,label:item.name,icon:<Icon name="lucide:file-text"/>}))}]} onNodeExpand={()=>setExpanded(true)} onNodeCollapse={()=>setExpanded(false)} onNodeClick={node=>{if(node.id==='root')setExpanded(!expanded);else setValue(node.label);}}/>;
     if(id==='visuallyhidden')return variant==='Keyboard skip link'?<div className="catalog-stack"><Typography typeRole="body">Press Tab to reveal the skip link. Enter moves focus to the library content.</Typography><a className="catalog-skip-example" href="#catalog-main" onClick={event=>{event.preventDefault();document.getElementById('catalog-main')?.focus();}}>Skip to library content</a></div>:<div className="catalog-stack"><Button variant="ghost"><Icon name="lucide:download"/><span className="catalog-sr-only">Download design guidelines</span></Button><Typography typeRole="body">Screen readers announce “Download design guidelines” for this icon button. The label is visually hidden.</Typography></div>;
@@ -453,8 +531,9 @@ export default function CatalogExample({spec,variant=spec.variants[0],state='Def
         return <div className="catalog-stack catalog-full"><Typography typeRole="body">{guidance[variant]}</Typography><ChartExample example={chartExamples.find(entry=>entry.id===idByVariant[variant])} state={state==='Default'?'populated':state.toLowerCase()}/></div>;
     }
     if(id==='metrics')return <MetricsSpecimen variant={variant} state={state}/>;
-    if(id==='document-form')return thumbnail?<div className="catalog-stack"><strong>Working document</strong><InputGroup aria-label="Example document name" defaultValue="Design foundations"/><Button variant="primary">Save changes</Button></div>:<DocumentSpecimen/>;
-    if(id==='analytical-report')return thumbnail?<div className="catalog-stack"><strong>Workspace report</strong><Typography typeRole="metric">24</Typography><span className="catalog-muted">Components reviewed</span><StatusChip tone="success">Ready</StatusChip></div>:<ReportDocumentSpecimen/>;
-    if(id==='comparison-layout')return thumbnail?<div className="catalog-mini-chart" role="img" aria-label="Illustrative comparison arrangement; open the page for the shared comparison renderer">{[75,45,60].map((width,index)=><span key={index} style={{width:`${width}%`,height:12}}/>)}</div>:<ComparisonWidthSpecimen/>;
+    if(id==='full-screen')return <FullScreenExample variant={variant} state={state} thumbnail={thumbnail}/>;
+    if(id==='document-form')return <DocumentFormExample variant={variant} thumbnail={thumbnail}/>;
+    if(id==='analytical-report')return <AnalyticalReportExample variant={variant} thumbnail={thumbnail}/>;
+    if(id==='comparison-layout')return <ComparisonLayoutExample variant={variant} thumbnail={thumbnail}/>;
     throw new Error(`Missing catalog example: ${id}`);
 }

@@ -3,6 +3,11 @@ import {normalizeLifetimeStart, resolveDateRangePreset, resolveDateRangePresetSy
 
 const afterMidnightUtc = new Date('2026-09-04T03:15:00.000Z');
 
+assert.deepEqual(resolveDateRangePreset('current_month', afterMidnightUtc, '2025-07-09', 'America/Los_Angeles'),
+    {start:'2026-09-01',end:'2026-09-30',granularity:'day'});
+assert.deepEqual(resolveDateRangePreset('current_month', new Date('2028-02-15T12:00:00Z'), '2025-07-09', 'UTC'),
+    {start:'2028-02-01',end:'2028-02-29',granularity:'day'});
+
 assert.deepEqual(
     resolveDateRangePreset('month', afterMidnightUtc, '2025-07-09', 'America/Los_Angeles'),
     {start: '2026-08-03', end: '2026-09-03', granularity: 'day'},

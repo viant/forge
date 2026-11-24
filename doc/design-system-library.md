@@ -182,3 +182,17 @@ width and 320px chat width. Metrics reuse report KPI blocks and distinguish
 zero, unavailable, failed and long values. The document report root supplies
 the existing container-query boundary so metric groups stack inside narrow
 panels independently of the browser width.
+
+
+### DS2 export menus
+
+When an authored List Page supplies Actions and a native export, compose Export
+inside Actions. Keep Actions available without selection while row operations
+retain their original permission and selection rules. Export, CSV and XLSX are
+text-only options; Export keeps its trailing Lucide chevron, vertically centered
+with the label in the standard menu row. Standalone Export also uses text and a
+trailing chevron. Preserve native hover/focus submenus, the shared anchored-panel
+gap, keyboard-only inset focus, and pointer activation without a ring or shadow.
+Keep the native exporter mounted through menu dismissal and preserve formats,
+scope, file naming, column order, limits and error announcements. Baseline keeps
+its existing icons and presentation.

@@ -1,4 +1,5 @@
 import Popover from './Popover.jsx';
+import DropdownMenu from './DropdownMenu.jsx';
 import React from 'react';
 
 import {useSignals} from '@preact/signals-react/runtime';
@@ -9,7 +10,8 @@ export default function RegisteredPopover({context,item,disabled=false,readOnly=
   useSignals();
   const [open,setOpen]=React.useState(false);
   const interact=next=>{if(next&&(disabled||readOnly))return false;setOpen(next);return true;};
+  const AnchoredPanel = item?.type === 'menu' ? DropdownMenu : Popover;
   return <NativeControlTarget context={context} item={item} disabled={disabled} readOnly={readOnly} value={value} options={options} validate={validate} actions={{click:()=>interact(!open),...actions}}>
-    <Popover placement={placement} interactionKind="click" minimal isOpen={open} onInteraction={interact} disabled={disabled||readOnly} content={renderContent(()=>interact(false))}>{children}</Popover>
+    <AnchoredPanel placement={placement} interactionKind="click" minimal isOpen={open} onInteraction={interact} disabled={disabled||readOnly} content={renderContent(()=>interact(false))}>{children}</AnchoredPanel>
   </NativeControlTarget>;
 }

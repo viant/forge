@@ -8,7 +8,7 @@ import Basic from './Basic.jsx';
 import {SettingProvider} from '../../core/context/Setting.jsx';
 import {ForgeThemeProvider, ForgeThemeBoundary} from '../ThemeBoundary.jsx';
 
-it.each([['light','list-page'],['dark','list-page']])('keeps a DS2 table identity group frozen below the legacy half-width limit (%s / %s)', async (colorMode,presentation) => {
+it.each([['light','list-page'],['dark','list-page'],['light',undefined],['dark',undefined]])('keeps a DS2 table identity group frozen below the legacy half-width limit (%s / %s)', async (colorMode,presentation) => {
     globalThis.IS_REACT_ACT_ENVIRONMENT = true;
     globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
     const host = document.createElement('div');

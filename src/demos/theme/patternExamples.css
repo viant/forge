@@ -1,0 +1,23 @@
+/* Catalog composition only. Native controls, report blocks and chart states
+   continue to receive their appearance from the loaded Global CSS export. */
+.catalog-pattern-example{container-type:inline-size;width:100%;min-width:0}
+.catalog-pattern-sheet{display:flex;flex-direction:column;gap:var(--forge-spacing-6);width:100%;min-width:0;margin:0;padding:var(--forge-spacing-6);border:var(--forge-border-width) solid var(--forge-border-color);border-radius:var(--forge-radius-surface);background:var(--forge-surface);color:var(--forge-text)}
+.catalog-pattern-header{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:var(--forge-spacing-3)}
+.catalog-pattern-header>div{display:flex;flex-direction:column;gap:var(--forge-spacing-2);min-width:0;flex:1}
+.catalog-pattern-header :is(h2,p){margin:0}
+.catalog-pattern-header p{color:var(--forge-text-secondary);max-width:65ch}
+.catalog-pattern-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));align-items:start;gap:var(--forge-spacing-4)}
+.catalog-pattern-section{display:flex;flex-direction:column;gap:var(--forge-spacing-4);min-width:0}
+.catalog-pattern-section>h3{margin:0}
+.catalog-pattern-actions{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--forge-spacing-4);padding-top:var(--forge-spacing-4);border-top:var(--forge-border-width) solid var(--forge-border-color)}
+.catalog-pattern-actions>[role=status]{color:var(--forge-text-secondary)}
+.catalog-pattern-sheet--narrow{max-width:360px;margin-inline:auto}
+.catalog-pattern-sheet.forge-chart-document{display:flex}
+.catalog-pattern-sheet>p{margin:0}
+.catalog-pattern-report>.forge-report-runtime{width:100%;min-width:0}
+.catalog-pattern-variants{grid-template-columns:minmax(0,1fr)}
+.catalog-pattern-variants .catalog-preview--variant:has(.catalog-pattern-example){max-height:none;align-items:flex-start}
+.catalog-preview--detail:has(.catalog-pattern-example){display:block;overflow:visible}
+.catalog-preview--thumbnail:has(.catalog-pattern-example){align-items:flex-start;padding:var(--forge-spacing-3)}
+.catalog-preview--thumbnail .catalog-pattern-sheet{gap:var(--forge-spacing-3);padding:var(--forge-spacing-3)}
+@container(max-width:400px){.catalog-pattern-sheet{padding:var(--forge-spacing-4)}.catalog-pattern-actions>.catalog-row{margin-inline-start:auto}}
