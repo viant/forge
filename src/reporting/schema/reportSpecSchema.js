@@ -4,6 +4,7 @@ import {windowCalculationDefinitions} from "./windowCalculationSchema.js";
 import {numericDisplayFormatSchema} from '../../components/categoryRange.js';
 import {templateRequestInputsSchema} from '../reportTemplateRequestInputs.js';
 import {pieSliceLabelSchema} from '../../components/pieSliceLabel.js';
+import {tableSummaryRowSchema} from "../tableVisualSpec.js";
 import {hierarchySchema,pivotSchema,columnGroupsSchema} from '../reportTableAnalytics.js';
 import {chartTooltipSchema,chartTooltipEntrySchema} from '../../components/chartTooltip.js';
 import {donutCenterSchema,resolvedDonutCenterSchema} from '../../components/donutCenter.js';
@@ -1167,15 +1168,7 @@ export const reportSpecSchema = {
           type: "array",
           items: { $ref: "#/$defs/tableColumn" },
         },
-        summaryRow: {
-          type: "object",
-          additionalProperties: false,
-          required: ["datasetRef"],
-          properties: {
-            datasetRef: { type: "string", minLength: 1 },
-            label: { type: "string", description: "Optional text in the first column; values otherwise use the table column mappings." },
-          },
-        },
+        summaryRow: tableSummaryRowSchema,
       },
     },
     kpiBlock: {

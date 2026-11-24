@@ -20,7 +20,7 @@ import (
 type WindowContentCheck func(context.Context, identity.ResolvedResource) error
 
 type WindowCatalog struct {
-	nativeHTTPWindows map[Connection]map[string]bool
+	nativeHTTPWindows map[nativeWindowSource]map[string]bool
 	// DefaultNamespace is trusted host routing for original unqualified keys.
 	DefaultNamespace string
 	// DefaultProviderIdentity and Aliases are startup-owned routing for local
@@ -185,6 +185,23 @@ func (c *WindowCatalog) locate(ctx context.Context, key, owner string) (windowLo
 	if e != nil || uri.Kind != "window" {
 		return windowLocator{}, identity.ErrResource
 	}
+	// Startup already bound this exact URI and publisher to a local MCP. Pass
+	// that locator through the same scoped owner, actor and capability checks
+	// used for other explicit roots. Never replace an existing caller scope.
+	if owner != "" && c.Gateway.Manager != nil && ctx != nil && ctx.Value(catalogRootsKey{}) == nil {
+		var root Connection
+		for name := range c.nativeHTTPWindows[nativeWindowSource{owner, key}] {
+			if c.Gateway.Manager.IsLocalClient(name) {
+				if root.Name != "" {
+					return windowLocator{}, ErrCollision
+				}
+				root = Connection{Name: name, ProviderIdentity: owner}
+			}
+		}
+		if root.Name != "" {
+			ctx = context.WithValue(ctx, catalogRootsKey{}, []Connection{root})
+		}
+	}
 	connection, e := c.Gateway.ConnectionForResource(ctx, uri, owner)
 	if e != nil {
 		return windowLocator{}, e
@@ -338,9 +355,7 @@ func (c *WindowCatalog) getForProvider(ctx context.Context, explicitOwner string
 	// Project host transport only after provider definition, target, source and
 	// integrity checks complete. Never rewrite provider bytes or descriptors.
 	// Compiled selection already returned a detached caller-owned variant.
-	nativeConnection := loc.Connection
-	nativeConnection.Generation = 0
-	if err := projectWindowDatasourceTransport(definition, selected.DataSources, c.nativeHTTPWindows[nativeConnection][loc.URI]); err != nil {
+	if err := projectWindowDatasourceTransport(definition, selected.DataSources, c.nativeHTTPWindows[nativeWindowSource{loc.Connection.ProviderIdentity, loc.URI}][loc.Connection.Name]); err != nil {
 		return nil, err
 	}
 	if read.independent {

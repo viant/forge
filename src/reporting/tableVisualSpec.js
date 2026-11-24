@@ -209,6 +209,16 @@ export function mergeReportTableSelections(sourceRows, visibleRows, choices, fie
   return next;
 }
 
+export const tableSummaryRowSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["datasetRef"],
+  properties: {
+    datasetRef: { type: "string", minLength: 1 },
+    label: { type: "string", description: "Optional text in the first column; values otherwise use the table column mappings." },
+  },
+};
+
 export function normalizeReportTableSummaryRow(binding) {
   if (!binding || typeof binding !== 'object' || Array.isArray(binding) || !normalizeString(binding.datasetRef)) throw new Error('Table summaryRow requires an existing datasetRef.');
   if (binding.label !== undefined && typeof binding.label !== 'string') throw new Error('Table summaryRow.label must be text.');

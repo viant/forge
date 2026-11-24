@@ -700,8 +700,8 @@ func (r *Replica) Admit(ctx context.Context) (admitErr error) {
 	admitTiming := timing(ctx, phaseAdmit, r.cfg.Source, "")
 	defer func() { admitTiming.End(timingOutcome(admitErr), observe.CacheUnknown) }()
 	key, err := r.admissionKey(ctx)
-	if err != nil || key == "" {
-		return ErrDenied
+	if err != nil {
+		return err
 	}
 	r.mu.RLock()
 	if !r.ready || r.store == nil {
@@ -713,7 +713,13 @@ func (r *Replica) Admit(ctx context.Context) (admitErr error) {
 	facts := authz.Facts{Tenant: r.cfg.Tenant, Subject: "public"}
 	if !publicOnly {
 		facts, err = r.cfg.Facts.Resolve(ctx)
-		if err != nil || facts.Subject == "" || facts.Tenant == "" {
+		if err != nil {
+			return admissionFailure(ctx, err)
+		}
+		if cause := ctx.Err(); cause != nil {
+			return cause
+		}
+		if facts.Subject == "" || facts.Tenant == "" {
 			return ErrDenied
 		}
 	}
@@ -728,12 +734,12 @@ func (r *Replica) Admit(ctx context.Context) (admitErr error) {
 			matched[cohort.Name] = cohort.PolicyHash
 			continue
 		}
-		decision, selected, _, e := service.AuthorizeWithRevision(ctx, authz.Request{Resource: cohort.PolicyResource, Action: PolicyAction})
-		if errors.Is(e, authz.ErrDenied) {
-			continue
+		allowed, err := admitPolicy(ctx, service, cohort.PolicyResource, facts.Subject)
+		if err != nil {
+			return err
 		}
-		if e != nil || decision.Bounded || selected.Subject != facts.Subject {
-			return ErrDenied
+		if !allowed {
+			continue
 		}
 		matched[cohort.Name] = cohort.PolicyHash
 	}
@@ -786,8 +792,8 @@ func (r *Replica) EnsureAdmitted(ctx context.Context) error {
 		return ErrUnsupported
 	}
 	key, err := r.admissionKey(ctx)
-	if err != nil || key == "" {
-		return ErrDenied
+	if err != nil {
+		return err
 	}
 	r.mu.RLock()
 	held, ok := r.admissions[key]
@@ -813,8 +819,8 @@ func (r *Replica) Open(ctx context.Context, uri string) (view *View, openErr err
 	openTiming := timing(ctx, phaseRootOpen, r.cfg.Source, "")
 	defer func() { openTiming.End(timingOutcome(openErr), observe.CacheUnknown) }()
 	key, err := r.admissionKey(ctx)
-	if err != nil || key == "" {
-		return nil, ErrDenied
+	if err != nil {
+		return nil, err
 	}
 	selected, err := r.selectedCohort(ctx)
 	if err != nil {
@@ -864,7 +870,10 @@ func (r *Replica) selectedCohort(ctx context.Context) (string, error) {
 		return "", nil
 	}
 	name, err := r.cfg.Cohort(ctx)
-	if err != nil || name == "" {
+	if err != nil {
+		return "", admissionFailure(ctx, err)
+	}
+	if name == "" {
 		return "", ErrDenied
 	}
 	return name, nil
@@ -1021,8 +1030,8 @@ func (r *Replica) PermittedRoots(ctx context.Context) ([]RootRef, error) {
 		return nil, ErrUnsupported
 	}
 	key, err := r.admissionKey(ctx)
-	if err != nil || key == "" {
-		return nil, ErrDenied
+	if err != nil {
+		return nil, err
 	}
 	selected, err := r.selectedCohort(ctx)
 	if err != nil {
@@ -1067,6 +1076,54 @@ func (r *Replica) PermittedRoots(ctx context.Context) ([]RootRef, error) {
 // user roles or a cached user grant. Private admissions retain their expiry.
 func (a admission) validAt(now time.Time) bool { return a.public || a.validUntil.After(now) }
 
+func admitPolicy(ctx context.Context, service *authz.Service, resource authz.Resource, subject string) (bool, error) {
+	decision, selected, _, err := service.AuthorizeWithStatus(ctx, authz.Request{Resource: resource, Action: PolicyAction})
+	if err != nil {
+		if ctx.Err() == nil && errors.Is(err, authz.ErrDenied) && !errors.Is(err, authz.ErrIdentityDenied) && !errors.Is(err, authz.ErrUnavailable) {
+			return false, nil
+		}
+		return false, admissionFailure(ctx, err)
+	}
+	if cause := ctx.Err(); cause != nil {
+		return false, cause
+	}
+	if decision.Bounded || selected.Subject != subject {
+		return false, ErrDenied
+	}
+	return true, nil
+}
+
+// Admission providers may return internal diagnostics. Keep the original
+// cause for the server and expose only the failure class to consumers.
+type admissionCause struct{ class, cause error }
+
+func (e admissionCause) Error() string {
+	if e.class == nil {
+		return "artifact cohort admission failed"
+	}
+	return e.class.Error()
+}
+func (e admissionCause) Unwrap() error        { return e.cause }
+func (e admissionCause) Is(target error) bool { return e.class != nil && target == e.class }
+
+func admissionFailure(ctx context.Context, err error) error {
+	if cause := ctx.Err(); cause != nil && errors.Is(err, authz.ErrDenied) && !errors.Is(err, authz.ErrUnavailable) {
+		return admissionCause{class: cause, cause: errors.Join(cause, err)}
+	}
+	var class error
+	switch {
+	case errors.Is(err, context.Canceled):
+		class = context.Canceled
+	case errors.Is(err, context.DeadlineExceeded):
+		class = context.DeadlineExceeded
+	case errors.Is(err, authz.ErrUnavailable):
+		class = ErrUnavailable
+	case errors.Is(err, authz.ErrDenied):
+		class = ErrDenied
+	}
+	return admissionCause{class: class, cause: err}
+}
+
 func (r *Replica) admissionKey(ctx context.Context) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
@@ -1080,7 +1137,14 @@ func (r *Replica) admissionKey(ctx context.Context) (string, error) {
 	if public {
 		return "public", nil
 	}
-	return r.cfg.SessionKey(ctx)
+	key, err := r.cfg.SessionKey(ctx)
+	if err != nil {
+		return "", admissionFailure(ctx, err)
+	}
+	if key == "" {
+		return "", ErrDenied
+	}
+	return key, nil
 }
 
 // Guidance is advisory metadata carried beside the immutable artifact catalog.

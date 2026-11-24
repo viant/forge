@@ -93,3 +93,16 @@ public struct ResourcePayloadPreparationDef: Codable, Sendable {
     public let mode: String?
     public let target: String?
 }
+
+public struct ResourceMappingDef: Codable, Sendable {
+    public let selectors: [String]
+    public let cases: [String: ResourceMappingCase]
+    public let `default`: ResourceMappingCase?
+    public let fieldOrder: [String]?
+    public let uploads: [String: UploadCollectionSpec]?
+}
+
+public struct ResourceMappingCase: Codable, Sendable {
+    public let modelRef: String
+    public let values: [String: JSONValue]?
+}

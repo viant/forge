@@ -1,5 +1,7 @@
 # Public framework repository
 
+- Work on `main` in this repository. Preserve existing uncommitted changes when synchronizing it.
+
 ## Capability reuse and explicit user approval
 
 - Before adding any feature or mechanism, inspect the owning framework's existing APIs, configuration, documentation, implementation, tests, and callers at the exact version used by the application. Prove the relevant native behavior with an executable example before proposing an alternative.

@@ -211,8 +211,8 @@ func (s *MetadataSource) admissionKey(ctx context.Context, resourceURI string) (
 		return "", err
 	}
 	session, err := s.replica.admissionKey(ctx)
-	if err != nil || session == "" {
-		return "", ErrDenied
+	if err != nil {
+		return "", err
 	}
 	selected, err := s.replica.selectedCohort(ctx)
 	if err != nil {
@@ -272,8 +272,8 @@ func (s *MetadataSource) CurrentVersionHash(ctx context.Context, uriText string)
 		return 0, "", err
 	}
 	key, err := s.replica.admissionKey(ctx)
-	if err != nil || key == "" {
-		return 0, "", ErrDenied
+	if err != nil {
+		return 0, "", err
 	}
 	selected, err := s.replica.selectedCohort(ctx)
 	if err != nil {
@@ -306,7 +306,10 @@ func (metadataUnavailable) HTTPStatusCode() int  { return 503 }
 func (metadataUnavailable) Is(target error) bool { return target == producer.ErrUnavailable }
 
 func metadataAdmissionError(err error) error {
-	if err == ErrUnavailable {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return err
+	}
+	if errors.Is(err, ErrUnavailable) {
 		return metadataUnavailable{err}
 	}
 	if errors.Is(err, ErrDenied) {

@@ -26,6 +26,14 @@ public struct ResourceValueEnvironment: Sendable {
 public typealias ResourceModelHook = @Sendable (_ name: String, _ value: JSONValue) throws -> JSONValue?
 
 public enum ResourceModelRuntime {
+    public static func mappedCase(_ name: String, row: [String: JSONValue], metadata: WindowMetadata) throws -> ResourceMappingCase {
+        guard let mapping = metadata.resourceMappings?[name] else { throw ResourceModelError.message("Unknown resource mapping: \(name)") }
+        let key = mapping.selectors.lazy.compactMap { SelectorUtil.resolve(JSONValue.object(row), selector: $0) as? String }.first { !$0.isEmpty }
+        guard let entry = key.flatMap({ mapping.cases[$0] }) ?? mapping.default else { throw ResourceModelError.message("No matching case for resource mapping: \(name)") }
+        guard let model = metadata.resourceModels[entry.modelRef], metadata.schemas[model.schemaRef] != nil else { throw ResourceModelError.message("Invalid resource mapping model: \(entry.modelRef)") }
+        return entry
+    }
+
     public static func unmarshal(value: JSONValue, modelRef: String, schemas: [String: ResourceSchemaDef], models: [String: ResourceModelDef], hook: ResourceModelHook? = nil) throws -> JSONValue {
         guard let model = models[modelRef] else { throw ResourceModelError.message("Unknown resource model: \(modelRef)") }
         let prepared = try applyResourceHook(model.hooks?.beforeUnmarshal, value: value, hook: hook)

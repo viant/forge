@@ -18,6 +18,15 @@ data class ResourceValueEnvironment(
 typealias ResourceModelHook = suspend (name: String, value: Any?) -> Any?
 
 object ResourceModelRuntime {
+    fun mappedCase(name: String, row: Map<String, Any?>, metadata: WindowMetadata): ResourceMappingCase {
+        val mapping = metadata.resourceMappings[name] ?: error("Unknown resource mapping: $name")
+        val key = mapping.selectors.asSequence().mapNotNull { SelectorUtil.resolve(row, it) as? String }.firstOrNull { it.isNotEmpty() }
+        val entry = key?.let(mapping.cases::get) ?: mapping.default ?: error("No matching case for resource mapping: $name")
+        val model = metadata.resourceModels[entry.modelRef] ?: error("Unknown resource mapping model: ${entry.modelRef}")
+        require(metadata.schemas.containsKey(model.schemaRef)) { "Unknown resource schema: ${model.schemaRef}" }
+        return entry
+    }
+
     suspend fun unmarshal(value: Any?, modelRef: String, schemas: Map<String, ResourceSchemaDef>, models: Map<String, ResourceModelDef>, hook: ResourceModelHook? = null): Any? {
         val model = models[modelRef] ?: error("Unknown resource model: $modelRef")
         val prepared = applyHook(model.hooks?.beforeUnmarshal, value, hook)

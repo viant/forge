@@ -334,3 +334,41 @@ func TestValidateResourceCollectionClientKey(t *testing.T) {
 		t.Fatal("undeclared clientKey must fail validation")
 	}
 }
+
+func TestWindowResourceMapping(t *testing.T) {
+	const source = `resourceMappings:
+  inspector:
+    selectors: [kind, legacyKind]
+    cases: {text: {modelRef: document, values: {editable: false}}}
+    default: {modelRef: document}
+    fieldOrder: [title]
+    uploads: {attachment: {accept: [.txt], multiple: false}}
+schemas: {document: {type: object, properties: {title: {type: string}}}}
+resourceModels: {document: {schemaRef: document, fields: {title: {read: caption}}}}
+`
+	var window Window
+	if err := yaml.Unmarshal([]byte(source), &window); err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateResourceModels(&window); err != nil {
+		t.Fatal(err)
+	}
+	encoded, err := json.Marshal(window)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var copy Window
+	if err := json.Unmarshal(encoded, &copy); err != nil {
+		t.Fatal(err)
+	}
+	mapping := copy.ResourceMappings["inspector"]
+	if len(mapping.Selectors) != 2 || mapping.Cases["text"].Values["editable"] != false ||
+		mapping.Default.ModelRef != "document" || mapping.FieldOrder[0] != "title" ||
+		*mapping.Uploads["attachment"].Multiple || mapping.Uploads["attachment"].Accept[0] != ".txt" {
+		t.Fatalf("mapping lost metadata during serialization: %+v", mapping)
+	}
+	mapping.Cases["text"] = ResourceMappingCase{ModelRef: "missing"}
+	if err := ValidateResourceModels(&copy); err == nil {
+		t.Fatal("dangling mapping accepted")
+	}
+}

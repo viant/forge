@@ -10,6 +10,15 @@ class WorkflowPrimitiveModelsTest {
     private val json = Json { ignoreUnknownKeys = false }
 
     @Test
+    fun `resource mapping selects native cases`() {
+        val metadata = json.decodeFromString<WindowMetadata>("""{"schemas":{"record":{"type":"object","properties":{}}},"resourceModels":{"brief":{"schemaRef":"record"},"general":{"schemaRef":"record"}},"resourceMappings":{"inspection":{"selectors":["kind","old.kind"],"cases":{"brief":{"modelRef":"brief"}},"default":{"modelRef":"general"}}}}""")
+        val row = mapOf("kind" to "", "old" to mapOf("kind" to "brief"))
+        assertEquals("brief", ResourceModelRuntime.mappedCase("inspection", row, metadata).modelRef)
+        assertEquals("general", ResourceModelRuntime.mappedCase("inspection", emptyMap(), metadata).modelRef)
+        kotlin.test.assertFails { ResourceModelRuntime.mappedCase("missing", row, metadata) }
+    }
+
+    @Test
     fun `presentation primitive contracts decode and round trip`() {
         val source = """
             {

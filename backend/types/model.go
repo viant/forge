@@ -272,6 +272,7 @@ type Window struct {
 	Authorization         *AuthorizationSpec                `json:"authorization,omitempty" yaml:"authorization,omitempty"`
 	Schemas               map[string]ResourceSchema         `json:"schemas,omitempty" yaml:"schemas,omitempty"`
 	ResourceModels        map[string]ResourceModel          `json:"resourceModels,omitempty" yaml:"resourceModels,omitempty"`
+	ResourceMappings      map[string]ResourceMapping        `json:"resourceMappings,omitempty" yaml:"resourceMappings,omitempty"`
 	LookupOverlays        []json.RawMessage                 `json:"lookupOverlays,omitempty" yaml:"lookupOverlays,omitempty"`
 	LookupLibraries       []json.RawMessage                 `json:"lookupLibraries,omitempty" yaml:"lookupLibraries,omitempty"`
 	AuthorizationSnapshot map[string]interface{}            `json:"authorizationSnapshot,omitempty" yaml:"-"`
@@ -657,6 +658,8 @@ type DashboardEditableTableColumn struct {
 	Editor      any                    `json:"editor,omitempty" yaml:"editor,omitempty"`
 	VisibleWhen map[string]interface{} `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
 }
+
+
 
 type DashboardEditableTableMobileCards struct {
 	Enabled        bool     `json:"enabled,omitempty" yaml:"enabled,omitempty"`

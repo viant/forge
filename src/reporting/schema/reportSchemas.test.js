@@ -41,6 +41,15 @@ for (const schema of [reportSpecSchema,reportFillSchema]) checkMetaContract(sche
 // Optional proof input for an independently installed standards validator.
 if (process.env.FORGE_GEO_SCHEMA_PROOF) writeFileSync(process.env.FORGE_GEO_SCHEMA_PROOF,JSON.stringify([reportSpecSchema,reportFillSchema]));
 
+const summaryFixture = JSON.parse(readFileSync(new URL("../../../doc/examples/report-table-summary.json", import.meta.url)));
+assert.deepEqual(validateReportSpec(summaryFixture.spec), {valid: true, errors: []});
+const summaryFill = buildReportFillFromReportSpec(summaryFixture.spec, summaryFixture.datasets);
+assert.deepEqual(validateReportFill(summaryFill), {valid: true, errors: []});
+
+const missingSummaryDataset = structuredClone(summaryFixture.spec);
+delete missingSummaryDataset.blocks[0].summaryRow.datasetRef;
+assert.equal(validateReportSpec(missingSummaryDataset).valid, false);
+
 const fixtureUrl = new URL("../fixtures/performance-report-fixtures.v1.json", import.meta.url);
 const fixtures = JSON.parse(readFileSync(fixtureUrl, "utf8"));
 const printFixtureUrl = new URL("../fixtures/performance-report-print-fixtures.v1.json", import.meta.url);

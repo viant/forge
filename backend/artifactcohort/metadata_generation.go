@@ -20,8 +20,8 @@ func (s *MetadataSource) MetadataGeneration(ctx context.Context, kind string) (s
 		return "", err
 	}
 	session, err := s.replica.admissionKey(ctx)
-	if err != nil || session == "" {
-		return "", ErrDenied
+	if err != nil {
+		return "", err
 	}
 	selected, err := s.replica.selectedCohort(ctx)
 	if err != nil {
