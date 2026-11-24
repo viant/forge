@@ -1487,7 +1487,7 @@ export function registerPack() {
     ), { framework: 'blueprint' });
 
     /* -------------------- Button ------------------------------------ */
-    registerWidget('button', ForgeButton, { framework: 'blueprint' });
+    registerWidget('button', props => <ForgeButton {...props}/>, { framework: 'blueprint' });
 
     registerEventAdapter('button', {
         onClick: () => () => {},
