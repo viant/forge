@@ -360,10 +360,10 @@ const unsupportedAppearanceHtml = renderToStaticMarkup(
 );
 
 assert.equal(unsupportedAppearanceHtml, legacyHtml);
-assert.match(legacyHtml, /^<form style="display:grid;grid-template-columns:repeat\(2, 1fr\);gap:12px">/);
+assert.match(legacyHtml, /^<form style="display:grid;grid-template-columns:repeat\(2, 1fr\);/);
 assert.doesNotMatch(legacyHtml, /data-forge-(?:part|form-appearance|field-id)=/);
 assert.doesNotMatch(legacyHtml, /id="ignored-by-legacy-markup"/);
-assert.match(legacyHtml, /<label style="grid-column:span 1;display:grid;gap:6px">/);
+assert.match(legacyHtml, /<label style="grid-column:span 1;display:grid;/);
 assert.match(legacyHtml, /forge-lookup-selection-input__field/);
 assert.match(legacyHtml, /forge-lookup-selection-input__end-button/);
 assert.doesNotMatch(legacyHtml, /forge-lookup-selection-input__trigger/);

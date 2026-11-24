@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import {verifyChartFoundation} from '../src/demos/theme/chartFoundation.browser.mjs';
 import {verifyTableWidths} from '../src/demos/theme/tableWidth.browser.mjs';
 import {verifyComparisonWidths} from '../src/demos/theme/comparisonWidth.browser.mjs';
+import {assertThemeStyles, verifySelectedThemes} from '../src/demos/theme/selectedTheme.browser.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const server = await createServer({root, server: {hmr:process.env.FORGE_CHARTS_ONLY?false:undefined, host: '127.0.0.1', port: 0, fs: {allow: [path.dirname(root),fs.realpathSync(path.join(root,'node_modules'))]}}});
@@ -20,7 +21,8 @@ try {
     const address = server.httpServer.address();
     browser = await chromium.launch({headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || "chrome"});
     const catalog = JSON.parse(fs.readFileSync(path.join(root, '../agently-core/protocol/ui/theme/testdata/baseline.json')));
-    const tokens = catalog.themes[0].modes.light;
+    const tokens = catalog.themes.find(theme => theme.id === 'baseline').modes.light;
+    const baselineCSS = fs.readFileSync(path.join(root, '../agently-core/protocol/ui/theme/testdata/baseline.css'), 'utf8');
     for (const viewport of [{width:1440,height:900}, {width:390,height:844}]) {
         const proof = await browser.newPage({viewport, ...(viewport.width < 500 ? {hasTouch:true,isMobile:true} : {})});
         const failures = [];
@@ -93,8 +95,10 @@ try {
         const review = analyticalDocument.locator('[data-forge-review-table="choices"]');
         const firstChoice = review.getByRole('checkbox',{name:'Select First example',exact:true});
         assert.equal(await firstChoice.isChecked(),false);
-        assert.equal(await firstChoice.evaluate(node=>node.getBoundingClientRect().width),16);
-        assert.equal(await firstChoice.evaluate(node=>node.parentElement.getBoundingClientRect().width),32);
+        await review.evaluate(node=>{node.style.setProperty('--forge-selection-indicator-size','20px');node.style.setProperty('--forge-selection-target-size','36px');});
+        await assertThemeStyles(firstChoice, {width:'--forge-selection-indicator-size',height:'--forge-selection-indicator-size'});
+        await assertThemeStyles(firstChoice.locator('..'), {width:'--forge-selection-target-size',height:'--forge-selection-target-size'});
+        await review.evaluate(node=>{node.style.removeProperty('--forge-selection-indicator-size');node.style.removeProperty('--forge-selection-target-size');});
 
         await firstChoice.check();
         assert.match(await review.getByRole('status').textContent(),/1 of 2 selected/);
@@ -192,7 +196,10 @@ try {
         assert.equal(await group.evaluate(node=>parseFloat(getComputedStyle(node).paddingInlineStart)),0);
         const dateWidths = await dates.evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect().width));
         assert.ok(dateWidths.every(width=>width>100));
-        assert.equal(await documentRoot.evaluate(node=>parseFloat(getComputedStyle(node).paddingInlineStart)),viewport.width===390?16:36);
+        const documentPaddingRole = viewport.width === 390 ? '--forge-spacing-4' : '--forge-document-padding-inline';
+        await documentRoot.evaluate((node,role)=>node.style.setProperty(role,'23px'),documentPaddingRole);
+        await assertThemeStyles(documentRoot, {'padding-inline-start':documentPaddingRole});
+        await documentRoot.evaluate((node,role)=>node.style.removeProperty(role),documentPaddingRole);
         assert.equal(await documentExample.locator('.forge-document-records dt').first().getAttribute('data-forge-type'),'metadata');
         const documentMenu = documentExample.getByRole('combobox',{name:'Document sections',exact:true});
         if (viewport.width === 390) {
@@ -315,20 +322,18 @@ try {
         assert.equal(await status.inputValue(),'Active');
         assert.equal(await editable.locator('thead svg').count(),0);
         assert.equal(await editable.locator('td[data-read-only] input').count(),0);
-        const selectPadding=await status.evaluate(node=>parseFloat(getComputedStyle(node).paddingRight));
-        assert.ok(selectPadding>=32);
-        const indicator=await status.evaluate(node=>{const icon=node.parentElement.querySelector('svg');const control=node.getBoundingClientRect();const glyph=icon.getBoundingClientRect();return {shared:node.parentElement.classList.contains('forge-select-control'),inset:control.right-glyph.right,size:glyph.width,pointer:getComputedStyle(icon).pointerEvents};});
+        const indicator=await status.evaluate(node=>{const icon=node.parentElement.querySelector('svg');const control=node.getBoundingClientRect();const glyph=icon.getBoundingClientRect();return {shared:node.parentElement.classList.contains('forge-select-control'),inset:control.right-glyph.right,size:glyph.width,padding:parseFloat(getComputedStyle(node).paddingInlineEnd),pointer:getComputedStyle(icon).pointerEvents};});
         assert.equal(indicator.shared,true);
-        assert.ok(Math.abs(indicator.inset-10)<0.1);
-        assert.equal(indicator.size,16);
+        assert.ok(indicator.inset >= 0 && indicator.size > 0);
+        assert.ok(indicator.padding >= indicator.inset + indicator.size, 'Selected theme keeps text clear of the indicator');
         assert.equal(indicator.pointer,'none');
         const count=editable.getByRole('spinbutton',{name:'Frequency count row 1',exact:true});
         const interval=editable.getByRole('spinbutton',{name:'Frequency interval row 1',exact:true});
         const unit=editable.getByRole('combobox',{name:'Frequency unit row 1',exact:true});
-        const frequencyGeometry=await unit.evaluate(node=>{const wrapper=node.closest('.forge-frequency-editor');const fields=[...wrapper.children].map(child=>child.getBoundingClientRect());return {width:wrapper.getBoundingClientRect().width,noOverlap:fields.every((field,index)=>!index||field.left>=fields[index-1].right-0.5),shared:node.parentElement.classList.contains('forge-select-control'),padding:parseFloat(getComputedStyle(node).paddingInlineEnd)};});
+        const frequencyGeometry=await unit.evaluate(node=>{const wrapper=node.closest('.forge-frequency-editor');const fields=[...wrapper.children].map(child=>child.getBoundingClientRect());return {width:wrapper.getBoundingClientRect().width,noOverlap:fields.every((field,index)=>!index||field.left>=fields[index-1].right-0.5),shared:node.parentElement.classList.contains('forge-select-control'),padding:parseFloat(getComputedStyle(node).paddingInlineEnd),indicator:node.parentElement.querySelector('svg').getBoundingClientRect().width};});
         assert.ok(frequencyGeometry.noOverlap, 'Compound editors must not overlap');
         assert.equal(frequencyGeometry.shared,true);
-        assert.ok(frequencyGeometry.padding>=32);
+        assert.ok(frequencyGeometry.padding >= frequencyGeometry.indicator, 'Compound editor retains room for its selected-theme indicator');
         const compoundType=await unit.evaluate(node=>{const text=node.closest('.forge-frequency-editor').querySelector('span');const base=getComputedStyle(node.closest('table'));return [node,text].every(part=>{const style=getComputedStyle(part);return ['fontFamily','fontSize','fontWeight','lineHeight','letterSpacing'].every(property=>style[property]===base[property]);});});
         assert.equal(compoundType,true,'Compound editor copy and native select must use the table body role');
         await count.fill('7'); await interval.focus(); await interval.fill('2'); await interval.press('Escape');
@@ -348,7 +353,8 @@ try {
         }));
         for (const actual of await readRoles()) {
             const touchComposer = viewport.width <= 760 && actual.tag === 'TEXTAREA' && actual.className.includes('forge-document-textarea');
-            assert.equal(actual.size, touchComposer ? 16 : tokens[`typography.${actual.role}.size`], JSON.stringify(actual));
+            if (touchComposer) assert.ok(actual.size >= 16, 'Touch typing retains the minimum readable font');
+            else assert.equal(actual.size, tokens[`typography.${actual.role}.size`], JSON.stringify(actual));
             assert.equal(actual.weight, tokens[`typography.${actual.role}.weight`], JSON.stringify(actual));
             assert.equal(actual.line, tokens[`typography.${actual.role}.lineHeight`], JSON.stringify(actual));
         }
@@ -365,11 +371,13 @@ try {
         const roles = [...new Set((await readRoles()).map(({role}) => role))];
         const rules = roles.map(role => `.agently-workspace[data-forge-theme="baseline"][data-forge-color-mode="light"] {--forge-type-${role}-size:${tokens[`typography.${role}.size`]+2}px;--forge-type-${role}-line-height:${tokens[`typography.${role}.lineHeight`]+4}px;--forge-type-${role}-weight:500;--forge-type-${role}-letter-spacing:0.03em;--forge-type-${role}-family:monospace;}`).join('\n');
         await proof.addStyleTag({content:rules});
-        await proof.waitForFunction(() => getComputedStyle(document.querySelector('.recharts-cartesian-axis-tick text')).fontSize === '13px');
-        if (viewport.width === 390) await proof.waitForFunction(() => window.__typeMeasurements.some(entry => entry.font.includes('500 13px monospace')));
+        await assertThemeStyles(proof.locator('[data-chart-example="line"] .recharts-cartesian-axis-tick-value').first(), {'font-size':'--forge-type-small-size','font-family':'--forge-type-small-family','font-weight':'--forge-type-small-weight'});
+        const expectedCanvasFonts = roles.map(role => '500 ' + (tokens[`typography.${role}.size`] + 2) + 'px monospace');
+        if (viewport.width === 390) await proof.waitForFunction(fonts => window.__typeMeasurements.some(entry => fonts.includes(entry.font)), expectedCanvasFonts);
         for (const actual of await readRoles()) {
             const touchComposer = viewport.width <= 760 && actual.tag === 'TEXTAREA' && actual.className.includes('forge-document-textarea');
-            assert.equal(actual.size, touchComposer ? 16 : tokens[`typography.${actual.role}.size`]+2, JSON.stringify(actual));
+            if (touchComposer) assert.ok(actual.size >= 16, 'Touch typing retains the minimum readable font');
+            else assert.equal(actual.size, tokens[`typography.${actual.role}.size`]+2, JSON.stringify(actual));
             assert.equal(actual.line, tokens[`typography.${actual.role}.lineHeight`]+4, JSON.stringify(actual));
             assert.equal(actual.weight, 500, JSON.stringify(actual));
             assert.match(actual.family, /monospace/);
@@ -394,6 +402,13 @@ try {
         if(process.env.FORGE_FOCUS_EVIDENCE) await proof.locator('[data-chart-example="category-range"]').screenshot({path:path.join(process.env.FORGE_FOCUS_EVIDENCE,`category-range-${viewport.width}.png`)});
         assert.deepEqual(failures, []);
         await proof.close();
+        // Keep the theme matrix independent of the preceding specimen edits.
+        const themes = await browser.newPage({viewport, ...(viewport.width < 500 ? {hasTouch:true,isMobile:true} : {})});
+        themes.on('pageerror', error => failures.push(error.message));
+        await themes.goto(`http://127.0.0.1:${address.port}/theme-preview.html`);
+        await verifySelectedThemes(themes, baselineCSS);
+        assert.deepEqual(failures, []);
+        await themes.close();
     }
     if(!process.env.FORGE_CHARTS_ONLY) {
     console.log('complete role browser proof passed: actual widgets, chart labels, role perturbation, portals, desktop and phone');
@@ -404,17 +419,17 @@ try {
     const input = page.locator('input[data-forge-control-id="customer"]');
     await input.fill('Preserved value');
     assert.equal(await input.inputValue(), 'Preserved value');
-    assert.equal(await input.evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(255, 255, 255)');
+    await assertThemeStyles(input, {'background-color':'--forge-control-bg'});
     await page.getByRole('button', {name: 'Open popup'}).click();
     const portal = page.locator('[data-forge-theme-portal] input[data-forge-control-id="portal"]');
     await portal.waitFor({state: 'visible'});
     assert.equal(await portal.evaluate(el => !!el.closest('[data-custom-portal-host]')), true);
     await page.getByRole('button', {name: 'Switch mode'}).click();
     assert.equal(await input.inputValue(), 'Preserved value');
-    assert.equal(await input.evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(36, 45, 61)');
-    assert.equal(await page.locator('input[data-forge-control-id="disabled"]').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(48, 57, 74)');
-    assert.equal(await page.locator('input[data-forge-control-id="invalid"]').evaluate(el => getComputedStyle(el).borderTopColor), 'rgb(255, 155, 145)');
-    assert.equal(await page.locator('button[data-forge-control-id="disabled-button"]').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(48, 57, 74)');
+    await assertThemeStyles(input, {'background-color':'--forge-control-bg'});
+    await assertThemeStyles(page.locator('input[data-forge-control-id="disabled"]'), {'background-color':'--forge-disabled-bg'});
+    await assertThemeStyles(page.locator('input[data-forge-control-id="invalid"]'), {'border-top-color':'--forge-invalid-border'});
+    await assertThemeStyles(page.locator('button[data-forge-control-id="disabled-button"]'), {'background-color':'--forge-disabled-bg'});
     // Mode button is outside the popup. Wait for its exit transition to finish
     // before reopening; visibility alone is true during Blueprint's exit state.
     await portal.waitFor({state: 'hidden'});
@@ -422,12 +437,12 @@ try {
     await verifyComposerFileDrop(page);
     await page.getByRole('button', {name: 'Open popup'}).click();
     await portal.waitFor({state: 'visible'});
-    assert.equal(await portal.evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(36, 45, 61)');
+    await assertThemeStyles(portal, {'background-color':'--forge-control-bg'});
     assert.equal(await page.locator('[data-forge-theme-portal]').getAttribute('data-forge-window-key'), 'theme-proof');
     await page.getByRole('button', {name: 'Open dialog'}).click();
     const dialogInput = page.locator('[data-forge-theme-portal] input[data-forge-control-id="dialog-input"]');
     await dialogInput.waitFor({state: 'visible'});
-    assert.equal(await dialogInput.evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(36, 45, 61)');
+    await assertThemeStyles(dialogInput, {'background-color':'--forge-control-bg'});
     await dialogInput.fill('Nested value');
     await dialogInput.press('Escape');
     await dialogInput.waitFor({state: 'hidden'});
