@@ -26,6 +26,7 @@ import {evaluatePlainVisibleWhen,trackVisibleWhen} from '../../visibleWhen.js';
 import {toolbarBooleanField, toolbarBooleanValue, updateToolbarBoolean} from './toolbarBoolean.js';
 import {downloadTableExport, tableExportColumns, tableExportFormats, tableExportRows} from './tableExport.js';
 import DisabledActionShell from '../../DisabledActionShell.jsx';
+import {anchoredPopoverProps, menuTriggerMinWidthModifier} from '../../anchoredPopoverProps.js';
 
 function sanitizeTestID(value) {
     return String(value || '')
@@ -174,7 +175,9 @@ function ToolbarStatus({item, context, align}) {
     );
 }
 
-export function TableExportControl({context, item, align, disabled = false, rows = [], columns = []}) {
+// Keep export work mounted outside either popover. Closing a menu must not
+// cancel the existing deferred download or discard its error announcement.
+function TableExportOwner({context, item, disabled = false, rows = [], columns = [], children}) {
     const isDesignSystem2 = useForgeTheme()?.themeId === 'design-system-2';
     item = workspaceToolbarItem(item, useWorkspacePresentation());
     const [busy, setBusy] = React.useState(false);
@@ -217,36 +220,43 @@ export function TableExportControl({context, item, align, disabled = false, rows
             }
         }, 0);});
     };
-    return (
+    return children({item, formats, exportDisabled, busy, error, runExport, isDesignSystem2});
+}
+
+function tableExportMenuItems({context, item, formats, busy, runExport, isDesignSystem2}, close) {
+    return formats.map(format => <NativeControlTarget key={format} context={context} item={{id:`${item.id}:${format}`,type:'button',label:format.toUpperCase()}} disabled={busy} actions={{click:()=>{close();return runExport(format,true);}}}><MenuItem
+        text={format.toUpperCase()}
+        icon={isDesignSystem2 ? undefined : <UnifiedIcon name={format === 'xlsx' ? 'th' : 'document'}/>}
+        disabled={busy}
+        onClick={() => {close();return runExport(format);}}
+    /></NativeControlTarget>);
+}
+
+export function TableExportControl({context, item, align, disabled = false, rows = [], columns = []}) {
+    const isDesignSystem2 = useForgeTheme()?.themeId === 'design-system-2';
+    return <TableExportOwner context={context} item={item} disabled={disabled} rows={rows} columns={columns}>{({item, formats, exportDisabled, busy, error, runExport}) => (
         <span key={`table-export-${item.id}-${align}`} className={`forge-toolbar-table-export ${align === 'right' ? 'is-aligned-right' : 'is-aligned-left'}`} aria-busy={busy || undefined}>
             <RegisteredPopover context={context} item={item} disabled={exportDisabled} renderContent={close=>(
                     <Menu className="forge-toolbar-select-menu" aria-label={`${item.label || 'Export'} formats`}>
-                        {formats.map((format) => (
-                            <NativeControlTarget key={format} context={context} item={{id:`${item.id}:${format}`,type:'button',label:format.toUpperCase()}} disabled={busy} actions={{click:()=>{close();return runExport(format,true);}}}><MenuItem
-                                text={format.toUpperCase()}
-                                icon={(iconName => iconName ? <UnifiedIcon name={iconName}/> : iconName)(format === 'xlsx' ? 'th' : 'document')}
-                                disabled={busy}
-                                onClick={() => {close();return runExport(format);}}
-                            /></NativeControlTarget>
-                        ))}
+                        {tableExportMenuItems({context, item, formats, busy, runExport, isDesignSystem2}, close)}
                     </Menu>
                 )}>
                 <Button
                     type="button"
-                    icon={toolbarItemIcon(item.icon || 'export')}
-                    rightIcon={(iconName => iconName ? <UnifiedIcon name={iconName}/> : iconName)(actionIconOnly({...item, icon: item.icon || 'export'}) ? undefined : "caret-down")}
-                    className={['forge-toolbar-action', actionIconOnly(item) ? 'is-icon-only' : '', item.className].filter(Boolean).join(' ')}
+                    icon={isDesignSystem2 ? undefined : toolbarItemIcon(item.icon || 'export')}
+                    rightIcon={isDesignSystem2 ? <UnifiedIcon name="lucide:chevron-down"/> : (actionIconOnly({...item, icon: item.icon || 'export'}) ? undefined : <UnifiedIcon name="caret-down"/>)}
+                    className={['forge-toolbar-action', !isDesignSystem2 && actionIconOnly(item) ? 'is-icon-only' : '', item.className].filter(Boolean).join(' ')}
                     loading={busy}
                     disabled={exportDisabled}
                     aria-label={item.ariaLabel || item.tooltip || item.label || 'Export'}
                     title={isDesignSystem2 ? undefined : item.tooltip || item.label || 'Export'}
                 >
-                    {toolbarItemLabel({...item, icon: item.icon || 'export'}) || ''}
+                    {isDesignSystem2 ? item.label || 'Export' : toolbarItemLabel({...item, icon: item.icon || 'export'}) || ''}
                 </Button>
             </RegisteredPopover>
             {error ? <span className="forge-toolbar-export-error" role="alert">{error}</span> : null}
         </span>
-    );
+    )}</TableExportOwner>;
 }
 
 const Toolbar = ({
@@ -274,6 +284,13 @@ const Toolbar = ({
     const disabled = control.value?.inactive || false;
     const formDirty = formStatus?.value?.dirty === true;
     const hasSelection = toolbarHasSelection(signals?.selection?.value || {});
+    const admittedItem = item => toolbarItemShouldRender(item, context, toolbarEvents[item.id]?.stateEvents?.onVisible?.() ?? true);
+    const actionsMenu = isDesignSystem2 && className.split(' ').includes('forge-list-page__actions')
+        ? toolbarItems.find(item => Array.isArray(item.menuItems)
+            && (item.id === 'actions' || String(item.className || '').split(' ').includes('forge-list-page-actions-menu'))
+            && admittedItem(item)) : undefined;
+    const menuExport = actionsMenu ? toolbarItems.find(item => (item.type === 'tableExport' || item.widget === 'tableExport')
+        && admittedItem(item)) : undefined;
 
     const renderToolbarItem = (item, align) => {
         item = workspaceToolbarItem(item, workspace);
@@ -296,6 +313,7 @@ const Toolbar = ({
             return <RefreshAction key={item.id} context={context} item={item} disabled={toolbarItemShouldDisable(item,context,isReadonly) || disabled}/>;
         }
         if (item.type === 'tableExport' || item.widget === 'tableExport') {
+            if (menuExport?.id === item.id) return null;
             const rows = tableExportRows({filteredSortedRows: exportRows, pageRows: exportPageRows, scope: item?.properties?.scope});
             return <TableExportControl context={context} key={`table-export-${item.id}-${align}`} item={item} align={align} disabled={item.disabled === true || disabled || isReadonly} rows={rows} columns={exportColumns}/>;
         }
@@ -305,12 +323,12 @@ const Toolbar = ({
         if ((item.type === 'menu' || item.widget === 'menu' || item.type === 'dropdown') && Array.isArray(item.menuItems)) {
             const menuEvents = useToolbarControlEvents(context, item.menuItems);
             const menuDisabled = toolbarItemShouldDisable(item, context, isReadonly)
-                || (item.enableWhenSelection === true && !hasSelection)
+                || (item.enableWhenSelection === true && !hasSelection && !(menuExport && actionsMenu.id === item.id))
                 || disabled;
             const spanStyle = align === 'center'
                 ? {margin: '0 10px'}
                 : (align === 'right' ? {marginLeft: '10px'} : {marginRight: '10px'});
-            return (
+            const renderMenu = exportState => (
                 <span key={`menu-${item.id}-${align}`} style={spanStyle}>
                     <RegisteredPopover context={context} item={item} disabled={menuDisabled} placement="bottom-start" renderContent={close=>(
                             <Menu className="forge-toolbar-select-menu" aria-label={`${item.label || item.id || 'Actions'} menu`}>
@@ -318,17 +336,28 @@ const Toolbar = ({
                                     const nested = menuEvents[menuItem.id] || {};
                                     const nestedVisible = nested.stateEvents?.onVisible ? nested.stateEvents.onVisible() : true;
                                     if (nestedVisible === false) return null;
+                                    if (exportState && !toolbarItemShouldRender(menuItem, context, nestedVisible)) return null;
                                     const nestedReadonly = nested.stateEvents?.onReadonly ? nested.stateEvents.onReadonly() : false;
+                                    const nestedDisabled = menuItem.disabled === true || nestedReadonly
+                                        || (exportState && (item.enableWhenSelection === true || menuItem.enableWhenSelection === true || menuItem.requiresSelection === true) && !hasSelection)
+                                        || (exportState && toolbarItemShouldDisable(menuItem, context, nestedReadonly));
                                     return (
-                                        <NativeControlTarget key={menuItem.id} context={context} item={{...menuItem,id:`${item.id}:${menuItem.id}`,type:'button'}} disabled={menuDisabled||menuItem.disabled===true||nestedReadonly} actions={{click:({event})=>{const result=(nested.events?.onClick?.operate || nested.events?.onClick)?.(event);close();return result;}}}><MenuItem
+                                        <NativeControlTarget key={menuItem.id} context={context} item={{...menuItem,id:`${item.id}:${menuItem.id}`,type:'button'}} disabled={menuDisabled||nestedDisabled} actions={{click:({event})=>{const result=(nested.events?.onClick?.operate || nested.events?.onClick)?.(event);close();return result;}}}><MenuItem
                                             text={menuItem.label || menuItem.id}
                                             icon={(iconName => iconName ? <UnifiedIcon name={iconName}/> : iconName)(menuItem.icon)}
-                                            disabled={menuItem.disabled === true || nestedReadonly}
+                                            disabled={!!nestedDisabled}
                                             title={menuItem.tooltip || menuItem.label || menuItem.id}
                                             onClick={event=>{const result=nested.events?.onClick?.(event);close();return result;}}
                                         /></NativeControlTarget>
                                     );
                                 })}
+                                {exportState && <MenuItem className="forge-toolbar-export-submenu" text={exportState.item.label || 'Export'}
+                                    labelElement={<UnifiedIcon name="lucide:chevron-right"/>} disabled={exportState.exportDisabled}
+                                    popoverProps={{...anchoredPopoverProps({placement:'right-start',popoverClassName:'forge-dropdown-menu',modifiersCustom:[menuTriggerMinWidthModifier]}),usePortal:false,enforceFocus:false,autoFocus:false,
+                                        targetProps:{role:'menuitem',tabIndex:0,'aria-disabled':exportState.exportDisabled || undefined}}}
+                                    submenuProps={{className:'forge-toolbar-select-menu','aria-label':`${exportState.item.label || 'Export'} formats`}}>
+                                    {tableExportMenuItems({context, ...exportState}, close)}
+                                </MenuItem>}
                             </Menu>
                         )}>
                         <Button
@@ -343,18 +372,32 @@ const Toolbar = ({
                             {toolbarItemLabel(item)}
                         </Button>
                     </RegisteredPopover>
+                    {exportState?.error ? <span className="forge-toolbar-export-error" role="alert">{exportState.error}</span> : null}
                 </span>
             );
+            if (menuExport && actionsMenu.id === item.id) {
+                const readonly = toolbarEvents[menuExport.id]?.stateEvents?.onReadonly?.() || false;
+                return <TableExportOwner key={`actions-export-${item.id}`} context={context} item={menuExport}
+                    disabled={toolbarItemShouldDisable(menuExport, context, readonly) || disabled}
+                    rows={tableExportRows({filteredSortedRows: exportRows, pageRows: exportPageRows, scope: menuExport?.properties?.scope})}
+                    columns={exportColumns}>{renderMenu}</TableExportOwner>;
+            }
+            return renderMenu();
         }
         if (item.type === 'dateRangePreset' || item.widget === 'dateRangePreset') {
-            const field = item.field || item.bind || item.id;
+            const field = (isDesignSystem2 ? item.dataField : undefined) || item.field || item.bind || item.id;
             const windowForm = signals?.windowForm?.value || {};
             const value = windowForm[field] ?? item.value ?? '';
-            const updateValue = (nextValue) => {
+            const updateValue = (nextValue, strict = false) => {
                 if (!signals?.windowForm) return;
                 const previous = signals.windowForm.peek?.() || signals.windowForm.value || {};
                 signals.windowForm.value = {...previous, [field]: nextValue};
+                if (isDesignSystem2) {
+                    const change = strict && events.onChange?.operate ? events.onChange.operate : events.onChange;
+                    return change?.({target:{value:nextValue}});
+                }
             };
+            updateValue.operate = nextValue => updateValue(nextValue, true);
             return (
                 <span key={`date-range-${item.id}-${align}`} style={{minWidth: item.minWidth || 350, marginLeft: align === 'right' ? 10 : 0}}>
                     <DateRangePresetInput

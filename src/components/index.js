@@ -51,6 +51,7 @@ export {
 } from './chatCommandCenterActions.js';
 
 export {ForgeThemeProvider, ForgeThemeBoundary} from './ThemeBoundary.jsx';
+export {default as SoftSkeleton, SoftBlock} from './SoftSkeleton.jsx';
 
 export {default as ContentCarousel} from './content/ContentCarousel.jsx';
 export {default as CardRail} from './content/CardRail.jsx';
@@ -73,6 +74,7 @@ export {default as WorkspaceRuntimeSurface, WorkspaceRuntimeTabs, WorkspaceRunti
 export {default as Typography, typographyProps, typographyRoles} from './Typography.jsx';
 export {default as Button, buttonVariants, buttonSizes} from './Button.jsx';
 export {default as StatusChip, statusChipTones} from './StatusChip.jsx';
+export {default as RemovableChip} from './RemovableChip.jsx';
 export {default as CountBadge} from './CountBadge.jsx';
 export {default as Icon, iconNames} from './Icon.jsx';
 export {default as AccessibleSection} from './AccessibleSection.jsx';
@@ -85,6 +87,7 @@ export {default as ReviewTable} from './dashboard/ReviewTable.jsx';
 
 export {default as Popover} from './Popover.jsx';
 export {default as DropdownMenu} from './DropdownMenu.jsx';
+export {default as NavigationFlyout} from './NavigationFlyout.jsx';
 export {anchoredPopoverProps} from './anchoredPopoverProps.js';
 
 export {default as GuidedResult} from './GuidedResult.jsx';

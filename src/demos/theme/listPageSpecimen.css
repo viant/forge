@@ -1,0 +1,6 @@
+.catalog-preview--thumbnail:has(.forge-list-page){padding:0;overflow:hidden;align-items:flex-start;justify-content:flex-start}
+.catalog-preview--thumbnail>.forge-list-page{width:1100px;min-width:1100px;transform:scale(.3);transform-origin:top left;pointer-events:none}
+.catalog-preview--variant:has(.forge-list-page){display:block;padding:0}
+.catalog-preview--detail:has(.forge-list-page){display:block;padding:0}
+.catalog-preview--thumbnail>.forge-list-page-review{width:1100px;min-width:1100px;min-height:560px;transform:scale(.3);transform-origin:top left;pointer-events:none}
+.catalog-preview--variant .forge-list-page-review,.catalog-preview--detail .forge-list-page-review{min-height:560px}

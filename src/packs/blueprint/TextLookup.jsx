@@ -5,7 +5,7 @@ import { applyLookupSelection, openLookup, resolveLookupValue } from '../../util
 import { createLookupOpenHandler } from './TextLookupHandlers.js';
 
 export default function TextLookup(props) {
-    const { value = '', readOnly, context, item, adapter, ...rest } = props;
+    const { value = '', readOnly, context, item, adapter, onChange, ...rest } = props;
 
     const latest = React.useRef(null);
     latest.current = { item, context, adapter, value };
@@ -37,11 +37,23 @@ export default function TextLookup(props) {
         }
     };
 
-    const edit=(raw,strict=false)=>{
-        if(readOnly || rest.disabled)return false;
-        const next=raw?.target?.value ?? raw;++requestVersion.current;
-        if(strict)adapter.set(next);else try{adapter.set(next);}catch(_){}
-        if(requestTrigger==='change')return resolve(next,strict);
+    const hasAuthoredChange = item?.on?.some?.(entry => entry?.event === 'onChange');
+    const edit = async (raw, strict = false) => {
+        if (readOnly || rest.disabled) return false;
+        const next = raw?.target?.value ?? raw;
+        const version = ++requestVersion.current;
+        try {
+            if (hasAuthoredChange && typeof onChange === 'function') {
+                const change = strict ? onChange.operate || onChange : onChange;
+                await change(next);
+            } else {
+                adapter.set(next);
+            }
+        } catch (error) {
+            if (strict) throw error;
+            return;
+        }
+        if (requestTrigger === 'change' && version === requestVersion.current) return resolve(next, strict);
     };
     const intent = item?.lookup?.intent || item?.intent || rest?.intent;
     const rightElement = React.useMemo(() => (

@@ -1,7 +1,7 @@
 import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {afterEach,expect,it,vi} from 'vitest';
-import {componentCatalog,referenceComponents,componentFamilies,findComponent,filterCatalog} from './componentCatalog.js';
+import {componentCatalog,referenceComponents,componentFamilies,catalogSections,catalogComponentGroups,findComponent,filterCatalog} from './componentCatalog.js';
 import CatalogExample from './CatalogExamples.jsx';
 import ComponentCatalog,{readSemanticTheme} from './ComponentCatalog.jsx';
 import {ForgeThemeProvider,ForgeThemeBoundary} from '../../components/ThemeBoundary.jsx';
@@ -9,6 +9,10 @@ import {Breadcrumbs,Menu,MenuItem,OverflowList,Toast} from '@blueprintjs/core';
 import {MultiSelect} from '@blueprintjs/select';
 import DropdownMenu from '../../components/DropdownMenu.jsx';
 import Button from '../../components/Button.jsx';
+import BasicTable from '../../components/table/Basic.jsx';
+import BasicTableSpecimen from './BasicTableSpecimen.jsx';
+import TableBackfill from '../../components/table/basic/TableBackfill.jsx';
+import {Context} from '../../core/context/Context.jsx';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 let root,host;
@@ -19,8 +23,8 @@ const mount=async(spec,props={})=>{
 };
 
 it('covers the reference inventory, preserves unique routes and supplies the full documentation contract',()=>{
- expect(referenceComponents).toHaveLength(88);
- expect(componentCatalog).toHaveLength(98);
+ expect(referenceComponents).toHaveLength(87);
+ expect(componentCatalog).toHaveLength(103);
  expect(new Set(componentCatalog.map(item=>item.id)).size).toBe(componentCatalog.length);
  expect(componentFamilies.filter(f=>referenceComponents.some(item=>item.family===f.id))).toHaveLength(11);
  for(const spec of componentCatalog){
@@ -32,7 +36,25 @@ it('covers the reference inventory, preserves unique routes and supplies the ful
   expect(spec.usage,spec.id).toBeTruthy();expect(spec.avoid,spec.id).toBeTruthy();
   expect(findComponent(spec.id)).toBe(spec);
  }
- expect(filterCatalog('', 'layout').map(item=>item.id)).toEqual(['form-layout']);
+ expect(filterCatalog('', 'patterns').map(item=>item.id)).toEqual(['list-page','drawer','dialog','full-screen','form-layout','document-form','analytical-report','comparison-layout']);
+ expect(catalogSections.map(section=>section.name)).toEqual(['Components','Chat','Patterns']);
+ expect(filterCatalog('', 'chat').map(item=>item.id)).toContain('chat-layout');
+ expect(filterCatalog('', 'components').every(item=>!['chat','patterns'].includes(item.section))).toBe(true);
+ expect(componentCatalog.filter(item=>item.navigationGroup==='dropdown').map(item=>item.id)).toEqual(expect.arrayContaining(['dropdown-menu','dropdown-menu-option']));
+ expect(componentCatalog.every(item=>catalogSections.some(section=>section.id===item.section))).toBe(true);
+ expect(componentCatalog.every(item=>!item.navigationGroup||catalogComponentGroups.some(group=>group.id===item.navigationGroup))).toBe(true);
+ expect(findComponent('drawer').kind).toBe('pattern');
+ expect(findComponent('dialog').family).toBe('patterns');
+ expect(findComponent('table').implementation).toBe('Basic');
+ expect(findComponent('table').section).toBe('components');
+ expect(componentFamilies.find(item=>item.id==='table').name).toBe('Table');
+ expect(catalogComponentGroups.find(item=>item.id==='table').name).toBe('Table');
+ expect(findComponent('table').variants.some(value=>findComponent('table').states.includes(value))).toBe(false);
+ expect(findComponent('table').states).not.toEqual(expect.arrayContaining(['With selection','With pending edits','Invalid edits']));
+ for(const id of ['report-table','editable-table','list','metadata-list','overflow-list','table-selection-toolbar','tree-list']){
+  expect(findComponent(id).section).toBe('chat');
+  expect(findComponent(id).navigationGroup).toBe('table');
+ }
  expect(filterCatalog('', 'forms')).toHaveLength(20);
  for(const id of ['typeahead','typeahead-item','rich-text-editor','rich-text-editor-auto-link-plugin','rich-text-editor-toolbar','bottom-sheet','bottom-sheet-switcher','command-palette','lightbox','overlay']) expect(findComponent(id)).toBeUndefined();
 });
@@ -43,10 +65,297 @@ it.each(componentCatalog.map(spec=>[spec.name,spec]))('renders every documented 
  for(const size of spec.sizes||[]){await mount(spec,{iconSize:size.toLowerCase()});expect(host.querySelector('.forge-button--icon-only')).not.toBeNull();}
 },20000);
 
+it('uses native form validation for the full screen section outline after Create',async()=>{
+ await mount(findComponent('full-screen'),{variant:'Create',thumbnail:false});
+ expect(host.querySelector('.forge-fullscreen-form')).toBeNull();
+ await act(async()=>[...host.querySelectorAll('button')].find(button=>button.textContent==='Open full screen').click());
+ const form=document.querySelector('.forge-fullscreen-dialog .forge-fullscreen-form');
+ const sections=[...form.querySelectorAll('[data-fullscreen-section]')];
+ const scroll=vi.fn();form.querySelector('.forge-fullscreen-body').scrollTo=scroll;
+ expect(form.querySelectorAll('[aria-invalid=true]')).toHaveLength(0);
+ expect(form.querySelectorAll('[data-invalid=true]')).toHaveLength(0);
+ await act(async()=>form.querySelector('button[type=submit]').click());
+ expect(form.querySelectorAll('[aria-invalid=true]')).toHaveLength(4);
+ expect(form.querySelectorAll('.forge-fullscreen-destination[data-invalid=true]')).toHaveLength(2);
+ expect(form.querySelectorAll('.forge-fullscreen-section-title[data-invalid=true]')).toHaveLength(2);
+ expect(form.querySelector('[role=alert]').textContent).toBe('Organization is required.');
+ expect(form.querySelector('.forge-fullscreen-footer').textContent).toBe('CancelCreate Workspace');
+ expect([...form.querySelectorAll('.forge-fullscreen-destination-copy')].map(node=>node.textContent)).toEqual(['Identity','Account Settings','Contact Information']);
+ expect(document.activeElement.name).toBe('organization');
+ expect(scroll).toHaveBeenCalledTimes(1);
+ const contact=form.querySelector('[aria-label="3. Contact Information"]');
+ await act(async()=>contact.click());
+ expect(document.activeElement.name).toBe('contact');
+ expect(contact.getAttribute('aria-current')).toBe('location');
+ expect(sections.every(section=>section.querySelector('[data-forge-component=section]'))).toBe(true);
+ const organization=form.querySelector('select[name=organization]');
+ await act(async()=>{organization.value='design';organization.dispatchEvent(new Event('change',{bubbles:true}));});
+ expect(organization.getAttribute('aria-invalid')).toBeNull();
+ expect(form.querySelectorAll('[aria-invalid=true]')).toHaveLength(3);
+ const type=async(name,value)=>act(async()=>{const input=form.querySelector(`input[name=${name}]`);Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));});
+ await type('name','Example workspace');
+ for(const [name,value] of [['category','internal'],['timezone','utc']])await act(async()=>{const select=form.querySelector(`select[name=${name}]`);select.value=value;select.dispatchEvent(new Event('change',{bubbles:true}));});
+ expect(form.querySelectorAll('[aria-invalid=true]')).toHaveLength(0);
+ expect(form.querySelectorAll('[data-invalid=true]')).toHaveLength(0);
+ await type('email','invalid-email');
+ expect(form.querySelector('input[name=email]').getAttribute('aria-invalid')).toBe('true');
+ expect(form.querySelector('[aria-label="3. Contact Information, 1 field needs attention"]')).not.toBeNull();
+ await type('email','review@example.com');
+ expect(form.querySelectorAll('[aria-invalid=true]')).toHaveLength(0);
+ await mount(findComponent('full-screen'),{variant:'Create',state:'Disabled',thumbnail:false});
+ await act(async()=>[...host.querySelectorAll('button')].find(button=>button.textContent==='Open full screen').click());
+ const disabledForm=document.querySelector('.forge-fullscreen-dialog .forge-fullscreen-form');
+ expect([...disabledForm.querySelectorAll('input,select')].every(field=>field.disabled)).toBe(true);
+ expect(disabledForm.querySelector('button[type=submit]').disabled).toBe(true);
+ expect(disabledForm.querySelector('.forge-fullscreen-destination').disabled).toBe(false);
+});
+
+it.each([0,73])('follows the full screen native scroll and edited section with a %spx header inset',async inset=>{
+ await mount(findComponent('full-screen'),{thumbnail:false});
+ await act(async()=>[...host.querySelectorAll('button')].find(button=>button.textContent==='Open full screen').click());
+ const form=document.querySelector('.forge-fullscreen-dialog form');
+ const viewport=form.querySelector('.forge-fullscreen-body');
+ // JSDOM has no Web Animations API for the native scroll-activity owner.
+ viewport.parentElement.querySelectorAll('.forge-scroll-area__thumb').forEach(thumb=>{
+  thumb.getAnimations=()=>[];thumb.animate=()=>({id:''});
+ });
+ const cards=[...form.querySelectorAll('[data-fullscreen-section]')];
+ const current=()=>form.querySelector('.forge-fullscreen-destination[aria-current=location]')?.textContent;
+ Object.defineProperties(viewport,{clientHeight:{value:400,configurable:true},scrollHeight:{value:1200,configurable:true}});
+ viewport.style.scrollPaddingTop=`${inset}px`;
+ viewport.getBoundingClientRect=()=>({top:64});
+ cards.forEach((card,index)=>{
+  card.style.scrollMarginTop='16px';
+  card.getBoundingClientRect=()=>({top:64+[24,400,820][index]-viewport.scrollTop});
+ });
+ const nav=form.querySelector('.forge-fullscreen-outline');
+ Object.defineProperties(nav,{clientWidth:{value:390},scrollWidth:{value:648}});
+ nav.style.paddingInlineStart='16px';
+ nav.getBoundingClientRect=()=>({left:0,right:390});
+ nav.scrollTo=({left})=>{nav.scrollLeft=Math.max(0,Math.min(258,left));};
+ [...nav.querySelectorAll('button')].forEach((button,index)=>{
+  button.getBoundingClientRect=()=>({left:16+208*index-nav.scrollLeft,right:216+208*index-nav.scrollLeft});
+ });
+ const scrollTo=async top=>act(async()=>{viewport.scrollTop=top;viewport.dispatchEvent(new Event('scroll'));});
+ const readingInset=inset+(400-inset)/4;
+ await scrollTo(400-readingInset-16-2);
+ expect(current()).toBe('1Identity');
+ await scrollTo(400-readingInset-16);
+ expect(current()).toBe('2Account Settings');
+ expect(nav.scrollLeft).toBe(50);
+ await scrollTo(800);
+ expect(current()).toBe('3Contact Information');
+ expect(nav.scrollLeft).toBe(258);
+ await scrollTo(0);
+ expect(current()).toBe('1Identity');
+ expect(nav.scrollLeft).toBe(0);
+ const contact=form.querySelector('input[name=contact]');
+ await act(async()=>contact.focus());
+ expect(current()).toBe('3Contact Information');
+ await scrollTo(400);
+ expect(current()).toBe('2Account Settings');
+ await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(contact,'Example contact');contact.dispatchEvent(new Event('input',{bubbles:true}));});
+ expect(current()).toBe('3Contact Information');
+ viewport.scrollTo=({top})=>{viewport.scrollTop=Math.min(viewport.scrollHeight-viewport.clientHeight,top);viewport.dispatchEvent(new Event('scroll'));};
+ await act(async()=>form.querySelector('[aria-label="3. Contact Information"]').click());
+ expect(current()).toBe('3Contact Information');
+ expect(document.activeElement).toBe(contact);
+ Object.defineProperty(viewport,'clientHeight',{value:900,configurable:true});
+ await act(async()=>form.querySelector('[aria-label="2. Account Settings"]').click());
+ expect(viewport.scrollTop).toBe(300);
+ expect(current()).toBe('2Account Settings');
+ await scrollTo(0);
+ await scrollTo(300);
+ expect(current()).toBe('3Contact Information');
+ Object.defineProperty(viewport,'scrollHeight',{value:400,configurable:true});
+ await act(async()=>form.querySelector('input[name=name]').focus());
+ await scrollTo(0);
+ expect(current()).toBe('1Identity');
+});
+
+it('completes the full screen Apply example locally and opens the native modal',async()=>{
+ await mount(findComponent('full-screen'),{variant:'Apply',thumbnail:false});
+ await act(async()=>[...host.querySelectorAll('button')].find(button=>button.textContent==='Open full screen').click());
+ const dialog=document.querySelector('.forge-fullscreen-dialog[role=dialog]');
+ expect(dialog).not.toBeNull();
+ expect(dialog.getAttribute('aria-modal')).toBe('true');
+ expect(document.getElementById(dialog.getAttribute('aria-labelledby')).textContent).toBe('Edit Workspace');
+ expect(dialog.querySelector('.forge-scroll-area__viewport')).not.toBeNull();
+ await act(async()=>dialog.querySelector('button[type=submit]').click());
+ expect(host.textContent).toContain('Example changes applied locally.');
+});
+
+it('lets an open native picker consume Escape before the full screen dialog',async()=>{
+ await mount(findComponent('full-screen'),{thumbnail:false});
+ await act(async()=>[...host.querySelectorAll('button')].find(button=>button.textContent==='Open full screen').click());
+ const select=document.querySelector('.forge-fullscreen-dialog select[name=organization]');
+ const originalMatches=select.matches;
+ select.matches=function(selector){return selector===':open'||originalMatches.call(this,selector);};
+ const escape=new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true});
+ await act(async()=>select.dispatchEvent(escape));
+ expect(escape.defaultPrevented).toBe(false);
+ expect(document.querySelector('.forge-fullscreen-dialog')).not.toBeNull();
+ select.matches=originalMatches;
+});
+
 it('keeps busy and read-only actions unavailable and exposes the busy state',async()=>{
  const spec=findComponent('button');await mount(spec,{state:'Loading'});
  expect(host.querySelector('button').disabled).toBe(true);expect(host.querySelector('button').getAttribute('aria-busy')).toBe('true');
  await mount(spec,{state:'Read only'});expect(host.querySelector('button').disabled).toBe(true);
+});
+
+it('demonstrates pending and failed option content inside the same native filter drawer',async()=>{
+ const drawer=findComponent('drawer');
+ const action=text=>[...document.querySelectorAll('button')].find(button=>button.textContent===text);
+ await mount(drawer,{variant:'Filter view',state:'Loading options'});
+ await act(async()=>action('Open drawer').click());
+ await act(async()=>action('Name').click());
+ expect(document.querySelectorAll('.forge-filter-options-skeleton__row')).toHaveLength(6);
+ expect(action('Apply').disabled).toBe(true);
+ await mount(drawer,{variant:'Filter view',state:'Load error'});
+ await act(async()=>action('Open drawer').click());
+ await act(async()=>action('Name').click());
+ const retry=document.querySelector('button[aria-label="Retry filter options"]');
+ expect(retry).not.toBeNull();
+ await act(async()=>{retry.focus();retry.click();});
+ expect(document.querySelectorAll('.forge-drawer-choice-list input[type=checkbox]')).toHaveLength(4);
+ expect(document.activeElement?.getAttribute('aria-label')).toBe('Search filter options');
+});
+
+it('uses the native workspace table for typed cells, headers, staged edits and column totals',async()=>{
+ const spec=findComponent('table');
+ await mount(spec,{variant:'Links and status'});
+ expect(host.querySelector('.basic-table-wrapper')).not.toBeNull();
+ expect(host.querySelector('.forge-list-page')).toBeNull();
+ expect(host.querySelectorAll('td[data-col=status] .forge-status-chip')).toHaveLength(2);
+ expect(host.querySelector('td[data-col=name] .forge-table-link')).not.toBeNull();
+ await mount(spec,{variant:'Editable cells'});
+ expect(host.querySelector('[data-summary-column=amount]').textContent).toBe('$2,580.25');
+ await act(async()=>host.querySelector('button[aria-label="Edit Email 1001"]').click());
+ const email=host.querySelector('input[aria-label="Email 1001"]');
+ await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(email,'invalid');email.dispatchEvent(new Event('input',{bubbles:true}));});
+ expect(email.getAttribute('aria-invalid')).toBe('true');
+ expect([...host.querySelectorAll('button')].find(button=>button.textContent==='Apply changes').disabled).toBe(true);
+ expect(host.querySelector('[data-summary-column=amount]').textContent).toBe('$2,580.25');
+});
+
+it.each(['light','dark'])('stages composed Dropdown and Switch edits without selecting the row (%s)',async mode=>{
+ host=document.createElement('div');document.body.append(host);root=createRoot(host);
+ await act(async()=>root.render(<ForgeThemeProvider themeId="design-system-2" mode={mode}><ForgeThemeBoundary><BasicTableSpecimen variant="Dropdown and Switch"/></ForgeThemeBoundary></ForgeThemeProvider>));
+ const control=label=>host.querySelector(`button[aria-label="${label}"]`);
+ const clickAction=async label=>act(async()=>[...host.querySelectorAll('button')].find(e=>e.textContent===label).click());
+ expect(control('Status 1001').textContent).toBe('Active');
+ expect(control('Status 1001').dataset.forgeVariant).toBe('ghost');
+ expect(control('Verified 1001').getAttribute('aria-checked')).toBe('true');
+ await act(async()=>control('Status 1001').click());
+ const options=()=>[...document.querySelectorAll('.forge-dropdown-menu [role=option]')];
+ expect(options().map(e=>e.textContent)).toEqual(['Active','Paused','Archived','Custom status']);
+ expect(options().find(e=>e.getAttribute('aria-selected')==='true').textContent).toBe('Active');
+ await act(async()=>options().find(e=>e.textContent==='Paused').querySelector('a').click());
+ expect(control('Status 1001').textContent).toBe('Paused');
+ await act(async()=>control('Verified 1001').click());
+ expect(control('Status 1001').textContent).toBe('Paused');
+ expect(control('Verified 1001').getAttribute('aria-checked')).toBe('false');
+ expect(host.querySelector('.forge-table-edit-review').textContent).toContain('2 unsaved changes in 1 row');
+ expect(host.querySelector('tbody input[aria-label="Select row"]').checked).toBe(false);
+ expect(host.querySelectorAll('[data-edit-state=pending]')).toHaveLength(2);
+ expect([...host.querySelectorAll('button')].find(e=>e.textContent==='Apply changes').disabled).toBe(false);
+ await clickAction('Revert all');
+ expect(control('Status 1001').textContent).toBe('Active');
+ expect(control('Verified 1001').getAttribute('aria-checked')).toBe('true');
+ expect(host.querySelector('.forge-table-edit-review')).toBeNull();
+ await act(async()=>control('Verified 1001').click());
+ await clickAction('Apply changes');
+ expect(control('Verified 1001').getAttribute('aria-checked')).toBe('false');
+ expect(host.querySelector('.forge-table-edit-review')).toBeNull();
+ for(const id of [1003,1004]){
+  expect(control(`Status ${id}`).disabled).toBe(true);
+  expect(control(`Verified ${id}`).disabled).toBe(true);
+  await act(async()=>control(`Verified ${id}`).click());
+ }
+ expect(host.querySelector('.forge-table-edit-review')).toBeNull();
+});
+
+it.each(['design-system-2','baseline'])('uses the requested native error icon only in DS2 (%s)',async themeId=>{
+ host=document.createElement('div');document.body.append(host);root=createRoot(host);
+ const context={signals:{control:{value:{error:{message:'The sample rows could not be loaded.'}}}}};
+ await act(async()=>root.render(<ForgeThemeProvider themeId={themeId}><table><tbody><TableBackfill context={context} rowCount={1} colSpan={1} collection={[]}/></tbody></table></ForgeThemeProvider>));
+ expect(host.querySelector('[role=alert]').textContent).toContain('could not be loaded');
+ expect(!!host.querySelector('.forge-table-error-message .lucide-info')).toBe(themeId==='design-system-2');
+ expect(!!host.querySelector('.forge-table-error-message .lucide-circle-alert')).toBe(themeId==='baseline');
+});
+
+it('composes list-page actions with native row selection and reversible starred filtering',async()=>{
+ await mount(findComponent('list-page'));
+ const actions=()=>[...host.querySelectorAll('.toolbar-left button')].find(button=>button.textContent==='Actions');
+ expect(actions().disabled).toBe(false);
+ expect(actions().querySelector('svg.lucide-chevron-down')).not.toBeNull();
+ await act(async()=>host.querySelector('[aria-label="Select row"]').click());
+ expect(actions().disabled).toBe(false);
+ expect(host.querySelector('[data-summary-column=amount]').textContent).toBe('$113,240.00');
+ expect(host.querySelector('tfoot').textContent).toContain('1 selected');
+ await act(async()=>host.querySelector('[aria-label="Starred view"]').click());
+ expect(host.querySelector('tfoot').textContent.toLowerCase()).toContain('2 records');
+ expect(host.querySelector('[data-summary-column=amount]').textContent).toBe('$47,315.00');
+ expect(actions().disabled).toBe(false);
+ expect(host.querySelector('[aria-label="Starred view"]').getAttribute('aria-pressed')).toBe('true');
+ await act(async()=>host.querySelector('[aria-label="Starred view"]').click());
+ expect(host.querySelector('tfoot').textContent.toLowerCase()).toContain('5 records');
+});
+
+it('combines table search and stable record-choice filtering without replacing either binding',async()=>{
+ await mount(findComponent('list-page'));
+ const input=host.querySelector('input[aria-label="Search records"]');
+ const change=async(node,value)=>act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(node,value);node.dispatchEvent(new Event('input',{bubbles:true}));});
+ await change(input,'Design');
+ expect(host.querySelectorAll('tbody tr:has(td[data-col=id])')).toHaveLength(1);
+ await act(async()=>host.querySelector('button[aria-label="Filter records"]').click());
+ await act(async()=>[...document.querySelectorAll('.forge-drawer-options button')].find(button=>button.textContent==='Record name').click());
+ const choices=document.querySelectorAll('.forge-drawer-choice-list input[type=checkbox]');
+ expect(choices).toHaveLength(6); // Select all plus all five records, independent of table search.
+ await act(async()=>choices[1].click());
+ await act(async()=>[...document.querySelectorAll('.forge-drawer-actions button')].find(button=>button.textContent==='Apply').click());
+ expect(host.querySelector('.forge-list-page__filters').textContent).toContain('Record name: Design foundations');
+ await change(input,'Component');
+ expect(host.querySelectorAll('tbody tr:has(td[data-col=id])')).toHaveLength(0);
+ await change(input,'');
+ expect(host.querySelectorAll('tbody tr:has(td[data-col=id])')).toHaveLength(1);
+ await act(async()=>host.querySelector('button[aria-label="Remove Record name filter"]').click());
+ expect(host.querySelectorAll('tbody tr:has(td[data-col=id])')).toHaveLength(5);
+ expect(host.querySelectorAll('td[data-col=status] .forge-status-chip')).toHaveLength(5);
+});
+
+it('applies the native list-page presentation only in DS2 and retains its existing select binding',async()=>{
+ const metadata={actions:{import:()=>({})},dataSource:{records:{autoFetch:false,cardinality:'collection',selectionMode:'multi',uniqueKey:[{field:'id'}]}}};
+ const windowContext=Context('native-list-pattern-test',metadata,'records',{});
+ windowContext.init();
+ const context=windowContext.Context('records');
+ context.handlers.dataSource.setCollection([{id:1,name:'Example record'}]);
+ context.signals.control.value={loaded:true};
+ const container={id:'records',title:'Records',fetchData:false,table:{presentation:'list-page',toolbar:{items:[
+  {id:'period',type:'dateRangePreset',placement:'header',align:'right',value:'current_month',options:[{value:'current_month',label:'Month'}]},
+  {id:'view',label:'View',type:'select',scope:'windowForm',appearance:'starred-toggle',value:'all',options:[{value:'all',label:'All records'},{value:'starred',label:'Starred only'}]},
+  {id:'search',type:'quickSearch',appearance:'field',properties:{field:'name',placeholder:'Search records'}},
+  {id:'settings',icon:'settings',label:'Customize',hideLabel:true,align:'right'},
+ ]}}};
+ host=document.createElement('div');document.body.append(host);root=createRoot(host);
+ const render=theme=><ForgeThemeProvider themeId={theme} mode="light"><ForgeThemeBoundary><BasicTable container={container} context={context} columns={[{id:'name',name:'Name'}]}/></ForgeThemeBoundary></ForgeThemeProvider>;
+ try {
+  await act(async()=>root.render(render('baseline')));
+  expect(host.querySelector('.forge-list-page')).toBeNull();
+  expect(host.querySelector('.forge-toolbar-select-trigger')).not.toBeNull();
+  await act(async()=>root.render(render('design-system-2')));
+  expect(host.querySelector('.forge-list-page h1').textContent).toBe('Records');
+  expect(host.querySelector('.forge-list-page__period').textContent).toContain('Month:');
+  expect(host.querySelector('input[placeholder="Search records"]')).not.toBeNull();
+  await act(async()=>host.querySelector('[aria-label="Starred view"]').click());
+  expect(context.signals.windowForm.peek().view).toBe('starred');
+  expect(host.querySelector('[aria-label="Starred view"]').getAttribute('aria-pressed')).toBe('true');
+  await act(async()=>host.querySelector('[data-testid="toolbar-btn-settings"]').click());
+  expect(document.querySelector('.bp6-drawer.forge-table-settings')).not.toBeNull();
+ } finally {
+  await act(async()=>root.unmount());root=null;windowContext.dispose();
+ }
 });
 
 it('uses native breadcrumb renderers with the existing dropdown and selection callbacks',async()=>{
@@ -58,6 +367,46 @@ it('uses native breadcrumb renderers with the existing dropdown and selection ca
  await act(async()=>[...host.querySelectorAll('button')].find(node=>node.textContent==='Design foundations').click());
  await act(async()=>[...document.querySelectorAll('.bp6-menu-item')].find(node=>node.textContent==='Component library').click());
  expect(select).toHaveBeenCalledOnce();
+});
+
+it('reuses table Customize in the drawer catalog and discards cancelled column edits',async()=>{
+ await mount(findComponent('drawer'),{variant:'Customize view'});
+ await act(async()=>[...host.querySelectorAll('button')].find(node=>node.textContent==='Open drawer').click());
+ const drawer=document.querySelector('.bp6-drawer.forge-table-settings');
+ expect(drawer).not.toBeNull();
+ expect([...drawer.querySelectorAll('.forge-drawer-actions button')].map(button=>button.textContent)).toEqual(['Cancel','Apply']);
+ const view=name=>[...drawer.querySelectorAll('[role="option"]')].find(node=>node.textContent===name);
+ expect(view('Default').getAttribute('aria-selected')).toBe('true');
+ await act(async()=>view('All Columns').querySelector('.bp6-menu-item').click());
+ expect(view('All Columns').getAttribute('aria-selected')).toBe('true');
+ expect(view('Default').getAttribute('aria-selected')).toBe('false');
+ await act(async()=>view('Default').querySelector('.bp6-menu-item').click());
+ expect(view('Default').getAttribute('aria-selected')).toBe('true');
+ const owner=()=>[...document.querySelectorAll('.forge-list-page-drawer label')].find(node=>node.textContent==='Owner').querySelector('input');
+ expect(owner().checked).toBe(true);
+ await act(async()=>owner().click());
+ await act(async()=>[...drawer.querySelectorAll('button')].find(node=>node.textContent==='Cancel').click());
+ await act(async()=>[...host.querySelectorAll('button')].find(node=>node.textContent==='Open drawer').click());
+ expect(owner().checked).toBe(true);
+ expect(document.querySelector('.forge-list-page-drawer input:disabled').checked).toBe(true);
+});
+
+it('reuses table Filter in the drawer catalog and commits the selected options through Apply',async()=>{
+ await mount(findComponent('drawer'),{variant:'Filter view'});
+ await act(async()=>[...host.querySelectorAll('button')].find(node=>node.textContent==='Open drawer').click());
+ const drawer=()=>document.querySelector('.bp6-drawer.forge-filter-dialog');
+ expect(drawer()).not.toBeNull();
+ await act(async()=>[...drawer().querySelectorAll('button')].find(node=>node.textContent==='Status').click());
+ const apply=()=>[...drawer().querySelectorAll('button')].find(node=>node.textContent==='Apply');
+ expect(apply().disabled).toBe(true);
+ const ready=()=>[...drawer().querySelectorAll('label')].find(node=>node.textContent==='Ready').querySelector('input');
+ await act(async()=>ready().click());
+ expect(apply().disabled).toBe(false);
+ await act(async()=>apply().click());
+ await act(async()=>[...host.querySelectorAll('button')].find(node=>node.textContent==='Open drawer').click());
+ await act(async()=>[...drawer().querySelectorAll('button')].find(node=>node.textContent==='Status').click());
+ expect(ready().checked).toBe(true);
+ expect([...drawer().querySelectorAll('.forge-drawer-actions button')].map(button=>button.textContent)).toEqual(['Cancel','Apply']);
 });
 
 it('switches sibling documents through each native breadcrumb dropdown',async()=>{
@@ -90,6 +439,43 @@ it('lets users revisit stepper steps without inventing completion and retains va
  expect(steps[2].dataset.stepStatus).toBe('pending');
  await mount(findComponent('stepper'),{state:'Missing information'});
  expect(host.querySelector('[data-step-status="missing"]').getAttribute('aria-label')).toContain('Missing information');expect(host.querySelector('.forge-stepper__status')).toBeNull();
+});
+
+it('shows native Workspace close and expand actions without touching real windows',async()=>{
+ await mount(findComponent('tab-list'),{variant:'Workspace'});
+ expect(host.querySelectorAll('.forge-window-tab-action[aria-label^="Close "]')).toHaveLength(3);
+ const expand=host.querySelector('[aria-label="Expand Overview"]');
+ expect(expand.querySelector('svg')).not.toBeNull();
+ await act(async()=>expand.click());
+ expect(host.querySelector('[role="status"]').textContent).toBe('Expand requested for Overview.');
+ expect(host.querySelector('[role="tab"][aria-selected="true"]').textContent).toContain('Overview');
+ await act(async()=>host.querySelector('[aria-label="Close Activity"]').click());
+ expect(host.querySelectorAll('[role="tab"]')).toHaveLength(2);
+ expect(host.querySelector('[role="tab"][aria-selected="true"]').textContent).toContain('Overview');
+ await act(async()=>host.querySelector('[aria-label="Close Overview"]').click());
+ const selected=host.querySelector('[role="tab"][aria-selected="true"]');
+ expect(selected.textContent).toContain('Settings');
+ expect(host.querySelector('[role="tabpanel"]').getAttribute('aria-labelledby')).toBe(selected.id);
+ await act(async()=>host.querySelector('[aria-label="Close Settings"]').click());
+ expect(host.querySelectorAll('[role="tab"]')).toHaveLength(0);
+ await act(async()=>[...host.querySelectorAll('button')].find(button=>button.textContent==='Restore example tabs').click());
+ expect(host.querySelectorAll('[role="tab"]')).toHaveLength(3);
+ await mount(findComponent('tab-list'),{variant:'Workspace',state:'Disabled'});
+ expect([...host.querySelectorAll('.forge-window-tab-action')].every(button=>button.disabled)).toBe(true);
+});
+
+it('keeps Contained tabs on the native panel owner with selection and disabled semantics',async()=>{
+ await mount(findComponent('tab-list'),{variant:'Contained'});
+ const tabs=[...host.querySelectorAll('.forge-form-panel-tabs [role="tab"]')];
+ expect(tabs).toHaveLength(3);
+ expect(tabs[0].getAttribute('aria-selected')).toBe('true');
+ await act(async()=>tabs[1].click());
+ expect(tabs[1].getAttribute('aria-selected')).toBe('true');
+ const panel=host.querySelector('[role="tabpanel"]');
+ expect(panel.getAttribute('aria-labelledby')).toBe(tabs[1].id);
+ expect(panel.textContent).toContain('Recent updates');
+ await mount(findComponent('tab-list'),{variant:'Contained',state:'Disabled'});
+ expect([...host.querySelectorAll('[role="tab"]')].every(tab=>tab.getAttribute('aria-disabled')==='true')).toBe(true);
 });
 
 it('uses the native tab keyboard path and exposes distinct Top Nav utilities and disabled states',async()=>{
@@ -144,7 +530,7 @@ it('uses the native right-side drawer sizing and supports filter drilldown',asyn
  await act(async()=>drawer.querySelector('input[type="checkbox"]').click());
  expect([...drawer.querySelectorAll('button')].find(n=>n.textContent==='Apply').disabled).toBe(false);
  await act(async()=>drawer.querySelector('[aria-label="Back to filters"]').click());
- expect(drawer.textContent).toContain('Filter view');
+ expect(drawer.textContent).toContain('Filter View');
 });
 
 it('uses distinct native toast intent icons and can restore a dismissed notification',async()=>{
@@ -153,6 +539,23 @@ it('uses distinct native toast intent icons and can restore a dismissed notifica
  }
  await mount(findComponent('toast'),{state:'Dismissed'});expect(host.querySelector('.bp6-toast')).toBeNull();
  await act(async()=>host.querySelector('button').click());expect(host.querySelector('.bp6-toast')).not.toBeNull();
+});
+
+it('removes and restores standalone values and preserves disabled category tags',async()=>{
+ const spec=findComponent('filter-chips');
+ await mount(spec,{variant:'Removable Chip'});
+ expect(host.querySelector('.forge-removable-chip').textContent).toContain('Workspace: 3 Selected');
+ await act(async()=>host.querySelector('.forge-removable-chip').click());
+ expect(host.querySelector('.forge-removable-chip')).not.toBeNull();
+ await act(async()=>host.querySelector('button[aria-label="Remove Workspace"]').click());
+ expect(host.querySelector('.forge-removable-chip')).toBeNull();
+ await act(async()=>host.querySelector('button').click());
+ expect(host.querySelector('.forge-removable-chip')).not.toBeNull();
+ await mount(spec,{variant:'Removable Chip',state:'Disabled'});
+ const remove=host.querySelector('button[aria-label="Remove Workspace"]');
+ expect(remove.disabled).toBe(true);
+ await act(async()=>remove.click());
+ expect(host.querySelector('.forge-removable-chip')).not.toBeNull();
 });
 
 it('uses the native Toast action and timeout APIs for close and automatic dismissal',async()=>{
@@ -354,6 +757,48 @@ it('assembles a component page with all documentation sections and an actual sta
  }finally{scroll.mockRestore();}
 });
 
+it('keeps Table configurations and current state presets distinct and labels the rendered columns accurately',async()=>{
+ const scroll=vi.spyOn(window,'scrollTo').mockImplementation(()=>{});
+ host=document.createElement('div');document.body.append(host);root=createRoot(host);
+ try{
+  await act(async()=>root.render(<ComponentCatalog route="components/table" mode="light" onModeChange={()=>{}}/>));
+  const configuration=host.querySelector('[aria-label="Preview variant"]'),state=host.querySelector('[aria-label="Preview state"]');
+  const preview=()=>host.querySelector('[data-example-id=table]');
+  const choose=async(node,value)=>act(async()=>{node.value=value;node.dispatchEvent(new Event('change',{bubbles:true}));});
+  expect(configuration.closest('label').textContent).toMatch(/^Configuration/);
+  expect(configuration.value).toBe('Text and IDs');
+  await choose(configuration,'Numbers and dates');
+  expect(preview().querySelector('th[data-column-id=amount]')).not.toBeNull();
+  await choose(state,'Validation error');
+  expect(configuration.value).toBe('Editable cells');
+  expect(preview().querySelector('input[aria-label="Email 1001"]').getAttribute('aria-invalid')).toBe('true');
+  expect([...preview().querySelectorAll('button')].find(x=>x.textContent==='Apply changes').disabled).toBe(true);
+  await choose(configuration,'Header types');
+  expect(state.value).toBe('Default');
+  expect(preview().querySelector('[data-col=email]')).toBeNull();
+  await choose(state,'Row selected');
+  expect(configuration.value).toBe('Header types');
+  expect(preview().querySelector('input[aria-label="Select row"]').checked).toBe(true);
+  expect(preview().querySelector('tfoot').textContent).toContain('1 selected');
+  await choose(state,'Load error');
+  expect(preview().querySelector('[role=alert]').textContent).toContain('could not be loaded');
+  await choose(state,'Empty');
+  expect(preview().textContent).toContain('No records to display');
+  expect(preview().querySelectorAll('tbody tr:has([data-col=id])')).toHaveLength(0);
+  await choose(configuration,'Dropdown and Switch');
+  await choose(state,'Read only');
+  expect(configuration.value).toBe('Dropdown and Switch');
+  expect(preview().querySelector('button[aria-label="Status 1001"]').disabled).toBe(true);
+  expect(preview().querySelector('button[aria-label="Verified 1001"]').disabled).toBe(true);
+  await choose(configuration,'Text and IDs');
+  expect(state.value).toBe('Read only');
+  const star=preview().querySelector('button[aria-label="Toggle starred record"]');
+  expect(star.disabled).toBe(false);
+  await act(async()=>star.click());
+  expect(preview().querySelector('button[aria-label="Toggle starred record"]').getAttribute('aria-pressed')).toBe('false');
+ }finally{scroll.mockRestore();}
+});
+
 
 it('shows the loaded semantic collection and derives renderer bindings from its actual stylesheet',async()=>{
  const style=document.createElement('style');
@@ -427,4 +872,36 @@ it('offers Small only for icon buttons and reuses the native compact icon API',a
   expect(host.querySelector('#component-overview .forge-button--icon-only').dataset.forgeSize).toBe('compact');
   expect(host.querySelectorAll('.catalog-state-grid .forge-button--icon-only[data-forge-size="compact"]').length).toBe(findComponent('icon-button').states.length);
  }finally{scroll.mockRestore();}
+});
+
+it('composes native discovery search and topic filters without replacing the rail cards',async()=>{
+ await mount(findComponent('card-rail-group'),{variant:'With filters'});
+ const input=host.querySelector('input[aria-label="Search resources"]');
+ expect(input?.type).toBe('search');
+ const topic=[...host.querySelectorAll('.forge-filter-chips button')].find(button=>button.textContent==='Design');
+ await act(async()=>topic.click());
+ expect(topic.getAttribute('aria-pressed')).toBe('true');
+ expect([...new Set([...host.querySelectorAll('.forge-content-card h3')].map(node=>node.textContent))]).toEqual(['Foundation guide','Component anatomy','Field patterns']);
+ await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'Keyboard');input.dispatchEvent(new Event('input',{bubbles:true}));});
+ expect(host.textContent).toContain('No resources match these filters.');
+ await act(async()=>topic.click());
+ expect([...new Set([...host.querySelectorAll('.forge-content-card h3')].map(node=>node.textContent))]).toEqual(['Keyboard navigation']);
+});
+
+it('uses the native data boundary error and retry path in the library',async()=>{
+ await mount(findComponent('data-state'),{state:'Error'});
+ expect(host.querySelector('[role="alert"]')).not.toBeNull();
+ const retry=host.querySelector('button[aria-label="Retry"]');
+ expect(retry).toBeTruthy();
+ await act(async()=>retry.click());
+ expect(host.querySelector('[role="alert"]')).toBeNull();
+ expect(host.querySelector('[data-forge-data-state="ready"]')).not.toBeNull();
+ expect(host.querySelector('[aria-busy="true"]')).toBeNull();
+ expect(host.textContent).toContain('Browse shared resource collections.');
+});
+
+it('shows the native empty collection after the library datasource has finished loading',async()=>{
+ await mount(findComponent('data-state'),{state:'Empty'});
+ expect(host.textContent).toContain('No resources yet.');
+ expect(host.querySelector('[aria-busy="true"]')).toBeNull();
 });

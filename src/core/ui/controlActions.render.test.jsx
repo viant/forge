@@ -217,6 +217,22 @@ it('text lookup returns pending declared interaction and applies only the normal
  await act(async()=>{dialog.value={open:false};finish({name:'Selected'});for(let i=0;i<10;i++)await Promise.resolve();});expect(f.form.peek().name).toBe('Selected');expect(readRegisteredControlActions({windowId:'operate-render',controlId:'lookup-name'}).controls[0].operationState.status).toBe('handler_completed');
  getMetadataSignal('operate-render').value={};
 });
+it('text lookup edits use the authored change path and picker selection applies mapped outputs', async () => {
+ const f=fixture();
+ f.form.value={name:'Selected',publisherId:42};
+ const changed=vi.fn(()=>{f.form.value={...f.form.peek(),publisherId:null};});
+ f.context.handlers.lookup={open:vi.fn(async()=>({id:42,name:'Selected'}))};
+ const item={id:'exchange',type:'lookup',dataField:'name',lookup:{valueField:'name',outputs:[{location:'id',name:'publisherId'},{location:'name',name:'name'}]},on:[{event:'onChange',handler:'test.change'}]};
+ await act(async()=>root.render(<WidgetRenderer item={item} context={f.context} events={{onChange:changed}}/>));
+ await act(async()=>{await operate('exchange','setValue',{value:'Typed'});});
+ expect(f.form.peek()).toEqual({name:'Typed',publisherId:null});
+ await act(async()=>{await operate('exchange','setValue',{value:'Selected'});});
+ expect(f.form.peek()).toEqual({name:'Selected',publisherId:null});
+ expect(changed).toHaveBeenCalledTimes(2);
+ await act(async()=>{await operate('exchange','click');});
+ expect(f.form.peek()).toEqual({name:'Selected',publisherId:42});
+ expect(changed).toHaveBeenCalledTimes(2);
+});
 it('toolbar select/boolean/menu actions use normal callbacks and reject unknown or disabled choices',async()=>{
  const f=fixture(),changed=vi.fn(),menu=vi.fn();f.context.signals.control=signal({});f.context.signals.formStatus=signal({});f.context.signals.selection=signal({});f.context.signals.windowForm=signal({});f.context.signals.message=signal([]);f.context.lookupHandler=name=>name==='test.menu'?menu:changed;
  const items=[{id:'choice',type:'select',field:'choice',options:[{value:'a',label:'A'},{value:'b',disabled:true}],on:[{event:'onChange',handler:'test.change'}]},{id:'flag',type:'checkbox',on:[{event:'onChange',handler:'test.change'}]},{id:'actions',type:'menu',label:'Actions',menuItems:[{id:'go',label:'Go',on:[{event:'onClick',handler:'test.menu'}]},{id:'blocked',disabled:true,label:'Blocked',on:[{event:'onClick',handler:'test.menu'}]}]}];

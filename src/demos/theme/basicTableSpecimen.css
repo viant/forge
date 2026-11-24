@@ -1,0 +1,7 @@
+.catalog-native-table{width:100%;min-width:0;min-height:0}
+.catalog-native-table>.basic-table-wrapper{max-width:100%;min-height:0!important}
+.catalog-native-table .basic-table-scroll{max-height:calc(var(--forge-control-height)*9);min-height:0!important}
+.catalog-native-table .forge-table-edit-review{inset-block-end:calc(var(--forge-control-height) + var(--forge-spacing-4))}
+.catalog-native-table .catalog-caption{padding-inline:var(--forge-spacing-3)}
+.catalog-native-table .catalog-table-choice-cell{display:flex;align-items:center;min-width:0;height:100%;min-height:var(--forge-control-height);line-height:var(--forge-type-body-line-height)}
+.catalog-native-table .catalog-table-choice-cell>.bp6-popover-target{width:auto;min-width:0;max-width:100%}
