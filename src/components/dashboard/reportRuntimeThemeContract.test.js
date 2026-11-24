@@ -35,10 +35,10 @@ for (const role of [
 }
 
 assert.ok(runtime.includes('forge-report-runtime-panel'));
-assert.ok(runtime.includes('var(--forge-report-surface, #ffffff)'));
+assert.match(runtime, /var\(--forge-report-surface(?:\s*,|\))/);
 assert.ok(runtime.includes('forge-report-runtime-kpi-value'));
-assert.ok(runtime.includes('var(--forge-report-status-danger-foreground, #a82a2a)'));
-assert.doesNotMatch(runtime, /fontSize:\s*(?:10|11|12|13|14|15|16|18|24|28)\b/);
+assert.match(runtime, /var\(--forge-report-status-danger-foreground(?:\s*,|\))/);
+assert.doesNotMatch(runtime, /fontSize:\s*(?:\d|\.\d)/);
 assert.doesNotMatch(runtime, /borderLeft:\s*[`"](?:[3-9]|[1-9]\d+)px\s+solid/);
 
 const unthemedRuntimeColorLines = runtime
@@ -46,14 +46,12 @@ const unthemedRuntimeColorLines = runtime
     .filter((line) => /#[0-9a-f]{3,8}\b/i.test(line) && !line.includes('var(--forge-report-'));
 assert.deepEqual(unthemedRuntimeColorLines, [], `unthemed report runtime colors:\n${unthemedRuntimeColorLines.join('\n')}`);
 
-assert.ok(dashboardStyles.includes('background: var(--forge-report-canvas, #f3f6f9)'));
-assert.ok(dashboardStyles.includes('font-size: var(--forge-report-type-metric-size, 28px)'));
-assert.ok(dashboardStyles.includes('font-size: var(--forge-report-type-metric-size, 25px)'));
-assert.ok(dashboardStyles.includes('var(--forge-report-status-success-background, #e7f7ef)'));
-assert.ok(tabStyles.includes('var(--forge-report-text-muted, #486579)'));
-assert.ok(tabStyles.includes('var(--forge-report-selected, rgba(47, 109, 225, 0.045))'));
-assert.ok(tabStyles.includes('border-bottom-color: var(--forge-tab-active-color, var(--forge-report-action, #215db0))'));
-assert.ok(tabStyles.includes('box-shadow: none'));
+assert.match(dashboardStyles, /background:\s*var\(--forge-report-canvas(?:\s*,|\))/);
+assert.match(dashboardStyles, /font\-size:\s*var\(--forge-report-type-metric-size(?:\s*,|\))/);
+assert.match(dashboardStyles, /var\(--forge-report-status-success-background(?:\s*,|\))/);
+assert.match(tabStyles, /var\(--forge-report-text-muted(?:\s*,|\))/);
+assert.match(tabStyles, /var\(--forge-report-selected(?:\s*,|\))/);
+assert.match(tabStyles, /border\-bottom\-color:\s*var\(--forge-tab-active-color(?:\s*,|\))/);
 
 console.log('report runtime semantic theme contract passed');
 const documentStyles=fs.readFileSync(new URL('./reportDocument.css',import.meta.url),'utf8');

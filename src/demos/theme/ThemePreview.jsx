@@ -14,6 +14,7 @@ import '../../../../agently-core/protocol/ui/theme/testdata/baseline.css';
 
 function App() {
     const [mode, setMode] = useState('light');
+    const [themeId, setThemeId] = useState('baseline');
     const [portalRoot, setPortalRoot] = useState(null);
     const [portalStatus, setPortalStatus] = useState('Not checked');
     const [active, setActive] = useState(true);
@@ -23,7 +24,8 @@ function App() {
     const input = (id, widget, more = {}) => <WidgetRenderer key={id} state={state}
         item={{id, label: id, widget, scope: 'local', ...more}} container={{layout: {columns: 1}}} />;
     return <>
-        <div style={{display: 'flex', gap: 12, padding: 16}}>
+        <div style={{display: 'flex', flexWrap: 'wrap', gap: 12, padding: 16}}>
+            <label>Theme identifier <input aria-label="Theme identifier" value={themeId} onChange={event => setThemeId(event.target.value)}/></label>
             <Button onClick={() => setMode(mode === 'light' ? 'dark' : 'light')}>Switch mode</Button>
             <Button onClick={() => setUnwrapped(!unwrapped)}>Toggle wrapper</Button>
             <Button onClick={() => setActive(!active)}>Toggle surface</Button>
@@ -31,13 +33,13 @@ function App() {
         <div ref={setPortalRoot} data-custom-portal-host className="custom-portal-owner" />
         <Button onClick={() => setPortalStatus(portalRoot?.className === 'custom-portal-owner' && (active ? !!portalRoot.querySelector('[data-forge-theme-portal]') : portalRoot.childElementCount === 0) ? (active ? 'Custom portal scope is attached; owner attributes preserved' : 'Portal scope removed; caller mount preserved') : 'Custom portal check failed')}>Check custom portal</Button>
         <p role="status">{portalStatus}</p>
-        <ForgeThemeProvider themeId="baseline" mode={mode} portalContainer={portalRoot}>
+        <ForgeThemeProvider themeId={themeId} mode={mode} portalContainer={portalRoot}>
             {active && <ForgeThemeBoundary windowKey="theme-proof?instance=1">
                 <FoundationSpecimen/>
                 <TypographySpecimen/>
                 <ChartSpecimen/>
                 <div style={{padding: 24, display: 'grid', gap: 16, maxWidth: 500}}>
-                    {input('customer', 'text', {wrapper: unwrapped ? 'none' : undefined})}
+                    {input('customer', 'text', {wrapper: unwrapped ? 'none' : undefined, properties: {typographyRole:'body'}})}
                     {input('amount', 'number')}
                     {input('notes', 'textarea')}
                     {input('disabled', 'text', {disabled: true})}

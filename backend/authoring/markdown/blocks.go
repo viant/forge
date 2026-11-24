@@ -5,6 +5,35 @@ import (
 	"strings"
 )
 
+// VisitFences visits complete named top-level fences in source order, including
+// repeated names. Literal examples inside another code fence remain untouched.
+func VisitFences(body string, visit func(name string, body []byte) error, names ...string) error {
+	allowed := map[string]bool{}
+	for _, name := range names {
+		allowed[name] = true
+	}
+	lines := strings.Split(body, "\n")
+	var fence byte
+	length, start := 0, 0
+	name := ""
+	for i, line := range lines {
+		next, nextLength := nextFence(line, fence, length)
+		if fence == 0 && next != 0 {
+			start = i
+			name = strings.TrimSpace(strings.TrimLeft(line, " ")[nextLength:])
+		} else if fence != 0 && next == 0 && allowed[name] {
+			if err := visit(name, []byte(strings.Join(lines[start+1:i], "\n"))); err != nil {
+				return err
+			}
+		}
+		fence, length = next, nextLength
+	}
+	if fence != 0 && allowed[name] {
+		return fmt.Errorf("unterminated %s fence", name)
+	}
+	return nil
+}
+
 // ExtractFences removes only explicitly named top-level fences. It shares the
 // role-document fence lexer, preserving ordinary and nested literal examples.
 func ExtractFences(body string, names ...string) (string, map[string][]byte, error) {

@@ -1,9 +1,31 @@
 package markdown
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
+
+func TestVisitFencesPreservesLiteralBoundariesAndRepeatedNames(t *testing.T) {
+	body := "````text\n```contract\nliteral\n```\n````\n~~~contract\nfirst\n~~~\n```contract\nsecond\n```\n```text\nunfinished ordinary example"
+	var values []string
+	if err := VisitFences(body, func(name string, raw []byte) error {
+		values = append(values, name+":"+string(raw))
+		return nil
+	}, "contract"); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(values, ",") != "contract:first,contract:second" {
+		t.Fatalf("unexpected named fences: %v", values)
+	}
+	if err := VisitFences("```contract\nx", func(string, []byte) error { return nil }, "contract"); err == nil {
+		t.Fatal("unterminated named fence accepted")
+	}
+	rejected := errors.New("invalid structured content")
+	if err := VisitFences("```contract\nx\n```", func(string, []byte) error { return rejected }, "contract"); !errors.Is(err, rejected) {
+		t.Fatalf("visitor error lost: %v", err)
+	}
+}
 
 func TestNamedFencesShareLiteralCodeBoundaries(t *testing.T) {
 	body := "````text\n```contract\nliteral\n```\n````\n~~~contract\n{type: object}\n~~~\nRead this."

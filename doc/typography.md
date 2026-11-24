@@ -15,6 +15,33 @@ The renderer supplies generic behavior, semantic hooks and neutral fallback
 recipes. Workspaces supply palettes, font assets, reviewed values, business
 content and variant selection. Customer styling never belongs in shared code.
 
+## Checking theme contracts
+
+Shared appearance checks must follow the selected theme's semantic roles. Test
+that supplied colors, typography, spacing and control roles reach the rendered
+component, including light/dark changes and owned portals. Resolve CSS aliases,
+relative units and color serialization in the browser rather than copying a
+current palette or pixel value into a general assertion.
+
+Keep role-binding guards independent of fallback values. A supported neutral
+fallback may change without removing the primary role; replacing that role with
+a fixed component value must still fail. Exact appearance expectations belong
+to an explicitly named theme or independently authored fixture, not every theme.
+The existing theme preview accepts a theme identifier so the native provider can
+be exercised with Baseline, the DS2 profile and contrasting synthetic values.
+
+Keep behavior checks: keyboard and focus, disabled/invalid states, retained edits,
+selection, sorting, paging, loading, responsive fit, readable touch targets,
+reduced motion and report/data correctness. Authored column widths, synthetic
+probe values and accessibility minima are test inputs or behavior contracts;
+they are not a universal visual palette. Preserve supported legacy behavior.
+
+`npm run test:workspace-theme` runs the role checks and browser theme matrix;
+`npm run test:schema-form-layout` retains form layout coverage. Both already run
+in the design-system workflow. These checks supplement the existing CSS color
+role guard and focused typography guards; they do not claim an exhaustive lint
+of every style declaration.
+
 ## Editable theme packages
 
 Use the existing style-resource definition as the portable design package:
