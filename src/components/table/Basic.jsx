@@ -429,9 +429,9 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
             ? convertWidthsToPct(visibleColumns, tableWidth)
             : preserveDeclaredColumnWidths(visibleColumns);
         const hasColumnOverflow = tableWidth > 0 && scrollableTableWidth(sizedColumns) > tableWidth + 1;
-        // List pages honor the producer's identity-column group at every width.
-        // Their responsive metadata owns which columns remain in narrow layouts.
-        const nextColumns = withStickyColumnOffsets(hasColumnOverflow ? sizedColumns : sizedColumns.map(column => ({...column, sticky: false})), listPage ? 0 : tableWidth);
+        // DS2 tables honor the producer's identity group at every width.
+        // Responsive column metadata owns the available narrow-layout columns.
+        const nextColumns = withStickyColumnOffsets(hasColumnOverflow ? sizedColumns : sizedColumns.map(column => ({...column, sticky: false})), isDesignSystem2 ? 0 : tableWidth);
         const nextSignature = stableColumnsSignature(nextColumns);
         if (enforceColumnSize && tableWidth > 0) {
             setColumnsToUse((previousColumns) => (
@@ -446,7 +446,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
                 ? previousColumns
                 : nextColumns
         ));
-    }, [enforceColumnSize, tableWidth, visibleColumns, listPage]);
+    }, [enforceColumnSize, tableWidth, visibleColumns, isDesignSystem2]);
     const trailingSpace = container.table?.fillRemainingWidth === true ? tableTrailingSpace(columnsToUse,tableWidth) : null;
     const fillerWidth = trailingSpace?.fillerWidth || 0;
     const resolvedTableWidth = enforceColumnSize ? '100%' : `${scrollableTableWidth(columnsToUse, tableWidth)}px`;
@@ -714,8 +714,8 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
     const selectedCount=context.signals.selection?.value?.selection?.length || 0;
     const countParts=collectionCountParts(info,sortedCollection,{properties:{pluralLabel:container.title || 'records',singularLabel:container.title || 'record'}});
     const summaryLabel = loading && !appending ? 'Loading rows…' : error && !appending ? 'Rows could not be loaded' : <>Summary: <span data-forge-value-type="number">{countParts.count}</span> {countParts.label}{selectedCount?<>{' · '}<span data-forge-value-type="number">{selectedCount}</span> selected</>:''}</>;
-    const columnSummary = listPage && typeof renderSummaryCell === 'function' && !renderRows && !showEmptyState;
-    const TableScrollArea = listPage ? ScrollArea : 'div';
+    const columnSummary = isDesignSystem2 && typeof renderSummaryCell === 'function' && !renderRows && !showEmptyState;
+    const TableScrollArea = isDesignSystem2 ? ScrollArea : 'div';
     const tableSurface = (
         <div
             className={`basic-table-wrapper${catalogPresentation ? ' is-catalog-presentation' : ''}${!catalogPresentation && container.table?.fullWidth !== true && !container.table?.width ? ' is-content-width' : ''}${rowSlots.rowHeight ? ' has-fixed-row-slots' : ''}${String(effectiveDensity || '').toLowerCase() === 'compact' ? " is-compact-density" : ""}${loadingMode === 'refresh' ? " is-refreshing" : ""}${showEmptyState ? " has-metadata-empty-state" : ""}${horizontalOverflow.left ? " has-table-overflow-left" : ""}${horizontalOverflow.right ? " has-table-overflow-right" : ""}`}
@@ -752,7 +752,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
             {showEmptyState ? (
                 <TableEmptyState context={context} config={resolvedEmptyState}/>
             ) : (
-                <TableScrollArea aria-busy={listPage && loading || undefined} className={`basic-table-scroll${renderRows ? ' has-responsive-cards' : ''}`} ref={scrollRef} tabIndex={0} aria-label="Table data; scroll horizontally for more columns">
+                <TableScrollArea aria-busy={isDesignSystem2 && loading || undefined} className={`basic-table-scroll${renderRows ? ' has-responsive-cards' : ''}`} ref={scrollRef} tabIndex={0} aria-label="Table data; scroll horizontally for more columns">
                     {renderRows ? renderRows({
                         rows: renderedCollection,
                         columns: columnsToUse,
@@ -786,7 +786,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
                         backfillCount={backfillCount}
                         loading={loading}
                         error={error}
-                        rowSkeletons={listPage}
+                        rowSkeletons={isDesignSystem2}
                         appending={appending}
                         enforceColumnSize={enforceColumnSize}
                         onShowFullContent={handleShowFullContent}
@@ -798,7 +798,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
                 </TableScrollArea>
             )}
 
-            {!listPage && loadingMode === 'refresh' ? (
+            {!isDesignSystem2 && loadingMode === 'refresh' ? (
                 <div className="table-refresh-indicator" role="status" aria-live="polite">
                     <Spinner size={14} />
                     <span>Refreshing rows…</span>
@@ -838,7 +838,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
         </div>
     );
     if (!listPage) return tableSurface;
-    const pageItems = primaryToolbarItems.filter(item => !['tableExport','refresh'].includes(item.type) && item.id !== 'refresh').map(item => {
+    const pageItems = primaryToolbarItems.filter(item => item.type !== 'refresh' && item.id !== 'refresh').map(item => {
         if (item.intent === 'primary' && item.label && item.hideLabel !== true) return {...item, hideLabel: false, icon: ['add', 'plus', 'lucide:plus'].includes(item.icon) ? undefined : item.icon};
         if (item.appearance === 'starred-toggle' || item.type === 'quickSearch') return {...item, align: 'right'};
         if (['settings','filterList'].includes(item.id)) return {...item, align: 'right', appearance: 'minimal', tooltip: item.id === 'filterList' ? 'Filter view' : item.tooltip, icon: item.id === 'settings' ? 'lucide:sliders-horizontal' : 'lucide:funnel'};

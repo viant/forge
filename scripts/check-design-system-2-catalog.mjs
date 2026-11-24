@@ -13,7 +13,7 @@ try {
         await page.goto(base, {waitUntil: 'networkidle'});
         await page.getByRole('heading', {name: 'Browse the library', exact: true}).waitFor();
         if (mode === 'dark') await page.getByRole('button', {name: 'View dark theme'}).click();
-        assert.equal(referenceComponents.length, 88);
+        assert.equal(referenceComponents.length, 87);
         assert.equal(await page.locator('.catalog-tile').count(), componentCatalog.length);
         assert.equal(await page.locator('.catalog-family').count(), 12);
         const links = await page.locator('.catalog-tile-label').evaluateAll(nodes => nodes.map(node => node.hash));
@@ -51,7 +51,7 @@ try {
     await page.getByRole('heading', {name: 'Date Input', exact: true}).waitFor();
     assert.equal(await page.getByRole('button', {name: 'Toggle component navigation'}).getAttribute('aria-expanded'), 'false');
     if (output) await page.screenshot({path: `${output}/phone-component-detail.png`});
-    console.log('Catalog: 88 retained reference entries, Forge additions, light/dark, search, documentation, live states and phone navigation passed.');
+    console.log('Catalog: 87 retained reference entries, Forge additions, light/dark, search, documentation, live states and phone navigation passed.');
 } finally {
     await browser.close();
 }

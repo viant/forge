@@ -376,7 +376,7 @@ const CurrencyInput = getWidget('currency');
 for (const [name, renderWidget] of [
     ['text', (props) => {
         const textWidget = TextInput(props);
-        return textWidget.type(textWidget.props);
+        return inspectWidget(textWidget.type, textWidget.props);
     }],
     ['number', (props) => NumberInput(props)],
     ['currency', (props) => CurrencyInput(props)],

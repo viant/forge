@@ -3945,6 +3945,20 @@
             "field",
             "format"
           ],
+          "allOf": [
+            {
+              "if": {
+                "required": [
+                  "hideExactOne"
+                ]
+              },
+              "then": {
+                "required": [
+                  "divideBy"
+                ]
+              }
+            }
+          ],
           "properties": {
             "field": {
               "type": "string",
@@ -3978,6 +3992,12 @@
                   ]
                 }
               }
+            },
+            "divideBy": {
+              "const": "center"
+            },
+            "hideExactOne": {
+              "type": "boolean"
             }
           }
         },
@@ -4015,6 +4035,9 @@
         },
         "seriesField": {
           "type": "string"
+        },
+        "showZeroCategories": {
+          "type": "boolean"
         },
         "preserveCategoryOrder": {
           "type": "boolean"
@@ -6149,6 +6172,20 @@
             "field",
             "format"
           ],
+          "allOf": [
+            {
+              "if": {
+                "required": [
+                  "hideExactOne"
+                ]
+              },
+              "then": {
+                "required": [
+                  "divideBy"
+                ]
+              }
+            }
+          ],
           "properties": {
             "field": {
               "type": "string",
@@ -6182,6 +6219,12 @@
                   ]
                 }
               }
+            },
+            "divideBy": {
+              "const": "center"
+            },
+            "hideExactOne": {
+              "type": "boolean"
             }
           }
         },
@@ -6199,6 +6242,9 @@
           ]
         },
         "stacked": {
+          "type": "boolean"
+        },
+        "showZeroCategories": {
           "type": "boolean"
         },
         "preserveCategoryOrder": {

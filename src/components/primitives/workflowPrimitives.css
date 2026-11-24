@@ -45,6 +45,12 @@
   line-height: 1.35;
 }
 
+.forge-editable-collection__operation-bar.forge-editable-collection__operation-menu {
+  width: auto;
+  margin: 0;
+  gap: var(--forge-spacing-2);
+}
+
 .forge-assignment-picker {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);

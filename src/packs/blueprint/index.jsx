@@ -107,12 +107,16 @@ const defaultSelectItemPredicate = (query, item, _index, exactMatch = false) => 
         : candidates.some((candidate) => candidate.includes(normalizedQuery));
 };
 
-function TextInput({ value = '', onChange, readOnly, fill, ...rest }) {
+function TextInput({ value = '', onChange, readOnly, fill, leftIcon, ...rest }) {
+    const themed = useForgeTheme()?.themeId === 'design-system-2';
     const resolvedFill = resolveFieldTrackFill(rest['data-forge-field-track-control'], fill);
+    const resolvedLeftIcon = themed && typeof leftIcon === 'string' && leftIcon
+        ? <SharedIcon name={leftIcon} className="bp6-icon"/> : leftIcon;
     return (
         <InputGroup
             {...rest}
             fill={resolvedFill}
+            leftIcon={resolvedLeftIcon}
             value={value}
             onChange={(e) => onChange?.(e.target.value)}
             readOnly={readOnly}
@@ -1483,7 +1487,7 @@ export function registerPack() {
     ), { framework: 'blueprint' });
 
     /* -------------------- Button ------------------------------------ */
-    registerWidget('button', ForgeButton, { framework: 'blueprint' });
+    registerWidget('button', props => <ForgeButton {...props}/>, { framework: 'blueprint' });
 
     registerEventAdapter('button', {
         onClick: () => () => {},

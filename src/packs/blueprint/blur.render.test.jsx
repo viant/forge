@@ -5,6 +5,9 @@ import {it,expect,vi} from 'vitest';
 import './index.jsx';
 import WidgetRenderer from '../../runtime/WidgetRenderer.jsx';
 import {useControlEvents} from '../../hooks/event.js';
+import {renderToStaticMarkup} from 'react-dom/server';
+import {getWidget} from '../../runtime/widgetRegistry.jsx';
+import {ForgeThemeProvider} from '../../components/ThemeBoundary.jsx';
 
 it.each(['text','textarea'])('forwards authored %s blur without writing the field',async type=>{
  globalThis.IS_REACT_ACT_ENVIRONMENT=true;
@@ -20,4 +23,22 @@ it.each(['text','textarea'])('forwards authored %s blur without writing the fiel
   await act(async()=>{input.focus();input.blur();});
   expect(verify).toHaveBeenCalledTimes(1);expect(verify.mock.calls[0][0].value).toBe('draft');expect(write).not.toHaveBeenCalled();expect(form.peek().source).toBe('draft');
  }finally{await act(async()=>root.unmount());host.remove();}
+});
+
+
+it.each(['light','dark'])('keeps named input icons theme-scoped in %s mode',mode=>{
+ const Input=getWidget('text');
+ for(const themeId of ['design-system-2','baseline','blueprint']){
+  const html=renderToStaticMarkup(<ForgeThemeProvider themeId={themeId} mode={mode}><Input leftIcon="search" value="Quarterly report" disabled aria-label="Search documents"/></ForgeThemeProvider>);
+  expect(html.includes('lucide-search')).toBe(themeId==='design-system-2');
+  expect(html).toContain('aria-label="Search documents"');
+  expect(html).toContain('value="Quarterly report"');
+  expect(html).toContain('disabled=""');
+ }
+});
+
+it('preserves a caller-supplied leading icon element',()=>{
+ const Input=getWidget('text');
+ const html=renderToStaticMarkup(<ForgeThemeProvider themeId="design-system-2"><Input leftIcon={<span data-custom-leading="true" aria-hidden="true"/>}/></ForgeThemeProvider>);
+ expect(html).toContain('data-custom-leading="true"');
 });
