@@ -4019,6 +4019,11 @@
           "description": "SerializationGroup optionally serializes commands in the same context/window, across writers.",
           "type": "string"
         },
+        "successFormState": {
+          "additionalProperties": {},
+          "description": "SuccessFormState patches the submitting dialog's form after acknowledgement if\nits presentation, authorization and submitted field values are still current.",
+          "type": "object"
+        },
         "successState": {
           "additionalProperties": {},
           "type": "object"
@@ -7767,7 +7772,7 @@
   "$ref": "#/$defs/Window",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "x-forge-provenance": {
-    "baseCommit": "ba4dc99b08de2e688f389373801424d5bea41f55",
+    "baseCommit": "04cdb61b6b96279a7206880ea1e84a383955e9ad",
     "generator": "scripts/window-schema/main.go",
     "sha256": {
       "choice_browser.go": "935cbeddb231dd329374114c5f38454dc7c44c2ab70a45ea3c0f37ce7f3aee26",
@@ -7813,7 +7818,7 @@
       "json_metadata_clone.go": "baa9bde7e567774737f28b87c45a2bb145d9c5b2fadc81da3024578b17c6c09c",
       "local_state_owner.go": "987402ce2487f4b7714a3991c405aab0dda74a573d8690f8f6561d4ce020ab8f",
       "model.go": "4ff4bccce7a6d47c345c2f16fd42e7c73b912960a88ebe8fc077dcd8bd5b4b5f",
-      "mutation_preparation.go": "5f4b247dd0d00f50e703a0a6c3cd1ae2070727a236bb2fad765f7d257931ecee",
+      "mutation_preparation.go": "a8e2cfc462645dfd90c40fc63c274b2c7a1e43beab6166f056419183dc6abd54",
       "parameter_editor.go": "a176f3b63d74714d216daf57ba5c3c3ee8e12aaf8ccf2c0ee1b663c95a657bf6",
       "predicate_composition_editor.go": "881bcf68a5f5e16cae2f58ef7495ac14582398236cfd263cc8585e89f97cab4b",
       "presentation_primitives.go": "4b2fdcf0fffb902dd8a8dee7c17d1075faa5d62ab74e1d2551f29935215905aa",
@@ -7823,7 +7828,7 @@
       "resource_field_attributes.go": "fc2ef49fcc4e88a78849581a9ccbdf62d2968023a5c76282e8b42ec488653c70",
       "resource_invariant.go": "9dee76d65b3161d019c6b446c764b54603416fa7bc5927b87d06bc79ca3687d4",
       "resource_model.go": "f04bef9d5a9594a318c3f547ef502ec943287cc09ac9af32d01fd646f0e6a9b5",
-      "resource_model_validation.go": "cc9cee021998d0b48902c83463e8de1c571f3b553193ecdc2c7351089c30a4e7",
+      "resource_model_validation.go": "b69645ed5cca07d2355529da7c0fc127a53341d103c69425a29d323a6d87fca8",
       "resource_policy_editor.go": "6f3a00bf5ac0751a133fe121e727f5aa2671489dfb07b98a29314cc7a380b8c2",
       "result_preview.go": "bd913237174dc663cf40a5cd30bf5e835ec077930e7f0916f7ce906671f3dbff",
       "rule_editor.go": "3eda2833f57c5a64adec603e42213423907151451998fa4ba538fe258273f6e6",
@@ -7835,7 +7840,7 @@
       "window_reference_manifest.go": "e8245d783f99d3a59143fd1e37e364c040389fa409b457207da567d9112ddb5b",
       "window_resource.go": "a991b091b9b4b45a999cca138fa8f6c0fa90b9ed0dc63bfce2ace576700ca872",
       "window_target_proof.go": "53605c132aae2b8c8d6e377daaae416f347e0ff8c48a39fb2a0f15f95ad5faeb",
-      "workflow_primitives.go": "9cad3d5c71ea823c52cf1f9b016a8039d22598eb72f9e8f21b21364a08212b4d",
+      "workflow_primitives.go": "a85f2ad1d5c328efd4f7c5c17c8291d8901592916eb17f185b76fdcb1d5a0a7f",
       "workspace_summary.go": "d9cf3867d3d3bfa3f65c9fdeccad91d21bd9d2602e066823bb36cbff079c86c1"
     },
     "sourceNote": "Generated from committed canonical Forge authored model and Forge-owned public contracts; SHA-256 identifies every parsed source file."
