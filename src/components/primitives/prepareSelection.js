@@ -150,13 +150,13 @@ export async function openPreparedSelection(context, operation, eligible) {
     applyPrimitiveState(context, {...pending, ...(spec.errorField ? {[spec.errorField]: ''} : {})});
     pendingPublished = Boolean(spec.pendingField);
     attempted = true;
-    const response = await reader.handlers.dataSource.fetchRecords({parameters: input});
+    const invocationId = globalThis.crypto?.randomUUID?.() || 'selection-' + Date.now() + '-' + Math.random();
+    const response = await reader.handlers.dataSource.fetchRecords({parameters: input, cache: {bypassCache: true}, invocationId});
     if (!active()) return {accepted: true, status: 'superseded'};
     const source = context.metadata.dataSource[spec.dataSourceRef];
     const {records} = extractData(source.selectors, undefined, response, true);
     const rows = orderedRows(records, keys, spec.identityField, scope);
     const modelRef = context.metadata.dataSource[destination].resourceModelRef;
-    const invocationId = globalThis.crypto?.randomUUID?.() || 'selection-' + Date.now() + '-' + Math.random();
     const projected = {
       rows, parameters: input, invocationId, ...projectCases(context, spec.mappingRef, rows),
       draftModel: modelRef ? context.metadata.resourceModels?.[modelRef] : null,

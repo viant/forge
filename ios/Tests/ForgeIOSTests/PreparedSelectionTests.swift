@@ -101,6 +101,8 @@ final class PreparedSelectionTests: XCTestCase {
         let result = await runtime.prepareEditableSelection(windowID: id, sourceDataSourceRef: "list", collection: spec, operation: op)
         XCTAssertEqual(result.status, "opened", result.error ?? "")
         let calls = await journal.calls
+        XCTAssertEqual(calls.first?.bypassCache, true)
+        XCTAssertEqual(calls.first?.invocationId, result.invocationId)
         XCTAssertEqual(calls.map(\.dataSourceRef), ["reader"])
         XCTAssertEqual(
             calls.first?.input.parameters,
@@ -205,6 +207,24 @@ private final class SelectionReadProtocol: URLProtocol {
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
+        XCTAssertEqual(request.cachePolicy, .reloadIgnoringLocalCacheData)
+        XCTAssertEqual(request.value(forHTTPHeaderField:"Cache-Control"),"no-cache")
+        var data = request.httpBody ?? Data()
+        if data.isEmpty, let stream = request.httpBodyStream {
+            stream.open()
+            defer { stream.close() }
+            var bytes=[UInt8](repeating:0,count:4096)
+            while true {
+                let count=stream.read(&bytes,maxLength:bytes.count)
+                if count <= 0 { break }
+                data.append(contentsOf:bytes.prefix(count))
+            }
+        }
+        let envelope=(try? JSONDecoder().decode(JSONValue.self,from:data))?.objectValue
+        XCTAssertEqual(envelope?["cache"], .object(["bypassCache":.bool(true)]))
+        XCTAssertNotNil(envelope?["invocationId"]?.stringValue)
+        XCTAssertNil(envelope?["inputs"]?.objectValue?["cache"])
+        XCTAssertNil(envelope?["inputs"]?.objectValue?["invocationId"])
         let target = request.url!.path
         let code = target.contains("denied") ? 403 : 200
         let rows: [[String: Any]] = [
@@ -239,6 +259,19 @@ extension PreparedSelectionTests {
             XCTAssertEqual(rows, [["old": .bool(true)]], route)
             XCTAssertNil(selected.selected, route)
         }
+    }
+
+    func testNilRegisteredResponseIsFinalEvenWhenTheHTTPRouteCouldReturnValidRows() async throws {
+        let (runtime,id,model,op) = try await fixture(httpPath:"/v1/api/datasources/reader/fetch")
+        let requests=PreparedReadLog()
+        await runtime.registerDataSourceLoader { request in await requests.add(request); return nil }
+        let result=await runtime.prepareEditableSelection(windowID:id,sourceDataSourceRef:"list",collection:model,operation:op)
+        XCTAssertEqual(result.status,"failed")
+        XCTAssertEqual(result.error,"Selection reader did not return records.")
+        let calls=await requests.calls
+        XCTAssertEqual(calls.count,1)
+        let form=await runtime.dataSourceForm(windowID:id,dataSourceRef:"draft")
+        XCTAssertEqual(form,["existing":.bool(true)])
     }
 
     func testRenderedWorkflowChecksTheAdmittedActorAndEachSelectedRow() throws {

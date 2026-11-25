@@ -4,6 +4,8 @@ import com.dokar.quickjs.QuickJs
 import com.dokar.quickjs.evaluate
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.*
+import okhttp3.mockwebserver.Dispatcher
+import okhttp3.mockwebserver.RecordedRequest
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import kotlin.test.*
@@ -30,7 +32,7 @@ class PreparedSelectionRuntimeTest {
                descriptors[0].modelRef!=='record'||descriptors[0].schema.type!=='object'||descriptors[0].values.flag!==true||
                rowCases.join(',')!=='0,0'||draftModel.schemaRef!=='record')throw Error('Bad mapping projection');
             if(context.Context('unused')||context.handlers.dataSource.getCollection().length)throw Error('Unneeded reader state');
-            return {ids:rows.map(context.lookupHandler('Nested.normalize')),invocation:invocationId};
+            return {ids:rows.map(context.lookupHandler('Nested.normalize')),invocation:invocationId,version:rows[0].version};
         },
         plain:({rows,mapping,descriptors,rowCases,draftModel})=>{
           if(mapping!==null || descriptors.length || rowCases.length || !draftModel)throw Error('Bad optional mapping');
@@ -79,12 +81,12 @@ class PreparedSelectionRuntimeTest {
             assertFalse(window.dialogSignal("editor").peek().open)
         }
     }
-    private suspend fun fixture(test: suspend Fixture.()->Unit){
+    private suspend fun fixture(server: MockWebServer? = null, test: suspend Fixture.()->Unit){
         val scope=CoroutineScope(SupervisorJob()+Dispatchers.Unconfined)
         ActionHookRuntime.testScriptEvaluator={ script ->
             val js=QuickJs.create(Dispatchers.Default);try{js.evaluate<String>(script)}finally{js.close()}
         }
-        try { Fixture(scope).test() } finally {ActionHookRuntime.testScriptEvaluator=null;scope.cancel()}
+        try { Fixture(scope,server).test() } finally {ActionHookRuntime.testScriptEvaluator=null;scope.cancel()}
     }
 
     @Test fun buttonOperationReadsOnlyFreshRowsAndSeedsTheDestinationOnce()=runBlocking { fixture {
@@ -101,6 +103,8 @@ class PreparedSelectionRuntimeTest {
         val expected=mapOf("Ids" to listOf("0002",1L),"Parent" to listOf(7L))
         assertEquals(expected,calls.single().input.parameters)
         assertEquals(expected,calls.single().resolvedInputs)
+        assertTrue(calls.single().bypassCache)
+        assertEquals(draft.form.peek()["invocation"],calls.single().invocationId)
         assertEquals(oldRows,reader.collection.peek())
         assertEquals(mapOf("old" to true),reader.form.peek())
         assertEquals(mapOf("unrelated" to 1),reader.input.peek().parameters)
@@ -202,6 +206,57 @@ class PreparedSelectionRuntimeTest {
             assertEquals(expected,resolver.resolvePreparedSelection(listOf(param),source).inbound[""]?.get("N"))
         }
     } }
+    @Test fun missingRegisteredReaderReceiptCannotFallThroughToASecondHTTPRead()=runBlocking {
+        val server=MockWebServer()
+        server.enqueue(MockResponse().setBody(buildJsonObject { put("rows",JsonUtil.anyToElement(records)) }.toString()))
+        server.start()
+        try { fixture(server) {
+            var loaderCalls=0
+            runtime.registerDataSourceLoader { request ->
+                assertEquals("detail",request.dataSourceRef)
+                assertTrue(request.bypassCache)
+                assertTrue(!request.invocationId.isNullOrBlank())
+                loaderCalls++
+                null
+            }
+            val result=activate()
+            assertTrue(result.isFailure)
+            assertEquals(result.exceptionOrNull()?.message,window.peekWindowForm()["error"])
+            assertEquals(1,loaderCalls)
+            assertEquals(0,server.requestCount)
+            untouched()
+        } } finally { server.shutdown() }
+    }
+
+    @Test fun coldAndWarmHTTPSelectionOpensBypassServiceCacheWithSeparateInvocationIds()=runBlocking {
+        val server=MockWebServer()
+        var producerReads=0
+        val envelopes=mutableListOf<JsonObject>()
+        server.dispatcher=object: Dispatcher() {
+            override fun dispatch(request:RecordedRequest):MockResponse {
+                val body=JsonUtil.json.parseToJsonElement(request.body.readUtf8()).jsonObject
+                envelopes.add(body)
+                if (producerReads==0 || body["cache"]?.jsonObject?.get("bypassCache")==JsonPrimitive(true)) producerReads++
+                val rows=records.map { it + ("version" to producerReads) }
+                return MockResponse().setBody(buildJsonObject { put("rows",JsonUtil.anyToElement(rows)) }.toString())
+            }
+        }
+        server.start()
+        try { fixture(server) {
+            for (version in 1..2) {
+                assertTrue(activate().getOrThrow())
+                assertEquals(version.toLong(),draft.form.peek()["version"])
+                assertEquals(draft.form.peek()["invocation"],envelopes.last()["invocationId"]?.jsonPrimitive?.content)
+                runtime.closeDialog(window.windowId,"editor")
+            }
+            assertEquals(2,producerReads)
+            assertEquals(2,server.requestCount)
+            assertEquals(envelopes[0]["inputs"],envelopes[1]["inputs"])
+            assertNotEquals(envelopes[0]["invocationId"],envelopes[1]["invocationId"])
+            assertFalse("detail" in runtime.registeredWindowDataSources(window.windowId))
+        } } finally { server.shutdown() }
+    }
+
     @Test fun declinedHTTPAndMalformedEnvelopePreserveThePriorDraft()=runBlocking {
         for(code in listOf(200,403)) {
             val server=MockWebServer();val scope=CoroutineScope(SupervisorJob()+Dispatchers.Unconfined)
@@ -213,7 +268,11 @@ class PreparedSelectionRuntimeTest {
                 assertEquals(1,server.requestCount)
                 val request=server.takeRequest()
                 assertEquals("/v1/api/datasources/detail/fetch",request.path)
-                assertEquals(JsonUtil.json.parseToJsonElement("""{"inputs":{"Parent":[7],"Ids":["0002",1]}}"""),JsonUtil.json.parseToJsonElement(request.body.readUtf8()))
+                val envelope=JsonUtil.json.parseToJsonElement(request.body.readUtf8()).jsonObject
+                assertEquals(setOf("inputs","cache","invocationId"),envelope.keys)
+                assertEquals(JsonUtil.json.parseToJsonElement("""{"Parent":[7],"Ids":["0002",1]}"""),envelope["inputs"])
+                assertEquals(JsonUtil.json.parseToJsonElement("""{"bypassCache":true}"""),envelope["cache"])
+                assertTrue(envelope.getValue("invocationId").jsonPrimitive.content.isNotBlank())
             }finally{server.shutdown();scope.cancel()}
         }
     }

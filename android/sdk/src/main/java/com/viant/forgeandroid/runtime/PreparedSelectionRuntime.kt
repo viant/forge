@@ -110,7 +110,7 @@ internal class PreparedSelectionRuntime {
             }
             if (status.isNotEmpty()) runtime.setWindowFormValues(window.windowId, status, bumpPrefillRevision = false)
             pending = true
-            val fresh = withContext(Dispatchers.IO) { runtime.readSelectedRows(window, prepare.dataSourceRef, request) }
+            val fresh = withContext(Dispatchers.IO) { runtime.readSelectedRows(window, prepare.dataSourceRef, request, invocation) }
             currentCoroutineContext().ensureActive()
             if (!eligible()) return Result.success(false)
             val ordered = orderedSelection(fresh, keys, prepare.identityField, scopes)

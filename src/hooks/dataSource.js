@@ -1068,12 +1068,15 @@ const setWindowFormData = ({values = {}, parameters = {}, replace = false, bumpP
             parameters = {},
             page = null,
             signal = null,
+            cache,
+            invocationId,
         } = props || {};
         const windowEpoch = protectedWindowEpoch(identity?.windowId);
         const datasetEpoch = protectedDataSourceEpoch(identity?.dataSourceId);
         const current = () => protectedWindowEpoch(identity?.windowId) === windowEpoch && protectedDataSourceEpoch(identity?.dataSourceId) === datasetEpoch;
         try {
-            const result = await connector.get({filter,page,pageSize:getPageSize() || undefined,inputParameters:parameters,...(signal ? {signal} : {})});
+            const result = await connector.get({filter,page,pageSize:getPageSize() || undefined,inputParameters:parameters,
+                ...(cache ? {cache} : {}), ...(invocationId ? {invocationId} : {}), ...(signal ? {signal} : {})});
             if(!current()) throw Object.assign(new Error('Datasource request superseded.'),{code:'request_superseded'});
             return result;
         } catch(error) {

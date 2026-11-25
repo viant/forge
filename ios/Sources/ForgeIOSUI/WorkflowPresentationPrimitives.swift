@@ -611,8 +611,10 @@ func workflowConditionAllows(_ condition: DashboardConditionDef?, row: [String: 
         case "windowform": value = .object(windowForm)
         case "authorization": value = .object(authorization)
         case "collection": value = .array(collection.map(JSONValue.object))
-        case "selection", "input", "filters", "filter": value = .object([:])
-        default: value = .object(metrics)
+        case "metrics": value = .object(metrics)
+        default:
+            return DashboardRuntime.resolveDashboardValue(source:node.source, selector:node.selector ?? node.field ?? node.key,
+                                                         metrics:metrics.mapValues(primitiveAnyValue))
         }
         return resourceResolveValue(value,path:node.selector ?? node.field ?? node.key ?? "").map(primitiveAnyValue)
     })

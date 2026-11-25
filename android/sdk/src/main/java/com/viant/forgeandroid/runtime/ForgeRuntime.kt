@@ -28,7 +28,9 @@ class ForgeRuntime(
         val dataSourceRef: String,
         val dataSource: DataSourceDef,
         val input: InputState,
-        val resolvedInputs: Map<String, Any?> = emptyMap()
+        val resolvedInputs: Map<String, Any?> = emptyMap(),
+        val invocationId: String? = null,
+        val bypassCache: Boolean = false
     )
 
     data class DataSourceFetchResult(
@@ -75,7 +77,7 @@ class ForgeRuntime(
     fun registerDataSourceLoader(
         loader: suspend (DataSourceFetchRequest) -> DataSourceFetchResult?
     ) {
-        dataSourceRuntime.setCollectionLoader { context ->
+        dataSourceRuntime.setRequestLoader { context, detachedReadId ->
             loader(
                 DataSourceFetchRequest(
                     windowId = context.window.windowId,
@@ -83,7 +85,9 @@ class ForgeRuntime(
                     dataSourceRef = context.dataSourceRef,
                     dataSource = context.dataSource,
                     input = context.input.peek(),
-                    resolvedInputs = parameterResolver.resolveFlat(context.dataSource.parameters, context)
+                    resolvedInputs = parameterResolver.resolveFlat(context.dataSource.parameters, context),
+                    invocationId = detachedReadId,
+                    bypassCache = detachedReadId != null
                 )
             )?.let {
                 DataSourceRuntime.LoaderResult(
@@ -224,8 +228,8 @@ class ForgeRuntime(
 
     internal fun registeredSource(windowId: String, ref: String) = dataSourceRuntime.registeredSource(windowId, ref)
     internal val preparedSelections = PreparedSelectionRuntime()
-    internal suspend fun readSelectedRows(window: WindowContext, ref: String, parameters: Map<String, Any?>) =
-        dataSourceRuntime.readSelectionRows(window, ref, parameters)
+    internal suspend fun readSelectedRows(window: WindowContext, ref: String, parameters: Map<String, Any?>, invocationId: String) =
+        dataSourceRuntime.readSelectionRows(window, ref, parameters, invocationId)
 
     fun registeredWindowDataSources(windowId: String) = dataSourceRuntime.registeredWindowContexts(windowId)
 

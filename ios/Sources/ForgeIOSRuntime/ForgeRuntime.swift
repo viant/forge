@@ -8,6 +8,8 @@ public actor ForgeRuntime {
         public let input: InputState
         public let resolvedInputs: [String: JSONValue]
         public let conversationID: String?
+        public let bypassCache: Bool
+        public let invocationId: String?
 
         public init(
             windowID: String,
@@ -15,7 +17,9 @@ public actor ForgeRuntime {
             dataSource: DataSourceDef,
             input: InputState,
             resolvedInputs: [String: JSONValue] = [:],
-            conversationID: String? = nil
+            conversationID: String? = nil,
+            bypassCache: Bool = false,
+            invocationId: String? = nil
         ) {
             self.windowID = windowID
             self.dataSourceRef = dataSourceRef
@@ -23,6 +27,8 @@ public actor ForgeRuntime {
             self.input = input
             self.resolvedInputs = resolvedInputs
             self.conversationID = conversationID
+            self.bypassCache = bypassCache
+            self.invocationId = invocationId
         }
     }
 
@@ -598,7 +604,7 @@ public actor ForgeRuntime {
         }
     }
 
-    func readPreparedSelection(windowID: String, metadata: WindowMetadata, ref: String, parameters: [String: JSONValue]) async throws -> [[String: JSONValue]] {
+    func readPreparedSelection(windowID: String, metadata: WindowMetadata, ref: String, parameters: [String: JSONValue], invocationId: String) async throws -> [[String: JSONValue]] {
         guard let source = metadata.dataSources[ref] else { throw SelectionPreparationError("Selection reader is unavailable.") }
         let input = InputState(parameters: parameters)
         let resolution = await buildParameterResolutionContext(windowID: windowID, metadata: metadata, identityDataSourceRef: ref, preferredInput: input)
@@ -606,8 +612,12 @@ public actor ForgeRuntime {
         let inputs = bound.isEmpty ? parameters : bound
         let fence = try await validatedReportFetchFence(windowID:windowID,dataSourceRef:ref,parameters:parameters)
         guard await reportFetchFenceIsCurrent(fence,windowID:windowID) else { throw SelectionPreparationError("The selection read is no longer authorized.") }
-        if let dataSourceLoader, let result = try await dataSourceLoader(DataSourceFetchRequest(windowID: windowID, dataSourceRef: ref, dataSource: source,
-            input: input, resolvedInputs: inputs, conversationID: windows.first { $0.id == windowID }?.conversationID)) {
+        if let dataSourceLoader {
+            let request = DataSourceFetchRequest(windowID:windowID, dataSourceRef:ref, dataSource:source, input:input,
+                                                 resolvedInputs:inputs, conversationID:windows.first { $0.id == windowID }?.conversationID, bypassCache:true, invocationId:invocationId)
+            guard let result = try await dataSourceLoader(request) else {
+                throw SelectionPreparationError("Selection reader did not return records.")
+            }
             guard await reportFetchFenceIsCurrent(fence,windowID:windowID) else { throw SelectionPreparationError("The selection read is no longer authorized.") }
             return result.rows
         }
@@ -615,7 +625,7 @@ public actor ForgeRuntime {
         guard let baseURL = defaultDataSourceBaseURL, let path = source.service?.uri ?? source.uri else { throw URLError(.resourceUnavailable) }
         let response = try await dataSourceRuntime.requestCollection(input: input, baseURL: baseURL.absoluteString, path: path,
             method: source.service?.method ?? source.method ?? "GET", staticParameters: source.params, inputParameters: inputs, paging: source.paging,
-            additionalHeaders: [:], session: session)
+            additionalHeaders: [:], session: session, bypassCache: true, invocationId: invocationId)
         guard let records = await dataSourceRuntime.invocationRecordsFromResponse(response, selector: source.selectors?.data),
               records.allSatisfy({ $0.objectValue != nil }) else { throw SelectionPreparationError("Selection reader returned invalid records.") }
         return records.compactMap(\.objectValue)

@@ -270,7 +270,7 @@ public actor DataSourceRuntime {
     /// publish the returned payload, while selection preparations consume it locally.
     func requestCollection(input: InputState, baseURL: String, path: String, method: String, staticParameters: [String: String],
                            inputParameters: [String: JSONValue], paging: DataSourcePagingDef?, additionalHeaders: [String: String],
-                           session: URLSession) async throws -> JSONValue {
+                           session: URLSession, bypassCache: Bool = false, invocationId: String? = nil) async throws -> JSONValue {
         let resolvedMethod = method.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         let requestMethod = resolvedMethod.isEmpty ? "GET" : resolvedMethod
         guard var components = URLComponents(string: baseURL + path) else { throw URLError(.badURL) }
@@ -291,11 +291,18 @@ public actor DataSourceRuntime {
         guard let url = components.url else { throw URLError(.badURL) }
         var request = URLRequest(url: url)
         request.httpMethod = requestMethod
+        if bypassCache {
+            request.cachePolicy = .reloadIgnoringLocalCacheData
+            request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        }
         for (k, v) in additionalHeaders { request.setValue(v, forHTTPHeaderField: k) }
         if requestMethod != "GET" {
             let payload: JSONValue
             if isDatasourceFetchRoute(path) {
-                payload = .object(["inputs": .object(fetchInputs)])
+                var envelope: [String: JSONValue] = ["inputs": .object(fetchInputs)]
+                if bypassCache { envelope["cache"] = .object(["bypassCache": .bool(true)]) }
+                if let invocationId { envelope["invocationId"] = .string(invocationId) }
+                payload = .object(envelope)
             } else {
                 payload = .object(inputParameters)
             }

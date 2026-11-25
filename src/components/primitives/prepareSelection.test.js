@@ -21,8 +21,8 @@ function fixture() {
       resourceMappings: {records: {selectors: ['kind'], cases: {unrelated: {}}, fieldOrder: ['field']}},
       resourceModels: {draftModel: {fields: {options: {default: ['a']}}}}},
     Context(ref) {
-      if (ref === 'read') return {handlers: {dataSource: {fetchRecords: async ({parameters}) => {
-        events.push('read'); calls.input = parameters; return calls.read ? calls.read() : {data: rows};
+      if (ref === 'read') return {handlers: {dataSource: {fetchRecords: async ({parameters, cache, invocationId}) => {
+        events.push('read'); calls.input = parameters; calls.cache = cache; calls.invocationId = invocationId; return calls.read ? calls.read() : {data: rows};
       }}}};
       if (ref === 'draft') return {handlers: {dataSource: {setEditedFormData: ({values}) => {calls.form = values; events.push('seed');}}}};
     },
@@ -38,6 +38,8 @@ test('one detached read preserves row order, checks parent and supplies only sel
   const f = fixture();
   assert.equal((await f.open()).status, 'opened');
   assert.deepEqual(f.events, ['read','prepare','seed','open']);
+  assert.deepEqual(f.calls.cache, {bypassCache: true});
+  assert.equal(f.calls.args.invocationId, f.calls.invocationId);
   assert.deepEqual(f.calls.input, {Parent: [8], IDs: ['9007199254740993', '002']});
   assert.deepEqual(f.calls.form.ids, ['9007199254740993',2]);
   assert.deepEqual(f.calls.args.rowCases, [0,0]);

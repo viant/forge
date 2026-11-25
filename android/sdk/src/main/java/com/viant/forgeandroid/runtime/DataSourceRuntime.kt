@@ -41,13 +41,17 @@ class DataSourceRuntime(
     fun registeredWindowContexts(windowId: String): Map<String, DataSourceContext> = registeredContexts[windowId]?.toMap().orEmpty()
     private val parameterResolver = ParameterResolver()
     private var executor: ((ExecutionDef, DataSourceContext, Map<String, Any?>) -> Unit)? = null
-    private var collectionLoader: (suspend (DataSourceContext) -> LoaderResult?)? = null
+    private var collectionLoader: (suspend (DataSourceContext, String?) -> LoaderResult?)? = null
 
     fun setExecutor(executor: (ExecutionDef, DataSourceContext, Map<String, Any?>) -> Unit) {
         this.executor = executor
     }
 
     fun setCollectionLoader(loader: suspend (DataSourceContext) -> LoaderResult?) {
+        setRequestLoader { context, _ -> loader(context) }
+    }
+
+    internal fun setRequestLoader(loader: suspend (DataSourceContext, String?) -> LoaderResult?) {
         collectionLoader = loader
     }
 
@@ -143,16 +147,19 @@ class DataSourceRuntime(
     }
 
     /** Invoke the configured reader without publishing input, rows, lifecycle events, or auto-selection. */
-    internal suspend fun readSelectionRows(window: WindowContext, ref: String, parameters: Map<String, Any?>): List<Map<String, Any?>> {
+    internal suspend fun readSelectionRows(window: WindowContext, ref: String, parameters: Map<String, Any?>, invocationId: String): List<Map<String, Any?>> {
         val metadata = window.metadata.peek() ?: error("Window metadata is unavailable.")
         val definition = metadata.dataSources[ref] ?: error("Selection reader is unavailable: $ref")
         require(ref !in reportOwnedDataSourceRefs(metadata)) { "This reader requires report admission." }
         val request = DataSourceContext(window.captureRequest(window.peekWindowForm(), metadata), ref, definition,
             Signal(emptyList()), Signal(emptyMap()), Signal(SelectionState()), Signal(InputState(parameters = parameters)),
             Signal(ControlState()), Signal(emptyMap()), { _, _ -> })
-        val loader = collectionLoader?.invoke(request)
-        val rows = if (loader != null) loader.rows else {
-            val binding = buildRequest(request, suppliedInputs = parameters) ?: error("No physical selection reader is configured: $ref")
+        val reader = collectionLoader
+        val rows = if (reader != null) {
+            val receipt = reader(request, invocationId) ?: error("The selection reader did not acknowledge the request: $ref")
+            receipt.rows
+        } else {
+            val binding = buildRequest(request, suppliedInputs = parameters, detachedReadId = invocationId) ?: error("No physical selection reader is configured: $ref")
             val response = executeRequest(definition.service?.endpoint, binding, requireRecords = true)
             val records = collectionValue(response, definition.selectors?.data, requireRecords = true)
             require(records is List<*> && records.all { it is Map<*, *> }) { "The selection reader did not return an array of records." }
@@ -175,7 +182,7 @@ class DataSourceRuntime(
 
         var receivedResponse = false
         try {
-            val loaderResult = collectionLoader?.invoke(ctx)
+            val loaderResult = collectionLoader?.invoke(ctx, null)
             if (loaderResult != null) {
                 receivedResponse = true
                 currentCoroutineContext().ensureActive()
@@ -358,7 +365,7 @@ class DataSourceRuntime(
             ?: row
     }
 
-    private fun buildRequest(ctx: DataSourceContext, suppliedInputs: Map<String, Any?> = emptyMap()): DataSourceRequest? {
+    private fun buildRequest(ctx: DataSourceContext, suppliedInputs: Map<String, Any?> = emptyMap(), detachedReadId: String? = null): DataSourceRequest? {
         val baseUri = ctx.dataSource.service?.uri ?: ctx.dataSource.uri ?: return null
         val method = (ctx.dataSource.service?.method ?: ctx.dataSource.method ?: "GET")
             .trim()
@@ -370,7 +377,7 @@ class DataSourceRuntime(
             DataSourceRequest(
                 method = method,
                 uri = baseUri,
-                body = buildRequestBody(ctx, baseUri, suppliedInputs)
+                body = buildRequestBody(ctx, baseUri, suppliedInputs, detachedReadId)
             )
         }
     }
@@ -428,10 +435,16 @@ class DataSourceRuntime(
         return baseUri + separator + encoded
     }
 
-    private fun buildRequestBody(ctx: DataSourceContext, baseUri: String, suppliedInputs: Map<String, Any?>): String {
+    private fun buildRequestBody(ctx: DataSourceContext, baseUri: String, suppliedInputs: Map<String, Any?>, detachedReadId: String?): String {
         val payload = if (isDatasourceFetchRoute(baseUri)) {
             val inputs = buildDatasourceFetchInputs(ctx)
-            mapOf("inputs" to if (suppliedInputs.isEmpty()) inputs else inputs + suppliedInputs)
+            buildMap<String, Any?> {
+                put("inputs", if (suppliedInputs.isEmpty()) inputs else inputs + suppliedInputs)
+                if (detachedReadId != null) {
+                    put("cache", mapOf("bypassCache" to true))
+                    put("invocationId", detachedReadId)
+                }
+            }
         } else {
             buildBodyParameters(ctx)
         }

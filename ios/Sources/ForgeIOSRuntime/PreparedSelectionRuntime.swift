@@ -202,7 +202,7 @@ extension ForgeRuntime {
             attempted = true
             guard try await admission() != nil else { throw SupersededSelection() }
             let records = try await readPreparedSelection(
-                windowID: windowID, metadata: metadata, ref: spec.dataSourceRef, parameters: parameters)
+                windowID: windowID, metadata: metadata, ref: spec.dataSourceRef, parameters: parameters, invocationId: invocation.uuidString)
             guard let current = try await admission() else { throw SupersededSelection() }
             let ordered = try rowsInSelectionOrder(records, keys: first.keys, identity: spec.identityField, scope: scope)
             var props = try projectedCases(ordered, mappingRef: spec.mappingRef, draftRef: destination.resourceModelRef, metadata: metadata)
