@@ -2171,7 +2171,7 @@ public enum DashboardRuntime {
                selectionValues: selectionValues,
                authorization: authorization, valueForCondition: valueForCondition
            ) { return false }
-        if condition.whenValue == nil && condition.equals == nil && condition.notEquals == nil && condition.containsValue == nil
+        if condition.field == nil && condition.whenValue == nil && condition.equals == nil && condition.notEquals == nil && condition.containsValue == nil
             && condition.inValues.isEmpty && condition.gt == nil && condition.gte == nil && condition.lt == nil && condition.lte == nil
             && condition.matches == nil && condition.exists == nil && condition.empty == nil && condition.notEmpty == nil { return true }
         let selector = condition.selector ?? condition.field ?? condition.key
@@ -2208,7 +2208,10 @@ public enum DashboardRuntime {
             return false
         }
 
-        if let exists = condition.exists, (actual != nil && !(actual is NSNull)) != exists { return false }
+        if let exists = condition.exists {
+            let present = (actual as? CanonicalPredicateValue)?.exists ?? (actual != nil && !(actual is NSNull))
+            if present != exists { return false }
+        }
         if let pattern = condition.matches {
             let text: String
             if let string = actual as? String { text = string }
@@ -2217,12 +2220,11 @@ public enum DashboardRuntime {
             guard let regex = try? NSRegularExpression(pattern: pattern),
                   regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil else { return false }
         }
-        if (condition.gt != nil || condition.gte != nil || condition.lt != nil || condition.lte != nil), numericValue(actual) == nil { return false }
-        if let number = numericValue(actual) {
-            if let gt = condition.gt, !(number > gt) { return false }
-            if let gte = condition.gte, !(number >= gte) { return false }
-            if let lt = condition.lt, !(number < lt) { return false }
-            if let lte = condition.lte, !(number <= lte) { return false }
+        if !numericBoundsAllow(actual, gt: condition.gt, gte: condition.gte, lt: condition.lt, lte: condition.lte) { return false }
+        if let canonical = actual as? CanonicalPredicateValue {
+            if canonical.missingNumericPeer { return false }
+            let bounds = canonical.peerBounds
+            if !bounds.isEmpty && !numericBoundsAllow(actual, gt: bounds[.gt], gte: bounds[.gte], lt: bounds[.lt], lte: bounds[.lte]) { return false }
         }
 
         if let empty = condition.empty, isEmpty(actual) != empty {
@@ -2540,6 +2542,7 @@ public enum DashboardRuntime {
     }
 
     private static func dashboardValuesEqual(actual: Any?, expected: JSONValue) -> Bool {
+        if let canonical = actual as? CanonicalPredicateValue { return canonical.value == expected }
         if let primitive = jsonPrimitiveValue(expected) {
             return dashboardPrimitiveValuesEqual(actual: actual, expected: primitive)
         }
@@ -2578,7 +2581,18 @@ public enum DashboardRuntime {
         }
     }
 
+    private static func numericBoundsAllow(_ value: Any?, gt: Double?, gte: Double?, lt: Double?, lte: Double?) -> Bool {
+        guard gt != nil || gte != nil || lt != nil || lte != nil else { return true }
+        guard let number = numericValue(value) else { return false }
+        if let gt, !(number > gt) { return false }
+        if let gte, !(number >= gte) { return false }
+        if let lt, !(number < lt) { return false }
+        if let lte, !(number <= lte) { return false }
+        return true
+    }
+
     private static func numericValue(_ value: Any?) -> Double? {
+        if let canonical = value as? CanonicalPredicateValue { return canonical.number }
         let value = unwrapOptional(value)
         switch value {
         case let number as Double:
@@ -2705,6 +2719,7 @@ public enum DashboardRuntime {
     }
 
     private static func isEmpty(_ value: Any?) -> Bool {
+        if let canonical = value as? CanonicalPredicateValue { return canonical.empty }
         let value = unwrapOptional(value)
         switch value {
         case nil:

@@ -310,8 +310,12 @@ data class DashboardConditionDef(
     val empty: Boolean? = null,
     val notEmpty: Boolean? = null,
     val exists: Boolean? = null,
-    val matches: String? = null
+    val matches: String? = null,
+    // Only the resource-invariant codec admits these canonical-record comparisons.
+    @kotlinx.serialization.Transient internal val invariantBounds: Map<String, String> = emptyMap()
 ) {
+    @kotlinx.serialization.Transient
+    internal var canonicalSelectors: CanonicalInvariantSelectors? = null
     internal val pattern by lazy { matches?.let { runCatching { Regex(it) }.getOrNull() } }
 }
 
@@ -1561,7 +1565,8 @@ data class InputState(
     internal val preparedWindowForm: Map<String, Any?>? = null,
     internal val preparedMetadata: WindowMetadata? = null,
     internal val preparedDispatchId: String? = null,
-    internal val preparedReadPermit: NativeReportReadPermit? = null
+    internal val preparedReadPermit: NativeReportReadPermit? = null,
+    internal val requireCommandRecords: Boolean = false
 )
 
 data class ControlState(

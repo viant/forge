@@ -29,6 +29,9 @@ func validateResourceModels(window *Window, validateDataSources bool) error {
 		if strings.ToLower(schema.Type) != "object" {
 			return fmt.Errorf("resource schema %s must be an object", name)
 		}
+		if err := validateResourceInvariants(window.Schemas, schema.Properties, schema.Invariants, name); err != nil {
+			return err
+		}
 		for _, field := range append(append([]string{}, schema.Identity...), schema.Required...) {
 			if _, ok := schema.Properties[field]; !ok {
 				return fmt.Errorf("resource schema %s references undeclared field %s", name, field)
@@ -142,6 +145,14 @@ func validateResourceFieldSchema(schemas map[string]ResourceSchema, path string,
 	typeName := strings.ToLower(strings.TrimSpace(field.Type))
 	if typeName != "" && typeName != "object" && typeName != "array" && typeName != "string" && typeName != "integer" && typeName != "number" && typeName != "boolean" {
 		return fmt.Errorf("resource field %s has unsupported type %s", path, field.Type)
+	}
+	if len(field.Invariants) > 0 {
+		if typeName != "object" || field.Ref != "" {
+			return fmt.Errorf("resource field %s declares invariants outside an inline object", path)
+		}
+		if err := validateResourceInvariants(schemas, field.Properties, field.Invariants, path); err != nil {
+			return err
+		}
 	}
 	if field.Ref != "" {
 		if _, ok := schemas[field.Ref]; !ok {

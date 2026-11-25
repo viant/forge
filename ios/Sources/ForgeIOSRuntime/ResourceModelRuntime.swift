@@ -376,6 +376,13 @@ private func validateObject(_ value: JSONValue, schema: ResourceSchemaDef, schem
         for key in object.keys where schema.properties[key] == nil { throw ResourceModelError.message("\(path).\(key) is not declared") }
     }
     for (field, fieldSchema) in schema.properties where object[field] != nil { try validateField(object[field]!, schema: fieldSchema, schemas: schemas, path: "\(path).\(field)") }
+    for rule in schema.invariants ?? [] where rule.when?.allows(value) != false {
+        if !rule.assertion.allows(value) {
+            let base = path.replacingOccurrences(of: #"\[([0-9]+)\]"#, with: ".$1", options: .regularExpression)
+            let target = rule.path.map { $0.isEmpty ? base : "\(base).\($0)" } ?? base
+            throw ResourceModelError.message("\(target): \(rule.message)")
+        }
+    }
 }
 
 private func validateField(_ value: JSONValue, schema: ResourceFieldSchemaDef, schemas: [String: ResourceSchemaDef], path: String) throws {
@@ -387,7 +394,7 @@ private func validateField(_ value: JSONValue, schema: ResourceFieldSchemaDef, s
     case "number": guard case .number = value else { throw ResourceModelError.message("\(path) must be a number") }
     case "boolean": guard case .bool = value else { throw ResourceModelError.message("\(path) must be a boolean") }
     case "array": guard case .array(let values) = value else { throw ResourceModelError.message("\(path) must be an array") }; if let min = schema.minItems, values.count < min { throw ResourceModelError.message("\(path) has too few items") }; if let max = schema.maxItems, values.count > max { throw ResourceModelError.message("\(path) has too many items") }; if let itemSchema = schema.items { for (index, item) in values.enumerated() { try validateField(item, schema: itemSchema, schemas: schemas, path: "\(path)[\(index)]") } }
-    case "object": try validateObject(value, schema: ResourceSchemaDef(type: "object", identity: [], required: schema.required, properties: schema.properties, additionalProperties: nil), schemas: schemas, path: path)
+    case "object": try validateObject(value, schema: ResourceSchemaDef(type: "object", identity: [], required: schema.required, properties: schema.properties, additionalProperties: nil, invariants: schema.invariants), schemas: schemas, path: path)
     default: break
     }
     if !schema.enumValues.isEmpty && !schema.enumValues.contains(value) { throw ResourceModelError.message("\(path) is not an allowed value") }
@@ -412,7 +419,11 @@ private func resourceNumber(_ value: JSONValue) -> Double? { switch value { case
 private func resourceResolve(_ object: [String: JSONValue], path: String) -> JSONValue? { resourceResolveValue(.object(object), path: path) }
 func resourceResolveValue(_ value: JSONValue, path: String) -> JSONValue? {
     if path.isEmpty { return value }
-    return path.split(separator: ".").reduce(Optional(value)) { current, part in
+    return resourceResolveValue(value, components: path.split(separator: "."))
+}
+
+func resourceResolveValue<Components: Sequence>(_ value: JSONValue, components: Components) -> JSONValue? where Components.Element: StringProtocol {
+    components.reduce(Optional(value)) { current, part in
         guard let current else { return nil }
         if let object = current.objectValue { return object[String(part)] }
         if let array = current.arrayValue, let index = Int(part), array.indices.contains(index) { return array[index] }

@@ -288,12 +288,27 @@ object ResourceModelRuntime {
         return source.codec?.let { applyCodec(value, it, false, null) } ?: value
     }
 
-    private fun validateObject(value: Any?, schema: ResourceSchemaDef, schemas: Map<String, ResourceSchemaDef>, path: String) {
+    private fun validateObject(
+        value: Any?, schema: ResourceSchemaDef, schemas: Map<String, ResourceSchemaDef>, path: String
+    ) = validateObject(value, schema.required, schema.properties, schema.additionalProperties, schema.invariants, schemas, path)
+
+    private fun validateObject(
+        value: Any?, required: List<String>, properties: Map<String, ResourceFieldSchemaDef>, additionalProperties: Boolean?,
+        invariants: List<ResourceInvariantDef>, schemas: Map<String, ResourceSchemaDef>, path: String
+    ) {
         val objectValue = JsonUtil.asStringMap(value)
         require(objectValue.isNotEmpty() || value is Map<*, *>) { "$path must be an object" }
-        schema.required.forEach { require(objectValue.containsKey(it) && objectValue[it] != null) { "$path.$it is required" } }
-        if (schema.additionalProperties == false) objectValue.keys.forEach { require(it in schema.properties) { "$path.$it is not declared" } }
-        schema.properties.forEach { (field, fieldSchema) -> if (objectValue.containsKey(field)) validateField(objectValue[field], fieldSchema, schemas, "$path.$field") }
+        required.forEach { require(objectValue.containsKey(it) && objectValue[it] != null) { "$path.$it is required" } }
+        if (additionalProperties == false) objectValue.keys.forEach { require(it in properties) { "$path.$it is not declared" } }
+        properties.forEach { (field, definition) ->
+            if (objectValue.containsKey(field)) validateField(objectValue[field], definition, schemas, "$path.$field")
+        }
+        for (rule in invariants) {
+            if (evaluateCanonicalCondition(rule.whenCondition, objectValue) && !evaluateCanonicalCondition(rule.assertion, objectValue)) {
+                val location = rule.path?.takeIf(String::isNotBlank)?.let { "$path.$it" } ?: path
+                throw IllegalArgumentException("$location: ${rule.message}")
+            }
+        }
     }
 
     private fun validateField(value: Any?, schema: ResourceFieldSchemaDef, schemas: Map<String, ResourceSchemaDef>, path: String) {
@@ -305,7 +320,7 @@ object ResourceModelRuntime {
             "number" -> require(value is Number) { "$path must be a number" }
             "boolean" -> require(value is Boolean) { "$path must be a boolean" }
             "array" -> { require(value is List<*>) { "$path must be an array" }; schema.minItems?.let { require(value.size >= it) { "$path has too few items" } }; schema.maxItems?.let { require(value.size <= it) { "$path has too many items" } }; schema.items?.let { item -> value.forEachIndexed { index, entry -> validateField(entry, item, schemas, "$path[$index]") } } }
-            "object" -> validateObject(value, ResourceSchemaDef(type = "object", required = schema.required, properties = schema.properties), schemas, path)
+            "object" -> validateObject(value, schema.required, schema.properties, null, schema.invariants, schemas, path)
         }
         if (schema.enumValues.isNotEmpty()) require(schema.enumValues.map(JsonUtil::elementToAny).contains(value)) { "$path is not an allowed value" }
         (value as? Number)?.toDouble()?.let { number -> schema.minimum?.let { require(number >= it) { "$path is below minimum" } }; schema.maximum?.let { require(number <= it) { "$path is above maximum" } } }

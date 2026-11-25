@@ -1,19 +1,25 @@
 package com.viant.forgeandroid.runtime
 
 object SelectorUtil {
+    internal object Missing
+
     fun resolve(obj: Any?, path: String?): Any? {
-        if (path == null || path.isEmpty()) return obj
-        val parts = path.split('.')
-        var current: Any? = obj
+        if (path.isNullOrEmpty()) return obj
+        return resolveParts(obj, path.split('.'), null)
+    }
+
+    internal fun resolveParts(obj: Any?, parts: List<String>, missing: Any?): Any? {
+        var current = obj
         for (part in parts) {
-            current = when (current) {
-                is Map<*, *> -> current[part]
+            current = when (val parent = current) {
+                is Map<*, *> -> parent[part] ?: if (missing == null || parent.containsKey(part)) null else return missing
                 is List<*> -> {
-                    val list = current
-                    part.toIntOrNull()?.takeIf { it in list.indices }?.let { list[it] }
+                    val index = part.toIntOrNull() ?: return missing
+                    if (index !in parent.indices) return missing
+                    parent[index]
                 }
-                else -> null
-            } ?: return null
+                else -> return missing
+            }
         }
         return current
     }

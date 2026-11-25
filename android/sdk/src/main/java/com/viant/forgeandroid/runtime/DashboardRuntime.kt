@@ -1386,53 +1386,51 @@ fun evaluateDashboardCondition(
     selectionValues: Map<String, Any?> = emptyMap(),
     authorization: Map<String, Any?> = emptyMap()
 ): Boolean {
-    if (condition == null) {
-        return true
+    return evaluateConditionTree(condition, record = null) { node, selector ->
+        resolveDashboardValue(node.source, selector, metrics, filters, selection, form, windowForm,
+            collection, input, selectionValues, authorization)
     }
-    if (condition.all.isNotEmpty() && condition.all.any {
-            !evaluateDashboardCondition(it, metrics, filters, selection, form, windowForm, collection, input, selectionValues, authorization)
-        }) {
-        return false
-    }
-    if (condition.any.isNotEmpty() && condition.any.none {
-            evaluateDashboardCondition(it, metrics, filters, selection, form, windowForm, collection, input, selectionValues, authorization)
-        }) {
-        return false
-    }
-    if (condition.not != null &&
-        evaluateDashboardCondition(condition.not, metrics, filters, selection, form, windowForm, collection, input, selectionValues, authorization)
-    ) {
-        return false
-    }
+}
+
+internal fun evaluateCanonicalCondition(condition: DashboardConditionDef?, record: Map<String, Any?>): Boolean =
+    evaluateConditionTree(condition, record) { node, _ -> SelectorUtil.resolveParts(record, checkNotNull(node.canonicalSelectors).field, SelectorUtil.Missing) }
+
+private fun evaluateConditionTree(
+    condition: DashboardConditionDef?,
+    record: Map<String, Any?>?,
+    resolve: (DashboardConditionDef, String?) -> Any?
+): Boolean {
+    if (condition == null) return true
+    if (condition.all.any { !evaluateConditionTree(it, record, resolve) }) return false
+    if (condition.any.isNotEmpty() && condition.any.none { evaluateConditionTree(it, record, resolve) }) return false
+    if (condition.not != null && evaluateConditionTree(condition.not, record, resolve)) return false
+
+    val canonical = record != null
     val selector = condition.selector ?: condition.field ?: condition.key
-    val actual = resolveDashboardValue(
-        condition.source,
-        selector,
-        metrics,
-        filters,
-        selection,
-        form,
-        windowForm,
-        collection,
-        input,
-        selectionValues,
-        authorization
-    )
+    val value = resolve(condition, selector)
+    val actual = when {
+        value === SelectorUtil.Missing -> null
+        canonical && value is JsonPrimitive -> JsonUtil.elementToAny(value)
+        else -> value
+    }
+    fun equal(expected: JsonElement): Boolean = if (canonical)
+        value !== SelectorUtil.Missing && canonicalScalarEquals(actual, expected)
+        else dashboardValuesEqual(actual, expected)
 
     condition.whenValue?.let { expected ->
-        if (!dashboardValuesEqual(actual, expected)) {
+        if (!equal(expected)) {
             return false
         }
     }
     condition.exists?.let { if ((actual != null) != it) return false }
     if (condition.matches != null && condition.pattern?.containsMatchIn(actual?.toString().orEmpty()) != true) return false
     condition.equals?.let { expected ->
-        if (!dashboardValuesEqual(actual, expected)) {
+        if (!equal(expected)) {
             return false
         }
     }
     condition.notEquals?.let { expected ->
-        if (dashboardValuesEqual(actual, expected)) {
+        if (equal(expected)) {
             return false
         }
     }
@@ -1446,27 +1444,27 @@ fun evaluateDashboardCondition(
         }
         if (!matches) return false
     }
-    if (condition.inValues.isNotEmpty() && condition.inValues.none { dashboardValuesEqual(actual, it) }) {
+    if (condition.inValues.isNotEmpty() && condition.inValues.none { equal(it) }) {
         return false
     }
-    if (condition.gt != null || condition.gte != null || condition.lt != null || condition.lte != null) {
-        // Editable numeric inputs may hold decimal text. JVM floating-point literals
-        // such as "12f" and hexadecimal floats are not decimal form values.
-        val scalar = if (actual is JsonPrimitive) JsonUtil.elementToAny(actual) else actual
-        val number = when (scalar) {
-            is Number -> scalar.toDouble()
-            is String -> scalar.trim().toBigDecimalOrNull()?.toDouble()
-            else -> null
-        }?.takeIf(Double::isFinite) ?: return false
-        condition.gt?.let { if (!it.isFinite() || number <= it) return false }
-        condition.gte?.let { if (!it.isFinite() || number < it) return false }
-        condition.lt?.let { if (!it.isFinite() || number >= it) return false }
-        condition.lte?.let { if (!it.isFinite() || number > it) return false }
+    val comparesFields = canonical && condition.invariantBounds.isNotEmpty()
+    if (comparesFields || condition.gt != null || condition.gte != null || condition.lt != null || condition.lte != null) {
+        val number = conditionNumber(actual) ?: return false
+        if (condition.gt != null && !boundAccepts("gt", number, condition.gt)) return false
+        if (condition.gte != null && !boundAccepts("gte", number, condition.gte)) return false
+        if (condition.lt != null && !boundAccepts("lt", number, condition.lt)) return false
+        if (condition.lte != null && !boundAccepts("lte", number, condition.lte)) return false
+        if (comparesFields) {
+            for ((operator, parts) in checkNotNull(condition.canonicalSelectors).bounds) {
+                val bound = conditionNumber(SelectorUtil.resolveParts(record, parts, SelectorUtil.Missing)) ?: return false
+                if (!boundAccepts(operator, number, bound)) return false
+            }
+        }
     }
     condition.empty?.let { required ->
         val empty = when (actual) {
             null -> true
-            is String -> actual.isBlank()
+            is String -> if (canonical) actual.isEmpty() else actual.isBlank()
             is Collection<*> -> actual.isEmpty()
             is Map<*, *> -> actual.isEmpty()
             else -> false
@@ -1478,7 +1476,7 @@ fun evaluateDashboardCondition(
     condition.notEmpty?.let { required ->
         val present = when (actual) {
             null -> false
-            is String -> actual.isNotBlank()
+            is String -> if (canonical) actual.isNotEmpty() else actual.isNotBlank()
             is Collection<*> -> actual.isNotEmpty()
             is Map<*, *> -> actual.isNotEmpty()
             else -> true
@@ -1487,13 +1485,13 @@ fun evaluateDashboardCondition(
             return false
         }
     }
-    val hasDirectPredicate = condition.whenValue != null || condition.equals != null || condition.notEquals != null || condition.contains != null ||
+    val hasDirectPredicate = comparesFields || condition.whenValue != null || condition.equals != null || condition.notEquals != null || condition.contains != null ||
         condition.inValues.isNotEmpty() || condition.gt != null || condition.gte != null || condition.lt != null ||
         condition.lte != null || condition.empty != null || condition.notEmpty != null || condition.exists != null || condition.matches != null
     if (!hasDirectPredicate && !selector.isNullOrBlank()) {
         return when (actual) {
             null -> false
-            is String -> actual.isNotBlank()
+            is String -> if (canonical) actual.isNotEmpty() else actual.isNotBlank()
             is Collection<*> -> actual.isNotEmpty()
             is Map<*, *> -> actual.isNotEmpty()
             is Boolean -> actual
@@ -1977,6 +1975,36 @@ private fun dashboardGeoMapNumber(row: Map<String, Any?>, selector: String): Dou
         is Number -> value.toDouble()
         is String -> value.trim().toDoubleOrNull()
         else -> null
+    }
+}
+
+private fun conditionNumber(value: Any?): Double? {
+    // Decimal form text excludes JVM suffixes and hexadecimal floating-point literals.
+    val scalar = if (value is JsonPrimitive) JsonUtil.elementToAny(value) else value
+    return when (scalar) {
+        is Number -> scalar.toDouble()
+        is String -> scalar.trim().toBigDecimalOrNull()?.toDouble()
+        else -> null
+    }?.takeIf(Double::isFinite)
+}
+
+private fun boundAccepts(operator: String, number: Double, bound: Double): Boolean =
+    bound.isFinite() && when (operator) {
+        "gt" -> number > bound
+        "gte" -> number >= bound
+        "lt" -> number < bound
+        "lte" -> number <= bound
+        else -> false
+    }
+
+private fun canonicalScalarEquals(actual: Any?, expected: JsonElement): Boolean {
+    val scalar = if (actual is JsonPrimitive) JsonUtil.elementToAny(actual) else actual
+    return when {
+        expected === JsonNull -> scalar == null
+        expected !is JsonPrimitive -> false
+        expected.isString -> scalar is String && scalar == expected.content
+        expected.booleanOrNull() != null -> scalar is Boolean && scalar == expected.booleanOrNull()
+        else -> scalar is Number && scalar.toDouble() == expected.doubleOrNull()
     }
 }
 

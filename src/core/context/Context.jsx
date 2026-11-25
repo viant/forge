@@ -1,3 +1,4 @@
+import {prepareWindowInvariants} from '../../validation/invariants.js';
 import {prepareResourceMappings} from '../../components/primitives/resourceModel.js';
 import {MissingDataSourceReferenceError} from './dataSourceReference.js';
 import {canonicalSelectionBinding} from '../../runtime/canonicalDelivery.js';
@@ -101,6 +102,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
         || connectorRuntime?.targetContext?.actorRef
         || ""
     ).trim();
+    prepareWindowInvariants(metadata?.schemas);
     const dataSourceContextCache = {};
     const dialogContextCache = {}
     const signalIds = {}

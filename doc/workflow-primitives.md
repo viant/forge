@@ -176,6 +176,32 @@ the persisted draft. On Save a marked row emits only its writable identity and
 the marker. An omitted persisted row never implies deletion. The producer
 continues to own validation and authorization for the removal.
 
+### Group invariants on a resource schema
+
+Use `invariants` for relationships between fields of a single canonical record. The resource-model validator evaluates them after normalization and before writing. A rule can identify the field to highlight with `path`. Rules run in declaration order. A failed assertion produces the supplied message at that path and rejects the write before transport.
+
+```yaml
+schemas:
+  allocation:
+    type: object
+    properties:
+      mode: {type: string}
+      minimum: {type: number, nullable: true}
+      maximum: {type: number, nullable: true}
+    invariants:
+      - when: {field: mode, equals: bounded}
+        assert:
+          all:
+            - {field: minimum, exists: true}
+            - {field: maximum, gteField: minimum}
+        path: maximum
+        message: Supply both limits with the maximum at or above the minimum.
+```
+
+`when` is optional. Conditions use `all`, `any`, and `not`, or a `field` selector and one of `equals`, `notEquals`, `in`, `empty`, `notEmpty`, or `exists`. Numeric bounds `gt`, `gte`, `lt`, and `lte` can be combined. For comparison to another field, use the corresponding `gtField`, `gteField`, `ltField`, or `lteField`. Use finite numbers or nonblank decimal numeric strings. The canonical record supplies both operands. Keep business-specific rules in the consumer schema.
+
+The schema loader checks field paths and operators when loading the window. Dotted paths can traverse declared nested objects and explicit array indices. An invariant on an array item is evaluated separately for each object in that array. Use a referenced schema to share a rule across resource models. Missing and null both fail `exists: true`; zero and false satisfy it. Typed equality distinguishes false from zero and explicit null from a missing field. Empty strings, arrays and objects satisfy `empty: true`.
+
 ### Paired association IDs
 
 Use `associationDelta` on a resource-model field when one writer accepts separate

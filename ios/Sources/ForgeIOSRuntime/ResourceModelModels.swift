@@ -4,20 +4,22 @@ public struct ResourceSchemaDef: Codable, Sendable {
     public let type: String?
     public let identity: [String]
     public let required: [String]
+    public let invariants: [ResourceSchemaInvariantDef]?
     public let properties: [String: ResourceFieldSchemaDef]
     public let additionalProperties: Bool?
 
-    public init(type: String? = nil, identity: [String] = [], required: [String] = [], properties: [String: ResourceFieldSchemaDef] = [:], additionalProperties: Bool? = nil) {
-        self.type = type; self.identity = identity; self.required = required; self.properties = properties; self.additionalProperties = additionalProperties
+    public init(type: String? = nil, identity: [String] = [], required: [String] = [], properties: [String: ResourceFieldSchemaDef] = [:], additionalProperties: Bool? = nil, invariants: [ResourceSchemaInvariantDef]? = nil) {
+        self.type = type; self.identity = identity; self.required = required; self.properties = properties; self.additionalProperties = additionalProperties; self.invariants = invariants
     }
 
-    private enum CodingKeys: String, CodingKey { case type, identity, required, properties, additionalProperties }
+    private enum CodingKeys: String, CodingKey { case type, identity, required, properties, additionalProperties, invariants }
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         type = try values.decodeIfPresent(String.self, forKey: .type)
         identity = try values.decodeIfPresent([String].self, forKey: .identity) ?? []
         required = try values.decodeIfPresent([String].self, forKey: .required) ?? []
         properties = try values.decodeIfPresent([String: ResourceFieldSchemaDef].self, forKey: .properties) ?? [:]
+        invariants = try values.decodeIfPresent([ResourceSchemaInvariantDef].self, forKey: .invariants)
         additionalProperties = try values.decodeIfPresent(Bool.self, forKey: .additionalProperties)
     }
 }
@@ -39,9 +41,10 @@ public final class ResourceFieldSchemaDef: Codable, @unchecked Sendable {
     public let maxItems: Int?
     public let items: ResourceFieldSchemaDef?
     public let required: [String]
+    public let invariants: [ResourceSchemaInvariantDef]?
     public let properties: [String: ResourceFieldSchemaDef]
 
-    private enum CodingKeys: String, CodingKey { case type, ref = "$ref", format, nullable, readOnly, writeOnly, enumValues = "enum", defaultValue = "default", minimum, maximum, minLength, maxLength, minItems, maxItems, items, required, properties }
+    private enum CodingKeys: String, CodingKey { case type, ref = "$ref", format, nullable, readOnly, writeOnly, enumValues = "enum", defaultValue = "default", minimum, maximum, minLength, maxLength, minItems, maxItems, items, required, properties, invariants }
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         type = try values.decodeIfPresent(String.self, forKey: .type); ref = try values.decodeIfPresent(String.self, forKey: .ref); format = try values.decodeIfPresent(String.self, forKey: .format)
@@ -49,6 +52,7 @@ public final class ResourceFieldSchemaDef: Codable, @unchecked Sendable {
         enumValues = try values.decodeIfPresent([JSONValue].self, forKey: .enumValues) ?? []; defaultValue = try values.decodeIfPresent(JSONValue.self, forKey: .defaultValue)
         minimum = try values.decodeIfPresent(Double.self, forKey: .minimum); maximum = try values.decodeIfPresent(Double.self, forKey: .maximum); minLength = try values.decodeIfPresent(Int.self, forKey: .minLength); maxLength = try values.decodeIfPresent(Int.self, forKey: .maxLength); minItems = try values.decodeIfPresent(Int.self, forKey: .minItems); maxItems = try values.decodeIfPresent(Int.self, forKey: .maxItems)
         items = try values.decodeIfPresent(ResourceFieldSchemaDef.self, forKey: .items); required = try values.decodeIfPresent([String].self, forKey: .required) ?? []; properties = try values.decodeIfPresent([String: ResourceFieldSchemaDef].self, forKey: .properties) ?? [:]
+        invariants = try values.decodeIfPresent([ResourceSchemaInvariantDef].self, forKey: .invariants)
     }
 }
 

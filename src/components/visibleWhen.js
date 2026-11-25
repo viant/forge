@@ -1,3 +1,4 @@
+import {evaluateCondition} from '../utils/evaluateCondition.js';
 import {formFieldValue} from '../runtime/formFieldValue.js';
 import {resolveSelector} from '../utils/selector.js';
 import {evaluateDashboardCondition, getDashboardVisibleWhen} from './dashboard/dashboardUtils.js';
@@ -13,31 +14,7 @@ export const resolveChildContext = (baseContext, dataSourceRef) => {
     return typeof baseContext?.Context === 'function' ? baseContext.Context(targetRef) : baseContext;
 };
 
-const isEmptyValue = (value) => {
-    if (value == null) return true;
-    if (Array.isArray(value) || typeof value === 'string') return value.length === 0;
-    if (typeof value === 'object') return Object.keys(value).length === 0;
-    return false;
-};
-
-const containsValue = (actual, expected) => {
-    if (Array.isArray(actual)) return actual.includes(expected);
-    if (typeof actual === 'string') return actual.includes(String(expected));
-    if (actual && typeof actual === 'object') return Object.hasOwn(actual, expected);
-    return false;
-};
-
-export const evaluatePlainVisibleWhen = (visibleWhen, context, row = undefined) => {
-    if (!visibleWhen || !context) return true;
-    if (Array.isArray(visibleWhen.all)) {
-        return visibleWhen.all.every((condition) => evaluatePlainVisibleWhen(condition, context, row));
-    }
-    if (Array.isArray(visibleWhen.any)) {
-        return visibleWhen.any.some((condition) => evaluatePlainVisibleWhen(condition, context, row));
-    }
-    if (visibleWhen.not) {
-        return !evaluatePlainVisibleWhen(visibleWhen.not, context, row);
-    }
+function readConditionValue(visibleWhen, context, row) {
     if (visibleWhen.dataSourceRef) context = resolveChildContext(context, visibleWhen.dataSourceRef) || {};
     const source = String(visibleWhen.source || 'form').toLowerCase();
     const field = visibleWhen.field || visibleWhen.selector || visibleWhen.key;
@@ -81,53 +58,12 @@ export const evaluatePlainVisibleWhen = (visibleWhen, context, row = undefined) 
             break;
     }
 
-    const actual = field ? resolveSelector(scope, field) : scope;
-    if (visibleWhen.equals !== undefined) {
-        return actual === visibleWhen.equals;
-    }
-    if (Array.isArray(visibleWhen.in)) {
-        return visibleWhen.in.includes(actual);
-    }
-    const numericBounds = [
-        ['gt', (value, bound) => value > bound],
-        ['gte', (value, bound) => value >= bound],
-        ['lt', (value, bound) => value < bound],
-        ['lte', (value, bound) => value <= bound],
-    ].filter(([key]) => visibleWhen[key] !== undefined);
-    if (numericBounds.length > 0) {
-        const value = Number(actual);
-        if (!Number.isFinite(value)) return false;
-        return numericBounds.every(([key, compare]) => {
-            const bound = Number(visibleWhen[key]);
-            return Number.isFinite(bound) && compare(value, bound);
-        });
-    }
-    if (visibleWhen.notEquals !== undefined) {
-        return actual !== visibleWhen.notEquals;
-    }
-    if (visibleWhen.contains !== undefined) {
-        return containsValue(actual, visibleWhen.contains);
-    }
-    if (visibleWhen.matches !== undefined) {
-        try {
-            return new RegExp(String(visibleWhen.matches)).test(String(actual ?? ''));
-        } catch (_) {
-            return false;
-        }
-    }
-    if (visibleWhen.empty !== undefined) {
-        return isEmptyValue(actual) === visibleWhen.empty;
-    }
-    if (visibleWhen.notEmpty !== undefined) {
-        return (!isEmptyValue(actual)) === visibleWhen.notEmpty;
-    }
-    if (visibleWhen.exists !== undefined) {
-        return (actual !== undefined && actual !== null) === visibleWhen.exists;
-    }
-    if (source === 'authorization') {
-        return false;
-    }
-    return !!actual;
+    return field ? resolveSelector(scope, field) : scope;
+}
+
+export const evaluatePlainVisibleWhen = (visibleWhen, context, row = undefined) => {
+    if (!visibleWhen || !context) return true;
+    return evaluateCondition(visibleWhen, leaf => readConditionValue(leaf, context, row));
 };
 
 export const trackVisibleWhen = (visibleWhen, context) => {

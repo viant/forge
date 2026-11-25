@@ -1,3 +1,4 @@
+import {checkInvariants} from './invariants.js';
 import {validateFieldRules} from './rules.js';
 const same = (left, right) => {try {return JSON.stringify(left) === JSON.stringify(right);} catch (_) {return left === right;}};
 function schemaForField(field = {}, schemas = {}) {
@@ -26,6 +27,7 @@ export function validateResource(value, schema = {}, schemas = {}, path = '$') {
       }
       errors.push(...validateResource(fieldValue, schemaForField(fieldSchema, schemas) || fieldSchema, schemas, `${path}.${field}`));
     }
+    checkInvariants(value, schema.invariants, schemas, path, errors);
     return errors;
   }
   if (type === 'array') {

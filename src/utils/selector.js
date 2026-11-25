@@ -63,10 +63,13 @@ export const resolveSelector = (holder, selector) => {
         return holder;
     }
 
-    const keys = selector.split('.')
+    return resolveSelectorParts(holder, selector.split('.'));
+};
+
+export function resolveSelectorParts(holder, keys, ownOnly = false) {
     let current = holder;
     for (const key of keys) {
-        if (current == null) {
+        if (current == null || (ownOnly && !Object.hasOwn(current, key))) {
             return undefined; // path breaks – stay safe
         }
         current = current[key];

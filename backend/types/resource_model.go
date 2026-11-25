@@ -10,6 +10,7 @@ import (
 // one resource. It intentionally models the bounded validation vocabulary
 // needed by renderers and marshallers rather than embedding executable rules.
 type ResourceSchema struct {
+	Invariants           []ResourceInvariant            `json:"invariants,omitempty" yaml:"invariants,omitempty"`
 	Type                 string                         `json:"type,omitempty" yaml:"type,omitempty"`
 	Identity             []string                       `json:"identity,omitempty" yaml:"identity,omitempty"`
 	Required             []string                       `json:"required,omitempty" yaml:"required,omitempty"`
@@ -20,6 +21,7 @@ type ResourceSchema struct {
 // ResourceFieldSchema is the typed field vocabulary shared by web and future
 // native interpreters. Ref points to another entry in Window.Schemas.
 type ResourceFieldSchema struct {
+	Invariants []ResourceInvariant            `json:"invariants,omitempty" yaml:"invariants,omitempty"`
 	Validation *ResourceFieldValidation       `json:"validation,omitempty" yaml:"validation,omitempty"`
 	TimeFormat *ResourceTimeFormat            `json:"timeFormat,omitempty" yaml:"timeFormat,omitempty"`
 	Type       string                         `json:"type,omitempty" yaml:"type,omitempty"`
