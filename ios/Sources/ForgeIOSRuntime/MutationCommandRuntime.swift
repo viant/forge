@@ -233,12 +233,15 @@ extension ForgeRuntime {
 
         let dialogSignal = if let dialogID { await signals.dialog(dialogID: "\(windowID)Dialog\(dialogID)") } else { nil as Signal<DialogState>? }
         let originalPresentation = await dialogSignal?.peek().presentationID
-        let admitted = await windowMetadata(id: windowID)?.authorizationSnapshot
+        let admittedMetadata = await windowMetadata(id: windowID)
+        let admitted = admittedMetadata?.authorizationSnapshot
         let originalSelection = await dataSourceSelectionState(windowID: windowID, dataSourceRef: sourceDataSourceRef)
         var submitted: [String: JSONValue] = [:]
-        if !command.clearFormFields.isEmpty {
+        var submittedSuccessFields: [String: JSONValue] = [:]
+        if !command.clearFormFields.isEmpty || !command.successFormState.isEmpty {
             let form = await dataSourceForm(windowID: windowID, dataSourceRef: sourceDataSourceRef)
             for field in command.clearFormFields { submitted[field] = form[field] }
+            for field in command.successFormState.keys { submittedSuccessFields[field] = form[field] }
         }
         guard await footerAllows(windowID: windowID, source: sourceDataSourceRef, action: footer),
               await mutationPredicateAllows(windowID: windowID, dataSourceRef: sourceDataSourceRef, condition: command.validateWhen) else {
@@ -300,6 +303,9 @@ extension ForgeRuntime {
         var attemptingFinalWriter = false
         var currentStep: String?
         do {
+            if !command.successFormState.isEmpty && (originalPresentation == nil || admittedMetadata?.dataSources[sourceDataSourceRef] == nil) {
+                throw MutationDispatchFailure(status: "invalid_payload", message: "successFormState requires a live submitting dialog.")
+            }
             if command.receiptWhen != nil { throw MutationDispatchFailure(status: "invalid_payload", message: "Only cleanup commands may assert their receipt.") }
             if let error = command.beforeValidationError {
                 throw MutationDispatchFailure(status: "invalid_payload", message: error)
@@ -339,6 +345,7 @@ extension ForgeRuntime {
                 guardedMutationCommands.remove(key)
             }
             var warnings: [MutationCommandWarning] = []
+            let formPatch = await applySuccessFormState(operation, dialogID: dialogID, submitted: submittedSuccessFields)
             if await completionIsCurrent(operation) {
                 warnings = await synchronizeMutationUI(
                     windowID: windowID, targetDataSourceRef: targetRef, command: command, authorization: admitted,
@@ -365,10 +372,16 @@ extension ForgeRuntime {
             }
             await clearSubmittedFields(windowID: windowID, source: sourceDataSourceRef, submitted: submitted)
             await applyMutationWindowState(windowID: windowID, patch: patch)
+            var message = "Completed"
+            if !warnings.isEmpty {
+                message = "Saved. Some related data could not be refreshed."
+            } else if formPatch == .conflict, await presentationIsCurrent(operation) {
+                message = "Saved the submitted version. Your newer changes are still in the form."
+            }
             await publishMutationState(
                 key,
                 MutationCommandState(
-                    phase: .succeeded, message: warnings.isEmpty ? "Completed" : "Saved. Some related data could not be refreshed.",
+                    phase: .succeeded, message: message,
                     invocationId: invocationId, writerStatus: .succeeded, syncStatus: warnings.isEmpty ? .succeeded : .partialFailure,
                     warnings: warnings))
             if footer?.close == true, let dialogID, let presentationID = operation.presentationID, await operationIsCurrent(operation) {
@@ -440,6 +453,19 @@ extension ForgeRuntime {
                 accepted: admittedWrites || failure.invoked, status: failure.status, invocationId: invocationId, failedStepId: currentStep,
                 error: failure.unknown ? nil : failure.message, warnings: warnings)
         }
+    }
+
+    private func applySuccessFormState(_ operation: MutationOperation, dialogID: String?, submitted: [String: JSONValue]) async -> SubmittedFormPatchDisposition {
+        let patch = operation.root.successFormState
+        guard !patch.isEmpty, let dialogID, let presentation = operation.presentationID else { return .unchanged }
+        let id = WindowIdentity(windowID: operation.windowID).dataSourceID(ref: operation.source)
+        let signal = await signals.form(dataSourceID: id)
+        let visible = await signal.checkSubmittedFormPatch(submitted: submitted, patch: patch)
+        guard await completionIsCurrent(operation), pendingDialogScope("\(operation.windowID)Dialog\(dialogID)").id == presentation else { return .unchanged }
+        guard visible == .apply else { return visible }
+        let stored = await dataSourceRuntime.applySubmittedFormPatch(dataSourceID: id, submitted: submitted, patch: patch)
+        guard stored == .apply else { return stored }
+        return await signal.applySubmittedFormPatch(submitted: submitted, patch: patch)
     }
 
     private func clearSubmittedFields(windowID: String, source: String, submitted: [String: JSONValue]) async {
@@ -553,7 +579,8 @@ extension ForgeRuntime {
         let exactReceipt = receipts != nil || (!child && operation.footer?.close == true)
         let outcome = await awaitMutationWriter(
             windowID: windowID, dataSourceRef: target, timeoutMs: max(1_000, command.timeoutMs ?? 30_000),
-            requireRecords: child || !command.resultState.isEmpty || exactReceipt, ordered: exactReceipt)
+            requireRecords: child || !command.resultState.isEmpty || exactReceipt, ordered: exactReceipt,
+            guardTransportErrors: exactReceipt || !command.successFormState.isEmpty)
         if case .indeterminate = outcome {
             retainLease = true
             throw MutationDispatchFailure(
@@ -574,7 +601,7 @@ extension ForgeRuntime {
     }
 
     private func awaitMutationWriter(
-        windowID: String, dataSourceRef: String, timeoutMs: Int, requireRecords: Bool = false, ordered: Bool = false
+        windowID: String, dataSourceRef: String, timeoutMs: Int, requireRecords: Bool, ordered: Bool, guardTransportErrors: Bool
     ) async -> MutationWriterOutcome {
         let race = MutationWriterRace()
         let writer = Task {
@@ -583,7 +610,7 @@ extension ForgeRuntime {
             case .success(let rows): await race.resolve(.succeeded(requireRecords ? rows : nil))
             case .failure(let error):
                 let transport = error as NSError
-                if (ordered
+                if (guardTransportErrors
                     && ((transport.domain == "Forge.DataSource.HTTP" && (transport.code == 408 || (500...599).contains(transport.code)))
                         || error is DecodingError))
                     || error is CancellationError

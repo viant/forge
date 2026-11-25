@@ -926,6 +926,16 @@ The root owns confirmation, state updates, result mapping and refresh. An
 optional `cleanupState` patches the originating window form while compensation
 is running. Closing and reopening a dialog creates a new presentation scope.
 
+A dialog footer command can set `successFormState: {saved: true, message: "Saved."}`.
+After the writer acknowledges that invocation, Forge merges the declared literal
+values into the source form of the submitting dialog. It checks the actor, the
+original open presentation, and the presence and value of each submitted field.
+A change to any of those fields skips the entire patch. Other form edits survive.
+A rejected or unknown write leaves the source form available for recovery.
+Declare window-wide work through the existing `successState` and `refresh`
+options. Each top-level form field can belong to either `successFormState` or
+`clearFormFields` in one command.
+
 A root command can also opt in to `clearFormFields: [attachment, attachments]`
 with or without preparation steps. The executor remembers the submitted source
 form values for those top-level fields. After a confirmed save or a definitive

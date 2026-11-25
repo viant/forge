@@ -98,6 +98,13 @@ class MutationCommandRuntime {
         val targetRef = command.dataSourceRef.trim()
         if (command.invalidClearFields) return MutationCommandResult(false, "invalid", error = "clearFormFields requires distinct top-level form fields.")
         if (command.receiptWhen != null) return MutationCommandResult(false, "invalid", error = "receiptWhen is supported only on a cleanup command.")
+        command.successFormDefinitionError?.let { return MutationCommandResult(false, "invalid", error = it) }
+        val patchForm = command.successFormState.isNotEmpty()
+        if (patchForm && (presentation?.open != true || !presentationCurrent())) {
+            return MutationCommandResult(false, "invalid", error = "successFormState requires a current submitting dialog.")
+        }
+        val submittedSuccessFields = source.captureFormFields(command.successFormState.keys)
+        val submittingActor = if (patchForm) window.metadata.peek()?.authorizationSnapshot.orEmpty() else null
         val key = commandKey(window.windowId, command)
         val group = command.serializationGroup?.trim()?.takeIf(String::isNotEmpty)?.let { "${window.windowId}::$it" }
         val acquired = mutex.withLock {
@@ -117,17 +124,17 @@ class MutationCommandRuntime {
         }
         if (!acquired) return MutationCommandResult(false, "suppressed")
 
-        val admitted = window.metadata.peek()?.authorizationSnapshot.orEmpty()
+        val admitted = submittingActor ?: window.metadata.peek()?.authorizationSnapshot.orEmpty()
         val ordered = command.before.isNotEmpty()
         val closing = closeDialogId != null
         val scopeSensitive = ordered || command.clearFormFields.isNotEmpty() || closing
         val selection = if (scopeSensitive) source.selection.peek() else null
-        val lease = CommandLease(key, command, presentation, presentationCurrent, closing) {
+        val lease = CommandLease(key, command, presentation, presentationCurrent, closing, submittedSuccessFields) {
             window.metadata.peek()?.authorizationSnapshot == admitted &&
                 (!(scopeSensitive || presentation != null) || window.signals.ownsMetadata(window.windowId, window.metadata)) &&
                 (!scopeSensitive || source.selection.peek() == selection)
         }
-        val checkDialog = closing || (!scopeSensitive && presentation != null)
+        val checkDialog = closing || patchForm || (!scopeSensitive && presentation != null)
         val eligible = { lease.admitted() && (!checkDialog || presentationCurrent()) && predicateAllows(source, command.validateWhen) }
         if (!scopeSensitive) return executeOne(runtime, window, source, command, extras, confirm, lease, eligible)
         val submitted = source.captureFormFields(command.clearFormFields)
@@ -162,7 +169,7 @@ class MutationCommandRuntime {
         }
     }
 
-    private inner class CommandLease(val key: String, val root: MutationCommandDef, presented: DialogState?, val presentationCurrent: () -> Boolean, val closing: Boolean, val admitted: () -> Boolean) {
+    private inner class CommandLease(val key: String, val root: MutationCommandDef, presented: DialogState?, val presentationCurrent: () -> Boolean, val closing: Boolean, val submittedSuccessFields: Map<String, Any?>, val admitted: () -> Boolean) {
         val ordered = root.before.isNotEmpty()
         val requiresReceipt = ordered || closing
         private val presentation = presented?.let { java.lang.ref.WeakReference(it) }
@@ -426,11 +433,12 @@ class MutationCommandRuntime {
             writerStatus = MutationWriterStatus.Pending
         ))
         lease.attempted = true
+        val requiresWriterReceipt = lease.requiresReceipt || command.successFormState.isNotEmpty()
         val writer = try {
-            val receipt = withTimeoutOrNull(timeout) { target.fetchCommandResult(parameters, requireRecords = lease.requiresReceipt) }
+            val receipt = withTimeoutOrNull(timeout) { target.fetchCommandResult(parameters, requireRecords = requiresWriterReceipt) }
             when {
                 receipt == null -> MutationWriterOutcome.Indeterminate()
-                lease.requiresReceipt && (!receipt.recordsConfirmed || uncertainTransport(receipt.cause)) -> MutationWriterOutcome.Indeterminate(receipt.cause)
+                requiresWriterReceipt && (!receipt.recordsConfirmed || uncertainTransport(receipt.cause)) -> MutationWriterOutcome.Indeterminate(receipt.cause)
                 receipt.cause is java.net.SocketTimeoutException || receipt.cause is java.util.concurrent.TimeoutException ->
                     MutationWriterOutcome.Indeterminate(receipt.cause)
                 receipt.error != null -> MutationWriterOutcome.Failed(receipt.error, receipt.cause)
@@ -496,6 +504,13 @@ class MutationCommandRuntime {
             }
             is MutationWriterOutcome.Succeeded -> {
                 if (onReceipt != null) onReceipt(invocationId, checkNotNull(writer.records))
+                val formConflict = if (command === lease.root && command.successFormState.isNotEmpty()) {
+                    synchronized(runtime) {
+                        source.applySuccessFormState(command.successFormState, lease.submittedSuccessFields) {
+                            lease.admitted() && lease.presentationCurrent()
+                        }
+                    }
+                } else false
                 val warnings = mutableListOf<MutationCommandWarning>()
                 val patch = command.successState.toMutableMap()
                 for ((field, selectors) in command.resultState) {
@@ -514,7 +529,12 @@ class MutationCommandRuntime {
                     throw cancelled
                 }
                 val sync = if (warnings.isEmpty()) MutationSyncStatus.Succeeded else MutationSyncStatus.PartialFailure
-                val message = if (warnings.isEmpty()) "Completed" else "Saved. Some related data could not be refreshed."
+                val message = when {
+                    warnings.isNotEmpty() -> "Saved. Some related data could not be refreshed."
+                    formConflict && lease.admitted() && lease.presentationCurrent() ->
+                        "Saved the submitted version. Your newer changes are still in the form."
+                    else -> "Completed"
+                }
                 lease.settle(transport, MutationCommandState(
                     phase = MutationCommandPhase.Succeeded,
                     message = message,

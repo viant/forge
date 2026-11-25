@@ -1,3 +1,5 @@
+import equal from 'fast-deep-equal';
+import {isDeferredCacheHitEnvelope} from '../dataSourceExtract.js';
 import {withoutAuthorizationValidationHints} from '../../runtime/canonicalDelivery.js';
 import {resolveParameters} from '../../hooks/parameters.js';
 import {evaluateCondition} from '../../utils/evaluateCondition.js';
@@ -118,7 +120,7 @@ async function prepareCommandParameters(context, command, parameters, extras) {
       }, Math.max(1000, Number(command.timeoutMs) || 30000)); }),
     ]);
     if (!prepared || typeof prepared !== 'object' || Array.isArray(prepared)) throw new Error('Command preparation must return a parameter map.');
-    return parameterSnapshot(prepared);
+    return Object.keys(command.successFormState || {}).length ? snapshotFormValue(prepared) : parameterSnapshot(prepared);
   } finally { clearTimeout(timer); }
 }
 
@@ -140,7 +142,7 @@ function awaitWriter(target, invoke, timeoutMs, requireRecords = false, presenta
     };
     const control = target?.signals?.control;
     const previousError = (control?.peek?.() || control?.value || {}).error;
-    const observed = !requireRecords && typeof control?.subscribe === 'function';
+    const observed = !requireRecords && !presentation?.requireAcknowledgement && typeof control?.subscribe === 'function';
     if (observed) dispose = control.subscribe((value = {}) => {
       if (!invocationStarted) return;
       if (value.loading) { loadingSeen = true; return; }
@@ -171,6 +173,13 @@ function awaitWriter(target, invoke, timeoutMs, requireRecords = false, presenta
         else result.then(records => {
           if (Array.isArray(records)) settle({status: 'succeeded', records});
           else settle({status: 'indeterminate', error: new Error('The writer did not return invocation records.')});
+        }, error => settle({status: error?.code === 'request_superseded' ? 'indeterminate' : 'failed', error}));
+      } else if (presentation?.requireAcknowledgement) {
+        const unknown = () => settle({status: 'indeterminate', error: new Error('The writer did not provide an invocation receipt.')});
+        if (!result?.then) unknown();
+        else result.then(payload => {
+          if (payload == null || typeof payload !== 'object' || isDeferredCacheHitEnvelope(payload)) unknown();
+          else settle({status: 'succeeded'});
         }, error => settle({status: error?.code === 'request_superseded' ? 'indeterminate' : 'failed', error}));
       } else if (ownsAcknowledgement) {
         result.then(() => settle({status: 'succeeded'}), error => settle({
@@ -384,7 +393,7 @@ function sequenceDefinitionError(command) {
         part.serializationGroup ||
         part.reconcile ||
         part.refresh?.length ||
-        ['pendingState', 'cleanupState', 'successState', 'errorState', 'indeterminateState', 'resultState'].some(
+        ['pendingState', 'cleanupState', 'successState', 'successFormState', 'errorState', 'indeterminateState', 'resultState'].some(
           (k) => Object.keys(part[k] || {}).length
         )
       ) {
@@ -438,6 +447,7 @@ function dispatchCommandWriter(target, command, parameters, id, requireRecords, 
     requireRecords,
     presentationCurrent && !requireRecords ? {
       current: presentationCurrent,
+      requireAcknowledgement: Object.keys(command.successFormState || {}).length > 0,
       retain: completion => retainMutationAcknowledgement(target.identity?.dataSourceId, id, completion),
     } : undefined
   );
@@ -537,13 +547,72 @@ async function unwindPreparation(context, root, sequence, key, current, presenta
   return !current();
 }
 
+function validFormField(field) {
+  return typeof field === 'string' && field !== '' && field.trim() === field &&
+    !/[.:/\[\]]/.test(field) && !['__proto__', 'constructor', 'prototype'].includes(field);
+}
+
+// Preserve immutable strings when snapshotting JSON-shaped drafts and writer
+// arguments. Delegate other structured values to the normal snapshot operation.
+function snapshotFormValue(root) {
+  if (root == null || typeof root !== 'object') return parameterSnapshot(root);
+  const seen = new WeakMap();
+  const useStructuredClone = Symbol();
+  function copy(value) {
+    if (typeof value === 'function' || typeof value === 'symbol') throw useStructuredClone;
+    if (value == null || typeof value !== 'object') return value;
+    if (seen.has(value)) return seen.get(value);
+    const array = Array.isArray(value), proto = Object.getPrototypeOf(value);
+    if (!array && proto && Object.getPrototypeOf(proto) !== null) throw useStructuredClone;
+    const result = array ? new Array(value.length) : {};
+    seen.set(value, result);
+    for (const key of Object.keys(value)) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor || !Object.hasOwn(descriptor, 'value')) throw useStructuredClone;
+      Object.defineProperty(result, key, {value: copy(descriptor.value), writable: true, configurable: true, enumerable: true});
+    }
+    return result;
+  }
+  try { return copy(root); }
+  catch (error) {
+    if (error !== useStructuredClone) throw error;
+    return parameterSnapshot(root);
+  }
+}
+
+function captureFormPatch(context, patch, clearFields, open) {
+  if (patch == null) return null;
+  if (typeof patch !== 'object' || Array.isArray(patch)) throw new Error('successFormState requires a map of literal fields.');
+  const fields = Object.keys(patch);
+  if (!fields.length) return null;
+  if (!open || typeof context.handlers?.dataSource?.setEditedFormData !== 'function') {
+    throw new Error('successFormState requires a live submitting dialog form.');
+  }
+  const form = context.signals?.form?.peek?.() ?? context.handlers.dataSource.peekFormData?.() ?? {};
+  const snapshot = new Map();
+  for (const field of fields) {
+    if (!validFormField(field) || clearFields?.includes(field)) throw new Error('Invalid or conflicting successFormState field.');
+    if (Object.hasOwn(form, field)) snapshot.set(field, snapshotFormValue(form[field]));
+  }
+  return {patch: parameterSnapshot(patch), fields, snapshot};
+}
+
+function applyFormPatch(context, {patch, fields, snapshot}) {
+  const source = context.handlers.dataSource;
+  const form = context.signals?.form?.peek?.() ?? source.peekFormData?.() ?? {};
+  if (fields.every(field => Object.hasOwn(form, field) === snapshot.has(field) && equal(form[field], snapshot.get(field)))) {
+    source.setEditedFormData({values: {...form, ...patch}});
+    return true;
+  }
+  return false;
+}
+
 function submittedFormFields(context, fields) {
   if (!fields?.length) return null;
   const submitted = new Map();
   const form = context.signals?.form?.peek?.() ?? context.handlers?.dataSource?.peekFormData?.() ?? {};
   for (const field of fields) {
-    if (typeof field !== 'string' || !field || field.trim() !== field || /[.:/\[\]]/.test(field) ||
-        ['__proto__', 'constructor', 'prototype'].includes(field) || submitted.has(field)) {
+    if (!validFormField(field) || submitted.has(field)) {
       throw new Error('clearFormFields requires distinct top-level form field names.');
     }
     // Published form edits replace values. Retain references to the submitted
@@ -587,6 +656,7 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
   const closesDialog = Boolean(lifecycle.dialogId) && typeof lifecycle.closeOnSuccess === 'function';
   const needsExactReceipt = ordered || clearFields || closesDialog;
   let submittedFields;
+  let formPatch;
   let sequence = null;
   let originalScope;
   let dialogSignal;
@@ -622,6 +692,7 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
       dialogSignal = findDialogSignal(`${windowId}Dialog${lifecycle.dialogId}`);
       dialogProps = dialogSignal?.peek()?.props;
     }
+    formPatch = captureFormPatch(context, command.successFormState, command.clearFormFields, dialogSignal && presentationCurrent());
     if (ordered) {
       sequence = sequenceInputs(extras);
       const problem = sequenceDefinitionError(command);
@@ -725,6 +796,11 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
     writerSucceeded = true;
     let warnings = [];
     if (uiIsCurrent()) clearSubmittedFields(context, submittedFields, warnings);
+    let formChanged = false;
+    if (formPatch && uiIsCurrent()) {
+      try { formChanged = !applyFormPatch(context, formPatch); }
+      catch (error) { warnings.push({stage: 'successFormState', error}); }
+    }
     const successState = mapsResult ? Object.assign(Object.create(null), command.successState) : command.successState;
     for (const [field, selectors] of Object.entries(command.resultState || {})) {
       let value;
@@ -754,7 +830,8 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
       catch (error) { warnings.push({stage: 'close', error}); }
     }
     const syncStatus = warnings.length ? 'partial_failure' : 'succeeded';
-    const message = warnings.length ? 'Saved. Some related data could not be refreshed.' : 'Completed';
+    const successMessage = formChanged ? 'Saved the submitted version. Your newer changes are still in the form.' : 'Completed';
+    const message = warnings.length ? 'Saved. Some related data could not be refreshed.' : successMessage;
     publish(context, key, {phase: 'succeeded', guarded: false, pending: false, retryAllowed: true, error: null, message, writerStatus: 'succeeded', syncStatus, warnings});
     if (uiIsCurrent()) notifyLifecycle(lifecycle, 'onSettled', {status: 'succeeded', warnings, invocationId: id});
     return {accepted: true, status: 'succeeded', warnings, invocationId: id};

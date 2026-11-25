@@ -37,6 +37,15 @@ public actor DataSourceRuntime {
         return true
     }
 
+    func applySubmittedFormPatch(dataSourceID: String, submitted: [String: JSONValue], patch: [String: JSONValue]) -> SubmittedFormPatchDisposition {
+        let decision = submittedFormPatchDisposition(formValues[dataSourceID] ?? [:], submitted: submitted, patch: patch)
+        if decision == .apply {
+            formValues[dataSourceID, default: [:]].merge(patch) { _, value in value }
+            publishForm(dataSourceID)
+        }
+        return decision
+    }
+
     func restoreForm(dataSourceID: String, ifCurrent current: [String:JSONValue], previous: [String:JSONValue]) -> Bool {
         guard form(dataSourceID: dataSourceID) == current else { return false }
         setForm(dataSourceID: dataSourceID, values: previous)
@@ -45,7 +54,12 @@ public actor DataSourceRuntime {
 
     public func setForm(dataSourceID: String, values: [String: JSONValue]) {
         formValues[dataSourceID] = values
-        for observer in formObservers[dataSourceID]?.values ?? [:].values { observer.yield(values) }
+        publishForm(dataSourceID)
+    }
+
+    private func publishForm(_ dataSourceID: String) {
+        let current = formValues[dataSourceID] ?? [:]
+        for observer in formObservers[dataSourceID]?.values ?? [:].values { observer.yield(current) }
     }
 
     public func compareAndSetReportForm(dataSourceID: String, expected: [String: JSONValue], updated: [String: JSONValue]) -> Bool {
@@ -480,6 +494,18 @@ public actor DataSourceRuntime {
             metricsValues.removeValue(forKey: key)
         }
     }
+}
+
+enum SubmittedFormPatchDisposition: Sendable { case apply, unchanged, conflict }
+
+// Missing dictionary entries and explicit JSON null are distinct submitted values.
+func submittedFormPatchDisposition(_ form: [String: JSONValue], submitted: [String: JSONValue], patch: [String: JSONValue]) -> SubmittedFormPatchDisposition {
+    var changed = false
+    for (key, value) in patch {
+        guard form[key] == submitted[key] else { return .conflict }
+        if form[key] != value { changed = true }
+    }
+    return changed ? .apply : .unchanged
 }
 
 /// Release only values still owned by the completed submission. Each form

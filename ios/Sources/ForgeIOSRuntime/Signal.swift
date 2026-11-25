@@ -15,10 +15,12 @@ public actor Signal<Value: Sendable> {
     func exchange(_ next: Value) -> Value {
         let previous = value
         value = next
-        for continuation in continuations.values {
-            continuation.yield(next)
-        }
+        publish()
         return previous
+    }
+
+    private func publish() {
+        for continuation in continuations.values { continuation.yield(value) }
     }
 
     public func peek() -> Value {
@@ -42,6 +44,21 @@ public actor Signal<Value: Sendable> {
 
     private func removeContinuation(_ id: UUID) {
         continuations.removeValue(forKey: id)
+    }
+}
+
+extension Signal where Value == [String: JSONValue] {
+    func checkSubmittedFormPatch(submitted: [String: JSONValue], patch: [String: JSONValue]) -> SubmittedFormPatchDisposition {
+        submittedFormPatchDisposition(value, submitted: submitted, patch: patch)
+    }
+
+    func applySubmittedFormPatch(submitted: [String: JSONValue], patch: [String: JSONValue]) -> SubmittedFormPatchDisposition {
+        let decision = checkSubmittedFormPatch(submitted: submitted, patch: patch)
+        if decision == .apply {
+            value.merge(patch) { _, next in next }
+            publish()
+        }
+        return decision
     }
 }
 

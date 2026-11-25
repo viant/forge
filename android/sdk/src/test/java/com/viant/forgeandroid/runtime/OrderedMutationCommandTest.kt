@@ -304,6 +304,170 @@ class OrderedMutationCommandTest {
         observer.join()
     } }
 
+    @Test fun confirmedFooterPatchesSourceFormOnceBeforeRefresh() = runBlocking { fixture {
+        val action = JsonUtil.json.decodeFromString<ActionDef>("""{"id":"apply","mutationCommand":{"dataSourceRef":"save",
+            "successFormState":{"note":null,"status":{"confirmed":true},"flags":[false,0]},
+            "successState":{"ownerDone":true},"refresh":[{"dataSourceRef":"unused"}]}}""")
+        val command = assertNotNull(action.footerCommand())
+        val unrelated = listOf(mapOf("value" to "retained"))
+        source.setForm(mapOf("status" to "editing", "unrelated" to unrelated))
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        var atRefresh: Map<String, Any?>? = null
+        loader {
+            if (it.dataSourceRef == "save") { started.complete(Unit); release.await() }
+            else atRefresh = source.peekForm()
+            emptyList()
+        }
+        assertTrue(runtime.presentDialog(window.windowId, "editor"))
+        val operation = startControlMutation(runtime, window, source, command, emptyMap(), this@runBlocking, "editor") { true }
+        started.await()
+        source.setFormField("later", "keep")
+        release.complete(Unit)
+        assertEquals("succeeded", operation.await().status)
+        val form = source.peekForm()
+        assertEquals("Completed", runtime.mutationCommands.state(window.windowId, command).message)
+        assertEquals(form, atRefresh)
+        assertTrue("note" in form)
+        assertNull(form["note"])
+        assertEquals(mapOf("confirmed" to true), form["status"])
+        assertEquals(listOf(false, 0L), form["flags"])
+        assertEquals("keep", form["later"])
+        assertSame(unrelated, form["unrelated"])
+        assertFalse("status" in window.peekWindowForm())
+        assertEquals(true, window.peekWindowForm()["ownerDone"])
+        assertEquals(listOf("save", "unused"), refs())
+    } }
+
+    @Test fun changedPatchedFieldOrPresenceSkipsTheWholePatch() = runBlocking { fixture {
+        val patch = JsonUtil.json.parseToJsonElement("""{"selected":null,"untouched":"saved"}""").jsonObject
+        for (variant in listOf("nested", "absent", "null")) {
+            val nested = mutableListOf("old")
+            val original = when (variant) {
+                "nested" -> mapOf("selected" to nested)
+                "null" -> mapOf("selected" to null)
+                else -> emptyMap()
+            }
+            source.setForm(original + ("untouched" to "draft"))
+            val command = child("save").copy(successFormState = patch)
+            val started = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            loader { started.complete(Unit); release.await(); emptyList() }
+            assertTrue(runtime.presentDialog(window.windowId, "editor"))
+            val op = startControlMutation(runtime, window, source, command, emptyMap(), this@runBlocking, "editor") { true }
+            started.await()
+            when (variant) {
+                "nested" -> nested[0] = "edited"
+                "null" -> source.setForm(source.peekForm() - "selected")
+                else -> source.setFormField("selected", null)
+            }
+            val expected = source.peekForm()
+            release.complete(Unit)
+            assertEquals("succeeded", op.await().status)
+            assertEquals(expected, source.peekForm())
+            assertEquals("Saved the submitted version. Your newer changes are still in the form.",
+                runtime.mutationCommands.state(window.windowId, command).message)
+            runtime.closeDialogPublic(window.windowId, "editor")
+        }
+    } }
+
+    @Test fun staleFooterCannotPatchAnIdenticalReopenedFormOrAnotherPrincipal() = runBlocking { fixture {
+        for (changeActor in listOf(false, true)) {
+            val started = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val command = child("save").copy(successFormState = JsonObject(mapOf("value" to JsonPrimitive("saved"))),
+                successState = JsonObject(mapOf("done" to JsonPrimitive(true))), refresh = listOf(RefreshSpec(dataSourceRef = "unused")))
+            loader { if (it.dataSourceRef == "save") { started.complete(Unit); release.await() }; emptyList() }
+            val args = mapOf("id" to 3)
+            assertTrue(runtime.presentDialog(window.windowId, "editor", args))
+            source.setForm(mapOf("value" to "same"))
+            val start = calls.size
+            val op = startControlMutation(runtime, window, source, command, emptyMap(), this@runBlocking, "editor") { true }
+            started.await()
+            if (changeActor) {
+                val metadata = checkNotNull(window.metadata.peek())
+                window.metadata.set(metadata.copy(authorizationSnapshot = mapOf("principal" to JsonObject(mapOf("subject" to JsonPrimitive("another"))))))
+            } else {
+                runtime.closeDialogPublic(window.windowId, "editor")
+                assertTrue(runtime.presentDialog(window.windowId, "editor", args))
+            }
+            release.complete(Unit)
+            val result = op.await()
+            assertEquals("same", source.peekForm()["value"])
+            if (!changeActor) {
+                assertEquals("succeeded", result.status)
+                assertEquals(listOf("save","unused"), refs().drop(start))
+                assertEquals(true, window.peekWindowForm()["done"])
+            }
+            runtime.closeDialogPublic(window.windowId, "editor")
+        }
+    } }
+
+    @Test fun successFormPatchRequiresAValidRootFooterAndConfirmedWrite() = runBlocking { fixture {
+        val patch = JsonObject(mapOf("field" to JsonPrimitive("saved")))
+        val command = child("save").copy(successFormState = patch)
+        loader()
+        assertEquals("invalid", execute(command).status)
+        for (key in listOf("field.path", "__proto__", "constructor", " field")) {
+            val invalid = command.copy(successFormState = JsonObject(mapOf(key to JsonNull)))
+            assertEquals("invalid", execute(invalid).status)
+        }
+        assertEquals("invalid", execute(command.copy(clearFormFields = listOf("field"))).status)
+        for (step in listOf(MutationBeforeStepDef(command = child("first").copy(successFormState = patch)),
+            MutationBeforeStepDef(command = child("first"), cleanup = child("cleanFirst").copy(successFormState = patch)))) {
+            assertFalse(execute(root.copy(before = listOf(step))).accepted)
+        }
+        assertTrue(calls.isEmpty())
+        assertTrue(runtime.presentDialog(window.windowId,"editor"))
+        source.setFormField("field", "original")
+        val cancelled = startControlMutation(runtime,window,source,command.copy(confirm = "Continue?"),emptyMap(),
+            this@runBlocking,"editor") { false }.await()
+        assertFalse(cancelled.accepted)
+        assertTrue(calls.isEmpty())
+        for ((failure, expectedStatus) in listOf(IllegalArgumentException("rejected") to "failed", IOException("lost") to "indeterminate")) {
+            loader { throw failure }
+            val result = startControlMutation(runtime,window,source,command,emptyMap(),this@runBlocking,"editor") { true }.await()
+            assertEquals(expectedStatus,result.status)
+            assertEquals("original",source.peekForm()["field"])
+        }
+    } }
+
+    @Test fun stagedReceiptDoesNotPatchUntilRootSucceedsAndDisjointFilesCanClear() = runBlocking { fixture {
+        val command = child("save").copy(
+            before = listOf(MutationBeforeStepDef(command = child("first"))),
+            successFormState = JsonObject(mapOf("status" to JsonPrimitive("saved"))),
+            clearFormFields = listOf("file")
+        )
+        source.setForm(mapOf("status" to "draft", "file" to "submitted"))
+        loader { request ->
+            if (request.dataSourceRef == "save") assertEquals("draft", source.peekForm()["status"])
+            emptyList()
+        }
+        assertTrue(runtime.presentDialog(window.windowId, "editor"))
+        val result = startControlMutation(runtime, window, source, command, emptyMap(), this@runBlocking, "editor") { true }.await()
+        assertEquals("succeeded", result.status)
+        assertEquals(listOf("first", "save"), refs())
+        assertEquals(mapOf("status" to "saved", "file" to null), source.peekForm())
+    } }
+
+    @Test fun formPatchAloneRequiresAnExactHTTPWriterAcknowledgement() = runBlocking {
+        for ((body, acknowledged) in listOf("{}" to false, """{"data":[]}""" to true)) {
+            val server = MockWebServer()
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+            try {
+                server.enqueue(MockResponse().setBody(body))
+                server.start()
+                val f = Fixture(scope, server)
+                val command = child("save").copy(successFormState = JsonObject(mapOf("flag" to JsonPrimitive(false))))
+                assertTrue(f.runtime.presentDialog(f.window.windowId, "editor"))
+                val result = startControlMutation(f.runtime, f.window, f.source, command, emptyMap(), this, "editor") { true }.await()
+                assertEquals(if (acknowledged) "succeeded" else "indeterminate", result.status)
+                assertEquals(acknowledged, "flag" in f.source.peekForm())
+                assertEquals(1, server.requestCount)
+            } finally { scope.cancel(); server.shutdown() }
+        }
+    }
+
     @Test fun anOldReceiptNeverDismissesAnIdenticalReopenedFooter() = runBlocking { fixture {
         val id = "editor"
         val args = mapOf("record" to 3)

@@ -858,12 +858,25 @@ class DataSourceContext(
 ) {
     fun peekForm(): Map<String, Any?> = form.peek()
     fun setForm(values: Map<String, Any?>) = form.set(values)
-    fun setFormField(key: String, value: Any?) = form.set(form.peek().toMutableMap().apply { this[key] = value })
+    fun setFormField(key: String, value: Any?) = form.update { current -> current + (key to value) }
 
-    internal fun captureFormFields(names: List<String>): Map<String, Any?> {
+    internal fun captureFormFields(names: Collection<String>): Map<String, Any?> {
         if (names.isEmpty()) return emptyMap()
         val current = form.peek()
         return buildMap { names.forEach { if (it in current) put(it, snapshotInputValue(current[it])) } }
+    }
+
+    /** Returns true only when newer values in the submitting form prevented the entire patch. */
+    internal fun applySuccessFormState(patch: JsonObject, submitted: Map<String, Any?>, isCurrent: () -> Boolean): Boolean {
+        var conflict = false
+        form.update { live ->
+            val current = isCurrent()
+            conflict = current && patch.keys.any { field ->
+                (field in live) != (field in submitted) || snapshotInputValue(live[field]) != submitted[field]
+            }
+            if (current && !conflict) live + patch.mapValues { JsonUtil.elementToAny(it.value) } else live
+        }
+        return conflict
     }
 
     internal fun clearSubmittedFormFields(submitted: Map<String, Any?>, isCurrent: () -> Boolean) {

@@ -350,3 +350,145 @@ extension DialogFooterMutationTests {
         }
     }
 }
+
+extension DialogFooterMutationTests {
+    private func formPatchWindow(subject: String = "owner") throws -> WindowMetadata {
+        let json: [String: Any] = [
+            "view": ["content": [:]], "dataSource": ["draft": [:], "writer": [:], "list": [:]],
+            "dialogs": [["id": "editor", "dataSourceRef": "draft", "fetchOnOpen": false]],
+            "authorizationSnapshot": ["principal": ["subject": subject, "roles": ["editor"]]]
+        ]
+        return try JSONDecoder().decode(WindowMetadata.self, from: JSONSerialization.data(withJSONObject: json))
+    }
+
+    func testSuccessFormStateAppliesOnlyToTheUnchangedFieldsOfItsSubmittingDialog() async throws {
+        let action = try JSONDecoder().decode(ActionDef.self, from: Data(#"""
+            {"id":"save","mutationCommand":{"dataSourceRef":"writer","successState":{"saved":true},
+             "successFormState":{"code":"","count":0,"busy":false,"receipt":null,"detail":{"ids":[1,2]}},
+             "refresh":[{"dataSourceRef":"list","bypassCache":true}]}}
+            """#.utf8))
+        let patch = try XCTUnwrap(action.footerCommand).successFormState
+        // receipt is absent and detail is explicitly null in the submitted draft.
+        let initial: [String: JSONValue] = ["code": .string("old"), "count": .number(3), "busy": .bool(true),
+                                             "detail": .null, "note": .string("original")]
+        for mode in ["success", "changed", "absentToNull", "nullToAbsent", "signalChanged", "conflictWithWarning", "reopened", "revoked", "rejected", "unknown"] {
+            let runtime = ForgeRuntime(), calls = FooterWrites()
+            let id = await runtime.openWindowInline(key: "records", title: "Records", metadata: try formPatchWindow()).id
+            let params: [String: JSONValue] = ["id": .number(7)]
+            _ = await runtime.presentDialog(windowID: id, dialogID: "editor", parameters: params)
+            await runtime.setDataSourceForm(windowID: id, dataSourceRef: "draft", values: initial)
+            let started = expectation(description: "Started " + mode)
+            let release = AsyncStream<Void>.makeStream()
+            await runtime.registerDataSourceLoader { req in
+                let form = await runtime.dataSourceForm(windowID: id, dataSourceRef: "draft")
+                await calls.record(req.dataSourceRef, form)
+                if req.dataSourceRef == "writer" {
+                    started.fulfill()
+                    for await _ in release.stream { break }
+                    if mode == "rejected" { throw NSError(domain: "Forge.DataSource.HTTP", code: 403) }
+                    if mode == "unknown" { throw URLError(.timedOut) }
+                }
+                if req.dataSourceRef == "list", mode == "conflictWithWarning" { throw NSError(domain: "reader", code: 503) }
+                return .init(rows: [])
+            }
+            let submit = Task { await runtime.activateDialogFooter(windowID: id, dialogID: "editor", sourceDataSourceRef: "draft", action: action) }
+            await fulfillment(of: [started], timeout: 4)
+            var current = initial
+            current["note"] = .string("unrelated edit")
+            switch mode {
+            case "changed", "conflictWithWarning": current["code"] = .string("new edit")
+            case "absentToNull": current["receipt"] = .null
+            case "nullToAbsent": current.removeValue(forKey: "detail")
+            case "reopened":
+                let first = await runtime.dialogState(windowID: id, dialogID: "editor")
+                await runtime.closeDialogPublic(windowID: id, dialogID: "editor")
+                _ = await runtime.presentDialog(windowID: id, dialogID: "editor", parameters: params)
+                let second = await runtime.dialogState(windowID: id, dialogID: "editor")
+                XCTAssertNotEqual(first.presentationID, second.presentationID)
+            case "revoked":
+                let signal = await runtime.signals.metadata(windowID: id)
+                await signal.set(try formPatchWindow(subject: "replacement"))
+            default: break
+            }
+            await runtime.setDataSourceForm(windowID: id, dataSourceRef: "draft", values: current)
+            if mode == "signalChanged" {
+                let source = WindowIdentity(windowID: id).dataSourceID(ref: "draft")
+                let signal = await runtime.signals.form(dataSourceID: source)
+                await signal.set(current.merging(["code": .string("visible edit")]) { _, edit in edit })
+            }
+            release.continuation.yield(())
+            release.continuation.finish()
+            let result = await submit.value
+            let expected = mode == "success" ? current.merging(patch) { _, terminal in terminal } : current
+            let visibleExpected = mode == "signalChanged" ? current.merging(["code": .string("visible edit")]) { _, edit in edit } : expected
+            let visible = await runtime.dataSourceForm(windowID: id, dataSourceRef: "draft")
+            let stored = await runtime.formJSONValue(windowID: id, dataSourceRef: "draft")
+            XCTAssertEqual(visible, visibleExpected, mode)
+            XCTAssertEqual(stored, expected, mode)
+            let events = await calls.calls
+            let global = await runtime.windowFormJSONValue(windowID: id)
+            switch mode {
+            case "revoked", "rejected", "unknown":
+                XCTAssertEqual(result?.status, ["revoked": "superseded", "rejected": "failed", "unknown": "indeterminate"][mode], mode)
+                XCTAssertNil(global["saved"], mode)
+                XCTAssertEqual(events.map(\.0), ["writer"], mode)
+            default:
+                XCTAssertEqual(result?.status, "succeeded", mode)
+                XCTAssertEqual(global["saved"], .bool(true), mode)
+                let state = await runtime.mutationCommandState(windowID: id, command: try XCTUnwrap(action.footerCommand))
+                let expectedMessage: String
+                switch mode {
+                case "conflictWithWarning": expectedMessage = "Saved. Some related data could not be refreshed."
+                case "changed", "absentToNull", "nullToAbsent", "signalChanged": expectedMessage = "Saved the submitted version. Your newer changes are still in the form."
+                default: expectedMessage = "Completed"
+                }
+                XCTAssertEqual(state.message, expectedMessage, mode)
+                XCTAssertEqual(events.map(\.0), ["writer", "list"], mode)
+                XCTAssertEqual(events.last?.1, visibleExpected, "The owner refresh must see the settled form: " + mode)
+            }
+        }
+    }
+
+    func testSuccessFormStateRejectsInvalidMetadataAndRequiresALiveDialog() async throws {
+        let runtime = ForgeRuntime(), calls = FooterWrites()
+        let id = await runtime.openWindowInline(key: "records", title: "Records", metadata: try formPatchWindow()).id
+        await runtime.registerDataSourceLoader { request in
+            await calls.record(request.dataSourceRef, request.input.parameters)
+            return .init(rows: [])
+        }
+        func footer(_ spec: [String: Any]) throws -> ActionDef {
+            let json: [String: Any] = ["id": "apply", "mutationCommand": ["dataSourceRef": "writer"].merging(spec) { _, next in next }]
+            return try JSONDecoder().decode(ActionDef.self, from: JSONSerialization.data(withJSONObject: json))
+        }
+        let active = try footer(["successFormState": ["note": ""]])
+        let closed = await runtime.activateDialogFooter(windowID: id, dialogID: "editor", sourceDataSourceRef: "draft", action: active)
+        XCTAssertEqual(closed?.status, "invalid_payload")
+        let unscoped = await runtime.executeMutationCommand(windowID: id, sourceDataSourceRef: "draft", command: try XCTUnwrap(active.footerCommand))
+        XCTAssertEqual(unscoped.status, "invalid_payload")
+
+        _ = await runtime.presentDialog(windowID: id, dialogID: "editor")
+        for spec: [String: Any] in [
+            ["successFormState": ["__proto__": 1]], ["successFormState": ["nested.field": 1]],
+            ["clearFormFields": ["file"], "successFormState": ["file": ""]],
+            ["before": [["command": ["commandId": "stage", "dataSourceRef": "writer", "successFormState": ["file": ""]]]]],
+            ["before": [["command": ["commandId": "stage", "dataSourceRef": "writer"],
+                         "cleanup": ["commandId": "undo", "dataSourceRef": "writer", "successFormState": ["file": ""]]]]]
+        ] {
+            let result = await runtime.activateDialogFooter(windowID: id, dialogID: "editor", sourceDataSourceRef: "draft", action: try footer(spec))
+            XCTAssertEqual(result?.status, "invalid_payload", String(describing: spec))
+        }
+        let missingForm = await runtime.activateDialogFooter(windowID: id, dialogID: "editor", sourceDataSourceRef: "missing", action: active)
+        XCTAssertEqual(missingForm?.status, "invalid_payload")
+        let avoided = await calls.calls
+        XCTAssertTrue(avoided.isEmpty)
+        await runtime.setDataSourceForm(windowID: id, dataSourceRef: "draft", values: ["file": .string("temp"), "note": .string("pending")])
+        let combined = try footer(["clearFormFields": ["file"], "successFormState": ["note": "done"]])
+        let applied = await runtime.activateDialogFooter(windowID: id, dialogID: "editor", sourceDataSourceRef: "draft", action: combined)
+        let form = await runtime.dataSourceForm(windowID: id, dataSourceRef: "draft")
+        XCTAssertEqual(applied?.status, "succeeded")
+        XCTAssertEqual(form, ["file": .null, "note": .string("done")])
+        let empty = try footer(["successFormState": [:]])
+        let allowed = await runtime.executeMutationCommand(windowID: id, sourceDataSourceRef: "draft", command: try XCTUnwrap(empty.footerCommand))
+        XCTAssertEqual(allowed.status, "succeeded")
+    }
+}

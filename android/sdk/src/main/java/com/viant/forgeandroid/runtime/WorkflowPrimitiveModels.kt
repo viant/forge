@@ -36,11 +36,19 @@ data class MutationCommandDef(
     val before: List<MutationBeforeStepDef> = emptyList(),
     val cleanupState: JsonObject = JsonObject(emptyMap()),
     val receiptWhen: DashboardConditionDef? = null,
-    val clearFormFields: List<String> = emptyList()
+    val clearFormFields: List<String> = emptyList(),
+    val successFormState: JsonObject = JsonObject(emptyMap())
 ) {
     @kotlinx.serialization.Transient
     internal val invalidClearFields: Boolean = clearFormFields.isNotEmpty() &&
         (clearFormFields.any { !safeFormField(it) } || clearFormFields.toSet().size != clearFormFields.size)
+    @kotlinx.serialization.Transient
+    internal val successFormDefinitionError: String? = when {
+        successFormState.isEmpty() -> null
+        successFormState.keys.any { !safeFormField(it) } -> "successFormState requires safe top-level form fields."
+        clearFormFields.any(successFormState::containsKey) -> "successFormState and clearFormFields cannot target the same field."
+        else -> null
+    }
     @kotlinx.serialization.Transient
     internal val beforeDefinitionError: String? = if (before.isEmpty()) null else validateBefore()
 }
@@ -68,7 +76,7 @@ private fun MutationCommandDef.validateBefore(): String? {
             !command.confirm.isNullOrBlank() || command.confirmSelection != null || command.reconcile != null ||
             command.refresh.isNotEmpty() || command.resultState.isNotEmpty() || command.pendingState.isNotEmpty() ||
             command.successState.isNotEmpty() || command.errorState.isNotEmpty() || command.indeterminateState.isNotEmpty() ||
-            command.cleanupState.isNotEmpty() || command.clearFormFields.isNotEmpty()) {
+            command.cleanupState.isNotEmpty() || command.clearFormFields.isNotEmpty() || command.successFormState.isNotEmpty()) {
             return "Ordered command $id must declare a writer without nested steps or command lifecycle metadata."
         }
     }

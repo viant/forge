@@ -487,6 +487,9 @@ func validateContainerResourceModels(window *Window, container *Container, valid
 		if err := validateCommandResultState(command); err != nil {
 			return fmt.Errorf("container %s: %w", container.ID, err)
 		}
+		if len(command.SuccessFormState) > 0 {
+			return fmt.Errorf("container %s: successFormState requires a dialog footer command", container.ID)
+		}
 		owner := "container " + container.ID
 		if err := validatePreparationSteps(window, owner, "", command, validateDataSources); err != nil {
 			return err

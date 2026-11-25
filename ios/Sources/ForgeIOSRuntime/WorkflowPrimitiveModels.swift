@@ -28,6 +28,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
     public let pendingState: [String: JSONValue]
     public let resultState: [String: [String]]
     public let successState: [String: JSONValue]
+    public let successFormState: [String: JSONValue]
     public let errorState: [String: JSONValue]
     public let indeterminateState: [String: JSONValue]
     public let reconcile: ReconcileSpec?
@@ -56,13 +57,14 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         cleanupState: [String: JSONValue] = [:],
         pendingState: [String: JSONValue] = [:],
         successState: [String: JSONValue] = [:],
+        successFormState: [String: JSONValue] = [:],
         resultState: [String: [String]] = [:],
         errorState: [String: JSONValue] = [:],
         indeterminateState: [String: JSONValue] = [:],
         reconcile: ReconcileSpec? = nil,
         refresh: [RefreshSpec] = []
     ) {
-        self.beforeValidationError = Self.validateBefore(before, root: commandId ?? dataSourceRef, fields: clearFormFields)
+        self.beforeValidationError = Self.validateBefore(before, root: commandId ?? dataSourceRef, fields: clearFormFields, successFormState: successFormState)
         self.before = before
         self.commandId = commandId
         self.serializationGroup = serializationGroup
@@ -86,6 +88,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         self.pendingState = pendingState
         self.resultState = resultState
         self.successState = successState
+        self.successFormState = successFormState
         self.errorState = errorState
         self.indeterminateState = indeterminateState
         self.reconcile = reconcile
@@ -106,10 +109,14 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         return condition.source == "collection" && condition.dataSourceRef == nil && condition.field?.isEmpty == false
     }
 
-    private static func validateBefore(_ steps: [MutationBeforeStepDef]?, root: String, fields: [String]) -> String? {
+    private static func validateBefore(_ steps: [MutationBeforeStepDef]?, root: String, fields: [String], successFormState: [String: JSONValue]) -> String? {
         var seen = Set<String>()
         for field in fields where !isPlainID(field) || !seen.insert(field).inserted {
             return "Fields cleared by a command must be distinct, top-level names."
+        }
+        for field in successFormState.keys {
+            guard isPlainID(field) else { return "successFormState requires top-level form field names." }
+            guard !seen.contains(field) else { return "successFormState and clearFormFields cannot target the same field." }
         }
         guard let steps else { return nil }
         var ids = Set([root])
@@ -123,7 +130,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
                 }
                 guard child.before?.isEmpty != false, child.confirm?.isEmpty != false, child.confirmSelection == nil,
                       child.serializationGroup?.isEmpty != false, child.reconcile == nil, child.refresh.isEmpty,
-                      child.pendingState.isEmpty, child.successState.isEmpty, child.resultState.isEmpty, child.errorState.isEmpty,
+                      child.pendingState.isEmpty, child.successState.isEmpty, child.successFormState.isEmpty, child.resultState.isEmpty, child.errorState.isEmpty,
                       child.clearFormFields.isEmpty, child.cleanupState.isEmpty, child.indeterminateState.isEmpty else {
                     return "The root command owns confirmation, sequencing and UI synchronization."
                 }
@@ -135,7 +142,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
     private enum CodingKeys: String, CodingKey {
         case before, commandId, serializationGroup, label, icon, hideLabel, intent, confirm, confirmSelection, invalidMessage, timeoutMs
         case invocationParameter, dataSourceRef, parameters, payload, prepare, validateWhen, receiptWhen
-        case clearFormFields, cleanupState, pendingState, resultState, successState, errorState, indeterminateState, reconcile, refresh
+        case clearFormFields, cleanupState, pendingState, resultState, successState, successFormState, errorState, indeterminateState, reconcile, refresh
     }
 
     public init(from decoder: Decoder) throws {
@@ -163,11 +170,12 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         pendingState = try values.decodeIfPresent([String: JSONValue].self, forKey: .pendingState) ?? [:]
         resultState = try values.decodeIfPresent([String: [String]].self, forKey: .resultState) ?? [:]
         successState = try values.decodeIfPresent([String: JSONValue].self, forKey: .successState) ?? [:]
+        successFormState = try values.decodeIfPresent([String: JSONValue].self, forKey: .successFormState) ?? [:]
         errorState = try values.decodeIfPresent([String: JSONValue].self, forKey: .errorState) ?? [:]
         indeterminateState = try values.decodeIfPresent([String: JSONValue].self, forKey: .indeterminateState) ?? [:]
         reconcile = try values.decodeIfPresent(ReconcileSpec.self, forKey: .reconcile)
         refresh = try values.decodeIfPresent([RefreshSpec].self, forKey: .refresh) ?? []
-        beforeValidationError = Self.validateBefore(before, root: commandId ?? dataSourceRef, fields: clearFormFields)
+        beforeValidationError = Self.validateBefore(before, root: commandId ?? dataSourceRef, fields: clearFormFields, successFormState: successFormState)
     }
 }
 
@@ -179,7 +187,7 @@ extension ActionDef {
             confirm: command.confirm, confirmSelection: command.confirmSelection, invalidMessage: command.invalidMessage,
             timeoutMs: command.timeoutMs, invocationParameter: command.invocationParameter, dataSourceRef: command.dataSourceRef,
             parameters: command.parameters, payload: command.payload, prepare: command.prepare, validateWhen: command.validateWhen, receiptWhen: command.receiptWhen,
-            clearFormFields: command.clearFormFields, cleanupState: command.cleanupState, pendingState: command.pendingState, successState: command.successState, resultState: command.resultState,
+            clearFormFields: command.clearFormFields, cleanupState: command.cleanupState, pendingState: command.pendingState, successState: command.successState, successFormState: command.successFormState, resultState: command.resultState,
             errorState: command.errorState, indeterminateState: command.indeterminateState, reconcile: command.reconcile, refresh: command.refresh)
     }
 }

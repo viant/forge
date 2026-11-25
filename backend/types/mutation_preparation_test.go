@@ -222,7 +222,7 @@ func TestMutationReceiptConditionScope(t *testing.T) {
 }
 
 func TestMutationOptionsOptOut(t *testing.T) {
-	for _, fields := range []string{"", "before: []\nclearFormFields: []\n", "before: null\nclearFormFields: null\n"} {
+	for _, fields := range []string{"", "before: []\nclearFormFields: []\nsuccessFormState: {}\n", "before: null\nclearFormFields: null\nsuccessFormState: null\n"} {
 		var root types.MutationCommand
 		if err := yaml.Unmarshal([]byte("dataSourceRef: publish\n"+fields), &root); err != nil {
 			t.Fatal(err)
@@ -251,5 +251,43 @@ func TestMutationOptionsOptOut(t *testing.T) {
 	ordinaryContainer := &types.Window{View: types.View{Content: &types.Container{ID: "save", MutationCommand: &types.MutationCommand{ReceiptWhen: map[string]any{"source": "form"}}}}}
 	if err := types.ValidateResourceModelStructure(ordinaryContainer); err == nil || !strings.Contains(err.Error(), "container save.receiptWhen") {
 		t.Fatalf("container root receipt predicate accepted: %v", err)
+	}
+}
+
+func TestSuccessFormStateIsDialogScoped(t *testing.T) {
+	cmd := &types.MutationCommand{DataSourceRef: "publish", SuccessFormState: map[string]any{"complete": true, "message": nil}}
+	window := orderedFooter(cmd)
+	if err := types.ValidateResourceModels(window); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(cmd)
+	if err != nil || !strings.Contains(string(raw), `"successFormState":{"complete":true,"message":null}`) {
+		t.Fatalf("round trip: %s, %v", raw, err)
+	}
+	for _, field := range []string{"", "a.b", "constructor", " leading", "x[0]"} {
+		invalid := &types.MutationCommand{DataSourceRef: "publish", SuccessFormState: map[string]any{field: true}}
+		if err := types.ValidateResourceModels(orderedFooter(invalid)); err == nil {
+			t.Fatalf("accepted invalid field %q", field)
+		}
+	}
+	window.View.Content = &types.Container{ID: "panel", MutationCommand: cmd}
+	if err := types.ValidateResourceModels(window); err == nil {
+		t.Fatal("accepted a non-dialog command with successFormState")
+	}
+	window.View.Content = nil
+	cmd.ClearFormFields = []string{"complete"}
+	if err := types.ValidateResourceModels(window); err == nil {
+		t.Fatal("accepted overlapping clear and patch")
+	}
+	for _, cleanup := range []bool{false, true} {
+		ordered := newOrderedCommand()
+		step := ordered.Before[0].Command
+		if cleanup {
+			step = ordered.Before[0].Cleanup
+		}
+		step.SuccessFormState = map[string]any{"complete": true}
+		if err := types.ValidateResourceModels(orderedFooter(ordered)); err == nil {
+			t.Fatal("accepted nested result patch")
+		}
 	}
 }

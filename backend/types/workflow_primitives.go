@@ -38,7 +38,10 @@ type MutationCommand struct {
 	ValidateWhen        map[string]interface{}      `json:"validateWhen,omitempty" yaml:"validateWhen,omitempty"`
 	PendingState        map[string]interface{}      `json:"pendingState,omitempty" yaml:"pendingState,omitempty"`
 	// ResultState maps window form fields to ordered selectors in this invocation's normalized writer rows.
-	ResultState        map[string][]string    `json:"resultState,omitempty" yaml:"resultState,omitempty"`
+	ResultState map[string][]string `json:"resultState,omitempty" yaml:"resultState,omitempty"`
+	// SuccessFormState patches the submitting dialog's form after acknowledgement if
+	// its presentation, authorization and submitted field values are still current.
+	SuccessFormState   map[string]interface{} `json:"successFormState,omitempty" yaml:"successFormState,omitempty"`
 	SuccessState       map[string]interface{} `json:"successState,omitempty" yaml:"successState,omitempty"`
 	ErrorState         map[string]interface{} `json:"errorState,omitempty" yaml:"errorState,omitempty"`
 	IndeterminateState map[string]interface{} `json:"indeterminateState,omitempty" yaml:"indeterminateState,omitempty"`

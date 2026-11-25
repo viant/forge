@@ -13,11 +13,19 @@ func validatePreparationSteps(window *Window, owner, fallbackID string, root *Mu
 	if root.ReceiptWhen != nil {
 		return fmt.Errorf("%s.receiptWhen can only be declared on a cleanup command", owner)
 	}
+	for field := range root.SuccessFormState {
+		if !validResourceSelector(field) || strings.Contains(field, ".") {
+			return fmt.Errorf("%s.successFormState requires safe top-level field names", owner)
+		}
+	}
 	if len(root.ClearFormFields) > 0 {
 		seen := make(map[string]bool, len(root.ClearFormFields))
 		for _, field := range root.ClearFormFields {
 			if !validResourceSelector(field) || strings.Contains(field, ".") || seen[field] {
 				return fmt.Errorf("%s.clearFormFields requires distinct, safe top-level field names", owner)
+			}
+			if _, both := root.SuccessFormState[field]; both {
+				return fmt.Errorf("%s field %q occurs in both clearFormFields and successFormState", owner, field)
 			}
 			seen[field] = true
 		}
@@ -47,7 +55,7 @@ func validatePreparationSteps(window *Window, owner, fallbackID string, root *Mu
 		}
 		ids[id] = true
 		if len(command.Before) > 0 || len(command.ClearFormFields) > 0 || command.Confirm != "" || command.ConfirmSelection != nil || command.SerializationGroup != "" ||
-			len(command.PendingState)+len(command.SuccessState)+len(command.ResultState)+len(command.ErrorState)+len(command.IndeterminateState)+len(command.CleanupState) > 0 ||
+			len(command.PendingState)+len(command.SuccessState)+len(command.SuccessFormState)+len(command.ResultState)+len(command.ErrorState)+len(command.IndeterminateState)+len(command.CleanupState) > 0 ||
 			len(command.Refresh) > 0 || command.Reconcile != nil {
 			return fmt.Errorf("%s: confirmation, sequencing and result lifecycle belong to the root command", location)
 		}
