@@ -232,6 +232,17 @@ function tableExportMenuItems({context, item, formats, busy, runExport, isDesign
     /></NativeControlTarget>);
 }
 
+// Both authored Actions menus and editable operation menus use the same exporter.
+export function TableExportSubmenu({context, exportState, close}) {
+    return <MenuItem className="forge-toolbar-export-submenu" text={exportState.item.label || 'Export'}
+        labelElement={<UnifiedIcon name="lucide:chevron-right"/>} disabled={exportState.exportDisabled}
+        popoverProps={{...anchoredPopoverProps({placement:'right-start',popoverClassName:'forge-dropdown-menu',modifiersCustom:[menuTriggerMinWidthModifier]}),usePortal:false,enforceFocus:false,autoFocus:false,
+            targetProps:{role:'menuitem',tabIndex:0,'aria-disabled':exportState.exportDisabled || undefined}}}
+        submenuProps={{className:'forge-toolbar-select-menu','aria-label':`${exportState.item.label || 'Export'} formats`}}>
+        {tableExportMenuItems({context, ...exportState}, close)}
+    </MenuItem>;
+}
+
 export function TableExportControl({context, item, align, disabled = false, rows = [], columns = []}) {
     const isDesignSystem2 = useForgeTheme()?.themeId === 'design-system-2';
     return <TableExportOwner context={context} item={item} disabled={disabled} rows={rows} columns={columns}>{({item, formats, exportDisabled, busy, error, runExport}) => (
@@ -289,7 +300,9 @@ const Toolbar = ({
         ? toolbarItems.find(item => Array.isArray(item.menuItems)
             && (item.id === 'actions' || String(item.className || '').split(' ').includes('forge-list-page-actions-menu'))
             && admittedItem(item)) : undefined;
-    const menuExport = actionsMenu ? toolbarItems.find(item => (item.type === 'tableExport' || item.widget === 'tableExport')
+    const externalActions = isDesignSystem2 && className.split(' ').includes('forge-list-page__actions')
+        && typeof leftContent === 'function';
+    const menuExport = actionsMenu || externalActions ? toolbarItems.find(item => (item.type === 'tableExport' || item.widget === 'tableExport')
         && admittedItem(item)) : undefined;
 
     const renderToolbarItem = (item, align) => {
@@ -323,7 +336,7 @@ const Toolbar = ({
         if ((item.type === 'menu' || item.widget === 'menu' || item.type === 'dropdown') && Array.isArray(item.menuItems)) {
             const menuEvents = useToolbarControlEvents(context, item.menuItems);
             const menuDisabled = toolbarItemShouldDisable(item, context, isReadonly)
-                || (item.enableWhenSelection === true && !hasSelection && !(menuExport && actionsMenu.id === item.id))
+                || (item.enableWhenSelection === true && !hasSelection && !(menuExport && actionsMenu?.id === item.id))
                 || disabled;
             const spanStyle = align === 'center'
                 ? {margin: '0 10px'}
@@ -351,13 +364,7 @@ const Toolbar = ({
                                         /></NativeControlTarget>
                                     );
                                 })}
-                                {exportState && <MenuItem className="forge-toolbar-export-submenu" text={exportState.item.label || 'Export'}
-                                    labelElement={<UnifiedIcon name="lucide:chevron-right"/>} disabled={exportState.exportDisabled}
-                                    popoverProps={{...anchoredPopoverProps({placement:'right-start',popoverClassName:'forge-dropdown-menu',modifiersCustom:[menuTriggerMinWidthModifier]}),usePortal:false,enforceFocus:false,autoFocus:false,
-                                        targetProps:{role:'menuitem',tabIndex:0,'aria-disabled':exportState.exportDisabled || undefined}}}
-                                    submenuProps={{className:'forge-toolbar-select-menu','aria-label':`${exportState.item.label || 'Export'} formats`}}>
-                                    {tableExportMenuItems({context, ...exportState}, close)}
-                                </MenuItem>}
+                                {exportState && <TableExportSubmenu context={context} exportState={exportState} close={close}/>}
                             </Menu>
                         )}>
                         <Button
@@ -375,7 +382,7 @@ const Toolbar = ({
                     {exportState?.error ? <span className="forge-toolbar-export-error" role="alert">{exportState.error}</span> : null}
                 </span>
             );
-            if (menuExport && actionsMenu.id === item.id) {
+            if (menuExport && actionsMenu?.id === item.id) {
                 const readonly = toolbarEvents[menuExport.id]?.stateEvents?.onReadonly?.() || false;
                 return <TableExportOwner key={`actions-export-${item.id}`} context={context} item={menuExport}
                     disabled={toolbarItemShouldDisable(menuExport, context, readonly) || disabled}
@@ -593,7 +600,7 @@ const Toolbar = ({
             });
     };
 
-    return (
+    const renderToolbar = exportState => (
         <div
             className={`toolbar-container${density === 'compact' ? ' is-compact' : ''}${layout === 'balanced' || layout === 'responsive' ? ' is-balanced' : ''}${layout === 'responsive' ? ' is-responsive' : ''}${leftContent ? ' has-left-content' : ''}${className ? ` ${className}` : ''}`}
             style={style}
@@ -601,7 +608,7 @@ const Toolbar = ({
         >
             {/* Items aligned to the left */}
             <div className="toolbar-left">
-                {leftContent}
+                {typeof leftContent === 'function' ? leftContent(exportState) : leftContent}
                 {renderAlignedItems('left')}
             </div>
             {/* Items aligned to the center */}
@@ -621,6 +628,14 @@ const Toolbar = ({
             </div>
         </div>
     );
+    if (menuExport && !actionsMenu) {
+        const readonly = toolbarEvents[menuExport.id]?.stateEvents?.onReadonly?.() || false;
+        return <TableExportOwner context={context} item={menuExport}
+            disabled={toolbarItemShouldDisable(menuExport, context, readonly) || disabled}
+            rows={tableExportRows({filteredSortedRows: exportRows, pageRows: exportPageRows, scope: menuExport?.properties?.scope})}
+            columns={exportColumns}>{renderToolbar}</TableExportOwner>;
+    }
+    return renderToolbar();
 };
 
 export default Toolbar;

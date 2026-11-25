@@ -6,6 +6,8 @@ import {afterEach, beforeEach, expect, it, vi} from 'vitest';
 import TableCell from './TableCell.jsx';
 import {tableCellMutation} from './tableCellMutation.js';
 import {executeCommand, getCommandState, resetCommandState, resolveIndeterminateCommand} from '../../primitives/commandExecutor.js';
+import {ForgeThemeProvider} from '../../ThemeBoundary.jsx';
+import TableCellMutation from './TableCellMutation.jsx';
 let host, root;
 const settle = async action => act(async () => {action?.(); for(let i=0;i<20;i++) await Promise.resolve();});
 beforeEach(()=>{globalThis.IS_REACT_ACT_ENVIRONMENT=true;host=document.createElement('div');document.body.append(host);root=createRoot(host);});
@@ -22,6 +24,15 @@ function cells(f,rows=[{id:1},{id:2}],spec=command,handlers={}) {
  return <table><tbody>{rows.map((row,index)=><tr key={row.id}><TableCell context={f.context} cell={{value:'Remove',displayedText:'Remove'}} cellSelection={{row,rowIndex:index,col:{id:'remove',name:'Remove record',type:'button',...(Array.isArray(spec)?{mutationCommands:spec}:{mutationCommand:spec})}}} columnHandlers={handlers} onRowClick={()=>{}}/></tr>)}</tbody></table>;
 }
 const buttons=()=>[...host.querySelectorAll('td button')];
+it.each(['light','dark'])('uses the shared DS2 icon for a pressed row mutation without changing its payload (%s)',async mode=>{
+ const f=fixture();
+ const render=(theme,pressed)=>root.render(<ForgeThemeProvider themeId={theme} mode={mode}><TableCellMutation context={f.context} command={{...command,commandId:'row-star'}} extras={{row:{id:7}}} buttonProps={{icon:'star','aria-label':'Watch record','aria-pressed':pressed}}/></ForgeThemeProvider>);
+ await settle(()=>render('design-system-2',true));
+ const button=()=>host.querySelector('button');expect(button().querySelector('.lucide-star')).toBeTruthy();expect(button().getAttribute('aria-pressed')).toBe('true');
+ await settle(()=>button().click());expect(f.writes).toEqual([{id:7}]);expect(button().disabled).toBe(true);
+ await settle(()=>f.finishes[0]());await settle(()=>render('design-system-2',false));expect(button().getAttribute('aria-pressed')).toBe('false');
+ await settle(()=>render('baseline',true));expect(button().querySelector('.lucide-star')).toBeNull();expect(button().querySelector('.bp6-icon-star')).toBeTruthy();
+});
 it('targets the clicked row, prevents duplicate/shared-writer writes, and keeps row state while sorting',async()=>{
  const f=fixture();const legacy=vi.fn();const handlers={onClick:{isDefined:()=>true,execute:legacy}};
  await settle(()=>root.render(cells(f,undefined,command,handlers)));

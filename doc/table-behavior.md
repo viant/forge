@@ -269,3 +269,18 @@ labels without decorative icons, with the parent retaining a trailing Lucide
 chevron. Native focus, dismissal and actual download ownership remain intact.
 The producer-bound heading period updates its original field and invokes its
 existing change callback exactly once. Other themes retain their prior toolbar.
+
+Editable collections place the same admitted export inside their existing
+operation Actions menu. Upload, archive and other producer operations retain
+their native permissions, selection limits and row-writability checks. No
+selection is needed to open Actions for export. Hidden exports stay hidden;
+empty, unavailable and pending exports retain the native disabled treatment.
+The exporter remains mounted when either menu closes, preserving the download
+and its error announcement. Pending inline-edit review remains independent.
+
+DS2 row-mutation buttons use the shared Icon renderer, including pressed and
+unpressed watch icons. Native `aria-pressed`, disabled and pending state remain
+authoritative; the shared semantic selected recipe supplies the accent/fill.
+Keyboard focus stays inside the existing border, while pointer activation has
+no outer ring. Verify both color modes and switching to Baseline, whose prior
+icon rendering and operation-bar placement remain unchanged.
