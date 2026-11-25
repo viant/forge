@@ -9,8 +9,8 @@ export function shouldFetchDialogOnOpen(dialog = {}) {
     return dialog?.content?.fetchData !== false;
 }
 
-export function shouldRefreshDialogDataSourceForMount(dataSource = {}, focusRequest = 0, lastHandledFocusRequest = null) {
-    if (dataSource?.preserveDialogStateOnReopen !== true) return true;
+// WindowContent may remount a visible dialog without opening it again.
+export function shouldInitializeDialogRevision(focusRequest = 0, lastHandledFocusRequest = null) {
     const revision = Number(focusRequest || 0);
     return !(revision > 0 && revision === Number(lastHandledFocusRequest || 0));
 }
@@ -26,7 +26,8 @@ export function consumeDialogFocusRevision(owner, dialogId, focusRequest = 0) {
     }
     const key = String(dialogId || '');
     const previous = revisions.has(key) ? revisions.get(key) : null;
-    revisions.set(key, Number(focusRequest || 0));
+    const revision = Number(focusRequest || 0);
+    if (revision !== previous) revisions.set(key, revision);
     return previous;
 }
 

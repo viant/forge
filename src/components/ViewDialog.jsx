@@ -13,7 +13,7 @@ import { getLogger } from '../utils/logger.js';
 import { buildQuickFilterSeed, mergeQuickFilterValue, withoutQuickFilterParameters } from './viewDialogQuickFilters.js';
 import {evaluatePlainVisibleWhen, trackVisibleWhen} from './visibleWhen.js';
 import {dialogCloseDisabledWhen, isDialogCloseDisabled} from './dialogClose.js';
-import {consumeDialogFocusRevision, dialogFreshFormSeed, shouldFetchDialogOnOpen, shouldRefreshDialogDataSourceForMount} from './viewDialogFreshState.js';
+import {consumeDialogFocusRevision, dialogFreshFormSeed, shouldFetchDialogOnOpen, shouldInitializeDialogRevision} from './viewDialogFreshState.js';
 import MutationCommand from './primitives/MutationCommand.jsx';
 import DisabledActionShell from './DisabledActionShell.jsx';
 
@@ -291,7 +291,14 @@ const ViewDialog = ({context, dialog, focusRequest = 0, mountedDataSourceRefs = 
         const isDialogOpen = dialogOpen;
         const wasOpen = previousOpenRef.current;
         log.debug('open effect', { isDialogOpen, wasOpen, dsRef: resolvedDataSourceRef });
-        if (isDialogOpen && !wasOpen) {
+        if (isDialogOpen) {
+            const focusOwner = context?.signals?.windowControl || context?.windowState || context;
+            const previousRevision = consumeDialogFocusRevision(focusOwner, dialog?.id, focusRequest);
+            if (wasOpen || !shouldInitializeDialogRevision(focusRequest, previousRevision)) {
+                // Focusing or remounting the open dialog retains its page, filters and in-flight read.
+                previousOpenRef.current = true;
+                return;
+            }
             const dialogContext = (() => {
                 try {
                     return resolvedDataSourceRef
@@ -302,13 +309,6 @@ const ViewDialog = ({context, dialog, focusRequest = 0, mountedDataSourceRefs = 
                 }
             })();
             const dialogDataSourceHandlers = dialogContext?.handlers?.dataSource;
-            const focusOwner = context?.signals?.windowControl || context?.windowState || context;
-            const lastHandledFocusRequest = consumeDialogFocusRevision(focusOwner, dialog?.id, focusRequest);
-            const refreshOnOpen = shouldRefreshDialogDataSourceForMount(
-                dialogContext?.dataSource,
-                focusRequest,
-                lastHandledFocusRequest,
-            );
             let initialFilter = {};
             try {
                 const args = handlers.dialog.callerArgs();
@@ -344,7 +344,7 @@ const ViewDialog = ({context, dialog, focusRequest = 0, mountedDataSourceRefs = 
                 // preserves dialog state must not lose its live form merely
                 // because that remount changed the input identity; its owning
                 // open action remains responsible for any intentional reset.
-                if (refreshOnOpen && fetchOnOpen) {
+                if (fetchOnOpen) {
                     try {
                         const formSeed = dialogFreshFormSeed(
                             dialogContext?.dataSource,
@@ -398,6 +398,7 @@ const ViewDialog = ({context, dialog, focusRequest = 0, mountedDataSourceRefs = 
                     return;
                 }
                 setTimeout(() => {
+                    if (!handlers.dialog.isOpen()) return;
                     try {
                         const dsC = resolvedDataSourceRef
                             ? context?.Context?.(resolvedDataSourceRef, selectionModeOverride ? { selectionMode: selectionModeOverride } : {})
@@ -424,11 +425,7 @@ const ViewDialog = ({context, dialog, focusRequest = 0, mountedDataSourceRefs = 
                         );
                         log.debug('deferred fetch', { filter, args });
                         dsHandlers?.setInactive?.(false);
-                        if (refreshOnOpen) {
-                            dsHandlers?.fetchCollection?.({filter, replaceFilter: true, cache: {bypassCache: true}});
-                        } else {
-                            dsHandlers?.setFilter?.({ filter });
-                        }
+                        dsHandlers?.fetchCollection?.({filter, replaceFilter: true, cache: {bypassCache: true}});
                     } catch (err) {
                         log.warn('deferred fetch error', { error: String(err?.message || err) });
                     }

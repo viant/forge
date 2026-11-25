@@ -107,7 +107,7 @@ it('fresh dialog opens fetch once on page one, including another provider after 
     const transport = async request => {
         if (request.dataSourceRef !== 'details') return {data: []};
         const args = {...request.options.inputParameters};
-        requests.push(args);
+        requests.push({...args, filter: {...request.options.filter}});
         return {data: [{id: 1, name: args.Provider + ' page ' + args.Page}], meta: {pageCount: 3, recordCount: 51}};
     };
     const flush = async action => act(async () => {
@@ -117,10 +117,11 @@ it('fresh dialog opens fetch once on page one, including another provider after 
         for (let i = 0; i < 30; i++) await Promise.resolve();
     });
     try {
-        await flush(() => root.render(<SettingProvider endpoints={{}} services={{dataConnectorTransport: transport}}
+        const renderWindow = key => root.render(<SettingProvider endpoints={{}} services={{dataConnectorTransport: transport}}
             connectorConfig={{window: {service: {uri: '/fixture'}}}}>
-            <WindowContent window={{windowId, windowKey: 'fixture'}} selectedMetadata={metadata}/>
-        </SettingProvider>));
+            <WindowContent key={key} window={{windowId, windowKey: 'fixture'}} selectedMetadata={metadata}/>
+        </SettingProvider>);
+        await flush(() => renderWindow(0));
         const context = getWindowContext(windowId);
         const source = context.Context('details');
         const open = provider => context.handlers.window.openDialog({execution: {args: ['details']}, parameters: {Provider: provider}});
@@ -133,9 +134,29 @@ it('fresh dialog opens fetch once on page one, including another provider after 
         const beforeReopen = requests.length;
         await flush(() => open('Second'));
         expect(source.handlers.dataSource.getPage()).toBe(1);
-        expect(requests.slice(beforeReopen)).toEqual([{Provider: 'Second', Page: 1, Limit: 25}]);
+        expect(requests.slice(beforeReopen)).toEqual([{Provider: 'Second', Page: 1, Limit: 25, filter: {}}]);
         expect(source.signals.collection.peek()).toEqual([{id: 1, name: 'Second page 1'}]);
         expect(firstOpenCount).toBe(1);
+
+        await flush(() => source.handlers.dataSource.setFilter({filter: {Category: 'A'}}));
+        await flush(() => source.handlers.dataSource.setPage(2));
+        expect(requests.at(-1)).toMatchObject({Provider: 'Second', Page: 2, filter: {Category: 'A'}});
+        const lastRead = requests.length;
+        await flush(() => open('Second')); // Focus the active dialog without a new read.
+        await flush(() => renderWindow(1));
+        expect(requests).toHaveLength(lastRead);
+        const live = getWindowContext(windowId);
+        expect(live.Context('details').handlers.dataSource.getPage()).toBe(2);
+        await flush(() => document.querySelector('[role="dialog"] button[title="Dismiss"]').click());
+        await flush(() => live.handlers.window.openDialog({execution: {args: ['details']}, parameters: {Provider: 'Second'}}));
+        expect(requests.slice(lastRead)).toEqual([{Provider: 'Second', Page: 1, Limit: 25, filter: {}}]);
+        await flush(() => document.querySelector('[role="dialog"] button[title="Dismiss"]').click());
+        const beforeReplacement = requests.length;
+        act(() => live.handlers.window.openDialog({execution: {args: ['details']}, parameters: {Provider: 'Superseded'}}));
+        act(() => document.querySelector('[role="dialog"] button[title="Dismiss"]').click());
+        act(() => live.handlers.window.openDialog({execution: {args: ['details']}, parameters: {Provider: 'Current'}}));
+        await flush();
+        expect(requests.slice(beforeReplacement)).toEqual([{Provider: 'Current', Page: 1, Limit: 25, filter: {}}]);
     } finally {
         await flush(() => root.unmount());
         host.remove();
