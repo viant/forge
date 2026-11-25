@@ -1,3 +1,5 @@
+import {visitCommandDataSourceRefs} from './dataSourceDependencies.js';
+
 // Reader plumbing for the contents of an open dialog. Mounting a reader does
 // not fetch it: its active container or focused options widget owns that call.
 export function dialogDataSourceRefs(dialog = {}, definitions = {}, primary = '', mounted = []) {
@@ -28,5 +30,17 @@ export function dialogDataSourceRefs(dialog = {}, definitions = {}, primary = ''
     }
     walk(dialog.content);
     for (const ref of refs) add(definitions[ref]?.dataSourceRef);
+    // A footer writer can be absent from the dialog body. Reuse window-owned
+    // sources and their ancestors so the dialog never installs a second consumer.
+    function addFooterRef(value) {
+        let ref = typeof value === 'string' ? value.trim() : '';
+        while (ref && ref !== primary && definitions[ref] && !refs.has(ref) && !owned.has(ref)) {
+            refs.add(ref);
+            ref = definitions[ref].dataSourceRef?.trim() || '';
+        }
+    }
+    for (const action of Array.isArray(dialog.actions) ? dialog.actions : []) {
+        visitCommandDataSourceRefs(action?.mutationCommand, addFooterRef);
+    }
     return [...refs];
 }

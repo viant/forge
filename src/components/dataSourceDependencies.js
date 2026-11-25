@@ -73,3 +73,16 @@ export function hasResolvedDependencies(parameters = [], values = {}, filter = {
     }
     return true;
 }
+
+// Command data sources need a mounted signal consumer. Only execution and
+// synchronization declarations identify targets; a payload may contain arbitrary data.
+export function visitCommandDataSourceRefs(command, visit) {
+    if (!command || typeof command !== 'object') return;
+    visit(command.dataSourceRef);
+    for (const step of Array.isArray(command.before) ? command.before : []) {
+        visit(step?.command?.dataSourceRef);
+        visit(step?.cleanup?.dataSourceRef);
+    }
+    for (const refresh of Array.isArray(command.refresh) ? command.refresh : []) visit(refresh?.dataSourceRef);
+    visit(command.reconcile?.dataSourceRef);
+}

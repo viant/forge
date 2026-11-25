@@ -36,6 +36,7 @@ import DataSource from './DataSource.jsx';
 import MessageBus from './MessageBus.jsx';
 import WindowLayout from './WindowLayout.jsx';
 import ViewDialog from './ViewDialog.jsx';
+import {visitCommandDataSourceRefs} from './dataSourceDependencies.js';
 import {openWindowPickerDialog} from './windowPickerDialog.js';
 import DataSourceContainer from './WindowContentDataSourceContainer.jsx';
 
@@ -490,12 +491,8 @@ function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}, fetchU
 
     // Commands execute through datasource signals. Their contexts must be
     // mounted, but declaring a writer must never invoke it on window open.
-    const addCommand = (command) => {
-        if (!command || typeof command !== 'object') return;
-        addRef(command.dataSourceRef, true);
-        for (const refresh of command.refresh || []) addRef(refresh?.dataSourceRef, true);
-        addRef(command.reconcile?.dataSourceRef, true);
-    };
+    const deferRef = ref => addRef(ref, true);
+    const addCommand = command => visitCommandDataSourceRefs(command, deferRef);
     addCommand(node.mutationCommand);
     addCommand(node.editableCollection?.mutation);
     for (const operation of node.editableCollection?.operations || []) addCommand(operation?.mutation);

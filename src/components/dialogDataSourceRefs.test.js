@@ -18,6 +18,17 @@ assert.deepEqual(dialogDataSourceRefs(visibleReader,definitions,'draft'),['prope
 const unrelated={content:{items:[{optionsDataSourceRef:'properties'}],mutationCommand:{dataSourceRef:'writer',refresh:[{dataSourceRef:'expression'}]}}};
 assert.deepEqual(dialogDataSourceRefs(unrelated,definitions,'draft'),['properties','writer','expression','record'],'option dependencies remain independent from post-success refresh targets');
 
+// Footer commands may be the only consumers of their writers. Window-owned
+// sources are shared with the dialog, including indirect and refresh targets.
+const footer = {content:{dataSourceRef:'draft'}, actions:[{mutationCommand:{
+    dataSourceRef:'writer', successFormState:{receipt:{dataSourceRef:'mapped'}},
+    before:[{command:{dataSourceRef:'expression'}, cleanup:{dataSourceRef:'options'}}],
+    refresh:[{dataSourceRef:'properties'}],
+}}]};
+assert.deepEqual(dialogDataSourceRefs(footer,definitions,'draft',['properties']),['writer','expression','options']);
+assert.deepEqual(dialogDataSourceRefs(footer,definitions,'draft',['writer','properties','options']),['expression']);
+assert.deepEqual(dialogDataSourceRefs(footer,definitions,'draft',[]),['writer','expression','options','properties','record']);
+
 let refreshed=0;let written=0;
 const state={value:{loading:false,error:null},peek(){return this.value;},subscribe(callback){this.callback=callback;callback(this.value);return()=>{};}};
 const writer={signals:{control:state,collection:{peek:()=>[{id:1}]}},handlers:{dataSource:{setInputParameters(){},fetchCollection(){written++;state.value={loading:true,error:null};state.callback?.(state.value);queueMicrotask(()=>{state.value={loading:false,error:null};state.callback?.(state.value);});}}}};

@@ -247,7 +247,7 @@ export function resolveDialogSelectionMode(dialog = {}, callerProps = {}) {
     return "";
 }
 
-const ViewDialog = ({context, dialog, focusRequest = 0, mountedDataSourceRefs = []}) => {
+const ViewDialog = ({context, dialog, focusRequest = 0, mountedDataSourceRefs}) => {
     useSignals();
     const log = getLogger('dialog');
     const {handlers} = context
@@ -264,6 +264,11 @@ const ViewDialog = ({context, dialog, focusRequest = 0, mountedDataSourceRefs = 
     const quickFilterSpecs = useMemo(() => normalizeQuickFilterSpecs(dialog), [quickFilterConfigKey]);
 
     const dialogOpen = handlers.dialog.isOpen();
+    const definitions = context?.metadata?.dataSource;
+    const dependencyRefs = useMemo(
+        () => dialogOpen ? dialogDataSourceRefs(dialog, definitions, resolvedDataSourceRef, mountedDataSourceRefs) : [],
+        [dialogOpen, dialog, definitions, resolvedDataSourceRef, mountedDataSourceRefs]
+    );
     const focusClassName = `forge-dialog-focus-${String(context?.identity?.windowId || 'window').replace(/[^a-zA-Z0-9_-]/g, '-')}-${String(dialog?.id || 'dialog').replace(/[^a-zA-Z0-9_-]/g, '-')}`;
     const previousOpenRef = useRef(false);
     const pendingOpenRead = useRef(false);
@@ -594,7 +599,7 @@ const ViewDialog = ({context, dialog, focusRequest = 0, mountedDataSourceRefs = 
                 {dsCtx ? (<>
                     <DataSource context={dsCtx} hasScheduledFetch={hasScheduledOpenRead} />
                     <MessageBus context={dsCtx} />
-                    {dialogDataSourceRefs(dialog, context?.metadata?.dataSource, resolvedDataSourceRef, mountedDataSourceRefs).map(ref => (
+                    {dependencyRefs.map(ref => (
                         <DataSourceContainer key={ref} windowContext={dsCtx} dsKey={ref} suppressAutomaticFetch />
                     ))}
                 </>) : null}

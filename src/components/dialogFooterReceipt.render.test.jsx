@@ -18,9 +18,9 @@ async function until(check) {
     expect(Boolean(check())).toBe(true);
 }
 
-for (const outcome of ['acknowledged', 'rejected', 'unknown']) {
-    it('delivers the original ' + outcome + ' write without displaying its result in a replacement dialog', async () => {
-        const id = 'footer-receipt-' + outcome;
+for (const [outcome, writerInContent] of [['acknowledged', true], ['rejected', true], ['unknown', true], ['acknowledged', false]]) {
+    it('delivers the original ' + outcome + ' write without displaying its result in a replacement dialog (writer in content: ' + writerInContent + ')', async () => {
+        const id = 'footer-receipt-' + outcome + '-' + writerInContent;
         const initial = {id: 'rows', dataSourceRef: 'rows', fetchData: false};
         const command = {
             commandId: 'update', dataSourceRef: 'write',
@@ -30,9 +30,9 @@ for (const outcome of ['acknowledged', 'rejected', 'unknown']) {
         };
         const dialog = {
             id: 'form', title: 'Edit', dataSourceRef: 'draft', fetchOnOpen: false,
-            content: {dataSourceRef: 'draft', fetchData: false, items: [
+            content: {dataSourceRef: 'draft', fetchData: false, items: writerInContent ? [
                 {id: 'receipt', type: 'label', dataSourceRef: 'write', scope: 'form', dataField: 'message'},
-            ]},
+            ] : []},
             actions: [{id: 'cancel', label: 'Dismiss', close: true}, {id: 'save', label: 'Apply', mutationCommand: command}],
         };
         const dataSource = Object.fromEntries(['rows', 'draft', 'write'].map(ref => [ref, {
@@ -58,6 +58,7 @@ for (const outcome of ['acknowledged', 'rejected', 'unknown']) {
             const owner = getWindowContext(id).Context('rows'), source = owner.Context('draft');
             const open = rowId => owner.handlers.window.openDialog({context:owner,parameters:{rowId},execution:{args:['form',{awaitResult:false}]}});
             await turn(() => open(1)); await until(() => button('Apply'));
+            expect(invocations.filter(r => r.dataSourceRef === 'write')).toHaveLength(0);
             await turn(() => button('Apply').click()); await until(() => invocations.some(r => r.dataSourceRef === 'write'));
             await turn(() => button('Dismiss').click()); await until(() => !button('Apply'));
             await turn(() => open(2)); await until(() => button('Apply'));
