@@ -1379,6 +1379,21 @@ class DashboardRuntimeTest {
     }
 
     @Test
+    fun numericConditionsAcceptFiniteFormAndInputStrings() {
+        val bounds = DashboardConditionDef(source = "input", field = "parameters.quantity", gte = 1.0, lte = 720.0)
+        fun allowed(value: Any?, condition: DashboardConditionDef = bounds): Boolean =
+            evaluateDashboardCondition(condition, input = mapOf("parameters" to mapOf("quantity" to value)))
+
+        for (value in listOf(1, "1", " 48 ", "7.2e2", JsonPrimitive("24"))) assertTrue(allowed(value))
+        for (value in listOf(null, "", "abc", "48px", "Infinity", Double.NaN, "0.9", "721")) assertFalse(allowed(value))
+        val exclusive = bounds.copy(gte = null, lte = null, gt = 1.0, lt = 720.0)
+        assertFalse(allowed("1", exclusive))
+        assertTrue(allowed("1.5", exclusive))
+        assertFalse(allowed("720", exclusive))
+        assertFalse(allowed("7", bounds.copy(gte = Double.NEGATIVE_INFINITY)))
+    }
+
+    @Test
     fun dashboardKeyUsesExplicitDashboardKeyWhenPresent() {
         val signals = SignalRegistry()
         val metadata = Signal<WindowMetadata?>(null)

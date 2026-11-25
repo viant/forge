@@ -1449,10 +1449,13 @@ fun evaluateDashboardCondition(
     if (condition.inValues.isNotEmpty() && condition.inValues.none { dashboardValuesEqual(actual, it) }) {
         return false
     }
-    condition.gt?.let { if ((actual as? Number)?.toDouble()?.let { value -> value > it } != true) return false }
-    condition.gte?.let { if ((actual as? Number)?.toDouble()?.let { value -> value >= it } != true) return false }
-    condition.lt?.let { if ((actual as? Number)?.toDouble()?.let { value -> value < it } != true) return false }
-    condition.lte?.let { if ((actual as? Number)?.toDouble()?.let { value -> value <= it } != true) return false }
+    if (condition.gt != null || condition.gte != null || condition.lt != null || condition.lte != null) {
+        val number = dashboardNumberValue(actual)?.takeIf(Double::isFinite) ?: return false
+        condition.gt?.let { if (!it.isFinite() || number <= it) return false }
+        condition.gte?.let { if (!it.isFinite() || number < it) return false }
+        condition.lt?.let { if (!it.isFinite() || number >= it) return false }
+        condition.lte?.let { if (!it.isFinite() || number > it) return false }
+    }
     condition.empty?.let { required ->
         val empty = when (actual) {
             null -> true
