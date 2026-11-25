@@ -1023,25 +1023,21 @@ public actor ForgeRuntime {
         if let handler = handlers[execution.action] {
             return await handler(execArgs)
         }
-        if let context, canProjectMetadataExecution(execution, context: context) {
+        if let context {
             let readOnlyEvent = ["onVisible", "onReadonly", "onDisabled"].contains(execution.event ?? "")
             return await executeProjectedMetadataAction(execution, context: context, args: args, applyEffects: !readOnlyEvent)
         }
         return nil
     }
 
-    private func canProjectMetadataExecution(_ execution: ExecutionDef, context: ExecutionContext) -> Bool {
-        guard let metadata = windows.first(where: { $0.id == context.windowID })?.metadata,
-              metadata.actions?.code?.isEmpty == false else { return false }
-        return metadata.actionNamespace(for: execution.action) != nil
-    }
-
     private func executeProjectedMetadataAction(
         _ execution: ExecutionDef, context: ExecutionContext,
         args: [String: JSONValue], applyEffects: Bool
     ) async -> JSONValue? {
-        guard let metadata = windows.first(where: { $0.id == context.windowID })?.metadata,
-              let code = metadata.actions?.code else { return nil }
+        guard windowState(id: context.windowID) != nil,
+              let metadata = await windowMetadata(id: context.windowID),
+              let code = metadata.actions?.code, !code.isEmpty,
+              let namespace = metadata.actionNamespace(for: execution.action) else { return nil }
         var snapshots: [String: JSONValue] = [:]
         for ref in metadata.dataSources.keys {
             let id = WindowIdentity(windowID: context.windowID).dataSourceID(ref: ref)
@@ -1056,15 +1052,18 @@ public actor ForgeRuntime {
             ])
         }
         let executionValue = (try? JSONEncoder().encode(execution)).flatMap { try? JSONDecoder().decode(JSONValue.self, from: $0) } ?? .object([:])
+        let windowForm = await windowFormJSONValue(windowID: context.windowID)
+        guard await windowMetadata(id: context.windowID)?.authorizationSnapshot == metadata.authorizationSnapshot,
+              windowState(id: context.windowID) != nil else { return nil }
         do {
             let projection = try UIActionProjection.invoke(
-                code: code, function: execution.action, namespace: metadata.actionNamespace(for: execution.action),
-                source: context.dataSourceRef, snapshots: snapshots,
-                windowForm: await windowFormJSONValue(windowID: context.windowID),
-                props: args.merging(["execution": executionValue]) { current, _ in current }
+                code: code, function: execution.action, namespace: namespace,
+                source: context.dataSourceRef, snapshots: snapshots, windowForm: windowForm,
+                props: args.merging(["execution": executionValue]) { current, _ in current },
+                authorization: metadata.authorizationSnapshot
             )
             if applyEffects {
-                await applyProjectedUIEffects(projection.effects, context: context, metadata: metadata)
+                guard await applyProjectedUIEffects(projection.effects, context: context, metadata: metadata) else { return nil }
             }
             return projection.result
         } catch {
@@ -1073,8 +1072,10 @@ public actor ForgeRuntime {
         }
     }
 
-    private func applyProjectedUIEffects(_ effects: [JSONValue], context: ExecutionContext, metadata: WindowMetadata) async {
+    private func applyProjectedUIEffects(_ effects: [JSONValue], context: ExecutionContext, metadata: WindowMetadata) async -> Bool {
         for effect in effects {
+            guard await windowMetadata(id: context.windowID)?.authorizationSnapshot == metadata.authorizationSnapshot,
+                  windowState(id: context.windowID) != nil else { return false }
             guard let object = effect.objectValue, let kind = object["kind"]?.stringValue else { continue }
             let ref = object["ref"]?.stringValue
             let value = object["value"]
@@ -1123,6 +1124,7 @@ public actor ForgeRuntime {
             default: break
             }
         }
+        return true
     }
 
     private func applyProjectedOpenDialog(_ value: JSONValue?, context: ExecutionContext, metadata: WindowMetadata) async {
