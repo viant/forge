@@ -5,6 +5,7 @@ import React from 'react';
 import {Button, ButtonGroup, Menu, MenuItem} from '@blueprintjs/core';
 import {useSignals} from '@preact/signals-react/runtime';
 import TablePanel from '../TablePanel.jsx';
+import {TableExportSubmenu} from '../table/basic/Toolbar.jsx';
 import ResponsiveDataGrid from './ResponsiveDataGrid.jsx';
 import {resolveParameters} from '../../hooks/parameters.js';
 import {
@@ -90,22 +91,24 @@ export default function EditableCollection({sizingMode = 'fill', container, cont
     applyOperation?.id, revertOperation?.id].filter(Boolean) : []);
   const inlineOperations = operations.filter(operation => !groupedIds.has(operation.id));
 
-  const groupedActions = operationToolbar ? <div className="forge-editable-collection__operation-bar forge-editable-collection__operation-menu">
+  const groupedActions = exportState => operationToolbar ? <div className="forge-editable-collection__operation-bar forge-editable-collection__operation-menu">
     {primary && <Button intent="primary" className="forge-toolbar-action" disabled={operationState(primary).disabled} onClick={() => invoke(primary)}>{primary.label || primary.id}</Button>}
-    {!!menuOperations.length && <RegisteredPopover
+    {(!!menuOperations.length || !!exportState) && <RegisteredPopover
       context={dataContext} item={{id:`${container.id}-operations`,type:'menu',label:operationToolbar.menu.label || 'Actions'}}
-      disabled={!selectedRows.length || !menuOperations.some(operation => operationState(operation).visible)} placement="bottom-start" renderContent={close => <Menu className="forge-toolbar-select-menu forge-dropdown-menu" aria-label={`${operationToolbar.menu.label || 'Actions'} menu`}>
+      disabled={!exportState && (!selectedRows.length || !menuOperations.some(operation => operationState(operation).visible))} placement="bottom-start" renderContent={close => <Menu className="forge-toolbar-select-menu forge-dropdown-menu" aria-label={`${operationToolbar.menu.label || 'Actions'} menu`}>
         {menuOperations.map(operation => {
           const state = operationState(operation);
           return state.visible ? <MenuItem key={operation.id} text={operationToolbar.menu.labels?.[operation.id] || operation.label || operation.id}
             disabled={state.disabled} onClick={() => {close();return invoke(operation);}}/> : null;
         })}
+        {exportState && <TableExportSubmenu context={dataContext} exportState={exportState} close={close}/>}
       </Menu>}>
-      <Button className="forge-toolbar-action" rightIcon={<Icon name="lucide:chevron-down"/>} disabled={!selectedRows.length || !menuOperations.some(operation => operationState(operation).visible)}>{operationToolbar.menu.label || 'Actions'}</Button>
+      <Button className="forge-toolbar-action" rightIcon={<Icon name="lucide:chevron-down"/>} disabled={!exportState && (!selectedRows.length || !menuOperations.some(operation => operationState(operation).visible))}>{operationToolbar.menu.label || 'Actions'}</Button>
     </RegisteredPopover>}
+    {exportState?.error ? <span className="forge-toolbar-export-error" role="alert">{exportState.error}</span> : null}
   </div> : null;
 
-  const toolbarActions = <>{groupedActions}{inlineOperations.length > 0 ? (
+  const renderToolbarActions = exportState => <>{groupedActions(exportState)}{inlineOperations.length > 0 ? (
         <ButtonGroup className="forge-editable-collection__operation-bar" minimal={false}>
           {inlineOperations.map((operation) => {
             const state = operationState(operation);
@@ -136,6 +139,7 @@ export default function EditableCollection({sizingMode = 'fill', container, cont
           })}
         </ButtonGroup>
       ) : null}</>;
+  const toolbarActions = operationToolbar?.menu ? renderToolbarActions : renderToolbarActions();
   return (
     <div style={containerSizingStyle(container,sizingMode,{chrome:true})} className={`forge-editable-collection${operationToolbar ? ' forge-list-page-review' : ''}`} data-forge-primitive="editableCollection">
       {spec.selectionStatus === true ? (

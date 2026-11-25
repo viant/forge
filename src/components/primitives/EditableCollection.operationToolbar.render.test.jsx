@@ -10,7 +10,7 @@ import {removeSignalsForKey} from '../../core/store/signals.js';
 import '../../packs/blueprint/index.jsx';
 
 let serial=0;
-async function fixture(themeId='design-system-2',mode='light'){
+async function fixture(themeId='design-system-2',mode='light',{withExport=false,hiddenExport=false,withAuxMenu=false}={}){
  globalThis.IS_REACT_ACT_ENVIRONMENT=true;
  const windowId=`operation-toolbar-${++serial}`,host=document.createElement('div');document.body.append(host);
  const root=createRoot(host),create=vi.fn(),upload=vi.fn(),save=vi.fn(),dialog=vi.fn();
@@ -23,9 +23,9 @@ async function fixture(themeId='design-system-2',mode='light'){
  ];
  const metadata={
   dataSource:{rows:{id:'rows',autoFetch:false,service:{uri:'/unused'},selectionMode:'multi',uniqueKey:[{field:'id'}],selectors:{data:'data'}}},
-  namespace:'example',actions:{code:'({create:args=>context.services.example.create(args),upload:args=>context.services.example.upload(args),save:args=>context.services.example.save(args)})'},
+  namespace:'example',actions:{code:'({create:args=>context.services.example.create(args),upload:args=>context.services.example.upload(args),save:args=>context.services.example.save(args),hidden:()=>false})'},
   view:{content:{id:'root',containers:[{id:'records',title:'Records',dataSourceRef:'rows',fetchData:false,editableCollection:{operations},table:{
-   columns:[{id:'id',name:'ID'},{id:'name',name:'Name'}],toolbar:{items:[]},
+   columns:[{id:'id',name:'ID'},{id:'name',name:'Name'}],toolbar:{items:withExport?[{id:'export',type:'tableExport',label:'Export',properties:{formats:['csv','xlsx'],filename:'records'},...(hiddenExport?{on:[{event:'onVisible',handler:'example.hidden'}]}:{})},...(withAuxMenu?[{id:'inspect',type:'menu',label:'Inspect',menuItems:[{id:'details',label:'Details',disabled:true}]}]:[])]:[]},
    targetOverrides:{'theme:design-system-2':{presentation:'list-page',operationToolbar:{
     primary:'new',menu:{label:'Actions',operations:['upload','archive']},
     editReview:{apply:'save',revert:'reset',countField:'changes',rowCountField:'changedRows'},
@@ -99,4 +99,43 @@ it('leaves the prior operation bar unchanged in Baseline',async()=>{
   for(const label of ['Save names','Reset names','New record','Upload entries','Archive'])expect(f.button(label)).toBeTruthy();
   expect(f.button('Actions')).toBeUndefined();expect(f.button('Apply changes')).toBeUndefined();
  }finally{await f.close();}
+});
+
+// Independently authored records exercise the native exporter; no service writes.
+it.each(['light','dark'])('exports inside guarded operation Actions without requiring a row selection (%s)',async mode=>{
+ const f=await fixture('design-system-2',mode,{withExport:true,withAuxMenu:true});
+ const originalCreate=URL.createObjectURL,originalRevoke=URL.revokeObjectURL,payloads=[],downloads=[];
+ URL.createObjectURL=vi.fn(blob=>{payloads.push(blob);return 'blob:local-records'});URL.revokeObjectURL=vi.fn();
+ const anchor=vi.spyOn(HTMLAnchorElement.prototype,'click').mockImplementation(function(){downloads.push(this.download)});
+ const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+ try{
+  expect(f.button('Actions').disabled).toBe(false);expect(f.host.querySelector('.forge-toolbar-table-export')).toBeNull();
+  await f.click(f.button('Actions'));
+  expect(f.item('Upload entries').getAttribute('aria-disabled')).toBe('true');expect(f.item('Archive').getAttribute('aria-disabled')).toBe('true');
+  await f.click(f.item('Archive'));expect(f.dialog).not.toHaveBeenCalled();
+  for(const [index,format] of ['CSV','XLSX'].entries()){
+   if(index)await f.click(f.button('Actions'));
+   const submenu=document.querySelector('.forge-toolbar-export-submenu');expect(submenu).toBeTruthy();
+   expect(submenu.querySelector('.bp6-menu-item-icon')).toBeNull();expect(submenu.querySelector('.lucide-chevron-right')).toBeTruthy();
+   await act(async()=>{submenu.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));await pause(220)});
+   expect(f.item(format).querySelector('svg')).toBeNull();await f.click(f.item(format));
+   await act(async()=>{await pause(340)});
+   expect(f.button('Actions').closest('[aria-haspopup]')?.getAttribute('aria-expanded')).toBe('false');
+  }
+  expect(downloads).toEqual(['records.csv','records.xlsx']);expect(payloads).toHaveLength(2);
+  const csv=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsText(payloads[0]);});
+  expect(csv).toContain('First');expect(csv).toContain('Protected');
+  await f.select([{id:1,writable:true}]);await f.click(f.button('Actions'));
+  expect(f.item('Upload entries').getAttribute('aria-disabled')).not.toBe('true');
+  await f.select([{id:2,writable:false}]);expect(f.item('Upload entries').getAttribute('aria-disabled')).toBe('true');
+ }finally{anchor.mockRestore();URL.createObjectURL=originalCreate;URL.revokeObjectURL=originalRevoke;await f.close();}
+});
+
+it('retains hidden export admission, empty export state and Baseline placement',async()=>{
+ let f=await fixture('design-system-2','light',{withExport:true,hiddenExport:true});
+ try{expect(f.button('Actions').disabled).toBe(true);expect(f.host.querySelector('.forge-toolbar-table-export')).toBeNull();}finally{await f.close();}
+ f=await fixture('design-system-2','light',{withExport:true});
+ try{await f.settle(()=>{f.context.signals.collection.value=[]});await f.click(f.button('Actions'));const option=document.querySelector('.forge-toolbar-export-submenu');expect(option,document.body.innerHTML).toBeTruthy();expect(option.getAttribute('aria-disabled') || option.querySelector('[aria-disabled]')?.getAttribute('aria-disabled')).toBe('true');}finally{await f.close();}
+ f=await fixture('baseline','dark',{withExport:true});
+ try{expect(f.button('Actions')).toBeUndefined();expect(f.host.querySelector('.forge-toolbar-table-export')).toBeTruthy();expect(f.button('Upload entries').disabled).toBe(true);}finally{await f.close();}
 });
