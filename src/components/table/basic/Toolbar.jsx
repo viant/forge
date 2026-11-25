@@ -236,7 +236,7 @@ function tableExportMenuItems({context, item, formats, busy, runExport, isDesign
 export function TableExportSubmenu({context, exportState, close}) {
     return <MenuItem className="forge-toolbar-export-submenu" text={exportState.item.label || 'Export'}
         labelElement={<UnifiedIcon name="lucide:chevron-right"/>} disabled={exportState.exportDisabled}
-        popoverProps={{...anchoredPopoverProps({placement:'right-start',popoverClassName:'forge-dropdown-menu',modifiersCustom:[menuTriggerMinWidthModifier]}),usePortal:false,enforceFocus:false,autoFocus:false,
+        popoverProps={{...anchoredPopoverProps({placement:'right-start',popoverClassName:'forge-dropdown-menu',modifiersCustom:[menuTriggerMinWidthModifier]}),usePortal:false,enforceFocus:false,autoFocus:false,hoverCloseDelay:300,
             targetProps:{role:'menuitem',tabIndex:0,'aria-disabled':exportState.exportDisabled || undefined}}}
         submenuProps={{className:'forge-toolbar-select-menu','aria-label':`${exportState.item.label || 'Export'} formats`}}>
         {tableExportMenuItems({context, ...exportState}, close)}

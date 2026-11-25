@@ -64,3 +64,26 @@ it('keeps a producer-hidden export out of the combined Actions menu',async()=>{
  expect(host.querySelector('button[aria-label=Actions]').disabled).toBe(true);
  expect(host.querySelector('.forge-toolbar-table-export')).toBeNull();
 });
+
+// Independent metadata composition probe: keep the producer's existing menu ID.
+it.each(['light','dark'])('adopts an existing named Actions owner without replacing its guarded options (%s)',async mode=>{
+ await mount(mode,'design-system-2',[{id:'recordActions',type:'menu',className:'forge-list-page-actions-menu',label:'Actions',enableWhenSelection:true,menuItems:[{id:'archiveUnavailable',label:'Archive unavailable',disabled:true}]},{id:'recordExport',type:'tableExport',label:'Export',properties:{formats:['csv','xlsx'],scope:'page'}}]);
+ expect(host.querySelector('button[aria-label=Actions]').disabled).toBe(false);expect(host.querySelector('.forge-toolbar-table-export')).toBeNull();
+ await act(async()=>host.querySelector('button[aria-label=Actions]').click());expect(action('Archive unavailable').getAttribute('aria-disabled')).toBe('true');
+ const submenu=document.querySelector('.forge-toolbar-export-submenu');expect(submenu).toBeTruthy();await act(async()=>{submenu.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));await pause(220);});expect(action('CSV')).toBeTruthy();expect(action('XLSX')).toBeTruthy();
+});
+
+// Independently authored records exercise Blueprint's actual hover lifecycle.
+it.each(['light','dark'])('keeps Export open while crossing the anchored panel gap (%s)',async mode=>{
+ await mount(mode);await openExport();
+ const option=document.querySelector('.forge-toolbar-export-submenu');
+ const target=option.closest('.bp6-popover-target');
+ const isOpen=()=>target.classList.contains('bp6-popover-open');expect(isOpen()).toBe(true);
+ await act(async()=>{option.dispatchEvent(new MouseEvent('mouseout',{bubbles:true,relatedTarget:document.body}));await pause(80);});
+ expect(isOpen()).toBe(true);
+ const csv=action('CSV');
+ await act(async()=>{csv.dispatchEvent(new MouseEvent('mouseover',{bubbles:true,relatedTarget:document.body}));await pause(340);});
+ expect(isOpen()).toBe(true);
+ await act(async()=>{csv.dispatchEvent(new MouseEvent('mouseout',{bubbles:true,relatedTarget:document.body}));await pause(340);});
+ expect(isOpen()).toBe(false);
+});
