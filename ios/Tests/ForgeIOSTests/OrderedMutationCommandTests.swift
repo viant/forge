@@ -296,6 +296,8 @@ extension OrderedMutationCommandTests {
             XCTAssertEqual(result.status, "failed", shape)
             XCTAssertTrue(result.error?.contains("422") == true, shape)
             XCTAssertEqual(result.warnings.map(\.stage), accepted ? [] : ["cleanup"], shape)
+            XCTAssertEqual(state.error, result.error, shape)
+            XCTAssertEqual(state.message, accepted ? result.error : result.error.map { $0 + " Cleanup could not be confirmed." }, shape)
             XCTAssertEqual(state.guarded, shape == "missing", shape)
         }
     }

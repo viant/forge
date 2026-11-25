@@ -420,12 +420,14 @@ extension ForgeRuntime {
                 }
                 await applyMutationWindowState(windowID: windowID, patch: unresolved ? command.indeterminateState : command.errorState)
             }
+            let cleanupUnconfirmed = warnings.contains { $0.stage == "cleanup" }
+            let message = cleanupUnconfirmed ? "\(failure.message) Cleanup could not be confirmed." : failure.message
             await publishMutationState(
                 key,
                 MutationCommandState(
                     phase: unresolved ? .indeterminate : .failed, guarded: unresolved, retryAllowed: !unresolved,
                     error: failure.unknown ? nil : failure.message,
-                    message: failure.message, invocationId: invocationId, failedStepId: currentStep, writerStatus: writerStatus,
+                    message: message, invocationId: invocationId, failedStepId: currentStep, writerStatus: writerStatus,
                     warnings: warnings))
             return MutationCommandResult(
                 accepted: admittedWrites || failure.invoked, status: failure.status, invocationId: invocationId, failedStepId: currentStep,
