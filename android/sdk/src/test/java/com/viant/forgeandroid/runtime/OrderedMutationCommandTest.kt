@@ -322,6 +322,44 @@ class OrderedMutationCommandTest {
         assertTrue(reopened.open)
     } }
 
+    @Test fun nonClosingFooterRetainsDispatchedOutcomeAfterItsControlIsDisposed() = runBlocking { fixture {
+        for (rejected in listOf(false, true)) {
+            val started = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val id = "editor"
+            val control = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+            val command = child("save").copy(
+                pendingState = JsonObject(mapOf("busy" to JsonPrimitive(true))),
+                successState = JsonObject(mapOf("busy" to JsonPrimitive(false))),
+                errorState = JsonObject(mapOf("busy" to JsonPrimitive(false))),
+                refresh = listOf(RefreshSpec(dataSourceRef = "unused", clearSelection = true))
+            )
+            val initialCalls = calls.size
+            loader {
+                if (it.dataSourceRef == "save") {
+                    started.complete(Unit)
+                    release.await()
+                    if (rejected) throw IllegalArgumentException("Rejected")
+                }
+                emptyList()
+            }
+            assertTrue(runtime.presentDialog(window.windowId, id, mapOf("id" to 1)))
+            val operation = startControlMutation(runtime, window, source, command, emptyMap(), control, id, false) { true }
+            withTimeout(3000) { started.await() }
+            runtime.closeDialogPublic(window.windowId, id)
+            control.cancel()
+            assertTrue(runtime.presentDialog(window.windowId, id, mapOf("id" to 2)))
+            val replacement = window.dialogSignal(id).peek()
+            assertEquals(true, window.peekWindowForm()["busy"])
+            release.complete(Unit)
+            assertEquals(if (rejected) "failed" else "succeeded", operation.await().status)
+            assertEquals(false, window.peekWindowForm()["busy"])
+            assertSame(replacement, window.dialogSignal(id).peek())
+            assertEquals(if (rejected) listOf("save") else listOf("save", "unused"), refs().drop(initialCalls))
+            runtime.closeDialogPublic(window.windowId, id)
+        }
+    } }
+
     @Test fun failedCancelledAndUncertainWritesLeaveTheFooterOpen() = runBlocking { fixture {
         val id = "editor"
         assertTrue(runtime.presentDialog(window.windowId, id))

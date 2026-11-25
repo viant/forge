@@ -11,7 +11,7 @@ import {applyFetchTransform} from "./dataSourceTransform.js";
 import {hasResolvedDependencies} from "./dataSourceDependencies.js";
 import {bindingFinalizationAction, dataSourceRequestId, isCurrentBindingGeneration} from "./primitives/bindingGeneration.js";
 import {resourceModelRefForDataSource, unmarshalResourceCollection} from "./primitives/resourceModel.js";
-import {requiresOrderedRecords, settleDataSourceRequest} from './dataSourceRequestLifecycle.js';
+import {requiresOrderedRecords, settleDataSourceRequest, settleUnmountedDataSourceResponse} from './dataSourceRequestLifecycle.js';
 import {isProtectedUpstreamDenial, isDataSourceLocalDenial} from './dataSourceAuthorization.js';
 import {shouldDispatchSelectionEvent} from './selectionEventModel.js';
 import {reconcileFetchForMetadataReadiness} from './dataSourceMetadataReadiness.js';
@@ -621,7 +621,10 @@ export default function DataSource({context, hasScheduledFetch}) {
                 return;
             }
             if (!mountedRef.current) {
-                settleDataSourceRequest(requestDataSourceId, requestId, Object.assign(new Error('Datasource unmounted before request completion.'), {code: 'request_superseded'}));
+                // A detached consumer cannot run its model or named row transforms.
+                // Only a plain, completed connector response can acknowledge a retained writer.
+                const validAcknowledgement = !resourceModelRef && !events.onFetch?.isDefined?.() && !isDeferredCacheHitEnvelope(payload);
+                settleUnmountedDataSourceResponse(requestDataSourceId, requestId, payload, validAcknowledgement);
                 return;
             }
             if (!isCurrentBindingGeneration(input.peek()?.bindingGeneration, bindingGeneration)) {

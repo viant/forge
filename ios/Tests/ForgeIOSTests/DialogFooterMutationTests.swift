@@ -307,3 +307,46 @@ extension DialogFooterMutationTests {
         XCTAssertEqual(secondResult,["choice":.number(2)])
     }
 }
+
+extension DialogFooterMutationTests {
+    func testNonclosingReceiptSettlesWindowStateAfterAnotherPresentationOpens() async throws {
+        let data = #"{"view":{"content":{}},"dataSource":{"draft":{"autoFetch":false},"writer":{},"list":{"autoFetch":false}},"dialogs":[{"id":"editor","dataSourceRef":"draft","fetchOnOpen":false}]}"#
+        let definition = try JSONDecoder().decode(WindowMetadata.self, from: Data(data.utf8))
+        let json = #"{"id":"apply","mutationCommand":{"dataSourceRef":"writer","pendingState":{"busy":true},"successState":{"busy":false},"errorState":{"busy":false},"refresh":[{"dataSourceRef":"list","clearSelection":true}]}}"#
+        let action = try JSONDecoder().decode(ActionDef.self, from: Data(json.utf8))
+        for rejected in [false, true] {
+            let runtime = ForgeRuntime(), calls = FooterWrites()
+            let window = await runtime.openWindowInline(key: "document", title: "Document", metadata: definition)
+            let started = expectation(description: "Original write started")
+            let release = AsyncStream<Void>.makeStream()
+            await runtime.registerDataSourceLoader { request in
+                await calls.record(request.dataSourceRef, request.input.parameters)
+                if request.dataSourceRef == "writer" {
+                    started.fulfill()
+                    for await _ in release.stream { break }
+                    if rejected { throw NSError(domain: "writer", code: 403) }
+                }
+                return ForgeRuntime.DataSourceFetchResult(rows: [["id": .number(2)]])
+            }
+            _ = await runtime.presentDialog(windowID: window.id, dialogID: "editor", parameters: ["id": .number(1)])
+            let write = Task { await runtime.activateDialogFooter(windowID: window.id, dialogID: "editor", sourceDataSourceRef: "draft", action: action) }
+            await fulfillment(of: [started], timeout: 4)
+            await runtime.closeDialogPublic(windowID: window.id, dialogID: "editor")
+            _ = await runtime.presentDialog(windowID: window.id, dialogID: "editor", parameters: ["id": .number(2)])
+            let replacement = await runtime.dialogState(windowID: window.id, dialogID: "editor")
+            let busy = await runtime.windowFormJSONValue(windowID: window.id)["busy"]
+            XCTAssertEqual(busy, .bool(true))
+            release.continuation.yield(())
+            release.continuation.finish()
+            let result = await write.value
+            let state = await runtime.windowFormJSONValue(windowID: window.id)
+            let present = await runtime.dialogState(windowID: window.id, dialogID: "editor")
+            let refs = await calls.calls.map(\.0)
+            XCTAssertEqual(result?.status, rejected ? "failed" : "succeeded")
+            XCTAssertEqual(state["busy"], .bool(false))
+            XCTAssertEqual(present.presentationID, replacement.presentationID)
+            XCTAssertEqual(present.args["id"], .number(2))
+            XCTAssertEqual(refs, rejected ? ["writer"] : ["writer", "list"])
+        }
+    }
+}

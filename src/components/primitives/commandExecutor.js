@@ -6,6 +6,7 @@ import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
 import {applyPrimitiveState, mutationCommandTargetParameters, reconcileEditableCollection} from './editableCollectionModel.js';
 import {prepareResourcePayload, snapshotResourceValue as parameterSnapshot} from './resourceModel.js';
 import {formatDataSourceError} from '../../utils/dataSourceError.js';
+import {retainMutationAcknowledgement} from '../dataSourceRequestLifecycle.js';
 import {findDialogSignal, protectedWindowEpoch} from '../../core/store/signals.js';
 
 const commandStates = new WeakMap();
@@ -121,11 +122,13 @@ async function prepareCommandParameters(context, command, parameters, extras) {
   } finally { clearTimeout(timer); }
 }
 
-function awaitWriter(target, invoke, timeoutMs, requireRecords = false) {
+function awaitWriter(target, invoke, timeoutMs, requireRecords = false, presentation) {
   return new Promise((resolve) => {
     let settled = false;
     let loadingSeen = false;
     let invocationStarted = false;
+    let ownsAcknowledgement;
+    let earlyControlOutcome;
     let timer = null;
     let dispose = () => {};
     const settle = (outcome) => {
@@ -144,15 +147,23 @@ function awaitWriter(target, invoke, timeoutMs, requireRecords = false) {
       // Parameter/stale publications can carry the prior invocation's error
       // before this retry starts loading. Fresh failures and terminal promise
       // outcomes still settle normally.
-      if (value.error && (loadingSeen || value.error !== previousError)) { settle({status: 'failed', error: value.error}); return; }
-      if (loadingSeen) settle(value.error ? {status: 'failed', error: value.error} : {status: 'succeeded'});
+      const outcome = value.error && (loadingSeen || value.error !== previousError)
+        ? {status: 'failed', error: value.error} : loadingSeen ? {status: 'succeeded'} : null;
+      if (!outcome) return;
+      if (!presentation) { settle(outcome); return; }
+      // A remounted datasource can publish idle while the original writer is
+      // still running. Prefer its own invocation promise when one exists.
+      if (ownsAcknowledgement === undefined) earlyControlOutcome = outcome;
+      else if (!ownsAcknowledgement && presentation.current()) settle(outcome);
     });
     if (settled) return;
     timer = setTimeout(() => settle({status: 'indeterminate', error: new Error('The writer outcome is unknown because the client stopped waiting.')}), timeoutMs);
     try {
       invocationStarted = true;
       const result = invoke();
+      ownsAcknowledgement = presentation?.retain(result) ?? false;
       if (result === false) settle({status: 'failed', error: new Error('The datasource rejected the command before invocation.')});
+      else if (earlyControlOutcome && !ownsAcknowledgement && presentation.current()) settle(earlyControlOutcome);
       else if (requireRecords) {
         // A control notification can belong to a different request. Only the
         // invocation promise can supply its own normalized response rows.
@@ -161,7 +172,12 @@ function awaitWriter(target, invoke, timeoutMs, requireRecords = false) {
           if (Array.isArray(records)) settle({status: 'succeeded', records});
           else settle({status: 'indeterminate', error: new Error('The writer did not return invocation records.')});
         }, error => settle({status: error?.code === 'request_superseded' ? 'indeterminate' : 'failed', error}));
+      } else if (ownsAcknowledgement) {
+        result.then(() => settle({status: 'succeeded'}), error => settle({
+          status: error?.code === 'request_superseded' ? 'indeterminate' : 'failed', error,
+        }));
       } else if (result?.then) result.then(() => {
+        if (presentation && !presentation.current()) { settle({status: 'succeeded'}); return; }
         // Some datasource transports resolve their request promise without ever
         // publishing a loading pulse. Give the control signal one event-loop
         // turn to publish a terminal error, then use the resolved transport as
@@ -178,7 +194,7 @@ function awaitWriter(target, invoke, timeoutMs, requireRecords = false) {
   });
 }
 
-async function synchronizeUI(context, target, command, writerResponse = null, authorizationIsCurrent = () => true, formSynchronization = null) {
+async function synchronizeUI(context, target, command, writerResponse = null, authorizationIsCurrent = () => true, formSynchronization = null, presentationCurrent = () => true) {
   const warnings = [];
   if (!authorizationIsCurrent()) return [{stage: 'authorization', error: new Error('Authorization context changed before UI synchronization.')}];
   const refreshOptions = (destination, bypassCache) => ({
@@ -186,7 +202,7 @@ async function synchronizeUI(context, target, command, writerResponse = null, au
     ...(formSynchronization && context?.identity?.dataSourceId && destination?.identity?.dataSourceId === context.identity.dataSourceId
       ? {formSynchronization, invocationId: invocationID()} : {}),
   });
-  if (command.reconcile) {
+  if (command.reconcile && presentationCurrent()) {
     const spec = command.reconcile;
     try {
       const destination = context?.Context?.(spec.dataSourceRef) || context;
@@ -207,7 +223,8 @@ async function synchronizeUI(context, target, command, writerResponse = null, au
     if (!authorizationIsCurrent()) return [...warnings, {stage: 'authorization', error: new Error('Authorization context changed before UI synchronization.')}];
     try {
       const dataContext = context?.Context?.(refresh.dataSourceRef);
-      if (refresh.clearSelection === true) dataContext?.handlers?.dataSource?.resetSelection?.();
+      if (!presentationCurrent() && refresh.dataSourceRef === context?.identity?.dataSourceRef) continue;
+      if (refresh.clearSelection === true && presentationCurrent()) dataContext?.handlers?.dataSource?.resetSelection?.();
       const result = dataContext?.handlers?.dataSource?.fetchCollection?.(refreshOptions(dataContext, refresh.bypassCache));
       if (result?.then) await result;
       if (!authorizationIsCurrent()) return [...warnings, {stage: 'authorization', error: new Error('Authorization context changed before UI synchronization.')}];
@@ -394,7 +411,7 @@ function preparedInputs(context, command, extras, fallback, base) {
 }
 
 // Every writer uses the same invocation receipt and timeout boundary.
-function dispatchCommandWriter(target, command, parameters, id, requireRecords, started, strictReceipt = false) {
+function dispatchCommandWriter(target, command, parameters, id, requireRecords, started, strictReceipt = false, presentationCurrent) {
   target.handlers.dataSource.setInputParameters({
     ...parameters,
     ...(command.invocationParameter ? {[command.invocationParameter]: id} : {})
@@ -418,7 +435,11 @@ function dispatchCommandWriter(target, command, parameters, id, requireRecords, 
       return result;
     },
     Math.max(1000, Number(command.timeoutMs) || 30000),
-    requireRecords
+    requireRecords,
+    presentationCurrent && !requireRecords ? {
+      current: presentationCurrent,
+      retain: completion => retainMutationAcknowledgement(target.identity?.dataSourceId, id, completion),
+    } : undefined
   );
 }
 
@@ -572,10 +593,13 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
   let dialogProps;
   let validationContext = context;
   const peek = signal => signal?.peek?.() ?? signal?.value;
-  const scopeSnapshot = () => JSON.stringify([peek(context?.signals?.authorization) ?? context?.authorization, peek(context?.signals?.selection)]);
+  const scopeSnapshot = () => JSON.stringify([peek(context?.signals?.authorization) ?? context?.authorization, needsExactReceipt ? peek(context?.signals?.selection) : null]);
   const authorizationIsCurrent = () => (!protectedWindow || protectedWindowEpoch(windowId) === authorizationEpoch) && (originalScope === undefined || scopeSnapshot() === originalScope);
   const presentationCurrent = () => !dialogSignal || (dialogSignal.peek()?.open === true && dialogSignal.peek().props === dialogProps);
   const uiIsCurrent = () => authorizationIsCurrent() && presentationCurrent();
+  // Plain commands retain their declared window-wide state and owner refresh.
+  // Dialog-local feedback belongs to the presentation that initiated the call.
+  const windowEffectsCurrent = needsExactReceipt ? uiIsCurrent : authorizationIsCurrent;
   const rootEligible = () => commandValidationPasses(validationContext, command);
   const superseded = (accepted, invocationId = '') => {
     const error = new Error('Authorization context changed before command completion.');
@@ -593,12 +617,10 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
     if (command.clearFormFields != null && !Array.isArray(command.clearFormFields)) throw new Error('Expected an array of clearFormFields.');
     if (command.receiptWhen) throw new Error('Only a cleanup command may declare receiptWhen.');
     if (command.before != null && !Array.isArray(command.before)) throw new Error('Expected an array of preparation steps.');
-    if (needsExactReceipt) {
-      originalScope = scopeSnapshot();
-      if (lifecycle.dialogId) {
-        dialogSignal = findDialogSignal(`${windowId}Dialog${lifecycle.dialogId}`);
-        dialogProps = dialogSignal?.peek()?.props;
-      }
+    if (needsExactReceipt || lifecycle.dialogId) originalScope = scopeSnapshot();
+    if (lifecycle.dialogId) {
+      dialogSignal = findDialogSignal(`${windowId}Dialog${lifecycle.dialogId}`);
+      dialogProps = dialogSignal?.peek()?.props;
     }
     if (ordered) {
       sequence = sequenceInputs(extras);
@@ -673,8 +695,8 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
     if (!sequence) applyPrimitiveState(context, command.pendingState);
     publish(context, key, {phase: 'pending', guarded: true, pending: true, retryAllowed: false, error: null, message: 'Saving…', invocationId: id, writerStatus: 'pending', syncStatus: 'not_started'});
     const mapsResult = Object.keys(command.resultState || {}).length > 0;
-    const writer = await dispatchCommandWriter(target,command,preparedSnapshot,id,needsExactReceipt || mapsResult,()=>{writerInvoked=true;}, needsExactReceipt);
-    if (needsExactReceipt && writer.status === 'failed' && ambiguousWriterFailure(writer.error)) writer.status='indeterminate';
+    const writer = await dispatchCommandWriter(target,command,preparedSnapshot,id,needsExactReceipt || mapsResult,()=>{writerInvoked=true;}, needsExactReceipt, dialogSignal ? presentationCurrent : undefined);
+    if ((needsExactReceipt || dialogSignal) && writer.status === 'failed' && ambiguousWriterFailure(writer.error)) writer.status='indeterminate';
     if (!needsExactReceipt && !authorizationIsCurrent()) {
       releaseTransport(target, key);
       transportAcquired = false;
@@ -684,16 +706,16 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
       if (needsExactReceipt) throw writer.error ?? new Error('The writer failed to return a receipt.');
       releaseTransport(target, key);
       transportAcquired = false;
-      applyPrimitiveState(context, command.errorState);
+      if (windowEffectsCurrent()) applyPrimitiveState(context, command.errorState);
       publish(context, key, {phase: 'failed', guarded: false, pending: false, retryAllowed: true, error: writer.error, message: commandErrorMessage(writer.error), writerStatus: 'failed', syncStatus: 'not_started'});
-      notifyLifecycle(lifecycle, 'onSettled', {status: 'failed', error: writer.error, invocationId: id});
+      if (uiIsCurrent()) notifyLifecycle(lifecycle, 'onSettled', {status: 'failed', error: writer.error, invocationId: id});
       return {accepted: true, status: 'failed', error: writer.error, invocationId: id};
     }
     if (writer.status === 'indeterminate') {
       stateEntry(context,key).unknownTransport=target;
       const warnings = [];
       publish(context, key, {phase: 'indeterminate', guarded: true, pending: false, retryAllowed: false, error: null, message: writer.error.message, writerStatus: 'indeterminate', syncStatus: 'not_started', warnings});
-      try { if (uiIsCurrent()) applyPrimitiveState(context, command.indeterminateState); } catch (error) {
+      try { if (windowEffectsCurrent()) applyPrimitiveState(context, command.indeterminateState); } catch (error) {
         warnings.push({stage: 'indeterminateState', error});
         publish(context, key, {warnings});
       }
@@ -713,7 +735,7 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
       if (value === undefined) warnings.push({stage: 'resultState', error: new Error(`Writer receipt omitted the value for ${field}.`)});
       successState[field] = value ?? null;
     }
-    try { if (uiIsCurrent()) applyPrimitiveState(context, successState); } catch (error) { warnings.push({stage: 'successState', error}); }
+    try { if (windowEffectsCurrent()) applyPrimitiveState(context, successState); } catch (error) { warnings.push({stage: 'successState', error}); }
     const writerResponse = writer.records ?? parameterSnapshot(target?.signals?.collection?.peek?.() || target?.signals?.collection?.value || []);
     // The writer transport is no longer in use once its terminal success is
     // acknowledged. Release it before potentially slow UI reconciliation so a
@@ -723,7 +745,7 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
     releaseTransport(target, key);
     transportAcquired = false;
     publish(context, key, {phase: 'synchronizing', guarded: true, pending: false, retryAllowed: false, error: null, message: 'Refreshing…', writerStatus: 'succeeded', syncStatus: 'pending'});
-    try { warnings.push(...await synchronizeUI(context, target, command, writerResponse, uiIsCurrent, formSynchronization)); } catch (error) { warnings.push({stage: 'synchronize', error}); }
+    try { warnings.push(...await synchronizeUI(context, target, command, writerResponse, windowEffectsCurrent, formSynchronization, presentationCurrent)); } catch (error) { warnings.push({stage: 'synchronize', error}); }
     if (!needsExactReceipt && !authorizationIsCurrent()) return superseded(writerInvoked, id);
     if (closesDialog && dialogSignal && uiIsCurrent()) {
       // A close hook can await application work. Check the invocation's scope
@@ -769,9 +791,10 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
       if (uiIsCurrent()) notifyLifecycle(lifecycle, 'onSettled', {status: 'succeeded', warnings, invocationId: id});
       return {accepted: true, status: 'succeeded', warnings, invocationId: id};
     }
+    if (!writerInvoked && !presentationCurrent()) return superseded(false, id);
     try { applyPrimitiveState(context, command.errorState); } catch (_) {}
     publish(context, key, {phase: 'failed', guarded: false, pending: false, retryAllowed: true, error, message: commandErrorMessage(error), writerStatus: writerInvoked ? 'failed' : 'not_invoked', syncStatus: 'not_started'});
-    notifyLifecycle(lifecycle, 'onSettled', {status: 'failed', error, invocationId: id});
+    if (uiIsCurrent()) notifyLifecycle(lifecycle, 'onSettled', {status: 'failed', error, invocationId: id});
     return {accepted: writerInvoked, status: 'failed', error, invocationId: id};
   } finally {
     const current = getCommandState(context, command);

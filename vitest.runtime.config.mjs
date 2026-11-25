@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     include: [
+      'src/components/dialogFooterReceipt.render.test.jsx',
       'src/components/Chart.zeroCategories.render.test.jsx',
       'src/components/table/Basic.listPage.render.test.jsx',
       'src/components/table/TableThemeOverrides.render.test.jsx',

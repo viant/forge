@@ -17,6 +17,22 @@ export function beginDataSourceRequest(dataSourceId, requestId, windowId = '', r
   return promise;
 }
 
+// Only the invocation that owns this promise can retain its acknowledgement
+// after a renderer unmounts. Reads and record-dependent transforms still
+// observe their existing supersession behavior.
+export function retainMutationAcknowledgement(dataSourceId, requestId, completion) {
+  const entry = pending.get(key(dataSourceId, requestId));
+  if (!entry || entry.promise !== completion || entry.result !== 'payload') return false;
+  entry.retainAcknowledgement = true;
+  return true;
+}
+
+export function settleUnmountedDataSourceResponse(dataSourceId, requestId, payload, validAcknowledgement) {
+  const retained = pending.get(key(dataSourceId, requestId))?.retainAcknowledgement;
+  const error = retained && validAcknowledgement ? null : Object.assign(new Error('Datasource unmounted before request completion.'), {code: 'request_superseded'});
+  return settleDataSourceRequest(dataSourceId, requestId, error, payload);
+}
+
 export function requiresOrderedRecords(dataSourceId, requestId) {
   return !!requestId && pending.get(key(dataSourceId, requestId))?.result === 'orderedRecords';
 }

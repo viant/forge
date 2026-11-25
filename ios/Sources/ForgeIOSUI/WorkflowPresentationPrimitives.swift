@@ -542,6 +542,7 @@ struct MutationCommandButton: View {
     var onSettled: ((MutationCommandResult) -> Void)? = nil
 
     @State private var state = MutationCommandState()
+    @State private var activatedPresentation: UUID?
     @State private var confirmationVisible = false
     @State private var confirmationReply: CheckedContinuation<Bool, Never>?
 
@@ -573,7 +574,13 @@ struct MutationCommandButton: View {
         }
         .task(id: command.commandId ?? command.dataSourceRef) {
             for await next in await runtime.mutationCommandUpdates(windowID: window.windowID, command: command) {
-                state = next
+                if let dialogFooter, !dialogFooter.action.close, command.before?.isEmpty != false, command.clearFormFields.isEmpty,
+                   await runtime.dialogState(windowID: window.windowID, dialogID: dialogFooter.id).presentationID != activatedPresentation {
+                    state = next.guarded ? MutationCommandState(phase: next.phase, guarded: true, retryAllowed: false,
+                        message: next.phase == .indeterminate ? "A previous submission needs verification before retrying." : "Another submission is in progress.") : MutationCommandState()
+                } else {
+                    state = next
+                }
             }
         }
     }
@@ -595,11 +602,17 @@ struct MutationCommandButton: View {
 
     private func execute() {
         Task {
+            let origin = if let dialogFooter {
+                await runtime.dialogState(windowID: window.windowID, dialogID: dialogFooter.id).presentationID
+            } else { nil as UUID? }
+            activatedPresentation = origin
             if effectiveConfirmation?.isEmpty == false && resolveMutationConfirmation(command: command, extras: extras).isEmpty {
                 guard await askConfirmation() else { return }
             }
             let confirmation: @Sendable (String) async -> Bool = { _ in await askConfirmation() }
             let result = await dispatch(confirmation)
+            if let dialogFooter, !dialogFooter.action.close,
+               await runtime.dialogState(windowID: window.windowID, dialogID: dialogFooter.id).presentationID != origin { return }
             onSettled?(result)
         }
     }

@@ -6,6 +6,7 @@ import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
 import {executeCommand, getMutationCommandState, resetMutationCommandState, subscribeMutationCommand} from './primitiveMutation.js';
 import {usePredicateSignals} from './usePredicateSignals.js';
 import DisabledActionShell from '../DisabledActionShell.jsx';
+import {findDialogSignal} from '../../core/store/signals.js';
 import {getLogger} from '../../utils/logger.js';
 const mutationLog = getLogger('mutation');
 
@@ -37,10 +38,17 @@ export default function MutationCommand({command, context, extras = {}, disabled
     ? (!valid ? command?.invalidMessage || command?.tooltip : command?.tooltip)
     : '';
   const busy = state.guarded === true || ['validating', 'confirming', 'pending'].includes(state.phase);
-  const statusMessage = state.message || ({validating: 'Validating…', confirming: 'Awaiting confirmation…', preparing: 'Preparing…', pending: 'Saving…', indeterminate: 'Outcome unknown; refresh authoritative data before retrying.'}[state.phase]) || (state.guarded ? 'Working…' : '');
+  const plainFooter = dialogId && !closeOnSuccess && !command.before?.length && !command.clearFormFields?.length;
+  const dialog = plainFooter && findDialogSignal(`${context?.identity?.windowId}Dialog${dialogId}`);
+  const presentation = dialog?.peek?.()?.props;
+  const activatedPresentation = React.useRef(null);
+  const belongsHere = !dialog || activatedPresentation.current === presentation;
+  const statusMessage = !belongsHere ? (state.guarded ? (state.phase === 'indeterminate'
+    ? 'A previous submission needs verification before retrying.' : 'Another submission is in progress.') : '') : state.message || ({validating: 'Validating…', confirming: 'Awaiting confirmation…', preparing: 'Preparing…', pending: 'Saving…', indeterminate: 'Outcome unknown; refresh authoritative data before retrying.'}[state.phase]) || (state.guarded ? 'Working…' : '');
   const invoke = () => {
     mutationLog.debug('activate', {commandId: command?.commandId, dataSourceRef: command?.dataSourceRef, blocked, busy, phase: state.phase, guarded: getMutationCommandState(context, command).guarded});
     if (blocked || busy) return;
+    activatedPresentation.current = presentation;
     commandPromise.current = executeCommand(context, command, extras, {onSettled, dialogId, closeOnSuccess, confirm: (message) => new Promise((resolve) => {
       confirmResolver.current = resolve;
       setConfirmMessage(message);
@@ -65,7 +73,7 @@ export default function MutationCommand({command, context, extras = {}, disabled
     <div ref={operationRoot} style={{display:'contents'}}><DisabledActionShell reason={blockedExplanation} label={command?.label || 'Action'} className="forge-mutation-command">
       {renderTrigger ? renderTrigger({invoke, disabled: blocked || busy, pending: state.phase === 'pending'}) :
         <Button className={command?.className} data-forge-part="button" icon={command?.icon || undefined} aria-label={command?.label || 'Save'} title={!valid ? command.invalidMessage || 'This action is not currently valid.' : command?.label || undefined} intent={command?.intent || undefined} loading={state.phase === 'pending'} disabled={blocked || busy} onClick={invoke}>{command?.hideLabel ? null : children || command?.label || 'Save'}</Button>}
-      <span className="forge-mutation-command__status" data-command-phase={state.phase || 'idle'} aria-live="polite">{statusMessage}</span>
+      <span className="forge-mutation-command__status" data-command-phase={(belongsHere || state.guarded ? state.phase : 'idle') || 'idle'} aria-live="polite">{statusMessage}</span>
       <Alert isOpen={confirmOpen} intent={command?.intent === 'danger' ? 'danger' : 'primary'} confirmButtonText={children || command?.label || 'Confirm'} cancelButtonText="Cancel" onCancel={() => settleConfirmation(false)} onConfirm={() => settleConfirmation(true)}>{confirmMessage}</Alert>
     </DisabledActionShell></div>
   );

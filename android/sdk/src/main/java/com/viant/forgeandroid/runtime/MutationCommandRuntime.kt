@@ -124,9 +124,11 @@ class MutationCommandRuntime {
         val selection = if (scopeSensitive) source.selection.peek() else null
         val lease = CommandLease(key, command, presentation, presentationCurrent, closing) {
             window.metadata.peek()?.authorizationSnapshot == admitted &&
-                (!scopeSensitive || (source.selection.peek() == selection && window.signals.ownsMetadata(window.windowId, window.metadata)))
+                (!(scopeSensitive || presentation != null) || window.signals.ownsMetadata(window.windowId, window.metadata)) &&
+                (!scopeSensitive || source.selection.peek() == selection)
         }
-        val eligible = { lease.admitted() && (!closing || presentationCurrent()) && predicateAllows(source, command.validateWhen) }
+        val checkDialog = closing || (!scopeSensitive && presentation != null)
+        val eligible = { lease.admitted() && (!checkDialog || presentationCurrent()) && predicateAllows(source, command.validateWhen) }
         if (!scopeSensitive) return executeOne(runtime, window, source, command, extras, confirm, lease, eligible)
         val submitted = source.captureFormFields(command.clearFormFields)
         return try {
@@ -171,7 +173,9 @@ class MutationCommandRuntime {
         var rootAcknowledged = false
         var cleaningUp = false
         var last = MutationCommandState(writerStatus = MutationWriterStatus.NotInvoked)
-        private fun rootState(state: MutationCommandState) = if (!ordered) state else state.copy(
+        private fun rootState(state: MutationCommandState) = if (!ordered) {
+            if (presentation == null) state else state.copy(presentation = presentation)
+        } else state.copy(
             invocationId = rootInvocationId, presentation = presentation, writerStatus = if (rootDispatched) state.writerStatus else MutationWriterStatus.NotInvoked)
         suspend fun publish(state: MutationCommandState) {
             if (cleaningUp && state.phase == MutationCommandPhase.Pending) return
@@ -501,7 +505,8 @@ class MutationCommandRuntime {
                 }
                 lease.applyWindowState(runtime, window.windowId, JsonObject(patch))
                 try {
-                    warnings += synchronize(window, target, command, if (lease.ordered) writer.records else null) { lease.admitted() && (!lease.requiresReceipt || lease.presentationCurrent()) }
+                    warnings += synchronize(window, target, command, if (lease.ordered) writer.records else null,
+                        source.dataSourceRef, lease.presentationCurrent) { lease.admitted() && (!lease.requiresReceipt || lease.presentationCurrent()) }
                 } catch (cancelled: CancellationException) {
                     withContext(NonCancellable) { lease.settle(transport, MutationCommandState(
                         phase = MutationCommandPhase.Succeeded, invocationId = invocationId, writerStatus = MutationWriterStatus.Succeeded,
@@ -596,11 +601,13 @@ class MutationCommandRuntime {
         target: DataSourceContext,
         command: MutationCommandDef,
         invocationRows: JsonArray?,
+        sourceRef: String,
+        presentationCurrent: () -> Boolean,
         current: () -> Boolean
     ): List<MutationCommandWarning> {
         val warnings = mutableListOf<MutationCommandWarning>()
         if (!current()) return listOf(MutationCommandWarning("authorization", message = "Authorization changed before synchronization."))
-        command.reconcile?.let { spec ->
+        command.reconcile?.takeIf { presentationCurrent() }?.let { spec ->
             runCatching {
                 val destinationRef = spec.dataSourceRef?.trim().orEmpty().ifBlank { target.dataSourceRef }
                 val destination = window.contextOrNull(destinationRef)
@@ -622,7 +629,9 @@ class MutationCommandRuntime {
             runCatching {
                 val context = window.contextOrNull(refresh.dataSourceRef)
                     ?: error("Refresh datasource is unavailable: ${refresh.dataSourceRef}")
-                if (refresh.clearSelection) context.resetSelection()
+                val original = presentationCurrent()
+                if (!original && refresh.dataSourceRef == sourceRef) return@runCatching
+                if (refresh.clearSelection && original) context.resetSelection()
                 awaitRefresh(context)
             }.onFailure {
                 if (it is CancellationException) throw it

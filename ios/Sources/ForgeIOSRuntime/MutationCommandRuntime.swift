@@ -115,6 +115,10 @@ private struct MutationOperation {
     let dialogSignal: Signal<DialogState>?
     let presentationID: UUID?
     let originalPendingFields: [String: JSONValue]
+    var plainDialogFooter: Bool {
+        presentationID != nil && footer?.close == false && root.before?.isEmpty != false && root.clearFormFields.isEmpty
+    }
+
 }
 
 private struct MutationDispatchFailure: Error {
@@ -334,14 +338,14 @@ extension ForgeRuntime {
                 mutationTransportOwners.removeValue(forKey: mutationTransportKey(windowID: windowID, dataSourceRef: targetRef))
                 guardedMutationCommands.remove(key)
             }
-            let currentBeforeSync = await operationIsCurrent(operation)
             var warnings: [MutationCommandWarning] = []
-            if currentBeforeSync, await presentationIsCurrent(operation) {
+            if await completionIsCurrent(operation) {
                 warnings = await synchronizeMutationUI(
                     windowID: windowID, targetDataSourceRef: targetRef, command: command, authorization: admitted,
-                    receipt: steps.isEmpty ? nil : rows?.compactMap(\.objectValue))
+                    receipt: steps.isEmpty ? nil : rows?.compactMap(\.objectValue),
+                    presentation: operation.plainDialogFooter ? operation : nil)
             }
-            guard await operationIsCurrent(operation), await presentationIsCurrent(operation) else {
+            guard await completionIsCurrent(operation) else {
                 await publishMutationState(
                     key,
                     MutationCommandState(
@@ -417,7 +421,7 @@ extension ForgeRuntime {
                 }
             }
             defer { if !unresolved { guardedMutationCommands.remove(key) } }
-            if !failure.lostScope, await operationIsCurrent(operation), await presentationIsCurrent(operation) {
+            if !failure.lostScope, await completionIsCurrent(operation) {
                 if !unresolved, admittedWrites || failure.invoked {
                     await clearSubmittedFields(windowID: windowID, source: sourceDataSourceRef, submitted: submitted)
                 }
@@ -450,6 +454,17 @@ extension ForgeRuntime {
     private func presentationIsCurrent(_ operation: MutationOperation) async -> Bool {
         guard let id = operation.presentationID else { return true }
         return await operation.dialogSignal?.peek().presentationID == id
+    }
+
+    // The window owns configured state and external readback after an ordinary
+    // footer write. A replacement dialog owns its own form and selection.
+    private func completionIsCurrent(_ operation: MutationOperation) async -> Bool {
+        if operation.plainDialogFooter {
+            return await windowMetadata(id: operation.windowID)?.authorizationSnapshot == operation.authorization
+                && windows.contains(where: { $0.id == operation.windowID })
+        }
+        guard await operationIsCurrent(operation) else { return false }
+        return await presentationIsCurrent(operation)
     }
 
     private func operationIsCurrent(_ operation: MutationOperation) async -> Bool {
@@ -592,9 +607,13 @@ extension ForgeRuntime {
         return outcome
     }
 
-    private func synchronizeMutationUI(windowID: String, targetDataSourceRef: String, command: MutationCommandDef, authorization: [String: JSONValue]?, receipt: [[String: JSONValue]]?) async -> [MutationCommandWarning] {
+    private func synchronizeMutationUI(windowID: String, targetDataSourceRef: String, command: MutationCommandDef, authorization: [String: JSONValue]?, receipt: [[String: JSONValue]]?, presentation: MutationOperation? = nil) async -> [MutationCommandWarning] {
         var warnings: [MutationCommandWarning] = []
-        if let reconcile = command.reconcile {
+        func originalDialog() async -> Bool {
+            guard let presentation else { return true }
+            return await presentationIsCurrent(presentation)
+        }
+        if let reconcile = command.reconcile, await originalDialog() {
             do {
                 let destinationRef = reconcile.dataSourceRef?.trimmingCharacters(in: .whitespacesAndNewlines)
                 let ref = destinationRef?.isEmpty == false ? destinationRef! : targetDataSourceRef
@@ -616,7 +635,9 @@ extension ForgeRuntime {
         }
         for refresh in command.refresh {
             guard await windowMetadata(id: windowID)?.authorizationSnapshot == authorization else { break }
-            if refresh.clearSelection {
+            let original = await originalDialog()
+            if !original && refresh.dataSourceRef == presentation?.source { continue }
+            if refresh.clearSelection && original {
                 await setDataSourceSelection(windowID: windowID, dataSourceRef: refresh.dataSourceRef, selected: nil)
             }
             await refreshDataSourceCollection(windowID: windowID, dataSourceRef: refresh.dataSourceRef)

@@ -362,12 +362,13 @@ private fun DraftFormActions(
 internal fun startControlMutation(runtime: ForgeRuntime, window: WindowContext, source: DataSourceContext,
     command: MutationCommandDef, extras: Map<String, Any?>, controlScope: CoroutineScope, dialogId: String?,
     closeOnSuccess: Boolean = false, confirm: suspend (String) -> Boolean): kotlinx.coroutines.Deferred<MutationCommandResult> {
-    if (command.before.isEmpty() && command.clearFormFields.isEmpty() && !closeOnSuccess) return controlScope.async {
+    if (dialogId == null && command.before.isEmpty() && command.clearFormFields.isEmpty() && !closeOnSuccess) return controlScope.async {
         runtime.mutationCommands.execute(runtime, window, source, command, extras, confirm)
     }
     val dialog = dialogId?.let(window::dialogSignal)
     val presented = dialog?.peek()
-    val owner = if (command.before.isEmpty() && !closeOnSuccess) controlScope else runtime.scope
+    val plainFooter = dialogId != null && command.before.isEmpty() && command.clearFormFields.isEmpty() && !closeOnSuccess
+    val owner = if (command.before.isEmpty() && !closeOnSuccess && !plainFooter) controlScope else runtime.scope
     return owner.async(controlScope.coroutineContext.minusKey(Job)) {
         runtime.mutationCommands.executePresented(runtime, window, source, command, extras, presented,
             { dialog == null || (presented?.open == true && dialog.peek() === presented) }, confirm, dialogId.takeIf { closeOnSuccess })
@@ -396,18 +397,28 @@ internal fun MutationCommandButton(
     }
 
     var activatedHere by remember(command.commandId, command.dataSourceRef) { mutableStateOf(false) }
-    val observed = if (command.before.isEmpty()) standaloneState
+    val plainFooter = dialogId != null && command.before.isEmpty() && command.clearFormFields.isEmpty() && !closeOnSuccess
+    val observeRuntime = command.before.isNotEmpty() || plainFooter
+    val observed = if (!observeRuntime) standaloneState
         else remember(runtime, window.windowId, command.commandId, command.dataSourceRef) {
             runtime.mutationCommands.stateUpdates(window.windowId, command)
         }.collectAsState().value
     val samePresentation = dialogId != null && observed.presentation?.get() === window.dialogSignal(dialogId).peek()
-    val state = if (observed.guarded || activatedHere || samePresentation) observed else MutationCommandState()
+    val state = when {
+        plainFooter && !samePresentation -> if (observed.guarded) MutationCommandState(
+            phase = observed.phase, guarded = true, retryAllowed = false,
+            message = if (observed.phase == MutationCommandPhase.Indeterminate) "A previous submission needs verification before retrying." else "Another submission is in progress."
+        ) else MutationCommandState()
+        observed.guarded || activatedHere || samePresentation -> observed
+        else -> MutationCommandState()
+    }
     DisposableEffect(scope) {
         onDispose { confirmation?.second?.complete(false) }
     }
 
     fun execute() {
         activatedHere = true
+        val origin = dialogId?.let { window.dialogSignal(it).peek() }
         scope.launch {
             val request = if (confirmationOverride == null) command else command.copy(confirm = confirmationOverride)
             val execution = startControlMutation(runtime, window, source, request, extras, this, dialogId, closeOnSuccess) { text ->
@@ -417,13 +428,13 @@ internal fun MutationCommandButton(
                     try { decision.await() } finally { confirmation = null }
                 }
             }
-            if (command.before.isEmpty()) {
+            if (!observeRuntime) {
                 yield()
                 standaloneState = runtime.mutationCommands.state(window.windowId, request)
             }
             val result = execution.await()
-            if (command.before.isEmpty()) standaloneState = runtime.mutationCommands.state(window.windowId, request)
-            onSettled?.invoke(result)
+            if (!observeRuntime) standaloneState = runtime.mutationCommands.state(window.windowId, request)
+            if (dialogId == null || closeOnSuccess || window.dialogSignal(dialogId).peek() === origin) onSettled?.invoke(result)
         }
     }
 
