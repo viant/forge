@@ -1,6 +1,6 @@
 import React from 'react';
 import {Icon as BlueprintIcon} from '@blueprintjs/core';
-import {Megaphone, Moon, Sun} from 'lucide-react';
+import {Megaphone, Moon, Sun, SunMoon, Monitor} from 'lucide-react';
 import {ArrowLeft, ArrowRight, ArrowUp, Bell, Gauge, LogOut, Building, Camera, Check, CloudUpload, Clock3, FileText, Flag, House, LayoutGrid, Maximize, Mic, Minimize, SlidersHorizontal, Star, Funnel, ChevronDown, ChevronRight, CircleAlert, CircleHelp, CirclePause, LoaderCircle, Link, RotateCcw, FileDown, History,
     Maximize2, Menu, MessageSquare, Minimize2, Paperclip, PanelRight, PanelRightClose,
     PanelRightOpen, Plus, RefreshCw, Search, Settings, Square, ThumbsUp, ThumbsDown, Ellipsis, Trash2, User, X, ZoomIn, ZoomOut, ArrowDown, Bot, Briefcase, Calendar, CalendarClock, ChartNoAxesCombined, ChevronLeft, ChevronUp, ChevronsLeft, ChevronsRight, ChevronsUpDown, Circle, CircleCheck, CircleX, Clipboard, Code, Columns3, Copy, Database, DollarSign, Download, EllipsisVertical, ExternalLink, Eye, EyeOff, FileSpreadsheet, Folder, FolderOpen, GitCompare, GripVertical, Info, ListFilter, FilterX, LogIn, Mail, Pause, Pencil, Play, Redo2, Rows3, Save, Send, Sparkles, Table, Target, Terminal, TriangleAlert, Undo2, Wrench, Users, Minus, Bug, ChartPie, Blend, FlaskConical, Globe, Handshake, Image, Palette, Route, Rocket, ShieldAlert, Tag, Activity, Layers, TrendingUp, Network, Gamepad2, List, CircleUserRound, Lightbulb, Brain} from 'lucide-react';
@@ -42,7 +42,7 @@ const icons = {
     'minimize-2': Minimize2, paperclip: Paperclip, 'panel-right': PanelRight,
     'panel-right-close': PanelRightClose, 'panel-right-open': PanelRightOpen,
     'cloud-upload': CloudUpload, plus: Plus, 'refresh-cw': RefreshCw, search: Search, settings: Settings,
-    square: Square, 'trash-2': Trash2, user: User, x: X, bell: Bell, gauge: Gauge, 'log-out': LogOut,
+    square: Square, 'sun-moon': SunMoon, monitor: Monitor, 'trash-2': Trash2, user: User, x: X, bell: Bell, gauge: Gauge, 'log-out': LogOut,
     'zoom-in': ZoomIn, 'zoom-out': ZoomOut,
     'circle-help': CircleHelp, 'circle-pause': CirclePause, 'loader-circle': LoaderCircle, link: Link, 'rotate-ccw': RotateCcw,
     'thumbs-up': ThumbsUp, 'thumbs-down': ThumbsDown, ellipsis: Ellipsis,
