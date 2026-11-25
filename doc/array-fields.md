@@ -14,6 +14,7 @@ properties:
   addLabel: Add range
   removeLabel: Remove range
   minRows: 1
+  maxRows: 5
   newRow: {id: null, start: null, end: null}
   rowReadOnlyWhen: {source: row, field: locked, equals: true}
   removeWhen: {source: row, field: removable, equals: true}
@@ -27,6 +28,11 @@ name registered source functions receiving `{value, row, field, context}` for
 explicit display/storage conversion. The editor preserves unbound row fields.
 `rowKey` defaults to `id`; unsaved rows without an ID use their position.
 `minRows` limits removal; it does not silently manufacture stored rows.
+
+The optional nonnegative integer `maxRows` disables Add when the live row count
+reaches the limit. Rows marked for deletion free a slot. Existing rows remain
+editable and removable under their usual rules, even above the limit. Omitting
+`maxRows` allows unlimited additions.
 
 The normal item `readOnlyWhen` guard applies to the whole editor. Per-field
 `readOnlyWhen` and row `rowReadOnlyWhen` constrain editing; `removeWhen` constrains

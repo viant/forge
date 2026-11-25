@@ -3,6 +3,7 @@ import {createRoot} from 'react-dom/client';
 import {it,expect,vi} from 'vitest';
 import '../../packs/blueprint/index.jsx';
 import ArrayFields from './ArrayFields.jsx';
+import {invokeRegisteredControlAction} from '../../core/ui/controlActions.js';
 
 it('edits and removes only eligible rows while preserving unbound row fields',async()=>{
  globalThis.IS_REACT_ACT_ENVIRONMENT=true;
@@ -47,4 +48,43 @@ it('tracks explicit stored-row removal and discards unsaved rows; reset clears t
   expect(host.querySelector('[aria-label="Name 1"]').value).toBe('Original');
   expect(baseline[0]).not.toHaveProperty('remove');
  }finally{await act(async()=>root.unmount());host.remove();}
+});
+
+it('limits additions to live rows through both the button and its registered action', async () => {
+ const host = document.body.appendChild(document.createElement('div'));
+ const root = createRoot(host);
+ const change = vi.fn();
+ const rows = [{id: 1, name: 'One'}, {id: 2, name: 'Two'}];
+ const context = {identity: {windowId: 'bounded-array'}};
+ const addAction = {windowId: context.identity.windowId, controlId: 'arrayFields:add'};
+ const addButton = () => host.querySelector('.forge-array-fields__add');
+ const render = (value, maxRows) => act(async () => root.render(
+  <ArrayFields context={context} value={value} fields={[{field: 'name', label: 'Name'}]}
+   onChange={change} newRow={{name: ''}} deleteMarker="remove" maxRows={maxRows}/>
+ ));
+ try {
+  await render(rows, 2);
+  expect(addButton().disabled).toBe(true);
+  await act(async () => addButton().click());
+  await expect(invokeRegisteredControlAction(addAction, 'click')).rejects.toThrow(/disabled/);
+  expect(change).not.toHaveBeenCalled();
+  expect(host.querySelector('[aria-label="Name 1"]').readOnly).toBe(false);
+  await act(async () => host.querySelector('[aria-label="Remove row 1"]').click());
+  const pending = change.mock.lastCall[0];
+  expect(pending[0].remove).toBe(true);
+  await render(pending, 2);
+  expect(addButton().disabled).toBe(false);
+  await act(async () => invokeRegisteredControlAction(addAction, 'click'));
+  expect(change.mock.lastCall[0]).toEqual([...pending, {name: ''}]);
+  await render(rows, 1);
+  expect(addButton().disabled).toBe(true);
+  expect(host.querySelectorAll('input')).toHaveLength(2);
+  await render([], 0);
+  expect(addButton().disabled).toBe(true);
+  await render(rows, undefined);
+  expect(addButton().disabled).toBe(false);
+ } finally {
+  await act(async () => root.unmount());
+  host.remove();
+ }
 });

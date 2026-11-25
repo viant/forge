@@ -8,7 +8,7 @@ import {registerControlActions,invalidateControlActionState,isLiveControlVisible
 
 // Inline editing remains owned by the form; registered operations share these
 // exact field/add/remove callbacks and never submit a replacement array directly.
-export default function ArrayFields({value, onChange, fields=[], newRow={}, minRows=0,
+export default function ArrayFields({value, onChange, fields=[], newRow={}, minRows=0, maxRows,
     addLabel='Add row', removeLabel='Remove row', rowLabel='Row', rowKey='id',
     rowReadOnlyWhen, removeWhen, deleteMarker, readOnly=false, disabled=false, timezone,
     context={}, item={}, className=''}) {
@@ -27,7 +27,8 @@ export default function ArrayFields({value, onChange, fields=[], newRow={}, minR
         const changed=write?write({value:next,row,field,context}):next;
         return emit(rows.map((entry,i)=>i===index?{...entry,[field.field]:changed}:entry),strict);
     };
-    const add=(strict=false)=>locked?false:emit([...rows,structuredClone(newRow)],strict);
+    const addDisabled = locked || (maxRows != null && liveRows.length >= maxRows);
+    const add=(strict=false)=>addDisabled?false:emit([...rows,structuredClone(newRow)],strict);
     const canRemoveRow=row=>!locked&&liveRows.length>minRows&&(!removeWhen||evaluatePlainVisibleWhen(removeWhen,context,row));
     const remove=(index,strict=false)=>{
         const row=rows[index];
@@ -62,7 +63,7 @@ export default function ArrayFields({value, onChange, fields=[], newRow={}, minR
     });
     const addId=`${baseId}:add`;
     records.set(addId,{meta:{windowId:context?.identity?.windowId,dataSourceRef:context?.identity?.dataSourceRef,controlId:addId,type:'button'},
-        read:()=>({visible:!locked&&isLiveControlVisible(root.current),disabled:locked,readOnly:locked,actions:{click:()=>add(true)}})});
+        read:()=>({visible:!locked&&isLiveControlVisible(root.current),disabled:addDisabled,readOnly:locked,actions:{click:()=>add(true)}})});
     current.current=records;
     const keys=[...records.keys()].join('|');
     React.useEffect(()=>{
@@ -72,7 +73,7 @@ export default function ArrayFields({value, onChange, fields=[], newRow={}, minR
         },()=>current.current.get(id)?.read?.() || {visible:false,actions:{}}));
         return ()=>cleanups.forEach(cleanup=>cleanup());
     },[context?.identity?.windowId,context?.identity?.dataSourceRef,keys]);
-    React.useEffect(()=>{if(context?.identity?.windowId)invalidateControlActionState(context.identity.windowId);},[context?.identity?.windowId,locked]);
+    React.useEffect(()=>{if(context?.identity?.windowId)invalidateControlActionState(context.identity.windowId);},[context?.identity?.windowId,locked,addDisabled]);
     return <div ref={root} className={`forge-array-fields ${className}`} data-forge-primitive="arrayFields">
         <div className="forge-array-fields__rows">
             {rendered.map(({row,index,ordinal,identity,controls,canRemove})=><div className="forge-array-fields__row" key={row?.[rowKey]??`draft-${index}`}>
@@ -86,6 +87,6 @@ export default function ArrayFields({value, onChange, fields=[], newRow={}, minR
                 {canRemove&&<Button minimal icon="cross" aria-label={`${removeLabel} ${ordinal+1}`} onClick={()=>remove(index)}/>}
             </div>)}
         </div>
-        {!locked&&<Button minimal icon="add" className="forge-array-fields__add" onClick={()=>add()}>{addLabel}</Button>}
+        {!locked&&<Button minimal icon="add" className="forge-array-fields__add" disabled={addDisabled} onClick={()=>add()}>{addLabel}</Button>}
     </div>;
 }
