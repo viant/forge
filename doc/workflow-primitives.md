@@ -24,7 +24,8 @@ primitive precondition
   -> resolve parameters
   -> command validation
   -> confirmation
-  -> invoke exactly one writer
+  -> run eligible preparation writers in order when before is declared
+  -> invoke the terminal writer once
      |-> failed: publish failed; no synchronization
      |-> indeterminate: keep guarded; optional authoritative recovery; no result reconciliation
      `-> succeeded: attempt reconciliation and every configured refresh; publish writer/sync status
@@ -832,6 +833,56 @@ Another row cannot release the lease. Separate windows and ungrouped commands
 keep their independent behavior. The existing target transport guard still
 serializes commands sharing one writer. This is optional concurrency control,
 not authorization, automatic queuing or retry.
+
+## Ordered preparation on a mutation command
+
+A command opts in by declaring a nonempty `before` list. An omitted list and
+`before: []` use the single-writer lifecycle. There is no window-wide switch.
+
+```yaml
+mutationCommand:
+  commandId: saveDocument
+  dataSourceRef: documentWriter
+  prepare: Documents.prepareSave
+  before:
+    - when: {source: windowForm, field: hasAttachment, equals: true}
+      command:
+        commandId: stageAttachment
+        dataSourceRef: attachmentWriter
+        prepare: Documents.prepareAttachment
+        invocationParameter: requestId
+      cleanup:
+        commandId: removeAttachment
+        dataSourceRef: attachmentRemoval
+        prepare: Documents.prepareRemoval
+        receiptWhen: {source: collection, field: '0.removed', equals: true}
+```
+
+Root confirmation precedes every writer. Each eligible step runs once, in
+declaration order. A subsequent preparation handler can read the earlier
+invocation's ID and normalized rows at `extras.steps.stageAttachment`. The
+executor supplies this map itself and sends only the parameters prepared for
+the current writer. A confirmed empty array is a valid receipt.
+
+After a definitive failure, the executor runs the declared cleanup for each
+acknowledged step in reverse order. A cleanup error is a secondary warning on
+the original failure. A cleanup can opt in to `receiptWhen` to check its own
+normalized rows. For the example above, a missing or false `removed` value
+produces a warning and the runtime continues earlier cleanup steps. An unknown write outcome holds the guard for authoritative
+readback. A confirmed terminal write can still have a refresh warning. This
+sequence spans individual producer calls, each with its own commit boundary.
+
+The root owns confirmation, state updates, result mapping and refresh. An
+optional `cleanupState` patches the originating window form while compensation
+is running. Closing and reopening a dialog creates a new presentation scope.
+
+A root command can also opt in to `clearFormFields: [attachment, attachments]`
+with or without preparation steps. The executor remembers the submitted source
+form values for those top-level fields. After a confirmed save or a definitive
+failure following dispatch and cleanup, it clears the still-matching fields.
+Lists become empty lists and single values become null. Missing fields, later
+edits and sibling drafts are preserved. An unknown outcome retains the files
+for authoritative recovery. This local edit performs no datasource read.
 
 ## Opt-in resource mappings
 

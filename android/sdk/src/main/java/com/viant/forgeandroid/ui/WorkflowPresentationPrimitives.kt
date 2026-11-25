@@ -13,6 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,6 +45,8 @@ import com.viant.forgeandroid.runtime.WorkflowPrimitiveRuntime
 import com.viant.forgeandroid.runtime.evaluateDashboardCondition
 import com.viant.forgeandroid.runtime.formatDashboardValue
 import kotlin.math.absoluteValue
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.async
 import kotlinx.coroutines.yield
@@ -336,6 +339,22 @@ private fun DraftFormActions(
     }
 }
 
+/** Keep an admitted ordered write alive if its pending metadata removes the composing control. */
+internal fun startControlMutation(runtime: ForgeRuntime, window: WindowContext, source: DataSourceContext,
+    command: MutationCommandDef, extras: Map<String, Any?>, controlScope: CoroutineScope, dialogId: String?,
+    confirm: suspend (String) -> Boolean): kotlinx.coroutines.Deferred<MutationCommandResult> {
+    if (command.before.isEmpty() && command.clearFormFields.isEmpty()) return controlScope.async {
+        runtime.mutationCommands.execute(runtime, window, source, command, extras, confirm)
+    }
+    val dialog = dialogId?.let(window::dialogSignal)
+    val presented = dialog?.peek()
+    val owner = if (command.before.isEmpty()) controlScope else runtime.scope
+    return owner.async(controlScope.coroutineContext.minusKey(Job)) {
+        runtime.mutationCommands.executePresented(runtime, window, source, command, extras, presented,
+            { dialog == null || (presented?.open == true && dialog.peek() === presented) }, confirm)
+    }
+}
+
 @Composable
 internal fun MutationCommandButton(
     runtime: ForgeRuntime,
@@ -347,26 +366,43 @@ internal fun MutationCommandButton(
     extras: Map<String, Any?> = emptyMap(),
     externallyDisabled: Boolean = false,
     onSettled: ((MutationCommandResult) -> Unit)? = null,
-    accessibilityDescriptionOverride: String? = null
+    accessibilityDescriptionOverride: String? = null,
+    dialogId: String? = null
 ) {
     val scope = rememberCoroutineScope()
-    var state by remember(command.commandId, command.dataSourceRef) { mutableStateOf(MutationCommandState()) }
+    var standaloneState by remember(command.commandId, command.dataSourceRef) { mutableStateOf(MutationCommandState()) }
     var confirmation by remember(command.commandId, command.dataSourceRef) {
         mutableStateOf<Pair<String, kotlinx.coroutines.CompletableDeferred<Boolean>>?>(null)
     }
 
+    var activatedHere by remember(command.commandId, command.dataSourceRef) { mutableStateOf(false) }
+    val observed = if (command.before.isEmpty()) standaloneState
+        else remember(runtime, window.windowId, command.commandId, command.dataSourceRef) {
+            runtime.mutationCommands.stateUpdates(window.windowId, command)
+        }.collectAsState().value
+    val samePresentation = dialogId != null && observed.presentation?.get() === window.dialogSignal(dialogId).peek()
+    val state = if (observed.guarded || activatedHere || samePresentation) observed else MutationCommandState()
+    DisposableEffect(scope) {
+        onDispose { confirmation?.second?.complete(false) }
+    }
+
     fun execute() {
+        activatedHere = true
         scope.launch {
             val request = if (confirmationOverride == null) command else command.copy(confirm = confirmationOverride)
-            val execution = async { runtime.mutationCommands.execute(runtime, window, source, request, extras) { text ->
-                val decision = kotlinx.coroutines.CompletableDeferred<Boolean>()
-                confirmation = text to decision
-                try { decision.await() } finally { confirmation = null }
-            } }
-            yield()
-            state = runtime.mutationCommands.state(window.windowId, request)
+            val execution = startControlMutation(runtime, window, source, request, extras, this, dialogId) { text ->
+                if (scope.coroutineContext[Job]?.isActive != true) false else {
+                    val decision = kotlinx.coroutines.CompletableDeferred<Boolean>()
+                    confirmation = text to decision
+                    try { decision.await() } finally { confirmation = null }
+                }
+            }
+            if (command.before.isEmpty()) {
+                yield()
+                standaloneState = runtime.mutationCommands.state(window.windowId, request)
+            }
             val result = execution.await()
-            state = runtime.mutationCommands.state(window.windowId, request)
+            if (command.before.isEmpty()) standaloneState = runtime.mutationCommands.state(window.windowId, request)
             onSettled?.invoke(result)
         }
     }

@@ -17,6 +17,8 @@ class SignalRegistry {
     fun metadata(windowId: String): Signal<WindowMetadata?> =
         metadataSignals.getOrPut(windowId) { Signal(null) }
 
+    internal fun ownsMetadata(windowId: String, signal: Signal<WindowMetadata?>): Boolean = metadataSignals[windowId] === signal
+
     fun collection(dsId: String): Signal<List<Map<String, Any?>>> =
         collectionSignals.getOrPut(dsId) { Signal(emptyList()) }
 

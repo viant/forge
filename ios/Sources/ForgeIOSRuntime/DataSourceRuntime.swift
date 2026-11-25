@@ -1,6 +1,6 @@
 import Foundation
 
-typealias DataSourceRowReceipt = Result<[[String: JSONValue]], Error>
+typealias DataSourceRowReceipt = Result<[JSONValue], Error>
 
 public actor DataSourceRuntime {
     private var collectionInputs: [String: InputState] = [:]
@@ -29,6 +29,12 @@ public actor DataSourceRuntime {
 
     public func form(dataSourceID: String) -> [String: JSONValue] {
         formValues[dataSourceID] ?? [:]
+    }
+
+    func clearSubmittedFormFields(dataSourceID: String, submitted: [String: JSONValue]) -> Bool {
+        guard let updated = clearingSubmittedFields(form(dataSourceID: dataSourceID), submitted: submitted) else { return false }
+        setForm(dataSourceID: dataSourceID, values: updated)
+        return true
     }
 
     public func setForm(dataSourceID: String, values: [String: JSONValue]) {
@@ -212,6 +218,7 @@ public actor DataSourceRuntime {
         inputParameters: [String: JSONValue] = [:],
         selectors: DataSourceSelectorDef? = nil,
         paging: DataSourcePagingDef? = nil,
+        requireInvocationRecords: Bool = false,
         additionalHeaders: [String: String] = [:],
         session: URLSession = .shared
     ) async -> DataSourceRowReceipt? {
@@ -259,6 +266,18 @@ public actor DataSourceRuntime {
                 )
             }
             let raw = try JSONDecoder().decode(JSONValue.self, from: data)
+            var invocationRecords: [JSONValue]?
+            if requireInvocationRecords {
+                let selector = selectors?.data?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                let records = selector.isEmpty
+                    ? raw.objectValue?["data"] ?? raw.objectValue?["entries"] ?? raw.objectValue?["Rows"] ?? raw.objectValue?["rows"] ?? raw
+                    : selectValue(raw, selector: selector)
+                guard let items = records?.arrayValue else {
+                    setControl(dataSourceID: dataSourceID, control: ControlState(error: "Writer invocation records are unavailable."))
+                    return nil
+                }
+                invocationRecords = items
+            }
             let rows = normalizeCollection(raw, selector: selectors?.data)
             setCollection(dataSourceID: dataSourceID, rows: rows, forInput: input)
             let selectedMetrics = normalizeDataInfo(raw, selector: selectors?.metrics)
@@ -272,7 +291,7 @@ public actor DataSourceRuntime {
                 setMetrics(dataSourceID: dataSourceID, values: dataInfo)
             }
             setControl(dataSourceID: dataSourceID, control: ControlState())
-            return .success(rows)
+            return .success(invocationRecords ?? rows.map(JSONValue.object))
         } catch {
             if Task.isCancelled || (error as? URLError)?.code == .cancelled || error is CancellationError {
                 setControl(dataSourceID: dataSourceID, control: ControlState())
@@ -433,5 +452,26 @@ public actor DataSourceRuntime {
             controlValues.removeValue(forKey: key)
             metricsValues.removeValue(forKey: key)
         }
+    }
+}
+
+/// Release only values still owned by the completed submission. Each form
+/// owner applies the same comparison, so a later editor's signal is preserved.
+private func clearingSubmittedFields(_ current: [String: JSONValue], submitted: [String: JSONValue]) -> [String: JSONValue]? {
+    var next = current
+    var changed = false
+    for (field, original) in submitted where current[field] == original {
+        let cleared: JSONValue = original.arrayValue == nil ? .null : .array([])
+        if original != cleared {
+            next[field] = cleared
+            changed = true
+        }
+    }
+    return changed ? next : nil
+}
+
+extension Signal where Value == [String: JSONValue] {
+    func clearSubmittedFormFields(_ submitted: [String: JSONValue]) {
+        if let updated = clearingSubmittedFields(peek(), submitted: submitted) { set(updated) }
     }
 }

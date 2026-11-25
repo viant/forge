@@ -32,8 +32,57 @@ data class MutationCommandDef(
     val refresh: List<RefreshSpec> = emptyList(),
     val prepare: String? = null,
     val serializationGroup: String? = null,
-    val tooltip: String? = null
+    val tooltip: String? = null,
+    val before: List<MutationBeforeStepDef> = emptyList(),
+    val cleanupState: JsonObject = JsonObject(emptyMap()),
+    val receiptWhen: DashboardConditionDef? = null,
+    val clearFormFields: List<String> = emptyList()
+) {
+    @kotlinx.serialization.Transient
+    internal val invalidClearFields: Boolean = clearFormFields.isNotEmpty() &&
+        (clearFormFields.any { !safeFormField(it) } || clearFormFields.toSet().size != clearFormFields.size)
+    @kotlinx.serialization.Transient
+    internal val beforeDefinitionError: String? = if (before.isEmpty()) null else validateBefore()
+}
+
+@Serializable
+data class MutationBeforeStepDef(
+    @SerialName("when") val condition: DashboardConditionDef? = null,
+    val command: MutationCommandDef,
+    val cleanup: MutationCommandDef? = null
 )
+
+private fun safeFormField(field: String) = field.isNotBlank() && field == field.trim() &&
+    field.none { it in "./:[]" } && field != "constructor" && field != "prototype" && field != "__proto__"
+
+private fun MutationCommandDef.validateBefore(): String? {
+    if (receiptWhen != null) return "receiptWhen is supported only on a cleanup command."
+    val ids = mutableSetOf(commandId?.trim().orEmpty())
+    for (step in before) for (command in listOfNotNull(step.command, step.cleanup)) {
+        val id = command.commandId?.trim()
+        if (id.isNullOrBlank() || !ids.add(id)) return "Ordered commands require unique explicit command IDs."
+        if (command.receiptWhen != null && (command !== step.cleanup || !command.receiptWhen.usesOnlyReceiptRows())) {
+            return "receiptWhen requires only collection predicates on a cleanup command."
+        }
+        if (command.dataSourceRef.isBlank() || command.before.isNotEmpty() || !command.serializationGroup.isNullOrBlank() ||
+            !command.confirm.isNullOrBlank() || command.confirmSelection != null || command.reconcile != null ||
+            command.refresh.isNotEmpty() || command.resultState.isNotEmpty() || command.pendingState.isNotEmpty() ||
+            command.successState.isNotEmpty() || command.errorState.isNotEmpty() || command.indeterminateState.isNotEmpty() ||
+            command.cleanupState.isNotEmpty() || command.clearFormFields.isNotEmpty()) {
+            return "Ordered command $id must declare a writer without nested steps or command lifecycle metadata."
+        }
+    }
+    return null
+}
+
+private fun DashboardConditionDef.usesOnlyReceiptRows(): Boolean {
+    val children = all + any + listOfNotNull(not)
+    val path = selector ?: field ?: key
+    if (children.isNotEmpty()) return source == null && path == null && children.all { it.usesOnlyReceiptRows() }
+    val index = path?.substringBefore('.') ?: return false
+    val row = index.toIntOrNull() ?: return false
+    return source == "collection" && row >= 0 && row.toString() == index
+}
 
 @Serializable
 data class SelectionConfirmationDef(

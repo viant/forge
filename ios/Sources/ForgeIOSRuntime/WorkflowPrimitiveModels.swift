@@ -5,6 +5,8 @@ import Foundation
 
 public final class MutationCommandDef: Codable, @unchecked Sendable {
     public let serializationGroup: String?
+    let beforeValidationError: String?
+    public let before: [MutationBeforeStepDef]?
     public let commandId: String?
     public let label: String?
     public let icon: String?
@@ -20,6 +22,9 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
     public let prepare: String?
     public let payload: ResourcePayloadPreparationDef?
     public let validateWhen: DashboardConditionDef?
+    public let receiptWhen: DashboardConditionDef?
+    public let clearFormFields: [String]
+    public let cleanupState: [String: JSONValue]
     public let pendingState: [String: JSONValue]
     public let resultState: [String: [String]]
     public let successState: [String: JSONValue]
@@ -30,6 +35,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
 
     public init(
         commandId: String? = nil,
+        before: [MutationBeforeStepDef]? = nil,
         serializationGroup: String? = nil,
         label: String? = nil,
         icon: String? = nil,
@@ -45,6 +51,9 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         payload: ResourcePayloadPreparationDef? = nil,
         prepare: String? = nil,
         validateWhen: DashboardConditionDef? = nil,
+        receiptWhen: DashboardConditionDef? = nil,
+        clearFormFields: [String] = [],
+        cleanupState: [String: JSONValue] = [:],
         pendingState: [String: JSONValue] = [:],
         successState: [String: JSONValue] = [:],
         resultState: [String: [String]] = [:],
@@ -53,6 +62,8 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         reconcile: ReconcileSpec? = nil,
         refresh: [RefreshSpec] = []
     ) {
+        self.beforeValidationError = Self.validateBefore(before, root: commandId ?? dataSourceRef, fields: clearFormFields)
+        self.before = before
         self.commandId = commandId
         self.serializationGroup = serializationGroup
         self.label = label
@@ -69,6 +80,9 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         self.payload = payload
         self.prepare = prepare
         self.validateWhen = validateWhen
+        self.receiptWhen = receiptWhen
+        self.clearFormFields = clearFormFields
+        self.cleanupState = cleanupState
         self.pendingState = pendingState
         self.resultState = resultState
         self.successState = successState
@@ -78,15 +92,56 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         self.refresh = refresh
     }
 
+    private static func isPlainID(_ name: String) -> Bool {
+        !name.isEmpty && name == name.trimmingCharacters(in: .whitespacesAndNewlines)
+            && name.rangeOfCharacter(from: CharacterSet(charactersIn: ".:/[]")) == nil
+            && !["__proto__", "constructor", "prototype"].contains(name)
+    }
+
+    private static func isReceiptCondition(_ condition: DashboardConditionDef) -> Bool {
+        if let negated = condition.not { return isReceiptCondition(negated) }
+        if !condition.any.isEmpty || !condition.all.isEmpty {
+            return (condition.any + condition.all).allSatisfy(isReceiptCondition)
+        }
+        return condition.source == "collection" && condition.dataSourceRef == nil && condition.field?.isEmpty == false
+    }
+
+    private static func validateBefore(_ steps: [MutationBeforeStepDef]?, root: String, fields: [String]) -> String? {
+        var seen = Set<String>()
+        for field in fields where !isPlainID(field) || !seen.insert(field).inserted {
+            return "Fields cleared by a command must be distinct, top-level names."
+        }
+        guard let steps else { return nil }
+        var ids = Set([root])
+        for step in steps {
+            if step.command.receiptWhen != nil { return "Only cleanup commands may assert their receipt." }
+            if let condition = step.cleanup?.receiptWhen, !isReceiptCondition(condition) { return "Cleanup conditions may read only their invocation records." }
+            for child in [step.command, step.cleanup].compactMap({ $0 }) {
+                guard let id = child.commandId, isPlainID(id), ids.insert(id).inserted,
+                      !child.dataSourceRef.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    return "Pre-save and cleanup commands require distinct, plain command IDs and a writer reference."
+                }
+                guard child.before?.isEmpty != false, child.confirm?.isEmpty != false, child.confirmSelection == nil,
+                      child.serializationGroup?.isEmpty != false, child.reconcile == nil, child.refresh.isEmpty,
+                      child.pendingState.isEmpty, child.successState.isEmpty, child.resultState.isEmpty, child.errorState.isEmpty,
+                      child.clearFormFields.isEmpty, child.cleanupState.isEmpty, child.indeterminateState.isEmpty else {
+                    return "The root command owns confirmation, sequencing and UI synchronization."
+                }
+            }
+        }
+        return nil
+    }
+
     private enum CodingKeys: String, CodingKey {
-        case commandId, serializationGroup, label, icon, hideLabel, intent, confirm, confirmSelection, invalidMessage, timeoutMs
-        case invocationParameter, dataSourceRef, parameters, payload, prepare, validateWhen
-        case pendingState, resultState, successState, errorState, indeterminateState, reconcile, refresh
+        case before, commandId, serializationGroup, label, icon, hideLabel, intent, confirm, confirmSelection, invalidMessage, timeoutMs
+        case invocationParameter, dataSourceRef, parameters, payload, prepare, validateWhen, receiptWhen
+        case clearFormFields, cleanupState, pendingState, resultState, successState, errorState, indeterminateState, reconcile, refresh
     }
 
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         serializationGroup = try values.decodeIfPresent(String.self, forKey: .serializationGroup)
+        before = try values.decodeIfPresent([MutationBeforeStepDef].self, forKey: .before)
         commandId = try values.decodeIfPresent(String.self, forKey: .commandId)
         label = try values.decodeIfPresent(String.self, forKey: .label)
         icon = try values.decodeIfPresent(String.self, forKey: .icon)
@@ -102,6 +157,9 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         prepare = try values.decodeIfPresent(String.self, forKey: .prepare)
         payload = try values.decodeIfPresent(ResourcePayloadPreparationDef.self, forKey: .payload)
         validateWhen = try values.decodeIfPresent(DashboardConditionDef.self, forKey: .validateWhen)
+        receiptWhen = try values.decodeIfPresent(DashboardConditionDef.self, forKey: .receiptWhen)
+        clearFormFields = try values.decodeIfPresent([String].self, forKey: .clearFormFields) ?? []
+        cleanupState = try values.decodeIfPresent([String: JSONValue].self, forKey: .cleanupState) ?? [:]
         pendingState = try values.decodeIfPresent([String: JSONValue].self, forKey: .pendingState) ?? [:]
         resultState = try values.decodeIfPresent([String: [String]].self, forKey: .resultState) ?? [:]
         successState = try values.decodeIfPresent([String: JSONValue].self, forKey: .successState) ?? [:]
@@ -109,6 +167,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         indeterminateState = try values.decodeIfPresent([String: JSONValue].self, forKey: .indeterminateState) ?? [:]
         reconcile = try values.decodeIfPresent(ReconcileSpec.self, forKey: .reconcile)
         refresh = try values.decodeIfPresent([RefreshSpec].self, forKey: .refresh) ?? []
+        beforeValidationError = Self.validateBefore(before, root: commandId ?? dataSourceRef, fields: clearFormFields)
     }
 }
 
@@ -116,12 +175,24 @@ extension ActionDef {
     public var footerCommand: MutationCommandDef? {
         guard let command = mutationCommand else { return nil }
         guard command.commandId?.isEmpty != false, let id, !id.isEmpty else { return command }
-        return MutationCommandDef(commandId: id, serializationGroup: command.serializationGroup, label: command.label, icon: command.icon, hideLabel: command.hideLabel, intent: command.intent,
+        return MutationCommandDef(commandId: id, before: command.before, serializationGroup: command.serializationGroup, label: command.label, icon: command.icon, hideLabel: command.hideLabel, intent: command.intent,
             confirm: command.confirm, confirmSelection: command.confirmSelection, invalidMessage: command.invalidMessage,
             timeoutMs: command.timeoutMs, invocationParameter: command.invocationParameter, dataSourceRef: command.dataSourceRef,
-            parameters: command.parameters, payload: command.payload, prepare: command.prepare, validateWhen: command.validateWhen,
-            pendingState: command.pendingState, successState: command.successState, resultState: command.resultState,
+            parameters: command.parameters, payload: command.payload, prepare: command.prepare, validateWhen: command.validateWhen, receiptWhen: command.receiptWhen,
+            clearFormFields: command.clearFormFields, cleanupState: command.cleanupState, pendingState: command.pendingState, successState: command.successState, resultState: command.resultState,
             errorState: command.errorState, indeterminateState: command.indeterminateState, reconcile: command.reconcile, refresh: command.refresh)
+    }
+}
+
+public struct MutationBeforeStepDef: Codable, Sendable {
+    public let when: DashboardConditionDef?
+    public let command: MutationCommandDef
+    public let cleanup: MutationCommandDef?
+
+    public init(when: DashboardConditionDef? = nil, command: MutationCommandDef, cleanup: MutationCommandDef? = nil) {
+        self.when = when
+        self.command = command
+        self.cleanup = cleanup
     }
 }
 

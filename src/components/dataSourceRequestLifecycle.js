@@ -17,6 +17,10 @@ export function beginDataSourceRequest(dataSourceId, requestId, windowId = '', r
   return promise;
 }
 
+export function requiresOrderedRecords(dataSourceId, requestId) {
+  return !!requestId && pending.get(key(dataSourceId, requestId))?.result === 'orderedRecords';
+}
+
 export function invalidateWindowDataSourceRequests(windowId) {
   const id = String(windowId || '').trim();
   if (!id) return 0;
@@ -39,7 +43,7 @@ export function settleDataSourceRequest(dataSourceId, requestId, error = null, v
   if (!entry) return false;
   pending.delete(requestKey);
   if (error) entry.reject(error);
-  else if (entry.result === 'records') {
+  else if (entry.result === 'records' || entry.result === 'orderedRecords') {
     if (!Array.isArray(records)) entry.reject(Object.assign(new Error('Datasource records were superseded before completion.'), {code: 'request_superseded'}));
     else {
       try { entry.resolve(typeof structuredClone === 'function' ? structuredClone(records) : JSON.parse(JSON.stringify(records))); }

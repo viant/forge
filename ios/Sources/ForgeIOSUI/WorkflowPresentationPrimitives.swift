@@ -559,8 +559,10 @@ struct MutationCommandButton: View {
                     .foregroundStyle(state.phase == .failed ? .red : .secondary)
             }
         }
-        .task {
-            state = await runtime.mutationCommandState(windowID: window.windowID, command: command)
+        .task(id: command.commandId ?? command.dataSourceRef) {
+            for await next in await runtime.mutationCommandUpdates(windowID: window.windowID, command: command) {
+                state = next
+            }
         }
     }
 
@@ -585,11 +587,7 @@ struct MutationCommandButton: View {
                 guard await askConfirmation() else { return }
             }
             let confirmation: @Sendable (String) async -> Bool = { _ in await askConfirmation() }
-            async let execution = dispatch(confirmation)
-            await Task.yield()
-            state = await runtime.mutationCommandState(windowID: window.windowID, command: command)
-            let result = await execution
-            state = await runtime.mutationCommandState(windowID: window.windowID, command: command)
+            let result = await dispatch(confirmation)
             onSettled?(result)
         }
     }

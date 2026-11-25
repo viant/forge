@@ -56,6 +56,7 @@ export function ViewDialogFooterAction({action, context, disabled = false, onClo
     };
     if (action?.mutationCommand) {
         return <MutationCommand
+            dialogId={dialogId}
             command={{...action.mutationCommand, commandId: action.mutationCommand.commandId || action.id, label: action.label || action.id, icon: action.icon || action.mutationCommand.icon, hideLabel: action.hideLabel === true, intent: action.intent || action.mutationCommand.intent, tooltip: action.tooltip || action.mutationCommand.tooltip}}
             context={context}
             disabled={disabled}

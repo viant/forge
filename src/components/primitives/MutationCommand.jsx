@@ -23,7 +23,7 @@ export function useMutationCommandState(context, command) {
   return state;
 }
 
-export default function MutationCommand({command, context, extras = {}, disabled = false, children, onSettled, renderTrigger}) {
+export default function MutationCommand({command, context, extras = {}, disabled = false, children, onSettled, renderTrigger, dialogId}) {
   usePredicateSignals(context, [command?.validateWhen]);
   const state = useMutationCommandState(context, command);
   const operationRoot = React.useRef(null);
@@ -41,7 +41,7 @@ export default function MutationCommand({command, context, extras = {}, disabled
   const invoke = () => {
     mutationLog.debug('activate', {commandId: command?.commandId, dataSourceRef: command?.dataSourceRef, blocked, busy, phase: state.phase, guarded: getMutationCommandState(context, command).guarded});
     if (blocked || busy) return;
-    commandPromise.current = executeCommand(context, command, extras, {onSettled, confirm: (message) => new Promise((resolve) => {
+    commandPromise.current = executeCommand(context, command, extras, {onSettled, dialogId, confirm: (message) => new Promise((resolve) => {
       confirmResolver.current = resolve;
       setConfirmMessage(message);
       setConfirmOpen(true);

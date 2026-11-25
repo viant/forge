@@ -1,9 +1,24 @@
 package types
 
+// MutationPreparationStep runs one command before the terminal writer. Only
+// records acknowledged by that invocation are available to subsequent steps.
+type MutationPreparationStep struct {
+	When    map[string]interface{} `json:"when,omitempty" yaml:"when,omitempty"`
+	Command *MutationCommand       `json:"command" yaml:"command"`
+	Cleanup *MutationCommand       `json:"cleanup,omitempty" yaml:"cleanup,omitempty"`
+}
+
 // MutationCommand describes the generic mutation lifecycle shared by workflow
 // primitives. Business validation and persistence remain owned by the target
 // datasource; Forge owns pending/success/error state and reconciliation.
 type MutationCommand struct {
+	// ClearFormFields clears the named draft fields after an acknowledged root write if their submitted values are still current.
+	ClearFormFields []string `json:"clearFormFields,omitempty" yaml:"clearFormFields,omitempty"`
+	// ReceiptWhen optionally checks this cleanup invocation's normalized rows.
+	ReceiptWhen  map[string]interface{}    `json:"receiptWhen,omitempty" yaml:"receiptWhen,omitempty"`
+	Before       []MutationPreparationStep `json:"before,omitempty" yaml:"before,omitempty"`
+	CleanupState map[string]interface{}    `json:"cleanupState,omitempty" yaml:"cleanupState,omitempty"`
+
 	// SerializationGroup optionally serializes commands in the same context/window, across writers.
 	SerializationGroup  string                      `json:"serializationGroup,omitempty" yaml:"serializationGroup,omitempty"`
 	ClassName           string                      `json:"className,omitempty" yaml:"className,omitempty"`

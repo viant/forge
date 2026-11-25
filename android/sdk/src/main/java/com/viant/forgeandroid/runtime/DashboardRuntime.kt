@@ -1392,6 +1392,12 @@ fun evaluateDashboardCondition(
     }
 }
 
+/** Only invocation-bound JSON is in scope for a cleanup receipt. */
+internal fun evaluateReceiptCondition(condition: DashboardConditionDef, records: JsonArray): Boolean =
+    evaluateConditionTree(condition, record = null) { _, path ->
+        if (path == null) null else (SelectorUtil.resolve(records, path) as? JsonElement)?.let(JsonUtil::elementToAny)
+    }
+
 internal fun evaluateCanonicalCondition(condition: DashboardConditionDef?, record: Map<String, Any?>): Boolean =
     evaluateConditionTree(condition, record) { node, _ -> SelectorUtil.resolveParts(record, checkNotNull(node.canonicalSelectors).field, SelectorUtil.Missing) }
 

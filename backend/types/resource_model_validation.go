@@ -130,6 +130,9 @@ func validateResourceModels(window *Window, validateDataSources bool) error {
 	}
 	for index := range window.Dialogs {
 		for _, action := range window.Dialogs[index].Actions {
+			if err := validatePreparationSteps(window, "dialog "+window.Dialogs[index].Id+" action "+action.ID, action.ID, action.MutationCommand, validateDataSources); err != nil {
+				return err
+			}
 			if err := validateCommandResultState(action.MutationCommand); err != nil {
 				return fmt.Errorf("dialog %s action %s: %w", window.Dialogs[index].Id, action.ID, err)
 			}
@@ -471,18 +474,20 @@ func validateContainerResourceModels(window *Window, container *Container, valid
 		}
 	}
 	for _, command := range commands {
+		if command == nil {
+			continue
+		}
 		if err := validateCommandResultState(command); err != nil {
 			return fmt.Errorf("container %s: %w", container.ID, err)
 		}
-		if command == nil || command.Payload == nil {
-			continue
-		}
-		model, ok := window.ResourceModels[command.Payload.ModelRef]
-		if !ok {
-			return fmt.Errorf("container %s command references unknown resource model %s", container.ID, command.Payload.ModelRef)
-		}
-		if err := validateResourcePayload(window, container.ID, command, model, validateDataSources); err != nil {
+		owner := "container " + container.ID
+		if err := validatePreparationSteps(window, owner, "", command, validateDataSources); err != nil {
 			return err
+		}
+		if len(command.Before) == 0 {
+			if err := validateCommandPayload(window, owner, command, validateDataSources); err != nil {
+				return err
+			}
 		}
 	}
 	for index := range container.Containers {
@@ -496,14 +501,25 @@ func validateContainerResourceModels(window *Window, container *Container, valid
 	return nil
 }
 
-func validateResourcePayload(window *Window, containerID string, command *MutationCommand, model ResourceModel, validateDataSources bool) error {
+func validateCommandPayload(window *Window, owner string, command *MutationCommand, checkSources bool) error {
+	if command.Payload == nil {
+		return nil
+	}
+	model, ok := window.ResourceModels[command.Payload.ModelRef]
+	if !ok {
+		return fmt.Errorf("%s command references unknown resource model %s", owner, command.Payload.ModelRef)
+	}
+	return validateResourcePayload(window, owner, command, model, checkSources)
+}
+
+func validateResourcePayload(window *Window, owner string, command *MutationCommand, model ResourceModel, validateDataSources bool) error {
 	payload := command.Payload
 	mode := strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(strings.TrimSpace(payload.Mode), "-", ""), "_", ""))
 	if mode != "" && mode != "full" && mode != "overlaybaseline" && mode != "changed" {
-		return fmt.Errorf("container %s command has unsupported payload mode %s", containerID, payload.Mode)
+		return fmt.Errorf("%s command has unsupported payload mode %s", owner, payload.Mode)
 	}
 	if model.Write == nil {
-		return fmt.Errorf("container %s resource payload model requires a write binding", containerID)
+		return fmt.Errorf("%s resource payload model requires a write binding", owner)
 	}
 	effectiveMode := mode
 	if effectiveMode == "" {
@@ -516,47 +532,47 @@ func validateResourcePayload(window *Window, containerID string, command *Mutati
 		schema := window.Schemas[model.SchemaRef]
 		for _, identity := range schema.Identity {
 			if binding, ok := model.Fields[identity]; ok && binding.Write == "-" {
-				return fmt.Errorf("container %s changed payload cannot omit identity field %s", containerID, identity)
+				return fmt.Errorf("%s changed payload cannot omit identity field %s", owner, identity)
 			}
 		}
 	}
 	if model.Write != nil {
 		if declared := strings.TrimSpace(model.Write.DataSourceRef); declared != "" && declared != command.DataSourceRef {
-			return fmt.Errorf("container %s command datasource %s does not match resource model writer %s", containerID, command.DataSourceRef, declared)
+			return fmt.Errorf("%s command datasource %s does not match resource model writer %s", owner, command.DataSourceRef, declared)
 		}
 		if target := strings.TrimSpace(payload.Target); target != "" && model.Write.InputPath != "" && target != model.Write.InputPath {
-			return fmt.Errorf("container %s payload target %s does not match resource model inputPath %s", containerID, target, model.Write.InputPath)
+			return fmt.Errorf("%s payload target %s does not match resource model inputPath %s", owner, target, model.Write.InputPath)
 		}
 	}
 	if validateDataSources {
 		if _, ok := window.DataSource[command.DataSourceRef]; !ok {
-			return fmt.Errorf("container %s command references unknown datasource %s", containerID, command.DataSourceRef)
+			return fmt.Errorf("%s command references unknown datasource %s", owner, command.DataSourceRef)
 		}
 	}
 	if strings.TrimSpace(payload.Target) == "" && (model.Write == nil || strings.TrimSpace(model.Write.InputPath) == "") {
-		return fmt.Errorf("container %s resource payload requires a target or model inputPath", containerID)
+		return fmt.Errorf("%s resource payload requires a target or model inputPath", owner)
 	}
 	if len(payload.Fields) > 0 {
 		if resourceValueSourceConfigured(payload.Source) {
-			return fmt.Errorf("container %s resource payload cannot combine source and fields", containerID)
+			return fmt.Errorf("%s resource payload cannot combine source and fields", owner)
 		}
 		for target, source := range payload.Fields {
 			if strings.TrimSpace(target) == "" {
-				return fmt.Errorf("container %s resource payload field target is required", containerID)
+				return fmt.Errorf("%s resource payload field target is required", owner)
 			}
-			if err := validateResourceValueSource(window, containerID+" payload field "+target, source, validateDataSources, "extras"); err != nil {
+			if err := validateResourceValueSource(window, owner+" payload field "+target, source, validateDataSources, "extras"); err != nil {
 				return err
 			}
 		}
-	} else if err := validateResourceValueSource(window, containerID+" payload source", payload.Source, validateDataSources, "extras"); err != nil {
+	} else if err := validateResourceValueSource(window, owner+" payload source", payload.Source, validateDataSources, "extras"); err != nil {
 		return err
 	}
 	if payload.Baseline != nil {
-		if err := validateResourceValueSource(window, containerID+" payload baseline", *payload.Baseline, validateDataSources, "collection"); err != nil {
+		if err := validateResourceValueSource(window, owner+" payload baseline", *payload.Baseline, validateDataSources, "collection"); err != nil {
 			return err
 		}
 	} else if (mode == "overlaybaseline" || mode == "changed" || (mode == "" && normalizedResourceMode(model.Write) != "full")) && (model.Read == nil || model.Read.DataSourceRef == "") {
-		return fmt.Errorf("container %s resource payload mode requires a baseline or model reader", containerID)
+		return fmt.Errorf("%s resource payload mode requires a baseline or model reader", owner)
 	}
 	return nil
 }

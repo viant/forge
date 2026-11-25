@@ -66,6 +66,12 @@ func declaredInvariantField(selector string, properties map[string]ResourceField
 }
 
 func validateInvariantCondition(condition map[string]any, properties map[string]ResourceFieldSchema, schemas map[string]ResourceSchema, at string) error {
+	return validateConditionTree(condition, at, func(leaf map[string]any, at string) error {
+		return validateInvariantLeaf(leaf, properties, schemas, at)
+	})
+}
+
+func validateConditionTree(condition map[string]any, at string, validateLeaf func(map[string]any, string) error) error {
 	for _, group := range []string{"all", "any", "not"} {
 		raw, ok := condition[group]
 		if !ok {
@@ -76,7 +82,7 @@ func validateInvariantCondition(condition map[string]any, properties map[string]
 		}
 		if group == "not" {
 			child, _ := raw.(map[string]any)
-			return validateInvariantCondition(child, properties, schemas, at+".not")
+			return validateConditionTree(child, at+".not", validateLeaf)
 		}
 		children := reflect.ValueOf(raw)
 		if !children.IsValid() || children.Kind() != reflect.Slice || children.Len() == 0 {
@@ -84,13 +90,16 @@ func validateInvariantCondition(condition map[string]any, properties map[string]
 		}
 		for i := 0; i < children.Len(); i++ {
 			child, _ := children.Index(i).Interface().(map[string]any)
-			if err := validateInvariantCondition(child, properties, schemas, fmt.Sprintf("%s.%s[%d]", at, group, i)); err != nil {
+			if err := validateConditionTree(child, fmt.Sprintf("%s.%s[%d]", at, group, i), validateLeaf); err != nil {
 				return err
 			}
 		}
 		return nil
 	}
+	return validateLeaf(condition, at)
+}
 
+func validateInvariantLeaf(condition map[string]any, properties map[string]ResourceFieldSchema, schemas map[string]ResourceSchema, at string) error {
 	field, _ := condition["field"].(string)
 	if !declaredInvariantField(field, properties, schemas) {
 		return fmt.Errorf("%s references undeclared field %q", at, field)
@@ -112,31 +121,14 @@ func validateInvariantCondition(condition map[string]any, properties map[string]
 				return fmt.Errorf("%s.%s conflicts with a literal bound", at, key)
 			}
 			bounds++
-		case "gt", "gte", "lt", "lte":
-			if !finiteInvariantNumber(operand) {
-				return fmt.Errorf("%s.%s requires a finite numeric bound", at, key)
-			}
-			bounds++
-		case "exists", "empty", "notEmpty":
-			if _, ok := operand.(bool); !ok {
-				return fmt.Errorf("%s.%s requires a boolean", at, key)
-			}
-		case "equals", "notEquals":
-			if !invariantScalar(operand) {
-				return fmt.Errorf("%s.%s requires a scalar operand", at, key)
-			}
-		case "in":
-			values := reflect.ValueOf(operand)
-			if !values.IsValid() || values.Kind() != reflect.Slice || values.Len() == 0 {
-				return fmt.Errorf("%s.in requires a non-empty scalar array", at)
-			}
-			for i := 0; i < values.Len(); i++ {
-				if !invariantScalar(values.Index(i).Interface()) {
-					return fmt.Errorf("%s.in[%d] requires a scalar operand", at, i)
-				}
-			}
 		default:
-			return fmt.Errorf("%s has unsupported condition key %q", at, key)
+			bound, err := validateConditionOperand(key, operand, at)
+			if err != nil {
+				return err
+			}
+			if bound {
+				bounds++
+			}
 		}
 		operators++
 	}
@@ -144,6 +136,38 @@ func validateInvariantCondition(condition map[string]any, properties map[string]
 		return fmt.Errorf("%s requires one predicate or a combination of numeric bounds", at)
 	}
 	return nil
+}
+
+// validateConditionOperand checks the scalar operators shared by resource and receipt predicates.
+func validateConditionOperand(key string, operand any, at string) (numericBound bool, err error) {
+	switch key {
+	case "gt", "gte", "lt", "lte":
+		if !finiteInvariantNumber(operand) {
+			return false, fmt.Errorf("%s.%s requires a finite numeric bound", at, key)
+		}
+		return true, nil
+	case "exists", "empty", "notEmpty":
+		if _, ok := operand.(bool); !ok {
+			return false, fmt.Errorf("%s.%s requires a boolean", at, key)
+		}
+	case "equals", "notEquals":
+		if !invariantScalar(operand) {
+			return false, fmt.Errorf("%s.%s requires a scalar operand", at, key)
+		}
+	case "in":
+		values := reflect.ValueOf(operand)
+		if !values.IsValid() || values.Kind() != reflect.Slice || values.Len() == 0 {
+			return false, fmt.Errorf("%s.in requires a non-empty scalar array", at)
+		}
+		for i := 0; i < values.Len(); i++ {
+			if !invariantScalar(values.Index(i).Interface()) {
+				return false, fmt.Errorf("%s.in[%d] requires a scalar operand", at, i)
+			}
+		}
+	default:
+		return false, fmt.Errorf("%s has unsupported condition key %q", at, key)
+	}
+	return false, nil
 }
 
 func invariantScalar(v any) bool {

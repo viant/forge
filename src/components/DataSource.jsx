@@ -11,7 +11,7 @@ import {applyFetchTransform} from "./dataSourceTransform.js";
 import {hasResolvedDependencies} from "./dataSourceDependencies.js";
 import {bindingFinalizationAction, isCurrentBindingGeneration} from "./primitives/bindingGeneration.js";
 import {resourceModelRefForDataSource, unmarshalResourceCollection} from "./primitives/resourceModel.js";
-import {settleDataSourceRequest} from './dataSourceRequestLifecycle.js';
+import {requiresOrderedRecords, settleDataSourceRequest} from './dataSourceRequestLifecycle.js';
 import {isProtectedUpstreamDenial, isDataSourceLocalDenial} from './dataSourceAuthorization.js';
 import {shouldDispatchSelectionEvent} from './selectionEventModel.js';
 import {reconcileFetchForMetadataReadiness} from './dataSourceMetadataReadiness.js';
@@ -498,6 +498,8 @@ export default function DataSource({context}) {
         const requestPaging = withPagingSize(paging, inputVal.pageSize);
         const requestId = bindingGeneration || invocationId;
         const requestDataSourceId = context?.identity?.dataSourceId;
+        const orderedRecords = requiresOrderedRecords(requestDataSourceId, requestId);
+        let receivedResponse = false;
         const hasDeps = hasResolvedDependencies(dataSource.parameters, parameters, filter, dataSource.requiredAnyParameters);
         if (!hasDeps) {
             const preservedParameters = lastResolvedParametersRef.current || {};
@@ -611,13 +613,14 @@ export default function DataSource({context}) {
             }) : null;
             if (aggregate) page = 1;
             const payload = aggregate ? collected.payload : await fetchPage(page);
+            receivedResponse = true;
             if (!authorizationIsCurrent()) return;
             if (append && stableSnapshotSignature(snapshotFilter({filter, parameters, sort})) !== stableSnapshotSignature(snapshotFilter({filter: input.peek()?.filter || {}, parameters: input.peek()?.parameters, sort: input.peek()?.sort || []}))) {
                 settleDataSourceRequest(requestDataSourceId, requestId, null, payload);
                 return;
             }
             if (!mountedRef.current) {
-                settleDataSourceRequest(requestDataSourceId, requestId, new Error('Datasource unmounted before request completion.'));
+                settleDataSourceRequest(requestDataSourceId, requestId, Object.assign(new Error('Datasource unmounted before request completion.'), {code: 'request_superseded'}));
                 return;
             }
             if (!isCurrentBindingGeneration(input.peek()?.bindingGeneration, bindingGeneration)) {
@@ -636,7 +639,8 @@ export default function DataSource({context}) {
 
             let {records, info, stats} = aggregate
                 ? collected
-                : extractData(selectors, requestPaging, payload);
+                : extractData(selectors, requestPaging, payload, orderedRecords);
+            if (orderedRecords && isDeferredCacheHitEnvelope(payload)) throw new Error('Writer returned a deferred cache envelope.');
             if (cursorRequest) {
                 info = cursorSessionRef.current.finish(cursorRequest, info);
                 if (!info) return;
@@ -786,11 +790,13 @@ export default function DataSource({context}) {
             settleDataSourceRequest(requestDataSourceId, requestId, null, payload, records);
         } catch (err) {
             if (!authorizationIsCurrent()) return;
+            const cause = orderedRecords && receivedResponse
+                ? Object.assign(new Error('Writer receipt could not be verified.', {cause: err}), {code: 'request_superseded'}) : err;
             if (!mountedRef.current) {
-                settleDataSourceRequest(requestDataSourceId, requestId, err);
+                settleDataSourceRequest(requestDataSourceId, requestId, cause);
                 return;
             }
-            settleDataSourceRequest(requestDataSourceId, requestId, err);
+            settleDataSourceRequest(requestDataSourceId, requestId, cause);
             if (!isCurrentBindingGeneration(input.peek()?.bindingGeneration, bindingGeneration)) {
                 try { log.debug('[doFetchRecords] ignored stale binding error', {ds: context?.identity?.dataSourceRef, bindingGeneration}); } catch (_) {}
                 return;

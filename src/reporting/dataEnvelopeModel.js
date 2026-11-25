@@ -116,7 +116,7 @@ function resolveDataPath(holder, path) {
   return { present: true, value };
 }
 
-export function extractData(selectors = {}, paging, data) {
+export function extractData(selectors = {}, paging, data, requireRecordArray = false) {
   let records = [];
   let info = {};
   let stats = {};
@@ -135,7 +135,7 @@ export function extractData(selectors = {}, paging, data) {
     } else {
       respData = resolveKey(data, dataSelector);
     }
-    if (typeof respData === "undefined" && !(Array.isArray(fallbacks) && fallbacks.length > 0)) {
+    if (!requireRecordArray && typeof respData === "undefined" && !(Array.isArray(fallbacks) && fallbacks.length > 0)) {
       if (Array.isArray(data)) {
         respData = data;
       } else {
@@ -144,12 +144,17 @@ export function extractData(selectors = {}, paging, data) {
       }
     }
   } else {
-    const envelopeRecords = extractEnvelopeRecords(data);
+    const envelopeRecords = requireRecordArray && Array.isArray(data?.entries) && !Array.isArray(data?.data)
+      ? data.entries : extractEnvelopeRecords(data);
     if (typeof envelopeRecords !== "undefined") {
       respData = envelopeRecords;
     } else {
       respData = data;
     }
+  }
+
+  if (requireRecordArray && !Array.isArray(respData)) {
+    throw new Error('The writer response did not include a record array.');
   }
 
   const tabularCandidate = Array.isArray(respData) && respData.length === 1

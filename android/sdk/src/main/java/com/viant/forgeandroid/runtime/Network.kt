@@ -20,90 +20,62 @@ data class EndpointConfig(
     val authTokenProvider: (() -> String?)? = null,
     val defaultHeadersProvider: (() -> Map<String, String>)? = null,
     val httpClient: OkHttpClient? = null
-)
+) {
+    internal val singleAttemptClient by lazy { httpClient?.forSingleAttempt() }
+}
+
+internal class HttpResponseException(val status: Int, method: String, url: String) :
+    IllegalStateException("$method ${url.substringBefore('?')} failed: $status")
 
 class RestClient(
     private val endpoints: EndpointRegistry
 ) {
     private val fallbackClient = OkHttpClient()
 
-    fun <T> get(endpoint: String?, uri: String, parser: (String) -> T): T {
-        val config = endpoints.resolve(endpoint)
-            ?: error("Endpoint not found: $endpoint")
+    private val singleAttemptFallback by lazy { fallbackClient.forSingleAttempt() }
+
+    fun <T> get(endpoint: String?, uri: String, parser: (String) -> T): T = request(endpoint, "GET", uri, null, parser)
+    fun <T> patch(endpoint: String?, uri: String, payload: String, parser: (String) -> T): T = request(endpoint, "PATCH", uri, payload, parser)
+    fun <T> post(endpoint: String?, uri: String, payload: String, parser: (String) -> T): T = request(endpoint, "POST", uri, payload, parser)
+    fun <T> put(endpoint: String?, uri: String, payload: String, parser: (String) -> T): T = request(endpoint, "PUT", uri, payload, parser)
+    fun <T> delete(endpoint: String?, uri: String, parser: (String) -> T): T = request(endpoint, "DELETE", uri, null, parser)
+
+    internal fun <T> request(endpoint: String?, method: String, uri: String, payload: String?, parser: (String) -> T,
+        singleAttempt: Boolean = false): T {
+        val config = endpoints.resolve(endpoint) ?: error("Endpoint not found: $endpoint")
         val url = config.baseUrl.trimEnd('/') + "/" + uri.trimStart('/')
-        val request = Request.Builder().url(url)
-            .applyEndpoint(config)
-            .get()
-            .build()
-        clientFor(config).newCall(request).execute().use { resp ->
-            if (!resp.isSuccessful) error("GET $url failed: ${resp.code}")
-            val body = resp.body?.string() ?: ""
-            return parser(body)
+        val builder = Request.Builder().url(url).applyEndpoint(config)
+        val request = when (method) {
+            "PATCH", "POST", "PUT" -> builder.method(method, requireNotNull(payload).toRequestBody("application/json".toMediaType()))
+            "DELETE" -> builder.delete()
+            else -> builder.get()
+        }
+        val client = if (singleAttempt) {
+            request.tag(PhysicalAttempt::class.java, PhysicalAttempt())
+            config.singleAttemptClient ?: singleAttemptFallback
+        } else config.httpClient ?: fallbackClient
+        client.newCall(request.build()).execute().use { response ->
+            if (!response.isSuccessful) throw HttpResponseException(response.code, method, url)
+            return parser(response.body?.string().orEmpty())
         }
     }
-
-    fun <T> patch(endpoint: String?, uri: String, payload: String, parser: (String) -> T): T {
-        val config = endpoints.resolve(endpoint)
-            ?: error("Endpoint not found: $endpoint")
-        val url = config.baseUrl.trimEnd('/') + "/" + uri.trimStart('/')
-        val request = Request.Builder().url(url)
-            .applyEndpoint(config)
-            .patch(payload.toRequestBody("application/json".toMediaType()))
-            .build()
-        clientFor(config).newCall(request).execute().use { resp ->
-            if (!resp.isSuccessful) error("PATCH $url failed: ${resp.code}")
-            val body = resp.body?.string() ?: ""
-            return parser(body)
-        }
-    }
-
-    fun <T> post(endpoint: String?, uri: String, payload: String, parser: (String) -> T): T {
-        val config = endpoints.resolve(endpoint)
-            ?: error("Endpoint not found: $endpoint")
-        val url = config.baseUrl.trimEnd('/') + "/" + uri.trimStart('/')
-        val request = Request.Builder().url(url)
-            .applyEndpoint(config)
-            .post(payload.toRequestBody("application/json".toMediaType()))
-            .build()
-        clientFor(config).newCall(request).execute().use { resp ->
-            if (!resp.isSuccessful) error("POST $url failed: ${resp.code}")
-            val body = resp.body?.string() ?: ""
-            return parser(body)
-        }
-    }
-
-    fun <T> put(endpoint: String?, uri: String, payload: String, parser: (String) -> T): T {
-        val config = endpoints.resolve(endpoint)
-            ?: error("Endpoint not found: $endpoint")
-        val url = config.baseUrl.trimEnd('/') + "/" + uri.trimStart('/')
-        val request = Request.Builder().url(url)
-            .applyEndpoint(config)
-            .put(payload.toRequestBody("application/json".toMediaType()))
-            .build()
-        clientFor(config).newCall(request).execute().use { resp ->
-            if (!resp.isSuccessful) error("PUT $url failed: ${resp.code}")
-            val body = resp.body?.string() ?: ""
-            return parser(body)
-        }
-    }
-
-    fun <T> delete(endpoint: String?, uri: String, parser: (String) -> T): T {
-        val config = endpoints.resolve(endpoint)
-            ?: error("Endpoint not found: $endpoint")
-        val url = config.baseUrl.trimEnd('/') + "/" + uri.trimStart('/')
-        val request = Request.Builder().url(url)
-            .applyEndpoint(config)
-            .delete()
-            .build()
-        clientFor(config).newCall(request).execute().use { resp ->
-            if (!resp.isSuccessful) error("DELETE $url failed: ${resp.code}")
-            val body = resp.body?.string() ?: ""
-            return parser(body)
-        }
-    }
-
-    private fun clientFor(config: EndpointConfig): OkHttpClient = config.httpClient ?: fallbackClient
 }
+
+private class PhysicalAttempt {
+    val started = java.util.concurrent.atomic.AtomicBoolean(false)
+}
+
+private fun OkHttpClient.forSingleAttempt(): OkHttpClient =
+    newBuilder().retryOnConnectionFailure(false).followRedirects(false).followSslRedirects(false).cache(null)
+        .addNetworkInterceptor { chain ->
+            val request = chain.request()
+            val attempt = checkNotNull(request.tag(PhysicalAttempt::class.java))
+            if (!attempt.started.compareAndSet(false, true)) throw java.io.IOException("An ordered command cannot repeat its HTTP request.")
+            val response = chain.proceed(request)
+            // Surface the first response before OkHttp can follow a 408, 503 Retry-After, or authentication challenge.
+            if (!response.isSuccessful) response.use { throw HttpResponseException(it.code, request.method, request.url.toString()) }
+            response
+        }.build()
 
 internal fun Request.Builder.applyEndpoint(config: EndpointConfig): Request.Builder {
     config.defaultHeadersProvider?.invoke()?.forEach { (name, value) ->

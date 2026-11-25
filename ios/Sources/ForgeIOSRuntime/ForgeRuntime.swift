@@ -126,10 +126,10 @@ public actor ForgeRuntime {
     private var feedPatchHandler: (@Sendable (String, FeedPatchOperation) async throws -> Bool)?
     private var interactionObserver: (@Sendable (ForgeInteraction) async -> Void)?
     private var externalURLHandler: (@Sendable (URL) async -> Void)?
-    var mutationCommandStates: [String: MutationCommandState] = [:]
+    var mutationCommandStates: [String: Signal<MutationCommandState>] = [:]
     var guardedMutationCommands: Set<String> = []
     var mutationSerializationOwners: [String: String] = [:]
-    var guardedMutationTransports: Set<String> = []
+    var mutationTransportOwners: [String: String] = [:]
 
     var handlers: [String: ForgeHandler] = [:]
     private var pendingDialogs: [String: PendingDialog] = [:]
@@ -638,7 +638,8 @@ public actor ForgeRuntime {
         dataSourceRef: String,
         baseURL: String = "",
         additionalHeaders: [String: String] = [:],
-        lifecyclePath: [String] = []
+        lifecyclePath: [String] = [],
+        requireInvocationRecords: Bool = false
     ) async -> DataSourceRowReceipt? {
         let signal = await signals.metadata(windowID: windowID)
         guard let metadata = await signal.peek() else { return nil }
@@ -731,7 +732,7 @@ public actor ForgeRuntime {
                         event: "onSuccess", rows: hookedRows, generation: fetchGeneration,
                         path: lifecyclePath + [dataSourceRef]
                     )
-                    return .success(hookedRows)
+                    return .success(hookedRows.map(JSONValue.object))
                 }
             } catch {
                 // SwiftUI restarts report tasks as restored filters and presets settle.
@@ -801,12 +802,13 @@ public actor ForgeRuntime {
             inputParameters: resolvedInputs,
             selectors: dataSource.selectors,
             paging: dataSource.paging,
+            requireInvocationRecords: requireInvocationRecords,
             additionalHeaders: additionalHeaders,
             session: session
         )
         guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return nil }
         let fetchedRows: [[String: JSONValue]]
-        if case let .success(rows) = receipt { fetchedRows = rows }
+        if case let .success(rows) = receipt { fetchedRows = rows.compactMap(\.objectValue) }
         else { fetchedRows = await dataSourceRuntime.collection(dataSourceID: dataSourceID) }
         let hookedRows = await applyDataSourceFetchHooks(
             windowID: windowID, dataSourceRef: dataSourceRef, metadata: metadata,
@@ -838,7 +840,11 @@ public actor ForgeRuntime {
             event: control.error == nil ? "onSuccess" : "onError", rows: hookedRows,
             generation: fetchGeneration, path: lifecyclePath + [dataSourceRef]
         )
-        return receipt?.map { _ in hookedRows }
+        // Grid signals contain objects. A command may also receive a scalar
+        // acknowledgement from its producer, which must keep its JSON type.
+        return receipt?.map { records in
+            records.contains { $0.objectValue == nil } ? records : hookedRows.map(JSONValue.object)
+        }
     }
 
     private func applyDataSourceLifecycleHooks(windowID: String, dataSourceRef: String,
@@ -1148,7 +1154,9 @@ public actor ForgeRuntime {
             await setDataSourceInputParameters(windowID: windowID, dataSourceRef: ref,
                 parameters: scoped?.isEmpty == false ? scoped! : parameters, preservePendingFetch: false)
         }
-        let previous = await sig.exchange(DialogState(open: true, selectionMode: selectionMode, props: parameters, args: parameters))
+        var presentation = DialogState(open: true, selectionMode: selectionMode, props: parameters, args: parameters)
+        presentation.presentationID = UUID()
+        let previous = await sig.exchange(presentation)
         if !previous.open { await dispatchDialogLifecycle("onOpen", windowID: windowID, dialogID: dialogID, parameters: parameters) }
     }
 

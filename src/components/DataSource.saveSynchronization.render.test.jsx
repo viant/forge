@@ -202,3 +202,61 @@ it('a saved draft becomes clean when normalization returns the unchanged server 
         expect(v.properties.signals.formStatus.peek().dirty).toBe(false);
     } finally {await v.close();}
 });
+
+it.each([
+    [{data: []}, 'succeeded', 2],
+    [{entries: []}, 'succeeded', 2],
+    [{message: 'received'}, 'indeterminate', 1],
+    [{data: {}}, 'indeterminate', 1],
+    [{rows: null, cache: {hit: true}}, 'indeterminate', 1],
+])('orders writers only after an explicit invocation record array (%j)', async (reply, status, expectedCalls) => {
+    const v = await mount();
+    try {
+        v.transport.mockResolvedValueOnce(reply).mockResolvedValueOnce({data: [{id: 7}]});
+        const command = {commandId: 'final', dataSourceRef: 'writer',
+            before: [{command: {commandId: 'stage', dataSourceRef: 'writer'}}]};
+        let completion;
+        await v.settle(() => {completion = executeCommand(v.properties, command);});
+        expect((await completion).status).toBe(status);
+        expect(v.transport.mock.calls.filter(([request]) => request.dataSourceRef === 'writer')).toHaveLength(expectedCalls);
+    } finally {await v.close();}
+});
+
+it.each([[true, 0], [false, 1], [undefined, 1]])('qualifies cleanup receipt %s through the mounted datasource', async (removed, warningCount) => {
+    const v = await mount();
+    try {
+        const primary = Object.assign(new Error('Save conflict'), {status: 409});
+        v.transport.mockResolvedValueOnce({data: [{id: 11}]}).mockRejectedValueOnce(primary)
+            .mockResolvedValueOnce({data: removed === undefined ? [] : [{removed}]});
+        const command = {commandId: 'final', dataSourceRef: 'writer', before: [{
+            command: {commandId: 'stage', dataSourceRef: 'writer'},
+            cleanup: {commandId: 'remove', dataSourceRef: 'writer', receiptWhen: {source: 'collection', field: '0.removed', equals: true}},
+        }]};
+        let completion;
+        await v.settle(() => {completion = executeCommand(v.properties, command);});
+        const result = await completion;
+        expect(result.status).toBe('failed');
+        expect(result.error.message).toContain('Save conflict');
+        expect(result.warnings).toHaveLength(warningCount);
+        expect(v.transport.mock.calls.filter(([request]) => request.dataSourceRef === 'writer')).toHaveLength(3);
+    } finally {await v.close();}
+});
+
+it('clears a confirmed submission through its source form owner while retaining newer and sibling edits', async () => {
+    const v = await mount();
+    try {
+        await v.edit(v.defaults, {file: {name: 'sibling'}});
+        await v.edit(v.properties, {file: {name: 'original'}, files: [{name: 'many'}]});
+        let finish, completion;
+        v.transport.mockImplementationOnce(() => new Promise(resolve => {finish = resolve;}));
+        const command = {dataSourceRef: 'writer', clearFormFields: ['file', 'files', 'absent']};
+        await v.settle(() => {completion = executeCommand(v.properties, command);});
+        await v.edit(v.properties, {file: {name: 'newer'}});
+        await v.settle(() => finish({data: [{id: 7}]}));
+        expect((await completion).status).toBe('succeeded');
+        expect(v.properties.signals.form.peek()).toMatchObject({file: {name: 'newer'}, files: []});
+        expect(v.properties.signals.form.peek()).not.toHaveProperty('absent');
+        expect(v.defaults.signals.form.peek().file).toEqual({name: 'sibling'});
+        expect(v.transport.mock.calls.map(([request]) => request.dataSourceRef)).toEqual(['record', 'writer']);
+    } finally {await v.close();}
+});

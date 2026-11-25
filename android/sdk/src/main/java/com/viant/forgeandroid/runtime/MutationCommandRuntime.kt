@@ -17,7 +17,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import java.util.UUID
 
-enum class MutationCommandPhase { Idle, Validating, Confirming, Pending, Succeeded, Failed, Indeterminate }
+enum class MutationCommandPhase { Idle, Validating, Confirming, Pending, CleaningUp, Succeeded, Failed, Indeterminate }
 enum class MutationWriterStatus { Idle, NotInvoked, Pending, Succeeded, Failed, Indeterminate }
 enum class MutationSyncStatus { NotStarted, Succeeded, PartialFailure }
 
@@ -37,7 +37,9 @@ data class MutationCommandState(
     val invocationId: String = "",
     val writerStatus: MutationWriterStatus = MutationWriterStatus.Idle,
     val syncStatus: MutationSyncStatus = MutationSyncStatus.NotStarted,
-    val warnings: List<MutationCommandWarning> = emptyList()
+    val warnings: List<MutationCommandWarning> = emptyList(),
+    val failedStepId: String? = null,
+    internal val presentation: java.lang.ref.WeakReference<DialogState>? = null
 )
 
 data class MutationCommandResult(
@@ -46,7 +48,8 @@ data class MutationCommandResult(
     val invocationId: String = "",
     val error: String? = null,
     val warnings: List<MutationCommandWarning> = emptyList(),
-    val cause: Throwable? = null
+    val cause: Throwable? = null,
+    val failedStepId: String? = null
 )
 
 private sealed interface MutationWriterOutcome {
@@ -57,21 +60,25 @@ private sealed interface MutationWriterOutcome {
 
 class MutationCommandRuntime {
     private val mutex = Mutex()
-    private val states = mutableMapOf<String, MutationCommandState>()
+    private val states = java.util.concurrent.ConcurrentHashMap<String, Signal<MutationCommandState>>()
     private val commandGuards = mutableMapOf<String, String?>()
     private val activeGroups = mutableSetOf<String>()
-    private val transportGuards = mutableSetOf<String>()
+    private val transportGuards = mutableMapOf<String, String>()
+
+    private fun stateSignal(key: String) = states.computeIfAbsent(key) { Signal(MutationCommandState()) }
+
+    internal fun stateUpdates(windowId: String, command: MutationCommandDef) = stateSignal(commandKey(windowId, command)).flow
 
     suspend fun state(windowId: String, command: MutationCommandDef): MutationCommandState =
-        mutex.withLock { states[commandKey(windowId, command)] ?: MutationCommandState() }
+        states[commandKey(windowId, command)]?.peek() ?: MutationCommandState()
 
     suspend fun resolveIndeterminate(windowId: String, command: MutationCommandDef, message: String = ""): Boolean {
         val key = commandKey(windowId, command)
         return mutex.withLock {
-            if (states[key]?.phase != MutationCommandPhase.Indeterminate) return@withLock false
+            if (states[key]?.peek()?.phase != MutationCommandPhase.Indeterminate) return@withLock false
             commandGuards.remove(key)?.let(activeGroups::remove)
-            transportGuards.remove(transportKey(windowId, command.dataSourceRef))
-            states[key] = MutationCommandState(message = message)
+            transportGuards.entries.removeAll { it.value == key }
+            stateSignal(key).set(MutationCommandState(message = message))
             true
         }
     }
@@ -83,8 +90,14 @@ class MutationCommandRuntime {
         command: MutationCommandDef,
         extras: Map<String, Any?> = emptyMap(),
         confirm: (suspend (String) -> Boolean)? = null
-    ): MutationCommandResult {
+    ): MutationCommandResult = executePresented(runtime, window, source, command, extras, null, { true }, confirm)
+
+    internal suspend fun executePresented(runtime: ForgeRuntime, window: WindowContext, source: DataSourceContext,
+        command: MutationCommandDef, extras: Map<String, Any?>, presentation: DialogState?, presentationCurrent: () -> Boolean,
+        confirm: (suspend (String) -> Boolean)?): MutationCommandResult {
         val targetRef = command.dataSourceRef.trim()
+        if (command.invalidClearFields) return MutationCommandResult(false, "invalid", error = "clearFormFields requires distinct top-level form fields.")
+        if (command.receiptWhen != null) return MutationCommandResult(false, "invalid", error = "receiptWhen is supported only on a cleanup command.")
         val key = commandKey(window.windowId, command)
         val group = command.serializationGroup?.trim()?.takeIf(String::isNotEmpty)?.let { "${window.windowId}::$it" }
         val acquired = mutex.withLock {
@@ -92,24 +105,228 @@ class MutationCommandRuntime {
             else {
                 commandGuards[key] = group
                 group?.let(activeGroups::add)
-                states[key] = MutationCommandState(
+                stateSignal(key).set(MutationCommandState(
                     phase = MutationCommandPhase.Validating,
                     guarded = true,
                     retryAllowed = false,
                     message = "Validating…",
                     writerStatus = MutationWriterStatus.NotInvoked
-                )
+                ))
                 true
             }
         }
         if (!acquired) return MutationCommandResult(false, "suppressed")
 
         val admitted = window.metadata.peek()?.authorizationSnapshot.orEmpty()
-        fun authorized() = window.metadata.peek()?.authorizationSnapshot == admitted && predicateAllows(source, command.validateWhen)
+        val ordered = command.before.isNotEmpty()
+        val scopeSensitive = ordered || command.clearFormFields.isNotEmpty()
+        val selection = if (scopeSensitive) source.selection.peek() else null
+        val lease = CommandLease(key, command, presentation, presentationCurrent) {
+            window.metadata.peek()?.authorizationSnapshot == admitted &&
+                (!scopeSensitive || (source.selection.peek() == selection && window.signals.ownsMetadata(window.windowId, window.metadata)))
+        }
+        val eligible = { lease.admitted() && predicateAllows(source, command.validateWhen) }
+        if (!scopeSensitive) return executeOne(runtime, window, source, command, extras, confirm, lease, eligible)
+        val submitted = source.captureFormFields(command.clearFormFields)
+        return try {
+            val result = if (ordered) {
+                val outcome = executeOrdered(runtime, window, source, command, extras, confirm, lease)
+                outcome.copy(accepted = outcome.accepted || lease.attempted, invocationId = lease.rootInvocationId)
+            } else executeOne(runtime, window, source, command, extras, confirm, lease, eligible)
+            if (result.accepted && lease.last.phase != MutationCommandPhase.Indeterminate &&
+                result.status in completedFormOutcomes) {
+                source.clearSubmittedFormFields(submitted) { lease.admitted() && lease.presentationCurrent() }
+            }
+            result
+        } catch (cancelled: CancellationException) {
+            withContext(NonCancellable) {
+                if (lease.last.phase != MutationCommandPhase.Indeterminate && !lease.rootAcknowledged && lease.last.writerStatus != MutationWriterStatus.Succeeded) {
+                    if (lease.completedStep) {
+                        lease.settle(MutationCommandState(phase = MutationCommandPhase.Indeterminate, guarded = true,
+                            retryAllowed = false, writerStatus = MutationWriterStatus.Indeterminate, message = "Command interrupted after a confirmed step."))
+                    } else lease.settle(MutationCommandState(writerStatus = MutationWriterStatus.NotInvoked))
+                }
+                if (lease.admitted() && lease.last.phase == MutationCommandPhase.Indeterminate) {
+                    lease.applyWindowState(runtime, window.windowId, command.indeterminateState)
+                }
+            }
+            throw cancelled
+        } finally {
+            withContext(NonCancellable) { lease.finish() }
+        }
+    }
+
+    private inner class CommandLease(val key: String, val root: MutationCommandDef, presented: DialogState?, val presentationCurrent: () -> Boolean, val admitted: () -> Boolean) {
+        val ordered = root.before.isNotEmpty()
+        private val presentation = presented?.let { java.lang.ref.WeakReference(it) }
+        val rootInvocationId = if (ordered) UUID.randomUUID().toString() else ""
+        var attempted = false
+        var rootDispatched = false
+        var completedStep = false
+        var rootAcknowledged = false
+        var cleaningUp = false
+        var last = MutationCommandState(writerStatus = MutationWriterStatus.NotInvoked)
+        private fun rootState(state: MutationCommandState) = if (!ordered) state else state.copy(
+            invocationId = rootInvocationId, presentation = presentation, writerStatus = if (rootDispatched) state.writerStatus else MutationWriterStatus.NotInvoked)
+        suspend fun publish(state: MutationCommandState) {
+            if (cleaningUp && state.phase == MutationCommandPhase.Pending) return
+            last = rootState(state)
+            // The root must finish unwinding before authoritative resolution can release its transport.
+            if (!ordered || state.phase != MutationCommandPhase.Indeterminate) mutex.withLock { stateSignal(key).set(last) }
+        }
+        suspend fun settle(state: MutationCommandState) = settle(null, state)
+        suspend fun settle(transport: String?, state: MutationCommandState) {
+            last = rootState(state)
+            mutex.withLock {
+                if (transport != null) transportGuards.remove(transport, key)
+                if (!ordered && root.clearFormFields.isEmpty()) release()
+            }
+        }
+        suspend fun finish() = mutex.withLock {
+            if (last.phase == MutationCommandPhase.Indeterminate) stateSignal(key).set(last) else release()
+        }
+        private fun release() {
+            commandGuards.remove(key)?.let(activeGroups::remove)
+            stateSignal(key).set(last)
+        }
+    }
+
+    private suspend fun confirmCommand(lease: CommandLease, prompt: String, confirm: (suspend (String) -> Boolean)?): MutationCommandResult? {
+        if (prompt.isBlank()) return null
+        if (confirm == null) {
+            val message = "Confirmation is required but no confirmation service is available."
+            lease.settle(MutationCommandState(phase = MutationCommandPhase.Failed, error = message,
+                message = message, writerStatus = MutationWriterStatus.NotInvoked))
+            return MutationCommandResult(false, "confirmation_unavailable", error = message)
+        }
+        lease.publish(MutationCommandState(phase = MutationCommandPhase.Confirming, guarded = true,
+            retryAllowed = false, message = prompt, writerStatus = MutationWriterStatus.NotInvoked))
+        if (confirm(prompt)) return null
+        lease.settle(MutationCommandState(writerStatus = MutationWriterStatus.NotInvoked))
+        return MutationCommandResult(false, "cancelled")
+    }
+
+    private suspend fun executeOrdered(runtime: ForgeRuntime, window: WindowContext, source: DataSourceContext,
+        root: MutationCommandDef, extras: Map<String, Any?>, confirm: (suspend (String) -> Boolean)?,
+        lease: CommandLease): MutationCommandResult {
+        var predicateWindowForm: (Map<String, Any?>) -> Map<String, Any?> = { it }
+        fun eligible() = lease.admitted() && predicateAllows(source, root.validateWhen, predicateWindowForm(window.peekWindowForm()))
+        fun forwardEligible() = eligible() && lease.presentationCurrent()
+        fun applyPhase(patch: JsonObject) {
+            if (patch.isEmpty()) return
+            val previous = predicateWindowForm
+            val before = window.peekWindowForm()
+            val admittedView = previous(before)
+            lease.applyWindowState(runtime, window.windowId, patch)
+            val applied = window.peekWindowForm()
+            // Ignore only this command's own stable lifecycle fields when rechecking the admission predicate.
+            predicateWindowForm = { current ->
+                if (current === applied) admittedView else previous(current.toMutableMap().apply {
+                    patch.keys.forEach { field ->
+                        if (current[field] == applied[field] && current.containsKey(field) == applied.containsKey(field)) {
+                            if (field in before) put(field, before[field]) else remove(field)
+                        }
+                    }
+                })
+            }
+        }
+        var receipts = emptyMap<String, Map<String, Any?>>()
+        // Each confirmed invocation publishes a new receipt view. Later steps and cleanup share that view.
+        var stepInputs = extras + ("steps" to receipts)
+        val cleanups = mutableListOf<MutationCommandDef>()
+        suspend fun reject(message: String): MutationCommandResult {
+            lease.settle(MutationCommandState(phase = MutationCommandPhase.Failed, error = message, message = message,
+                writerStatus = MutationWriterStatus.NotInvoked))
+            return MutationCommandResult(false, "invalid", error = message)
+        }
+        suspend fun superseded(failedStepId: String? = null): MutationCommandResult {
+            val message = "The command's authorization, selection, or dialog changed. Remaining steps were skipped."
+            lease.settle(MutationCommandState(phase = MutationCommandPhase.Failed, error = message, message = message,
+                writerStatus = MutationWriterStatus.NotInvoked, failedStepId = failedStepId))
+            return MutationCommandResult(lease.attempted, "superseded", error = message, failedStepId = failedStepId)
+        }
+        suspend fun failed(primary: MutationCommandResult): MutationCommandResult {
+            lease.last = lease.last.copy(failedStepId = primary.failedStepId)
+            if (primary.status == "superseded") return primary
+            if (primary.status == "indeterminate") {
+                if (lease.admitted()) lease.applyWindowState(runtime, window.windowId, root.indeterminateState)
+                return primary
+            }
+            if (!lease.admitted() || !lease.presentationCurrent()) return superseded(primary.failedStepId)
+            if (!eligible() && receipts.isNotEmpty()) return superseded(primary.failedStepId)
+            val original = lease.last
+            val warnings = primary.warnings.toMutableList()
+            if (cleanups.isNotEmpty()) {
+                applyPhase(root.cleanupState)
+                lease.cleaningUp = true
+                lease.publish(original.copy(phase = MutationCommandPhase.CleaningUp, guarded = true, retryAllowed = false,
+                    pending = false, message = "Cleaning up completed steps.", error = primary.error))
+            }
+            for (cleanup in cleanups.asReversed()) {
+                if (!eligible()) break
+                var confirmed = true
+                val receiptCheck = cleanup.receiptWhen
+                val outcome = executeOne(runtime, window, source, cleanup, stepInputs, null, lease,
+                    { eligible() && predicateAllows(source, cleanup.validateWhen) }) { _, rows ->
+                    if (receiptCheck != null) confirmed = evaluateReceiptCondition(receiptCheck, rows)
+                }
+                if (outcome.status == "succeeded") {
+                    if (!confirmed) warnings += MutationCommandWarning("cleanup", cleanup.dataSourceRef,
+                        "Cleanup ${cleanup.commandId} did not return the expected receipt.")
+                    continue
+                }
+                warnings += MutationCommandWarning("cleanup", cleanup.dataSourceRef,
+                    "Cleanup ${cleanup.commandId} (${outcome.status}): ${outcome.error ?: outcome.cause?.message ?: "No confirmed result."}")
+                if (outcome.status == "indeterminate" || !lease.admitted()) break
+            }
+            val unknown = lease.last.phase == MutationCommandPhase.Indeterminate
+            if (lease.admitted()) lease.applyWindowState(runtime, window.windowId, if (unknown) root.indeterminateState else root.errorState)
+            val state = if (unknown) lease.last else original
+            val message = if (warnings.any { it.stage == "cleanup" }) {
+                listOfNotNull(primary.error ?: state.message.takeIf(String::isNotBlank), "Cleanup could not be confirmed.").joinToString(" ")
+            } else state.message
+            lease.settle(state.copy(error = primary.error, message = message, warnings = warnings,
+                writerStatus = original.writerStatus, failedStepId = primary.failedStepId))
+            return primary.copy(warnings = warnings)
+        }
+
+        root.beforeDefinitionError?.let { return reject(it) }
+        if (!forwardEligible()) {
+            if (lease.admitted()) lease.applyWindowState(runtime, window.windowId, root.errorState)
+            return reject(root.invalidMessage ?: "This action is not currently valid.")
+        }
+        confirmCommand(lease, resolveConfirmation(root, extras), confirm)?.let { return it }
+        if (!forwardEligible()) return superseded()
+        applyPhase(root.pendingState)
+        lease.publish(MutationCommandState(phase = MutationCommandPhase.Pending, guarded = true, pending = true,
+            retryAllowed = false, message = "Saving…", writerStatus = MutationWriterStatus.NotInvoked))
+        for (step in root.before) {
+            if (!forwardEligible()) return superseded()
+            if (!predicateAllows(source, step.condition)) continue
+            val command = step.command
+            val outcome = executeOne(runtime, window, source, command, stepInputs, null, lease,
+                { forwardEligible() && predicateAllows(source, step.condition) && predicateAllows(source, command.validateWhen) }) { invocationId, rows ->
+                lease.completedStep = true
+                val receipt = mapOf("invocationId" to invocationId, "rows" to JsonUtil.elementToAny(rows))
+                receipts = receipts + (command.commandId!!.trim() to receipt)
+                stepInputs = extras + ("steps" to receipts)
+            }
+            if (outcome.status != "succeeded") return failed(outcome.copy(failedStepId = command.commandId))
+            step.cleanup?.let(cleanups::add)
+        }
+        if (!forwardEligible()) return superseded()
+        val result = executeOne(runtime, window, source, root, stepInputs, null, lease, ::forwardEligible) { _, _ -> lease.rootAcknowledged = true }
+        return if (lease.rootAcknowledged || result.status == "succeeded") result else failed(result)
+    }
+
+    private suspend fun executeOne(runtime: ForgeRuntime, window: WindowContext, source: DataSourceContext,
+        command: MutationCommandDef, extras: Map<String, Any?>, confirm: (suspend (String) -> Boolean)?,
+        lease: CommandLease, authorized: () -> Boolean, onReceipt: ((String, JsonArray) -> Unit)? = null): MutationCommandResult {
+        val targetRef = command.dataSourceRef.trim()
         if (!authorized()) {
             val message = command.invalidMessage ?: "This action is not currently valid."
-            applyWindowState(runtime, window.windowId, command.errorState)
-            releaseCommand(key, MutationCommandState(
+            if (!lease.ordered) lease.applyWindowState(runtime, window.windowId, command.errorState)
+            lease.settle(MutationCommandState(
                 phase = MutationCommandPhase.Failed,
                 error = message,
                 message = message,
@@ -127,32 +344,11 @@ class MutationCommandRuntime {
             fun capture() = runtime.actionSnapshots(runtime.registeredWindowDataSources(window.windowId) + (source.dataSourceRef to source))
             val initialSources by lazy { capture() }
             val prepared = withTimeoutOrNull(timeout) {
-                deepMerge(base, preparePayload(window, source, command.payload, extras) { initialSources })
+                deepMerge(base, if (command.payload == null && lease.ordered) extras - "steps"
+                    else preparePayload(window, source, command.payload, extras) { initialSources })
             } ?: error("Command payload preparation timed out. The writer was not invoked.")
-            val confirmation = resolveConfirmation(command, extras)
-            if (confirmation.isNotBlank()) {
-                if (confirm == null) {
-                    val message = "Confirmation is required but no confirmation service is available."
-                    releaseCommand(key, MutationCommandState(
-                        phase = MutationCommandPhase.Failed,
-                        error = message,
-                        message = message,
-                        writerStatus = MutationWriterStatus.NotInvoked
-                    ))
-                    return MutationCommandResult(false, "confirmation_unavailable", error = message)
-                }
-                publish(key, MutationCommandState(
-                    phase = MutationCommandPhase.Confirming,
-                    guarded = true,
-                    retryAllowed = false,
-                    message = confirmation,
-                    writerStatus = MutationWriterStatus.NotInvoked
-                ))
-                if (!confirm(confirmation)) {
-                    releaseCommand(key, MutationCommandState(writerStatus = MutationWriterStatus.NotInvoked))
-                    return MutationCommandResult(false, "cancelled")
-                }
-            }
+            val confirmation = if (lease.ordered) "" else resolveConfirmation(command, extras)
+            confirmCommand(lease, confirmation, confirm)?.let { return it }
 
             check(authorized()) { "Authorization or command eligibility changed before dispatch." }
             val hook = command.prepare
@@ -168,18 +364,18 @@ class MutationCommandRuntime {
                 preparedByHook
             }
         } catch (cancelled: CancellationException) {
-            withContext(NonCancellable) { releaseCommand(key, MutationCommandState(writerStatus = MutationWriterStatus.NotInvoked)) }
+            withContext(NonCancellable) { lease.settle(MutationCommandState(writerStatus = MutationWriterStatus.NotInvoked)) }
             throw cancelled
         } catch (error: Exception) {
             val message = error.message ?: "Invalid command preparation."
-            if (window.metadata.peek()?.authorizationSnapshot == admitted) applyWindowState(runtime, window.windowId, command.errorState)
-            releaseCommand(key, MutationCommandState(phase = MutationCommandPhase.Failed, error = message, message = message, writerStatus = MutationWriterStatus.NotInvoked))
+            if (!lease.ordered && lease.admitted()) lease.applyWindowState(runtime, window.windowId, command.errorState)
+            lease.settle(MutationCommandState(phase = MutationCommandPhase.Failed, error = message, message = message, writerStatus = MutationWriterStatus.NotInvoked))
             return MutationCommandResult(false, "invalid_payload", error = message, cause = error)
         }
         val target = window.contextOrNull(targetRef)
         if (target == null) {
             val message = "Command datasource is unavailable: $targetRef"
-            releaseCommand(key, MutationCommandState(
+            lease.settle(MutationCommandState(
                 phase = MutationCommandPhase.Failed,
                 error = message,
                 message = message,
@@ -190,26 +386,28 @@ class MutationCommandRuntime {
         val transport = transportKey(window.windowId, targetRef)
         val transportAcquired = mutex.withLock {
             if (transport in transportGuards) false else {
-                transportGuards += transport
+                transportGuards[transport] = lease.key
                 true
             }
         }
         if (!transportAcquired) {
             val message = "Another command is using this datasource."
-            releaseCommand(key, MutationCommandState(message = message, writerStatus = MutationWriterStatus.NotInvoked))
+            lease.settle(MutationCommandState(message = message, writerStatus = MutationWriterStatus.NotInvoked))
             return MutationCommandResult(false, "transport_busy", error = message)
         }
 
         if (!authorized()) {
             val message = "Authorization or command eligibility changed before dispatch."
-            finishTransport(transport, key, MutationCommandState(phase = MutationCommandPhase.Failed, message = message,
+            lease.settle(transport, MutationCommandState(phase = MutationCommandPhase.Failed, message = message,
                 error = message, writerStatus = MutationWriterStatus.NotInvoked))
             return MutationCommandResult(false, "invalid", error = message)
         }
-        val invocationId = UUID.randomUUID().toString()
+        val rootWriter = lease.ordered && command === lease.root
+        val invocationId = if (rootWriter) lease.rootInvocationId else UUID.randomUUID().toString()
+        if (rootWriter) lease.rootDispatched = true
         command.invocationParameter?.trim()?.takeIf(String::isNotEmpty)?.let { parameters[it] = invocationId }
-        applyWindowState(runtime, window.windowId, command.pendingState)
-        publish(key, MutationCommandState(
+        if (!lease.ordered) lease.applyWindowState(runtime, window.windowId, command.pendingState)
+        lease.publish(MutationCommandState(
             phase = MutationCommandPhase.Pending,
             guarded = true,
             pending = true,
@@ -218,10 +416,12 @@ class MutationCommandRuntime {
             invocationId = invocationId,
             writerStatus = MutationWriterStatus.Pending
         ))
+        lease.attempted = true
         val writer = try {
-            val receipt = withTimeoutOrNull(timeout) { target.fetchCommandResult(parameters) }
+            val receipt = withTimeoutOrNull(timeout) { target.fetchCommandResult(parameters, requireRecords = lease.ordered) }
             when {
                 receipt == null -> MutationWriterOutcome.Indeterminate()
+                lease.ordered && (!receipt.recordsConfirmed || uncertainTransport(receipt.cause)) -> MutationWriterOutcome.Indeterminate(receipt.cause)
                 receipt.cause is java.net.SocketTimeoutException || receipt.cause is java.util.concurrent.TimeoutException ->
                     MutationWriterOutcome.Indeterminate(receipt.cause)
                 receipt.error != null -> MutationWriterOutcome.Failed(receipt.error, receipt.cause)
@@ -229,26 +429,40 @@ class MutationCommandRuntime {
             }
         } catch (cancelled: CancellationException) {
             withContext(NonCancellable) {
-                publish(key, MutationCommandState(phase = MutationCommandPhase.Indeterminate, guarded = true,
+                lease.publish(MutationCommandState(phase = MutationCommandPhase.Indeterminate, guarded = true,
                     retryAllowed = false, invocationId = invocationId, writerStatus = MutationWriterStatus.Indeterminate,
                     message = "Command was cancelled after dispatch. Verify its outcome."))
-                if (window.metadata.peek()?.authorizationSnapshot == admitted) applyWindowState(runtime, window.windowId, command.indeterminateState)
+                if (lease.admitted()) lease.applyWindowState(runtime, window.windowId, command.indeterminateState)
             }
             throw cancelled
         } catch (error: Exception) {
             // Dispatch has started and its completion receipt is unavailable.
             MutationWriterOutcome.Indeterminate(error)
         }
-        if (window.metadata.peek()?.authorizationSnapshot != admitted) {
+        val lostScope = !lease.admitted()
+        if (lease.ordered && writer !is MutationWriterOutcome.Indeterminate && (lostScope || (rootWriter && !lease.presentationCurrent()))) {
+            val committed = rootWriter && writer is MutationWriterOutcome.Succeeded
+            val failure = writer as? MutationWriterOutcome.Failed
+            val message = if (committed) "Saved. The original presentation is no longer current."
+                else "The command scope changed after dispatch. Remaining steps were skipped."
+            val warnings = if (committed) listOf(MutationCommandWarning("synchronize", targetRef, message)) else emptyList()
+            lease.rootAcknowledged = committed
+            lease.settle(transport, MutationCommandState(phase = if (committed) MutationCommandPhase.Succeeded else MutationCommandPhase.Failed,
+                message = message, error = failure?.message, invocationId = invocationId,
+                writerStatus = if (committed) MutationWriterStatus.Succeeded else if (rootWriter) MutationWriterStatus.Failed else MutationWriterStatus.NotInvoked,
+                syncStatus = if (committed) MutationSyncStatus.PartialFailure else MutationSyncStatus.NotStarted, warnings = warnings))
+            return MutationCommandResult(true, "superseded", invocationId, error = failure?.message, warnings = warnings, cause = failure?.cause)
+        }
+        if (lostScope && !lease.ordered) {
             val message = "Authorization context changed after dispatch. Verify the outcome."
-            publish(key, MutationCommandState(phase = MutationCommandPhase.Indeterminate, guarded = true, retryAllowed = false,
+            lease.publish(MutationCommandState(phase = MutationCommandPhase.Indeterminate, guarded = true, retryAllowed = false,
                 message = message, invocationId = invocationId, writerStatus = MutationWriterStatus.Indeterminate))
             return MutationCommandResult(true, "indeterminate", invocationId, message)
         }
         return when (writer) {
             is MutationWriterOutcome.Failed -> {
-                applyWindowState(runtime, window.windowId, command.errorState)
-                finishTransport(transport, key, MutationCommandState(
+                if (!lease.ordered) lease.applyWindowState(runtime, window.windowId, command.errorState)
+                lease.settle(transport, MutationCommandState(
                     phase = MutationCommandPhase.Failed,
                     error = writer.message,
                     message = writer.message,
@@ -258,9 +472,9 @@ class MutationCommandRuntime {
                 MutationCommandResult(true, "failed", invocationId, writer.message, cause = writer.cause)
             }
             is MutationWriterOutcome.Indeterminate -> {
-                applyWindowState(runtime, window.windowId, command.indeterminateState)
+                lease.applyWindowState(runtime, window.windowId, command.indeterminateState)
                 val message = "The writer outcome is unknown because the client stopped waiting."
-                publish(key, MutationCommandState(
+                lease.publish(MutationCommandState(
                     phase = MutationCommandPhase.Indeterminate,
                     guarded = true,
                     retryAllowed = false,
@@ -271,6 +485,7 @@ class MutationCommandRuntime {
                 MutationCommandResult(true, "indeterminate", invocationId, cause = writer.cause)
             }
             is MutationWriterOutcome.Succeeded -> {
+                if (onReceipt != null) onReceipt(invocationId, checkNotNull(writer.records))
                 val warnings = mutableListOf<MutationCommandWarning>()
                 val patch = command.successState.toMutableMap()
                 for ((field, selectors) in command.resultState) {
@@ -278,18 +493,18 @@ class MutationCommandRuntime {
                     if (value == null) warnings += MutationCommandWarning("resultState", message = "Writer receipt omitted the value for $field.")
                     patch[field] = value ?: JsonNull
                 }
-                applyWindowState(runtime, window.windowId, JsonObject(patch))
+                lease.applyWindowState(runtime, window.windowId, JsonObject(patch))
                 try {
-                    warnings += synchronize(window, target, command) { window.metadata.peek()?.authorizationSnapshot == admitted }
+                    warnings += synchronize(window, target, command, if (lease.ordered) writer.records else null) { lease.admitted() && (!lease.ordered || lease.presentationCurrent()) }
                 } catch (cancelled: CancellationException) {
-                    withContext(NonCancellable) { finishTransport(transport, key, MutationCommandState(
+                    withContext(NonCancellable) { lease.settle(transport, MutationCommandState(
                         phase = MutationCommandPhase.Succeeded, invocationId = invocationId, writerStatus = MutationWriterStatus.Succeeded,
                         syncStatus = MutationSyncStatus.PartialFailure, message = "Saved. Refresh was cancelled.")) }
                     throw cancelled
                 }
                 val sync = if (warnings.isEmpty()) MutationSyncStatus.Succeeded else MutationSyncStatus.PartialFailure
                 val message = if (warnings.isEmpty()) "Completed" else "Saved. Some related data could not be refreshed."
-                finishTransport(transport, key, MutationCommandState(
+                lease.settle(transport, MutationCommandState(
                     phase = MutationCommandPhase.Succeeded,
                     message = message,
                     invocationId = invocationId,
@@ -374,6 +589,7 @@ class MutationCommandRuntime {
         window: WindowContext,
         target: DataSourceContext,
         command: MutationCommandDef,
+        invocationRows: JsonArray?,
         current: () -> Boolean
     ): List<MutationCommandWarning> {
         val warnings = mutableListOf<MutationCommandWarning>()
@@ -386,7 +602,8 @@ class MutationCommandRuntime {
                 if (spec.mode.equals("refetch", ignoreCase = true)) {
                     awaitRefresh(destination)
                 } else {
-                    val incoming = mutationResultRows(target.collection.peek(), spec.resultPath ?: spec.rowsPath)
+                    val rows = invocationRows?.map { JsonUtil.asStringMap(JsonUtil.elementToAny(it)) } ?: target.collection.peek()
+                    val incoming = mutationResultRows(rows, spec.resultPath ?: spec.rowsPath)
                     destination.collection.set(reconcileRows(destination.collection.peek(), incoming, spec))
                 }
             }.onFailure {
@@ -417,7 +634,8 @@ class MutationCommandRuntime {
         }
     }
 
-    internal fun predicateAllows(context: DataSourceContext, condition: DashboardConditionDef?): Boolean {
+    internal fun predicateAllows(context: DataSourceContext, condition: DashboardConditionDef?,
+        windowForm: Map<String, Any?> = context.window.peekWindowForm()): Boolean {
         if (condition == null) return true
         val input = context.input.peek()
         val selection = context.selection.peek()
@@ -426,7 +644,7 @@ class MutationCommandRuntime {
             metrics = context.metrics.peek(),
             filters = input.filter,
             form = context.form.peek(),
-            windowForm = context.window.peekWindowForm(),
+            windowForm = windowForm,
             collection = context.collection.peek(),
             input = mapOf("filter" to input.filter, "parameters" to input.parameters, "page" to input.page),
             selectionValues = mapOf("selected" to selection.selected, "selection" to selection.selection, "rowIndex" to selection.rowIndex),
@@ -434,29 +652,20 @@ class MutationCommandRuntime {
         )
     }
 
-    private fun applyWindowState(runtime: ForgeRuntime, windowId: String, patch: kotlinx.serialization.json.JsonObject) {
-        if (patch.isEmpty()) return
+    private fun CommandLease.applyWindowState(runtime: ForgeRuntime, windowId: String, patch: JsonObject) {
+        if (patch.isEmpty() || (ordered && (!presentationCurrent() || !admitted()))) return
         runtime.setWindowFormValue(windowId, patch.mapValues { JsonUtil.elementToAny(it.value) }, bumpPrefillRevision = false)
     }
 
-    private suspend fun publish(key: String, state: MutationCommandState) {
-        mutex.withLock { states[key] = state }
-    }
 
-    private suspend fun releaseCommand(key: String, state: MutationCommandState) {
-        mutex.withLock {
-            commandGuards.remove(key)?.let(activeGroups::remove)
-            states[key] = state
-        }
-    }
+}
 
-    private suspend fun finishTransport(transport: String, key: String, state: MutationCommandState) {
-        mutex.withLock {
-            transportGuards.remove(transport)
-            commandGuards.remove(key)?.let(activeGroups::remove)
-            states[key] = state
-        }
-    }
+private val completedFormOutcomes = setOf("succeeded", "failed", "invalid", "invalid_payload", "transport_busy")
+
+private fun uncertainTransport(cause: Throwable?): Boolean = when (cause) {
+    is HttpResponseException -> cause.status in 300..399 || cause.status == 408 || cause.status >= 500
+    is java.io.IOException, is kotlinx.serialization.SerializationException -> true
+    else -> false
 }
 
 private fun commandKey(windowId: String, command: MutationCommandDef): String =
