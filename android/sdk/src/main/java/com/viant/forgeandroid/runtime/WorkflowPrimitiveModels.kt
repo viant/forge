@@ -113,7 +113,9 @@ data class RefreshSpec(
 )
 
 @Serializable data class PrimitiveSelectionSpec(val mode: String? = null, val min: Int? = null, val max: Int? = null, val disabledWhen: DashboardConditionDef? = null, val every: DashboardConditionDef? = null, val any: DashboardConditionDef? = null, val none: DashboardConditionDef? = null)
-@Serializable data class EditableCollectionSpec(val dataSourceRef: String? = null, val identityFields: List<String> = emptyList(), val selection: PrimitiveSelectionSpec? = null, val selectionStatus: Boolean = false, val selectionPrompt: String? = null, val operations: List<EditableCollectionOperationSpec> = emptyList(), val mutation: MutationCommandDef? = null)
+@Serializable data class EditableCollectionSpec(val dataSourceRef: String? = null, val identityFields: List<String> = emptyList(), val selection: PrimitiveSelectionSpec? = null, val selectionStatus: Boolean = false, val selectionPrompt: String? = null, val operations: List<EditableCollectionOperationSpec> = emptyList(), val mutation: MutationCommandDef? = null) {
+    internal val predicateStores by lazy { editablePredicateStores(this) }
+}
 @Serializable data class EditableCollectionOperationSpec(val id: String, val label: String, val tooltip: String? = null, val intent: String? = null, val dialogId: String? = null, val handler: String? = null, val requiresSelection: Boolean = false, val selection: PrimitiveSelectionSpec? = null, val visibleWhen: DashboardConditionDef? = null, val disabledWhen: DashboardConditionDef? = null, val parameters: List<ParameterDef> = emptyList(), val mutation: MutationCommandDef? = null, val prepareSelection: PreparedSelectionDef? = null)
 @Serializable
 data class PreparedSelectionDef(

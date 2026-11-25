@@ -5061,6 +5061,7 @@ public struct ExecutionDef: Codable, Sendable {
 
 public struct ParameterDef: Codable, Sendable {
     public let codec: JSONValue?
+    public let defaultValue: JSONValue?
     public let name: String
     public let input: String?
     public let from: String?
@@ -5073,6 +5074,7 @@ public struct ParameterDef: Codable, Sendable {
     public let selector: String?
 
     enum CodingKeys: String, CodingKey {
+        case defaultValue = "default"
         case codec, name
         case input = "in"
         case from
@@ -5087,7 +5089,8 @@ public struct ParameterDef: Codable, Sendable {
 
     public init(name: String = "", input: String? = nil, direction: String? = nil,
                 value: JSONValue? = nil, location: JSONValue? = nil, selector: String? = nil,
-                from: String? = nil, to: String? = nil, kind: String? = nil, output: Bool? = nil, codec: JSONValue? = nil) {
+                from: String? = nil, to: String? = nil, kind: String? = nil, output: Bool? = nil, codec: JSONValue? = nil, defaultValue: JSONValue? = nil) {
+        self.defaultValue = defaultValue
         self.codec = codec
         self.name = name
         self.input = input
@@ -5103,6 +5106,7 @@ public struct ParameterDef: Codable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        defaultValue = container.contains(.defaultValue) ? try container.decode(JSONValue.self, forKey: .defaultValue) : nil
         codec = try container.decodeIfPresent(JSONValue.self, forKey: .codec)
         name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
         input = try container.decodeIfPresent(String.self, forKey: .input)
@@ -5111,25 +5115,17 @@ public struct ParameterDef: Codable, Sendable {
         kind = try container.decodeIfPresent(String.self, forKey: .kind)
         direction = try container.decodeIfPresent(String.self, forKey: .direction)
         output = try container.decodeIfPresent(Bool.self, forKey: .output)
-        value = try container.decodeIfPresent(JSONValue.self, forKey: .value)
-        location = try container.decodeIfPresent(JSONValue.self, forKey: .location)
+        value = container.contains(.value) ? try container.decode(JSONValue.self, forKey: .value) : nil
+        location = container.contains(.location) ? try container.decode(JSONValue.self, forKey: .location) : nil
         selector = try container.decodeIfPresent(String.self, forKey: .selector)
     }
 
     var constantValue: JSONValue? {
         guard let raw = location ?? value else { return nil }
         let name = codec?.objectValue?["name"]?.stringValue ?? codec?.stringValue
-        guard case .string(let text) = raw else { return raw }
-        switch name?.lowercased() {
-        case "json": return try? JSONDecoder().decode(JSONValue.self, from: Data(text.utf8))
-        case "boolean", "bool":
-            switch text.trimmingCharacters(in:.whitespacesAndNewlines).lowercased() {
-            case "true", "1": return .bool(true)
-            case "false", "0": return .bool(false)
-            default: return nil
-            }
-        default: return raw
-        }
+        guard case .string = raw, let name = name?.lowercased(), ["json", "boolean", "bool"].contains(name) else { return raw }
+        let decoded = ParameterResolver.decodeOperationValue(raw, codec)
+        return name == "json" || decoded?.boolValue != nil ? decoded : nil
     }
 }
 

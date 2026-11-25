@@ -1023,6 +1023,10 @@ class DataSourceContext(
         setInputParametersValue(parameters, fetch)
     }
 
+    internal fun setDialogInputParameters(parameters: Map<String, Any?>, fetch: Boolean) {
+        setInputParametersValue(parameters, fetch = fetch, preservePendingFetch = false)
+    }
+
     // Detach mutable inputs while preserving the scalar types supplied by callers.
     private fun snapshotInputValue(value: Any?): Any? = when (value) {
         is JsonElement -> JsonUtil.elementToAny(value)
@@ -1032,7 +1036,7 @@ class DataSourceContext(
         else -> value.toString()
     }
 
-    private fun setInputParametersValue(parameters: Map<String, Any?>, fetch: Boolean = false, commitGuard: (() -> Boolean)? = null, permit: NativeReportReadPermit? = null, captureResult: Boolean = false, requireRecords: Boolean = false): String? {
+    private fun setInputParametersValue(parameters: Map<String, Any?>, fetch: Boolean = false, commitGuard: (() -> Boolean)? = null, permit: NativeReportReadPermit? = null, captureResult: Boolean = false, requireRecords: Boolean = false, preservePendingFetch: Boolean = true): String? {
         val current = input.peek()
         val inputPayload = JsonUtil.asStringMap(parameters["input"])
         val query = JsonUtil.asStringMap(inputPayload["query"])
@@ -1041,7 +1045,8 @@ class DataSourceContext(
         } else {
             current.filter
         }
-        val next = current.copy(parameters = parameters.mapValues { snapshotInputValue(it.value) }, filter = nextFilter, fetch = fetch || current.fetch,
+        val next = current.copy(parameters = parameters.mapValues { snapshotInputValue(it.value) }, filter = nextFilter, fetch = fetch || (preservePendingFetch && current.fetch),
+            refresh = if (!preservePendingFetch && fetch && current.fetch) !current.refresh else current.refresh,
             preparedGuard = commitGuard, requireCommandRecords = requireRecords,
             preparedWindowForm = if (commitGuard == null) null else window.peekWindowForm().mapValues { snapshotInputValue(it.value) },
             preparedMetadata = if (commitGuard == null) null else window.metadata.peek(),

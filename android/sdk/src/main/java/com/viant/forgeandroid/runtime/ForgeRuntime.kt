@@ -50,7 +50,7 @@ class ForgeRuntime(
         nativeReportLifecycle.canRead(context, input) { reportPreparationIsCurrent(it) }
     }
     private val windowRuntime = WindowRuntime(signals, dataSourceRuntime)
-    private val parameterResolver = ParameterResolver()
+    internal val parameterResolver = ParameterResolver()
     val mutationCommands = MutationCommandRuntime()
 
     private val handlers = HandlerRegistry()
@@ -599,7 +599,7 @@ class ForgeRuntime(
         if (source != null) {
             if (args.isNotEmpty()) {
                 val scoped = JsonUtil.asStringMap(args[source.dataSourceRef]).ifEmpty { args }
-                source.setInputParameters(scoped, fetch = fetch)
+                source.setDialogInputParameters(scoped, fetch = fetch)
             } else if (fetch && !source.control.peek().loading && (dialog?.fetchOnOpen == true || source.collection.peek().isEmpty())) {
                 source.fetchCollection()
             }
@@ -773,7 +773,8 @@ class ExecutionEngine(
         applyState: Boolean
     ): Any? {
         val params = if (context != null) {
-            parameterResolver.resolve(execution.parameters, context)
+            if (execution.handler == "dataSource.setFormData") parameterResolver.resolveOperation(execution.parameters, context)
+            else parameterResolver.resolve(execution.parameters, context)
         } else {
             ParameterResolution(emptyMap(), emptyList())
         }
@@ -817,7 +818,8 @@ class ExecutionEngine(
                         outbound = resolution.outbound
                     )
                 )
-                runtime.openDialog(windowId, dialogId, resolution.inbound, selectionMode, callerCtx.dataSourceRef)
+                val explicit = JsonUtil.asStringMap(args.args["parameters"])
+                runtime.openDialog(windowId, dialogId, explicit.ifEmpty { resolution.inbound }, selectionMode, callerCtx.dataSourceRef)
                 return@handler null
             }
             runtime.openDialog(windowId, dialogId, emptyMap(), selectionMode)
@@ -904,6 +906,15 @@ class ExecutionEngine(
         }
         "dataSource.fetchCollection" -> { args ->
             args.context?.fetchCollection()
+            null
+        }
+        "dataSource.setFormData" -> handler@{ args ->
+            val context = args.context ?: return@handler null
+            val explicit = JsonUtil.asStringMap(args.args["values"])
+            val parameters = JsonUtil.asStringMap(args.args["parameters"]).ifEmpty {
+                args.parameters[context.dataSourceRef] ?: args.parameters[""] ?: emptyMap()
+            }
+            context.setForm(explicit.ifEmpty { parameters })
             null
         }
         "dataSource.setWindowFormData" -> handler@{ args ->

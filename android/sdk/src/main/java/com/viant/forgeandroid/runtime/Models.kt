@@ -1418,7 +1418,8 @@ data class ParameterDef(
     val output: Boolean? = null,
     val value: JsonElement? = null,
     val selector: String? = null,
-    val codec: JsonElement? = null
+    val codec: JsonElement? = null,
+    val defaultValue: JsonElement? = null
 )
 
 object ParameterDefSerializer : KSerializer<ParameterDef> {
@@ -1442,7 +1443,8 @@ object ParameterDefSerializer : KSerializer<ParameterDef> {
             output = boolField(obj, "output"),
             value = obj["value"],
             selector = stringField(obj, "selector"),
-            codec = obj["codec"]
+            codec = obj["codec"],
+            defaultValue = obj["default"]
         )
     }
 
@@ -1462,6 +1464,7 @@ object ParameterDefSerializer : KSerializer<ParameterDef> {
         value.value?.let { obj["value"] = it }
         putString(obj, "selector", value.selector)
         value.codec?.let { obj["codec"] = it }
+        value.defaultValue?.let { obj["default"] = it }
         jsonEncoder.encodeJsonElement(JsonObject(obj))
     }
 

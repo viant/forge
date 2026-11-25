@@ -4,7 +4,7 @@ class ParameterResolver {
     fun resolve(params: List<ParameterDef>, context: DataSourceContext): ParameterResolution =
         resolveBindings(params, context, applyCodecs = false)
 
-    internal fun resolvePreparedSelection(params: List<ParameterDef>, context: DataSourceContext): ParameterResolution =
+    internal fun resolveOperation(params: List<ParameterDef>, context: DataSourceContext): ParameterResolution =
         resolveBindings(params, context, applyCodecs = true)
 
     private fun resolveBindings(params: List<ParameterDef>, context: DataSourceContext, applyCodecs: Boolean): ParameterResolution {
@@ -48,9 +48,16 @@ class ParameterResolver {
             val toDs = p.to ?: p.kind
             val dst = toDs ?: ""
             val dstMap = ensure(dst)
-            val value = readLegacy(context, p)
             val name = p.name ?: return@forEach
-            dstMap[name] = decoded(p, value)
+            if (!applyCodecs) {
+                dstMap[name] = readLegacy(context, p)
+                return@forEach
+            }
+            val raw = if (p.input == null && p.defaultValue != null) SelectorUtil.Missing else readLegacy(context, p, typed = true)
+            if (raw === SelectorUtil.Missing && p.defaultValue == null) return@forEach
+            val value = if (raw === SelectorUtil.Missing) p.defaultValue?.let(JsonUtil::elementToAny) else raw
+            if (name == "...") checkParameterKeys(value)
+            applyResolvedValue(dstMap, name, decoded(p, value))
         }
 
         return ParameterResolution(inbound, outbound)
@@ -156,21 +163,28 @@ class ParameterResolver {
         }
     }
 
-    private fun readLegacy(context: DataSourceContext, p: ParameterDef): Any? {
-        val (sourceContext, location) = resolveLegacySourceContext(context, p.location)
+    private fun readLegacy(context: DataSourceContext, p: ParameterDef, typed: Boolean = false): Any? {
+        val (sourceContext, location) = resolveLegacySourceContext(context, p.location, wholeReference = typed && (p.input == "selection" || p.input == "form"))
+        fun select(store: Any?): Any? = when {
+            location == null -> if (typed) SelectorUtil.Missing else null
+            location.isEmpty() -> store
+            else -> SelectorUtil.resolveParts(store, location.split('.'), if (typed) SelectorUtil.Missing else null)
+        }
         return when (p.input) {
-            "selection" -> location?.let { SelectorUtil.resolve(sourceContext.peekSelection().selected ?: emptyMap<String, Any?>(), it) }
-            "form" -> location?.let { SelectorUtil.resolve(sourceContext.peekForm(), it) }
+            "selection" -> if (typed && sourceContext.dataSource.selectionMode == "multi") {
+                readSelectionValue(sourceContext, location.orEmpty())
+            } else select(sourceContext.peekSelection().selected)
+            "form" -> select(sourceContext.peekForm())
             "dataSource" -> resolveFromLegacyDataSource(sourceContext, location)
-            "windowForm" -> location?.let { SelectorUtil.resolve(context.window.peekWindowForm(), it) }
-            "metrics" -> location?.let {
+            "windowForm" -> select(context.window.peekWindowForm())
+            "metrics" -> if (typed) select(sourceContext.metrics.peek()) else location?.let {
                 SelectorUtil.resolve(sourceContext.metrics.peek(), it)
                     ?: SelectorUtil.resolve(sourceContext.collection.peek().firstOrNull().orEmpty(), it)
             }
-            "filter" -> location?.let { SelectorUtil.resolve(sourceContext.peekFilter(), it) }
-            "input" -> location?.let { SelectorUtil.resolve(sourceContext.input.peek().bindingValues(), it) }
+            "filter" -> select(sourceContext.peekFilter())
+            "input" -> select(sourceContext.input.peek().bindingValues())
             "metadata" -> sourceContext.window.metadata.peek()?.let { it } // full metadata if needed
-            "const" -> p.constantValue()
+            "const" -> if (!typed) p.constantValue() else if (p.locationElement() == null) SelectorUtil.Missing else p.locationAny()
             else -> {
                 p.value?.let(JsonUtil::elementToAny)
                     ?: p.selector?.let { SelectorUtil.resolve(context.window.peekWindowForm(), it) }
@@ -241,7 +255,8 @@ class ParameterResolver {
 
     private fun resolveLegacySourceContext(
         context: DataSourceContext,
-        rawLocation: String?
+        rawLocation: String?,
+        wholeReference: Boolean = false
     ): Pair<DataSourceContext, String?> {
         val location = rawLocation?.trim().orEmpty()
         if (location.isEmpty()) {
@@ -249,6 +264,10 @@ class ParameterResolver {
         }
         val dotIndex = location.indexOf('.')
         if (dotIndex <= 0) {
+            if (wholeReference && location == context.dataSourceRef) return context to ""
+            if (wholeReference && context.window.metadata.peek()?.dataSources?.containsKey(location) == true) {
+                return context.window.context(location) to ""
+            }
             return context to location
         }
         val possibleRef = location.substring(0, dotIndex)

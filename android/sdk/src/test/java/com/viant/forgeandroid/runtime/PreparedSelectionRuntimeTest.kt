@@ -203,7 +203,7 @@ class PreparedSelectionRuntimeTest {
         val param=ParameterDef(name="N",input="windowForm",location="n",codec=JsonPrimitive("number"))
         for ((text,expected) in listOf("1f" to "1f", "0x1.0p3" to "0x1.0p3", "2.5e1" to 25.0)) {
             runtime.setWindowFormValues(window.windowId,mapOf("n" to text))
-            assertEquals(expected,resolver.resolvePreparedSelection(listOf(param),source).inbound[""]?.get("N"))
+            assertEquals(expected,resolver.resolveOperation(listOf(param),source).inbound[""]?.get("N"))
         }
     } }
     @Test fun missingRegisteredReaderReceiptCannotFallThroughToASecondHTTPRead()=runBlocking {

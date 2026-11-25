@@ -1403,7 +1403,7 @@ internal fun evaluateReceiptCondition(condition: DashboardConditionDef, records:
 internal fun evaluateCanonicalCondition(condition: DashboardConditionDef?, record: Map<String, Any?>): Boolean =
     evaluateConditionTree(condition, record) { node, _ -> SelectorUtil.resolveParts(record, checkNotNull(node.canonicalSelectors).field, SelectorUtil.Missing) }
 
-private fun evaluateConditionTree(
+internal fun evaluateConditionTree(
     condition: DashboardConditionDef?,
     record: Map<String, Any?>?,
     resolve: (DashboardConditionDef, String?) -> Any?
@@ -1844,7 +1844,7 @@ fun dashboardToneName(value: Any?, tone: DashboardToneDef?): String {
     }
 }
 
-private fun resolveDashboardValue(
+internal fun resolveDashboardValue(
     source: String?,
     selector: String?,
     metrics: Map<String, Any?>,

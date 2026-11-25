@@ -738,13 +738,13 @@ struct MutationScope: Sendable {
         return result.result ?? (result.returnedValue ? .null : nil)
     }
 
-    func resolvedParameters(_ parameters: [ParameterDef], target: String) -> [String:JSONValue] {
+    func resolvedParameters(_ parameters: [ParameterDef], target: String, operationBindings: Bool = false) -> [String:JSONValue] {
         var context = ParameterResolver.ResolutionContext(identityDataSourceRef: source, windowForm: windowForm, metadata: metadata)
         context.lookup = { ref in
             guard let state = snapshot(ref) else { return nil }
             return .init(selectionMode: metadata.dataSources[ref]?.selectionMode, form: state.form, metrics: state.metrics, selection: state.selection, input: state.input)
         }
-        let resolved = ParameterResolver.resolve(parameters: parameters, context: context)
+        let resolved = ParameterResolver.resolve(parameters: parameters, context: context, operationBindings: operationBindings)
         let envelope = resolved[target]?.objectValue ?? resolved
         return envelope["input"]?.objectValue?["parameters"]?.objectValue ?? envelope["parameters"]?.objectValue ?? envelope
     }

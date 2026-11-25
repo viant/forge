@@ -12,6 +12,7 @@ struct WorkflowPresentationPrimitives: View {
     let selection: SelectionState
     let authorization: [String:JSONValue]
 
+    @State private var operationPresentation: [String:(visible:Bool,disabled:Bool)] = [:]
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var record: [String: JSONValue] {
@@ -172,8 +173,8 @@ struct WorkflowPresentationPrimitives: View {
     private var editableCollectionActions: some View {
         if let spec = container.editableCollection, !(spec.operations ?? []).isEmpty {
             HStack(spacing: 8) {
-                ForEach((spec.operations ?? []).filter { operationVisible($0) }) { operation in
-                    let disabled = operationDisabled(operation)
+                ForEach((spec.operations ?? []).filter { runtime != nil && window != nil ? operationPresentation[$0.id]?.visible == true : operationVisible($0) }) { operation in
+                    let disabled = operationPresentation[operation.id]?.disabled ?? operationDisabled(operation)
                     if let mutation = operation.mutation ?? spec.mutation, let runtime, let window {
                         MutationCommandButton(
                             runtime: runtime,
@@ -195,6 +196,19 @@ struct WorkflowPresentationPrimitives: View {
                     }
                 }
             }
+            .task(id: spec.dataSourceRef ?? container.dataSourceRef) {
+                guard let runtime, let window else { return }
+                let source = spec.dataSourceRef ?? container.dataSourceRef ?? ""
+                let conditions = (spec.operations ?? []).flatMap { operation -> [DashboardConditionDef?] in
+                    let selection = operation.selection ?? spec.selection
+                    return [operation.visibleWhen, operation.disabledWhen, selection?.disabledWhen, selection?.every, selection?.any, selection?.none]
+                }
+                await observeWorkflowPredicates(runtime:runtime, windowID:window.windowID, source:source, conditions:conditions, observeSelection:true) {
+                    let current = await runtime.editableOperationPresentation(windowID:window.windowID,source:source,collection:spec)
+                    if !Task.isCancelled { await MainActor.run { operationPresentation = current } }
+                }
+            }
+
             if spec.selectionStatus == true {
                 Text(selectedRows.isEmpty ? (spec.selectionPrompt ?? "Select a row to enable row actions.") : "\(selectedRows.count) \(selectedRows.count == 1 ? "row" : "rows") selected")
                     .font(.caption)
@@ -422,8 +436,8 @@ struct WorkflowPresentationPrimitives: View {
                 _ = await runtime.prepareEditableSelection(windowID: window.windowID, sourceDataSourceRef: dataSourceRef, collection: spec, operation: operation, boundary: container.permissionBoundary)
             } else if let handler = operation.handler {
                 _ = await runtime.execute(ExecutionDef(action: handler), context: ExecutionContext(windowID: window.windowID, dataSourceRef: dataSourceRef), args: args)
-            } else if let dialogId = operation.dialogId {
-                _ = await runtime.execute(ExecutionDef(action: "window.openDialog", args: [dialogId]), context: ExecutionContext(windowID: window.windowID, dataSourceRef: dataSourceRef), args: args)
+            } else if operation.dialogId != nil {
+                await runtime.openEditableOperationDialog(windowID: window.windowID, source: dataSourceRef, collection: spec, operation: operation)
             }
         }
     }

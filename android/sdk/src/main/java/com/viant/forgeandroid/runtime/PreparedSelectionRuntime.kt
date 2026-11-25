@@ -9,18 +9,78 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 
+internal data class EditablePredicateStore(val ref: String, val store: String)
+
+private fun DashboardConditionDef.editableStore(): EditablePredicateStore? {
+    val ref = dataSourceRef?.takeIf { it.isNotBlank() } ?: return null
+    val kind = source?.lowercase()
+    val store = when (kind) {
+        "filter", "filters", "input" -> "input"
+        null, "form" -> "form"
+        "collection", "metrics", "selection" -> kind
+        else -> return null
+    }
+    return EditablePredicateStore(ref, store)
+}
+
+internal fun editablePredicateStores(spec: EditableCollectionSpec): Set<EditablePredicateStore> = buildSet {
+    fun collect(node: DashboardConditionDef?) {
+        if (node == null) return
+        node.editableStore()?.let(::add)
+        node.all.forEach(::collect); node.any.forEach(::collect); collect(node.not)
+    }
+    fun bounds(value: PrimitiveSelectionSpec?) {
+        if (value == null) return
+        collect(value.disabledWhen); collect(value.every); collect(value.any); collect(value.none)
+    }
+    bounds(spec.selection)
+    spec.operations.forEach { collect(it.visibleWhen); collect(it.disabledWhen); bounds(it.selection) }
+}
+
+internal fun EditableCollectionSpec.predicateSignals(window: WindowContext, caller: String?): Map<EditablePredicateStore, kotlinx.coroutines.flow.StateFlow<Any?>> =
+    buildMap {
+        for (owner in predicateStores) {
+            if (owner.ref == caller || window.metadata.peek()?.dataSources?.containsKey(owner.ref) != true) continue
+            val id = window.identity.dataSourceId(owner.ref)
+            val flow: kotlinx.coroutines.flow.StateFlow<Any?> = when (owner.store) {
+                "form" -> window.signals.form(id).flow
+                "collection" -> window.signals.collection(id).flow
+                "metrics" -> window.signals.metrics(id).flow
+                "selection" -> window.signals.selection(id, SelectionState()).flow
+                "input" -> window.signals.input(id).flow
+                else -> continue
+            }
+            put(owner, flow)
+        }
+    }
+
 internal class EditableOperationInputs(
     private val metrics: Map<String, Any?>, private val form: Map<String, Any?>, private val windowForm: Map<String, Any?>,
-    private val collection: List<Map<String, Any?>>, private val authorization: Map<String, Any?>, input: InputState, selection: SelectionState
+    private val collection: List<Map<String, Any?>>, private val authorization: Map<String, Any?>, input: InputState, selection: SelectionState,
+    private val caller: String? = null, private val scoped: Map<EditablePredicateStore, Any?> = emptyMap()
 ) {
     private val inputValues = input.bindingValues()
     private val filter = input.filter
     private val selectionValues = mapOf("selected" to selection.selected, "selection" to selection.selection, "rowIndex" to selection.rowIndex)
 
     fun allows(condition: DashboardConditionDef?, row: Map<String, Any?>? = null): Boolean =
-        evaluateDashboardCondition(condition, metrics = metrics, filters = filter, form = row ?: form,
-            windowForm = windowForm, collection = collection, input = inputValues, selectionValues = selectionValues,
-            authorization = authorization, row = row)
+        evaluateConditionTree(condition, record = null) { node, path ->
+            val owner = node.editableStore()
+            when {
+                owner != null && owner.ref != caller -> {
+                    val state = scoped[owner]
+                    val value = when (state) {
+                        is InputState -> if (node.source.equals("input", true)) state.bindingValues() else state.filter
+                        is SelectionState -> mapOf("selected" to state.selected, "selection" to state.selection, "rowIndex" to state.rowIndex)
+                        else -> state
+                    }
+                    SelectorUtil.resolve(value, path)
+                }
+                row != null && node.source.equals("row", true) -> SelectorUtil.resolve(row, path)
+                else -> resolveDashboardValue(node.source, path, metrics, filter, DashboardSelectionState(),
+                    row ?: form, windowForm, collection, inputValues, selectionValues, authorization)
+            }
+        }
 
     fun disabled(operation: EditableCollectionOperationSpec, spec: EditableCollectionSpec, rows: List<Map<String, Any?>>): Boolean {
         val bounds = operation.selection ?: spec.selection
@@ -55,12 +115,13 @@ internal class PreparedSelectionRuntime {
         val selected = selection.selection.ifEmpty { selection.selected?.let(::listOf).orEmpty() }
         val authorization = metadata.authorizationSnapshot.mapValues { JsonUtil.elementToAny(it.value) }
         val original = window.peekWindowForm()
+        val scoped = spec.predicateSignals(window, source.dataSourceRef)
         var pending = false
         var expectedParameters: JsonObject? = null
         fun currentPresentation() = presented() && window.signals.ownsMetadata(window.windowId, window.metadata) &&
             window.metadata.peek() === metadata && dialog.peek() === priorDialog && active[key] == invocation
         fun parameters(): Map<String, Any?> {
-            val resolved = ParameterResolver().resolvePreparedSelection(operation.parameters, source).inbound
+            val resolved = runtime.parameterResolver.resolveOperation(operation.parameters, source).inbound
             return mutationTargetParameters(resolved[prepare.dataSourceRef] ?: resolved[""] ?: emptyMap())
         }
         fun eligible(rows: List<Map<String, Any?>> = selected): Boolean {
@@ -73,7 +134,8 @@ internal class PreparedSelectionRuntime {
             val state = if (pending && flag != null && current[flag] == true) current.toMutableMap().also {
                 if (flag in original) it[flag] = original[flag] else it.remove(flag)
             } else current
-            val facts = EditableOperationInputs(metrics, form, state, collection, authorization, source.input.peek(), selection)
+            val facts = EditableOperationInputs(metrics, form, state, collection, authorization, source.input.peek(), selection,
+                source.dataSourceRef, scoped.mapValues { it.value.value })
             if (!facts.allows(operation.visibleWhen) || facts.disabled(operation, spec, rows)) return false
             if (permission != null) {
                 if (!facts.allows(permission.visibleWhen)) return false

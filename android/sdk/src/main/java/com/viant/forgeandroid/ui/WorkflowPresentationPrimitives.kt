@@ -42,6 +42,7 @@ import com.viant.forgeandroid.runtime.JsonUtil
 import com.viant.forgeandroid.runtime.SelectorUtil
 import com.viant.forgeandroid.runtime.WindowContext
 import com.viant.forgeandroid.runtime.EditableOperationInputs
+import com.viant.forgeandroid.runtime.predicateSignals
 import com.viant.forgeandroid.runtime.InputState
 import com.viant.forgeandroid.runtime.WorkflowPrimitiveRuntime
 import com.viant.forgeandroid.runtime.evaluateDashboardCondition
@@ -167,7 +168,10 @@ internal fun WorkflowPresentationPrimitives(
 
         container.editableCollection?.takeIf { it.operations.isNotEmpty() }?.let { spec ->
             val input = context?.input?.flow?.collectAsState()?.value ?: InputState()
-            val facts = EditableOperationInputs(metrics, form, windowForm, collection, authorization, input, selection)
+            val references = remember(spec, window, context?.dataSourceRef, metadata) { spec.predicateSignals(window, context?.dataSourceRef) }
+            val externalValues = references.mapValues { (_, signal) -> signal.collectAsState().value }
+            val facts = EditableOperationInputs(metrics, form, windowForm, collection, authorization, input, selection,
+                context?.dataSourceRef, externalValues)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 spec.operations.filter { facts.allows(it.visibleWhen) }.forEach { operation ->
                     val disabled = facts.disabled(operation, spec, selectedRows)
@@ -456,17 +460,22 @@ internal fun MutationCommandButton(
     }
 }
 
-private fun invokeEditableOperation(
+internal fun invokeEditableOperation(
     runtime: ForgeRuntime,
     context: DataSourceContext,
     operation: EditableCollectionOperationSpec,
     selectedRows: List<Map<String, Any?>>
-) {
+): Job? {
     val args = mapOf("operationId" to operation.id, "selectedRows" to selectedRows)
-    when {
-        !operation.handler.isNullOrBlank() -> runtime.execute(com.viant.forgeandroid.runtime.ExecutionDef(handler = operation.handler), context, args)
-        !operation.dialogId.isNullOrBlank() -> runtime.execute(com.viant.forgeandroid.runtime.ExecutionDef(handler = "window.openDialog", args = listOf(operation.dialogId.orEmpty())), context, args)
+    if (!operation.handler.isNullOrBlank()) {
+        return runtime.execute(com.viant.forgeandroid.runtime.ExecutionDef(handler = operation.handler), context, args)
     }
+    val dialogId = operation.dialogId?.takeIf(String::isNotBlank) ?: return null
+    val bindings = runtime.parameterResolver.resolveOperation(operation.parameters, context).inbound
+    val envelope = bindings[context.dataSourceRef] ?: bindings[""] ?: emptyMap()
+    val parameters = com.viant.forgeandroid.runtime.mutationTargetParameters(envelope) + args
+    return runtime.execute(com.viant.forgeandroid.runtime.ExecutionDef(handler = "window.openDialog", args = listOf(dialogId)),
+        context, args + ("parameters" to parameters))
 }
 
 @Composable

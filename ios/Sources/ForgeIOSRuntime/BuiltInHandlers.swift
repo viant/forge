@@ -167,6 +167,20 @@ extension ForgeRuntime {
             return nil
         }
 
+        // A clean form seed replaces the previous draft, including when the new seed is empty.
+        handlers["dataSource.setFormData"] = { [weak runtime] args in
+            guard let runtime, let source = args.context?.dataSourceRef, !source.isEmpty,
+                  let windowID = args.args["windowId"]?.stringValue ?? args.context?.windowID, !windowID.isEmpty else { return nil }
+            let values: [String: JSONValue]
+            if let direct = args.args["values"]?.objectValue, !direct.isEmpty {
+                values = direct
+            } else {
+                values = await buildInboundParameters(runtime: runtime, args: args, windowID: windowID, operationBindings: true)
+            }
+            await runtime.setDataSourceForm(windowID: windowID, dataSourceRef: source, values: values)
+            return nil
+        }
+
         // 7A. dataSource.setWindowFormData
         handlers["dataSource.setWindowFormData"] = { [weak runtime] args in
             guard let runtime else { return nil }
@@ -332,7 +346,7 @@ extension ForgeRuntime {
     private static func buildInboundParameters(
         runtime: ForgeRuntime,
         args: ExecutionArgs,
-        windowID: String
+        windowID: String, operationBindings: Bool = false
     ) async -> [String: JSONValue] {
         guard !args.execution.parameters.isEmpty else { return [:] }
         let metadata = await runtime.windowMetadata(id: windowID)
@@ -341,6 +355,6 @@ extension ForgeRuntime {
             metadata: metadata,
             identityDataSourceRef: args.context?.dataSourceRef ?? ""
         )
-        return ParameterResolver.resolve(parameters: args.execution.parameters, context: context)
+        return ParameterResolver.resolve(parameters: args.execution.parameters, context: context, operationBindings: operationBindings)
     }
 }

@@ -300,28 +300,9 @@ private struct WindowDialogHost: View {
     }
 
     private func observeFooterConditions() async {
-        var sources: [String: Set<String>] = [:]
-        func collect(_ condition: DashboardConditionDef?) {
-            guard let condition else { return }
-            if condition.field != nil || condition.selector != nil || condition.source != nil || condition.key != nil {
-                sources[condition.dataSourceRef ?? dialogDataSourceRef, default: []].insert((condition.source ?? "form").lowercased())
-            }
-            condition.all.forEach(collect); condition.any.forEach(collect); collect(condition.not)
-        }
-        for action in dialog.actions { collect(action.visibleWhen); collect(action.disabledWhen); collect(action.mutationCommand?.validateWhen) }
-        guard !sources.isEmpty else { return }
-        await refreshFooterConditions()
-        await withTaskGroup(of: Void.self) { group in
-            if sources.values.contains(where: { $0.contains("windowform") }) { group.addTask { for await _ in await runtime.windowFormUpdates(windowID: window.windowID) { await refreshFooterConditions() } } }
-            if sources.values.contains(where: { $0.contains("authorization") }) { group.addTask { for await _ in await runtime.windowMetadataUpdates(id: window.windowID) { await refreshFooterConditions() } } }
-            for (ref, scopes) in sources {
-            if scopes.contains("form") { group.addTask { for await _ in await runtime.dataSourceFormUpdates(windowID: window.windowID, dataSourceRef: ref) { await refreshFooterConditions() } } }
-
-            if scopes.contains("selection") { group.addTask { for await _ in await runtime.dataSourceSelectionUpdates(windowID: window.windowID, dataSourceRef: ref) { await refreshFooterConditions() } } }
-            if scopes.contains("collection") { group.addTask { for await _ in await runtime.dataSourceCollectionUpdates(windowID: window.windowID, dataSourceRef: ref) { await refreshFooterConditions() } } }
-            if scopes.contains("metrics") { group.addTask { for await _ in await runtime.dataSourceMetricsUpdates(windowID: window.windowID, dataSourceRef: ref) { await refreshFooterConditions() } } }
-            if !scopes.isDisjoint(with: ["input", "filter", "filters"]) { group.addTask { for await _ in await runtime.dataSourceInputUpdates(windowID: window.windowID, dataSourceRef: ref) { await refreshFooterConditions() } } }
-            }
+        let conditions = dialog.actions.flatMap { [$0.visibleWhen, $0.disabledWhen, $0.mutationCommand?.validateWhen] }
+        await observeWorkflowPredicates(runtime:runtime, windowID:window.windowID, source:dialogDataSourceRef, conditions:conditions) {
+            await refreshFooterConditions()
         }
     }
 
@@ -580,3 +561,33 @@ private extension JSONValue {
         }
     }
 }
+
+
+/// Subscribe only to source/signal pairs named by these controls' predicates.
+func observeWorkflowPredicates(runtime:ForgeRuntime, windowID:String, source:String, conditions:[DashboardConditionDef?],
+                               observeSelection:Bool = false, refresh:@escaping @Sendable () async -> Void) async {
+        var sources: [String: Set<String>] = [:]
+        func collect(_ condition: DashboardConditionDef?) {
+            guard let condition else { return }
+            if condition.field != nil || condition.selector != nil || condition.source != nil || condition.key != nil {
+                sources[condition.dataSourceRef ?? source, default: []].insert((condition.source ?? "form").lowercased())
+            }
+            condition.all.forEach(collect); condition.any.forEach(collect); collect(condition.not)
+        }
+        conditions.forEach(collect)
+        if observeSelection { sources[source,default:[]].insert("selection") }
+        guard !sources.isEmpty else { return }
+        await refresh()
+        await withTaskGroup(of: Void.self) { group in
+            if sources.values.contains(where: { $0.contains("windowform") }) { group.addTask { for await _ in await runtime.windowFormUpdates(windowID: windowID) { await refresh() } } }
+            if sources.values.contains(where: { $0.contains("authorization") }) { group.addTask { for await _ in await runtime.windowMetadataUpdates(id: windowID) { await refresh() } } }
+            for (ref, scopes) in sources {
+            if scopes.contains("form") { group.addTask { for await _ in await runtime.dataSourceFormUpdates(windowID: windowID, dataSourceRef: ref) { await refresh() } } }
+
+            if scopes.contains("selection") { group.addTask { for await _ in await runtime.dataSourceSelectionUpdates(windowID: windowID, dataSourceRef: ref) { await refresh() } } }
+            if scopes.contains("collection") { group.addTask { for await _ in await runtime.dataSourceCollectionUpdates(windowID: windowID, dataSourceRef: ref) { await refresh() } } }
+            if scopes.contains("metrics") { group.addTask { for await _ in await runtime.dataSourceMetricsUpdates(windowID: windowID, dataSourceRef: ref) { await refresh() } } }
+            if !scopes.isDisjoint(with: ["input", "filter", "filters"]) { group.addTask { for await _ in await runtime.dataSourceInputUpdates(windowID: windowID, dataSourceRef: ref) { await refresh() } } }
+            }
+        }
+    }

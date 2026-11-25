@@ -45,10 +45,11 @@ public enum ParameterResolver {
         }
     }
 
-    public static func resolve(
-        parameters: [ParameterDef],
-        context: ResolutionContext
-    ) -> [String: JSONValue] {
+    public static func resolve(parameters: [ParameterDef], context: ResolutionContext) -> [String: JSONValue] {
+        resolve(parameters: parameters, context: context, operationBindings: false)
+    }
+
+    static func resolve(parameters: [ParameterDef], context: ResolutionContext, operationBindings: Bool) -> [String: JSONValue] {
         var resolved: [String: JSONValue] = [:]
         for parameter in parameters where isCompact(parameter) {
             guard !isOutbound(parameter) else { continue }
@@ -61,14 +62,13 @@ public enum ParameterResolver {
             let sourcePath = parameter.name == "..."
                 ? parameter.location?.stringValue
                 : parameter.location?.stringValue ?? parameter.name
-            guard let value = readCompactValue(
+            let raw = readCompactValue(
                 context: context,
                 dataSourceRef: sourceDataSourceRef,
                 store: expandStore(sourceParts.store),
                 path: sourcePath
-            ) else {
-                continue
-            }
+            )
+            guard let value = operationBindings ? decodeOperationValue(raw ?? parameter.defaultValue, parameter.codec) : raw else { continue }
             var dataSourceResult = resolved[destinationDataSourceRef]?.objectValue ?? [:]
             writeCompactValue(
                 &dataSourceResult,
@@ -82,7 +82,10 @@ public enum ParameterResolver {
         for parameter in parameters where !isCompact(parameter) && !isOutbound(parameter) {
             let name = parameter.name.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !name.isEmpty else { continue }
-            guard let value = resolve(parameter: parameter, context: context) else { continue }
+            let raw = operationBindings && parameter.input == "const"
+                ? parameter.location ?? parameter.value
+                : resolve(parameter: parameter, context: context)
+            guard let value = operationBindings ? decodeOperationValue(raw ?? parameter.defaultValue, parameter.codec) : raw else { continue }
             let toDataSource = (parameter.to ?? parameter.kind ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             if !toDataSource.isEmpty {
                 var dataSourceResult = resolved[toDataSource]?.objectValue ?? [:]
@@ -93,6 +96,44 @@ public enum ParameterResolver {
             }
         }
         return resolved
+    }
+
+    /// UI operation parameters share the declarative codec contract. Datasource
+    /// requests keep their existing host-side decoding and wire shape.
+    static func decodeOperationValue(_ raw: JSONValue?, _ codec: JSONValue?) -> JSONValue? {
+        guard let raw, raw != .null,
+              let name = (codec?.stringValue ?? codec?.objectValue?["name"]?.stringValue)?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+              !name.isEmpty else { return raw }
+        if name.hasSuffix("[]") {
+            let values = raw.arrayValue ?? [raw]
+            let decoded = values.compactMap { decodeOperationValue($0, .string(String(name.dropLast(2)))) }
+            return decoded.count == values.count ? .array(decoded) : nil
+        }
+        if let values = raw.arrayValue {
+            return values.count == 1 ? decodeOperationValue(values[0], codec) : raw
+        }
+        let text = raw.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch name {
+        case "json":
+            guard case .string(let literal) = raw else { return raw }
+            return try? JSONDecoder().decode(JSONValue.self, from: Data(literal.utf8))
+        case "bool", "boolean":
+            if raw == .number(1) || ["true","1"].contains(text?.lowercased()) { return .bool(true) }
+            if raw == .number(0) || ["false","0"].contains(text?.lowercased()) { return .bool(false) }
+        case "int", "integer", "float", "number":
+            let number: Double?
+            switch raw {
+            case .number(let value): number = value
+            case .bool(let value): number = value ? 1 : 0
+            default: number = text.flatMap(Double.init)
+            }
+            if let number, number.isFinite, ["float","number"].contains(name) || number.rounded() == number { return .number(number) }
+        case "string":
+            if raw.objectValue != nil { return .string("[object Object]") }
+            if raw.stringValue == nil, let data = try? JSONEncoder().encode(raw) { return .string(String(decoding:data,as:UTF8.self)) }
+        default: break
+        }
+        return raw
     }
 
     public static func resolve(

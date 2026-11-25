@@ -139,7 +139,6 @@ extension ForgeRuntime {
         let dialogSignal = await signals.dialog(dialogID: key)
         let originalDialog = await dialogSignal.peek()
         guard !originalDialog.open else { return .init(accepted: false, status: "invalid") }
-        let policy = operation.selection ?? collection.selection
         let actor = metadata.authorizationSnapshot
         let originalPending =
             if let field = spec.pendingField { await windowFormJSONValue(windowID: windowID)[field] } else { nil as JSONValue? }
@@ -153,12 +152,9 @@ extension ForgeRuntime {
             else { return nil }
             var live = state
             if attempted, let field = spec.pendingField, live.windowForm[field] == .bool(true) { live.windowForm[field] = originalPending }
-            let selected = state.snapshot(source)?.selection ?? SelectionState()
-            let rows = selected.selection.isEmpty ? selected.selected.map { [$0] } ?? [] : selected.selection
-            guard !rows.isEmpty, rows.count >= (policy?.min ?? 0), policy?.max.map({ $0 <= 0 || rows.count <= $0 }) ?? true,
-                live.allows(operation.visibleWhen), !(operation.disabledWhen.map { live.allows($0) } ?? false),
-                !(policy?.disabledWhen.map { live.allows($0) } ?? false)
-            else { return nil }
+            let rows = state.editableSelectedRows
+            let presentation = live.editablePresentation(operation:operation, collection:collection, rows:rows)
+            guard !rows.isEmpty, presentation.visible, !presentation.disabled else { return nil }
             if let boundary {
                 guard live.allows(boundary.visibleWhen) else { return nil }
                 var grants: [SelectionRecord] = []
@@ -170,9 +166,6 @@ extension ForgeRuntime {
                     return nil
                 }
             }
-            if let condition = policy?.every, !rows.allSatisfy({ live.allows(condition, row: $0) }) { return nil }
-            if let condition = policy?.any, !rows.contains(where: { live.allows(condition, row: $0) }) { return nil }
-            if let condition = policy?.none, rows.contains(where: { live.allows(condition, row: $0) }) { return nil }
             let ids = rows.map { resourceResolveValue(.object($0), path: spec.identityField) ?? .null }
             let keys = try ids.map(selectionKey)
             guard Set(keys).count == rows.count else { throw SelectionPreparationError("Select one or more distinct records.") }
