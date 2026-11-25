@@ -213,7 +213,7 @@ private fun DialogFooterAction(runtime: ForgeRuntime, window: WindowContext, sou
     val command = remember(action) { action.footerCommand() }
     val disabled = (unavailable && (command != null || !action.close)) || action.disabled || (action.disabledWhen != null && allows(action.disabledWhen)) || (action.close && closeDisabled)
     if (command != null) {
-        if (source != null) MutationCommandButton(runtime, window, source, command, externallyDisabled = disabled, dialogId = dialogId)
+        if (source != null) MutationCommandButton(runtime, window, source, command, externallyDisabled = disabled, dialogId = dialogId, closeOnSuccess = action.close)
         else TextButton(enabled = false, onClick = {}) { Text(command.label ?: "Action") }
         return
     }

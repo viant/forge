@@ -569,7 +569,8 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
   const authorizationEpoch = protectedWindow ? protectedWindowEpoch(windowId) : null;
   const ordered = Array.isArray(command.before) && command.before.length > 0;
   const clearFields = Array.isArray(command.clearFormFields) && command.clearFormFields.length > 0;
-  const needsExactReceipt = ordered || clearFields;
+  const closesDialog = Boolean(lifecycle.dialogId) && typeof lifecycle.closeOnSuccess === 'function';
+  const needsExactReceipt = ordered || clearFields || closesDialog;
   let submittedFields;
   let sequence = null;
   let originalScope;
@@ -730,6 +731,12 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
     publish(context, key, {phase: 'synchronizing', guarded: true, pending: false, retryAllowed: false, error: null, message: 'Refreshing…', writerStatus: 'succeeded', syncStatus: 'pending'});
     try { warnings.push(...await synchronizeUI(context, target, command, writerResponse, uiIsCurrent, formSynchronization)); } catch (error) { warnings.push({stage: 'synchronize', error}); }
     if (!needsExactReceipt && !authorizationIsCurrent()) return superseded(writerInvoked, id);
+    if (closesDialog && dialogSignal && uiIsCurrent()) {
+      // A close hook can await application work. Check the invocation's scope
+      // again inside the dialog immediately before dismissing its presentation.
+      try { await lifecycle.closeOnSuccess(uiIsCurrent); }
+      catch (error) { warnings.push({stage: 'close', error}); }
+    }
     const syncStatus = warnings.length ? 'partial_failure' : 'succeeded';
     const message = warnings.length ? 'Saved. Some related data could not be refreshed.' : 'Completed';
     publish(context, key, {phase: 'succeeded', guarded: false, pending: false, retryAllowed: true, error: null, message, writerStatus: 'succeeded', syncStatus, warnings});

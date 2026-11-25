@@ -245,3 +245,84 @@ it('binds native lookup parameter envelopes to the visible quick filter before t
         removeSignalsForKey(windowId);
     }
 });
+
+it.each([
+    ['success', true, true], ['empty', true, true], ['refresh warning', true, true],
+    ['failure', true, false], ['unknown', true, false], ['reopen', true, false],
+    ['opt-out', false, false],
+])('command footer dismissal respects its own writer and presentation (%s)', async (outcome, close, dismissed) => {
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    HTMLElement.prototype.scrollIntoView ||= function () {};
+    const windowId = 'command-dismiss-' + outcome.replace(/ /g, '-');
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    const reads = [];
+    let complete, refuse;
+    const transport = request => {
+        reads.push(request.dataSourceRef);
+        if (request.dataSourceRef === 'writer') {
+            return new Promise((resolve, reject) => {complete = resolve; refuse = reject;});
+        }
+        return Promise.reject(new Error('Reader unavailable'));
+    };
+    const metadata = {
+        namespace: 'Edit',
+        actions: {code: '({recordClose: ({context}) => { const form = context.signals.windowForm; form.value = {...form.peek(), closes: (form.peek().closes || 0) + 1}; return true; }})'},
+        dataSource: {
+            draft: {id: 'draft', autoFetch: false, backend: {kind: 'inline', rows: []}},
+            writer: {id: 'writer', autoFetch: false, service: {uri: '/writer'}},
+            list: {id: 'list', autoFetch: false, service: {uri: '/list'}},
+        },
+        view: {content: {id: 'root', dataSourceRef: 'draft', fetchData: false, containers: [
+            {id: 'writer-source', dataSourceRef: 'writer', fetchData: false},
+            {id: 'list-source', dataSourceRef: 'list', fetchData: false},
+        ]}},
+        dialogs: [{id: 'editor', title: 'Edit', dataSourceRef: 'draft', fetchOnOpen: false,
+            on: [{event: 'onClose', handler: 'Edit.recordClose'}],
+            content: {id: 'fields', dataSourceRef: 'draft', fetchData: false},
+            actions: [{id: 'dismiss', label: 'Dismiss', close: true}, {
+                id: 'save', label: 'Save', close, mutationCommand: {dataSourceRef: 'writer',
+                    successState: {saved: true},
+                    refresh: outcome === 'refresh warning' ? [{dataSourceRef: 'list', bypassCache: true}] : []},
+            }]}],
+    };
+    const settle = async fn => act(async () => {
+        fn();
+        for (let i = 0; i < 50; i++) await Promise.resolve();
+    });
+    try {
+        await settle(() => root.render(<SettingProvider endpoints={{}} services={{dataConnectorTransport: transport}}
+            connectorConfig={{window: {service: {uri: '/window'}}}}>
+            <WindowContent window={{windowId, windowKey: 'fixture'}} selectedMetadata={metadata}/>
+        </SettingProvider>));
+        const context = getWindowContext(windowId), source = context.Context('draft');
+        const open = () => context.handlers.window.openDialog({execution: {args: ['editor', {awaitResult: true}]}});
+        const button = title => document.querySelector('[role="dialog"] button[title="' + title + '"]');
+        let result;
+        await settle(() => {result = open();});
+        await settle(() => button('Save').click());
+        expect(reads).toEqual(['writer']);
+        if (outcome === 'reopen') {
+            await settle(() => button('Dismiss').click());
+            await settle(() => {open();});
+        }
+        await settle(() => {
+            if (outcome === 'failure') refuse(Object.assign(new Error('Conflict'), {status: 409}));
+            else if (outcome === 'unknown') complete({message: 'No confirmed receipt'});
+            else complete({data: outcome === 'empty' ? [] : [{id: 7}]});
+        });
+        expect(!!document.querySelector('[role="dialog"]')).toBe(!dismissed);
+        if (dismissed) {
+            expect(await result).toMatchObject({status: 'canceled', reason: 'closed'});
+            expect(source.signals.windowForm.peek().saved).toBe(true);
+            expect(source.signals.windowForm.peek().closes).toBe(1);
+        }
+        if (outcome === 'reopen') expect(source.signals.windowForm.peek().saved).toBeUndefined();
+        expect(reads).toEqual(outcome === 'refresh warning' ? ['writer', 'list'] : ['writer']);
+    } finally {
+        await settle(() => root.unmount());
+        host.remove();
+        removeSignalsForKey(windowId);
+    }
+});

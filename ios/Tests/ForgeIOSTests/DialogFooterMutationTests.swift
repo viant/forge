@@ -229,3 +229,81 @@ final class DialogFooterMutationTests: XCTestCase {
     }
 
 }
+
+extension DialogFooterMutationTests {
+    func testClosingCommandDismissesOnlyConfirmedOriginalPresentation() async throws {
+        for mode in ["success","empty","refresh","failed","unknown","cancel","reopened","selection","keep"] {
+            let (runtime,id,capture) = try await seeded()
+            let raw: [String: Any] = [
+                "id":"save", "close":mode != "keep", "mutationCommand":[
+                    "dataSourceRef":"writer", "confirm":"Save?", "resultState":["saved":["0.id"]], "refresh":[["dataSourceRef":"list"]]
+                ]
+            ]
+            let footer = try JSONDecoder().decode(ActionDef.self,from:JSONSerialization.data(withJSONObject:raw))
+            await runtime.openDialog(windowID:id,dialogID:"editor",parameters:[:])
+            await runtime.registerDataSourceLoader { request in
+                await capture.record(request.dataSourceRef, request.input.parameters)
+                if request.dataSourceRef == "writer" {
+                    if mode == "failed" { throw NSError(domain:"writer",code:422) }
+                    if mode == "unknown" { throw URLError(.timedOut) }
+                    if mode == "empty" { return .init(rows:[]) }
+                    if mode == "reopened" {
+                        await runtime.closeDialogPublic(windowID:id,dialogID:"editor")
+                        await runtime.openDialog(windowID:id,dialogID:"editor",parameters:[:])
+                    }
+                    if mode == "selection" {
+                        await runtime.setDataSourceSelection(windowID:id,dataSourceRef:"draft",selected:["id":.number(17)])
+                    }
+                    return .init(rows:[["id":.number(7)]])
+                }
+                if mode == "refresh" { throw NSError(domain:"reader",code:500) }
+                return .init(rows:[])
+            }
+            let result=await runtime.activateDialogFooter(windowID:id,dialogID:"editor",sourceDataSourceRef:"draft",action:footer,confirm:{_ in mode != "cancel"})
+            let open=await runtime.dialogState(windowID:id,dialogID:"editor").open
+            XCTAssertEqual(open,!["success","empty","refresh"].contains(mode),mode)
+            let calls = await capture.calls
+            XCTAssertEqual(calls.filter{$0.0=="writer"}.count,mode == "cancel" ? 0 : 1,mode)
+            switch mode {
+            case "success","keep": XCTAssertEqual(result?.status,"succeeded",mode)
+            case "empty","refresh":
+                XCTAssertEqual(result?.status,"succeeded",mode)
+                XCTAssertEqual(result?.warnings.map(\.stage),[mode == "empty" ? "resultState" : "refresh"],mode)
+            case "unknown": XCTAssertEqual(result?.status,"indeterminate",mode)
+            case "failed": XCTAssertEqual(result?.status,"failed",mode)
+            case "cancel": XCTAssertEqual(result?.status,"cancelled",mode)
+            default: XCTAssertEqual(result?.status,"superseded",mode)
+            }
+        }
+    }
+}
+
+extension DialogFooterMutationTests {
+    func testReopenedAwaitResultOwnsItsWaiterWhenThePriorCommandCompletes() async throws {
+        let document = #"{"view":{"content":{}},"dataSource":{"draft":{},"writer":{}},"dialogs":[{"id":"editor","dataSourceRef":"draft"}]}"#
+        let metadata=try JSONDecoder().decode(WindowMetadata.self,from:Data(document.utf8))
+        let runtime=ForgeRuntime(), id=await runtime.openWindowInline(key:"record",title:"Record",metadata:metadata).id
+        let old=Task { await runtime.openDialogAwaitResult(windowID:id,dialogID:"editor",parameters:["name":.string("first")]) }
+        func waitForPresentation(_ name: String) async -> UUID? {
+            let updates = await runtime.dialogUpdates(windowID:id,dialogID:"editor")
+            for await state in updates where state.open && state.args["name"] == .string(name) { return state.presentationID }
+            return nil
+        }
+        let first = await waitForPresentation("first")
+        let initialID = try XCTUnwrap(first)
+        let replacement = Task { await runtime.openDialogAwaitResult(windowID:id,dialogID:"editor",parameters:["name":.string("second")]) }
+        let second = await waitForPresentation("second")
+        let newID = try XCTUnwrap(second)
+        XCTAssertNotEqual(initialID,newID)
+        // This is the dismissal path used when an admitted command settles.
+        await runtime.closeDialog(windowID:id,dialogID:"editor",presentationID:initialID)
+        let stillOpen = await runtime.dialogState(windowID:id,dialogID:"editor")
+        XCTAssertTrue(stillOpen.open)
+        XCTAssertEqual(stillOpen.presentationID,newID)
+        await runtime.closeDialog(windowID:id,dialogID:"editor",presentationID:newID,payload:["choice":.number(2)])
+        let firstResult = await old.value
+        let secondResult = await replacement.value
+        XCTAssertNil(firstResult)
+        XCTAssertEqual(secondResult,["choice":.number(2)])
+    }
+}

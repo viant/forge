@@ -3,6 +3,7 @@ package com.viant.forgeandroid.runtime
 import com.viant.forgeandroid.ui.startControlMutation
 import java.io.IOException
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.*
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -27,6 +28,7 @@ class OrderedMutationCommandTest {
         val runtime = ForgeRuntime(if (server == null) emptyMap() else mapOf("local" to EndpointConfig(server.url("/").toString())), scope)
         private val refs = listOf("source", "first", "second", "cleanFirst", "cleanSecond", "save", "unused")
         private val metadata = WindowMetadata(view = ViewDef(content = ContentDef()),
+            dialogs = listOf(DialogDef(id = "editor", dataSourceRef = "source", fetchOnOpen = false)),
             schemas = mapOf("receipt" to ResourceSchemaDef(type = "object", properties = fields, required = fields.keys.toList())),
             resourceModels = mapOf("receipt" to ResourceModelDef(schemaRef = "receipt", write = ResourceWriteBindingDef(dataSourceRef = "save", mode = "full"))),
             dataSources = refs.associateWith { ref -> DataSourceDef(autoFetch = false, service = if (server == null) null else ServiceDef(endpoint = "local", uri = "/$ref", method = "POST")) })
@@ -265,6 +267,78 @@ class OrderedMutationCommandTest {
         assertFalse(state.guarded)
         assertNull(window.peekWindowForm()["done"])
         assertEquals(listOf("first","second","save"), refs())
+    } }
+
+    @Test fun footerClosesOnlyAfterAnAcknowledgedWriterIncludingAnEmptyReceipt() = runBlocking { fixture {
+        val id = "editor"
+        val action = ActionDef(id = "apply", close = true, mutationCommand = child("save").copy(
+            resultState = mapOf("returnedId" to listOf("0.id"))))
+        assertTrue(runtime.presentDialog(window.windowId, id))
+        val waiting = async(start = CoroutineStart.UNDISPATCHED) { runtime.awaitDialogResult(window.windowId, id) }
+        loader { emptyList() }
+        val result = startControlMutation(runtime, window, source, action.footerCommand()!!, emptyMap(), this@runBlocking, id, action.close) { true }.await()
+        assertEquals("succeeded", result.status)
+        assertEquals(listOf("resultState"), result.warnings.map { it.stage })
+        assertFalse(window.dialogSignal(id).peek().open)
+        assertNull(withTimeout(2000) { waiting.await() })
+    } }
+
+    @Test fun publishingAConfirmedCloseCannotResolveTheReopenedDialogWaiter() = runBlocking { fixture {
+        val id = "editor"
+        val first = async(start = CoroutineStart.UNDISPATCHED) { runtime.openDialogAwaitResult(window.windowId, id) }
+        val presentation = window.dialogSignal(id)
+        val replacement = CompletableDeferred<Deferred<Map<String, Any?>?>>()
+        val observer = launch(Dispatchers.Unconfined, start = CoroutineStart.UNDISPATCHED) {
+            presentation.flow.first { !it.open }
+            replacement.complete(async(start = CoroutineStart.UNDISPATCHED) { runtime.openDialogAwaitResult(window.windowId, id) })
+        }
+        loader { emptyList() }
+        val result = startControlMutation(runtime, window, source, child("save"), emptyMap(), this@runBlocking, id, true) { true }.await()
+        assertEquals("succeeded", result.status)
+        assertNull(withTimeout(2000) { first.await() })
+        val next = withTimeout(2000) { replacement.await() }
+        assertTrue(presentation.peek().open)
+        assertFalse(next.isCompleted)
+        runtime.closeDialog(window.windowId, id, result = mapOf("id" to 7))
+        assertEquals(mapOf("id" to 7), withTimeout(2000) { next.await() })
+        observer.join()
+    } }
+
+    @Test fun anOldReceiptNeverDismissesAnIdenticalReopenedFooter() = runBlocking { fixture {
+        val id = "editor"
+        val args = mapOf("record" to 3)
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        loader { started.complete(Unit); release.await(); emptyList() }
+        assertTrue(runtime.presentDialog(window.windowId, id, args))
+        val operation = startControlMutation(runtime, window, source, child("save"), emptyMap(), this@runBlocking, id, true) { true }
+        withTimeout(3000) { started.await() }
+        runtime.closeDialogPublic(window.windowId, id)
+        assertTrue(runtime.presentDialog(window.windowId, id, args))
+        val reopened = window.dialogSignal(id).peek()
+        release.complete(Unit)
+        assertEquals("succeeded", operation.await().status)
+        assertSame(reopened, window.dialogSignal(id).peek())
+        assertTrue(reopened.open)
+    } }
+
+    @Test fun failedCancelledAndUncertainWritesLeaveTheFooterOpen() = runBlocking { fixture {
+        val id = "editor"
+        assertTrue(runtime.presentDialog(window.windowId, id))
+        val state = window.dialogSignal(id).peek()
+        val command = child("save").copy(confirm = "Confirm?")
+        val cancelled = startControlMutation(runtime, window, source, command, emptyMap(), this@runBlocking, id, true) { false }.await()
+        assertEquals("cancelled", cancelled.status)
+        assertSame(state, window.dialogSignal(id).peek())
+        loader { throw IllegalArgumentException("Rejected") }
+        val failed = startControlMutation(runtime, window, source, command, emptyMap(), this@runBlocking, id, true) { true }.await()
+        assertEquals("failed", failed.status)
+        assertSame(state, window.dialogSignal(id).peek())
+        loader { throw java.net.SocketTimeoutException("Lost acknowledgement") }
+        val unknown = startControlMutation(runtime, window, source, command, emptyMap(), this@runBlocking, id, true) { true }.await()
+        assertEquals("indeterminate", unknown.status)
+        assertTrue(runtime.mutationCommands.state(window.windowId, command).guarded)
+        assertSame(state, window.dialogSignal(id).peek())
     } }
 
     @Test fun aReopenedDialogCannotSubmitANewDraftWithAnOldStageReceipt() = runBlocking { fixture {

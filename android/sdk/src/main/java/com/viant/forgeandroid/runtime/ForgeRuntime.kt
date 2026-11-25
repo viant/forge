@@ -566,6 +566,7 @@ class ForgeRuntime(
         return json.decodeFromJsonElement(normalizeWindowMetadataJson(resolved))
     }
 
+    @Synchronized
     internal fun openDialog(
         windowId: String,
         dialogId: String,
@@ -610,12 +611,17 @@ class ForgeRuntime(
         }
     }
 
-    internal fun closeDialog(windowId: String, dialogId: String) {
+    @Synchronized
+    internal fun closeDialog(windowId: String, dialogId: String, expected: DialogState? = null, result: Map<String, Any?>? = null) {
         val dialogKey = "${windowId}Dialog$dialogId"
         val sig = signals.dialog("${windowId}Dialog$dialogId")
-        sig.set(sig.peek().copy(open = false))
+        val current = sig.peek()
+        if (expected != null && (!current.open || current !== expected)) return
+        val waiter = pendingDialogResults.remove(dialogKey)
         pendingDialogs.remove(dialogKey)
-        pendingDialogResults.remove(dialogKey)?.complete(null)
+        // Publishing the closed state can synchronously reopen this key and register a new waiter.
+        sig.set(current.copy(open = false))
+        waiter?.complete(result)
     }
 
     fun closeDialogPublic(windowId: String, dialogId: String) {
@@ -626,15 +632,13 @@ class ForgeRuntime(
         return windowContext(windowId).context(dataSourceRef)
     }
 
+    @Synchronized
     internal fun registerPendingDialog(dialogKey: String, pending: PendingDialog) {
         pendingDialogs[dialogKey] = pending
     }
 
+    @Synchronized
     internal fun pendingDialog(dialogKey: String): PendingDialog? = pendingDialogs[dialogKey]
-
-    internal fun resolvePendingDialogResult(dialogKey: String, payload: Map<String, Any?>?) {
-        pendingDialogResults.remove(dialogKey)?.complete(payload)
-    }
 
     internal fun registerPendingWindow(windowId: String, pending: PendingWindow) {
         pendingWindows[windowId] = pending
@@ -647,10 +651,10 @@ class ForgeRuntime(
     }
 
     suspend fun awaitDialogResult(windowId: String, dialogId: String): Map<String, Any?>? {
-        val dialogKey = "${windowId}Dialog$dialogId"
-        val deferred = CompletableDeferred<Map<String, Any?>?>()
-        pendingDialogResults[dialogKey] = deferred
-        return deferred.await()
+        val waiter = synchronized(this) {
+            pendingDialogResults.getOrPut("${windowId}Dialog$dialogId") { CompletableDeferred() }
+        }
+        return waiter.await()
     }
 
     fun presentDialog(
@@ -673,9 +677,11 @@ class ForgeRuntime(
         parameters: Map<String, Any?> = emptyMap(),
         selectionMode: String? = null
     ): Map<String, Any?>? {
-        val opened = presentDialog(windowId, dialogId, parameters, selectionMode)
-        if (!opened) return null
-        return awaitDialogResult(windowId, dialogId)
+        val waiter = synchronized(this) {
+            if (!presentDialog(windowId, dialogId, parameters, selectionMode) || !windowContext(windowId).dialogSignal(dialogId).peek().open) return null
+            pendingDialogResults.getOrPut("${windowId}Dialog$dialogId") { CompletableDeferred() }
+        }
+        return waiter.await()
     }
 
     fun isReadOnly(execution: ExecutionDef, context: DataSourceContext?): Boolean {
@@ -878,8 +884,7 @@ class ExecutionEngine(
                 val callerCtx = runtime.dataSourceContext(pending.callerWindowId, pending.callerDataSourceRef)
                 outboundApply(pending.outbound, payload, callerCtx)
             }
-            runtime.resolvePendingDialogResult(dialogKey, payload)
-            runtime.closeDialog(windowId, dialogId)
+            runtime.closeDialog(windowId, dialogId, result = payload)
             null
         }
         "dialog.close" -> handler@{ args ->

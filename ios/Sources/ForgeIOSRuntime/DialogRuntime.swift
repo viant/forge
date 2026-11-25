@@ -21,29 +21,24 @@ extension ForgeRuntime {
         parameters: [String: JSONValue] = [:],
         selectionMode: String? = nil
     ) async -> Bool {
+        await presentDialogSession(windowID: windowID, dialogID: dialogID, parameters: parameters, selectionMode: selectionMode) != nil
+    }
+
+    private func presentDialogSession(windowID: String, dialogID: String, parameters: [String: JSONValue], selectionMode: String?,
+                                      waiter: CheckedContinuation<[String: JSONValue]?, Never>? = nil) async -> UUID? {
         guard let metadata = await windowMetadata(id: windowID),
               metadata.dialogs.contains(where: { $0.id == dialogID }) else {
-            return false
+            waiter?.resume(returning:nil)
+            return nil
         }
-        await openDialog(
-            windowID: windowID,
-            dialogID: dialogID,
-            parameters: parameters,
-            selectionMode: selectionMode
-        )
-        return true
+        return await openDialog(windowID: windowID, dialogID: dialogID, parameters: parameters, selectionMode: selectionMode, waiter: waiter)
     }
 
     public func awaitDialogResult(
         windowID: String,
         dialogID: String
     ) async -> [String: JSONValue]? {
-        await withCheckedContinuation { continuation in
-            Task {
-                let key = "\(windowID)Dialog\(dialogID)"
-                registerPendingDialogResult(key, continuation)
-            }
-        }
+        await waitForDialog("\(windowID)Dialog\(dialogID)")
     }
 
     public func openDialogAwaitResult(
@@ -52,24 +47,10 @@ extension ForgeRuntime {
         parameters: [String: JSONValue] = [:],
         selectionMode: String? = nil
     ) async -> [String: JSONValue]? {
-        let opened = await presentDialog(
-            windowID: windowID,
-            dialogID: dialogID,
-            parameters: parameters,
-            selectionMode: selectionMode
-        )
-        guard opened else {
-            return nil
+        await withCheckedContinuation { waiter in
+            Task {
+                _ = await presentDialogSession(windowID:windowID, dialogID:dialogID, parameters:parameters, selectionMode:selectionMode, waiter:waiter)
+            }
         }
-        return await awaitDialogResult(windowID: windowID, dialogID: dialogID)
-    }
-
-    func resolvePendingDialogResult(
-        windowID: String,
-        dialogID: String,
-        payload: [String: JSONValue]?
-    ) {
-        let key = "\(windowID)Dialog\(dialogID)"
-        resolvePendingDialogResult(key, payload: payload)
     }
 }

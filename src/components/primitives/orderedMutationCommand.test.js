@@ -222,3 +222,25 @@ test('pre-dispatch refusal retains submitted fields', async () => {
   assert.equal(result.accepted, false);
   assert.equal(edits, 0);
 });
+
+test('a close observer can recheck its scope after awaiting a dismissal hook', async () => {
+  const {context, calls} = fixture();
+  const dialog = getDialogSignal('testDialogeditor');
+  dialog.value = {open: true, props: {id: 1}};
+  let entered, resume;
+  const waiting = new Promise(resolve => {entered = resolve;});
+  const gate = new Promise(resolve => {resume = resolve;});
+  let closed = false;
+  const pending = executeCommand(context, writer('save'), {}, {dialogId: 'editor',
+    closeOnSuccess: async current => {
+      entered();
+      await gate;
+      if (current()) closed = true;
+    }});
+  await waiting;
+  dialog.value = {open: true, props: {id: 1}};
+  resume();
+  assert.equal((await pending).status, 'succeeded');
+  assert.equal(closed, false);
+  assert.equal(calls.length, 1);
+});

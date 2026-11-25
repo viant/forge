@@ -367,6 +367,9 @@ extension ForgeRuntime {
                     phase: .succeeded, message: warnings.isEmpty ? "Completed" : "Saved. Some related data could not be refreshed.",
                     invocationId: invocationId, writerStatus: .succeeded, syncStatus: warnings.isEmpty ? .succeeded : .partialFailure,
                     warnings: warnings))
+            if footer?.close == true, let dialogID, let presentationID = operation.presentationID, await operationIsCurrent(operation) {
+                await closeDialog(windowID: windowID, dialogID: dialogID, presentationID: presentationID)
+            }
             return MutationCommandResult(accepted: true, status: "succeeded", invocationId: invocationId, warnings: warnings)
         } catch {
             let failure = error as? MutationDispatchFailure ?? .init(status: "invalid_payload", message: error.localizedDescription)
@@ -532,9 +535,10 @@ extension ForgeRuntime {
                     phase: .pending, guarded: true, pending: true, retryAllowed: false, message: "Saving…", invocationId: operation.id,
                     writerStatus: .pending))
         }
+        let exactReceipt = receipts != nil || (!child && operation.footer?.close == true)
         let outcome = await awaitMutationWriter(
             windowID: windowID, dataSourceRef: target, timeoutMs: max(1_000, command.timeoutMs ?? 30_000),
-            requireRecords: child || !command.resultState.isEmpty || receipts != nil, ordered: receipts != nil)
+            requireRecords: child || !command.resultState.isEmpty || exactReceipt, ordered: exactReceipt)
         if case .indeterminate = outcome {
             retainLease = true
             throw MutationDispatchFailure(

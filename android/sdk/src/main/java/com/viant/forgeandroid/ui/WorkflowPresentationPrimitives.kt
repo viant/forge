@@ -342,16 +342,16 @@ private fun DraftFormActions(
 /** Keep an admitted ordered write alive if its pending metadata removes the composing control. */
 internal fun startControlMutation(runtime: ForgeRuntime, window: WindowContext, source: DataSourceContext,
     command: MutationCommandDef, extras: Map<String, Any?>, controlScope: CoroutineScope, dialogId: String?,
-    confirm: suspend (String) -> Boolean): kotlinx.coroutines.Deferred<MutationCommandResult> {
-    if (command.before.isEmpty() && command.clearFormFields.isEmpty()) return controlScope.async {
+    closeOnSuccess: Boolean = false, confirm: suspend (String) -> Boolean): kotlinx.coroutines.Deferred<MutationCommandResult> {
+    if (command.before.isEmpty() && command.clearFormFields.isEmpty() && !closeOnSuccess) return controlScope.async {
         runtime.mutationCommands.execute(runtime, window, source, command, extras, confirm)
     }
     val dialog = dialogId?.let(window::dialogSignal)
     val presented = dialog?.peek()
-    val owner = if (command.before.isEmpty()) controlScope else runtime.scope
+    val owner = if (command.before.isEmpty() && !closeOnSuccess) controlScope else runtime.scope
     return owner.async(controlScope.coroutineContext.minusKey(Job)) {
         runtime.mutationCommands.executePresented(runtime, window, source, command, extras, presented,
-            { dialog == null || (presented?.open == true && dialog.peek() === presented) }, confirm)
+            { dialog == null || (presented?.open == true && dialog.peek() === presented) }, confirm, dialogId.takeIf { closeOnSuccess })
     }
 }
 
@@ -367,7 +367,8 @@ internal fun MutationCommandButton(
     externallyDisabled: Boolean = false,
     onSettled: ((MutationCommandResult) -> Unit)? = null,
     accessibilityDescriptionOverride: String? = null,
-    dialogId: String? = null
+    dialogId: String? = null,
+    closeOnSuccess: Boolean = false
 ) {
     val scope = rememberCoroutineScope()
     var standaloneState by remember(command.commandId, command.dataSourceRef) { mutableStateOf(MutationCommandState()) }
@@ -390,7 +391,7 @@ internal fun MutationCommandButton(
         activatedHere = true
         scope.launch {
             val request = if (confirmationOverride == null) command else command.copy(confirm = confirmationOverride)
-            val execution = startControlMutation(runtime, window, source, request, extras, this, dialogId) { text ->
+            val execution = startControlMutation(runtime, window, source, request, extras, this, dialogId, closeOnSuccess) { text ->
                 if (scope.coroutineContext[Job]?.isActive != true) false else {
                     val decision = kotlinx.coroutines.CompletableDeferred<Boolean>()
                     confirmation = text to decision

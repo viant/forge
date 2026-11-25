@@ -57,6 +57,7 @@ export function ViewDialogFooterAction({action, context, disabled = false, onClo
     if (action?.mutationCommand) {
         return <MutationCommand
             dialogId={dialogId}
+            closeOnSuccess={action.close === true ? onClose : undefined}
             command={{...action.mutationCommand, commandId: action.mutationCommand.commandId || action.id, label: action.label || action.id, icon: action.icon || action.mutationCommand.icon, hideLabel: action.hideLabel === true, intent: action.intent || action.mutationCommand.intent, tooltip: action.tooltip || action.mutationCommand.tooltip}}
             context={context}
             disabled={disabled}
@@ -448,9 +449,16 @@ const ViewDialog = ({context, dialog, focusRequest = 0, mountedDataSourceRefs = 
         return ()=>context.services?.hostWindow?.setDialogOpen?.(dialog.id,false);
     },[context,dialog.id,dialogOpen]);
 
-    const handleClose = () => {
+    const handleClose = (canClose = () => true) => {
         if (isDialogCloseDisabled(dialog, dsCtx)) return false;
-        const close = () => { handlers.dialog.close(); return true; };
+        const close = () => {
+            if (typeof canClose === 'function' && !canClose()) return false;
+            // This path has already dispatched onClose. Programmatic closes
+            // still use the open-state transition or unmount effect.
+            previousOpenRef.current = false;
+            handlers.dialog.close();
+            return true;
+        };
         if (!events.onClose.isDefined()) return close();
         const result = events.onClose.execute({context: dsCtx, dialog});
         if (result && typeof result.then === 'function') return result.then(value => value === false || value === null ? false : close());

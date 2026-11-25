@@ -18,22 +18,17 @@ extension ForgeRuntime {
             let windowID = args.args["windowId"]?.stringValue
                 ?? args.context?.windowID ?? ""
             guard !windowID.isEmpty else { return nil }
-            let dialogKey = "\(windowID)Dialog\(dialogID)"
             let inbound = await buildInboundParameters(runtime: runtime, args: args, windowID: windowID)
             let outbound = await runtime.resolveOutbound(args.execution.parameters)
             let selectionMode = args.args["multiple"]?.boolValue == true ? "multi" : (args.args["multiple"]?.boolValue == false ? "single" : nil)
-            if let ctx = args.context, !outbound.isEmpty {
-                await runtime.registerPendingDialog(dialogKey, PendingDialog(
-                    callerWindowID: ctx.windowID,
-                    callerDataSourceRef: ctx.dataSourceRef,
-                    outbound: outbound
-                ))
+            let pending = args.context.flatMap { ctx in
+                outbound.isEmpty ? nil : PendingDialog(callerWindowID:ctx.windowID,callerDataSourceRef:ctx.dataSourceRef,outbound:outbound)
             }
             await runtime.openDialog(
                 windowID: windowID,
                 dialogID: dialogID,
                 parameters: inbound,
-                selectionMode: selectionMode
+                selectionMode: selectionMode, outbound: pending
             )
             return nil
         }
@@ -118,6 +113,7 @@ extension ForgeRuntime {
                 ?? args.context?.windowID ?? ""
             guard !dialogID.isEmpty, !windowID.isEmpty else { return nil }
             let dialogKey = "\(windowID)Dialog\(dialogID)"
+            let presentation = await runtime.pendingDialogScope(dialogKey)
             let payload: [String: JSONValue]
             if let p = args.args["payload"]?.objectValue, !p.isEmpty {
                 payload = p
@@ -140,13 +136,12 @@ extension ForgeRuntime {
                     payload = selection.selected ?? [:]
                 }
             }
-            if let pending = await runtime.pendingDialog(dialogKey) {
+            if let pending = presentation.outbound {
                 await runtime.applyOutbound(pending.outbound, payload: payload,
                                          callerWindowID: pending.callerWindowID,
                                          callerDSRef: pending.callerDataSourceRef)
             }
-            await runtime.resolvePendingDialogResult(windowID: windowID, dialogID: dialogID, payload: payload)
-            await runtime.closeDialog(windowID: windowID, dialogID: dialogID)
+            await runtime.closeDialog(windowID: windowID, dialogID: dialogID, presentationID: presentation.id, payload: payload)
             return nil
         }
 

@@ -834,6 +834,14 @@ keep their independent behavior. The existing target transport guard still
 serializes commands sharing one writer. This is optional concurrency control,
 not authorization, automatic queuing or retry.
 
+A dialog footer with both `mutationCommand` and `close: true` dismisses its
+originating dialog after the writer returns a confirmed receipt and the
+configured synchronization completes. A valid empty receipt can confirm a
+write that returns no generated ID. Refresh warnings remain part of the save
+result. The ordinary dialog close handler and close guard still apply.
+Cancellation, a rejected write, an unknown outcome or replacement of the
+originating presentation leaves the active dialog open.
+
 ## Ordered preparation on a mutation command
 
 A command opts in by declaring a nonempty `before` list. An omitted list and

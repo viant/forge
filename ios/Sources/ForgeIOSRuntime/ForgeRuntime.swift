@@ -132,8 +132,12 @@ public actor ForgeRuntime {
     var mutationTransportOwners: [String: String] = [:]
 
     var handlers: [String: ForgeHandler] = [:]
-    private var pendingDialogs: [String: PendingDialog] = [:]
-    private var pendingDialogResults: [String: CheckedContinuation<[String: JSONValue]?, Never>] = [:]
+    private struct DialogPresentation {
+        var id: UUID?
+        var outbound: PendingDialog?
+        var waiter: CheckedContinuation<[String: JSONValue]?, Never>?
+    }
+    private var pendingDialogs: [String: DialogPresentation] = [:]
     private var pendingWindows: [String: PendingWindow] = [:]
 
     public init(
@@ -281,6 +285,9 @@ public actor ForgeRuntime {
     }
 
     public func closeWindow(id: String) {
+        for key in pendingDialogs.keys.filter({ $0.hasPrefix("\(id)Dialog") }) {
+            pendingDialogs.removeValue(forKey:key)?.waiter?.resume(returning:nil)
+        }
         frozenNativeReportAdmissions.removeValue(forKey: id)
         frozenNativeReportPublishedSignatures.removeValue(forKey: id)
         completedNativeReportCaches.removeValue(forKey: id)
@@ -1113,20 +1120,18 @@ public actor ForgeRuntime {
     // MARK: - Pending state
 
     func registerPendingDialog(_ key: String, _ pending: PendingDialog) {
-        pendingDialogs[key] = pending
+        pendingDialogs[key, default: DialogPresentation()].outbound = pending
     }
 
-    func pendingDialog(_ key: String) -> PendingDialog? { pendingDialogs[key] }
-
-    func registerPendingDialogResult(
-        _ key: String,
-        _ continuation: CheckedContinuation<[String: JSONValue]?, Never>
-    ) {
-        pendingDialogResults[key] = continuation
+    func pendingDialogScope(_ key: String) -> (id: UUID?, outbound: PendingDialog?) {
+        (pendingDialogs[key]?.id, pendingDialogs[key]?.outbound)
     }
 
-    func resolvePendingDialogResult(_ key: String, payload: [String: JSONValue]?) {
-        pendingDialogResults.removeValue(forKey: key)?.resume(returning: payload)
+    func waitForDialog(_ key: String) async -> [String: JSONValue]? {
+        return await withCheckedContinuation { continuation in
+            pendingDialogs[key]?.waiter?.resume(returning: nil)
+            pendingDialogs[key, default: DialogPresentation()].waiter = continuation
+        }
     }
 
     func registerPendingWindow(_ id: String, _ pending: PendingWindow) {
@@ -1137,17 +1142,20 @@ public actor ForgeRuntime {
 
     func clearPendingWindow(_ id: String) { pendingWindows.removeValue(forKey: id) }
 
-    func clearPendingDialog(_ key: String) { pendingDialogs.removeValue(forKey: key) }
 
     // MARK: - Dialog lifecycle
 
+    @discardableResult
     func openDialog(
         windowID: String,
         dialogID: String,
         parameters: [String: JSONValue],
-        selectionMode: String? = nil
-    ) async {
-        let sig = await signals.dialog(dialogID: "\(windowID)Dialog\(dialogID)")
+        selectionMode: String? = nil,
+        outbound: PendingDialog? = nil,
+        waiter: CheckedContinuation<[String: JSONValue]?, Never>? = nil
+    ) async -> UUID {
+        let key = "\(windowID)Dialog\(dialogID)"
+        let sig = await signals.dialog(dialogID: key)
         if !parameters.isEmpty, let dialog = await windowMetadata(id: windowID)?.dialogs.first(where: { $0.id == dialogID }),
            let ref = dialog.content?.dataSourceRef ?? dialog.dataSourceRef, !ref.isEmpty {
             let scoped = parameters[ref]?.objectValue
@@ -1155,18 +1163,39 @@ public actor ForgeRuntime {
                 parameters: scoped?.isEmpty == false ? scoped! : parameters, preservePendingFetch: false)
         }
         var presentation = DialogState(open: true, selectionMode: selectionMode, props: parameters, args: parameters)
-        presentation.presentationID = UUID()
+        let id = UUID()
+        presentation.presentationID = id
+        var session = pendingDialogs[key] ?? DialogPresentation()
+        if session.id != nil {
+            session.waiter?.resume(returning: nil)
+            session = DialogPresentation()
+        }
+        session.id = id
+        if let waiter {
+            session.waiter?.resume(returning: nil)
+            session.waiter = waiter
+        }
+        if let outbound { session.outbound = outbound }
+        pendingDialogs[key] = session
         let previous = await sig.exchange(presentation)
-        if !previous.open { await dispatchDialogLifecycle("onOpen", windowID: windowID, dialogID: dialogID, parameters: parameters) }
+        if !previous.open, pendingDialogs[key]?.id == id {
+            await dispatchDialogLifecycle("onOpen", windowID: windowID, dialogID: dialogID, parameters: parameters)
+        }
+        return id
     }
 
-    func closeDialog(windowID: String, dialogID: String) async {
+    func closeDialog(windowID: String, dialogID: String, presentationID: UUID? = nil, payload: [String: JSONValue]? = nil) async {
         let key = "\(windowID)Dialog\(dialogID)"
         let sig = await signals.dialog(dialogID: key)
-        let previous = await sig.exchange(DialogState(open: false))
-        pendingDialogs.removeValue(forKey: key)
-        resolvePendingDialogResult(windowID: windowID, dialogID: dialogID, payload: nil)
-        if previous.open { await dispatchDialogLifecycle("onClose", windowID: windowID, dialogID: dialogID, parameters: previous.args) }
+        if let presentationID, pendingDialogs[key]?.id != presentationID { return }
+        // Detach the accepted presentation before yielding to its signal. A new
+        // presentation at the same key owns its own caller and result waiter.
+        let session = pendingDialogs.removeValue(forKey: key)
+        let previous = await sig.dismiss(presentationID: session?.id)
+        session?.waiter?.resume(returning: payload)
+        if let previous, previous.open, pendingDialogs[key]?.id == nil {
+            await dispatchDialogLifecycle("onClose", windowID: windowID, dialogID: dialogID, parameters: previous.args)
+        }
     }
 
     private func dispatchDialogLifecycle(_ event:String, windowID:String, dialogID:String, parameters:[String:JSONValue]) async {

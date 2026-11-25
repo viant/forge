@@ -44,3 +44,11 @@ public actor Signal<Value: Sendable> {
         continuations.removeValue(forKey: id)
     }
 }
+
+extension Signal where Value == DialogState {
+    /// A completed command may dismiss only the presentation that accepted it.
+    func dismiss(presentationID: UUID?) -> DialogState? {
+        if let presentationID, value.presentationID != presentationID || !value.open { return nil }
+        return exchange(DialogState(open: false))
+    }
+}
