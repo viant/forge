@@ -104,10 +104,17 @@ it('fresh dialog opens fetch once on page one, including another provider after 
                 table: {columns: [{id: 'name', name: 'Name'}], toolbar: {items: []}}},
             actions: [{id: 'close', label: 'Dismiss', close: true}]}],
     };
+    let holdNextRead = false;
+    let releaseInterruptedRead;
     const transport = async request => {
         if (request.dataSourceRef !== 'details') return {data: []};
         const args = {...request.options.inputParameters};
         requests.push({...args, filter: {...request.options.filter}});
+        if (holdNextRead) {
+            holdNextRead = false;
+            await new Promise(resolve => { releaseInterruptedRead = resolve; });
+            return {data: [{id: 2, name: 'Earlier response'}]};
+        }
         return {data: [{id: 1, name: args.Provider + ' page ' + args.Page}], meta: {pageCount: 3, recordCount: 51}};
     };
     const flush = async action => act(async () => {
@@ -150,6 +157,15 @@ it('fresh dialog opens fetch once on page one, including another provider after 
         await flush(() => document.querySelector('[role="dialog"] button[title="Dismiss"]').click());
         await flush(() => live.handlers.window.openDialog({execution: {args: ['details']}, parameters: {Provider: 'Second'}}));
         expect(requests.slice(lastRead)).toEqual([{Provider: 'Second', Page: 1, Limit: 25, filter: {}}]);
+        holdNextRead = true;
+        await flush(() => live.Context('details').handlers.dataSource.setFilter({filter: {Category: 'Interrupted'}}));
+        expect(releaseInterruptedRead).toBeTypeOf('function');
+        await flush(() => document.querySelector('[role="dialog"] button[title="Dismiss"]').click());
+        await flush(releaseInterruptedRead);
+        const afterInterruption = requests.length;
+        await flush(() => live.handlers.window.openDialog({execution: {args: ['details']}, parameters: {Provider: 'Second'}}));
+        await flush();
+        expect(requests.slice(afterInterruption)).toEqual([{Provider: 'Second', Page: 1, Limit: 25, filter: {}}]);
         await flush(() => document.querySelector('[role="dialog"] button[title="Dismiss"]').click());
         const beforeReplacement = requests.length;
         act(() => live.handlers.window.openDialog({execution: {args: ['details']}, parameters: {Provider: 'Superseded'}}));
@@ -157,6 +173,14 @@ it('fresh dialog opens fetch once on page one, including another provider after 
         act(() => live.handlers.window.openDialog({execution: {args: ['details']}, parameters: {Provider: 'Current'}}));
         await flush();
         expect(requests.slice(beforeReplacement)).toEqual([{Provider: 'Current', Page: 1, Limit: 25, filter: {}}]);
+        holdNextRead = true;
+        const filtered = requests.length;
+        await flush(() => live.Context('details').handlers.dataSource.setFilter({filter: {Category: 'Still open'}}));
+        await flush(() => renderWindow(2));
+        await flush(releaseInterruptedRead);
+        const request = {Provider: 'Current', Page: 1, Limit: 25, filter: {Category: 'Still open'}};
+        expect(requests.slice(filtered)).toEqual([request, request]);
+        expect(getWindowContext(windowId).Context('details').signals.collection.peek()).toEqual([{id: 1, name: 'Current page 1'}]);
     } finally {
         await flush(() => root.unmount());
         host.remove();

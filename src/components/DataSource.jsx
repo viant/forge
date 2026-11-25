@@ -71,7 +71,7 @@ function stableSnapshotSignature(value) {
  * DataSource props:
  *  - context
  */
-export default function DataSource({context}) {
+export default function DataSource({context, hasScheduledFetch}) {
     useSignals();
     const log = getLogger('ds');
     try { log.debug('[mount]', { ds: context?.identity?.dataSourceRef }); } catch (_) {}
@@ -237,7 +237,8 @@ export default function DataSource({context}) {
             try { log.debug('[watch] reconcile restored pending fetch', { ds: context?.identity?.dataSourceRef, replay: restored.input.fetch }); } catch(_) {}
             return;
         }
-        const recovered = recoverInterruptedFetchOnMount(dataSource, inputVal, controlValue, initialFetchObservation);
+        const fetchScheduled = initialFetchObservation && loadingNow && hasScheduledFetch?.() === true;
+        const recovered = recoverInterruptedFetchOnMount(dataSource, inputVal, controlValue, initialFetchObservation, fetchScheduled);
         if (recovered) {
             input.value = recovered.input;
             control.value = recovered.control;

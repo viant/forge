@@ -13,7 +13,7 @@ import { getLogger } from '../utils/logger.js';
 import { buildQuickFilterSeed, mergeQuickFilterValue, withoutQuickFilterParameters } from './viewDialogQuickFilters.js';
 import {evaluatePlainVisibleWhen, trackVisibleWhen} from './visibleWhen.js';
 import {dialogCloseDisabledWhen, isDialogCloseDisabled} from './dialogClose.js';
-import {consumeDialogFocusRevision, dialogFreshFormSeed, shouldFetchDialogOnOpen, shouldInitializeDialogRevision} from './viewDialogFreshState.js';
+import {consumeDialogFocusRevision, dialogFocusRevision, dialogFreshFormSeed, shouldFetchDialogOnOpen, shouldInitializeDialogRevision} from './viewDialogFreshState.js';
 import MutationCommand from './primitives/MutationCommand.jsx';
 import DisabledActionShell from './DisabledActionShell.jsx';
 
@@ -266,6 +266,15 @@ const ViewDialog = ({context, dialog, focusRequest = 0, mountedDataSourceRefs = 
     const dialogOpen = handlers.dialog.isOpen();
     const focusClassName = `forge-dialog-focus-${String(context?.identity?.windowId || 'window').replace(/[^a-zA-Z0-9_-]/g, '-')}-${String(dialog?.id || 'dialog').replace(/[^a-zA-Z0-9_-]/g, '-')}`;
     const previousOpenRef = useRef(false);
+    const pendingOpenRead = useRef(false);
+    const focusOwner = context?.signals?.windowControl || context?.windowState || context;
+    // The datasource can mount on either side of the parent's open effect.
+    // A fresh open owns its read until dispatch. An already-open remount
+    // still recovers a read interrupted by the previous datasource instance.
+    const hasScheduledOpenRead = () => fetchOnOpen && dialogOpen && (
+        pendingOpenRead.current || (!previousOpenRef.current &&
+            shouldInitializeDialogRevision(focusRequest, dialogFocusRevision(focusOwner, dialog?.id)))
+    );
     // WindowContent removes closed dialogs, so a close can unmount this view
     // before the open-state effect observes the transition.
     const closeEventRef = useRef(null);
@@ -294,7 +303,6 @@ const ViewDialog = ({context, dialog, focusRequest = 0, mountedDataSourceRefs = 
         const wasOpen = previousOpenRef.current;
         log.debug('open effect', { isDialogOpen, wasOpen, dsRef: resolvedDataSourceRef });
         if (isDialogOpen) {
-            const focusOwner = context?.signals?.windowControl || context?.windowState || context;
             const previousRevision = consumeDialogFocusRevision(focusOwner, dialog?.id, focusRequest);
             if (wasOpen || !shouldInitializeDialogRevision(focusRequest, previousRevision)) {
                 // Focusing or remounting the open dialog retains its page, filters and in-flight read.
@@ -399,7 +407,9 @@ const ViewDialog = ({context, dialog, focusRequest = 0, mountedDataSourceRefs = 
                     }
                     return;
                 }
+                pendingOpenRead.current = true;
                 setTimeout(() => {
+                    pendingOpenRead.current = false;
                     if (!handlers.dialog.isOpen()) return;
                     try {
                         const dsC = resolvedDataSourceRef
@@ -582,7 +592,7 @@ const ViewDialog = ({context, dialog, focusRequest = 0, mountedDataSourceRefs = 
             <DialogBody className={bodyClassName} style={bodyStyle}>
                 {/* Mount DataSource + MessageBus for dialog DS to enable fetching */}
                 {dsCtx ? (<>
-                    <DataSource context={dsCtx} />
+                    <DataSource context={dsCtx} hasScheduledFetch={hasScheduledOpenRead} />
                     <MessageBus context={dsCtx} />
                     {dialogDataSourceRefs(dialog, context?.metadata?.dataSource, resolvedDataSourceRef, mountedDataSourceRefs).map(ref => (
                         <DataSourceContainer key={ref} windowContext={dsCtx} dsKey={ref} suppressAutomaticFetch />

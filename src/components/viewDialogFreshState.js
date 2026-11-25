@@ -17,6 +17,10 @@ export function shouldInitializeDialogRevision(focusRequest = 0, lastHandledFocu
 
 const dialogFocusRevisionByOwner = new WeakMap();
 
+export function dialogFocusRevision(owner, dialogId) {
+    return dialogFocusRevisionByOwner.get(owner)?.get(String(dialogId || '')) ?? null;
+}
+
 export function consumeDialogFocusRevision(owner, dialogId, focusRequest = 0) {
     if (!owner || (typeof owner !== 'object' && typeof owner !== 'function')) return null;
     let revisions = dialogFocusRevisionByOwner.get(owner);
@@ -25,7 +29,7 @@ export function consumeDialogFocusRevision(owner, dialogId, focusRequest = 0) {
         dialogFocusRevisionByOwner.set(owner, revisions);
     }
     const key = String(dialogId || '');
-    const previous = revisions.has(key) ? revisions.get(key) : null;
+    const previous = revisions.get(key) ?? null;
     const revision = Number(focusRequest || 0);
     if (revision !== previous) revisions.set(key, revision);
     return previous;

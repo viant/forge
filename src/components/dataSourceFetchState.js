@@ -95,16 +95,17 @@ export function consumeDataSourceFetchRequest(input = {}, request = "fetch") {
     };
 }
 
-export function recoverInterruptedFetchOnMount(dataSource = {}, input = {}, control = {}, initialObservation = false) {
+export function recoverInterruptedFetchOnMount(dataSource = {}, input = {}, control = {}, initialObservation = false, fetchScheduled = false) {
     // A loading flag is owned by the DataSource instance that started the
     // request. If a new instance observes it on mount, the owner was
     // unmounted and can no longer settle the flag (even when older rows had
     // already set `loaded`). Clear and optionally replay the read.
     if (!initialObservation || control?.loading !== true) return null;
     const restoredPendingFetch = input?.[RESTORED_PENDING_FETCH] === true;
+    const allowAutomaticReplay = !fetchScheduled && dataSource?.replayPendingFetchOnRestore !== false;
     const replay = restoredPendingFetch
-        ? dataSource?.replayPendingFetchOnRestore !== false
-        : input?.fetch === true || dataSource?.replayPendingFetchOnRestore !== false;
+        ? allowAutomaticReplay
+        : input?.fetch === true || allowAutomaticReplay;
     const {[RESTORED_PENDING_FETCH]: _restored, ...nextInput} = input || {};
     return {
         input: {...nextInput, fetch: replay, refresh: false},
