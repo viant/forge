@@ -7,13 +7,14 @@ public enum TableValueProjection {
         row: [String: JSONValue],
         column: ColumnDef,
         code: String,
-        namespace: String? = nil
+        namespace: String? = nil,
+        actionNamespace: ((String) -> String?)? = nil
     ) throws -> JSONValue? {
         let key = column.id ?? column.name ?? ""
         var value = row[key]
         for hook in column.on where hook.event?.lowercased() == "onvalue" {
             var name = hook.action
-            if let namespace, name.hasPrefix(namespace + ".") {
+            if let namespace = actionNamespace?(name) ?? namespace, name.hasPrefix(namespace + ".") {
                 name.removeFirst(namespace.count + 1)
             }
             if let projected = try ActionHookRuntime.invoke(

@@ -10,6 +10,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.JsonObject
@@ -233,6 +234,12 @@ class DataSourceRuntime(
             trigger(ctx, "onError", mapOf("error" to (e.message ?: "Unknown error")), currentPath)
             if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
             finishFetch(ctx, error = e.message)
+        } finally {
+            if (requestedInput.fetch) {
+                live.input.update { current ->
+                    if (current === requestedInput) current.copy(fetch = false, refresh = false) else current
+                }
+            }
         }
     }
 
@@ -254,7 +261,6 @@ class DataSourceRuntime(
     private fun finishFetch(ctx: DataSourceContext, error: String? = null, rows: List<Map<String, Any?>> = emptyList(), metrics: Map<String, Any?> = emptyMap()) {
         ctx.control.set(ctx.control.peek().copy(loading = false, error = error, resolved = true))
         ctx.input.peek().preparedDispatchId?.let { id -> preparedCompletions[id]?.result?.complete(PreparedReportFetchResult(JsonUtil.anyToElement(rows).jsonArray, JsonUtil.anyToElement(metrics).jsonObject, error)) }
-        ctx.input.set(ctx.input.peek().copy(fetch = false, refresh = false))
     }
 
     private suspend fun applyCollectionHook(
@@ -602,7 +608,6 @@ class DataSourceRuntime(
         lifecyclePath: List<String> = listOf(ctx.dataSourceRef)
     ) {
         val metadata = ctx.window.metadata.peek()
-        val namespace = metadata?.namespace?.trim().orEmpty()
         ctx.dataSource.on
             .filter { it.event == event }
             .forEach { execution ->
@@ -610,7 +615,7 @@ class DataSourceRuntime(
                 val code = metadata?.actions?.code?.trim().orEmpty()
                 if (event == "onFetch") {
                     return@forEach
-                } else if (metadata != null && code.isNotBlank() && namespace.isNotBlank() && handler.startsWith("$namespace.")) {
+                } else if (metadata != null && code.isNotBlank() && metadata.actionNamespace(handler) != null) {
                     runLifecycleHook(ctx, execution, code, metadata, args["collection"] as? List<Map<String, Any?>> ?: ctx.collection.peek(), lifecyclePath)
                 } else {
                     executor?.invoke(execution, ctx, args)
@@ -640,9 +645,10 @@ class DataSourceRuntime(
             val projection = DataSourceHookProjection.invoke(
                 code = code,
                 functionName = handler,
-                namespace = metadata.namespace,
+                namespace = metadata.actionNamespace(handler),
                 source = source.dataSourceRef,
                 snapshots = snapshots,
+                windowForm = source.window.peekWindowForm(),
                 collection = collection
             )
             applyLifecycleEffects(source, projection.effects, lifecyclePath)
@@ -658,12 +664,11 @@ class DataSourceRuntime(
     ): List<Map<String, Any?>> {
         val metadata = source.window.metadata.peek() ?: return rows
         val code = metadata.actions?.code?.trim().orEmpty()
-        val namespace = metadata.namespace?.trim().orEmpty()
-        if (code.isBlank() || namespace.isBlank()) return rows
+        if (code.isBlank()) return rows
         var current = rows
         source.dataSource.on.filter { it.event == "onFetch" }.forEach { execution ->
             val handler = execution.handler?.trim().orEmpty()
-            if (!handler.startsWith("$namespace.")) {
+            if (metadata.actionNamespace(handler) == null) {
                 executor?.invoke(execution, source, mapOf("collection" to current))
                 return@forEach
             }
@@ -671,9 +676,10 @@ class DataSourceRuntime(
                 val projection = DataSourceHookProjection.invoke(
                     code = code,
                     functionName = handler,
-                    namespace = metadata.namespace,
+                    namespace = metadata.actionNamespace(handler),
                     source = source.dataSourceRef,
                     snapshots = lifecycleSnapshots(source, metadata),
+                    windowForm = source.window.peekWindowForm(),
                     collection = current
                 )
                 applyLifecycleEffects(source, projection.effects, lifecyclePath)
@@ -950,6 +956,15 @@ class DataSourceContext(
         setInputParametersValue(parameters, fetch)
     }
 
+    // Detach mutable inputs while preserving the scalar types supplied by callers.
+    private fun snapshotInputValue(value: Any?): Any? = when (value) {
+        is JsonElement -> JsonUtil.elementToAny(value)
+        is Map<*, *> -> value.entries.associate { it.key.toString() to snapshotInputValue(it.value) }
+        is List<*> -> value.map(::snapshotInputValue)
+        is Number, is Boolean, is String, null -> value
+        else -> value.toString()
+    }
+
     private fun setInputParametersValue(parameters: Map<String, Any?>, fetch: Boolean = false, commitGuard: (() -> Boolean)? = null, permit: NativeReportReadPermit? = null, captureResult: Boolean = false): String? {
         val current = input.peek()
         val inputPayload = JsonUtil.asStringMap(parameters["input"])
@@ -959,9 +974,9 @@ class DataSourceContext(
         } else {
             current.filter
         }
-        val next = current.copy(parameters = JsonUtil.asStringMap(JsonUtil.elementToAny(JsonUtil.anyToElement(parameters))), filter = nextFilter, fetch = fetch || current.fetch,
+        val next = current.copy(parameters = parameters.mapValues { snapshotInputValue(it.value) }, filter = nextFilter, fetch = fetch || current.fetch,
             preparedGuard = commitGuard,
-            preparedWindowForm = if (commitGuard == null) null else JsonUtil.asStringMap(JsonUtil.elementToAny(JsonUtil.anyToElement(window.peekWindowForm()))),
+            preparedWindowForm = if (commitGuard == null) null else window.peekWindowForm().mapValues { snapshotInputValue(it.value) },
             preparedMetadata = if (commitGuard == null) null else window.metadata.peek(),
             preparedDispatchId = if (commitGuard == null && !captureResult) null else java.util.UUID.randomUUID().toString(), preparedReadPermit = permit)
         if (commitGuard != null && !preparedAuthorization(next)) return null

@@ -24,6 +24,20 @@ class DataSourceHookRuntimeTest {
     private val server = MockWebServer()
 
     @Test
+    fun declaredAliasRestoresScopedWindowState() = runBlocking {
+        val metadata = JsonUtil.json.decodeFromString(WindowMetadata.serializer(), """{"namespace":"Records","actionAliases":["Shared"],"actions":{"code":"({restore: ({context, collection}) => collection.map(row => ({...row, title:context.signals.windowForm.peek().title}))})"},"dataSource":{"source":{"selectionMode":"single","on":[{"event":"onFetch","handler":"Shared.restore"}]}}}""")
+        assertNull(metadata.actionNamespace("Other.restore"))
+        val runtime = ForgeRuntime(emptyMap(), CoroutineScope(Dispatchers.Unconfined))
+        val state = runtime.openWindowInline("draft", "Draft", metadata = metadata)
+        runtime.setWindowFormValue(state.windowId, mapOf("title" to "Saved"))
+        runtime.registerDataSourceLoader { ForgeRuntime.DataSourceFetchResult(rows = listOf(mapOf("id" to 2))) }
+        val ctx = runtime.windowContext(state.windowId).context("source")
+        ctx.fetchCollection()
+        withTimeout(5_000) { ctx.collection.flow.first { it.firstOrNull()?.get("title") == "Saved" } }
+        assertEquals(2, (ctx.collection.peek().single()["id"] as Number).toInt())
+    }
+
+    @Test
     fun configuredInstancesBackedBySameDatasourceKeepIndependentSignals() {
         val signals = SignalRegistry()
         val runtime = DataSourceRuntime(

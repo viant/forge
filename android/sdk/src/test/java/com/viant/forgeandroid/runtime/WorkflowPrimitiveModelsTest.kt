@@ -10,6 +10,28 @@ class WorkflowPrimitiveModelsTest {
     private val json = Json { ignoreUnknownKeys = false }
 
     @Test
+    fun `datasource accepts an empty compiled parameter list`() {
+        assertEquals(emptyList(), json.decodeFromString<DataSourceDef>("""{"parameters":null}""").parameters)
+        assertEquals(emptyList(), json.decodeFromString<DialogDef>("""{"actions":null}""").actions)
+        kotlin.test.assertFails { json.decodeFromString<DialogDef>("""{"actions":{}}""") }
+        assertEquals(emptyList(), json.decodeFromString<DataSourceDef>("""{"parameters":[]}""").parameters)
+        kotlin.test.assertFails { json.decodeFromString<DataSourceDef>("""{"parameters":{}}""") }
+    }
+
+    @Test
+    fun `mapped selection rules round trip with and without commands`() {
+        val source = """{"selectors":["kind"],"cases":{"text":{"modelRef":"entry"}},"uploads":{"single":{"accept":[".txt"],"multiple":false,"upload":null},"many":{"multiple":true,"maxFiles":3},"bound":{"upload":{"dataSourceRef":"saveFile"}}}}"""
+        val mapping = json.decodeFromString<ResourceMappingDef>(source)
+        val rules = json.decodeFromString<ResourceMappingDef>(json.encodeToString(ResourceMappingDef.serializer(), mapping)).uploads
+        assertEquals(listOf(".txt"), rules.getValue("single").accept)
+        assertEquals(false, rules.getValue("single").multiple)
+        assertEquals(null, rules.getValue("single").upload)
+        assertEquals(3, rules.getValue("many").maxFiles)
+        assertEquals("saveFile", rules.getValue("bound").upload?.dataSourceRef)
+        kotlin.test.assertFails { json.decodeFromString<UploadCollectionSpec>("""{"upload":null}""") }
+    }
+
+    @Test
     fun `resource mapping selects native cases`() {
         val metadata = json.decodeFromString<WindowMetadata>("""{"schemas":{"record":{"type":"object","properties":{}}},"resourceModels":{"brief":{"schemaRef":"record"},"general":{"schemaRef":"record"}},"resourceMappings":{"inspection":{"selectors":["kind","old.kind"],"cases":{"brief":{"modelRef":"brief"}},"default":{"modelRef":"general"}}}}""")
         val row = mapOf("kind" to "", "old" to mapOf("kind" to "brief"))

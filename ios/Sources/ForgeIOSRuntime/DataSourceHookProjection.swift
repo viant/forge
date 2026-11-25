@@ -9,7 +9,8 @@ public struct DataSourceHookProjectionResult: Sendable, Equatable {
 
 public enum DataSourceHookProjection {
     public static func invoke(code: String, function: String, namespace: String?, source: String,
-                              snapshots: [String: JSONValue], collection: [[String: JSONValue]]) throws -> DataSourceHookProjectionResult {
+                              snapshots: [String: JSONValue], collection: [[String: JSONValue]],
+                              windowForm: [String: JSONValue] = [:]) throws -> DataSourceHookProjectionResult {
         var name = function
         if let namespace, name.hasPrefix(namespace + ".") { name.removeFirst(namespace.count + 1) }
         let wrapper = #"""
@@ -22,7 +23,8 @@ public enum DataSourceHookProjection {
           const module = (
         """# + code + #"""
           );
-          return { run: ({name, source, snapshots, collection}) => {
+          return { run: ({name, source, snapshots, collection, windowForm}) => {
+            const windowFormSignal = {value: windowForm, peek: () => windowForm};
             const effects = [];
             const contexts = {};
             const contextFor = ref => {
@@ -36,7 +38,7 @@ public enum DataSourceHookProjection {
               });
               const ctx = {
                 Context: contextFor,
-                signals: {form},
+                signals: {form, windowForm:windowFormSignal},
                 handlers: {dataSource: {
                   getFormData: () => state.form || {},
                   getCollection: () => state.collection || [],
@@ -61,7 +63,7 @@ public enum DataSourceHookProjection {
         """#
         let result = try ActionHookRuntime.invoke(code: wrapper, functionName: "run", props: .object([
             "name": .string(name), "source": .string(source), "snapshots": .object(snapshots),
-            "collection": .array(collection.map(JSONValue.object))
+            "windowForm": .object(windowForm), "collection": .array(collection.map(JSONValue.object))
         ]))
         let object = result?.objectValue ?? [:]
         return DataSourceHookProjectionResult(

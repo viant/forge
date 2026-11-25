@@ -379,8 +379,7 @@ class ForgeRuntime(
     internal fun canProjectMetadataExecution(execution: ExecutionDef, context: DataSourceContext?): Boolean {
         val handler = execution.handler?.trim().orEmpty()
         val metadata = context?.window?.metadata?.peek() ?: return false
-        val namespace = metadata.namespace?.trim().orEmpty()
-        return handler.isNotBlank() && namespace.isNotBlank() && handler.startsWith("$namespace.") && !metadata.actions?.code.isNullOrBlank()
+        return metadata.actionNamespace(handler) != null && !metadata.actions?.code.isNullOrBlank()
     }
 
     internal suspend fun evaluateMetadataExecution(
@@ -414,7 +413,7 @@ class ForgeRuntime(
         val projection = UIActionProjection.invoke(
             code = code,
             functionName = handler,
-            namespace = metadata.namespace,
+            namespace = metadata.actionNamespace(handler),
             source = context.dataSourceRef,
             snapshots = snapshots,
             windowForm = JsonUtil.anyToElement(context.window.peekWindowForm()) as JsonObject,

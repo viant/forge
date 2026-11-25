@@ -869,7 +869,8 @@ public actor ForgeRuntime {
             guard dataSourceFetchGenerations[sourceID] == generation, !Task.isCancelled else { return }
             do {
                 let projection = try DataSourceHookProjection.invoke(code: code, function: hook.action,
-                    namespace: metadata.namespace, source: dataSourceRef, snapshots: snapshots, collection: rows)
+                    namespace: metadata.actionNamespace(for: hook.action), source: dataSourceRef, snapshots: snapshots, collection: rows,
+                    windowForm: await windowFormJSONValue(windowID: windowID))
                 await applyDataSourceLifecycleEffects(
                     projection.effects, windowID: windowID, metadata: metadata,
                     sourceID: sourceID, generation: generation, path: path
@@ -900,8 +901,9 @@ public actor ForgeRuntime {
             }
             do {
                 let projection = try DataSourceHookProjection.invoke(
-                    code: code, function: hook.action, namespace: metadata.namespace,
-                    source: dataSourceRef, snapshots: snapshots, collection: current
+                    code: code, function: hook.action, namespace: metadata.actionNamespace(for: hook.action),
+                    source: dataSourceRef, snapshots: snapshots, collection: current,
+                    windowForm: await windowFormJSONValue(windowID: windowID)
                 )
                 guard dataSourceFetchGenerations[sourceID] == generation, !Task.isCancelled else { return rows }
                 await applyDataSourceLifecycleEffects(
@@ -985,9 +987,8 @@ public actor ForgeRuntime {
 
     private func canProjectMetadataExecution(_ execution: ExecutionDef, context: ExecutionContext) -> Bool {
         guard let metadata = windows.first(where: { $0.id == context.windowID })?.metadata,
-              let namespace = metadata.namespace, !namespace.isEmpty,
               metadata.actions?.code?.isEmpty == false else { return false }
-        return execution.action.hasPrefix(namespace + ".")
+        return metadata.actionNamespace(for: execution.action) != nil
     }
 
     private func executeProjectedMetadataAction(
@@ -1012,7 +1013,7 @@ public actor ForgeRuntime {
         let executionValue = (try? JSONEncoder().encode(execution)).flatMap { try? JSONDecoder().decode(JSONValue.self, from: $0) } ?? .object([:])
         do {
             let projection = try UIActionProjection.invoke(
-                code: code, function: execution.action, namespace: metadata.namespace,
+                code: code, function: execution.action, namespace: metadata.actionNamespace(for: execution.action),
                 source: context.dataSourceRef, snapshots: snapshots,
                 windowForm: await windowFormJSONValue(windowID: context.windowID),
                 props: args.merging(["execution": executionValue]) { current, _ in current }

@@ -4,6 +4,7 @@ public struct WindowMetadata: Codable, Sendable {
     /// In-memory authored input for portable hooks; never an encoded metadata field.
     public var runtimeAuthoring: JSONValue?
     public let namespace: String?
+    public let actionAliases: [String]?
     public let view: ViewDef?
     public let dialogs: [DialogDef]
     public let dataSources: [String: DataSourceDef]
@@ -18,8 +19,14 @@ public struct WindowMetadata: Codable, Sendable {
 
     public let resourceMappings: [String: ResourceMappingDef]?
 
+    public func actionNamespace(for handler: String) -> String? {
+        if let namespace, !namespace.isEmpty, handler.hasPrefix(namespace + ".") { return namespace }
+        return actionAliases?.first { !$0.isEmpty && handler.hasPrefix($0 + ".") }
+    }
+
     enum CodingKeys: String, CodingKey {
         case namespace
+        case actionAliases
         case view
         case dialogs
         case dataSources
@@ -52,10 +59,12 @@ public struct WindowMetadata: Codable, Sendable {
         authorizationSnapshot: [String: JSONValue] = [:],
         schemas: [String: ResourceSchemaDef] = [:],
         resourceModels: [String: ResourceModelDef] = [:],
-        resourceMappings: [String: ResourceMappingDef]? = nil
+        resourceMappings: [String: ResourceMappingDef]? = nil,
+        actionAliases: [String]? = nil
     ) {
         self.runtimeAuthoring = nil
         self.namespace = namespace
+        self.actionAliases = actionAliases
         self.view = view
         self.dialogs = dialogs
         self.dataSources = dataSources
@@ -74,6 +83,7 @@ public struct WindowMetadata: Codable, Sendable {
         runtimeAuthoring = try? JSONValue(from: decoder)
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let legacyContainer = try decoder.container(keyedBy: LegacyCodingKeys.self)
+        actionAliases = try container.decodeIfPresent([String].self, forKey: .actionAliases)
         namespace = try container.decodeIfPresent(String.self, forKey: .namespace)
         let decodedView = try container.decodeIfPresent(ViewDef.self, forKey: .view)
         dialogs = try container.decodeIfPresent([DialogDef].self, forKey: .dialogs) ?? []

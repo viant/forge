@@ -13,7 +13,8 @@ object DataSourceHookProjection {
         namespace: String?,
         source: String,
         snapshots: JsonObject,
-        collection: List<Map<String, Any?>>
+        collection: List<Map<String, Any?>>,
+        windowForm: Map<String, Any?> = emptyMap()
     ): DataSourceLifecycleProjection {
         val name = namespace?.takeIf { functionName.startsWith("$it.") }
             ?.let { functionName.removePrefix("$it.") } ?: functionName
@@ -27,7 +28,8 @@ object DataSourceHookProjection {
               const module = (
             $code
               );
-              return { run: ({name, source, snapshots, collection}) => {
+              return { run: ({name, source, snapshots, collection, windowForm}) => {
+                const windowFormSignal = {value: windowForm, peek: () => windowForm};
                 const effects = [];
                 const contexts = {};
                 const contextFor = ref => {
@@ -41,7 +43,7 @@ object DataSourceHookProjection {
                   });
                   const ctx = {
                     Context: contextFor,
-                    signals: {form},
+                    signals: {form, windowForm:windowFormSignal},
                     handlers: {dataSource: {
                       getFormData: () => state.form || {},
                       getCollection: () => state.collection || [],
@@ -72,6 +74,7 @@ object DataSourceHookProjection {
                     "name" to JsonPrimitive(name),
                     "source" to JsonPrimitive(source),
                     "snapshots" to snapshots,
+                    "windowForm" to JsonUtil.anyToElement(windowForm),
                     "collection" to JsonArray(collection.map(JsonUtil::anyToElement))
                 )
             )

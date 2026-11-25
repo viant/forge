@@ -38,8 +38,14 @@ data class WindowMetadata(
     val authorizationSnapshot: Map<String, JsonElement> = emptyMap(),
     val schemas: Map<String, ResourceSchemaDef> = emptyMap(),
     val resourceModels: Map<String, ResourceModelDef> = emptyMap(),
-    val resourceMappings: Map<String, ResourceMappingDef> = emptyMap()
-)
+    val resourceMappings: Map<String, ResourceMappingDef> = emptyMap(),
+    val actionAliases: List<String> = emptyList()
+) {
+    fun actionNamespace(handler: String): String? {
+        if (!namespace.isNullOrBlank() && handler.startsWith("$namespace.")) return namespace
+        return actionAliases.firstOrNull { it.isNotBlank() && handler.startsWith("$it.") }
+    }
+}
 
 @Serializable
 data class ResourceMappingDef(
@@ -47,7 +53,23 @@ data class ResourceMappingDef(
     val cases: Map<String, ResourceMappingCase>,
     val default: ResourceMappingCase? = null,
     val fieldOrder: List<String> = emptyList(),
-    val uploads: Map<String, UploadCollectionSpec> = emptyMap()
+    val uploads: Map<String, ResourceMappingUploadDef> = emptyMap()
+)
+
+// A mapped selection rule does not require an executable widget.
+@Serializable
+data class ResourceMappingUploadDef(
+    val accept: List<String> = emptyList(),
+    val multiple: Boolean? = null,
+    val maxFiles: Int? = null,
+    val maxBytes: Long? = null,
+    val transport: String? = null,
+    val blobField: String? = null,
+    val metadataField: String? = null,
+    val emptyMessage: String? = null,
+    val replaceConfirmation: String? = null,
+    val retainOnSuccess: Boolean? = null,
+    val upload: MutationCommandDef? = null
 )
 
 @Serializable
@@ -1243,6 +1265,7 @@ data class DialogDef(
     val selectionMode: String? = null,
     val content: ContainerDef? = null,
     val on: List<ExecutionDef> = emptyList(),
+    @Serializable(with = DialogActionsSerializer::class)
     val actions: List<ActionDef> = emptyList(),
     val properties: Map<String, JsonElement> = emptyMap(),
     val style: Map<String, String> = emptyMap(),
@@ -1260,6 +1283,16 @@ data class ActionDef(
     val targetOverrides: Map<String, JsonElement> = emptyMap()
 )
 
+// These optional Go slices can be absent, null, or a concrete array.
+abstract class CompiledListSerializer<T>(elementSerializer: KSerializer<T>) :
+    kotlinx.serialization.json.JsonTransformingSerializer<List<T>>(ListSerializer(elementSerializer)) {
+    override fun transformDeserialize(element: JsonElement): JsonElement =
+        if (element == kotlinx.serialization.json.JsonNull) JsonArray(emptyList()) else element
+}
+
+object DataSourceParametersSerializer : CompiledListSerializer<ParameterDef>(ParameterDef.serializer())
+object DialogActionsSerializer : CompiledListSerializer<ActionDef>(ActionDef.serializer())
+
 @Serializable
 data class DataSourceDef(
     val service: ServiceDef? = null,
@@ -1270,6 +1303,7 @@ data class DataSourceDef(
     val selectors: SelectorDef? = null,
     val paging: PagingDef? = null,
     val params: Map<String, String> = emptyMap(),
+    @Serializable(with = DataSourceParametersSerializer::class)
     val parameters: List<ParameterDef> = emptyList(),
     val uri: String? = null,
     val method: String? = null,

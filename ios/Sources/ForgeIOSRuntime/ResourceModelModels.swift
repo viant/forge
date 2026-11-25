@@ -99,10 +99,25 @@ public struct ResourceMappingDef: Codable, Sendable {
     public let cases: [String: ResourceMappingCase]
     public let `default`: ResourceMappingCase?
     public let fieldOrder: [String]?
-    public let uploads: [String: UploadCollectionSpec]?
+    public let uploads: [String: ResourceMappingUploadDef]?
 }
 
 public struct ResourceMappingCase: Codable, Sendable {
     public let modelRef: String
     public let values: [String: JSONValue]?
+}
+
+// A mapping may describe file selection alone or bind it to an upload command.
+public struct ResourceMappingUploadDef: Codable, Sendable {
+    public let accept: [String]?
+    public let multiple: Bool?
+    public let maxFiles: Int?
+    public let maxBytes: Int64?
+    public let transport: String?
+    public let blobField: String?
+    public let metadataField: String?
+    public let emptyMessage: String?
+    public let replaceConfirmation: String?
+    public let retainOnSuccess: Bool?
+    public let upload: MutationCommandDef?
 }

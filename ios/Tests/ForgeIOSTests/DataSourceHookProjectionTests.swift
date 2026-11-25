@@ -2,6 +2,19 @@ import XCTest
 @testable import ForgeIOSRuntime
 
 final class DataSourceHookProjectionTests: XCTestCase {
+    func testDeclaredAliasRestoresScopedWindowState() async throws {
+        let source = #"{"namespace":"Records","actionAliases":["Shared"],"actions":{"code":"({restore: ({context, collection}) => collection.map(row => ({...row, title:context.signals.windowForm.peek().title}))})"},"dataSource":{"source":{"selectionMode":"single","on":[{"event":"onFetch","handler":"Shared.restore"}]}}}"#
+        let metadata = try JSONDecoder().decode(WindowMetadata.self, from: Data(source.utf8))
+        XCTAssertNil(metadata.actionNamespace(for: "Other.restore"))
+        let runtime = ForgeRuntime()
+        let window = await runtime.openWindowInline(key: "draft", title: "Draft", metadata: metadata)
+        await runtime.setWindowFormValue(windowID: window.id, values: ["title": .string("Saved")])
+        await runtime.registerDataSourceLoader { _ in .init(rows: [["id": .number(2)]]) }
+        await runtime.refreshDataSourceCollection(windowID: window.id, dataSourceRef: "source")
+        let rows = await runtime.dataSourceCollection(windowID: window.id, dataSourceRef: "source")
+        XCTAssertEqual(rows, [["id": .number(2), "title": .string("Saved")]])
+    }
+
     func testDependentLoaderFetchUpdatesSourceAndStopsCycle() async throws {
         let payload = #"{"namespace":"Test","actions":{"code":"({load: ({context}) => {const target=context.Context('labels'); target.handlers.dataSource.setInputParameters({Id:7}); target.handlers.dataSource.fetchCollection();}, apply: ({context,collection}) => {const source=context.Context('source'); source.signals.form.value={summary:collection[0].label}; source.handlers.dataSource.fetchCollection();}})"},"dataSource":{"source":{"on":[{"event":"onSuccess","handler":"Test.load"}]},"labels":{"on":[{"event":"onSuccess","handler":"Test.apply"}]}}}"#
         let metadata = try JSONDecoder().decode(WindowMetadata.self, from: Data(payload.utf8))

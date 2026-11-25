@@ -426,7 +426,7 @@ public struct TableRenderer: View {
             for column in columns {
                 do {
                     values[columnKey(column)] = try TableValueProjection.value(
-                        row: row, column: column, code: code, namespace: metadata.namespace
+                        row: row, column: column, code: code, actionNamespace: metadata.actionNamespace(for:)
                     )
                 } catch {
                     // Keep the original value visible, but retain diagnostic evidence.

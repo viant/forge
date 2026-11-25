@@ -2,6 +2,19 @@ import XCTest
 @testable import ForgeIOSRuntime
 
 final class WorkflowPrimitiveModelsTests: XCTestCase {
+    func testMappedUploadRulesRoundTripWithAndWithoutCommands() throws {
+        let source = #"{"selectors":["kind"],"cases":{"text":{"modelRef":"entry"}},"uploads":{"single":{"accept":[".txt"],"multiple":false,"upload":null},"many":{"multiple":true,"maxFiles":3},"bound":{"upload":{"dataSourceRef":"saveFile"}}}}"#
+        let decoder = JSONDecoder()
+        let mapping = try decoder.decode(ResourceMappingDef.self, from: Data(source.utf8))
+        let rules = try XCTUnwrap(try decoder.decode(ResourceMappingDef.self, from: JSONEncoder().encode(mapping)).uploads)
+        XCTAssertEqual(rules["single"]?.accept, [".txt"])
+        XCTAssertEqual(rules["single"]?.multiple, false)
+        XCTAssertNil(rules["single"]?.upload)
+        XCTAssertEqual(rules["many"]?.maxFiles, 3)
+        XCTAssertEqual(rules["bound"]?.upload?.dataSourceRef, "saveFile")
+        XCTAssertThrowsError(try decoder.decode(UploadCollectionSpec.self, from: Data(#"{"upload":null}"#.utf8)))
+    }
+
     func testResourceMappingSelectsNativeCases() throws {
         let source = #"{"schemas":{"record":{"type":"object","properties":{}}},"resourceModels":{"brief":{"schemaRef":"record"},"general":{"schemaRef":"record"}},"resourceMappings":{"inspection":{"selectors":["kind","old.kind"],"cases":{"brief":{"modelRef":"brief"}},"default":{"modelRef":"general"}}}}"#
         let metadata = try JSONDecoder().decode(WindowMetadata.self, from: Data(source.utf8))
