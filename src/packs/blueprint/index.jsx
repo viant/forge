@@ -903,9 +903,12 @@ export function registerPack() {
                     || {value: selected, label: selected})
                 : normalizedOptions.filter((opt) => selectedSet.has(`${opt?.value ?? ''}`));
             const availableOptions = themed ? normalizedOptions.filter(opt => !selectedSet.has(`${opt?.value ?? ''}`)) : normalizedOptions;
+            const optionDisabled = option => isSelectOptionDisabled(option) && !selectedSet.has(String(option.value ?? ''));
+            const itemDisabled = (item, index) => optionDisabled(item)
+                || (typeof rest.itemDisabled === 'function' ? rest.itemDisabled(item, index) : Boolean(item?.[rest.itemDisabled]));
             const toggle = (option) => {
                 const optionValue = `${option?.value ?? ''}`;
-                if (!optionValue) return;
+                if (unavailable || !optionValue || optionDisabled(option)) return;
                 const next = selectedSet.has(optionValue)
                     ? selectedValues.filter((v) => v !== optionValue)
                     : [...selectedValues, optionValue];
@@ -936,7 +939,7 @@ export function registerPack() {
                                         type="checkbox"
                                         aria-label={optionLabel}
                                         checked={selectedSet.has(optionValue)}
-                                        disabled={unavailable}
+                                        disabled={unavailable || optionDisabled(opt)}
                                         style={{width: 16, height: 16, margin: 0, accentColor: '#2563eb'}}
                                         onChange={() => toggle(opt)}
                                     />
@@ -969,7 +972,7 @@ export function registerPack() {
                                     aria-pressed={selected}
                                     data-selected={selected ? 'true' : 'false'}
                                     small
-                                    disabled={unavailable}
+                                    disabled={unavailable || optionDisabled(opt)}
                                     outlined={false}
                                     minimal={!selected}
                                     intent="none"
@@ -1003,6 +1006,7 @@ export function registerPack() {
                 <MultiSelect
                     {...rest}
                     items={availableOptions}
+                    itemDisabled={itemDisabled}
                     selectedItems={selectedItems}
                     itemsEqual={rest.itemsEqual === undefined ? (themed?'value':undefined) : rest.itemsEqual}
                     disabled={unavailable}
@@ -1026,6 +1030,8 @@ export function registerPack() {
                             key={`${item?.value ?? ''}`} ref={ref} id={itemId} onFocus={handleFocus}
                             text={item?.label || item?.value}
                             active={modifiers.active}
+                            disabled={modifiers.disabled}
+                            htmlTitle={item.tooltip || undefined}
                             roleStructure="listoption" selected={selectedSet.has(`${item?.value ?? ''}`)}
                             onClick={handleClick}
                             shouldDismissPopover={false}

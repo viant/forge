@@ -20,3 +20,45 @@ for(const [kind,appearance] of [['checkbox',''],['toggle',''],['radio',''],['rad
   }finally{await act(async()=>root.unmount());host.remove();}
  });
 }
+
+const multiselectOptions = [
+    {value: 'full', label: 'Full', disabled: true},
+    {value: 'selected', label: 'Selected', disabled: true},
+    {value: 'open', label: 'Open'},
+];
+
+for (const appearance of ['checkboxes', 'pills', undefined]) {
+    it(`multiSelect ${appearance || 'dropdown'} blocks disabled additions and allows removal`, async () => {
+        globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+        const host = document.createElement('div');
+        document.body.append(host);
+        const root = createRoot(host);
+        const change = vi.fn();
+        const select = vi.fn();
+        const MultiSelect = getWidget('multiSelect');
+        try {
+            await act(async () => root.render(<MultiSelect appearance={appearance} value={['selected']}
+                options={multiselectOptions} onChange={change} onItemSelect={select}
+                />));
+            if (!appearance) {
+                const search = host.querySelector('input');
+                await act(async () => search.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowDown', bubbles: true})));
+            }
+            const option = label => appearance ? host.querySelector(`[aria-label="${label}"]`)
+                : [...document.querySelectorAll('[role=option]')].find(node => node.textContent.trim() === label)?.querySelector('a');
+            const full = option('Full');
+            expect(full).toBeDefined();
+            expect(full.disabled || full.getAttribute('aria-disabled') === 'true').toBe(true);
+            await act(async () => full.click());
+            expect(change).not.toHaveBeenCalled();
+            expect(select).not.toHaveBeenCalled();
+            await act(async () => option('Selected').click());
+            expect(change).toHaveBeenLastCalledWith([]);
+            await act(async () => option('Open').click());
+            expect(change).toHaveBeenLastCalledWith(['selected', 'open']);
+        } finally {
+            await act(async () => root.unmount());
+            host.remove();
+        }
+    });
+}
