@@ -66,6 +66,14 @@ extension ForgeRuntime {
         return await dataSourceRuntime.input(dataSourceID: dataSourceID)
     }
 
+    package func editInputParameter(windowID: String, dataSourceRef: String, selector: String, value: JSONValue) async -> Bool {
+        let id = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
+        let signal = await signals.input(dataSourceID: id)
+        guard let input = await dataSourceRuntime.editInputParameter(dataSourceID: id, selector: selector, value: value) else { return false }
+        await signal.set(input)
+        return true
+    }
+
     public func dataSourceInputUpdates(
         windowID: String,
         dataSourceRef: String

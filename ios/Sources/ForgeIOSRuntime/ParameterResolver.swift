@@ -256,7 +256,7 @@ public enum ParameterResolver {
             : jsonValue(any: SelectorUtil.resolve(jsonObjectAny(selected), selector: path))
     }
 
-    private static func inputObject(_ input: InputState) -> [String: JSONValue] {
+    package static func inputObject(_ input: InputState) -> [String: JSONValue] {
         var object: [String: JSONValue] = [
             "filter": .object(input.filter),
             "parameters": .object(input.parameters),

@@ -16,6 +16,7 @@ public struct MenuListRenderer: View {
     @State private var windowFormValues: [String: JSONValue] = [:]
     @State private var authorizationValues: [String: JSONValue] = [:]
     @State private var formValuesByDataSource: [String: [String: JSONValue]] = [:]
+    @State private var inputValuesByDataSource: [String: InputState] = [:]
     @State private var metricsValuesByDataSource: [String: [String: JSONValue]] = [:]
     @State private var collectionValuesByDataSource: [String: [[String: JSONValue]]] = [:]
     @State private var eventVisibilityByItemID: [String: Bool] = [:]
@@ -73,6 +74,7 @@ public struct MenuListRenderer: View {
         .task(id: dataTaskKey) {
             await loadValues()
         }
+        .onChange(of: inputValuesByDataSource) { _, _ in displayProjectionRevision += 1 }
         .onChange(of: formValuesByDataSource) { _, _ in displayProjectionRevision += 1 }
         .onChange(of: metricsValuesByDataSource) { _, _ in displayProjectionRevision += 1 }
         .onChange(of: collectionValuesByDataSource) { _, _ in displayProjectionRevision += 1 }
@@ -137,7 +139,7 @@ public struct MenuListRenderer: View {
         [
             window?.windowID ?? "",
             windowFormValues.signature,
-            String(describing: formValuesByDataSource).hashValue.description,
+            String(displayProjectionRevision),
             items.map { $0.id ?? $0.label ?? "" }.joined(separator: "|")
         ].joined(separator: ":")
     }
@@ -738,8 +740,15 @@ public struct MenuListRenderer: View {
         guard let runtime, let window, !relevantDataSourceRefs.isEmpty else {
             return
         }
+        let inputRefs = Set(items.filter(menuItemObservesInput).compactMap(resolveItemDataSourceRef(_:)))
         await withTaskGroup(of: Void.self) { group in
             for ref in relevantDataSourceRefs {
+                if inputRefs.contains(ref) {
+                    group.addTask {
+                        let stream = await runtime.dataSourceInputUpdates(windowID: window.windowID, dataSourceRef: ref)
+                        for await next in stream { await MainActor.run { inputValuesByDataSource[ref] = next } }
+                    }
+                }
                 group.addTask {
                     let stream = await runtime.dataSourceCollectionUpdates(windowID: window.windowID, dataSourceRef: ref)
                     for await next in stream {
@@ -871,6 +880,10 @@ public struct MenuListRenderer: View {
             return item.value
         }
         switch item.scope?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "input":
+            guard let ref = resolveItemDataSourceRef(item), let input = inputValuesByDataSource[ref],
+                  let binding = MenuInputBinding(item) else { return nil }
+            return binding.value(in: input)
         case "metrics":
             guard let ref = resolveItemDataSourceRef(item) else { return nil }
             if let resolved = jsonValue(from: SelectorUtil.resolve(metricsValuesByDataSource[ref], selector: key)),
@@ -1071,6 +1084,7 @@ public struct MenuListRenderer: View {
             form: (formValuesByDataSource[ref] ?? [:]).mapValues { $0.menuListAnyValue as Any },
             windowForm: windowFormValues.mapValues { $0.menuListAnyValue as Any },
             collection: rows.map { $0.mapValues { $0.menuListAnyValue as Any } },
+            input: inputValuesByDataSource[ref].map { ParameterResolver.inputObject($0).mapValues { $0.menuListAnyValue as Any } } ?? [:],
             authorization: authorizationValues.mapValues { $0.menuListAnyValue as Any }
         )
     }
@@ -1141,6 +1155,8 @@ public struct MenuListRenderer: View {
             let dataSourceRef = resolveItemDataSourceRef(item) ?? container.dataSourceRef ?? ""
             if scope == "windowform" {
                 await runtime.setWindowFormValue(windowID: window.windowID, values: [key: value])
+            } else if let binding = MenuInputBinding(item) {
+                guard !dataSourceRef.isEmpty, await binding.set(value, runtime: runtime, windowID: window.windowID, dataSourceRef: dataSourceRef) else { return }
             } else if !dataSourceRef.isEmpty {
                 let current = await runtime.formJSONValue(windowID: window.windowID, dataSourceRef: dataSourceRef)
                 guard let updated = SelectorUtil.setting(value, in: .object(current), selector: key)?.objectValue else {
@@ -1332,6 +1348,41 @@ private func selectorStringValue(from value: Any?) -> String? {
     default:
         return nil
     }
+}
+
+/// The same binding supplies the displayed value and commits edits from NativeWidgetView.
+struct MenuInputBinding {
+    let selector: String
+
+    init?(_ item: ItemDef) {
+        guard item.scope?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "input",
+              let key = item.valueKey, !key.isEmpty else { return nil }
+        selector = key
+    }
+
+    func value(in input: InputState) -> JSONValue? {
+        jsonValue(from: SelectorUtil.resolve(ParameterResolver.inputObject(input), selector: selector))
+    }
+
+    @discardableResult
+    func set(_ value: JSONValue, runtime: ForgeRuntime, windowID: String, dataSourceRef: String) async -> Bool {
+        await runtime.editInputParameter(windowID: windowID, dataSourceRef: dataSourceRef, selector: selector, value: value)
+    }
+}
+
+private func menuItemObservesInput(_ item: ItemDef) -> Bool {
+    if MenuInputBinding(item) != nil { return true }
+    func usesInput(_ condition: DashboardConditionDef?) -> Bool {
+        guard let condition else { return false }
+        return condition.source?.lowercased() == "input" || condition.all.contains(where: usesInput)
+            || condition.any.contains(where: usesInput) || usesInput(condition.not)
+    }
+    if usesInput(item.visibleWhen) { return true }
+    for key in ["readOnlyWhen", "disabledWhen"] {
+        if let value = item.properties[key], let data = try? JSONEncoder().encode(value),
+           let condition = try? JSONDecoder().decode(DashboardConditionDef.self, from: data), usesInput(condition) { return true }
+    }
+    return false
 }
 
 private func jsonValue(from value: Any?) -> JSONValue? {

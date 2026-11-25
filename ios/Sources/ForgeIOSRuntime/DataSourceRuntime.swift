@@ -89,6 +89,22 @@ public actor DataSourceRuntime {
         )
     }
 
+    /// A parameter edit is atomic with respect to sibling controls on the same datasource.
+    func editInputParameter(dataSourceID: String, selector: String, value: JSONValue) -> InputState? {
+        let updated: JSONValue?
+        if selector == "parameters" {
+            updated = value
+        } else {
+            let prefix = "parameters."
+            guard selector.hasPrefix(prefix) else { return nil }
+            let path = String(selector.dropFirst(prefix.count))
+            updated = SelectorUtil.setting(value, in: .object(input(dataSourceID: dataSourceID).parameters), selector: path)
+        }
+        guard let parameters = updated?.objectValue else { return nil }
+        setInputParameters(dataSourceID: dataSourceID, parameters: parameters, fetch: false, preservePendingFetch: false)
+        return input(dataSourceID: dataSourceID)
+    }
+
     public func control(dataSourceID: String) -> ControlState {
         controlValues[dataSourceID] ?? ControlState()
     }

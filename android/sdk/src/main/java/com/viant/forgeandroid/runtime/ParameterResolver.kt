@@ -70,7 +70,7 @@ class ParameterResolver {
             "filter" -> readObjectValue(ctx.peekFilter(), key)
             "metrics" -> SelectorUtil.resolve(ctx.metrics.peek(), key)
                 ?: SelectorUtil.resolve(ctx.collection.peek().firstOrNull().orEmpty(), key)
-            "input" -> SelectorUtil.resolve(inputObject(ctx.input.peek()), key)
+            "input" -> SelectorUtil.resolve(ctx.input.peek().bindingValues(), key)
             "windowform" -> SelectorUtil.resolve(context.window.peekWindowForm(), key)
             else -> null
         }
@@ -118,7 +118,7 @@ class ParameterResolver {
                     ?: SelectorUtil.resolve(sourceContext.collection.peek().firstOrNull().orEmpty(), it)
             }
             "filter" -> location?.let { SelectorUtil.resolve(sourceContext.peekFilter(), it) }
-            "input" -> location?.let { SelectorUtil.resolve(inputObject(sourceContext.input.peek()), it) }
+            "input" -> location?.let { SelectorUtil.resolve(sourceContext.input.peek().bindingValues(), it) }
             "metadata" -> sourceContext.window.metadata.peek()?.let { it } // full metadata if needed
             "const" -> p.constantValue()
             else -> {
@@ -146,26 +146,13 @@ class ParameterResolver {
     private fun readObjectValue(source: Map<String, Any?>, path: String): Any? =
         if (path.isBlank()) source else SelectorUtil.resolve(source, path)
 
-    private fun inputObject(input: InputState): Map<String, Any?> {
-        val output = linkedMapOf<String, Any?>(
-            "filter" to input.filter,
-            "parameters" to input.parameters,
-            "fetch" to input.fetch,
-            "refresh" to input.refresh
-        )
-        if (input.page != null) {
-            output["page"] = input.page
-        }
-        return output
-    }
-
     private fun resolveFromLegacyDataSource(context: DataSourceContext, location: String?): Any? {
         val path = location.orEmpty()
         val candidates = listOf(
             context.peekSelection().selected,
             context.peekForm(),
             context.peekFilter(),
-            inputObject(context.input.peek())
+            context.input.peek().bindingValues()
         )
         return candidates.firstNotNullOfOrNull { candidate ->
             candidate?.let { readObjectValue(it, path) }
@@ -227,3 +214,16 @@ data class ParameterResolution(
     val inbound: Map<String, Map<String, Any?>>, // dsRef -> map
     val outbound: List<ParameterDef>
 )
+
+internal fun InputState.bindingValues(): Map<String, Any?> {
+    val output = linkedMapOf<String, Any?>(
+        "filter" to filter,
+        "parameters" to parameters,
+        "fetch" to fetch,
+        "refresh" to refresh
+    )
+    if (page != null) {
+        output["page"] = page
+    }
+    return output
+}

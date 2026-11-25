@@ -53,10 +53,12 @@ import androidx.compose.ui.unit.dp
 import com.viant.forgeandroid.runtime.DataSourceContext
 import com.viant.forgeandroid.runtime.ExecutionDef
 import com.viant.forgeandroid.runtime.ForgeRuntime
+import com.viant.forgeandroid.runtime.InputState
 import com.viant.forgeandroid.runtime.ItemDef
 import com.viant.forgeandroid.runtime.JsonUtil
 import com.viant.forgeandroid.runtime.ParameterDef
 import com.viant.forgeandroid.runtime.SelectorUtil
+import com.viant.forgeandroid.runtime.bindingValues
 import com.viant.forgeandroid.runtime.formatDashboardValue
 import com.viant.forgeandroid.runtime.valueKey
 import kotlinx.serialization.json.JsonArray
@@ -163,7 +165,9 @@ private fun SummaryItemPill(
     val windowForm by windowFormSignal.flow.collectAsState(initial = windowFormSignal.peek())
     val key = itemValueKey(item) ?: return
     val label = item.label ?: key
-    val value = resolveItemDisplayValue(item, key, form, metrics, windowForm).ifBlank { "—" }
+    val boundInput = if (item.scope.equals("input", ignoreCase = true))
+        dataSourceContext.input.flow.collectAsState().value.bindingValues() else emptyMap()
+    val value = resolveItemDisplayValue(item, key, form, metrics, windowForm, input = boundInput).ifBlank { "—" }
     Text(
         text = "$label: $value",
         style = MaterialTheme.typography.labelMedium,
@@ -325,6 +329,7 @@ private fun FormItemRenderer(
     val windowForm by windowFormSignal.flow.collectAsState(initial = windowFormSignal.peek())
     val collection by dataSourceContext.collection.flow.collectAsState(initial = dataSourceContext.collection.peek())
     val input by dataSourceContext.input.flow.collectAsState(initial = dataSourceContext.input.peek())
+    val boundInput = remember(input) { input.bindingValues() }
     val selection by dataSourceContext.selection.flow.collectAsState(initial = dataSourceContext.selection.peek())
     val visibleExecutions = item.on.filter { it.event == "onVisible" }
     val callbackVisible by produceState(
@@ -348,7 +353,7 @@ private fun FormItemRenderer(
         form = form,
         windowForm = windowForm,
         collection = collection,
-        input = mapOf("filter" to input.filter, "parameters" to input.parameters, "page" to input.page),
+        input = boundInput,
         selectionValues = mapOf(
             "selected" to selection.selected,
             "selection" to selection.selection,
@@ -358,7 +363,7 @@ private fun FormItemRenderer(
     )
     if (!callbackVisible || !metadataVisible) return
     val conditionDisabled = item.disabled == true || item.readOnly == true ||
-        itemConditionDisables(item, metrics, input.filter, form, windowForm, collection, selection, authorization)
+        itemConditionDisables(item, metrics, input.filter, form, windowForm, collection, selection, authorization, boundInput)
     val renderItem = if (conditionDisabled && item.disabled != true) item.copy(disabled = true) else item
 
     LaunchedEffect(dataSourceContext.dataSourceRef) {
@@ -375,11 +380,16 @@ private fun FormItemRenderer(
     }
 
     val key = itemValueKey(item) ?: item.label?.takeIf { com.viant.forgeandroid.runtime.NativeWidgetContract.kind(item) == "button" } ?: return
-    val value = resolveItemValue(item, key, form, metrics, windowForm)
+    val value = resolveItemValue(item, key, form, metrics, windowForm, input = boundInput)
     val validationError = validationErrors[key]
     if (item.lookup == null && com.viant.forgeandroid.runtime.NativeWidgetContract.kind(item) != "label" && item.link == null) {
-        val rawWidgetValue = resolveItemRawValue(item, key, form, metrics, windowForm, collection)
-        val owner = when (item.scope?.lowercase()) { "windowform" -> windowForm; "metrics" -> metrics; else -> form }
+        val rawWidgetValue = resolveItemRawValue(item, key, form, metrics, windowForm, collection, boundInput)
+        val owner = when (item.scope?.trim()?.lowercase()) {
+            "windowform" -> windowForm
+            "metrics" -> metrics
+            "input" -> boundInput
+            else -> form
+        }
         val widgetValue = if (rawWidgetValue == null && !com.viant.forgeandroid.runtime.NativeWidgetContract.hasValue(owner, key)) com.viant.forgeandroid.runtime.NativeWidgetContract.initialValue(item) else com.viant.forgeandroid.runtime.JsonUtil.anyToElement(rawWidgetValue)
     LaunchedEffect(item, widgetValue, metrics) {
         if (com.viant.forgeandroid.runtime.NativeWidgetContract.kind(item) == "daterangepreset") {
@@ -403,7 +413,7 @@ private fun FormItemRenderer(
     when (if (item.lookup != null) "lookup" else com.viant.forgeandroid.runtime.NativeWidgetContract.kind(item)) {
                 "label" -> LabelItemCard(
                     label = item.label ?: key,
-                    value = resolveItemDisplayValue(item, key, form, metrics, windowForm)
+                    value = resolveItemDisplayValue(item, key, form, metrics, windowForm, input = boundInput)
                 )
                 "markdown" -> {
                     val markdown = value.ifBlank {
@@ -467,7 +477,7 @@ private fun FormItemRenderer(
                     )
                 }
                 "multiSelect" -> {
-                    val selectedValues = when (val raw = resolveItemRawValue(item, key, form, metrics, windowForm)) {
+                    val selectedValues = when (val raw = resolveItemRawValue(item, key, form, metrics, windowForm, input = boundInput)) {
                         is List<*> -> raw.mapNotNull { it?.toString() }
                         is String -> listOf(raw)
                         else -> emptyList()
@@ -525,7 +535,7 @@ private fun FormItemRenderer(
                     )
                 }
                 "dateRange" -> {
-                    val raw = resolveItemRawValue(item, key, form, metrics, windowForm) as? Map<*, *> ?: emptyMap<String, Any?>()
+                    val raw = resolveItemRawValue(item, key, form, metrics, windowForm, input = boundInput) as? Map<*, *> ?: emptyMap<String, Any?>()
                     val start = raw["start"]?.toString().orEmpty()
                     val end = raw["end"]?.toString().orEmpty()
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(vertical = 2.dp)) {
@@ -612,7 +622,7 @@ private fun FormItemRenderer(
                     }
                 }
                 "checkbox", "toggle" -> {
-                    val checked = when (val raw = resolveItemRawValue(item, key, form, metrics, windowForm)) {
+                    val checked = when (val raw = resolveItemRawValue(item, key, form, metrics, windowForm, input = boundInput)) {
                         is Boolean -> raw
                         is Number -> raw.toInt() != 0
                         else -> raw?.toString()?.equals("true", ignoreCase = true) == true
@@ -683,7 +693,8 @@ internal fun itemConditionDisables(
     windowForm: Map<String, Any?> = emptyMap(),
     collection: List<Map<String, Any?>> = emptyList(),
     selection: com.viant.forgeandroid.runtime.SelectionState = com.viant.forgeandroid.runtime.SelectionState(),
-    authorization: Map<String, Any?> = emptyMap()
+    authorization: Map<String, Any?> = emptyMap(),
+    input: Map<String, Any?> = emptyMap()
 ): Boolean {
     fun decoded(name: String, direct: com.viant.forgeandroid.runtime.DashboardConditionDef?): com.viant.forgeandroid.runtime.DashboardConditionDef? {
         if (direct != null) return direct
@@ -700,6 +711,7 @@ internal fun itemConditionDisables(
                 form = form,
                 windowForm = windowForm,
                 collection = collection,
+                input = input,
                 selectionValues = mapOf("selected" to selection.selected, "selection" to selection.selection, "rowIndex" to selection.rowIndex),
                 authorization = authorization
             )
@@ -751,7 +763,9 @@ private fun SummaryItemCard(
     val windowFormSignal = dataSourceContext.window.windowFormSignal()
     val windowForm by windowFormSignal.flow.collectAsState(initial = windowFormSignal.peek())
     val key = itemValueKey(item) ?: return
-    val value = resolveItemDisplayValue(item, key, form, metrics, windowForm)
+    val boundInput = if (item.scope.equals("input", ignoreCase = true))
+        dataSourceContext.input.flow.collectAsState().value.bindingValues() else emptyMap()
+    val value = resolveItemDisplayValue(item, key, form, metrics, windowForm, input = boundInput)
     LabelItemCard(
         label = item.label ?: key,
         value = value,
@@ -943,12 +957,14 @@ internal fun resolveItemRawValue(
     form: Map<String, Any?>,
     metrics: Map<String, Any?>,
     windowForm: Map<String, Any?>,
-    collection: List<Map<String, Any?>> = emptyList()
+    collection: List<Map<String, Any?>> = emptyList(),
+    input: Map<String, Any?> = emptyMap()
 ): Any? {
     return when (item.scope?.trim()?.lowercase()) {
         "metrics" -> SelectorUtil.resolve(metrics, key)
             ?: SelectorUtil.resolve(collection.firstOrNull().orEmpty(), key)
         "windowform" -> SelectorUtil.resolve(windowForm, key)
+        "input" -> SelectorUtil.resolve(input, key)
         else -> SelectorUtil.resolve(form, key)
     }
 }
@@ -959,9 +975,10 @@ internal fun resolveItemValue(
     form: Map<String, Any?>,
     metrics: Map<String, Any?>,
     windowForm: Map<String, Any?>,
-    collection: List<Map<String, Any?>> = emptyList()
+    collection: List<Map<String, Any?>> = emptyList(),
+    input: Map<String, Any?> = emptyMap()
 ): String {
-    return resolveItemRawValue(item, key, form, metrics, windowForm, collection)?.toString().orEmpty()
+    return resolveItemRawValue(item, key, form, metrics, windowForm, collection, input)?.toString().orEmpty()
 }
 
 internal fun resolveItemDisplayValue(
@@ -970,9 +987,10 @@ internal fun resolveItemDisplayValue(
     form: Map<String, Any?>,
     metrics: Map<String, Any?>,
     windowForm: Map<String, Any?>,
-    collection: List<Map<String, Any?>> = emptyList()
+    collection: List<Map<String, Any?>> = emptyList(),
+    input: Map<String, Any?> = emptyMap()
 ): String {
-    val raw = resolveItemRawValue(item, key, form, metrics, windowForm, collection)
+    val raw = resolveItemRawValue(item, key, form, metrics, windowForm, collection, input)
     if (raw is Map<*, *> && raw.containsKey("start") && raw.containsKey("end")) {
         return listOf(raw["start"], raw["end"])
             .mapNotNull { it?.toString()?.takeIf(String::isNotBlank) }
@@ -990,6 +1008,19 @@ internal fun setScopedItemValue(
 ) {
     when (item.scope?.trim()?.lowercase()) {
         "windowform" -> runtime.setWindowFormValues(context.window.windowId, mapOf(key to value))
+        "input" -> {
+            val path = key.substringAfter("parameters.", "")
+            if (!key.startsWith("parameters.") || path.isBlank()) return
+            context.input.update { previous ->
+                // Changed parameters form a new draft, independent of any previously prepared request.
+                InputState(
+                    parameters = SelectorUtil.set(previous.parameters, path, value),
+                    filter = previous.filter,
+                    page = previous.page,
+                    refresh = previous.refresh
+                )
+            }
+        }
         else -> context.setFormField(key, value)
     }
     runtime.emitInteraction(
