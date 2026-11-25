@@ -61,8 +61,17 @@ const apiEntries={
  'popover':[['content','React node','The contextual content.'],['children','trigger element','An operable trigger with a meaningful name.'],['position','Blueprint placement','Request placement; existing constraints keep it in view.']],
 };
 const AnatomyDescriptions={
+ 'Native expanded menu trigger':'An unselected left-navigation category uses the grey hover background and semantic blue foreground while its native menu is open. Only aria-current selects a destination; opening or focusing the menu does not select it.',
+ 'Menu panel and option list':'The native outer Multi Selector panel owns one shared semantic menu border. Its inner content surface adds no second stroke. Selected values, query and available options stay inside the same anchored panel; each input keeps its own field-state border.',
+ 'Optional trailing icon or description':'Align the last visible trailing icon to the option\'s existing ending padding. A hidden native submenu caret must not leave an extra gap after its Lucide replacement. Keep label-to-icon spacing and leading content independent.',
+ 'Named action trigger':'Reuse Secondary Button for an outlined action menu, including all semantic state borders, content sizing, label typography and the shared Lucide chevron. Ghost keeps its own variant.',
+ 'Anchored panel':'The native DropdownMenu owns placement, dismissal and focus return. Use the shared 8px gap, subtle border, rounded panel and no shadow, matching the trigger width up to the existing viewport-safe maximum.',
+ 'Full-width menu options':'Use the shared MenuItem: a 40px minimum target, centered content, 8px panel inset and 2px option separation. Preserve selected semantics without a decorative checkmark.',
+ 'Optional nested menu':'Native MenuItem owns hover and keyboard interaction. Table Export retains the 8px gap and uses Blueprint’s 300ms close delay so the pointer can reach CSV or XLSX without collapsing the menu.',
+ 'Fixed rail with one shared icon-and-label foreground':'Direct destinations and flyout triggers use the same navigation default foreground. Lucide icons inherit their label color; native aria-current marks the active destination independently from an open category.',
+ 'Titled anchored menu with vertically centered option text':'Only navigation flyouts show every current destination without the ordinary menu row cap. Their outer viewport constraint remains; all other menus retain their own limits.',
  'Page canvas':'The List Page uses 32px desktop padding at the top and sides, and 16px at the bottom through spacing-4. The collapsed chat actions occupy their own native row below the page, without covering the summary.',
- 'Table action bar':'Keep creation and bulk actions on the left. Show Starred view only when its native producer binding exists. Starred view, Customize view, Filter view and Search share one right-hand flex group with equal spacing-2 (8px) gaps measured between control boundaries. All four controls stay 40px high. Keep the existing icon padding; visible glyph-to-glyph spacing includes that padding. Set the existing toolbar-item-gap to zero within this group so nested tooltip wrappers cannot add extra margins.',
+ 'Table action bar':'Keep creation and bulk actions on the left, separated by spacing-4 (16px), including grouped collection operations. Show Starred view only when its native producer binding exists. Starred view, Customize view, Filter view and Search share one right-hand flex group with equal spacing-2 (8px) gaps measured between control boundaries. All four controls stay 40px high. Keep the existing icon padding; visible glyph-to-glyph spacing includes that padding. Set the existing toolbar-item-gap to zero within this group so nested tooltip wrappers cannot add extra margins.',
  'Selection and starred controls':'The ghost Starred view trigger, Customize view trigger and Filter view trigger have equal 40px targets, centered icons and the same 8px boundary-to-boundary gap used before the Search field. Retain internal padding and target size; visible glyph edges do not define this spacing. Preserve each native hover, selected and keyboard-only inset focus state.',
  'Numeric field':'The native Number control retains its numeric draft, producer rules and shared control height.',
  'Optional leading prefix':'A currency or unit adornment sits at the semantic inline inset, matching the value’s opposite edge padding, and stays vertically centered within the input height, independent of table-row line height.',
@@ -298,7 +307,7 @@ export function readSemanticTheme(element, names=[]) {
    if(rule.style&&rule.selectorText){
     let matches=false;try{matches=node.matches(rule.selectorText);}catch{continue;}
     if(matches)for(let index=0;index<rule.style.length;index++){
-     const property=rule.style.item(index);
+     const property=rule.style[index];
      if(property.startsWith('--'))declarations[property]=rule.style.getPropertyValue(property).trim();
     }
    }else if(rule.cssRules){

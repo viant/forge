@@ -19,7 +19,7 @@ import FilterChips from '../../components/content/FilterChips.jsx';
 import Avatar from '../../components/Avatar.jsx';
 import Popover from '../../components/Popover.jsx';
 import DropdownMenu from '../../components/DropdownMenu.jsx';
-import NavigationFlyout, {NavigationSubmenu} from '../../components/NavigationFlyout.jsx';
+import NavigationFlyout from '../../components/NavigationFlyout.jsx';
 import SwitchControl from '../../components/SwitchControl.jsx';
 import SectionTabRail from '../../components/SectionTabRail.jsx';
 import {WorkspaceRuntimeTabs,workspaceTabID,workspacePanelID} from '../../components/WorkspaceRuntimeSurface.jsx';
@@ -345,17 +345,19 @@ function DrawerExample({variant,disabled}) {
     </div>;
 }
 
-function SideNavExample({variant, disabled}) {
+function SideNavExample({disabled}) {
     const [destination, setDestination] = useState('Documents');
-    const documents = ['Overview', 'Documents', 'History'];
+    const documents = ['All documents', 'Documents', 'History'];
     return <nav className="forge-navigation-example" aria-label="Example workspace destinations">
-      <NavigationFlyout title="Documents" icon="lucide:file-text" current={documents.includes(destination) || destination === 'Shared documents'} disabled={disabled}>
+      <BlueprintButton minimal className="forge-navigation-trigger" aria-label="Overview"
+        aria-current={destination === 'Overview' ? 'page' : undefined} disabled={disabled}
+        onClick={() => setDestination('Overview')}>
+        <Icon name="lucide:house"/><span className="forge-navigation-label">Overview</span>
+      </BlueprintButton>
+      <NavigationFlyout title="Documents" icon="lucide:file-text" current={documents.includes(destination)} disabled={disabled}>
         <Menu aria-label="Documents">{documents.map(name => <MenuItem key={name} text={name}
           active={destination === name} aria-current={destination === name ? 'page' : undefined} onClick={() => setDestination(name)}/>)}
-          {variant === 'Nested menus' ? <NavigationSubmenu text="Collections">
-            <MenuItem text="Shared documents" active={destination === 'Shared documents'} aria-current={destination === 'Shared documents' ? 'page' : undefined} onClick={() => setDestination('Shared documents')}/>
-            <MenuItem text="Unavailable collection" disabled/>
-          </NavigationSubmenu> : null}
+
           <MenuItem text="Unavailable destination" disabled/>
         </Menu>
       </NavigationFlyout>
@@ -501,7 +503,7 @@ export default function CatalogExample({spec,variant=spec.variants[0],state='Def
     if(id==='outline')return <nav className="catalog-outline" aria-label="Example document outline"><a href="#foundations">Foundations</a><a href="#components/button">Components</a>{variant==='Nested'&&<a className="is-nested" href="#components/button">Button</a>}<a href="#components/analytical-report">Patterns</a></nav>;
     if(id==='pagination')return <nav className="forge-pagination" aria-label="Example result pages"><Button variant="ghost" size="compact" disabled={disabled||page===1} aria-label="Previous page" icon="lucide:chevron-left" hideLabel onClick={()=>setPage(page-1)}/>{variant==='Numbered'?<>{[1,2,3].map(n=><BlueprintButton minimal small key={n} active={page===n} aria-current={page===n?'page':undefined} aria-label={`Page ${n}`} disabled={disabled} onClick={()=>setPage(n)} {...typographyProps('small')}>{n}</BlueprintButton>)}<span className="catalog-sr-only" role="status">Page {page} of 3</span></>:<Typography typeRole="small" role="status" aria-live="polite">{page} / 3</Typography>}<Button variant="ghost" size="compact" disabled={disabled||page===3} aria-label="Next page" icon="lucide:chevron-right" hideLabel onClick={()=>setPage(page+1)}/></nav>;
     if(id==='top-nav')return <TopNavExample variant={variant} disabled={disabled}/>;
-    if(id==='side-nav')return <SideNavExample variant={variant} disabled={disabled}/>;
+    if(id==='side-nav')return <SideNavExample disabled={disabled}/>;
     if(id==='stepper')return <StepperExample variant={variant} state={state}/>;
     if(id==='tab-list')return <LocalTabs variant={variant} disabled={disabled}/>;
     if(id==='dialog')return <DialogExample variant={variant} disabled={disabled}/>;
