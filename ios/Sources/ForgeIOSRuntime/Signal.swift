@@ -9,10 +9,16 @@ public actor Signal<Value: Sendable> {
     }
 
     public func set(_ next: Value) {
+        _ = exchange(next)
+    }
+
+    func exchange(_ next: Value) -> Value {
+        let previous = value
         value = next
         for continuation in continuations.values {
             continuation.yield(next)
         }
+        return previous
     }
 
     public func peek() -> Value {

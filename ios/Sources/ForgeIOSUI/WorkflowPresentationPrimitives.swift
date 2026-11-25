@@ -518,7 +518,6 @@ private struct DraftFormActions: View {
 }
 
 struct MutationCommandButton: View {
-    private static let acceptConfirmation: @Sendable (String) async -> Bool = { _ in true }
     let runtime: ForgeRuntime
     let window: WindowContext
     let sourceDataSourceRef: String
@@ -527,24 +526,22 @@ struct MutationCommandButton: View {
     var confirmationOverride: String? = nil
     var extras: [String: JSONValue] = [:]
     var externallyDisabled: Bool = false
+    var dialogFooter: (id: String, action: ActionDef)? = nil
     var onSettled: ((MutationCommandResult) -> Void)? = nil
 
     @State private var state = MutationCommandState()
     @State private var confirmationVisible = false
+    @State private var confirmationReply: CheckedContinuation<Bool, Never>?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Button {
-                if effectiveConfirmation?.isEmpty == false {
-                    confirmationVisible = true
-                } else {
-                    execute(confirmed: false)
-                }
+                execute()
             } label: {
                 if state.pending {
                     ProgressView().controlSize(.small)
                 }
-                if !command.hideLabel {
+                if !(dialogFooter?.action.hideLabel ?? command.hideLabel) {
                     Text(labelOverride ?? command.label ?? "Save")
                 }
             }
@@ -552,9 +549,10 @@ struct MutationCommandButton: View {
             .disabled(state.guarded || externallyDisabled)
             .accessibilityIdentifier("forge-mutation-\(command.commandId ?? command.dataSourceRef)")
             .alert(effectiveConfirmation ?? "Confirm", isPresented: $confirmationVisible) {
-                Button("Cancel", role: .cancel) {}
-                Button(labelOverride ?? command.label ?? "Confirm") { execute(confirmed: true) }
+                Button("Cancel", role: .cancel) { settleConfirmation(false) }
+                Button(labelOverride ?? command.label ?? "Confirm") { settleConfirmation(true) }
             }
+            .onDisappear { settleConfirmation(false) }
             if !state.message.isEmpty {
                 Text(state.message)
                     .font(.caption)
@@ -570,22 +568,39 @@ struct MutationCommandButton: View {
         confirmationOverride ?? resolveMutationConfirmation(command: command, extras: extras)
     }
 
-    private func execute(confirmed: Bool) {
+    @MainActor private func askConfirmation() async -> Bool {
+        guard confirmationReply == nil else { return false }
+        return await withCheckedContinuation { reply in confirmationReply = reply; confirmationVisible = true }
+    }
+
+    @MainActor private func settleConfirmation(_ accepted: Bool) {
+        let reply = confirmationReply
+        confirmationReply = nil
+        reply?.resume(returning: accepted)
+    }
+
+    private func execute() {
         Task {
-            let confirmation: (@Sendable (String) async -> Bool)? = confirmed ? Self.acceptConfirmation : nil
-            async let execution = runtime.executeMutationCommand(
-                windowID: window.windowID,
-                sourceDataSourceRef: sourceDataSourceRef,
-                command: command,
-                extras: extras,
-                confirm: confirmation
-            )
+            if effectiveConfirmation?.isEmpty == false && resolveMutationConfirmation(command: command, extras: extras).isEmpty {
+                guard await askConfirmation() else { return }
+            }
+            let confirmation: @Sendable (String) async -> Bool = { _ in await askConfirmation() }
+            async let execution = dispatch(confirmation)
             await Task.yield()
             state = await runtime.mutationCommandState(windowID: window.windowID, command: command)
             let result = await execution
             state = await runtime.mutationCommandState(windowID: window.windowID, command: command)
             onSettled?(result)
         }
+    }
+
+    private func dispatch(_ confirmation: (@Sendable (String) async -> Bool)?) async -> MutationCommandResult {
+        if let footer = dialogFooter {
+            return await runtime.activateDialogFooter(windowID: window.windowID, dialogID: footer.id, sourceDataSourceRef: sourceDataSourceRef, action: footer.action, confirm: confirmation)
+                ?? MutationCommandResult(accepted: false, status: "invalid")
+        }
+        return await runtime.executeMutationCommand(windowID: window.windowID, sourceDataSourceRef: sourceDataSourceRef,
+            command: command, extras: extras, confirm: confirmation)
     }
 }
 

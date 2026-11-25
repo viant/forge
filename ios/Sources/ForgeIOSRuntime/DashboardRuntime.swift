@@ -2126,7 +2126,8 @@ public enum DashboardRuntime {
         collection: [[String: Any]] = [],
         input: [String: Any] = [:],
         selectionValues: [String: Any] = [:],
-        authorization: [String: Any] = [:]
+        authorization: [String: Any] = [:],
+        valueForCondition: ((DashboardConditionDef) -> Any?)? = nil
     ) -> Bool {
         guard let condition else { return true }
         if !condition.all.isEmpty && condition.all.contains(where: {
@@ -2140,7 +2141,7 @@ public enum DashboardRuntime {
                 collection: collection,
                 input: input,
                 selectionValues: selectionValues,
-                authorization: authorization
+                authorization: authorization, valueForCondition: valueForCondition
             )
         }) { return false }
         if !condition.any.isEmpty && !condition.any.contains(where: {
@@ -2154,7 +2155,7 @@ public enum DashboardRuntime {
                 collection: collection,
                 input: input,
                 selectionValues: selectionValues,
-                authorization: authorization
+                authorization: authorization, valueForCondition: valueForCondition
             )
         }) { return false }
         if let negated = condition.not,
@@ -2168,10 +2169,15 @@ public enum DashboardRuntime {
                collection: collection,
                input: input,
                selectionValues: selectionValues,
-               authorization: authorization
+               authorization: authorization, valueForCondition: valueForCondition
            ) { return false }
+        if condition.whenValue == nil && condition.equals == nil && condition.notEquals == nil && condition.containsValue == nil
+            && condition.inValues.isEmpty && condition.gt == nil && condition.gte == nil && condition.lt == nil && condition.lte == nil
+            && condition.matches == nil && condition.exists == nil && condition.empty == nil && condition.notEmpty == nil { return true }
         let selector = condition.selector ?? condition.field ?? condition.key
-        let actual = resolveDashboardValue(
+        let actual: Any?
+        if let valueForCondition { actual = valueForCondition(condition) }
+        else { actual = resolveDashboardValue(
             source: condition.source,
             selector: selector,
             metrics: metrics,
@@ -2183,7 +2189,7 @@ public enum DashboardRuntime {
             input: input,
             selectionValues: selectionValues,
             authorization: authorization
-        )
+        ) }
 
         if let expected = condition.whenValue, !dashboardValuesEqual(actual: actual, expected: expected) {
             return false
@@ -2202,6 +2208,16 @@ public enum DashboardRuntime {
             return false
         }
 
+        if let exists = condition.exists, (actual != nil && !(actual is NSNull)) != exists { return false }
+        if let pattern = condition.matches {
+            let text: String
+            if let string = actual as? String { text = string }
+            else if let number = actual as? Double, number.isFinite, number.rounded() == number { text = String(format: "%.0f", number) }
+            else { text = actual.map { String(describing: $0) } ?? "" }
+            guard let regex = try? NSRegularExpression(pattern: pattern),
+                  regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil else { return false }
+        }
+        if (condition.gt != nil || condition.gte != nil || condition.lt != nil || condition.lte != nil), numericValue(actual) == nil { return false }
         if let number = numericValue(actual) {
             if let gt = condition.gt, !(number > gt) { return false }
             if let gte = condition.gte, !(number >= gte) { return false }
@@ -2235,7 +2251,7 @@ public enum DashboardRuntime {
         selectionValues: [String: Any] = [:],
         authorization: [String: Any] = [:]
     ) -> Any? {
-        let selectionPayload = selectionDictionary(selection)
+        let selectionPayload = selectionDictionary(selection).merging(selectionValues) { _, scoped in scoped }
 
         guard let selector, !selector.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             switch source?.lowercased() {

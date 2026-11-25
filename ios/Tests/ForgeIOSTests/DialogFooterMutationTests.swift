@@ -1,0 +1,231 @@
+import XCTest
+@testable import ForgeIOSRuntime
+
+private actor FooterWrites {
+    var calls: [(String, [String: JSONValue])] = []
+    func record(_ ref: String, _ values: [String: JSONValue]) { calls.append((ref, values)) }
+}
+
+final class DialogFooterMutationTests: XCTestCase {
+    private let script = #"""
+    ({
+      normalize: ({value, modelRef, schema, phase, context}) => {
+        if (modelRef !== 'entry' || !schema.properties.name || phase !== 'beforeMarshal') throw Error('Unexpected model context');
+        return {...value, name:value.name.trim(), number:context.Context('parent').signals.form.peek().number};
+      },
+      project: ({value, phase}) => { if (phase !== 'afterMarshal') throw Error('Missing phase'); return {entry:value}; },
+      prepare: ({context, parameters, extras}) => {
+        if (!context.signals.authorization.peek().principal.roles.includes('editor')) throw Error('Access unavailable');
+        if (Object.keys(extras).length) throw Error('Unexpected extra arguments');
+        return {body:{...parameters.entry, selected:context.handlers.dataSource.getSelection().selected.id, approved:false, optional:null}};
+      },
+      reject: () => {throw Error('Validation failed')},
+      wait: async () => ({}),
+      effect: ({context}) => {context.handlers.dataSource.fetchCollection();return {};},
+      invalid: () => []
+    })
+    """#
+
+    private func metadata(_ role: String = "editor") throws -> WindowMetadata {
+        let json: [String: Any] = ["namespace":"Records","actionAliases":["Edit"],"view":["content":[:]],
+            "dataSource":["draft":[:], "parent":[:], "writer":[:], "list":[:]],
+            "authorizationSnapshot":["principal":["subject":"user","roles":[role],"features":[]]],
+            "actions":["code":script], "schemas":["entry":["type":"object","properties":["name":["type":"string"],"number":["type":"integer"]]]],
+            "resourceModels":["entry":["schemaRef":"entry","write":["dataSourceRef":"writer","mode":"full"],
+                "fields":["name":["write":"label"],"number":["write":"number"]],"hooks":["beforeMarshal":"Edit.normalize","afterMarshal":"Records.project"]]]]
+        return try JSONDecoder().decode(WindowMetadata.self, from: JSONSerialization.data(withJSONObject: json))
+    }
+
+    private func action(prepare: String = "Edit.prepare", confirmation: String? = nil, missingField: Bool = false) throws -> ActionDef {
+        var command: [String: Any] = ["dataSourceRef":"writer", "prepare":prepare, "payload":["modelRef":"entry","source":["scope":"form"],"target":"$"],
+            "refresh":[["dataSourceRef":"list","bypassCache":true]], "resultState":["receipt":["0.id"]],
+            "validateWhen":["source":"authorization","field":"principal.roles","contains":"editor"]]
+        if let confirmation { command["confirm"] = confirmation }
+        if missingField { command["resultState"] = ["unknown":["0.absent"]] }
+        return try JSONDecoder().decode(ActionDef.self, from: JSONSerialization.data(withJSONObject: [
+            "id":"submit","label":"Apply","close":true,"on":[["event":"onClick","handler":"legacy.execute"]],
+            "visibleWhen":["source":"authorization","field":"principal.subject","matches":"^user$"],
+            "disabledWhen":["not":["source":"selection","field":"selected.id","exists":true]],
+            "mutationCommand":command
+        ]))
+    }
+
+    private func seeded(_ role: String = "editor") async throws -> (ForgeRuntime, String, FooterWrites) {
+        let runtime = ForgeRuntime()
+        let window = await runtime.openWindowInline(key:"record",title:"Record",metadata:try metadata(role))
+        let writes = FooterWrites()
+        await runtime.registerHandler("legacy.execute") { _ in await writes.record("legacy",[:]); return .bool(true) }
+        await runtime.registerDataSourceLoader { request in
+            await writes.record(request.dataSourceRef,request.input.parameters)
+            return ForgeRuntime.DataSourceFetchResult(rows:[["id":.number(37)]])
+        }
+        await runtime.setDataSourceForm(windowID:window.id,dataSourceRef:"parent",values:["number":.number(0)])
+        await runtime.setDataSourceSelection(windowID:window.id,dataSourceRef:"draft",selected:["id":.number(9)],rowIndex:0)
+        await runtime.setDataSourceForm(windowID:window.id,dataSourceRef:"draft",values:["name":.string(" value ")])
+        return (runtime,window.id,writes)
+    }
+
+    func testFooterRunsScopedHooksAndExactlyOnePreparedWrite() async throws {
+        let (runtime, id, capture) = try await seeded()
+        let writerID = WindowIdentity(windowID:id).dataSourceID(ref:"writer")
+        await runtime.dataSourceRuntime.setInput(dataSourceID:writerID,input:InputState(fetch:true))
+        let footer = try action()
+        let visible = await runtime.mutationPredicateAllows(windowID:id,dataSourceRef:"draft",condition:footer.visibleWhen)
+        let disabled = await runtime.mutationPredicateAllows(windowID:id,dataSourceRef:"draft",condition:footer.disabledWhen)
+        let valid = await runtime.mutationPredicateAllows(windowID:id,dataSourceRef:"draft",condition:footer.footerCommand?.validateWhen)
+        XCTAssertTrue(visible, "Visible")
+        XCTAssertFalse(disabled, "Enabled")
+        XCTAssertTrue(valid, "Authorized")
+        let result = await runtime.activateDialogFooter(windowID:id,dialogID:"editor",sourceDataSourceRef:"draft",action:footer)
+        XCTAssertEqual(footer.footerCommand?.commandId,"submit")
+        XCTAssertEqual(result?.status,"succeeded",result?.error ?? "")
+        let calls = await capture.calls
+        XCTAssertEqual(calls.map(\.0),["writer","list"])
+        XCTAssertEqual(calls.first?.1,["body":.object(["label":.string("value"),"number":.number(0),"selected":.number(9),"approved":.bool(false),"optional":.null])])
+        let state = await runtime.windowFormJSONValue(windowID:id)
+        XCTAssertEqual(state["receipt"],.number(37))
+    }
+
+    func testPreparationFailuresAndReadOnlyRoleNeverDispatch() async throws {
+        let (runtime,id,capture) = try await seeded()
+        for name in ["missing","reject","wait","effect","invalid"] {
+            let result = await runtime.activateDialogFooter(windowID:id,dialogID:"editor",sourceDataSourceRef:"draft",action:try action(prepare:"Records."+name))
+            XCTAssertEqual(result?.accepted,false,name)
+            XCTAssertEqual(result?.status,"invalid_payload",name)
+        }
+        let calls = await capture.calls
+        XCTAssertTrue(calls.isEmpty)
+        let (denied,other,deniedCapture) = try await seeded("reader")
+        let result = await denied.activateDialogFooter(windowID:other,dialogID:"editor",sourceDataSourceRef:"draft",action:try action())
+        XCTAssertEqual(result?.status,"invalid")
+        let deniedCalls = await deniedCapture.calls
+        XCTAssertTrue(deniedCalls.isEmpty)
+    }
+
+    func testSelectionChangeDuringConfirmationRejectsAndLegacyClickStillWorks() async throws {
+        let (runtime,id,capture) = try await seeded()
+        let result = await runtime.activateDialogFooter(windowID:id,dialogID:"editor",sourceDataSourceRef:"draft",action:try action(confirmation:"Apply selection?")) { _ in
+            await runtime.setDataSourceSelection(windowID:id,dataSourceRef:"draft",selected:["id":.number(10)],rowIndex:1)
+            return true
+        }
+        XCTAssertEqual(result?.accepted,false)
+        let click = try JSONDecoder().decode(ActionDef.self,from:Data(#"{"id":"legacy","on":[{"event":"onClick","handler":"legacy.execute"}]}"#.utf8))
+        _ = await runtime.activateDialogFooter(windowID:id,dialogID:"editor",sourceDataSourceRef:"draft",action:click)
+        let calls = await capture.calls
+        XCTAssertEqual(calls.map(\.0),["legacy"])
+    }
+
+    func testCommittedWriteReportsMissingReceiptAndRefreshFailureSeparately() async throws {
+        let (runtime,id,capture) = try await seeded()
+        await runtime.registerDataSourceLoader { request in
+            await capture.record(request.dataSourceRef,request.input.parameters)
+            if request.dataSourceRef == "list" { throw NSError(domain:"Fixture",code:1) }
+            return ForgeRuntime.DataSourceFetchResult(rows:[["id":.number(37)]])
+        }
+        let footer = try action(missingField:true)
+        let result = await runtime.activateDialogFooter(windowID:id,dialogID:"editor",sourceDataSourceRef:"draft",action:footer)
+        XCTAssertEqual(result?.status,"succeeded",result?.error ?? "")
+        XCTAssertEqual(Set(result?.warnings.map(\.stage) ?? []),["refresh","resultState"])
+        let state = await runtime.mutationCommandState(windowID:id,command:try XCTUnwrap(footer.footerCommand))
+        XCTAssertEqual(state.writerStatus,.succeeded)
+        XCTAssertEqual(state.syncStatus,.partialFailure)
+        let calls = await capture.calls
+        XCTAssertEqual(calls.map(\.0),["writer","list"])
+    }
+    func testUnknownWriteStaysGuardedUntilResolved() async throws {
+        let (runtime,id,capture) = try await seeded()
+        await runtime.registerDataSourceLoader { request in
+            await capture.record(request.dataSourceRef, request.input.parameters)
+            throw URLError(.timedOut)
+        }
+        let footer = try action()
+        let first = await runtime.activateDialogFooter(windowID:id,dialogID:"editor",sourceDataSourceRef:"draft",action:footer)
+        let retry = await runtime.activateDialogFooter(windowID:id,dialogID:"editor",sourceDataSourceRef:"draft",action:footer)
+        XCTAssertEqual(first?.status, "indeterminate")
+        XCTAssertEqual(retry?.accepted, false)
+        let calls = await capture.calls
+        XCTAssertEqual(calls.map(\.0), ["writer"])
+    }
+
+    func testRevocationDuringConfirmationDoesNotWrite() async throws {
+        let (runtime,id,capture) = try await seeded()
+        let revoked = try metadata("viewer")
+        let result = await runtime.activateDialogFooter(windowID:id,dialogID:"editor",sourceDataSourceRef:"draft",action:try action(confirmation:"Confirm")) { _ in
+            _ = await runtime.updateWindowInline(id:id,title:"Record",metadata:revoked)
+            return true
+        }
+        XCTAssertEqual(result?.accepted,false)
+        let calls = await capture.calls
+        XCTAssertTrue(calls.isEmpty)
+    }
+
+    func testConflictingWritersShareOneWindowLeaseAcrossConfirmationAndUnknownWrite() async throws {
+        let (runtime,id,capture) = try await seeded()
+        func footer(_ actionID: String, target: String, prepare: String? = nil, confirm: Bool = false) throws -> ActionDef {
+            var command: [String: Any] = ["dataSourceRef":target,"serializationGroup":"record.edit"]
+            if let prepare { command["prepare"] = prepare }
+            if confirm { command["confirm"] = "Apply?" }
+            return try JSONDecoder().decode(ActionDef.self, from: JSONSerialization.data(withJSONObject:["id":actionID,"mutationCommand":command]))
+        }
+        let first = try footer("first",target:"writer",confirm:true)
+        let other = try footer("other",target:"list")
+        let cancelled = await runtime.activateDialogFooter(windowID:id,dialogID:"edit",sourceDataSourceRef:"draft",action:first) { _ in
+            let blocked = await runtime.activateDialogFooter(windowID:id,dialogID:"edit",sourceDataSourceRef:"draft",action:other)
+            XCTAssertEqual(blocked?.status,"group_busy")
+            return false
+        }
+        XCTAssertEqual(cancelled?.status,"cancelled")
+        let invalid = try footer("bad",target:"writer",prepare:"Edit.reject")
+        let rejected = await runtime.activateDialogFooter(windowID:id,dialogID:"edit",sourceDataSourceRef:"draft",action:invalid)
+        XCTAssertEqual(rejected?.status,"invalid_payload")
+        await runtime.registerDataSourceLoader { request in
+            await capture.record(request.dataSourceRef,request.input.parameters)
+            throw URLError(.networkConnectionLost)
+        }
+        let unknown = await runtime.activateDialogFooter(windowID:id,dialogID:"edit",sourceDataSourceRef:"draft",action:first) { _ in true }
+        XCTAssertEqual(unknown?.status,"indeterminate")
+        let blocked = await runtime.activateDialogFooter(windowID:id,dialogID:"edit",sourceDataSourceRef:"draft",action:other)
+        XCTAssertEqual(blocked?.status,"group_busy")
+        let released = await runtime.resolveIndeterminateMutationCommand(windowID:id,command:try XCTUnwrap(first.footerCommand))
+        XCTAssertTrue(released)
+        await runtime.registerDataSourceLoader { request in
+            await capture.record(request.dataSourceRef,request.input.parameters)
+            return .init(rows:[])
+        }
+        let next = await runtime.activateDialogFooter(windowID:id,dialogID:"edit",sourceDataSourceRef:"draft",action:other)
+        XCTAssertEqual(next?.status,"succeeded")
+        let calls = await capture.calls
+        XCTAssertEqual(calls.map(\.0),["writer","list"])
+    }
+
+    func testOpenAndCloseRunDeclaredLifecycleOnceAndReopenResetsTypedState() async throws {
+        let raw = #"{"view":{"content":{}},"dataSource":{"draft":{}},"dialogs":[{"id":"record","dataSourceRef":"draft","on":[{"event":"onOpen","handler":"dataSource.setWindowFormData","parameters":[{"name":"done","in":"const","location":"false","codec":{"name":"boolean"}},{"name":"receipt","in":"const","location":"null","codec":{"name":"json"}}]},{"event":"onClose","handler":"fixture.closed"}]}]}"#
+        let metadata = try JSONDecoder().decode(WindowMetadata.self,from:Data(raw.utf8))
+        let runtime = ForgeRuntime(), calls = FooterWrites()
+        let window = await runtime.openWindowInline(key:"edit",title:"Edit",metadata:metadata)
+        await runtime.registerHandler("fixture.closed"){ _ in await calls.record("close",[:]); return .bool(true) }
+        _ = await runtime.presentDialog(windowID:window.id,dialogID:"record")
+        await runtime.setWindowFormValue(windowID:window.id,values:["done":.bool(true),"receipt":.number(17)],bumpPrefillRevision:false)
+        _ = await runtime.presentDialog(windowID:window.id,dialogID:"record")
+        let during = await runtime.windowFormJSONValue(windowID:window.id)
+        XCTAssertEqual(during["done"],.bool(true))
+        await runtime.closeDialogPublic(windowID:window.id,dialogID:"record")
+        await runtime.closeDialogPublic(windowID:window.id,dialogID:"record")
+        _ = await runtime.presentDialog(windowID:window.id,dialogID:"record")
+        let reopened = await runtime.windowFormJSONValue(windowID:window.id)
+        XCTAssertEqual(reopened["done"],.bool(false))
+        XCTAssertEqual(reopened["receipt"],.null)
+        let events = await calls.calls
+        XCTAssertEqual(events.map(\.0),["close"])
+    }
+
+    func testDialogFetchPolicyPreservesExplicitAndContentOwnedDrafts() throws {
+        for (source, expected) in [
+            (#"{}"#, true), (#"{"fetchOnOpen":false}"#, false), (#"{"content":{"id":"draft","fetchData":false}}"#, false),
+            (#"{"fetchOnOpen":true,"content":{"id":"draft","fetchData":false}}"#, true)
+        ] {
+            XCTAssertEqual(try JSONDecoder().decode(DialogDef.self,from:Data(source.utf8)).shouldFetchOnOpen, expected)
+        }
+    }
+
+}

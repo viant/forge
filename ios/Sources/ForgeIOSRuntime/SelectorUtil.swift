@@ -42,9 +42,9 @@ public enum SelectorUtil {
         guard !parts.isEmpty else {
             return value
         }
-        return parts.reduce(value) { partial, key in
+        return unwrapOptional(parts.reduce(value) { partial, key in
             resolveComponent(partial, key: key)
-        }
+        })
     }
 
     private static func resolveComponent(_ value: Any?, key: String) -> Any? {

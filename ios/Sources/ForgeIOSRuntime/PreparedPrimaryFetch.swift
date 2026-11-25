@@ -8,6 +8,8 @@ public struct RegisteredDataSourceSnapshot: Sendable {
     /// nil means unresolved; [] is a confirmed empty collection.
     public let collection: [[String: JSONValue]]?
     public let metrics: [String: JSONValue]
+    public var dataInfo: [String: JSONValue] = [:]
+    public var stale = false
 }
 
 struct PreparedPrimaryFetch: Sendable {

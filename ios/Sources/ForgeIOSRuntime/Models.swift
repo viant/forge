@@ -3,6 +3,7 @@ import Foundation
 public struct WindowMetadata: Codable, Sendable {
     /// In-memory authored input for portable hooks; never an encoded metadata field.
     public var runtimeAuthoring: JSONValue?
+    public let windowKey: String?
     public let namespace: String?
     public let actionAliases: [String]?
     public let view: ViewDef?
@@ -25,7 +26,7 @@ public struct WindowMetadata: Codable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case namespace
+        case windowKey, namespace
         case actionAliases
         case view
         case dialogs
@@ -60,10 +61,12 @@ public struct WindowMetadata: Codable, Sendable {
         schemas: [String: ResourceSchemaDef] = [:],
         resourceModels: [String: ResourceModelDef] = [:],
         resourceMappings: [String: ResourceMappingDef]? = nil,
-        actionAliases: [String]? = nil
+        actionAliases: [String]? = nil,
+        windowKey: String? = nil
     ) {
         self.runtimeAuthoring = nil
         self.namespace = namespace
+        self.windowKey = windowKey
         self.actionAliases = actionAliases
         self.view = view
         self.dialogs = dialogs
@@ -84,6 +87,7 @@ public struct WindowMetadata: Codable, Sendable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let legacyContainer = try decoder.container(keyedBy: LegacyCodingKeys.self)
         actionAliases = try container.decodeIfPresent([String].self, forKey: .actionAliases)
+        windowKey = try container.decodeIfPresent(String.self, forKey: .windowKey)
         namespace = try container.decodeIfPresent(String.self, forKey: .namespace)
         let decodedView = try container.decodeIfPresent(ViewDef.self, forKey: .view)
         dialogs = try container.decodeIfPresent([DialogDef].self, forKey: .dialogs) ?? []
@@ -295,6 +299,8 @@ public struct DialogDef: Codable, Sendable, Identifiable {
     public let title: String?
     public let dataSourceRef: String?
     public let selectionMode: String?
+    public let fetchOnOpen: Bool?
+    public var shouldFetchOnOpen: Bool { fetchOnOpen ?? (content?.fetchData != false) }
     public let content: ContainerDef?
     public let on: [ExecutionDef]
     public let actions: [ActionDef]
@@ -308,6 +314,7 @@ public struct DialogDef: Codable, Sendable, Identifiable {
         title: String? = nil,
         dataSourceRef: String? = nil,
         selectionMode: String? = nil,
+        fetchOnOpen: Bool? = nil,
         content: ContainerDef? = nil,
         on: [ExecutionDef] = [],
         actions: [ActionDef] = [],
@@ -320,6 +327,7 @@ public struct DialogDef: Codable, Sendable, Identifiable {
         self.title = title
         self.dataSourceRef = dataSourceRef
         self.selectionMode = selectionMode
+        self.fetchOnOpen = fetchOnOpen
         self.content = content
         self.on = on
         self.actions = actions
@@ -333,7 +341,7 @@ public struct DialogDef: Codable, Sendable, Identifiable {
         case id
         case title
         case dataSourceRef
-        case selectionMode
+        case selectionMode, fetchOnOpen
         case content
         case on
         case actions
@@ -360,6 +368,7 @@ public struct DialogDef: Codable, Sendable, Identifiable {
         id = try container.decodeIfPresent(String.self, forKey: .id)
         title = try container.decodeIfPresent(String.self, forKey: .title)
         dataSourceRef = try container.decodeIfPresent(String.self, forKey: .dataSourceRef)
+        fetchOnOpen = try container.decodeIfPresent(Bool.self, forKey: .fetchOnOpen)
         selectionMode = try container.decodeIfPresent(String.self, forKey: .selectionMode)
         content = try container.decodeIfPresent(ContainerDef.self, forKey: .content)
         on = try container.decodeIfPresent([ExecutionDef].self, forKey: .on) ?? []
@@ -376,6 +385,11 @@ public struct ActionDef: Codable, Sendable, Identifiable {
     public let id: String?
     public let label: String?
     public let icon: String?
+    public let mutationCommand: MutationCommandDef?
+    public let visibleWhen: DashboardConditionDef?
+    public let disabledWhen: DashboardConditionDef?
+    public let close: Bool
+    public let hideLabel: Bool
     public let on: [ExecutionDef]
     public let target: JSONValue?
     public let targetOverrides: [String: JSONValue]
@@ -385,6 +399,11 @@ public struct ActionDef: Codable, Sendable, Identifiable {
         label: String? = nil,
         icon: String? = nil,
         on: [ExecutionDef] = [],
+        mutationCommand: MutationCommandDef? = nil,
+        visibleWhen: DashboardConditionDef? = nil,
+        disabledWhen: DashboardConditionDef? = nil,
+        close: Bool = false,
+        hideLabel: Bool = false,
         target: JSONValue? = nil,
         targetOverrides: [String: JSONValue] = [:]
     ) {
@@ -392,6 +411,11 @@ public struct ActionDef: Codable, Sendable, Identifiable {
         self.label = label
         self.icon = icon
         self.on = on
+        self.mutationCommand = mutationCommand
+        self.visibleWhen = visibleWhen
+        self.disabledWhen = disabledWhen
+        self.close = close
+        self.hideLabel = hideLabel
         self.target = target
         self.targetOverrides = targetOverrides
     }
@@ -400,7 +424,7 @@ public struct ActionDef: Codable, Sendable, Identifiable {
         case id
         case label
         case icon
-        case on
+        case on, mutationCommand, visibleWhen, disabledWhen, close, hideLabel
         case target
         case targetOverrides
     }
@@ -410,6 +434,11 @@ public struct ActionDef: Codable, Sendable, Identifiable {
         id = try container.decodeIfPresent(String.self, forKey: .id)
         label = try container.decodeIfPresent(String.self, forKey: .label)
         icon = try container.decodeIfPresent(String.self, forKey: .icon)
+        mutationCommand = try container.decodeIfPresent(MutationCommandDef.self, forKey: .mutationCommand)
+        visibleWhen = try container.decodeIfPresent(DashboardConditionDef.self, forKey: .visibleWhen)
+        disabledWhen = try container.decodeIfPresent(DashboardConditionDef.self, forKey: .disabledWhen)
+        close = try container.decodeIfPresent(Bool.self, forKey: .close) ?? false
+        hideLabel = try container.decodeIfPresent(Bool.self, forKey: .hideLabel) ?? false
         on = try container.decodeIfPresent([ExecutionDef].self, forKey: .on) ?? []
         target = try container.decodeIfPresent(JSONValue.self, forKey: .target)
         targetOverrides = try container.decodeIfPresent([String: JSONValue].self, forKey: .targetOverrides) ?? [:]
@@ -3158,6 +3187,8 @@ public final class DashboardConditionDef: Codable, @unchecked Sendable {
     public let gte: Double?
     public let lt: Double?
     public let lte: Double?
+    public let exists: Bool?
+    public let matches: String?
     public let empty: Bool?
     public let notEmpty: Bool?
 
@@ -3179,7 +3210,7 @@ public final class DashboardConditionDef: Codable, @unchecked Sendable {
         case gte
         case lt
         case lte
-        case empty
+        case empty, exists, matches
         case notEmpty
     }
 
@@ -3198,6 +3229,8 @@ public final class DashboardConditionDef: Codable, @unchecked Sendable {
         gte: Double? = nil,
         lt: Double? = nil,
         lte: Double? = nil,
+        exists: Bool? = nil,
+        matches: String? = nil,
         empty: Bool? = nil,
         notEmpty: Bool? = nil,
         all: [DashboardConditionDef] = [],
@@ -3221,6 +3254,8 @@ public final class DashboardConditionDef: Codable, @unchecked Sendable {
         self.gte = gte
         self.lt = lt
         self.lte = lte
+        self.exists = exists
+        self.matches = matches
         self.empty = empty
         self.notEmpty = notEmpty
     }
@@ -3244,6 +3279,8 @@ public final class DashboardConditionDef: Codable, @unchecked Sendable {
         gte = try container.decodeIfPresent(Double.self, forKey: .gte)
         lt = try container.decodeIfPresent(Double.self, forKey: .lt)
         lte = try container.decodeIfPresent(Double.self, forKey: .lte)
+        exists = try container.decodeIfPresent(Bool.self, forKey: .exists)
+        matches = try container.decodeIfPresent(String.self, forKey: .matches)
         empty = try container.decodeIfPresent(Bool.self, forKey: .empty)
         notEmpty = try container.decodeIfPresent(Bool.self, forKey: .notEmpty)
     }
@@ -5023,6 +5060,7 @@ public struct ExecutionDef: Codable, Sendable {
 }
 
 public struct ParameterDef: Codable, Sendable {
+    public let codec: JSONValue?
     public let name: String
     public let input: String?
     public let from: String?
@@ -5035,7 +5073,7 @@ public struct ParameterDef: Codable, Sendable {
     public let selector: String?
 
     enum CodingKeys: String, CodingKey {
-        case name
+        case codec, name
         case input = "in"
         case from
         case to
@@ -5049,7 +5087,8 @@ public struct ParameterDef: Codable, Sendable {
 
     public init(name: String = "", input: String? = nil, direction: String? = nil,
                 value: JSONValue? = nil, location: JSONValue? = nil, selector: String? = nil,
-                from: String? = nil, to: String? = nil, kind: String? = nil, output: Bool? = nil) {
+                from: String? = nil, to: String? = nil, kind: String? = nil, output: Bool? = nil, codec: JSONValue? = nil) {
+        self.codec = codec
         self.name = name
         self.input = input
         self.from = from
@@ -5064,6 +5103,7 @@ public struct ParameterDef: Codable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        codec = try container.decodeIfPresent(JSONValue.self, forKey: .codec)
         name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
         input = try container.decodeIfPresent(String.self, forKey: .input)
         from = try container.decodeIfPresent(String.self, forKey: .from)
@@ -5074,6 +5114,22 @@ public struct ParameterDef: Codable, Sendable {
         value = try container.decodeIfPresent(JSONValue.self, forKey: .value)
         location = try container.decodeIfPresent(JSONValue.self, forKey: .location)
         selector = try container.decodeIfPresent(String.self, forKey: .selector)
+    }
+
+    var constantValue: JSONValue? {
+        guard let raw = location ?? value else { return nil }
+        let name = codec?.objectValue?["name"]?.stringValue ?? codec?.stringValue
+        guard case .string(let text) = raw else { return raw }
+        switch name?.lowercased() {
+        case "json": return try? JSONDecoder().decode(JSONValue.self, from: Data(text.utf8))
+        case "boolean", "bool":
+            switch text.trimmingCharacters(in:.whitespacesAndNewlines).lowercased() {
+            case "true", "1": return .bool(true)
+            case "false", "0": return .bool(false)
+            default: return nil
+            }
+        default: return raw
+        }
     }
 }
 

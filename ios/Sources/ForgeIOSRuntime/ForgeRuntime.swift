@@ -28,6 +28,7 @@ public actor ForgeRuntime {
 
     public struct DataSourceFetchResult: Sendable {
         public let rows: [[String: JSONValue]]
+        public let dataInfo: [String: JSONValue]
         public let metrics: [String: JSONValue]
         public let form: [String: JSONValue]?
         public let selection: [String: JSONValue]?
@@ -36,11 +37,13 @@ public actor ForgeRuntime {
         public init(
             rows: [[String: JSONValue]] = [],
             metrics: [String: JSONValue] = [:],
+            dataInfo: [String: JSONValue] = [:],
             form: [String: JSONValue]? = nil,
             selection: [String: JSONValue]? = nil,
             rowIndex: Int? = nil
         ) {
             self.rows = rows
+            self.dataInfo = dataInfo
             self.metrics = metrics
             self.form = form
             self.selection = selection
@@ -125,6 +128,7 @@ public actor ForgeRuntime {
     private var externalURLHandler: (@Sendable (URL) async -> Void)?
     var mutationCommandStates: [String: MutationCommandState] = [:]
     var guardedMutationCommands: Set<String> = []
+    var mutationSerializationOwners: [String: String] = [:]
     var guardedMutationTransports: Set<String> = []
 
     var handlers: [String: ForgeHandler] = [:]
@@ -317,31 +321,16 @@ public actor ForgeRuntime {
         preferredInput: InputState? = nil
     ) async -> ParameterResolver.ResolutionContext {
         let windowForm = await windowFormJSONValue(windowID: windowID)
-        var snapshots: [String: ParameterResolver.DataSourceSnapshot] = [:]
-        var dataSourceRefs = Set(metadata?.dataSources.keys.map { $0 } ?? [])
-        let trimmedIdentity = identityDataSourceRef.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmedIdentity.isEmpty {
-            dataSourceRefs.insert(trimmedIdentity)
+        let reader = await dataSourceRuntime.snapshotReader()
+        let identity = WindowIdentity(windowID: windowID)
+        var context = ParameterResolver.ResolutionContext(identityDataSourceRef: identityDataSourceRef, windowForm: windowForm, metadata: metadata)
+        context.lookup = { ref in
+            guard ref == identityDataSourceRef || metadata?.dataSources[ref] != nil else { return nil }
+            let value = reader(identity.dataSourceID(ref: ref))
+            return .init(selectionMode: metadata?.dataSources[ref]?.selectionMode, form: value?.form ?? [:], metrics: value?.metrics ?? [:],
+                selection: value?.selection ?? .init(), input: (ref == identityDataSourceRef ? preferredInput : nil) ?? value?.input ?? .init())
         }
-        for ref in dataSourceRefs {
-            let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: ref)
-            let input = ref == trimmedIdentity && preferredInput != nil
-                ? preferredInput!
-                : await dataSourceRuntime.input(dataSourceID: dataSourceID)
-            snapshots[ref] = ParameterResolver.DataSourceSnapshot(
-                selectionMode: metadata?.dataSources[ref]?.selectionMode,
-                form: await dataSourceRuntime.form(dataSourceID: dataSourceID),
-                metrics: await dataSourceRuntime.metrics(dataSourceID: dataSourceID),
-                selection: await dataSourceRuntime.selection(dataSourceID: dataSourceID),
-                input: input
-            )
-        }
-        return ParameterResolver.ResolutionContext(
-            identityDataSourceRef: trimmedIdentity,
-            dataSources: snapshots,
-            windowForm: windowForm,
-            metadata: metadata
-        )
+        return context
     }
 
     public func windowMetadata(id: String) async -> WindowMetadata? {
@@ -610,10 +599,11 @@ public actor ForgeRuntime {
         windowID: String,
         dataSourceRef: String,
         parameters: [String: JSONValue],
-        fetch: Bool = false
+        fetch: Bool = false,
+        preservePendingFetch: Bool = true
     ) async {
         let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
-        await dataSourceRuntime.setInputParameters(dataSourceID: dataSourceID, parameters: parameters, fetch: fetch)
+        await dataSourceRuntime.setInputParameters(dataSourceID: dataSourceID, parameters: parameters, fetch: fetch, preservePendingFetch: preservePendingFetch)
         let signal = await signals.input(dataSourceID: dataSourceID)
         let next = await dataSourceRuntime.input(dataSourceID: dataSourceID)
         await signal.set(next)
@@ -703,7 +693,8 @@ public actor ForgeRuntime {
                         rows: baseRows, generation: fetchGeneration, path: lifecyclePath + [dataSourceRef]
                     )
                     guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return nil }
-                    await dataSourceRuntime.setCollection(dataSourceID: dataSourceID, rows: hookedRows)
+                    await dataSourceRuntime.setCollection(dataSourceID: dataSourceID, rows: hookedRows, forInput: input)
+                    await dataSourceRuntime.setCollectionInfo(dataSourceID: dataSourceID, values: result.dataInfo)
                     await dataSourceRuntime.setMetrics(dataSourceID: dataSourceID, values: result.metrics)
                     await dataSourceRuntime.setControl(dataSourceID: dataSourceID, control: ControlState())
                     let collectionSignal = await signals.collection(dataSourceID: dataSourceID)
@@ -1151,15 +1142,32 @@ public actor ForgeRuntime {
         selectionMode: String? = nil
     ) async {
         let sig = await signals.dialog(dialogID: "\(windowID)Dialog\(dialogID)")
-        await sig.set(DialogState(open: true, selectionMode: selectionMode, props: parameters, args: parameters))
+        if !parameters.isEmpty, let dialog = await windowMetadata(id: windowID)?.dialogs.first(where: { $0.id == dialogID }),
+           let ref = dialog.content?.dataSourceRef ?? dialog.dataSourceRef, !ref.isEmpty {
+            let scoped = parameters[ref]?.objectValue
+            await setDataSourceInputParameters(windowID: windowID, dataSourceRef: ref,
+                parameters: scoped?.isEmpty == false ? scoped! : parameters, preservePendingFetch: false)
+        }
+        let previous = await sig.exchange(DialogState(open: true, selectionMode: selectionMode, props: parameters, args: parameters))
+        if !previous.open { await dispatchDialogLifecycle("onOpen", windowID: windowID, dialogID: dialogID, parameters: parameters) }
     }
 
     func closeDialog(windowID: String, dialogID: String) async {
         let key = "\(windowID)Dialog\(dialogID)"
         let sig = await signals.dialog(dialogID: key)
-        await sig.set(DialogState(open: false))
+        let previous = await sig.exchange(DialogState(open: false))
         pendingDialogs.removeValue(forKey: key)
         resolvePendingDialogResult(windowID: windowID, dialogID: dialogID, payload: nil)
+        if previous.open { await dispatchDialogLifecycle("onClose", windowID: windowID, dialogID: dialogID, parameters: previous.args) }
+    }
+
+    private func dispatchDialogLifecycle(_ event:String, windowID:String, dialogID:String, parameters:[String:JSONValue]) async {
+        guard let dialog = await windowMetadata(id:windowID)?.dialogs.first(where: { $0.id == dialogID }) else { return }
+        let ref = dialog.content?.dataSourceRef ?? dialog.dataSourceRef ?? ""
+        let context = ExecutionContext(windowID:windowID,dataSourceRef:ref)
+        for execution in dialog.on where execution.event == event {
+            _ = await execute(execution,context:context,args:["dialogId":.string(dialogID),"windowId":.string(windowID),"parameters":.object(parameters)])
+        }
     }
 
     // MARK: - Outbound parameter application

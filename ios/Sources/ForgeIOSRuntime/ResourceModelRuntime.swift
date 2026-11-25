@@ -13,6 +13,7 @@ public struct ResourceDataSnapshot: Sendable {
 }
 
 public struct ResourceValueEnvironment: Sendable {
+    var lookup: (@Sendable (String) -> ResourceDataSnapshot?)?
     public let identityDataSourceRef: String
     public let dataSources: [String: ResourceDataSnapshot]
     public let windowForm: [String: JSONValue]
@@ -24,6 +25,8 @@ public struct ResourceValueEnvironment: Sendable {
 }
 
 public typealias ResourceModelHook = @Sendable (_ name: String, _ value: JSONValue) throws -> JSONValue?
+
+typealias ScopedResourceModelHook = @Sendable (_ name: String, _ phase: String, _ modelRef: String, _ value: JSONValue, _ baseline: JSONValue?) throws -> JSONValue
 
 public enum ResourceModelRuntime {
     public static func mappedCase(_ name: String, row: [String: JSONValue], metadata: WindowMetadata) throws -> ResourceMappingCase {
@@ -47,6 +50,10 @@ public enum ResourceModelRuntime {
     }
 
     public static func marshal(draft: JSONValue, baseline: JSONValue?, modelRef: String, mode requestedMode: String? = nil, target requestedTarget: String? = nil, schemas: [String: ResourceSchemaDef], models: [String: ResourceModelDef], hook: ResourceModelHook? = nil) throws -> [String: JSONValue] {
+        try marshal(draft: draft, baseline: baseline, modelRef: modelRef, mode: requestedMode, target: requestedTarget, schemas: schemas, models: models, hook: hook, scoped: nil)
+    }
+
+    static func marshal(draft: JSONValue, baseline: JSONValue?, modelRef: String, mode requestedMode: String? = nil, target requestedTarget: String? = nil, schemas: [String: ResourceSchemaDef], models: [String: ResourceModelDef], hook: ResourceModelHook? = nil, scoped: ScopedResourceModelHook?) throws -> [String: JSONValue] {
         guard let model = models[modelRef], let write = model.write else { throw ResourceModelError.message("Resource model \(modelRef) requires a write binding") }
         let mode = normalizeResourceMode(requestedMode ?? write.mode ?? "changed")
         let associationModels = associationCollectionModels(from: modelRef, models: models)
@@ -58,26 +65,34 @@ public enum ResourceModelRuntime {
                 overlayBase = .object(object.filter { !associationFields.contains($0.key) })
             }
         }
+        var preparedBaseline = baseline
+        if let scoped, mode == "changed", let baseline, let name = model.hooks?.beforeMarshal, !name.isEmpty {
+            preparedBaseline = try scoped(name, "beforeMarshalBaseline", modelRef, baseline, baseline)
+        }
         var canonical = mode == "overlaybaseline" ? overlayResource(base: overlayBase, patch: draft) : draft
-        canonical = try applyResourceHook(model.hooks?.beforeMarshal, value: canonical, hook: hook)
+        canonical = try writeHook(model.hooks?.beforeMarshal, "beforeMarshal", modelRef, canonical, preparedBaseline, hook, scoped)
         try validate(value: canonical, schemaRef: model.schemaRef, schemas: schemas)
         if associationFields.isEmpty || baseline != nil {
             try validateImmutableIdentity(draft: canonical, baseline: baseline, schema: schemas[model.schemaRef])
         }
-        var wire = try marshalValue(canonical, baseline: baseline, model: model, mode: mode, schemas: schemas, models: models, associationModels: associationModels, hook: hook)
-        wire = try applyResourceHook(model.hooks?.afterMarshal, value: wire, hook: hook)
+        var wire = try marshalValue(canonical, baseline: preparedBaseline, model: model, mode: mode, schemas: schemas, models: models, associationModels: associationModels, hook: hook, scoped: scoped)
+        wire = try writeHook(model.hooks?.afterMarshal, "afterMarshal", modelRef, wire, preparedBaseline, hook, scoped)
         let target = requestedTarget?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? requestedTarget! : (write.inputPath ?? "")
         if target == "$" || target.isEmpty {
             guard let object = wire.objectValue else { throw ResourceModelError.message("Root resource payload must be an object") }
             return object
         }
         var result: [String: JSONValue] = [:]
-        let payload = !associationFields.isEmpty && write.collection == true ? JSONValue.array([wire]) : wire
+        let payload = (scoped != nil || !associationFields.isEmpty) && write.collection == true ? JSONValue.array([wire]) : wire
         setResourcePath(&result, path: target, value: payload)
         return result
     }
 
     public static func prepare(payload: ResourcePayloadPreparationDef, environment: ResourceValueEnvironment, schemas: [String: ResourceSchemaDef], models: [String: ResourceModelDef], hook: ResourceModelHook? = nil) throws -> [String: JSONValue] {
+        try prepare(payload: payload, environment: environment, schemas: schemas, models: models, hook: hook, scoped: nil)
+    }
+
+    static func prepare(payload: ResourcePayloadPreparationDef, environment: ResourceValueEnvironment, schemas: [String: ResourceSchemaDef], models: [String: ResourceModelDef], hook: ResourceModelHook? = nil, scoped: ScopedResourceModelHook?) throws -> [String: JSONValue] {
         let draft: JSONValue
         if let fields = payload.fields, !fields.isEmpty {
             var object: [String: JSONValue] = [:]
@@ -91,7 +106,7 @@ public enum ResourceModelRuntime {
             draft = .object(environment.extras)
         }
         let baseline = try payload.baseline.flatMap { try resolve(source: $0, environment: environment) }
-        return try marshal(draft: draft, baseline: baseline, modelRef: payload.modelRef, mode: payload.mode, target: payload.target, schemas: schemas, models: models, hook: hook)
+        return try marshal(draft: draft, baseline: baseline, modelRef: payload.modelRef, mode: payload.mode, target: payload.target, schemas: schemas, models: models, hook: hook, scoped: scoped)
     }
 
     public static func validate(value: JSONValue, schemaRef: String, schemas: [String: ResourceSchemaDef]) throws {
@@ -120,10 +135,10 @@ public enum ResourceModelRuntime {
         return try applyResourceCodec(value, codec: binding.codec, trim: binding.trim == true, empty: binding.empty)
     }
 
-    private static func marshalValue(_ value: JSONValue, baseline: JSONValue?, model: ResourceModelDef, mode: String, schemas: [String: ResourceSchemaDef], models: [String: ResourceModelDef], associationModels: Set<String>, hook: ResourceModelHook?) throws -> JSONValue {
+    private static func marshalValue(_ value: JSONValue, baseline: JSONValue?, model: ResourceModelDef, mode: String, schemas: [String: ResourceSchemaDef], models: [String: ResourceModelDef], associationModels: Set<String>, hook: ResourceModelHook?, scoped: ScopedResourceModelHook?) throws -> JSONValue {
         if case .array(let values) = value {
             let baselineValues = baseline?.arrayValue ?? []
-            return .array(try values.enumerated().map { index, item in try marshalValue(item, baseline: baselineValues.indices.contains(index) ? baselineValues[index] : nil, model: model, mode: mode, schemas: schemas, models: models, associationModels: associationModels, hook: hook) })
+            return .array(try values.enumerated().map { index, item in try marshalValue(item, baseline: baselineValues.indices.contains(index) ? baselineValues[index] : nil, model: model, mode: mode, schemas: schemas, models: models, associationModels: associationModels, hook: hook, scoped: scoped) })
         }
         guard let object = value.objectValue else { throw ResourceModelError.message("Canonical resource must be an object") }
         let baselineObject = baseline?.objectValue ?? [:]
@@ -144,10 +159,11 @@ public enum ResourceModelRuntime {
             let identity = schema?.identity.contains(field) == true
             let include = mode != "changed" || identity || binding.alwaysWrite == true || (binding.omitIfUnchanged != true && current != previous)
             guard include, let current else { continue }
+            if binding.empty?.lowercased() == "omit", current == .null || current == .string("") { continue }
             let transformed: JSONValue
             if let modelRef = binding.modelRef, let nested = models[modelRef] {
-                let prepared = try applyResourceHook(nested.hooks?.beforeMarshal, value: current, hook: hook)
-                transformed = try applyResourceHook(nested.hooks?.afterMarshal, value: marshalValue(prepared, baseline: previous, model: nested, mode: mode, schemas: schemas, models: models, associationModels: associationModels, hook: hook), hook: hook)
+                let prepared = try writeHook(nested.hooks?.beforeMarshal, "beforeMarshal", modelRef, current, previous, hook, scoped)
+                transformed = try writeHook(nested.hooks?.afterMarshal, "afterMarshal", modelRef, marshalValue(prepared, baseline: previous, model: nested, mode: mode, schemas: schemas, models: models, associationModels: associationModels, hook: hook, scoped: scoped), previous, hook, scoped)
             } else if let collection = binding.collection, let modelRef = collection.modelRef, let nested = models[modelRef] {
                 let pairByIdentity = associationModels.contains(modelRef)
                 let associationFields = pairByIdentity ? Set(nested.fields.filter { $0.value.associationDelta != nil }.keys) : []
@@ -190,20 +206,20 @@ public enum ResourceModelRuntime {
                             }
                             if row == comparison { continue }
                         }
-                        let prepared = try applyResourceHook(nested.hooks?.beforeMarshal, value: row, hook: hook)
-                        let wire = try marshalValue(prepared, baseline: prior, model: nested, mode: mode == "changed" ? "overlaybaseline" : mode, schemas: schemas, models: models, associationModels: associationModels, hook: hook)
-                        rows.append(try applyResourceHook(nested.hooks?.afterMarshal, value: wire, hook: hook))
+                        let prepared = try writeHook(nested.hooks?.beforeMarshal, "beforeMarshal", modelRef, row, prior, hook, scoped)
+                        let wire = try marshalValue(prepared, baseline: prior, model: nested, mode: mode == "changed" ? "overlaybaseline" : mode, schemas: schemas, models: models, associationModels: associationModels, hook: hook, scoped: scoped)
+                        rows.append(try writeHook(nested.hooks?.afterMarshal, "afterMarshal", modelRef, wire, prior, hook, scoped))
                     }
                     if mode == "changed", rows.isEmpty { continue }
                     transformed = .array(rows)
                 } else {
                     let draftRows = JSONValue.array(merged.map { $0.0 })
-                    let prepared = try applyResourceHook(nested.hooks?.beforeMarshal, value: draftRows, hook: hook)
+                    let prepared = try writeHook(nested.hooks?.beforeMarshal, "beforeMarshal", modelRef, draftRows, previous, hook, scoped)
                     if pairByIdentity, prepared != draftRows {
                         throw ResourceModelError.message("Collection hooks cannot replace association draft rows before identity pairing")
                     }
                     let priorRows = pairByIdentity ? JSONValue.array(merged.map { $0.1 ?? .null }) : previous
-                    transformed = try applyResourceHook(nested.hooks?.afterMarshal, value: marshalValue(prepared, baseline: priorRows, model: nested, mode: mode, schemas: schemas, models: models, associationModels: associationModels, hook: hook), hook: hook)
+                    transformed = try writeHook(nested.hooks?.afterMarshal, "afterMarshal", modelRef, marshalValue(prepared, baseline: priorRows, model: nested, mode: mode, schemas: schemas, models: models, associationModels: associationModels, hook: hook, scoped: scoped), priorRows, hook, scoped)
                 }
             } else {
                 transformed = try applyResourceCodec(current, codec: binding.codec, trim: binding.trim == true, empty: binding.empty)
@@ -285,7 +301,7 @@ public enum ResourceModelRuntime {
     private static func resolve(source: ResourceValueSourceDef, environment: ResourceValueEnvironment) throws -> JSONValue? {
         let scope = source.scope?.lowercased() ?? "extras"
         let ref = source.dataSourceRef ?? environment.identityDataSourceRef
-        let snapshot = environment.dataSources[ref] ?? ResourceDataSnapshot()
+        let snapshot = environment.lookup?(ref) ?? environment.dataSources[ref] ?? ResourceDataSnapshot()
         var value: JSONValue?
         switch scope {
         case "constant": value = source.value
@@ -325,6 +341,12 @@ extension ForgeRuntime {
             return object
         }
     }
+}
+
+private func writeHook(_ name: String?, _ phase: String, _ modelRef: String, _ value: JSONValue, _ baseline: JSONValue?, _ legacy: ResourceModelHook?, _ scoped: ScopedResourceModelHook?) throws -> JSONValue {
+    guard let name, !name.isEmpty else { return value }
+    if let scoped { return try scoped(name, phase, modelRef, value, baseline) }
+    return try applyResourceHook(name, value: value, hook: legacy)
 }
 
 private func applyResourceHook(_ name: String?, value: JSONValue, hook: ResourceModelHook?) throws -> JSONValue {
@@ -373,11 +395,12 @@ private func validateField(_ value: JSONValue, schema: ResourceFieldSchemaDef, s
 }
 
 private func applyResourceCodec(_ value: JSONValue, codec: String?, trim: Bool, empty: String?) throws -> JSONValue {
+    if value == .null { return .null }
     var value = value
     if trim, case .string(let text) = value { value = .string(text.trimmingCharacters(in: .whitespacesAndNewlines)) }
     if case .string(let text) = value, text.isEmpty { if empty?.lowercased() == "null" || empty?.lowercased() == "omit" { return .null } }
     switch codec?.lowercased() {
-    case "int", "integer": guard let number = resourceNumber(value) else { throw ResourceModelError.message("Cannot coerce value to integer") }; return .number(Double(Int(number)))
+    case "int", "integer": guard let number = resourceNumber(value), number.isFinite, number.rounded() == number else { throw ResourceModelError.message("Cannot coerce value to integer") }; return .number(number)
     case "float", "number": guard let number = resourceNumber(value) else { throw ResourceModelError.message("Cannot coerce value to number") }; return .number(number)
     case "bool", "boolean": if case .bool = value { return value }; if case .string(let text) = value, let bool = Bool(text) { return .bool(bool) }; throw ResourceModelError.message("Cannot coerce value to boolean")
     case "string": return .string(value.stringValue ?? String(describing: value.anyValue ?? ""))

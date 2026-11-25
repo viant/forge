@@ -86,11 +86,7 @@ private func resolveInitialWindowFormValues(metadata: WindowMetadata) -> [String
         for parameter in entry.parameters where parameter.input == "const" {
             let name = parameter.name.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
             guard !name.isEmpty else { continue }
-            if let location = parameter.location {
-                initial[name] = location
-            } else if let value = parameter.value {
-                initial[name] = value
-            }
+            if let value = parameter.constantValue { initial[name] = value }
         }
     }
     for container in metadata.view?.content?.containers ?? [] {

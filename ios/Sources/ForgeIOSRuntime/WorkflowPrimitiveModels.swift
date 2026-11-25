@@ -4,6 +4,7 @@ import Foundation
 // Rendering and authoritative datasource behavior remain owned by the runtime.
 
 public final class MutationCommandDef: Codable, @unchecked Sendable {
+    public let serializationGroup: String?
     public let commandId: String?
     public let label: String?
     public let icon: String?
@@ -16,6 +17,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
     public let invocationParameter: String?
     public let dataSourceRef: String
     public let parameters: [ParameterDef]
+    public let prepare: String?
     public let payload: ResourcePayloadPreparationDef?
     public let validateWhen: DashboardConditionDef?
     public let pendingState: [String: JSONValue]
@@ -28,6 +30,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
 
     public init(
         commandId: String? = nil,
+        serializationGroup: String? = nil,
         label: String? = nil,
         icon: String? = nil,
         hideLabel: Bool = false,
@@ -40,6 +43,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         dataSourceRef: String,
         parameters: [ParameterDef] = [],
         payload: ResourcePayloadPreparationDef? = nil,
+        prepare: String? = nil,
         validateWhen: DashboardConditionDef? = nil,
         pendingState: [String: JSONValue] = [:],
         successState: [String: JSONValue] = [:],
@@ -50,6 +54,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         refresh: [RefreshSpec] = []
     ) {
         self.commandId = commandId
+        self.serializationGroup = serializationGroup
         self.label = label
         self.icon = icon
         self.hideLabel = hideLabel
@@ -62,6 +67,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         self.dataSourceRef = dataSourceRef
         self.parameters = parameters
         self.payload = payload
+        self.prepare = prepare
         self.validateWhen = validateWhen
         self.pendingState = pendingState
         self.resultState = resultState
@@ -73,13 +79,14 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case commandId, label, icon, hideLabel, intent, confirm, confirmSelection, invalidMessage, timeoutMs
-        case invocationParameter, dataSourceRef, parameters, payload, validateWhen
+        case commandId, serializationGroup, label, icon, hideLabel, intent, confirm, confirmSelection, invalidMessage, timeoutMs
+        case invocationParameter, dataSourceRef, parameters, payload, prepare, validateWhen
         case pendingState, resultState, successState, errorState, indeterminateState, reconcile, refresh
     }
 
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
+        serializationGroup = try values.decodeIfPresent(String.self, forKey: .serializationGroup)
         commandId = try values.decodeIfPresent(String.self, forKey: .commandId)
         label = try values.decodeIfPresent(String.self, forKey: .label)
         icon = try values.decodeIfPresent(String.self, forKey: .icon)
@@ -92,6 +99,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         invocationParameter = try values.decodeIfPresent(String.self, forKey: .invocationParameter)
         dataSourceRef = try values.decode(String.self, forKey: .dataSourceRef)
         parameters = try values.decodeIfPresent([ParameterDef].self, forKey: .parameters) ?? []
+        prepare = try values.decodeIfPresent(String.self, forKey: .prepare)
         payload = try values.decodeIfPresent(ResourcePayloadPreparationDef.self, forKey: .payload)
         validateWhen = try values.decodeIfPresent(DashboardConditionDef.self, forKey: .validateWhen)
         pendingState = try values.decodeIfPresent([String: JSONValue].self, forKey: .pendingState) ?? [:]
@@ -101,6 +109,19 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         indeterminateState = try values.decodeIfPresent([String: JSONValue].self, forKey: .indeterminateState) ?? [:]
         reconcile = try values.decodeIfPresent(ReconcileSpec.self, forKey: .reconcile)
         refresh = try values.decodeIfPresent([RefreshSpec].self, forKey: .refresh) ?? []
+    }
+}
+
+extension ActionDef {
+    public var footerCommand: MutationCommandDef? {
+        guard let command = mutationCommand else { return nil }
+        guard command.commandId?.isEmpty != false, let id, !id.isEmpty else { return command }
+        return MutationCommandDef(commandId: id, serializationGroup: command.serializationGroup, label: command.label, icon: command.icon, hideLabel: command.hideLabel, intent: command.intent,
+            confirm: command.confirm, confirmSelection: command.confirmSelection, invalidMessage: command.invalidMessage,
+            timeoutMs: command.timeoutMs, invocationParameter: command.invocationParameter, dataSourceRef: command.dataSourceRef,
+            parameters: command.parameters, payload: command.payload, prepare: command.prepare, validateWhen: command.validateWhen,
+            pendingState: command.pendingState, successState: command.successState, resultState: command.resultState,
+            errorState: command.errorState, indeterminateState: command.indeterminateState, reconcile: command.reconcile, refresh: command.refresh)
     }
 }
 

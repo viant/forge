@@ -3,6 +3,8 @@ import Foundation
 typealias DataSourceRowReceipt = Result<[[String: JSONValue]], Error>
 
 public actor DataSourceRuntime {
+    private var collectionInputs: [String: InputState] = [:]
+    private var collectionInfo: [String: [String: JSONValue]] = [:]
     private var collectionValues: [String: [[String: JSONValue]]] = [:]
     private var formValues: [String: [String: JSONValue]] = [:]
     private var selectionValues: [String: SelectionState] = [:]
@@ -20,7 +22,8 @@ public actor DataSourceRuntime {
         collectionValues[dataSourceID] ?? []
     }
 
-    public func setCollection(dataSourceID: String, rows: [[String: JSONValue]]) {
+    public func setCollection(dataSourceID: String, rows: [[String: JSONValue]], forInput: InputState? = nil) {
+        collectionInputs[dataSourceID] = forInput ?? inputValues[dataSourceID] ?? InputState()
         collectionValues[dataSourceID] = rows
     }
 
@@ -73,7 +76,7 @@ public actor DataSourceRuntime {
         inputValues[dataSourceID] = input
     }
 
-    public func setInputParameters(dataSourceID: String, parameters: [String: JSONValue], fetch: Bool = false) {
+    public func setInputParameters(dataSourceID: String, parameters: [String: JSONValue], fetch: Bool = false, preservePendingFetch: Bool = true) {
         let current = inputValues[dataSourceID] ?? InputState()
         let query = parameters["input"]?.objectValue?["query"]?.objectValue ?? [:]
         let mergedFilter = current.filter.merging(query) { _, new in new }
@@ -81,8 +84,8 @@ public actor DataSourceRuntime {
             filter: mergedFilter,
             parameters: parameters,
             page: current.page,
-            fetch: fetch || current.fetch,
-            refresh: current.refresh
+            fetch: fetch || (preservePendingFetch && current.fetch),
+            refresh: preservePendingFetch && current.refresh
         )
     }
 
@@ -104,6 +107,8 @@ public actor DataSourceRuntime {
         if inputValues[dataSourceID]?.parameters == parameters { return false }
         inputValues[dataSourceID] = InputState(parameters: parameters)
         collectionValues.removeValue(forKey: dataSourceID)
+        collectionInputs.removeValue(forKey: dataSourceID)
+        collectionInfo.removeValue(forKey: dataSourceID)
         formValues.removeValue(forKey: dataSourceID)
         metricsValues.removeValue(forKey: dataSourceID)
         selectionValues.removeValue(forKey: dataSourceID)
@@ -111,9 +116,25 @@ public actor DataSourceRuntime {
         return true
     }
 
+    // Copy-on-write storage gives one operation a consistent indexed view without
+    // walking the window catalog or materializing unused forms and collections.
+    func snapshotReader() -> @Sendable (String) -> RegisteredDataSourceSnapshot? {
+        { [inputValues, controlValues, formValues, selectionValues, collectionValues, metricsValues, collectionInputs, collectionInfo] id in
+            guard inputValues[id] != nil || controlValues[id] != nil || formValues[id] != nil
+                    || selectionValues[id] != nil || collectionValues[id] != nil || metricsValues[id] != nil else { return nil }
+            let input = inputValues[id] ?? InputState(), loaded = collectionInputs[id]
+            let stale = loaded.map { $0.parameters != input.parameters || $0.filter != input.filter || $0.page != input.page } ?? false
+            return RegisteredDataSourceSnapshot(input: input, control: controlValues[id] ?? ControlState(),
+                form: formValues[id] ?? [:], selection: selectionValues[id] ?? SelectionState(), collection: collectionValues[id], metrics: metricsValues[id] ?? [:], dataInfo: collectionInfo[id] ?? [:], stale: stale)
+        }
+    }
+
     public func registeredSnapshot(dataSourceID: String) -> RegisteredDataSourceSnapshot? {
-        guard inputValues[dataSourceID] != nil || collectionValues[dataSourceID] != nil || formValues[dataSourceID] != nil || controlValues[dataSourceID] != nil else { return nil }
-        return RegisteredDataSourceSnapshot(input: inputValues[dataSourceID] ?? InputState(), control: controlValues[dataSourceID] ?? ControlState(), form: formValues[dataSourceID] ?? [:], selection: selectionValues[dataSourceID] ?? SelectionState(), collection: collectionValues[dataSourceID], metrics: metricsValues[dataSourceID] ?? [:])
+        snapshotReader()(dataSourceID)
+    }
+
+    func setCollectionInfo(dataSourceID: String, values: [String: JSONValue]) {
+        collectionInfo[dataSourceID] = values
     }
 
     public func setMetrics(dataSourceID: String, values: [String: JSONValue]) {
@@ -223,9 +244,10 @@ public actor DataSourceRuntime {
             }
             let raw = try JSONDecoder().decode(JSONValue.self, from: data)
             let rows = normalizeCollection(raw, selector: selectors?.data)
-            setCollection(dataSourceID: dataSourceID, rows: rows)
+            setCollection(dataSourceID: dataSourceID, rows: rows, forInput: input)
             let selectedMetrics = normalizeDataInfo(raw, selector: selectors?.metrics)
             let dataInfo = normalizeDataInfo(raw, selector: selectors?.dataInfo)
+            setCollectionInfo(dataSourceID: dataSourceID, values: extractPagingMetrics(raw, paging: paging).merging(dataInfo) { _, selected in selected })
             if !selectedMetrics.isEmpty {
                 setMetrics(dataSourceID: dataSourceID, values: selectedMetrics)
             } else if dataInfo.isEmpty {
@@ -387,6 +409,8 @@ public actor DataSourceRuntime {
             .union(metricsValues.keys.filter { $0.hasPrefix(windowID) })
         for key in keys {
             collectionValues.removeValue(forKey: key)
+            collectionInputs.removeValue(forKey: key)
+            collectionInfo.removeValue(forKey: key)
             formValues.removeValue(forKey: key)
             selectionValues.removeValue(forKey: key)
             inputValues.removeValue(forKey: key)

@@ -25,9 +25,16 @@ public enum ActionHookRuntime {
     public static func invoke(
         code: String,
         functionName: String,
-        props: JSONValue = .object([:])
+        props: JSONValue = .object([:]),
+        snapshot: (@Sendable (String) -> JSONValue?)? = nil
     ) throws -> JSONValue? {
         let context = JSContext()
+        if let snapshot {
+            let lookup: @convention(block) (String) -> Any = { ref in
+                snapshot(ref).map(foundationValue(from:)) ?? NSNull()
+            }
+            context?.setObject(lookup, forKeyedSubscript: "__forgeSnapshot" as NSString)
+        }
         var capturedError: ActionHookRuntimeError?
         context?.exceptionHandler = { _, exception in
             let message = exception?.toString() ?? "Unknown JavaScript error"

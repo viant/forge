@@ -109,9 +109,8 @@ private struct WindowDialogHost: View {
     private let dialog: DialogDef
     private let defaultDataSourceRef: String
 
-    @State private var hydratedArgsSignature = ""
     @State private var quickFilterValues: [String: String]
-    @State private var didInitialFetch = false
+    @State private var footerPresentation: [(visible: Bool, disabled: Bool)] = []
     @StateObject private var observer: DialogStateObserver
     @StateObject private var dataObserver: DialogDataObserver
 
@@ -228,13 +227,10 @@ private struct WindowDialogHost: View {
             }
         }
         .task(id: stateSignature) {
-            await hydrateDialogInputIfNeeded()
+            await bindAndFetchDialogIfNeeded()
         }
         .task(id: autoSelectionSignature) {
             await autoSelectSingleRowIfNeeded()
-        }
-        .task(id: initialFetchSignature) {
-            await fetchDialogCollectionIfNeeded()
         }
     }
 
@@ -269,95 +265,80 @@ private struct WindowDialogHost: View {
 
     @ViewBuilder
     private var actionsRow: some View {
-        let dismissIDs = Set(["cancel", "close", "dismiss"])
-        let primaryActions = dialog.actions.filter { !dismissIDs.contains(($0.id ?? "").lowercased()) }
-        let dismissAction = dialog.actions.first { dismissIDs.contains(($0.id ?? "").lowercased()) }
-        let canSelect = dataObserver.canSelect
-
         HStack(spacing: 10) {
             Spacer(minLength: 0)
+            let hasOnlyDismissActions = dialog.actions.allSatisfy { ["cancel", "close", "dismiss"].contains(($0.id ?? "").lowercased()) && $0.mutationCommand == nil }
+            if hasOnlyDismissActions {
+                Button("Select") { commitDialog() }.buttonStyle(.borderedProminent).disabled(!dataObserver.canSelect)
+            }
+            if !dialog.actions.contains(where: { ["cancel", "close", "dismiss"].contains(($0.id ?? "").lowercased()) || $0.close }) {
+                Button("Close") { Task { await runtime.closeDialogPublic(windowID: window.windowID, dialogID: dialogID) } }.buttonStyle(.bordered)
+            }
+            ForEach(Array(dialog.actions.enumerated()), id: \.offset) { index, action in
+                let presentation = footerPresentation.indices.contains(index) ? footerPresentation[index] : nil
+                if presentation?.visible ?? (action.visibleWhen == nil) {
+                    let disabled = presentation?.disabled ?? (action.disabledWhen != nil || action.mutationCommand?.validateWhen != nil)
+                    if let command = action.footerCommand {
+                        MutationCommandButton(runtime: runtime, window: window, sourceDataSourceRef: dialogDataSourceRef, command: command,
+                            labelOverride: action.label ?? action.id ?? command.label, externallyDisabled: disabled, dialogFooter: (dialogID, action))
+                    } else {
+                        Button(action.label ?? action.id ?? "Action") {
+                            Task { _ = await runtime.activateDialogFooter(windowID: window.windowID, dialogID: dialogID, sourceDataSourceRef: dialogDataSourceRef, action: action) }
+                        }.disabled(disabled)
+                    }
+                }
+            }
+        }
+        .controlSize(.small)
+        .task { await observeFooterConditions() }
+    }
 
-            if primaryActions.isEmpty {
-                Button("Select") {
-                    commitDialog()
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(!canSelect)
-                .controlSize(.small)
+    @MainActor
+    private func refreshFooterConditions() async {
+        let next = await runtime.dialogFooterPresentation(windowID: window.windowID, sourceDataSourceRef: dialogDataSourceRef, actions: dialog.actions)
+        if !Task.isCancelled { footerPresentation = next }
+    }
 
-                Button("Close") {
-                    Task {
-                        await runtime.closeDialogPublic(windowID: window.windowID, dialogID: dialogID)
-                    }
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-            } else {
-                if let dismissAction {
-                    Button(dismissAction.label ?? dismissAction.id ?? "Close") {
-                        execute(dismissAction)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                } else {
-                    Button("Close") {
-                        Task {
-                            await runtime.closeDialogPublic(windowID: window.windowID, dialogID: dialogID)
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                }
-                ForEach(primaryActions) { action in
-                    Button(action.label ?? action.id ?? "Action") {
-                        execute(action)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                }
+    private func observeFooterConditions() async {
+        var sources: [String: Set<String>] = [:]
+        func collect(_ condition: DashboardConditionDef?) {
+            guard let condition else { return }
+            if condition.field != nil || condition.selector != nil || condition.source != nil || condition.key != nil {
+                sources[condition.dataSourceRef ?? dialogDataSourceRef, default: []].insert((condition.source ?? "form").lowercased())
+            }
+            condition.all.forEach(collect); condition.any.forEach(collect); collect(condition.not)
+        }
+        for action in dialog.actions { collect(action.visibleWhen); collect(action.disabledWhen); collect(action.mutationCommand?.validateWhen) }
+        guard !sources.isEmpty else { return }
+        await refreshFooterConditions()
+        await withTaskGroup(of: Void.self) { group in
+            if sources.values.contains(where: { $0.contains("windowform") }) { group.addTask { for await _ in await runtime.windowFormUpdates(windowID: window.windowID) { await refreshFooterConditions() } } }
+            if sources.values.contains(where: { $0.contains("authorization") }) { group.addTask { for await _ in await runtime.windowMetadataUpdates(id: window.windowID) { await refreshFooterConditions() } } }
+            for (ref, scopes) in sources {
+            if scopes.contains("form") { group.addTask { for await _ in await runtime.dataSourceFormUpdates(windowID: window.windowID, dataSourceRef: ref) { await refreshFooterConditions() } } }
+
+            if scopes.contains("selection") { group.addTask { for await _ in await runtime.dataSourceSelectionUpdates(windowID: window.windowID, dataSourceRef: ref) { await refreshFooterConditions() } } }
+            if scopes.contains("collection") { group.addTask { for await _ in await runtime.dataSourceCollectionUpdates(windowID: window.windowID, dataSourceRef: ref) { await refreshFooterConditions() } } }
+            if scopes.contains("metrics") { group.addTask { for await _ in await runtime.dataSourceMetricsUpdates(windowID: window.windowID, dataSourceRef: ref) { await refreshFooterConditions() } } }
+            if !scopes.isDisjoint(with: ["input", "filter", "filters"]) { group.addTask { for await _ in await runtime.dataSourceInputUpdates(windowID: window.windowID, dataSourceRef: ref) { await refreshFooterConditions() } } }
             }
         }
     }
 
-    private func hydrateDialogInputIfNeeded() async {
-        guard observer.state.open else { return }
-        let scopedArgs = scopedDialogArgs()
-        if scopedArgs.isEmpty {
-            return
+    private func bindAndFetchDialogIfNeeded() async {
+        guard observer.state.open, !dialogDataSourceRef.isEmpty else { return }
+        // Explicit dialog sources receive their arguments before the runtime
+        // publishes onOpen. Only the inherited source is known solely to the host.
+        if dialog.content?.dataSourceRef == nil && dialog.dataSourceRef == nil {
+            let args = scopedDialogArgs()
+            if !args.isEmpty {
+                await runtime.setDataSourceInputParameters(windowID: window.windowID, dataSourceRef: dialogDataSourceRef,
+                    parameters: args, preservePendingFetch: false)
+            }
         }
-        let signature = scopedArgs
-            .keys
-            .sorted()
-            .map { "\($0)=\(scopedArgs[$0]?.stringValue ?? scopedArgs[$0]?.intValue.map(String.init) ?? "")" }
-            .joined(separator: "|")
-        guard signature != hydratedArgsSignature else { return }
-        hydratedArgsSignature = signature
-        guard !dialogDataSourceRef.isEmpty else { return }
-        await runtime.setDataSourceInputParameters(
-            windowID: window.windowID,
-            dataSourceRef: dialogDataSourceRef,
-            parameters: scopedArgs,
-            fetch: true
-        )
-    }
-
-    private var initialFetchSignature: String {
-        "\(observer.state.open)::\(dialogDataSourceRef)"
-    }
-
-    @MainActor
-    private func fetchDialogCollectionIfNeeded() async {
-        guard observer.state.open else {
-            didInitialFetch = false
-            return
+        if dialog.shouldFetchOnOpen && !Task.isCancelled {
+            await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: dialogDataSourceRef)
         }
-        guard !didInitialFetch else { return }
-        guard !dialogDataSourceRef.isEmpty else { return }
-        didInitialFetch = true
-        await runtime.refreshDataSourceCollection(
-            windowID: window.windowID,
-            dataSourceRef: dialogDataSourceRef
-        )
     }
 
     private func applyQuickFilters() async {
@@ -423,7 +404,7 @@ private struct WindowDialogHost: View {
 
     private var shouldAutoCommitSelection: Bool {
         let dismissIDs = Set(["cancel", "close", "dismiss"])
-        let primaryActions = dialog.actions.filter { !dismissIDs.contains(($0.id ?? "").lowercased()) }
+        let primaryActions = dialog.actions.filter { $0.mutationCommand != nil || !dismissIDs.contains(($0.id ?? "").lowercased()) }
         return effectiveSelectionMode == "single" && primaryActions.isEmpty
     }
 
@@ -448,21 +429,7 @@ private struct WindowDialogHost: View {
         }
     }
 
-    private func execute(_ action: ActionDef) {
-        let context = ExecutionContext(windowID: window.windowID, dataSourceRef: dialogDataSourceRef)
-        Task {
-            for execution in action.on {
-                _ = await runtime.execute(
-                    execution,
-                    context: context,
-                    args: [
-                        "dialogId": .string(dialogID),
-                        "windowId": .string(window.windowID)
-                    ]
-                )
-            }
-        }
-    }
+
 }
 
 @MainActor

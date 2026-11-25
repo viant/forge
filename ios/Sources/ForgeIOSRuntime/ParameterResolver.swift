@@ -24,6 +24,9 @@ public enum ParameterResolver {
     }
 
     public struct ResolutionContext: Sendable {
+        var lookup: (@Sendable (String) -> DataSourceSnapshot?)?
+        func snapshot(_ ref: String) -> DataSourceSnapshot? { lookup?(ref) ?? dataSources[ref] }
+
         public let identityDataSourceRef: String
         public let dataSources: [String: DataSourceSnapshot]
         public let windowForm: [String: JSONValue]
@@ -132,7 +135,7 @@ public enum ParameterResolver {
         case "metrics":
             return resolveFromMetrics(context: context, location: parameter.location?.stringValue)
         case "const":
-            return parameter.location ?? parameter.value
+            return parameter.constantValue
         default:
             if let explicit = parameter.value {
                 return explicit
@@ -209,7 +212,7 @@ public enum ParameterResolver {
                 ? .object(context.windowForm)
                 : jsonValue(any: SelectorUtil.resolve(jsonObjectAny(context.windowForm), selector: sourcePath))
         case "input":
-            guard let snapshot = context.dataSources[dataSourceRef] else { return nil }
+            guard let snapshot = context.snapshot(dataSourceRef) else { return nil }
             let input = inputObject(snapshot.input)
             return sourcePath.isEmpty
                 ? .object(input)
@@ -225,7 +228,7 @@ public enum ParameterResolver {
         object: (DataSourceSnapshot) -> [String: JSONValue],
         path: String
     ) -> JSONValue? {
-        guard let snapshot = context.dataSources[dataSourceRef] else { return nil }
+        guard let snapshot = context.snapshot(dataSourceRef) else { return nil }
         let value = object(snapshot)
         return path.isEmpty
             ? .object(value)
@@ -237,7 +240,7 @@ public enum ParameterResolver {
         dataSourceRef: String,
         path: String
     ) -> JSONValue? {
-        guard let snapshot = context.dataSources[dataSourceRef] else { return nil }
+        guard let snapshot = context.snapshot(dataSourceRef) else { return nil }
         let selectionMode = (snapshot.selectionMode ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         if selectionMode == "multi" {
             if path.isEmpty {
@@ -299,7 +302,7 @@ public enum ParameterResolver {
         location: String?
     ) -> JSONValue? {
         let (dataSourceRef, fieldPath) = resolveDataSourceRef(location: location, context: context)
-        guard let snapshot = context.dataSources[dataSourceRef] else { return nil }
+        guard let snapshot = context.snapshot(dataSourceRef) else { return nil }
         let selectionMode = (snapshot.selectionMode ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         if selectionMode == "multi" {
             let selectedRows = snapshot.selection.selection
@@ -325,7 +328,7 @@ public enum ParameterResolver {
         location: String?
     ) -> JSONValue? {
         let (dataSourceRef, fieldPath) = resolveDataSourceRef(location: location, context: context)
-        guard let snapshot = context.dataSources[dataSourceRef] else { return nil }
+        guard let snapshot = context.snapshot(dataSourceRef) else { return nil }
         if fieldPath.isEmpty {
             return .object(snapshot.form)
         }
@@ -337,7 +340,7 @@ public enum ParameterResolver {
         location: String?
     ) -> JSONValue? {
         let (dataSourceRef, fieldPath) = resolveDataSourceRef(location: location, context: context)
-        guard let snapshot = context.dataSources[dataSourceRef] else { return nil }
+        guard let snapshot = context.snapshot(dataSourceRef) else { return nil }
         let candidates: [[String: JSONValue]?] = [
             snapshot.selection.selected,
             snapshot.form,
@@ -382,7 +385,7 @@ public enum ParameterResolver {
         location: String?
     ) -> JSONValue? {
         let (dataSourceRef, fieldPath) = resolveDataSourceRef(location: location, context: context)
-        guard let snapshot = context.dataSources[dataSourceRef] else { return nil }
+        guard let snapshot = context.snapshot(dataSourceRef) else { return nil }
         return readObjectValue(inputObject(snapshot.input), path: fieldPath)
     }
 
@@ -391,7 +394,7 @@ public enum ParameterResolver {
         location: String?
     ) -> JSONValue? {
         let (dataSourceRef, fieldPath) = resolveDataSourceRef(location: location, context: context)
-        guard let snapshot = context.dataSources[dataSourceRef] else { return nil }
+        guard let snapshot = context.snapshot(dataSourceRef) else { return nil }
         return readObjectValue(snapshot.input.filter, path: fieldPath)
     }
 
@@ -400,7 +403,7 @@ public enum ParameterResolver {
         location: String?
     ) -> JSONValue? {
         let (dataSourceRef, fieldPath) = resolveDataSourceRef(location: location, context: context)
-        guard let snapshot = context.dataSources[dataSourceRef] else { return nil }
+        guard let snapshot = context.snapshot(dataSourceRef) else { return nil }
         if fieldPath.isEmpty {
             return .object(snapshot.input.filter)
         }
@@ -412,7 +415,7 @@ public enum ParameterResolver {
         location: String?
     ) -> JSONValue? {
         let (dataSourceRef, fieldPath) = resolveDataSourceRef(location: location, context: context)
-        guard let snapshot = context.dataSources[dataSourceRef] else { return nil }
+        guard let snapshot = context.snapshot(dataSourceRef) else { return nil }
         if fieldPath.isEmpty {
             return .object(snapshot.metrics)
         }
@@ -438,14 +441,14 @@ public enum ParameterResolver {
             return (context.identityDataSourceRef, "")
         }
         guard let dotIndex = trimmed.firstIndex(of: ".") else {
-            if context.dataSources[trimmed] != nil {
+            if context.snapshot(trimmed) != nil {
                 return (trimmed, "")
             }
             return (context.identityDataSourceRef, trimmed)
         }
         let possibleDataSourceRef = String(trimmed[..<dotIndex])
         let remainder = String(trimmed[trimmed.index(after: dotIndex)...])
-        if context.dataSources[possibleDataSourceRef] != nil {
+        if context.snapshot(possibleDataSourceRef) != nil {
             return (possibleDataSourceRef, remainder)
         }
         return (context.identityDataSourceRef, trimmed)
