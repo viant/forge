@@ -234,9 +234,13 @@ function tableExportMenuItems({context, item, formats, busy, runExport, isDesign
 
 // Both authored Actions menus and editable operation menus use the same exporter.
 export function TableExportSubmenu({context, exportState, close}) {
+    const popoverProps = anchoredPopoverProps({placement:'right-start',popoverClassName:'forge-dropdown-menu',modifiersCustom:[menuTriggerMinWidthModifier]});
+    // Prefer the other side before stacking; native overflow shifting owns height.
+    popoverProps.modifiers.flip.options = {...popoverProps.modifiers.flip.options,
+        altAxis:false,fallbackPlacements:['left-start','bottom-start','top-start']};
     return <MenuItem className="forge-toolbar-export-submenu" text={exportState.item.label || 'Export'}
         labelElement={<UnifiedIcon name="lucide:chevron-right"/>} disabled={exportState.exportDisabled}
-        popoverProps={{...anchoredPopoverProps({placement:'right-start',popoverClassName:'forge-dropdown-menu',modifiersCustom:[menuTriggerMinWidthModifier]}),usePortal:false,enforceFocus:false,autoFocus:false,hoverCloseDelay:300,
+        popoverProps={{...popoverProps,usePortal:false,enforceFocus:false,autoFocus:false,hoverCloseDelay:300,
             targetProps:{role:'menuitem',tabIndex:0,'aria-disabled':exportState.exportDisabled || undefined}}}
         submenuProps={{className:'forge-toolbar-select-menu','aria-label':`${exportState.item.label || 'Export'} formats`}}>
         {tableExportMenuItems({context, ...exportState}, close)}
