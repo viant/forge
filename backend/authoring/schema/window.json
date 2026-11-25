@@ -720,6 +720,9 @@
           "additionalProperties": {},
           "type": "object"
         },
+        "currencyField": {
+          "type": "string"
+        },
         "disabledWhen": {
           "additionalProperties": {},
           "type": "object"
@@ -743,6 +746,13 @@
         "headProperties": {
           "additionalProperties": {},
           "type": "object"
+        },
+        "hiddenInThemes": {
+          "description": "HiddenInThemes excludes the column from rendering and Customize for these theme IDs.\nSaved column preferences remain available when another theme is selected.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "hiddenWhen": {
           "additionalProperties": {},
@@ -2872,6 +2882,9 @@
           },
           "type": "array"
         },
+        "prepareSelection": {
+          "$ref": "#/$defs/SelectionPreparation"
+        },
         "requiresSelection": {
           "type": "boolean"
         },
@@ -3903,8 +3916,25 @@
     "MutationCommand": {
       "additionalProperties": true,
       "properties": {
+        "before": {
+          "items": {
+            "$ref": "#/$defs/MutationPreparationStep"
+          },
+          "type": "array"
+        },
         "className": {
           "type": "string"
+        },
+        "cleanupState": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "clearFormFields": {
+          "description": "ClearFormFields clears the named draft fields after an acknowledged root write if their submitted values are still current.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "commandId": {
           "type": "string"
@@ -3961,6 +3991,11 @@
           "description": "Prepare names an optional async handler that returns the final parameter map\nafter confirmation and before the writer is invoked.",
           "type": "string"
         },
+        "receiptWhen": {
+          "additionalProperties": {},
+          "description": "ReceiptWhen optionally checks this cleanup invocation's normalized rows.",
+          "type": "object"
+        },
         "reconcile": {
           "$ref": "#/$defs/ReconcileSpec"
         },
@@ -3969,6 +4004,16 @@
             "$ref": "#/$defs/RefreshSpec"
           },
           "type": "array"
+        },
+        "resultState": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "description": "ResultState maps window form fields to ordered selectors in this invocation's normalized writer rows.",
+          "type": "object"
         },
         "serializationGroup": {
           "description": "SerializationGroup optionally serializes commands in the same context/window, across writers.",
@@ -3982,6 +4027,22 @@
           "type": "integer"
         },
         "validateWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "MutationPreparationStep": {
+      "additionalProperties": true,
+      "properties": {
+        "cleanup": {
+          "$ref": "#/$defs/MutationCommand"
+        },
+        "command": {
+          "$ref": "#/$defs/MutationCommand"
+        },
+        "when": {
           "additionalProperties": {},
           "type": "object"
         }
@@ -4785,6 +4846,12 @@
         "format": {
           "type": "string"
         },
+        "invariants": {
+          "items": {
+            "$ref": "#/$defs/ResourceInvariant"
+          },
+          "type": "array"
+        },
         "items": {
           "$ref": "#/$defs/ResourceFieldSchema"
         },
@@ -4933,6 +5000,72 @@
         },
         "titleField": {
           "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ResourceInvariant": {
+      "additionalProperties": true,
+      "properties": {
+        "assert": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "message": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "when": {
+          "additionalProperties": {},
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "ResourceMapping": {
+      "additionalProperties": true,
+      "properties": {
+        "cases": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ResourceMappingCase"
+          },
+          "type": "object"
+        },
+        "default": {
+          "$ref": "#/$defs/ResourceMappingCase"
+        },
+        "fieldOrder": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "selectors": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "uploads": {
+          "additionalProperties": {
+            "$ref": "#/$defs/UploadCollectionSpec"
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "ResourceMappingCase": {
+      "additionalProperties": true,
+      "properties": {
+        "modelRef": {
+          "type": "string"
+        },
+        "values": {
+          "additionalProperties": {},
+          "type": "object"
         }
       },
       "type": "object"
@@ -5094,6 +5227,12 @@
         "identity": {
           "items": {
             "type": "string"
+          },
+          "type": "array"
+        },
+        "invariants": {
+          "items": {
+            "$ref": "#/$defs/ResourceInvariant"
           },
           "type": "array"
         },
@@ -5479,6 +5618,39 @@
     },
     "SelectionMode": {
       "type": "string"
+    },
+    "SelectionPreparation": {
+      "additionalProperties": true,
+      "properties": {
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "errorField": {
+          "type": "string"
+        },
+        "identityField": {
+          "type": "string"
+        },
+        "idsParameter": {
+          "type": "string"
+        },
+        "mappingRef": {
+          "type": "string"
+        },
+        "pendingField": {
+          "type": "string"
+        },
+        "prepare": {
+          "type": "string"
+        },
+        "scopeFields": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
     },
     "SelectorCondition": {
       "additionalProperties": true,
@@ -6222,6 +6394,10 @@
           },
           "type": "array"
         },
+        "optionsDataSourceRef": {
+          "description": "OptionsDataSourceRef names the native source preparing these options.\nIts existing fetch state owns loading, retry and error presentation.",
+          "type": "string"
+        },
         "placeholder": {
           "type": "string"
         },
@@ -6621,6 +6797,12 @@
         "resourceDependencies": {
           "additionalProperties": {
             "type": "string"
+          },
+          "type": "object"
+        },
+        "resourceMappings": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ResourceMapping"
           },
           "type": "object"
         },
@@ -7585,7 +7767,7 @@
   "$ref": "#/$defs/Window",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "x-forge-provenance": {
-    "baseCommit": "92630858255e55ff13e20cdec6d1c2d28cd4fd00",
+    "baseCommit": "ba4dc99b08de2e688f389373801424d5bea41f55",
     "generator": "scripts/window-schema/main.go",
     "sha256": {
       "choice_browser.go": "935cbeddb231dd329374114c5f38454dc7c44c2ab70a45ea3c0f37ce7f3aee26",
@@ -7630,7 +7812,8 @@
       "host_content.go": "f9f870afe88756eb3abd04b79cc717f60a696a5dc2501dec11ffba0f87dbc0fd",
       "json_metadata_clone.go": "baa9bde7e567774737f28b87c45a2bb145d9c5b2fadc81da3024578b17c6c09c",
       "local_state_owner.go": "987402ce2487f4b7714a3991c405aab0dda74a573d8690f8f6561d4ce020ab8f",
-      "model.go": "be0dd424f1de4e8b43a9c7ae40354bce5d02193592655f06f5ec2ede08728c74",
+      "model.go": "4ff4bccce7a6d47c345c2f16fd42e7c73b912960a88ebe8fc077dcd8bd5b4b5f",
+      "mutation_preparation.go": "5f4b247dd0d00f50e703a0a6c3cd1ae2070727a236bb2fad765f7d257931ecee",
       "parameter_editor.go": "a176f3b63d74714d216daf57ba5c3c3ee8e12aaf8ccf2c0ee1b663c95a657bf6",
       "predicate_composition_editor.go": "881bcf68a5f5e16cae2f58ef7495ac14582398236cfd263cc8585e89f97cab4b",
       "presentation_primitives.go": "4b2fdcf0fffb902dd8a8dee7c17d1075faa5d62ab74e1d2551f29935215905aa",
@@ -7638,11 +7821,13 @@
       "reader_workbench.go": "6ff2f9e276b1dc7482960d14e8e8ba710374cee49e72efbbdc0dc05c20e32253",
       "resource_assignment.go": "80ad53f8050041d9e652f3954084f6148fc8e53c324510126904a5ab35e3507e",
       "resource_field_attributes.go": "fc2ef49fcc4e88a78849581a9ccbdf62d2968023a5c76282e8b42ec488653c70",
-      "resource_model.go": "68313690c7c28632f4880bf742c375ae28072432e4d3a822f03a9f26ce580ab3",
-      "resource_model_validation.go": "169c4958bb8b62aa222ed6b3d44632912a536645da73a74f6b3fadd441011af3",
+      "resource_invariant.go": "9dee76d65b3161d019c6b446c764b54603416fa7bc5927b87d06bc79ca3687d4",
+      "resource_model.go": "f04bef9d5a9594a318c3f547ef502ec943287cc09ac9af32d01fd646f0e6a9b5",
+      "resource_model_validation.go": "cc9cee021998d0b48902c83463e8de1c571f3b553193ecdc2c7351089c30a4e7",
       "resource_policy_editor.go": "6f3a00bf5ac0751a133fe121e727f5aa2671489dfb07b98a29314cc7a380b8c2",
       "result_preview.go": "bd913237174dc663cf40a5cd30bf5e835ec077930e7f0916f7ce906671f3dbff",
       "rule_editor.go": "3eda2833f57c5a64adec603e42213423907151451998fa4ba538fe258273f6e6",
+      "selection_preparation.go": "d3edad9acf6ffbaa2c4e565864b00f861c1690bf701662638b44d5ccdee7d8eb",
       "window_compiled_resource.go": "12eddf7313e2a4a52f81fe5fa68b67e2c284f07b5947e9bdb2dea833cfd20cc1",
       "window_consumer.go": "68fb1c0e6023416f0f27420c0a5fcd0c08b1ce6502ca63cf97a96236e0918837",
       "window_descriptor.go": "99170237b79c06523e72302b7917e0f573ef5f54bbc4bf0b8a4625915274c789",
@@ -7650,7 +7835,7 @@
       "window_reference_manifest.go": "e8245d783f99d3a59143fd1e37e364c040389fa409b457207da567d9112ddb5b",
       "window_resource.go": "a991b091b9b4b45a999cca138fa8f6c0fa90b9ed0dc63bfce2ace576700ca872",
       "window_target_proof.go": "53605c132aae2b8c8d6e377daaae416f347e0ff8c48a39fb2a0f15f95ad5faeb",
-      "workflow_primitives.go": "ac24eb8d11331e9ddeeb97c3b5b3dcce17ec3be3b7fd253852bb39267e47d962",
+      "workflow_primitives.go": "9cad3d5c71ea823c52cf1f9b016a8039d22598eb72f9e8f21b21364a08212b4d",
       "workspace_summary.go": "d9cf3867d3d3bfa3f65c9fdeccad91d21bd9d2602e066823bb36cbff079c86c1"
     },
     "sourceNote": "Generated from committed canonical Forge authored model and Forge-owned public contracts; SHA-256 identifies every parsed source file."
