@@ -196,3 +196,59 @@ gap, keyboard-only inset focus, and pointer activation without a ring or shadow.
 Keep the native exporter mounted through menu dismissal and preserve formats,
 scope, file naming, column order, limits and error announcements. Baseline keeps
 its existing icons and presentation.
+
+### Shared action-menu trigger adoption
+
+Dropdown Menu composes the existing Secondary Button for outlined action
+triggers. Pages reuse that variant’s default, hover, pressed/open and disabled
+semantic colors and borders, content width, 40px control height, 8px radius,
+16px inline padding and 8px icon gap. Native aria-expanded retains the pressed
+appearance until the owning menu closes. Ghost and field selectors retain their
+own documented variants; List Page must not stretch Actions to field width.
+Creation and Actions use spacing-4 (16px), including grouped operations.
+Pointer/touch adds no focus decoration; native keyboard modality retains the
+shared inset indicator in both modes. Baseline and legacy remain unchanged.
+
+Table Export reuses native MenuItem and the shared 8px panel gap. Blueprint’s
+300ms hover-close delay permits pointer transit to CSV/XLSX without a second
+listener, state owner or timing mechanism. Leaving both surfaces closes the
+submenu normally. Keep native option activation, disabled admission, Escape
+and focus return. Catalog and consumers load the exact exported Global CSS
+definition and retain its revision/hash receipt.
+
+### Left-navigation flyout limits and foreground
+
+In DS2 only, direct destinations and menu categories share the navigation
+semantic default foreground for both Lucide icon and label. Hover, current
+destination, open, disabled and inset keyboard focus retain their independent
+native states. An unselected category retains hover styling while its menu is open.
+Only its native current destination selects it.
+
+Only left-navigation flyouts remove the shared menu row cap. Show every current
+category destination together while retaining the existing outer viewport
+constraint and native collision placement. Other menus, field selectors,
+filters and date pickers keep their defined limits. Verify both color modes,
+real pointer and Tab/Shift+Tab, and restoration of Baseline and legacy themes.
+
+### Left-navigation state contract
+
+Side Nav exposes Fixed rail with one level of category options. There is no
+nested-menu variant in this component.
+
+Default, hover and selected are distinct states. Default uses a transparent
+background and navigation foreground. Hover uses the neutral navigation
+background with semantic blue for both Lucide icon and label. An unselected
+category retains that hover treatment while its menu is open. Only the native
+current destination (`aria-current`) selects its category after a destination
+is chosen; opening or focusing its menu does not select it. The current category
+keeps its selected treatment when another category is open.
+
+This is a left-navigation category exception to the ordinary ghost-dropdown
+open-state policy. Other dropdowns and settings panels retain their own
+documented behavior. Keep the shared 2px menu-row gap; only left-navigation
+flyouts omit the ordinary row cap, retaining the outer viewport constraint.
+
+Check default, hover, pressed, open, selected, disabled, validation and keyboard
+states wherever the component supports them. Compare each component with its
+own catalog specification on the actual consumer in both color modes; retain
+the native pointer and inset keyboard-focus behavior and every other theme.
