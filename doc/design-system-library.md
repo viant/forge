@@ -209,7 +209,12 @@ Creation and Actions use spacing-4 (16px), including grouped operations.
 Pointer/touch adds no focus decoration; native keyboard modality retains the
 shared inset indicator in both modes. Baseline and legacy remain unchanged.
 
-Table Export reuses native MenuItem and the shared 8px panel gap. Blueprint’s
+Table Export reuses native MenuItem and the shared 8px panel gap. Its native
+collision handling prefers right, then left; vertical shifting keeps the options
+within a short viewport before vertical fallback is considered. This setting
+belongs to Table Export only; ordinary menu limits and navigation rules stay
+with their own components. The transparent hover surface keeps constant geometry
+during a flip; only the inner panel aligns to its opening direction. Blueprint’s
 300ms hover-close delay permits pointer transit to CSV/XLSX without a second
 listener, state owner or timing mechanism. Leaving both surfaces closes the
 submenu normally. Keep native option activation, disabled admission, Escape
