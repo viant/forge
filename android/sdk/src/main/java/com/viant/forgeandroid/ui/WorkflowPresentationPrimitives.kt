@@ -77,7 +77,7 @@ internal fun WorkflowPresentationPrimitives(
     val metadata by window.metadata.flow.collectAsState(initial = window.metadata.peek())
     val authorization = metadata?.authorizationSnapshot?.mapValues { JsonUtil.elementToAny(it.value) }.orEmpty()
     androidx.compose.runtime.LaunchedEffect(context?.dataSourceRef) {
-        if (container.mutationCommand == null && context != null && context.dataSource.autoFetch != false && !context.control.peek().resolved) context.fetchCollection()
+        if (container.fetchData != false && container.mutationCommand == null && context != null && context.dataSource.autoFetch != false && !context.control.peek().resolved) context.fetchCollection()
     }
     val record = WorkflowPrimitiveRuntime.presentationRecord(form, collection, metrics)
     val detailRecord = when (container.detailView?.source?.lowercase()) {
@@ -351,22 +351,22 @@ internal fun MutationCommandButton(
 ) {
     val scope = rememberCoroutineScope()
     var state by remember(command.commandId, command.dataSourceRef) { mutableStateOf(MutationCommandState()) }
-    var confirmationVisible by remember { mutableStateOf(false) }
+    var confirmation by remember(command.commandId, command.dataSourceRef) {
+        mutableStateOf<Pair<String, kotlinx.coroutines.CompletableDeferred<Boolean>>?>(null)
+    }
 
-    fun execute(confirmed: Boolean) {
+    fun execute() {
         scope.launch {
-            val execution = async { runtime.mutationCommands.execute(
-                runtime = runtime,
-                window = window,
-                source = source,
-                command = command,
-                extras = extras,
-                confirm = if (confirmed) ({ true }) else null
-            ) }
+            val request = if (confirmationOverride == null) command else command.copy(confirm = confirmationOverride)
+            val execution = async { runtime.mutationCommands.execute(runtime, window, source, request, extras) { text ->
+                val decision = kotlinx.coroutines.CompletableDeferred<Boolean>()
+                confirmation = text to decision
+                try { decision.await() } finally { confirmation = null }
+            } }
             yield()
-            state = runtime.mutationCommands.state(window.windowId, command)
+            state = runtime.mutationCommands.state(window.windowId, request)
             val result = execution.await()
-            state = runtime.mutationCommands.state(window.windowId, command)
+            state = runtime.mutationCommands.state(window.windowId, request)
             onSettled?.invoke(result)
         }
     }
@@ -374,14 +374,16 @@ internal fun MutationCommandButton(
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Button(
             enabled = !state.guarded && !externallyDisabled,
-            onClick = {
-                if (!(confirmationOverride ?: runtime.mutationCommands.resolveConfirmation(command, extras)).isBlank()) confirmationVisible = true else execute(false)
-            },
+            onClick = { execute() },
+            colors = if (command.intent.isNullOrBlank()) androidx.compose.material3.ButtonDefaults.buttonColors()
+                else androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = notificationColor(command.intent)),
             modifier = Modifier.semantics {
                 contentDescription = accessibilityDescriptionOverride ?: command.label ?: "Save"
             }
         ) {
-            Text(if (state.pending) "Saving…" else labelOverride ?: command.label ?: "Save")
+            val icon = toolbarIcon(command.icon)
+            if (icon != null) androidx.compose.material3.Icon(icon, contentDescription = null)
+            if (!command.hideLabel || icon == null) Text(if (state.pending) "Saving…" else labelOverride ?: command.label ?: "Save")
         }
         if (state.message.isNotBlank()) {
             Text(
@@ -391,20 +393,13 @@ internal fun MutationCommandButton(
             )
         }
     }
-    if (confirmationVisible) {
+    confirmation?.let { (message, decision) ->
         AlertDialog(
-            onDismissRequest = { confirmationVisible = false },
+            onDismissRequest = { decision.complete(false) },
             title = { Text(labelOverride ?: command.label ?: "Confirm") },
-            text = { Text(confirmationOverride ?: runtime.mutationCommands.resolveConfirmation(command, extras).ifBlank { "Continue?" }) },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmationVisible = false
-                    execute(true)
-                }) { Text(labelOverride ?: command.label ?: "Confirm") }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmationVisible = false }) { Text("Cancel") }
-            }
+            text = { Text(message) },
+            confirmButton = { TextButton(onClick = { decision.complete(true) }) { Text(labelOverride ?: command.label ?: "Confirm") } },
+            dismissButton = { TextButton(onClick = { decision.complete(false) }) { Text("Cancel") } }
         )
     }
 }

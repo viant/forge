@@ -11,6 +11,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -77,9 +78,9 @@ object ActionHookRuntime {
             val context = checkNotNull(applicationContext) {
                 "ActionHookRuntime is not initialized with an Android application context."
             }
-            val activeIsolate = isolate ?: createIsolate(context)
+            val activeIsolate = isolate ?: runInterruptible(Dispatchers.IO) { createIsolate(context) }
             try {
-                activeIsolate.evaluateJavaScriptAsync(script).get().also {
+                runInterruptible(Dispatchers.IO) { activeIsolate.evaluateJavaScriptAsync(script).get() }.also {
                     scheduleIdleClose()
                 }
             } catch (error: Throwable) {

@@ -1424,6 +1424,8 @@ fun evaluateDashboardCondition(
             return false
         }
     }
+    condition.exists?.let { if ((actual != null) != it) return false }
+    if (condition.matches != null && condition.pattern?.containsMatchIn(actual?.toString().orEmpty()) != true) return false
     condition.equals?.let { expected ->
         if (!dashboardValuesEqual(actual, expected)) {
             return false
@@ -1477,7 +1479,7 @@ fun evaluateDashboardCondition(
     }
     val hasDirectPredicate = condition.whenValue != null || condition.equals != null || condition.notEquals != null || condition.contains != null ||
         condition.inValues.isNotEmpty() || condition.gt != null || condition.gte != null || condition.lt != null ||
-        condition.lte != null || condition.empty != null || condition.notEmpty != null
+        condition.lte != null || condition.empty != null || condition.notEmpty != null || condition.exists != null || condition.matches != null
     if (!hasDirectPredicate && !selector.isNullOrBlank()) {
         return when (actual) {
             null -> false

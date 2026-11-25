@@ -39,7 +39,8 @@ data class WindowMetadata(
     val schemas: Map<String, ResourceSchemaDef> = emptyMap(),
     val resourceModels: Map<String, ResourceModelDef> = emptyMap(),
     val resourceMappings: Map<String, ResourceMappingDef> = emptyMap(),
-    val actionAliases: List<String> = emptyList()
+    val actionAliases: List<String> = emptyList(),
+    val windowKey: String? = null
 ) {
     fun actionNamespace(handler: String): String? {
         if (!namespace.isNullOrBlank() && handler.startsWith("$namespace.")) return namespace
@@ -307,8 +308,12 @@ data class DashboardConditionDef(
     val lt: Double? = null,
     val lte: Double? = null,
     val empty: Boolean? = null,
-    val notEmpty: Boolean? = null
-)
+    val notEmpty: Boolean? = null,
+    val exists: Boolean? = null,
+    val matches: String? = null
+) {
+    internal val pattern by lazy { matches?.let { runCatching { Regex(it) }.getOrNull() } }
+}
 
 @Serializable
 data class DashboardDef(
@@ -1270,7 +1275,9 @@ data class DialogDef(
     val properties: Map<String, JsonElement> = emptyMap(),
     val style: Map<String, String> = emptyMap(),
     val target: JsonElement? = null,
-    val targetOverrides: Map<String, JsonElement> = emptyMap()
+    val targetOverrides: Map<String, JsonElement> = emptyMap(),
+    val closeDisabledWhen: DashboardConditionDef? = null,
+    val fetchOnOpen: Boolean? = null
 )
 
 @Serializable
@@ -1280,7 +1287,15 @@ data class ActionDef(
     val icon: String? = null,
     val on: List<ExecutionDef> = emptyList(),
     val target: JsonElement? = null,
-    val targetOverrides: Map<String, JsonElement> = emptyMap()
+    val targetOverrides: Map<String, JsonElement> = emptyMap(),
+    val visibleWhen: DashboardConditionDef? = null,
+    val disabledWhen: DashboardConditionDef? = null,
+    val close: Boolean = false,
+    val disabled: Boolean = false,
+    val hideLabel: Boolean = false,
+    val intent: String? = null,
+    val tooltip: String? = null,
+    val mutationCommand: MutationCommandDef? = null
 )
 
 // These optional Go slices can be absent, null, or a concrete array.
@@ -1394,7 +1409,8 @@ data class ParameterDef(
     val direction: String? = null,
     val output: Boolean? = null,
     val value: JsonElement? = null,
-    val selector: String? = null
+    val selector: String? = null,
+    val codec: JsonElement? = null
 )
 
 object ParameterDefSerializer : KSerializer<ParameterDef> {
@@ -1417,7 +1433,8 @@ object ParameterDefSerializer : KSerializer<ParameterDef> {
             direction = stringField(obj, "direction"),
             output = boolField(obj, "output"),
             value = obj["value"],
-            selector = stringField(obj, "selector")
+            selector = stringField(obj, "selector"),
+            codec = obj["codec"]
         )
     }
 
@@ -1436,6 +1453,7 @@ object ParameterDefSerializer : KSerializer<ParameterDef> {
         value.output?.let { obj["output"] = JsonPrimitive(it) }
         value.value?.let { obj["value"] = it }
         putString(obj, "selector", value.selector)
+        value.codec?.let { obj["codec"] = it }
         jsonEncoder.encodeJsonElement(JsonObject(obj))
     }
 
@@ -1457,6 +1475,25 @@ fun ParameterDef.locationElement(): JsonElement? =
 
 fun ParameterDef.locationAny(): Any? =
     locationElement()?.takeUnless { it is JsonNull }?.let(JsonUtil::elementToAny)
+
+// Constants retain their literal type unless the author explicitly selects a codec.
+internal fun ParameterDef.constantValue(): Any? {
+    val raw = locationAny() ?: return null
+    val name = when (val spec = codec) {
+        is JsonObject -> (spec["name"] as? JsonPrimitive)?.content
+        is JsonPrimitive -> spec.content
+        else -> null
+    }
+    return when (name?.lowercase()) {
+        "json" -> if (raw is String) JsonUtil.elementToAny(JsonUtil.json.parseToJsonElement(raw)) else raw
+        "boolean", "bool" -> when (raw.toString().trim().lowercase()) {
+            "1", "true" -> true
+            "0", "false" -> false
+            else -> raw
+        }
+        else -> raw
+    }
+}
 
 @Serializable
 data class ChatDef(
@@ -1540,5 +1577,8 @@ data class DialogState(
     val open: Boolean = false,
     val selectionMode: String? = null,
     val props: Map<String, Any?> = emptyMap(),
-    val args: Map<String, Any?> = emptyMap()
+    val args: Map<String, Any?> = emptyMap(),
+    val initializing: Boolean = false,
+    val initializationError: String? = null,
+    val sourceDataSourceRef: String? = null
 )

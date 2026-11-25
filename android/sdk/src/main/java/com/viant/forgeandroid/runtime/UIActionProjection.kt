@@ -14,7 +14,10 @@ object UIActionProjection {
         source: String,
         snapshots: JsonObject,
         windowForm: JsonObject,
-        props: JsonObject
+        props: JsonObject,
+        authorization: JsonObject = JsonObject(emptyMap()),
+        readOnly: Boolean = false,
+        windowKey: String? = null
     ): UIActionProjectionResult {
         val name = namespace?.takeIf { functionName.startsWith("$it.") }
             ?.let { functionName.removePrefix("$it.") } ?: functionName
@@ -30,7 +33,7 @@ object UIActionProjection {
               const module = (
             $code
               );
-              return { run: ({name, source, snapshots, windowForm, props}) => {
+              return { run: ({name, source, snapshots, windowForm, props, authorization, readOnly, windowKey}) => {
                 const effects = [], contexts = {}; activeEffects = effects;
                 const signal = (state, key, kind, ref) => {
                   const holder = {peek: () => state[key]};
@@ -43,8 +46,9 @@ object UIActionProjection {
                   if (contexts[ref]) return contexts[ref];
                   const state = snapshots[ref];
                   const ctx = {
-                    identity:{dataSourceRef:ref}, Context:contextFor,
+                    identity:{dataSourceRef:ref}, Context:contextFor, authorization, metadata:{windowKey},
                     signals:{
+                      authorization:{peek:()=>authorization,get value(){return authorization;}}, control:{peek:()=>state.control,get value(){return state.control;}},
                       form:signal(state,'form','form',ref), collection:{peek:()=>state.collection||[],get value(){return state.collection||[];}},
                       selection:{peek:()=>state.selection||{},get value(){return state.selection||{};}},
                       input:{peek:()=>state.input||{},get value(){return state.input||{};}},
@@ -52,7 +56,7 @@ object UIActionProjection {
                     },
                     handlers:{
                       dataSource:{
-                        getFormData:()=>state.form||{}, getCollection:()=>state.collection||[], peekFullCollection:()=>state.collection||[], getCollectionInfo:()=>state.metrics||{},
+                        getFormData:()=>state.form||{}, getCollection:()=>state.collection||[], peekFullCollection:()=>state.collection||[], getCollectionInfo:()=>state.metrics||{}, getPage:()=>state.input?.page ?? 1, getPageSize:()=>state.pageSize,
                         getSelection:()=>state.selection||{},peekSelection:()=>state.selection||{},peekInput:()=>state.input||{},getInputParameters:()=>state.input?.parameters||{},peekFilter:()=>state.input?.filter||{},peekWindowFormData:()=>windowFormSignal.peek(),
                         setFormData: payload=>{const value=payload&&payload.values!==undefined?payload.values:payload;state.form=value||{};effects.push({kind:'form',ref,value:state.form});return true;},
                         setEditedFormData:payload=>{const value=payload&&payload.values!==undefined?payload.values:payload;state.form=value||{};effects.push({kind:'form',ref,value:state.form});return true;},
@@ -80,14 +84,15 @@ object UIActionProjection {
                 const result=fn({...props,context:contextFor(source)});
                 if(result&&typeof result.then==='function')throw new Error('Async UI actions are unsupported');
                 let count=0;while(timers.length){if(++count>100)throw new Error('UI action timer limit exceeded');timers.shift()();}
-                return {effects,result:result===undefined?null:result};
+                if(readOnly && effects.length)throw new Error('Command preparation must not modify window state.');
+                return {effects,result:result===undefined && readOnly ? props.value : result};
               }};
             })()
         """.trimIndent()
         val envelope = ActionHookRuntime.invoke(
             wrapper,
             "run",
-            JsonObject(mapOf("name" to JsonPrimitive(name), "source" to JsonPrimitive(source), "snapshots" to snapshots, "windowForm" to windowForm, "props" to props))
+            JsonObject(mapOf("name" to JsonPrimitive(name), "source" to JsonPrimitive(source), "snapshots" to snapshots, "windowForm" to windowForm, "props" to props, "authorization" to authorization, "readOnly" to JsonPrimitive(readOnly), "windowKey" to (windowKey?.let(::JsonPrimitive) ?: JsonNull)))
         ) as? JsonObject ?: return UIActionProjectionResult(emptyList(), null)
         val effects = (envelope["effects"] as? JsonArray).orEmpty().mapNotNull { raw ->
             val obj = raw as? JsonObject ?: return@mapNotNull null

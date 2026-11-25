@@ -17,6 +17,8 @@ data class ResourceValueEnvironment(
 
 typealias ResourceModelHook = suspend (name: String, value: Any?) -> Any?
 
+internal typealias ScopedMarshalHook = suspend (name: String, phase: String, modelRef: String, value: Any?, baseline: Any?) -> Any?
+
 object ResourceModelRuntime {
     fun mappedCase(name: String, row: Map<String, Any?>, metadata: WindowMetadata): ResourceMappingCase {
         val mapping = metadata.resourceMappings[name] ?: error("Unknown resource mapping: $name")
@@ -34,7 +36,10 @@ object ResourceModelRuntime {
         return applyHook(model.hooks?.afterUnmarshal, decoded, hook)
     }
 
-    suspend fun marshal(draft: Any?, baseline: Any?, modelRef: String, requestedMode: String? = null, requestedTarget: String? = null, schemas: Map<String, ResourceSchemaDef>, models: Map<String, ResourceModelDef>, hook: ResourceModelHook? = null): Map<String, Any?> {
+    suspend fun marshal(draft: Any?, baseline: Any?, modelRef: String, requestedMode: String? = null, requestedTarget: String? = null, schemas: Map<String, ResourceSchemaDef>, models: Map<String, ResourceModelDef>, hook: ResourceModelHook? = null): Map<String, Any?> =
+        marshalScoped(draft, baseline, modelRef, requestedMode, requestedTarget, schemas, models, hook, null)
+
+    private suspend fun marshalScoped(draft: Any?, baseline: Any?, modelRef: String, requestedMode: String? = null, requestedTarget: String? = null, schemas: Map<String, ResourceSchemaDef>, models: Map<String, ResourceModelDef>, hook: ResourceModelHook?, scopedHook: ScopedMarshalHook?): Map<String, Any?> {
         val model = models[modelRef] ?: error("Unknown resource model: $modelRef")
         val write = model.write ?: error("Resource model $modelRef requires a write binding")
         val mode = normalizeMode(requestedMode ?: write.mode ?: "changed")
@@ -44,25 +49,35 @@ object ResourceModelRuntime {
             require(draft is Map<*, *>) { "Association delta requires one canonical resource object" }
             JsonUtil.asStringMap(baseline).filterKeys { it !in associationFields }
         }
-        var canonical = if (mode == "overlaybaseline") overlayResource(overlayBase, draft) else draft
-        canonical = applyHook(model.hooks?.beforeMarshal, canonical, hook)
+        val prior = if (scopedHook != null && mode == "changed" && baseline != null && !model.hooks?.beforeMarshal.isNullOrBlank())
+            scopedHook(model.hooks!!.beforeMarshal!!, "beforeMarshalBaseline", modelRef, baseline, baseline) else baseline
+        val candidate = if (mode == "overlaybaseline") overlayResource(overlayBase, draft)
+            else if (scopedHook != null && mode == "changed") overlayResource(prior, draft) else draft
+        val canonical = applyMarshalHook(model.hooks?.beforeMarshal, "beforeMarshal", modelRef, candidate, prior, hook, scopedHook)
         validate(canonical, model.schemaRef, schemas)
-        if (associationFields.isEmpty() || baseline != null) validateImmutableIdentity(canonical, baseline, schemas[model.schemaRef])
-        val wire = applyHook(model.hooks?.afterMarshal, marshalValue(canonical, baseline, model, mode, schemas, models, associationModels, hook), hook)
+        if (prior != null) validateImmutableIdentity(canonical, prior, schemas[model.schemaRef])
+        val projected = marshalValue(canonical, prior, model, mode, schemas, models, associationModels, hook, scopedHook)
+        val wire = applyMarshalHook(model.hooks?.afterMarshal, "afterMarshal", modelRef, projected, prior, hook, scopedHook)
         val target = requestedTarget?.trim().orEmpty().ifBlank { write.inputPath.orEmpty() }
         if (target.isEmpty() || target == "\$") return JsonUtil.asStringMap(wire).ifEmpty { error("Root resource payload must be an object") }
-        val payload = if (associationFields.isNotEmpty() && write.collection) listOf(wire) else wire
+        val payload = if (write.collection && (scopedHook != null || associationFields.isNotEmpty())) listOf(wire) else wire
         val output = linkedMapOf<String, Any?>()
         setPath(output, target, payload)
         return output
     }
 
-    suspend fun prepare(payload: ResourcePayloadPreparationDef, environment: ResourceValueEnvironment, schemas: Map<String, ResourceSchemaDef>, models: Map<String, ResourceModelDef>, hook: ResourceModelHook? = null): Map<String, Any?> {
+    suspend fun prepare(payload: ResourcePayloadPreparationDef, environment: ResourceValueEnvironment, schemas: Map<String, ResourceSchemaDef>, models: Map<String, ResourceModelDef>, hook: ResourceModelHook? = null): Map<String, Any?> =
+        prepareScoped(payload, environment, schemas, models, hook, null)
+
+    internal suspend fun prepareScoped(payload: ResourcePayloadPreparationDef, environment: ResourceValueEnvironment, schemas: Map<String, ResourceSchemaDef>, models: Map<String, ResourceModelDef>, hook: ResourceModelHook?, scopedHook: ScopedMarshalHook?): Map<String, Any?> {
         val draft = if (payload.fields.isNotEmpty()) {
-            linkedMapOf<String, Any?>().also { output -> payload.fields.forEach { (path, source) -> resolveSource(source, environment)?.let { setPath(output, path, it) } } }
+            linkedMapOf<String, Any?>().also { output -> payload.fields.forEach { (path, source) ->
+                val value = resolveSource(source, environment)
+                if (value != null || (scopedHook != null && source.scope == "constant" && source.value == kotlinx.serialization.json.JsonNull)) setPath(output, path, value)
+            } }
         } else payload.source?.let { resolveSource(it, environment) } ?: environment.extras
         val baseline = payload.baseline?.let { resolveSource(it, environment) }
-        return marshal(draft, baseline, payload.modelRef, payload.mode, payload.target, schemas, models, hook)
+        return marshalScoped(draft, baseline, payload.modelRef, payload.mode, payload.target, schemas, models, hook, scopedHook)
     }
 
     fun validate(value: Any?, schemaRef: String, schemas: Map<String, ResourceSchemaDef>) {
@@ -91,16 +106,18 @@ object ResourceModelRuntime {
         else -> applyCodec(value, binding.codec, binding.trim, binding.empty)
     }
 
-    private suspend fun marshalValue(value: Any?, baseline: Any?, model: ResourceModelDef, mode: String, schemas: Map<String, ResourceSchemaDef>, models: Map<String, ResourceModelDef>, associationModels: Set<String>, hook: ResourceModelHook?): Any? {
+    private suspend fun marshalValue(value: Any?, baseline: Any?, model: ResourceModelDef, mode: String, schemas: Map<String, ResourceSchemaDef>, models: Map<String, ResourceModelDef>, associationModels: Set<String>, hook: ResourceModelHook?, scopedHook: ScopedMarshalHook?): Any? {
         if (value is List<*>) {
             val prior = baseline as? List<*> ?: emptyList<Any?>()
-            return value.mapIndexed { index, item -> marshalValue(item, prior.getOrNull(index), model, mode, schemas, models, associationModels, hook) }
+            return value.mapIndexed { index, item -> marshalValue(item, prior.getOrNull(index), model, mode, schemas, models, associationModels, hook, scopedHook) }
         }
         val source = JsonUtil.asStringMap(value)
         val prior = JsonUtil.asStringMap(baseline)
         val schema = schemas[model.schemaRef]
         val output = linkedMapOf<String, Any?>()
-        model.fields.forEach { (field, binding) ->
+        val declaredFields = if (scopedHook == null) model.fields.keys else schema?.properties.orEmpty().keys + model.fields.keys
+        declaredFields.forEach { field ->
+            val binding = model.fields[field] ?: ResourceFieldBindingDef()
             binding.associationDelta?.let { delta ->
                 if (source.containsKey(field)) {
                     val fieldSchema = schema?.properties?.get(field) ?: error("Missing association schema for $field")
@@ -113,16 +130,21 @@ object ResourceModelRuntime {
             val current = if (source.containsKey(field)) source[field] else binding.defaultValue?.let(JsonUtil::elementToAny)
             val previous = prior[field]
             val include = mode != "changed" || field in schema?.identity.orEmpty() || binding.alwaysWrite || (!binding.omitIfUnchanged && current != previous)
-            if (!include || current == null) return@forEach
+            if (!include) return@forEach
+            if (current == null) {
+                if (scopedHook != null && source.containsKey(field) && !binding.empty.equals("omit", true)) setPath(output, binding.write ?: field, null)
+                return@forEach
+            }
             val transformed = when {
                 binding.modelRef != null -> {
                     val nested = models[binding.modelRef] ?: error("Unknown nested model: ${binding.modelRef}")
-                    val prepared = applyHook(nested.hooks?.beforeMarshal, current, hook)
-                    applyHook(nested.hooks?.afterMarshal, marshalValue(prepared, previous, nested, mode, schemas, models, associationModels, hook), hook)
+                    val prepared = applyMarshalHook(nested.hooks?.beforeMarshal, "beforeMarshal", binding.modelRef, current, previous, hook, scopedHook)
+                    applyMarshalHook(nested.hooks?.afterMarshal, "afterMarshal", binding.modelRef, marshalValue(prepared, previous, nested, mode, schemas, models, associationModels, hook, scopedHook), previous, hook, scopedHook)
                 }
                 binding.collection?.modelRef != null -> {
                     val nested = models[binding.collection.modelRef] ?: error("Unknown nested model: ${binding.collection.modelRef}")
                     val collection = binding.collection
+                    val nestedRef = checkNotNull(collection.modelRef)
                     val nestedSchema = schemas[nested.schemaRef]
                     val pairByIdentity = binding.collection.modelRef in associationModels
                     val associationFields = if (pairByIdentity) nested.fields.filterValues { it.associationDelta != null }.keys else emptySet()
@@ -130,12 +152,12 @@ object ResourceModelRuntime {
                     val marker = collection.deleteMarker
                     if (marker == null) {
                         val draftRows = merged.map { it.row }
-                        val prepared = applyHook(nested.hooks?.beforeMarshal, draftRows, hook)
+                        val prepared = applyMarshalHook(nested.hooks?.beforeMarshal, "beforeMarshal", nestedRef, draftRows, previous, hook, scopedHook)
                         require(!pairByIdentity || prepared == draftRows) {
                             "Collection hooks cannot replace association draft rows before identity pairing"
                         }
                         val priorRows = if (pairByIdentity) merged.map { it.prior } else previous
-                        applyHook(nested.hooks?.afterMarshal, marshalValue(prepared, priorRows, nested, mode, schemas, models, associationModels, hook), hook)
+                        applyMarshalHook(nested.hooks?.afterMarshal, "afterMarshal", nestedRef, marshalValue(prepared, priorRows, nested, mode, schemas, models, associationModels, hook, scopedHook), priorRows, hook, scopedHook)
                     } else {
                         val identities = collection.identity.ifEmpty { nestedSchema?.identity.orEmpty() }
                         val markerSchema = nestedSchema?.properties?.get(marker)
@@ -167,9 +189,9 @@ object ResourceModelRuntime {
                                         JsonUtil.asStringMap(entry.prior).filterKeys { it !in associationFields || row.containsKey(it) }
                                     if (entry.row == comparison) continue
                                 }
-                                val prepared = applyHook(nested.hooks?.beforeMarshal, entry.row, hook)
-                                val wire = marshalValue(prepared, entry.prior, nested, if (mode == "changed") "overlaybaseline" else mode, schemas, models, associationModels, hook)
-                                rows.add(applyHook(nested.hooks?.afterMarshal, wire, hook))
+                                val prepared = applyMarshalHook(nested.hooks?.beforeMarshal, "beforeMarshal", nestedRef, entry.row, entry.prior, hook, scopedHook)
+                                val wire = marshalValue(prepared, entry.prior, nested, if (mode == "changed") "overlaybaseline" else mode, schemas, models, associationModels, hook, scopedHook)
+                                rows.add(applyMarshalHook(nested.hooks?.afterMarshal, "afterMarshal", nestedRef, wire, entry.prior, hook, scopedHook))
                             }
                         }
                         if (mode == "changed" && rows.isEmpty()) return@forEach
@@ -381,6 +403,11 @@ object ResourceModelRuntime {
         filter.notEquals?.let { return actual != JsonUtil.elementToAny(it) }
         if (filter.inValues.isNotEmpty()) return filter.inValues.map(JsonUtil::elementToAny).contains(actual)
         return false
+    }
+
+    private suspend fun applyMarshalHook(name: String?, phase: String, modelRef: String, value: Any?, baseline: Any?, hook: ResourceModelHook?, scoped: ScopedMarshalHook?): Any? {
+        if (name.isNullOrBlank()) return value
+        return if (scoped == null) applyHook(name, value, hook) else scoped(name, phase, modelRef, value, baseline)
     }
 
     private suspend fun applyHook(name: String?, value: Any?, hook: ResourceModelHook?): Any? {

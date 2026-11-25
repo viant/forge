@@ -36,8 +36,8 @@ class DataSourceRuntime(
     private data class PreparedCompletion(val windowId: String, val instanceRef: String, val result: CompletableDeferred<PreparedReportFetchResult>)
     private val preparedCompletions = java.util.concurrent.ConcurrentHashMap<String, PreparedCompletion>()
     private val jobs = mutableMapOf<String, Job>()
-    private val registeredContexts = java.util.concurrent.ConcurrentHashMap<String, Pair<String, DataSourceContext>>()
-    fun registeredWindowContexts(windowId: String): Map<String, DataSourceContext> = registeredContexts.values.filter { it.second.window.windowId == windowId }.associate { it.first to it.second }
+    private val registeredContexts = java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.ConcurrentHashMap<String, DataSourceContext>>()
+    fun registeredWindowContexts(windowId: String): Map<String, DataSourceContext> = registeredContexts[windowId]?.toMap().orEmpty()
     private val parameterResolver = ParameterResolver()
     private var executor: ((ExecutionDef, DataSourceContext, Map<String, Any?>) -> Unit)? = null
     private var collectionLoader: (suspend (DataSourceContext) -> LoaderResult?)? = null
@@ -108,7 +108,7 @@ class DataSourceRuntime(
             instanceRef = instanceRef,
             preparedAuthorization = { proposed ->
                 val owned = window.metadata.peek()?.let { dataSourceRef in reportOwnedDataSourceRefs(it) } == true
-                !owned || authorizeReportRead?.invoke(registeredContexts[dsId]?.second ?: error("The datasource is not registered."), proposed) != false
+                !owned || authorizeReportRead?.invoke(registeredContexts[window.windowId]?.get(instanceRef) ?: error("The datasource is not registered."), proposed) != false
             },
             preparedRegister = { id -> preparedCompletions[id] = PreparedCompletion(window.windowId, instanceRef, CompletableDeferred()) },
             preparedAwait = { id ->
@@ -117,7 +117,7 @@ class DataSourceRuntime(
                 try { completion.result.await() } finally { preparedCompletions.remove(id, completion) }
             }
         )
-        registeredContexts[dsId] = instanceRef to ctx
+        registeredContexts.computeIfAbsent(window.windowId) { java.util.concurrent.ConcurrentHashMap() }[instanceRef] = ctx
         if (!jobs.containsKey(dsId)) {
             applyInitialParameters(ctx)
             jobs[dsId] = scope.launch(Dispatchers.IO) {
@@ -135,7 +135,7 @@ class DataSourceRuntime(
         preparedCompletions.entries.filter { it.value.windowId == windowId }.forEach { (id, completion) ->
             preparedCompletions.remove(id, completion); completion.result.cancel(CancellationException("Report window closed."))
         }
-        registeredContexts.entries.removeIf { it.value.second.window.windowId == windowId }
+        registeredContexts.remove(windowId)
         jobs.keys.filter { it.startsWith(windowId) }.forEach { key ->
             jobs.remove(key)?.cancel()
         }
@@ -197,7 +197,12 @@ class DataSourceRuntime(
 
             val endpoint = ctx.dataSource.service?.endpoint
             val request = buildRequest(ctx) ?: run {
-                finishFetch(ctx, error = if (reportOwned) "The report datasource has no physical loader." else null)
+                val message = when {
+                    reportOwned -> "The report datasource has no physical loader."
+                    requestedInput.preparedDispatchId != null -> "The command datasource has no physical loader."
+                    else -> null
+                }
+                finishFetch(ctx, error = message, cause = message?.let(::IllegalStateException))
                 return
             }
 
@@ -233,7 +238,7 @@ class DataSourceRuntime(
             if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
             trigger(ctx, "onError", mapOf("error" to (e.message ?: "Unknown error")), currentPath)
             if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
-            finishFetch(ctx, error = e.message)
+            finishFetch(ctx, error = e.message ?: e.javaClass.simpleName, cause = e)
         } finally {
             if (requestedInput.fetch) {
                 live.input.update { current ->
@@ -258,9 +263,9 @@ class DataSourceRuntime(
         ctx.input.peek().preparedDispatchId?.let { preparedCompletions[it]?.result?.completeExceptionally(IllegalStateException(message)) }
     }
 
-    private fun finishFetch(ctx: DataSourceContext, error: String? = null, rows: List<Map<String, Any?>> = emptyList(), metrics: Map<String, Any?> = emptyMap()) {
+    private fun finishFetch(ctx: DataSourceContext, error: String? = null, rows: List<Map<String, Any?>> = emptyList(), metrics: Map<String, Any?> = emptyMap(), cause: Throwable? = null) {
         ctx.control.set(ctx.control.peek().copy(loading = false, error = error, resolved = true))
-        ctx.input.peek().preparedDispatchId?.let { id -> preparedCompletions[id]?.result?.complete(PreparedReportFetchResult(JsonUtil.anyToElement(rows).jsonArray, JsonUtil.anyToElement(metrics).jsonObject, error)) }
+        ctx.input.peek().preparedDispatchId?.let { id -> preparedCompletions[id]?.result?.complete(PreparedReportFetchResult(JsonUtil.anyToElement(rows).jsonArray, JsonUtil.anyToElement(metrics).jsonObject, error, cause)) }
     }
 
     private suspend fun applyCollectionHook(

@@ -19,7 +19,7 @@ data class NativeReportAdmission(
 )
 data class NativeReportAdmissionStatus(val identity: ReportPreparationIdentity, val status: String, val reason: String? = null)
 data class NativeReportReadPermit(val uiRunRequestId: String, val datasetId: String)
-data class PreparedReportFetchResult(val rows: JsonArray, val metrics: JsonObject, val error: String? = null)
+data class PreparedReportFetchResult(val rows: JsonArray, val metrics: JsonObject, val error: String? = null, val cause: Throwable? = null)
 data class NativeReportDatasetAdmission(val id: String, val dataSourceRef: String, val request: JsonObject)
 data class NativeReportRunHandle(val reportRunId: String, val revision: Long, val uiRunRequestId: String, val admission: NativeReportAdmission, val contextRevision: Long = 0, val ownerId: String? = null, val reportAdmissionRef: String? = null)
 data class NativeReportCompletedRun(val reportRunId: String, val revision: Long, val contextStatus: String = "active", val active: Boolean? = true, val activationError: String? = null,val verifiedDatasets:JsonArray?=null)

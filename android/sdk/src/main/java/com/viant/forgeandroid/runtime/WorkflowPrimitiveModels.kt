@@ -29,7 +29,10 @@ data class MutationCommandDef(
     val errorState: JsonObject = JsonObject(emptyMap()),
     val indeterminateState: JsonObject = JsonObject(emptyMap()),
     val reconcile: ReconcileSpec? = null,
-    val refresh: List<RefreshSpec> = emptyList()
+    val refresh: List<RefreshSpec> = emptyList(),
+    val prepare: String? = null,
+    val serializationGroup: String? = null,
+    val tooltip: String? = null
 )
 
 @Serializable
@@ -212,3 +215,19 @@ data class MasterDetailRegionSpec(
 data class MasterDetailEmptySpec(
     val message: String? = null
 )
+
+
+/** The dialog owns presentation; the command owns confirmation, execution and its receipt. */
+internal fun ActionDef.footerCommand(): MutationCommandDef? {
+    val command = mutationCommand ?: return null
+    val guards = listOfNotNull(command.validateWhen, visibleWhen, disabledWhen?.let { DashboardConditionDef(not = it) })
+    return command.copy(
+        commandId = command.commandId?.takeIf(String::isNotBlank) ?: id,
+        label = label ?: id,
+        icon = icon ?: command.icon,
+        hideLabel = hideLabel,
+        intent = intent ?: command.intent,
+        tooltip = tooltip ?: command.tooltip,
+        validateWhen = if (guards.size > 1) DashboardConditionDef(all = guards) else guards.firstOrNull()
+    )
+}

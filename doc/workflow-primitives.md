@@ -62,6 +62,14 @@ preparation or write.
 
 Forge workflow primitives keep interaction mechanics in the runtime and business rules in datasource contracts. Metadata selects datasources, fields, permissions, transitions, reconciliation, and layout; it does not implement transactions. Mutation datasources should normally set `replayPendingFetchOnRestore: false`.
 
+### Dialog footer commands
+
+A footer action can declare `mutationCommand` directly. The action supplies its presentation and the command owns confirmation, payload preparation, the writer and the outcome. Use the action's `id` as the default command ID. A legacy footer that declares only an `onClick` handler continues through the normal action dispatcher.
+
+On iOS and Android, footer commands use the same executor as other native mutation triggers. The executor checks current eligibility before dispatch, including after a confirmation. A window-scoped `serializationGroup` can guard related commands using different writers. An indeterminate outcome retains the guard until the caller reconciles it.
+
+Native preparation handlers and resource-model hooks can read the active draft, selected rows, window state and admitted authorization. Use a synchronous, side-effect-free `prepare` handler that returns the writer parameter object. A missing handler, a promise, an attempted mutation inside preparation, or an invalid result fails before the writer is invoked. Declare post-write work in `resultState`, `reconcile` or `refresh`. Use the dialog’s `onOpen` event for state that must reset on each genuine open.
+
 ## Resource models and typed marshalling
 
 Resource models are a shared data contract used by primitives; they are not an additional visual primitive and they do not replace ordinary form/datasource binding. Existing windows remain unchanged unless they explicitly declare `resourceModelRef` on a reader or `payload.modelRef` on a `MutationCommand`.

@@ -358,6 +358,17 @@ class ForgeRuntime(
         return execEngine.execute(execution, context, args)
     }
 
+    internal suspend fun activatePlainFooter(window: WindowContext, dialogId: String, action: ActionDef, source: DataSourceContext?) {
+        require(action.mutationCommand == null) { "Command footers must use the mutation executor." }
+        val args = mapOf("dialogId" to dialogId, "windowId" to window.windowId)
+        var completed = true
+        for (event in action.on) {
+            val result = execEngine.evaluate(event, source, args, applyEffects = true)
+            if (result == false || result == null) completed = false
+        }
+        if (action.close && completed) closeDialogPublic(window.windowId, dialogId)
+    }
+
     suspend fun evaluate(
         execution: ExecutionDef,
         context: DataSourceContext?,
@@ -386,24 +397,15 @@ class ForgeRuntime(
         execution: ExecutionDef,
         context: DataSourceContext,
         args: Map<String, Any?>,
-        applyEffects: Boolean
+        applyEffects: Boolean,
+        current: () -> Boolean = { true }
     ): Any? {
         val metadata = context.window.metadata.peek() ?: return null
         val code = metadata.actions?.code?.trim().orEmpty()
         val handler = execution.handler?.trim().orEmpty()
         if (code.isBlank() || handler.isBlank()) return null
-        val snapshots = JsonObject(metadata.dataSources.keys.associateWith { ref ->
-            val target = context.window.contextOrNull(ref)
-            val selection = target?.selection?.peek() ?: SelectionState()
-            val input = target?.input?.peek() ?: InputState()
-            JsonObject(mapOf(
-                "form" to JsonUtil.anyToElement(target?.form?.peek().orEmpty()),
-                "collection" to JsonUtil.anyToElement(target?.collection?.peek().orEmpty()),
-                "selection" to JsonUtil.anyToElement(mapOf("selected" to selection.selected, "selection" to selection.selection, "rowIndex" to selection.rowIndex)),
-                "input" to JsonUtil.anyToElement(mapOf("filter" to input.filter, "parameters" to input.parameters, "page" to input.page, "fetch" to input.fetch, "refresh" to input.refresh)),
-                "metrics" to JsonUtil.anyToElement(target?.metrics?.peek().orEmpty())
-            ))
-        })
+        val contexts = metadata.dataSources.keys.mapNotNull { ref -> context.window.contextOrNull(ref)?.let { ref to it } }.toMap()
+        val snapshots = actionSnapshots(contexts)
         val executionValue = mapOf(
             "handler" to execution.handler,
             "event" to execution.event,
@@ -417,11 +419,29 @@ class ForgeRuntime(
             source = context.dataSourceRef,
             snapshots = snapshots,
             windowForm = JsonUtil.anyToElement(context.window.peekWindowForm()) as JsonObject,
-            props = JsonUtil.anyToElement(args + ("execution" to executionValue)) as JsonObject
+            props = JsonUtil.anyToElement(args + ("execution" to executionValue)) as JsonObject,
+            authorization = JsonObject(metadata.authorizationSnapshot), windowKey = metadata.windowKey
         )
-        if (applyEffects) applyUIActionEffects(context, projection.effects, metadata)
+        if (applyEffects && current()) applyUIActionEffects(context, projection.effects, metadata)
         return projection.result?.let(JsonUtil::elementToAny)
     }
+
+    internal fun actionSnapshots(contexts: Map<String, DataSourceContext>): JsonObject =
+        JsonObject(contexts.mapValues { (_, target) ->
+            val selection = target.selection.peek()
+            val input = target.input.peek()
+            val control = target.control.peek()
+            JsonObject(mapOf(
+                "form" to JsonUtil.anyToElement(target.form.peek()),
+                "collection" to JsonUtil.anyToElement(target.collection.peek()),
+                "selection" to JsonUtil.anyToElement(mapOf("selected" to selection.selected, "selection" to selection.selection, "rowIndex" to selection.rowIndex)),
+                "input" to JsonUtil.anyToElement(mapOf("filter" to input.filter, "parameters" to input.parameters, "page" to input.page, "fetch" to input.fetch, "refresh" to input.refresh)),
+                "metrics" to JsonUtil.anyToElement(target.metrics.peek()),
+                "control" to JsonUtil.anyToElement(mapOf("loaded" to control.resolved, "loading" to control.loading,
+                    "stale" to !control.resolved, "error" to control.error, "inactive" to control.inactive)),
+                "pageSize" to JsonUtil.anyToElement(target.dataSource.paging?.size ?: 0)
+            ))
+        })
 
     private fun applyUIActionEffects(source: DataSourceContext, effects: List<UIActionEffect>, metadata: WindowMetadata) {
         effects.forEach { effect ->
@@ -465,7 +485,7 @@ class ForgeRuntime(
         if (metadata.dialogs.none { it.id == dialogId }) return
         val parameters = JsonUtil.asStringMap(payload["parameters"])
         val options = JsonUtil.asStringMap(args?.getOrNull(1))
-        openDialog(source.window.windowId, dialogId, parameters, options["selectionMode"]?.toString())
+        openDialog(source.window.windowId, dialogId, parameters, options["selectionMode"]?.toString(), source.dataSourceRef)
     }
 
     private fun applyProjectedOpenWindow(source: DataSourceContext, value: Any?) {
@@ -550,10 +570,44 @@ class ForgeRuntime(
         windowId: String,
         dialogId: String,
         args: Map<String, Any?>,
-        selectionMode: String? = null
+        selectionMode: String? = null,
+        callerDataSourceRef: String? = null
     ) {
-        val sig = signals.dialog("${windowId}Dialog$dialogId")
-        sig.set(DialogState(open = true, selectionMode = selectionMode, props = args, args = args))
+        val signal = signals.dialog("${windowId}Dialog$dialogId")
+        val previous = signal.peek()
+        val window = windowContext(windowId)
+        val metadata = window.metadata.peek()
+        val dialog = metadata?.dialogs?.firstOrNull { it.id == dialogId }
+        val sourceRef = dialog?.content?.dataSourceRef ?: dialog?.dataSourceRef ?: callerDataSourceRef
+        if (previous.open && (previous.initializing || (previous.args == args &&
+                previous.selectionMode == selectionMode && previous.sourceDataSourceRef == sourceRef))) return
+        val source = sourceRef?.let(window::contextOrNull)
+        val hooks = if (previous.open) emptyList() else dialog?.on.orEmpty().filter { it.event == "onOpen" }
+        val next = DialogState(open = true, selectionMode = selectionMode, props = args, args = args, initializing = hooks.isNotEmpty(), sourceDataSourceRef = sourceRef)
+        signal.set(next)
+        val fetch = dialog?.fetchOnOpen ?: (dialog?.content?.fetchData != false)
+        if (source != null) {
+            if (args.isNotEmpty()) {
+                val scoped = JsonUtil.asStringMap(args[source.dataSourceRef]).ifEmpty { args }
+                source.setInputParameters(scoped, fetch = fetch)
+            } else if (fetch && !source.control.peek().loading && (dialog?.fetchOnOpen == true || source.collection.peek().isEmpty())) {
+                source.fetchCollection()
+            }
+        }
+        if (hooks.isNotEmpty()) scope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            try {
+                for (hook in hooks) {
+                    if (signal.peek() !== next) return@launch
+                    execEngine.evaluate(hook, source, mapOf("dialogId" to dialogId, "windowId" to windowId),
+                        applyEffects = true, current = { signal.peek() === next }, required = true)
+                }
+                signal.update { if (it === next) next.copy(initializing = false) else it }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                signal.update { if (it === next) next.copy(initializing = false, initializationError = error.message ?: "Dialog initialization failed.") else it }
+            }
+        }
     }
 
     internal fun closeDialog(windowId: String, dialogId: String) {
@@ -681,14 +735,18 @@ class ExecutionEngine(
     suspend fun evaluate(
         execution: ExecutionDef,
         context: DataSourceContext?,
-        args: Map<String, Any?> = emptyMap()
+        args: Map<String, Any?> = emptyMap(),
+        applyEffects: Boolean = false,
+        current: () -> Boolean = { true },
+        required: Boolean = false
     ): Any? {
         val handlerName = execution.handler ?: return null
         val handler = handlers.resolve(handlerName) ?: builtIn(handlerName)
-        if (handler != null) return invokeHandler(execution, context, args, handler, applyState = false)
+        if (handler != null) return invokeHandler(execution, context, args, handler, applyState = applyEffects)
         if (context != null && runtime.canProjectMetadataExecution(execution, context)) {
-            return runtime.evaluateMetadataExecution(execution, context, args, applyEffects = false)
+            return runtime.evaluateMetadataExecution(execution, context, args, applyEffects = applyEffects, current = current)
         }
+        check(!required) { "Dialog lifecycle handler is unavailable: $handlerName" }
         return null
     }
 
@@ -744,7 +802,7 @@ class ExecutionEngine(
                         outbound = resolution.outbound
                     )
                 )
-                runtime.openDialog(windowId, dialogId, resolution.inbound, selectionMode)
+                runtime.openDialog(windowId, dialogId, resolution.inbound, selectionMode, callerCtx.dataSourceRef)
                 return@handler null
             }
             runtime.openDialog(windowId, dialogId, emptyMap(), selectionMode)

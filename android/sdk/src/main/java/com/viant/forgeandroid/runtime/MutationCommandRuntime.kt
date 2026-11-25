@@ -45,19 +45,21 @@ data class MutationCommandResult(
     val status: String,
     val invocationId: String = "",
     val error: String? = null,
-    val warnings: List<MutationCommandWarning> = emptyList()
+    val warnings: List<MutationCommandWarning> = emptyList(),
+    val cause: Throwable? = null
 )
 
 private sealed interface MutationWriterOutcome {
     data class Succeeded(val records: JsonArray? = null) : MutationWriterOutcome
-    data object Indeterminate : MutationWriterOutcome
-    data class Failed(val message: String) : MutationWriterOutcome
+    data class Indeterminate(val cause: Throwable? = null) : MutationWriterOutcome
+    data class Failed(val message: String, val cause: Throwable? = null) : MutationWriterOutcome
 }
 
 class MutationCommandRuntime {
     private val mutex = Mutex()
     private val states = mutableMapOf<String, MutationCommandState>()
-    private val commandGuards = mutableSetOf<String>()
+    private val commandGuards = mutableMapOf<String, String?>()
+    private val activeGroups = mutableSetOf<String>()
     private val transportGuards = mutableSetOf<String>()
 
     suspend fun state(windowId: String, command: MutationCommandDef): MutationCommandState =
@@ -67,7 +69,7 @@ class MutationCommandRuntime {
         val key = commandKey(windowId, command)
         return mutex.withLock {
             if (states[key]?.phase != MutationCommandPhase.Indeterminate) return@withLock false
-            commandGuards.remove(key)
+            commandGuards.remove(key)?.let(activeGroups::remove)
             transportGuards.remove(transportKey(windowId, command.dataSourceRef))
             states[key] = MutationCommandState(message = message)
             true
@@ -84,10 +86,12 @@ class MutationCommandRuntime {
     ): MutationCommandResult {
         val targetRef = command.dataSourceRef.trim()
         val key = commandKey(window.windowId, command)
+        val group = command.serializationGroup?.trim()?.takeIf(String::isNotEmpty)?.let { "${window.windowId}::$it" }
         val acquired = mutex.withLock {
-            if (targetRef.isEmpty() || key in commandGuards) false
+            if (targetRef.isEmpty() || key in commandGuards || group in activeGroups) false
             else {
-                commandGuards += key
+                commandGuards[key] = group
+                group?.let(activeGroups::add)
                 states[key] = MutationCommandState(
                     phase = MutationCommandPhase.Validating,
                     guarded = true,
@@ -100,7 +104,9 @@ class MutationCommandRuntime {
         }
         if (!acquired) return MutationCommandResult(false, "suppressed")
 
-        if (!predicateAllows(source, command.validateWhen)) {
+        val admitted = window.metadata.peek()?.authorizationSnapshot.orEmpty()
+        fun authorized() = window.metadata.peek()?.authorizationSnapshot == admitted && predicateAllows(source, command.validateWhen)
+        if (!authorized()) {
             val message = command.invalidMessage ?: "This action is not currently valid."
             applyWindowState(runtime, window.windowId, command.errorState)
             releaseCommand(key, MutationCommandState(
@@ -111,30 +117,65 @@ class MutationCommandRuntime {
             ))
             return MutationCommandResult(false, "invalid", error = message)
         }
-        resolveConfirmation(command, extras).takeIf(String::isNotBlank)?.let { confirmation ->
-            if (confirm == null) {
-                val message = "Confirmation is required but no confirmation service is available."
-                releaseCommand(key, MutationCommandState(
-                    phase = MutationCommandPhase.Failed,
-                    error = message,
-                    message = message,
+        val timeout = (command.timeoutMs ?: 30_000).coerceAtLeast(1_000).toLong()
+        val parameters = try {
+            val resolved = ParameterResolver().resolve(command.parameters, source)
+            val envelope = resolved.inbound[targetRef] ?: resolved.inbound[""] ?: emptyMap()
+            val base = mutationTargetParameters(envelope)
+            // The isolated script engine has no synchronous callback into Kotlin. Capture only
+            // this window's attached contexts, and share the capture across hooks in this phase.
+            fun capture() = runtime.actionSnapshots(runtime.registeredWindowDataSources(window.windowId) + (source.dataSourceRef to source))
+            val initialSources by lazy { capture() }
+            val prepared = withTimeoutOrNull(timeout) {
+                deepMerge(base, preparePayload(window, source, command.payload, extras) { initialSources })
+            } ?: error("Command payload preparation timed out. The writer was not invoked.")
+            val confirmation = resolveConfirmation(command, extras)
+            if (confirmation.isNotBlank()) {
+                if (confirm == null) {
+                    val message = "Confirmation is required but no confirmation service is available."
+                    releaseCommand(key, MutationCommandState(
+                        phase = MutationCommandPhase.Failed,
+                        error = message,
+                        message = message,
+                        writerStatus = MutationWriterStatus.NotInvoked
+                    ))
+                    return MutationCommandResult(false, "confirmation_unavailable", error = message)
+                }
+                publish(key, MutationCommandState(
+                    phase = MutationCommandPhase.Confirming,
+                    guarded = true,
+                    retryAllowed = false,
+                    message = confirmation,
                     writerStatus = MutationWriterStatus.NotInvoked
                 ))
-                return MutationCommandResult(false, "confirmation_unavailable", error = message)
+                if (!confirm(confirmation)) {
+                    releaseCommand(key, MutationCommandState(writerStatus = MutationWriterStatus.NotInvoked))
+                    return MutationCommandResult(false, "cancelled")
+                }
             }
-            publish(key, MutationCommandState(
-                phase = MutationCommandPhase.Confirming,
-                guarded = true,
-                retryAllowed = false,
-                message = confirmation,
-                writerStatus = MutationWriterStatus.NotInvoked
-            ))
-            if (!confirm(confirmation)) {
-                releaseCommand(key, MutationCommandState(writerStatus = MutationWriterStatus.NotInvoked))
-                return MutationCommandResult(false, "cancelled")
-            }
-        }
 
+            check(authorized()) { "Authorization or command eligibility changed before dispatch." }
+            val hook = command.prepare
+            if (hook.isNullOrBlank()) prepared.toMutableMap() else {
+                val preparedByHook = withTimeoutOrNull(timeout) {
+                    val result = invokePreparation(window, source, hook, JsonObject(mapOf(
+                        "parameters" to JsonUtil.anyToElement(prepared), "extras" to JsonUtil.anyToElement(extras)
+                    )), if (confirmation.isBlank()) initialSources else capture())
+                    require(result is JsonObject) { "Command preparation must return a parameter map." }
+                    JsonUtil.asStringMap(JsonUtil.elementToAny(result)).toMutableMap()
+                } ?: error("Command preparation timed out. The writer was not invoked.")
+                check(authorized()) { "Authorization or command eligibility changed before dispatch." }
+                preparedByHook
+            }
+        } catch (cancelled: CancellationException) {
+            withContext(NonCancellable) { releaseCommand(key, MutationCommandState(writerStatus = MutationWriterStatus.NotInvoked)) }
+            throw cancelled
+        } catch (error: Exception) {
+            val message = error.message ?: "Invalid command preparation."
+            if (window.metadata.peek()?.authorizationSnapshot == admitted) applyWindowState(runtime, window.windowId, command.errorState)
+            releaseCommand(key, MutationCommandState(phase = MutationCommandPhase.Failed, error = message, message = message, writerStatus = MutationWriterStatus.NotInvoked))
+            return MutationCommandResult(false, "invalid_payload", error = message, cause = error)
+        }
         val target = window.contextOrNull(targetRef)
         if (target == null) {
             val message = "Command datasource is unavailable: $targetRef"
@@ -159,18 +200,13 @@ class MutationCommandRuntime {
             return MutationCommandResult(false, "transport_busy", error = message)
         }
 
-        val invocationId = UUID.randomUUID().toString()
-        val resolution = ParameterResolver().resolve(command.parameters, source)
-        val envelope = resolution.inbound[targetRef] ?: resolution.inbound[""] ?: emptyMap()
-        val base = mutationTargetParameters(envelope)
-        val prepared = runCatching { preparePayload(window, source, command.payload, extras) }.getOrElse { error ->
-            releaseTransportAndCommand(transport, key)
-            applyWindowState(runtime, window.windowId, command.errorState)
-            val message = error.message ?: "Invalid resource payload"
-            publish(key, MutationCommandState(phase = MutationCommandPhase.Failed, error = message, message = message, writerStatus = MutationWriterStatus.NotInvoked))
-            return MutationCommandResult(false, "invalid_payload", error = message)
+        if (!authorized()) {
+            val message = "Authorization or command eligibility changed before dispatch."
+            finishTransport(transport, key, MutationCommandState(phase = MutationCommandPhase.Failed, message = message,
+                error = message, writerStatus = MutationWriterStatus.NotInvoked))
+            return MutationCommandResult(false, "invalid", error = message)
         }
-        val parameters = deepMerge(base, prepared).toMutableMap()
+        val invocationId = UUID.randomUUID().toString()
         command.invocationParameter?.trim()?.takeIf(String::isNotEmpty)?.let { parameters[it] = invocationId }
         applyWindowState(runtime, window.windowId, command.pendingState)
         publish(key, MutationCommandState(
@@ -182,44 +218,46 @@ class MutationCommandRuntime {
             invocationId = invocationId,
             writerStatus = MutationWriterStatus.Pending
         ))
-        val timeout = (command.timeoutMs ?: 30_000).coerceAtLeast(1_000)
-        val writer = if (command.resultState.isEmpty()) {
-            target.setInputParameters(parameters)
-            awaitWriter(target, timeout)
-        } else {
-            val result = try {
-                withTimeoutOrNull(timeout.toLong()) { target.fetchCommandResult(parameters) }
-            } catch (cancelled: CancellationException) {
-                withContext(NonCancellable) {
-                    publish(key, MutationCommandState(phase = MutationCommandPhase.Indeterminate, guarded = true,
-                        retryAllowed = false, invocationId = invocationId, writerStatus = MutationWriterStatus.Indeterminate,
-                        message = "Command was cancelled after dispatch. Verify its outcome."))
-                }
-                throw cancelled
-            } catch (superseded: IllegalStateException) {
-                // The owner could not deliver this dispatch's receipt.
-                null
-            }
+        val writer = try {
+            val receipt = withTimeoutOrNull(timeout) { target.fetchCommandResult(parameters) }
             when {
-                result == null -> MutationWriterOutcome.Indeterminate
-                result.error != null -> MutationWriterOutcome.Failed(result.error)
-                else -> MutationWriterOutcome.Succeeded(result.rows)
+                receipt == null -> MutationWriterOutcome.Indeterminate()
+                receipt.cause is java.net.SocketTimeoutException || receipt.cause is java.util.concurrent.TimeoutException ->
+                    MutationWriterOutcome.Indeterminate(receipt.cause)
+                receipt.error != null -> MutationWriterOutcome.Failed(receipt.error, receipt.cause)
+                else -> MutationWriterOutcome.Succeeded(receipt.rows)
             }
+        } catch (cancelled: CancellationException) {
+            withContext(NonCancellable) {
+                publish(key, MutationCommandState(phase = MutationCommandPhase.Indeterminate, guarded = true,
+                    retryAllowed = false, invocationId = invocationId, writerStatus = MutationWriterStatus.Indeterminate,
+                    message = "Command was cancelled after dispatch. Verify its outcome."))
+                if (window.metadata.peek()?.authorizationSnapshot == admitted) applyWindowState(runtime, window.windowId, command.indeterminateState)
+            }
+            throw cancelled
+        } catch (error: Exception) {
+            // Dispatch has started and its completion receipt is unavailable.
+            MutationWriterOutcome.Indeterminate(error)
+        }
+        if (window.metadata.peek()?.authorizationSnapshot != admitted) {
+            val message = "Authorization context changed after dispatch. Verify the outcome."
+            publish(key, MutationCommandState(phase = MutationCommandPhase.Indeterminate, guarded = true, retryAllowed = false,
+                message = message, invocationId = invocationId, writerStatus = MutationWriterStatus.Indeterminate))
+            return MutationCommandResult(true, "indeterminate", invocationId, message)
         }
         return when (writer) {
             is MutationWriterOutcome.Failed -> {
-                releaseTransportAndCommand(transport, key)
                 applyWindowState(runtime, window.windowId, command.errorState)
-                publish(key, MutationCommandState(
+                finishTransport(transport, key, MutationCommandState(
                     phase = MutationCommandPhase.Failed,
                     error = writer.message,
                     message = writer.message,
                     invocationId = invocationId,
                     writerStatus = MutationWriterStatus.Failed
                 ))
-                MutationCommandResult(true, "failed", invocationId, writer.message)
+                MutationCommandResult(true, "failed", invocationId, writer.message, cause = writer.cause)
             }
-            MutationWriterOutcome.Indeterminate -> {
+            is MutationWriterOutcome.Indeterminate -> {
                 applyWindowState(runtime, window.windowId, command.indeterminateState)
                 val message = "The writer outcome is unknown because the client stopped waiting."
                 publish(key, MutationCommandState(
@@ -230,10 +268,10 @@ class MutationCommandRuntime {
                     invocationId = invocationId,
                     writerStatus = MutationWriterStatus.Indeterminate
                 ))
-                MutationCommandResult(true, "indeterminate", invocationId)
+                MutationCommandResult(true, "indeterminate", invocationId, cause = writer.cause)
             }
             is MutationWriterOutcome.Succeeded -> {
-                val warnings = synchronize(window, target, command).toMutableList()
+                val warnings = mutableListOf<MutationCommandWarning>()
                 val patch = command.successState.toMutableMap()
                 for ((field, selectors) in command.resultState) {
                     val value = selectors.firstNotNullOfOrNull { SelectorUtil.resolve(writer.records, it) as? JsonElement }
@@ -241,10 +279,17 @@ class MutationCommandRuntime {
                     patch[field] = value ?: JsonNull
                 }
                 applyWindowState(runtime, window.windowId, JsonObject(patch))
-                releaseTransportAndCommand(transport, key)
+                try {
+                    warnings += synchronize(window, target, command) { window.metadata.peek()?.authorizationSnapshot == admitted }
+                } catch (cancelled: CancellationException) {
+                    withContext(NonCancellable) { finishTransport(transport, key, MutationCommandState(
+                        phase = MutationCommandPhase.Succeeded, invocationId = invocationId, writerStatus = MutationWriterStatus.Succeeded,
+                        syncStatus = MutationSyncStatus.PartialFailure, message = "Saved. Refresh was cancelled.")) }
+                    throw cancelled
+                }
                 val sync = if (warnings.isEmpty()) MutationSyncStatus.Succeeded else MutationSyncStatus.PartialFailure
                 val message = if (warnings.isEmpty()) "Completed" else "Saved. Some related data could not be refreshed."
-                publish(key, MutationCommandState(
+                finishTransport(transport, key, MutationCommandState(
                     phase = MutationCommandPhase.Succeeded,
                     message = message,
                     invocationId = invocationId,
@@ -288,7 +333,7 @@ class MutationCommandRuntime {
         val control = withTimeoutOrNull(timeoutMs.toLong()) { terminal.await() }
         if (control == null) {
             terminal.cancel()
-            MutationWriterOutcome.Indeterminate
+            MutationWriterOutcome.Indeterminate()
         } else if (!control.error.isNullOrBlank()) {
             MutationWriterOutcome.Failed(control.error)
         } else {
@@ -296,39 +341,43 @@ class MutationCommandRuntime {
         }
     }
 
-    private suspend fun preparePayload(window: WindowContext, source: DataSourceContext, payload: ResourcePayloadPreparationDef?, extras: Map<String, Any?>): Map<String, Any?> {
+    private suspend fun invokePreparation(window: WindowContext, source: DataSourceContext,
+        handler: String, props: JsonObject, snapshots: JsonObject): JsonElement? {
+        val metadata = window.metadata.peek() ?: error("Window metadata is unavailable.")
+        val code = metadata.actions?.code?.takeIf { it.isNotBlank() } ?: error("Command preparation handler is unavailable: $handler")
+        return UIActionProjection.invoke(code, handler, metadata.actionNamespace(handler), source.dataSourceRef, snapshots,
+            JsonUtil.anyToElement(window.peekWindowForm()) as JsonObject, props, JsonObject(metadata.authorizationSnapshot), readOnly = true, windowKey = metadata.windowKey).result
+    }
+
+    private suspend fun preparePayload(window: WindowContext, source: DataSourceContext,
+        payload: ResourcePayloadPreparationDef?, extras: Map<String, Any?>, hookSources: () -> JsonObject): Map<String, Any?> {
         if (payload == null) return extras
         val metadata = window.metadata.peek() ?: error("Window metadata is unavailable")
-        val snapshots = metadata.dataSources.keys.associateWith { ref ->
-            val context = window.contextOrNull(ref)
-            ResourceDataSnapshot(
-                form = context?.form?.peek().orEmpty(),
-                collection = context?.collection?.peek().orEmpty(),
-                selection = context?.selection?.peek() ?: SelectionState(),
-                metrics = context?.metrics?.peek().orEmpty(),
-                input = context?.input?.peek() ?: InputState()
-            )
+        val refs = (payload.fields.values + listOfNotNull(payload.source, payload.baseline)).mapNotNull { it.dataSourceRef }.toSet() + source.dataSourceRef
+        val snapshots = refs.associateWith { ref ->
+            val ctx = if (ref == source.dataSourceRef) source else window.contextOrNull(ref)
+            ResourceDataSnapshot(ctx?.form?.peek().orEmpty(), ctx?.collection?.peek().orEmpty(), ctx?.selection?.peek() ?: SelectionState(),
+                ctx?.metrics?.peek().orEmpty(), ctx?.input?.peek() ?: InputState())
         }
-        val code = metadata.actions?.code?.trim().orEmpty()
-        val hook: ResourceModelHook? = if (code.isBlank()) null else { name, value ->
-            val result = ActionHookRuntime.invoke(code, name, JsonUtil.anyToElement(value))
-            result?.let(JsonUtil::elementToAny) ?: value
+        return ResourceModelRuntime.prepareScoped(payload, ResourceValueEnvironment(source.dataSourceRef, snapshots, window.peekWindowForm(), extras),
+            metadata.schemas, metadata.resourceModels, null) { name, phase, ref, value, baseline ->
+            val model = metadata.resourceModels.getValue(ref)
+            val props = JsonObject(mapOf("value" to JsonUtil.anyToElement(value), "baseline" to JsonUtil.anyToElement(baseline),
+                "phase" to JsonUtil.anyToElement(phase), "modelRef" to JsonUtil.anyToElement(ref),
+                "model" to JsonUtil.json.encodeToJsonElement(ResourceModelDef.serializer(), model),
+                "schema" to JsonUtil.json.encodeToJsonElement(ResourceSchemaDef.serializer(), metadata.schemas.getValue(model.schemaRef))))
+            invokePreparation(window, source, name, props, hookSources())?.let(JsonUtil::elementToAny)
         }
-        return ResourceModelRuntime.prepare(
-            payload,
-            ResourceValueEnvironment(source.dataSourceRef, snapshots, window.peekWindowForm(), extras),
-            metadata.schemas,
-            metadata.resourceModels,
-            hook
-        )
     }
 
     private suspend fun synchronize(
         window: WindowContext,
         target: DataSourceContext,
-        command: MutationCommandDef
+        command: MutationCommandDef,
+        current: () -> Boolean
     ): List<MutationCommandWarning> {
         val warnings = mutableListOf<MutationCommandWarning>()
+        if (!current()) return listOf(MutationCommandWarning("authorization", message = "Authorization changed before synchronization."))
         command.reconcile?.let { spec ->
             runCatching {
                 val destinationRef = spec.dataSourceRef?.trim().orEmpty().ifBlank { target.dataSourceRef }
@@ -341,16 +390,19 @@ class MutationCommandRuntime {
                     destination.collection.set(reconcileRows(destination.collection.peek(), incoming, spec))
                 }
             }.onFailure {
+                if (it is CancellationException) throw it
                 warnings += MutationCommandWarning("reconcile", spec.dataSourceRef, it.message ?: "Reconciliation failed")
             }
         }
         command.refresh.forEach { refresh ->
+            if (!current()) return warnings + MutationCommandWarning("refresh", message = "Authorization context changed before refresh.")
             runCatching {
                 val context = window.contextOrNull(refresh.dataSourceRef)
                     ?: error("Refresh datasource is unavailable: ${refresh.dataSourceRef}")
                 if (refresh.clearSelection) context.resetSelection()
                 awaitRefresh(context)
             }.onFailure {
+                if (it is CancellationException) throw it
                 warnings += MutationCommandWarning("refresh", refresh.dataSourceRef, it.message ?: "Refresh failed")
             }
         }
@@ -360,12 +412,12 @@ class MutationCommandRuntime {
     private suspend fun awaitRefresh(context: DataSourceContext) {
         when (val outcome = awaitWriter(context, 30_000)) {
             is MutationWriterOutcome.Failed -> error(outcome.message)
-            MutationWriterOutcome.Indeterminate -> error("Refresh outcome is unknown")
+            is MutationWriterOutcome.Indeterminate -> error("Refresh outcome is unknown")
             is MutationWriterOutcome.Succeeded -> Unit
         }
     }
 
-    private fun predicateAllows(context: DataSourceContext, condition: DashboardConditionDef?): Boolean {
+    internal fun predicateAllows(context: DataSourceContext, condition: DashboardConditionDef?): Boolean {
         if (condition == null) return true
         val input = context.input.peek()
         val selection = context.selection.peek()
@@ -377,7 +429,8 @@ class MutationCommandRuntime {
             windowForm = context.window.peekWindowForm(),
             collection = context.collection.peek(),
             input = mapOf("filter" to input.filter, "parameters" to input.parameters, "page" to input.page),
-            selectionValues = mapOf("selected" to selection.selected, "selection" to selection.selection, "rowIndex" to selection.rowIndex)
+            selectionValues = mapOf("selected" to selection.selected, "selection" to selection.selection, "rowIndex" to selection.rowIndex),
+            authorization = context.window.metadata.peek()?.authorizationSnapshot.orEmpty().mapValues { JsonUtil.elementToAny(it.value) }
         )
     }
 
@@ -392,15 +445,16 @@ class MutationCommandRuntime {
 
     private suspend fun releaseCommand(key: String, state: MutationCommandState) {
         mutex.withLock {
-            commandGuards.remove(key)
+            commandGuards.remove(key)?.let(activeGroups::remove)
             states[key] = state
         }
     }
 
-    private suspend fun releaseTransportAndCommand(transport: String, key: String) {
+    private suspend fun finishTransport(transport: String, key: String, state: MutationCommandState) {
         mutex.withLock {
             transportGuards.remove(transport)
-            commandGuards.remove(key)
+            commandGuards.remove(key)?.let(activeGroups::remove)
+            states[key] = state
         }
     }
 }

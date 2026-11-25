@@ -22,6 +22,14 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import com.viant.forgeandroid.runtime.ActionDef
+import com.viant.forgeandroid.runtime.DataSourceContext
+import com.viant.forgeandroid.runtime.DashboardConditionDef
+import com.viant.forgeandroid.runtime.evaluateDashboardCondition
+import com.viant.forgeandroid.runtime.footerCommand
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -47,13 +55,20 @@ fun DialogRenderer(runtime: ForgeRuntime, window: WindowContext, dialogs: List<D
 
         if (state.open) {
             key(dialogId) {
-                val dialogDataSourceRef = dialog.content?.dataSourceRef ?: dialog.dataSourceRef
+                val dialogDataSourceRef = dialog.content?.dataSourceRef ?: dialog.dataSourceRef ?: state.sourceDataSourceRef
                 val dsContext = dialogDataSourceRef?.let { window.contextOrNull(it) }
                 val selectionState by if (dsContext != null) {
                     dsContext.selection.flow.collectAsState(initial = dsContext.peekSelection())
                 } else {
                     remember(dialogId) { mutableStateOf(SelectionState()) }
                 }
+                val allows = dialogPredicate(window, dsContext)
+                val closeCondition = remember(dialog) {
+                    dialog.closeDisabledWhen ?: dialog.properties["closeDisabledWhen"]?.let {
+                        JsonUtil.json.decodeFromJsonElement(DashboardConditionDef.serializer(), it)
+                    }
+                }
+                val closeDisabled = state.initializationError == null && closeCondition != null && allows(closeCondition)
                 val effectiveSelectionMode = (state.selectionMode ?: dialog.selectionMode ?: dsContext?.dataSource?.selectionMode ?: "")
                     .trim()
                     .lowercase()
@@ -67,21 +82,8 @@ fun DialogRenderer(runtime: ForgeRuntime, window: WindowContext, dialogs: List<D
                         }
                     }
                 }
-                LaunchedEffect(dialogId, state.args) {
-                    if (dsContext != null && state.args.isNotEmpty()) {
-                        val scoped = JsonUtil.asStringMap(state.args[dialogDataSourceRef])
-                            .takeIf { value -> value.isNotEmpty() }
-                            ?: state.args
-                        dsContext.setInputParameters(scoped, fetch = true)
-                    }
-                }
-                LaunchedEffect(dialogId, state.open) {
-                    if (state.open && dsContext != null && dsContext.collection.peek().isEmpty()) {
-                        dsContext.fetchCollection()
-                    }
-                }
                 AlertDialog(
-                    onDismissRequest = { runtime.closeDialogPublic(window.windowId, dialogId) },
+                    onDismissRequest = { if (!closeDisabled) runtime.closeDialogPublic(window.windowId, dialogId) },
                     title = {
                         DialogTitle(
                             title = dialog.title ?: dialogId,
@@ -113,6 +115,7 @@ fun DialogRenderer(runtime: ForgeRuntime, window: WindowContext, dialogs: List<D
                                     }
                                 }
                             }
+                            state.initializationError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                             dialog.content?.let { container ->
                                 if (
                                     container.fileBrowser != null ||
@@ -127,7 +130,11 @@ fun DialogRenderer(runtime: ForgeRuntime, window: WindowContext, dialogs: List<D
                                     ContainerRenderer(
                                         runtime = runtime,
                                         window = window,
-                                        container = container,
+                                        // The dialog lifecycle owns the read for this datasource.
+                                        container = remember(container, dialogDataSourceRef) {
+                                            if (container.dataSourceRef == null || container.dataSourceRef == dialogDataSourceRef)
+                                                container.copy(fetchData = false) else container
+                                        },
                                         selectionModeOverride = effectiveSelectionMode,
                                         inheritedDataSourceRef = dialogDataSourceRef
                                     )
@@ -162,14 +169,8 @@ fun DialogRenderer(runtime: ForgeRuntime, window: WindowContext, dialogs: List<D
                                     Text("Select")
                                 }
                             } else {
-                                primaryActions.forEach { action ->
-                                    TextButton(onClick = {
-                                        action.on.forEach { exec ->
-                                            runtime.execute(exec, dsContext, mapOf("dialogId" to dialogId, "windowId" to window.windowId))
-                                        }
-                                    }) {
-                                        Text(action.label ?: action.id ?: "Action")
-                                    }
+                                primaryActions.filter { allows(it.visibleWhen) }.forEach { action ->
+                                    DialogFooterAction(runtime, window, dsContext, dialogId, action, closeDisabled, state.initializing || state.initializationError != null, allows)
                                 }
                             }
                         }
@@ -179,23 +180,55 @@ fun DialogRenderer(runtime: ForgeRuntime, window: WindowContext, dialogs: List<D
                             (action.id ?: "").lowercase() in setOf("cancel", "close", "dismiss")
                         }
                         if (dismissAction != null) {
-                            TextButton(onClick = {
-                                dismissAction.on.forEach { exec ->
-                                    runtime.execute(exec, dsContext, mapOf("dialogId" to dialogId, "windowId" to window.windowId))
-                                }
-                            }) {
-                                Text(dismissAction.label ?: dismissAction.id ?: "Close")
-                            }
+                            if (allows(dismissAction.visibleWhen)) DialogFooterAction(runtime, window, dsContext, dialogId, dismissAction, closeDisabled, state.initializing || state.initializationError != null, allows)
                         } else {
-                            TextButton(onClick = { runtime.closeDialogPublic(window.windowId, dialogId) }) {
-                                Text("Close")
-                            }
+                            TextButton(enabled = !closeDisabled, onClick = { runtime.closeDialogPublic(window.windowId, dialogId) }) { Text("Close") }
                         }
                     }
                 )
             }
         }
     }
+}
+
+@Composable
+private fun dialogPredicate(window: WindowContext, source: DataSourceContext?): (DashboardConditionDef?) -> Boolean {
+    val metadata by window.metadata.flow.collectAsState()
+    val windowForm by window.windowFormSignal().flow.collectAsState()
+    val form = source?.form?.flow?.collectAsState()?.value.orEmpty()
+    val metrics = source?.metrics?.flow?.collectAsState()?.value.orEmpty()
+    val input = source?.input?.flow?.collectAsState()?.value
+    val selection = source?.selection?.flow?.collectAsState()?.value
+    val collection = source?.collection?.flow?.collectAsState()?.value.orEmpty()
+    val auth = remember(metadata?.authorizationSnapshot) { metadata?.authorizationSnapshot.orEmpty().mapValues { JsonUtil.elementToAny(it.value) } }
+    return { condition -> evaluateDashboardCondition(condition, metrics = metrics, filters = input?.filter.orEmpty(), form = form,
+        windowForm = windowForm, collection = collection, authorization = auth,
+        input = mapOf("parameters" to input?.parameters, "filter" to input?.filter, "page" to input?.page),
+        selectionValues = mapOf("selected" to selection?.selected, "selection" to selection?.selection, "rowIndex" to selection?.rowIndex)) }
+}
+
+@Composable
+private fun DialogFooterAction(runtime: ForgeRuntime, window: WindowContext, source: DataSourceContext?, dialogId: String,
+                              action: ActionDef, closeDisabled: Boolean, unavailable: Boolean, allows: (DashboardConditionDef?) -> Boolean) {
+    val command = remember(action) { action.footerCommand() }
+    val disabled = (unavailable && (command != null || !action.close)) || action.disabled || (action.disabledWhen != null && allows(action.disabledWhen)) || (action.close && closeDisabled)
+    if (command != null) {
+        if (source != null) MutationCommandButton(runtime, window, source, command, externallyDisabled = disabled)
+        else TextButton(enabled = false, onClick = {}) { Text(command.label ?: "Action") }
+        return
+    }
+    val scope = rememberCoroutineScope()
+    var invoking by remember(action) { mutableStateOf(false) }
+    TextButton(enabled = !disabled && !invoking, onClick = {
+        if (!invoking) {
+            invoking = true
+            scope.launch {
+                try {
+                    runtime.activatePlainFooter(window, dialogId, action, source)
+                } finally { invoking = false }
+            }
+        }
+    }) { Text(action.label ?: action.id ?: "Action") }
 }
 
 @Composable

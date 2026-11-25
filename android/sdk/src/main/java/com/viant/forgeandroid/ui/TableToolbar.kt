@@ -634,7 +634,7 @@ private fun quickFilterSet(context: DataSourceContext): FilterSetDef? {
 
 private fun toolbarEventArgs(item: ToolbarItemDef): Map<String, Any?> = mapOf("item" to item)
 
-private fun toolbarIcon(name: String?): ImageVector? = when (name?.trim()?.lowercase()) {
+internal fun toolbarIcon(name: String?): ImageVector? = when (name?.trim()?.lowercase()) {
     "refresh" -> Icons.Default.Refresh
     "plus", "add", "new-object" -> Icons.Default.Add
     "edit" -> Icons.Default.Edit

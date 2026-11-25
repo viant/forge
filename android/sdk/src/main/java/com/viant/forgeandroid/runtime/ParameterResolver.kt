@@ -120,7 +120,7 @@ class ParameterResolver {
             "filter" -> location?.let { SelectorUtil.resolve(sourceContext.peekFilter(), it) }
             "input" -> location?.let { SelectorUtil.resolve(inputObject(sourceContext.input.peek()), it) }
             "metadata" -> sourceContext.window.metadata.peek()?.let { it } // full metadata if needed
-            "const" -> p.locationAny()
+            "const" -> p.constantValue()
             else -> {
                 p.value?.let(JsonUtil::elementToAny)
                     ?: p.selector?.let { SelectorUtil.resolve(context.window.peekWindowForm(), it) }
@@ -196,8 +196,8 @@ class ParameterResolver {
         val resolved = linkedMapOf<String, Any?>()
         params.forEach { parameter ->
             val name = parameter.name ?: return@forEach
-            val value = readLegacy(context, parameter) ?: return@forEach
-            resolved[name] = value
+            val value = readLegacy(context, parameter)
+            if (value != null || (parameter.input == "const" && parameter.locationElement() != null)) resolved[name] = value
         }
         return resolved
     }
