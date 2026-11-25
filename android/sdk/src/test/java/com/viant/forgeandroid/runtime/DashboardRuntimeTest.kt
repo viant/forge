@@ -1384,8 +1384,9 @@ class DashboardRuntimeTest {
         fun allowed(value: Any?, condition: DashboardConditionDef = bounds): Boolean =
             evaluateDashboardCondition(condition, input = mapOf("parameters" to mapOf("quantity" to value)))
 
-        for (value in listOf(1, "1", " 48 ", "7.2e2", JsonPrimitive("24"))) assertTrue(allowed(value))
-        for (value in listOf(null, "", "abc", "48px", "Infinity", Double.NaN, "0.9", "721")) assertFalse(allowed(value))
+        for (value in listOf(1, "1", " 48 ", "+48.", ".48e2", "7.2E+2", JsonPrimitive("24"))) assertTrue(allowed(value))
+        for (value in listOf(null, "", "  ", false, listOf(48), "abc", "48px", "48f", JsonPrimitive("48d"),
+            "0x1.8p5", "0x30", "1e", "Infinity", Double.NaN, "0.9", "721")) assertFalse(allowed(value))
         val exclusive = bounds.copy(gte = null, lte = null, gt = 1.0, lt = 720.0)
         assertFalse(allowed("1", exclusive))
         assertTrue(allowed("1.5", exclusive))

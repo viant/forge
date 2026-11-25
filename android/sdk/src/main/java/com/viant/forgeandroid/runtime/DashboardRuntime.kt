@@ -1450,7 +1450,14 @@ fun evaluateDashboardCondition(
         return false
     }
     if (condition.gt != null || condition.gte != null || condition.lt != null || condition.lte != null) {
-        val number = dashboardNumberValue(actual)?.takeIf(Double::isFinite) ?: return false
+        // Editable numeric inputs may hold decimal text. JVM floating-point literals
+        // such as "12f" and hexadecimal floats are not decimal form values.
+        val scalar = if (actual is JsonPrimitive) JsonUtil.elementToAny(actual) else actual
+        val number = when (scalar) {
+            is Number -> scalar.toDouble()
+            is String -> scalar.trim().toBigDecimalOrNull()?.toDouble()
+            else -> null
+        }?.takeIf(Double::isFinite) ?: return false
         condition.gt?.let { if (!it.isFinite() || number <= it) return false }
         condition.gte?.let { if (!it.isFinite() || number < it) return false }
         condition.lt?.let { if (!it.isFinite() || number >= it) return false }
