@@ -41,18 +41,20 @@ object ActionHookRuntime {
         code: String,
         functionName: String,
         props: JsonElement = JsonObject(emptyMap())
-    ): JsonElement? {
+    ): JsonElement? = invoke(code, functionName, props, fallbackName = null)
+
+    internal suspend fun invoke(code: String, functionName: String, props: JsonElement, fallbackName: String?): JsonElement? {
         val propsJson = json.encodeToString(JsonElement.serializer(), props)
         val fnNameJson = json.encodeToString(functionName)
+        val fallback = fallbackName?.let { " || lookup(" + json.encodeToString(it) + ")" }.orEmpty()
         val script = """
           (() => {
             const __forge_module = ($code);
             const __forge_props = $propsJson;
             const __forge_fn_name = $fnNameJson;
-            const __forge_fn = String(__forge_fn_name || "")
-              .split(".")
-              .filter(Boolean)
+            const lookup = name => String(name || "").split(".").filter(Boolean)
               .reduce((current, key) => current == null ? undefined : current[key], __forge_module);
+            const __forge_fn = lookup(__forge_fn_name)$fallback;
             const __forge_result = typeof __forge_fn === "function"
               ? __forge_fn(__forge_props)
               : null;

@@ -390,9 +390,11 @@ class ForgeRuntime(
         args: Map<String, Any?> = emptyMap()
     ): Any? {
         val handler = execution.handler?.trim().orEmpty()
-        val code = context.window.metadata.peek()?.actions?.code?.trim().orEmpty()
+        val metadata = context.window.metadata.peek() ?: return null
+        val code = metadata.actions?.code?.trim().orEmpty()
         if (handler.isBlank() || code.isBlank()) return null
-        return ActionHookRuntime.invoke(code, handler, JsonUtil.anyToElement(args))
+        val localName = metadata.actionNamespace(handler)?.let { handler.removePrefix("$it.") }
+        return ActionHookRuntime.invoke(code, handler, JsonUtil.anyToElement(args), fallbackName = localName)
             ?.let(JsonUtil::elementToAny)
     }
 

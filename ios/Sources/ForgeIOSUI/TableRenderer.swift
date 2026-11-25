@@ -425,7 +425,7 @@ public struct TableRenderer: View {
             var values: [String: JSONValue] = [:]
             for column in columns {
                 do {
-                    values[columnKey(column)] = try TableValueProjection.value(
+                    values[columnKey(column)] = try TableValueProjection.override(
                         row: row, column: column, code: code, actionNamespace: metadata.actionNamespace(for:)
                     )
                 } catch {
@@ -1524,11 +1524,14 @@ public struct TableRenderer: View {
     }
 
     private func rowAccessibilityLabel(row: [String: JSONValue]) -> String {
-        var displayRow = row
-        for column in displayColumns {
-            displayRow[columnKey(column)] = projectedValue(row: row, column: column)
-        }
-        return tableRowAccessibilityLabel(columns: displayColumns, row: displayRow)
+        tableRowAccessibilityLabel(columns: displayColumns, row: row) { presentedCellText(row: row, column: $0) }
+    }
+
+    private func presentedCellText(row: [String: JSONValue], column: ColumnDef, fallback: String? = nil) -> String {
+        let key = columnKey(column)
+        let index = column.on.isEmpty ? nil : projectedSourceRows.firstIndex(of: row)
+        let override = index.flatMap { projectedValues.indices.contains($0) ? projectedValues[$0][key] : nil }
+        return tableCellPresentation(row[key], column: column, override: override, fallback: fallback)
     }
 
     private func rowHasInteractiveLinks(_ row: [String: JSONValue]) -> Bool {
@@ -1555,7 +1558,7 @@ public struct TableRenderer: View {
 
     @ViewBuilder
     private func valueLabel(row: [String: JSONValue], column: ColumnDef, fallback: String? = nil, font: Font, color: Color) -> some View {
-        let text = displayValue(projectedValue(row: row, column: column), column: column, fallback: fallback)
+        let text = presentedCellText(row: row, column: column, fallback: fallback)
         if let fraction = dataBarFraction(row: row, column: column) {
             ZStack(alignment: .leading) {
                 RoundedRectangle(cornerRadius: 9)
@@ -1958,13 +1961,14 @@ func tableRefreshFeedback(control: ControlState, isRefreshing: Bool) -> TableRef
 func tableRowAccessibilityLabel(
     columns: [ColumnDef],
     row: [String: JSONValue],
-    limit: Int = 3
+    limit: Int = 3,
+    display: ((ColumnDef) -> String)? = nil
 ) -> String {
     columns
         .prefix(max(limit, 0))
         .map { column in
             let key = tableAccessibilityColumnKey(column)
-            let value = tableAccessibilityDisplayValue(row[key], column: column)
+            let value = display?(column) ?? tableCellPresentation(row[key], column: column)
             return "\(column.displayLabel) \(value)"
         }
         .joined(separator: ", ")
@@ -1974,7 +1978,10 @@ private func tableAccessibilityColumnKey(_ column: ColumnDef) -> String {
     column.id ?? column.name ?? column.key ?? column.label ?? ""
 }
 
-private func tableAccessibilityDisplayValue(_ value: JSONValue?, column: ColumnDef) -> String {
+func tableCellPresentation(_ source: JSONValue?, column: ColumnDef, override: JSONValue? = nil, fallback: String? = nil) -> String {
+    if override == nil, let mapped = mappedPresentationValue(source, in: column.valueMap) { return mapped.displayString }
+    let value = override ?? source
+    if let empty = column.emptyText, value == nil || value == .null || value == .string("") { return empty }
     if let value {
         if let format = column.format?.trimmingCharacters(in: .whitespacesAndNewlines),
            !format.isEmpty {
@@ -1986,7 +1993,7 @@ private func tableAccessibilityDisplayValue(_ value: JSONValue?, column: ColumnD
        !emptyText.isEmpty {
         return emptyText
     }
-    return "—"
+    return fallback?.nilIfBlank ?? "—"
 }
 
 private func positiveInt(_ value: JSONValue?) -> Int? {
@@ -2341,10 +2348,7 @@ private extension JSONValue {
         case .string(let value):
             return value
         case .number(let value):
-            if value.rounded(.towardZero) == value {
-                return String(Int(value))
-            }
-            return String(value)
+            return Int(exactly: value).map(String.init) ?? String(value)
         case .bool(let value):
             return value ? "true" : "false"
         case .array(let value):

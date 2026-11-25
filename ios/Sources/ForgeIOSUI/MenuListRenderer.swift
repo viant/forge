@@ -146,7 +146,7 @@ public struct MenuListRenderer: View {
 
     private var summaryItems: [ItemDef] {
         visibleItems.filter { item in
-            !isPlaceholderSummaryValue(resolvedItemDisplayValue(item) ?? item.value?.displayString)
+            item.valueMap != nil || item.properties["emptyText"] != nil || !isPlaceholderSummaryValue(resolvedItemDisplayValue(item) ?? item.value?.displayString)
         }
     }
 
@@ -918,7 +918,7 @@ public struct MenuListRenderer: View {
             var value = resolvedItemValue(item)
             for hook in item.on where hook.event?.lowercased() == "onvalue" {
                 var function = hook.action
-                if let namespace = metadata.namespace, function.hasPrefix(namespace + ".") {
+                if let namespace = metadata.actionNamespace(for: function) {
                     function.removeFirst(namespace.count + 1)
                 }
                 do {
@@ -951,6 +951,10 @@ public struct MenuListRenderer: View {
     }
 
     private func normalizedItemDisplayValue(_ item: ItemDef) -> String {
+        if item.valueMap != nil || item.properties["emptyText"] != nil {
+            let value = projectedLabelValues[labelProjectionKey(item)] ?? resolvedItemValue(item) ?? (item.dataField == nil ? item.value : nil)
+            return menuLabelPresentation(item, value: value)
+        }
         let raw = resolvedItemDisplayValue(item) ?? item.value?.displayString
         return isPlaceholderSummaryValue(raw) ? "No data" : (raw ?? "No data")
     }
@@ -1269,6 +1273,39 @@ internal func menuListSummaryMinimumWidth(isRegular: Bool) -> CGFloat {
     isRegular ? 132 : 82
 }
 
+func mappedPresentationValue(_ value: JSONValue?, in mapping: [String: JSONValue]?) -> JSONValue? {
+    guard let mapping, !mapping.isEmpty else { return nil }
+    return mapping[presentationKey(value)]
+}
+
+private func presentationKey(_ value: JSONValue?) -> String {
+    switch value {
+    case .string(let key): return key
+    case .number(let number):
+        if abs(number) < 9_007_199_254_740_992, let integer = Int(exactly: number) { return String(integer) }
+        let text = String(number)
+        guard let e = text.firstIndex(of: "e"), let power = Int(text[text.index(after: e)...]) else {
+            return text.hasSuffix(".0") ? String(text.dropLast(2)) : text
+        }
+        if (-6...20).contains(power) { return NSDecimalNumber(string: text).stringValue }
+        return String(text[..<e]) + "e" + (power > 0 ? "+" : "") + String(power)
+    case .bool(let boolean): return boolean ? "true" : "false"
+    case .array(let array): return array.map { $0 == .null ? "" : presentationKey($0) }.joined(separator: ",")
+    case .object: return "[object Object]"
+    case .null: return "null"
+    case nil: return "undefined"
+    }
+}
+
+internal func menuLabelPresentation(_ item: ItemDef, value: JSONValue?) -> String {
+    if item.dataField != nil && (value == nil || value == .null || value?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true) {
+        let empty = item.properties["emptyText"]?.stringValue
+        if let empty, !empty.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return empty }
+        return "No data"
+    }
+    return menuListFormattedValue(mappedPresentationValue(value, in: item.valueMap) ?? value, format: item.format) ?? "No data"
+}
+
 internal func menuListFormattedValue(_ value: JSONValue?, format: String?) -> String? {
     guard let value else { return nil }
     let normalizedFormat = format?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -1432,10 +1469,7 @@ private extension JSONValue {
         case .string(let value):
             return value
         case .number(let value):
-            if value.rounded(.towardZero) == value {
-                return String(Int(value))
-            }
-            return String(value)
+            return Int(exactly: value).map(String.init) ?? String(value)
         case .bool(let value):
             return value ? "true" : "false"
         case .array(let value):
@@ -1477,10 +1511,7 @@ private extension JSONPrimitive {
         case .string(let value):
             return value
         case .number(let value):
-            if value.rounded(.towardZero) == value {
-                return String(Int(value))
-            }
-            return String(value)
+            return Int(exactly: value).map(String.init) ?? String(value)
         case .bool(let value):
             return value ? "true" : "false"
         case .null:

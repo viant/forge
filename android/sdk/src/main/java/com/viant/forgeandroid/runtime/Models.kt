@@ -1164,7 +1164,8 @@ data class ColumnDef(
     val editor: JsonElement? = null,
     val on: List<ExecutionDef> = emptyList(),
     val target: JsonElement? = null,
-    val targetOverrides: Map<String, JsonElement> = emptyMap()
+    val targetOverrides: Map<String, JsonElement> = emptyMap(),
+    val valueMap: Map<String, JsonElement> = emptyMap()
 )
 
 @Serializable
@@ -1252,7 +1253,9 @@ data class ItemDef(
     val granularityField: String? = null,
     val includePartialDataField: String? = null,
     val customApplyEnabled: Boolean? = null,
-    @SerialName("default") val defaultValue: JsonElement? = null
+    @SerialName("default") val defaultValue: JsonElement? = null,
+    val valueMap: Map<String, JsonElement> = emptyMap(),
+    val emptyText: String? = null
 )
 
 fun ItemDef.valueKey(): String? {

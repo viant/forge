@@ -3366,6 +3366,7 @@ public struct ItemDef: Codable, Sendable, Identifiable {
     public let severity: String?
     public let current: String?
     public let previous: String?
+    public let valueMap: [String: JSONValue]?
     public let format: String?
     public let deltaFormat: String?
     public let positiveIsUp: Bool?
@@ -3406,6 +3407,7 @@ public struct ItemDef: Codable, Sendable, Identifiable {
         case severity
         case current
         case previous
+        case valueMap
         case format
         case deltaFormat
         case positiveIsUp
@@ -3447,6 +3449,7 @@ public struct ItemDef: Codable, Sendable, Identifiable {
         severity: String? = nil,
         current: String? = nil,
         previous: String? = nil,
+        valueMap: [String: JSONValue]? = nil,
         format: String? = nil,
         deltaFormat: String? = nil,
         positiveIsUp: Bool? = nil,
@@ -3487,6 +3490,7 @@ public struct ItemDef: Codable, Sendable, Identifiable {
         self.severity = severity
         self.current = current
         self.previous = previous
+        self.valueMap = valueMap
         self.format = format
         self.deltaFormat = deltaFormat
         self.positiveIsUp = positiveIsUp
@@ -3529,6 +3533,7 @@ public struct ItemDef: Codable, Sendable, Identifiable {
         severity = try container.decodeIfPresent(String.self, forKey: .severity)
         current = try container.decodeIfPresent(String.self, forKey: .current)
         previous = try container.decodeIfPresent(String.self, forKey: .previous)
+        valueMap = try container.decodeIfPresent([String: JSONValue].self, forKey: .valueMap)
         format = try container.decodeIfPresent(String.self, forKey: .format)
         deltaFormat = try container.decodeIfPresent(String.self, forKey: .deltaFormat)
         positiveIsUp = try container.decodeIfPresent(Bool.self, forKey: .positiveIsUp)
@@ -3578,6 +3583,7 @@ public struct ItemDef: Codable, Sendable, Identifiable {
         try container.encodeIfPresent(severity, forKey: .severity)
         try container.encodeIfPresent(current, forKey: .current)
         try container.encodeIfPresent(previous, forKey: .previous)
+        try container.encodeIfPresent(valueMap, forKey: .valueMap)
         try container.encodeIfPresent(format, forKey: .format)
         try container.encodeIfPresent(deltaFormat, forKey: .deltaFormat)
         try container.encodeIfPresent(positiveIsUp, forKey: .positiveIsUp)
@@ -4567,6 +4573,7 @@ public struct ColumnDef: Codable, Sendable, Identifiable {
     public let key: String?
     public let label: String?
     public let type: String?
+    public let valueMap: [String: JSONValue]?
     public let format: String?
     public let emptyText: String?
     public let sortable: Bool?
@@ -4586,6 +4593,7 @@ public struct ColumnDef: Codable, Sendable, Identifiable {
         case name
         case label
         case type
+        case valueMap
         case format
         case emptyText
         case sortable
@@ -4606,6 +4614,7 @@ public struct ColumnDef: Codable, Sendable, Identifiable {
         key: String? = nil,
         label: String? = nil,
         type: String? = nil,
+        valueMap: [String: JSONValue]? = nil,
         format: String? = nil,
         emptyText: String? = nil,
         sortable: Bool? = nil,
@@ -4624,6 +4633,7 @@ public struct ColumnDef: Codable, Sendable, Identifiable {
         self.key = key
         self.label = label
         self.type = type
+        self.valueMap = valueMap
         self.format = format
         self.emptyText = emptyText
         self.sortable = sortable
@@ -4647,6 +4657,7 @@ public struct ColumnDef: Codable, Sendable, Identifiable {
             self.key = nil
             self.label = trimmed
             self.type = nil
+            self.valueMap = nil
             self.format = nil
             self.emptyText = nil
             self.sortable = nil
@@ -4670,6 +4681,7 @@ public struct ColumnDef: Codable, Sendable, Identifiable {
         key = rawKey
         label = try container.decodeIfPresent(String.self, forKey: .label)
         type = try container.decodeIfPresent(String.self, forKey: .type)
+        valueMap = try container.decodeIfPresent([String: JSONValue].self, forKey: .valueMap)
         format = try container.decodeIfPresent(String.self, forKey: .format)
         emptyText = try container.decodeIfPresent(String.self, forKey: .emptyText)
         sortable = try container.decodeIfPresent(Bool.self, forKey: .sortable)
@@ -4691,6 +4703,7 @@ public struct ColumnDef: Codable, Sendable, Identifiable {
         try container.encodeIfPresent(name, forKey: .name)
         try container.encodeIfPresent(label, forKey: .label)
         try container.encodeIfPresent(type, forKey: .type)
+        try container.encodeIfPresent(valueMap, forKey: .valueMap)
         try container.encodeIfPresent(format, forKey: .format)
         try container.encodeIfPresent(emptyText, forKey: .emptyText)
         try container.encodeIfPresent(sortable, forKey: .sortable)

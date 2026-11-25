@@ -109,7 +109,7 @@ fun FormRenderer(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 visibleItems.forEach { item ->
-                    SummaryItemPill(context = context, item = item) { label, value ->
+                    SummaryItemPill(runtime, context, item) { label, value ->
                         expandedSummary = label to value
                     }
                 }
@@ -123,7 +123,7 @@ fun FormRenderer(
                     .fillMaxWidth()
                     .padding(8.dp)
             ) { item ->
-                SummaryItemCard(context = context, item = item) { label, value ->
+                SummaryItemCard(runtime, context, item) { label, value ->
                     expandedSummary = label to value
                 }
             }
@@ -154,6 +154,7 @@ fun FormRenderer(
 
 @Composable
 private fun SummaryItemPill(
+    runtime: ForgeRuntime,
     context: DataSourceContext,
     item: ItemDef,
     onExpand: (String, String) -> Unit
@@ -167,7 +168,8 @@ private fun SummaryItemPill(
     val label = item.label ?: key
     val boundInput = if (item.scope.equals("input", ignoreCase = true))
         dataSourceContext.input.flow.collectAsState().value.bindingValues() else emptyMap()
-    val value = resolveItemDisplayValue(item, key, form, metrics, windowForm, input = boundInput).ifBlank { "—" }
+    val collection = if (item.scope.equals("metrics", true)) dataSourceContext.collection.flow.collectAsState().value else emptyList()
+    val value = presentedLabelValue(runtime, dataSourceContext, item, resolveItemRawValue(item, key, form, metrics, windowForm, collection, boundInput)).ifBlank { "—" }
     Text(
         text = "$label: $value",
         style = MaterialTheme.typography.labelMedium,
@@ -413,7 +415,7 @@ private fun FormItemRenderer(
     when (if (item.lookup != null) "lookup" else com.viant.forgeandroid.runtime.NativeWidgetContract.kind(item)) {
                 "label" -> LabelItemCard(
                     label = item.label ?: key,
-                    value = resolveItemDisplayValue(item, key, form, metrics, windowForm, input = boundInput)
+                    value = presentedLabelValue(runtime, dataSourceContext, item, resolveItemRawValue(item, key, form, metrics, windowForm, collection, boundInput))
                 )
                 "markdown" -> {
                     val markdown = value.ifBlank {
@@ -753,6 +755,7 @@ private fun CompactTextInputSurface(
 
 @Composable
 private fun SummaryItemCard(
+    runtime: ForgeRuntime,
     context: DataSourceContext,
     item: ItemDef,
     onExpand: (String, String) -> Unit
@@ -765,7 +768,8 @@ private fun SummaryItemCard(
     val key = itemValueKey(item) ?: return
     val boundInput = if (item.scope.equals("input", ignoreCase = true))
         dataSourceContext.input.flow.collectAsState().value.bindingValues() else emptyMap()
-    val value = resolveItemDisplayValue(item, key, form, metrics, windowForm, input = boundInput)
+    val collection = if (item.scope.equals("metrics", true)) dataSourceContext.collection.flow.collectAsState().value else emptyList()
+    val value = presentedLabelValue(runtime, dataSourceContext, item, resolveItemRawValue(item, key, form, metrics, windowForm, collection, boundInput))
     LabelItemCard(
         label = item.label ?: key,
         value = value,
@@ -990,7 +994,54 @@ internal fun resolveItemDisplayValue(
     collection: List<Map<String, Any?>> = emptyList(),
     input: Map<String, Any?> = emptyMap()
 ): String {
-    val raw = resolveItemRawValue(item, key, form, metrics, windowForm, collection, input)
+    return formatLabelValue(item, resolveItemRawValue(item, key, form, metrics, windowForm, collection, input))
+}
+
+internal fun mappedPresentationValue(value: Any?, mapping: Map<String, JsonElement>): JsonElement? {
+    if (mapping.isEmpty()) return null
+    return mapping[presentationKey(value)]
+}
+
+private fun presentationKey(value: Any?): String = when (value) {
+    null -> "null"
+    is List<*> -> value.joinToString(",") { if (it == null) "" else presentationKey(it) }
+    is Map<*, *> -> "[object Object]"
+    is Double, is Float -> {
+        val text = value.toString()
+        val e = text.indexOf('E')
+        if (e < 0) text.removeSuffix(".0").let { if (it == "-0") "0" else it }
+        else {
+            val power = text.substring(e + 1).toInt()
+            if (power in -6..20) text.toBigDecimal().stripTrailingZeros().toPlainString()
+            else text.substring(0, e).removeSuffix(".0") + "e" + (if (power > 0) "+" else "") + power
+        }
+    }
+    else -> value.toString()
+}
+
+@Composable
+private fun presentedLabelValue(runtime: ForgeRuntime, context: DataSourceContext, item: ItemDef, raw: Any?): String {
+    if (item.on.isEmpty() || (item.valueMap.isEmpty() && item.emptyText == null && "emptyText" !in item.properties)) return formatLabelValue(item, raw)
+    val hooks = remember(item.on) { item.on.filter { it.event.equals("onValue", true) } }
+    if (hooks.isEmpty()) return formatLabelValue(item, raw)
+    return androidx.compose.runtime.key(context, item, raw) {
+        val projected by produceState<Any?>(initialValue = raw) {
+            for (hook in hooks) {
+                runtime.evaluateMetadataAction(hook, context, mapOf("value" to value))?.let { value = it }
+            }
+        }
+        formatLabelValue(item, projected)
+    }
+}
+
+internal fun formatLabelValue(item: ItemDef, value: Any?): String {
+    if (item.dataField != null && (value == null || value is String && value.isBlank())) {
+        val empty = item.emptyText ?: (item.properties["emptyText"] as? JsonPrimitive)?.contentOrNull
+        if (!empty.isNullOrBlank()) return empty
+        if (item.valueMap.isNotEmpty()) return "No data"
+    }
+    val mapped = mappedPresentationValue(value, item.valueMap)
+    val raw = if (mapped == null) value else JsonUtil.elementToAny(mapped)
     if (raw is Map<*, *> && raw.containsKey("start") && raw.containsKey("end")) {
         return listOf(raw["start"], raw["end"])
             .mapNotNull { it?.toString()?.takeIf(String::isNotBlank) }

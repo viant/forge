@@ -224,7 +224,7 @@ fun TableRenderer(
                                 val displayRow = indexed.displayRow
                                 val rowIndex = indexed.originalIndex
                                 val isSelected = tableRowIsSelected(selection, row, rowIndex)
-                                DesktopTableRow(runtime, context, effectiveTable, row, displayRow, rowIndex, displayIndex, isSelected, form, metrics, windowForm) {
+                                DesktopTableRow(runtime, context, effectiveTable, row, displayRow, indexed.projectedFields, rowIndex, displayIndex, isSelected, form, metrics, windowForm) {
                                     coroutineScope.launch { context.toggleSelection(row, rowIndex, selectionModeOverride) }
                                 }
                             }
@@ -334,13 +334,14 @@ private fun CompactTabularTable(
                     .fillMaxWidth()
                     .background(if (selected) Color(0xFFF0F5FF) else Color.White)
                     .clickable { onSelect(indexed.row, indexed.originalIndex) }
-                    .semantics { contentDescription = tableRowAccessibilityLabel(table, indexed.displayRow) }
+                    .semantics { contentDescription = tableRowAccessibilityLabel(table, indexed.displayRow, projectedFields = indexed.projectedFields) }
                     .padding(horizontal = 10.dp, vertical = 12.dp)
             ) {
                 frozenColumns.forEach { (index, column) ->
                     val key = tableColumnKey(column).orEmpty()
                     CompactTabularCell(
                         value = SelectorUtil.resolve(indexed.displayRow, key),
+                        projected = key in indexed.projectedFields,
                         column = column,
                         emphasized = index == 0,
                         width = compactTableColumnWidth(column, index)
@@ -351,6 +352,7 @@ private fun CompactTabularTable(
                         val key = tableColumnKey(column).orEmpty()
                         CompactTabularCell(
                             value = SelectorUtil.resolve(indexed.displayRow, key),
+                            projected = key in indexed.projectedFields,
                             column = column,
                             emphasized = index == 0,
                             width = compactTableColumnWidth(column, index)
@@ -367,6 +369,7 @@ internal fun compactColumnFrozen(column: ColumnDef): Boolean =
 
 @Composable
 private fun CompactTabularCell(
+    projected: Boolean,
     value: Any?,
     column: ColumnDef,
     emphasized: Boolean,
@@ -385,7 +388,7 @@ private fun CompactTabularCell(
         return
     }
     Text(
-        text = formatTableValue(value, column).ifBlank { "-" },
+        text = formatTableValue(value, column, projected).ifBlank { "-" },
         style = MaterialTheme.typography.bodyMedium,
         fontWeight = if (emphasized) FontWeight.SemiBold else FontWeight.Normal,
         maxLines = 2,
@@ -727,6 +730,7 @@ private fun DesktopTableRow(
     table: TableDef,
     row: Map<String, Any?>,
     displayRow: Map<String, Any?>,
+    projectedFields: Set<String>,
     index: Int,
     displayIndex: Int,
     isSelected: Boolean,
@@ -749,7 +753,7 @@ private fun DesktopTableRow(
                 if (isSelected) Color(0xFFF4F7FF) else if (displayIndex.isEven()) Color.White else Color(0xFFFBFCFE)
             )
             .semantics {
-                contentDescription = tableRowAccessibilityLabel(table, displayRow)
+                contentDescription = tableRowAccessibilityLabel(table, displayRow, projectedFields = projectedFields)
             }
             .clickable(onClick = onToggleSelection)
             .padding(horizontal = 12.dp, vertical = 10.dp)
@@ -775,7 +779,7 @@ private fun DesktopTableRow(
                 }
                 else -> {
                     val key = tableColumnKey(col) ?: ""
-                    val value = formatTableValue(SelectorUtil.resolve(displayRow, key), col)
+                    val value = formatTableValue(SelectorUtil.resolve(displayRow, key), col, key in projectedFields)
                     val linkTarget = resolveColumnLinkTargetFromContext(
                         col,
                         LinkResolutionContext(
@@ -898,7 +902,11 @@ private fun executeRowAction(
     runtime.execute(execution, context, mapOf("row" to row, "rowIndex" to rowIndex))
 }
 
-private fun formatTableValue(value: Any?, column: ColumnDef): String {
+internal fun formatTableValue(value: Any?, column: ColumnDef, projected: Boolean = false): String {
+    if (!projected) {
+        mappedPresentationValue(value, column.valueMap)?.let { return formatDashboardValue(JsonUtil.elementToAny(it), null) }
+    }
+    if (value == "" && column.emptyText != null) return column.emptyText
     if (value == null) {
         return column.emptyText?.takeIf { it.isNotBlank() } ?: ""
     }
@@ -908,14 +916,15 @@ private fun formatTableValue(value: Any?, column: ColumnDef): String {
 internal fun tableRowAccessibilityLabel(
     table: TableDef,
     row: Map<String, Any?>,
-    limit: Int = 3
+    limit: Int = 3,
+    projectedFields: Set<String> = emptySet()
 ): String {
     return displayColumns(table)
         .take(limit.coerceAtLeast(0))
         .mapNotNull { column ->
             val key = tableColumnKey(column) ?: return@mapNotNull null
             val label = tableColumnLabel(column, key)
-            val value = formatTableValue(row[key], column).ifBlank { "-" }
+            val value = formatTableValue(row[key], column, key in projectedFields).ifBlank { "-" }
             "$label $value"
         }
         .joinToString(", ")
@@ -936,7 +945,8 @@ private fun tableColumnLabel(column: ColumnDef, key: String): String {
 internal data class IndexedTableRow(
     val originalIndex: Int,
     val row: Map<String, Any?>,
-    val displayRow: Map<String, Any?> = row
+    val displayRow: Map<String, Any?> = row,
+    val projectedFields: Set<String> = emptySet()
 )
 
 internal fun sortedTableRows(
@@ -945,7 +955,10 @@ internal fun sortedTableRows(
     ascending: Boolean,
     projectedValues: Map<Int, Map<String, Any?>> = emptyMap()
 ): List<IndexedTableRow> {
-    val indexed = rows.mapIndexed { index, row -> IndexedTableRow(index, row, row + projectedValues[index].orEmpty()) }
+    val indexed = rows.mapIndexed { index, row ->
+        val overrides = projectedValues[index].orEmpty()
+        IndexedTableRow(index, row, if (overrides.isEmpty()) row else row + overrides, overrides.keys)
+    }
     val columnId = sortColumnId?.takeIf { it.isNotBlank() } ?: return indexed
     return indexed.sortedWith { left, right ->
         compareTableSortValues(
