@@ -41,6 +41,8 @@ import com.viant.forgeandroid.runtime.EditableCollectionSpec
 import com.viant.forgeandroid.runtime.JsonUtil
 import com.viant.forgeandroid.runtime.SelectorUtil
 import com.viant.forgeandroid.runtime.WindowContext
+import com.viant.forgeandroid.runtime.EditableOperationInputs
+import com.viant.forgeandroid.runtime.InputState
 import com.viant.forgeandroid.runtime.WorkflowPrimitiveRuntime
 import com.viant.forgeandroid.runtime.evaluateDashboardCondition
 import com.viant.forgeandroid.runtime.formatDashboardValue
@@ -164,9 +166,11 @@ internal fun WorkflowPresentationPrimitives(
             }
 
         container.editableCollection?.takeIf { it.operations.isNotEmpty() }?.let { spec ->
+            val input = context?.input?.flow?.collectAsState()?.value ?: InputState()
+            val facts = EditableOperationInputs(metrics, form, windowForm, collection, authorization, input, selection)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                spec.operations.filter { operationVisible(it, metrics, form, windowForm, collection, authorization) }.forEach { operation ->
-                    val disabled = operationDisabled(operation, spec, selectedRows, metrics, form, windowForm, collection, authorization)
+                spec.operations.filter { facts.allows(it.visibleWhen) }.forEach { operation ->
+                    val disabled = facts.disabled(operation, spec, selectedRows)
                     val mutation = operation.mutation ?: spec.mutation
                     if (mutation != null && context != null) {
                         MutationCommandButton(
@@ -176,10 +180,21 @@ internal fun WorkflowPresentationPrimitives(
                             externallyDisabled = disabled,
                             accessibilityDescriptionOverride = listOfNotNull(operation.label, operation.tooltip).joinToString(". ")
                         )
-                    } else {
+                    } else androidx.compose.runtime.key(operation.id) {
+                        val operationScope = rememberCoroutineScope()
+                        var failure by remember { mutableStateOf<String?>(null) }
                         Button(enabled = !disabled, modifier = Modifier.semantics { contentDescription = listOfNotNull(operation.label, operation.tooltip).joinToString(". ") }, onClick = {
-                            if (context != null) invokeEditableOperation(runtime, context, operation, selectedRows)
+                            if (operation.prepareSelection != null && context != null) {
+                                operationScope.launch {
+                                    failure = null
+                                    val result = runtime.preparedSelections.activate(runtime, context, spec, operation, container.permissionBoundary) {
+                                        operationScope.coroutineContext[Job]?.isActive == true
+                                    }
+                                    if (operation.prepareSelection.errorField == null) failure = result.exceptionOrNull()?.message
+                                }
+                            } else if (context != null) invokeEditableOperation(runtime, context, operation, selectedRows)
                         }) { Text(operation.label) }
+                        failure?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     }
                 }
             }
@@ -439,45 +454,6 @@ internal fun MutationCommandButton(
             dismissButton = { TextButton(onClick = { decision.complete(false) }) { Text("Cancel") } }
         )
     }
-}
-
-private fun operationVisible(
-    operation: EditableCollectionOperationSpec,
-    metrics: Map<String, Any?>,
-    form: Map<String, Any?>,
-    windowForm: Map<String, Any?>,
-    collection: List<Map<String, Any?>>,
-    authorization: Map<String, Any?>
-): Boolean = operation.visibleWhen == null || evaluateDashboardCondition(
-    operation.visibleWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection, authorization = authorization
-)
-
-private fun operationDisabled(
-    operation: EditableCollectionOperationSpec,
-    spec: EditableCollectionSpec,
-    selectedRows: List<Map<String, Any?>>,
-    metrics: Map<String, Any?>,
-    form: Map<String, Any?>,
-    windowForm: Map<String, Any?>,
-    collection: List<Map<String, Any?>>,
-    authorization: Map<String, Any?>
-): Boolean {
-    val selection = operation.selection ?: spec.selection
-    val minimum = selection?.min ?: if (operation.requiresSelection) 1 else 0
-    val maximum = selection?.max ?: 0
-    if (selectedRows.size < minimum || (maximum > 0 && selectedRows.size > maximum)) return true
-    if (operation.disabledWhen != null && evaluateDashboardCondition(operation.disabledWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection, authorization = authorization)) return true
-    if (selection?.disabledWhen != null && evaluateDashboardCondition(selection.disabledWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection, authorization = authorization)) return true
-    selection?.every?.let { predicate ->
-        if (selectedRows.isEmpty() || selectedRows.any { !evaluateDashboardCondition(predicate, metrics = metrics, form = it, windowForm = windowForm, collection = collection, authorization = authorization) }) return true
-    }
-    selection?.any?.let { predicate ->
-        if (selectedRows.isEmpty() || selectedRows.none { evaluateDashboardCondition(predicate, metrics = metrics, form = it, windowForm = windowForm, collection = collection, authorization = authorization) }) return true
-    }
-    selection?.none?.let { predicate ->
-        if (selectedRows.any { evaluateDashboardCondition(predicate, metrics = metrics, form = it, windowForm = windowForm, collection = collection, authorization = authorization) }) return true
-    }
-    return false
 }
 
 private fun invokeEditableOperation(

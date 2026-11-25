@@ -5,9 +5,10 @@ struct ScopedWorkflowPrimitives: View {
     let runtime: ForgeRuntime?
     let window: WindowContext?
     let container: ContainerDef
+    let authorization: [String:JSONValue]
     var body: some View {
         ForEach(PrimitivePairing.scopedContainers(container)) { part in
-            ScopedWorkflowPrimitive(runtime: runtime, window: window, container: part)
+            ScopedWorkflowPrimitive(runtime: runtime, window: window, container: part, authorization: authorization)
         }
     }
 }
@@ -16,6 +17,7 @@ private struct ScopedWorkflowPrimitive: View {
     let runtime: ForgeRuntime?
     let window: WindowContext?
     let container: ContainerDef
+    let authorization: [String:JSONValue]
     @State private var form: [String: JSONValue] = [:]
     @State private var collection: [[String: JSONValue]] = []
     @State private var metrics: [String: JSONValue] = [:]
@@ -26,7 +28,7 @@ private struct ScopedWorkflowPrimitive: View {
     var body: some View {
         Group {
             if loaded {
-                WorkflowPresentationPrimitives(runtime: runtime, window: window, container: container, form: form, collection: collection, metrics: metrics, windowForm: windowForm, selection: selection)
+                WorkflowPresentationPrimitives(runtime: runtime, window: window, container: container, form: form, collection: collection, metrics: metrics, windowForm: windowForm, selection: selection, authorization: authorization)
             }
         }.task(id: "\(window?.windowID ?? ""):\(container.dataSourceRef ?? "")") { await observe() }
     }

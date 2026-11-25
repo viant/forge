@@ -138,6 +138,10 @@ func walkAssetReferences(node interface{}, parentKey string, refs *AssetReferenc
 			}
 		}
 		for key, child := range actual {
+			// Scope fields map reader columns to parameter names; neither is an asset ID.
+			if parentKey == "prepareSelection" && key == "scopeFields" {
+				continue
+			}
 			if key == "dataSourceRefs" {
 				// Binding.DataSourceRefs maps aliases to datasource identities.
 				if aliases, ok := child.(map[string]interface{}); ok {

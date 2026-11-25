@@ -10,6 +10,8 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+export {clone as snapshotResourceValue};
+
 function freeze(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   Object.values(value).forEach(freeze);

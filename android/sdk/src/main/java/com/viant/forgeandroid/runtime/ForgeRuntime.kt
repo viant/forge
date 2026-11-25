@@ -222,6 +222,11 @@ class ForgeRuntime(
         return leases.mapNotNull { it.second }.distinct()
     }
 
+    internal fun registeredSource(windowId: String, ref: String) = dataSourceRuntime.registeredSource(windowId, ref)
+    internal val preparedSelections = PreparedSelectionRuntime()
+    internal suspend fun readSelectedRows(window: WindowContext, ref: String, parameters: Map<String, Any?>) =
+        dataSourceRuntime.readSelectionRows(window, ref, parameters)
+
     fun registeredWindowDataSources(windowId: String) = dataSourceRuntime.registeredWindowContexts(windowId)
 
     private data class ReportPrefillAcknowledgment(val key: String, val acknowledged: Boolean)
@@ -426,14 +431,14 @@ class ForgeRuntime(
         return projection.result?.let(JsonUtil::elementToAny)
     }
 
-    internal fun actionSnapshots(contexts: Map<String, DataSourceContext>): JsonObject =
+    internal fun actionSnapshots(contexts: Map<String, DataSourceContext>, includeCollection: Boolean = true): JsonObject =
         JsonObject(contexts.mapValues { (_, target) ->
             val selection = target.selection.peek()
             val input = target.input.peek()
             val control = target.control.peek()
             JsonObject(mapOf(
                 "form" to JsonUtil.anyToElement(target.form.peek()),
-                "collection" to JsonUtil.anyToElement(target.collection.peek()),
+                "collection" to if (includeCollection) JsonUtil.anyToElement(target.collection.peek()) else JsonArray(emptyList()),
                 "selection" to JsonUtil.anyToElement(mapOf("selected" to selection.selected, "selection" to selection.selection, "rowIndex" to selection.rowIndex)),
                 "input" to JsonUtil.anyToElement(mapOf("filter" to input.filter, "parameters" to input.parameters, "page" to input.page, "fetch" to input.fetch, "refresh" to input.refresh)),
                 "metrics" to JsonUtil.anyToElement(target.metrics.peek()),
@@ -578,7 +583,7 @@ class ForgeRuntime(
         val previous = signal.peek()
         val window = windowContext(windowId)
         val metadata = window.metadata.peek()
-        val dialog = metadata?.dialogs?.firstOrNull { it.id == dialogId }
+        val dialog = metadata?.dialogIndex?.get(dialogId)
         val sourceRef = dialog?.content?.dataSourceRef ?: dialog?.dataSourceRef ?: callerDataSourceRef
         if (previous.open && (previous.initializing || (previous.args == args &&
                 previous.selectionMode == selectionMode && previous.sourceDataSourceRef == sourceRef))) return

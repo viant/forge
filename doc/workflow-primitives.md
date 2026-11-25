@@ -842,6 +842,48 @@ result. The ordinary dialog close handler and close guard still apply.
 Cancellation, a rejected write, an unknown outcome or replacement of the
 originating presentation leaves the active dialog open.
 
+## Prepare an edit dialog from a fresh selection
+
+An `editableCollection` dialog operation can opt in to one fresh read before
+opening. Declare a local draft datasource on the target dialog and turn off the
+draft's automatic, open and content fetches when the preparation owns its seed.
+
+```yaml
+operations:
+  - id: editRecords
+    label: Edit selected records
+    dialogId: recordEditor
+    requiresSelection: true
+    selection: {min: 1, max: 100}
+    parameters:
+      - {name: Parent, in: windowForm, location: parentId}
+    prepareSelection:
+      dataSourceRef: recordDetails
+      idsParameter: IDs
+      identityField: id
+      scopeFields: {parentId: Parent}
+      mappingRef: recordKinds
+      prepare: Records.prepareEditDraft
+      pendingField: openingEditor
+      errorField: editorError
+```
+
+The reader receives the existing operation parameters and the selected IDs.
+Each `scopeFields` entry binds a returned row field to a scalar or single-value
+parameter. Every selected ID must be distinct and have exactly one matching
+row in scope. Rows are delivered to the preparation in selection order. The
+reader result belongs to this invocation and does not replace the reader's
+displayed collection.
+
+The synchronous `prepare` handler receives the invocation ID, exact parameters,
+ordered `rows`, and the destination's optional `draftModel`. A `mappingRef`
+adds one descriptor per distinct selected case, a `rowCases` index per row, and
+the mapping's field order and upload declarations. The handler returns a
+complete local draft record. The runtime checks the originating selection,
+authorization and scope before applying it. A second activation while the
+same dialog is being prepared performs no read. The optional pending and error
+fields expose the operation state to authored controls.
+
 ## Ordered preparation on a mutation command
 
 A command opts in by declaring a nonempty `before` list. An omitted list and

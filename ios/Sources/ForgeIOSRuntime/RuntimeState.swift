@@ -54,6 +54,7 @@ public struct ControlState: Sendable, Equatable {
 
 public struct DialogState: Sendable, Equatable {
     var presentationID: UUID?
+    var lastClosedPresentationID: UUID?
     public let open: Bool
     public let selectionMode: String?
     public let props: [String: JSONValue]

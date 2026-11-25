@@ -114,7 +114,14 @@ data class RefreshSpec(
 
 @Serializable data class PrimitiveSelectionSpec(val mode: String? = null, val min: Int? = null, val max: Int? = null, val disabledWhen: DashboardConditionDef? = null, val every: DashboardConditionDef? = null, val any: DashboardConditionDef? = null, val none: DashboardConditionDef? = null)
 @Serializable data class EditableCollectionSpec(val dataSourceRef: String? = null, val identityFields: List<String> = emptyList(), val selection: PrimitiveSelectionSpec? = null, val selectionStatus: Boolean = false, val selectionPrompt: String? = null, val operations: List<EditableCollectionOperationSpec> = emptyList(), val mutation: MutationCommandDef? = null)
-@Serializable data class EditableCollectionOperationSpec(val id: String, val label: String, val tooltip: String? = null, val intent: String? = null, val dialogId: String? = null, val handler: String? = null, val requiresSelection: Boolean = false, val selection: PrimitiveSelectionSpec? = null, val visibleWhen: DashboardConditionDef? = null, val disabledWhen: DashboardConditionDef? = null, val parameters: List<ParameterDef> = emptyList(), val mutation: MutationCommandDef? = null)
+@Serializable data class EditableCollectionOperationSpec(val id: String, val label: String, val tooltip: String? = null, val intent: String? = null, val dialogId: String? = null, val handler: String? = null, val requiresSelection: Boolean = false, val selection: PrimitiveSelectionSpec? = null, val visibleWhen: DashboardConditionDef? = null, val disabledWhen: DashboardConditionDef? = null, val parameters: List<ParameterDef> = emptyList(), val mutation: MutationCommandDef? = null, val prepareSelection: PreparedSelectionDef? = null)
+@Serializable
+data class PreparedSelectionDef(
+    val dataSourceRef: String, val idsParameter: String, val identityField: String,
+    val scopeFields: Map<String, String> = emptyMap(), val mappingRef: String? = null,
+    val prepare: String, val pendingField: String? = null, val errorField: String? = null
+)
+
 @Serializable data class AssignmentPickerSpec(val availableDataSourceRef: String, val assignedDataSourceRef: String, val identityFields: List<String> = emptyList(), val labelField: String? = null, val assign: MutationCommandDef? = null, val unassign: MutationCommandDef? = null, val allowMultiple: Boolean? = null)
 @Serializable data class StatusWorkflowSpec(val stateField: String, val transitions: List<StatusWorkflowTransitionSpec>)
 @Serializable data class StatusWorkflowTransitionSpec(val id: String, val from: List<JsonElement> = emptyList(), val to: JsonElement, val label: String, val confirm: String? = null, val availableWhen: DashboardConditionDef? = null, val command: MutationCommandDef)

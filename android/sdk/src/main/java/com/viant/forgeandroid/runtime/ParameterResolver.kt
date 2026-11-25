@@ -1,7 +1,19 @@
 package com.viant.forgeandroid.runtime
 
 class ParameterResolver {
-    fun resolve(params: List<ParameterDef>, context: DataSourceContext): ParameterResolution {
+    fun resolve(params: List<ParameterDef>, context: DataSourceContext): ParameterResolution =
+        resolveBindings(params, context, applyCodecs = false)
+
+    internal fun resolvePreparedSelection(params: List<ParameterDef>, context: DataSourceContext): ParameterResolution =
+        resolveBindings(params, context, applyCodecs = true)
+
+    private fun resolveBindings(params: List<ParameterDef>, context: DataSourceContext, applyCodecs: Boolean): ParameterResolution {
+        fun decoded(parameter: ParameterDef, raw: Any?): Any? {
+            if (!applyCodecs || parameter.codec == null) return raw
+            val codec = parameter.codec
+            val name = (if (codec is kotlinx.serialization.json.JsonObject) codec["name"] else codec) as? kotlinx.serialization.json.JsonPrimitive
+            return parameterValue(raw, name?.content?.trim()?.lowercase().orEmpty())
+        }
         val inbound = mutableMapOf<String, MutableMap<String, Any?>>()
         val outbound = mutableListOf<ParameterDef>()
 
@@ -25,7 +37,7 @@ class ParameterResolver {
             val sourcePath = if (p.name == "...") p.location else p.location ?: p.name
             val srcValue = readStore(context, srcDs, srcStore, sourcePath) ?: return@forEach
             val dstMap = ensure(dstDs)
-            writeStore(dstMap, dstStore, p.name, srcValue)
+            writeStore(dstMap, dstStore, p.name, decoded(p, srcValue))
         }
 
         params.filter { it !in compact }.forEach { p ->
@@ -38,10 +50,48 @@ class ParameterResolver {
             val dstMap = ensure(dst)
             val value = readLegacy(context, p)
             val name = p.name ?: return@forEach
-            dstMap[name] = value
+            dstMap[name] = decoded(p, value)
         }
 
         return ParameterResolution(inbound, outbound)
+    }
+
+    private fun parameterValue(raw: Any?, codec: String): Any? {
+        if (raw == null || codec.isEmpty()) return raw
+        if (codec.endsWith("[]")) {
+            val entries = if (raw is List<*>) raw else listOf(raw)
+            return entries.map { parameterValue(it, codec.removeSuffix("[]")) }
+        }
+        if (raw is List<*>) return if (raw.size == 1) parameterValue(raw.first(), codec) else raw
+        return when (codec) {
+            "int", "integer" -> {
+                if (raw !is String) raw else {
+                    val parsed = raw.trim().toBigDecimalOrNull()
+                    // Unsafe decimal IDs are opaque text all the way to the producer.
+                    val integer = try { parsed?.longValueExact() } catch (_: ArithmeticException) { null }
+                    if (integer != null && integer in -9007199254740991L..9007199254740991L) integer else raw
+                }
+            }
+            "number", "float" -> if (raw is String) conditionNumber(raw) ?: raw else raw
+            "boolean", "bool" -> when (raw) {
+                is Number -> when (raw.toDouble()) { 1.0 -> true; 0.0 -> false; else -> raw }
+                is String -> when (raw.trim().lowercase()) { "1", "true" -> true; "0", "false" -> false; else -> raw }
+                else -> raw
+            }
+            "string" -> if (raw is Map<*, *>) "[object Object]" else raw.toString()
+            "json" -> (if (raw is String) JsonUtil.elementToAny(JsonUtil.json.parseToJsonElement(raw)) else raw).also(::checkParameterKeys)
+            else -> raw
+        }
+    }
+
+    private fun checkParameterKeys(value: Any?) {
+        when (value) {
+            is Map<*, *> -> value.forEach { (key, child) ->
+                require(key != "__proto__" && key != "prototype" && key != "constructor") { "The parameter contains an unsafe key." }
+                checkParameterKeys(child)
+            }
+            is List<*> -> value.forEach(::checkParameterKeys)
+        }
     }
 
     private fun isCompact(parameter: ParameterDef): Boolean =
@@ -62,7 +112,7 @@ class ParameterResolver {
     }
 
     private fun readStore(context: DataSourceContext, dsRef: String, store: String, path: String?): Any? {
-        val ctx = context.window.contextOrNull(dsRef) ?: return null
+        val ctx = if (dsRef == context.dataSourceRef) context else context.window.contextOrNull(dsRef) ?: return null
         val key = path ?: ""
         return when (store) {
             "form" -> readObjectValue(ctx.peekForm(), key)
@@ -203,6 +253,7 @@ class ParameterResolver {
         }
         val possibleRef = location.substring(0, dotIndex)
         val metadata = context.window.metadata.peek()
+        if (possibleRef == context.dataSourceRef) return context to location.substring(dotIndex + 1)
         if (metadata?.dataSources?.containsKey(possibleRef) == true) {
             return context.window.context(possibleRef) to location.substring(dotIndex + 1)
         }

@@ -1,0 +1,220 @@
+package com.viant.forgeandroid.runtime
+
+import com.dokar.quickjs.QuickJs
+import com.dokar.quickjs.evaluate
+import kotlinx.coroutines.*
+import kotlinx.serialization.json.*
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
+import kotlin.test.*
+
+class PreparedSelectionRuntimeTest {
+    private val selected = listOf(mapOf("id" to "0002", "editable" to true), mapOf("id" to 1L, "editable" to true))
+    private val records = listOf(mapOf("id" to "1", "parent" to "007", "editable" to true, "kind" to "basic"),
+        mapOf("id" to 2L, "parent" to 7L, "editable" to true, "kind" to "basic"))
+    private val operation = JsonUtil.json.decodeFromString(EditableCollectionOperationSpec.serializer(), """
+        {"id":"edit","label":"Edit","dialogId":"editor","requiresSelection":true,
+         "parameters":[{"name":"Parent","in":"windowForm","location":"parent","codec":{"name":"int[]"}}],
+         "visibleWhen":{"source":"authorization","field":"principal.active","equals":true},
+         "disabledWhen":{"source":"windowForm","field":"opening","equals":true},
+         "selection":{"every":{"source":"row","field":"editable","equals":true}},
+         "prepareSelection":{"dataSourceRef":"detail","idsParameter":"Ids","identityField":"id",
+          "scopeFields":{"parent":"Parent"},"mappingRef":"types","prepare":"Inventory.prepare","pendingField":"opening","errorField":"error"}}
+    """.trimIndent())
+    private val spec = EditableCollectionSpec(operations = listOf(operation))
+    private val module = """({
+        normalize: row=>row.id,
+        prepare:({context,rows,parameters,invocationId,mapping,descriptors,rowCases,draftModel})=>{
+            if(!invocationId || parameters.Ids.join(',')!=='0002,1' || parameters.Parent[0]!==7) throw Error('Bad inputs');
+            if(mapping.fieldOrder[0]!=='size'||mapping.cases||descriptors.length!==1 ||
+               descriptors[0].modelRef!=='record'||descriptors[0].schema.type!=='object'||descriptors[0].values.flag!==true||
+               rowCases.join(',')!=='0,0'||draftModel.schemaRef!=='record')throw Error('Bad mapping projection');
+            if(context.Context('unused')||context.handlers.dataSource.getCollection().length)throw Error('Unneeded reader state');
+            return {ids:rows.map(context.lookupHandler('Nested.normalize')),invocation:invocationId};
+        },
+        plain:({rows,mapping,descriptors,rowCases,draftModel})=>{
+          if(mapping!==null || descriptors.length || rowCases.length || !draftModel)throw Error('Bad optional mapping');
+          return {ids:rows.map(r=>r.id)};
+        },
+        bad:()=>{throw Error('The chosen rows cannot be opened.')},
+        effect:({context})=>{context.handlers.dataSource.setFormData({values:{bad:true}});return {}},
+        deferred:async()=>({}),scalar:()=>true,wrong:({context})=>context.lookupHandler('Unknown.normalize')
+    })"""
+    private inner class Fixture(scope: CoroutineScope, server: MockWebServer? = null) {
+        val runtime = ForgeRuntime(if(server==null)emptyMap() else mapOf("service" to EndpointConfig(server.url("/").toString())),scope)
+        private val definition = DataSourceDef(autoFetch=false, selectionMode="none",
+            service=server?.let { ServiceDef(endpoint="service",uri="/v1/api/datasources/detail/fetch",method="POST") },
+            selectors=SelectorDef(data="rows"),
+            parameters=listOf(ParameterDef(name="Ids",input="input",location="detail.parameters.Ids"),ParameterDef(name="Parent",input="input",location="detail.parameters.Parent")))
+        private val model = ResourceModelDef(schemaRef="record")
+        private val meta = WindowMetadata(namespace="Inventory",actionAliases=listOf("Nested"),windowKey="inventory",actions=ActionsDef(code=module),
+            view=ViewDef(content=ContentDef()),dataSources=mapOf("list" to DataSourceDef(selectionMode="multi"),"detail" to definition,
+                "draft" to DataSourceDef(autoFetch=false,resourceModelRef="record"),"unused" to DataSourceDef()),
+            schemas=mapOf("record" to ResourceSchemaDef(type="object")),resourceModels=mapOf("record" to model),
+            resourceMappings=mapOf("types" to ResourceMappingDef(listOf("kind"),mapOf("basic" to ResourceMappingCase("record",mapOf("flag" to JsonPrimitive(true))),
+                "unused" to ResourceMappingCase("absent")),fieldOrder=listOf("size"))),
+            dialogs=listOf(DialogDef(id="editor",dataSourceRef="draft",fetchOnOpen=false)),
+            authorizationSnapshot=JsonUtil.json.parseToJsonElement("""{"principal":{"active":true}}""").jsonObject)
+        val window = runtime.windowContext(runtime.openWindowInline("inventory","Inventory",metadata=meta).windowId)
+        val source = window.context("list")
+        val draft = window.context("draft")
+        val calls = mutableListOf<ForgeRuntime.DataSourceFetchRequest>()
+        init {
+            source.selection.set(SelectionState(selection=selected))
+            source.collection.set(listOf(mapOf("unrelatedList" to true)))
+            draft.form.set(mapOf("previous" to true))
+            runtime.setWindowFormValues(window.windowId,mapOf("parent" to "007"))
+        }
+        fun loader(read: suspend (ForgeRuntime.DataSourceFetchRequest)->List<Map<String,Any?>> = { records }) {
+            runtime.registerDataSourceLoader { request ->
+                require(request.dataSourceRef=="detail")
+                calls+=request
+                ForgeRuntime.DataSourceFetchResult(rows=read(request))
+            }
+        }
+        suspend fun activate(op:EditableCollectionOperationSpec=operation,presented:()->Boolean={true}) =
+            runtime.preparedSelections.activate(runtime,source,spec,op,presented=presented)
+        fun untouched(){
+            assertEquals(mapOf("previous" to true),draft.form.peek())
+            assertFalse(window.dialogSignal("editor").peek().open)
+        }
+    }
+    private suspend fun fixture(test: suspend Fixture.()->Unit){
+        val scope=CoroutineScope(SupervisorJob()+Dispatchers.Unconfined)
+        ActionHookRuntime.testScriptEvaluator={ script ->
+            val js=QuickJs.create(Dispatchers.Default);try{js.evaluate<String>(script)}finally{js.close()}
+        }
+        try { Fixture(scope).test() } finally {ActionHookRuntime.testScriptEvaluator=null;scope.cancel()}
+    }
+
+    @Test fun buttonOperationReadsOnlyFreshRowsAndSeedsTheDestinationOnce()=runBlocking { fixture {
+        val reader=window.context("detail")
+        val oldRows=listOf(mapOf("id" to 12));reader.collection.set(oldRows)
+        reader.form.set(mapOf("old" to true));reader.setInputParameters(mapOf("unrelated" to 1))
+        loader()
+        assertTrue(activate().getOrThrow())
+        assertEquals(listOf(2L,"1"),draft.form.peek()["ids"])
+        assertTrue(draft.form.peek()["invocation"].toString().isNotBlank())
+        assertFalse("previous" in draft.form.peek())
+        assertTrue(window.dialogSignal("editor").peek().open)
+        assertEquals(1,calls.size)
+        val expected=mapOf("Ids" to listOf("0002",1L),"Parent" to listOf(7L))
+        assertEquals(expected,calls.single().input.parameters)
+        assertEquals(expected,calls.single().resolvedInputs)
+        assertEquals(oldRows,reader.collection.peek())
+        assertEquals(mapOf("old" to true),reader.form.peek())
+        assertEquals(mapOf("unrelated" to 1),reader.input.peek().parameters)
+        assertFalse(reader.control.peek().resolved)
+        assertFalse("unused" in runtime.registeredWindowDataSources(window.windowId))
+        assertEquals(false,window.peekWindowForm()["opening"])
+    } }
+
+    @Test fun malformedScopeAndDuplicateSelectedIdsCannotInvokeAReader()=runBlocking {
+        for(mode in listOf("duplicate","unsafe","missing","scope","empty","denied")) fixture {
+            loader()
+            when(mode) {
+                "scope" -> runtime.setWindowFormValues(window.windowId,mapOf("parent" to listOf(7,8)))
+                "empty" -> runtime.setWindowFormValues(window.windowId,mapOf("parent" to null))
+                "denied" -> source.setSelection(SelectionState(selection=listOf(mapOf("id" to 1,"editable" to false))))
+                else -> source.setSelection(SelectionState(selection=listOf(mapOf("id" to "01","editable" to true),
+                    mapOf("id" to when(mode){"duplicate"->1;"unsafe"->9007199254740992L;else->null},"editable" to true))))
+            }
+            assertFalse(activate().getOrDefault(false));assertTrue(calls.isEmpty());untouched()
+        }
+    }
+    @Test fun invalidForeignDuplicateAndMissingFreshRowsNeverOpenOrPublish()=runBlocking {
+        for(bad in listOf(records.drop(1), records+records.first(), listOf(records.first(),records.first()),
+            listOf(records.first(),records.last()+("id" to 99)),listOf(records.first(),records.last()+("parent" to 8)),
+            listOf(records.first(),records.last()+("editable" to false)))) fixture {
+            loader{bad};val result=activate()
+            assertTrue(result.isFailure);assertTrue(window.peekWindowForm()["error"].toString().isNotBlank())
+            assertEquals(1,calls.size);assertFalse("detail" in runtime.registeredWindowDataSources(window.windowId));untouched()
+        }
+    }
+    @Test fun changedScopePresentationOrParentStopsAnOutstandingReadWithoutAStaleError()=runBlocking {
+        for(change in listOf("parent","role","selection","presentation")) fixture {
+            var here=true
+            loader {
+                when(change) {
+                    "parent"->runtime.setWindowFormValues(window.windowId,mapOf("parent" to listOf(9)))
+                    "role"->runtime.updatePreviewPrincipal(window.windowId,setOf("reader"),emptySet())
+                    "selection"->source.setSelection(SelectionState(selection=selected.reversed()))
+                    else->here=false
+                }
+                throw IllegalStateException("no stale diagnostic")
+            }
+            assertFalse(activate(presented={here}).getOrThrow());untouched()
+            assertFalse(window.peekWindowForm()["error"]=="no stale diagnostic")
+            assertEquals(false,window.peekWindowForm()["opening"])
+        }
+    }
+    @Test fun aliasErrorsPromisesAndEffectfulHooksCanNeverSeedTheDraft()=runBlocking {
+        for(handler in listOf("bad","effect","deferred","scalar","wrong")) fixture {
+            loader();val op=operation.copy(prepareSelection=operation.prepareSelection!!.copy(prepare="Inventory.$handler"))
+            val result=activate(op)
+            assertTrue(result.isFailure);assertEquals(result.exceptionOrNull()?.message,window.peekWindowForm()["error"])
+            assertFalse(source.form.peek().containsKey("bad"));untouched()
+        }
+    }
+    @Test fun duplicateClicksShareOnePendingReadAndRestoreTheOwnedFlag()=runBlocking { fixture {
+        val start=CompletableDeferred<Unit>();val finish=CompletableDeferred<Unit>()
+        loader {start.complete(Unit);finish.await();records}
+        coroutineScope {
+            val first=async {activate()}
+            start.await();assertEquals(true,window.peekWindowForm()["opening"])
+            assertFalse(activate().getOrThrow());assertEquals(1,calls.size)
+            finish.complete(Unit);assertTrue(first.await().getOrThrow())
+        }
+        assertEquals(false,window.peekWindowForm()["opening"])
+    } }
+    @Test fun opaqueAndLargeDecimalTextIdentitiesAreComparedExactly()=runBlocking { fixture {
+        val ids=listOf("900719925474099300000000"," X ")
+        source.setSelection(SelectionState(selection=ids.map{ mapOf("id" to it,"editable" to true) }))
+        loader {ids.reversed().map{mapOf("id" to it,"parent" to 7,"editable" to true)}}
+        val op=operation.copy(prepareSelection=operation.prepareSelection!!.copy(mappingRef=null,prepare="Inventory.plain"))
+        assertTrue(activate(op).getOrThrow());assertEquals(ids,draft.form.peek()["ids"])
+    } }
+    @Test fun codecNormalizesOnlySafeScopeValuesAndPreservesLongDecimalText()=runBlocking { fixture {
+        val text="9007199254740993123456"
+        runtime.setWindowFormValues(window.windowId,mapOf("parent" to text))
+        loader { request ->
+            require(request.input.parameters["Parent"] == listOf(text))
+            records.map { it + ("parent" to text) }
+        }
+        val op=operation.copy(prepareSelection=operation.prepareSelection!!.copy(mappingRef=null,prepare="Inventory.plain"))
+        assertTrue(activate(op).getOrThrow())
+    } }
+    @Test fun inputAndSelectionPredicatesUseTheSameSourcesAtTheButtonAndBeforeSeeding()=runBlocking { fixture {
+        val enabled = DashboardConditionDef(all=listOf(
+            DashboardConditionDef(source="input",field="parameters.enabled",equals=JsonPrimitive(true)),
+            DashboardConditionDef(source="selection",field="selection.0.id",equals=JsonPrimitive("0002"))))
+        val op=operation.copy(visibleWhen=enabled)
+        loader { source.setInputParameters(mapOf("enabled" to false));records }
+        assertFalse(activate(op).getOrThrow());assertTrue(calls.isEmpty())
+        source.setInputParameters(mapOf("enabled" to true))
+        assertFalse(activate(op).getOrThrow());assertEquals(1,calls.size);untouched()
+    } }
+    @Test fun decimalParameterCodecsDoNotAcceptJVMLiteralSuffixes()=runBlocking { fixture {
+        val resolver=ParameterResolver()
+        val param=ParameterDef(name="N",input="windowForm",location="n",codec=JsonPrimitive("number"))
+        for ((text,expected) in listOf("1f" to "1f", "0x1.0p3" to "0x1.0p3", "2.5e1" to 25.0)) {
+            runtime.setWindowFormValues(window.windowId,mapOf("n" to text))
+            assertEquals(expected,resolver.resolvePreparedSelection(listOf(param),source).inbound[""]?.get("N"))
+        }
+    } }
+    @Test fun declinedHTTPAndMalformedEnvelopePreserveThePriorDraft()=runBlocking {
+        for(code in listOf(200,403)) {
+            val server=MockWebServer();val scope=CoroutineScope(SupervisorJob()+Dispatchers.Unconfined)
+            try {
+                server.enqueue(MockResponse().setResponseCode(code).setBody("""{"data":[{"id":1}]}"""));server.start()
+                val f=Fixture(scope,server)
+                val result=f.activate();assertTrue(result.isFailure);f.untouched()
+                if(code==403)assertEquals(403,assertIs<HttpResponseException>(result.exceptionOrNull()).status)
+                assertEquals(1,server.requestCount)
+                val request=server.takeRequest()
+                assertEquals("/v1/api/datasources/detail/fetch",request.path)
+                assertEquals(JsonUtil.json.parseToJsonElement("""{"inputs":{"Parent":[7],"Ids":["0002",1]}}"""),JsonUtil.json.parseToJsonElement(request.body.readUtf8()))
+            }finally{server.shutdown();scope.cancel()}
+        }
+    }
+}

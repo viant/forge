@@ -11,7 +11,7 @@ public enum UIActionProjection {
     public static func invoke(code: String, function: String, namespace: String?, source: String,
                               snapshots: [String: JSONValue], windowForm: [String: JSONValue],
                               props: [String: JSONValue], authorization: [String: JSONValue] = [:],
-                              windowKey: String = "", aliases: [String] = [], snapshot: (@Sendable (String) -> JSONValue?)? = nil) throws -> UIActionProjectionResult {
+                              windowKey: String = "", aliases: [String] = [], selectionPreparation: Bool = false, snapshot: (@Sendable (String) -> JSONValue?)? = nil) throws -> UIActionProjectionResult {
         var name = function
         if let namespace, name.hasPrefix(namespace + ".") { name.removeFirst(namespace.count + 1) }
         let wrapper = #"""
@@ -23,16 +23,26 @@ public enum UIActionProjection {
           const module=(
         """# + code + #"""
           );
-          return {run:({name,source,snapshots,windowForm,props,authorization,aliases,windowKey})=>{
+          return {run:({name,source,snapshots,windowForm,props,authorization,aliases,windowKey,selectionPreparation})=>{
             const effects=[],contexts=Object.create(null);activeEffects=effects;
             const signal=(state,key,kind,ref)=>{const holder={peek:()=>state[key]};Object.defineProperty(holder,'value',{get:()=>state[key],set:value=>{state[key]=value;effects.push({kind,ref,value});}});return holder;};
             const windowState={value:windowForm},windowFormSignal=signal(windowState,'value','windowForm',null);
+            const lookupHandler=key=>{const ns=aliases.find(n=>key.startsWith(n+'.'));const fn=module[ns?key.slice(ns.length+1):key];if(typeof fn!=='function')throw new Error('Missing action: '+key);return fn;};
+            const preparationContext=()=>{
+              const signals={};
+              for(const key of ['form','input','selection','authorization','windowForm']){
+                let value,captured=false;
+                const read=()=>{if(!captured){value=__forgeSnapshot(key);captured=true;}return value;};
+                signals[key]={peek:read,get value(){return read();},set value(_){throw new Error('Selection preparation cannot change a live signal.');}};
+              }
+              return {identity:{dataSourceRef:source},metadata:{windowKey},signals,lookupHandler,get authorization(){return signals.authorization.peek();}};
+            };
             const contextFor=ref=>{
               if(Object.hasOwn(contexts,ref))return contexts[ref];
               const state=Object.hasOwn(snapshots,ref)?snapshots[ref]:typeof __forgeSnapshot==='function'?__forgeSnapshot(ref):null;
               if(!state)return undefined;
               const ctx={identity:{dataSourceRef:ref},Context:contextFor,authorization,metadata:{windowKey},
-                lookupHandler:key=>{const ns=aliases.find(n=>key.startsWith(n+'.'));const fn=module[ns?key.slice(ns.length+1):key];if(typeof fn!=='function')throw new Error('Missing action: '+key);return fn;},
+                lookupHandler,
                 signals:{authorization:{peek:()=>authorization,value:authorization},control:{peek:()=>state.control||{},value:state.control||{}},
                 form:signal(state,'form','form',ref),collection:{peek:()=>state.collection||[],get value(){return state.collection||[];}},
                 selection:{peek:()=>state.selection||{},get value(){return state.selection||{};}},input:{peek:()=>state.input||{},get value(){return state.input||{};}},
@@ -53,14 +63,14 @@ public enum UIActionProjection {
               contexts[ref]=ctx;return ctx;
             };
             const fn=module[name];if(typeof fn!=='function')throw new Error('Missing UI action: '+name);
-            const result=fn({...props,context:contextFor(source)});if(result&&typeof result.then==='function')throw new Error('Async UI actions are unsupported');
+            const result=fn({...props,context:selectionPreparation?preparationContext():contextFor(source)});if(result&&typeof result.then==='function')throw new Error('Async UI actions are unsupported');
             let count=0;while(timers.length){if(++count>100)throw new Error('UI action timer limit exceeded');timers.shift()();}
             return {effects,result:result===undefined?null:result,returnedValue:result!==undefined};
           }};
         })()
         """#
         let envelope = try ActionHookRuntime.invoke(code: wrapper, functionName: "run", props: .object([
-            "name": .string(name), "source": .string(source), "snapshots": .object(snapshots),
+            "name": .string(name), "source": .string(source), "selectionPreparation": .bool(selectionPreparation), "snapshots": .object(snapshots),
             "windowForm": .object(windowForm), "props": .object(props),
             "authorization": .object(authorization), "windowKey": .string(windowKey), "aliases": .array(aliases.map(JSONValue.string))
         ]), snapshot: snapshot)?.objectValue ?? [:]

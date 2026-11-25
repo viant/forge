@@ -17,7 +17,8 @@ object UIActionProjection {
         props: JsonObject,
         authorization: JsonObject = JsonObject(emptyMap()),
         readOnly: Boolean = false,
-        windowKey: String? = null
+        windowKey: String? = null,
+        actionNamespaces: List<String> = emptyList()
     ): UIActionProjectionResult {
         val name = namespace?.takeIf { functionName.startsWith("$it.") }
             ?.let { functionName.removePrefix("$it.") } ?: functionName
@@ -33,7 +34,7 @@ object UIActionProjection {
               const module = (
             $code
               );
-              return { run: ({name, source, snapshots, windowForm, props, authorization, readOnly, windowKey}) => {
+              return { run: ({name, source, snapshots, windowForm, props, authorization, readOnly, windowKey, actionNamespaces}) => {
                 const effects = [], contexts = {}; activeEffects = effects;
                 const signal = (state, key, kind, ref) => {
                   const holder = {peek: () => state[key]};
@@ -47,6 +48,12 @@ object UIActionProjection {
                   const state = snapshots[ref];
                   const ctx = {
                     identity:{dataSourceRef:ref}, Context:contextFor, authorization, metadata:{windowKey},
+                    ...(actionNamespaces.length ? {lookupHandler:key=>{
+                      const ns=actionNamespaces.find(alias=>typeof key==='string' && key.startsWith(alias+'.'));
+                      const method=ns && key.slice(ns.length+1);
+                      if(!method || !Object.hasOwn(module,method) || typeof module[method]!=='function')throw Error('Missing action: '+key);
+                      return module[method];
+                    }} : {}),
                     signals:{
                       authorization:{peek:()=>authorization,get value(){return authorization;}}, control:{peek:()=>state.control,get value(){return state.control;}},
                       form:signal(state,'form','form',ref), collection:{peek:()=>state.collection||[],get value(){return state.collection||[];}},
@@ -92,7 +99,7 @@ object UIActionProjection {
         val envelope = ActionHookRuntime.invoke(
             wrapper,
             "run",
-            JsonObject(mapOf("name" to JsonPrimitive(name), "source" to JsonPrimitive(source), "snapshots" to snapshots, "windowForm" to windowForm, "props" to props, "authorization" to authorization, "readOnly" to JsonPrimitive(readOnly), "windowKey" to (windowKey?.let(::JsonPrimitive) ?: JsonNull)))
+            JsonObject(mapOf("name" to JsonPrimitive(name), "source" to JsonPrimitive(source), "snapshots" to snapshots, "windowForm" to windowForm, "props" to props, "authorization" to authorization, "readOnly" to JsonPrimitive(readOnly), "windowKey" to (windowKey?.let(::JsonPrimitive) ?: JsonNull), "actionNamespaces" to JsonUtil.anyToElement(actionNamespaces)))
         ) as? JsonObject ?: return UIActionProjectionResult(emptyList(), null)
         val effects = (envelope["effects"] as? JsonArray).orEmpty().mapNotNull { raw ->
             val obj = raw as? JsonObject ?: return@mapNotNull null

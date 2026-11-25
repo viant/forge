@@ -37,6 +37,12 @@ public actor DataSourceRuntime {
         return true
     }
 
+    func restoreForm(dataSourceID: String, ifCurrent current: [String:JSONValue], previous: [String:JSONValue]) -> Bool {
+        guard form(dataSourceID: dataSourceID) == current else { return false }
+        setForm(dataSourceID: dataSourceID, values: previous)
+        return true
+    }
+
     public func setForm(dataSourceID: String, values: [String: JSONValue]) {
         formValues[dataSourceID] = values
         for observer in formObservers[dataSourceID]?.values ?? [:].values { observer.yield(values) }
@@ -225,54 +231,11 @@ public actor DataSourceRuntime {
         setControl(dataSourceID: dataSourceID, control: ControlState(loading: true))
         do {
             let input = inputValues[dataSourceID] ?? InputState()
-            let resolvedMethod = method.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-            let requestMethod = resolvedMethod.isEmpty ? "GET" : resolvedMethod
-            var components = URLComponents(string: baseURL + path)!
-            let fetchInputs = buildDatasourceFetchInputs(
-                input: input,
-                staticParameters: staticParameters,
-                inputParameters: inputParameters,
-                paging: paging
-            )
-            if requestMethod == "GET" {
-                let queryItems = fetchInputs.compactMap { key, value -> URLQueryItem? in
-                    guard let stringValue = requestString(value) else { return nil }
-                    return URLQueryItem(name: key, value: stringValue)
-                }
-                if !queryItems.isEmpty { components.queryItems = queryItems }
-            }
-
-            var request = URLRequest(url: components.url!)
-            request.httpMethod = requestMethod
-            for (k, v) in additionalHeaders { request.setValue(v, forHTTPHeaderField: k) }
-            if requestMethod != "GET" {
-                let payload: JSONValue
-                if isDatasourceFetchRoute(path) {
-                    payload = .object(["inputs": .object(fetchInputs)])
-                } else {
-                    payload = .object(inputParameters)
-                }
-                request.httpBody = try JSONEncoder().encode(payload)
-                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            }
-
-            let (data, response) = try await session.data(for: request)
-            if let response = response as? HTTPURLResponse,
-               !(200..<300).contains(response.statusCode) {
-                throw NSError(
-                    domain: "Forge.DataSource.HTTP",
-                    code: response.statusCode,
-                    userInfo: [NSLocalizedDescriptionKey: "Unable to load data (HTTP \(response.statusCode)). Please retry."]
-                )
-            }
-            let raw = try JSONDecoder().decode(JSONValue.self, from: data)
+            let raw = try await requestCollection(input: input, baseURL: baseURL, path: path, method: method, staticParameters: staticParameters,
+                                                  inputParameters: inputParameters, paging: paging, additionalHeaders: additionalHeaders, session: session)
             var invocationRecords: [JSONValue]?
             if requireInvocationRecords {
-                let selector = selectors?.data?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                let records = selector.isEmpty
-                    ? raw.objectValue?["data"] ?? raw.objectValue?["entries"] ?? raw.objectValue?["Rows"] ?? raw.objectValue?["rows"] ?? raw
-                    : selectValue(raw, selector: selector)
-                guard let items = records?.arrayValue else {
+                guard let items = invocationRecordsFromResponse(raw, selector: selectors?.data) else {
                     setControl(dataSourceID: dataSourceID, control: ControlState(error: "Writer invocation records are unavailable."))
                     return nil
                 }
@@ -301,6 +264,63 @@ public actor DataSourceRuntime {
                        control: ControlState(error: error.localizedDescription))
             return .failure(error)
         }
+    }
+
+    /// The transport has no signal side effects. Normal collection fetches
+    /// publish the returned payload, while selection preparations consume it locally.
+    func requestCollection(input: InputState, baseURL: String, path: String, method: String, staticParameters: [String: String],
+                           inputParameters: [String: JSONValue], paging: DataSourcePagingDef?, additionalHeaders: [String: String],
+                           session: URLSession) async throws -> JSONValue {
+        let resolvedMethod = method.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        let requestMethod = resolvedMethod.isEmpty ? "GET" : resolvedMethod
+        guard var components = URLComponents(string: baseURL + path) else { throw URLError(.badURL) }
+        let fetchInputs = buildDatasourceFetchInputs(
+            input: input,
+            staticParameters: staticParameters,
+            inputParameters: inputParameters,
+            paging: paging
+        )
+        if requestMethod == "GET" {
+            let queryItems = fetchInputs.compactMap { key, value -> URLQueryItem? in
+                guard let stringValue = requestString(value) else { return nil }
+                return URLQueryItem(name: key, value: stringValue)
+            }
+            if !queryItems.isEmpty { components.queryItems = queryItems }
+        }
+
+        guard let url = components.url else { throw URLError(.badURL) }
+        var request = URLRequest(url: url)
+        request.httpMethod = requestMethod
+        for (k, v) in additionalHeaders { request.setValue(v, forHTTPHeaderField: k) }
+        if requestMethod != "GET" {
+            let payload: JSONValue
+            if isDatasourceFetchRoute(path) {
+                payload = .object(["inputs": .object(fetchInputs)])
+            } else {
+                payload = .object(inputParameters)
+            }
+            request.httpBody = try JSONEncoder().encode(payload)
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
+
+        let (data, response) = try await session.data(for: request)
+        if let response = response as? HTTPURLResponse,
+           !(200..<300).contains(response.statusCode) {
+            throw NSError(
+                domain: "Forge.DataSource.HTTP",
+                code: response.statusCode,
+                userInfo: [NSLocalizedDescriptionKey: "Unable to load data (HTTP \(response.statusCode)). Please retry."]
+            )
+        }
+        return try JSONDecoder().decode(JSONValue.self, from: data)
+    }
+
+    func invocationRecordsFromResponse(_ raw: JSONValue, selector: String?) -> [JSONValue]? {
+        let path = selector?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let value = path.isEmpty
+            ? raw.objectValue?["data"] ?? raw.objectValue?["entries"] ?? raw.objectValue?["Rows"] ?? raw.objectValue?["rows"] ?? raw
+            : selectValue(raw, selector: path)
+        return value?.arrayValue
     }
 
     private func buildDatasourceFetchInputs(

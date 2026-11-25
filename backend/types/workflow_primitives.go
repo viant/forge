@@ -94,7 +94,20 @@ type PrimitiveSelection struct {
 	None         map[string]interface{} `json:"none,omitempty" yaml:"none,omitempty"`
 }
 
+// SelectionPreparation reads an operation's selected records before opening its draft dialog.
+type SelectionPreparation struct {
+	DataSourceRef string            `json:"dataSourceRef" yaml:"dataSourceRef"`
+	IDsParameter  string            `json:"idsParameter" yaml:"idsParameter"`
+	IdentityField string            `json:"identityField" yaml:"identityField"`
+	ScopeFields   map[string]string `json:"scopeFields,omitempty" yaml:"scopeFields,omitempty"`
+	MappingRef    string            `json:"mappingRef,omitempty" yaml:"mappingRef,omitempty"`
+	Prepare       string            `json:"prepare" yaml:"prepare"`
+	PendingField  string            `json:"pendingField,omitempty" yaml:"pendingField,omitempty"`
+	ErrorField    string            `json:"errorField,omitempty" yaml:"errorField,omitempty"`
+}
+
 type EditableCollectionOperation struct {
+	PrepareSelection  *SelectionPreparation  `json:"prepareSelection,omitempty" yaml:"prepareSelection,omitempty"`
 	Icon              string                 `json:"icon,omitempty" yaml:"icon,omitempty"`
 	HideLabel         *bool                  `json:"hideLabel,omitempty" yaml:"hideLabel,omitempty"`
 	AriaLabel         string                 `json:"ariaLabel,omitempty" yaml:"ariaLabel,omitempty"`

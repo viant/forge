@@ -679,7 +679,7 @@ private fun commandKey(windowId: String, command: MutationCommandDef): String =
 
 private fun transportKey(windowId: String, dataSourceRef: String): String = "$windowId::$dataSourceRef"
 
-private fun mutationTargetParameters(envelope: Map<String, Any?>): Map<String, Any?> {
+internal fun mutationTargetParameters(envelope: Map<String, Any?>): Map<String, Any?> {
     val input = JsonUtil.asStringMap(envelope["input"])
     val inputParameters = JsonUtil.asStringMap(input["parameters"])
     if (inputParameters.isNotEmpty()) return inputParameters

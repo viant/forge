@@ -485,7 +485,7 @@ extension ForgeRuntime {
                 }
             }
             guard live.allows(operation.root.validateWhen), live.allows(operation.footer?.visibleWhen) else { return false }
-            return !(operation.footer?.disabledWhen.map(live.allows) ?? false)
+            return !(operation.footer?.disabledWhen.map { live.allows($0) } ?? false)
         }
         if !compensating && (begin || ordered) {
             guard await presentationIsCurrent(operation) else { throw scopeFailure() }
@@ -627,7 +627,7 @@ extension ForgeRuntime {
         return warnings
     }
 
-    private func mutationScope(windowID: String, source: String) async -> MutationScope? {
+    func mutationScope(windowID: String, source: String) async -> MutationScope? {
         guard let metadata = await windowMetadata(id: windowID) else { return nil }
         return MutationScope(windowKey: metadata.windowKey ?? windows.first(where: { $0.id == windowID })?.key ?? "",
             identity: WindowIdentity(windowID: windowID), source: source, metadata: metadata,
@@ -643,7 +643,7 @@ extension ForgeRuntime {
         guard let scope = await mutationScope(windowID: windowID, source: sourceDataSourceRef) else { return actions.map { _ in (false,true) } }
         return actions.map { action in
             let visible = scope.allows(action.visibleWhen)
-            return (visible, !visible || (action.disabledWhen.map(scope.allows) ?? false) || !scope.allows(action.mutationCommand?.validateWhen))
+            return (visible, !visible || (action.disabledWhen.map { scope.allows($0) } ?? false) || !scope.allows(action.mutationCommand?.validateWhen))
         }
     }
 
@@ -661,7 +661,7 @@ extension ForgeRuntime {
     }
 }
 
-private struct MutationScope: Sendable {
+struct MutationScope: Sendable {
     let windowKey: String
     let identity: WindowIdentity
     let source: String
@@ -669,13 +669,13 @@ private struct MutationScope: Sendable {
     var windowForm: [String: JSONValue]
     let read: @Sendable (String) -> RegisteredDataSourceSnapshot?
 
-    private func snapshot(_ ref: String) -> RegisteredDataSourceSnapshot? {
+    func snapshot(_ ref: String) -> RegisteredDataSourceSnapshot? {
         guard metadata.dataSources[ref] != nil else { return nil }
         return read(identity.dataSourceID(ref: ref)) ?? RegisteredDataSourceSnapshot(input: .init(), control: .init(),
             form: [:], selection: .init(), collection: nil, metrics: [:])
     }
 
-    func allows(_ condition: DashboardConditionDef?) -> Bool {
+    func allows(_ condition: DashboardConditionDef?, row: [String: JSONValue]? = nil) -> Bool {
         DashboardRuntime.evaluateDashboardCondition(condition, valueForCondition: { node in
             let path = node.field ?? node.selector ?? node.key ?? ""
             let value: JSONValue
@@ -691,7 +691,7 @@ private struct MutationScope: Sendable {
                 case "input": value = .object(["filter":.object(state.input.filter),"parameters":.object(state.input.parameters),"page":state.input.page.map{.number(Double($0))} ?? .null])
                 case "metrics": value = .object(state.metrics)
                 case "collection": value = .array((state.collection ?? []).map(JSONValue.object))
-                default: value = .object(state.form)
+                default: value = .object(row ?? state.form)
                 }
             }
             return resourceResolveValue(value, path: path)?.anyValue
@@ -712,13 +712,41 @@ private struct MutationScope: Sendable {
         ])
     }
 
-    private func invoke(_ name: String, props: [String: JSONValue]) throws -> JSONValue? {
+    private func preparationSignal(_ key: String) -> JSONValue? {
+        switch key {
+        case "authorization": return .object(metadata.authorizationSnapshot)
+        case "windowForm": return .object(windowForm)
+        default:
+            guard let state = snapshot(source) else { return nil }
+            switch key {
+            case "form": return .object(state.form)
+            case "input": return .object(["parameters":.object(state.input.parameters),"filter":.object(state.input.filter),
+                                          "page":state.input.page.map{.number(Double($0))} ?? .null])
+            case "selection": return .object(["selected":state.selection.selected.map(JSONValue.object) ?? .null,
+                                               "selection":.array(state.selection.selection.map(JSONValue.object)),"rowIndex":.number(Double(state.selection.rowIndex))])
+            default: return nil
+            }
+        }
+    }
+
+    func invoke(_ name: String, props: [String: JSONValue], selectionPreparation: Bool = false) throws -> JSONValue? {
         guard let code = metadata.actions?.code, !code.isEmpty else { throw MutationRuntimeError.message("Action module is unavailable: \(name)") }
         let result = try UIActionProjection.invoke(code: code, function: name, namespace: metadata.actionNamespace(for: name),
-            source: source, snapshots: [:], windowForm: windowForm, props: props, authorization: metadata.authorizationSnapshot, windowKey: windowKey,
-            aliases: ([metadata.namespace].compactMap { $0 } + (metadata.actionAliases ?? [])), snapshot: { self.actionState($0) })
+            source: source, snapshots: [:], windowForm: selectionPreparation ? [:] : windowForm, props: props, authorization: selectionPreparation ? [:] : metadata.authorizationSnapshot, windowKey: windowKey,
+            aliases: ([metadata.namespace].compactMap { $0 } + (metadata.actionAliases ?? [])), selectionPreparation: selectionPreparation, snapshot: { selectionPreparation ? self.preparationSignal($0) : self.actionState($0) })
         guard result.effects.isEmpty else { throw MutationRuntimeError.message("Command preparation cannot apply UI or network effects: \(name)") }
         return result.result ?? (result.returnedValue ? .null : nil)
+    }
+
+    func resolvedParameters(_ parameters: [ParameterDef], target: String) -> [String:JSONValue] {
+        var context = ParameterResolver.ResolutionContext(identityDataSourceRef: source, windowForm: windowForm, metadata: metadata)
+        context.lookup = { ref in
+            guard let state = snapshot(ref) else { return nil }
+            return .init(selectionMode: metadata.dataSources[ref]?.selectionMode, form: state.form, metrics: state.metrics, selection: state.selection, input: state.input)
+        }
+        let resolved = ParameterResolver.resolve(parameters: parameters, context: context)
+        let envelope = resolved[target]?.objectValue ?? resolved
+        return envelope["input"]?.objectValue?["parameters"]?.objectValue ?? envelope["parameters"]?.objectValue ?? envelope
     }
 
     func parameters(command: MutationCommandDef, extras: [String: JSONValue], stepReceipts: [String: JSONValue]? = nil) throws -> [String: JSONValue] {
@@ -726,14 +754,7 @@ private struct MutationScope: Sendable {
         if stepReceipts != nil { parametersExtras.removeValue(forKey: "steps") }
         var invocationExtras = parametersExtras
         if let stepReceipts { invocationExtras["steps"] = .object(stepReceipts) }
-        var context = ParameterResolver.ResolutionContext(identityDataSourceRef: source, windowForm: windowForm, metadata: metadata)
-        context.lookup = { ref in
-            guard let state = snapshot(ref) else { return nil }
-            return .init(selectionMode: metadata.dataSources[ref]?.selectionMode, form: state.form, metrics: state.metrics, selection: state.selection, input: state.input)
-        }
-        let resolved = ParameterResolver.resolve(parameters: command.parameters, context: context)
-        let envelope = resolved[command.dataSourceRef]?.objectValue ?? resolved
-        let base = envelope["input"]?.objectValue?["parameters"]?.objectValue ?? envelope["parameters"]?.objectValue ?? envelope
+        let base = resolvedParameters(command.parameters, target:command.dataSourceRef)
         var prepared = parametersExtras
         if let payload = command.payload {
             var environment = ResourceValueEnvironment(identityDataSourceRef: source, dataSources: [:], windowForm: windowForm, extras: invocationExtras)

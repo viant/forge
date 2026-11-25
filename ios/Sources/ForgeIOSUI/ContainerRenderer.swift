@@ -138,7 +138,7 @@ public struct ContainerRenderer: View {
                 if let toolbar = container.toolbar, !toolbar.items.isEmpty {
                     containerActionToolbar(toolbar)
                 }
-                ScopedWorkflowPrimitives(runtime: runtime, window: window, container: resolvedContainer())
+                ScopedWorkflowPrimitives(runtime: runtime, window: window, container: resolvedContainer(), authorization: authorizationSnapshot)
                 renderedBody
             }
         }

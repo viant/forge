@@ -125,7 +125,8 @@ func validateResourceModels(window *Window, validateDataSources bool) error {
 			}
 		}
 	}
-	if err := validateContainerResourceModels(window, window.View.Content, validateDataSources); err != nil {
+	validateSelection := selectionPreparationValidator(window, validateDataSources)
+	if err := validateContainerResourceModels(window, window.View.Content, validateDataSources, validateSelection); err != nil {
 		return err
 	}
 	for index := range window.Dialogs {
@@ -137,7 +138,7 @@ func validateResourceModels(window *Window, validateDataSources bool) error {
 				return fmt.Errorf("dialog %s action %s: %w", window.Dialogs[index].Id, action.ID, err)
 			}
 		}
-		if err := validateContainerResourceModels(window, window.Dialogs[index].Content, validateDataSources); err != nil {
+		if err := validateContainerResourceModels(window, window.Dialogs[index].Content, validateDataSources, validateSelection); err != nil {
 			return fmt.Errorf("dialog %s: %w", window.Dialogs[index].Id, err)
 		}
 	}
@@ -402,7 +403,7 @@ func validateAssociationDestinations(name string, schema ResourceSchema, model R
 	return nil
 }
 
-func validateContainerResourceModels(window *Window, container *Container, validateDataSources bool) error {
+func validateContainerResourceModels(window *Window, container *Container, validateDataSources bool, validateSelection func(string, *EditableCollectionOperation) error) error {
 	if container == nil {
 		return nil
 	}
@@ -418,7 +419,13 @@ func validateContainerResourceModels(window *Window, container *Container, valid
 	if container.EditableCollection != nil {
 		commands = append(commands, container.EditableCollection.Mutation)
 		for index := range container.EditableCollection.Operations {
-			commands = append(commands, container.EditableCollection.Operations[index].Mutation)
+			op := &container.EditableCollection.Operations[index]
+			if op.PrepareSelection != nil {
+				if err := validateSelection("container "+container.ID+" operation "+op.ID, op); err != nil {
+					return err
+				}
+			}
+			commands = append(commands, op.Mutation)
 		}
 	}
 	if container.AssignmentPicker != nil {
@@ -491,11 +498,11 @@ func validateContainerResourceModels(window *Window, container *Container, valid
 		}
 	}
 	for index := range container.Containers {
-		if err := validateContainerResourceModels(window, &container.Containers[index], validateDataSources); err != nil {
+		if err := validateContainerResourceModels(window, &container.Containers[index], validateDataSources, validateSelection); err != nil {
 			return err
 		}
 	}
-	if err := validateContainerResourceModels(window, container.Footer, validateDataSources); err != nil {
+	if err := validateContainerResourceModels(window, container.Footer, validateDataSources, validateSelection); err != nil {
 		return err
 	}
 	return nil

@@ -36,7 +36,9 @@ fun activeWindowDataSourceRefs(metadata: WindowMetadata, windowForm: Map<String,
     metadata.view?.content?.containers.orEmpty().forEach(::visit)
     return refs.toList()
 }
-fun reportOwnedDataSourceRefs(metadata: WindowMetadata): Set<String> {
+fun reportOwnedDataSourceRefs(metadata: WindowMetadata): Set<String> = metadata.reportReadOwners
+
+internal fun collectReportOwnedDataSourceRefs(metadata: WindowMetadata): Set<String> {
     val refs = linkedSetOf<String>()
     fun add(config: DashboardReportBuilderDef?, ref: String?) { ref?.takeIf(String::isNotBlank)?.let(refs::add); config?.dataSources.orEmpty().forEach { refs.add(it.dataSourceRef) } }
     fun visit(container: ContainerDef) {

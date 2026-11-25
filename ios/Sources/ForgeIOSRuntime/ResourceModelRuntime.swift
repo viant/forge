@@ -30,11 +30,15 @@ typealias ScopedResourceModelHook = @Sendable (_ name: String, _ phase: String, 
 
 public enum ResourceModelRuntime {
     public static func mappedCase(_ name: String, row: [String: JSONValue], metadata: WindowMetadata) throws -> ResourceMappingCase {
+        try indexedMappedCase(name, row: row, metadata: metadata).1
+    }
+
+    static func indexedMappedCase(_ name: String, row: [String: JSONValue], metadata: WindowMetadata) throws -> (String?, ResourceMappingCase) {
         guard let mapping = metadata.resourceMappings?[name] else { throw ResourceModelError.message("Unknown resource mapping: \(name)") }
         let key = mapping.selectors.lazy.compactMap { SelectorUtil.resolve(JSONValue.object(row), selector: $0) as? String }.first { !$0.isEmpty }
         guard let entry = key.flatMap({ mapping.cases[$0] }) ?? mapping.default else { throw ResourceModelError.message("No matching case for resource mapping: \(name)") }
         guard let model = metadata.resourceModels[entry.modelRef], metadata.schemas[model.schemaRef] != nil else { throw ResourceModelError.message("Invalid resource mapping model: \(entry.modelRef)") }
-        return entry
+        return (key.flatMap { mapping.cases[$0] == nil ? nil : $0 }, entry)
     }
 
     public static func unmarshal(value: JSONValue, modelRef: String, schemas: [String: ResourceSchemaDef], models: [String: ResourceModelDef], hook: ResourceModelHook? = nil) throws -> JSONValue {
@@ -417,7 +421,7 @@ private func applyResourceCodec(_ value: JSONValue, codec: String?, trim: Bool, 
 
 private func resourceNumber(_ value: JSONValue) -> Double? { switch value { case .number(let value): return value; case .string(let value): return Double(value); default: return nil } }
 private func resourceResolve(_ object: [String: JSONValue], path: String) -> JSONValue? { resourceResolveValue(.object(object), path: path) }
-func resourceResolveValue(_ value: JSONValue, path: String) -> JSONValue? {
+package func resourceResolveValue(_ value: JSONValue, path: String) -> JSONValue? {
     if path.isEmpty { return value }
     return resourceResolveValue(value, components: path.split(separator: "."))
 }

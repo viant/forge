@@ -37,6 +37,7 @@ class DataSourceRuntime(
     private val preparedCompletions = java.util.concurrent.ConcurrentHashMap<String, PreparedCompletion>()
     private val jobs = mutableMapOf<String, Job>()
     private val registeredContexts = java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.ConcurrentHashMap<String, DataSourceContext>>()
+    internal fun registeredSource(windowId: String, ref: String) = registeredContexts[windowId]?.get(ref)
     fun registeredWindowContexts(windowId: String): Map<String, DataSourceContext> = registeredContexts[windowId]?.toMap().orEmpty()
     private val parameterResolver = ParameterResolver()
     private var executor: ((ExecutionDef, DataSourceContext, Map<String, Any?>) -> Unit)? = null
@@ -139,6 +140,25 @@ class DataSourceRuntime(
         jobs.keys.filter { it.startsWith(windowId) }.forEach { key ->
             jobs.remove(key)?.cancel()
         }
+    }
+
+    /** Invoke the configured reader without publishing input, rows, lifecycle events, or auto-selection. */
+    internal suspend fun readSelectionRows(window: WindowContext, ref: String, parameters: Map<String, Any?>): List<Map<String, Any?>> {
+        val metadata = window.metadata.peek() ?: error("Window metadata is unavailable.")
+        val definition = metadata.dataSources[ref] ?: error("Selection reader is unavailable: $ref")
+        require(ref !in reportOwnedDataSourceRefs(metadata)) { "This reader requires report admission." }
+        val request = DataSourceContext(window.captureRequest(window.peekWindowForm(), metadata), ref, definition,
+            Signal(emptyList()), Signal(emptyMap()), Signal(SelectionState()), Signal(InputState(parameters = parameters)),
+            Signal(ControlState()), Signal(emptyMap()), { _, _ -> })
+        val loader = collectionLoader?.invoke(request)
+        val rows = if (loader != null) loader.rows else {
+            val binding = buildRequest(request, suppliedInputs = parameters) ?: error("No physical selection reader is configured: $ref")
+            val response = executeRequest(definition.service?.endpoint, binding, requireRecords = true)
+            val records = collectionValue(response, definition.selectors?.data, requireRecords = true)
+            require(records is List<*> && records.all { it is Map<*, *> }) { "The selection reader did not return an array of records." }
+            normalizeCollection(records)
+        }
+        return applyResourceModel(request, rows)
     }
 
     private suspend fun fetchCollection(live: DataSourceContext, lifecyclePath: List<String> = emptyList(), requestedInput: InputState = live.input.peek()) {
@@ -338,7 +358,7 @@ class DataSourceRuntime(
             ?: row
     }
 
-    private fun buildRequest(ctx: DataSourceContext): DataSourceRequest? {
+    private fun buildRequest(ctx: DataSourceContext, suppliedInputs: Map<String, Any?> = emptyMap()): DataSourceRequest? {
         val baseUri = ctx.dataSource.service?.uri ?: ctx.dataSource.uri ?: return null
         val method = (ctx.dataSource.service?.method ?: ctx.dataSource.method ?: "GET")
             .trim()
@@ -350,7 +370,7 @@ class DataSourceRuntime(
             DataSourceRequest(
                 method = method,
                 uri = baseUri,
-                body = buildRequestBody(ctx, baseUri)
+                body = buildRequestBody(ctx, baseUri, suppliedInputs)
             )
         }
     }
@@ -408,9 +428,10 @@ class DataSourceRuntime(
         return baseUri + separator + encoded
     }
 
-    private fun buildRequestBody(ctx: DataSourceContext, baseUri: String): String {
+    private fun buildRequestBody(ctx: DataSourceContext, baseUri: String, suppliedInputs: Map<String, Any?>): String {
         val payload = if (isDatasourceFetchRoute(baseUri)) {
-            mapOf("inputs" to buildDatasourceFetchInputs(ctx))
+            val inputs = buildDatasourceFetchInputs(ctx)
+            mapOf("inputs" to if (suppliedInputs.isEmpty()) inputs else inputs + suppliedInputs)
         } else {
             buildBodyParameters(ctx)
         }
@@ -554,6 +575,7 @@ class DataSourceRuntime(
         }
         val possibleRef = location.substring(0, dotIndex)
         val metadata = ctx.window.metadata.peek()
+        if (possibleRef == ctx.dataSourceRef) return ctx to location.substring(dotIndex + 1)
         if (metadata?.dataSources?.containsKey(possibleRef) == true) {
             return ctx.window.context(possibleRef) to location.substring(dotIndex + 1)
         }

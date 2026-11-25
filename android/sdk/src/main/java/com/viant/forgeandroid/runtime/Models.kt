@@ -42,6 +42,8 @@ data class WindowMetadata(
     val actionAliases: List<String> = emptyList(),
     val windowKey: String? = null
 ) {
+    internal val dialogIndex by lazy { buildMap { dialogs.forEach { dialog -> dialog.id?.let { putIfAbsent(it, dialog) } } } }
+    internal val reportReadOwners by lazy { collectReportOwnedDataSourceRefs(this) }
     fun actionNamespace(handler: String): String? {
         if (!namespace.isNullOrBlank() && handler.startsWith("$namespace.")) return namespace
         return actionAliases.firstOrNull { it.isNotBlank() && handler.startsWith("$it.") }
@@ -70,6 +72,8 @@ data class ResourceMappingUploadDef(
     val emptyMessage: String? = null,
     val replaceConfirmation: String? = null,
     val retainOnSuccess: Boolean? = null,
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    @kotlinx.serialization.EncodeDefault
     val upload: MutationCommandDef? = null
 )
 

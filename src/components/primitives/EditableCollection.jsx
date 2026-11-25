@@ -14,6 +14,7 @@ import {
   mutationCommandTargetParameters,
 } from './editableCollectionModel.js';
 import MutationCommand from './MutationCommand.jsx';
+import {openPreparedSelection, prepareDialogSources} from './prepareSelection.js';
 import {permissionBoundaryAllows, permissionBoundaryAllowsRows} from './PermissionBoundary.jsx';
 import DisabledActionShell from '../DisabledActionShell.jsx';
 import ForgeButton from '../Button.jsx';
@@ -36,24 +37,31 @@ export default function EditableCollection({sizingMode = 'fill', container, cont
   const operationToolbar = themeId === 'design-system-2' && themedTable?.presentation === 'list-page'
     ? themedTable.operationToolbar : null;
   for (const operation of operations) {
+    if (operation.prepareSelection) prepareDialogSources(dataContext.metadata);
     trackVisibleWhen(operation.visibleWhen, dataContext);
     trackVisibleWhen(operation.disabledWhen, dataContext);
     trackVisibleWhen((operation.selection || spec.selection)?.disabledWhen, dataContext);
   }
   const selectedRows = editableCollectionRows(selection);
 
-  const operationState = (operation) => {
-    const state = editableCollectionOperationState({...operation, selection: operation.selection || spec.selection}, dataContext, selection);
+  const operationState = (operation, owner = dataContext, currentSelection = selection) => {
+    const state = editableCollectionOperationState({...operation, selection: operation.selection || spec.selection}, owner, currentSelection);
     const boundaryMode = String(container.permissionBoundary?.mode || 'resource').toLowerCase();
     const selectionPermitted = !container.permissionBoundary || (boundaryMode === 'resource'
-      ? permissionBoundaryAllows(container.permissionBoundary, dataContext)
-      : permissionBoundaryAllowsRows(container.permissionBoundary, dataContext, state.rows));
+      ? permissionBoundaryAllows(container.permissionBoundary, owner)
+      : permissionBoundaryAllowsRows(container.permissionBoundary, owner, state.rows));
     return {...state, disabled: state.disabled || !selectionPermitted};
   };
 
   const invoke = (operation) => {
     const state = operationState(operation);
     if (state.disabled) return false;
+    if (operation.prepareSelection) {
+      return openPreparedSelection(dataContext, operation, owner => {
+        const live = operationState(operation, owner, owner.signals?.selection?.peek?.() || {});
+        return live.visible && !live.disabled;
+      });
+    }
     const resolved = resolveParameters(operation.parameters || [], dataContext) || {};
     const seed = {
       ...mutationCommandTargetParameters(resolved, ref),

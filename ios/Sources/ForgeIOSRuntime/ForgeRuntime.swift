@@ -138,6 +138,7 @@ public actor ForgeRuntime {
         var waiter: CheckedContinuation<[String: JSONValue]?, Never>?
     }
     private var pendingDialogs: [String: DialogPresentation] = [:]
+    var selectionPreparationOwners: [String: UUID] = [:]
     private var pendingWindows: [String: PendingWindow] = [:]
 
     public init(
@@ -588,6 +589,36 @@ public actor ForgeRuntime {
             await dataSourceRuntime.setControl(dataSourceID: dataSourceID, control: control)
             await (await signals.control(dataSourceID: dataSourceID)).set(control)
         }
+    }
+
+    func restorePreparedForm(windowID: String, draft: String, submitted: [String:JSONValue], previous: [String:JSONValue]) async {
+        let id = WindowIdentity(windowID:windowID).dataSourceID(ref:draft), signal = await signals.form(dataSourceID: id)
+        if await dataSourceRuntime.restoreForm(dataSourceID:id,ifCurrent:submitted,previous:previous) {
+            await signal.replace(submitted,with:previous)
+        }
+    }
+
+    func readPreparedSelection(windowID: String, metadata: WindowMetadata, ref: String, parameters: [String: JSONValue]) async throws -> [[String: JSONValue]] {
+        guard let source = metadata.dataSources[ref] else { throw SelectionPreparationError("Selection reader is unavailable.") }
+        let input = InputState(parameters: parameters)
+        let resolution = await buildParameterResolutionContext(windowID: windowID, metadata: metadata, identityDataSourceRef: ref, preferredInput: input)
+        let bound = ParameterResolver.resolve(parameters: source.parameters, context: resolution)
+        let inputs = bound.isEmpty ? parameters : bound
+        let fence = try await validatedReportFetchFence(windowID:windowID,dataSourceRef:ref,parameters:parameters)
+        guard await reportFetchFenceIsCurrent(fence,windowID:windowID) else { throw SelectionPreparationError("The selection read is no longer authorized.") }
+        if let dataSourceLoader, let result = try await dataSourceLoader(DataSourceFetchRequest(windowID: windowID, dataSourceRef: ref, dataSource: source,
+            input: input, resolvedInputs: inputs, conversationID: windows.first { $0.id == windowID }?.conversationID)) {
+            guard await reportFetchFenceIsCurrent(fence,windowID:windowID) else { throw SelectionPreparationError("The selection read is no longer authorized.") }
+            return result.rows
+        }
+        guard !fence.required else { throw SelectionPreparationError("A prepared report requires its native datasource loader.") }
+        guard let baseURL = defaultDataSourceBaseURL, let path = source.service?.uri ?? source.uri else { throw URLError(.resourceUnavailable) }
+        let response = try await dataSourceRuntime.requestCollection(input: input, baseURL: baseURL.absoluteString, path: path,
+            method: source.service?.method ?? source.method ?? "GET", staticParameters: source.params, inputParameters: inputs, paging: source.paging,
+            additionalHeaders: [:], session: session)
+        guard let records = await dataSourceRuntime.invocationRecordsFromResponse(response, selector: source.selectors?.data),
+              records.allSatisfy({ $0.objectValue != nil }) else { throw SelectionPreparationError("Selection reader returned invalid records.") }
+        return records.compactMap(\.objectValue)
     }
 
     public func setDataSourceMetrics(windowID: String, dataSourceRef: String, values: [String: JSONValue]) async {
@@ -1152,8 +1183,9 @@ public actor ForgeRuntime {
         parameters: [String: JSONValue],
         selectionMode: String? = nil,
         outbound: PendingDialog? = nil,
-        waiter: CheckedContinuation<[String: JSONValue]?, Never>? = nil
-    ) async -> UUID {
+        waiter: CheckedContinuation<[String: JSONValue]?, Never>? = nil,
+        expected: DialogState? = nil
+    ) async -> UUID? {
         let key = "\(windowID)Dialog\(dialogID)"
         let sig = await signals.dialog(dialogID: key)
         if !parameters.isEmpty, let dialog = await windowMetadata(id: windowID)?.dialogs.first(where: { $0.id == dialogID }),
@@ -1162,6 +1194,7 @@ public actor ForgeRuntime {
             await setDataSourceInputParameters(windowID: windowID, dataSourceRef: ref,
                 parameters: scoped?.isEmpty == false ? scoped! : parameters, preservePendingFetch: false)
         }
+        if let expected, await sig.peek() != expected || pendingDialogs[key]?.id != nil { return nil }
         var presentation = DialogState(open: true, selectionMode: selectionMode, props: parameters, args: parameters)
         let id = UUID()
         presentation.presentationID = id

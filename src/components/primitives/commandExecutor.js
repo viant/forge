@@ -4,7 +4,7 @@ import {evaluateCondition} from '../../utils/evaluateCondition.js';
 import {resolveSelector, resolveSelectorParts} from '../../utils/selector.js';
 import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
 import {applyPrimitiveState, mutationCommandTargetParameters, reconcileEditableCollection} from './editableCollectionModel.js';
-import {prepareResourcePayload} from './resourceModel.js';
+import {prepareResourcePayload, snapshotResourceValue as parameterSnapshot} from './resourceModel.js';
 import {formatDataSourceError} from '../../utils/dataSourceError.js';
 import {findDialogSignal, protectedWindowEpoch} from '../../core/store/signals.js';
 
@@ -220,12 +220,6 @@ function notifyLifecycle(lifecycle, name, payload) {
   try { lifecycle?.[name]?.(payload); } catch (_) { /* observers cannot change terminal state */ }
 }
 
-function parameterSnapshot(value) {
-  if (!value || typeof value !== 'object') return value;
-  if (typeof globalThis.structuredClone === 'function') return globalThis.structuredClone(value);
-  return JSON.parse(JSON.stringify(value));
-}
-
 export function mergeCommandParameters(base, prepared) {
   if (!base || typeof base !== 'object' || Array.isArray(base)) return parameterSnapshot(prepared);
   if (!prepared || typeof prepared !== 'object' || Array.isArray(prepared)) return parameterSnapshot(prepared ?? base);
@@ -287,7 +281,7 @@ function frozenCopy(value) {
 
 // Only the values this invocation actually installed may hide its own guard.
 // Other edits and live permission, selection and capacity predicates remain visible.
-function pendingValidationContext(context, patch, original) {
+export function pendingValidationContext(context, patch, original) {
   if (!patch || !Object.keys(patch).length || !context.signals?.windowForm) return context;
   const windowForm = context.signals.windowForm;
   const peek = () => {

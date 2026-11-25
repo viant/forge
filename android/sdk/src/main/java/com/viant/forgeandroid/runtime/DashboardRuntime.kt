@@ -1384,10 +1384,12 @@ fun evaluateDashboardCondition(
     collection: List<Map<String, Any?>> = emptyList(),
     input: Map<String, Any?> = emptyMap(),
     selectionValues: Map<String, Any?> = emptyMap(),
-    authorization: Map<String, Any?> = emptyMap()
+    authorization: Map<String, Any?> = emptyMap(),
+    row: Map<String, Any?>? = null
 ): Boolean {
     return evaluateConditionTree(condition, record = null) { node, selector ->
-        resolveDashboardValue(node.source, selector, metrics, filters, selection, form, windowForm,
+        if (row != null && node.source.equals("row", ignoreCase = true)) SelectorUtil.resolve(row, selector)
+        else resolveDashboardValue(node.source, selector, metrics, filters, selection, form, windowForm,
             collection, input, selectionValues, authorization)
     }
 }
@@ -1984,7 +1986,7 @@ private fun dashboardGeoMapNumber(row: Map<String, Any?>, selector: String): Dou
     }
 }
 
-private fun conditionNumber(value: Any?): Double? {
+internal fun conditionNumber(value: Any?): Double? {
     // Decimal form text excludes JVM suffixes and hexadecimal floating-point literals.
     val scalar = if (value is JsonPrimitive) JsonUtil.elementToAny(value) else value
     return when (scalar) {

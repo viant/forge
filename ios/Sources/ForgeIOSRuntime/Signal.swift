@@ -49,6 +49,14 @@ extension Signal where Value == DialogState {
     /// A completed command may dismiss only the presentation that accepted it.
     func dismiss(presentationID: UUID?) -> DialogState? {
         if let presentationID, value.presentationID != presentationID || !value.open { return nil }
-        return exchange(DialogState(open: false))
+        var closed = DialogState(open: false)
+        closed.lastClosedPresentationID = value.presentationID ?? value.lastClosedPresentationID
+        return exchange(closed)
+    }
+}
+
+extension Signal where Value: Equatable {
+    func replace(_ expected: Value, with replacement: Value) {
+        if value == expected { set(replacement) }
     }
 }

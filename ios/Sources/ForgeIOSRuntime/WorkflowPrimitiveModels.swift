@@ -317,9 +317,10 @@ public struct EditableCollectionOperationSpec: Codable, Sendable, Identifiable {
     public let visibleWhen: DashboardConditionDef?
     public let disabledWhen: DashboardConditionDef?
     public let parameters: [ParameterDef]?
+    public let prepareSelection: SelectionPreparationDef?
     public let mutation: MutationCommandDef?
 
-    public init(id: String, label: String, tooltip: String? = nil, intent: String? = nil, dialogId: String? = nil, handler: String? = nil, requiresSelection: Bool? = nil, selection: PrimitiveSelectionSpec? = nil, visibleWhen: DashboardConditionDef? = nil, disabledWhen: DashboardConditionDef? = nil, parameters: [ParameterDef]? = nil, mutation: MutationCommandDef? = nil) {
+    public init(id: String, label: String, tooltip: String? = nil, intent: String? = nil, dialogId: String? = nil, handler: String? = nil, requiresSelection: Bool? = nil, selection: PrimitiveSelectionSpec? = nil, visibleWhen: DashboardConditionDef? = nil, disabledWhen: DashboardConditionDef? = nil, parameters: [ParameterDef]? = nil, mutation: MutationCommandDef? = nil, prepareSelection: SelectionPreparationDef? = nil) {
         self.id = id
         self.label = label
         self.tooltip = tooltip
@@ -331,6 +332,7 @@ public struct EditableCollectionOperationSpec: Codable, Sendable, Identifiable {
         self.visibleWhen = visibleWhen
         self.disabledWhen = disabledWhen
         self.parameters = parameters
+        self.prepareSelection = prepareSelection
         self.mutation = mutation
     }
 }

@@ -10,6 +10,7 @@ struct WorkflowPresentationPrimitives: View {
     let metrics: [String: JSONValue]
     let windowForm: [String: JSONValue]
     let selection: SelectionState
+    let authorization: [String:JSONValue]
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
@@ -388,13 +389,8 @@ struct WorkflowPresentationPrimitives: View {
     }
 
     private func conditionAllows(_ condition: DashboardConditionDef?, row: [String: JSONValue]? = nil) -> Bool {
-        DashboardRuntime.evaluateDashboardCondition(
-            condition,
-            metrics: metrics.mapValues(primitiveAnyValue),
-            form: (row ?? form).mapValues(primitiveAnyValue),
-            windowForm: windowForm.mapValues(primitiveAnyValue),
-            collection: collection.map { $0.mapValues(primitiveAnyValue) }
-        )
+        workflowConditionAllows(condition, row:row, form:form, metrics:metrics, windowForm:windowForm,
+                                collection:collection, authorization:authorization)
     }
 
     private func operationVisible(_ operation: EditableCollectionOperationSpec) -> Bool {
@@ -422,7 +418,9 @@ struct WorkflowPresentationPrimitives: View {
         ]
         let dataSourceRef = spec.dataSourceRef ?? container.dataSourceRef ?? ""
         Task {
-            if let handler = operation.handler {
+            if operation.prepareSelection != nil {
+                _ = await runtime.prepareEditableSelection(windowID: window.windowID, sourceDataSourceRef: dataSourceRef, collection: spec, operation: operation, boundary: container.permissionBoundary)
+            } else if let handler = operation.handler {
                 _ = await runtime.execute(ExecutionDef(action: handler), context: ExecutionContext(windowID: window.windowID, dataSourceRef: dataSourceRef), args: args)
             } else if let dialogId = operation.dialogId {
                 _ = await runtime.execute(ExecutionDef(action: "window.openDialog", args: [dialogId]), context: ExecutionContext(windowID: window.windowID, dataSourceRef: dataSourceRef), args: args)
@@ -600,6 +598,24 @@ struct MutationCommandButton: View {
         return await runtime.executeMutationCommand(windowID: window.windowID, sourceDataSourceRef: sourceDataSourceRef,
             command: command, extras: extras, confirm: confirmation)
     }
+}
+
+func workflowConditionAllows(_ condition: DashboardConditionDef?, row: [String: JSONValue]? = nil, form: [String: JSONValue],
+                             metrics: [String: JSONValue], windowForm: [String: JSONValue], collection: [[String:JSONValue]],
+                             authorization: [String:JSONValue]) -> Bool {
+    DashboardRuntime.evaluateDashboardCondition(condition, valueForCondition: { node in
+        let value: JSONValue
+        switch node.source?.lowercased() {
+        case "row": value = .object(row ?? [:])
+        case "form": value = .object(row ?? form)
+        case "windowform": value = .object(windowForm)
+        case "authorization": value = .object(authorization)
+        case "collection": value = .array(collection.map(JSONValue.object))
+        case "selection", "input", "filters", "filter": value = .object([:])
+        default: value = .object(metrics)
+        }
+        return resourceResolveValue(value,path:node.selector ?? node.field ?? node.key ?? "").map(primitiveAnyValue)
+    })
 }
 
 private func primitiveAnyValue(_ value: JSONValue) -> Any {
