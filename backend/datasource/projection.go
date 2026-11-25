@@ -4,6 +4,8 @@ package datasource
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/viant/forge/backend/types"
@@ -13,13 +15,16 @@ import (
 // (rows, dataInfo, metrics). Rows are always []map[string]interface{}.
 func project(raw interface{}, ds *types.DataSource) ([]map[string]interface{}, map[string]interface{}, map[string]interface{}) {
 	rowsRaw := raw
+	var rowPath string
 	var dataInfo map[string]interface{}
 	var metrics map[string]interface{}
 	if ds != nil && ds.Selectors != nil {
 		if ds.Selectors.Data != "" {
-			rowsRaw = selectPath(ds.Selectors.Data, raw)
+			rowPath = ds.Selectors.Data
 			if len(ds.Selectors.DataFallbacks) > 0 {
-				rowsRaw = selectDataPath(ds.Selectors.Data, ds.Selectors.DataFallbacks, raw)
+				rowsRaw, rowPath = selectDataPathWithSelector(ds.Selectors.Data, ds.Selectors.DataFallbacks, raw)
+			} else {
+				rowsRaw = selectPath(rowPath, raw)
 			}
 			if len(ds.Selectors.DataFallbacks) == 0 && rowsRaw == nil && strings.EqualFold(strings.TrimSpace(ds.Selectors.Data), "data") {
 				switch raw.(type) {
@@ -31,6 +36,14 @@ func project(raw interface{}, ds *types.DataSource) ([]map[string]interface{}, m
 		if ds.Selectors.DataInfo != "" {
 			if di, ok := selectPath(ds.Selectors.DataInfo, raw).(map[string]interface{}); ok {
 				dataInfo = di
+				if strings.TrimSpace(ds.Selectors.DataInfo) == "." {
+					switch rowsRaw.(type) {
+					case []interface{}, []map[string]interface{}:
+						if tokens := dataPathTokens(rowPath); len(tokens) > 0 {
+							dataInfo, _ = withoutSelectedRows(di, tokens).(map[string]interface{})
+						}
+					}
+				}
 			}
 		}
 		if ds.Selectors.Metrics != "" {
@@ -49,18 +62,23 @@ func project(raw interface{}, ds *types.DataSource) ([]map[string]interface{}, m
 // selectDataPath uses declared alternatives only when the preceding path is
 // absent. An explicitly present nil, empty array, false or zero wins.
 func selectDataPath(primary string, fallbacks []string, root interface{}) interface{} {
+	value, _ := selectDataPathWithSelector(primary, fallbacks, root)
+	return value
+}
+
+func selectDataPathWithSelector(primary string, fallbacks []string, root interface{}) (interface{}, string) {
 	for _, path := range append([]string{primary}, fallbacks...) {
 		if value, present := lookupDataPath(path, root); present {
-			return value
+			return value, path
 		}
 	}
-	return nil
+	return nil, ""
 }
 
 // lookupDataPath is scoped to opt-in data fallbacks; selectPath retains its
 // existing behavior for info/metrics and definitions without alternatives.
 func lookupDataPath(selector string, root interface{}) (interface{}, bool) {
-	norm := strings.TrimPrefix(strings.ReplaceAll(strings.ReplaceAll(strings.TrimSpace(selector), "[", "."), "]", ""), ".")
+	norm := normalizeDataPath(selector)
 	cur := root
 	for _, token := range strings.Split(norm, ".") {
 		token = strings.TrimSpace(token)
@@ -91,6 +109,53 @@ func lookupDataPath(selector string, root interface{}) (interface{}, bool) {
 		}
 	}
 	return cur, true
+}
+
+func normalizeDataPath(selector string) string {
+	return strings.TrimPrefix(strings.ReplaceAll(strings.ReplaceAll(strings.TrimSpace(selector), "[", "."), "]", ""), ".")
+}
+
+func dataPathTokens(selector string) []string {
+	norm := normalizeDataPath(selector)
+	var tokens []string
+	for _, token := range strings.Split(norm, ".") {
+		if token = strings.TrimSpace(token); token != "" {
+			tokens = append(tokens, token)
+		}
+	}
+	return tokens
+}
+
+// withoutSelectedRows copies only the path to the selected collection. Other
+// metadata remains available, and the producer response is never modified.
+func withoutSelectedRows(value interface{}, path []string) interface{} {
+	key := path[0]
+	switch node := value.(type) {
+	case map[string]interface{}:
+		result := maps.Clone(node)
+		if len(path) == 1 {
+			delete(result, key)
+		} else {
+			result[key] = withoutSelectedRows(node[key], path[1:])
+		}
+		return result
+	case []interface{}:
+		if index, ok := dataPathIndex(key, len(node)); ok {
+			result := slices.Clone(node)
+			result[index] = nil
+			if len(path) > 1 {
+				result[index] = withoutSelectedRows(node[index], path[1:])
+			}
+			return result
+		}
+	case []map[string]interface{}:
+		if index, ok := dataPathIndex(key, len(node)); ok && len(path) > 1 {
+			result := slices.Clone(node)
+			result[index], _ = withoutSelectedRows(node[index], path[1:]).(map[string]interface{})
+			return result
+		}
+	}
+	return value
 }
 
 func dataPathIndex(token string, size int) (int, bool) {

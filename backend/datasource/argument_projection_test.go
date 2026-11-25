@@ -68,6 +68,7 @@ func TestMCPArgumentProjectionKeepsLogicalScopeAndEnvelope(t *testing.T) {
 		out, err := service.Fetch(ctx, source.ID, inputs, FetchOptions{})
 		require.NoError(t, err)
 		require.Equal(t, float64(7), out.Rows[0]["amount"])
+		require.NotContains(t, out.DataInfo, "data")
 		require.Equal(t, false, out.DataInfo["hasMore"])
 		require.Equal(t, true, out.DataInfo["truncated"])
 		require.Equal(t, false, out.DataInfo["complete"])
@@ -83,6 +84,8 @@ func TestMCPArgumentProjectionKeepsLogicalScopeAndEnvelope(t *testing.T) {
 	out, err := service.Fetch(ctx, source.ID, projectionInputs(2), FetchOptions{})
 	require.NoError(t, err)
 	require.True(t, out.Cache.Hit)
+	require.NotContains(t, out.DataInfo, "data")
+	require.Equal(t, false, out.DataInfo["hasMore"])
 	require.Len(t, executor.names, 2)
 	source.Backend.Args["cubes.0.filters"] = "inputs.query"
 	_, err = service.Fetch(ctx, source.ID, projectionInputs(2), FetchOptions{})

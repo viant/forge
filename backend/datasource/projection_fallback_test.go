@@ -30,6 +30,47 @@ func TestDataFallbackPresenceAndLegacyProjection(t *testing.T) {
 	}
 }
 
+func TestRootMetadataProjectionCopiesOnlySelectedFallbackPath(t *testing.T) {
+	selectedRows := []interface{}{map[string]interface{}{"id": 7}}
+	siblingRows := []interface{}{map[string]interface{}{"id": 8}}
+	payload := map[string]interface{}{
+		"pages": []interface{}{
+			map[string]interface{}{"rows": selectedRows, "total": 1, "hasMore": false},
+			map[string]interface{}{"rows": siblingRows, "total": 1},
+		},
+		"cursor": nil,
+	}
+	source := &types.DataSource{Selectors: &types.Selectors{
+		Data: "missing.rows", DataFallbacks: []string{"pages[0].rows"}, DataInfo: ".",
+	}}
+	rows, metadata, _ := project(payload, source)
+	wantRows := []map[string]interface{}{{"id": 7}}
+	wantMetadata := map[string]interface{}{
+		"pages": []interface{}{
+			map[string]interface{}{"total": 1, "hasMore": false},
+			map[string]interface{}{"rows": siblingRows, "total": 1},
+		},
+		"cursor": nil,
+	}
+	if !reflect.DeepEqual(rows, wantRows) || !reflect.DeepEqual(metadata, wantMetadata) {
+		t.Fatalf("projected rows or metadata changed: rows=%#v metadata=%#v", rows, metadata)
+	}
+	sourcePage := payload["pages"].([]interface{})[0].(map[string]interface{})
+	if !reflect.DeepEqual(sourcePage["rows"], selectedRows) {
+		t.Fatal("projection removed the selected rows from the source payload")
+	}
+	metadata["pages"].([]interface{})[0].(map[string]interface{})["total"] = 9
+	if sourcePage["total"] != 1 {
+		t.Fatal("projection reused a map on the selected collection path")
+	}
+
+	source.Selectors.DataInfo = "pages[0]"
+	_, metadata, _ = project(payload, source)
+	if !reflect.DeepEqual(metadata, sourcePage) {
+		t.Fatal("projection changed an explicitly selected metadata object")
+	}
+}
+
 // The opt-in cross-runtime check executes Forge itself against the same JSON
 // vectors as Core. Production builds do not depend on Node or checkout layout.
 func TestCoreForgeDeclaredFallbackEquivalence(t *testing.T) {
