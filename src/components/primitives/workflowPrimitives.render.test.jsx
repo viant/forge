@@ -43,6 +43,10 @@ includes(renderToStaticMarkup(<StatusWorkflow context={root} container={{statusW
 includes(renderToStaticMarkup(<TreeEditor context={root} container={{treeEditor: {dataSourceRef: 'tree', identityField: 'id', labelField: 'name', childrenField: 'children'}}}/>), 'Leaf');
 includes(renderToStaticMarkup(<Wizard context={root} container={{wizard: {steps: [{id: 'one', label: 'One', containerId: 'one'}]}}} renderStep={() => <div>Step content</div>}/>), 'Step content');
 includes(renderToStaticMarkup(<UploadCollection context={root} container={{uploadCollection: {accept: ['text/csv'], upload: {dataSourceRef: 'upload'}}}}/>), 'forge-upload-collection');
+for (const label of [undefined, 'Import file']) {
+  const html = renderToStaticMarkup(<UploadCollection context={root} container={{uploadCollection: {upload: {dataSourceRef: 'upload', label}}}}/>);
+  includes(html, `aria-label="${label ?? 'Upload'}"`);
+}
 includes(renderToStaticMarkup(<HistoryDiff context={root} container={{historyDiff: {dataSourceRef: 'history', beforeField: 'before', afterField: 'after'}}}/>), 'Old');
 includes(renderToStaticMarkup(<ScheduleEditor context={root} container={{scheduleEditor: {dataSourceRef: 'schedule', startField: 'start', endField: 'end'}}}/>), 'forge-schedule-editor');
 includes(renderToStaticMarkup(<PermissionBoundary context={root} container={{permissionBoundary: {capability: 'write'}}}><span>Allowed</span></PermissionBoundary>), 'Allowed');
