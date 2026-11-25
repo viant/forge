@@ -9,7 +9,7 @@ import { beginDataSourceFetch, consumeDataSourceFetchRequest, reconcileRestoredP
 import {pageSelectionPolicy, reconcileMultiSelection, reconcileSingleSelection} from "./dataSourceSelection.js";
 import {applyFetchTransform} from "./dataSourceTransform.js";
 import {hasResolvedDependencies} from "./dataSourceDependencies.js";
-import {bindingFinalizationAction, isCurrentBindingGeneration} from "./primitives/bindingGeneration.js";
+import {bindingFinalizationAction, dataSourceRequestId, isCurrentBindingGeneration} from "./primitives/bindingGeneration.js";
 import {resourceModelRefForDataSource, unmarshalResourceCollection} from "./primitives/resourceModel.js";
 import {requiresOrderedRecords, settleDataSourceRequest} from './dataSourceRequestLifecycle.js';
 import {isProtectedUpstreamDenial, isDataSourceLocalDenial} from './dataSourceAuthorization.js';
@@ -122,7 +122,7 @@ export default function DataSource({context}) {
         : typeof structuredClone === "function" ? structuredClone(value) : JSON.parse(JSON.stringify(value));
 
     const handleUpstream = () => {
-        const requestId = input.peek()?.bindingGeneration || input.peek()?.invocationId;
+        const requestId = dataSourceRequestId(input.peek());
         const parentControl = upstreamContext?.signals?.control?.peek?.() || {};
         if (parentControl.loading || (parentControl.stale && !parentControl.error) || (!upstream?.peek?.()?.selected && !parentControl.loaded && !parentControl.error && !parentControl.inactive)) {
             if (!control.peek()?.loading) setLoading(true);
@@ -496,7 +496,7 @@ export default function DataSource({context}) {
         const inputVal = input.value || {};
         let {page, filter = {}, parameters, sort = [], cache = null, invocationId = null, bindingGeneration = null} = inputVal || {};
         const requestPaging = withPagingSize(paging, inputVal.pageSize);
-        const requestId = bindingGeneration || invocationId;
+        const requestId = dataSourceRequestId(inputVal);
         const requestDataSourceId = context?.identity?.dataSourceId;
         const orderedRecords = requiresOrderedRecords(requestDataSourceId, requestId);
         let receivedResponse = false;

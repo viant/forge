@@ -2,7 +2,8 @@
 // commands and direct datasource dispatches never enter it.
 const pendingReads = new WeakMap();
 let sequence = 0;
-export function sharedReadRequestId() { return `projection-read-${++sequence}`; }
+export function nextDataSourceReadId(kind) { return `${kind}-${++sequence}`; }
+export function sharedReadRequestId() { return nextDataSourceReadId('projection-read'); }
 export function pendingSharedRead(owner, signature, requestId) {
     const pending = pendingReads.get(owner);
     return pending?.signature === signature && pending.requestId === requestId ? pending.promise : null;

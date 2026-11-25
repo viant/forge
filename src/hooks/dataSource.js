@@ -16,7 +16,8 @@ import {resolveParameters} from './parameters.js';
 import {isDataSourceLocalDenial, isWindowAuthorizationFailure} from '../components/dataSourceAuthorization.js';
 import { normalizeDataSourceError } from '../utils/dataSourceError.js';
 import {beginDataSourceRequest, settleDataSourceRequest} from '../components/dataSourceRequestLifecycle.js';
-import {pendingSharedRead, registerSharedRead, sharedReadRequestId} from '../components/dataSourceSharedRead.js';
+import {pendingSharedRead, registerSharedRead, sharedReadRequestId, nextDataSourceReadId} from '../components/dataSourceSharedRead.js';
+import {dataSourceRequestId, isDependencyGeneration} from '../components/primitives/bindingGeneration.js';
 import {snapshotFilter} from '../components/dataSourceFetchState.js';
 
 function isPlainObject(value) {
@@ -32,7 +33,7 @@ export function buildFetchCollectionSignal(current = {}, props = {}) {
         fetch: true,
         cache,
         invocationId,
-        bindingGeneration,
+        bindingGeneration: bindingGeneration ?? (isDependencyGeneration(current?.bindingGeneration) ? current.bindingGeneration : null),
         ...(formSynchronization ? {formSynchronization} : {}),
     };
 }
@@ -324,7 +325,8 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector,
                 dependencyInputs[depRef] = depInput
             }
             // Prepare new param values (start with existing to avoid nuking others)
-            const newParamValues = {...(depInput.peek().parameters || {})};
+            const previousInput = depInput.peek() || {};
+            const newParamValues = {...(previousInput.parameters || {})};
 
             // Decide mapping strategy – compact/new if any param uses colon syntax
             const useCompact = depParameters.some((p) => (p.from && p.from.includes(':')) || (p.to && p.to.includes(':')));
@@ -355,11 +357,22 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector,
             const hasAnyParam = Object.values(newParamValues).some((v) => v != null && v !== '');
             const newFetchVal = !!record && hasAnyParam;
 
-            // Update child's input
+            // A local projection follows its parent's publication and owns its own shared read.
+            if (dataSources[depRef]?.dataSourceRef) {
+                depInput.value = {...previousInput, fetch: newFetchVal, parameters: newParamValues};
+                return;
+            }
+            const kind = newFetchVal ? 'selection-dependency-bound' : 'selection-dependency-empty';
+            if (previousInput.bindingGeneration?.toString().startsWith(kind + '-') && equal(previousInput.parameters, newParamValues)) return;
+            const previousRequest = dataSourceRequestId(previousInput);
+            if (previousRequest && (previousInput.fetch || previousInput.refresh)) {
+                const error = Object.assign(new Error('Datasource inputs changed before dispatch.'), {code: 'request_superseded'});
+                settleDataSourceRequest(identity.getDataSourceId(depRef), previousRequest, error);
+            }
+            const {appendPage, formSynchronization, ...baseInput} = previousInput;
             depInput.value = {
-                ...depInput.peek(),
-                fetch: newFetchVal,
-                parameters: newParamValues,
+                ...baseInput, parameters: newParamValues, fetch: newFetchVal, refresh: false, page: 1,
+                cache: null, invocationId: null, bindingGeneration: nextDataSourceReadId(kind),
             };
         });
     }
@@ -1041,12 +1054,12 @@ const setWindowFormData = ({values = {}, parameters = {}, replace = false, bumpP
                 page: newValue.page, pageSize: newValue.pageSize, sort: newValue.sort, cache: newValue.cache,
                 service: dataSource.service, backend: dataSource.backend,
                 windowEpoch: protectedWindowEpoch(identity?.windowId), datasetEpoch: protectedDataSourceEpoch(identity?.dataSourceId)}));
-            const pending = pendingSharedRead(input, sharedSignature, previous.bindingGeneration || previous.invocationId);
+            const pending = pendingSharedRead(input, sharedSignature, dataSourceRequestId(previous));
             if (pending) return pending;
             newValue.invocationId = newValue.invocationId || sharedReadRequestId();
         }
-        const previousRequestId = previous.bindingGeneration || previous.invocationId;
-        const requestId = newValue.bindingGeneration || newValue.invocationId;
+        const previousRequestId = dataSourceRequestId(previous);
+        const requestId = dataSourceRequestId(newValue);
         if (previousRequestId && requestId && String(previousRequestId) !== String(requestId)) {
             const superseded = new Error('Datasource request was superseded before completion.');
             superseded.code = 'request_superseded';
