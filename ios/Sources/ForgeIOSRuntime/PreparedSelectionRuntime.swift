@@ -89,8 +89,9 @@ private func projectedCases(_ rows: [SelectionRecord], mappingRef: String?, draf
     ]
     guard let ref = mappingRef, !ref.isEmpty else { return result }
     guard let mapping = metadata.resourceMappings?[ref] else { throw SelectionPreparationError("Unknown resource mapping: " + ref) }
+    let header = raw?["resourceMappings"]?.objectValue?[ref]?.objectValue
     result["mapping"] = .object([
-        "fieldOrder": .array((mapping.fieldOrder ?? []).map(JSONValue.string)), "uploads": try encodedResource(mapping.uploads ?? [:]),
+        "fieldOrder": .array((mapping.fieldOrder ?? []).map(JSONValue.string)), "uploads": try header?["uploads"] ?? encodedResource(mapping.uploads ?? [:]),
     ])
     var seen: [String?: Int] = [:]
     var descriptors: [JSONValue] = []

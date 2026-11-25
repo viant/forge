@@ -17,6 +17,7 @@ final class PreparedSelectionTests: XCTestCase {
                 if (context.signals.form.peek().unrelated || context.authorization.principal.subject !== 'editor') throw Error('Wrong source state');
                 if (!invocationId || parameters.owner !== '0007' || mapping.fieldOrder.join(',') !== 'caption' || Object.hasOwn(mapping,'cases'))
                     throw Error('Invalid preparation envelope');
+                if (mapping.uploads.text.upload !== null) throw Error('Missing explicit null on the declared upload');
                 if (descriptors.length !== 2 || rowCases.join(',') !== '0,1,0') throw Error('Duplicate or unordered mapped case');
                 if (descriptors[0].modelRef !== 'note' || descriptors[1].values.format !== 'other' || !descriptors[0].schema.properties.caption)
                     throw Error('Expected only selected descriptors');
@@ -41,6 +42,7 @@ final class PreparedSelectionTests: XCTestCase {
             ],
             "resourceMappings": [
                 "noteTypes": [
+                    "uploads": ["text": ["accept": [".txt"], "upload": NSNull()]],
                     "selectors": ["primary.kind", "kind"], "fieldOrder": ["caption"],
                     "cases": ["known": ["modelRef": "note", "values": ["format": "normal"]]],
                     "default": ["modelRef": "note", "values": ["format": "other"]],
