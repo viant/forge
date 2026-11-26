@@ -178,17 +178,17 @@
 }
 :is(.agently-workspace, .agently-application) .bp6-date-input-popover > .bp6-popover-content {
     overflow: hidden;
-    background: var(--forge-surface-raised, var(--forge-surface));
-    color: var(--forge-text);
+    background: var(--forge-surface-raised, var(--forge-surface, var(--bp-surface-background-color-default-rest, Canvas)));
+    color: var(--forge-text, var(--bp-typography-color-default-rest, CanvasText));
 }
 :is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .bp6-date-input-popover .bp6-popover-arrow { display: none; }
 :is(.agently-workspace[data-forge-theme="design-system-2"], .agently-application[data-agently-theme="design-system-2"]) .bp6-date-input-popover { max-width: min(320px, calc(100dvw - 24px)); }
 /* Native calendar dialogs follow the selected theme, even when the OS prefers Dark. */
-:is(.agently-workspace[data-forge-theme="design-system-2"][data-forge-color-mode="light"], .agently-application[data-agently-theme="design-system-2"][data-agently-color-mode="light"]) :is(input[type="date"], input[type="datetime-local"], input[type="month"], input[type="week"], .bp6-date-input-popover) { color-scheme: light; }
-:is(.agently-workspace[data-forge-theme="design-system-2"][data-forge-color-mode="dark"], .agently-application[data-agently-theme="design-system-2"][data-agently-color-mode="dark"]) :is(input[type="date"], input[type="datetime-local"], input[type="month"], input[type="week"], .bp6-date-input-popover) { color-scheme: dark; }
+:is(.agently-workspace[data-forge-theme="design-system-2"][data-forge-color-mode="light"], .agently-application[data-agently-theme="design-system-2"][data-agently-color-mode="light"]) :is(input[type="date"], input[type="datetime-local"], input[type="month"], input[type="week"], .bp6-date-input, .bp6-date-input-popover) { color-scheme: light; }
+:is(.agently-workspace[data-forge-theme="design-system-2"][data-forge-color-mode="dark"], .agently-application[data-agently-theme="design-system-2"][data-agently-color-mode="dark"]) :is(input[type="date"], input[type="datetime-local"], input[type="month"], input[type="week"], .bp6-date-input, .bp6-date-input-popover) { color-scheme: dark; }
 :is(.agently-workspace, .agently-application) .bp6-date-input-popover .bp6-datepicker {
-    background: var(--forge-surface-raised, var(--forge-surface));
-    color: var(--forge-text);
+    background: var(--forge-surface-raised, var(--forge-surface, var(--bp-surface-background-color-default-rest, Canvas)));
+    color: var(--forge-text, var(--bp-typography-color-default-rest, CanvasText));
 }
 :is(.agently-workspace, .agently-application) .bp6-date-input-popover .rdp {
     --rdp-accent-color: var(--forge-interaction-color);

@@ -311,12 +311,21 @@
 .agently-workspace[data-forge-theme] .bp6-date-input > .bp6-input {
     box-sizing: border-box;
     min-height: var(--forge-control-height);
-    border: var(--forge-border-width, 1px) solid var(--forge-control-border);
-    border-radius: var(--forge-control-radius);
-    padding-inline: var(--forge-control-padding-inline);
-    background-color: var(--forge-control-bg);
-    color: var(--forge-control-text);
+    border: var(--forge-border-width, 1px) solid var(--forge-control-border, var(--bp-surface-border-color-default, ButtonBorder));
+    border-radius: var(--forge-control-radius, var(--bp-surface-border-radius, 4px));
+    padding-inline: var(--forge-control-padding-inline, calc(var(--bp-surface-spacing, 4px) * 2));
+    background-color: var(--forge-control-bg, var(--bp-surface-background-color-default-rest, Canvas));
+    color: var(--forge-control-text, var(--bp-typography-color-default-rest, CanvasText));
     box-shadow: none;
+}
+.agently-workspace[data-forge-theme] .bp6-date-input > .bp6-input:not(:first-child) {
+    padding-inline-start: max(var(--forge-control-padding-inline, 0px), calc(var(--bp-surface-spacing, 4px) * 7.5));
+}
+.agently-workspace[data-forge-theme] .bp6-date-input > .bp6-input:not(:last-child) {
+    padding-inline-end: max(var(--forge-control-padding-inline, 0px), calc(var(--bp-surface-spacing, 4px) * 7.5));
+}
+.agently-workspace[data-forge-theme] .bp6-date-input.bp6-intent-danger > .bp6-input {
+    border-color: var(--forge-status-danger-border, var(--bp-intent-danger-rest));
 }
 /* Explicit semantic roles own all five type properties. */
 .agently-workspace[data-forge-theme] [data-forge-part="input"]:not([data-forge-type]) {
