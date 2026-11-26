@@ -10,6 +10,7 @@ import {resolveSelector, setSelector} from "../utils/selector.js";
 
 import {arrayEquals} from "../utils/equal.js";
 import { getLogger } from "../utils/logger.js";
+import {acceptedFormValue, acceptFormValue} from '../core/store/formBaseline.js';
 import equal from 'fast-deep-equal';
 import { mapParameters } from '../utils/parameterMapper.js';
 import {resolveParameters} from './parameters.js';
@@ -166,10 +167,15 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector,
     }
     const {control, form, selection, collection, input, collectionInfo, formStatus} = signals
 
-    let formSnapshot = form.peek();
+    acceptedFormValue(form);
+    const acceptForm = (value = form.peek()) => {
+        const version = formStatus.peek().version + 1;
+        acceptFormValue(form, value, version);
+        formStatus.value = {dirty: false, version};
+    };
 
     const updateDirtyFlag = () => {
-        const dirtyNow = !equal(formSnapshot, form.peek());
+        const dirtyNow = !equal(acceptedFormValue(form), form.peek());
         const current  = formStatus.peek();
         if (dirtyNow !== current.dirty) {
             formStatus.value = { dirty: dirtyNow, version: current.version + (dirtyNow ? 0 : 1) };
@@ -390,8 +396,7 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector,
                 // For single selection, clear selection
                 selection.value = selectionMode === 'multi' ? {selection: []} : {selected: null, nodePath: null};
                 form.value = {};
-                formSnapshot = {};
-                formStatus.value = { dirty: false, version: formStatus.peek().version + 1 };
+                acceptForm();
                 if (selectionMode === 'single') {
                     pushDependencies(null);
                 }
@@ -407,8 +412,7 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector,
             // For single selection
             selection.value = newSelection;
             form.value = {...newSelection.selected};
-            formSnapshot = form.peek();
-            formStatus.value = { dirty: false, version: formStatus.peek().version + 1 };
+            acceptForm();
 
             if (selectionMode === 'single') {
                 // Push updates to dependencies
@@ -435,8 +439,7 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector,
             // For single selection, clear selection
             selection.value = selectionMode === 'multi' ? {selection: []} : {selected: null, rowIndex: -1};
             form.value = {};
-            formSnapshot = {};
-            formStatus.value = { dirty: false, version: formStatus.peek().version + 1 };
+            acceptForm();
             if (selectionMode === 'single') {
                 pushDependencies(null);
             }
@@ -456,8 +459,7 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector,
             log.info('[setSelected] applied', { ds: identity?.dataSourceRef, newSelection });
         } catch (_) {}
         form.value = {...newSelection.selected};
-        formSnapshot = form.peek();
-        formStatus.value = { dirty: false, version: formStatus.peek().version + 1 };
+        acceptForm();
         if (selectionMode === 'single') {
           // Push updates to dependencies
             pushDependencies(newSelection.selected);
@@ -666,8 +668,7 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector,
     const handleAddNew = () => {
         resetSelection()
         form.value = {};
-        formSnapshot = {};
-        formStatus.value = { dirty: false, version: formStatus.peek().version + 1 };
+        acceptForm();
     };
 
 
@@ -720,8 +721,7 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector,
             fetchCollection();
 
             // Reset dirty flag – saved state is now source of truth.
-            formSnapshot = { ...body };
-            formStatus.value = { dirty: false, version: formStatus.peek().version + 1 };
+            acceptForm({ ...body });
 
             return true;
         } catch (err) {
@@ -896,8 +896,7 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector,
 const setFormData = ({values = {}, parameters = {}}) => {
     const nextValues = Object.keys(values || {}).length > 0 ? values : parameters;
     form.value = nextValues;
-    formSnapshot = nextValues;
-    formStatus.value = { dirty: false, version: formStatus.peek().version + 1 };
+    acceptForm();
 }
 
 const setEditedFormData = ({values = {}, parameters = {}}) => {
@@ -1190,8 +1189,7 @@ const setWindowFormData = ({values = {}, parameters = {}, replace = false, bumpP
         isFormDirty: () => formStatus.peek().dirty,
         isFormNotDirty: () => !formStatus.peek().dirty,
         resetFormDirty: () => {
-            formSnapshot = form.peek();
-            formStatus.value = { dirty: false, version: formStatus.peek().version + 1 };
+            acceptForm();
         },
         setError,
 

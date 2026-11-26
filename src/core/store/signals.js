@@ -1,3 +1,4 @@
+import {acceptFormValue} from './formBaseline.js';
 import {signal} from '@preact/signals-react';
 
 import {generateIntHash} from "../../utils/hash.js";
@@ -409,7 +410,10 @@ export const clearProtectedWindowState = (windowId) => {
     const belongs = key => windowOwnsSignalKey(key, id, knownWindowIds);
     const reset = (registry, value) => {
         for (const [key, entry] of Object.entries(registry.peek())) {
-            if (belongs(key)) entry.value = typeof value === 'function' ? value() : value;
+            if (!belongs(key)) continue;
+            const next = typeof value === 'function' ? value() : value;
+            if (registry === formSignals) acceptFormValue(entry, next, 0);
+            entry.value = next;
         }
     };
     reset(metadataSignals, null);
@@ -438,6 +442,8 @@ export const clearDeniedDataSourceState = (sourceId,error) => {
  protectedDataSourceEpochs.set(id,protectedDataSourceEpoch(id)+1);
  invalidateDataSourceRequests(id);
  const reset=(registry,value)=>{const entry=registry.peek()[id];if(entry)entry.value=value;};
+ const form = formSignals.peek()[id];
+ if (form) acceptFormValue(form, {}, 0);
  reset(dataSignals,[]);reset(formSignals,{});reset(selectionSignals,{selected:null,rowIndex:-1,selection:[]});
  reset(collectionInfoSignals,{});reset(metricsSignals,{});reset(messageSignals,[]);reset(formStatusSignals,{dirty:false,version:0});reset(busSignals,[]);
  const input=inputSignals.peek()[id];if(input)input.value={...input.peek(),fetch:false,refresh:false,invocationId:null,cache:null};
@@ -661,6 +667,7 @@ function restoreWindowSignalsFromSnapshot(win) {
             getControlSignal(dataSourceId).value = nextControl;
         }
         if (hasSerializationMarker) {
+            acceptFormValue(getFormSignal(dataSourceId), {}, 0);
             getFormSignal(dataSourceId).value = {};
             getSelectionSignal(dataSourceId, null).value = null;
             getCollectionSignal(dataSourceId).value = [];
@@ -670,7 +677,10 @@ function restoreWindowSignalsFromSnapshot(win) {
             continue;
         }
         if (snapshot?.form && typeof snapshot.form === 'object') {
-            getFormSignal(dataSourceId).value = snapshot.form;
+            const form = getFormSignal(dataSourceId);
+            const baseline = snapshot.formStatus?.dirty ? snapshot.selection?.selected ?? snapshot.form : snapshot.form;
+            acceptFormValue(form, baseline, snapshot.formStatus?.version);
+            form.value = snapshot.form;
         }
         if (Object.prototype.hasOwnProperty.call(snapshot || {}, 'selection')) {
             getSelectionSignal(dataSourceId, null).value = snapshot.selection;

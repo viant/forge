@@ -32,7 +32,7 @@ export default function DraftForm({container, context, children}) {
     // datasource version (load/reset/save) may replace the reset baseline.
     if (typeof formStatus.version === 'number' && previous.owner === baselineOwner && previous.version === formStatus.version) return;
     acceptedBaseline.current = {owner: baselineOwner, version: formStatus.version};
-    retainDraftBaseline(baselineOwner,snapshot,formStatus.version);
+    retainDraftBaseline(baselineOwner,snapshot,formStatus.version,form);
     setBaseline(snapshot);
   }, [formStatus.dirty, formStatus.version, baselineOwner, snapshot]);
   const dirty = spec.dirtyWhen ? evaluatePlainVisibleWhen(spec.dirtyWhen, dataContext) : typeof formStatus.dirty === 'boolean' ? formStatus.dirty : snapshot !== baseline;

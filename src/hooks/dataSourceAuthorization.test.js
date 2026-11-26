@@ -62,3 +62,12 @@ staleSave.signals.form.value={secret:'draft'};const write=staleSave.handlers.han
 clearDeniedDataSourceState('scopedLateSaveDSrows',{status:403,code:'datasource_denied',scope:'dataset'});
 finishSave({ok:true});assert.equal(await write,false);assert.equal(staleSave.signals.input.peek().fetch,false);
 assert.deepEqual(staleSave.signals.form.peek(),{});
+
+// Existing handlers survive scoped denial, but the old accepted draft must not.
+const cleared = fixture('clearedBaseline', {});
+cleared.handlers.setFormData({values: {name: 'Old account'}});
+clearDeniedDataSourceState('clearedBaselineDSrows', {status: 403});
+cleared.handlers.setEditedFormData({values: {name: 'Old account'}});
+assert.equal(cleared.signals.formStatus.peek().dirty, true);
+cleared.handlers.setEditedFormData({values: {}});
+assert.equal(cleared.signals.formStatus.peek().dirty, false);

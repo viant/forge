@@ -216,7 +216,7 @@ export function completeWindowStateAdoption(record, freshMetadata) {
       const patch = source.newerPatch ? applyDraftPatch(source.patch || {},source.newerPatch) : source.patch;
       if (patch && getFormStatusSignal(source.id).peek()?.dirty !== true) {
         const form = getFormSignal(source.id);
-        retainDraftBaseline(form,draftSnapshot(form.peek()),getFormStatusSignal(source.id).peek()?.version);
+        retainDraftBaseline(form,draftSnapshot(form.peek()),getFormStatusSignal(source.id).peek()?.version,form.peek());
         handler.setEditedFormData({values:applyDraftPatch(form.peek(),patch)});
       }
       waiting.delete(source);

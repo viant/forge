@@ -34,10 +34,4 @@ export function resetDraft(context, baseline, busy) {
   return true;
 }
 
-const acceptedDraftBaselines = new WeakMap();
-export function retainedDraftBaseline(owner, fallback) {
-  return owner && typeof owner === 'object' ? acceptedDraftBaselines.get(owner)?.snapshot ?? fallback : fallback;
-}
-export function retainDraftBaseline(owner, snapshot, version) {
-  if(owner && typeof owner === 'object') acceptedDraftBaselines.set(owner,{snapshot,version});
-}
+export {retainedDraftBaseline, retainDraftBaseline} from '../../core/store/formBaseline.js';

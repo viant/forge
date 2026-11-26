@@ -123,3 +123,25 @@ it('watches defaults context without reseeding edits and gates unresolved or den
   expect(f.form().name).toBe('');expect(f.requests).toHaveLength(5);
  }finally{await settle(()=>root.unmount());host.remove()}
 });
+
+it('shares the accepted form across handlers created during editing and after reset', () => {
+  const {context} = fixture('shared-form-baseline', 42);
+  const owner = context.handlers.dataSource;
+  const dirty = () => context.signals.formStatus.peek().dirty;
+  const edit = (handler, enabled) => handler.setFormField({item: {dataField: 'enabled'}, value: enabled});
+  owner.setFormData({values: {enabled: true}});
+  edit(owner, false);
+  const control = useDataSourceHandlers(context.identity, context.signals, {}, null, {});
+  edit(control, true);
+  expect(dirty()).toBe(false);
+  edit(control, false);
+  expect(dirty()).toBe(true);
+  owner.resetFormDirty();
+  edit(control, true);
+  expect(dirty()).toBe(true);
+  edit(control, false);
+  expect(dirty()).toBe(false);
+  control.setFormData({values: {enabled: true}});
+  edit(owner, false);
+  expect(dirty()).toBe(true);
+});
