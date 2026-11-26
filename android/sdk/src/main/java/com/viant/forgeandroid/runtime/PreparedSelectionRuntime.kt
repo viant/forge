@@ -86,7 +86,7 @@ internal class EditableOperationInputs(
         }
 
     fun disabled(operation: EditableCollectionOperationSpec, spec: EditableCollectionSpec, rows: List<Map<String, Any?>>): Boolean {
-        val bounds = operation.selection ?: spec.selection.takeIf { operation.prepareSelection?.parentParameter == null }
+        val bounds = operation.selection ?: spec.selection
         val minimum = bounds?.min ?: if (operation.requiresSelection) 1 else 0
         val maximum = bounds?.max ?: 0
         if (rows.size < minimum || (maximum > 0 && rows.size > maximum)) return true
@@ -123,15 +123,15 @@ internal class PreparedSelectionRuntime {
         val original = window.peekWindowForm()
         val scoped = spec.predicateSignals(window, source.dataSourceRef)
         var pending = false
-        var expectedParameters: JsonObject? = null
+        var expectedBindings: JsonObject? = null
         var warmCurrent: (() -> Boolean)? = null
         fun currentPresentation() = presented() && window.signals.ownsMetadata(window.windowId, window.metadata) &&
             window.metadata.peek() === metadata && JsonObject(metadata.authorizationSnapshot).toString() == actor &&
             dialog.peek() === priorDialog && active[key] == invocation && (parent == null || runtime.selectionReadTransport === transport)
-        fun parameters(): Map<String, Any?> {
-            val resolved = runtime.parameterResolver.resolveOperation(operation.parameters, source).inbound
-            return mutationTargetParameters(resolved[prepare.dataSourceRef] ?: resolved[""] ?: emptyMap())
-        }
+        fun bindings() = runtime.parameterResolver.resolveOperation(operation.parameters, source).inbound
+        fun bindingKey(inbound: Map<String, Map<String, Any?>>): JsonObject =
+            JsonUtil.anyToElement(if (parent == null) mutationTargetParameters(inbound[prepare.dataSourceRef] ?: inbound[""].orEmpty()) else inbound).jsonObject
+
         fun eligible(fresh: List<Map<String, Any?>>? = null): Boolean {
             val liveSelection = source.selection.peek()
             if (!currentPresentation() || (parent == null && liveSelection != selection) || warmCurrent?.invoke() == false) return false
@@ -152,7 +152,7 @@ internal class PreparedSelectionRuntime {
                 val grants = permission.dataSourceRef?.let { runtime.registeredSource(window.windowId, it)?.collection?.peek() }.orEmpty()
                 if (!WorkflowPrimitiveRuntime.permissionAllows(permission, authorization, rows, grants)) return false
             }
-            return expectedParameters?.let { JsonUtil.anyToElement(parameters()) == it } ?: true
+            return expectedBindings?.let { bindingKey(bindings()) == it } ?: true
         }
         try {
             if (!eligible()) return Result.success(false)
@@ -162,12 +162,44 @@ internal class PreparedSelectionRuntime {
             require(prepare.mappingRef == null || prepare.mappingRef in metadata.resourceMappings) { "The selection mapping is unavailable." }
             val names = operation.parameters.mapNotNull { it.name }
             require((parent == null) != (prepare.idsParameter == null)) { "Declare exactly one parent or selection ID parameter." }
-            if (parent != null) require(parent.isNotBlank() && names.count { it == parent } == 1) { "The parent parameter must name one declared operation parameter." }
+            if (parent != null) require(parent.isNotBlank() && operation.parameters.count {
+                it.name == parent && it.to != "$draftRef:parameters"
+            } == 1) { "The parent parameter must name one declared reader parameter." }
             else require(!prepare.idsParameter.isNullOrBlank() && prepare.idsParameter !in names) { "The selection ID parameter is invalid or already declared." }
             require(destination.fetchOnOpen == false || (destination.fetchOnOpen == null && destination.content?.fetchData == false)) {
                 "Prepared selection dialogs must disable their automatic opening read."
             }
-            val resolved = parameters()
+            var bindsDraft = false
+            if (parent != null) {
+                for (parameter in operation.parameters) {
+                    val target = parameter.to ?: continue
+                    if (':' !in target) continue
+                    require(target == "${prepare.dataSourceRef}:parameters" || target == "$draftRef:parameters") {
+                        "A prepared parent binding must target the reader or draft parameters."
+                    }
+                    if (target == "$draftRef:parameters") {
+                        require(draftRef != prepare.dataSourceRef) { "Draft and reader parameter destinations must differ." }
+                        bindsDraft = true
+                    }
+                    val owner = parameter.from?.substringBefore(':').orEmpty()
+                    require(owner.isEmpty() || owner in metadata.dataSources) { "The operation binding source is unavailable: $owner" }
+                }
+            }
+            val inbound = bindings()
+            val untargeted = inbound[""].orEmpty()
+            val readerEnvelope = inbound[prepare.dataSourceRef].orEmpty()
+            val resolved = if (parent == null) {
+                mutationTargetParameters(inbound[prepare.dataSourceRef] ?: untargeted)
+            } else {
+                val scoped = JsonUtil.asStringMap(readerEnvelope["parameters"])
+                val named = readerEnvelope - "parameters"
+                require(scoped.keys.none { it in untargeted || it in named } && named.keys.none { it in untargeted }) {
+                    "A reader parameter was bound twice."
+                }
+                untargeted + named + scoped
+            }
+            val snapshot = bindingKey(inbound)
+            val draftParameters = if (bindsDraft) snapshot[draftRef]?.jsonObject?.get("parameters")?.jsonObject ?: JsonObject(emptyMap()) else null
             val ids = if (parent != null) {
                 val value = resolved[parent]
                 listOf(if (value is List<*>) value.singleOrNull() else value)
@@ -178,7 +210,7 @@ internal class PreparedSelectionRuntime {
             val keys = ids.map(::selectionIdentity)
             require(keys.toSet().size == keys.size) { "The selection contains a duplicate identity." }
             val captured = JsonUtil.anyToElement(resolved).jsonObject
-            expectedParameters = captured
+            expectedBindings = snapshot
             val request = JsonUtil.asStringMap(JsonUtil.elementToAny(captured)).let {
                 if (parent != null) it else it + (checkNotNull(prepare.idsParameter) to ids)
             }
@@ -203,7 +235,7 @@ internal class PreparedSelectionRuntime {
             if (!eligible()) return Result.success(false)
             val ordered = orderedSelection(fresh, keys, prepare.identityField, scopes)
             require(eligible(ordered)) { "The refreshed records are not eligible for this operation." }
-            val props = selectionProps(metadata, prepare.mappingRef, ordered, request, invocation, definition.resourceModelRef)
+            val props = selectionProps(metadata, prepare.mappingRef, ordered, request, invocation, definition.resourceModelRef, draftParameters)
             val code = metadata.actions?.code?.takeIf(String::isNotBlank) ?: error("Selection preparation handler is unavailable.")
             val projection = UIActionProjection.invoke(code, prepare.prepare, metadata.actionNamespace(prepare.prepare), source.dataSourceRef,
                 runtime.actionSnapshots(mapOf(source.dataSourceRef to source), includeCollection = false),
@@ -229,7 +261,7 @@ internal class PreparedSelectionRuntime {
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
-            if (!currentPresentation() || (expectedParameters != null && !runCatching { eligible() }.getOrDefault(false))) return Result.success(false)
+            if (!currentPresentation() || (expectedBindings != null && !runCatching { eligible() }.getOrDefault(false))) return Result.success(false)
             prepare.errorField?.let { runtime.setWindowFormValues(window.windowId, mapOf(it to (error.message ?: "Could not prepare the selected records.")), bumpPrefillRevision = false) }
             return Result.failure(error)
         } finally {
@@ -273,7 +305,7 @@ private fun orderedSelection(rows: List<Map<String, Any?>>, keys: List<String>, 
 }
 
 private fun selectionProps(metadata: WindowMetadata, mappingRef: String?, rows: List<Map<String, Any?>>,
-    parameters: Map<String, Any?>, invocationId: String, draftModelRef: String?): JsonObject {
+    parameters: Map<String, Any?>, invocationId: String, draftModelRef: String?, draftParameters: JsonObject?): JsonObject {
     val descriptors = mutableListOf<JsonObject>()
     val indexes = HashMap<ResourceMappingCase, Int>()
     val cases = mutableListOf<Int>()
@@ -291,6 +323,7 @@ private fun selectionProps(metadata: WindowMetadata, mappingRef: String?, rows: 
         }
     }
     return buildJsonObject {
+        draftParameters?.let { put("draftParameters", it) }
         put("rows", JsonUtil.anyToElement(rows)); put("parameters", JsonUtil.anyToElement(parameters)); put("invocationId", invocationId)
         put("mapping", mapping?.let { buildJsonObject {
             put("fieldOrder", JsonUtil.anyToElement(it.fieldOrder))

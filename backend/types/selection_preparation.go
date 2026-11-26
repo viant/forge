@@ -60,8 +60,81 @@ func selectionPreparationValidator(window *Window, bound bool) func(string, *Edi
 		if openFetch || contentFetch || (source.AutoFetch != nil && *source.AutoFetch) {
 			return fmt.Errorf("%s.prepareSelection dialog %q must retain the prepared draft on open; disable its draft fetch", owner, op.DialogID)
 		}
+		return validateParentDraftBindings(owner, window, op, draft)
+	}
+}
+
+// A parent draft can consume local fields independently of the producer inputs.
+func validateParentDraftBindings(owner string, window *Window, op *EditableCollectionOperation, draft string) error {
+	spec := op.PrepareSelection
+	if spec.ParentParameter == "" {
 		return nil
 	}
+	draftTarget := draft + ":parameters"
+	hasDraft := false
+	for _, p := range op.Parameters {
+		if p != nil && p.To == draftTarget {
+			hasDraft = true
+			break
+		}
+	}
+	if !hasDraft {
+		return nil
+	}
+	if draft == spec.DataSourceRef {
+		return fmt.Errorf("%s.prepareSelection requires distinct reader and draft destinations", owner)
+	}
+	readerNames := map[string]bool{}
+	draftNames := map[string]bool{}
+	readerRoots := map[string]string{}
+	for _, p := range op.Parameters {
+		if p == nil {
+			continue
+		}
+		if !validResourceSelector(p.Name) || p.Name == "..." {
+			return fmt.Errorf("%s.prepareSelection requires named fields in scoped bindings", owner)
+		}
+		source, store, compact := strings.Cut(p.From, ":")
+		if store == "collection" {
+			if source != "" {
+				if _, ok := window.DataSource[source]; !ok {
+					return fmt.Errorf("%s.prepareSelection unknown collection source %q", owner, source)
+				}
+			}
+			if p.Location != "" && !validResourceSelector(p.Location) {
+				return fmt.Errorf("%s.prepareSelection unsafe collection field selector %q", owner, p.Location)
+			}
+		}
+		names := readerNames
+		switch p.To {
+		case draftTarget:
+			names = draftNames
+		case "", spec.DataSourceRef, spec.DataSourceRef + ":parameters":
+			root, _, _ := strings.Cut(p.Name, ".")
+			if prior, ok := readerRoots[root]; ok && prior != p.To {
+				return fmt.Errorf("%s.prepareSelection ambiguous reader binding %q", owner, root)
+			}
+			readerRoots[root] = p.To
+		default:
+			return fmt.Errorf("%s.prepareSelection unknown parameter destination %q", owner, p.To)
+		}
+		if (strings.Contains(p.To, ":") && !compact) || p.Direction == "out" {
+			return fmt.Errorf("%s.prepareSelection scoped bindings require an inbound source", owner)
+		}
+		if names[p.Name] {
+			return fmt.Errorf("%s.prepareSelection duplicate binding %q", owner, p.Name)
+		}
+		names[p.Name] = true
+	}
+	if !readerNames[spec.ParentParameter] {
+		return fmt.Errorf("%s.prepareSelection parentParameter must bind to the reader", owner)
+	}
+	for _, name := range spec.ScopeFields {
+		if !readerNames[name] {
+			return fmt.Errorf("%s.prepareSelection scope parameter %q must bind to the reader", owner, name)
+		}
+	}
+	return nil
 }
 
 func validateSelectionPreparation(owner string, op *EditableCollectionOperation) error {

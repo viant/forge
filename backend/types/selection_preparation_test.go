@@ -26,7 +26,9 @@ view:
           prepareSelection: {dataSourceRef: details, idsParameter: IDs, identityField: identity.id, scopeFields: {scope.id: Scope, dialogId: Scope, dataSourceRef: Scope}, mappingRef: variants, prepare: 'Editor.prepare', pendingField: reading, errorField: lastError}
         - id: create
           dialogId: editor
-          parameters: [{name: ID, in: windowForm, location: parentID}]
+          parameters:
+            - {name: ID, in: windowForm, location: parentID}
+            - {name: enabled, from: 'details:collection', location: '0.enabled', to: 'draft:parameters'}
           prepareSelection: {dataSourceRef: details, parentParameter: ID, identityField: id, prepare: 'Editor.prepare'}
 `,
 		"extension/forge/dialogs/Scope.yaml":  "id: Scope\ncontent: {id: unused}\n",
@@ -139,6 +141,40 @@ func TestPrepareSelectionValidation(t *testing.T) {
 			err := types.ValidateResourceModels(w)
 			if err == nil || !strings.Contains(err.Error(), tt.text) || !strings.Contains(err.Error(), "container grid operation edit") {
 				t.Fatalf("expected %q, got %v", tt.text, err)
+			}
+		})
+	}
+}
+
+func TestPreparedParentDraftBindings(t *testing.T) {
+	no := false
+	for _, tt := range []struct {
+		name, expected string
+		modify         func(*types.EditableCollectionOperation)
+	}{
+		{"correct destinations", "", func(*types.EditableCollectionOperation) {}},
+		{"unknown source", "unknown collection source", func(o *types.EditableCollectionOperation) { o.Parameters[1].From = "absent:collection" }},
+		{"foreign destination", "unknown parameter destination", func(o *types.EditableCollectionOperation) {
+			o.Parameters = append(o.Parameters, &types.Parameter{Name: "flag", From: "view:collection", To: "other:parameters"})
+		}},
+		{"local identity", "must bind to the reader", func(o *types.EditableCollectionOperation) { o.PrepareSelection.ParentParameter = "available" }},
+		{"duplicate reader", "ambiguous reader binding", func(o *types.EditableCollectionOperation) {
+			o.Parameters = append(o.Parameters, &types.Parameter{Name: "ID", From: "view:windowform", To: "reader:parameters"})
+		}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			op := types.EditableCollectionOperation{ID: "create", DialogID: "editor", Parameters: []*types.Parameter{{Name: "ID", In: "windowForm", Location: "parent"}, {Name: "available", From: "view:collection", Location: "0.available", To: "draft:parameters"}}, PrepareSelection: &types.SelectionPreparation{DataSourceRef: "reader", IdentityField: "id", ParentParameter: "ID", Prepare: "Editor.prepare"}}
+			tt.modify(&op)
+			w := &types.Window{DataSource: map[string]types.DataSource{"reader": {}, "view": {}, "draft": {}}, Dialogs: []types.Dialog{{Id: "editor", DataSourceRef: "draft", FetchOnOpen: &no}}, View: types.View{Content: &types.Container{ID: "grid", EditableCollection: &types.EditableCollection{Operations: []types.EditableCollectionOperation{op}}}}}
+			err := types.ValidateResourceModels(w)
+			if tt.expected == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tt.expected) {
+				t.Fatalf("expected %q, got %v", tt.expected, err)
 			}
 		})
 	}

@@ -907,7 +907,7 @@ struct MutationScope: Sendable {
         var context = ParameterResolver.ResolutionContext(identityDataSourceRef: ref, windowForm: windowForm, metadata: metadata)
         context.lookup = { source in
             guard let state = snapshot(source) else { return nil }
-            return .init(selectionMode: metadata.dataSources[source]?.selectionMode, form: state.form, metrics: state.metrics,
+            return .init(selectionMode: metadata.dataSources[source]?.selectionMode, form: state.form, metrics: state.metrics, collection: state.collection,
                          selection: state.selection, input: source == ref ? (input ?? state.input) : state.input)
         }
         return context
@@ -916,8 +916,11 @@ struct MutationScope: Sendable {
     func resolvedParameters(_ parameters: [ParameterDef], target: String, operationBindings: Bool = false) -> [String:JSONValue] {
         let context = parameterContext(source: source)
         let resolved = ParameterResolver.resolve(parameters: parameters, context: context, operationBindings: operationBindings)
-        let envelope = resolved[target]?.objectValue ?? resolved
-        return envelope["input"]?.objectValue?["parameters"]?.objectValue ?? envelope["parameters"]?.objectValue ?? envelope
+        return Self.targetParameters(resolved[target]?.objectValue ?? resolved)
+    }
+
+    static func targetParameters(_ envelope: [String:JSONValue]) -> [String:JSONValue] {
+        envelope["input"]?.objectValue?["parameters"]?.objectValue ?? envelope["parameters"]?.objectValue ?? envelope
     }
 
     func parameters(command: MutationCommandDef, extras: [String: JSONValue], stepReceipts: [String: JSONValue]? = nil) throws -> [String: JSONValue] {

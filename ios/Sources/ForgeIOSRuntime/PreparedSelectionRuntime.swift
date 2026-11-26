@@ -175,7 +175,25 @@ extension ForgeRuntime {
         let originalPending =
             if let field = spec.pendingField { await windowFormJSONValue(windowID: windowID)[field] } else { nil as JSONValue? }
         var admittedKeys: [String]?
+        let bindings = operation.parameters ?? []
+        let bindsDraft = spec.parentParameter != nil && bindings.contains { $0.to == draft + ":parameters" }
+        if bindsDraft {
+            var readerNames = Set<String>(), draftNames = Set<String>()
+            for binding in bindings where binding.direction != "out" {
+                let name = binding.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                let to = binding.to ?? ""
+                let explicit = !to.isEmpty
+                guard draft != spec.dataSourceRef, !name.isEmpty, name != "...",
+                      !explicit || (binding.from?.contains(":") == true && [draft + ":parameters", spec.dataSourceRef + ":parameters"].contains(to)),
+                      explicit || (name != draft && name != spec.dataSourceRef) else {
+                    return .init(accepted: false, status: "failed", error: "A parent binding has an ambiguous or unsupported destination.")
+                }
+                let distinct = to == draft + ":parameters" ? draftNames.insert(name).inserted : readerNames.insert(name).inserted
+                guard distinct else { return .init(accepted: false, status: "failed", error: "A parent parameter has duplicate bindings.") }
+            }
+        }
         var admittedInput: SelectionRecord?
+        var admittedDraftParameters: SelectionRecord?
         var admittedEffectiveParameters: SelectionRecord?
         var reusedRead: UUID?
         var attempted = false
@@ -207,7 +225,20 @@ extension ForgeRuntime {
                     return nil
                 }
             }
-            let parameters = state.resolvedParameters(operation.parameters ?? [], target: spec.dataSourceRef)
+            let parameters: SelectionRecord
+            if bindsDraft {
+                var resolved = ParameterResolver.resolve(parameters: bindings, context: state.parameterContext(source: source))
+                let draftEnvelope = resolved.removeValue(forKey: draft)?.objectValue
+                let draftParameters = draftEnvelope?["parameters"]?.objectValue ?? [:]
+                guard admittedDraftParameters == nil || admittedDraftParameters == draftParameters else { return nil }
+                admittedDraftParameters = draftParameters
+                let readerParameters = resolved.removeValue(forKey: spec.dataSourceRef)?.objectValue?["parameters"]?.objectValue ?? [:]
+                parameters = try resolved.merging(readerParameters) { _, _ in
+                    throw SelectionPreparationError("A reader parameter has duplicate bindings.")
+                }
+            } else {
+                parameters = state.resolvedParameters(bindings, target: spec.dataSourceRef)
+            }
             let ids: [JSONValue]
             if let parent = spec.parentParameter {
                 guard spec.idsParameter == nil, !parent.isEmpty,
@@ -275,6 +306,7 @@ extension ForgeRuntime {
             var props = try projectedCases(ordered, mappingRef: spec.mappingRef, draftRef: destination.resourceModelRef, metadata: metadata)
             props["rows"] = .array(ordered.map(JSONValue.object))
             props["parameters"] = .object(parameters)
+            if let admittedDraftParameters { props["draftParameters"] = .object(admittedDraftParameters) }
             props["invocationId"] = .string(invocation.uuidString)
             guard let values = try current.scope.invoke(spec.prepare, props: props, selectionPreparation: true)?.objectValue else {
                 throw SelectionPreparationError("Selection preparation must synchronously return a draft record.")

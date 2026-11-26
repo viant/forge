@@ -39,17 +39,22 @@ it.each([true, false])('opens a prepared parent through an empty grid (warm read
   const local = id => ({id, autoFetch:false, backend:{kind:'inline', rows:[]}});
   const parameter = {name:'ParentID', in:'windowForm', location:'parent'};
   const metadata = {
-    namespace:'Example', actions:{code:'({seed: ({rows}) => ({name: rows[0].name})})'},
+    namespace:'Example', actions:{code:`({seed: ({rows, draftParameters}) => {
+      if (draftParameters.available !== true) throw new Error('Capacity exhausted');
+      return {name: rows[0].name};
+    }})`},
     dataSource:{
-      grid:local('grid'), draft:local('draft'),
+      grid:local('grid'), draft:local('draft'), capacity:local('capacity'),
       parent:{id:'parent', autoFetch:false, service:{uri:'mcp://example/parent'}, parameters:[parameter],
         uniqueKey:[{field:'id'}], selectors:{data:'data'}},
     },
     view:{content:{id:'root', containers:[
       {id:'parentReader', dataSourceRef:'parent', fetchData:false},
+      {id:'capacityReader',dataSourceRef:'capacity',fetchData:false},
       {id:'documents', dataSourceRef:'grid', fetchData:false, editableCollection:{
         dataSourceRef:'grid', selection:{mode:'multi', min:0}, operations:[{
-          id:'create',label:'Create document',dialogId:'editor',parameters:[parameter],
+          id:'create',label:'Create document',dialogId:'editor',parameters:[parameter,
+            {name:'available',from:'capacity:collection',location:'0.available',to:'draft:parameters'}],
           prepareSelection:{dataSourceRef:'parent',parentParameter:'ParentID',identityField:'id',prepare:'Example.seed',errorField:'openError'},
         }]},table:{columns:[{id:'id', name:'ID'}]}},
     ]}},
@@ -66,6 +71,8 @@ it.each([true, false])('opens a prepared parent through an empty grid (warm read
       services={{dataConnectorTransport:transport}}><WindowContent window={{windowId,windowKey:'example'}} selectedMetadata={metadata}/></SettingProvider>));
     const context = getWindowContext(windowId);
     await settle(() => context.Context('grid').handlers.dataSource.setWindowFormData({values:{parent:8}}));
+    const capacity = context.Context('capacity').handlers.dataSource;
+    await settle(() => capacity.setCollection([{available:true}]));
     if (warm) await settle(() => context.Context('parent').handlers.dataSource.fetchCollection({}));
     const before = reads.length;
     const create = [...host.querySelectorAll('button')].find(button => button.textContent.includes('Create document'));
@@ -76,6 +83,15 @@ it.each([true, false])('opens a prepared parent through an empty grid (warm read
     expect(context.Context('draft').signals.form.peek()?.name).toBe('Parent eight');
     expect([...document.querySelectorAll('[role="dialog"] input')].map(input => input.value)).toContain('Parent eight');
     expect(reads.length - before).toBe(warm ? 0 : 1);
+    for (const request of reads) expect(request.inputParameters || {}).not.toHaveProperty('available');
+    if (warm) {
+      await settle(() => context.handlers.window.closeDialog({dialogId:'editor'}));
+      await settle(() => capacity.setCollection([{available:false}]));
+      await settle(() => create.click());
+      expect(document.querySelector('[role="dialog"]')).toBeNull();
+      expect(context.Context('grid').signals.windowForm.peek().openError).toMatch(/Capacity exhausted/);
+      expect(reads.length).toBe(before);
+    }
   } finally {
     await settle(() => root.unmount());
     host.remove();

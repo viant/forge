@@ -904,6 +904,16 @@ operations:
 
 A current single-record read for the same input, window revision and authorization can supply the parent directly. A cold or stale parent requires one reader request. The operation checks the returned identity, declared scope, presentation conditions and current authorization before seeding the draft. Changing the parent during the read suppresses the open. Child selection limits and row permission predicates still apply when the operation declares them. Use either `parentParameter` or `idsParameter` on an operation.
 
+A parent operation can also bind a named field from a collection in the same window to its destination draft. For a dialog backed by `documentDraft`, the following operation parameters keep local availability separate from the folder reader's request.
+
+```yaml
+parameters:
+  - {name: FolderID, in: windowForm, location: folderId}
+  - {name: available, from: 'folderCapacity:collection', location: '0.available', to: 'documentDraft:parameters'}
+```
+
+The synchronous preparation hook receives the folder ID in `parameters` and the local value in `draftParameters.available`. The binder reads the current collection without fetching it. Declare any required source readiness in the operation's presentation conditions. If either set of bound values changes during a pending parent read, the operation discards the result. A missing field is omitted, and an explicitly null field retains its null value.
+
 ## Ordered preparation on a mutation command
 
 A command opts in by declaring a nonempty `before` list. An omitted list and

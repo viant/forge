@@ -197,3 +197,48 @@ test('invalid or changed parent and revoked authorization cannot seed or open a 
     assert.deepEqual(f.events, ['read']);
   }
 });
+
+function draftBindingFixture() {
+  const f = parentFixture();
+  const limits = {value:[{remaining:2, owner:8, note:null, internal:'private'}]};
+  const resolve = f.context.Context;
+  f.context.Context = ref => ref === 'limits' ? {signals:{collection:limits}} : resolve(ref);
+  const binding = (name, location) => ({name, from:'limits:collection', location, to:'draft:parameters'});
+  f.operation.parameters.push(binding('remaining','0.remaining'), binding('owner','0.owner'),
+    binding('note','0.note'), binding('absent','0.missing'));
+  return {...f, limits};
+}
+
+test('a prepared parent binds only named live collection fields to the draft without disturbing a warm read', async () => {
+  for (const warm of [true, false]) {
+    const f = draftBindingFixture();
+    if (warm) f.admit();
+    assert.equal((await f.open()).status, 'opened');
+    assert.deepEqual(f.calls.args.draftParameters, {remaining:2, owner:8, note:null});
+    assert.deepEqual(f.calls.args.parameters, {Parent:8});
+    assert.equal(f.events.filter(event => event === 'read').length, warm ? 0 : 1);
+    if (!warm) assert.deepEqual(f.calls.input, {Parent:8});
+    assert.equal(f.limits.value[0].internal, 'private');
+  }
+});
+
+test('a replaced peer collection suppresses a draft without changing the parent identity', async () => {
+  const f = draftBindingFixture();
+  let finish;
+  f.calls.read = () => new Promise(resolve => { finish = resolve; });
+  const pending = f.open();
+  f.limits.value = [{remaining:0, owner:9, note:null}];
+  finish({data:[{id:8}]});
+  assert.equal((await pending).status, 'superseded');
+  assert.deepEqual(f.events, ['read']);
+});
+
+test('scoped reader and draft parameters with the same field name remain separate', async () => {
+  const f = draftBindingFixture();
+  f.operation.parameters[0] = {name:'Parent',from:'grid:windowform',location:'parent',to:'read:parameters'};
+  f.operation.parameters.push({name:'Parent',from:'limits:collection',location:'0.remaining',to:'draft:parameters'},
+    {name:'pageSize',in:'const',location:1}, {name:'language',in:'const',location:'en',to:'read'});
+  assert.equal((await f.open()).status, 'opened');
+  assert.deepEqual(f.calls.input, {Parent:8,pageSize:1,language:'en'});
+  assert.equal(f.calls.args.draftParameters.Parent, 2);
+});

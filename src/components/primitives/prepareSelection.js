@@ -91,6 +91,20 @@ function draftHookContext(context) {
   };
 }
 
+function resolvePreparedArguments(context, operation, destination, bindsDraft) {
+  const resolved = resolveParameters(operation.parameters || [], context);
+  const reader = operation.prepareSelection.dataSourceRef;
+  if (!bindsDraft) return {parameters: mutationCommandTargetParameters(resolved, reader)};
+  const envelope = resolved.inbound || resolved;
+  const {[destination]: draft, [reader]: scopedReader, ...unscoped} = envelope;
+  const {parameters: compact = {}, ...legacy} = scopedReader || {};
+  const parameters = {...unscoped, ...legacy, ...compact};
+  if (Object.keys(parameters).length !== Object.keys(unscoped).length + Object.keys(legacy).length + Object.keys(compact).length) {
+    throw new Error('A prepared reader parameter is bound more than once.');
+  }
+  return {parameters, draftParameters: draft?.parameters || {}};
+}
+
 // The caller supplies the same live operation + permission boundary evaluation
 // as its visible toolbar. Only the operation's own pending flag is masked.
 export async function openPreparedSelection(context, operation, eligible) {
@@ -105,7 +119,9 @@ export async function openPreparedSelection(context, operation, eligible) {
   if (dialogState()?.open || !eligible(context)) return {accepted: false, status: 'invalid'};
   leases.add(dialogId);
   const selection = () => editableCollectionRows(peek(context.signals.selection)).map(row => resolveSelector(row, spec.identityField));
-  const readParameters = () => mutationCommandTargetParameters(resolveParameters(operation.parameters || [], context), spec.dataSourceRef);
+  const destination = prepareDialogSources(context.metadata).get(dialogId);
+  const bindsDraft = spec.parentParameter && operation.parameters?.some(binding => binding.to === destination + ':parameters');
+  const readArguments = () => resolvePreparedArguments(context, operation, destination, bindsDraft);
   const actor = () => JSON.stringify(context.signals.authorization ? peek(context.signals.authorization) : context.authorization);
   const epoch = protectedWindowEpoch(context.identity.windowId);
   const metadataSignal = findMetadataSignal(context.identity.windowId);
@@ -117,7 +133,8 @@ export async function openPreparedSelection(context, operation, eligible) {
   let attempted = false;
   let pendingPublished = false;
   try {
-    const parameters = snapshotResourceValue(readParameters());
+    const bound = snapshotResourceValue(readArguments());
+    const parameters = bound.parameters;
     const parent = spec.parentParameter;
     const value = parent ? parameters[parent] : null;
     const ids = parent ? (Array.isArray(value) ? value : [value]) : selection();
@@ -129,23 +146,22 @@ export async function openPreparedSelection(context, operation, eligible) {
       const value = parameters[parameter];
       return [field, identity(Array.isArray(value) && value.length === 1 ? value[0] : value)];
     });
-    const originalActor = actor(), originalParameters = JSON.stringify(parameters);
+    const originalActor = actor(), originalArguments = JSON.stringify(bound);
     const eligibilityContext = pendingValidationContext(context, pending, originalWindowForm);
     active = () => {
       try {
         if (protectedWindowEpoch(context.identity.windowId) !== epoch || peek(metadataSignal) !== metadataRevision || actor() !== originalActor ||
             dialogState()?.open || dialogState()?.props !== originalDialog || !eligible(eligibilityContext)) return false;
-        if (parent) return JSON.stringify(readParameters()) === originalParameters;
+        if (parent) return JSON.stringify(readArguments()) === originalArguments;
         const current = selection();
         return current.length === keys.length && current.every((id, index) => identity(id) === keys[index]) &&
-          JSON.stringify(readParameters()) === originalParameters;
+          JSON.stringify(readArguments()) === originalArguments;
       } catch {
         // A replacement selection or scope may no longer have valid input.
         return false;
       }
     };
     const reader = context.Context(spec.dataSourceRef);
-    const destination = prepareDialogSources(context.metadata).get(dialogId);
     const draft = destination && context.Context(destination);
     const prepare = context.lookupHandler?.(spec.prepare);
     if (!reader?.handlers?.dataSource?.fetchRecords || !draft?.handlers?.dataSource?.setEditedFormData ||
@@ -172,7 +188,7 @@ export async function openPreparedSelection(context, operation, eligible) {
     }
     const modelRef = context.metadata.dataSource[destination].resourceModelRef;
     const projected = {
-      rows, parameters: input, invocationId, ...projectCases(context, spec.mappingRef, rows),
+      ...bound, rows, parameters: input, invocationId, ...projectCases(context, spec.mappingRef, rows),
       draftModel: modelRef ? context.metadata.resourceModels?.[modelRef] : null,
     };
     const values = prepare({context: draftHookContext(context), ...snapshotResourceValue(projected)});

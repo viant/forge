@@ -35,7 +35,8 @@ class ParameterResolver {
             val srcStore = expandStore(srcStoreRaw)
             val dstStore = expandStore(dstStoreRaw)
             val sourcePath = if (p.name == "...") p.location else p.location ?: p.name
-            val srcValue = readStore(context, srcDs, srcStore, sourcePath) ?: return@forEach
+            val srcValue = readStore(context, srcDs, srcStore, sourcePath)
+            if (srcValue === SelectorUtil.Missing || (srcValue == null && srcStore != "collection")) return@forEach
             val dstMap = ensure(dstDs)
             writeStore(dstMap, dstStore, p.name, decoded(p, srcValue))
         }
@@ -119,8 +120,13 @@ class ParameterResolver {
     }
 
     private fun readStore(context: DataSourceContext, dsRef: String, store: String, path: String?): Any? {
-        val ctx = if (dsRef == context.dataSourceRef) context else context.window.contextOrNull(dsRef) ?: return null
         val key = path ?: ""
+        if (store == "collection") {
+            if (context.window.metadata.peek()?.dataSources?.containsKey(dsRef) != true) return SelectorUtil.Missing
+            val rows = context.window.signals.collection(context.window.identity.dataSourceId(dsRef)).peek()
+            return if (key.isEmpty() || key == ".") rows else SelectorUtil.resolveParts(rows, key.split('.'), SelectorUtil.Missing)
+        }
+        val ctx = if (dsRef == context.dataSourceRef) context else context.window.contextOrNull(dsRef) ?: return null
         return when (store) {
             "form" -> readObjectValue(ctx.peekForm(), key)
             "selection" -> readSelectionValue(ctx, key)

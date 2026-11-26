@@ -39,6 +39,10 @@ class PreparedSelectionRuntimeTest {
             if(context.Context('unused')||context.handlers.dataSource.getCollection().length)throw Error('Unneeded reader state');
             return {ids:rows.map(context.lookupHandler('Nested.normalize')),invocation:invocationId,version:rows[0].version};
         },
+        scoped:({parameters,draftParameters})=>{
+          if(Object.keys(parameters).sort().join(',')!=='Max,Parent'||parameters.Max!==5||parameters.Parent!=='007')throw Error('Reader bindings changed.');
+          return {local:draftParameters};
+        },
         plain:({rows,mapping,descriptors,rowCases,draftModel})=>{
           if(mapping!==null || descriptors.length || rowCases.length || !draftModel)throw Error('Bad optional mapping');
           return {ids:rows.map(r=>r.id)};
@@ -129,9 +133,64 @@ class PreparedSelectionRuntimeTest {
                 listOf(mapOf("id" to 7))
             }
             val childTable = spec.copy(selection = PrimitiveSelectionSpec(min = 1))
-            assertTrue(runtime.preparedSelections.activate(runtime, source, childTable, parentOperation).getOrThrow())
+            assertFalse(runtime.preparedSelections.activate(runtime, source, childTable, parentOperation).getOrThrow())
+            assertTrue(calls.isEmpty())
+            val noChildMinimum = parentOperation.copy(selection = PrimitiveSelectionSpec(min = 0))
+            assertTrue(runtime.preparedSelections.activate(runtime, source, childTable, noChildMinimum).getOrThrow())
             assertEquals(1, calls.size)
             assertEquals(listOf(7L), draft.form.peek()["ids"])
+        }
+    }
+
+    @Test fun parentPreservesInheritedCollectionPredicatesBeforeAndDuringTheRead() = runBlocking {
+        val table = spec.copy(selection = PrimitiveSelectionSpec(every = DashboardConditionDef(
+            source = "row", field = "editable", equals = JsonPrimitive(true))))
+        for (late in listOf(false, true)) fixture {
+            source.setSelection(SelectionState(selected = mapOf("id" to 3, "editable" to late)))
+            loader {
+                source.setSelection(SelectionState(selected = mapOf("id" to 3, "editable" to false)))
+                listOf(mapOf("id" to 7))
+            }
+            assertFalse(runtime.preparedSelections.activate(runtime, source, table, parentOperation).getOrThrow())
+            assertEquals(if (late) 1 else 0, calls.size)
+            untouched()
+        }
+    }
+
+    @Test fun draftCollectionBindingsAreScopedAndNeverForwardedToTheParentReader() = runBlocking {
+        for (change in listOf("none","count","identity","missing","wrongDestination","duplicate","predicate")) fixture {
+            val bound = window.context("unused")
+            fun rows(id:Int, count:Int) = listOf(mapOf("id" to id, "count" to count, "note" to null))
+            bound.collection.set(rows(19, 2))
+            bound.control.set(ControlState(resolved = true))
+            val from = if (change == "missing") "unknown:collection" else "unused:collection"
+            val to = if (change == "wrongDestination") "list:parameters" else "draft:parameters"
+            val ready = DashboardConditionDef(source = "control", dataSourceRef = "unused", field = "loaded", equals = JsonPrimitive(true))
+            val bindings = parentOperation.parameters + listOf(
+                ParameterDef(name = "Max", from = ":windowForm", to = "detail:parameters", location = "maximum"),
+                ParameterDef(name = "Parent", from = from, to = to, location = "0.id"),
+                ParameterDef(name = "count", from = from, to = to, location = "0.count"),
+                ParameterDef(name = "owner", from = from, to = to, location = "0.id"),
+                ParameterDef(name = "note", from = from, to = to, location = "0.note"),
+                ParameterDef(name = "unavailable", from = from, to = to, location = "0.absent"))
+            val op = parentOperation.copy(visibleWhen = ready, parameters = if (change == "duplicate")
+                bindings + ParameterDef(name="Max",input="windowForm",location="maximum") else bindings,
+                prepareSelection = parentOperation.prepareSelection!!.copy(prepare = "Inventory.scoped"))
+            runtime.setWindowFormValues(window.windowId, mapOf("maximum" to 5))
+            loader { request ->
+                assertEquals(mapOf("Parent" to "007", "Max" to 5L), request.input.parameters)
+                when (change) {
+                    "count" -> bound.collection.set(rows(19, 3))
+                    "identity" -> bound.collection.set(rows(20, 2))
+                    "predicate" -> bound.control.set(ControlState(resolved = false))
+                }
+                listOf(mapOf("id" to 7))
+            }
+            val result = runtime.preparedSelections.activate(runtime, source, spec.copy(operations=listOf(op)), op)
+            assertEquals(change == "none",result.getOrDefault(false),change)
+            assertEquals(if (change in listOf("missing","wrongDestination","duplicate")) 0 else 1,calls.size,change)
+            if (change == "none") assertEquals(mapOf("Parent" to 19L,"count" to 2L,"owner" to 19L,"note" to null),draft.form.peek()["local"])
+            else untouched()
         }
     }
 

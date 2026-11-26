@@ -91,22 +91,22 @@ final class PreparedSelectionTests: XCTestCase {
         ]
         .map { $0.merging(["parent": .object(["id": .number(7)])]) { a, _ in a } }
     }
-    private func parentFixture(_ identity: JSONValue = .string("001")) async throws -> (
+    private func parentFixture(_ identity: JSONValue = .string("001"), bindings: [[String:Any]]? = nil, prepareCode: String? = nil) async throws -> (
         ForgeRuntime, String, EditableCollectionSpec, EditableCollectionOperationSpec, WindowMetadata
     ) {
         let op: [String: Any] = [
             "id": "new", "label": "New", "dialogId": "editor",
             "visibleWhen": ["source":"authorization", "field":"principal.roles", "contains":"write"],
-            "parameters": [["name":"Parent", "in":"windowForm", "location":"parent"]],
+            "parameters": bindings ?? [["name":"Parent", "in":"windowForm", "location":"parent"]],
             "prepareSelection": ["dataSourceRef":"reader", "parentParameter":"Parent", "identityField":"id", "prepare":"Editor.seed"]
         ]
         let collection: [String:Any] = ["dataSourceRef":"list", "operations":[op]]
         let json: [String:Any] = [
             "namespace":"Editor", "authorizationSnapshot":["principal":["subject":"owner","roles":["write"]]],
             "dialogs":[["id":"editor","dataSourceRef":"draft"]],
-            "dataSource":["list":[:],"draft":[:],"reader":["parameters":[["name":"Parent","in":"windowForm","location":"parent"]]]],
+            "dataSource":["list":[:],"facts":[:],"draft":[:],"reader":["parameters":[["name":"Parent","in":"windowForm","location":"parent"]]]],
             "view":["content":["containers":[["id":"list","editableCollection":collection]]]],
-            "actions":["code":"({seed:({rows,parameters})=>({id:rows[0].id,caption:rows[0].caption,bound:parameters.Parent})})"]
+            "actions":["code":prepareCode ?? "({seed:({rows,parameters})=>({id:rows[0].id,caption:rows[0].caption,bound:parameters.Parent})})"]
         ]
         let metadata = try JSONDecoder().decode(WindowMetadata.self, from: JSONSerialization.data(withJSONObject: json))
         let spec = try XCTUnwrap(metadata.view?.content?.containers.first?.editableCollection)
@@ -224,6 +224,55 @@ final class PreparedSelectionTests: XCTestCase {
         XCTAssertEqual(calls.count,2)
         let draft = await runtime.dataSourceForm(windowID:id,dataSourceRef:"draft")
         XCTAssertEqual(draft["caption"],.string("Current"))
+    }
+
+    func testScopedDraftBindingsFenceLiveFactsWithoutSendingThemToTheReader() async throws {
+        let bindings: [[String:Any]] = [
+            ["name":"Parent","from":":windowform","to":"reader:parameters","location":"parent"],
+            ["name":"Other","in":"windowForm","location":"other"],
+            ["name":"fact","from":"facts:collection","to":"draft:parameters","location":"0"],
+            ["name":"empty","from":"facts:collection","to":"draft:parameters","location":"0.empty"],
+            ["name":"absent","from":"facts:collection","to":"draft:parameters","location":"0.missing"]
+        ]
+        let prepare = "({seed:({rows,draftParameters})=>({id:rows[0].id, facts:draftParameters})})"
+        let (runtime,id,spec,op,_) = try await parentFixture(bindings:bindings, prepareCode:prepare)
+        await runtime.setWindowFormValue(windowID:id,values:["other":.bool(false)])
+        let original: Row = ["value":.number(2),"empty":.null]
+        await runtime.setDataSourceCollection(windowID:id,dataSourceRef:"facts",rows:[original])
+        let log = PreparedReadLog()
+        await runtime.registerDataSourceLoader { request in await log.add(request); return .init(rows:[["id":.number(1)]]) }
+        let result = await runtime.prepareEditableSelection(windowID:id,sourceDataSourceRef:"list",collection:spec,operation:op)
+        XCTAssertEqual(result.status,"opened",result.error ?? "")
+        let calls = await log.calls
+        XCTAssertEqual(calls.map(\.input.parameters),[["Parent":.string("001"),"Other":.bool(false)]])
+        let form = await runtime.dataSourceForm(windowID:id,dataSourceRef:"draft")
+        XCTAssertEqual(form["facts"],.object(["fact":.object(original),"empty":.null]))
+        await runtime.closeDialogPublic(windowID:id,dialogID:"editor")
+        await runtime.registerDataSourceLoader { _ in
+            await runtime.setDataSourceCollection(windowID:id,dataSourceRef:"facts",rows:[["value":.number(7)]])
+            return .init(rows:[["id":.number(1)]])
+        }
+        let changed = await runtime.prepareEditableSelection(windowID:id,sourceDataSourceRef:"list",collection:spec,operation:op)
+        XCTAssertEqual(changed.status,"superseded")
+        let shown = await runtime.dialogState(windowID:id,dialogID:"editor")
+        XCTAssertFalse(shown.open)
+    }
+
+    func testScopedParentRejectsDuplicateAndUnknownReadDestinationsBeforeIO() async throws {
+        let parent = ["name":"Parent", "in":"windowForm", "location":"parent"]
+        let draft = ["name":"caption", "from":"facts:collection", "to":"draft:parameters", "location":"0.caption"]
+        for extra in [
+            ["name":"Parent","from":":windowform","to":"reader:parameters","location":"parent"],
+            ["name":"Other","from":":windowform","to":"unknown:parameters","location":"parent"]
+        ] {
+            let (runtime,id,spec,op,_) = try await parentFixture(bindings:[parent,draft,extra])
+            let calls = PreparedReadLog()
+            await runtime.registerDataSourceLoader { request in await calls.add(request); return .init(rows:[]) }
+            let result = await runtime.prepareEditableSelection(windowID:id,sourceDataSourceRef:"list",collection:spec,operation:op)
+            XCTAssertEqual(result.status,"failed")
+            let requests = await calls.calls
+            XCTAssertTrue(requests.isEmpty)
+        }
     }
 
     func testExistingControlPredicatesFenceParentOperationOnTheReferencedReader() async throws {

@@ -342,7 +342,7 @@ public actor ForgeRuntime {
         context.lookup = { ref in
             guard ref == identityDataSourceRef || metadata?.dataSources[ref] != nil else { return nil }
             let value = reader(identity.dataSourceID(ref: ref))
-            return .init(selectionMode: metadata?.dataSources[ref]?.selectionMode, form: value?.form ?? [:], metrics: value?.metrics ?? [:],
+            return .init(selectionMode: metadata?.dataSources[ref]?.selectionMode, form: value?.form ?? [:], metrics: value?.metrics ?? [:], collection: value?.collection,
                 selection: value?.selection ?? .init(), input: (ref == identityDataSourceRef ? preferredInput : nil) ?? value?.input ?? .init())
         }
         return context

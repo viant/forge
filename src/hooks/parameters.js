@@ -1,4 +1,4 @@
-import {resolveSelector, setSelector, assertSafeAssignmentPath, assertSafeAssignmentKeys} from "../utils/selector.js";
+import {resolveSelector, resolveSelectorParts, setSelector, assertSafeAssignmentPath, assertSafeAssignmentKeys} from "../utils/selector.js";
 
 // Context caches are keyed by datasource and selection mode. Resolve authored
 // prefixes against the declared graph, not the cache's implementation keys.
@@ -151,6 +151,14 @@ export function resolveParameters(parameterDefinitions = [], context) {
 
             let srcVal;
             switch (srcStore) {
+                case 'collection': {
+                    if (!srcCtx?.signals?.collection) throw new Error('Collection binding source is unavailable: ' + srcDs);
+                    assertSafeAssignmentPath(srcPath);
+                    const rows = srcCtx.signals.collection.peek?.() ?? srcCtx.signals.collection.value;
+                    srcVal = resolveSelectorParts(rows, srcPath.split('.'), true);
+                    if (srcVal === undefined) return;
+                    break;
+                }
                 case 'form':
                     srcVal = resolveSelector(srcCtx.handlers.dataSource.peekFormData(), srcPath);
                     break;

@@ -5,6 +5,7 @@ public enum ParameterResolver {
         public let selectionMode: String?
         public let form: [String: JSONValue]
         public let metrics: [String: JSONValue]
+        public let collection: [[String: JSONValue]]?
         public let selection: SelectionState
         public let input: InputState
 
@@ -12,12 +13,14 @@ public enum ParameterResolver {
             selectionMode: String? = nil,
             form: [String: JSONValue] = [:],
             metrics: [String: JSONValue] = [:],
+            collection: [[String: JSONValue]]? = nil,
             selection: SelectionState = SelectionState(),
             input: InputState = InputState()
         ) {
             self.selectionMode = selectionMode
             self.form = form
             self.metrics = metrics
+            self.collection = collection
             self.selection = selection
             self.input = input
         }
@@ -242,6 +245,13 @@ public enum ParameterResolver {
         switch store {
         case "form":
             return readDataSourceObject(context: context, dataSourceRef: dataSourceRef, object: \.form, path: sourcePath)
+        case "collection":
+            guard let rows = context.snapshot(dataSourceRef)?.collection else { return nil }
+            let parts = sourcePath.split(separator: ".", omittingEmptySubsequences: false)
+            guard let first = parts.first, let index = Int(first), String(index) == first, rows.indices.contains(index),
+                  parts.allSatisfy({ !$0.isEmpty && $0 != "__proto__" && $0 != "constructor" && $0 != "prototype" })
+            else { return nil }
+            return resourceResolveValue(.object(rows[index]), components: parts.dropFirst(), strictIndices: true)
         case "selection":
             return readSelection(context: context, dataSourceRef: dataSourceRef, path: sourcePath)
         case "filter":
