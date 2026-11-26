@@ -7801,7 +7801,7 @@
   "$ref": "#/$defs/Window",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "x-forge-provenance": {
-    "baseCommit": "84a95b0a1c175276f1de575d371789d36b96d4f8",
+    "baseCommit": "be81ab2633d1720d7a1434230304121151185a2e",
     "generator": "scripts/window-schema/main.go",
     "sha256": {
       "choice_browser.go": "935cbeddb231dd329374114c5f38454dc7c44c2ab70a45ea3c0f37ce7f3aee26",
@@ -7861,7 +7861,7 @@
       "resource_policy_editor.go": "6f3a00bf5ac0751a133fe121e727f5aa2671489dfb07b98a29314cc7a380b8c2",
       "result_preview.go": "bd913237174dc663cf40a5cd30bf5e835ec077930e7f0916f7ce906671f3dbff",
       "rule_editor.go": "3eda2833f57c5a64adec603e42213423907151451998fa4ba538fe258273f6e6",
-      "selection_preparation.go": "f6d00dbbb71c0c002dd8ffe7370d2fe591bc25fb6399428b9ccebc7feb628033",
+      "selection_preparation.go": "def1337f6d98450c28f018eb01e5f03d0ecbd724c89b58ca17c36e2acff68690",
       "window_compiled_resource.go": "12eddf7313e2a4a52f81fe5fa68b67e2c284f07b5947e9bdb2dea833cfd20cc1",
       "window_consumer.go": "68fb1c0e6023416f0f27420c0a5fcd0c08b1ce6502ca63cf97a96236e0918837",
       "window_descriptor.go": "99170237b79c06523e72302b7917e0f573ef5f54bbc4bf0b8a4625915274c789",
