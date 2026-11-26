@@ -9,7 +9,7 @@ import {executeCommand, getCommandState} from './primitives/commandExecutor.js';
 import '../packs/blueprint/index.jsx';
 
 let index = 0;
-async function mount() {
+async function mount(configure) {
     globalThis.IS_REACT_ACT_ENVIRONMENT = true;
     const windowId = `saved-projection-${++index}`, host = document.createElement('div');
     document.body.append(host);
@@ -36,6 +36,7 @@ async function mount() {
             {id: 'writerPanel', dataSourceRef: 'writer', fetchData: false},
         ]}},
     };
+    configure?.(metadata);
     const settle = async fn => act(async () => {fn?.(); for (let n = 0; n < 60; n++) await Promise.resolve();});
     await settle(() => root.render(<SettingProvider endpoints={{}} connectorConfig={{window: {service: {uri: '/window'}}}} services={{dataConnectorTransport: transport}}><WindowContent window={{windowId, windowKey: 'fixture'}} selectedMetadata={metadata}/></SettingProvider>));
     const context = getWindowContext(windowId), properties = context.Context('properties'), defaults = context.Context('defaults');
@@ -305,5 +306,23 @@ it.each([
         expect((await result).status).toBe(status);
         const calls = v.transport.mock.calls.slice(start).map(([request]) => request.dataSourceRef);
         expect(calls).toEqual(status === 'succeeded' ? ['writer', 'record'] : ['writer']);
+    } finally {await v.close();}
+});
+
+it.each([[8, 9, 'succeeded'], [9, 8, 'indeterminate']])('checks returned ID %s before a display hook rewrites it to %s', async (received, displayed, status) => {
+    const v = await mount(metadata => {
+        metadata.namespace = 'Probe';
+        metadata.actions = {code: `(() => ({ project({collection}) {collection[0].id = ${displayed}; return collection;} }))()`};
+        metadata.dataSource.writer.on = [{event: 'onFetch', handler: 'Probe.project'}];
+    });
+    try {
+        v.transport.mockResolvedValueOnce({data: [{id: received}]});
+        const command = {dataSourceRef: 'writer', receiptIdentity: {submittedRows: 'items', field: 'id'},
+            resultState: {verifiedID: ['0.id']}};
+        let completion;
+        await v.settle(() => {completion = executeCommand(v.properties, command, {items: [{id: 8}]});});
+        expect((await completion).status).toBe(status);
+        expect(v.context.Context('writer').signals.collection.peek()[0].id).toBe(displayed);
+        expect(v.properties.signals.windowForm.peek().verifiedID).toBe(status === 'succeeded' ? 8 : undefined);
     } finally {await v.close();}
 });

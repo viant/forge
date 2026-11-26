@@ -116,7 +116,7 @@ function resolveDataPath(holder, path) {
   return { present: true, value };
 }
 
-export function extractData(selectors = {}, paging, data, requireRecordArray = false) {
+export function extractData(selectors = {}, paging, data, requireRecordArray = false, captureSelectedRows = false) {
   let records = [];
   let info = {};
   let stats = {};
@@ -210,5 +210,5 @@ export function extractData(selectors = {}, paging, data, requireRecordArray = f
       stats = resolveKey(data, metricsSelector) || [];
     }
   }
-  return { records, info, stats };
+  return captureSelectedRows ? {records, info, stats, selectedRows: respData} : {records, info, stats};
 }

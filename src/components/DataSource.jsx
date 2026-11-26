@@ -11,7 +11,7 @@ import {applyFetchTransform} from "./dataSourceTransform.js";
 import {hasResolvedDependencies} from "./dataSourceDependencies.js";
 import {bindingFinalizationAction, dataSourceRequestId, isCurrentBindingGeneration} from "./primitives/bindingGeneration.js";
 import {resourceModelRefForDataSource, unmarshalResourceCollection} from "./primitives/resourceModel.js";
-import {requiresOrderedRecords, settleDataSourceRequest, settleUnmountedDataSourceResponse} from './dataSourceRequestLifecycle.js';
+import {requestedResultMode, settleDataSourceRequest, settleUnmountedDataSourceResponse} from './dataSourceRequestLifecycle.js';
 import {isProtectedUpstreamDenial, isDataSourceLocalDenial} from './dataSourceAuthorization.js';
 import {shouldDispatchSelectionEvent} from './selectionEventModel.js';
 import {reconcileFetchForMetadataReadiness} from './dataSourceMetadataReadiness.js';
@@ -499,7 +499,8 @@ export default function DataSource({context, hasScheduledFetch}) {
         const requestPaging = withPagingSize(paging, inputVal.pageSize);
         const requestId = dataSourceRequestId(inputVal);
         const requestDataSourceId = context?.identity?.dataSourceId;
-        const orderedRecords = requiresOrderedRecords(requestDataSourceId, requestId);
+        const resultMode = requestedResultMode(requestDataSourceId, requestId);
+        const orderedRecords = resultMode === 'orderedRecords' || resultMode === 'identityRecords';
         let receivedResponse = false;
         const hasDeps = hasResolvedDependencies(dataSource.parameters, parameters, filter, dataSource.requiredAnyParameters);
         if (!hasDeps) {
@@ -641,9 +642,13 @@ export default function DataSource({context, hasScheduledFetch}) {
             } catch (_) {
             }
 
-            let {records, info, stats} = aggregate
+            let {records, info, stats, selectedRows} = aggregate
                 ? collected
-                : extractData(selectors, requestPaging, payload, orderedRecords);
+                : extractData(selectors, requestPaging, payload, orderedRecords, resultMode === 'identityRecords');
+            // Preserve producer evidence before resource mapping, hooks or pagination change the displayed rows.
+            const identityRows = resultMode === 'identityRecords' && Array.isArray(selectedRows)
+                ? (typeof structuredClone === 'function' ? structuredClone(selectedRows) : JSON.parse(JSON.stringify(selectedRows)))
+                : undefined;
             if (orderedRecords && isDeferredCacheHitEnvelope(payload)) throw new Error('Writer returned a deferred cache envelope.');
             if (cursorRequest) {
                 info = cursorSessionRef.current.finish(cursorRequest, info);
@@ -791,7 +796,7 @@ export default function DataSource({context, hasScheduledFetch}) {
                 }
             } catch (_) {
             }
-            settleDataSourceRequest(requestDataSourceId, requestId, null, payload, records);
+            settleDataSourceRequest(requestDataSourceId, requestId, null, payload, records, identityRows);
         } catch (err) {
             if (!authorizationIsCurrent()) return;
             const cause = orderedRecords && receivedResponse

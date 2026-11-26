@@ -558,7 +558,7 @@ function dispatchCommandWriter(target, command, input, id, requireRecords, start
       const options = {
         cache: {bypassCache: true},
         invocationId: id,
-        ...(requireRecords ? {result: strictReceipt ? 'orderedRecords' : 'records'} : {})
+        ...(requireRecords ? {result: command.receiptIdentity ? 'identityRecords' : strictReceipt ? 'orderedRecords' : 'records'} : {})
       };
       let result;
       try {

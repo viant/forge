@@ -33,8 +33,8 @@ export function settleUnmountedDataSourceResponse(dataSourceId, requestId, paylo
   return settleDataSourceRequest(dataSourceId, requestId, error, payload);
 }
 
-export function requiresOrderedRecords(dataSourceId, requestId) {
-  return !!requestId && pending.get(key(dataSourceId, requestId))?.result === 'orderedRecords';
+export function requestedResultMode(dataSourceId, requestId) {
+  return requestId && pending.get(key(dataSourceId, requestId))?.result;
 }
 
 export function invalidateWindowDataSourceRequests(windowId) {
@@ -52,14 +52,17 @@ export function invalidateWindowDataSourceRequests(windowId) {
   return invalidated;
 }
 
-export function settleDataSourceRequest(dataSourceId, requestId, error = null, value = undefined, records = undefined) {
+export function settleDataSourceRequest(dataSourceId, requestId, error = null, value = undefined, records = undefined, identityRows = undefined) {
   if (!dataSourceId || !requestId) return false;
   const requestKey = key(dataSourceId, requestId);
   const entry = pending.get(requestKey);
   if (!entry) return false;
   pending.delete(requestKey);
   if (error) entry.reject(error);
-  else if (entry.result === 'records' || entry.result === 'orderedRecords') {
+  else if (entry.result === 'identityRecords') {
+    if (Array.isArray(identityRows)) entry.resolve(identityRows);
+    else entry.reject(Object.assign(new Error('The writer did not provide invocation identity records.'), {code: 'request_superseded'}));
+  } else if (entry.result === 'records' || entry.result === 'orderedRecords') {
     if (!Array.isArray(records)) entry.reject(Object.assign(new Error('Datasource records were superseded before completion.'), {code: 'request_superseded'}));
     else {
       try { entry.resolve(typeof structuredClone === 'function' ? structuredClone(records) : JSON.parse(JSON.stringify(records))); }
