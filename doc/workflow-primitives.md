@@ -923,6 +923,7 @@ receiptIdentity: {submittedRows: body.items, submittedField: id, field: id}
 ```
 
 Forge captures the identities from the final prepared request before dispatch.
+For identity-checked writes, the datasource’s response selector determines the receipt rows before display hooks or collection updates. Result mappings read those same rows.
 Each submitted ID must appear exactly once in the invocation’s returned rows,
 in any order. Missing, additional, duplicate and type-mismatched IDs leave the
 outcome indeterminate. IDs may be nonblank strings or safe JSON integers.
