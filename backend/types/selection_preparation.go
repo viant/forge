@@ -72,7 +72,11 @@ func validateSelectionPreparation(owner string, op *EditableCollectionOperation)
 	if strings.TrimSpace(spec.DataSourceRef) == "" || strings.TrimSpace(spec.Prepare) == "" {
 		return fmt.Errorf("%s.prepareSelection requires a reader dataSourceRef and a prepare handler", owner)
 	}
-	if !topLevelSelectionField(spec.IDsParameter) || !validResourceSelector(spec.IdentityField) {
+	if spec.ParentParameter != "" {
+		if spec.IDsParameter != "" || !topLevelSelectionField(spec.ParentParameter) || !validResourceSelector(spec.IdentityField) {
+			return fmt.Errorf("%s.prepareSelection requires a safe parentParameter and identityField, without idsParameter", owner)
+		}
+	} else if !topLevelSelectionField(spec.IDsParameter) || !validResourceSelector(spec.IdentityField) {
 		return fmt.Errorf("%s.prepareSelection requires a top-level idsParameter and a safe identityField", owner)
 	}
 	for _, field := range []string{spec.PendingField, spec.ErrorField} {
@@ -88,10 +92,13 @@ func validateSelectionPreparation(owner string, op *EditableCollectionOperation)
 		if parameter == nil {
 			continue
 		}
-		if parameter.Name == spec.IDsParameter {
+		if spec.IDsParameter != "" && parameter.Name == spec.IDsParameter {
 			return fmt.Errorf("%s.prepareSelection idsParameter %q collides with an operation parameter", owner, spec.IDsParameter)
 		}
 		declared[parameter.Name] = true
+	}
+	if spec.ParentParameter != "" && !declared[spec.ParentParameter] {
+		return fmt.Errorf("%s.prepareSelection parentParameter must name a declared operation parameter", owner)
 	}
 	for field, parameter := range spec.ScopeFields {
 		if !validResourceSelector(field) || !topLevelSelectionField(parameter) || !declared[parameter] {

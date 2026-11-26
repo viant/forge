@@ -110,14 +110,15 @@ type PrimitiveSelection struct {
 
 // SelectionPreparation reads an operation's selected records before opening its draft dialog.
 type SelectionPreparation struct {
-	DataSourceRef string            `json:"dataSourceRef" yaml:"dataSourceRef"`
-	IDsParameter  string            `json:"idsParameter" yaml:"idsParameter"`
-	IdentityField string            `json:"identityField" yaml:"identityField"`
-	ScopeFields   map[string]string `json:"scopeFields,omitempty" yaml:"scopeFields,omitempty"`
-	MappingRef    string            `json:"mappingRef,omitempty" yaml:"mappingRef,omitempty"`
-	Prepare       string            `json:"prepare" yaml:"prepare"`
-	PendingField  string            `json:"pendingField,omitempty" yaml:"pendingField,omitempty"`
-	ErrorField    string            `json:"errorField,omitempty" yaml:"errorField,omitempty"`
+	DataSourceRef   string            `json:"dataSourceRef" yaml:"dataSourceRef"`
+	IDsParameter    string            `json:"idsParameter,omitempty" yaml:"idsParameter,omitempty"`
+	ParentParameter string            `json:"parentParameter,omitempty" yaml:"parentParameter,omitempty"`
+	IdentityField   string            `json:"identityField" yaml:"identityField"`
+	ScopeFields     map[string]string `json:"scopeFields,omitempty" yaml:"scopeFields,omitempty"`
+	MappingRef      string            `json:"mappingRef,omitempty" yaml:"mappingRef,omitempty"`
+	Prepare         string            `json:"prepare" yaml:"prepare"`
+	PendingField    string            `json:"pendingField,omitempty" yaml:"pendingField,omitempty"`
+	ErrorField      string            `json:"errorField,omitempty" yaml:"errorField,omitempty"`
 }
 
 type EditableCollectionOperation struct {

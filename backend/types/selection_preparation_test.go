@@ -24,6 +24,10 @@ view:
           dialogId: editor
           parameters: [{name: Scope, in: const, location: A}]
           prepareSelection: {dataSourceRef: details, idsParameter: IDs, identityField: identity.id, scopeFields: {scope.id: Scope, dialogId: Scope, dataSourceRef: Scope}, mappingRef: variants, prepare: 'Editor.prepare', pendingField: reading, errorField: lastError}
+        - id: create
+          dialogId: editor
+          parameters: [{name: ID, in: windowForm, location: parentID}]
+          prepareSelection: {dataSourceRef: details, parentParameter: ID, identityField: id, prepare: 'Editor.prepare'}
 `,
 		"extension/forge/dialogs/Scope.yaml":  "id: Scope\ncontent: {id: unused}\n",
 		"extension/forge/dialogs/editor.yaml": "id: editor\ndataSourceRef: draft\ncontent: {id: fields, dataSourceRef: draft, fetchData: false}\n",
@@ -54,6 +58,10 @@ resourceModels: {selected: {schemaRef: record}}
 			t.Fatalf("missing bound %s", name)
 		}
 	}
+	parent := w.View.Content.EditableCollection.Operations[1].PrepareSelection
+	if parent == nil || parent.ParentParameter != "ID" || parent.IDsParameter != "" {
+		t.Fatal("parent reader parameter not preserved")
+	}
 	spec := w.View.Content.EditableCollection.Operations[0].PrepareSelection
 	if spec == nil || spec.DataSourceRef != "details" || spec.IDsParameter != "IDs" || spec.ScopeFields["scope.id"] != "Scope" || spec.IdentityField != "identity.id" || spec.Prepare != "Editor.prepare" || spec.PendingField != "reading" || spec.ErrorField != "lastError" {
 		t.Fatalf("compiled selection differs: %+v", spec)
@@ -70,6 +78,12 @@ func TestPrepareSelectionValidation(t *testing.T) {
 		boundOnly  bool
 		modify     edit
 	}{
+		{"ambiguous identity source", "without idsParameter", false, func(o *types.EditableCollectionOperation, _ *types.Window) {
+			o.PrepareSelection.ParentParameter = "Scope"
+		}},
+		{"unbound parent", "must name a declared operation parameter", false, func(o *types.EditableCollectionOperation, _ *types.Window) {
+			o.PrepareSelection.ParentParameter, o.PrepareSelection.IDsParameter = "Other", ""
+		}},
 		{"dialog required", "requires a dialogId", false, func(o *types.EditableCollectionOperation, _ *types.Window) { o.DialogID = "" }},
 		{"handler conflicts", "cannot also declare", false, func(o *types.EditableCollectionOperation, _ *types.Window) { o.Handler = "run" }},
 		{"mutation conflicts", "cannot also declare", false, func(o *types.EditableCollectionOperation, _ *types.Window) { o.Mutation = &types.MutationCommand{} }},
