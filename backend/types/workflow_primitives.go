@@ -14,8 +14,10 @@ type MutationPreparationStep struct {
 type MutationCommand struct {
 	// ClearFormFields clears the named draft fields after an acknowledged root write if their submitted values are still current.
 	ClearFormFields []string `json:"clearFormFields,omitempty" yaml:"clearFormFields,omitempty"`
-	// ReceiptWhen optionally checks this cleanup invocation's normalized rows.
-	ReceiptWhen  map[string]interface{}    `json:"receiptWhen,omitempty" yaml:"receiptWhen,omitempty"`
+	// ReceiptWhen requires the invocation's normalized rows to confirm the requested operation.
+	ReceiptWhen map[string]interface{} `json:"receiptWhen,omitempty" yaml:"receiptWhen,omitempty"`
+	// RejectedWhen identifies a definitive producer rejection on a root or preparation command with ReceiptWhen.
+	RejectedWhen map[string]interface{}    `json:"rejectedWhen,omitempty" yaml:"rejectedWhen,omitempty"`
 	Before       []MutationPreparationStep `json:"before,omitempty" yaml:"before,omitempty"`
 	CleanupState map[string]interface{}    `json:"cleanupState,omitempty" yaml:"cleanupState,omitempty"`
 

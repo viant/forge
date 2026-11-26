@@ -10,8 +10,8 @@ func validatePreparationSteps(window *Window, owner, fallbackID string, root *Mu
 	if root == nil {
 		return nil
 	}
-	if root.ReceiptWhen != nil {
-		return fmt.Errorf("%s.receiptWhen can only be declared on a cleanup command", owner)
+	if err := validateWriterReceipt(root, owner); err != nil {
+		return err
 	}
 	for field := range root.SuccessFormState {
 		if !validResourceSelector(field) || strings.Contains(field, ".") {
@@ -66,12 +66,15 @@ func validatePreparationSteps(window *Window, owner, fallbackID string, root *Mu
 		if err := validate(step.Command, location+".command"); err != nil {
 			return err
 		}
-		if step.Command.ReceiptWhen != nil {
-			return fmt.Errorf("%s.command.receiptWhen can only be declared on a cleanup command", location)
+		if err := validateWriterReceipt(step.Command, location+".command"); err != nil {
+			return err
 		}
 		if step.Cleanup != nil {
 			if err := validate(step.Cleanup, location+".cleanup"); err != nil {
 				return err
+			}
+			if step.Cleanup.RejectedWhen != nil {
+				return fmt.Errorf("%s.cleanup.rejectedWhen is only supported on the root or a preparation command", location)
 			}
 			if step.Cleanup.ReceiptWhen != nil {
 				if err := validateConditionTree(step.Cleanup.ReceiptWhen, location+".cleanup.receiptWhen", validateReceiptLeaf); err != nil {
@@ -99,9 +102,24 @@ func validatePreparationWriter(window *Window, owner string, command *MutationCo
 	return nil
 }
 
+func validateWriterReceipt(command *MutationCommand, owner string) error {
+	if command.ReceiptWhen != nil {
+		if err := validateConditionTree(command.ReceiptWhen, owner+".receiptWhen", validateReceiptLeaf); err != nil {
+			return err
+		}
+	}
+	if command.RejectedWhen == nil {
+		return nil
+	}
+	if command.ReceiptWhen == nil {
+		return fmt.Errorf("%s.rejectedWhen requires receiptWhen", owner)
+	}
+	return validateConditionTree(command.RejectedWhen, owner+".rejectedWhen", validateReceiptLeaf)
+}
+
 func validateReceiptLeaf(leaf map[string]any, at string) error {
 	if source, ok := leaf["source"].(string); !ok || source != "collection" {
-		return fmt.Errorf("%s must use collection scope for the cleanup receipt", at)
+		return fmt.Errorf("%s must use collection scope for the invocation receipt", at)
 	}
 	selectors, operators, bounds := 0, 0, 0
 	for key, operand := range leaf {
@@ -113,7 +131,7 @@ func validateReceiptLeaf(leaf map[string]any, at string) error {
 			index, _, _ := strings.Cut(selector, ".")
 			n, err := strconv.ParseUint(index, 10, 32)
 			if err != nil || strconv.FormatUint(n, 10) != index || !validResourceSelector(selector) {
-				return fmt.Errorf("%s.%s requires a row index and an optional dotted path in the cleanup receipt", at, key)
+				return fmt.Errorf("%s.%s requires a row index and an optional dotted path in the invocation receipt", at, key)
 			}
 			selectors++
 			continue

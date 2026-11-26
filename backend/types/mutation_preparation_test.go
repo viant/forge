@@ -143,13 +143,13 @@ func TestOrderedMutationValidation(t *testing.T) {
 		{"child result", "belong to the root", func(c *types.MutationCommand) { c.Before[0].Cleanup.ResultState = map[string][]string{"value": {"id"}} }},
 		{"child clear", "belong to the root", func(c *types.MutationCommand) { c.Before[0].Command.ClearFormFields = []string{"one"} }},
 		{"cleanup clear", "belong to the root", func(c *types.MutationCommand) { c.Before[0].Cleanup.ClearFormFields = []string{"one"} }},
-		{"root receipt", "only be declared on a cleanup", func(c *types.MutationCommand) { c.ReceiptWhen = map[string]any{} }},
-		{"root receipt without before", "only be declared on a cleanup", func(c *types.MutationCommand) { c.Before = nil; c.ReceiptWhen = map[string]any{} }},
-		{"root receipt empty before", "only be declared on a cleanup", func(c *types.MutationCommand) {
+		{"root receipt", "receiptWhen", func(c *types.MutationCommand) { c.ReceiptWhen = map[string]any{} }},
+		{"root receipt without before", "receiptWhen", func(c *types.MutationCommand) { c.Before = nil; c.ReceiptWhen = map[string]any{} }},
+		{"root receipt empty before", "receiptWhen", func(c *types.MutationCommand) {
 			c.Before = []types.MutationPreparationStep{}
 			c.ReceiptWhen = map[string]any{}
 		}},
-		{"forward receipt", "only be declared on a cleanup", func(c *types.MutationCommand) { c.Before[0].Command.ReceiptWhen = map[string]any{} }},
+		{"forward receipt", "receiptWhen", func(c *types.MutationCommand) { c.Before[0].Command.ReceiptWhen = map[string]any{} }},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			c := newOrderedCommand()
@@ -289,5 +289,51 @@ func TestSuccessFormStateIsDialogScoped(t *testing.T) {
 		if err := types.ValidateResourceModels(orderedFooter(ordered)); err == nil {
 			t.Fatal("accepted nested result patch")
 		}
+	}
+}
+
+func TestWriterReceiptConditions(t *testing.T) {
+	accepted := map[string]any{"source": "collection", "field": "0.status", "equals": "completed"}
+	rejected := map[string]any{"source": "collection", "field": "0.status", "equals": "rejected"}
+	for _, position := range []string{"root", "ordinary", "step", "cleanup"} {
+		t.Run(position, func(t *testing.T) {
+			root := newOrderedCommand()
+			target := root
+			switch position {
+			case "ordinary":
+				root.Before = nil
+			case "step":
+				target = root.Before[0].Command
+			case "cleanup":
+				target = root.Before[0].Cleanup
+			}
+			target.ReceiptWhen = accepted
+			if err := types.ValidateResourceModels(orderedFooter(root)); err != nil {
+				t.Fatal(err)
+			}
+			target.RejectedWhen = rejected
+			err := types.ValidateResourceModels(orderedFooter(root))
+			if position == "cleanup" {
+				if err == nil || !strings.Contains(err.Error(), "cleanup.rejectedWhen") {
+					t.Fatalf("cleanup rejection rule: %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw, err := json.Marshal(target)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var decoded types.MutationCommand
+			if err = json.Unmarshal(raw, &decoded); err != nil || !reflect.DeepEqual(decoded.RejectedWhen, rejected) {
+				t.Fatalf("receipt predicate did not round trip: %v", err)
+			}
+			target.ReceiptWhen = nil
+			if err = types.ValidateResourceModels(orderedFooter(root)); err == nil || !strings.Contains(err.Error(), "rejectedWhen requires receiptWhen") {
+				t.Fatalf("rejection without positive receipt: %v", err)
+			}
+		})
 	}
 }
