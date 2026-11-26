@@ -432,7 +432,8 @@ class ForgeRuntime(
             snapshots = snapshots,
             windowForm = JsonUtil.anyToElement(context.window.peekWindowForm()) as JsonObject,
             props = JsonUtil.anyToElement(args + ("execution" to executionValue)) as JsonObject,
-            authorization = JsonObject(metadata.authorizationSnapshot), windowKey = metadata.windowKey
+            authorization = JsonObject(metadata.authorizationSnapshot), windowKey = metadata.windowKey,
+            actionNamespaces = metadata.actionNamespaces
         )
         if (applyEffects && current()) applyUIActionEffects(context, projection.effects, metadata)
         return projection.result?.let(JsonUtil::elementToAny)

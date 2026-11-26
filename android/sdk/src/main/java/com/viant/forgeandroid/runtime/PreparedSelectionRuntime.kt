@@ -182,7 +182,7 @@ internal class PreparedSelectionRuntime {
             val projection = UIActionProjection.invoke(code, prepare.prepare, metadata.actionNamespace(prepare.prepare), source.dataSourceRef,
                 runtime.actionSnapshots(mapOf(source.dataSourceRef to source), includeCollection = false),
                 JsonUtil.anyToElement(window.peekWindowForm()).jsonObject, props, JsonObject(metadata.authorizationSnapshot),
-                readOnly = true, windowKey = metadata.windowKey, actionNamespaces = listOfNotNull(metadata.namespace) + metadata.actionAliases)
+                readOnly = true, windowKey = metadata.windowKey, actionNamespaces = metadata.actionNamespaces)
             val seed = projection.result as? JsonObject ?: error("Selection preparation must return the complete draft object.")
             currentCoroutineContext().ensureActive()
             return synchronized(runtime) {

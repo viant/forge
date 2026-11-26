@@ -595,7 +595,8 @@ class MutationCommandRuntime {
         val metadata = window.metadata.peek() ?: error("Window metadata is unavailable.")
         val code = metadata.actions?.code?.takeIf { it.isNotBlank() } ?: error("Command preparation handler is unavailable: $handler")
         return UIActionProjection.invoke(code, handler, metadata.actionNamespace(handler), source.dataSourceRef, snapshots,
-            JsonUtil.anyToElement(window.peekWindowForm()) as JsonObject, props, JsonObject(metadata.authorizationSnapshot), readOnly = true, windowKey = metadata.windowKey).result
+            JsonUtil.anyToElement(window.peekWindowForm()) as JsonObject, props, JsonObject(metadata.authorizationSnapshot), readOnly = true, windowKey = metadata.windowKey,
+            actionNamespaces = metadata.actionNamespaces).result
     }
 
     private suspend fun preparePayload(window: WindowContext, source: DataSourceContext,

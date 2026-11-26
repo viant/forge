@@ -149,6 +149,43 @@ class DialogMutationFooterTest {
         }
     }
 
+    @Test fun declaredWindowActionsResolveInsideEventsAndReadOnlyResourcePreparation() = runBlocking {
+        withFixture { f ->
+            val code = """({
+                lookup: ({context, name}) => context.lookupHandler(name)({context}),
+                choose: ({context}) => { context.signals.windowForm.value = {chosen: 17}; return true; },
+                prepare: ({context, value}) => context.lookupHandler("Shared.normalize")({value}),
+                normalize: ({value}) => ({...value, id: 17, active: false}),
+                impure: ({context}) => context.lookupHandler("Workspace.choose")({context}),
+                'ordinary.with.dot': () => 17,
+                'Other.choose': () => true
+            })"""
+            val schema = JsonUtil.json.decodeFromString<ResourceSchemaDef>(
+                """{"type":"object","properties":{"id":{"type":"integer"},"active":{"type":"boolean"}}}""")
+            val model = JsonUtil.json.decodeFromString<ResourceModelDef>(
+                """{"schemaRef":"record","write":{"dataSourceRef":"save","mode":"full"},
+                    "hooks":{"beforeMarshal":"Workspace.prepare"}}""")
+            val meta = f.window.metadata.peek()!!.copy(actions=ActionsDef(code), actionAliases=listOf("Shared"),
+                schemas=mapOf("record" to schema), resourceModels=mapOf("record" to model))
+            f.window.metadata.set(meta)
+            val event = ExecutionDef(handler="Workspace.lookup", event="onLookup")
+            f.runtime.execute(event, f.source, mapOf("name" to "Shared.choose"))!!.join()
+            assertEquals(17L, f.window.peekWindowForm()["chosen"])
+            assertEquals(17L, f.runtime.evaluate(ExecutionDef(handler="Shared.ordinary.with.dot"), f.source))
+            for (name in listOf("Other.choose", "Shared.missing", "Shared.toString")) {
+                assertFails { f.runtime.evaluate(event, f.source, mapOf("name" to name)) }
+            }
+            val command = f.action.footerCommand()!!.copy(prepare=null, refresh=emptyList(), payload=ResourcePayloadPreparationDef(
+                modelRef="record", source=ResourceValueSourceDef(scope="form")))
+            val result = f.execute(command)
+            assertEquals("succeeded", result.status, result.error)
+            assertEquals(JsonUtil.json.parseToJsonElement("""{"id":17,"active":false}"""), JsonUtil.anyToElement(f.calls.single().second))
+            f.window.metadata.set(meta.copy(resourceModels=mapOf("record" to model.copy(hooks=ResourceModelHooksDef(beforeMarshal="Workspace.impure")))))
+            assertFalse(f.execute(command).accepted)
+            assertEquals(1, f.calls.size)
+        }
+    }
+
     @Test fun openingRunsDeclaredLifecycleOnceAndBindsArgumentsBeforeIt() = runBlocking {
         withFixture { f ->
             var opened = 0

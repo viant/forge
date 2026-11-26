@@ -847,7 +847,7 @@ struct MutationScope: Sendable {
         guard let code = metadata.actions?.code, !code.isEmpty else { throw MutationRuntimeError.message("Action module is unavailable: \(name)") }
         let result = try UIActionProjection.invoke(code: code, function: name, namespace: metadata.actionNamespace(for: name),
             source: source, snapshots: [:], windowForm: selectionPreparation ? [:] : windowForm, props: props, authorization: selectionPreparation ? [:] : metadata.authorizationSnapshot, windowKey: windowKey,
-            aliases: ([metadata.namespace].compactMap { $0 } + (metadata.actionAliases ?? [])), selectionPreparation: selectionPreparation, snapshot: { selectionPreparation ? self.preparationSignal($0) : self.actionState($0) })
+            aliases: metadata.actionNamespaces, selectionPreparation: selectionPreparation, snapshot: { selectionPreparation ? self.preparationSignal($0) : self.actionState($0) })
         guard result.effects.isEmpty else { throw MutationRuntimeError.message("Command preparation cannot apply UI or network effects: \(name)") }
         return result.result ?? (result.returnedValue ? .null : nil)
     }

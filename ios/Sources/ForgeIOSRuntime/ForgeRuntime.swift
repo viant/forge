@@ -1060,7 +1060,7 @@ public actor ForgeRuntime {
                 code: code, function: execution.action, namespace: namespace,
                 source: context.dataSourceRef, snapshots: snapshots, windowForm: windowForm,
                 props: args.merging(["execution": executionValue]) { current, _ in current },
-                authorization: metadata.authorizationSnapshot
+                authorization: metadata.authorizationSnapshot, aliases: metadata.actionNamespaces
             )
             if applyEffects {
                 guard await applyProjectedUIEffects(projection.effects, context: context, metadata: metadata) else { return nil }

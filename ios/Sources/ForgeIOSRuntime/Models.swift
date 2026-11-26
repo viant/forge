@@ -6,6 +6,7 @@ public struct WindowMetadata: Codable, Sendable {
     public let windowKey: String?
     public let namespace: String?
     public let actionAliases: [String]?
+    let actionNamespaces: [String]
     public let view: ViewDef?
     public let dialogs: [DialogDef]
     public let dataSources: [String: DataSourceDef]
@@ -21,8 +22,11 @@ public struct WindowMetadata: Codable, Sendable {
     public let resourceMappings: [String: ResourceMappingDef]?
 
     public func actionNamespace(for handler: String) -> String? {
-        if let namespace, !namespace.isEmpty, handler.hasPrefix(namespace + ".") { return namespace }
-        return actionAliases?.first { !$0.isEmpty && handler.hasPrefix($0 + ".") }
+        actionNamespaces.first { handler.hasPrefix($0 + ".") }
+    }
+
+    private static func declaredActionNamespaces(_ namespace: String?, aliases: [String]?) -> [String] {
+        ([namespace].compactMap { $0 } + (aliases ?? [])).filter { !$0.isEmpty }
     }
 
     enum CodingKeys: String, CodingKey {
@@ -68,6 +72,7 @@ public struct WindowMetadata: Codable, Sendable {
         self.namespace = namespace
         self.windowKey = windowKey
         self.actionAliases = actionAliases
+        self.actionNamespaces = Self.declaredActionNamespaces(namespace, aliases: actionAliases)
         self.view = view
         self.dialogs = dialogs
         self.dataSources = dataSources
@@ -89,6 +94,7 @@ public struct WindowMetadata: Codable, Sendable {
         actionAliases = try container.decodeIfPresent([String].self, forKey: .actionAliases)
         windowKey = try container.decodeIfPresent(String.self, forKey: .windowKey)
         namespace = try container.decodeIfPresent(String.self, forKey: .namespace)
+        actionNamespaces = Self.declaredActionNamespaces(namespace, aliases: actionAliases)
         let decodedView = try container.decodeIfPresent(ViewDef.self, forKey: .view)
         dialogs = try container.decodeIfPresent([DialogDef].self, forKey: .dialogs) ?? []
         dataSources = try container.decodeIfPresent([String: DataSourceDef].self, forKey: .dataSources)

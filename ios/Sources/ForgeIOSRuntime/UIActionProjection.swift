@@ -27,7 +27,12 @@ public enum UIActionProjection {
             const effects=[],contexts=Object.create(null);activeEffects=effects;
             const signal=(state,key,kind,ref)=>{const holder={peek:()=>state[key]};Object.defineProperty(holder,'value',{get:()=>state[key],set:value=>{state[key]=value;effects.push({kind,ref,value});}});return holder;};
             const windowState={value:windowForm},windowFormSignal=signal(windowState,'value','windowForm',null);
-            const lookupHandler=key=>{const ns=aliases.find(n=>key.startsWith(n+'.'));const fn=module[ns?key.slice(ns.length+1):key];if(typeof fn!=='function')throw new Error('Missing action: '+key);return fn;};
+            const lookupHandler=key=>{
+              const ns=aliases.find(alias=>typeof key==='string' && key.startsWith(alias+'.'));
+              const method=ns ? key.slice(ns.length+1) : (typeof key==='string' && !key.includes('.') ? key : null);
+              if(!method || !Object.prototype.hasOwnProperty.call(module,method) || typeof module[method]!=='function')throw new Error('Missing action: '+key);
+              return module[method];
+            };
             const preparationContext=()=>{
               const signals={};
               for(const key of ['form','input','selection','authorization','windowForm']){

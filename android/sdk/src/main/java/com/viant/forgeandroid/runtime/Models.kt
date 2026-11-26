@@ -44,10 +44,9 @@ data class WindowMetadata(
 ) {
     internal val dialogIndex by lazy { buildMap { dialogs.forEach { dialog -> dialog.id?.let { putIfAbsent(it, dialog) } } } }
     internal val reportReadOwners by lazy { collectReportOwnedDataSourceRefs(this) }
-    fun actionNamespace(handler: String): String? {
-        if (!namespace.isNullOrBlank() && handler.startsWith("$namespace.")) return namespace
-        return actionAliases.firstOrNull { it.isNotBlank() && handler.startsWith("$it.") }
-    }
+    internal val actionNamespaces by lazy { (listOfNotNull(namespace) + actionAliases).filter { it.isNotBlank() } }
+
+    fun actionNamespace(handler: String): String? = actionNamespaces.firstOrNull { handler.startsWith("$it.") }
 }
 
 @Serializable
