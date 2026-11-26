@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import {verifyPublishedPickerRoot,bindPublishedWindowNavigation} from './WindowContent.jsx';
+import {verifyPublishedPickerRoot,bindPublishedWindowNavigation,compileWindowFormDatePresets} from './WindowContent.jsx';
 
 import { applyWindowPermissionMetadata, canUseInlineMetadataFallback, compilePermissionAppliedMetadata, formatWindowMetadataError, isAdmittedPublishedWindowResponse, isProtectedWindowMetadata, resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialDateRangePresetValues, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowDataSourceFetchFlag, resolveWindowMetadataDisplayState, resolveWindowMetadataForTarget, resolveWindowModelCacheScope, resolveWindowRootContainer, reuseShallowEqualRuntimeObject, scopedWindowHostServices, shouldPreserveMissingResolvedParameters, shouldPrimeDataSourceFetch, shouldResetWindowDashboardState } from './WindowContent.jsx';
 
@@ -248,6 +248,34 @@ describe('resolveInitialDateRangePresetValues', () => {
     expect(resolveInitialDateRangePresetValues(lifetime,{periodView:'lifetime',AdvertiserId:[350]},{accountStart:'2024-04-02'},new Date('2026-10-25T12:00:00Z'))).toEqual({
       periodView:'lifetime',AdvertiserId:[350],From:'2024-04-02',To:'2026-10-25',granularity:'day',
     });
+  });
+  it('honors toolbar alias precedence, theme overrides and unrelated form scope', () => {
+    const table = {toolbar:{items:[
+      {id:'legacy',type:'dateRangePreset',field:'period',dataField:'themePeriod',value:'month',
+        properties:{startField:'from',endField:'to',timeZone:'America/Los_Angeles'}},
+      {id:'editorRange',type:'dateRangePreset',scope:'form',value:'week',
+        properties:{startField:'editorFrom',endField:'editorTo'}},
+      {id:'localCalendar',type:'dateRangePreset',value:'lifetime',
+        properties:{startField:'calendarFrom',lifetimeStartSelector:'accountStart'}},
+    ]}};
+    const metadata={view:{content:{table,containers:[{table:{toolbar:{items:[
+      {id:'other',type:'dateRangePreset',bind:'otherPeriod',value:'today',
+        properties:{startField:'otherFrom',endField:'otherTo'}},
+    ]}}}]}}};
+    const now=new Date('2026-10-25T01:00:00Z');
+    const baseline=resolveInitialDateRangePresetValues(compileWindowFormDatePresets(metadata,'baseline'),
+      {period:'year',themePeriod:'custom'}, {accountStart:'2020-01-01'}, now);
+    expect(baseline).toMatchObject({from:'2025-10-24',to:'2026-10-24',otherFrom:'2026-10-25',otherTo:'2026-10-25'});
+    expect(baseline).not.toHaveProperty('editorFrom');
+    expect(baseline).not.toHaveProperty('calendarFrom');
+    expect(resolveInitialDateRangePresetValues(compileWindowFormDatePresets(metadata,'design-system-2'),
+      {period:'year',themePeriod:'custom'}, {}, now)).not.toHaveProperty('from');
+    table.targetOverrides={'theme:design-system-2':{toolbar:{items:[
+      {id:'replacement',type:'dateRangePreset',value:'today',properties:{startField:'replacementFrom'}},
+    ]}}};
+    const replacement=resolveInitialDateRangePresetValues(compileWindowFormDatePresets(metadata,'design-system-2'), {}, {}, now);
+    expect(replacement.replacementFrom).toBe('2026-10-25');
+    expect(replacement).not.toHaveProperty('from');
   });
 });
 

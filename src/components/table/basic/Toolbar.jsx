@@ -20,6 +20,7 @@ import PaginationBar from './PaginationBar.jsx';
 import "./Toolbar.css";
 import { useToolbarControlEvents } from '../../../hooks/event.js';
 import { DateRangePresetInput } from '../../../packs/blueprint/index.jsx';
+import {toolbarDateRangePresetField} from '../../../packs/blueprint/dateRangePreset.js';
 import {dispatchToolbarSelectChange, toolbarSelectLabel} from './toolbarSelect.js';
 import {resolveSelector, setSelector} from '../../../utils/selector.js';
 import {evaluatePlainVisibleWhen,trackVisibleWhen} from '../../visibleWhen.js';
@@ -396,7 +397,7 @@ const Toolbar = ({
             return renderMenu();
         }
         if (item.type === 'dateRangePreset' || item.widget === 'dateRangePreset') {
-            const field = (isDesignSystem2 ? item.dataField : undefined) || item.field || item.bind || item.id;
+            const field = toolbarDateRangePresetField(item, isDesignSystem2);
             const windowForm = signals?.windowForm?.value || {};
             const value = windowForm[field] ?? item.value ?? '';
             const updateValue = (nextValue, strict = false) => {

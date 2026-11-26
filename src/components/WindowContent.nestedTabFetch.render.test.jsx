@@ -4,9 +4,10 @@ import {createRoot} from 'react-dom/client';
 import {beforeEach,afterEach,expect,it} from 'vitest';
 import WindowContent from './WindowContent.jsx';
 import {SettingProvider} from '../core/context/Setting.jsx';
-import {removeSignalsForKey} from '../core/store/signals.js';
+import {getFormSignal,removeSignalsForKey} from '../core/store/signals.js';
 import {getWindowContext} from '../core/context/registry.js';
 import {invokeRegisteredControlAction} from '../core/ui/controlActions.js';
+import {resolveDateRangePreset} from '../packs/blueprint/dateRangePreset.js';
 import '../packs/blueprint/index.jsx';
 let host,root,windowId,serial=0;
 beforeEach(()=>{globalThis.IS_REACT_ACT_ENVIRONMENT=true;windowId=`nested-fetch-audit-${++serial}`;host=document.createElement('div');document.body.append(host);root=createRoot(host);HTMLElement.prototype.scrollIntoView ||=function(){};});
@@ -64,4 +65,55 @@ it.each(['tabs','stableTabs'].flatMap(tabKind=>['root','window-title','view-titl
   if(binding==='root')def.view.dataSourceRef='details';else if(binding==='window-title')def.window={...def.window,titleBinding:{dataSourceRef:'details',field:'name'}};else def.view.titleBinding={dataSourceRef:'details',field:'name'};
  });
  expect(count(calls,'details')).toBe(1);
+});
+
+it.each([
+ ['active default', false, null],
+ ['deferred default', true, null],
+ ['restored custom', false, {recordPeriod:'custom', recordFrom:'2026-01-02', recordTo:'2026-01-08'}],
+ ['restored cleared custom', false, {recordPeriod:'custom', recordFrom:'', recordTo:''}],
+])('applies the table date range to the first read for %s',async(_name,defer,restored)=>{
+ const requests=[];
+ const def={
+  window:{on:[{event:'onInit',handler:'dataSource.setWindowFormData',parameters:[
+    {name:'recordPeriod',in:'const',location:'year'},
+    {name:'recordFrom',in:'const',location:''},
+    {name:'recordTo',in:'const',location:''},
+  ]}]},
+  dataSource:{records:{id:'records',service:{uri:'mcp://fixture/records'},selectors:{data:'data'},parameters:[
+    {name:'AdvertiserId',in:'windowForm',location:'AdvertiserId',required:true},
+    {name:'StartDate',in:'windowForm',location:'recordFrom',required:false},
+    {name:'EndDate',in:'windowForm',location:'recordTo',required:false},
+  ]}},
+  view:{content:{id:'record-tabs',tabs:{defaultSelectedTabId:defer?'summary':'records-tab',renderActiveTabPanelOnly:true,
+    keepVisitedTabPanelsMounted:true,dataSourceFetchMode:'once'},containers:[
+   {id:'summary',title:'Summary',items:[{id:'caption',type:'label',value:'Summary'}]},
+   {id:'records-tab',title:'Records',dataSourceRef:'records',fetchData:true,
+    editableCollection:{dataSourceRef:'records'},
+    table:{columns:[{id:'name',name:'Name'}],toolbar:{items:[
+     {id:'dateRange',type:'dateRangePreset',field:'recordPeriod',value:'year',label:'Record date range',
+      properties:{startField:'recordFrom',endField:'recordTo',granularityField:'recordGranularity'}},
+    ]}}}
+  ]}},
+ };
+ const expected=restored?{StartDate:restored.recordFrom,EndDate:restored.recordTo}:(()=>{
+  const range=resolveDateRangePreset('year');
+  return {StartDate:range.start,EndDate:range.end};
+ })();
+ await settle(()=>{
+  if(restored)getFormSignal(windowId+':windowForm').value=restored;
+  root.render(<SettingProvider services={{dataConnectorTransport:async request=>{
+    const {StartDate,EndDate}=request.options.inputParameters;
+    requests.push({StartDate,EndDate});
+    return {data:[{id:1,name:'Record'}]};
+   }}} connectorConfig={{window:{service:{uri:'/fixture-window'}}}}>
+    <WindowContent window={{windowId,windowKey:'fixture',parameters:{AdvertiserId:[1]}}} selectedMetadata={def}/>
+   </SettingProvider>);
+ });
+ if(defer){
+  expect(requests).toHaveLength(0);
+  await settle(()=>tab('Records').click());
+ }
+ expect(requests).toEqual([expected]);
+ if(restored)expect(getFormSignal(windowId+':windowForm').peek()).toMatchObject(restored);
 });

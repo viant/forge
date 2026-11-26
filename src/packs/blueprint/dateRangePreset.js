@@ -1,4 +1,9 @@
 const formatUtcDate = (value) => value.toISOString().slice(0, 10);
+
+export function toolbarDateRangePresetField(item, isDesignSystem2) {
+    return (isDesignSystem2 ? item.dataField : undefined) || item.field || item.bind || item.id;
+}
+
 const civilDate = (year, month, day) => {
     const date = new Date(0);
     date.setUTCFullYear(year, month, day);

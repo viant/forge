@@ -1,7 +1,7 @@
 import {useWorkspaceRefresh,workspaceRefreshScopeIdentity} from '../runtime/useWorkspaceRefresh.js';
 import {windowFillsAllocatedSpace, showWindowSelectionFooter} from './windowPresentationPolicy.js';
 import {beginWindowStateAdoption, windowStateAdoptionCleared, completeWindowStateAdoption, rejectWindowStateAdoption} from '../runtime/windowStateAdoption.js';
-import {ForgeThemeBoundary} from './ThemeBoundary.jsx';
+import {ForgeThemeBoundary, useForgeTheme} from './ThemeBoundary.jsx';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useSignals} from '@preact/signals-react/runtime';
 
@@ -60,7 +60,8 @@ import {useViewPartition} from './useViewPartition.js';
 import {applyTablePagingMetadata} from '../runtime/tablePagingMetadata.js';
 import {admittedPublishedWindowModel,publishedWindowConditionalETag} from '../runtime/publishedWindowModelCache.js';
 import {recordWindowPerfPhase} from '../runtime/windowPerfPhases.js';
-import {normalizeLifetimeStart, resolveDateRangePreset, resolveDateRangePresetSyncPatch} from '../packs/blueprint/dateRangePreset.js';
+import {normalizeLifetimeStart, resolveDateRangePreset, resolveDateRangePresetSyncPatch, toolbarDateRangePresetField} from '../packs/blueprint/dateRangePreset.js';
+import {resolveTableThemeOverrides} from './table/tableThemeOverrides.js';
 
 const EMPTY_WINDOW_METRICS = Object.freeze({});
 const EMPTY_ENDPOINTS = Object.freeze({});
@@ -139,18 +140,19 @@ function collectInitialWindowFormItemValues(node, initial) {
     }
 }
 
-function collectWindowFormDatePresetItems(node, presets) {
-    if (!node || typeof node !== 'object') return;
-    if (node.parameterEditor) {
-        collectWindowFormDatePresetItems({items: node.parameterEditor.fields}, presets);
-        for (const section of node.parameterEditor.sections || []) collectWindowFormDatePresetItems({items: section.fields}, presets);
-    }
-    for (const item of Array.isArray(node.items) ? node.items : []) {
-        if (String(item?.scope || '').trim() !== 'windowForm'
-            || item?.widget !== 'dateRangePreset' && item?.type !== 'dateRangePreset') continue;
+function collectWindowFormDatePresets(items, presets, toolbar, themeId) {
+    for (const item of Array.isArray(items) ? items : []) {
+        if (item?.widget !== 'dateRangePreset' && item?.type !== 'dateRangePreset') continue;
+        const scope = String(item.scope || '').trim();
+        if (scope !== 'windowForm' && (!toolbar || scope)) continue;
         const properties = item.properties || {};
+        // A toolbar with a metric-derived calendar resolves it in its own
+        // datasource context. Root window metrics may come from another source.
+        if (toolbar && (properties.timeZoneSelector || properties.lifetimeStartSelector)) continue;
+        const binding = toolbar ? toolbarDateRangePresetField(item, themeId === 'design-system-2')
+            : item.bindingPath || item.dataField || item.id;
         presets.push({
-            field: String(item.bindingPath || item.dataField || item.id || '').trim(),
+            field: String(binding || '').trim(),
             fallbackValue: item.value,
             startField: properties.startField || 'customDateStart',
             endField: properties.endField || 'customDateEnd',
@@ -161,12 +163,25 @@ function collectWindowFormDatePresetItems(node, presets) {
             timeZoneSelector: properties.timeZoneSelector || '',
         });
     }
-    for (const child of Array.isArray(node.containers) ? node.containers : []) collectWindowFormDatePresetItems(child, presets);
 }
 
-export function compileWindowFormDatePresets(metadata) {
+function collectWindowFormDatePresetItems(node, presets, themeId) {
+    if (!node || typeof node !== 'object') return;
+    if (node.parameterEditor) {
+        collectWindowFormDatePresets(node.parameterEditor.fields, presets);
+        for (const section of node.parameterEditor.sections || []) collectWindowFormDatePresets(section.fields, presets);
+    }
+    collectWindowFormDatePresets(node.items, presets);
+    if (node.table) {
+        const {table} = resolveTableThemeOverrides(node.table, undefined, themeId);
+        collectWindowFormDatePresets(table.toolbar?.items, presets, true, themeId);
+    }
+    for (const child of Array.isArray(node.containers) ? node.containers : []) collectWindowFormDatePresetItems(child, presets, themeId);
+}
+
+export function compileWindowFormDatePresets(metadata, themeId) {
     const presets = [];
-    collectWindowFormDatePresetItems(metadata?.view?.content, presets);
+    collectWindowFormDatePresetItems(metadata?.view?.content, presets, themeId);
     return presets;
 }
 
@@ -883,7 +898,8 @@ function WindowContentInner({window, metadata, services}) {
     }), [parameters, metadata]);
     const windowFormSignal = useMemo(() => findFormSignal(`${windowId}:windowForm`), [windowId]);
     const windowViewSignal = useMemo(() => getViewSignal(windowId), [windowId]);
-    const datePresets = useMemo(() => compileWindowFormDatePresets(metadata), [metadata]);
+    const themeId = useForgeTheme()?.themeId;
+    const datePresets = useMemo(() => compileWindowFormDatePresets(metadata, themeId), [metadata, themeId]);
 
     const hookContext = Context(windowId, metadata, defaultDataSourceRef, services);
     const existingContext = getWindowContext(windowId);
