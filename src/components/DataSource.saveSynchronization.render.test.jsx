@@ -288,3 +288,22 @@ it.each([
         expect(requests.filter(([r]) => r.dataSourceRef === 'record')).toHaveLength(refreshes);
     } finally {await v.close();}
 });
+
+it.each([
+    [[{id: 8}, {id: 7}], 'succeeded'],
+    [[{id: 8}, {id: 9}], 'indeterminate'],
+    [[{id: 7}, {id: 8}, false], 'indeterminate'],
+])('checks the identities in the mounted writer response before refreshing (%j)', async (data, status) => {
+    const v = await mount();
+    try {
+        const start = v.transport.mock.calls.length;
+        v.transport.mockResolvedValueOnce({data});
+        const command = {dataSourceRef: 'writer', receiptIdentity: {submittedRows: 'items', field: 'id'},
+            refresh: [{dataSourceRef: 'record', bypassCache: true}]};
+        let result;
+        await v.settle(() => {result = executeCommand(v.properties, command, {items: [{id: 7}, {id: 8}]});});
+        expect((await result).status).toBe(status);
+        const calls = v.transport.mock.calls.slice(start).map(([request]) => request.dataSourceRef);
+        expect(calls).toEqual(status === 'succeeded' ? ['writer', 'record'] : ['writer']);
+    } finally {await v.close();}
+});
