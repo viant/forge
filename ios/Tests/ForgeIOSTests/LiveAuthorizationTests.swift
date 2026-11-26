@@ -2,6 +2,35 @@ import XCTest
 @testable import ForgeIOSRuntime
 
 final class LiveAuthorizationTests: XCTestCase {
+    func testDecodedNullSubjectFailsTheNonemptyPresentationCondition() async throws {
+        let payload = #"""
+        {"authorizationSnapshot":{"principal":{"subject":null,"enabled":false,"count":0}},
+         "view":{"content":{"containers":[{"id":"editor","visibleWhen":{"source":"authorization","field":"principal.subject","notEmpty":true}}]}}}
+        """#
+        let metadata = try JSONDecoder().decode(WindowMetadata.self, from: Data(payload.utf8))
+        let runtime = ForgeRuntime()
+        let window = await runtime.openWindowInline(key: "test", title: "Test", metadata: metadata)
+        let retained = await runtime.windowMetadata(id: window.id)
+        let live = try XCTUnwrap(retained)
+        let rule = try XCTUnwrap(live.view?.content?.containers.first?.visibleWhen)
+        // Native presentation passes Foundation values, including NSNull, to the condition evaluator.
+        let snapshot = try JSONEncoder().encode(live.authorizationSnapshot)
+        let facts = try XCTUnwrap(JSONSerialization.jsonObject(with: snapshot) as? [String: Any])
+        let principal = try XCTUnwrap(facts["principal"] as? [String: Any])
+        XCTAssertTrue(principal["subject"] is NSNull)
+        func allows(_ condition: DashboardConditionDef) -> Bool {
+            DashboardRuntime.evaluateDashboardCondition(condition, authorization: facts)
+        }
+        XCTAssertFalse(allows(rule))
+        XCTAssertTrue(allows(DashboardConditionDef(source: "authorization", field: "principal.subject", empty: true)))
+        XCTAssertFalse(allows(DashboardConditionDef(source: "authorization", field: "principal.subject", exists: true)))
+        XCTAssertFalse(allows(DashboardConditionDef(source: "authorization", field: "principal.missing", notEmpty: true)))
+        XCTAssertTrue(allows(DashboardConditionDef(source: "authorization", field: "principal.enabled", notEmpty: true)))
+        XCTAssertTrue(allows(DashboardConditionDef(source: "authorization", field: "principal.count", notEmpty: true)))
+        XCTAssertTrue(allows(DashboardConditionDef(source: "authorization", field: "principal.enabled", equals: .bool(false))))
+        XCTAssertTrue(allows(DashboardConditionDef(source: "authorization", field: "principal.count", equals: .number(0))))
+    }
+
     func testMetadataStreamPublishesGrantAndRevocationWithoutReopening() async throws {
         let runtime = ForgeRuntime()
         let initial = WindowMetadata(authorizationSnapshot: ["principal": .object(["roles": .array([]), "features": .array([])])])

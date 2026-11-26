@@ -2722,7 +2722,7 @@ public enum DashboardRuntime {
         if let canonical = value as? CanonicalPredicateValue { return canonical.empty }
         let value = unwrapOptional(value)
         switch value {
-        case nil:
+        case nil, is NSNull:
             return true
         case let string as String:
             return string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
