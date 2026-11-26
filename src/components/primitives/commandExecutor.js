@@ -17,7 +17,7 @@ const transportStates = new WeakMap();
 
 const commandErrorMessage = (error) => formatDataSourceError(error) || 'The request could not be completed.';
 
-function stableContextOwner(context) {
+export function stableContextOwner(context) {
   return context?.signals?.control || context?.signals?.input || context;
 }
 

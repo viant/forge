@@ -1,10 +1,12 @@
 import React, {act} from 'react';
 import {createRoot} from 'react-dom/client';
+import {signal} from '@preact/signals-react';
+import MutationCommand from './primitives/MutationCommand.jsx';
 import {it, expect} from 'vitest';
 import WindowContent from './WindowContent.jsx';
 import {SettingProvider} from '../core/context/Setting.jsx';
 import {getWindowContext} from '../core/context/registry.js';
-import {removeSignalsForKey} from '../core/store/signals.js';
+import {getDialogSignal, removeSignalsForKey} from '../core/store/signals.js';
 import {getCommandState} from './primitives/commandExecutor.js';
 import '../packs/blueprint/index.jsx';
 
@@ -87,3 +89,66 @@ for (const [outcome, writerInContent] of [['acknowledged', true], ['rejected', t
         }
     });
 }
+
+it('retains a producer rejection across host rerenders, then scopes feedback to the writer and actor', async () => {
+    const id = 'footer-context-replacement';
+    const host = document.createElement('div'); document.body.append(host);
+    const root = createRoot(host);
+    const signals = {control: signal({}), input: signal({}), form: signal({}), windowForm: signal({})};
+    const dialog = getDialogSignal(id + 'Dialogedit');
+    const presentation = {recordId: 17};
+    dialog.value = {open: true, props: presentation};
+    const pending = [];
+    const target = {signals: {control: signal({}), collection: signal([])}, handlers: {dataSource: {
+        setInputParameters() {},
+        fetchCollection() { return new Promise((resolve, reject) => pending.push({resolve, reject})); },
+    }}};
+    const first = {principal: {subject: 'first', roles: ['owner']}};
+    const second = {principal: {subject: 'second', roles: ['reader']}};
+    const command = {commandId: 'submit', dataSourceRef: 'writer', label: 'Apply'};
+    const message = 'Column names must match.';
+    const status = () => host.querySelector('[data-command-phase]').textContent;
+    const button = () => host.querySelector('button');
+    let context;
+    function draw(authority, writer = 'writer') {
+        // A host publishing a notification creates a new facade for the same mounted form.
+        context = {signals, authorization: authority, identity: {windowId: id, dataSourceRef: 'draft', protectedWindow: true},
+            Context: () => target};
+        root.render(<MutationCommand command={{...command, dataSourceRef: writer}} context={context} dialogId="edit"/>);
+    }
+    async function submitAndReject() {
+        const prior = pending.length;
+        await turn(() => button().click());
+        await until(() => pending.length === prior + 1);
+        await turn(() => pending[prior].reject(Object.assign(new Error(message), {status: 422, code: 'business_validation'})));
+        await until(() => status() === message);
+    }
+    try {
+        await turn(() => draw(first));
+        await submitAndReject();
+        const node = host.querySelector('[data-command-phase]');
+        await turn(() => draw(first));
+        expect(host.querySelector('[data-command-phase]')).toBe(node);
+        expect(dialog.peek().props).toBe(presentation);
+        expect(status()).toBe(message);
+
+        await turn(() => draw(first, 'anotherWriter'));
+        expect(status()).toBe('');
+        await submitAndReject();
+        await turn(() => draw(second, 'anotherWriter'));
+        expect(dialog.peek().props).toBe(presentation);
+        expect(status()).toBe('');
+
+        await turn(() => button().click());
+        await until(() => pending.length === 3);
+        await turn(() => draw(first, 'anotherWriter'));
+        await turn(() => pending[2].reject(Object.assign(new Error('Old actor rejection.'), {status: 422, code: 'business_validation'})));
+        expect(status()).not.toContain('Old actor rejection.');
+        await turn(() => button().click());
+        await until(() => pending.length === 4);
+        await turn(() => pending[3].resolve({data: []}));
+        await until(() => getCommandState(context, command).phase === 'succeeded');
+    } finally {
+        await turn(() => root.unmount()); host.remove(); removeSignalsForKey(id);
+    }
+});

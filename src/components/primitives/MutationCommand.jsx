@@ -5,28 +5,40 @@ import {Alert, Button} from '@blueprintjs/core';
 import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
 import {executeCommand, getMutationCommandState, resetMutationCommandState, subscribeMutationCommand} from './primitiveMutation.js';
 import {usePredicateSignals} from './usePredicateSignals.js';
+import {commandGuardKey, stableContextOwner} from './commandExecutor.js';
 import DisabledActionShell from '../DisabledActionShell.jsx';
-import {findDialogSignal} from '../../core/store/signals.js';
+import {findDialogSignal, protectedWindowEpoch} from '../../core/store/signals.js';
 import {getLogger} from '../../utils/logger.js';
 const mutationLog = getLogger('mutation');
 
-export function useMutationCommandState(context, command) {
+function useBoundMutationCommandState(context, command) {
   const [state, setState] = React.useState(() => {
     const current = getMutationCommandState(context, command);
     return !current.guarded && ['succeeded', 'failed'].includes(current.phase)
       ? {...current, phase: 'idle', message: '', error: null, writerStatus: 'idle', syncStatus: 'not_started', warnings: []}
       : current;
   });
-  React.useEffect(() => {
-    resetMutationCommandState(context, command);
-    return subscribeMutationCommand(context, command, setState);
-  }, [context, command?.commandId, command?.dataSourceRef]);
-  return state;
+  // A host may recreate context facades while the same datasource and dialog remain mounted.
+  // Subscribe and reset only when the underlying command state actually changes owners.
+  const owner = stableContextOwner(context);
+  const key = commandGuardKey(command);
+  const authority = context?.signals?.authorization?.value ?? context?.authorization;
+  const epoch = context?.identity?.protectedWindow ? protectedWindowEpoch(context.identity.windowId) : undefined;
+  const binding = React.useMemo(() => ({context, command}), [owner, key, command?.dataSourceRef, authority, epoch]);
+  React.useLayoutEffect(() => {
+    resetMutationCommandState(binding.context, binding.command);
+    return subscribeMutationCommand(binding.context, binding.command, setState);
+  }, [binding]);
+  return {state, binding};
+}
+
+export function useMutationCommandState(context, command) {
+  return useBoundMutationCommandState(context, command).state;
 }
 
 export default function MutationCommand({command, context, extras = {}, disabled = false, children, onSettled, renderTrigger, dialogId, closeOnSuccess}) {
   usePredicateSignals(context, [command?.validateWhen]);
-  const state = useMutationCommandState(context, command);
+  const {state, binding} = useBoundMutationCommandState(context, command);
   const operationRoot = React.useRef(null);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [confirmMessage, setConfirmMessage] = React.useState('');
@@ -42,13 +54,13 @@ export default function MutationCommand({command, context, extras = {}, disabled
   const dialog = plainFooter && findDialogSignal(`${context?.identity?.windowId}Dialog${dialogId}`);
   const presentation = dialog?.peek?.()?.props;
   const activatedPresentation = React.useRef(null);
-  const belongsHere = !dialog || activatedPresentation.current === presentation;
+  const belongsHere = !dialog || (activatedPresentation.current?.props === presentation && activatedPresentation.current?.binding === binding);
   const statusMessage = !belongsHere ? (state.guarded ? (state.phase === 'indeterminate'
     ? 'A previous submission needs verification before retrying.' : 'Another submission is in progress.') : '') : state.message || ({validating: 'Validating…', confirming: 'Awaiting confirmation…', preparing: 'Preparing…', pending: 'Saving…', indeterminate: 'Outcome unknown; refresh authoritative data before retrying.'}[state.phase]) || (state.guarded ? 'Working…' : '');
   const invoke = () => {
     mutationLog.debug('activate', {commandId: command?.commandId, dataSourceRef: command?.dataSourceRef, blocked, busy, phase: state.phase, guarded: getMutationCommandState(context, command).guarded});
     if (blocked || busy) return;
-    activatedPresentation.current = presentation;
+    activatedPresentation.current = {props: presentation, binding};
     commandPromise.current = executeCommand(context, command, extras, {onSettled, dialogId, closeOnSuccess, confirm: (message) => new Promise((resolve) => {
       confirmResolver.current = resolve;
       setConfirmMessage(message);
