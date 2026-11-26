@@ -426,11 +426,12 @@ package func resourceResolveValue(_ value: JSONValue, path: String) -> JSONValue
     return resourceResolveValue(value, components: path.split(separator: "."))
 }
 
-func resourceResolveValue<Components: Sequence>(_ value: JSONValue, components: Components) -> JSONValue? where Components.Element: StringProtocol {
+func resourceResolveValue<Components: Sequence>(_ value: JSONValue, components: Components, strictIndices: Bool = false) -> JSONValue? where Components.Element: StringProtocol {
     components.reduce(Optional(value)) { current, part in
         guard let current else { return nil }
         if let object = current.objectValue { return object[String(part)] }
-        if let array = current.arrayValue, let index = Int(part), array.indices.contains(index) { return array[index] }
+        if let array = current.arrayValue, let index = Int(part), array.indices.contains(index),
+           !strictIndices || String(index) == String(part) { return array[index] }
         return nil
     }
 }

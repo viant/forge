@@ -231,6 +231,9 @@ private final class CommandResponseProtocol: URLProtocol {
         case "text": body = #"{"rows":["true"]}"#
         case "own": body = #"{"rows":[{"accepted":true}]}"#
         case "refused": body = #"{"rows":[{"accepted":false}]}"#
+        case "identities": body = #"{"rows":[{"id":2},{"id":1}]}"#
+        case "identity-mismatch": body = #"{"rows":[{"id":1},{"id":3}]}"#
+        case "identity-extra-scalar": body = #"{"rows":[{"id":1},{"id":2},true]}"#
         case "bad-shape": body = #"{"rows":{}}"#
         case "missing": body = #"{"message":"received"}"#
         case "malformed": body = "invalid"
@@ -245,6 +248,23 @@ private final class CommandResponseProtocol: URLProtocol {
 }
 
 extension OrderedMutationCommandTests {
+    func testHTTPReceiptIdentityRequiresExactInvocationRows() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [CommandResponseProtocol.self]
+        let session = URLSession(configuration: configuration)
+        for (path, expected) in [("identities", "succeeded"), ("identity-mismatch", "indeterminate"), ("identity-extra-scalar", "indeterminate"), ("missing", "indeterminate")] {
+            let runtime = ForgeRuntime(windowMetadataBaseURL: URL(string: "https://items.test")!, session: session)
+            let definitions: [String: Any] = ["draft": [:], "save": ["service": ["uri": "/" + path, "method": "POST"]]]
+            let window = await runtime.openWindowInline(key: "items", title: "Items", metadata: try metadata(refs: definitions))
+            let command = MutationCommandDef(dataSourceRef: "save", receiptIdentity: .init(field: "id", submittedRows: "segments"))
+            let outcome = await runtime.executeMutationCommand(windowID: window.id, sourceDataSourceRef: "draft", command: command,
+                extras: ["segments": .array([.object(["id": .number(1)]), .object(["id": .number(2)])])])
+            XCTAssertEqual(outcome.status, expected, path)
+            let state = await runtime.mutationCommandState(windowID: window.id, command: command)
+            XCTAssertEqual(state.guarded, expected == "indeterminate", path)
+        }
+    }
+
     func testHTTPResponseReceiptAndStatusDistinguishRejectionFromUnknown() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [CommandResponseProtocol.self]
@@ -492,6 +512,142 @@ extension OrderedMutationCommandTests {
 }
 
 extension OrderedMutationCommandTests {
+    func testReceiptIdentityUsesExactPreparedIDsAndRejectsAmbiguousReceipts() async throws {
+        let submitted: [JSONValue] = [.object(["key": .number(7)]), .object(["key": .string("8")])]
+        let examples: [([JSONValue], String)] = [
+            ([.object(["id": .string("8")]), .object(["id": .number(7)])], "succeeded"),
+            ([.object(["id": .number(7)])], "indeterminate"),
+            ([.object(["id": .number(7)]), .object(["id": .number(7)])], "indeterminate"),
+            ([.object(["id": .number(7)]), .object(["id": .number(8)])], "indeterminate"),
+            ([.object(["id": .number(7)]), .object(["id": .null])], "indeterminate"),
+            ([.object(["id": .number(7)]), .object(["id": .number(9_007_199_254_740_992)])], "indeterminate"),
+            ([], "indeterminate"),
+        ]
+        for (rows, expected) in examples {
+            let (runtime, id) = try await seeded(), journal = CommandJournal()
+            await runtime.registerDataSourceLoader { request in
+                await journal.append(request)
+                return .init(rows: rows.compactMap(\.objectValue))
+            }
+            let command = MutationCommandDef(dataSourceRef: "save", receiptIdentity: .init(field: "id", submittedRows: "payload.segments", submittedField: "key"))
+            let outcome = await runtime.executeMutationCommand(windowID: id, sourceDataSourceRef: "draft", command: command,
+                extras: ["payload": .object(["segments": .array(submitted)])])
+            XCTAssertEqual(outcome.status, expected)
+            let calls = await journal.calls
+            XCTAssertEqual(calls.count, 1)
+            XCTAssertEqual(calls.first?.1["payload"]?.objectValue?["segments"], .array(submitted))
+        }
+    }
+
+    func testReceiptIdentityRejectsInvalidSubmittedValuesBeforeTransport() async throws {
+        let examples: [[JSONValue]] = [[], [.object(["id": .null])], [.object(["id": .bool(true)])],
+            [.object(["id": .string("  ")])], [.object(["id": .number(1.5)])],
+            [.object(["id": .number(9_007_199_254_740_992)])], [.object(["id": .number(1)]), .object(["id": .number(1)])]]
+        for rows in examples {
+            let (runtime, id) = try await seeded(), journal = CommandJournal()
+            await runtime.registerDataSourceLoader { request in await journal.append(request); return .init(rows: []) }
+            let command = MutationCommandDef(dataSourceRef: "save", receiptIdentity: .init(field: "id", submittedRows: "segments"))
+            let outcome = await runtime.executeMutationCommand(windowID: id, sourceDataSourceRef: "draft", command: command, extras: ["segments": .array(rows)])
+            XCTAssertEqual(outcome.status, "invalid_payload")
+            let calls = await journal.calls
+            XCTAssertTrue(calls.isEmpty)
+        }
+    }
+
+    func testReceiptIdentityStringsUseExactUTF8NotCanonicalEquivalence() async throws {
+        let composed = "\u{00E9}", decomposed = "e\u{0301}"
+        for (submitted, received, expected) in [
+            ([composed], [decomposed], "indeterminate"),
+            ([composed, decomposed], [decomposed, composed], "succeeded"),
+        ] {
+            let (runtime, id) = try await seeded()
+            await runtime.registerDataSourceLoader { _ in .init(rows: received.map { ["id": .string($0)] }) }
+            let command = MutationCommandDef(dataSourceRef: "save", receiptIdentity: .init(field: "id", submittedRows: "segments"))
+            let outcome = await runtime.executeMutationCommand(windowID: id, sourceDataSourceRef: "draft", command: command,
+                extras: ["segments": .array(submitted.map { .object(["id": .string($0)]) })])
+            XCTAssertEqual(outcome.status, expected)
+        }
+    }
+
+    func testGeneratedIdentityAndExplicitRejectionPriority() async throws {
+        for (rows, expected) in [([JSONValue.object(["id": .number(42)])], "succeeded"),
+                                 ([.object(["id": .number(0)]), .object(["id": .number(1)])], "indeterminate"),
+                                 ([.object(["id": .string("")])], "indeterminate")] {
+            let (runtime, id) = try await seeded()
+            await runtime.registerDataSourceLoader { _ in .init(rows: rows.compactMap(\.objectValue)) }
+            let command = MutationCommandDef(dataSourceRef: "save", receiptIdentity: .init(field: "id", generated: true))
+            let outcome = await runtime.executeMutationCommand(windowID: id, sourceDataSourceRef: "draft", command: command)
+            XCTAssertEqual(outcome.status, expected)
+        }
+        let (runtime, id) = try await seeded()
+        await runtime.registerDataSourceLoader { _ in .init(rows: [["status": .string("rejected"), "message": .string("Refused")]]) }
+        let rejected = try JSONDecoder().decode(DashboardConditionDef.self, from: Data(#"{"source":"collection","field":"0.status","equals":"rejected"}"#.utf8))
+        let command = MutationCommandDef(dataSourceRef: "save", rejectedWhen: rejected, receiptIdentity: .init(field: "id", generated: true))
+        let outcome = await runtime.executeMutationCommand(windowID: id, sourceDataSourceRef: "draft", command: command)
+        XCTAssertEqual(outcome.status, "failed")
+        XCTAssertEqual(outcome.error, "Refused")
+    }
+
+    func testForwardStepReceiptIdentityAndInvalidDefinitions() async throws {
+        let invalid: [MutationReceiptIdentityDef] = [.init(field: "__proto__.id", generated: true), .init(field: "id"),
+            .init(field: "id", submittedRows: "segments", generated: true), .init(field: "id", submittedRows: "a..b")]
+        for spec in invalid {
+            let (runtime, id) = try await seeded(), journal = CommandJournal()
+            await runtime.registerDataSourceLoader { request in await journal.append(request); return .init(rows: []) }
+            let command = MutationCommandDef(dataSourceRef: "save", receiptIdentity: spec)
+            let outcome = await runtime.executeMutationCommand(windowID: id, sourceDataSourceRef: "draft", command: command)
+            XCTAssertEqual(outcome.status, "invalid_payload")
+            let calls = await journal.calls
+            XCTAssertTrue(calls.isEmpty)
+        }
+        let (runtime, id) = try await seeded(), journal = CommandJournal()
+        await runtime.registerDataSourceLoader { request in
+            await journal.append(request)
+            return .init(rows: request.dataSourceRef == "create" ? [["id": .number(9)]] : [["id": .number(2)]])
+        }
+        let step = MutationCommandDef(commandId: "stage", dataSourceRef: "create", receiptIdentity: .init(field: "id", generated: true))
+        let command = MutationCommandDef(before: [.init(command: step)], dataSourceRef: "save")
+        let result = await runtime.executeMutationCommand(windowID: id, sourceDataSourceRef: "draft", command: command)
+        XCTAssertEqual(result.status, "succeeded")
+        let calls = await journal.calls
+        XCTAssertEqual(calls.map(\.0), ["create", "save"])
+
+        let (other, otherID) = try await seeded(), secondJournal = CommandJournal()
+        await other.registerDataSourceLoader { request in
+            await secondJournal.append(request)
+            return .init(rows: request.dataSourceRef == "create" ? [["id": .number(8)]] : [["id": .number(2)]])
+        }
+        let matching = MutationCommandDef(commandId: "stage", dataSourceRef: "create", receiptIdentity: .init(field: "id", submittedRows: "payload.items", submittedField: "keys.0"))
+        let staged = MutationCommandDef(before: [.init(command: matching)], dataSourceRef: "save")
+        let input: [JSONValue] = [.object(["keys": .array([.number(9)])])]
+        let refused = await other.executeMutationCommand(windowID: otherID, sourceDataSourceRef: "draft", command: staged,
+            extras: ["payload": .object(["items": .array(input)])])
+        XCTAssertEqual(refused.status, "indeterminate")
+        let secondCalls = await secondJournal.calls
+        XCTAssertEqual(secondCalls.map(\.0), ["create"])
+
+        let (third, thirdID) = try await seeded(), thirdJournal = CommandJournal()
+        await third.registerDataSourceLoader { request in await thirdJournal.append(request); return .init(rows: []) }
+        let cleanup = MutationCommandDef(commandId: "undo", dataSourceRef: "remove", receiptIdentity: .init(field: "id", generated: true))
+        let invalidCleanup = MutationCommandDef(before: [.init(command: step, cleanup: cleanup)], dataSourceRef: "save")
+        let blocked = await third.executeMutationCommand(windowID: thirdID, sourceDataSourceRef: "draft", command: invalidCleanup)
+        XCTAssertEqual(blocked.status, "invalid_payload")
+        let thirdCalls = await thirdJournal.calls
+        XCTAssertTrue(thirdCalls.isEmpty)
+    }
+
+    func testReceiptIdentityDecodingAndFooterForwarding() throws {
+        let data = Data(#"{"id":"save","mutationCommand":{"dataSourceRef":"save","receiptIdentity":{"field":"nested.id","submittedRows":"payload.rows","submittedField":"key","generated":false}}}"#.utf8)
+        let action = try JSONDecoder().decode(ActionDef.self, from: data)
+        let command = try XCTUnwrap(action.footerCommand)
+        XCTAssertEqual(command.receiptIdentity?.field, "nested.id")
+        XCTAssertEqual(command.receiptIdentity?.submittedRows, "payload.rows")
+        XCTAssertEqual(command.receiptIdentity?.submittedField, "key")
+        XCTAssertEqual(command.receiptIdentity?.generated, false)
+        let decoded = try JSONDecoder().decode(MutationCommandDef.self, from: JSONEncoder().encode(command))
+        XCTAssertEqual(decoded.receiptIdentity?.submittedRows, "payload.rows")
+    }
+
     func testRejectsUnpairedOrAmbientWriterReceiptPredicatesBeforeDispatch() async throws {
         let (runtime,id) = try await seeded(), journal = CommandJournal()
         await runtime.registerDataSourceLoader { request in await journal.append(request); return .init() }
@@ -524,6 +680,33 @@ extension OrderedMutationCommandTests {
 }
 
 extension OrderedMutationCommandTests {
+    func testIdentityReceiptAfterDialogReplacementDoesNotPatchOrRefresh() async throws {
+        let (runtime, id) = try await seeded(), journal = CommandJournal()
+        let action = try footer(["before": [], "prepare": "", "dataSourceRef": "save", "successState": ["done": true],
+                                 "successFormState": ["done": true], "receiptIdentity": ["field": "id", "generated": true]])
+        _ = await runtime.presentDialog(windowID: id, dialogID: "editor", parameters: ["record": .number(1)])
+        let invoked = expectation(description: "identity writer"), release = AsyncStream<Void>.makeStream()
+        await runtime.registerDataSourceLoader { request in
+            await journal.append(request)
+            if request.dataSourceRef == "save" {
+                invoked.fulfill()
+                for await _ in release.stream { break }
+                return .init(rows: [["id": .number(10)]])
+            }
+            return .init()
+        }
+        let send = Task { await self.run(runtime, id, action) }
+        await fulfillment(of: [invoked], timeout: 4)
+        await runtime.closeDialogPublic(windowID: id, dialogID: "editor")
+        _ = await runtime.presentDialog(windowID: id, dialogID: "editor", parameters: ["record": .number(2)])
+        release.continuation.yield(()); release.continuation.finish()
+        let result = await send.value, refs = await journal.calls.map(\.0)
+        let window = await runtime.windowFormJSONValue(windowID: id), form = await runtime.dataSourceForm(windowID: id, dataSourceRef: "draft")
+        XCTAssertEqual(result?.status, "succeeded")
+        XCTAssertEqual(refs, ["save"])
+        XCTAssertNil(window["done"]); XCTAssertNil(window["receipt"]); XCTAssertNil(form["done"])
+    }
+
     func testConfirmedReceiptAfterDialogReplacementRetainsAcknowledgementWithoutRefreshing() async throws {
         let (runtime,id) = try await seeded(), journal = CommandJournal()
         let action = try footer(["before":[],"prepare":"","dataSourceRef":"save","successState":["done":true],

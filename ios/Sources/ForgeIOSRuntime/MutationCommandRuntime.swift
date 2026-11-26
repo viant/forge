@@ -1,5 +1,30 @@
 import Foundation
 
+private enum MutationReceiptID: Hashable {
+    case string(Data)
+    case number(Double)
+}
+
+private func mutationIdentitySet(_ rows: [JSONValue], field: String) -> Set<MutationReceiptID>? {
+    guard !rows.isEmpty else { return nil }
+    var ids = Set<MutationReceiptID>()
+    let path = field.components(separatedBy: ".")
+    for row in rows {
+        guard row.objectValue != nil, let value = resourceResolveValue(row, components: path, strictIndices: true) else { return nil }
+        let id: MutationReceiptID
+        switch value {
+        case .string(let value) where !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty:
+            id = .string(Data(value.utf8))
+        case .number(let value) where value.isFinite && value.rounded(.towardZero) == value && abs(value) <= 9_007_199_254_740_991:
+            id = .number(value)
+        default:
+            return nil
+        }
+        guard ids.insert(id).inserted else { return nil }
+    }
+    return ids
+}
+
 public enum MutationCommandPhase: String, Codable, Sendable {
     case idle
     case validating
@@ -118,7 +143,7 @@ private struct MutationOperation {
     let fileFields: Set<String>
     let submittedFiles: [String: FormFileSelection]
     var plainDialogFooter: Bool {
-        presentationID != nil && footer?.close == false && root.before?.isEmpty != false && root.clearFormFields.isEmpty && root.receiptWhen == nil
+        presentationID != nil && footer?.close == false && root.before?.isEmpty != false && root.clearFormFields.isEmpty && root.receiptWhen == nil && root.receiptIdentity == nil
     }
 
 }
@@ -360,11 +385,11 @@ extension ForgeRuntime {
             if await completionIsCurrent(operation) {
                 warnings = await synchronizeMutationUI(
                     windowID: windowID, targetDataSourceRef: targetRef, command: command, authorization: admitted,
-                    receipt: steps.isEmpty && command.receiptWhen == nil ? nil : rows?.compactMap(\.objectValue),
-                    presentation: operation.plainDialogFooter || command.receiptWhen != nil ? operation : nil)
+                    receipt: steps.isEmpty && command.receiptWhen == nil && command.receiptIdentity == nil ? nil : rows?.compactMap(\.objectValue),
+                    presentation: operation.plainDialogFooter || command.receiptWhen != nil || command.receiptIdentity != nil ? operation : nil)
             }
             guard await completionIsCurrent(operation) else {
-                if command.receiptWhen != nil, await operationIsCurrent(operation), await !presentationIsCurrent(operation) {
+                if command.receiptWhen != nil || command.receiptIdentity != nil, await operationIsCurrent(operation), await !presentationIsCurrent(operation) {
                     await publishMutationState(key, .init(phase: .succeeded, message: "Completed", invocationId: invocationId, writerStatus: .succeeded, syncStatus: .succeeded))
                     return .init(accepted: true, status: "succeeded", invocationId: invocationId)
                 }
@@ -571,6 +596,17 @@ extension ForgeRuntime {
         if let field = command.invocationParameter?.trimmingCharacters(in: .whitespacesAndNewlines), !field.isEmpty {
             parameters[field] = .string(invocation)
         }
+        let submittedIdentity: Set<MutationReceiptID>?
+        if !compensating, let identity = command.receiptIdentity, identity.generated != true {
+            guard let path = identity.submittedRows,
+                  let rows = resourceResolveValue(.object(parameters), components: path.components(separatedBy: "."), strictIndices: true)?.arrayValue,
+                  let ids = mutationIdentitySet(rows, field: identity.submittedField ?? identity.field) else {
+                throw MutationDispatchFailure(status: "invalid_payload", message: "Submitted receipt identities are missing or invalid.")
+            }
+            submittedIdentity = ids
+        } else {
+            submittedIdentity = nil
+        }
         if begin {
             await applyMutationWindowState(windowID: windowID, patch: operation.root.pendingState)
             await publishMutationState(
@@ -594,7 +630,7 @@ extension ForgeRuntime {
                 throw MutationDispatchFailure(status: "invalid_payload", message: "The selected file changed. Review it before saving.")
             }
         }
-        let exactReceipt = receipts != nil || (!compensating && command.receiptWhen != nil) || (!child && operation.footer?.close == true)
+        let exactReceipt = receipts != nil || (!compensating && (command.receiptWhen != nil || command.receiptIdentity != nil)) || (!child && operation.footer?.close == true)
         let outcome = await awaitMutationWriter(
             windowID: windowID, dataSourceRef: target, timeoutMs: max(1_000, command.timeoutMs ?? 30_000),
             requireRecords: child || !command.resultState.isEmpty || exactReceipt, ordered: exactReceipt,
@@ -609,10 +645,18 @@ extension ForgeRuntime {
         switch outcome {
         case .succeeded(let rows):
             if child, await !operationIsCurrent(operation) { throw scopeFailure(invoked: true) }
-            if !compensating, let rule = command.receiptWhen,
-               let failure = Self.classifyWriterReceipt(rows ?? [], accepted: rule, rejected: command.rejectedWhen) {
+            if !compensating, (command.receiptWhen != nil || command.rejectedWhen != nil),
+               let failure = Self.classifyWriterReceipt(rows ?? [], accepted: command.receiptWhen, rejected: command.rejectedWhen) {
                 retainLease = failure.unknown
                 throw failure
+            }
+            if !compensating, let identity = command.receiptIdentity {
+                let actual = rows.flatMap { mutationIdentitySet($0, field: identity.field) }
+                let valid = identity.generated == true ? (rows?.count == 1 && actual?.count == 1) : actual != nil && actual == submittedIdentity
+                guard valid else {
+                    retainLease = true
+                    throw MutationDispatchFailure(status: "indeterminate", message: "The producer did not confirm the requested identities. Verify the outcome before retrying.", invoked: true, unknown: true)
+                }
             }
             retainLease = !child  // final synchronization still owns its writer's collection.
             return rows
@@ -623,7 +667,7 @@ extension ForgeRuntime {
         }
     }
 
-    private static func classifyWriterReceipt(_ rows: [JSONValue], accepted: DashboardConditionDef, rejected: DashboardConditionDef?) -> MutationDispatchFailure? {
+    private static func classifyWriterReceipt(_ rows: [JSONValue], accepted: DashboardConditionDef?, rejected: DashboardConditionDef?) -> MutationDispatchFailure? {
         let receipt = JSONValue.array(rows)
         var rejection: Bool? = false
         if let rejected { rejection = writerReceiptMatches(rejected, receipt: receipt) }
@@ -632,7 +676,7 @@ extension ForgeRuntime {
             let reason = message.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
             return .init(status: "failed", message: reason ?? "The producer rejected the write.", invoked: true)
         }
-        if rejection == false && writerReceiptMatches(accepted, receipt: receipt) == true { return nil }
+        if rejection == false && (accepted == nil || writerReceiptMatches(accepted!, receipt: receipt) == true) { return nil }
         return .init(status: "indeterminate", message: "The producer did not confirm the write. Verify its outcome before retrying.", invoked: true, unknown: true)
     }
 
@@ -728,7 +772,7 @@ extension ForgeRuntime {
         for refresh in command.refresh {
             guard await windowMetadata(id: windowID)?.authorizationSnapshot == authorization else { break }
             let original = await originalDialog()
-            if !original && command.receiptWhen != nil { break }
+            if !original && (command.receiptWhen != nil || command.receiptIdentity != nil) { break }
             if !original && refresh.dataSourceRef == presentation?.source { continue }
             if refresh.clearSelection && original {
                 await setDataSourceSelection(windowID: windowID, dataSourceRef: refresh.dataSourceRef, selected: nil)

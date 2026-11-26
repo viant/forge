@@ -18,6 +18,20 @@ extension DashboardConditionDef {
 // Platform-neutral metadata contracts from doc/workflow-primitives.md.
 // Rendering and authoritative datasource behavior remain owned by the runtime.
 
+public struct MutationReceiptIdentityDef: Codable, Sendable {
+    public let field: String
+    public let submittedRows: String?
+    public let submittedField: String?
+    public let generated: Bool?
+
+    public init(field: String, submittedRows: String? = nil, submittedField: String? = nil, generated: Bool? = nil) {
+        self.field = field
+        self.submittedRows = submittedRows
+        self.submittedField = submittedField
+        self.generated = generated
+    }
+}
+
 public final class MutationCommandDef: Codable, @unchecked Sendable {
     public let serializationGroup: String?
     let beforeValidationError: String?
@@ -39,6 +53,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
     public let validateWhen: DashboardConditionDef?
     public let receiptWhen: DashboardConditionDef?
     public let rejectedWhen: DashboardConditionDef?
+    public let receiptIdentity: MutationReceiptIdentityDef?
     public let clearFormFields: [String]
     public let cleanupState: [String: JSONValue]
     public let pendingState: [String: JSONValue]
@@ -70,6 +85,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         validateWhen: DashboardConditionDef? = nil,
         receiptWhen: DashboardConditionDef? = nil,
         rejectedWhen: DashboardConditionDef? = nil,
+        receiptIdentity: MutationReceiptIdentityDef? = nil,
         clearFormFields: [String] = [],
         cleanupState: [String: JSONValue] = [:],
         pendingState: [String: JSONValue] = [:],
@@ -81,7 +97,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         reconcile: ReconcileSpec? = nil,
         refresh: [RefreshSpec] = []
     ) {
-        self.beforeValidationError = Self.validateBefore(before, root: commandId ?? dataSourceRef, fields: clearFormFields, successFormState: successFormState, receiptWhen: receiptWhen, rejectedWhen: rejectedWhen)
+        self.beforeValidationError = Self.validateBefore(before, root: commandId ?? dataSourceRef, fields: clearFormFields, successFormState: successFormState, receiptWhen: receiptWhen, rejectedWhen: rejectedWhen, receiptIdentity: receiptIdentity)
         self.before = before
         self.commandId = commandId
         self.serializationGroup = serializationGroup
@@ -101,6 +117,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         self.validateWhen = validateWhen
         self.receiptWhen = receiptWhen
         self.rejectedWhen = rejectedWhen
+        self.receiptIdentity = receiptIdentity
         self.clearFormFields = clearFormFields
         self.cleanupState = cleanupState
         self.pendingState = pendingState
@@ -127,8 +144,8 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         return condition.source == "collection" && condition.dataSourceRef == nil && condition.field?.isEmpty == false
     }
 
-    private static func writerReceiptError(_ receipt: DashboardConditionDef?, _ rejection: DashboardConditionDef?) -> String? {
-        if rejection != nil && receipt == nil { return "rejectedWhen requires receiptWhen." }
+    private static func writerReceiptError(_ receipt: DashboardConditionDef?, _ rejection: DashboardConditionDef?, _ identity: MutationReceiptIdentityDef?) -> String? {
+        if rejection != nil && receipt == nil && identity == nil { return "rejectedWhen requires receiptWhen or receiptIdentity." }
         for rule in [receipt, rejection].compactMap({ $0 }) where !isWriterReceiptCondition(rule) {
             return "Writer receipt conditions may read only their invocation records."
         }
@@ -155,7 +172,19 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         return UInt32(parts[0]).map(String.init) == parts[0] && parts.dropFirst().allSatisfy(isPlainID)
     }
 
-    private static func validateBefore(_ steps: [MutationBeforeStepDef]?, root: String, fields: [String], successFormState: [String: JSONValue], receiptWhen: DashboardConditionDef?, rejectedWhen: DashboardConditionDef?) -> String? {
+    private static func identityError(_ identity: MutationReceiptIdentityDef?) -> String? {
+        guard let identity else { return nil }
+        func safe(_ path: String) -> Bool { !path.isEmpty && path.components(separatedBy: ".").allSatisfy(isPlainID) }
+        guard safe(identity.field), identity.submittedField.map(safe) ?? true else { return "receiptIdentity requires safe field paths." }
+        if identity.generated == true {
+            guard identity.submittedRows == nil, identity.submittedField == nil else { return "Generated receiptIdentity cannot specify submitted rows or field." }
+        } else {
+            guard let rows = identity.submittedRows, safe(rows) else { return "receiptIdentity requires submittedRows or generated: true." }
+        }
+        return nil
+    }
+
+    private static func validateBefore(_ steps: [MutationBeforeStepDef]?, root: String, fields: [String], successFormState: [String: JSONValue], receiptWhen: DashboardConditionDef?, rejectedWhen: DashboardConditionDef?, receiptIdentity: MutationReceiptIdentityDef?) -> String? {
         var seen = Set<String>()
         for field in fields where !isPlainID(field) || !seen.insert(field).inserted {
             return "Fields cleared by a command must be distinct, top-level names."
@@ -164,11 +193,14 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
             guard isPlainID(field) else { return "successFormState requires top-level form field names." }
             guard !seen.contains(field) else { return "successFormState and clearFormFields cannot target the same field." }
         }
-        if let error = writerReceiptError(receiptWhen, rejectedWhen) { return error }
+        if let error = writerReceiptError(receiptWhen, rejectedWhen, receiptIdentity) { return error }
+        if let error = identityError(receiptIdentity) { return error }
         guard let steps else { return nil }
         var ids = Set([root])
         for step in steps {
-            if let error = writerReceiptError(step.command.receiptWhen, step.command.rejectedWhen) { return error }
+            if let error = writerReceiptError(step.command.receiptWhen, step.command.rejectedWhen, step.command.receiptIdentity) { return error }
+            if let error = identityError(step.command.receiptIdentity) { return error }
+            if step.cleanup?.receiptIdentity != nil { return "Cleanup commands do not support receiptIdentity." }
             if step.cleanup?.rejectedWhen != nil { return "Cleanup commands do not support rejectedWhen." }
             if let condition = step.cleanup?.receiptWhen, !isReceiptCondition(condition) { return "Cleanup conditions may read only their invocation records." }
             for child in [step.command, step.cleanup].compactMap({ $0 }) {
@@ -189,7 +221,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case before, commandId, serializationGroup, label, icon, hideLabel, intent, confirm, confirmSelection, invalidMessage, timeoutMs
-        case invocationParameter, dataSourceRef, parameters, payload, prepare, validateWhen, receiptWhen, rejectedWhen
+        case invocationParameter, dataSourceRef, parameters, payload, prepare, validateWhen, receiptWhen, rejectedWhen, receiptIdentity
         case clearFormFields, cleanupState, pendingState, resultState, successState, successFormState, errorState, indeterminateState, reconcile, refresh
     }
 
@@ -219,6 +251,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         receiptWhen = cleanup ? try values.decodeIfPresent(DashboardConditionDef.self, forKey: .receiptWhen)
             : try values.decodeIfPresent(WriterReceiptCondition.self, forKey: .receiptWhen)?.value
         rejectedWhen = try values.decodeIfPresent(WriterReceiptCondition.self, forKey: .rejectedWhen)?.value
+        receiptIdentity = try values.decodeIfPresent(MutationReceiptIdentityDef.self, forKey: .receiptIdentity)
         clearFormFields = try values.decodeIfPresent([String].self, forKey: .clearFormFields) ?? []
         cleanupState = try values.decodeIfPresent([String: JSONValue].self, forKey: .cleanupState) ?? [:]
         pendingState = try values.decodeIfPresent([String: JSONValue].self, forKey: .pendingState) ?? [:]
@@ -229,7 +262,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         indeterminateState = try values.decodeIfPresent([String: JSONValue].self, forKey: .indeterminateState) ?? [:]
         reconcile = try values.decodeIfPresent(ReconcileSpec.self, forKey: .reconcile)
         refresh = try values.decodeIfPresent([RefreshSpec].self, forKey: .refresh) ?? []
-        beforeValidationError = Self.validateBefore(before, root: commandId ?? dataSourceRef, fields: clearFormFields, successFormState: successFormState, receiptWhen: receiptWhen, rejectedWhen: rejectedWhen)
+        beforeValidationError = Self.validateBefore(before, root: commandId ?? dataSourceRef, fields: clearFormFields, successFormState: successFormState, receiptWhen: receiptWhen, rejectedWhen: rejectedWhen, receiptIdentity: receiptIdentity)
     }
 }
 
@@ -240,7 +273,7 @@ extension ActionDef {
         return MutationCommandDef(commandId: id, before: command.before, serializationGroup: command.serializationGroup, label: command.label, icon: command.icon, hideLabel: command.hideLabel, intent: command.intent,
             confirm: command.confirm, confirmSelection: command.confirmSelection, invalidMessage: command.invalidMessage,
             timeoutMs: command.timeoutMs, invocationParameter: command.invocationParameter, dataSourceRef: command.dataSourceRef,
-            parameters: command.parameters, payload: command.payload, prepare: command.prepare, validateWhen: command.validateWhen, receiptWhen: command.receiptWhen, rejectedWhen: command.rejectedWhen,
+            parameters: command.parameters, payload: command.payload, prepare: command.prepare, validateWhen: command.validateWhen, receiptWhen: command.receiptWhen, rejectedWhen: command.rejectedWhen, receiptIdentity: command.receiptIdentity,
             clearFormFields: command.clearFormFields, cleanupState: command.cleanupState, pendingState: command.pendingState, successState: command.successState, successFormState: command.successFormState, resultState: command.resultState,
             errorState: command.errorState, indeterminateState: command.indeterminateState, reconcile: command.reconcile, refresh: command.refresh)
     }
