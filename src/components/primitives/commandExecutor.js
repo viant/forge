@@ -544,12 +544,14 @@ function preparedInputs(context, command, extras, fallback, base) {
   return mergeCommandParameters(base, command.payload ? prepareResourcePayload(context, command.payload, extras) : fallback);
 }
 
+function verifiedWriterInput(command, parameters, id) {
+  const input = {...parameters, ...(command.invocationParameter ? {[command.invocationParameter]: id} : {})};
+  return {parameters: input, expected: submittedIdentities(command.receiptIdentity, input)};
+}
+
 // Every writer uses the same invocation receipt and timeout boundary.
-function dispatchCommandWriter(target, command, parameters, id, requireRecords, started, strictReceipt = false, presentationCurrent) {
-  target.handlers.dataSource.setInputParameters({
-    ...parameters,
-    ...(command.invocationParameter ? {[command.invocationParameter]: id} : {})
-  });
+function dispatchCommandWriter(target, command, input, id, requireRecords, started, strictReceipt = false, presentationCurrent) {
+  target.handlers.dataSource.setInputParameters(input.parameters);
   return awaitWriter(
     target,
     () => {
@@ -606,12 +608,12 @@ async function invokePreparationStep(context, command, key, sequence, current, e
     }
     acquired = acquireTransport(target, key);
     if (!acquired) throw stepError('transport_busy', id, new Error('Another command is using this writer.'));
-    const expected = submittedIdentities(command.receiptIdentity, parameters);
     const invocationId = invocationID();
+    const input = verifiedWriterInput(command, parameters, invocationId);
     const response = await dispatchCommandWriter(
       target,
       command,
-      parameters,
+      input,
       invocationId,
       true,
       () => {
@@ -620,7 +622,7 @@ async function invokePreparationStep(context, command, key, sequence, current, e
       },
       true
     );
-    const writer = cleanup ? response : classifyWriterReceipt(response, command, expected);
+    const writer = cleanup ? response : classifyWriterReceipt(response, command, input.expected);
     if (writer.status !== 'succeeded') {
       const unknown = writer.status === 'indeterminate' || (invoked && ambiguousWriterFailure(writer.error));
       if (unknown) {
@@ -895,7 +897,6 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
     if (!submittedFileChoicesMatch(context, formPatch, submittedFields)) {
       throw stepError('invalid', '', new Error('The selected file changed before submission.'));
     }
-    const expected = submittedIdentities(command.receiptIdentity, preparedSnapshot);
     target = context?.Context?.(targetRef);
     if (!target?.handlers?.dataSource?.setInputParameters || !target?.handlers?.dataSource?.fetchCollection) throw new Error(`Command datasource is unavailable: ${targetRef}`);
     if (!acquireTransport(target, key)) {
@@ -908,8 +909,9 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
     if (!sequence) applyPrimitiveState(context, command.pendingState);
     publish(context, key, {phase: 'pending', guarded: true, pending: true, retryAllowed: false, error: null, message: 'Saving…', invocationId: id, writerStatus: 'pending', syncStatus: 'not_started'});
     const mapsResult = Object.keys(command.resultState || {}).length > 0;
-    const response = await dispatchCommandWriter(target,command,preparedSnapshot,id,needsExactReceipt || mapsResult,()=>{writerInvoked=true;}, needsExactReceipt, dialogSignal ? presentationCurrent : undefined);
-    const writer = classifyWriterReceipt(response, command, expected);
+    const input = verifiedWriterInput(command, preparedSnapshot, id);
+    const response = await dispatchCommandWriter(target,command,input,id,needsExactReceipt || mapsResult,()=>{writerInvoked=true;}, needsExactReceipt, dialogSignal ? presentationCurrent : undefined);
+    const writer = classifyWriterReceipt(response, command, input.expected);
     if ((needsExactReceipt || dialogSignal) && writer.status === 'failed' && ambiguousWriterFailure(writer.error)) writer.status='indeterminate';
     if (!needsExactReceipt && !authorizationIsCurrent()) {
       releaseTransport(target, key);

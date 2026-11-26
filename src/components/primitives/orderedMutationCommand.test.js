@@ -389,3 +389,11 @@ test('a transport cannot replace the submitted identity set while it owns the re
   assert.equal(result.status, 'indeterminate');
   assert.equal(calls.length, 1);
 });
+
+test('a generated invocation parameter cannot replace a verified row collection', async () => {
+  const {context, calls} = fixture({save: () => [{id: 1}]});
+  const command = writer('save', {invocationParameter: 'items', receiptIdentity: {field: 'id', submittedRows: 'items'}});
+  const outcome = await executeCommand(context, command, {items: [{id: 1}]});
+  assert.notEqual(outcome.status, 'succeeded');
+  assert.equal(calls.length, 0);
+});
