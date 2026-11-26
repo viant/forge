@@ -63,6 +63,7 @@ import {recordWindowPerfPhase} from '../runtime/windowPerfPhases.js';
 import {normalizeLifetimeStart, resolveDateRangePreset, resolveDateRangePresetSyncPatch} from '../packs/blueprint/dateRangePreset.js';
 
 const EMPTY_WINDOW_METRICS = Object.freeze({});
+const EMPTY_ENDPOINTS = Object.freeze({});
 
 export function reuseShallowEqualRuntimeObject(previous = null, candidate = null) {
     if (!previous || !candidate || typeof previous !== 'object' || typeof candidate !== 'object') {
@@ -1403,14 +1404,18 @@ export default React.memo(WindowContent);
 
 function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}) {
     useSignals();
-    const {windowKey, windowId} = window;
+    const {windowTitle, ...runtimeWindowEntries} = window;
+    const {windowKey, windowId} = runtimeWindowEntries;
     const baseKey = windowKey.split('?')[0];
     const runtimeWindowHolder = useRef(null);
+    // The bound title is published back to the host after a datasource read.
+    // It changes presentation without rebinding that datasource.
     runtimeWindowHolder.current = reuseShallowEqualRuntimeObject(
         runtimeWindowHolder.current,
-        {...window, isInTab},
+        {...runtimeWindowEntries, isInTab},
     );
     const runtimeWindow = runtimeWindowHolder.current;
+    const presentedWindow = useMemo(() => ({...runtimeWindow, windowTitle}), [runtimeWindow, windowTitle]);
 
     const [metadataSignalHandle, setMetadataSignalHandle] = useState(() => findMetadataSignal(windowId));
     const [loading, setLoading] = useState(() => !(metadataSignalHandle?.peek?.()));
@@ -1436,7 +1441,7 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
     const admittedRefreshDefinitions = useMemo(() => new WeakSet(), []);
 
     // Settings & connector
-    const {endpoints = {}, connectorConfig = {}, services = {}, targetContext = {}, useAuth = () => ({})} = useSetting();
+    const {endpoints = EMPTY_ENDPOINTS, connectorConfig = {}, services = {}, targetContext = {}, useAuth = () => ({})} = useSetting();
     const auth = useAuth();
     const prepareConnectorRequest = useMemo(() => (
         typeof services?.prepareDataConnectorRequest === 'function'
@@ -1799,7 +1804,7 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
 
     return (
         <WindowContentInner
-            window={runtimeWindow}
+            window={presentedWindow}
             metadata={metadata}
             services={runtimeServices}
         />
