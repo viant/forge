@@ -914,6 +914,22 @@ invocation's ID and normalized rows at `extras.steps.stageAttachment`. The
 executor supplies this map itself and sends only the parameters prepared for
 the current writer. Without a receipt condition, a confirmed empty array is a valid receipt.
 
+A root writer or a forward preparation step can opt into `receiptIdentity` when its
+response must identify the submitted rows. For example, a writer that takes
+`body.items` and returns one record per item can declare:
+
+```yaml
+receiptIdentity: {submittedRows: body.items, submittedField: id, field: id}
+```
+
+Forge captures the identities from the final prepared request before dispatch.
+Each submitted ID must appear exactly once in the invocation’s returned rows,
+in any order. Missing, additional, duplicate and type-mismatched IDs leave the
+outcome indeterminate. IDs may be nonblank strings or safe JSON integers.
+For a create, `receiptIdentity: {generated: true, field: id}` requires exactly
+one returned row with a valid ID. `receiptWhen` can further restrict the value,
+for example to a positive integer. A matching `rejectedWhen` takes precedence.
+
 A root write or preparation step can require a positive `receiptWhen` and
 optionally declare `rejectedWhen`. For example, a producer can confirm a write
 with `{source: collection, field: '0.accepted', equals: true}` and reject it

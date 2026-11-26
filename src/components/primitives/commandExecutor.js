@@ -382,9 +382,64 @@ function usesOnlyReceiptRows(rule, writer = false) {
   );
 }
 
+function validIdentityPath(path) {
+  return typeof path === 'string' && path.split('.').every(part => part && part.trim() === part &&
+    !/[:/\[\]]/.test(part) && !['__proto__', 'prototype', 'constructor'].includes(part));
+}
+
+// Only JSON object members and array indices are evidence supplied by a writer.
+function identityValue(root, keys) {
+  let value = root;
+  for (const key of keys) {
+    if (value == null || typeof value !== 'object' || !Object.hasOwn(value, key) ||
+      (Array.isArray(value) && !/^(0|[1-9]\d*)$/.test(key))) return undefined;
+    value = value[key];
+  }
+  return value;
+}
+
+function rowIdentitySet(rows, field) {
+  if (!Array.isArray(rows) || !rows.length) return null;
+  const keys = field.split('.');
+  const ids = new Set();
+  for (const row of rows) {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) return null;
+    const id = identityValue(row, keys);
+    if (!(Number.isSafeInteger(id) || (typeof id === 'string' && id.trim())) || ids.has(id)) return null;
+    ids.add(id);
+  }
+  return ids;
+}
+
+function submittedIdentities(spec, parameters) {
+  if (!spec || spec.generated) return null;
+  const rows = identityValue(parameters, spec.submittedRows.split('.'));
+  const ids = rowIdentitySet(rows, spec.submittedField || spec.field);
+  if (!ids) throw new Error('The submitted rows require distinct, valid identities.');
+  return ids;
+}
+
+function receiptIdentitiesMatch(spec, rows, expected) {
+  if (!spec) return true;
+  if (rows?.length !== (spec.generated ? 1 : expected.size)) return false;
+  const actual = rowIdentitySet(rows, spec.field);
+  if (!actual) return false;
+  if (spec.generated) return true;
+  for (const id of actual) if (!expected.has(id)) return false;
+  return true;
+}
+
 function validateWriterReceipt(command) {
-  if (command.rejectedWhen != null && command.receiptWhen == null)
-    throw new Error('rejectedWhen requires receiptWhen.');
+  const spec = command.receiptIdentity;
+  if (spec != null && (!validIdentityPath(spec.field) ||
+    (spec.generated != null && typeof spec.generated !== 'boolean') ||
+    (spec.generated === true) === (spec.submittedRows != null) ||
+    (spec.submittedRows != null && !validIdentityPath(spec.submittedRows)) ||
+    (spec.submittedField != null && (spec.generated || !validIdentityPath(spec.submittedField))))) {
+    throw new Error('receiptIdentity requires a safe field and either generated or a submitted row selector.');
+  }
+  if (command.rejectedWhen != null && command.receiptWhen == null && command.receiptIdentity == null)
+    throw new Error('rejectedWhen requires receiptWhen or receiptIdentity.');
   for (const rule of [command.receiptWhen, command.rejectedWhen]) {
     if (rule != null && !usesOnlyReceiptRows(rule, true))
       throw new Error('Writer receipt conditions require invocation collection fields.');
@@ -418,21 +473,23 @@ function receiptCondition(rule, rows) {
   return evaluateCondition(rule, () => actual);
 }
 
-function classifyWriterReceipt(writer, command) {
-  if (!command.receiptWhen || writer.status !== 'succeeded') return writer;
+function classifyWriterReceipt(writer, command, expected) {
+  if ((!command.receiptIdentity && !command.receiptWhen) || writer.status !== 'succeeded') return writer;
   const rows = writer.records;
   const rejected = command.rejectedWhen ? receiptCondition(command.rejectedWhen, rows) : false;
   if (rejected === true) {
     const message = rows[0]?.message;
     return {status: 'failed', error: new Error(typeof message === 'string' && message.trim() ? message : 'The producer rejected the write.')};
   }
-  if (rejected === false && receiptCondition(command.receiptWhen, rows) === true) return writer;
+  if (rejected === false && (!command.receiptWhen || receiptCondition(command.receiptWhen, rows) === true) &&
+    receiptIdentitiesMatch(command.receiptIdentity, rows, expected)) return writer;
   return {status: 'indeterminate', error: new Error('The producer did not confirm the write. Verify its outcome before retrying.')};
 }
 
 function sequenceDefinitionError(command) {
   const ids = new Set([commandGuardKey(command)]);
   for (const entry of command.before) {
+    if (entry?.cleanup?.receiptIdentity != null) return 'A cleanup command cannot declare receiptIdentity.';
     if (entry?.cleanup?.receiptWhen && !usesOnlyReceiptRows(entry.cleanup.receiptWhen))
       return 'Cleanup conditions require invocation collection fields.';
     if (entry?.cleanup?.rejectedWhen != null) return 'A cleanup command cannot declare rejectedWhen.';
@@ -549,6 +606,7 @@ async function invokePreparationStep(context, command, key, sequence, current, e
     }
     acquired = acquireTransport(target, key);
     if (!acquired) throw stepError('transport_busy', id, new Error('Another command is using this writer.'));
+    const expected = submittedIdentities(command.receiptIdentity, parameters);
     const invocationId = invocationID();
     const response = await dispatchCommandWriter(
       target,
@@ -562,7 +620,7 @@ async function invokePreparationStep(context, command, key, sequence, current, e
       },
       true
     );
-    const writer = cleanup ? response : classifyWriterReceipt(response, command);
+    const writer = cleanup ? response : classifyWriterReceipt(response, command, expected);
     if (writer.status !== 'succeeded') {
       const unknown = writer.status === 'indeterminate' || (invoked && ambiguousWriterFailure(writer.error));
       if (unknown) {
@@ -734,7 +792,7 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
   const ordered = Array.isArray(command.before) && command.before.length > 0;
   const clearFields = Array.isArray(command.clearFormFields) && command.clearFormFields.length > 0;
   const closesDialog = Boolean(lifecycle.dialogId) && typeof lifecycle.closeOnSuccess === 'function';
-  const needsExactReceipt = ordered || clearFields || closesDialog || command.receiptWhen != null;
+  const needsExactReceipt = ordered || clearFields || closesDialog || command.receiptWhen != null || command.receiptIdentity != null;
   let submittedFields;
   let formPatch;
   let sequence = null;
@@ -837,6 +895,7 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
     if (!submittedFileChoicesMatch(context, formPatch, submittedFields)) {
       throw stepError('invalid', '', new Error('The selected file changed before submission.'));
     }
+    const expected = submittedIdentities(command.receiptIdentity, preparedSnapshot);
     target = context?.Context?.(targetRef);
     if (!target?.handlers?.dataSource?.setInputParameters || !target?.handlers?.dataSource?.fetchCollection) throw new Error(`Command datasource is unavailable: ${targetRef}`);
     if (!acquireTransport(target, key)) {
@@ -850,7 +909,7 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
     publish(context, key, {phase: 'pending', guarded: true, pending: true, retryAllowed: false, error: null, message: 'Saving…', invocationId: id, writerStatus: 'pending', syncStatus: 'not_started'});
     const mapsResult = Object.keys(command.resultState || {}).length > 0;
     const response = await dispatchCommandWriter(target,command,preparedSnapshot,id,needsExactReceipt || mapsResult,()=>{writerInvoked=true;}, needsExactReceipt, dialogSignal ? presentationCurrent : undefined);
-    const writer = classifyWriterReceipt(response, command);
+    const writer = classifyWriterReceipt(response, command, expected);
     if ((needsExactReceipt || dialogSignal) && writer.status === 'failed' && ambiguousWriterFailure(writer.error)) writer.status='indeterminate';
     if (!needsExactReceipt && !authorizationIsCurrent()) {
       releaseTransport(target, key);

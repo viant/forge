@@ -341,3 +341,40 @@ test('confirmed receipt from a replaced footer skips form, window and owner refr
     assert.deepEqual(calls.map(call => call.ref), ['save']);
   } finally {dialog.value = {open: false};}
 });
+
+test('matching submitted identities uses final parameters and the exact invocation rows', async () => {
+  const receiptIdentity = {field: 'key', submittedRows: 'body.items', submittedField: 'entity.key'};
+  for (const [ids, expected] of [
+    [[8, 7], 'succeeded'], [[7], 'indeterminate'], [[7, 7], 'indeterminate'],
+    [[7, 99], 'indeterminate'], [[7, 8, 9], 'indeterminate'], [['7', 8], 'indeterminate'],
+    [[null, 8], 'indeterminate'], [[true, 8], 'indeterminate'], [[], 'indeterminate'],
+  ]) {
+    for (const preparation of [false, true]) {
+      const ref = preparation ? 'stage' : 'save';
+      const {context, calls} = fixture({[ref]: () => ids.map(key => ({key}))});
+      context.lookupHandler = () => () => ({body: {items: [{entity: {key: 7}}, {entity: {key: 8}}]}});
+      const checked = writer(ref, {receiptIdentity, prepare: 'resolve', successState: preparation ? undefined : {saved: true}});
+      const command = preparation ? ordered([{command: checked}]) : checked;
+      const result = await executeCommand(context, command, {body: {items: [{entity: {key: 99}}]}});
+      assert.equal(result.status, expected);
+      assert.equal(calls.length, preparation && expected === 'succeeded' ? 2 : 1);
+      assert.equal(context.signals.windowForm.value.saved, !preparation && expected === 'succeeded' ? true : undefined);
+    }
+  }
+});
+
+test('invalid submitted identities are rejected before transport; generated receipt requires one identity', async () => {
+  for (const values of [[], [true], [null], [' '], [2.5], [2 ** 53], [1, 1]]) {
+    const {context, calls} = fixture();
+    await executeCommand(context, writer('save', {receiptIdentity: {field: 'id', submittedRows: 'items'}}), {items: values.map(id => ({id}))});
+    assert.equal(calls.length, 0);
+  }
+  for (const [rows, expected] of [[[{key: 'created'}], 'succeeded'], [[{key: 27}], 'succeeded'],
+    [[{key: 0}], 'succeeded'], [[{key: null}], 'indeterminate'], [[{}, {key: 1}], 'indeterminate'], [[], 'indeterminate']]) {
+    const {context} = fixture({save: () => rows});
+    assert.equal((await executeCommand(context, writer('save', {receiptIdentity: {generated: true, field: 'key'}}))).status, expected);
+  }
+  const {context} = fixture({save: () => [{rejected: true}]});
+  const command = writer('save', {receiptIdentity: {generated: true, field: 'key'}, rejectedWhen: {source:'collection',field:'0.rejected',equals:true}});
+  assert.equal((await executeCommand(context, command)).status, 'failed');
+});
