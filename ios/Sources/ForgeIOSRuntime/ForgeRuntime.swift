@@ -126,6 +126,7 @@ public actor ForgeRuntime {
     private var windowMetadataEndpoint: URL?
     private var defaultDataSourceBaseURL: URL?
     private let session: URLSession
+    private(set) var dataSourceTransportRevision = UUID()
     private var dataSourceLoader: (@Sendable (DataSourceFetchRequest) async throws -> DataSourceFetchResult?)?
     private var windowMetadataLoader: (@Sendable (String) async throws -> WindowMetadata?)?
     private var windowMetadataRequestLoader: (@Sendable (WindowMetadataRequest) async throws -> WindowMetadata?)?
@@ -202,7 +203,7 @@ public actor ForgeRuntime {
         conversationID: String? = nil,
         presentation: String? = nil
     ) async -> WindowState {
-        let resolved = MetadataResolver.resolve(metadata, for: targetContext)
+        let resolved = MetadataResolver.resolve(metadata, for: targetContext).preparingParentReaders()
         let state = WindowState(
             key: key,
             title: title,
@@ -228,7 +229,7 @@ public actor ForgeRuntime {
     ) async -> WindowState? {
         guard let index = windows.firstIndex(where: { $0.id == id }) else { return nil }
         let current = windows[index]
-        let resolved = resolveMetadata ? MetadataResolver.resolve(metadata, for: targetContext) : metadata
+        let resolved = (resolveMetadata ? MetadataResolver.resolve(metadata, for: targetContext) : metadata).preparingParentReaders()
         let state = WindowState(
             id: current.id,
             key: current.key,
@@ -358,6 +359,7 @@ public actor ForgeRuntime {
     }
 
     public func configureWindowMetadata(baseURL: URL?, path: String = "/v1/api/forge/window") {
+        if defaultDataSourceBaseURL != baseURL { dataSourceTransportRevision = UUID() }
         defaultDataSourceBaseURL = baseURL
         windowMetadataEndpoint = Self.makeWindowMetadataEndpoint(baseURL: baseURL, path: path)
     }
@@ -365,6 +367,7 @@ public actor ForgeRuntime {
     public func registerDataSourceLoader(
         _ loader: @escaping @Sendable (DataSourceFetchRequest) async throws -> DataSourceFetchResult?
     ) {
+        dataSourceTransportRevision = UUID()
         dataSourceLoader = loader
     }
 
@@ -697,6 +700,11 @@ public actor ForgeRuntime {
         }
         let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
         let input = await dataSourceRuntime.input(dataSourceID: dataSourceID)
+        let transportRevision = dataSourceTransportRevision
+        func parentRead(_ rows: [[String: JSONValue]], raw: [[String: JSONValue]], _ resolvedInputs: [String: JSONValue]) -> ParentCollectionRead? {
+            guard rows.count == 1, let readers = metadata.parentReaders, readers.refs.contains(dataSourceRef), rows == raw else { return nil }
+            return ParentCollectionRead(metadataRevision: readers.revision, transportRevision: transportRevision, effectiveParameters: input.parameters.merging(resolvedInputs) { _, resolved in resolved })
+        }
         let preparationFence: PreparedReportFetchFence
         do { preparationFence = try await validatedReportFetchFence(windowID: windowID, dataSourceRef: dataSourceRef, parameters: input.parameters) }
         catch {
@@ -715,21 +723,15 @@ public actor ForgeRuntime {
             await loadingSignal.set(loadingControl)
             do {
                 guard await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return nil }
+                let resolvedInputs = ParameterResolver.resolve(parameters: dataSource.parameters, context: await buildParameterResolutionContext(
+                    windowID: windowID, metadata: metadata, identityDataSourceRef: dataSourceRef, preferredInput: input))
                 if let result = try await dataSourceLoader(
                     DataSourceFetchRequest(
                         windowID: windowID,
                         dataSourceRef: dataSourceRef,
                         dataSource: dataSource,
                         input: input,
-                        resolvedInputs: ParameterResolver.resolve(
-                            parameters: dataSource.parameters,
-                            context: await buildParameterResolutionContext(
-                                windowID: windowID,
-                                metadata: metadata,
-                                identityDataSourceRef: dataSourceRef,
-                                preferredInput: input
-                            )
-                        ),
+                        resolvedInputs: resolvedInputs,
                         conversationID: windows.first { $0.id == windowID }?.conversationID
                     )
                 ) {
@@ -742,7 +744,8 @@ public actor ForgeRuntime {
                         rows: baseRows, generation: fetchGeneration, path: lifecyclePath + [dataSourceRef]
                     )
                     guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return nil }
-                    await dataSourceRuntime.setCollection(dataSourceID: dataSourceID, rows: hookedRows, forInput: input)
+                    await dataSourceRuntime.setCollection(dataSourceID: dataSourceID, rows: hookedRows, forInput: input,
+                        parentRead: parentRead(hookedRows, raw: result.rows, resolvedInputs))
                     await dataSourceRuntime.setCollectionInfo(dataSourceID: dataSourceID, values: result.dataInfo)
                     await dataSourceRuntime.setMetrics(dataSourceID: dataSourceID, values: result.metrics)
                     await dataSourceRuntime.setControl(dataSourceID: dataSourceID, control: ControlState())
@@ -863,7 +866,11 @@ public actor ForgeRuntime {
             rows: fetchedRows, generation: fetchGeneration, path: lifecyclePath + [dataSourceRef]
         )
         guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return nil }
-        await dataSourceRuntime.setCollection(dataSourceID: dataSourceID, rows: hookedRows)
+        if case .success = receipt, baseURL.isEmpty, additionalHeaders.isEmpty, let proof = parentRead(hookedRows, raw: fetchedRows, resolvedInputs) {
+            await dataSourceRuntime.setCollection(dataSourceID: dataSourceID, rows: hookedRows, forInput: input, parentRead: proof)
+        } else {
+            await dataSourceRuntime.setCollection(dataSourceID: dataSourceID, rows: hookedRows)
+        }
         if dataSource.autoSelect != false,
            let first = hookedRows.first,
            await dataSourceRuntime.selection(dataSourceID: dataSourceID).selected == nil {
@@ -1305,7 +1312,7 @@ public actor ForgeRuntime {
                 } else {
                     resolved = nil
                 }
-                if let resolved {
+                if let resolved = resolved?.preparingParentReaders() {
                     if let index = windows.firstIndex(where: { $0.id == state.id }) {
                         let existing = windows[index]
                         windows[index] = WindowState(
@@ -1338,7 +1345,7 @@ public actor ForgeRuntime {
         }
         do {
             let (data, _) = try await session.data(from: endpoint)
-            let resolved = try Self.decodeWindowMetadata(from: data, targetContext: targetContext)
+            let resolved = try Self.decodeWindowMetadata(from: data, targetContext: targetContext).preparingParentReaders()
             if let index = windows.firstIndex(where: { $0.id == state.id }) {
                 let existing = windows[index]
                 windows[index] = WindowState(

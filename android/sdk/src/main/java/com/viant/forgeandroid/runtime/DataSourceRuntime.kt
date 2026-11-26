@@ -20,8 +20,10 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import java.lang.ref.WeakReference
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import java.util.WeakHashMap
 
 class DataSourceRuntime(
     private val signals: SignalRegistry,
@@ -36,7 +38,9 @@ class DataSourceRuntime(
         val form: Map<String, Any?>? = null,
         val selection: Map<String, Any?>? = null,
         val rowIndex: Int? = null
-    )
+    ) {
+        internal var admittedParentInputs: JsonElement? = null
+    }
 
     private data class PreparedCompletion(val windowId: String, val instanceRef: String, val result: CompletableDeferred<PreparedReportFetchResult>)
     private val preparedCompletions = java.util.concurrent.ConcurrentHashMap<String, PreparedCompletion>()
@@ -46,7 +50,7 @@ class DataSourceRuntime(
     fun registeredWindowContexts(windowId: String): Map<String, DataSourceContext> = registeredContexts[windowId]?.toMap().orEmpty()
     private val parameterResolver = ParameterResolver()
     private var executor: ((ExecutionDef, DataSourceContext, Map<String, Any?>) -> Unit)? = null
-    private var collectionLoader: (suspend (DataSourceContext, String?) -> LoaderResult?)? = null
+    @Volatile private var collectionLoader: (suspend (DataSourceContext, String?) -> LoaderResult?)? = null
 
     fun setExecutor(executor: (ExecutionDef, DataSourceContext, Map<String, Any?>) -> Unit) {
         this.executor = executor
@@ -57,8 +61,13 @@ class DataSourceRuntime(
     }
 
     internal fun setRequestLoader(loader: suspend (DataSourceContext, String?) -> LoaderResult?) {
-        collectionLoader = loader
+        synchronized(parentReads) {
+            collectionLoader = loader
+            parentReads.clear()
+        }
     }
+
+    internal val readTransport: Any? get() = collectionLoader
 
     fun attach(window: WindowContext, dataSourceRef: String): DataSourceContext {
         return attachConfigured(window, dataSourceRef, dataSourceRef)
@@ -173,6 +182,60 @@ class DataSourceRuntime(
         return applyResourceModel(request, rows)
     }
 
+    // An ordinary successful read may qualify for parent preparation. The receipt
+    // shares the installed collection signal; it never owns another copy of its rows.
+    private data class ParentRead(
+        val owner: WeakReference<WindowMetadata>, val actor: String, val bindings: JsonElement,
+        val inputs: JsonElement? = null, val fromLoader: Boolean = false,
+        val rows: WeakReference<List<Map<String, Any?>>>? = null, val settled: ControlState? = null
+    ) {
+        fun belongsTo(metadata: WindowMetadata?) =
+            metadata != null && owner.get() === metadata && actor == JsonObject(metadata.authorizationSnapshot).toString()
+    }
+    private val parentReads = WeakHashMap<Signal<List<Map<String, Any?>>>, ParentRead>()
+
+    private fun admitParentRead(live: DataSourceContext, ctx: DataSourceContext): ParentRead? {
+        val metadata = ctx.window.metadata.peek() ?: return null
+        if (ctx.dataSourceRef !in metadata.preparedParentReaders) return null
+        val input = ctx.input.peek()
+        return synchronized(parentReads) {
+            parentReads.remove(live.collection)
+            if (ctx.instanceRef != ctx.dataSourceRef || ctx.dataSourceRef in metadata.reportReadOwners ||
+                (input.preparedDispatchId != null && input.refreshOwner == null) || input.filter.isNotEmpty() || input.page != null ||
+                ctx.window.metadata.peek()?.dataSources?.get(ctx.dataSourceRef) !== ctx.dataSource) return@synchronized null
+            ParentRead(WeakReference(metadata), JsonObject(metadata.authorizationSnapshot).toString(),
+                JsonUtil.anyToElement(input.parameters)).also { parentReads[live.collection] = it }
+        }
+    }
+
+    private fun settleParentRead(live: DataSourceContext, receipt: ParentRead?, data: List<Map<String, Any?>>,
+        inputs: JsonElement?, fromLoader: Boolean) {
+        if (receipt == null || inputs == null || data.size != 1) return
+        synchronized(parentReads) {
+            val rows = live.collection.peek()
+            if (parentReads[live.collection] !== receipt || !receipt.belongsTo(live.window.metadata.peek()) ||
+                !live.window.signals.ownsMetadata(live.window.windowId, live.window.metadata) || rows != data) return
+            parentReads[live.collection] = receipt.copy(inputs = inputs, fromLoader = fromLoader,
+                rows = WeakReference(rows), settled = live.control.peek())
+        }
+    }
+
+    internal fun currentParentRows(window: WindowContext, ref: String, parameters: Map<String, Any?>): List<Map<String, Any?>>? {
+        val source = registeredSource(window.windowId, ref) ?: return null
+        val input = source.input.peek()
+        val control = source.control.peek()
+        if (control.inactive || control.loading || !control.resolved || control.error != null || input.fetch ||
+            input.filter.isNotEmpty() || input.page != null) return null
+        val receipt = synchronized(parentReads) { parentReads[source.collection] } ?: return null
+        val rows = source.collection.peek()
+        val declared = JsonUtil.anyToElement(parameters)
+        if (!receipt.belongsTo(window.metadata.peek()) || control !== receipt.settled || rows !== receipt.rows?.get() ||
+            receipt.inputs != declared || JsonUtil.anyToElement(input.parameters) != receipt.bindings) return null
+        if (input.parameters.any { (key, value) -> declared.jsonObject[key] != JsonUtil.anyToElement(value) }) return null
+        val current = if (receipt.fromLoader) parameterResolver.resolveFlat(source.dataSource.parameters, source) else buildDatasourceFetchInputs(source)
+        return rows.takeIf { receipt.inputs == JsonUtil.anyToElement(current) && synchronized(parentReads) { parentReads[source.collection] === receipt } }
+    }
+
     private suspend fun fetchCollection(live: DataSourceContext, lifecyclePath: List<String> = emptyList(), requestedInput: InputState = live.input.peek()) {
         val ctx = live.captureRequest(requestedInput)
         val currentPath = lifecyclePath + ctx.dataSourceRef
@@ -186,6 +249,7 @@ class DataSourceRuntime(
             ((commitGuard == null && refreshOwner == null) || live.input.peek().preparedDispatchId == requestedInput.preparedDispatchId) &&
             (!reportOwned || authorizeReportRead?.invoke(live, requestedInput) != false)
         if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
+        val parentRead = admitParentRead(live, ctx)
         ctx.control.set(ctx.control.peek().copy(loading = true, error = null, resolved = false, requestId = requestedInput.preparedDispatchId))
 
         var receivedResponse = false
@@ -196,7 +260,8 @@ class DataSourceRuntime(
                 currentCoroutineContext().ensureActive()
                 if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
                 val evidence = if (rawCommandReceipt) JsonUtil.anyToElement(loaderResult.rows).jsonArray else null
-                val data = applyNamedFetchHooks(ctx, applyCollectionHook(ctx, applyResourceModel(ctx, loaderResult.rows)), currentPath)
+                val modeled = applyResourceModel(ctx, loaderResult.rows)
+                val data = applyNamedFetchHooks(ctx, applyCollectionHook(ctx, modeled), currentPath)
                 currentCoroutineContext().ensureActive()
                 if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
                 ctx.collection.set(data)
@@ -230,11 +295,16 @@ class DataSourceRuntime(
                 trigger(ctx, "onSuccess", mapOf("collection" to data), currentPath)
                 if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
                 finishFetch(ctx, rows = data, metrics = loaderResult.metrics, invocationEvidence = evidence)
+                if (parentRead != null && data == modeled) settleParentRead(live, parentRead, data, loaderResult.admittedParentInputs, fromLoader = true)
                 return
             }
 
             val endpoint = ctx.dataSource.service?.endpoint
-            val request = buildRequest(ctx) ?: run {
+            var admittedInputs: JsonElement? = null
+            val captureInputs: ((Map<String, Any?>) -> Unit)? = parentRead?.let {
+                { values -> admittedInputs = JsonUtil.anyToElement(values) }
+            }
+            val request = buildRequest(ctx, captureInputs = captureInputs) ?: run {
                 val message = when {
                     reportOwned -> "The report datasource has no physical loader."
                     requestedInput.preparedDispatchId != null && refreshOwner == null -> "The command datasource has no physical loader."
@@ -253,10 +323,8 @@ class DataSourceRuntime(
             // The displayed collection may transform or filter records. A checked receipt belongs
             // to the selected physical response, before any resource model or onFetch hook.
             val evidence = if (rawCommandReceipt && rawRows is List<*>) JsonUtil.anyToElement(rawRows).jsonArray else null
-            val data = applyNamedFetchHooks(ctx, applyCollectionHook(
-                ctx,
-                applyResourceModel(ctx, normalizeCollection(rawRows))
-            ), currentPath)
+            val modeled = applyResourceModel(ctx, normalizeCollection(rawRows))
+            val data = applyNamedFetchHooks(ctx, applyCollectionHook(ctx, modeled), currentPath)
             currentCoroutineContext().ensureActive()
             val dataInfo = normalizeDataInfo(response, ctx.dataSource.selectors?.dataInfo)
             if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
@@ -278,6 +346,8 @@ class DataSourceRuntime(
             val invocationRows = if (requireRecords && rawRows is List<*> && rawRows.any { it !is Map<*, *> }) rawRows else data
             finishFetch(ctx, rows = invocationRows, metrics = if (dataInfo.isNotEmpty()) dataInfo else extractPagingMetrics(response, ctx.dataSource),
                 recordsConfirmed = rawRows is List<*>, invocationEvidence = evidence)
+            if (parentRead != null && rawRows is List<*> && rawRows.size == 1 && rawRows[0] is Map<*, *> && data == modeled)
+                settleParentRead(live, parentRead, data, admittedInputs, fromLoader = false)
         } catch (e: CancellationException) {
             failPrepared(ctx, "The prepared report query was cancelled.")
             throw e
@@ -377,7 +447,8 @@ class DataSourceRuntime(
             ?: row
     }
 
-    private fun buildRequest(ctx: DataSourceContext, suppliedInputs: Map<String, Any?> = emptyMap(), detachedReadId: String? = null): DataSourceRequest? {
+    private fun buildRequest(ctx: DataSourceContext, suppliedInputs: Map<String, Any?> = emptyMap(), detachedReadId: String? = null,
+        captureInputs: ((Map<String, Any?>) -> Unit)? = null): DataSourceRequest? {
         val baseUri = ctx.dataSource.service?.uri ?: ctx.dataSource.uri ?: return null
         val method = (ctx.dataSource.service?.method ?: ctx.dataSource.method ?: "GET")
             .trim()
@@ -389,7 +460,7 @@ class DataSourceRuntime(
             DataSourceRequest(
                 method = method,
                 uri = baseUri,
-                body = buildRequestBody(ctx, baseUri, suppliedInputs, detachedReadId)
+                body = buildRequestBody(ctx, baseUri, suppliedInputs, detachedReadId, captureInputs)
             )
         }
     }
@@ -447,11 +518,14 @@ class DataSourceRuntime(
         return baseUri + separator + encoded
     }
 
-    private fun buildRequestBody(ctx: DataSourceContext, baseUri: String, suppliedInputs: Map<String, Any?>, detachedReadId: String?): String {
+    private fun buildRequestBody(ctx: DataSourceContext, baseUri: String, suppliedInputs: Map<String, Any?>, detachedReadId: String?,
+        captureInputs: ((Map<String, Any?>) -> Unit)?): String {
         val payload = if (isDatasourceFetchRoute(baseUri)) {
             val inputs = buildDatasourceFetchInputs(ctx)
+            val effective = if (suppliedInputs.isEmpty()) inputs else inputs + suppliedInputs
+            captureInputs?.invoke(effective)
             buildMap<String, Any?> {
-                put("inputs", if (suppliedInputs.isEmpty()) inputs else inputs + suppliedInputs)
+                put("inputs", effective)
                 if (detachedReadId != null) {
                     put("cache", mapOf("bypassCache" to true))
                     put("invocationId", detachedReadId)

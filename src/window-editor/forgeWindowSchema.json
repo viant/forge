@@ -5668,6 +5668,9 @@
         "mappingRef": {
           "type": "string"
         },
+        "parentParameter": {
+          "type": "string"
+        },
         "pendingField": {
           "type": "string"
         },
@@ -7798,7 +7801,7 @@
   "$ref": "#/$defs/Window",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "x-forge-provenance": {
-    "baseCommit": "c6b82e3fa73b75b8d81da46d4dacd38c987d939e",
+    "baseCommit": "84a95b0a1c175276f1de575d371789d36b96d4f8",
     "generator": "scripts/window-schema/main.go",
     "sha256": {
       "choice_browser.go": "935cbeddb231dd329374114c5f38454dc7c44c2ab70a45ea3c0f37ce7f3aee26",
@@ -7858,7 +7861,7 @@
       "resource_policy_editor.go": "6f3a00bf5ac0751a133fe121e727f5aa2671489dfb07b98a29314cc7a380b8c2",
       "result_preview.go": "bd913237174dc663cf40a5cd30bf5e835ec077930e7f0916f7ce906671f3dbff",
       "rule_editor.go": "3eda2833f57c5a64adec603e42213423907151451998fa4ba538fe258273f6e6",
-      "selection_preparation.go": "d3edad9acf6ffbaa2c4e565864b00f861c1690bf701662638b44d5ccdee7d8eb",
+      "selection_preparation.go": "f6d00dbbb71c0c002dd8ffe7370d2fe591bc25fb6399428b9ccebc7feb628033",
       "window_compiled_resource.go": "12eddf7313e2a4a52f81fe5fa68b67e2c284f07b5947e9bdb2dea833cfd20cc1",
       "window_consumer.go": "68fb1c0e6023416f0f27420c0a5fcd0c08b1ce6502ca63cf97a96236e0918837",
       "window_descriptor.go": "99170237b79c06523e72302b7917e0f573ef5f54bbc4bf0b8a4625915274c789",
@@ -7866,7 +7869,7 @@
       "window_reference_manifest.go": "e8245d783f99d3a59143fd1e37e364c040389fa409b457207da567d9112ddb5b",
       "window_resource.go": "a991b091b9b4b45a999cca138fa8f6c0fa90b9ed0dc63bfce2ace576700ca872",
       "window_target_proof.go": "53605c132aae2b8c8d6e377daaae416f347e0ff8c48a39fb2a0f15f95ad5faeb",
-      "workflow_primitives.go": "c781025373e9e7915f6881db3b2c209d6923bae6a9f7891318ebc58bee08e9e0",
+      "workflow_primitives.go": "caa0721face2fda47a711eeff3db77933750a25b3cd24344fe5f0297463220a3",
       "workspace_summary.go": "d9cf3867d3d3bfa3f65c9fdeccad91d21bd9d2602e066823bb36cbff079c86c1"
     },
     "sourceNote": "Generated from committed canonical Forge authored model and Forge-owned public contracts; SHA-256 identifies every parsed source file."

@@ -884,6 +884,26 @@ authorization and scope before applying it. A second activation while the
 same dialog is being prepared performs no read. The optional pending and error
 fields expose the operation state to authored controls.
 
+### Prepare a create dialog from its parent
+
+For a create operation, bind the parent's identity through an operation parameter and use `parentParameter` to name that parameter. The reader receives the declared scalar or singleton-array value. The hook receives the verified parent as its sole row and the same draft model used by selected-row preparation.
+
+```yaml
+operations:
+  - id: newDocument
+    label: New document
+    dialogId: documentEditor
+    parameters:
+      - {name: FolderID, in: windowForm, location: folderId}
+    prepareSelection:
+      dataSourceRef: folderRecord
+      parentParameter: FolderID
+      identityField: id
+      prepare: Documents.prepareDraft
+```
+
+A current single-record read for the same input, window revision and authorization can supply the parent directly. A cold or stale parent requires one reader request. The operation checks the returned identity, declared scope, presentation conditions and current authorization before seeding the draft. Changing the parent during the read suppresses the open. Child selection limits and row permission predicates still apply when the operation declares them. Use either `parentParameter` or `idsParameter` on an operation.
+
 ## Ordered preparation on a mutation command
 
 A command opts in by declaring a nonempty `before` list. An omitted list and

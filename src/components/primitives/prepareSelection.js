@@ -1,4 +1,5 @@
 import {batch} from '@preact/signals-react';
+import {loadedParentRows} from '../../runtime/parentPreparation.js';
 import {findDialogSignal, findMetadataSignal, protectedWindowEpoch} from '../../core/store/signals.js';
 import {resolveParameters} from '../../hooks/parameters.js';
 import {resolveSelector} from '../../utils/selector.js';
@@ -116,10 +117,14 @@ export async function openPreparedSelection(context, operation, eligible) {
   let attempted = false;
   let pendingPublished = false;
   try {
-    const ids = selection(), keys = ids.map(identity);
-    if (!keys.length || new Set(keys).size !== keys.length) throw new Error('Select one or more distinct records.');
     const parameters = snapshotResourceValue(readParameters());
-    if (Object.hasOwn(parameters, spec.idsParameter)) throw new Error('The selected ID parameter is already bound.');
+    const parent = spec.parentParameter;
+    const value = parent ? parameters[parent] : null;
+    const ids = parent ? (Array.isArray(value) ? value : [value]) : selection();
+    if (parent && (spec.idsParameter || ids.length !== 1)) throw new Error('Parent preparation requires exactly one bound identity.');
+    const keys = ids.map(identity);
+    if (!keys.length || new Set(keys).size !== keys.length) throw new Error('Select one or more distinct records.');
+    if (!parent && Object.hasOwn(parameters, spec.idsParameter)) throw new Error('The selected ID parameter is already bound.');
     const scope = Object.entries(spec.scopeFields || {}).map(([field, parameter]) => {
       const value = parameters[parameter];
       return [field, identity(Array.isArray(value) && value.length === 1 ? value[0] : value)];
@@ -130,6 +135,7 @@ export async function openPreparedSelection(context, operation, eligible) {
       try {
         if (protectedWindowEpoch(context.identity.windowId) !== epoch || peek(metadataSignal) !== metadataRevision || actor() !== originalActor ||
             dialogState()?.open || dialogState()?.props !== originalDialog || !eligible(eligibilityContext)) return false;
+        if (parent) return JSON.stringify(readParameters()) === originalParameters;
         const current = selection();
         return current.length === keys.length && current.every((id, index) => identity(id) === keys[index]) &&
           JSON.stringify(readParameters()) === originalParameters;
@@ -146,16 +152,24 @@ export async function openPreparedSelection(context, operation, eligible) {
         typeof prepare !== 'function' || typeof context.handlers?.window?.openDialog !== 'function') {
       throw new Error('The selected-record reader, draft or preparation handler is unavailable.');
     }
-    const input = {...parameters, [spec.idsParameter]: ids};
+    const input = parent ? parameters : {...parameters, [spec.idsParameter]: ids};
     applyPrimitiveState(context, {...pending, ...(spec.errorField ? {[spec.errorField]: ''} : {})});
     pendingPublished = Boolean(spec.pendingField);
     attempted = true;
     const invocationId = globalThis.crypto?.randomUUID?.() || 'selection-' + Date.now() + '-' + Math.random();
-    const response = await reader.handlers.dataSource.fetchRecords({parameters: input, cache: {bypassCache: true}, invocationId});
-    if (!active()) return {accepted: true, status: 'superseded'};
-    const source = context.metadata.dataSource[spec.dataSourceRef];
-    const {records} = extractData(source.selectors, undefined, response, true);
-    const rows = orderedRows(records, keys, spec.identityField, scope);
+    let rows;
+    const loaded = parent && loadedParentRows(reader, input);
+    if (loaded) {
+      try { rows = orderedRows(loaded, keys, spec.identityField, scope); }
+      catch { /* A different stored parent requires the declared reader. */ }
+    }
+    if (!rows) {
+      const response = await reader.handlers.dataSource.fetchRecords({parameters: input, cache: {bypassCache: true}, invocationId});
+      if (!active()) return {accepted: true, status: 'superseded'};
+      const source = context.metadata.dataSource[spec.dataSourceRef];
+      const {records} = extractData(source.selectors, undefined, response, true);
+      rows = orderedRows(records, keys, spec.identityField, scope);
+    }
     const modelRef = context.metadata.dataSource[destination].resourceModelRef;
     const projected = {
       rows, parameters: input, invocationId, ...projectCases(context, spec.mappingRef, rows),

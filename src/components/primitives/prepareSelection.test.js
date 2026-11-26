@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {openPreparedSelection} from './prepareSelection.js';
+import {admitParentRead, recordParentRead} from '../../runtime/parentPreparation.js';
 import {getDialogSignal} from '../../core/store/signals.js';
 
 let counter = 0;
@@ -117,4 +118,82 @@ test('preparation cannot publish changes to a live window signal', async () => {
   assert.equal((await f.open()).status, 'failed');
   assert.equal(f.form.value.parent, 8);
   assert.deepEqual(f.events, ['read']);
+});
+
+function parentFixture() {
+  const f = fixture();
+  const {context, operation, form, selection} = f;
+  operation.parameters = [{name: 'Parent', in: 'windowForm', location: 'parent'}];
+  delete operation.prepareSelection.idsParameter;
+  delete operation.prepareSelection.scopeFields;
+  operation.prepareSelection.parentParameter = 'Parent';
+  context.metadata.view = {content: {editableCollection: {operations: [operation]}}};
+  selection.value = {selection: []};
+  const reader = context.Context('read');
+  reader.identity = {...context.identity, dataSourceRef: 'read', dataSourceId: context.identity.windowId + 'DSread'};
+  reader.metadata = context.metadata;
+  reader.authorization = context.authorization;
+  reader.signals = {
+    collection: {value: [{id: form.value.parent}]}, input: {value: {parameters: {Parent: form.value.parent}}},
+    control: {value: {loaded: true}},
+  };
+  const resolve = context.Context;
+  context.Context = ref => ref === 'read' ? reader : resolve(ref);
+  f.calls.read = () => ({data: [{id: form.value.parent}]});
+  const admit = () => recordParentRead(admitParentRead(reader, {Parent: form.value.parent}), reader.signals.collection.value);
+  return {...f, reader, admit};
+}
+
+test('a bound parent reuses only an admitted current record and ignores unrelated child selection', async () => {
+  for (const shape of [8, [8]]) {
+    const f = parentFixture();
+    f.form.value.parent = shape;
+    f.reader.signals.input.value.parameters.Parent = shape;
+    f.admit();
+    f.selection.value = {selection: [{id: 91}]};
+    assert.equal((await f.open()).status, 'opened');
+    assert.deepEqual(f.events, ['prepare', 'seed', 'open']);
+    assert.deepEqual(f.calls.args.parameters, {Parent: shape});
+    assert.deepEqual(f.calls.form.ids, [8]);
+  }
+});
+
+test('a cold parent reads exactly once with the declared argument shape', async () => {
+  for (const change of [
+    null, f => { f.reader.signals.control.value.stale = true; },
+    f => { f.reader.signals.collection.value = [{id: 8}]; },
+    f => { f.reader.authorization = {subject: 'other'}; f.context.authorization = f.reader.authorization; },
+    f => { f.reader.metadata = {...f.reader.metadata}; },
+    f => { f.reader.connector = {}; },
+    f => { f.reader.identity.actorRef = 'other'; },
+    f => { f.reader.signals.input.value.parameters = {Parent: 7}; },
+    f => { f.reader.signals.input.value.filter = {group: 'different'}; },
+    f => { f.form.value.parent = [8]; },
+  ]) {
+    const f = parentFixture();
+    if (change) { f.admit(); change(f); }
+    f.calls.read = () => ({data: [{id: 8}]});
+    assert.equal((await f.open()).status, 'opened');
+    assert.deepEqual(f.events, ['read', 'prepare', 'seed', 'open']);
+    assert.deepEqual(f.calls.input, {Parent: f.form.value.parent});
+  }
+});
+
+test('invalid or changed parent and revoked authorization cannot seed or open a draft', async () => {
+  for (const invalid of [null, [], [8, 9], {}, true, '']) {
+    const f = parentFixture();
+    f.form.value.parent = invalid;
+    assert.equal((await f.open()).status, 'failed');
+    assert.deepEqual(f.events, []);
+  }
+  for (const replace of [f => { f.form.value.parent = 9; }, f => { f.context.authorization = {subject: 'other'}; }]) {
+    const f = parentFixture();
+    let finish;
+    f.calls.read = () => new Promise(resolve => { finish = resolve; });
+    const pending = f.open();
+    replace(f);
+    finish({data: [{id: 8}]});
+    assert.equal((await pending).status, 'superseded');
+    assert.deepEqual(f.events, ['read']);
+  }
 });

@@ -10,6 +10,7 @@ public struct RegisteredDataSourceSnapshot: Sendable {
     public let metrics: [String: JSONValue]
     public var dataInfo: [String: JSONValue] = [:]
     public var stale = false
+    var parentRead: ParentCollectionRead?
 }
 
 struct PreparedPrimaryFetch: Sendable {

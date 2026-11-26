@@ -3,6 +3,7 @@ import Foundation
 public struct WindowMetadata: Codable, Sendable {
     /// In-memory authored input for portable hooks; never an encoded metadata field.
     public var runtimeAuthoring: JSONValue?
+    var parentReaders: ParentPreparationReaders?
     public let windowKey: String?
     public let namespace: String?
     public let actionAliases: [String]?

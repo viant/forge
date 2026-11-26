@@ -1,3 +1,4 @@
+import {admitParentRead, prepareParentReaders, recordParentRead} from '../runtime/parentPreparation.js';
 // DataSource.jsx
 import React, {useEffect, useState} from "react";
 import {recordWindowPerfPhase} from '../runtime/windowPerfPhases.js';
@@ -99,6 +100,7 @@ export default function DataSource({context, hasScheduledFetch}) {
         }
     };
     const resourceModelRef = resourceModelRefForDataSource(context, dataSource.resourceModelRef);
+    const parentReader = prepareParentReaders(context.metadata)?.has(identity.dataSourceRef);
     const selectionMode = dataSource.selectionMode || 'single';
     useEffect(() => {
         recordWindowPerfPhase('datasource-mounted',context?.identity?.windowId);
@@ -497,6 +499,10 @@ export default function DataSource({context, hasScheduledFetch}) {
         const inputVal = input.value || {};
         let {page, filter = {}, parameters, sort = [], cache = null, invocationId = null, bindingGeneration = null} = inputVal || {};
         const requestPaging = withPagingSize(paging, inputVal.pageSize);
+        const parentRead = parentReader && !pagingEnabled && !appendRequested && !dataSource.dataSourceRef &&
+            !resourceModelRef && !events.onFetch.isDefined() && Number(page || 1) === 1 &&
+            !Object.keys(filter || {}).length && !sort?.length ? admitParentRead(context, parameters) : null;
+
         const requestId = dataSourceRequestId(inputVal);
         const requestDataSourceId = context?.identity?.dataSourceId;
         const resultMode = requestedResultMode(requestDataSourceId, requestId);
@@ -703,6 +709,8 @@ export default function DataSource({context, hasScheduledFetch}) {
                 records = combined;
             }
             collection.value = records;
+            if (!append && !aggregate && !deferredCacheHit) recordParentRead(parentRead, records);
+
             try {
                 log.debug('[doFetchRecords] set collection', {
                     ds: context?.identity?.dataSourceRef,

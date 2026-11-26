@@ -12,12 +12,12 @@ import kotlinx.serialization.json.*
 internal data class EditablePredicateStore(val ref: String, val store: String)
 
 private fun DashboardConditionDef.editableStore(): EditablePredicateStore? {
-    val ref = dataSourceRef?.takeIf { it.isNotBlank() } ?: return null
     val kind = source?.lowercase()
+    val ref = dataSourceRef?.takeIf { it.isNotBlank() } ?: if (kind == "control") "" else return null
     val store = when (kind) {
         "filter", "filters", "input" -> "input"
         null, "form" -> "form"
-        "collection", "metrics", "selection" -> kind
+        "collection", "metrics", "selection", "control" -> kind
         else -> return null
     }
     return EditablePredicateStore(ref, store)
@@ -40,14 +40,16 @@ internal fun editablePredicateStores(spec: EditableCollectionSpec): Set<Editable
 internal fun EditableCollectionSpec.predicateSignals(window: WindowContext, caller: String?): Map<EditablePredicateStore, kotlinx.coroutines.flow.StateFlow<Any?>> =
     buildMap {
         for (owner in predicateStores) {
-            if (owner.ref == caller || window.metadata.peek()?.dataSources?.containsKey(owner.ref) != true) continue
-            val id = window.identity.dataSourceId(owner.ref)
+            val ref = if (owner.ref.isEmpty()) caller ?: continue else owner.ref
+            if ((ref == caller && owner.store != "control") || window.metadata.peek()?.dataSources?.containsKey(ref) != true) continue
+            val id = window.identity.dataSourceId(ref)
             val flow: kotlinx.coroutines.flow.StateFlow<Any?> = when (owner.store) {
                 "form" -> window.signals.form(id).flow
                 "collection" -> window.signals.collection(id).flow
                 "metrics" -> window.signals.metrics(id).flow
                 "selection" -> window.signals.selection(id, SelectionState()).flow
                 "input" -> window.signals.input(id).flow
+                "control" -> window.signals.control(id).flow
                 else -> continue
             }
             put(owner, flow)
@@ -67,9 +69,10 @@ internal class EditableOperationInputs(
         evaluateConditionTree(condition, record = null) { node, path ->
             val owner = node.editableStore()
             when {
-                owner != null && owner.ref != caller -> {
+                owner != null && (owner.ref != caller || owner.store == "control") -> {
                     val state = scoped[owner]
                     val value = when (state) {
+                        is ControlState -> state.bindingValues()
                         is InputState -> if (node.source.equals("input", true)) state.bindingValues() else state.filter
                         is SelectionState -> mapOf("selected" to state.selected, "selection" to state.selection, "rowIndex" to state.rowIndex)
                         else -> state
@@ -83,7 +86,7 @@ internal class EditableOperationInputs(
         }
 
     fun disabled(operation: EditableCollectionOperationSpec, spec: EditableCollectionSpec, rows: List<Map<String, Any?>>): Boolean {
-        val bounds = operation.selection ?: spec.selection
+        val bounds = operation.selection ?: spec.selection.takeIf { operation.prepareSelection?.parentParameter == null }
         val minimum = bounds?.min ?: if (operation.requiresSelection) 1 else 0
         val maximum = bounds?.max ?: 0
         if (rows.size < minimum || (maximum > 0 && rows.size > maximum)) return true
@@ -112,20 +115,27 @@ internal class PreparedSelectionRuntime {
         val invocation = UUID.randomUUID().toString()
         if (priorDialog.open || active.putIfAbsent(key, invocation) != null) return Result.success(false)
         val selection = source.selection.peek()
+        val parent = prepare.parentParameter
+        val transport = runtime.selectionReadTransport
         val selected = selection.selection.ifEmpty { selection.selected?.let(::listOf).orEmpty() }
         val authorization = metadata.authorizationSnapshot.mapValues { JsonUtil.elementToAny(it.value) }
+        val actor = JsonObject(metadata.authorizationSnapshot).toString()
         val original = window.peekWindowForm()
         val scoped = spec.predicateSignals(window, source.dataSourceRef)
         var pending = false
         var expectedParameters: JsonObject? = null
+        var warmCurrent: (() -> Boolean)? = null
         fun currentPresentation() = presented() && window.signals.ownsMetadata(window.windowId, window.metadata) &&
-            window.metadata.peek() === metadata && dialog.peek() === priorDialog && active[key] == invocation
+            window.metadata.peek() === metadata && JsonObject(metadata.authorizationSnapshot).toString() == actor &&
+            dialog.peek() === priorDialog && active[key] == invocation && (parent == null || runtime.selectionReadTransport === transport)
         fun parameters(): Map<String, Any?> {
             val resolved = runtime.parameterResolver.resolveOperation(operation.parameters, source).inbound
             return mutationTargetParameters(resolved[prepare.dataSourceRef] ?: resolved[""] ?: emptyMap())
         }
-        fun eligible(rows: List<Map<String, Any?>> = selected): Boolean {
-            if (!currentPresentation() || source.selection.peek() != selection) return false
+        fun eligible(fresh: List<Map<String, Any?>>? = null): Boolean {
+            val liveSelection = source.selection.peek()
+            if (!currentPresentation() || (parent == null && liveSelection != selection) || warmCurrent?.invoke() == false) return false
+            val rows = if (parent == null) fresh ?: selected else liveSelection.selection.ifEmpty { liveSelection.selected?.let(::listOf).orEmpty() }
             val form = source.form.peek()
             val metrics = source.metrics.peek()
             val collection = source.collection.peek()
@@ -134,7 +144,7 @@ internal class PreparedSelectionRuntime {
             val state = if (pending && flag != null && current[flag] == true) current.toMutableMap().also {
                 if (flag in original) it[flag] = original[flag] else it.remove(flag)
             } else current
-            val facts = EditableOperationInputs(metrics, form, state, collection, authorization, source.input.peek(), selection,
+            val facts = EditableOperationInputs(metrics, form, state, collection, authorization, source.input.peek(), liveSelection,
                 source.dataSourceRef, scoped.mapValues { it.value.value })
             if (!facts.allows(operation.visibleWhen) || facts.disabled(operation, spec, rows)) return false
             if (permission != null) {
@@ -150,18 +160,28 @@ internal class PreparedSelectionRuntime {
             val draftRef = destination.content?.dataSourceRef ?: destination.dataSourceRef ?: error("The selection dialog requires a draft datasource.")
             val definition = metadata.dataSources[draftRef] ?: error("Selection draft is unavailable: $draftRef")
             require(prepare.mappingRef == null || prepare.mappingRef in metadata.resourceMappings) { "The selection mapping is unavailable." }
-            require(prepare.idsParameter !in operation.parameters.mapNotNull { it.name }) { "The selection ID parameter is already declared." }
+            val names = operation.parameters.mapNotNull { it.name }
+            require((parent == null) != (prepare.idsParameter == null)) { "Declare exactly one parent or selection ID parameter." }
+            if (parent != null) require(parent.isNotBlank() && names.count { it == parent } == 1) { "The parent parameter must name one declared operation parameter." }
+            else require(!prepare.idsParameter.isNullOrBlank() && prepare.idsParameter !in names) { "The selection ID parameter is invalid or already declared." }
             require(destination.fetchOnOpen == false || (destination.fetchOnOpen == null && destination.content?.fetchData == false)) {
                 "Prepared selection dialogs must disable their automatic opening read."
             }
-            require(selected.isNotEmpty()) { "Select at least one record." }
-            val ids = selected.map { SelectorUtil.resolve(it, prepare.identityField) }
+            val resolved = parameters()
+            val ids = if (parent != null) {
+                val value = resolved[parent]
+                listOf(if (value is List<*>) value.singleOrNull() else value)
+            } else {
+                require(selected.isNotEmpty()) { "Select at least one record." }
+                selected.map { SelectorUtil.resolve(it, prepare.identityField) }
+            }
             val keys = ids.map(::selectionIdentity)
             require(keys.toSet().size == keys.size) { "The selection contains a duplicate identity." }
-            val resolved = parameters()
             val captured = JsonUtil.anyToElement(resolved).jsonObject
             expectedParameters = captured
-            val request = JsonUtil.asStringMap(JsonUtil.elementToAny(captured)) + (prepare.idsParameter to ids)
+            val request = JsonUtil.asStringMap(JsonUtil.elementToAny(captured)).let {
+                if (parent != null) it else it + (checkNotNull(prepare.idsParameter) to ids)
+            }
             val scopes = prepare.scopeFields.mapValues { (_, name) ->
                 val value = request[name]
                 selectionIdentity(if (value is List<*>) value.singleOrNull() else value)
@@ -172,7 +192,13 @@ internal class PreparedSelectionRuntime {
             }
             if (status.isNotEmpty()) runtime.setWindowFormValues(window.windowId, status, bumpPrefillRevision = false)
             pending = true
-            val fresh = withContext(Dispatchers.IO) { runtime.readSelectedRows(window, prepare.dataSourceRef, request, invocation) }
+            val warm = parent?.let {
+                runtime.currentParentRows(window, prepare.dataSourceRef, request)?.takeIf { rows ->
+                    runCatching { orderedSelection(rows, keys, prepare.identityField, scopes) }.isSuccess
+                }
+            }
+            if (warm != null) warmCurrent = { runtime.currentParentRows(window, prepare.dataSourceRef, request) === warm }
+            val fresh = warm ?: withContext(Dispatchers.IO) { runtime.readSelectedRows(window, prepare.dataSourceRef, request, invocation) }
             currentCoroutineContext().ensureActive()
             if (!eligible()) return Result.success(false)
             val ordered = orderedSelection(fresh, keys, prepare.identityField, scopes)
@@ -203,7 +229,7 @@ internal class PreparedSelectionRuntime {
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
-            if (!currentPresentation() || source.selection.peek() != selection || expectedParameters?.let { runCatching { JsonUtil.anyToElement(parameters()) != it }.getOrDefault(true) } == true) return Result.success(false)
+            if (!currentPresentation() || (expectedParameters != null && !runCatching { eligible() }.getOrDefault(false))) return Result.success(false)
             prepare.errorField?.let { runtime.setWindowFormValues(window.windowId, mapOf(it to (error.message ?: "Could not prepare the selected records.")), bumpPrefillRevision = false) }
             return Result.failure(error)
         } finally {

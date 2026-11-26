@@ -2,7 +2,8 @@ import Foundation
 
 public struct SelectionPreparationDef: Codable, Sendable {
     public let dataSourceRef: String
-    public let idsParameter: String
+    public let idsParameter: String?
+    public let parentParameter: String?
     public let identityField: String
     public let scopeFields: [String: String]?
     public let mappingRef: String?
@@ -11,11 +12,12 @@ public struct SelectionPreparationDef: Codable, Sendable {
     public let errorField: String?
 
     public init(
-        dataSourceRef: String, idsParameter: String, identityField: String, scopeFields: [String: String]? = nil,
+        dataSourceRef: String, idsParameter: String? = nil, parentParameter: String? = nil, identityField: String, scopeFields: [String: String]? = nil,
         mappingRef: String? = nil, prepare: String, pendingField: String? = nil, errorField: String? = nil
     ) {
         self.dataSourceRef = dataSourceRef
         self.idsParameter = idsParameter
+        self.parentParameter = parentParameter
         self.identityField = identityField
         self.scopeFields = scopeFields
         self.mappingRef = mappingRef
@@ -23,6 +25,35 @@ public struct SelectionPreparationDef: Codable, Sendable {
         self.pendingField = pendingField
         self.errorField = errorField
     }
+}
+
+struct ParentPreparationReaders: Sendable {
+    let revision = UUID()
+    let refs: Set<String>
+}
+
+extension WindowMetadata {
+    func preparingParentReaders() -> Self {
+        var refs = Set<String>()
+        func collect(_ container: ContainerDef) {
+            for operation in container.editableCollection?.operations ?? [] {
+                if let spec = operation.prepareSelection, spec.parentParameter != nil { refs.insert(spec.dataSourceRef) }
+            }
+            container.containers.forEach(collect)
+        }
+        view?.content?.containers.forEach(collect)
+        dialogs.compactMap(\.content).forEach(collect)
+        var installed = self
+        installed.parentReaders = ParentPreparationReaders(refs: refs)
+        return installed
+    }
+}
+
+struct ParentCollectionRead: Sendable {
+    let id = UUID()
+    let metadataRevision: UUID
+    let transportRevision: UUID
+    let effectiveParameters: [String: JSONValue]
 }
 
 struct SelectionPreparationError: LocalizedError {
@@ -140,10 +171,13 @@ extension ForgeRuntime {
         let originalDialog = await dialogSignal.peek()
         guard !originalDialog.open else { return .init(accepted: false, status: "invalid") }
         let actor = metadata.authorizationSnapshot
+        let transportRevision = dataSourceTransportRevision
         let originalPending =
             if let field = spec.pendingField { await windowFormJSONValue(windowID: windowID)[field] } else { nil as JSONValue? }
         var admittedKeys: [String]?
         var admittedInput: SelectionRecord?
+        var admittedEffectiveParameters: SelectionRecord?
+        var reusedRead: UUID?
         var attempted = false
         var pendingPublished = false
         func admission() async throws -> (keys: [String], ids: [JSONValue], parameters: SelectionRecord, scope: MutationScope)? {
@@ -152,9 +186,16 @@ extension ForgeRuntime {
             else { return nil }
             var live = state
             if attempted, let field = spec.pendingField, live.windowForm[field] == .bool(true) { live.windowForm[field] = originalPending }
+            if spec.parentParameter != nil {
+                guard state.metadata.parentReaders?.revision == metadata.parentReaders?.revision, dataSourceTransportRevision == transportRevision else { return nil }
+                if let reusedRead {
+                    guard let reader = state.snapshot(spec.dataSourceRef), reader.parentRead?.id == reusedRead,
+                          !reader.stale, !reader.control.loading, !reader.control.inactive, reader.control.error == nil else { return nil }
+                }
+            }
             let rows = state.editableSelectedRows
             let presentation = live.editablePresentation(operation:operation, collection:collection, rows:rows)
-            guard !rows.isEmpty, presentation.visible, !presentation.disabled else { return nil }
+            guard spec.parentParameter != nil || !rows.isEmpty, presentation.visible, !presentation.disabled else { return nil }
             if let boundary {
                 guard live.allows(boundary.visibleWhen) else { return nil }
                 var grants: [SelectionRecord] = []
@@ -166,10 +207,27 @@ extension ForgeRuntime {
                     return nil
                 }
             }
-            let ids = rows.map { resourceResolveValue(.object($0), path: spec.identityField) ?? .null }
-            let keys = try ids.map(selectionKey)
-            guard Set(keys).count == rows.count else { throw SelectionPreparationError("Select one or more distinct records.") }
             let parameters = state.resolvedParameters(operation.parameters ?? [], target: spec.dataSourceRef)
+            let ids: [JSONValue]
+            if let parent = spec.parentParameter {
+                guard spec.idsParameter == nil, !parent.isEmpty,
+                      operation.parameters?.contains(where: { $0.name == parent }) == true,
+                      let value = parameters[parent] else {
+                    throw SelectionPreparationError("The parent identity must name a bound operation parameter.")
+                }
+                let bound = ParameterResolver.resolve(parameters: metadata.dataSources[spec.dataSourceRef]?.parameters ?? [],
+                    context: state.parameterContext(source: spec.dataSourceRef, input: InputState(parameters: parameters)))
+                let effective = parameters.merging(bound) { _, resolved in resolved }
+                guard effective[parent] == value else { throw SelectionPreparationError("The reader overrides the parent parameter.") }
+                guard admittedEffectiveParameters == nil || admittedEffectiveParameters == effective else { return nil }
+                admittedEffectiveParameters = effective
+                ids = value.arrayValue ?? [value]
+                guard ids.count == 1 else { throw SelectionPreparationError("The parent parameter must identify one record.") }
+            } else {
+                ids = rows.map { resourceResolveValue(.object($0), path: spec.identityField) ?? .null }
+            }
+            let keys = try ids.map(selectionKey)
+            guard Set(keys).count == ids.count else { throw SelectionPreparationError("Select one or more distinct records.") }
             guard admittedKeys == nil || keys == admittedKeys, admittedInput == nil || parameters == admittedInput else { return nil }
             return (keys, ids, parameters, live)
         }
@@ -179,13 +237,17 @@ extension ForgeRuntime {
             admittedKeys = first.keys
             admittedInput = first.parameters
             var parameters = first.parameters
-            guard parameters[spec.idsParameter] == nil else { throw SelectionPreparationError("The selected ID parameter is already bound.") }
+            if spec.parentParameter == nil {
+                guard let name = spec.idsParameter, !name.isEmpty, parameters[name] == nil else {
+                    throw SelectionPreparationError("The selected ID parameter is missing or already bound.")
+                }
+            }
             var scope: [String: String] = [:]
             for (field, name) in spec.scopeFields ?? [:] {
                 let parameter = parameters[name]
                 scope[field] = try selectionKey(parameter?.arrayValue?.count == 1 ? parameter?.arrayValue?.first : parameter)
             }
-            parameters[spec.idsParameter] = .array(first.ids)
+            if let name = spec.idsParameter { parameters[name] = .array(first.ids) }
             var patch: SelectionRecord = [:]
             if let field = spec.errorField { patch[field] = .string("") }
             if let field = spec.pendingField {
@@ -195,10 +257,21 @@ extension ForgeRuntime {
             if !patch.isEmpty { await setWindowFormValue(windowID: windowID, values: patch, bumpPrefillRevision: false) }
             attempted = true
             guard try await admission() != nil else { throw SupersededSelection() }
-            let records = try await readPreparedSelection(
-                windowID: windowID, metadata: metadata, ref: spec.dataSourceRef, parameters: parameters, invocationId: invocation.uuidString)
+            let ordered: [SelectionRecord]
+            if spec.parentParameter != nil, let snapshot = first.scope.snapshot(spec.dataSourceRef),
+               let proof = snapshot.parentRead, proof.metadataRevision == metadata.parentReaders?.revision,
+               proof.transportRevision == transportRevision, proof.effectiveParameters == admittedEffectiveParameters, !snapshot.stale,
+               !snapshot.control.loading, !snapshot.control.inactive, snapshot.control.error == nil,
+               snapshot.input.filter.isEmpty, snapshot.input.page == nil, let rows = snapshot.collection,
+               let confirmed = try? rowsInSelectionOrder(rows, keys: first.keys, identity: spec.identityField, scope: scope) {
+                ordered = confirmed
+                reusedRead = proof.id
+            } else {
+                let records = try await readPreparedSelection(windowID: windowID, metadata: metadata, ref: spec.dataSourceRef,
+                                                             parameters: parameters, invocationId: invocation.uuidString)
+                ordered = try rowsInSelectionOrder(records, keys: first.keys, identity: spec.identityField, scope: scope)
+            }
             guard let current = try await admission() else { throw SupersededSelection() }
-            let ordered = try rowsInSelectionOrder(records, keys: first.keys, identity: spec.identityField, scope: scope)
             var props = try projectedCases(ordered, mappingRef: spec.mappingRef, draftRef: destination.resourceModelRef, metadata: metadata)
             props["rows"] = .array(ordered.map(JSONValue.object))
             props["parameters"] = .object(parameters)

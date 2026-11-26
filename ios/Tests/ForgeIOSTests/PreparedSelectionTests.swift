@@ -91,6 +91,189 @@ final class PreparedSelectionTests: XCTestCase {
         ]
         .map { $0.merging(["parent": .object(["id": .number(7)])]) { a, _ in a } }
     }
+    private func parentFixture(_ identity: JSONValue = .string("001")) async throws -> (
+        ForgeRuntime, String, EditableCollectionSpec, EditableCollectionOperationSpec, WindowMetadata
+    ) {
+        let op: [String: Any] = [
+            "id": "new", "label": "New", "dialogId": "editor",
+            "visibleWhen": ["source":"authorization", "field":"principal.roles", "contains":"write"],
+            "parameters": [["name":"Parent", "in":"windowForm", "location":"parent"]],
+            "prepareSelection": ["dataSourceRef":"reader", "parentParameter":"Parent", "identityField":"id", "prepare":"Editor.seed"]
+        ]
+        let collection: [String:Any] = ["dataSourceRef":"list", "operations":[op]]
+        let json: [String:Any] = [
+            "namespace":"Editor", "authorizationSnapshot":["principal":["subject":"owner","roles":["write"]]],
+            "dialogs":[["id":"editor","dataSourceRef":"draft"]],
+            "dataSource":["list":[:],"draft":[:],"reader":["parameters":[["name":"Parent","in":"windowForm","location":"parent"]]]],
+            "view":["content":["containers":[["id":"list","editableCollection":collection]]]],
+            "actions":["code":"({seed:({rows,parameters})=>({id:rows[0].id,caption:rows[0].caption,bound:parameters.Parent})})"]
+        ]
+        let metadata = try JSONDecoder().decode(WindowMetadata.self, from: JSONSerialization.data(withJSONObject: json))
+        let spec = try XCTUnwrap(metadata.view?.content?.containers.first?.editableCollection)
+        let runtime = ForgeRuntime()
+        let id = await runtime.openWindowInline(key: "catalog", title: "Catalog", metadata: metadata).id
+        await runtime.setWindowFormValue(windowID: id, values: ["parent": identity])
+        return (runtime, id, spec, try XCTUnwrap(spec.operations?.first), metadata)
+    }
+
+    func testParentColdPreservesScalarAndSingletonShapeWithoutRequiringGridSelection() async throws {
+        for identity: JSONValue in [.string("001"), .array([.string("001")])] {
+            let (runtime,id,spec,op,_) = try await parentFixture(identity)
+            let reads = PreparedReadLog()
+            await runtime.registerDataSourceLoader { request in
+                await reads.add(request)
+                return .init(rows:[["id":.number(1),"caption":.string("New draft")]])
+            }
+            if identity.arrayValue != nil { await select(runtime,id,ids:[.string("unrelated")]) }
+            let result = await runtime.prepareEditableSelection(windowID:id,sourceDataSourceRef:"list",collection:spec,operation:op)
+            XCTAssertEqual(result.status,"opened",result.error ?? "")
+            let requests = await reads.calls
+            XCTAssertEqual(requests.count,1)
+            XCTAssertEqual(requests.first?.input.parameters["Parent"],identity)
+            XCTAssertEqual(requests.first?.resolvedInputs["Parent"],identity)
+            let draft = await runtime.dataSourceForm(windowID:id,dataSourceRef:"draft")
+            XCTAssertEqual(draft,["id":.number(1),"caption":.string("New draft"),"bound":identity])
+        }
+    }
+
+    func testParentWarmRequiresQualifiedReadForCurrentMetadataAndUnmodifiedCollection() async throws {
+        let (runtime,id,spec,op,metadata) = try await parentFixture()
+        let log = PreparedReadLog()
+        await runtime.registerDataSourceLoader { request in
+            await log.add(request)
+            return .init(rows:[["id":.number(1),"caption":.string("Confirmed")]])
+        }
+        func open() async {
+            let result = await runtime.prepareEditableSelection(windowID:id,sourceDataSourceRef:"list",collection:spec,operation:op)
+            XCTAssertEqual(result.status,"opened",result.error ?? "")
+            await runtime.closeDialogPublic(windowID:id,dialogID:"editor")
+        }
+        await runtime.refreshDataSourceCollection(windowID:id,dataSourceRef:"reader")
+        await open()
+        let warm = await log.calls
+        XCTAssertEqual(warm.count,1, "An already resolved reader shares the actor and effective parameter")
+        _ = await runtime.updateWindowInline(id:id,title:"Reloaded",metadata:metadata)
+        await open()
+        let changed = await log.calls
+        XCTAssertEqual(changed.count,2,"Even the same actor and ID cannot reuse a previous metadata installation")
+        await runtime.refreshDataSourceCollection(windowID:id,dataSourceRef:"reader")
+        await runtime.setDataSourceCollection(windowID:id,dataSourceRef:"reader",rows:[["id":.number(1),"caption":.string("Manual")]])
+        await open()
+        let replaced = await log.calls
+        XCTAssertEqual(replaced.count,4,"A manually replaced collection has no authenticated read provenance")
+    }
+
+    func testParentIgnoresUnprovenRowsAndRequiresOneMatchingDetachedResult() async throws {
+        let (runtime,id,spec,op,_) = try await parentFixture()
+        let journal = PreparedReadLog()
+        let ref = WindowIdentity(windowID:id).dataSourceID(ref:"reader")
+        let row: Row = ["id":.number(1),"caption":.string("Ready")]
+        for scenario in ["failed","loading","other-input","extra-warm","wrong-warm","extra-response","wrong-response"] {
+            await runtime.registerDataSourceLoader { request in
+                await journal.add(request)
+                if request.bypassCache == true {
+                    if scenario == "extra-response" { return .init(rows:[row,row]) }
+                    if scenario == "wrong-response" { return .init(rows:[["id":.number(2)]]) }
+                    return .init(rows:[row])
+                }
+                if scenario == "extra-warm" { return .init(rows:[row,row]) }
+                if scenario == "wrong-warm" { return .init(rows:[["id":.number(2)]]) }
+                return .init(rows:[row])
+            }
+            await runtime.setDataSourceInputParameters(windowID:id,dataSourceRef:"reader",parameters:[:])
+            await runtime.refreshDataSourceCollection(windowID:id,dataSourceRef:"reader")
+            switch scenario {
+            case "failed":
+                await runtime.dataSourceRuntime.setControl(dataSourceID:ref,control:ControlState(error:"Denied"))
+                await runtime.dataSourceRuntime.setControl(dataSourceID:ref,control:ControlState())
+            case "loading":
+                await runtime.dataSourceRuntime.setControl(dataSourceID:ref,control:ControlState(loading:true))
+            case "other-input":
+                await runtime.setDataSourceInputParameters(windowID:id,dataSourceRef:"reader",parameters:["unrelated":.number(2)])
+            case "extra-response","wrong-response":
+                await runtime.setDataSourceCollection(windowID:id,dataSourceRef:"reader",rows:[row])
+            default: break
+            }
+            let count = await journal.calls.count
+            let result = await runtime.prepareEditableSelection(windowID:id,sourceDataSourceRef:"list",collection:spec,operation:op)
+            let calls = await journal.calls
+            XCTAssertEqual(calls.count,count+1,scenario)
+            XCTAssertEqual(calls.last?.bypassCache,true,scenario)
+            let invalid = scenario.hasSuffix("response")
+            XCTAssertEqual(result.status,invalid ? "failed" : "opened",scenario)
+            let state = await runtime.dialogState(windowID:id,dialogID:"editor")
+            XCTAssertEqual(state.open,!invalid,scenario)
+            await runtime.closeDialogPublic(windowID:id,dialogID:"editor")
+        }
+    }
+
+    func testMetadataReplacementDuringOrdinaryParentLoadCannotAuthorizeWarmReuse() async throws {
+        let (runtime,id,spec,op,metadata) = try await parentFixture()
+        let journal = PreparedReadLog()
+        await runtime.registerDataSourceLoader { request in
+            await journal.add(request)
+            if request.bypassCache != true {
+                _ = await runtime.updateWindowInline(id:id,title:"Reloaded",metadata:metadata)
+            }
+            return .init(rows:[["id":.number(1),"caption":.string(request.bypassCache == true ? "Current" : "Old")]])
+        }
+        await runtime.refreshDataSourceCollection(windowID:id,dataSourceRef:"reader")
+        let result = await runtime.prepareEditableSelection(windowID:id,sourceDataSourceRef:"list",collection:spec,operation:op)
+        let calls = await journal.calls
+        XCTAssertEqual(result.status,"opened")
+        XCTAssertEqual(calls.count,2)
+        let draft = await runtime.dataSourceForm(windowID:id,dataSourceRef:"draft")
+        XCTAssertEqual(draft["caption"],.string("Current"))
+    }
+
+    func testExistingControlPredicatesFenceParentOperationOnTheReferencedReader() async throws {
+        let (runtime,id,_,_,_) = try await parentFixture()
+        let ref = WindowIdentity(windowID:id).dataSourceID(ref:"reader")
+        func value(_ field: String, _ expected: Any, source: String = "reader") async throws -> Bool {
+            let raw: [String:Any] = ["source":"control","field":field,"dataSourceRef":source,"equals":expected]
+            let condition = try JSONDecoder().decode(DashboardConditionDef.self, from: JSONSerialization.data(withJSONObject:raw))
+            let scope = await runtime.mutationScope(windowID:id,source:"list")
+            return try XCTUnwrap(scope).allows(condition)
+        }
+        var allowed = try await value("loaded",true)
+        XCTAssertFalse(allowed)
+        await runtime.setDataSourceCollection(windowID:id,dataSourceRef:"reader",rows:[])
+        allowed = try await value("loaded",true)
+        XCTAssertTrue(allowed)
+        allowed = try await value("loaded",true,source:"missing")
+        XCTAssertFalse(allowed)
+        await runtime.dataSourceRuntime.setControl(dataSourceID:ref,control:ControlState(loading:true))
+        allowed = try await value("loading",true)
+        XCTAssertTrue(allowed)
+        await runtime.dataSourceRuntime.setControl(dataSourceID:ref,control:ControlState(error:"Unavailable"))
+        allowed = try await value("error","Unavailable")
+        XCTAssertTrue(allowed)
+        await runtime.setDataSourceInputParameters(windowID:id,dataSourceRef:"reader",parameters:["id":.number(2)])
+        allowed = try await value("stale",true)
+        XCTAssertTrue(allowed)
+    }
+
+    func testMalformedParentAndMidReadParentChangeLeaveTheDialogClosed() async throws {
+        for invalid: JSONValue in [.array([]), .array([.number(1),.number(2)]), .null, .string(" ")] {
+            let (runtime,id,spec,op,_) = try await parentFixture(invalid)
+            let log = PreparedReadLog()
+            await runtime.registerDataSourceLoader { request in await log.add(request); return .init(rows:[]) }
+            let result = await runtime.prepareEditableSelection(windowID:id,sourceDataSourceRef:"list",collection:spec,operation:op)
+            XCTAssertEqual(result.status,"failed")
+            let requests = await log.calls
+            XCTAssertTrue(requests.isEmpty)
+        }
+        let (runtime,id,spec,op,_) = try await parentFixture()
+        await runtime.registerDataSourceLoader { _ in
+            await runtime.setWindowFormValue(windowID:id,values:["parent":.string("002")])
+            return .init(rows:[["id":.number(1)]])
+        }
+        let result = await runtime.prepareEditableSelection(windowID:id,sourceDataSourceRef:"list",collection:spec,operation:op)
+        XCTAssertEqual(result.status,"superseded")
+        let shown = await runtime.dialogState(windowID:id,dialogID:"editor")
+        XCTAssertFalse(shown.open)
+    }
+
     func testSingleDetachedReadPreparesExactlyTheOrderedSelection() async throws {
         let (runtime, id, spec, op) = try await fixture()
         let journal = PreparedReadLog()

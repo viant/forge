@@ -42,6 +42,18 @@ data class WindowMetadata(
     val actionAliases: List<String> = emptyList(),
     val windowKey: String? = null
 ) {
+    internal val preparedParentReaders by lazy {
+        buildSet<String> {
+            fun visit(container: ContainerDef) {
+                container.editableCollection?.operations.orEmpty().forEach { operation ->
+                    operation.prepareSelection?.takeIf { !it.parentParameter.isNullOrBlank() }?.let { add(it.dataSourceRef) }
+                }
+                container.containers.forEach(::visit)
+            }
+            view?.content?.containers.orEmpty().forEach(::visit)
+            dialogs.forEach { it.content?.let(::visit) }
+        }
+    }
     internal val dialogIndex by lazy { buildMap { dialogs.forEach { dialog -> dialog.id?.let { putIfAbsent(it, dialog) } } } }
     internal val reportReadOwners by lazy { collectReportOwnedDataSourceRefs(this) }
     internal val actionNamespaces by lazy { (listOfNotNull(namespace) + actionAliases).filter { it.isNotBlank() } }
@@ -1590,6 +1602,9 @@ data class ControlState(
     val warnings: List<String> = emptyList(),
     val requestId: String? = null
 )
+
+internal fun ControlState.bindingValues(): Map<String, Any?> =
+    mapOf("loaded" to resolved, "loading" to loading, "stale" to !resolved, "error" to error, "inactive" to inactive)
 
 data class DialogState(
     val open: Boolean = false,

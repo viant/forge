@@ -28,3 +28,57 @@ it('an operation reacts to its baseline control without changing selection',asyn
   expect(button().disabled).toBe(true);
  }finally{await settle(()=>root.unmount());host.remove();removeSignalsForKey(windowId)}
 });
+
+it.each([true, false])('opens a prepared parent through an empty grid (warm reader: %s)', async warm => {
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const windowId = 'parent-dialog-' + warm;
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const reads = [];
+  const local = id => ({id, autoFetch:false, backend:{kind:'inline', rows:[]}});
+  const parameter = {name:'ParentID', in:'windowForm', location:'parent'};
+  const metadata = {
+    namespace:'Example', actions:{code:'({seed: ({rows}) => ({name: rows[0].name})})'},
+    dataSource:{
+      grid:local('grid'), draft:local('draft'),
+      parent:{id:'parent', autoFetch:false, service:{uri:'mcp://example/parent'}, parameters:[parameter],
+        uniqueKey:[{field:'id'}], selectors:{data:'data'}},
+    },
+    view:{content:{id:'root', containers:[
+      {id:'parentReader', dataSourceRef:'parent', fetchData:false},
+      {id:'documents', dataSourceRef:'grid', fetchData:false, editableCollection:{
+        dataSourceRef:'grid', selection:{mode:'multi', min:0}, operations:[{
+          id:'create',label:'Create document',dialogId:'editor',parameters:[parameter],
+          prepareSelection:{dataSourceRef:'parent',parentParameter:'ParentID',identityField:'id',prepare:'Example.seed',errorField:'openError'},
+        }]},table:{columns:[{id:'id', name:'ID'}]}},
+    ]}},
+    dialogs:[{id:'editor', title:'Document', dataSourceRef:'draft', fetchOnOpen:false, properties:{searchable:false},
+      content:{id:'form',dataSourceRef:'draft',fetchData:false,items:[{id:'name',type:'text',scope:'form',dataField:'name'}]}}],
+  };
+  const settle = async fn => act(async () => { fn?.(); await new Promise(resolve => setTimeout(resolve, 10)); });
+  const transport = async request => {
+    if (request.dataSourceRef === 'parent') reads.push(request);
+    return {data:[{id:8, name:'Parent eight'}]};
+  };
+  try {
+    await settle(() => root.render(<SettingProvider endpoints={{}} connectorConfig={{window:{service:{uri:'/window'}}}}
+      services={{dataConnectorTransport:transport}}><WindowContent window={{windowId,windowKey:'example'}} selectedMetadata={metadata}/></SettingProvider>));
+    const context = getWindowContext(windowId);
+    await settle(() => context.Context('grid').handlers.dataSource.setWindowFormData({values:{parent:8}}));
+    if (warm) await settle(() => context.Context('parent').handlers.dataSource.fetchCollection({}));
+    const before = reads.length;
+    const create = [...host.querySelectorAll('button')].find(button => button.textContent.includes('Create document'));
+    expect(create).toBeDefined();
+    expect(create.disabled).toBe(false);
+    await settle(() => create.click());
+    expect(context.Context('grid').signals.windowForm.peek().openError).toBe('');
+    expect(context.Context('draft').signals.form.peek()?.name).toBe('Parent eight');
+    expect([...document.querySelectorAll('[role="dialog"] input')].map(input => input.value)).toContain('Parent eight');
+    expect(reads.length - before).toBe(warm ? 0 : 1);
+  } finally {
+    await settle(() => root.unmount());
+    host.remove();
+    removeSignalsForKey(windowId);
+  }
+});

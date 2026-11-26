@@ -142,9 +142,9 @@ data class RefreshSpec(
 @Serializable data class EditableCollectionOperationSpec(val id: String, val label: String, val tooltip: String? = null, val intent: String? = null, val dialogId: String? = null, val handler: String? = null, val requiresSelection: Boolean = false, val selection: PrimitiveSelectionSpec? = null, val visibleWhen: DashboardConditionDef? = null, val disabledWhen: DashboardConditionDef? = null, val parameters: List<ParameterDef> = emptyList(), val mutation: MutationCommandDef? = null, val prepareSelection: PreparedSelectionDef? = null)
 @Serializable
 data class PreparedSelectionDef(
-    val dataSourceRef: String, val idsParameter: String, val identityField: String,
+    val dataSourceRef: String, val idsParameter: String? = null, val identityField: String,
     val scopeFields: Map<String, String> = emptyMap(), val mappingRef: String? = null,
-    val prepare: String, val pendingField: String? = null, val errorField: String? = null
+    val prepare: String, val pendingField: String? = null, val errorField: String? = null, val parentParameter: String? = null
 )
 
 @Serializable data class AssignmentPickerSpec(val availableDataSourceRef: String, val assignedDataSourceRef: String, val identityFields: List<String> = emptyList(), val labelField: String? = null, val assign: MutationCommandDef? = null, val unassign: MutationCommandDef? = null, val allowMultiple: Boolean? = null)

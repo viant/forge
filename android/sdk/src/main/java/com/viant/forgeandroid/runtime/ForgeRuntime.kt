@@ -79,6 +79,9 @@ class ForgeRuntime(
     ) {
         dataSourceRuntime.setRequestLoader { context, detachedReadId ->
             val input = context.input.peek()
+            val resolved = parameterResolver.resolveFlat(context.dataSource.parameters, context)
+            val parentInputs = if (detachedReadId == null && context.window.metadata.peek()?.preparedParentReaders?.contains(context.dataSourceRef) == true)
+                JsonUtil.anyToElement(resolved) else null
             loader(
                 DataSourceFetchRequest(
                     windowId = context.window.windowId,
@@ -86,7 +89,7 @@ class ForgeRuntime(
                     dataSourceRef = context.dataSourceRef,
                     dataSource = context.dataSource,
                     input = input,
-                    resolvedInputs = parameterResolver.resolveFlat(context.dataSource.parameters, context),
+                    resolvedInputs = resolved,
                     invocationId = detachedReadId ?: input.preparedDispatchId.takeIf { input.refreshOwner != null },
                     bypassCache = detachedReadId != null || input.refreshBypassCache
                 )
@@ -97,7 +100,7 @@ class ForgeRuntime(
                     form = it.form,
                     selection = it.selection,
                     rowIndex = it.rowIndex
-                )
+                ).also { result -> result.admittedParentInputs = parentInputs }
             }
         }
     }
@@ -228,6 +231,9 @@ class ForgeRuntime(
     }
 
     internal fun registeredSource(windowId: String, ref: String) = dataSourceRuntime.registeredSource(windowId, ref)
+    internal fun currentParentRows(window: WindowContext, ref: String, parameters: Map<String, Any?>) =
+        dataSourceRuntime.currentParentRows(window, ref, parameters)
+    internal val selectionReadTransport: Any? get() = dataSourceRuntime.readTransport
     internal val preparedSelections = PreparedSelectionRuntime()
     internal suspend fun readSelectedRows(window: WindowContext, ref: String, parameters: Map<String, Any?>, invocationId: String) =
         dataSourceRuntime.readSelectionRows(window, ref, parameters, invocationId)
@@ -450,8 +456,7 @@ class ForgeRuntime(
                 "selection" to JsonUtil.anyToElement(mapOf("selected" to selection.selected, "selection" to selection.selection, "rowIndex" to selection.rowIndex)),
                 "input" to JsonUtil.anyToElement(mapOf("filter" to input.filter, "parameters" to input.parameters, "page" to input.page, "fetch" to input.fetch, "refresh" to input.refresh)),
                 "metrics" to JsonUtil.anyToElement(target.metrics.peek()),
-                "control" to JsonUtil.anyToElement(mapOf("loaded" to control.resolved, "loading" to control.loading,
-                    "stale" to !control.resolved, "error" to control.error, "inactive" to control.inactive)),
+                "control" to JsonUtil.anyToElement(control.bindingValues()),
                 "pageSize" to JsonUtil.anyToElement(target.dataSource.paging?.size ?: 0)
             ))
         })

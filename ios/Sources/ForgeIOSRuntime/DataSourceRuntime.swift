@@ -73,7 +73,11 @@ final class FormFileSelections: @unchecked Sendable {
 
 public actor DataSourceRuntime {
     nonisolated let fileSelections = FormFileSelections()
-    private var collectionInputs: [String: InputState] = [:]
+    private struct CollectionInput: Sendable {
+        let input: InputState
+        var parentRead: ParentCollectionRead?
+    }
+    private var collectionInputs: [String: CollectionInput] = [:]
     private var collectionInfo: [String: [String: JSONValue]] = [:]
     private var collectionValues: [String: [[String: JSONValue]]] = [:]
     private var formValues: [String: [String: JSONValue]] = [:]
@@ -93,7 +97,11 @@ public actor DataSourceRuntime {
     }
 
     public func setCollection(dataSourceID: String, rows: [[String: JSONValue]], forInput: InputState? = nil) {
-        collectionInputs[dataSourceID] = forInput ?? inputValues[dataSourceID] ?? InputState()
+        setCollection(dataSourceID: dataSourceID, rows: rows, forInput: forInput, parentRead: nil)
+    }
+
+    func setCollection(dataSourceID: String, rows: [[String: JSONValue]], forInput: InputState?, parentRead: ParentCollectionRead?) {
+        collectionInputs[dataSourceID] = CollectionInput(input: forInput ?? inputValues[dataSourceID] ?? InputState(), parentRead: parentRead)
         collectionValues[dataSourceID] = rows
     }
 
@@ -220,6 +228,9 @@ public actor DataSourceRuntime {
     }
 
     public func setControl(dataSourceID: String, control: ControlState) {
+        if control.loading || control.inactive || control.error != nil, collectionInputs[dataSourceID]?.parentRead != nil {
+            collectionInputs[dataSourceID]?.parentRead = nil
+        }
         controlValues[dataSourceID] = control
     }
 
@@ -249,9 +260,9 @@ public actor DataSourceRuntime {
             guard inputValues[id] != nil || controlValues[id] != nil || formValues[id] != nil
                     || selectionValues[id] != nil || collectionValues[id] != nil || metricsValues[id] != nil else { return nil }
             let input = inputValues[id] ?? InputState(), loaded = collectionInputs[id]
-            let stale = loaded.map { $0.parameters != input.parameters || $0.filter != input.filter || $0.page != input.page } ?? false
+            let stale = (loaded?.input).map { $0.parameters != input.parameters || $0.filter != input.filter || $0.page != input.page } ?? false
             return RegisteredDataSourceSnapshot(input: input, control: controlValues[id] ?? ControlState(),
-                form: formValues[id] ?? [:], selection: selectionValues[id] ?? SelectionState(), collection: collectionValues[id], metrics: metricsValues[id] ?? [:], dataInfo: collectionInfo[id] ?? [:], stale: stale)
+                form: formValues[id] ?? [:], selection: selectionValues[id] ?? SelectionState(), collection: collectionValues[id], metrics: metricsValues[id] ?? [:], dataInfo: collectionInfo[id] ?? [:], stale: stale, parentRead: loaded?.parentRead)
         }
     }
 

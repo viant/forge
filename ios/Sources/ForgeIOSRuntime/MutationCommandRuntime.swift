@@ -819,6 +819,13 @@ extension ForgeRuntime {
     }
 }
 
+private extension RegisteredDataSourceSnapshot {
+    var projectedControl: JSONValue {
+        .object(["loaded": .bool(collection != nil), "loading": .bool(control.loading),
+                 "stale": .bool(stale), "inactive": .bool(control.inactive), "error": control.error.map(JSONValue.string) ?? .null])
+    }
+}
+
 struct MutationScope: Sendable {
     let windowKey: String
     let identity: WindowIdentity
@@ -849,6 +856,7 @@ struct MutationScope: Sendable {
                 case "input": value = .object(["filter":.object(state.input.filter),"parameters":.object(state.input.parameters),"page":state.input.page.map{.number(Double($0))} ?? .null])
                 case "metrics": value = .object(state.metrics)
                 case "collection": value = .array((state.collection ?? []).map(JSONValue.object))
+                case "control": value = state.projectedControl
                 default: value = .object(row ?? state.form)
                 }
             }
@@ -865,8 +873,7 @@ struct MutationScope: Sendable {
             "input": .object(["parameters": .object(input.parameters), "filter": .object(input.filter), "page": input.page.map { .number(Double($0)) } ?? .null]),
             "pageSize": metadata.dataSources[ref]?.paging?.size.map { .number(Double($0)) } ?? .null,
             "metrics": .object(state.metrics), "dataInfo": .object(state.dataInfo),
-            "control": .object(["loaded": .bool(state.collection != nil), "loading": .bool(state.control.loading),
-                                "stale": .bool(state.stale), "inactive": .bool(state.control.inactive), "error": state.control.error.map(JSONValue.string) ?? .null])
+            "control": state.projectedControl
         ])
     }
 
@@ -896,12 +903,18 @@ struct MutationScope: Sendable {
         return result.result ?? (result.returnedValue ? .null : nil)
     }
 
-    func resolvedParameters(_ parameters: [ParameterDef], target: String, operationBindings: Bool = false) -> [String:JSONValue] {
-        var context = ParameterResolver.ResolutionContext(identityDataSourceRef: source, windowForm: windowForm, metadata: metadata)
-        context.lookup = { ref in
-            guard let state = snapshot(ref) else { return nil }
-            return .init(selectionMode: metadata.dataSources[ref]?.selectionMode, form: state.form, metrics: state.metrics, selection: state.selection, input: state.input)
+    func parameterContext(source ref: String, input: InputState? = nil) -> ParameterResolver.ResolutionContext {
+        var context = ParameterResolver.ResolutionContext(identityDataSourceRef: ref, windowForm: windowForm, metadata: metadata)
+        context.lookup = { source in
+            guard let state = snapshot(source) else { return nil }
+            return .init(selectionMode: metadata.dataSources[source]?.selectionMode, form: state.form, metrics: state.metrics,
+                         selection: state.selection, input: source == ref ? (input ?? state.input) : state.input)
         }
+        return context
+    }
+
+    func resolvedParameters(_ parameters: [ParameterDef], target: String, operationBindings: Bool = false) -> [String:JSONValue] {
+        let context = parameterContext(source: source)
         let resolved = ParameterResolver.resolve(parameters: parameters, context: context, operationBindings: operationBindings)
         let envelope = resolved[target]?.objectValue ?? resolved
         return envelope["input"]?.objectValue?["parameters"]?.objectValue ?? envelope["parameters"]?.objectValue ?? envelope

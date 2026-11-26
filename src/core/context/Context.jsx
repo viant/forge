@@ -1,3 +1,4 @@
+import {prepareParentReaders} from '../../runtime/parentPreparation.js';
 import {prepareWindowInvariants} from '../../validation/invariants.js';
 import {prepareResourceMappings} from '../../components/primitives/resourceModel.js';
 import {MissingDataSourceReferenceError} from './dataSourceReference.js';
@@ -103,6 +104,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
         || ""
     ).trim();
     prepareWindowInvariants(metadata?.schemas);
+    prepareParentReaders(metadata);
     const dataSourceContextCache = {};
     const dialogContextCache = {}
     const signalIds = {}
