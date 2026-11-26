@@ -1577,6 +1577,7 @@ data class InputState(
     internal val preparedDispatchId: String? = null,
     internal val preparedReadPermit: NativeReportReadPermit? = null,
     internal val requireCommandRecords: Boolean = false,
+    internal val rawCommandReceipt: Boolean = false,
     internal val refreshOwner: (() -> Boolean)? = null,
     internal val refreshBypassCache: Boolean = false
 )

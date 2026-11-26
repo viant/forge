@@ -38,7 +38,8 @@ data class MutationCommandDef(
     val receiptWhen: @Serializable(with = ReceiptConditionSerializer::class) DashboardConditionDef? = null,
     val clearFormFields: List<String> = emptyList(),
     val successFormState: JsonObject = JsonObject(emptyMap()),
-    val rejectedWhen: @Serializable(with = ReceiptConditionSerializer::class) DashboardConditionDef? = null
+    val rejectedWhen: @Serializable(with = ReceiptConditionSerializer::class) DashboardConditionDef? = null,
+    val receiptIdentity: MutationReceiptIdentityDef? = null
 ) {
     @kotlinx.serialization.Transient
     internal val invalidClearFields: Boolean = clearFormFields.isNotEmpty() &&
@@ -54,9 +55,11 @@ data class MutationCommandDef(
     internal val acceptedReceipt = receiptWhen?.compileReceiptPredicate()
     @kotlinx.serialization.Transient
     internal val rejectedReceipt = rejectedWhen?.compileReceiptPredicate()
+    internal val checksReceipt get() = receiptWhen != null || receiptIdentity != null
     @kotlinx.serialization.Transient
     internal val receiptDefinitionError = when {
-        rejectedWhen != null && receiptWhen == null -> "rejectedWhen requires receiptWhen."
+        receiptIdentity?.valid == false -> "receiptIdentity requires safe identity fields and exactly one of generated or submittedRows."
+        rejectedWhen != null && !checksReceipt -> "rejectedWhen requires receiptWhen or receiptIdentity."
         receiptWhen != null && acceptedReceipt == null || rejectedWhen != null && rejectedReceipt == null ->
             "Receipt predicates must use indexed invocation collection rows."
         else -> null
@@ -81,7 +84,7 @@ private fun MutationCommandDef.validateBefore(): String? {
         val id = command.commandId?.trim()
         if (id.isNullOrBlank() || !ids.add(id)) return "Ordered commands require unique explicit command IDs."
         if (command === step.cleanup) {
-            if (command.rejectedWhen != null || command.receiptWhen?.usesOnlyReceiptRows() == false)
+            if (command.receiptIdentity != null || command.rejectedWhen != null || command.receiptWhen?.usesOnlyReceiptRows() == false)
                 return "Cleanup supports only receiptWhen on indexed invocation collection rows."
         } else command.receiptDefinitionError?.let { return it }
         if (command.dataSourceRef.isBlank() || command.before.isNotEmpty() || !command.serializationGroup.isNullOrBlank() ||

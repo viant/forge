@@ -8,14 +8,14 @@ object SelectorUtil {
         return resolveParts(obj, path.split('.'), null)
     }
 
-    internal fun resolveParts(obj: Any?, parts: List<String>, missing: Any?): Any? {
+    internal fun resolveParts(obj: Any?, parts: List<String>, missing: Any?, strictArrayIndex: Boolean = false): Any? {
         var current = obj
         for (part in parts) {
             current = when (val parent = current) {
                 is Map<*, *> -> parent[part] ?: if (missing == null || parent.containsKey(part)) null else return missing
                 is List<*> -> {
                     val index = part.toIntOrNull() ?: return missing
-                    if (index !in parent.indices) return missing
+                    if (index !in parent.indices || (strictArrayIndex && part != index.toString())) return missing
                     parent[index]
                 }
                 else -> return missing

@@ -1,5 +1,7 @@
 package com.viant.forgeandroid.runtime
 
+import com.dokar.quickjs.QuickJs
+import com.dokar.quickjs.evaluate
 import com.viant.forgeandroid.ui.readSelectedFile
 import com.viant.forgeandroid.ui.startControlMutation
 import java.io.IOException
@@ -999,6 +1001,215 @@ class OrderedMutationCommandTest {
             val cleanup = if (observed == "rejected") listOf("cleanSecond", "cleanFirst") else emptyList()
             assertEquals(listOf("first","second","save") + cleanup, refs())
         }
+    }
+
+    @Test fun receiptIdentityRequiresOneSafeModeBeforeAnyWrite() = runBlocking { fixture {
+        loader()
+        val submitted = MutationReceiptIdentityDef("id", "items")
+        for (bad in listOf(submitted.copy(field = ""), submitted.copy(field = "nested.__proto__"),
+            submitted.copy(submittedRows = ".rows"), submitted.copy(submittedField = "id[0]"),
+            submitted.copy(submittedRows = null), submitted.copy(generated = true),
+            submitted.copy(submittedRows = null, generated = true, submittedField = "key"))) {
+            assertEquals("invalid", execute(child("save").copy(receiptIdentity = bad)).status)
+            assertEquals("invalid", execute(root.copy(before = listOf(stageA.copy(command = stageA.command.copy(receiptIdentity = bad))))).status)
+        }
+        val badCleanup = stageA.copy(cleanup = stageA.cleanup!!.copy(receiptIdentity = submitted))
+        assertEquals("invalid", execute(root.copy(before = listOf(badCleanup))).status)
+        assertTrue(calls.isEmpty())
+    } }
+
+    @Test fun receiptIdentityValidatesOnlyProperSubmittedRecordIDsBeforePhysicalDispatch() = runBlocking {
+        val command = child("save").copy(receiptIdentity = MutationReceiptIdentityDef("key", "payload.items", "id"),
+            pendingState = buildJsonObject { put("started",true) })
+        val badInputs = listOf(null, emptyList<Any>(), listOf(1), listOf(mapOf("id" to null)), listOf(mapOf("id" to "  ")),
+            listOf(mapOf("id" to true)), listOf(mapOf("id" to 1.2)), listOf(mapOf("id" to 9007199254740992L)),
+            listOf(mapOf("id" to 1),mapOf("id" to 1.0)),listOf(mapOf("id" to listOf(1))))
+        for (input in badInputs) fixture {
+            loader()
+            val result = runtime.mutationCommands.execute(runtime,window,source,command,mapOf("payload" to mapOf("items" to input)))
+            assertEquals("invalid_payload",result.status,"$input")
+            assertIs<InvalidSubmittedIdentity>(result.cause)
+            assertEquals(MutationWriterStatus.NotInvoked,runtime.mutationCommands.state(window.windowId,command).writerStatus)
+            assertTrue(calls.isEmpty())
+            assertFalse(window.context("save").input.peek().fetch)
+            assertFalse("started" in window.peekWindowForm())
+        }
+        // The real invocation parameter is added after preparation; a colliding field can no longer supply rows.
+        fixture {
+            loader()
+            val result = runtime.mutationCommands.execute(runtime,window,source,command.copy(invocationParameter = "payload"),
+                mapOf("payload" to mapOf("items" to listOf(mapOf("id" to 1)))))
+            assertEquals("invalid_payload",result.status)
+            assertTrue(calls.isEmpty())
+        }
+    }
+
+    @Test fun exactTypedIdentityUsesOnlyThisHTTPResponseAndKeepsUnprovenWritesGuarded() = runBlocking {
+        val identity = MutationReceiptIdentityDef("entity.key", "payload.items", "id")
+        val command = child("save").copy(receiptIdentity = identity, successState = buildJsonObject { put("done",true) },
+            errorState = buildJsonObject { put("failed",true) },indeterminateState = buildJsonObject { put("unknown",true) },
+            refresh = listOf(RefreshSpec("unused")))
+        val submitted = mapOf("payload" to mapOf("items" to listOf(mapOf("id" to "02"),mapOf("id" to 1))))
+        val ok = """[{"entity":{"key":1.0}},{"entity":{"key":"02"}}]"""
+        val cases = listOf(ok to "succeeded",
+            """[{"entity":{"key":"1"}},{"entity":{"key":"02"}}]""" to "indeterminate",
+            """[{"entity":{"key":1}},{"entity":{"key":2}}]""" to "indeterminate",
+            """[{"entity":{"key":1}}]""" to "indeterminate",
+            """[{"entity":{"key":1}},{"entity":{"key":"02"}},{"entity":{"key":3}}]""" to "indeterminate",
+            """[{"entity":{"key":1}},{"entity":{"key":1.0}}]""" to "indeterminate",
+            """[{"entity":{"key":1}},{"entity":{"key":false}}]""" to "indeterminate",
+            """[{"entity":{"key":1}},{"entity":{"key":9007199254740992}}]""" to "indeterminate",
+            """[{"entity":{"key":1}},{"entity":{}}]""" to "indeterminate",
+            "[1,2]" to "indeterminate","[]" to "indeterminate","{}" to "indeterminate")
+        for ((rows,expected) in cases) {
+            val server=MockWebServer();val scope=CoroutineScope(SupervisorJob()+Dispatchers.Unconfined)
+            try {
+                server.enqueue(MockResponse().setBody("""{"data":$rows}"""))
+                server.enqueue(MockResponse().setBody("""{"data":[]}"""));server.start()
+                val f=Fixture(scope,server)
+                f.window.context("save").collection.set(listOf(mapOf("entity" to mapOf("key" to 1)),mapOf("entity" to mapOf("key" to "02"))))
+                val result=f.runtime.mutationCommands.execute(f.runtime,f.window,f.source,command,submitted)
+                assertEquals(expected,result.status,rows)
+                val state=f.runtime.mutationCommands.state(f.window.windowId,command)
+                val succeeded=expected=="succeeded"
+                assertEquals(!succeeded,state.guarded)
+                assertEquals(succeeded,f.window.peekWindowForm()["done"]==true)
+                assertEquals(!succeeded,f.window.peekWindowForm()["unknown"]==true)
+                if (!succeeded) assertEquals("suppressed",f.runtime.mutationCommands.execute(f.runtime,f.window,f.source,command,submitted).status)
+                assertEquals(if(succeeded)2 else 1,server.requestCount)
+            } finally {scope.cancel();server.shutdown()}
+        }
+    }
+
+    @Test fun generatedIdentityAcceptsOneStrictKeyAndExplicitRejectionWinsOverCorrelation() = runBlocking {
+        val generated=MutationReceiptIdentityDef("entity.id",generated=true)
+        val command=child("save").copy(receiptIdentity=generated,rejectedWhen=DashboardConditionDef(source="collection",field="0.denied",equals=JsonPrimitive(true)))
+        val cases=listOf(
+            """[{"denied":false,"entity":{"id":0}}]""" to "succeeded",
+            """[{"denied":false,"entity":{"id":" 1 "}}]""" to "succeeded",
+            """[{"denied":true,"message":"Request refused"}]""" to "failed",
+            """[{"denied":true,"entity":{"id":1},"message":"Request refused"}]""" to "failed",
+            """[{"entity":{"id":1}}]""" to "indeterminate",
+            """[{"denied":false,"entity":{"id":""}}]""" to "indeterminate",
+            """[{"denied":false,"entity":{"id":null}}]""" to "indeterminate",
+            """[{"denied":false,"entity":{"id":1}},{"entity":{"id":2}}]""" to "indeterminate")
+        for ((rows,expected) in cases) {
+            val server=MockWebServer();val scope=CoroutineScope(SupervisorJob()+Dispatchers.Unconfined)
+            try {
+                server.enqueue(MockResponse().setBody("""{"data":$rows}"""));server.start()
+                val result=Fixture(scope,server).execute(command)
+                assertEquals(expected,result.status,rows)
+                if (expected=="failed") assertEquals("Request refused",result.error)
+                assertEquals(1,server.requestCount)
+            } finally {scope.cancel();server.shutdown()}
+        }
+    }
+
+    @Test fun submittedIdentityIsImmutableAndDoesNotCoerceStringAndNumberIntoOneKey() = runBlocking { fixture {
+        val command=child("save").copy(receiptIdentity=MutationReceiptIdentityDef("id","items"))
+        val row=mutableMapOf<String,Any?>("id" to 1);val data=mutableListOf<Map<String,Any?>>(row,mapOf("id" to "1"))
+        val started=CompletableDeferred<Unit>();val release=CompletableDeferred<Unit>()
+        loader { request ->
+            started.complete(Unit);release.await()
+            assertEquals(1,(request.input.parameters["items"] as List<*>).map { (it as Map<*,*>)["id"] }.first())
+            listOf(mapOf("id" to "1"),mapOf("id" to 1L))
+        }
+        val pending=async { runtime.mutationCommands.execute(runtime,window,source,command,mapOf("items" to data)) }
+        withTimeout(3000){started.await()};row["id"]=99;data.clear();release.complete(Unit)
+        assertEquals("succeeded",pending.await().status)
+        assertEquals(listOf("save"),refs())
+    } }
+
+    @Test fun mismatchedOrderedIdentitySkipsLaterWritesAndCompensations() = runBlocking { fixture {
+        val stage=stageB.command.copy(receiptIdentity=MutationReceiptIdentityDef("id",generated=true))
+        loader { req -> if(req.dataSourceRef=="second")listOf(mapOf("id" to 1),mapOf("id" to 2)) else listOf(mapOf("token" to 7)) }
+        val result=execute(root.copy(before=listOf(stageA,stageB.copy(command=stage))))
+        assertEquals("indeterminate",result.status)
+        assertEquals("second",result.failedStepId)
+        assertEquals(listOf("first","second"),refs())
+        assertEquals(true,window.peekWindowForm()["unknown"])
+    } }
+
+    @Test fun identitySelectorsPreserveExactArrayIndicesAndScopeAfterDispatch() = runBlocking { fixture {
+        val command = JsonUtil.json.decodeFromString<MutationCommandDef>("""{"commandId":"save","dataSourceRef":"save",
+          "receiptIdentity":{"field":"keys.0.value","submittedRows":"inputRows.0.items","submittedField":"key","generated":false},
+          "successState":{"done":true},"refresh":[{"dataSourceRef":"unused"}]}""")
+        assertEquals(command, JsonUtil.json.decodeFromString<MutationCommandDef>(JsonUtil.json.encodeToString(MutationCommandDef.serializer(),command)))
+        val items = mapOf("inputRows" to listOf(mapOf("items" to listOf(mapOf("key" to " 7 ")))))
+        val started = CompletableDeferred<Unit>()
+        val resume = CompletableDeferred<Unit>()
+        loader {
+            started.complete(Unit)
+            resume.await()
+            listOf(mapOf("keys" to listOf(mapOf("value" to " 7 "))))
+        }
+        val old = async { runtime.mutationCommands.execute(runtime,window,source,command,items) }
+        withTimeout(3000) { started.await() }
+        source.selection.set(SelectionState(selected=mapOf("id" to "replacement")))
+        resume.complete(Unit)
+        assertEquals("superseded", old.await().status)
+        assertFalse("done" in window.peekWindowForm())
+        assertEquals(listOf("save"), refs())
+        val wrongIndex = command.copy(receiptIdentity=command.receiptIdentity!!.copy(submittedRows="inputRows.00.items"))
+        assertEquals("invalid_payload", runtime.mutationCommands.execute(runtime,window,source,wrongIndex,items).status)
+        assertEquals(listOf("save"), refs())
+    } }
+
+    @Test fun operandIdentityInAForwardStepPreservesDefinitiveRejectionAndPreviousCleanup() = runBlocking { fixture {
+        val command = child("second").copy(receiptIdentity=MutationReceiptIdentityDef("id","submitted"),
+            rejectedWhen=DashboardConditionDef(source="collection",field="0.denied",equals=JsonPrimitive(true)))
+        val batch = root.copy(before=listOf(stageA,stageB.copy(command=command)))
+        loader { req ->
+            if (req.dataSourceRef=="second") listOf(mapOf("denied" to true,"message" to "Request refused"))
+            else listOf(mapOf("token" to 7))
+        }
+        val result=runtime.mutationCommands.execute(runtime,window,source,batch,mapOf("submitted" to listOf(mapOf("id" to 2))))
+        assertEquals("failed",result.status)
+        assertEquals("Request refused",result.error)
+        assertEquals("second",result.failedStepId)
+        assertEquals(listOf("first","second","cleanFirst"),refs())
+    } }
+
+    @Test fun checkedReceiptsUseWireRowsForBothIdentityAndResultMappingsBeforeOnFetch() = runBlocking {
+        data class Sample(val raw: String, val displayed: Int, val checked: Boolean, val expected: String,
+            val mapped: Long? = null, val checkRejection: Boolean = false)
+        val samples = listOf(
+            Sample("""[{"id":9}]""",7,true,"indeterminate"),
+            Sample("""[{"id":7},{"id":9}]""",7,true,"indeterminate"),
+            Sample("""[{"id":7}]""",9,true,"succeeded",7L),
+            Sample("""[{"id":7}]""",9,false,"succeeded",9L),
+            Sample("""[{"id":9,"denied":true,"message":"Refused"}]""",7,true,"failed",checkRejection=true)
+        )
+        ActionHookRuntime.testScriptEvaluator = { script ->
+            val js = QuickJs.create(Dispatchers.Default)
+            try { js.evaluate<String>(script) } finally { js.close() }
+        }
+        try {
+            for (sample in samples) {
+                val scope = CoroutineScope(SupervisorJob()+Dispatchers.Unconfined)
+                val server = MockWebServer()
+                try {
+                    server.enqueue(MockResponse().setBody("""{"payload":{"items":${sample.raw}},"data":[{"id":999}]}"""))
+                    server.start()
+                    val f = Fixture(scope,server)
+                    val metadata = f.window.metadata.peek()!!
+                    val writer = metadata.dataSources.getValue("save").copy(selectors=SelectorDef(data="payload.items"),
+                        on=listOf(ExecutionDef(event="onFetch",handler="Example.forDisplay")))
+                    f.window.metadata.set(metadata.copy(namespace="Example",
+                        actions=ActionsDef(code="({forDisplay:()=>[{id:${sample.displayed},denied:false}]})"),
+                        dataSources=metadata.dataSources+("save" to writer)))
+                    val command = child("save").copy(resultState=mapOf("createdId" to listOf("0.id")),
+                        receiptIdentity=if (sample.checked) MutationReceiptIdentityDef("id","items") else null,
+                        rejectedWhen=if (sample.checkRejection) DashboardConditionDef(source="collection",field="0.denied",equals=JsonPrimitive(true)) else null)
+                    val result=f.runtime.mutationCommands.execute(f.runtime,f.window,f.source,command,mapOf("items" to listOf(mapOf("id" to 7))))
+                    assertEquals(sample.expected,result.status,sample.toString())
+                    assertEquals(sample.displayed,(f.window.context("save").collection.peek().single()["id"] as Number).toInt())
+                    assertEquals(sample.mapped,f.window.peekWindowForm()["createdId"])
+                    if (sample.checkRejection) assertEquals("Refused",result.error)
+                    assertEquals(1,server.requestCount)
+                } finally { scope.cancel(); server.shutdown() }
+            }
+        } finally { ActionHookRuntime.testScriptEvaluator=null }
     }
 
     @Test fun cleanupPredicateChecksOnlyItsOwnPhysicalResponseAndContinuesAfterADefiniteNegative() = runBlocking {
