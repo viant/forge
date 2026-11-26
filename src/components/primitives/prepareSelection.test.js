@@ -242,3 +242,15 @@ test('scoped reader and draft parameters with the same field name remain separat
   assert.deepEqual(f.calls.input, {Parent:8,pageSize:1,language:'en'});
   assert.equal(f.calls.args.draftParameters.Parent, 2);
 });
+
+test('foreign draft-binding destinations fail before reading or opening', async () => {
+  for (const binding of [{to:'unrelated:parameters',from:'limits:collection'}, {kind:'unrelated',in:'const'},
+    {to:'draft:parameters',in:'const'}]) {
+    const f = draftBindingFixture();
+    f.operation.parameters.push({name:'unexpected',location:'0.remaining',...binding});
+    const result = await f.open();
+    assert.equal(result.status, 'failed');
+    assert.match(result.error.message, /destination/);
+    assert.deepEqual(f.events, []);
+  }
+});

@@ -169,17 +169,21 @@ internal class PreparedSelectionRuntime {
             require(destination.fetchOnOpen == false || (destination.fetchOnOpen == null && destination.content?.fetchData == false)) {
                 "Prepared selection dialogs must disable their automatic opening read."
             }
-            var bindsDraft = false
+            val bindsDraft = parent != null && operation.parameters.any { it.to == "$draftRef:parameters" }
             if (parent != null) {
                 for (parameter in operation.parameters) {
-                    val target = parameter.to ?: continue
-                    if (':' !in target) continue
+                    val target = parameter.to ?: parameter.kind ?: continue
+                    if (':' !in target) {
+                        require(!bindsDraft || target.isEmpty() || target == prepare.dataSourceRef) {
+                            "A prepared parent binding has an unknown reader destination."
+                        }
+                        continue
+                    }
                     require(target == "${prepare.dataSourceRef}:parameters" || target == "$draftRef:parameters") {
                         "A prepared parent binding must target the reader or draft parameters."
                     }
                     if (target == "$draftRef:parameters") {
                         require(draftRef != prepare.dataSourceRef) { "Draft and reader parameter destinations must differ." }
-                        bindsDraft = true
                     }
                     val owner = parameter.from?.substringBefore(':').orEmpty()
                     require(owner.isEmpty() || owner in metadata.dataSources) { "The operation binding source is unavailable: $owner" }

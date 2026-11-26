@@ -133,6 +133,18 @@ export async function openPreparedSelection(context, operation, eligible) {
   let attempted = false;
   let pendingPublished = false;
   try {
+    if (bindsDraft) {
+      if (destination === spec.dataSourceRef) throw new Error('The prepared draft and reader must be distinct.');
+      for (const binding of operation.parameters) {
+        const target = binding.to || binding.kind;
+        if (target?.includes(':') && (!binding.to || !binding.from?.includes(':'))) {
+          throw new Error('A scoped prepared binding requires an explicit source and destination.');
+        }
+        if (target && target !== spec.dataSourceRef && target !== spec.dataSourceRef + ':parameters' && target !== destination + ':parameters') {
+          throw new Error('Unknown prepared parameter destination: ' + target);
+        }
+      }
+    }
     const bound = snapshotResourceValue(readArguments());
     const parameters = bound.parameters;
     const parent = spec.parentParameter;

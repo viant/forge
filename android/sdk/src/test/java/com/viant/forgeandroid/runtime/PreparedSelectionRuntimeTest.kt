@@ -158,7 +158,7 @@ class PreparedSelectionRuntimeTest {
     }
 
     @Test fun draftCollectionBindingsAreScopedAndNeverForwardedToTheParentReader() = runBlocking {
-        for (change in listOf("none","count","identity","missing","wrongDestination","duplicate","predicate")) fixture {
+        for (change in listOf("none","count","identity","missing","wrongDestination","legacyDestination","duplicate","predicate")) fixture {
             val bound = window.context("unused")
             fun rows(id:Int, count:Int) = listOf(mapOf("id" to id, "count" to count, "note" to null))
             bound.collection.set(rows(19, 2))
@@ -174,7 +174,9 @@ class PreparedSelectionRuntimeTest {
                 ParameterDef(name = "note", from = from, to = to, location = "0.note"),
                 ParameterDef(name = "unavailable", from = from, to = to, location = "0.absent"))
             val op = parentOperation.copy(visibleWhen = ready, parameters = if (change == "duplicate")
-                bindings + ParameterDef(name="Max",input="windowForm",location="maximum") else bindings,
+                bindings + ParameterDef(name="Max",input="windowForm",location="maximum")
+                else if (change == "legacyDestination") bindings + ParameterDef(name="extra",input="windowForm",location="maximum",kind="list")
+                else bindings,
                 prepareSelection = parentOperation.prepareSelection!!.copy(prepare = "Inventory.scoped"))
             runtime.setWindowFormValues(window.windowId, mapOf("maximum" to 5))
             loader { request ->
@@ -188,7 +190,7 @@ class PreparedSelectionRuntimeTest {
             }
             val result = runtime.preparedSelections.activate(runtime, source, spec.copy(operations=listOf(op)), op)
             assertEquals(change == "none",result.getOrDefault(false),change)
-            assertEquals(if (change in listOf("missing","wrongDestination","duplicate")) 0 else 1,calls.size,change)
+            assertEquals(if (change in listOf("missing","wrongDestination","legacyDestination","duplicate")) 0 else 1,calls.size,change)
             if (change == "none") assertEquals(mapOf("Parent" to 19L,"count" to 2L,"owner" to 19L,"note" to null),draft.form.peek()["local"])
             else untouched()
         }

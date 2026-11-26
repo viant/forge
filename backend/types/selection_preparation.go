@@ -105,20 +105,24 @@ func validateParentDraftBindings(owner string, window *Window, op *EditableColle
 				return fmt.Errorf("%s.prepareSelection unsafe collection field selector %q", owner, p.Location)
 			}
 		}
+		target := p.To
+		if target == "" {
+			target = p.Kind
+		}
 		names := readerNames
-		switch p.To {
+		switch target {
 		case draftTarget:
 			names = draftNames
 		case "", spec.DataSourceRef, spec.DataSourceRef + ":parameters":
 			root, _, _ := strings.Cut(p.Name, ".")
-			if prior, ok := readerRoots[root]; ok && prior != p.To {
+			if prior, ok := readerRoots[root]; ok && prior != target {
 				return fmt.Errorf("%s.prepareSelection ambiguous reader binding %q", owner, root)
 			}
-			readerRoots[root] = p.To
+			readerRoots[root] = target
 		default:
-			return fmt.Errorf("%s.prepareSelection unknown parameter destination %q", owner, p.To)
+			return fmt.Errorf("%s.prepareSelection unknown parameter destination %q", owner, target)
 		}
-		if (strings.Contains(p.To, ":") && !compact) || p.Direction == "out" {
+		if (strings.Contains(p.To, ":") && !compact) || p.Direction == "out" || store == "output" {
 			return fmt.Errorf("%s.prepareSelection scoped bindings require an inbound source", owner)
 		}
 		if names[p.Name] {

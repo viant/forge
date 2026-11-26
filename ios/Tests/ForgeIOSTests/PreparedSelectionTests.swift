@@ -230,6 +230,7 @@ final class PreparedSelectionTests: XCTestCase {
         let bindings: [[String:Any]] = [
             ["name":"Parent","from":":windowform","to":"reader:parameters","location":"parent"],
             ["name":"Other","in":"windowForm","location":"other"],
+            ["name":"Legacy","kind":"reader","in":"windowForm","location":"other"],
             ["name":"fact","from":"facts:collection","to":"draft:parameters","location":"0"],
             ["name":"empty","from":"facts:collection","to":"draft:parameters","location":"0.empty"],
             ["name":"absent","from":"facts:collection","to":"draft:parameters","location":"0.missing"]
@@ -244,7 +245,7 @@ final class PreparedSelectionTests: XCTestCase {
         let result = await runtime.prepareEditableSelection(windowID:id,sourceDataSourceRef:"list",collection:spec,operation:op)
         XCTAssertEqual(result.status,"opened",result.error ?? "")
         let calls = await log.calls
-        XCTAssertEqual(calls.map(\.input.parameters),[["Parent":.string("001"),"Other":.bool(false)]])
+        XCTAssertEqual(calls.map(\.input.parameters),[["Parent":.string("001"),"Other":.bool(false),"Legacy":.bool(false)]])
         let form = await runtime.dataSourceForm(windowID:id,dataSourceRef:"draft")
         XCTAssertEqual(form["facts"],.object(["fact":.object(original),"empty":.null]))
         await runtime.closeDialogPublic(windowID:id,dialogID:"editor")
@@ -263,7 +264,8 @@ final class PreparedSelectionTests: XCTestCase {
         let draft = ["name":"caption", "from":"facts:collection", "to":"draft:parameters", "location":"0.caption"]
         for extra in [
             ["name":"Parent","from":":windowform","to":"reader:parameters","location":"parent"],
-            ["name":"Other","from":":windowform","to":"unknown:parameters","location":"parent"]
+            ["name":"Other","from":":windowform","to":"unknown:parameters","location":"parent"],
+            ["name":"Other","in":"windowForm","kind":"unknown","location":"parent"]
         ] {
             let (runtime,id,spec,op,_) = try await parentFixture(bindings:[parent,draft,extra])
             let calls = PreparedReadLog()

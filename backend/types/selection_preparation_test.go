@@ -157,6 +157,9 @@ func TestPreparedParentDraftBindings(t *testing.T) {
 		{"foreign destination", "unknown parameter destination", func(o *types.EditableCollectionOperation) {
 			o.Parameters = append(o.Parameters, &types.Parameter{Name: "flag", From: "view:collection", To: "other:parameters"})
 		}},
+		{"unknown legacy destination", "unknown parameter destination", func(o *types.EditableCollectionOperation) {
+			o.Parameters = append(o.Parameters, &types.Parameter{Name: "unexpected", Kind: "unrelated", In: "const"})
+		}},
 		{"local identity", "must bind to the reader", func(o *types.EditableCollectionOperation) { o.PrepareSelection.ParentParameter = "available" }},
 		{"duplicate reader", "ambiguous reader binding", func(o *types.EditableCollectionOperation) {
 			o.Parameters = append(o.Parameters, &types.Parameter{Name: "ID", From: "view:windowform", To: "reader:parameters"})

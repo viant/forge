@@ -178,17 +178,27 @@ extension ForgeRuntime {
         let bindings = operation.parameters ?? []
         let bindsDraft = spec.parentParameter != nil && bindings.contains { $0.to == draft + ":parameters" }
         if bindsDraft {
-            var readerNames = Set<String>(), draftNames = Set<String>()
+            var readerNames = Set<String>(), draftNames = Set<String>(), readerRoots: [String:String] = [:]
             for binding in bindings where binding.direction != "out" {
                 let name = binding.name.trimmingCharacters(in: .whitespacesAndNewlines)
-                let to = binding.to ?? ""
-                let explicit = !to.isEmpty
+                let target = binding.to.flatMap { $0.isEmpty ? nil : $0 } ?? binding.kind ?? ""
                 guard draft != spec.dataSourceRef, !name.isEmpty, name != "...",
-                      !explicit || (binding.from?.contains(":") == true && [draft + ":parameters", spec.dataSourceRef + ":parameters"].contains(to)),
-                      explicit || (name != draft && name != spec.dataSourceRef) else {
+                      ["", spec.dataSourceRef, spec.dataSourceRef + ":parameters", draft + ":parameters"].contains(target),
+                      !target.hasSuffix(":parameters") || binding.from?.contains(":") == true,
+                      !target.isEmpty || (name != draft && name != spec.dataSourceRef) else {
                     return .init(accepted: false, status: "failed", error: "A parent binding has an ambiguous or unsupported destination.")
                 }
-                let distinct = to == draft + ":parameters" ? draftNames.insert(name).inserted : readerNames.insert(name).inserted
+                let distinct: Bool
+                if target == draft + ":parameters" {
+                    distinct = draftNames.insert(name).inserted
+                } else {
+                    let root = name.components(separatedBy: ".")[0]
+                    guard readerRoots[root] == nil || readerRoots[root] == target else {
+                        return .init(accepted: false, status: "failed", error: "A reader parameter has ambiguous destinations.")
+                    }
+                    readerRoots[root] = target
+                    distinct = readerNames.insert(name).inserted
+                }
                 guard distinct else { return .init(accepted: false, status: "failed", error: "A parent parameter has duplicate bindings.") }
             }
         }
@@ -232,8 +242,11 @@ extension ForgeRuntime {
                 let draftParameters = draftEnvelope?["parameters"]?.objectValue ?? [:]
                 guard admittedDraftParameters == nil || admittedDraftParameters == draftParameters else { return nil }
                 admittedDraftParameters = draftParameters
-                let readerParameters = resolved.removeValue(forKey: spec.dataSourceRef)?.objectValue?["parameters"]?.objectValue ?? [:]
-                parameters = try resolved.merging(readerParameters) { _, _ in
+                var addressed = resolved.removeValue(forKey: spec.dataSourceRef)?.objectValue ?? [:]
+                let compact = addressed.removeValue(forKey: "parameters")?.objectValue ?? [:]
+                parameters = try resolved.merging(addressed) { _, _ in
+                    throw SelectionPreparationError("A reader parameter has duplicate bindings.")
+                }.merging(compact) { _, _ in
                     throw SelectionPreparationError("A reader parameter has duplicate bindings.")
                 }
             } else {
