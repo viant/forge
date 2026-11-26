@@ -378,3 +378,14 @@ test('invalid submitted identities are rejected before transport; generated rece
   const command = writer('save', {receiptIdentity: {generated: true, field: 'key'}, rejectedWhen: {source:'collection',field:'0.rejected',equals:true}});
   assert.equal((await executeCommand(context, command)).status, 'failed');
 });
+
+test('a transport cannot replace the submitted identity set while it owns the request', async () => {
+  const {context, calls} = fixture({save: () => {
+    calls[0].input.items[0].key = 'replacement';
+    return [{key: 'replacement'}];
+  }});
+  const result = await executeCommand(context, writer('save', {receiptIdentity: {submittedRows:'items', field:'key'}}),
+    {items:[{key:'original'}]});
+  assert.equal(result.status, 'indeterminate');
+  assert.equal(calls.length, 1);
+});
