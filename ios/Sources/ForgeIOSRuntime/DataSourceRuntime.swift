@@ -2,7 +2,77 @@ import Foundation
 
 typealias DataSourceRowReceipt = Result<[JSONValue], Error>
 
+struct FormFileSelection: Equatable, Sendable {
+    let revision: UUID
+    let reading: Bool
+}
+
+// The picker records intent synchronously before scheduling I/O. The receipt
+// and form actors consult the same revisions; file bytes are never stored here.
+final class FormFileSelections: @unchecked Sendable {
+    private let lock = NSLock()
+    private struct Field {
+        var revision: UUID
+        let presentation: UUID?
+        var pending: [String: UUID] = [:]
+    }
+    private var entries: [String: [String: Field]] = [:]
+
+    private func topLevel(_ path: String) -> String { String(path.prefix { $0 != "." }) }
+
+    func begin(_ id: String, field: String, presentation: UUID?) -> UUID {
+        lock.withLock {
+            let revision = UUID()
+            let key = topLevel(field)
+            var choice = entries[id]?[key]
+            if choice == nil || choice?.presentation != presentation { choice = Field(revision: revision, presentation: presentation) }
+            choice?.revision = revision
+            choice?.pending[field] = revision
+            entries[id, default: [:]][key] = choice
+            return revision
+        }
+    }
+
+    func whileCurrent(_ id: String, field: String, revision: UUID, _ apply: () -> Bool) -> Bool {
+        lock.withLock {
+            guard entries[id]?[topLevel(field)]?.pending[field] == revision else { return false }
+            return apply()
+        }
+    }
+
+    func finish(_ id: String, field: String, revision: UUID) {
+        lock.withLock {
+            let key = topLevel(field)
+            if entries[id]?[key]?.pending[field] == revision { entries[id]?[key]?.pending[field] = nil }
+        }
+    }
+
+    func snapshot(_ id: String, fields: Set<String>, presentation: UUID?) -> [String: FormFileSelection] {
+        withSnapshot(id, fields: fields, presentation: presentation) { $0 }
+    }
+
+    func withSnapshot<T>(_ id: String, fields: Set<String>, presentation: UUID?, _ apply: ([String: FormFileSelection]) -> T) -> T {
+        lock.withLock {
+            var snapshot: [String: FormFileSelection] = [:]
+            if let selections = entries[id] {
+                for field in fields {
+                    guard let selection = selections[field], selection.presentation == nil || presentation == nil || selection.presentation == presentation else { continue }
+                    snapshot[field] = FormFileSelection(revision: selection.revision, reading: !selection.pending.isEmpty)
+                }
+            }
+            return apply(snapshot)
+        }
+    }
+
+    func detach(windowID: String) {
+        lock.withLock {
+            for id in entries.keys where id.hasPrefix(windowID + "DS") { entries[id] = nil }
+        }
+    }
+}
+
 public actor DataSourceRuntime {
+    nonisolated let fileSelections = FormFileSelections()
     private var collectionInputs: [String: InputState] = [:]
     private var collectionInfo: [String: [String: JSONValue]] = [:]
     private var collectionValues: [String: [[String: JSONValue]]] = [:]
@@ -31,19 +101,33 @@ public actor DataSourceRuntime {
         formValues[dataSourceID] ?? [:]
     }
 
-    func clearSubmittedFormFields(dataSourceID: String, submitted: [String: JSONValue]) -> Bool {
-        guard let updated = clearingSubmittedFields(form(dataSourceID: dataSourceID), submitted: submitted) else { return false }
-        setForm(dataSourceID: dataSourceID, values: updated)
-        return true
+    func publishFormFile(_ id: String, field: String, revision: UUID, value: JSONValue) -> Bool {
+        fileSelections.whileCurrent(id, field: field, revision: revision) {
+            guard let updated = SelectorUtil.setting(value, in: .object(formValues[id] ?? [:]), selector: field)?.objectValue else { return false }
+            setForm(dataSourceID: id, values: updated)
+            return true
+        }
     }
 
-    func applySubmittedFormPatch(dataSourceID: String, submitted: [String: JSONValue], patch: [String: JSONValue]) -> SubmittedFormPatchDisposition {
-        let decision = submittedFormPatchDisposition(formValues[dataSourceID] ?? [:], submitted: submitted, patch: patch)
-        if decision == .apply {
-            formValues[dataSourceID, default: [:]].merge(patch) { _, value in value }
-            publishForm(dataSourceID)
+    func clearSubmittedFormFields(dataSourceID: String, submitted: [String: JSONValue], files: [String: FormFileSelection], presentation: UUID?) -> [String: JSONValue] {
+        fileSelections.withSnapshot(dataSourceID, fields: Set(submitted.keys), presentation: presentation) { choices in
+            let eligible = submitted.filter { choices[$0.key] == files[$0.key] }
+            guard let updated = clearingSubmittedFields(form(dataSourceID: dataSourceID), submitted: eligible) else { return [:] }
+            setForm(dataSourceID: dataSourceID, values: updated)
+            return eligible
         }
-        return decision
+    }
+
+    func applySubmittedFormPatch(dataSourceID: String, submitted: [String: JSONValue], patch: [String: JSONValue], files: [String: FormFileSelection], guardedFields: Set<String>, presentation: UUID?) -> SubmittedFormPatchDisposition {
+        fileSelections.withSnapshot(dataSourceID, fields: guardedFields, presentation: presentation) { choices in
+            guard choices == files else { return .conflict }
+            let decision = submittedFormPatchDisposition(formValues[dataSourceID] ?? [:], submitted: submitted, patch: patch)
+            if decision == .apply {
+                formValues[dataSourceID, default: [:]].merge(patch) { _, value in value }
+                publishForm(dataSourceID)
+            }
+            return decision
+        }
     }
 
     func restoreForm(dataSourceID: String, ifCurrent current: [String:JSONValue], previous: [String:JSONValue]) -> Bool {
@@ -477,6 +561,7 @@ public actor DataSourceRuntime {
     // MARK: - Window cleanup
 
     public func detachWindow(_ windowID: String) {
+        fileSelections.detach(windowID: windowID)
         let keys = Set(collectionValues.keys.filter { $0.hasPrefix(windowID) })
             .union(formValues.keys.filter { $0.hasPrefix(windowID) })
             .union(selectionValues.keys.filter { $0.hasPrefix(windowID) })
@@ -524,7 +609,10 @@ private func clearingSubmittedFields(_ current: [String: JSONValue], submitted: 
 }
 
 extension Signal where Value == [String: JSONValue] {
-    func clearSubmittedFormFields(_ submitted: [String: JSONValue]) {
-        if let updated = clearingSubmittedFields(peek(), submitted: submitted) { set(updated) }
+    func clearSubmittedFormFields(_ submitted: [String: JSONValue], id: String, files: FormFileSelections, original: [String: FormFileSelection], presentation: UUID?) {
+        files.withSnapshot(id, fields: Set(submitted.keys), presentation: presentation) { choices in
+            let eligible = submitted.filter { choices[$0.key] == original[$0.key] }
+            if let updated = clearingSubmittedFields(peek(), submitted: eligible) { set(updated) }
+        }
     }
 }

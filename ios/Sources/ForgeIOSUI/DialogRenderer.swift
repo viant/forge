@@ -1,6 +1,10 @@
 import SwiftUI
 import ForgeIOSRuntime
 
+private struct ForgeDialogPresentationKey: EnvironmentKey {
+    static let defaultValue: (id: String, presentation: UUID)? = nil
+}
+
 private struct ForgeDialogSelectionModeKey: EnvironmentKey {
     static let defaultValue = ""
 }
@@ -10,6 +14,11 @@ private struct ForgeDialogCommitSelectionKey: EnvironmentKey {
 }
 
 extension EnvironmentValues {
+    var forgeDialogPresentation: (id: String, presentation: UUID)? {
+        get { self[ForgeDialogPresentationKey.self] }
+        set { self[ForgeDialogPresentationKey.self] = newValue }
+    }
+
     var forgeDialogSelectionMode: String {
         get { self[ForgeDialogSelectionModeKey.self] }
         set { self[ForgeDialogSelectionModeKey.self] = newValue }
@@ -196,6 +205,7 @@ private struct WindowDialogHost: View {
                                             container: content
                                         )
                                         .environment(\.forgeDialogSelectionMode, effectiveSelectionMode)
+                                        .environment(\.forgeDialogPresentation, observer.state.presentationID.map { (dialogID, $0) })
                                         .environment(
                                             \.forgeDialogCommitSelection,
                                             shouldAutoCommitSelection

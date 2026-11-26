@@ -5,6 +5,7 @@ private let hostedWorkspaceDidOpenNotification = Notification.Name("forgeHostedW
 
 public struct MenuListRenderer: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.forgeDialogPresentation) private var dialogPresentation
     @Environment(\.openURL) private var openURL
     @Environment(\.forgePresentationDensity) private var presentationDensity
 
@@ -173,6 +174,7 @@ public struct MenuListRenderer: View {
             else if NativeWidgetContract.kind(item) == "link", item.link != nil { linkItem(item) }
             else if NativeWidgetContract.kind(item) == "label" { labelItem(item) }
             else {
+                let file = formFileChoice(for: item)
                 NativeWidgetView(item: item, value: resolvedItemValue(item) ?? NativeWidgetContract.initialValue(item), onChange: { value in
                     if NativeWidgetContract.kind(item) == "daterangepreset", let runtime, let window,
                        let patch = NativeDateRangePreset.patch(item: item, value: value, metrics: metricsValuesByDataSource[resolveItemDataSourceRef(item) ?? ""] ?? [:]) {
@@ -181,7 +183,7 @@ public struct MenuListRenderer: View {
                             applyItemValue(value, for: item)
                         }
                     } else { applyItemValue(value, for: item) }
-                }, windowForm: windowFormValues, onDraftChange: { values in
+                }, beginFileChoice: file?.begin, onFileChoice: file?.apply, windowForm: windowFormValues, onDraftChange: { values in
                     if let runtime, let window { Task { await runtime.setWindowFormValue(windowID: window.windowID, values: values, bumpPrefillRevision: false) } }
                 }, onCustomApply: { values in
                     if let runtime, let window { Task {
@@ -1169,25 +1171,45 @@ public struct MenuListRenderer: View {
                 }
                 await runtime.setDataSourceForm(windowID: window.windowID, dataSourceRef: dataSourceRef, values: updated)
             }
-            await runtime.emitInteraction(
-                kind: "feed.form_changed",
-                windowID: window.windowID,
-                dataSourceRef: dataSourceRef.isEmpty ? nil : dataSourceRef,
-                detail: [
-                    "field": .string(key),
-                    "scope": .string(scope.isEmpty ? "form" : scope),
-                    "controlType": .string(item.type ?? "text"),
-                    "value": value
-                ]
-            )
-            let changeEvents = Set(["onChange", "onInput", "onValueChange", "onSelection", "onItemSelect"])
-            for execution in item.on where changeEvents.contains(execution.event ?? "") {
-                _ = await runtime.execute(
-                    execution,
-                    context: ExecutionContext(windowID: window.windowID, dataSourceRef: dataSourceRef),
-                    args: ["value": value]
-                )
+            await notifyItemChange(value, item: item, source: dataSourceRef, runtime: runtime, window: window)
+        }
+    }
+
+    func formFileChoice(for item: ItemDef) -> (begin: () -> UUID, apply: (URL?, UUID) async throws -> Void)? {
+        guard NativeWidgetContract.kind(item) == "file", let runtime, let window,
+              let source = resolveItemDataSourceRef(item), let field = item.valueKey, !field.isEmpty,
+              !["windowform", "input"].contains((item.scope ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()) else { return nil }
+        let dialog = dialogPresentation
+        return ({ runtime.beginFormFile(windowID: window.windowID, source: source, field: field, presentation: dialog?.presentation) }, { url, revision in
+            if let value = try await runtime.editFormFile(windowID: window.windowID, source: source, field: field, revision: revision, dialog: dialog, read: {
+                try await NativeWidgetView.readFile(url)
+            }) {
+                await notifyItemChange(value, item: item, source: source, runtime: runtime, window: window)
             }
+        })
+    }
+
+    private func notifyItemChange(_ value: JSONValue, item: ItemDef, source dataSourceRef: String, runtime: ForgeRuntime, window: WindowContext) async {
+        let key = item.valueKey ?? ""
+        let scope = (item.scope ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        await runtime.emitInteraction(
+            kind: "feed.form_changed",
+            windowID: window.windowID,
+            dataSourceRef: dataSourceRef.isEmpty ? nil : dataSourceRef,
+            detail: [
+                "field": .string(key),
+                "scope": .string(scope.isEmpty ? "form" : scope),
+                "controlType": .string(item.type ?? "text"),
+                "value": value
+            ]
+        )
+        let changeEvents = Set(["onChange", "onInput", "onValueChange", "onSelection", "onItemSelect"])
+        for execution in item.on where changeEvents.contains(execution.event ?? "") {
+            _ = await runtime.execute(
+                execution,
+                context: ExecutionContext(windowID: window.windowID, dataSourceRef: dataSourceRef),
+                args: ["value": value]
+            )
         }
     }
 

@@ -1,5 +1,6 @@
 import XCTest
 @testable import ForgeIOSRuntime
+@testable import ForgeIOSUI
 
 private actor FooterWrites {
     var calls: [(String, [String: JSONValue])] = []
@@ -354,7 +355,7 @@ extension DialogFooterMutationTests {
 extension DialogFooterMutationTests {
     private func formPatchWindow(subject: String = "owner") throws -> WindowMetadata {
         let json: [String: Any] = [
-            "view": ["content": [:]], "dataSource": ["draft": [:], "writer": [:], "list": [:]],
+            "view": ["content": [:]], "dataSource": ["draft": [:], "writer": [:], "list": [:], "stage": [:], "undo": [:]],
             "dialogs": [["id": "editor", "dataSourceRef": "draft", "fetchOnOpen": false]],
             "authorizationSnapshot": ["principal": ["subject": subject, "roles": ["editor"]]]
         ]
@@ -490,5 +491,171 @@ extension DialogFooterMutationTests {
         let empty = try footer(["successFormState": [:]])
         let allowed = await runtime.executeMutationCommand(windowID: id, sourceDataSourceRef: "draft", command: try XCTUnwrap(empty.footerCommand))
         XCTAssertEqual(allowed.status, "succeeded")
+    }
+}
+
+extension DialogFooterMutationTests {
+    func testReplacementFileIntentsAtSaveReceipt() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".csv")
+        try Data("key,value".utf8).write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let original = try await NativeWidgetView.readFile(url)
+        XCTAssertEqual(original.objectValue?["data"], .string(Data("key,value".utf8).base64EncodedString()))
+        for mode in ["pending", "same", "failed", "clear", "unrelated", "cancelled", "cleanupField"] {
+            let runtime = ForgeRuntime(), calls = FooterWrites()
+            let id = await runtime.openWindowInline(key: "files", title: "Files", metadata: try formPatchWindow()).id
+            _ = await runtime.presentDialog(windowID: id, dialogID: "editor")
+            let state = await runtime.dialogState(windowID: id, dialogID: "editor")
+            let dialog = ("editor", try XCTUnwrap(state.presentationID))
+            let field = mode == "cleanupField" ? "attachment" : mode == "unrelated" ? "another" : "file"
+            let action = try JSONDecoder().decode(ActionDef.self, from: Data(#"""
+                {"mutationCommand":{"dataSourceRef":"writer","successFormState":{"file":null,"done":true},
+                 "clearFormFields":["attachment"],"refresh":[{"dataSourceRef":"list"}]}}
+                """#.utf8))
+            await runtime.setDataSourceForm(windowID: id, dataSourceRef: "draft", values: ["file": original, "attachment": original, "note": .string("untouched")])
+            let sent = expectation(description: "writer"), response = AsyncStream<Void>.makeStream()
+            await runtime.registerDataSourceLoader { request in
+                await calls.record(request.dataSourceRef, request.input.parameters)
+                if request.dataSourceRef == "writer" { sent.fulfill(); for await _ in response.stream { break } }
+                return .init()
+            }
+            let submission = Task { await runtime.activateDialogFooter(windowID: id, dialogID: "editor", sourceDataSourceRef: "draft", action: action) }
+            await fulfillment(of: [sent], timeout: 4)
+            // Cancelling the system picker never enters the accepted-URL callback.
+            let readGate = AsyncStream<Void>.makeStream()
+            var reading: Task<JSONValue?, Error>?
+            if mode != "cancelled" {
+                let revision = runtime.beginFormFile(windowID: id, source: "draft", field: field, presentation: dialog.1)
+                reading = Task {
+                    try await runtime.editFormFile(windowID: id, source: "draft", field: field, revision: revision, dialog: dialog) {
+                        if mode == "pending" { for await _ in readGate.stream { break } }
+                        if mode == "failed" { throw CocoaError(.fileReadCorruptFile) }
+                        return try await NativeWidgetView.readFile(mode == "clear" ? nil : url)
+                    }
+                }
+                if mode != "pending" { _ = await reading?.result }
+            }
+            response.continuation.yield(()); response.continuation.finish()
+            let result = await submission.value, form = await runtime.dataSourceForm(windowID: id, dataSourceRef: "draft")
+            XCTAssertEqual(result?.status, "succeeded", mode)
+            let refs = await calls.calls.map(\.0)
+            XCTAssertEqual(refs, ["writer", "list"], mode)
+            let conflict = ["pending","same","failed","clear","cleanupField"].contains(mode)
+            XCTAssertEqual(form["done"], conflict ? nil : .bool(true), mode)
+            XCTAssertEqual(form["file"], conflict && mode != "clear" ? original : .null, mode)
+            XCTAssertEqual(form["attachment"], mode == "cleanupField" ? original : .null, mode)
+            XCTAssertEqual(form["note"], .string("untouched"), mode)
+            let status = await runtime.mutationCommandState(windowID: id, command: try XCTUnwrap(action.footerCommand))
+            if conflict { XCTAssertEqual(status.message, "Saved the submitted version. Your newer changes are still in the form.", mode) }
+            readGate.continuation.yield(()); readGate.continuation.finish()
+            _ = await reading?.result
+        }
+    }
+
+    func testFileChoiceBeforeDispatchAndSupersededReads() async throws {
+        let runtime = ForgeRuntime(), calls = FooterWrites()
+        let id = await runtime.openWindowInline(key: "files", title: "Files", metadata: try formPatchWindow()).id
+        _ = await runtime.presentDialog(windowID: id, dialogID: "editor")
+        let presentation = await runtime.dialogState(windowID: id, dialogID: "editor").presentationID
+        let dialog = ("editor", try XCTUnwrap(presentation))
+        let action = try JSONDecoder().decode(ActionDef.self, from: Data(#"{"mutationCommand":{"dataSourceRef":"writer","confirm":"Continue?","successFormState":{"file":null}}}"#.utf8))
+        await runtime.registerDataSourceLoader { q in await calls.record(q.dataSourceRef, q.input.parameters); return .init() }
+        let first = runtime.beginFormFile(windowID: id, source: "draft", field: "file", presentation: presentation)
+        let blocked = await runtime.activateDialogFooter(windowID: id, dialogID: "editor", sourceDataSourceRef: "draft", action: action, confirm: { _ in XCTFail("pending file reached confirmation"); return true })
+        XCTAssertEqual(blocked?.status, "invalid_payload")
+        let second = runtime.beginFormFile(windowID: id, source: "draft", field: "file", presentation: presentation)
+        let latest = try await runtime.editFormFile(windowID: id, source: "draft", field: "file", revision: second, dialog: dialog) { .string("new") }
+        let stale = try await runtime.editFormFile(windowID: id, source: "draft", field: "file", revision: first, dialog: dialog) { .string("old") }
+        XCTAssertEqual(latest, .string("new")); XCTAssertNil(stale)
+        let changed = await runtime.activateDialogFooter(windowID: id, dialogID: "editor", sourceDataSourceRef: "draft", action: action, confirm: { _ in
+            let clear = runtime.beginFormFile(windowID: id, source: "draft", field: "file", presentation: presentation)
+            _ = try? await runtime.editFormFile(windowID: id, source: "draft", field: "file", revision: clear, dialog: dialog) { .null }
+            return true
+        })
+        XCTAssertEqual(changed?.status, "invalid_payload")
+        let beforeRetry = await calls.calls.count; XCTAssertEqual(beforeRetry, 0)
+        let failed = runtime.beginFormFile(windowID: id, source: "draft", field: "file", presentation: presentation)
+        do {
+            _ = try await runtime.editFormFile(windowID: id, source: "draft", field: "file", revision: failed, dialog: dialog) { throw CocoaError(.fileReadCorruptFile) }
+            XCTFail("the file error was lost")
+        } catch {}
+        let retry = await runtime.activateDialogFooter(windowID: id, dialogID: "editor", sourceDataSourceRef: "draft", action: action, confirm: { _ in true })
+        XCTAssertEqual(retry?.status, "succeeded")
+        let old = runtime.beginFormFile(windowID: id, source: "draft", field: "file", presentation: presentation)
+        await runtime.closeDialogPublic(windowID: id, dialogID: "editor")
+        _ = await runtime.presentDialog(windowID: id, dialogID: "editor")
+        let reopened = await runtime.activateDialogFooter(windowID: id, dialogID: "editor", sourceDataSourceRef: "draft", action: action, confirm: { _ in true })
+        XCTAssertEqual(reopened?.status, "succeeded")
+        let late = try await runtime.editFormFile(windowID: id, source: "draft", field: "file", revision: old, dialog: dialog) { .string("old") }
+        XCTAssertNil(late)
+    }
+}
+
+extension DialogFooterMutationTests {
+    func testOrderedFileSaveCleansUpTheConfirmedStepWhenSelectionChanges() async throws {
+        let runtime = ForgeRuntime(), calls = FooterWrites()
+        let id = await runtime.openWindowInline(key: "files", title: "Files", metadata: try formPatchWindow()).id
+        _ = await runtime.presentDialog(windowID: id, dialogID: "editor")
+        let presentation = await runtime.dialogState(windowID: id, dialogID: "editor").presentationID
+        let dialog = ("editor", try XCTUnwrap(presentation))
+        let action = try JSONDecoder().decode(ActionDef.self, from: Data(#"""
+        {"mutationCommand":{"commandId":"save","dataSourceRef":"writer","clearFormFields":["file"],
+         "before":[{"command":{"commandId":"stage","dataSourceRef":"stage"},"cleanup":{"commandId":"undo","dataSourceRef":"undo"}}]}}
+        """#.utf8))
+        await runtime.registerDataSourceLoader { q in
+            await calls.record(q.dataSourceRef, q.input.parameters)
+            if q.dataSourceRef == "stage" {
+                let second = runtime.beginFormFile(windowID: id, source: "draft", field: "file", presentation: presentation)
+                _ = try await runtime.editFormFile(windowID: id, source: "draft", field: "file", revision: second, dialog: dialog) { .string("replacement") }
+            }
+            return .init(rows: [[:]])
+        }
+        let result = await runtime.activateDialogFooter(windowID: id, dialogID: "editor", sourceDataSourceRef: "draft", action: action)
+        XCTAssertEqual(result?.status, "invalid_payload")
+        let refs = await calls.calls.map(\.0), form = await runtime.dataSourceForm(windowID: id, dataSourceRef: "draft")
+        XCTAssertEqual(refs, ["stage", "undo"]); XCTAssertEqual(form["file"], .string("replacement"))
+    }
+
+    func testFileReadsOnSiblingPathsProtectTheirTopLevelPatchAndBothComplete() async throws {
+        let runtime = ForgeRuntime(), id = await runtime.openWindowInline(key: "files", title: "Files", metadata: try formPatchWindow()).id
+        _ = await runtime.presentDialog(windowID: id, dialogID: "editor")
+        let presentation = await runtime.dialogState(windowID: id, dialogID: "editor").presentationID
+        let dialog = ("editor", try XCTUnwrap(presentation))
+        let action = try JSONDecoder().decode(ActionDef.self, from: Data(#"{"mutationCommand":{"dataSourceRef":"writer","successFormState":{"files":null}}}"#.utf8))
+        let a = runtime.beginFormFile(windowID: id, source: "draft", field: "files.first", presentation: presentation)
+        let b = runtime.beginFormFile(windowID: id, source: "draft", field: "files.second", presentation: presentation)
+        _ = try await runtime.editFormFile(windowID: id, source: "draft", field: "files.second", revision: b, dialog: dialog) { .number(2) }
+        let blocked = await runtime.activateDialogFooter(windowID: id, dialogID: "editor", sourceDataSourceRef: "draft", action: action)
+        XCTAssertEqual(blocked?.status, "invalid_payload")
+        _ = try await runtime.editFormFile(windowID: id, source: "draft", field: "files.first", revision: a, dialog: dialog) { .number(1) }
+        let form = await runtime.dataSourceForm(windowID: id, dataSourceRef: "draft")
+        XCTAssertEqual(form["files"], .object(["first": .number(1), "second": .number(2)]))
+    }
+
+    @MainActor
+    func testNativeFileBindingPublishesOnceAfterReadingAndOnceForAnExplicitClear() async throws {
+        let runtime = ForgeRuntime(), changes = FooterWrites()
+        let id = await runtime.openWindowInline(key: "files", title: "Files", metadata: try formPatchWindow()).id
+        let window = await runtime.windowContext(id: id)
+        let container = try JSONDecoder().decode(ContainerDef.self, from: Data(#"{"dataSourceRef":"draft"}"#.utf8))
+        let item = try JSONDecoder().decode(ItemDef.self, from: Data(#"{"id":"choose","dataField":"file","type":"file","on":[{"event":"onValueChange","handler":"fixture.changed"}]}"#.utf8))
+        await runtime.registerHandler("fixture.changed") { args in
+            await changes.record("change", args.args); return .bool(true)
+        }
+        let menu = MenuListRenderer(runtime: runtime, window: window, container: container, items: [item])
+        let chooser = try XCTUnwrap(menu.formFileChoice(for: item))
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".txt")
+        try Data("abc".utf8).write(to: url); defer { try? FileManager.default.removeItem(at: url) }
+        let first = chooser.begin()
+        let before = await runtime.dataSourceForm(windowID: id, dataSourceRef: "draft"), beforeCalls = await changes.calls.count
+        XCTAssertNil(before["file"]); XCTAssertEqual(beforeCalls, 0)
+        try await chooser.apply(url, first)
+        let selected = await runtime.dataSourceForm(windowID: id, dataSourceRef: "draft")
+        let expected = try await NativeWidgetView.readFile(url)
+        XCTAssertEqual(selected["file"], expected)
+        try await chooser.apply(nil, chooser.begin())
+        let cleared = await runtime.dataSourceForm(windowID: id, dataSourceRef: "draft"), events = await changes.calls
+        XCTAssertEqual(cleared["file"], .null)
+        XCTAssertEqual(events.map { $0.1["value"] }, [expected, .null])
     }
 }

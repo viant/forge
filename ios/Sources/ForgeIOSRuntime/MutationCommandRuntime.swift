@@ -115,6 +115,8 @@ private struct MutationOperation {
     let dialogSignal: Signal<DialogState>?
     let presentationID: UUID?
     let originalPendingFields: [String: JSONValue]
+    let fileFields: Set<String>
+    let submittedFiles: [String: FormFileSelection]
     var plainDialogFooter: Bool {
         presentationID != nil && footer?.close == false && root.before?.isEmpty != false && root.clearFormFields.isEmpty
     }
@@ -238,7 +240,17 @@ extension ForgeRuntime {
         let originalSelection = await dataSourceSelectionState(windowID: windowID, dataSourceRef: sourceDataSourceRef)
         var submitted: [String: JSONValue] = [:]
         var submittedSuccessFields: [String: JSONValue] = [:]
-        if !command.clearFormFields.isEmpty || !command.successFormState.isEmpty {
+        let fileFields = Set(command.clearFormFields).union(command.successFormState.keys)
+        var submittedFiles: [String: FormFileSelection] = [:]
+        if !fileFields.isEmpty {
+            let id = WindowIdentity(windowID: windowID).dataSourceID(ref: sourceDataSourceRef)
+            submittedFiles = dataSourceRuntime.fileSelections.snapshot(id, fields: fileFields, presentation: originalPresentation)
+            if submittedFiles.values.contains(where: \.reading) {
+                let message = "Wait for the selected file to finish loading."
+                guardedMutationCommands.remove(key)
+                await publishMutationState(key, .init(phase: .failed, error: message, message: message, writerStatus: .notInvoked))
+                return .init(accepted: false, status: "invalid_payload", error: message)
+            }
             let form = await dataSourceForm(windowID: windowID, dataSourceRef: sourceDataSourceRef)
             for field in command.clearFormFields { submitted[field] = form[field] }
             for field in command.successFormState.keys { submittedSuccessFields[field] = form[field] }
@@ -295,7 +307,7 @@ extension ForgeRuntime {
         let operation = MutationOperation(
             key: key, id: invocationId, windowID: windowID, source: sourceDataSourceRef,
             authorization: admitted, selection: originalSelection, root: command, footer: footer, dialogSignal: dialogSignal,
-            presentationID: originalPresentation, originalPendingFields: originalPendingFields)
+            presentationID: originalPresentation, originalPendingFields: originalPendingFields, fileFields: fileFields, submittedFiles: submittedFiles)
         let steps = command.before ?? []
         var receipts: [String: JSONValue] = [:]
         var cleanups: [(id: String, command: MutationCommandDef)] = []
@@ -370,7 +382,7 @@ extension ForgeRuntime {
                 }
                 patch[field] = value ?? .null
             }
-            await clearSubmittedFields(windowID: windowID, source: sourceDataSourceRef, submitted: submitted)
+            await clearSubmittedFields(windowID: windowID, source: sourceDataSourceRef, submitted: submitted, files: submittedFiles, presentation: operation.presentationID)
             await applyMutationWindowState(windowID: windowID, patch: patch)
             var message = "Completed"
             if !warnings.isEmpty {
@@ -436,7 +448,7 @@ extension ForgeRuntime {
             defer { if !unresolved { guardedMutationCommands.remove(key) } }
             if !failure.lostScope, await completionIsCurrent(operation) {
                 if !unresolved, admittedWrites || failure.invoked {
-                    await clearSubmittedFields(windowID: windowID, source: sourceDataSourceRef, submitted: submitted)
+                    await clearSubmittedFields(windowID: windowID, source: sourceDataSourceRef, submitted: submitted, files: submittedFiles, presentation: operation.presentationID)
                 }
                 await applyMutationWindowState(windowID: windowID, patch: unresolved ? command.indeterminateState : command.errorState)
             }
@@ -462,18 +474,19 @@ extension ForgeRuntime {
         let signal = await signals.form(dataSourceID: id)
         let visible = await signal.checkSubmittedFormPatch(submitted: submitted, patch: patch)
         guard await completionIsCurrent(operation), pendingDialogScope("\(operation.windowID)Dialog\(dialogID)").id == presentation else { return .unchanged }
-        guard visible == .apply else { return visible }
-        let stored = await dataSourceRuntime.applySubmittedFormPatch(dataSourceID: id, submitted: submitted, patch: patch)
+        guard visible != .conflict else { return visible }
+        let stored = await dataSourceRuntime.applySubmittedFormPatch(dataSourceID: id, submitted: submitted, patch: patch, files: operation.submittedFiles, guardedFields: operation.fileFields, presentation: presentation)
         guard stored == .apply else { return stored }
-        return await signal.applySubmittedFormPatch(submitted: submitted, patch: patch)
+        return await signal.applySubmittedFormPatch(submitted: submitted, patch: patch, id: id, files: dataSourceRuntime.fileSelections, original: operation.submittedFiles, guardedFields: operation.fileFields, presentation: presentation)
     }
 
-    private func clearSubmittedFields(windowID: String, source: String, submitted: [String: JSONValue]) async {
+    private func clearSubmittedFields(windowID: String, source: String, submitted: [String: JSONValue], files: [String: FormFileSelection], presentation: UUID?) async {
         guard !submitted.isEmpty else { return }
         let id = WindowIdentity(windowID: windowID).dataSourceID(ref: source)
         let signal = await signals.form(dataSourceID: id)
-        if await dataSourceRuntime.clearSubmittedFormFields(dataSourceID: id, submitted: submitted) {
-            await signal.clearSubmittedFormFields(submitted)
+        let eligible = await dataSourceRuntime.clearSubmittedFormFields(dataSourceID: id, submitted: submitted, files: files, presentation: presentation)
+        if !eligible.isEmpty {
+            await signal.clearSubmittedFormFields(eligible, id: id, files: dataSourceRuntime.fileSelections, original: files, presentation: presentation)
         }
     }
 
@@ -575,6 +588,12 @@ extension ForgeRuntime {
                 .init(
                     phase: .pending, guarded: true, pending: true, retryAllowed: false, message: "Saving…", invocationId: operation.id,
                     writerStatus: .pending))
+        }
+        if !compensating && !operation.fileFields.isEmpty {
+            let id = WindowIdentity(windowID: windowID).dataSourceID(ref: source)
+            guard dataSourceRuntime.fileSelections.snapshot(id, fields: operation.fileFields, presentation: operation.presentationID) == operation.submittedFiles else {
+                throw MutationDispatchFailure(status: "invalid_payload", message: "The selected file changed. Review it before saving.")
+            }
         }
         let exactReceipt = receipts != nil || (!child && operation.footer?.close == true)
         let outcome = await awaitMutationWriter(

@@ -8,6 +8,31 @@ extension ForgeRuntime {
         return await signal.peek()
     }
 
+    /// Called directly by the picker at accepted selection, before its read task starts.
+    package nonisolated func beginFormFile(windowID: String, source: String, field: String, presentation: UUID?) -> UUID {
+        let id = WindowIdentity(windowID: windowID).dataSourceID(ref: source)
+        return dataSourceRuntime.fileSelections.begin(id, field: field, presentation: presentation)
+    }
+
+    package func editFormFile(windowID: String, source: String, field: String, revision: UUID, dialog: (id: String, presentation: UUID)?,
+                              read: @Sendable () async throws -> JSONValue) async throws -> JSONValue? {
+        let id = WindowIdentity(windowID: windowID).dataSourceID(ref: source)
+        let files = dataSourceRuntime.fileSelections
+        defer { files.finish(id, field: field, revision: revision) }
+        func ownsPresentation() -> Bool {
+            guard windowState(id: windowID) != nil, !Task.isCancelled else { return false }
+            guard let dialog else { return true }
+            return pendingDialogScope("\(windowID)Dialog\(dialog.id)").id == dialog.presentation
+        }
+        guard ownsPresentation() else { return nil }
+        let authorization = await windowMetadata(id: windowID)?.authorizationSnapshot
+        let value = try await read()
+        let signal = await signals.form(dataSourceID: id)
+        guard await windowMetadata(id: windowID)?.authorizationSnapshot == authorization, ownsPresentation(),
+              await dataSourceRuntime.publishFormFile(id, field: field, revision: revision, value: value) else { return nil }
+        return await signal.setFormFile(field: field, value: value, id: id, revision: revision, files: files) ? value : nil
+    }
+
     public func dataSourceFormUpdates(
         windowID: String,
         dataSourceRef: String

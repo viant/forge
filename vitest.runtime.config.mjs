@@ -5,6 +5,7 @@ export default defineConfig({
     environment: 'jsdom',
     include: [
       'src/components/dialogFooterReceipt.render.test.jsx',
+      'src/packs/blueprint/fileReceiptSelection.render.test.jsx',
       'src/components/Chart.zeroCategories.render.test.jsx',
       'src/components/table/Basic.listPage.render.test.jsx',
       'src/components/table/TableThemeOverrides.render.test.jsx',

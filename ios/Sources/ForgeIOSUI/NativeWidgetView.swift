@@ -9,6 +9,8 @@ struct NativeWidgetView: View {
     let item: ItemDef
     let value: JSONValue?
     var onChange: (JSONValue) -> Void
+    var beginFileChoice: (() -> UUID)? = nil
+    var onFileChoice: ((URL?, UUID) async throws -> Void)? = nil
     var onAction: (() -> Void)? = nil
     var windowForm: [String: JSONValue] = [:]
     var onDraftChange: (([String: JSONValue]) -> Void)? = nil
@@ -20,6 +22,7 @@ struct NativeWidgetView: View {
     @State private var draft: String? = nil
     @State private var error = ""
     @State private var importing = false
+    @State private var fileRead: Task<Void, Never>?
     private var kind: String { NativeWidgetContract.kind(item) }
     private var label: String { item.label ?? item.title ?? item.id ?? "Field" }
     private var unavailable: Bool { NativeWidgetContract.disabled(item) }
@@ -46,18 +49,40 @@ struct NativeWidgetView: View {
         .accessibilityIdentifier("forge-widget-\(kind)-\(item.id ?? "field")")
         .onChange(of: value) { draft = nil; error = "" }
         .task(id: text + presetSyncKey) { if kind == "daterangepreset", let value { onPresetSync?(value) } }
+        .onDisappear { fileRead?.cancel() }
         .fileImporter(isPresented: $importing, allowedContentTypes: allowedTypes) { result in
-            do {
-                let url = try result.get()
-                let access = url.startAccessingSecurityScopedResource()
-                defer { if access { url.stopAccessingSecurityScopedResource() } }
-                let bytes = try Data(contentsOf: url)
-                let mime = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
-                onChange(.object(["name": .string(url.lastPathComponent), "filename": .string(url.lastPathComponent), "size": .number(Double(bytes.count)), "type": .string(mime), "mimeType": .string(mime), "data": .string(bytes.base64EncodedString())]))
-                error = ""
-            } catch { self.error = "Could not read the selected file" }
+            switch result {
+            case .success(let url): selectFile(url)
+            case .failure(let failure):
+                if (failure as NSError).code != NSUserCancelledError { error = "Could not read the selected file" }
+            }
         }
     }
+    private func selectFile(_ url: URL?) {
+        fileRead?.cancel()
+        let revision = beginFileChoice?()
+        fileRead = Task {
+            do {
+                if let revision, let onFileChoice { try await onFileChoice(url, revision) }
+                else {
+                    let value = try await Self.readFile(url)
+                    guard !Task.isCancelled else { return }
+                    onChange(value)
+                }
+                if !Task.isCancelled { error = "" }
+            } catch { if !Task.isCancelled { self.error = "Could not read the selected file" } }
+        }
+    }
+
+    nonisolated static func readFile(_ url: URL?) async throws -> JSONValue {
+        guard let url else { return .null }
+        let access = url.startAccessingSecurityScopedResource()
+        defer { if access { url.stopAccessingSecurityScopedResource() } }
+        let bytes = try Data(contentsOf: url)
+        let mime = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
+        return .object(["name": .string(url.lastPathComponent), "filename": .string(url.lastPathComponent), "size": .number(Double(bytes.count)), "type": .string(mime), "mimeType": .string(mime), "data": .string(bytes.base64EncodedString())])
+    }
+
     @ViewBuilder private var control: some View {
         switch kind {
         case "password": SecureField(label, text: textBinding).modifier(ForgeThemeInputModifier(invalid: !error.isEmpty, required: required)).accessibilityLabel(label)
@@ -129,7 +154,7 @@ struct NativeWidgetView: View {
             }.disabled(item.properties["customApplyEnabled"] != .bool(true) || start.isEmpty || end.isEmpty || start > end)
             if item.properties["customApplyEnabled"] != .bool(true) { Text("Custom dates are saved as a draft and do not refresh data yet.").font(.caption) }
         case "file":
-            HStack { Text(value?.objectValue?["name"]?.stringValue ?? "No file selected"); Button("Browse") { importing = true }; if value != nil && value != .null { Button("Clear selected file") { onChange(.null) } } }
+            HStack { Text(value?.objectValue?["name"]?.stringValue ?? "No file selected"); Button("Browse") { importing = true }; if value != nil && value != .null { Button("Clear selected file") { selectFile(nil) } } }
         case "progressbar": ProgressView(value: min(1, max(0, value?.widgetNumber ?? 0))).accessibilityLabel(label)
         case "link": if let url = safeURL(text) { Link(label, destination: url) } else { Text(label) }
         case "mediapreview":

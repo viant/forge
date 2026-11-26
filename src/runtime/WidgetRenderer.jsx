@@ -176,7 +176,7 @@ function WidgetRendererContent({
                     // File encoding is asynchronous. Authored handlers must see
                     // the encoded state, not the native input's fake-path string.
                     mergedEvents[k] = async (...args) => {
-                        try { await internalFn?.(...args); } catch (e) { console.error(e); return; }
+                        if (await internalFn?.(...args) === false) return;
                         try { return await extFn?.(...args); } catch (e) { console.error(e); }
                     };
                 } else {

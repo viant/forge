@@ -402,14 +402,19 @@ private fun FormItemRenderer(
             }
         }
     }
+        val fileField = key.takeIf { com.viant.forgeandroid.runtime.NativeWidgetContract.kind(item) == "file" &&
+            (item.scope.isNullOrBlank() || item.scope.equals("form", ignoreCase = true)) && dataSourceContext.sourceForm() != null }
         NativeWidgetView(renderItem, widgetValue, onChange = { next ->
             if (com.viant.forgeandroid.runtime.NativeWidgetContract.kind(item) == "daterangepreset") {
                 com.viant.forgeandroid.runtime.NativeDateRangePreset.patch(item, com.viant.forgeandroid.runtime.NativeWidgetContract.text(next), metrics)?.let { patch -> runtime.setWindowFormValues(context.window.windowId, patch, bumpPrefillRevision = false) }
             }
-            setScopedItemValue(runtime, dataSourceContext, item, key, com.viant.forgeandroid.runtime.JsonUtil.elementToAny(next))
+            val edited = JsonUtil.elementToAny(next)
+            if (fileField != null) notifyScopedItemChange(runtime, dataSourceContext, item, key, edited)
+            else setScopedItemValue(runtime, dataSourceContext, item, key, edited)
         }, windowForm = windowForm, onDraftChange = { runtime.setWindowFormValues(context.window.windowId, it, bumpPrefillRevision = false) }, onAction = {
             item.on.filter { it.event == "onClick" || it.event == "onPress" }.forEach { runtime.execute(it, dataSourceContext, mapOf("item" to item)) }
-        }, loadedOptions = loadedNativeWidgetOptions(item, optionsCollection))
+        }, loadedOptions = loadedNativeWidgetOptions(item, optionsCollection),
+            fileContext = dataSourceContext, fileField = fileField)
         return
     }
     when (if (item.lookup != null) "lookup" else com.viant.forgeandroid.runtime.NativeWidgetContract.kind(item)) {
@@ -1074,6 +1079,10 @@ internal fun setScopedItemValue(
         }
         else -> context.setFormField(key, value)
     }
+    notifyScopedItemChange(runtime, context, item, key, value)
+}
+
+private fun notifyScopedItemChange(runtime: ForgeRuntime, context: DataSourceContext, item: ItemDef, key: String, value: Any?) {
     runtime.emitInteraction(
         kind = "feed.form_changed",
         windowId = context.window.windowId,

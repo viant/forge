@@ -860,31 +860,57 @@ class DataSourceContext(
     fun setForm(values: Map<String, Any?>) = form.set(values)
     fun setFormField(key: String, value: Any?) = form.update { current -> current + (key to value) }
 
-    internal fun captureFormFields(names: Collection<String>): Map<String, Any?> {
+    internal fun sourceForm(): SourceForm? =
+        window.signals.sourceForm(window.identity.dataSourceId(instanceRef), form)
+
+    internal data class SubmittedField(val present: Boolean, val value: Any?, val fileRevision: Long, val pending: Boolean)
+
+    internal fun captureFormFields(names: Collection<String>): Map<String, SubmittedField> {
         if (names.isEmpty()) return emptyMap()
-        val current = form.peek()
-        return buildMap { names.forEach { if (it in current) put(it, snapshotInputValue(current[it])) } }
+        val owner = sourceForm()
+        return synchronized(form) {
+            val current = form.peek()
+            names.associateWith { field ->
+                SubmittedField(field in current, snapshotInputValue(current[field]), owner?.revision(field) ?: 0L,
+                    owner?.reading(field) == true)
+            }
+        }
+    }
+
+    internal fun submittedFilesCurrent(submitted: Map<String, SubmittedField>): Boolean {
+        if (submitted.isEmpty()) return true
+        val owner = sourceForm()
+        return synchronized(form) {
+            submitted.all { (field, captured) -> (owner?.revision(field) ?: 0L) == captured.fileRevision && !captured.pending }
+        }
     }
 
     /** Returns true only when newer values in the submitting form prevented the entire patch. */
-    internal fun applySuccessFormState(patch: JsonObject, submitted: Map<String, Any?>, isCurrent: () -> Boolean): Boolean {
+    internal fun applySuccessFormState(patch: JsonObject, submitted: Map<String, SubmittedField>, isCurrent: () -> Boolean): Boolean = synchronized(form) {
         var conflict = false
+        val owner = sourceForm()
         form.update { live ->
             val current = isCurrent()
-            conflict = current && patch.keys.any { field ->
-                (field in live) != (field in submitted) || snapshotInputValue(live[field]) != submitted[field]
-            }
+            conflict = current && (submitted.any { (field, captured) ->
+                (owner?.revision(field) ?: 0L) != captured.fileRevision
+            } || patch.keys.any { field ->
+                val captured = submitted.getValue(field)
+                (field in live) != captured.present || snapshotInputValue(live[field]) != captured.value
+            })
             if (current && !conflict) live + patch.mapValues { JsonUtil.elementToAny(it.value) } else live
         }
-        return conflict
+        conflict
     }
 
-    internal fun clearSubmittedFormFields(submitted: Map<String, Any?>, isCurrent: () -> Boolean) {
-        if (submitted.isEmpty()) return
+    internal fun clearSubmittedFormFields(submitted: Map<String, SubmittedField>, isCurrent: () -> Boolean): Unit = synchronized(form) {
+        if (submitted.isEmpty()) return@synchronized
+        val owner = sourceForm()
         form.update { live ->
             if (!isCurrent()) return@update live
             var edited: MutableMap<String, Any?>? = null
-            for ((field, original) in submitted) {
+            for ((field, captured) in submitted) {
+                if ((owner?.revision(field) ?: 0L) != captured.fileRevision) continue
+                val original = captured.value
                 val value = live[field]
                 if (value == null || (value is List<*> && value.isEmpty()) || snapshotInputValue(value) != original) continue
                 val next = edited ?: live.toMutableMap().also { edited = it }
@@ -983,10 +1009,8 @@ class DataSourceContext(
         window.captureRequest(snapshot.preparedWindowForm ?: window.peekWindowForm(), snapshot.preparedMetadata ?: window.metadata.peek()),
         dataSourceRef, dataSource, collection, form, selection, Signal(snapshot), control, metrics, eventDispatcher, selectionHook, instanceRef, preparedAuthorization, preparedRegister, preparedAwait)
 
-    internal suspend fun fetchCommandResult(parameters: Map<String, Any?>, requireRecords: Boolean = false): PreparedReportFetchResult {
-        val id = checkNotNull(setInputParametersValue(parameters, fetch = true, captureResult = true, requireRecords = requireRecords))
-        return preparedAwait(id)
-    }
+    internal fun dispatchCommand(parameters: Map<String, Any?>, requireRecords: Boolean): String =
+        checkNotNull(setInputParametersValue(parameters, fetch = true, captureResult = true, requireRecords = requireRecords))
 
     fun setPreparedInputParameters(parameters: Map<String, Any?>, permit: NativeReportReadPermit? = null, commitGuard: () -> Boolean): String? {
         if (!commitGuard()) return null

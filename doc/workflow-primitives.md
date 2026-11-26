@@ -936,6 +936,13 @@ Declare window-wide work through the existing `successState` and `refresh`
 options. Each top-level form field can belong to either `successFormState` or
 `clearFormFields` in one command.
 
+For a file field, choosing a replacement starts an edit immediately. The form
+receives the new file once its read has finished. Submitting a command that targets this
+field with `successFormState` or `clearFormFields` requires a completed file
+read. If the choice changes while a write
+is in flight, its receipt preserves the replacement and any newer form edits.
+Canceling the picker leaves the current file intact.
+
 A root command can also opt in to `clearFormFields: [attachment, attachments]`
 with or without preparation steps. The executor remembers the submitted source
 form values for those top-level fields. After a confirmed save or a definitive

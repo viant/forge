@@ -1,3 +1,4 @@
+import {submittedFileRevision, fileRevisionMatches} from '../../runtime/formFileSelection.js';
 import equal from 'fast-deep-equal';
 import {isDeferredCacheHitEnvelope} from '../dataSourceExtract.js';
 import {withoutAuthorizationValidationHints} from '../../runtime/canonicalDelivery.js';
@@ -589,12 +590,13 @@ function captureFormPatch(context, patch, clearFields, open) {
     throw new Error('successFormState requires a live submitting dialog form.');
   }
   const form = context.signals?.form?.peek?.() ?? context.handlers.dataSource.peekFormData?.() ?? {};
-  const snapshot = new Map();
+  const snapshot = new Map(), fileRevisions = new Map();
   for (const field of fields) {
     if (!validFormField(field) || clearFields?.includes(field)) throw new Error('Invalid or conflicting successFormState field.');
+    fileRevisions.set(field, submittedFileRevision(context, field));
     if (Object.hasOwn(form, field)) snapshot.set(field, snapshotFormValue(form[field]));
   }
-  return {patch: parameterSnapshot(patch), fields, snapshot};
+  return {patch: parameterSnapshot(patch), fields, snapshot, fileRevisions};
 }
 
 function applyFormPatch(context, {patch, fields, snapshot}) {
@@ -617,9 +619,19 @@ function submittedFormFields(context, fields) {
     }
     // Published form edits replace values. Retain references to the submitted
     // values so this check never serializes or duplicates file contents.
-    submitted.set(field, Object.hasOwn(form, field) ? form[field] : undefined);
+    submitted.set(field, {value: Object.hasOwn(form, field) ? form[field] : undefined, revision: submittedFileRevision(context, field)});
   }
   return submitted;
+}
+
+function submittedFileChoicesMatch(context, formPatch, clearFields) {
+  if (formPatch) for (const [field, revision] of formPatch.fileRevisions) {
+    if (!fileRevisionMatches(context, field, revision)) return false;
+  }
+  if (clearFields) for (const [field, saved] of clearFields) {
+    if (!fileRevisionMatches(context, field, saved.revision)) return false;
+  }
+  return true;
 }
 
 function clearSubmittedFields(context, submitted, warnings) {
@@ -628,8 +640,8 @@ function clearSubmittedFields(context, submitted, warnings) {
     const source = context.handlers?.dataSource;
     const form = context.signals?.form?.peek?.() ?? source?.peekFormData?.() ?? {};
     const patch = {};
-    for (const [key, original] of submitted) {
-      if (original == null || !Object.is(form[key], original)) continue;
+    for (const [key, {value: original, revision}] of submitted) {
+      if (!fileRevisionMatches(context, key, revision) || original == null || !Object.is(form[key], original)) continue;
       if (Array.isArray(original) && original.length === 0) continue;
       patch[key] = Array.isArray(original) ? [] : null;
     }
@@ -754,6 +766,9 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
       return superseded(false);
     }
     if (needsExactReceipt && !rootEligible()) throw stepError('invalid', '', new Error(command.invalidMessage || 'Command eligibility changed before the final write.'));
+    if (!submittedFileChoicesMatch(context, formPatch, submittedFields)) {
+      throw stepError('invalid', '', new Error('The selected file changed before submission.'));
+    }
     target = context?.Context?.(targetRef);
     if (!target?.handlers?.dataSource?.setInputParameters || !target?.handlers?.dataSource?.fetchCollection) throw new Error(`Command datasource is unavailable: ${targetRef}`);
     if (!acquireTransport(target, key)) {
@@ -798,7 +813,7 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
     if (uiIsCurrent()) clearSubmittedFields(context, submittedFields, warnings);
     let formChanged = false;
     if (formPatch && uiIsCurrent()) {
-      try { formChanged = !applyFormPatch(context, formPatch); }
+      try { formChanged = !submittedFileChoicesMatch(context, formPatch, submittedFields) || !applyFormPatch(context, formPatch); }
       catch (error) { warnings.push({stage: 'successFormState', error}); }
     }
     const successState = mapsResult ? Object.assign(Object.create(null), command.successState) : command.successState;

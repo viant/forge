@@ -26,6 +26,10 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.viant.forgeandroid.runtime.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -33,14 +37,13 @@ import kotlinx.serialization.json.*
 import java.time.*
 
 @Composable
-internal fun NativeWidgetView(sourceItem: ItemDef, value: JsonElement?, onChange: (JsonElement) -> Unit, onAction: (() -> Unit)? = null, windowForm: Map<String, Any?> = emptyMap(), onDraftChange: ((Map<String, Any?>) -> Unit)? = null, loadedOptions: List<Pair<JsonElement, String>>? = null) {
+internal fun NativeWidgetView(sourceItem: ItemDef, value: JsonElement?, onChange: (JsonElement) -> Unit, onAction: (() -> Unit)? = null, windowForm: Map<String, Any?> = emptyMap(), onDraftChange: ((Map<String, Any?>) -> Unit)? = null, loadedOptions: List<Pair<JsonElement, String>>? = null, fileContext: DataSourceContext? = null, fileField: String? = null) {
     val item = sourceItem.copy(properties = sourceItem.properties + buildMap {
         sourceItem.min?.let { put("min", it) }; sourceItem.max?.let { put("max", it) }
         sourceItem.accept?.let { put("accept", JsonPrimitive(it)) }; sourceItem.separator?.let { put("separator", JsonPrimitive(it)) }
     })
     val appearance = LocalForgeThemeAppearance.current
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val kind = NativeWidgetContract.kind(item)
     val label = item.label ?: item.title ?: item.id ?: "Field"
     val unavailable = NativeWidgetContract.disabled(item)
@@ -60,20 +63,6 @@ internal fun NativeWidgetView(sourceItem: ItemDef, value: JsonElement?, onChange
         val uri = Uri.parse(raw)
         if (uri.scheme?.lowercase() !in setOf("http","https","mailto","tel","content","file")) { error = "Invalid link"; return }
         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.onFailure { error = "No application can open this item" }
-    }
-    val importer = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) scope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    val resolver = context.contentResolver
-                    var filename = "blob"
-                    resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor -> if (cursor.moveToFirst()) filename = cursor.getString(0) }
-                    val bytes = resolver.openInputStream(uri)?.use { it.readBytes() } ?: error("No file bytes")
-                    val mime = resolver.getType(uri) ?: "application/octet-stream"
-                    JsonObject(mapOf("name" to JsonPrimitive(filename), "filename" to JsonPrimitive(filename), "size" to JsonPrimitive(bytes.size), "type" to JsonPrimitive(mime), "mimeType" to JsonPrimitive(mime), "data" to JsonPrimitive(Base64.encodeToString(bytes, Base64.NO_WRAP))))
-                }
-            }.onSuccess { onChange(it); error = "" }.onFailure { error = "Could not read the selected file" }
-        }
     }
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp).semantics { contentDescription = label }, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         when (kind) {
@@ -152,7 +141,9 @@ internal fun NativeWidgetView(sourceItem: ItemDef, value: JsonElement?, onChange
                 NativeDateButton("End", end, false, !unavailable) { onChange(JsonObject(range + ("end" to JsonPrimitive(it)))) }
                 if (start.isNotEmpty() && end.isNotEmpty() && start > end) Text("Start must not be after end", color = MaterialTheme.colorScheme.error)
             }
-            "file" -> Row { Text((value as? JsonObject)?.get("name")?.jsonPrimitive?.content ?: "No file selected"); TextButton(onClick = { importer.launch(nativeAcceptMime(item)) }, enabled = !unavailable) { Text("Browse") }; if (value != null && value != JsonNull) TextButton(onClick = { onChange(JsonNull) }, enabled = !unavailable) { Text("Clear") } }
+            "file" -> key(fileContext?.form, fileField, item.id) {
+                NativeFileInput(item, value, !unavailable, fileContext, fileField, onChange) { error = it }
+            }
             "progressbar" -> { Text(label); LinearProgressIndicator(progress = (number ?: 0.0).toFloat().coerceIn(0f,1f), modifier = Modifier.fillMaxWidth()) }
             "link" -> TextButton(onClick = { open(text) }, enabled = !presentationDisabled) { Text(label) }
             "mediapreview" -> {
@@ -182,6 +173,89 @@ internal fun NativeWidgetView(sourceItem: ItemDef, value: JsonElement?, onChange
         }
         if (error.isNotEmpty()) Text(error, color = MaterialTheme.colorScheme.error)
     }
+}
+
+internal class FileDialogPresentation(private val signal: Signal<DialogState>, private val presented: DialogState) {
+    fun isCurrent() = presented.open && signal.peek() === presented
+}
+internal val LocalFileDialogPresentation = staticCompositionLocalOf<FileDialogPresentation?> { null }
+
+@Composable
+private fun NativeFileInput(item: ItemDef, value: JsonElement?, enabled: Boolean, source: DataSourceContext?,
+    field: String?, onChange: (JsonElement) -> Unit, setError: (String) -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val dialog = LocalFileDialogPresentation.current
+    val owner = if (field != null) source?.sourceForm() else null
+    var currentPicker by remember { mutableStateOf<(() -> Boolean)?>(null) }
+    var readJob by remember { mutableStateOf<Job?>(null) }
+    var activeSelection by remember { mutableStateOf<SourceForm.FileSelection?>(null) }
+    DisposableEffect(Unit) {
+        onDispose { currentPicker = null; activeSelection?.settle(); readJob?.cancel() }
+    }
+
+    val importer = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        val stillCurrent = currentPicker
+        currentPicker = null
+        if (uri == null || stillCurrent?.invoke() != true) return@rememberLauncherForActivityResult
+        readJob?.cancel()
+        val token = field?.let { owner?.beginSelection(it, stillCurrent) }
+        activeSelection = token
+        readJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            try {
+                readSelectedFile(token, stillCurrent, { withContext(Dispatchers.IO) { readNativeFile(context, uri) } },
+                    { file -> onChange(file); setError("") }, { setError("Could not read the selected file") })
+            } finally {
+                if (readJob === coroutineContext[Job]) { readJob = null; activeSelection = null }
+            }
+        }
+    }
+    Row {
+        Text((value as? JsonObject)?.get("name")?.jsonPrimitive?.content ?: "No file selected")
+        TextButton(onClick = {
+            val actor = source?.window?.metadata?.peek()?.authorizationSnapshot
+            currentPicker = { (dialog?.isCurrent() != false) && (source == null ||
+                (source.window.signals.ownsMetadata(source.window.windowId, source.window.metadata) &&
+                    source.window.metadata.peek()?.authorizationSnapshot == actor)) }
+            importer.launch(nativeAcceptMime(item))
+        }, enabled = enabled) { Text("Browse") }
+        if ((value != null && value != JsonNull) || readJob?.isActive == true) TextButton(onClick = {
+            currentPicker = null
+            readJob?.cancel()
+            if (owner == null || field == null) onChange(JsonNull)
+            else if (owner.beginSelection(field).settle(JsonNull)) onChange(JsonNull)
+            setError("")
+        }, enabled = enabled) { Text("Clear") }
+    }
+}
+
+internal suspend fun readSelectedFile(token: SourceForm.FileSelection?, current: () -> Boolean,
+    read: suspend () -> JsonElement, publish: (JsonElement) -> Unit, failed: (Exception) -> Unit) {
+    try {
+        if (!current()) return
+        val file = try { read() } catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) {
+            if (current()) {
+                if (token == null || token.settle()) failed(failure)
+            }
+            return
+        }
+        kotlinx.coroutines.currentCoroutineContext().ensureActive()
+        if (current()) {
+            if (token == null || token.settle(file)) publish(file)
+        }
+    } finally {
+        token?.settle()
+    }
+}
+
+private fun readNativeFile(context: android.content.Context, uri: Uri): JsonObject {
+    val resolver = context.contentResolver
+    var filename = "blob"
+    resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor -> if (cursor.moveToFirst()) filename = cursor.getString(0) }
+    val bytes = resolver.openInputStream(uri)?.use { it.readBytes() } ?: error("No file bytes")
+    val mime = resolver.getType(uri) ?: "application/octet-stream"
+    return JsonObject(mapOf("name" to JsonPrimitive(filename), "filename" to JsonPrimitive(filename), "size" to JsonPrimitive(bytes.size), "type" to JsonPrimitive(mime), "mimeType" to JsonPrimitive(mime), "data" to JsonPrimitive(Base64.encodeToString(bytes, Base64.NO_WRAP))))
 }
 
 private fun nativeAcceptMime(item: ItemDef): String {

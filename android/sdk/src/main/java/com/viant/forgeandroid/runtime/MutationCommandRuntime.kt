@@ -103,13 +103,21 @@ class MutationCommandRuntime {
         if (patchForm && (presentation?.open != true || !presentationCurrent())) {
             return MutationCommandResult(false, "invalid", error = "successFormState requires a current submitting dialog.")
         }
-        val submittedSuccessFields = source.captureFormFields(command.successFormState.keys)
+        val fields = if (command.clearFormFields.isEmpty()) command.successFormState.keys
+            else if (!patchForm) command.clearFormFields else command.successFormState.keys + command.clearFormFields
+        val submittedFields = source.captureFormFields(fields)
         val submittingActor = if (patchForm) window.metadata.peek()?.authorizationSnapshot.orEmpty() else null
         val key = commandKey(window.windowId, command)
         val group = command.serializationGroup?.trim()?.takeIf(String::isNotEmpty)?.let { "${window.windowId}::$it" }
         val acquired = mutex.withLock {
             if (targetRef.isEmpty() || key in commandGuards || group in activeGroups) false
             else {
+                if (submittedFields.values.any { it.pending }) {
+                    val message = "Wait for the selected file to finish loading."
+                    stateSignal(key).set(MutationCommandState(phase = MutationCommandPhase.Failed, error = message,
+                        message = message, writerStatus = MutationWriterStatus.NotInvoked, presentation = presentation?.let { java.lang.ref.WeakReference(it) }))
+                    return MutationCommandResult(false, "invalid", error = message)
+                }
                 commandGuards[key] = group
                 group?.let(activeGroups::add)
                 stateSignal(key).set(MutationCommandState(
@@ -129,7 +137,7 @@ class MutationCommandRuntime {
         val closing = closeDialogId != null
         val scopeSensitive = ordered || command.clearFormFields.isNotEmpty() || closing
         val selection = if (scopeSensitive) source.selection.peek() else null
-        val lease = CommandLease(key, command, presentation, presentationCurrent, closing, submittedSuccessFields) {
+        val lease = CommandLease(key, command, presentation, presentationCurrent, closing, submittedFields) {
             window.metadata.peek()?.authorizationSnapshot == admitted &&
                 (!(scopeSensitive || presentation != null) || window.signals.ownsMetadata(window.windowId, window.metadata)) &&
                 (!scopeSensitive || source.selection.peek() == selection)
@@ -137,7 +145,7 @@ class MutationCommandRuntime {
         val checkDialog = closing || patchForm || (!scopeSensitive && presentation != null)
         val eligible = { lease.admitted() && (!checkDialog || presentationCurrent()) && predicateAllows(source, command.validateWhen) }
         if (!scopeSensitive) return executeOne(runtime, window, source, command, extras, confirm, lease, eligible)
-        val submitted = source.captureFormFields(command.clearFormFields)
+        val submitted = submittedFields.filterKeys { it in command.clearFormFields }
         return try {
             val result = if (ordered) {
                 val outcome = executeOrdered(runtime, window, source, command, extras, confirm, lease)
@@ -169,7 +177,7 @@ class MutationCommandRuntime {
         }
     }
 
-    private inner class CommandLease(val key: String, val root: MutationCommandDef, presented: DialogState?, val presentationCurrent: () -> Boolean, val closing: Boolean, val submittedSuccessFields: Map<String, Any?>, val admitted: () -> Boolean) {
+    private inner class CommandLease(val key: String, val root: MutationCommandDef, presented: DialogState?, val presentationCurrent: () -> Boolean, val closing: Boolean, val submittedFields: Map<String, DataSourceContext.SubmittedField>, val admitted: () -> Boolean) {
         val ordered = root.before.isNotEmpty()
         val requiresReceipt = ordered || closing
         private val presentation = presented?.let { java.lang.ref.WeakReference(it) }
@@ -419,8 +427,8 @@ class MutationCommandRuntime {
             return MutationCommandResult(false, "invalid", error = message)
         }
         val rootWriter = lease.ordered && command === lease.root
-        val invocationId = if (rootWriter) lease.rootInvocationId else UUID.randomUUID().toString()
         if (rootWriter) lease.rootDispatched = true
+        val invocationId = if (rootWriter) lease.rootInvocationId else UUID.randomUUID().toString()
         command.invocationParameter?.trim()?.takeIf(String::isNotEmpty)?.let { parameters[it] = invocationId }
         if (!lease.ordered) lease.applyWindowState(runtime, window.windowId, command.pendingState)
         lease.publish(MutationCommandState(
@@ -432,10 +440,24 @@ class MutationCommandRuntime {
             invocationId = invocationId,
             writerStatus = MutationWriterStatus.Pending
         ))
-        lease.attempted = true
         val requiresWriterReceipt = lease.requiresReceipt || command.successFormState.isNotEmpty()
         val writer = try {
-            val receipt = withTimeoutOrNull(timeout) { target.fetchCommandResult(parameters, requireRecords = requiresWriterReceipt) }
+            // A confirmation or transport lease can suspend. Admit the exact reviewed selection
+            // and enqueue its prepared input under the form's file-selection lock.
+            val dispatch = if (lease.cleaningUp || lease.submittedFields.isEmpty()) target.dispatchCommand(parameters, requiresWriterReceipt)
+            else synchronized(source.form) {
+                if (source.submittedFilesCurrent(lease.submittedFields)) target.dispatchCommand(parameters, requiresWriterReceipt) else null
+            }
+            if (dispatch == null) {
+                if (rootWriter) lease.rootDispatched = false
+                val message = "The selected file changed before dispatch. Review the form and try again."
+                if (!lease.ordered) lease.applyWindowState(runtime, window.windowId, command.errorState)
+                lease.settle(transport, MutationCommandState(phase = MutationCommandPhase.Failed, message = message,
+                    error = message, writerStatus = MutationWriterStatus.NotInvoked))
+                return MutationCommandResult(false, "invalid", error = message)
+            }
+            lease.attempted = true
+            val receipt = withTimeoutOrNull(timeout) { target.awaitPreparedResult(dispatch) }
             when {
                 receipt == null -> MutationWriterOutcome.Indeterminate()
                 requiresWriterReceipt && (!receipt.recordsConfirmed || uncertainTransport(receipt.cause)) -> MutationWriterOutcome.Indeterminate(receipt.cause)
@@ -506,7 +528,7 @@ class MutationCommandRuntime {
                 if (onReceipt != null) onReceipt(invocationId, checkNotNull(writer.records))
                 val formConflict = if (command === lease.root && command.successFormState.isNotEmpty()) {
                     synchronized(runtime) {
-                        source.applySuccessFormState(command.successFormState, lease.submittedSuccessFields) {
+                        source.applySuccessFormState(command.successFormState, lease.submittedFields) {
                             lease.admitted() && lease.presentationCurrent()
                         }
                     }

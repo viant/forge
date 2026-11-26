@@ -48,17 +48,28 @@ public actor Signal<Value: Sendable> {
 }
 
 extension Signal where Value == [String: JSONValue] {
+    func setFormFile(field: String, value file: JSONValue, id: String, revision: UUID, files: FormFileSelections) -> Bool {
+        files.whileCurrent(id, field: field, revision: revision) {
+            guard let updated = SelectorUtil.setting(file, in: .object(value), selector: field)?.objectValue else { return false }
+            set(updated)
+            return true
+        }
+    }
+
     func checkSubmittedFormPatch(submitted: [String: JSONValue], patch: [String: JSONValue]) -> SubmittedFormPatchDisposition {
         submittedFormPatchDisposition(value, submitted: submitted, patch: patch)
     }
 
-    func applySubmittedFormPatch(submitted: [String: JSONValue], patch: [String: JSONValue]) -> SubmittedFormPatchDisposition {
-        let decision = checkSubmittedFormPatch(submitted: submitted, patch: patch)
-        if decision == .apply {
-            value.merge(patch) { _, next in next }
-            publish()
+    func applySubmittedFormPatch(submitted: [String: JSONValue], patch: [String: JSONValue], id: String, files: FormFileSelections, original: [String: FormFileSelection], guardedFields: Set<String>, presentation: UUID) -> SubmittedFormPatchDisposition {
+        files.withSnapshot(id, fields: guardedFields, presentation: presentation) { choices in
+            guard choices == original else { return .conflict }
+            let decision = checkSubmittedFormPatch(submitted: submitted, patch: patch)
+            if decision == .apply {
+                value.merge(patch) { _, next in next }
+                publish()
+            }
+            return decision
         }
-        return decision
     }
 }
 

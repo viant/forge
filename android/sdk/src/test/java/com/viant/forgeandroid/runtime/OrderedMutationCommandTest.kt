@@ -1,5 +1,6 @@
 package com.viant.forgeandroid.runtime
 
+import com.viant.forgeandroid.ui.readSelectedFile
 import com.viant.forgeandroid.ui.startControlMutation
 import java.io.IOException
 import kotlinx.coroutines.*
@@ -369,6 +370,145 @@ class OrderedMutationCommandTest {
                 runtime.mutationCommands.state(window.windowId, command).message)
             runtime.closeDialogPublic(window.windowId, "editor")
         }
+    } }
+
+    @Test fun fileChoiceGuardsReviewedFooterAndPreservesNewReadsThroughAcknowledgement() = runBlocking { fixture {
+        val owner = checkNotNull(window.context("source").sourceForm())
+        val command = child("save").copy(confirm = "Continue?", successFormState = buildJsonObject {
+            put("file", JsonNull); put("status", "complete")
+        }, clearFormFields = listOf("other"), refresh = listOf(RefreshSpec(dataSourceRef = "unused")))
+        assertTrue(runtime.presentDialog(window.windowId, "editor"))
+        source.setForm(mapOf("file" to "original", "status" to "ready", "other" to "second"))
+        fun start(confirm: suspend (String) -> Boolean = { true }) =
+            startControlMutation(runtime, window, source, command, emptyMap(), this@runBlocking, "editor", confirm = confirm)
+
+        loader()
+        val pending = owner.beginSelection("file")
+        assertEquals("invalid", start().await().status)
+        assertEquals("Wait for the selected file to finish loading.", runtime.mutationCommands.state(window.windowId, command).message)
+        pending.settle() // A failed read leaves the original draft intact.
+        assertEquals("invalid", start { owner.beginSelection("file").settle(); true }.await().status)
+        assertTrue(calls.isEmpty())
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        loader { if (it.dataSourceRef == "save") { entered.complete(Unit); release.await() } else delay(50); emptyList() }
+        val op = start()
+        entered.await()
+        val bytesAvailable = CompletableDeferred<JsonElement>()
+        var publications = 0
+        val reading = launch(start = CoroutineStart.UNDISPATCHED) {
+            readSelectedFile(owner.beginSelection("file"), { true }, { bytesAvailable.await() },
+                { publications++; assertEquals("original", source.peekForm()["file"]) }, { throw it })
+        }
+        val other = owner.beginSelection("other")
+        release.complete(Unit)
+        assertEquals("succeeded", op.await().status)
+        assertEquals(listOf("save", "unused"), refs())
+        assertEquals(mapOf("file" to "original", "status" to "ready", "other" to "second"), source.peekForm())
+        assertEquals("Saved the submitted version. Your newer changes are still in the form.",
+            runtime.mutationCommands.state(window.windowId, command).message)
+        assertEquals(0, publications)
+        bytesAvailable.complete(JsonPrimitive("original")) // Same bytes are still a newer selection.
+        reading.join()
+        assertEquals(1, publications)
+        other.settle()
+        val unrelated = owner.beginSelection("independent")
+        assertEquals("succeeded", start().await().status)
+        assertEquals(mapOf("file" to null, "status" to "complete", "other" to null), source.peekForm())
+        unrelated.settle()
+    } }
+
+    @Test fun onlyCurrentFileReadPublishesAndDisposalClearOrFailureSettlePending() = runBlocking {
+        val form = SourceForm()
+        val published = mutableListOf<String>()
+        val write: (JsonElement) -> Unit = { published += it.jsonPrimitive.content }
+        val first = form.beginSelection("attachment")
+        val newest = form.beginSelection("attachment")
+        readSelectedFile(first, { true }, { JsonPrimitive("old") }, write, { throw it })
+        readSelectedFile(newest, { true }, { JsonPrimitive("new") }, write, { throw it })
+        val disposed = form.beginSelection("attachment")
+        disposed.settle()
+        readSelectedFile(disposed, { true }, { JsonPrimitive("unmounted") }, write, { throw it })
+        val clear = form.beginSelection("attachment")
+        if (form.beginSelection("attachment").settle(JsonNull)) published += "clear"
+        readSelectedFile(clear, { true }, { JsonPrimitive("cleared read") }, write, { throw it })
+        val error = IOException("read failed")
+        val failed = form.beginSelection("attachment")
+        readSelectedFile(failed, { true }, { throw error }, write, { assertSame(error, it) })
+        assertFalse(form.reading("attachment"))
+        assertTrue(form.revision("attachment") > 0)
+        var current = true
+        val replaced = form.beginSelection("attachment")
+        readSelectedFile(replaced, { current }, { current = false; JsonPrimitive("old presentation") }, write, { throw it })
+        assertFalse(form.reading("attachment"))
+        val inactive = form.beginSelection("attachment") { false }
+        assertFalse(form.reading("attachment"), "a departed presentation cannot block the reopened form")
+        assertFalse(inactive.settle(JsonPrimitive("stale")))
+        assertNull(form.values.peek()["attachment"])
+        assertEquals(listOf("new", "clear"), published)
+        form.values.set(mapOf("attachment" to listOf(mapOf("name" to "old", "keep" to 7), "unchanged")))
+        assertTrue(form.beginSelection("attachment.0.name").settle(JsonPrimitive("new")))
+        val expected = mapOf("attachment" to listOf(mapOf("name" to "new", "keep" to 7), "unchanged"))
+        assertEquals(expected, form.values.peek())
+        val item = ItemDef(type = "file", dataField = "attachment.0.name")
+        assertEquals("new", com.viant.forgeandroid.ui.resolveItemRawValue(item, checkNotNull(item.valueKey()),
+            form.values.peek(), emptyMap(), emptyMap()))
+        for (invalid in listOf("attachment.4.name", "attachment.1.name", "attachment.bad")) {
+            assertFalse(form.beginSelection(invalid).settle(JsonPrimitive("bad")))
+            assertEquals(expected, form.values.peek())
+        }
+    }
+
+    @Test fun changedClearOnlyFileProtectsStatusButOtherSubmittedFieldsStillClear() = runBlocking { fixture {
+        val form = checkNotNull(source.sourceForm())
+        val command = child("save").copy(successFormState = buildJsonObject { put("status", "complete") },
+            clearFormFields = listOf("attachment", "other"), refresh = listOf(RefreshSpec(dataSourceRef = "unused")))
+        assertTrue(runtime.presentDialog(window.windowId, "editor"))
+        for (action in listOf("same file", "explicit clear", "ordinary edit")) {
+            source.setForm(mapOf("status" to "ready", "attachment" to "original", "other" to "submitted"))
+            val entered = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            loader { if (it.dataSourceRef == "save") { entered.complete(Unit); release.await() } else delay(50); emptyList() }
+            val op = startControlMutation(runtime, window, source, command, emptyMap(), this@runBlocking, "editor") { true }
+            entered.await()
+            when (action) {
+                "same file" -> form.beginSelection("attachment").settle(JsonPrimitive("original"))
+                "explicit clear" -> form.beginSelection("attachment").settle(JsonNull)
+                else -> source.setFormField("attachment", "typed")
+            }
+            release.complete(Unit)
+            assertEquals("succeeded", op.await().status)
+            assertEquals(if (action == "ordinary edit") "complete" else "ready", source.peekForm()["status"])
+            assertNull(source.peekForm()["other"])
+            assertEquals(when (action) { "same file" -> "original"; "explicit clear" -> null; else -> "typed" },
+                source.peekForm()["attachment"])
+        }
+        assertEquals(listOf("save","unused","save","unused","save","unused"), refs())
+    } }
+
+    @Test fun nestedFileReadsProtectTheirParentAndCompleteIndependently() = runBlocking { fixture {
+        val form = checkNotNull(source.sourceForm())
+        source.setForm(mapOf("files" to mapOf("name" to "untouched", "left" to "old")))
+        val command = child("save").copy(successFormState = buildJsonObject { put("files", JsonNull) })
+        assertTrue(runtime.presentDialog(window.windowId, "editor"))
+        loader()
+        fun submit() = startControlMutation(runtime, window, source, command, emptyMap(), this@runBlocking, "editor") { true }
+        val slow = CompletableDeferred<JsonElement>()
+        val changes = mutableListOf<JsonElement>()
+        val reading = launch(start = CoroutineStart.UNDISPATCHED) {
+            readSelectedFile(form.beginSelection("files.left"), { true }, { slow.await() }, { changes += it }, { throw it })
+        }
+        val right = form.beginSelection("files.right")
+        assertEquals("invalid", submit().await().status)
+        readSelectedFile(right, { true }, { JsonPrimitive("fast") }, { changes += it }, { throw it })
+        assertEquals(mapOf("name" to "untouched", "left" to "old", "right" to "fast"), source.peekForm()["files"])
+        assertEquals("invalid", submit().await().status, "another path below the same field still has a pending read")
+        assertTrue(refs().isEmpty())
+        reading.cancelAndJoin()
+        assertFalse(form.reading("files"))
+        assertEquals(listOf<JsonElement>(JsonPrimitive("fast")), changes.toList())
+        assertEquals("succeeded", submit().await().status)
+        assertNull(source.peekForm()["files"])
     } }
 
     @Test fun staleFooterCannotPatchAnIdenticalReopenedFormOrAnotherPrincipal() = runBlocking { fixture {

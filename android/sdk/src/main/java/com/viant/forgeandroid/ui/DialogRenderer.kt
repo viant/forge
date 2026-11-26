@@ -15,6 +15,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -127,17 +128,19 @@ fun DialogRenderer(runtime: ForgeRuntime, window: WindowContext, dialogs: List<D
                                     container.items.isNotEmpty() ||
                                     container.containers.isNotEmpty()
                                 ) {
-                                    ContainerRenderer(
-                                        runtime = runtime,
-                                        window = window,
-                                        // The dialog lifecycle owns the read for this datasource.
-                                        container = remember(container, dialogDataSourceRef) {
-                                            if (container.dataSourceRef == null || container.dataSourceRef == dialogDataSourceRef)
-                                                container.copy(fetchData = false) else container
-                                        },
-                                        selectionModeOverride = effectiveSelectionMode,
-                                        inheritedDataSourceRef = dialogDataSourceRef
-                                    )
+                                    CompositionLocalProvider(LocalFileDialogPresentation provides FileDialogPresentation(signal, state)) {
+                                        ContainerRenderer(
+                                            runtime = runtime,
+                                            window = window,
+                                            // The dialog lifecycle owns the read for this datasource.
+                                            container = remember(container, dialogDataSourceRef) {
+                                                if (container.dataSourceRef == null || container.dataSourceRef == dialogDataSourceRef)
+                                                    container.copy(fetchData = false) else container
+                                            },
+                                            selectionModeOverride = effectiveSelectionMode,
+                                            inheritedDataSourceRef = dialogDataSourceRef
+                                        )
+                                    }
                                 } else {
                                     Text("Dialog content")
                                 }

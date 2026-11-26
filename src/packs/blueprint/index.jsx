@@ -25,6 +25,7 @@ import './theme.css';
 import React from 'react';
 import {batch} from '@preact/signals-react';
 import {fileToMCPBlob} from './fileBlob.js';
+import {beginFileSelection, currentFileRead, finishFileRead} from '../../runtime/formFileSelection.js';
 import {createPortal, flushSync} from 'react-dom';
 import {
     InputGroup,
@@ -455,17 +456,42 @@ export function registerPack() {
     });
 
     /* -------------------- Local file selector -------------------- */
+    const explicitFileClear = Symbol('explicitFileClear');
     registerWidget('file', ({onChange, readOnly, disabled, value, item, style, context, adapter, options, ...rest}) => {
         const fileInputRef = React.useRef(null);
+        const [readError, setReadError] = React.useState(false);
         const themed = useForgeTheme()?.themeId === 'design-system-2';
         const multiple = item?.multiple === true || item?.properties?.multiple === true;
         const selectedName = Array.isArray(value) ? value.map(file => file?.filename || file?.name).filter(Boolean).join(', ') : value && typeof value === 'object' ? value.name : String(value || '');
+        React.useLayoutEffect(() => {
+            const input = fileInputRef.current;
+            return () => {
+                if (input) {
+                    finishFileRead(input.forgeFileSelection);
+                    input.forgeFileSelection = undefined;
+                }
+            };
+        }, [context?.signals?.form, item?.dataField, item?.bindingPath, item?.id]);
         React.useEffect(() => {
             if (!selectedName && fileInputRef.current) {
                 fileInputRef.current.value = '';
-                fileInputRef.current.forgeFileSelection = (fileInputRef.current.forgeFileSelection || 0) + 1;
+                finishFileRead(fileInputRef.current.forgeFileSelection);
+                fileInputRef.current.forgeFileSelection = undefined;
             }
         }, [selectedName]);
+        const selectFile = async event => {
+            const input = event.target;
+            if (!input?.files?.length) return;
+            setReadError(false);
+            let read;
+            try {
+                const completion = onChange?.(event);
+                read = input.forgeFileSelection;
+                await completion;
+            } catch {
+                if (fileInputRef.current === input && input.forgeFileSelection === read) setReadError(true);
+            }
+        };
         return (
             <div className="forge-file-control" style={style}>
                 <FileInput
@@ -481,7 +507,7 @@ export function registerPack() {
                         multiple,
                         ref: fileInputRef,
                     }}
-                    onInputChange={onChange}
+                    onInputChange={selectFile}
                 />
                 {selectedName ? (
                     <Button
@@ -495,27 +521,52 @@ export function registerPack() {
                         title="Clear selected file"
                         disabled={disabled || readOnly}
                         onClick={() => {
-                            if (fileInputRef.current) { fileInputRef.current.value = ''; fileInputRef.current.forgeFileSelection = (fileInputRef.current.forgeFileSelection || 0) + 1; }
+                            if (fileInputRef.current) {
+                                fileInputRef.current.value = '';
+                                finishFileRead(fileInputRef.current.forgeFileSelection);
+                                fileInputRef.current.forgeFileSelection = undefined;
+                            }
+                            setReadError(false);
+                            beginFileSelection(context, item, false);
                             adapter?.set?.(multiple ? [] : null);
                             // Use the same encoded-state/authored-event pipeline
                             // as a file selection so dependent validation refreshes.
-                            if (fileInputRef.current) onChange?.({target: fileInputRef.current});
+                            const input = fileInputRef.current;
+                            if (input) {
+                                input.forgeFileSelection = explicitFileClear;
+                                try { onChange?.({target: input}); }
+                                finally {
+                                    if (input.forgeFileSelection === explicitFileClear) input.forgeFileSelection = undefined;
+                                }
+                            }
                         }}
                     />
                 ) : null}
+                {readError && <span data-forge-part="validation-message" role="alert">Could not read the selected file. Choose it again.</span>}
             </div>
         );
     }, {framework: 'blueprint'});
 
     registerEventAdapter('file', {
-        onChange: ({adapter}) => async (event) => {
+        onChange: ({adapter, context, item}) => async (event) => {
             const input = event?.target;
-            if (!input) return;
-            const generation = (input.forgeFileSelection || 0) + 1;
-            input.forgeFileSelection = generation;
-            const files = Array.from(input.files || []);
-            const encoded = input.multiple ? await Promise.all(files.map(fileToMCPBlob)) : await fileToMCPBlob(files[0]);
-            if (input.forgeFileSelection === generation) adapter.set(encoded);
+            if (input?.forgeFileSelection === explicitFileClear) return true;
+            const files = Array.from(input?.files || []);
+            if (!files.length) return false;
+            finishFileRead(input.forgeFileSelection);
+            const read = beginFileSelection(context, item);
+            input.forgeFileSelection = read;
+            try {
+                const encoded = input.multiple ? await Promise.all(files.map(fileToMCPBlob)) : await fileToMCPBlob(files[0]);
+                if (input.forgeFileSelection !== read || !currentFileRead(read)) return false;
+                adapter.set(encoded);
+                return true;
+            } catch (error) {
+                if (input.forgeFileSelection !== read || !currentFileRead(read)) return false;
+                throw error;
+            } finally {
+                finishFileRead(read);
+            }
         },
     });
 
