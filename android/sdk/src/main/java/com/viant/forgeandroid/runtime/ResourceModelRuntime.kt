@@ -71,9 +71,11 @@ object ResourceModelRuntime {
 
     internal suspend fun prepareScoped(payload: ResourcePayloadPreparationDef, environment: ResourceValueEnvironment, schemas: Map<String, ResourceSchemaDef>, models: Map<String, ResourceModelDef>, hook: ResourceModelHook?, scopedHook: ScopedMarshalHook?): Map<String, Any?> {
         val draft = if (payload.fields.isNotEmpty()) {
+            // Scoped mutation hooks distinguish an explicit clear from an untouched field.
+            val missing = if (scopedHook != null) SelectorUtil.Missing else null
             linkedMapOf<String, Any?>().also { output -> payload.fields.forEach { (path, source) ->
-                val value = resolveSource(source, environment)
-                if (value != null || (scopedHook != null && source.scope == "constant" && source.value == kotlinx.serialization.json.JsonNull)) setPath(output, path, value)
+                val value = resolveSource(source, environment, missing)
+                if (value !== missing) setPath(output, path, value)
             } }
         } else payload.source?.let { resolveSource(it, environment) } ?: environment.extras
         val baseline = payload.baseline?.let { resolveSource(it, environment) }
@@ -268,11 +270,11 @@ object ResourceModelRuntime {
         if (deleted.isNotEmpty()) setPath(output, delta.deleted, deleted.toList())
     }
 
-    private fun resolveSource(source: ResourceValueSourceDef, environment: ResourceValueEnvironment): Any? {
+    private fun resolveSource(source: ResourceValueSourceDef, environment: ResourceValueEnvironment, missing: Any? = null): Any? {
         val scope = source.scope?.lowercase() ?: "extras"
         val snapshot = environment.dataSources[source.dataSourceRef ?: environment.identityDataSourceRef] ?: ResourceDataSnapshot()
         var value: Any? = when (scope) {
-            "constant" -> source.value?.let(JsonUtil::elementToAny)
+            "constant" -> if (source.value == null) missing else JsonUtil.elementToAny(source.value)
             "extras" -> environment.extras
             "form" -> snapshot.form
             "collection" -> snapshot.collection
@@ -282,7 +284,8 @@ object ResourceModelRuntime {
             "windowform" -> environment.windowForm
             else -> error("Unsupported resource value scope: $scope")
         }
-        source.selector?.takeIf(String::isNotBlank)?.let { value = resolveValuePath(value, it) }
+        source.selector?.takeIf(String::isNotBlank)?.let { value = SelectorUtil.resolveParts(value, it.split('.'), missing) }
+        if (missing != null && (value === missing || value == null)) return value
         source.where?.let { filter -> if (value is List<*>) value = (value as List<*>).filter { filterMatches(it, filter) } }
         source.mapSelector?.let { selector -> if (value is List<*>) value = (value as List<*>).map { resolveValuePath(it, selector) } }
         return source.codec?.let { applyCodec(value, it, false, null) } ?: value

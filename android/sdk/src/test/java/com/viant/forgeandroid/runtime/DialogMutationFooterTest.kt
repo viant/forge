@@ -186,6 +186,47 @@ class DialogMutationFooterTest {
         }
     }
 
+    @Test fun editedResourceFieldsKeepExplicitNullDistinctFromAbsentSelectors() = runBlocking {
+        withFixture { f ->
+            val names = listOf("id", "cleared", "unchanged", "unmapped", "outOfBounds", "belowNull", "zero", "flag", "nested", "mapped", "constantNull", "absentConstant")
+            val schema = ResourceSchemaDef(type="object", identity=listOf("id"), properties=names.associateWith { ResourceFieldSchemaDef(nullable=true) })
+            val model = ResourceModelDef(schemaRef="record", write=ResourceWriteBindingDef("save", inputPath="records", mode="changed", collection=true),
+                fields=names.associateWith { ResourceFieldBindingDef() })
+            val meta = f.window.metadata.peek()!!
+            f.window.metadata.set(meta.copy(schemas=mapOf("record" to schema), resourceModels=mapOf("record" to model)))
+            val reviewed = mapOf("id" to 7, "cleared" to 2, "unchanged" to null, "unmapped" to "untouched",
+                "outOfBounds" to 13, "belowNull" to 19, "zero" to 3, "flag" to true, "nested" to mapOf("clear" to "old"), "mapped" to listOf("old"), "constantNull" to "before", "absentConstant" to 42)
+            val edit = mapOf("items" to listOf(mapOf("amount" to null)), "unchanged" to null, "zero" to "0", "flag" to false)
+            f.source.setForm(mapOf("id" to 7, "edited" to edit, "reviewed" to reviewed))
+            fun field(path: String, codec: String? = null) = ResourceValueSourceDef(scope="form", selector=path, codec=codec)
+            val fields = mapOf("id" to field("id"), "cleared" to field("edited.items.0.amount","integer"),
+                "unchanged" to field("edited.unchanged"), "unmapped" to field("edited.items.0.absent","integer"),
+                "outOfBounds" to field("edited.items.9.amount"), "belowNull" to field("edited.items.0.amount.value"),
+                "zero" to field("edited.zero","integer"), "flag" to field("edited.flag","boolean"),
+                "nested.clear" to field("edited.items.0.amount"), "nested.missing" to field("edited.items.0.absent"),
+                "mapped" to ResourceValueSourceDef(scope="form", selector="edited.items", mapSelector="amount"),
+                "constantNull" to ResourceValueSourceDef(scope="constant", value=JsonNull),
+                "absentConstant" to ResourceValueSourceDef(scope="constant"))
+            val payload = ResourcePayloadPreparationDef(modelRef="record", fields=fields, baseline=field("reviewed"))
+            val cmd=f.action.footerCommand()!!.copy(prepare=null, refresh=emptyList(), validateWhen=null, payload=payload)
+            val success=f.execute(cmd)
+            assertEquals("succeeded", success.status, success.error)
+            assertEquals(JsonUtil.json.parseToJsonElement("""{"records":[{"id":7,"cleared":null,"zero":0,"flag":false,"nested":{"clear":null},"mapped":[null],"constantNull":null}]}"""),
+                JsonUtil.anyToElement(f.calls.single().second))
+            val ordinary = ResourceModelRuntime.prepare(payload.copy(fields=mapOf("id" to field("id"),
+                "flag" to field("edited.flag"), "unmapped" to field("edited.items.0.absent"))),
+                ResourceValueEnvironment(formSource, mapOf(formSource to ResourceDataSnapshot(form=f.source.peekForm()))),
+                mapOf("record" to schema), mapOf("record" to model))
+            assertEquals(JsonUtil.json.parseToJsonElement("""{"records":{"id":7,"flag":false}}"""), JsonUtil.anyToElement(ordinary))
+            // The same code path still rejects present, nonnumeric values before issuing a write.
+            f.source.setForm(f.source.peekForm() + ("edited" to (edit + ("zero" to "invalid"))))
+            val bad=f.execute(cmd)
+            assertEquals("invalid_payload", bad.status)
+            assertContains(bad.error.orEmpty(),"integer")
+            assertEquals(1,f.calls.size)
+        }
+    }
+
     @Test fun openingRunsDeclaredLifecycleOnceAndBindsArgumentsBeforeIt() = runBlocking {
         withFixture { f ->
             var opened = 0
