@@ -337,3 +337,35 @@ func TestWriterReceiptConditions(t *testing.T) {
 		})
 	}
 }
+
+func TestReceiptIdentityContract(t *testing.T) {
+	for _, tc := range []struct {
+		spec  types.ReceiptIdentity
+		valid bool
+	}{
+		{types.ReceiptIdentity{Field: "id", Generated: true}, true},
+		{types.ReceiptIdentity{Field: "key", SubmittedRows: "body.items", SubmittedField: "identity.key"}, true},
+		{types.ReceiptIdentity{Field: "id"}, false},
+		{types.ReceiptIdentity{Field: "id", Generated: true, SubmittedRows: "items"}, false},
+		{types.ReceiptIdentity{Field: "id", Generated: true, SubmittedField: "key"}, false},
+		{types.ReceiptIdentity{Field: "a.prototype", Generated: true}, false},
+		{types.ReceiptIdentity{Field: "key", SubmittedRows: "a..items"}, false},
+	} {
+		root := newOrderedCommand()
+		root.Before[0].Command.ReceiptIdentity = &tc.spec
+		err := types.ValidateResourceModels(orderedFooter(root))
+		if (err == nil) != tc.valid {
+			t.Fatalf("spec %#v: %v", tc.spec, err)
+		}
+	}
+	root := newOrderedCommand()
+	root.ReceiptIdentity = &types.ReceiptIdentity{Field: "key", SubmittedRows: "items"}
+	root.RejectedWhen = map[string]any{"source": "collection", "field": "0.rejected", "equals": true}
+	if err := types.ValidateResourceModels(orderedFooter(root)); err != nil {
+		t.Fatal(err)
+	}
+	root.Before[0].Cleanup.ReceiptIdentity = root.ReceiptIdentity
+	if err := types.ValidateResourceModels(orderedFooter(root)); err == nil {
+		t.Fatal("accepted identity on cleanup")
+	}
+}

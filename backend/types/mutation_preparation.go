@@ -73,6 +73,9 @@ func validatePreparationSteps(window *Window, owner, fallbackID string, root *Mu
 			if err := validate(step.Cleanup, location+".cleanup"); err != nil {
 				return err
 			}
+			if step.Cleanup.ReceiptIdentity != nil {
+				return fmt.Errorf("%s.cleanup.receiptIdentity is only supported on the root or a preparation command", location)
+			}
 			if step.Cleanup.RejectedWhen != nil {
 				return fmt.Errorf("%s.cleanup.rejectedWhen is only supported on the root or a preparation command", location)
 			}
@@ -103,6 +106,13 @@ func validatePreparationWriter(window *Window, owner string, command *MutationCo
 }
 
 func validateWriterReceipt(command *MutationCommand, owner string) error {
+	if identity := command.ReceiptIdentity; identity != nil {
+		if !validResourceSelector(identity.Field) || identity.Generated == (identity.SubmittedRows != "") ||
+			(identity.SubmittedRows != "" && !validResourceSelector(identity.SubmittedRows)) ||
+			(identity.SubmittedField != "" && (identity.Generated || !validResourceSelector(identity.SubmittedField))) {
+			return fmt.Errorf("%s.receiptIdentity requires a safe field and either generated or a submitted row selector", owner)
+		}
+	}
 	if command.ReceiptWhen != nil {
 		if err := validateConditionTree(command.ReceiptWhen, owner+".receiptWhen", validateReceiptLeaf); err != nil {
 			return err
@@ -111,8 +121,8 @@ func validateWriterReceipt(command *MutationCommand, owner string) error {
 	if command.RejectedWhen == nil {
 		return nil
 	}
-	if command.ReceiptWhen == nil {
-		return fmt.Errorf("%s.rejectedWhen requires receiptWhen", owner)
+	if command.ReceiptWhen == nil && command.ReceiptIdentity == nil {
+		return fmt.Errorf("%s.rejectedWhen requires receiptWhen or receiptIdentity", owner)
 	}
 	return validateConditionTree(command.RejectedWhen, owner+".rejectedWhen", validateReceiptLeaf)
 }
