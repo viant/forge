@@ -118,7 +118,7 @@ private struct MutationOperation {
     let fileFields: Set<String>
     let submittedFiles: [String: FormFileSelection]
     var plainDialogFooter: Bool {
-        presentationID != nil && footer?.close == false && root.before?.isEmpty != false && root.clearFormFields.isEmpty
+        presentationID != nil && footer?.close == false && root.before?.isEmpty != false && root.clearFormFields.isEmpty && root.receiptWhen == nil
     }
 
 }
@@ -318,7 +318,6 @@ extension ForgeRuntime {
             if !command.successFormState.isEmpty && (originalPresentation == nil || admittedMetadata?.dataSources[sourceDataSourceRef] == nil) {
                 throw MutationDispatchFailure(status: "invalid_payload", message: "successFormState requires a live submitting dialog.")
             }
-            if command.receiptWhen != nil { throw MutationDispatchFailure(status: "invalid_payload", message: "Only cleanup commands may assert their receipt.") }
             if let error = command.beforeValidationError {
                 throw MutationDispatchFailure(status: "invalid_payload", message: error)
             }
@@ -361,10 +360,14 @@ extension ForgeRuntime {
             if await completionIsCurrent(operation) {
                 warnings = await synchronizeMutationUI(
                     windowID: windowID, targetDataSourceRef: targetRef, command: command, authorization: admitted,
-                    receipt: steps.isEmpty ? nil : rows?.compactMap(\.objectValue),
-                    presentation: operation.plainDialogFooter ? operation : nil)
+                    receipt: steps.isEmpty && command.receiptWhen == nil ? nil : rows?.compactMap(\.objectValue),
+                    presentation: operation.plainDialogFooter || command.receiptWhen != nil ? operation : nil)
             }
             guard await completionIsCurrent(operation) else {
+                if command.receiptWhen != nil, await operationIsCurrent(operation), await !presentationIsCurrent(operation) {
+                    await publishMutationState(key, .init(phase: .succeeded, message: "Completed", invocationId: invocationId, writerStatus: .succeeded, syncStatus: .succeeded))
+                    return .init(accepted: true, status: "succeeded", invocationId: invocationId)
+                }
                 await publishMutationState(
                     key,
                     MutationCommandState(
@@ -426,11 +429,7 @@ extension ForgeRuntime {
                             let receipt = JSONValue.array(records ?? [])
                             let confirmed = DashboardRuntime.evaluateDashboardCondition(condition, valueForCondition: { node in
                                 guard node.source == "collection", let field = node.field else { return nil }
-                                let value = resourceResolveValue(receipt, path: field)
-                                if node.equals != nil || node.notEquals != nil || !node.inValues.isEmpty {
-                                    return CanonicalPredicateValue(value: value)
-                                }
-                                return value?.anyValue
+                                return Self.receiptLeafValue(node, value: resourceResolveValue(receipt, path: field))
                             })
                             if !confirmed { throw MutationDispatchFailure(status: "failed", message: "Cleanup was not acknowledged by the producer.") }
                         }
@@ -595,7 +594,7 @@ extension ForgeRuntime {
                 throw MutationDispatchFailure(status: "invalid_payload", message: "The selected file changed. Review it before saving.")
             }
         }
-        let exactReceipt = receipts != nil || (!child && operation.footer?.close == true)
+        let exactReceipt = receipts != nil || (!compensating && command.receiptWhen != nil) || (!child && operation.footer?.close == true)
         let outcome = await awaitMutationWriter(
             windowID: windowID, dataSourceRef: target, timeoutMs: max(1_000, command.timeoutMs ?? 30_000),
             requireRecords: child || !command.resultState.isEmpty || exactReceipt, ordered: exactReceipt,
@@ -610,6 +609,11 @@ extension ForgeRuntime {
         switch outcome {
         case .succeeded(let rows):
             if child, await !operationIsCurrent(operation) { throw scopeFailure(invoked: true) }
+            if !compensating, let rule = command.receiptWhen,
+               let failure = Self.classifyWriterReceipt(rows ?? [], accepted: rule, rejected: command.rejectedWhen) {
+                retainLease = failure.unknown
+                throw failure
+            }
             retainLease = !child  // final synchronization still owns its writer's collection.
             return rows
         case .failed(let error):
@@ -617,6 +621,48 @@ extension ForgeRuntime {
             throw MutationDispatchFailure(status: "failed", message: error, invoked: true)
         case .indeterminate: preconditionFailure("Handled above")
         }
+    }
+
+    private static func classifyWriterReceipt(_ rows: [JSONValue], accepted: DashboardConditionDef, rejected: DashboardConditionDef?) -> MutationDispatchFailure? {
+        let receipt = JSONValue.array(rows)
+        var rejection: Bool? = false
+        if let rejected { rejection = writerReceiptMatches(rejected, receipt: receipt) }
+        if rejection == true {
+            let message = rows.first?.objectValue?["message"]?.stringValue
+            let reason = message.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+            return .init(status: "failed", message: reason ?? "The producer rejected the write.", invoked: true)
+        }
+        if rejection == false && writerReceiptMatches(accepted, receipt: receipt) == true { return nil }
+        return .init(status: "indeterminate", message: "The producer did not confirm the write. Verify its outcome before retrying.", invoked: true, unknown: true)
+    }
+
+    private static func receiptLeafValue(_ node: DashboardConditionDef, value: JSONValue?) -> Any? {
+        if node.equals != nil || node.notEquals != nil || !node.inValues.isEmpty { return CanonicalPredicateValue(value: value) }
+        return value?.anyValue
+    }
+
+    // Only invocation assertions distinguish a missing field from a false comparison.
+    // A definitive sibling can resolve an otherwise unknown all/any group.
+    private static func writerReceiptMatches(_ condition: DashboardConditionDef, receipt: JSONValue) -> Bool? {
+        if let negated = condition.not { return writerReceiptMatches(negated, receipt: receipt).map { !$0 } }
+        if !condition.all.isEmpty || !condition.any.isEmpty {
+            let any = !condition.any.isEmpty
+            var missing = false
+            for child in any ? condition.any : condition.all {
+                guard let match = writerReceiptMatches(child, receipt: receipt) else { missing = true; continue }
+                if match == any { return any }
+            }
+            return missing ? nil : !any
+        }
+        guard let path = condition.field ?? condition.selector ?? condition.key else { return nil }
+        let parts = path.split(separator: ".")
+        guard let first = parts.first, let index = Int(first), let rows = receipt.arrayValue, rows.indices.contains(index),
+              rows[index].objectValue != nil, let value = resourceResolveValue(rows[index], components: parts.dropFirst()) else { return nil }
+        if condition.writerReceiptBoundCount > 0 {
+            guard case .number(let number) = value, number.isFinite else { return nil }
+        }
+        if condition.writerReceiptOperandCount == 0 { return NativeWidgetContract.truthy(value) }
+        return DashboardRuntime.evaluateDashboardCondition(condition, valueForCondition: { node in receiptLeafValue(node, value: value) })
     }
 
     private func awaitMutationWriter(
@@ -682,6 +728,7 @@ extension ForgeRuntime {
         for refresh in command.refresh {
             guard await windowMetadata(id: windowID)?.authorizationSnapshot == authorization else { break }
             let original = await originalDialog()
+            if !original && command.receiptWhen != nil { break }
             if !original && refresh.dataSourceRef == presentation?.source { continue }
             if refresh.clearSelection && original {
                 await setDataSourceSelection(windowID: windowID, dataSourceRef: refresh.dataSourceRef, selected: nil)

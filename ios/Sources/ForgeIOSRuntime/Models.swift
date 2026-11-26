@@ -3192,6 +3192,10 @@ public final class DashboardConditionDef: Codable, @unchecked Sendable {
     public let empty: Bool?
     public let notEmpty: Bool?
 
+    // Typed decoding discards unknown keys. Invocation assertions must retain
+    // whether an unsupported operand would otherwise look like a bare field.
+    private(set) var validWriterReceiptKeys = true
+
     enum CodingKeys: String, CodingKey {
         case all
         case any
@@ -3260,20 +3264,34 @@ public final class DashboardConditionDef: Codable, @unchecked Sendable {
         self.notEmpty = notEmpty
     }
 
-    public init(from decoder: Decoder) throws {
+    public convenience init(from decoder: Decoder) throws {
+        try self.init(from: decoder, receipt: false)
+    }
+
+    init(from decoder: Decoder, receipt: Bool) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        all = try container.decodeIfPresent([DashboardConditionDef].self, forKey: .all) ?? []
-        any = try container.decodeIfPresent([DashboardConditionDef].self, forKey: .any) ?? []
-        not = try container.decodeIfPresent(DashboardConditionDef.self, forKey: .not)
+        if receipt {
+            all = try container.decodeIfPresent([WriterReceiptCondition].self, forKey: .all)?.map(\.value) ?? []
+            any = try container.decodeIfPresent([WriterReceiptCondition].self, forKey: .any)?.map(\.value) ?? []
+            not = try container.decodeIfPresent(WriterReceiptCondition.self, forKey: .not)?.value
+        } else {
+            all = try container.decodeIfPresent([DashboardConditionDef].self, forKey: .all) ?? []
+            any = try container.decodeIfPresent([DashboardConditionDef].self, forKey: .any) ?? []
+            not = try container.decodeIfPresent(DashboardConditionDef.self, forKey: .not)
+        }
         source = try container.decodeIfPresent(String.self, forKey: .source)
         dataSourceRef = try container.decodeIfPresent(String.self, forKey: .dataSourceRef)
         selector = try container.decodeIfPresent(String.self, forKey: .selector)
         field = try container.decodeIfPresent(String.self, forKey: .field)
         key = try container.decodeIfPresent(String.self, forKey: .key)
         whenValue = try container.decodeIfPresent(JSONValue.self, forKey: .whenValue)
-        equals = try container.decodeIfPresent(JSONValue.self, forKey: .equals)
-        notEquals = try container.decodeIfPresent(JSONValue.self, forKey: .notEquals)
-        containsValue = try container.decodeIfPresent(JSONValue.self, forKey: .containsValue)
+        func operand(_ key: CodingKeys) throws -> JSONValue? {
+            if receipt && container.contains(key) { return try container.decode(JSONValue.self, forKey: key) }
+            return try container.decodeIfPresent(JSONValue.self, forKey: key)
+        }
+        equals = try operand(.equals)
+        notEquals = try operand(.notEquals)
+        containsValue = try operand(.containsValue)
         inValues = try container.decodeIfPresent([JSONValue].self, forKey: .inValues) ?? []
         gt = try container.decodeIfPresent(Double.self, forKey: .gt)
         gte = try container.decodeIfPresent(Double.self, forKey: .gte)
@@ -3283,6 +3301,18 @@ public final class DashboardConditionDef: Codable, @unchecked Sendable {
         matches = try container.decodeIfPresent(String.self, forKey: .matches)
         empty = try container.decodeIfPresent(Bool.self, forKey: .empty)
         notEmpty = try container.decodeIfPresent(Bool.self, forKey: .notEmpty)
+        if receipt {
+            let raw = try decoder.container(keyedBy: NativeWidgetCodingKey.self)
+            let groups = raw.allKeys.filter { ["all","any","not"].contains($0.stringValue) }
+            if !groups.isEmpty {
+                validWriterReceiptKeys = raw.allKeys.count == 1 && (!all.isEmpty || !any.isEmpty || not != nil)
+            } else {
+                let keys = raw.allKeys.map(\.stringValue)
+                let selectorCount = keys.filter { ["field","selector","key"].contains($0) }.count
+                let selectorKeys = 1 + selectorCount // one source plus one selector
+                validWriterReceiptKeys = selectorCount == 1 && keys.contains("source") && keys.count == selectorKeys + writerReceiptOperandCount
+            }
+        }
     }
 }
 

@@ -318,6 +318,7 @@ data class DashboardConditionDef(
     // Only the resource-invariant codec admits these canonical-record comparisons.
     @kotlinx.serialization.Transient internal val invariantBounds: Map<String, String> = emptyMap()
 ) {
+    @kotlinx.serialization.Transient internal var declaredReceipt: JsonElement? = null
     @kotlinx.serialization.Transient
     internal var canonicalSelectors: CanonicalInvariantSelectors? = null
     internal val pattern by lazy { matches?.let { runCatching { Regex(it) }.getOrNull() } }
@@ -1576,7 +1577,9 @@ data class InputState(
     internal val preparedMetadata: WindowMetadata? = null,
     internal val preparedDispatchId: String? = null,
     internal val preparedReadPermit: NativeReportReadPermit? = null,
-    internal val requireCommandRecords: Boolean = false
+    internal val requireCommandRecords: Boolean = false,
+    internal val refreshOwner: (() -> Boolean)? = null,
+    internal val refreshBypassCache: Boolean = false
 )
 
 data class ControlState(

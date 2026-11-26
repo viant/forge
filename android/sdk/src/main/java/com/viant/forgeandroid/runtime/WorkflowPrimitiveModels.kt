@@ -35,9 +35,10 @@ data class MutationCommandDef(
     val tooltip: String? = null,
     val before: List<MutationBeforeStepDef> = emptyList(),
     val cleanupState: JsonObject = JsonObject(emptyMap()),
-    val receiptWhen: DashboardConditionDef? = null,
+    val receiptWhen: @Serializable(with = ReceiptConditionSerializer::class) DashboardConditionDef? = null,
     val clearFormFields: List<String> = emptyList(),
-    val successFormState: JsonObject = JsonObject(emptyMap())
+    val successFormState: JsonObject = JsonObject(emptyMap()),
+    val rejectedWhen: @Serializable(with = ReceiptConditionSerializer::class) DashboardConditionDef? = null
 ) {
     @kotlinx.serialization.Transient
     internal val invalidClearFields: Boolean = clearFormFields.isNotEmpty() &&
@@ -47,6 +48,17 @@ data class MutationCommandDef(
         successFormState.isEmpty() -> null
         successFormState.keys.any { !safeFormField(it) } -> "successFormState requires safe top-level form fields."
         clearFormFields.any(successFormState::containsKey) -> "successFormState and clearFormFields cannot target the same field."
+        else -> null
+    }
+    @kotlinx.serialization.Transient
+    internal val acceptedReceipt = receiptWhen?.compileReceiptPredicate()
+    @kotlinx.serialization.Transient
+    internal val rejectedReceipt = rejectedWhen?.compileReceiptPredicate()
+    @kotlinx.serialization.Transient
+    internal val receiptDefinitionError = when {
+        rejectedWhen != null && receiptWhen == null -> "rejectedWhen requires receiptWhen."
+        receiptWhen != null && acceptedReceipt == null || rejectedWhen != null && rejectedReceipt == null ->
+            "Receipt predicates must use indexed invocation collection rows."
         else -> null
     }
     @kotlinx.serialization.Transient
@@ -60,18 +72,18 @@ data class MutationBeforeStepDef(
     val cleanup: MutationCommandDef? = null
 )
 
-private fun safeFormField(field: String) = field.isNotBlank() && field == field.trim() &&
+internal fun safeFormField(field: String) = field.isNotBlank() && field == field.trim() &&
     field.none { it in "./:[]" } && field != "constructor" && field != "prototype" && field != "__proto__"
 
 private fun MutationCommandDef.validateBefore(): String? {
-    if (receiptWhen != null) return "receiptWhen is supported only on a cleanup command."
     val ids = mutableSetOf(commandId?.trim().orEmpty())
     for (step in before) for (command in listOfNotNull(step.command, step.cleanup)) {
         val id = command.commandId?.trim()
         if (id.isNullOrBlank() || !ids.add(id)) return "Ordered commands require unique explicit command IDs."
-        if (command.receiptWhen != null && (command !== step.cleanup || !command.receiptWhen.usesOnlyReceiptRows())) {
-            return "receiptWhen requires only collection predicates on a cleanup command."
-        }
+        if (command === step.cleanup) {
+            if (command.rejectedWhen != null || command.receiptWhen?.usesOnlyReceiptRows() == false)
+                return "Cleanup supports only receiptWhen on indexed invocation collection rows."
+        } else command.receiptDefinitionError?.let { return it }
         if (command.dataSourceRef.isBlank() || command.before.isNotEmpty() || !command.serializationGroup.isNullOrBlank() ||
             !command.confirm.isNullOrBlank() || command.confirmSelection != null || command.reconcile != null ||
             command.refresh.isNotEmpty() || command.resultState.isNotEmpty() || command.pendingState.isNotEmpty() ||

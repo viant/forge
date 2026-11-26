@@ -341,16 +341,34 @@ function stepError(status, id, cause) {
   return Object.assign(error, {stepStatus: status, failedStepId: id, primary: cause});
 }
 
-function usesOnlyReceiptRows(rule) {
+const receiptBounds = new Set(['gt', 'gte', 'lt', 'lte']);
+const isReceiptScalar = value => value === null || typeof value === 'string' || typeof value === 'boolean' || Number.isFinite(value);
+
+function validWriterReceiptLeaf(rule) {
+  let operators = 0, bounds = 0;
+  for (const [name, operand] of Object.entries(rule)) {
+    if (['source', 'field', 'key', 'selector'].includes(name)) continue;
+    operators++;
+    if (receiptBounds.has(name) && Number.isFinite(operand)) bounds++;
+    else if (['equals', 'notEquals', 'contains'].includes(name) && isReceiptScalar(operand)) continue;
+    else if (['empty', 'notEmpty', 'exists'].includes(name) && typeof operand === 'boolean') continue;
+    else if (name === 'in' && Array.isArray(operand) && operand.length && operand.every(isReceiptScalar)) continue;
+    else if (name !== 'matches' || typeof operand !== 'string') return false;
+  }
+  return operators <= 1 || operators === bounds;
+}
+
+function usesOnlyReceiptRows(rule, writer = false) {
   if (!rule || typeof rule !== 'object') return false;
   for (const group of ['all', 'any', 'not']) {
     if (!Object.hasOwn(rule, group)) continue;
     if (Object.keys(rule).length !== 1) return false;
-    if (group === 'not') return usesOnlyReceiptRows(rule.not);
-    return Array.isArray(rule[group]) && rule[group].length > 0 && rule[group].every(usesOnlyReceiptRows);
+    if (group === 'not') return usesOnlyReceiptRows(rule.not, writer);
+    return Array.isArray(rule[group]) && rule[group].length > 0 && rule[group].every(child => usesOnlyReceiptRows(child, writer));
   }
   const paths = [rule.field, rule.selector, rule.key].filter((path) => typeof path === 'string' && path.length > 0);
   if (rule.source !== 'collection' || rule.dataSourceRef || paths.length !== 1) return false;
+  if (writer && !validWriterReceiptLeaf(rule)) return false;
   const [index, ...fields] = paths[0].split('.');
   return (
     /^(0|[1-9]\d*)$/.test(index) &&
@@ -364,13 +382,62 @@ function usesOnlyReceiptRows(rule) {
   );
 }
 
+function validateWriterReceipt(command) {
+  if (command.rejectedWhen != null && command.receiptWhen == null)
+    throw new Error('rejectedWhen requires receiptWhen.');
+  for (const rule of [command.receiptWhen, command.rejectedWhen]) {
+    if (rule != null && !usesOnlyReceiptRows(rule, true))
+      throw new Error('Writer receipt conditions require invocation collection fields.');
+  }
+}
+
+// Undefined means the producer omitted evidence. In particular, negating an
+// absent field cannot prove a write succeeded or failed.
+function receiptCondition(rule, rows) {
+  if (rule.not) {
+    const result = receiptCondition(rule.not, rows);
+    return result === undefined ? undefined : !result;
+  }
+  const children = rule.all || rule.any;
+  if (children) {
+    const decisive = !!rule.any;
+    let missing = false;
+    for (const child of children) {
+      const result = receiptCondition(child, rows);
+      if (result === decisive) return decisive;
+      if (result === undefined) missing = true;
+    }
+    return missing ? undefined : !decisive;
+  }
+  const parts = (rule.field || rule.selector || rule.key).split('.');
+  const row = rows[parts[0]];
+  if (!row || typeof row !== 'object' || Array.isArray(row)) return undefined;
+  const actual = resolveSelectorParts(rows, parts, true);
+  if (actual === undefined) return undefined;
+  if (!Number.isFinite(actual) && (rule.gt !== undefined || rule.gte !== undefined || rule.lt !== undefined || rule.lte !== undefined)) return undefined;
+  return evaluateCondition(rule, () => actual);
+}
+
+function classifyWriterReceipt(writer, command) {
+  if (!command.receiptWhen || writer.status !== 'succeeded') return writer;
+  const rows = writer.records;
+  const rejected = command.rejectedWhen ? receiptCondition(command.rejectedWhen, rows) : false;
+  if (rejected === true) {
+    const message = rows[0]?.message;
+    return {status: 'failed', error: new Error(typeof message === 'string' && message.trim() ? message : 'The producer rejected the write.')};
+  }
+  if (rejected === false && receiptCondition(command.receiptWhen, rows) === true) return writer;
+  return {status: 'indeterminate', error: new Error('The producer did not confirm the write. Verify its outcome before retrying.')};
+}
+
 function sequenceDefinitionError(command) {
   const ids = new Set([commandGuardKey(command)]);
   for (const entry of command.before) {
     if (entry?.cleanup?.receiptWhen && !usesOnlyReceiptRows(entry.cleanup.receiptWhen))
       return 'Cleanup conditions require invocation collection fields.';
-    if (entry?.command?.receiptWhen) return 'Only a cleanup command may declare receiptWhen.';
+    if (entry?.cleanup?.rejectedWhen != null) return 'A cleanup command cannot declare rejectedWhen.';
     if (!entry?.command) return 'A preparation step requires a command.';
+    validateWriterReceipt(entry.command);
     for (const part of [entry.command, entry.cleanup].filter(Boolean)) {
       const id = part.commandId;
       if (
@@ -454,7 +521,7 @@ function dispatchCommandWriter(target, command, parameters, id, requireRecords, 
   );
 }
 
-async function invokePreparationStep(context, command, key, sequence, current, eligible = () => true) {
+async function invokePreparationStep(context, command, key, sequence, current, eligible = () => true, cleanup = false) {
   const id = command.commandId;
   let acquired = false,
     invoked = false,
@@ -483,7 +550,7 @@ async function invokePreparationStep(context, command, key, sequence, current, e
     acquired = acquireTransport(target, key);
     if (!acquired) throw stepError('transport_busy', id, new Error('Another command is using this writer.'));
     const invocationId = invocationID();
-    const writer = await dispatchCommandWriter(
+    const response = await dispatchCommandWriter(
       target,
       command,
       parameters,
@@ -495,6 +562,7 @@ async function invokePreparationStep(context, command, key, sequence, current, e
       },
       true
     );
+    const writer = cleanup ? response : classifyWriterReceipt(response, command);
     if (writer.status !== 'succeeded') {
       const unknown = writer.status === 'indeterminate' || (invoked && ambiguousWriterFailure(writer.error));
       if (unknown) {
@@ -525,7 +593,7 @@ async function unwindPreparation(context, root, sequence, key, current, presenta
   for (const command of sequence.cleanups.reverse()) {
     if (!current()) return true;
     try {
-      const receipt = await invokePreparationStep(context, command, key, sequence, current);
+      const receipt = await invokePreparationStep(context, command, key, sequence, current, undefined, true);
       if (
         command.receiptWhen &&
         !evaluateCondition(command.receiptWhen, (leaf) => {
@@ -666,7 +734,7 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
   const ordered = Array.isArray(command.before) && command.before.length > 0;
   const clearFields = Array.isArray(command.clearFormFields) && command.clearFormFields.length > 0;
   const closesDialog = Boolean(lifecycle.dialogId) && typeof lifecycle.closeOnSuccess === 'function';
-  const needsExactReceipt = ordered || clearFields || closesDialog;
+  const needsExactReceipt = ordered || clearFields || closesDialog || command.receiptWhen != null;
   let submittedFields;
   let formPatch;
   let sequence = null;
@@ -697,7 +765,7 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
   let target = null;
   try {
     if (command.clearFormFields != null && !Array.isArray(command.clearFormFields)) throw new Error('Expected an array of clearFormFields.');
-    if (command.receiptWhen) throw new Error('Only a cleanup command may declare receiptWhen.');
+    validateWriterReceipt(command);
     if (command.before != null && !Array.isArray(command.before)) throw new Error('Expected an array of preparation steps.');
     if (needsExactReceipt || lifecycle.dialogId) originalScope = scopeSnapshot();
     if (lifecycle.dialogId) {
@@ -781,7 +849,8 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
     if (!sequence) applyPrimitiveState(context, command.pendingState);
     publish(context, key, {phase: 'pending', guarded: true, pending: true, retryAllowed: false, error: null, message: 'Saving…', invocationId: id, writerStatus: 'pending', syncStatus: 'not_started'});
     const mapsResult = Object.keys(command.resultState || {}).length > 0;
-    const writer = await dispatchCommandWriter(target,command,preparedSnapshot,id,needsExactReceipt || mapsResult,()=>{writerInvoked=true;}, needsExactReceipt, dialogSignal ? presentationCurrent : undefined);
+    const response = await dispatchCommandWriter(target,command,preparedSnapshot,id,needsExactReceipt || mapsResult,()=>{writerInvoked=true;}, needsExactReceipt, dialogSignal ? presentationCurrent : undefined);
+    const writer = classifyWriterReceipt(response, command);
     if ((needsExactReceipt || dialogSignal) && writer.status === 'failed' && ambiguousWriterFailure(writer.error)) writer.status='indeterminate';
     if (!needsExactReceipt && !authorizationIsCurrent()) {
       releaseTransport(target, key);

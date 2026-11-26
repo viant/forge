@@ -912,7 +912,20 @@ Root confirmation precedes every writer. Each eligible step runs once, in
 declaration order. A subsequent preparation handler can read the earlier
 invocation's ID and normalized rows at `extras.steps.stageAttachment`. The
 executor supplies this map itself and sends only the parameters prepared for
-the current writer. A confirmed empty array is a valid receipt.
+the current writer. Without a receipt condition, a confirmed empty array is a valid receipt.
+
+A root write or preparation step can require a positive `receiptWhen` and
+optionally declare `rejectedWhen`. For example, a producer can confirm a write
+with `{source: collection, field: '0.accepted', equals: true}` and reject it
+with `{source: collection, field: '0.accepted', equals: false}`. The executor
+uses only that invocation’s returned records. A proven rejection takes precedence
+and preserves the first row’s nonblank `message` when available. Missing fields
+are unknown, including inside a negation. Numeric bounds require a finite JSON
+number in the receipt. An `any` group can still match a
+different branch with positive evidence. An unconfirmed outcome holds the write
+guard and skips later writers, success effects and compensation until the
+application verifies the outcome. A definite rejection follows normal failure
+handling, including compensation for previously confirmed preparation steps.
 
 After a definitive failure, the executor runs the declared cleanup for each
 acknowledged step in reverse order. A cleanup error is a secondary warning on

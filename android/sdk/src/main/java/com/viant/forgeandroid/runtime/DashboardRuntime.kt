@@ -1444,10 +1444,10 @@ internal fun evaluateConditionTree(
     }
     condition.contains?.let { expected ->
         val matches = when (actual) {
-            is String -> actual.contains(JsonUtil.elementToAny(expected)?.toString().orEmpty())
-            is Collection<*> -> actual.any { dashboardValuesEqual(it, expected) }
-            is Map<*, *> -> actual.keys.any { dashboardValuesEqual(it, expected) } ||
-                actual.values.any { dashboardValuesEqual(it, expected) }
+            is String -> actual.contains(if (canonical) expected.jsonPrimitive.content else JsonUtil.elementToAny(expected)?.toString().orEmpty())
+            is Collection<*> -> actual.any { if (canonical) canonicalScalarEquals(it, expected) else dashboardValuesEqual(it, expected) }
+            is Map<*, *> -> if (canonical) actual.containsKey(expected.jsonPrimitive.content)
+                else actual.keys.any { dashboardValuesEqual(it, expected) } || actual.values.any { dashboardValuesEqual(it, expected) }
             else -> false
         }
         if (!matches) return false

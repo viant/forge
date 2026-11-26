@@ -1,5 +1,20 @@
 import Foundation
 
+struct WriterReceiptCondition: Decodable {
+    let value: DashboardConditionDef
+    init(from decoder: Decoder) throws { value = try DashboardConditionDef(from: decoder, receipt: true) }
+}
+
+extension DashboardConditionDef {
+    var writerReceiptBoundCount: Int { [gt,gte,lt,lte].compactMap { $0 }.count }
+
+    var writerReceiptOperandCount: Int {
+        let predicates = [equals != nil, notEquals != nil, containsValue != nil, !inValues.isEmpty,
+                          exists != nil, matches != nil, empty != nil, notEmpty != nil]
+        return predicates.filter { $0 }.count + writerReceiptBoundCount
+    }
+}
+
 // Platform-neutral metadata contracts from doc/workflow-primitives.md.
 // Rendering and authoritative datasource behavior remain owned by the runtime.
 
@@ -23,6 +38,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
     public let payload: ResourcePayloadPreparationDef?
     public let validateWhen: DashboardConditionDef?
     public let receiptWhen: DashboardConditionDef?
+    public let rejectedWhen: DashboardConditionDef?
     public let clearFormFields: [String]
     public let cleanupState: [String: JSONValue]
     public let pendingState: [String: JSONValue]
@@ -53,6 +69,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         prepare: String? = nil,
         validateWhen: DashboardConditionDef? = nil,
         receiptWhen: DashboardConditionDef? = nil,
+        rejectedWhen: DashboardConditionDef? = nil,
         clearFormFields: [String] = [],
         cleanupState: [String: JSONValue] = [:],
         pendingState: [String: JSONValue] = [:],
@@ -64,7 +81,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         reconcile: ReconcileSpec? = nil,
         refresh: [RefreshSpec] = []
     ) {
-        self.beforeValidationError = Self.validateBefore(before, root: commandId ?? dataSourceRef, fields: clearFormFields, successFormState: successFormState)
+        self.beforeValidationError = Self.validateBefore(before, root: commandId ?? dataSourceRef, fields: clearFormFields, successFormState: successFormState, receiptWhen: receiptWhen, rejectedWhen: rejectedWhen)
         self.before = before
         self.commandId = commandId
         self.serializationGroup = serializationGroup
@@ -83,6 +100,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         self.prepare = prepare
         self.validateWhen = validateWhen
         self.receiptWhen = receiptWhen
+        self.rejectedWhen = rejectedWhen
         self.clearFormFields = clearFormFields
         self.cleanupState = cleanupState
         self.pendingState = pendingState
@@ -109,7 +127,35 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         return condition.source == "collection" && condition.dataSourceRef == nil && condition.field?.isEmpty == false
     }
 
-    private static func validateBefore(_ steps: [MutationBeforeStepDef]?, root: String, fields: [String], successFormState: [String: JSONValue]) -> String? {
+    private static func writerReceiptError(_ receipt: DashboardConditionDef?, _ rejection: DashboardConditionDef?) -> String? {
+        if rejection != nil && receipt == nil { return "rejectedWhen requires receiptWhen." }
+        for rule in [receipt, rejection].compactMap({ $0 }) where !isWriterReceiptCondition(rule) {
+            return "Writer receipt conditions may read only their invocation records."
+        }
+        return nil
+    }
+
+    private static func isWriterReceiptCondition(_ node: DashboardConditionDef) -> Bool {
+        let selectors = [node.selector, node.field, node.key].compactMap { $0 }
+        let groups = [!node.all.isEmpty, !node.any.isEmpty, node.not != nil].filter { $0 }.count
+        guard node.validWriterReceiptKeys, node.dataSourceRef == nil, node.whenValue == nil else { return false }
+        if groups > 0 {
+            guard groups == 1, node.source == nil, selectors.isEmpty,
+                  node.whenValue == nil, node.equals == nil, node.notEquals == nil, node.containsValue == nil, node.inValues.isEmpty,
+                  node.gt == nil, node.gte == nil, node.lt == nil, node.lte == nil, node.exists == nil, node.matches == nil,
+                  node.empty == nil, node.notEmpty == nil else { return false }
+            if let negated = node.not { return isWriterReceiptCondition(negated) }
+            return (node.all + node.any).allSatisfy(isWriterReceiptCondition)
+        }
+        let operands = node.writerReceiptOperandCount
+        guard node.source == "collection", selectors.count == 1, operands <= 1 || operands == node.writerReceiptBoundCount else { return false }
+        let scalars = [node.equals, node.notEquals, node.containsValue].compactMap { $0 } + node.inValues
+        guard scalars.allSatisfy({ $0.objectValue == nil && $0.arrayValue == nil }) else { return false }
+        let parts = selectors[0].components(separatedBy: ".")
+        return UInt32(parts[0]).map(String.init) == parts[0] && parts.dropFirst().allSatisfy(isPlainID)
+    }
+
+    private static func validateBefore(_ steps: [MutationBeforeStepDef]?, root: String, fields: [String], successFormState: [String: JSONValue], receiptWhen: DashboardConditionDef?, rejectedWhen: DashboardConditionDef?) -> String? {
         var seen = Set<String>()
         for field in fields where !isPlainID(field) || !seen.insert(field).inserted {
             return "Fields cleared by a command must be distinct, top-level names."
@@ -118,10 +164,12 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
             guard isPlainID(field) else { return "successFormState requires top-level form field names." }
             guard !seen.contains(field) else { return "successFormState and clearFormFields cannot target the same field." }
         }
+        if let error = writerReceiptError(receiptWhen, rejectedWhen) { return error }
         guard let steps else { return nil }
         var ids = Set([root])
         for step in steps {
-            if step.command.receiptWhen != nil { return "Only cleanup commands may assert their receipt." }
+            if let error = writerReceiptError(step.command.receiptWhen, step.command.rejectedWhen) { return error }
+            if step.cleanup?.rejectedWhen != nil { return "Cleanup commands do not support rejectedWhen." }
             if let condition = step.cleanup?.receiptWhen, !isReceiptCondition(condition) { return "Cleanup conditions may read only their invocation records." }
             for child in [step.command, step.cleanup].compactMap({ $0 }) {
                 guard let id = child.commandId, isPlainID(id), ids.insert(id).inserted,
@@ -141,11 +189,15 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case before, commandId, serializationGroup, label, icon, hideLabel, intent, confirm, confirmSelection, invalidMessage, timeoutMs
-        case invocationParameter, dataSourceRef, parameters, payload, prepare, validateWhen, receiptWhen
+        case invocationParameter, dataSourceRef, parameters, payload, prepare, validateWhen, receiptWhen, rejectedWhen
         case clearFormFields, cleanupState, pendingState, resultState, successState, successFormState, errorState, indeterminateState, reconcile, refresh
     }
 
-    public init(from decoder: Decoder) throws {
+    public convenience init(from decoder: Decoder) throws {
+        try self.init(from: decoder, cleanup: false)
+    }
+
+    fileprivate init(from decoder: Decoder, cleanup: Bool) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         serializationGroup = try values.decodeIfPresent(String.self, forKey: .serializationGroup)
         before = try values.decodeIfPresent([MutationBeforeStepDef].self, forKey: .before)
@@ -164,7 +216,9 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         prepare = try values.decodeIfPresent(String.self, forKey: .prepare)
         payload = try values.decodeIfPresent(ResourcePayloadPreparationDef.self, forKey: .payload)
         validateWhen = try values.decodeIfPresent(DashboardConditionDef.self, forKey: .validateWhen)
-        receiptWhen = try values.decodeIfPresent(DashboardConditionDef.self, forKey: .receiptWhen)
+        receiptWhen = cleanup ? try values.decodeIfPresent(DashboardConditionDef.self, forKey: .receiptWhen)
+            : try values.decodeIfPresent(WriterReceiptCondition.self, forKey: .receiptWhen)?.value
+        rejectedWhen = try values.decodeIfPresent(WriterReceiptCondition.self, forKey: .rejectedWhen)?.value
         clearFormFields = try values.decodeIfPresent([String].self, forKey: .clearFormFields) ?? []
         cleanupState = try values.decodeIfPresent([String: JSONValue].self, forKey: .cleanupState) ?? [:]
         pendingState = try values.decodeIfPresent([String: JSONValue].self, forKey: .pendingState) ?? [:]
@@ -175,7 +229,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         indeterminateState = try values.decodeIfPresent([String: JSONValue].self, forKey: .indeterminateState) ?? [:]
         reconcile = try values.decodeIfPresent(ReconcileSpec.self, forKey: .reconcile)
         refresh = try values.decodeIfPresent([RefreshSpec].self, forKey: .refresh) ?? []
-        beforeValidationError = Self.validateBefore(before, root: commandId ?? dataSourceRef, fields: clearFormFields, successFormState: successFormState)
+        beforeValidationError = Self.validateBefore(before, root: commandId ?? dataSourceRef, fields: clearFormFields, successFormState: successFormState, receiptWhen: receiptWhen, rejectedWhen: rejectedWhen)
     }
 }
 
@@ -186,7 +240,7 @@ extension ActionDef {
         return MutationCommandDef(commandId: id, before: command.before, serializationGroup: command.serializationGroup, label: command.label, icon: command.icon, hideLabel: command.hideLabel, intent: command.intent,
             confirm: command.confirm, confirmSelection: command.confirmSelection, invalidMessage: command.invalidMessage,
             timeoutMs: command.timeoutMs, invocationParameter: command.invocationParameter, dataSourceRef: command.dataSourceRef,
-            parameters: command.parameters, payload: command.payload, prepare: command.prepare, validateWhen: command.validateWhen, receiptWhen: command.receiptWhen,
+            parameters: command.parameters, payload: command.payload, prepare: command.prepare, validateWhen: command.validateWhen, receiptWhen: command.receiptWhen, rejectedWhen: command.rejectedWhen,
             clearFormFields: command.clearFormFields, cleanupState: command.cleanupState, pendingState: command.pendingState, successState: command.successState, successFormState: command.successFormState, resultState: command.resultState,
             errorState: command.errorState, indeterminateState: command.indeterminateState, reconcile: command.reconcile, refresh: command.refresh)
     }
@@ -196,6 +250,14 @@ public struct MutationBeforeStepDef: Codable, Sendable {
     public let when: DashboardConditionDef?
     public let command: MutationCommandDef
     public let cleanup: MutationCommandDef?
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        when = try values.decodeIfPresent(DashboardConditionDef.self, forKey: .when)
+        command = try values.decode(MutationCommandDef.self, forKey: .command)
+        cleanup = try values.contains(.cleanup) && !values.decodeNil(forKey: .cleanup)
+            ? try MutationCommandDef(from: values.superDecoder(forKey: .cleanup), cleanup: true) : nil
+    }
 
     public init(when: DashboardConditionDef? = nil, command: MutationCommandDef, cleanup: MutationCommandDef? = nil) {
         self.when = when

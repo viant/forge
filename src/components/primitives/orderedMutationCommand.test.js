@@ -244,3 +244,100 @@ test('a close observer can recheck its scope after awaiting a dismissal hook', a
   assert.equal(closed, false);
   assert.equal(calls.length, 1);
 });
+
+test('root and preparation receipts distinguish a confirmed write, rejection and unknown outcome', async () => {
+  const condition = (field, equals) => ({source: 'collection', field, equals});
+  const options = {receiptWhen: condition('0.accepted', true), rejectedWhen: condition('0.rejected', true)};
+  for (const position of ['single', 'root', 'step']) {
+    for (const [rows, status] of [
+      [[{accepted: true, rejected: false}], 'succeeded'],
+      [[{accepted: true, rejected: true, message: 'Rejected by producer'}], 'failed'],
+      [[{accepted: false, rejected: false}], 'indeterminate'],
+      [[{accepted: true}], 'indeterminate'],
+      [[], 'indeterminate'],
+      [[false], 'indeterminate'],
+    ]) {
+      const checked = position === 'step' ? 'verify' : 'save';
+      const {context, calls, windowForm} = fixture({[checked]: () => rows});
+      context.Context(checked).signals = {collection: {value: [{accepted: true, rejected: false}]}};
+      const before = position === 'single' ? [] : [stage('first')];
+      if (position === 'step') before.push(stage(checked, options));
+      const command = ordered(before, {
+        ...(position === 'step' ? {} : options), successState: {saved: true},
+        refresh: [{dataSourceRef: 'refresh'}],
+      });
+      const result = await executeCommand(context, command);
+      assert.equal(result.status, status, position);
+      assert.equal(windowForm.value.saved, status === 'succeeded' ? true : undefined);
+      assert.equal(calls.some(c => c.ref === 'refresh'), status === 'succeeded');
+      assert.equal(calls.find(c => c.ref === checked).options.result, 'orderedRecords');
+      assert.equal(calls.some(c => c.ref === 'undo_first'), status === 'failed' && position !== 'single');
+      if (position === 'step') assert.equal(calls.some(c => c.ref === 'save'), status === 'succeeded');
+      if (status === 'failed') assert.equal(result.error.message, 'Rejected by producer');
+      if (status === 'indeterminate') {
+        assert.equal(getCommandState(context, command).retryAllowed, false);
+        assert.equal((await executeCommand(context, command)).status, 'suppressed');
+      }
+    }
+  }
+});
+
+test('a missing receipt field cannot become proof through negation, while an explicit null is present', async () => {
+  const missing = {source: 'collection', field: '0.other', notEquals: 'no'};
+  const present = {source: 'collection', field: '0.flag', equals: null};
+  for (const [rule, status] of [[missing, 'indeterminate'], [{not: missing}, 'indeterminate'],
+      [{all: [missing, present]}, 'indeterminate'], [{any: [missing, present]}, 'succeeded'], [present, 'succeeded']]) {
+    const {context} = fixture({save: () => [{flag: null}]});
+    assert.equal((await executeCommand(context, writer('save', {receiptWhen: rule}))).status, status);
+  }
+});
+
+test('writer numeric bounds require a finite JSON number in the receipt', async () => {
+  const atLeastZero = {source: 'collection', field: '0.count', gte: 0};
+  for (const [count, expected] of [[0, 'succeeded'], [2, 'succeeded'], [null, 'indeterminate'], ['2', 'indeterminate'], [false, 'indeterminate']]) {
+    const {context} = fixture({save: () => [{count}]});
+    assert.equal((await executeCommand(context, writer('save', {receiptWhen: atLeastZero}))).status, expected);
+    if (expected === 'indeterminate') {
+      const other = fixture({save: () => [{count}]});
+      assert.equal((await executeCommand(other.context, writer('save', {receiptWhen: {not: atLeastZero}}))).status, expected);
+    }
+  }
+});
+
+test('invalid receipt predicates fail before writing', async () => {
+  const scoped = {source: 'collection', field: '0.success', equals: true};
+  for (const command of [
+    writer('save', {rejectedWhen: scoped}),
+    ordered([stage('a', {rejectedWhen: scoped})]),
+    ordered([{command: writer('a'), cleanup: writer('undo', {receiptWhen: scoped, rejectedWhen: scoped})}]),
+    writer('save', {receiptWhen: {source: 'form', field: '0.success', equals: true}}),
+    writer('save', {receiptWhen: {source: 'collection', field: '0.success', unsupported: true}}),
+    writer('save', {receiptWhen: {source: 'collection', field: '0.success', equals: true, exists: true}}),
+  ]) {
+    const {context, calls} = fixture();
+    assert.equal((await executeCommand(context, command)).accepted, false);
+    assert.deepEqual(calls, []);
+  }
+});
+
+test('confirmed receipt from a replaced footer skips form, window and owner refresh effects', async () => {
+  const dialog = getDialogSignal('testDialogqualified');
+  dialog.value = {open: true, props: {record: 1}};
+  const {context, calls, windowForm} = fixture({save: () => {
+    dialog.value = {open: true, props: {record: 2}};
+    return [{accepted: true}];
+  }});
+  context.signals.form = {value: {done: false}, peek() {return this.value;}};
+  context.handlers = {dataSource: {setEditedFormData: ({values}) => {context.signals.form.value = values;}}};
+  const command = writer('save', {
+    receiptWhen: {source: 'collection', field: '0.accepted', equals: true},
+    successFormState: {done: true}, successState: {saved: true}, refresh: [{dataSourceRef: 'owner'}],
+  });
+  try {
+    const result = await executeCommand(context, command, {}, {dialogId: 'qualified'});
+    assert.equal(result.status, 'succeeded');
+    assert.equal(context.signals.form.value.done, false);
+    assert.equal(windowForm.value.saved, undefined);
+    assert.deepEqual(calls.map(call => call.ref), ['save']);
+  } finally {dialog.value = {open: false};}
+});

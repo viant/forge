@@ -305,6 +305,82 @@ class OrderedMutationCommandTest {
         observer.join()
     } }
 
+    @Test fun immediateRefreshKeepsTheOriginalQueryAndAcknowledgesItsOwnEmptyResult() = runBlocking { fixture {
+        val reader = window.context("unused")
+        val input = InputState(filter = mapOf("active" to true), parameters = mapOf("scope" to 3), page = 4)
+        reader.input.set(input)
+        loader { request ->
+            if (request.dataSourceRef == "unused") {
+                assertEquals(input.filter, request.input.filter)
+                assertEquals(input.parameters, request.input.parameters)
+                assertEquals(input.page, request.input.page)
+                assertNotNull(request.input.preparedDispatchId)
+                assertEquals(request.input.preparedDispatchId, request.invocationId)
+                assertTrue(request.bypassCache)
+            }
+            emptyList()
+        }
+        val command = child("save").copy(refresh = listOf(RefreshSpec("unused", bypassCache = true)))
+        val result = withTimeout(3000) { execute(command) }
+        assertEquals("succeeded", result.status)
+        assertTrue(result.warnings.isEmpty())
+        assertEquals(listOf("save","unused"), refs())
+        assertFalse(reader.control.peek().loading)
+        assertNull(reader.input.peek().refreshOwner)
+    } }
+
+    @Test fun supersedingARefreshCompletesItsOwnWaitWithoutAdoptingTheNewRead() = runBlocking { fixture {
+        val reader = window.context("unused")
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        var n = 0
+        loader {
+            n++
+            if (n == 1) {
+                started.complete(Unit)
+                withContext(NonCancellable) { release.await() }
+                listOf(mapOf("id" to "old"))
+            } else listOf(mapOf("id" to "new"))
+        }
+        val old = async { runCatching { reader.refreshAndAwait { true } } }
+        withTimeout(3000) { started.await() }
+        val next = async { reader.refreshAndAwait { true } }
+        try {
+            val failure = withTimeout(3000) { old.await() }.exceptionOrNull()
+            assertContains(failure?.message.orEmpty(), "superseded")
+        } finally { release.complete(Unit) }
+        assertEquals("new", withTimeout(3000) { next.await() }.rows.first().jsonObject["id"]?.jsonPrimitive?.content)
+        assertEquals("new", reader.collection.peek().single()["id"])
+        assertEquals(listOf("unused","unused"), refs())
+    } }
+
+    @Test fun failedRefreshPreservesItsCauseAndCancelledRefreshCannotCommit() = runBlocking { fixture {
+        val reader = window.context("unused")
+        val error = IOException("read unavailable")
+        loader { throw error }
+        val failed = withTimeout(3000) { reader.refreshAndAwait { true } }
+        assertSame(error, failed.cause)
+        var current = true
+        loader { current = false; listOf(mapOf("id" to "stale")) }
+        val revoked = assertFailsWith<IllegalStateException> { reader.refreshAndAwait { current } }
+        assertContains(revoked.message.orEmpty(), "stale or unauthorized")
+        assertTrue(reader.collection.peek().isEmpty())
+        val started = CompletableDeferred<Unit>()
+        val cancelled = CompletableDeferred<Unit>()
+        loader {
+            started.complete(Unit)
+            try { awaitCancellation() } finally { cancelled.complete(Unit) }
+        }
+        val waiting = async { reader.refreshAndAwait { true } }
+        withTimeout(3000) { started.await() }
+        waiting.cancelAndJoin()
+        withTimeout(3000) { cancelled.await() }
+        assertNull(reader.input.peek().refreshOwner)
+        assertFalse(reader.control.peek().loading)
+        assertTrue(reader.collection.peek().isEmpty())
+        assertEquals(listOf("unused","unused","unused"), refs())
+    } }
+
     @Test fun confirmedFooterPatchesSourceFormOnceBeforeRefresh() = runBlocking { fixture {
         val action = JsonUtil.json.decodeFromString<ActionDef>("""{"id":"apply","mutationCommand":{"dataSourceRef":"save",
             "successFormState":{"note":null,"status":{"confirmed":true},"flags":[false,0]},
@@ -800,17 +876,130 @@ class OrderedMutationCommandTest {
         assertTrue(calls.isEmpty())
     } }
 
-    @Test fun receiptPredicatesAreLimitedToIndexedCleanupRecordsBeforeAnyWrite() = runBlocking { fixture {
+    private fun status(value: String) = DashboardConditionDef(source = "collection", field = "0.status", equals = JsonPrimitive(value))
+
+    @Test fun receiptPredicatesUseOnlyIndexedInvocationRowsBeforeAnyWrite() = runBlocking { fixture {
         loader()
-        val receipt = DashboardConditionDef(source = "collection", field = "0.entity", equals = JsonPrimitive(true))
-        for (command in listOf(child("save").copy(receiptWhen = receipt), root.copy(receiptWhen = receipt),
-            root.copy(before = listOf(stageA.copy(command = stageA.command.copy(receiptWhen = receipt)))),
-            root.copy(before = listOf(stageA.copy(cleanup = stageA.cleanup!!.copy(receiptWhen = receipt.copy(source = "form"))))),
-            root.copy(before = listOf(stageA.copy(cleanup = stageA.cleanup!!.copy(receiptWhen = receipt.copy(field = "entity"))))))) {
+        val ok = status("accepted")
+        for (command in listOf(child("save").copy(rejectedWhen = ok), root.copy(receiptWhen = ok.copy(source = "form")),
+            root.copy(before = listOf(stageA.copy(command = stageA.command.copy(receiptWhen = ok.copy(field = "status"))))),
+            root.copy(before = listOf(stageA.copy(command = stageA.command.copy(rejectedWhen = ok)))),
+            root.copy(before = listOf(stageA.copy(command = stageA.command.copy(receiptWhen = ok, rejectedWhen = ok.copy(field = "0..status"))))),
+            root.copy(before = listOf(stageA.copy(cleanup = stageA.cleanup!!.copy(rejectedWhen = ok)))),
+            root.copy(before = listOf(stageA.copy(cleanup = stageA.cleanup!!.copy(receiptWhen = ok.copy(source = "form"))))))) {
             assertEquals("invalid", execute(command).status)
+        }
+        for (rule in listOf(
+            """{"source":"collection","field":"0.status","unsupported":true}""",
+            """{"source":"collection","field":"0.status","equals":"accepted","exists":true}""",
+            """{"all":[]}""",
+            """{"source":"collection","selector":"0.status","contains":{"unexpected":true}}"""
+        )) {
+            val decoded = JsonUtil.json.decodeFromString<MutationCommandDef>("""{"dataSourceRef":"save","receiptWhen":$rule}""")
+            assertEquals("invalid", execute(decoded).status)
         }
         assertTrue(calls.isEmpty())
     } }
+
+    @Test fun forwardReceiptClassifiesOnlyTheCurrentHTTPResponseBeforeRootEffects() = runBlocking {
+        val accepted = status("accepted")
+        val rejected = DashboardConditionDef(source = "collection", field = "0.denied", equals = JsonPrimitive(true))
+        val command = child("save").copy(receiptWhen = accepted, rejectedWhen = rejected,
+            successState = buildJsonObject { put("done", true) }, errorState = buildJsonObject { put("failed", true) },
+            indeterminateState = buildJsonObject { put("unknown", true) })
+        val samples = mapOf(
+            """{"data":[{"status":"accepted","denied":false}]}""" to "succeeded",
+            """{"data":[{"status":"accepted","denied":true,"message":"Request refused"}]}""" to "failed",
+            """{"data":[{"denied":true,"message":"Request refused"}]}""" to "failed",
+            """{"data":[{"status":"accepted"}]}""" to "indeterminate",
+            """{"data":[{"status":"queued","denied":false}]}""" to "indeterminate",
+            """{"data":[false]}""" to "indeterminate",
+            """{"data":[]}""" to "indeterminate",
+            """{"data":{}}""" to "indeterminate",
+            "invalid JSON" to "indeterminate"
+        )
+        for ((body, expected) in samples) {
+            val server = MockWebServer()
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+            try {
+                server.enqueue(MockResponse().setBody(body))
+                server.start()
+                val f = Fixture(scope, server)
+                f.window.context("save").collection.set(listOf(mapOf("status" to "accepted", "denied" to false)))
+                val result = f.execute(command)
+                assertEquals(expected, result.status, body)
+                val flags = f.window.peekWindowForm()
+                assertEquals(expected == "succeeded", flags["done"] == true)
+                assertEquals(expected == "failed", flags["failed"] == true)
+                assertEquals(expected == "indeterminate", flags["unknown"] == true)
+                if (expected == "failed") assertEquals("Request refused", result.error)
+                if (expected == "indeterminate") {
+                    assertEquals("suppressed", f.execute(command).status)
+                    assertTrue(f.runtime.mutationCommands.resolveIndeterminate(f.window.windowId, command))
+                }
+                assertEquals(1, server.requestCount)
+            } finally { scope.cancel(); server.shutdown() }
+        }
+    }
+
+    @Test fun forwardReceiptUsesThreeValuedGroupsAndExplicitNull() {
+        fun match(condition: DashboardConditionDef, rows: String): Boolean? =
+            checkNotNull(condition.compileReceiptPredicate())(JsonUtil.json.parseToJsonElement(rows).jsonArray)
+        val missing = status("rejected").copy(field = "0.reason")
+        val accepted = status("accepted")
+        val rows = """[{"status":"accepted","explicit":null}]"""
+        assertNull(match(DashboardConditionDef(not = missing), rows))
+        assertNull(match(missing.copy(equals = null, notEquals = JsonPrimitive("rejected")), rows))
+        assertEquals(true, match(DashboardConditionDef(any = listOf(missing, accepted)), rows))
+        assertEquals(false, match(DashboardConditionDef(all = listOf(missing, status("queued"))), rows))
+        assertNull(match(DashboardConditionDef(all = listOf(accepted, missing)), rows))
+        assertEquals(true, match(accepted.copy(field = "0.explicit", equals = JsonNull), rows))
+        assertNull(match(accepted.copy(field = "0", equals = JsonPrimitive(true)), "[true]"))
+        assertNull(match(DashboardConditionDef(not = accepted), "[]"))
+        for (operand in listOf("null", "true", "1", "\"1\"")) {
+            val text = """{"dataSourceRef":"save","receiptWhen":{"source":"collection","field":"0.value","equals":$operand}}"""
+            val decoded = JsonUtil.json.decodeFromString<MutationCommandDef>(text)
+            val encoded = JsonUtil.json.encodeToString(MutationCommandDef.serializer(), decoded)
+            val restored = JsonUtil.json.decodeFromString<MutationCommandDef>(encoded)
+            val expected = JsonUtil.json.parseToJsonElement("""[{"value":$operand}]""").jsonArray
+            assertEquals(true, restored.acceptedReceipt?.invoke(expected), text)
+            assertNull(restored.acceptedReceipt?.invoke(JsonArray(listOf(buildJsonObject {}))))
+        }
+        val bare = DashboardConditionDef(source = "collection", field = "0.value")
+        for ((json, truthy) in listOf("0" to false, "null" to false, "false" to false, "\"\"" to false, "{}" to true, "[]" to true, "1" to true)) {
+            assertEquals(truthy, match(bare, """[{"value":$json}]"""))
+        }
+        val number = bare.copy(gte = 1.0, lt = 4.0)
+        for (json in listOf("null","true","\"2\"")) {
+            assertNull(match(number, """[{"value":$json}]"""))
+            assertNull(match(DashboardConditionDef(not = number), """[{"value":$json}]"""))
+        }
+        assertEquals(true, match(number, """[{"value":2}]"""))
+        assertEquals(false, match(number, """[{"value":4}]"""))
+        val exact = accepted.copy(field = "0.value", equals = JsonPrimitive("1"))
+        assertEquals(false, match(exact, """[{"value":1}]"""))
+    }
+
+    @Test fun forwardPreparationOnlyCompensatesPreviouslyConfirmedStepsAfterProvenRejection() = runBlocking {
+        val ok = status("accepted")
+        for ((observed, expected) in listOf("rejected" to "failed", "waiting" to "indeterminate", "accepted" to "succeeded")) fixture {
+            val gated = root.copy(before = listOf(stageA, stageB.copy(command = stageB.command.copy(receiptWhen = ok, rejectedWhen = status("rejected")))),
+                receiptWhen = ok, rejectedWhen = status("rejected"))
+            loader { request -> listOf(mapOf("status" to (if (request.dataSourceRef == "second") observed else "accepted"), "token" to 7, "message" to "Request refused")) }
+            val result = execute(gated)
+            assertEquals(expected, result.status)
+            val tail = when(observed) { "accepted" -> listOf("save"); "rejected" -> listOf("cleanFirst"); else -> emptyList() }
+            assertEquals(listOf("first", "second") + tail, refs())
+            if (expected != "succeeded") assertEquals("second", result.failedStepId)
+        }
+        for ((observed, expected) in listOf("rejected" to "failed", "waiting" to "indeterminate")) fixture {
+            val gated = root.copy(receiptWhen = ok, rejectedWhen = status("rejected"))
+            loader { request -> listOf(mapOf("status" to (if (request.dataSourceRef == "save") observed else "accepted"), "token" to 7)) }
+            assertEquals(expected, execute(gated).status)
+            val cleanup = if (observed == "rejected") listOf("cleanSecond", "cleanFirst") else emptyList()
+            assertEquals(listOf("first","second","save") + cleanup, refs())
+        }
+    }
 
     @Test fun cleanupPredicateChecksOnlyItsOwnPhysicalResponseAndContinuesAfterADefiniteNegative() = runBlocking {
         val receipt = DashboardConditionDef(any = listOf("0.entity", "0.data.entity", "0", "1").map { path ->

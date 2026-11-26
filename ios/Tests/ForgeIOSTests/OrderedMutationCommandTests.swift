@@ -220,6 +220,11 @@ private final class CommandResponseProtocol: URLProtocol {
         let status = Int(path) ?? 200
         let body: String
         switch path {
+        case "confirmed": body = #"{"rows":[{"status":"ready","denied":false,"nullable":null,"zero":0,"empty":"","flag":false,"numericText":"1","bag":[],"object":{}}]}"#
+        case "denied": body = #"{"rows":[{"status":"ready","denied":true,"message":"A record already exists."}]}"#
+        case "blank-denial": body = #"{"rows":[{"status":"ready","denied":true,"message":"  "}]}"#
+        case "ambiguous": body = #"{"rows":[{"status":"ready"}]}"#
+        case "unconfirmed": body = #"{"rows":[{"status":"processing","denied":false}]}"#
         case "true": body = #"{"rows":[true]}"#
         case "false": body = #"{"rows":[false]}"#
         case "number": body = #"{"rows":[1]}"#
@@ -380,5 +385,169 @@ extension OrderedMutationCommandTests {
             XCTAssertEqual(calls.map(\.0),revoke ? ["create","remove"] : ["create","link","save","list"])
             XCTAssertEqual(result?.status,revoke ? "invalid_payload" : "succeeded")
         }
+    }
+}
+
+extension OrderedMutationCommandTests {
+    func testRootInvocationReceiptClassifiesHTTPRowsAndScopesCompletionEffects() async throws {
+        typealias Rule = [String: Any]
+        let accepted: Rule = ["source":"collection","selector":"0.status","equals":"ready"]
+        let denied: Rule = ["source":"collection","key":"0.denied","equals":true]
+        let noApproval: Rule = ["source":"collection","field":"0.unsupplied","notEquals":"denied"]
+        let zero: Rule = ["source":"collection","field":"0.zero","equals":0]
+        let null: Rule = ["source":"collection","field":"0.nullable","equals":NSNull()]
+        let table: [(String, Rule, Rule?, String)] = [
+            ("confirmed", accepted, denied, "succeeded"), ("denied", accepted, denied, "failed"),
+            ("blank-denial", accepted, denied, "failed"), ("ambiguous", accepted, denied, "indeterminate"),
+            ("unconfirmed", accepted, denied, "indeterminate"), ("confirmed", noApproval, nil, "indeterminate"),
+            ("confirmed", ["source":"collection","field":"0.bag"], nil, "succeeded"),
+            ("confirmed", ["source":"collection","field":"0.object"], nil, "succeeded"),
+            ("confirmed", ["not":["source":"collection","field":"0.numericText","gt":0]], nil, "indeterminate"),
+            ("confirmed", ["not":["source":"collection","field":"0.flag","gt":0]], nil, "indeterminate"),
+            ("confirmed", ["not":["source":"collection","field":"0.nullable","gt":0]], nil, "indeterminate"),
+            ("confirmed", ["source":"collection","field":"0.zero","gte":0,"lt":1], nil, "succeeded"),
+            ("confirmed", ["source":"collection","field":"0.flag"], nil, "indeterminate"),
+            ("confirmed", ["source":"collection","field":"0.zero"], nil, "indeterminate"),
+            ("confirmed", ["source":"collection","field":"0.empty"], nil, "indeterminate"),
+            ("confirmed", ["source":"collection","field":"0.nullable"], nil, "indeterminate"),
+            ("confirmed", ["source":"collection","field":"0.status"], nil, "succeeded"),
+            ("confirmed", ["source":"collection","field":"0.flag","equals":"false"], nil, "indeterminate"),
+            ("confirmed", ["source":"collection","field":"0.flag","in":["false"]], nil, "indeterminate"),
+            ("confirmed", ["source":"collection","field":"0.flag","equals":false], nil, "succeeded"),
+            ("confirmed", ["not":noApproval], nil, "indeterminate"), ("confirmed", ["any":[noApproval,zero]], nil, "succeeded"),
+            ("confirmed", ["all":[noApproval,zero]], nil, "indeterminate"), ("confirmed", ["all":[null,zero]], nil, "succeeded"),
+            ("confirmed", accepted, ["all":[noApproval,denied]], "succeeded"),
+            ("confirmed", ["source":"collection","field":"0.empty","equals":""], nil, "succeeded"),
+            ("confirmed", ["source":"collection","field":"0.flag","equals":0], nil, "indeterminate"),
+            ("empty", ["not":noApproval], nil, "indeterminate"), ("true", ["source":"collection","field":"0","equals":true], nil, "indeterminate"),
+            ("missing", accepted, nil, "indeterminate"), ("malformed", accepted, nil, "indeterminate"),
+            ("422", accepted, nil, "failed"), ("502", accepted, nil, "indeterminate"),
+        ]
+        for (path, yes, no, expected) in table {
+            let configuration = URLSessionConfiguration.ephemeral
+            configuration.protocolClasses = [CommandResponseProtocol.self]
+            let runtime = ForgeRuntime(windowMetadataBaseURL: URL(string: "https://items.test")!, session: URLSession(configuration: configuration))
+            let refs: [String:Any] = ["draft":[:],"writer":["service":["uri":"/"+path,"method":"POST"]],"list":["service":["uri":"/empty"]]]
+            let id = await runtime.openWindowInline(key: "items", title: "Items", metadata: try metadata(refs: refs)).id
+            _ = await runtime.presentDialog(windowID: id, dialogID: "editor")
+            await runtime.setDataSourceForm(windowID: id, dataSourceRef: "draft", values:["file":.string("submitted")])
+            await runtime.setDataSourceCollection(windowID: id, dataSourceRef: "writer", rows:[["status":.string("ready"),"denied":.bool(false)]])
+            var command: [String:Any] = ["dataSourceRef":"writer","receiptWhen":yes,"resultState":["observed":["0.status"]],
+                "successState":["committed":true],"successFormState":["file":NSNull()],"indeterminateState":["uncertain":true],"refresh":[["dataSourceRef":"list"]]]
+            if let no { command["rejectedWhen"] = no }
+            let action = try JSONDecoder().decode(ActionDef.self, from: JSONSerialization.data(withJSONObject: ["id":"save","close":true,"mutationCommand":command]))
+            let result = await run(runtime, id, action), root = try XCTUnwrap(action.footerCommand)
+            let state = await runtime.mutationCommandState(windowID: id, command: root)
+            let window = await runtime.windowFormJSONValue(windowID: id), form = await runtime.dataSourceForm(windowID: id, dataSourceRef: "draft")
+            let dialog = await runtime.dialogState(windowID: id, dialogID: "editor")
+            XCTAssertEqual(result?.status, expected, path)
+            XCTAssertEqual(state.writerStatus, expected == "succeeded" ? .succeeded : expected == "failed" ? .failed : .indeterminate, path)
+            XCTAssertEqual(state.guarded, expected == "indeterminate", path)
+            XCTAssertEqual(dialog.open, expected != "succeeded", path)
+            XCTAssertEqual(window["committed"], expected == "succeeded" ? .bool(true) : nil, path)
+            XCTAssertEqual(window["observed"], expected == "succeeded" ? .string("ready") : nil, path)
+            XCTAssertEqual(window["uncertain"], expected == "indeterminate" ? .bool(true) : nil, path)
+            XCTAssertEqual(form["file"], expected == "succeeded" ? .null : .string("submitted"), path)
+            if path == "denied" { XCTAssertEqual(result?.error, "A record already exists.") }
+            if path == "blank-denial" { XCTAssertEqual(result?.error, "The producer rejected the write.") }
+            if path == "422" { XCTAssertTrue(result?.error?.contains("422") == true) }
+            if expected == "indeterminate" {
+                let again = await run(runtime, id, action)
+                XCTAssertEqual(again?.status, "suppressed", path)
+            }
+        }
+    }
+
+    func testPreparationAndFinalRejectionCompensateOnlyConfirmedPredecessors() async throws {
+        let ready = DashboardConditionDef(source: "collection", field: "0.status", equals: .string("ready"))
+        let rejected = DashboardConditionDef(source: "collection", field: "0.status", equals: .string("denied"))
+        for (target,status,expected,calls) in [
+            ("stage","pending","indeterminate",["stage"]), ("stage","denied","failed",["stage"]),
+            ("link","pending","indeterminate",["stage","link"]), ("link","denied","failed",["stage","link","remove"]),
+            ("save","pending","indeterminate",["stage","link","save"]), ("save","denied","failed",["stage","link","save","unlink","remove"]),
+            ("save","ready","succeeded",["stage","link","save","list"])
+        ] {
+            let runtime = ForgeRuntime(), journal = CommandJournal()
+            let refs = Dictionary(uniqueKeysWithValues: ["draft","stage","link","save","remove","unlink","list"].map { ($0, [:] as [String:String]) })
+            let id = await runtime.openWindowInline(key:"items",title:"Items",metadata:try metadata(refs: refs)).id
+            await runtime.registerDataSourceLoader { request in
+                await journal.append(request)
+                return .init(rows:[["status":.string(request.dataSourceRef == target ? status : "ready"),"message":.string("Changes were refused.")]])
+            }
+            let before = [
+                MutationBeforeStepDef(command:.init(commandId:"stage",dataSourceRef:"stage",receiptWhen:ready,rejectedWhen:rejected),cleanup:.init(commandId:"remove",dataSourceRef:"remove")),
+                MutationBeforeStepDef(command:.init(commandId:"link",dataSourceRef:"link",receiptWhen:ready,rejectedWhen:rejected),cleanup:.init(commandId:"unlink",dataSourceRef:"unlink"))
+            ]
+            let command = MutationCommandDef(commandId:"final",before:before,dataSourceRef:"save",receiptWhen:ready,rejectedWhen:rejected,
+                successState:["published":.bool(true)],refresh:[.init(dataSourceRef:"list")])
+            let outcome = await runtime.executeMutationCommand(windowID:id,sourceDataSourceRef:"draft",command:command)
+            let journalRefs = await journal.calls.map(\.0), state = await runtime.mutationCommandState(windowID:id,command:command)
+            XCTAssertEqual(outcome.status,expected); XCTAssertEqual(journalRefs,calls)
+            XCTAssertEqual(outcome.failedStepId, target == "save" ? nil : target)
+            XCTAssertEqual(state.guarded,expected == "indeterminate")
+            if expected == "failed" { XCTAssertEqual(outcome.error,"Changes were refused.") }
+            if target != "save" { XCTAssertEqual(state.writerStatus,.notInvoked) }
+        }
+    }
+}
+
+extension OrderedMutationCommandTests {
+    func testRejectsUnpairedOrAmbientWriterReceiptPredicatesBeforeDispatch() async throws {
+        let (runtime,id) = try await seeded(), journal = CommandJournal()
+        await runtime.registerDataSourceLoader { request in await journal.append(request); return .init() }
+        let valid: [String: Any] = ["source":"collection","field":"0.status","equals":"accepted"]
+        let invalid: [[String:Any]] = [
+            ["receiptWhen":["source":"collection","field":"0.status","equals":"ok","exists":true]],
+            ["receiptWhen":["source":"collection","field":"0.status","typo":true]],
+            ["receiptWhen":["source":"collection","field":"0.status","in":[]]],
+            ["receiptWhen":["source":"collection","field":"0.status","in":["ok",["nested":true]]]],
+            ["receiptWhen":["source":"collection","field":"0.status","equals":["unexpected"]]],
+            ["receiptWhen":["source":"collection","field":"0.status","gt":NSNull()]],
+            ["receiptWhen":["any":[valid],"unexpected":true]],
+            ["rejectedWhen":valid], ["receiptWhen":["source":"form","field":"0.status","equals":"ok"]],
+            ["receiptWhen":["source":"collection","dataSourceRef":"another","field":"0.status","equals":"ok"]],
+            ["receiptWhen":["source":"collection","field":"__proto__.status","equals":"ok"]],
+            ["receiptWhen":["source":"collection","field":"0.constructor","equals":"ok"]],
+            ["receiptWhen":["all":[valid],"equals":true]],
+            ["before":[["command":["commandId":"stage","dataSourceRef":"create","rejectedWhen":valid]]]],
+            ["before":[["command":["commandId":"stage","dataSourceRef":"create"],
+                        "cleanup":["commandId":"clean","dataSourceRef":"remove","receiptWhen":valid,"rejectedWhen":valid]]]],
+        ]
+        for extra in invalid {
+            let action = try footer(extra)
+            let outcome = await run(runtime,id,action)
+            XCTAssertEqual(outcome?.status,"invalid_payload",String(describing:extra))
+        }
+        let calls = await journal.calls
+        XCTAssertTrue(calls.isEmpty)
+    }
+}
+
+extension OrderedMutationCommandTests {
+    func testConfirmedReceiptAfterDialogReplacementRetainsAcknowledgementWithoutRefreshing() async throws {
+        let (runtime,id) = try await seeded(), journal = CommandJournal()
+        let action = try footer(["before":[],"prepare":"","dataSourceRef":"save","successState":["done":true],
+            "successFormState":["done":true],"receiptWhen":["source":"collection","field":"0.status","equals":"completed"]])
+        _ = await runtime.presentDialog(windowID:id,dialogID:"editor",parameters:["record":.number(1)])
+        let invoked = expectation(description:"writer"), release = AsyncStream<Void>.makeStream()
+        await runtime.registerDataSourceLoader { request in
+            await journal.append(request)
+            if request.dataSourceRef == "save" {
+                invoked.fulfill()
+                for await _ in release.stream { break }
+                return .init(rows:[["status":.string("completed"),"id":.number(10)]])
+            }
+            return .init()
+        }
+        let send = Task { await self.run(runtime,id,action) }
+        await fulfillment(of:[invoked],timeout:4)
+        await runtime.closeDialogPublic(windowID:id,dialogID:"editor")
+        _ = await runtime.presentDialog(windowID:id,dialogID:"editor",parameters:["record":.number(2)])
+        release.continuation.yield(()); release.continuation.finish()
+        let result = await send.value, refs = await journal.calls.map(\.0)
+        let window = await runtime.windowFormJSONValue(windowID:id), form = await runtime.dataSourceForm(windowID:id,dataSourceRef:"draft")
+        XCTAssertEqual(result?.status,"succeeded")
+        XCTAssertEqual(refs,["save"])
+        XCTAssertNil(window["done"]); XCTAssertNil(window["receipt"]); XCTAssertNil(form["done"])
     }
 }

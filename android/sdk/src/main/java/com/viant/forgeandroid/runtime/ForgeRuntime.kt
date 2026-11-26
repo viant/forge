@@ -78,16 +78,17 @@ class ForgeRuntime(
         loader: suspend (DataSourceFetchRequest) -> DataSourceFetchResult?
     ) {
         dataSourceRuntime.setRequestLoader { context, detachedReadId ->
+            val input = context.input.peek()
             loader(
                 DataSourceFetchRequest(
                     windowId = context.window.windowId,
                     conversationId = windows.value.firstOrNull { it.windowId == context.window.windowId }?.conversationId,
                     dataSourceRef = context.dataSourceRef,
                     dataSource = context.dataSource,
-                    input = context.input.peek(),
+                    input = input,
                     resolvedInputs = parameterResolver.resolveFlat(context.dataSource.parameters, context),
-                    invocationId = detachedReadId,
-                    bypassCache = detachedReadId != null
+                    invocationId = detachedReadId ?: input.preparedDispatchId.takeIf { input.refreshOwner != null },
+                    bypassCache = detachedReadId != null || input.refreshBypassCache
                 )
             )?.let {
                 DataSourceRuntime.LoaderResult(

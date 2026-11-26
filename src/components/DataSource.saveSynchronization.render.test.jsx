@@ -260,3 +260,31 @@ it('clears a confirmed submission through its source form owner while retaining 
         expect(v.transport.mock.calls.map(([request]) => request.dataSourceRef)).toEqual(['record', 'writer']);
     } finally {await v.close();}
 });
+
+it.each([
+    [{data: [{outcome: 'accepted'}]}, 'succeeded', 1],
+    [{data: [{outcome: 'rejected', message: 'Invalid source'}]}, 'failed', 0],
+    [{data: [{outcome: 'pending'}]}, 'indeterminate', 0],
+    [{data: [{}]}, 'indeterminate', 0],
+    [{rows: null, cache: {hit: true}}, 'indeterminate', 0],
+])('checks the writer response before refreshing its mounted owner (%j)', async (reply, status, refreshes) => {
+    const v = await mount();
+    try {
+        const priorRequests = v.transport.mock.calls.length;
+        v.transport.mockResolvedValueOnce(reply);
+        const command = {
+            commandId: 'apply', dataSourceRef: 'writer',
+            receiptWhen: {source: 'collection', field: '0.outcome', equals: 'accepted'},
+            rejectedWhen: {source: 'collection', field: '0.outcome', equals: 'rejected'},
+            refresh: [{dataSourceRef: 'record', bypassCache: true}],
+        };
+        let completion;
+        await v.settle(() => {completion = executeCommand(v.properties, command);});
+        const result = await completion;
+        expect(result.status).toBe(status);
+        if (status === 'failed') expect(result.error.message).toBe('Invalid source');
+        const requests = v.transport.mock.calls.slice(priorRequests);
+        expect(requests.filter(([r]) => r.dataSourceRef === 'writer')).toHaveLength(1);
+        expect(requests.filter(([r]) => r.dataSourceRef === 'record')).toHaveLength(refreshes);
+    } finally {await v.close();}
+});

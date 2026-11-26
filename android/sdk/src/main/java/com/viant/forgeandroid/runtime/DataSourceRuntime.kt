@@ -7,6 +7,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
@@ -174,8 +179,10 @@ class DataSourceRuntime(
         val commitGuard = requestedInput.preparedGuard
         val reportOwned = live.window.metadata.peek()?.let { live.dataSourceRef in reportOwnedDataSourceRefs(it) } == true
         if (reportOwned && reportRequestInspectionOnly) { failPrepared(ctx, "Debug report inspection is active."); return }
+        val refreshOwner = requestedInput.refreshOwner
         fun canCommit() = (!reportOwned || commitGuard != null) && commitGuard?.invoke() != false &&
-            (commitGuard == null || live.input.peek().preparedDispatchId == requestedInput.preparedDispatchId) &&
+            refreshOwner?.invoke() != false &&
+            ((commitGuard == null && refreshOwner == null) || live.input.peek().preparedDispatchId == requestedInput.preparedDispatchId) &&
             (!reportOwned || authorizeReportRead?.invoke(live, requestedInput) != false)
         if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
         ctx.control.set(ctx.control.peek().copy(loading = true, error = null, resolved = false, requestId = requestedInput.preparedDispatchId))
@@ -228,7 +235,7 @@ class DataSourceRuntime(
             val request = buildRequest(ctx) ?: run {
                 val message = when {
                     reportOwned -> "The report datasource has no physical loader."
-                    requestedInput.preparedDispatchId != null -> "The command datasource has no physical loader."
+                    requestedInput.preparedDispatchId != null && refreshOwner == null -> "The command datasource has no physical loader."
                     else -> null
                 }
                 finishFetch(ctx, error = message, cause = message?.let(::IllegalStateException))
@@ -957,13 +964,38 @@ class DataSourceContext(
     fun setFilterValue(key: String, value: Any?) {
         val next = input.peek().filter.toMutableMap()
         next[key] = value
-        input.set(input.peek().copy(filter = next, preparedGuard = null, preparedWindowForm = null, preparedMetadata = null, preparedDispatchId = null, preparedReadPermit = null))
+        input.set(input.peek().copy(filter = next, preparedGuard = null, preparedWindowForm = null, preparedMetadata = null, preparedDispatchId = null, preparedReadPermit = null, refreshOwner = null, refreshBypassCache = false))
     }
 
     fun fetchCollection() {
-        val current = input.peek()
-        input.set(current.copy(fetch = true, refresh = !current.refresh))
+        input.update { current -> current.copy(fetch = true, refresh = !current.refresh, refreshOwner = null, refreshBypassCache = false,
+            preparedDispatchId = if (current.refreshOwner == null) current.preparedDispatchId else null) }
     }
+    /** Use the refresh's own completion even if the reader enters and leaves loading in the same turn. */
+    internal suspend fun refreshAndAwait(bypassCache: Boolean = false, currentOwner: () -> Boolean): PreparedReportFetchResult = coroutineScope {
+        check(currentOwner()) { "The refresh is no longer current." }
+        val id = java.util.UUID.randomUUID().toString()
+        preparedRegister(id)
+        val completion = async(start = CoroutineStart.UNDISPATCHED) { preparedAwait(id) }
+        input.update { original -> original.copy(fetch = true, refresh = !original.refresh,
+            preparedDispatchId = id, requireCommandRecords = false, refreshOwner = currentOwner, refreshBypassCache = bypassCache) }
+        // A second input can replace this one before collectLatest even observes it.
+        val superseded = async(start = CoroutineStart.UNDISPATCHED) { input.flow.first { it.preparedDispatchId != id } }
+        try {
+            select {
+                completion.onAwait { it }
+                superseded.onAwait { error("The requested refresh was superseded.") }
+            }
+        } finally {
+            completion.cancel()
+            superseded.cancel()
+            input.update { latest -> if (latest.preparedDispatchId != id) latest else
+                latest.copy(fetch = false, refresh = false, preparedDispatchId = null, refreshOwner = null, refreshBypassCache = false) }
+            control.update { status -> if (status.requestId == id && status.loading)
+                status.copy(loading = false, resolved = false, requestId = null) else status }
+        }
+    }
+
     fun fetchCollectionAutomatically():Boolean {
         if(dataSource.autoFetch==false) return false
         fetchCollection();return true
@@ -1002,7 +1034,7 @@ class DataSourceContext(
     }
 
     fun setFilter(filter: Map<String, Any?>) {
-        input.set(input.peek().copy(filter = filter, fetch = true, preparedGuard = null, preparedWindowForm = null, preparedMetadata = null, preparedDispatchId = null, preparedReadPermit = null))
+        input.set(input.peek().copy(filter = filter, fetch = true, preparedGuard = null, preparedWindowForm = null, preparedMetadata = null, preparedDispatchId = null, preparedReadPermit = null, refreshOwner = null, refreshBypassCache = false))
     }
 
     internal fun captureRequest(snapshot: InputState): DataSourceContext = DataSourceContext(
@@ -1084,7 +1116,7 @@ class DataSourceContext(
         }
         val next = current.copy(parameters = parameters.mapValues { snapshotInputValue(it.value) }, filter = nextFilter, fetch = fetch || (preservePendingFetch && current.fetch),
             refresh = if (!preservePendingFetch && fetch && current.fetch) !current.refresh else current.refresh,
-            preparedGuard = commitGuard, requireCommandRecords = requireRecords,
+            preparedGuard = commitGuard, requireCommandRecords = requireRecords, refreshOwner = null, refreshBypassCache = false,
             preparedWindowForm = if (commitGuard == null) null else window.peekWindowForm().mapValues { snapshotInputValue(it.value) },
             preparedMetadata = if (commitGuard == null) null else window.metadata.peek(),
             preparedDispatchId = if (commitGuard == null && !captureResult) null else java.util.UUID.randomUUID().toString(), preparedReadPermit = permit)
@@ -1101,7 +1133,7 @@ class DataSourceContext(
     }
 
     fun setPage(page: Int?) {
-        input.set(input.peek().copy(page = page, fetch = true, preparedGuard = null, preparedWindowForm = null, preparedMetadata = null, preparedDispatchId = null, preparedReadPermit = null))
+        input.set(input.peek().copy(page = page, fetch = true, preparedGuard = null, preparedWindowForm = null, preparedMetadata = null, preparedDispatchId = null, preparedReadPermit = null, refreshOwner = null, refreshBypassCache = false))
     }
 
     private fun trigger(event: String, args: Map<String, Any?> = emptyMap()) {
