@@ -127,6 +127,10 @@ On iOS and Android, footer commands use the same executor as other native mutati
 
 Native preparation handlers and resource-model hooks can read the active draft, selected rows, window state and admitted authorization. Use a synchronous, side-effect-free `prepare` handler that returns the writer parameter object. A missing handler, a promise, an attempted mutation inside preparation, or an invalid result fails before the writer is invoked. Declare post-write work in `resultState`, `reconcile` or `refresh`. Use the dialog’s `onOpen` event for state that must reset on each genuine open.
 
+### Selection-only lookup
+
+For a single-row chooser, a lookup with `scope: noop` and an authored `onLookup` action can display a selected value while keeping its browse button available. Declare the ID and display-field outputs on the lookup. The native clients apply those outputs to the live form and run the authored action once when the user commits a selection. Cancellation, a replaced parent dialog, or a changed principal discards the pending selection. Keep the producer's authorization decision with its existing reader or writer.
+
 ## Resource models and typed marshalling
 
 Resource models are a shared data contract used by primitives; they are not an additional visual primitive and they do not replace ordinary form/datasource binding. Existing windows remain unchanged unless they explicitly declare `resourceModelRef` on a reader or `payload.modelRef` on a `MutationCommand`.

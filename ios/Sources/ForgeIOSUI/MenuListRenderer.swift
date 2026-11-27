@@ -511,12 +511,20 @@ public struct MenuListRenderer: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title + (required ? " *" : "")).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             HStack(spacing: 6) {
-                TextField(item.properties["placeholder"]?.displayString ?? "Select \(title.lowercased())", text: Binding(
-                    get: { value },
-                    set: { applyItemValue(.string($0), for: item) }
-                ))
-                .modifier(ForgeThemeInputModifier(required: required, lookup: true))
-                .accessibilityLabel(title + (required ? ", required" : ""))
+                if selectionOnlyLookupCallback(item) != nil {
+                    Text(value.isEmpty ? (item.properties["placeholder"]?.displayString ?? "Select \(title.lowercased())") : value)
+                        .foregroundStyle(value.isEmpty ? Color.secondary : Color.primary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityLabel(title)
+                        .accessibilityValue(value)
+                } else {
+                    TextField(item.properties["placeholder"]?.displayString ?? "Select \(title.lowercased())", text: Binding(
+                        get: { value },
+                        set: { applyItemValue(.string($0), for: item) }
+                    ))
+                    .modifier(ForgeThemeInputModifier(required: required, lookup: true))
+                    .accessibilityLabel(title + (required ? ", required" : ""))
+                }
                 Button { openItemLookup(item) } label: {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 16, weight: .semibold))
@@ -1219,19 +1227,33 @@ public struct MenuListRenderer: View {
         return display == "—" ? "" : display
     }
 
+    private func selectionOnlyLookupCallback(_ item: ItemDef) -> ExecutionDef? {
+        guard item.scope?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "noop",
+              item.lookup?.objectValue?["multiple"]?.boolValue != true else { return nil }
+        return item.on.first { $0.event?.lowercased() == "onlookup" }
+    }
+
     private func openItemLookup(_ item: ItemDef) {
         guard let runtime,
               let window,
               let lookup = item.lookup,
               let dialogID = lookup.objectValue?["dialogId"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines),
               !dialogID.isEmpty else { return }
+        let dataSourceRef = resolveItemDataSourceRef(item) ?? container.dataSourceRef ?? ""
+        if let callback = selectionOnlyLookupCallback(item) {
+            let parent = dialogPresentation
+            Task {
+                await runtime.openSelectionOnlyLookup(windowID: window.windowID, source: dataSourceRef, dialogID: dialogID,
+                    parameters: menuLookupParameters(lookup), valueField: item.valueKey, parent: parent, callback: callback)
+            }
+            return
+        }
         let multiple = lookup.objectValue?["multiple"]?.boolValue ?? false
         let execution = ExecutionDef(
             action: "window.openDialog",
             args: [dialogID],
             parameters: menuLookupParameters(lookup)
         )
-        let dataSourceRef = resolveItemDataSourceRef(item) ?? container.dataSourceRef ?? ""
         Task {
             _ = await runtime.execute(
                 execution,

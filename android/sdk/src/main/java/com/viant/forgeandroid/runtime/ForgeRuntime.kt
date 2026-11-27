@@ -56,7 +56,11 @@ class ForgeRuntime(
     private val handlers = HandlerRegistry()
     private val execEngine = ExecutionEngine(this, handlers, parameterResolver, scope)
     private val pendingDialogs = mutableMapOf<String, PendingDialog>()
-    private val pendingDialogResults = mutableMapOf<String, CompletableDeferred<Map<String, Any?>?>>()
+    private class DialogResultWaiter(val owned: Boolean = false) {
+        val result = CompletableDeferred<Map<String, Any?>?>()
+        var closed: DialogState? = null
+    }
+    private val pendingDialogResults = mutableMapOf<String, DialogResultWaiter>()
     private val pendingWindows = mutableMapOf<String, PendingWindow>()
     private var windowMetadataLoader: (suspend (String) -> WindowMetadata?)? = null
     private var windowMetadataRequestLoader: (suspend (WindowMetadataRequest) -> WindowMetadata?)? = null
@@ -334,7 +338,11 @@ class ForgeRuntime(
 
     fun closeWindow(windowId: String) {
         metadataSignal(windowId).peek()?.dialogs?.forEach { dialog ->
-            signals.dialog("${windowId}Dialog${dialog.id}").peek().verifiedSelection?.dispose()
+            val key = "${windowId}Dialog${dialog.id}"
+            signals.dialog(key).peek().verifiedSelection?.dispose()
+            synchronized(this) {
+                if (pendingDialogResults[key]?.owned == true) pendingDialogResults.remove(key)?.result?.complete(null)
+            }
         }
         completedDatasetProofs.closeWindow(windowId)
         frozenNativeReports.closeWindow(windowId)
@@ -616,6 +624,10 @@ class ForgeRuntime(
         val next = DialogState(open = true, selectionMode = selectionMode, props = args, args = args,
             initializing = hooks.isNotEmpty(), sourceDataSourceRef = sourceRef, verifiedSelection = verifiedSelection)
         previous.verifiedSelection?.dispose()
+        val key = "${windowId}Dialog$dialogId"
+        if (previous.open && pendingDialogResults[key]?.owned == true) {
+            pendingDialogResults.remove(key)?.result?.complete(null)
+        }
         signal.set(next)
         if (previous.open) scope.launch { mutationCommands.retireReadbacks(windowId, previous) }
         val fetch = dialog?.fetchOnOpen ?: (dialog?.content?.fetchData != false)
@@ -653,8 +665,10 @@ class ForgeRuntime(
         pendingDialogs.remove(dialogKey)
         // Publishing the closed state can synchronously reopen this key and register a new waiter.
         current.verifiedSelection?.dispose()
-        sig.set(current.copy(open = false, verifiedSelection = null))
-        waiter?.complete(result)
+        val closed = current.copy(open = false, verifiedSelection = null)
+        waiter?.closed = closed
+        sig.set(closed)
+        waiter?.result?.complete(result)
         if (current.open) scope.launch { mutationCommands.retireReadbacks(windowId, current) }
     }
 
@@ -672,7 +686,8 @@ class ForgeRuntime(
     }
 
     @Synchronized
-    internal fun pendingDialog(dialogKey: String): PendingDialog? = pendingDialogs[dialogKey]
+    internal fun pendingDialog(dialogKey: String): PendingDialog? =
+        pendingDialogs[dialogKey].takeUnless { pendingDialogResults[dialogKey]?.owned == true }
 
     internal fun registerPendingWindow(windowId: String, pending: PendingWindow) {
         pendingWindows[windowId] = pending
@@ -686,7 +701,9 @@ class ForgeRuntime(
 
     suspend fun awaitDialogResult(windowId: String, dialogId: String): Map<String, Any?>? {
         val waiter = synchronized(this) {
-            pendingDialogResults.getOrPut("${windowId}Dialog$dialogId") { CompletableDeferred() }
+            val key = "${windowId}Dialog$dialogId"
+            if (pendingDialogResults[key]?.owned == true) return null
+            pendingDialogResults.getOrPut(key) { DialogResultWaiter() }.result
         }
         return waiter.await()
     }
@@ -713,9 +730,79 @@ class ForgeRuntime(
     ): Map<String, Any?>? {
         val waiter = synchronized(this) {
             if (!presentDialog(windowId, dialogId, parameters, selectionMode) || !windowContext(windowId).dialogSignal(dialogId).peek().open) return null
-            pendingDialogResults.getOrPut("${windowId}Dialog$dialogId") { CompletableDeferred() }
+            val key = "${windowId}Dialog$dialogId"
+            if (pendingDialogResults[key]?.owned == true) return null
+            pendingDialogResults.getOrPut(key) { DialogResultWaiter() }.result
         }
         return waiter.await()
+    }
+
+    // The selection-only path owns one picker result. Ordinary dialogs
+    // keep their existing shared waiter and output-mapping behavior.
+    private suspend fun openDialogAwaitResult(window: WindowContext, dialogId: String, parameters: Map<String, Any?>,
+        current: () -> Boolean, consume: suspend (Map<String, Any?>, () -> Boolean) -> Unit) {
+        val key = "${window.windowId}Dialog$dialogId"
+        val signal = window.dialogSignal(dialogId)
+        val waiter = synchronized(this) {
+            if (!current() || signal.peek().open || pendingDialogResults.containsKey(key) ||
+                window.metadata.peek()?.dialogIndex?.containsKey(dialogId) != true) return
+            DialogResultWaiter(owned = true).also {
+                pendingDialogResults[key] = it
+                openDialog(window.windowId, dialogId, parameters, selectionMode = "single")
+            }
+        }
+        try {
+            val payload = waiter.result.await() ?: return
+            val closed = waiter.closed ?: return
+            val completed = { current() && signal.peek() === closed }
+            if (completed()) consume(payload, completed)
+        } finally {
+            synchronized(this) {
+                if (pendingDialogResults[key] === waiter) {
+                    closeDialog(window.windowId, dialogId)
+                }
+            }
+        }
+    }
+
+    internal suspend fun openSelectionOnlyLookup(context: DataSourceContext, item: ItemDef, dialogId: String,
+        parameters: List<ParameterDef>, callback: ExecutionDef, presentationCurrent: () -> Boolean) {
+        val window = context.window
+        val metadata = window.metadata.peek() ?: return
+        val dialog = metadata.dialogIndex[dialogId] ?: return
+        val job = kotlinx.coroutines.currentCoroutineContext()[kotlinx.coroutines.Job]
+        fun current() = job?.isActive != false && presentationCurrent() &&
+            window.signals.ownsMetadata(window.windowId, window.metadata) && window.metadata.peek() === metadata
+
+        val bindings = parameterResolver.resolve(parameters, context)
+        val destination = dialog.content?.dataSourceRef ?: dialog.dataSourceRef ?: context.dataSourceRef
+        val inputs = mutationTargetParameters(bindings.inbound[destination] ?: bindings.inbound[""] ?: emptyMap())
+        openDialogAwaitResult(window, dialogId, inputs, ::current) { payload, stillCurrent ->
+            val record = when {
+                "selected" in payload || "selection" in payload -> {
+                    val rows = payload["selection"] as? List<*>
+                    if ((rows?.size ?: 0) > 1) null
+                    else JsonUtil.asStringMap(payload["selected"] ?: rows?.singleOrNull()).takeIf { it.isNotEmpty() }
+                }
+                else -> payload.takeIf { it.isNotEmpty() }
+            } ?: return@openDialogAwaitResult
+            if (!stillCurrent()) return@openDialogAwaitResult
+            val presentOutputs = bindings.outbound.filter { parameter ->
+                val path = parameter.location ?: parameter.name ?: return@filter false
+                SelectorUtil.resolveParts(record, path.split('.'), SelectorUtil.Missing) !== SelectorUtil.Missing
+            }
+            execEngine.outboundApply(presentOutputs, record, context)
+            if (!stillCurrent()) return@openDialogAwaitResult
+            val value = SelectorUtil.resolve(context.form.peek(), item.dataField ?: item.id)
+            try {
+                execEngine.evaluate(callback, context, mapOf("item" to item, "record" to record, "value" to value),
+                    applyEffects = true, current = stillCurrent, required = true)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                println("Forge lookup action failed [${callback.handler}]: ${error.message}")
+            }
+        }
     }
 
     fun isReadOnly(execution: ExecutionDef, context: DataSourceContext?): Boolean {
@@ -1050,7 +1137,7 @@ class ExecutionEngine(
         else -> null
     }
 
-    private fun outboundApply(outbound: List<ParameterDef>, payload: Map<String, Any?>, callerCtx: DataSourceContext) {
+    internal fun outboundApply(outbound: List<ParameterDef>, payload: Map<String, Any?>, callerCtx: DataSourceContext) {
         outbound.forEach { p ->
             val srcPath = p.location ?: p.name ?: return@forEach
             val value = SelectorUtil.resolve(payload, srcPath)

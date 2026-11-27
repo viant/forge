@@ -1085,11 +1085,54 @@ public actor ForgeRuntime {
         return nil
     }
 
+    package func openSelectionOnlyLookup(
+        windowID: String, source: String, dialogID: String, parameters: [ParameterDef], valueField: String?,
+        parent: (id: String, presentation: UUID)?, callback: ExecutionDef
+    ) async {
+        let key = "\(windowID)Dialog\(dialogID)"
+        guard parent?.id != dialogID, selectionPreparationOwners[key] == nil,
+              let scope = await mutationScope(windowID: windowID, source: source),
+              let dialog = scope.metadata.dialogs.first(where: { $0.id == dialogID }),
+              scope.metadata.dataSources[source] != nil, selectionPreparationOwners[key] == nil else { return }
+        let token = UUID()
+        selectionPreparationOwners[key] = token
+        defer { selectionPreparationOwners.removeValue(forKey: key) }
+
+        let authorization = scope.metadata.authorizationSnapshot
+        let revision = scope.metadata.parentReaders?.revision
+        let current: @Sendable () async -> Bool = {
+            await self.selectionOnlyLookupIsCurrent(windowID: windowID, parent: parent, authorization: authorization,
+                revision: revision, key: key, token: token)
+        }
+        guard await current(), await dialogState(windowID: windowID, dialogID: dialogID).open == false else { return }
+        let destination = dialog.content?.dataSourceRef ?? dialog.dataSourceRef ?? source
+        let input = scope.resolvedParameters(parameters, target: destination)
+        guard let payload = await openDialogAwaitResult(windowID: windowID, dialogID: dialogID, parameters: input, selectionMode: "single"),
+              let record = payload["selected"]?.objectValue ?? payload["selection"]?.arrayValue?.first?.objectValue ?? (payload.isEmpty ? nil : payload),
+              await current() else { return }
+        guard await applyOutbound(parameters, payload: record, callerWindowID: windowID, callerDSRef: source, current: current) else { return }
+        let data = JSONValue.object(record)
+        let execution = ExecutionContext(windowID: windowID, dataSourceRef: source)
+        let value = await formJSONValue(windowID: windowID, dataSourceRef: source)
+        _ = await executeProjectedMetadataAction(callback, context: execution,
+            args: ["record": data, "value": valueField.flatMap { resourceResolveValue(.object(value), path: $0) } ?? .null],
+            applyEffects: true, current: current)
+    }
+
+    private func selectionOnlyLookupIsCurrent(windowID: String, parent: (id: String, presentation: UUID)?,
+                                             authorization: [String: JSONValue], revision: UUID?, key: String, token: UUID) async -> Bool {
+        guard !Task.isCancelled, let metadata = await windowMetadata(id: windowID),
+              metadata.authorizationSnapshot == authorization, metadata.parentReaders?.revision == revision,
+              windowState(id: windowID) != nil, selectionPreparationOwners[key] == token else { return false }
+        guard let parent else { return true }
+        return pendingDialogScope("\(windowID)Dialog\(parent.id)").id == parent.presentation
+    }
+
     private func executeProjectedMetadataAction(
         _ execution: ExecutionDef, context: ExecutionContext,
-        args: [String: JSONValue], applyEffects: Bool
+        args: [String: JSONValue], applyEffects: Bool, current: (@Sendable () async -> Bool)? = nil
     ) async -> JSONValue? {
-        guard windowState(id: context.windowID) != nil,
+        guard await current?() != false, windowState(id: context.windowID) != nil,
               let metadata = await windowMetadata(id: context.windowID),
               let code = metadata.actions?.code, !code.isEmpty,
               let namespace = metadata.actionNamespace(for: execution.action) else { return nil }
@@ -1108,8 +1151,12 @@ public actor ForgeRuntime {
         }
         let executionValue = (try? JSONEncoder().encode(execution)).flatMap { try? JSONDecoder().decode(JSONValue.self, from: $0) } ?? .object([:])
         let windowForm = await windowFormJSONValue(windowID: context.windowID)
-        guard await windowMetadata(id: context.windowID)?.authorizationSnapshot == metadata.authorizationSnapshot,
-              windowState(id: context.windowID) != nil else { return nil }
+        if let current {
+            guard await current() else { return nil }
+        } else {
+            guard await windowMetadata(id: context.windowID)?.authorizationSnapshot == metadata.authorizationSnapshot,
+                  windowState(id: context.windowID) != nil else { return nil }
+        }
         do {
             let projection = try UIActionProjection.invoke(
                 code: code, function: execution.action, namespace: namespace,
@@ -1118,7 +1165,7 @@ public actor ForgeRuntime {
                 authorization: metadata.authorizationSnapshot, aliases: metadata.actionNamespaces
             )
             if applyEffects {
-                guard await applyProjectedUIEffects(projection.effects, context: context, metadata: metadata) else { return nil }
+                guard await applyProjectedUIEffects(projection.effects, context: context, metadata: metadata, current: current) else { return nil }
             }
             return projection.result
         } catch {
@@ -1127,10 +1174,15 @@ public actor ForgeRuntime {
         }
     }
 
-    private func applyProjectedUIEffects(_ effects: [JSONValue], context: ExecutionContext, metadata: WindowMetadata) async -> Bool {
+    private func applyProjectedUIEffects(_ effects: [JSONValue], context: ExecutionContext, metadata: WindowMetadata,
+                                         current: (@Sendable () async -> Bool)? = nil) async -> Bool {
         for effect in effects {
-            guard await windowMetadata(id: context.windowID)?.authorizationSnapshot == metadata.authorizationSnapshot,
-                  windowState(id: context.windowID) != nil else { return false }
+            if let current {
+                guard await current() else { return false }
+            } else {
+                guard await windowMetadata(id: context.windowID)?.authorizationSnapshot == metadata.authorizationSnapshot,
+                      windowState(id: context.windowID) != nil else { return false }
+            }
             guard let object = effect.objectValue, let kind = object["kind"]?.stringValue else { continue }
             let ref = object["ref"]?.stringValue
             let value = object["value"]
@@ -1157,7 +1209,15 @@ public actor ForgeRuntime {
             case "windowFormPatch": if let values = value?.objectValue { await setWindowFormValue(windowID: context.windowID, values: values, bumpPrefillRevision: false) }
             case "input": if let ref, let values = value?.objectValue { await setDataSourceInputParameters(windowID: context.windowID, dataSourceRef: ref, parameters: values) }
             case "filter": if let ref, let values = value?.objectValue { await setDataSourceFilter(windowID: context.windowID, dataSourceRef: ref, filter: values) }
-            case "fetch": if let ref, metadata.dataSources[ref] != nil { await refreshDataSourceCollection(windowID: context.windowID, dataSourceRef: ref) }
+            case "fetch":
+                if let ref, metadata.dataSources[ref] != nil {
+                    if let current {
+                        let bypassCache = value?.objectValue?["cache"]?.objectValue?["bypassCache"] == .bool(true)
+                        _ = await refreshDataSourceRows(windowID: context.windowID, dataSourceRef: ref, bypassCache: bypassCache, current: current)
+                    } else {
+                        await refreshDataSourceCollection(windowID: context.windowID, dataSourceRef: ref)
+                    }
+                }
             case "resetSelection":
                 if let ref, metadata.dataSources[ref] != nil {
                     let id = WindowIdentity(windowID: context.windowID).dataSourceID(ref: ref)
@@ -1319,12 +1379,14 @@ public actor ForgeRuntime {
 
     // MARK: - Outbound parameter application
 
+    @discardableResult
     func applyOutbound(
         _ outbound: [ParameterDef],
         payload: [String: JSONValue],
         callerWindowID: String,
-        callerDSRef: String
-    ) async {
+        callerDSRef: String,
+        current: (@Sendable () async -> Bool)? = nil
+    ) async -> Bool {
         let dsID = WindowIdentity(windowID: callerWindowID).dataSourceID(ref: callerDSRef)
         var form = await dataSourceRuntime.form(dataSourceID: dsID)
         for param in outbound where param.direction == "out" || param.direction == "inout" {
@@ -1338,7 +1400,13 @@ public actor ForgeRuntime {
                 form[targetName] = val
             }
         }
-        await dataSourceRuntime.setForm(dataSourceID: dsID, values: form)
+        if let current {
+            guard await current() else { return false }
+            await setDataSourceForm(windowID: callerWindowID, dataSourceRef: callerDSRef, values: form)
+        } else {
+            await dataSourceRuntime.setForm(dataSourceID: dsID, values: form)
+        }
+        return true
     }
 
     func resolveOutbound(_ parameters: [ParameterDef]) -> [ParameterDef] {

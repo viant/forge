@@ -42,6 +42,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
@@ -568,6 +570,17 @@ private fun FormItemRenderer(
                 }
                 "lookup" -> {
                     val lookup = item.lookup ?: item.properties["lookup"]
+                    val callback = selectionOnlyLookupCallback(item)
+                    val selectionOnly = callback != null
+                    val scope = if (selectionOnly) rememberCoroutineScope() else null
+                    val owner = LocalFileDialogPresentation.current
+                    val open = {
+                        if (scope == null) openLookup(runtime, dataSourceContext, lookup)
+                        else scope.launch {
+                            runSelectionOnlyLookup(runtime, dataSourceContext, item) { owner?.isCurrent() != false }
+                        }
+                        Unit
+                    }
                     val display = lookupDisplayValue(lookup, form, value)
                     val compactPresentation = LocalForgePresentationDensity.current == ForgePresentationDensity.Compact
                     if (compactPresentation) {
@@ -589,10 +602,11 @@ private fun FormItemRenderer(
                                     value = value,
                                     onValueChange = { setScopedItemValue(runtime, dataSourceContext, item, key, it) },
                                     modifier = Modifier.weight(1f),
-                                    backgroundColor = Color(0xFFEEF8F1)
+                                    backgroundColor = Color(0xFFEEF8F1),
+                                    readOnly = selectionOnly
                                 )
                                 IconButton(
-                                    onClick = { openLookup(runtime, dataSourceContext, item, lookup) },
+                                    onClick = open,
                                     enabled = !conditionDisabled && lookupDialogId(lookup) != null,
                                     modifier = Modifier.size(40.dp)
                                 ) {
@@ -606,12 +620,13 @@ private fun FormItemRenderer(
                                 value = value,
                                 onValueChange = { setScopedItemValue(runtime, dataSourceContext, item, key, it) },
                                 label = { Text(item.label ?: key) },
+                                readOnly = selectionOnly,
                                 modifier = Modifier
                                     .weight(1f)
                                     .padding(vertical = 4.dp)
                             )
                             IconButton(
-                                onClick = { openLookup(runtime, dataSourceContext, item, lookup) },
+                                onClick = open,
                                 enabled = !conditionDisabled && lookupDialogId(lookup) != null,
                                 modifier = Modifier.padding(top = 8.dp)
                             ) {
@@ -745,10 +760,12 @@ private fun CompactTextInputSurface(
     modifier: Modifier = Modifier,
     shape: androidx.compose.ui.graphics.Shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
     backgroundColor: Color = Color.White,
+    readOnly: Boolean = false,
 ) {
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
+        readOnly = readOnly,
         singleLine = true,
         textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
         modifier = modifier
@@ -829,10 +846,23 @@ private fun LabelItemCard(
     }
 }
 
+internal fun selectionOnlyLookupCallback(item: ItemDef): ExecutionDef? {
+    val lookup = item.lookup ?: item.properties["lookup"]
+    if (item.type?.trim()?.lowercase() != "lookup" || item.scope?.trim()?.lowercase() != "noop" || lookupMultiple(lookup)) return null
+    return item.on.firstOrNull { it.event.equals("onLookup", ignoreCase = true) && !it.handler.isNullOrBlank() }
+}
+
+internal suspend fun runSelectionOnlyLookup(runtime: ForgeRuntime, context: DataSourceContext, item: ItemDef,
+    presentationCurrent: () -> Boolean = { true }) {
+    val callback = selectionOnlyLookupCallback(item) ?: return
+    val lookup = item.lookup ?: item.properties["lookup"]
+    val dialogId = lookupDialogId(lookup) ?: return
+    runtime.openSelectionOnlyLookup(context, item, dialogId, lookupParameters(lookup), callback, presentationCurrent)
+}
+
 private fun openLookup(
     runtime: ForgeRuntime,
     context: DataSourceContext,
-    item: ItemDef,
     lookup: JsonElement?
 ) {
     val dialogId = lookupDialogId(lookup) ?: return
@@ -1062,6 +1092,7 @@ internal fun setScopedItemValue(
     key: String,
     value: Any?
 ) {
+    if (selectionOnlyLookupCallback(item) != null) return
     when (item.scope?.trim()?.lowercase()) {
         "windowform" -> runtime.setWindowFormValues(context.window.windowId, mapOf(key to value))
         "input" -> {
