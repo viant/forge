@@ -128,7 +128,14 @@ func schema(expr ast.Expr, context definition) S {
 	case *ast.ArrayType:
 		return S{"type": "array", "items": schema(t.Elt, context)}
 	case *ast.MapType:
-		return S{"type": "object", "additionalProperties": schema(t.Value, context)}
+		value := schema(t.Value, context)
+		if _, pointer := t.Value.(*ast.StarExpr); pointer {
+			if scalar, ok := value["type"].(string); ok && scalar == "string" {
+				// A present nil string pointer encodes a null dictionary value.
+				value["type"] = []string{"string", "null"}
+			}
+		}
+		return S{"type": "object", "additionalProperties": value}
 	case *ast.SelectorExpr:
 		alias, ok := t.X.(*ast.Ident)
 		if !ok {

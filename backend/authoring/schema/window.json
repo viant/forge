@@ -7578,6 +7578,13 @@
         "resultKey": {
           "type": "string"
         },
+        "resultLookups": {
+          "additionalProperties": {
+            "$ref": "#/$defs/github.com~1viant~1forge~1backend~1datasource~1contract.ResultLookup"
+          },
+          "description": "ResultLookups adds display fields to returned rows after paging and cache access.\nEach lookup reads the original returned row by literal key.",
+          "type": "object"
+        },
         "resultMap": {
           "type": "string"
         },
@@ -7655,6 +7662,28 @@
     },
     "github.com/viant/forge/backend/datasource/contract.RefreshPolicy": {
       "type": "string"
+    },
+    "github.com/viant/forge/backend/datasource/contract.ResultLookup": {
+      "additionalProperties": true,
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "trimSpace": {
+          "description": "TrimSpace strips ECMAScript String.trim whitespace from the input field.",
+          "type": "boolean"
+        },
+        "values": {
+          "additionalProperties": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
     },
     "github.com/viant/forge/backend/datasource/contract.SortField": {
       "additionalProperties": true,
@@ -7801,7 +7830,7 @@
   "$ref": "#/$defs/Window",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "x-forge-provenance": {
-    "baseCommit": "f93d91423ad1889ebb81f130dc399455f7d5246c",
+    "baseCommit": "705363918f968c6775a123399e7d5798362926b6",
     "generator": "scripts/window-schema/main.go",
     "sha256": {
       "choice_browser.go": "935cbeddb231dd329374114c5f38454dc7c44c2ab70a45ea3c0f37ce7f3aee26",
@@ -7813,7 +7842,7 @@
       "gate_requirements_editor.go": "94b32304fae82298136f1b9ed5f6d440e427ab74aaccfafca0382721e3edc0a9",
       "github.com/viant/forge/backend/datasource/contract.argument_projection.go": "d516237702990088462ce88689ed3056f8129369354d44e70e6116baaa2c644d",
       "github.com/viant/forge/backend/datasource/contract.backend_json.go": "aa901f5debe6f5c0876faf0188f4355b5b77fd4616c0be6651cc649696e40da7",
-      "github.com/viant/forge/backend/datasource/contract.datasource.go": "010b2d890ac19fe895525ef8827ca767bd83002ab39236f05531c688d2e9d3f3",
+      "github.com/viant/forge/backend/datasource/contract.datasource.go": "b3fb0ae1ec8f865361580f50472d6d8f6886a334bd011d4f440ea02c614e0add",
       "github.com/viant/forge/backend/datasource/contract.denial.go": "33f9f5fd666591f7b90392b410efe982051197652fa18881f8f2a238b7e24d05",
       "github.com/viant/forge/backend/datasource/contract.method_variants.go": "e4aa1178a31ee0f8ebd15dfd83c512dc8a8d84afb8ba5e6a856cc993870e682c",
       "github.com/viant/forge/backend/datasource/contract.operation.go": "92f01c7ca32a99ceaebde0e5aba2a3ba97168465f65003bca44344bc6dcdb99a",
@@ -7869,7 +7898,7 @@
       "window_reference_manifest.go": "e8245d783f99d3a59143fd1e37e364c040389fa409b457207da567d9112ddb5b",
       "window_resource.go": "a991b091b9b4b45a999cca138fa8f6c0fa90b9ed0dc63bfce2ace576700ca872",
       "window_target_proof.go": "53605c132aae2b8c8d6e377daaae416f347e0ff8c48a39fb2a0f15f95ad5faeb",
-      "workflow_primitives.go": "caa0721face2fda47a711eeff3db77933750a25b3cd24344fe5f0297463220a3",
+      "workflow_primitives.go": "c58ba7200138588a8379bb46773244f40c2e8ce69593528fcc6687f24068fc13",
       "workspace_summary.go": "d9cf3867d3d3bfa3f65c9fdeccad91d21bd9d2602e066823bb36cbff079c86c1"
     },
     "sourceNote": "Generated from committed canonical Forge authored model and Forge-owned public contracts; SHA-256 identifies every parsed source file."
