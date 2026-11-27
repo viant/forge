@@ -47,7 +47,7 @@ for (const scenario of ['save', 'actor', 'queued', 'after-prepare', 'acknowledge
             admitWriter?.();
             requests.push(dataSourceRef);inputs.push(options.inputParameters);
             if (scenario==='mixed-group' && requests.length===1) switchParent(8);
-            if (scenario==='acknowledged' || scenario==='replacement' || (scenario==='ordered' && dataSourceRef==='first')) {
+            if ((scenario==='acknowledged' || scenario==='replacement' || (scenario==='ordered' && dataSourceRef==='first')) && !finish) {
                 await new Promise(resolve=>{finish=resolve;});
             }
             return {rows:[{id:7}]};
@@ -140,6 +140,15 @@ for (const scenario of ['save', 'actor', 'queued', 'after-prepare', 'acknowledge
                 expect(writes()).toEqual(scenario==='ordered'?['first']:[]);
                 if (scenario==='ordered') expect(settled.receipts.prepare.rows).toEqual([{id:7}]);
                 else expect(settled.accepted).toBe(false);
+            }
+            if (scenario==='queued' || scenario==='acknowledged') {
+                const priorWrites=writes().length;
+                await turn(()=>owner.handlers.window.closeDialog({dialogId}));
+                await turn(()=>{setParent(7);owner.handlers.window.openDialog({context:owner,execution:{args:[dialogId]},parameters:{review:{id:7}}});});
+                await until(()=>button('Apply'));
+                await turn(()=>button('Apply').click());
+                await until(()=>draft.signals.windowForm.peek().saved===true);
+                expect(writes().length).toBe(priorWrites+1);
             }
         } finally {await turn(()=>root.unmount());host.remove();removeSignalsForKey(windowId);}
     },10000);

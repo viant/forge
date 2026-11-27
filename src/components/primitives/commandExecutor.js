@@ -1353,9 +1353,13 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
     const writer = classifyWriterReceipt(response, command, input.expected);
     if (reviewed && writer.status === 'failed' && writer.error?.code === 'reviewed_scope_changed' && !writerInvoked) {
       if (sequence) throw stepError('superseded', '', writer.error);
+      releaseTransport(target, key);
+      transportAcquired = false;
       return superseded(false, id);
     }
     if (reviewed && writer.status === 'succeeded' && !uiIsCurrent()) {
+      releaseTransport(target, key);
+      transportAcquired = false;
       guardAcknowledgedPresentation(context, key, id, dialogSignal, dialogProps);
       return {accepted:true, status:'superseded', invocationId:id, writerStatus:'succeeded'};
     }
