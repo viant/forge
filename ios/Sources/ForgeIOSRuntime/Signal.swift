@@ -56,6 +56,11 @@ extension Signal where Value == [String: JSONValue] {
         }
     }
 
+    func releasePending(_ patch: ReviewedPendingPatch, restore: Bool) {
+        let next = patch.releasing(from: value, restore: restore)
+        if value != next { set(next) }
+    }
+
     func checkSubmittedFormPatch(submitted: [String: JSONValue], patch: [String: JSONValue]) -> SubmittedFormPatchDisposition {
         submittedFormPatchDisposition(value, submitted: submitted, patch: patch)
     }

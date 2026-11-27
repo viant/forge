@@ -7,6 +7,7 @@ import {
 import { getWindowContext } from "../core/context/registry.js";
 import { resolveSelector } from "../utils/selector.js";
 import { resolveParameters } from './parameters.js';
+import {captureDialogReview, releaseReviewedPending} from '../components/primitives/reviewedScope.js';
 import { resolveScopedWindowKey, scopedWindowProviderIdentity } from '../utils/windowResourceKey.js';
 import {buildStandaloneDashboardDocument, downloadDashboardHtml} from "../core/ui/dashboardExport.js";
 import {getBusSignal, getDashboardFilterSignal, getDashboardSelectionSignal} from "../core/store/signals.js";
@@ -23,6 +24,7 @@ const dialogArgs = (dialogSignal) => {
 
 
 const closeViewDialog = (dialogSignal) => {
+    releaseReviewedPending(dialogSignal.peek()?.props);
     dialogSignal.value = {...dialogSignal.peek(), open: false};
 }
 
@@ -885,6 +887,9 @@ export function useWindowHandlers(windowId) {
             ? explicitParameters
             : inboundParams;
 
+        const presentationProps = {...props, ...options, parameters};
+        captureDialogReview(props.context || getWindowContext(windowId), dialogId, argsObj, presentationProps);
+
         // Set dialog signal (open + props + args) in a single write to avoid reactive cycles
         try {
             const sig = getDialogSignal(dialogKey);
@@ -897,11 +902,7 @@ export function useWindowHandlers(windowId) {
                 open: true,
                 focusRequest: Number(prev?.focusRequest || 0) + 1,
                 selectionMode,
-                props: {
-                    ...props,
-                    ...options,
-                    parameters,
-                },
+                props: presentationProps,
                 args: argsObj,
             };
         } catch (_) {

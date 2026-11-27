@@ -93,6 +93,27 @@ Forge workflow primitives keep interaction mechanics in the runtime and business
 
 ### Verify persisted fields after a write
 
+### Keep a dialog write in its reviewed scope
+
+A dialog footer can declare `reviewedScope` on its root mutation command. Each match names an original launch argument and a live value. For example, a dialog opened with `ownerId: 7` can require both the active owner and the loaded parent record to retain that ID.
+
+```yaml
+mutationCommand:
+  commandId: updateRecord
+  dataSourceRef: recordPatch
+  reviewedScope:
+    - {parameter: ownerId, source: windowForm, field: activeOwnerId}
+    - {parameter: ownerId, source: collection, dataSourceRef: parentRecord, field: '0.id'}
+```
+
+Forge captures the verified subject, issuer and tenant and the declared argument values at opening. `parameter` and `field` are dot-separated selectors. `windowForm` reads the opening window’s live state. `collection`, `metrics` and `selection` read a named, already-loaded datasource and require `dataSourceRef`. A missing value, null or blank string fails the check. Comparisons preserve JSON types, array order and object contents. Use the source’s canonical value for set-like or producer-specific comparisons.
+
+The command rechecks its original presentation, actor and values after preparation or confirmation and at transport admission. Preparation steps, group members and cleanup inherit the root check. A stale queued write sends no request. A write already admitted to the transport keeps its own outcome and invocation identity. A confirmed write cannot be replayed by switching the old presentation back. Reopen to review a new scope. Commands that verify persisted values retain their read-only verification path while the original scope is current.
+
+A host-provided Web datasource transport must advertise `supportsReviewedDispatch: true` to run reviewed writes. It receives a runtime-only `admitWriter` callback alongside `operation` and `options`. Invoke it immediately before each writer fetch, after asynchronous credential or session preparation and again before an eligible retry. Keep it out of serialized requests. An adapter without this capability rejects a reviewed write before dispatch.
+
+Bind the writer’s destination to the reviewed resource and keep ordinary authorization and readiness predicates on the command. The check uses local state and adds no producer reads. Restored presentations without runtime-owned proof require a fresh open.
+
 A root command can opt into verified readback by adding `verify` to its refetch reconciliation. The writer and reader each keep their own authorization and data contracts. This example submits record changes and verifies the persisted caption for each row that included it.
 
 ```yaml

@@ -1,5 +1,6 @@
 import {submittedFileRevision, fileRevisionMatches} from '../../runtime/formFileSelection.js';
 import equal from 'fast-deep-equal';
+import {trackReviewedPending, reviewedScopeCurrent} from './reviewedScope.js';
 import {extractData, isDeferredCacheHitEnvelope} from '../dataSourceExtract.js';
 import {withoutAuthorizationValidationHints} from '../../runtime/canonicalDelivery.js';
 import {resolveParameters} from '../../hooks/parameters.js';
@@ -9,7 +10,7 @@ import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
 import {applyPrimitiveState, editableCollectionRows, mutationCommandTargetParameters, reconcileEditableCollection} from './editableCollectionModel.js';
 import {prepareResourcePayload, snapshotResourceValue as parameterSnapshot} from './resourceModel.js';
 import {formatDataSourceError} from '../../utils/dataSourceError.js';
-import {retainMutationAcknowledgement} from '../dataSourceRequestLifecycle.js';
+import {retainMutationAcknowledgement, settleDataSourceRequest} from '../dataSourceRequestLifecycle.js';
 import {findDialogSignal, protectedWindowEpoch} from '../../core/store/signals.js';
 
 const commandStates = new WeakMap();
@@ -576,9 +577,9 @@ function watchReadbackScope(context, dialog, originSelection, scope, onChange) {
 
 // A failed verification can discard its proof without making the still-open
 // footer eligible to submit that acknowledged mutation again.
-function abandonVerification(context, key, id, dialog, props) {
+function guardAcknowledgedPresentation(context, key, id, dialog, props, partial = false) {
   const reset = {
-    phase: 'idle', guarded: false, pending: false, retryAllowed: true, writerStatus: 'succeeded',
+    phase: 'idle', guarded: false, pending: false, retryAllowed: true, writerStatus: partial ? 'partial_failure' : 'succeeded',
     syncStatus: 'verification_superseded', message: '', error: null, warnings: [],
   };
   const current = () => dialog?.peek()?.open === true && dialog.peek().props === props;
@@ -592,7 +593,7 @@ function abandonVerification(context, key, id, dialog, props) {
     if (stateEntry(context, key).value.invocationId === id) publish(context, key, reset);
   });
   publish(context, key, {...reset, phase: 'verification_abandoned', guarded: true, retryAllowed: false,
-    message: 'Saved. Reopen the form to continue.'});
+    message: partial ? 'Some changes were saved. Reopen the form to continue.' : 'Saved. Reopen the form to continue.'});
 }
 
 function submittedReadbackRows(command, input) {
@@ -714,13 +715,13 @@ function validateCommandGroup(command) {
   }
 }
 
-async function dispatchGroupMember(member, key, unknownTransports, eligible) {
+async function dispatchGroupMember(member, key, unknownTransports, eligible, reviewed) {
   const {command, target, input, id} = member;
   let invoked = false;
   let result;
   try {
     if (!eligible()) throw new Error('Command scope or eligibility changed before dispatch.');
-    const response = await dispatchCommandWriter(target, command, input, id, true, () => { invoked = true; }, true);
+    const response = await dispatchCommandWriter(target, command, input, id, true, () => { invoked = true; }, true, undefined, reviewed ? eligible : undefined);
     result = classifyWriterReceipt(response, command, input.expected);
   } catch (error) {
     result = {status: 'failed', error};
@@ -763,7 +764,7 @@ async function prepareCommandGroup(context, command, parameters, extras, members
   return plan;
 }
 
-async function runCommandGroup(context, command, key, id, parameters, extras, current, lifecycle, selectionCleared) {
+async function runCommandGroup(context, command, key, id, parameters, extras, current, lifecycle, selectionCleared, beginPending) {
   const members = Object.create(null);
   let plan = [];
   const acquired = [];
@@ -795,7 +796,7 @@ async function runCommandGroup(context, command, key, id, parameters, extras, cu
     }
     const windowState = context.signals?.windowForm?.peek?.() ?? context.signals?.windowForm?.value ?? {};
     validationContext = pendingValidationContext(context, command.pendingState, windowState);
-    applyPrimitiveState(context, command.pendingState);
+    beginPending();
     pendingApplied = true;
     publish(context, key, {phase: 'pending', guarded: true, pending: true, retryAllowed: false,
       invocationId: id, writerStatus: 'pending', syncStatus: 'not_started', message: 'Saving…'});
@@ -806,7 +807,7 @@ async function runCommandGroup(context, command, key, id, parameters, extras, cu
   if (!error) {
     const outcomes = await Promise.all(plan.map(member => dispatchGroupMember(member, key, unknownTransports,
       () => current() && commandValidationPasses(validationContext, command) && commandValidationPasses(validationContext, member.command)
-        && (!member.when || evaluatePlainVisibleWhen(member.when, validationContext)))));
+        && (!member.when || evaluatePlainVisibleWhen(member.when, validationContext)), command.reviewedScope != null)));
     for (const [index, member] of plan.entries()) members[member.command.commandId] = outcomes[index];
   }
   const results = command.group.map(({command: child}) => members[child.commandId]);
@@ -863,12 +864,23 @@ function verifiedWriterInput(command, parameters, id) {
 }
 
 // Every writer uses the same invocation receipt and timeout boundary.
-function dispatchCommandWriter(target, command, input, id, requireRecords, started, strictReceipt = false, presentationCurrent) {
-  target.handlers.dataSource.setInputParameters(input.parameters);
-  return awaitWriter(
+function dispatchCommandWriter(target, command, input, id, requireRecords, started, strictReceipt = false, presentationCurrent, admission) {
+  let open = true, admitted = false;
+  const check = admission && (() => {
+    if (!open || !admission()) throw Object.assign(new Error('The reviewed scope changed. Reopen the dialog.'), {code:'reviewed_scope_changed'});
+  });
+  if (check) {
+    if (!target.handlers.dataSource.fetchCollection.supportsReviewedDispatch) {
+      throw new Error('This datasource does not support reviewed dispatch.');
+    }
+    check();
+  } else target.handlers.dataSource.setInputParameters(input.parameters);
+  const completion = awaitWriter(
     target,
     () => {
+      if (admission) check();
       const options = {
+        ...(admission ? {parameters:input.parameters, admitWriter: () => { check(); if (!admitted) { admitted = true; started(); } }} : {}),
         cache: {bypassCache: true},
         invocationId: id,
         ...(requireRecords ? {result: command.receiptIdentity ? 'identityRecords' : strictReceipt ? 'orderedRecords' : 'records'} : {})
@@ -877,23 +889,33 @@ function dispatchCommandWriter(target, command, input, id, requireRecords, start
       try {
         result = target.handlers.dataSource.fetchCollection(options);
       } catch (error) {
-        started();
+        if (!admission) started();
         throw error;
       }
-      if (!strictReceipt || result !== false) started();
+      if (!admission && (!strictReceipt || result !== false)) started();
       return result;
     },
     Math.max(1000, Number(command.timeoutMs) || 30000),
     requireRecords,
     presentationCurrent && !requireRecords ? {
       current: presentationCurrent,
-      requireAcknowledgement: Object.keys(command.successFormState || {}).length > 0,
+      requireAcknowledgement: Boolean(admission) || Object.keys(command.successFormState || {}).length > 0,
       retain: completion => retainMutationAcknowledgement(target.identity?.dataSourceId, id, completion),
     } : undefined
   );
+  if (!admission) return completion;
+  return completion.then(outcome => {
+    open = false;
+    if (!admitted && outcome.status !== 'failed') {
+      const error = Object.assign(new Error('The reviewed write did not reach its transport.', {cause:outcome.error}), {code:'writer_not_dispatched'});
+      settleDataSourceRequest(target.identity?.dataSourceId, id, error);
+      return {status:'failed', error};
+    }
+    return outcome;
+  });
 }
 
-async function invokePreparationStep(context, command, key, sequence, current, eligible = () => true, cleanup = false) {
+async function invokePreparationStep(context, command, key, sequence, current, eligible = () => true, cleanup = false, reviewed = false) {
   const id = command.commandId;
   let acquired = false,
     invoked = false,
@@ -933,7 +955,7 @@ async function invokePreparationStep(context, command, key, sequence, current, e
         invoked = true;
         sequence.attempted = true;
       },
-      true
+      true, undefined, reviewed ? () => current() && eligible() && commandValidationPasses(context, command) : undefined
     );
     const writer = cleanup ? response : classifyWriterReceipt(response, command, input.expected);
     if (writer.status !== 'succeeded') {
@@ -954,7 +976,11 @@ async function invokePreparationStep(context, command, key, sequence, current, e
 }
 
 async function unwindPreparation(context, root, sequence, key, current, presentationCurrent, warnings) {
-  if (!sequence.cleanups.length || !current()) return false;
+  if (!sequence.cleanups.length) return false;
+  if (!current()) {
+    if (root.reviewedScope) warnings.push({stage:'cleanup', message:'The review changed before cleanup could run.'});
+    return false;
+  }
   publish(context, key, {phase: 'cleaning_up', guarded: true, pending: false, retryAllowed: false, message: 'Cleaning up…'});
   if (presentationCurrent()) {
     try {
@@ -966,7 +992,7 @@ async function unwindPreparation(context, root, sequence, key, current, presenta
   for (const command of sequence.cleanups.reverse()) {
     if (!current()) return true;
     try {
-      const receipt = await invokePreparationStep(context, command, key, sequence, current, undefined, true);
+      const receipt = await invokePreparationStep(context, command, key, sequence, current, undefined, true, root.reviewedScope != null);
       if (
         command.receiptWhen &&
         !evaluateCondition(command.receiptWhen, (leaf) => {
@@ -1107,6 +1133,7 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
   const authorizationEpoch = protectedWindow ? protectedWindowEpoch(windowId) : null;
   const ordered = Array.isArray(command.before) && command.before.length > 0;
   const clearFields = Array.isArray(command.clearFormFields) && command.clearFormFields.length > 0;
+  const reviewed = command.reviewedScope != null;
   const closesDialog = Boolean(lifecycle.dialogId) && typeof lifecycle.closeOnSuccess === 'function';
   const needsExactReceipt = grouped || ordered || clearFields || closesDialog || command.receiptWhen != null || command.receiptIdentity != null;
   let submittedFields;
@@ -1141,7 +1168,8 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
   const authorizationIsCurrent = () => (!protectedWindow || protectedWindowEpoch(windowId) === authorizationEpoch)
     && (!originalScope || (authority() === originalScope.authority && selection() === originalScope.selection));
   const presentationCurrent = () => !dialogSignal || (dialogSignal.peek()?.open === true && dialogSignal.peek().props === dialogProps);
-  const uiIsCurrent = () => authorizationIsCurrent() && presentationCurrent();
+  const reviewCurrent = () => !reviewed || (presentationCurrent() && reviewedScopeCurrent(context, command.reviewedScope, dialogProps));
+  const uiIsCurrent = () => reviewCurrent() && authorizationIsCurrent() && presentationCurrent();
   const readbackScopeCurrent = () => {
     if (scopeInvalidated || !uiIsCurrent() || lifecycle.isPresent?.() === false) return false;
     try { return equal(readback.scope, readbackScope(readback.spec, context)); }
@@ -1154,13 +1182,21 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
   };
   // Plain commands retain their declared window-wide state and owner refresh.
   // Dialog-local feedback belongs to the presentation that initiated the call.
-  const windowEffectsCurrent = needsExactReceipt ? uiIsCurrent : authorizationIsCurrent;
+  const windowEffectsCurrent = needsExactReceipt || reviewed ? uiIsCurrent : authorizationIsCurrent;
   const rootEligible = () => commandValidationPasses(validationContext, command);
+  let priorPending;
+  const beginPending = () => {
+    if (reviewed && presentationCurrent()) priorPending = trackReviewedPending(context, dialogProps, command.pendingState);
+    applyPrimitiveState(context, command.pendingState);
+  };
   const superseded = (accepted, invocationId = '') => {
-    const error = new Error('Authorization context changed before command completion.');
-    error.code = 'request_superseded';
-    publish(context, key, {phase: 'failed', guarded: false, pending: false, retryAllowed: true, error, message: 'Authorization context changed. Reopen this window.', writerStatus: accepted ? 'failed' : 'not_invoked', syncStatus: 'not_started'});
-    return {accepted, status: 'failed', error, invocationId};
+    const staleReview = reviewed && !reviewCurrent();
+    const error = new Error(staleReview ? 'The reviewed scope changed. Reopen the dialog.' : 'Authorization context changed before command completion.');
+    error.code = staleReview ? 'reviewed_scope_changed' : 'request_superseded';
+    publish(context, key, {phase: 'failed', guarded: false, pending: false, retryAllowed: true, error,
+      message: staleReview ? (presentationCurrent() ? error.message : '') : 'Authorization context changed. Reopen this window.',
+      writerStatus: accepted ? 'failed' : 'not_invoked', syncStatus: 'not_started'});
+    return {accepted, status: staleReview ? 'superseded' : 'failed', error, invocationId};
   };
   publish(context, key, {phase: 'validating', guarded: true, pending: false, retryAllowed: false, error: null, message: 'Validating…', writerStatus: 'not_invoked', syncStatus: 'not_started', ...(grouped && {members: {}})});
   let id = ordered || grouped ? invocationID() : '';
@@ -1186,6 +1222,7 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
         origin = dialogProps?.context;
       }
     }
+    if (reviewed && !reviewCurrent()) return superseded(false);
     if (needsExactReceipt || lifecycle.dialogId) originalScope = scopeSnapshot();
     if (command.reconcile?.verify) {
       const spec = command.reconcile;
@@ -1245,18 +1282,29 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
       const selectionCleared = destination => {
         if (destination?.signals?.selection && destination.signals.selection === context.signals?.selection) originalScope.selection = selection();
       };
-      return await runCommandGroup(context, command, key, id, baseParameters, groupExtras, uiIsCurrent, lifecycle, selectionCleared);
+      const group = await runCommandGroup(context, command, key, id, baseParameters, groupExtras, uiIsCurrent, lifecycle, selectionCleared, beginPending);
+      if (reviewed && !group.accepted && !reviewCurrent()) return {...superseded(false, id), members:group.members};
+      if (reviewed && group.status === 'partial_failure' && !uiIsCurrent() &&
+          Object.values(group.members).every(member => ['succeeded','skipped','not_invoked'].includes(member.status))) {
+        guardAcknowledgedPresentation(context, key, id, dialogSignal, dialogProps, true);
+        return group;
+      }
+      if (reviewed && group.status === 'succeeded' && !uiIsCurrent()) {
+        guardAcknowledgedPresentation(context, key, id, dialogSignal, dialogProps);
+        return {...group, status: 'superseded', writerStatus: 'succeeded'};
+      }
+      return group;
     }
     if (sequence) {
       if (!uiIsCurrent() || (confirmation && !rootEligible())) throw stepError('superseded','',new Error('Command eligibility changed before preparation.'));
       validationContext = pendingValidationContext(context, command.pendingState, peek(context.signals?.windowForm) || {});
-      applyPrimitiveState(context, command.pendingState);
+      beginPending();
       for (const step of command.before) {
         if (!uiIsCurrent()) throw stepError('superseded',step.command.commandId,new Error('Command scope changed.'));
         if (step.when && !evaluatePlainVisibleWhen(step.when,context)) continue;
         publish(context,key,{phase:'preparing',guarded:true,pending:true,retryAllowed:false,invocationId:id,writerStatus:'not_invoked',message:step.command.label || 'Preparing…'});
         const stepEligible = () => rootEligible() && (!step.when || evaluatePlainVisibleWhen(step.when, context));
-        const receipt = await invokePreparationStep(context, step.command, key, sequence, uiIsCurrent, stepEligible);
+        const receipt = await invokePreparationStep(context, step.command, key, sequence, uiIsCurrent, stepEligible, reviewed);
         sequence.receipts[step.command.commandId] = receipt;
         if (step.cleanup) sequence.cleanups.push(step.cleanup);
       }
@@ -1277,7 +1325,7 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
       return superseded(false);
     }
     if (readback && !readbackScopeCurrent()) throw stepError('superseded', '', new Error('The verification scope changed before submission.'));
-    if (needsExactReceipt && !rootEligible()) throw stepError('invalid', '', new Error(command.invalidMessage || 'Command eligibility changed before the final write.'));
+    if ((needsExactReceipt || reviewed) && !rootEligible()) throw stepError('invalid', '', new Error(command.invalidMessage || 'Command eligibility changed before the final write.'));
     if (!submittedFileChoicesMatch(context, formPatch, submittedFields)) {
       throw stepError('invalid', '', new Error('The selected file changed before submission.'));
     }
@@ -1290,7 +1338,10 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
     }
     transportAcquired = true;
     if (!ordered) id = invocationID();
-    if (!sequence) applyPrimitiveState(context, command.pendingState);
+    if (!sequence) {
+      if (reviewed) validationContext = pendingValidationContext(context, command.pendingState, peek(context.signals?.windowForm) || {});
+      beginPending();
+    }
     publish(context, key, {phase: 'pending', guarded: true, pending: true, retryAllowed: false, error: null, message: 'Saving…', invocationId: id, writerStatus: 'pending', syncStatus: 'not_started'});
     const mapsResult = Object.keys(command.resultState || {}).length > 0;
     const input = verifiedWriterInput(command, preparedSnapshot, id);
@@ -1298,10 +1349,18 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
       if (!readbackScopeCurrent()) throw stepError('superseded', '', new Error('The verification scope changed before submission.'));
       readback.submitted = submittedReadbackRows(command, input);
     }
-    const response = await dispatchCommandWriter(target,command,input,id,needsExactReceipt || mapsResult,()=>{writerInvoked=true;}, needsExactReceipt, dialogSignal ? presentationCurrent : undefined);
+    const response = await dispatchCommandWriter(target,command,input,id,needsExactReceipt || mapsResult,()=>{writerInvoked=true;}, needsExactReceipt, dialogSignal ? presentationCurrent : undefined, reviewed ? () => uiIsCurrent() && rootEligible() : undefined);
     const writer = classifyWriterReceipt(response, command, input.expected);
+    if (reviewed && writer.status === 'failed' && writer.error?.code === 'reviewed_scope_changed' && !writerInvoked) {
+      if (sequence) throw stepError('superseded', '', writer.error);
+      return superseded(false, id);
+    }
+    if (reviewed && writer.status === 'succeeded' && !uiIsCurrent()) {
+      guardAcknowledgedPresentation(context, key, id, dialogSignal, dialogProps);
+      return {accepted:true, status:'superseded', invocationId:id, writerStatus:'succeeded'};
+    }
     if ((needsExactReceipt || dialogSignal) && writer.status === 'failed' && ambiguousWriterFailure(writer.error)) writer.status='indeterminate';
-    if (!needsExactReceipt && !authorizationIsCurrent()) {
+    if (!needsExactReceipt && !reviewed && !authorizationIsCurrent()) {
       releaseTransport(target, key);
       transportAcquired = false;
       return superseded(writerInvoked, id);
@@ -1311,9 +1370,9 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
       releaseTransport(target, key);
       transportAcquired = false;
       if (windowEffectsCurrent()) applyPrimitiveState(context, command.errorState);
-      publish(context, key, {phase: 'failed', guarded: false, pending: false, retryAllowed: true, error: writer.error, message: commandErrorMessage(writer.error), writerStatus: 'failed', syncStatus: 'not_started'});
+      publish(context, key, {phase: 'failed', guarded: false, pending: false, retryAllowed: true, error: writer.error, message: commandErrorMessage(writer.error), writerStatus: reviewed && !writerInvoked ? 'not_invoked' : 'failed', syncStatus: 'not_started'});
       if (uiIsCurrent()) notifyLifecycle(lifecycle, 'onSettled', {status: 'failed', error: writer.error, invocationId: id});
-      return {accepted: true, status: 'failed', error: writer.error, invocationId: id};
+      return {accepted: !reviewed || writerInvoked, status: 'failed', error: writer.error, invocationId: id};
     }
     if (writer.status === 'indeterminate') {
       stateEntry(context,key).unknownTransport=target;
@@ -1359,9 +1418,13 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
       }
       publish(context, key, {phase: 'synchronizing', guarded: true, pending: false, retryAllowed: false, error: null, message: 'Refreshing…', writerStatus: 'succeeded', syncStatus: 'pending'});
       try { warnings.push(...await synchronizeUI(context, target, command, writerResponse, readback ? effectCurrent : windowEffectsCurrent, formSynchronization, presentationCurrent)); } catch (error) { warnings.push({stage: 'synchronize', error}); }
-      if (!needsExactReceipt && !authorizationIsCurrent()) return superseded(writerInvoked, id);
+      if (!needsExactReceipt && !reviewed && !authorizationIsCurrent()) return superseded(writerInvoked, id);
       // Deliver verified evidence while the caller still owns the presentation.
       // Its successful close may intentionally unmount that presentation.
+      if (reviewed && !uiIsCurrent()) {
+        guardAcknowledgedPresentation(context, key, id, dialogSignal, dialogProps);
+        return {accepted:true, status:'superseded', writerStatus:'succeeded', invocationId:id, warnings};
+      }
       const result = {status: 'succeeded', warnings, invocationId: id};
       const evidence = readbackRows && effectCurrent()
         ? {readbackRows, writerRecords: parameterSnapshot(writer.records)} : null;
@@ -1387,7 +1450,7 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
     let verificationController;
     const supersededVerification = () => {
       finishReadbackScope();
-      abandonVerification(context, key, id, dialogSignal, dialogProps);
+      guardAcknowledgedPresentation(context, key, id, dialogSignal, dialogProps);
       return {accepted: true, status: 'superseded', writerStatus: 'succeeded', invocationId: id};
     };
     const retry = {
@@ -1446,9 +1509,9 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
       const accepted = writerInvoked || sequence?.attempted === true;
       const current = authorizationIsCurrent();
       const primaryUnknown = error.stepStatus === 'indeterminate';
-      const cleanupUnknown = sequence && !primaryUnknown && current &&
-        await unwindPreparation(context, command, sequence, key, authorizationIsCurrent, presentationCurrent, warnings);
-      const unknown = primaryUnknown || cleanupUnknown || (!current && accepted);
+      const cleanupUnknown = sequence && !primaryUnknown && (reviewed || current) &&
+        await unwindPreparation(context, command, sequence, key, reviewed ? uiIsCurrent : authorizationIsCurrent, presentationCurrent, warnings);
+      const unknown = primaryUnknown || cleanupUnknown || (!reviewed && !current && accepted);
       const status = primaryUnknown ? 'indeterminate' : error.stepStatus || 'failed';
       if (!grouped && uiIsCurrent()) {
         if (accepted && !unknown) clearSubmittedFields(context, submittedFields, warnings);
@@ -1462,18 +1525,22 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
         retryAllowed: !unknown, writerStatus: writerInvoked ? 'failed' : 'not_invoked',
         syncStatus: 'not_started', message: message.join(' ')});
       if (uiIsCurrent()) notifyLifecycle(lifecycle,'onSettled',{status,...details});
-      return {accepted,status,...details};
+      return {accepted,status,...details, ...(reviewed && sequence ? {receipts:sequence.receipts} : {})};
     }
-    if (!needsExactReceipt && !authorizationIsCurrent()) return superseded(writerInvoked, id);
+    if (!needsExactReceipt && !reviewed && !authorizationIsCurrent()) return superseded(writerInvoked, id);
     console.error(`Forge mutation command failed commandId=${key} dataSourceRef=${targetRef} writerInvoked=${writerInvoked}: ${error?.stack || error}`);
     if (writerSucceeded) return postWriteFailure(error);
     if (!writerInvoked && !presentationCurrent()) return superseded(false, id);
-    try { applyPrimitiveState(context, command.errorState); } catch (_) {}
+    try { if (windowEffectsCurrent()) applyPrimitiveState(context, command.errorState); } catch (_) {}
     publish(context, key, {phase: 'failed', guarded: false, pending: false, retryAllowed: true, error, message: commandErrorMessage(error), writerStatus: writerInvoked ? 'failed' : 'not_invoked', syncStatus: 'not_started'});
     if (uiIsCurrent()) notifyLifecycle(lifecycle, 'onSettled', {status: 'failed', error, invocationId: id});
     return {accepted: writerInvoked, status: 'failed', error, invocationId: id};
   } finally {
     const current = getCommandState(context, command);
+    if (priorPending) {
+      if (presentationCurrent() && (!uiIsCurrent() || current.writerStatus === 'not_invoked')) priorPending.release();
+      else priorPending.disarm();
+    }
     if (!entry.verificationRetry) finishReadbackScope();
     if (!(current.guarded && ['indeterminate', 'partial_failure'].includes(current.phase))) releaseSerialization(context, key);
   }

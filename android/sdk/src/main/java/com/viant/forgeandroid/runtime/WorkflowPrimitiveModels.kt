@@ -40,7 +40,8 @@ data class MutationCommandDef(
     val successFormState: JsonObject = JsonObject(emptyMap()),
     val rejectedWhen: @Serializable(with = ReceiptConditionSerializer::class) DashboardConditionDef? = null,
     val receiptIdentity: MutationReceiptIdentityDef? = null,
-    val group: List<MutationGroupMemberDef>? = null
+    val group: List<MutationGroupMemberDef>? = null,
+    val reviewedScope: List<MutationReviewedScopeDef>? = null
 ) {
     @kotlinx.serialization.Transient
     internal val invalidClearFields: Boolean = clearFormFields.isNotEmpty() &&
@@ -112,7 +113,7 @@ private fun MutationCommandDef.hasPrivateLifecycle(): Boolean = !serializationGr
     !confirm.isNullOrBlank() || confirmSelection != null || reconcile != null || refresh.isNotEmpty() ||
     resultState.isNotEmpty() || pendingState.isNotEmpty() || successState.isNotEmpty() ||
     errorState.isNotEmpty() || indeterminateState.isNotEmpty() || cleanupState.isNotEmpty() ||
-    clearFormFields.isNotEmpty() || successFormState.isNotEmpty()
+    clearFormFields.isNotEmpty() || successFormState.isNotEmpty() || reviewedScope != null
 
 @Serializable
 data class MutationBeforeStepDef(

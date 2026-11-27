@@ -12,7 +12,7 @@ import {applyFetchTransform} from "./dataSourceTransform.js";
 import {hasResolvedDependencies} from "./dataSourceDependencies.js";
 import {bindingFinalizationAction, dataSourceRequestId, isCurrentBindingGeneration} from "./primitives/bindingGeneration.js";
 import {resourceModelRefForDataSource, unmarshalResourceCollection} from "./primitives/resourceModel.js";
-import {requestedResultMode, settleDataSourceRequest, settleUnmountedDataSourceResponse} from './dataSourceRequestLifecycle.js';
+import {admitReviewedWriter, reviewedWriterInput, requestedResultMode, settleDataSourceRequest, settleUnmountedDataSourceResponse} from './dataSourceRequestLifecycle.js';
 import {isProtectedUpstreamDenial, isDataSourceLocalDenial} from './dataSourceAuthorization.js';
 import {shouldDispatchSelectionEvent} from './selectionEventModel.js';
 import {reconcileFetchForMetadataReadiness} from './dataSourceMetadataReadiness.js';
@@ -284,6 +284,11 @@ export default function DataSource({context, hasScheduledFetch}) {
             const consumed = consumeDataSourceFetchRequest(input.peek(), "fetch");
             if (!consumed) return;
             input.value = consumed;
+            if (consumed.reviewedRequest) {
+                settleDataSourceRequest(identity.dataSourceId, dataSourceRequestId(consumed),
+                    new Error('A reviewed writer requires a direct datasource transport.'));
+                return;
+            }
             try { log.debug('[watch] fetch: upstream branch', { ds: context?.identity?.dataSourceRef, upstream: dataSource.dataSourceRef }); } catch(_) {}
             fetchUpstream(inputVal.cache)
             return
@@ -496,7 +501,10 @@ export default function DataSource({context, hasScheduledFetch}) {
             log.debug('[doFetchRecords] start', {ds: context?.identity?.dataSourceRef, ts: Date.now()});
         } catch (_) {
         }
-        const inputVal = input.value || {};
+        const sharedInput = input.value || {};
+        const reviewedInput = sharedInput.reviewedRequest && reviewedWriterInput(identity.dataSourceId, dataSourceRequestId(sharedInput));
+        if (sharedInput.reviewedRequest && !reviewedInput) return;
+        const inputVal = reviewedInput || sharedInput;
         let {page, filter = {}, parameters, sort = [], cache = null, invocationId = null, bindingGeneration = null} = inputVal || {};
         const requestPaging = withPagingSize(paging, inputVal.pageSize);
         const parentRead = parentReader && !pagingEnabled && !appendRequested && !dataSource.dataSourceRef &&
@@ -609,6 +617,7 @@ export default function DataSource({context, hasScheduledFetch}) {
                 inputParameters: {...(parameters || {}), ...(sort?.length ? {sort} : {})},
                 cache,
                 invocationId,
+                ...(inputVal.reviewedRequest ? {admitWriter: () => admitReviewedWriter(requestDataSourceId, requestId)} : {}),
             });
             const collected = aggregate ? await collectPagedCollection({
                 pageSize: Number(requestPaging.size),
@@ -814,6 +823,7 @@ export default function DataSource({context, hasScheduledFetch}) {
                 return;
             }
             settleDataSourceRequest(requestDataSourceId, requestId, cause);
+            if (cause?.code === 'reviewed_scope_changed') return;
             if (!isCurrentBindingGeneration(input.peek()?.bindingGeneration, bindingGeneration)) {
                 try { log.debug('[doFetchRecords] ignored stale binding error', {ds: context?.identity?.dataSourceRef, bindingGeneration}); } catch (_) {}
                 return;

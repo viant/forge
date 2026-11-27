@@ -310,6 +310,18 @@ public struct DialogDef: Codable, Sendable, Identifiable {
     public var shouldFetchOnOpen: Bool { fetchOnOpen ?? (content?.fetchData != false) }
     public let content: ContainerDef?
     public let on: [ExecutionDef]
+    let reviewedPlans: [String:[MutationReviewedScopeDef]]
+
+    private static func reviewedPlans(_ actions: [ActionDef]) -> [String:[MutationReviewedScopeDef]] {
+        var plans: [String:[MutationReviewedScopeDef]] = [:]
+        for action in actions {
+            guard let command = action.mutationCommand, let rules = command.reviewedScope else { continue }
+            let name = command.commandId?.isEmpty == false ? command.commandId : action.id
+            plans[name ?? command.dataSourceRef] = rules
+        }
+        return plans
+    }
+
     public let actions: [ActionDef]
     public let properties: [String: JSONValue]
     public let style: [String: String]
@@ -337,6 +349,7 @@ public struct DialogDef: Codable, Sendable, Identifiable {
         self.fetchOnOpen = fetchOnOpen
         self.content = content
         self.on = on
+        reviewedPlans = Self.reviewedPlans(actions)
         self.actions = actions
         self.properties = properties
         self.style = style
@@ -380,6 +393,7 @@ public struct DialogDef: Codable, Sendable, Identifiable {
         content = try container.decodeIfPresent(ContainerDef.self, forKey: .content)
         on = try container.decodeIfPresent([ExecutionDef].self, forKey: .on) ?? []
         actions = try container.decodeIfPresent([ActionDef].self, forKey: .actions) ?? []
+        reviewedPlans = Self.reviewedPlans(actions)
         properties = try container.decodeIfPresent([String: JSONValue].self, forKey: .properties) ?? [:]
         style = try container.decodeIfPresent([String: String].self, forKey: .style) ?? [:]
         target = try container.decodeIfPresent(JSONValue.self, forKey: .target)

@@ -225,16 +225,22 @@ public actor DataSourceRuntime {
     }
 
     public func setInputParameters(dataSourceID: String, parameters: [String: JSONValue], fetch: Bool = false, preservePendingFetch: Bool = true) {
+        _ = installInputParameters(dataSourceID: dataSourceID, parameters: parameters, fetch: fetch, preservePendingFetch: preservePendingFetch)
+    }
+
+    func installInputParameters(dataSourceID: String, parameters: [String:JSONValue], fetch: Bool, preservePendingFetch: Bool) -> InputState {
         let current = inputValues[dataSourceID] ?? InputState()
         let query = parameters["input"]?.objectValue?["query"]?.objectValue ?? [:]
         let mergedFilter = current.filter.merging(query) { _, new in new }
-        inputValues[dataSourceID] = InputState(
+        let submitted = InputState(
             filter: mergedFilter,
             parameters: parameters,
             page: current.page,
             fetch: fetch || (preservePendingFetch && current.fetch),
             refresh: preservePendingFetch && current.refresh
         )
+        inputValues[dataSourceID] = submitted
+        return submitted
     }
 
     /// A parameter edit is atomic with respect to sibling controls on the same datasource.
@@ -369,15 +375,17 @@ public actor DataSourceRuntime {
         session: URLSession = .shared,
         bypassCache: Bool = false,
         invocationId: String? = nil,
-        current: (@Sendable () async -> Bool)? = nil
+        current: (@Sendable () async -> Bool)? = nil,
+        admitTransport: (@Sendable () async -> Bool)? = nil,
+        submittedInput: InputState? = nil
     ) async -> DataSourceRowReceipt? {
         if let current, await !current() { return nil }
         setControl(dataSourceID: dataSourceID, control: ControlState(loading: true))
         do {
-            let input = inputValues[dataSourceID] ?? InputState()
+            let input = submittedInput ?? inputValues[dataSourceID] ?? InputState()
             let raw = try await requestCollection(input: input, baseURL: baseURL, path: path, method: method, staticParameters: staticParameters,
                                                   inputParameters: inputParameters, paging: paging, additionalHeaders: additionalHeaders,
-                                                  session: session, bypassCache: bypassCache, invocationId: invocationId)
+                                                  session: session, bypassCache: bypassCache, invocationId: invocationId, admitTransport: admitTransport)
             if let current, await !current() { return nil }
             var invocationRecords: [JSONValue]?
             if requireInvocationRecords {
@@ -401,6 +409,8 @@ public actor DataSourceRuntime {
             }
             setControl(dataSourceID: dataSourceID, control: ControlState())
             return .success(invocationRecords ?? rows.map(JSONValue.object))
+        } catch let error as ReviewedScopeChanged {
+            return .failure(error)
         } catch {
             if let current, await !current() { return nil }
             if Task.isCancelled || (error as? URLError)?.code == .cancelled || error is CancellationError {
@@ -417,7 +427,8 @@ public actor DataSourceRuntime {
     /// publish the returned payload, while selection preparations consume it locally.
     func requestCollection(input: InputState, baseURL: String, path: String, method: String, staticParameters: [String: String],
                            inputParameters: [String: JSONValue], paging: DataSourcePagingDef?, additionalHeaders: [String: String],
-                           session: URLSession, bypassCache: Bool = false, invocationId: String? = nil) async throws -> JSONValue {
+                           session: URLSession, bypassCache: Bool = false, invocationId: String? = nil,
+                           admitTransport: (@Sendable () async -> Bool)? = nil) async throws -> JSONValue {
         let resolvedMethod = method.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         let requestMethod = resolvedMethod.isEmpty ? "GET" : resolvedMethod
         guard var components = URLComponents(string: baseURL + path) else { throw URLError(.badURL) }
@@ -457,6 +468,7 @@ public actor DataSourceRuntime {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
 
+        if let admitTransport, await !admitTransport() { throw ReviewedScopeChanged() }
         let (data, response) = try await session.data(for: request)
         if let response = response as? HTTPURLResponse,
            !(200..<300).contains(response.statusCode) {

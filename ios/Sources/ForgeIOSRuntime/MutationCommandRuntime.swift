@@ -159,6 +159,7 @@ public struct MutationCommandResult: Sendable, Equatable {
 }
 
 private enum MutationWriterOutcome: Sendable {
+    case notInvoked
     case succeeded([JSONValue]?)
     case failed(String)
     case indeterminate
@@ -176,6 +177,7 @@ struct MutationOperation: Sendable {
     let footer: ActionDef?
     let dialogSignal: Signal<DialogState>?
     let presentationID: UUID?
+    let dialogID: String?
     let selectionFence: DialogSelectionFence?
     let originalPendingFields: [String: JSONValue]
     let fileFields: Set<String>
@@ -231,9 +233,9 @@ private struct MutationWriterReceipt: Sendable {
     let verification: MutationReadback?
 }
 
-struct AcknowledgedMutationReadback: Sendable {
+struct AcknowledgedDialogMutation: Sendable {
     let operation: MutationOperation
-    let verification: MutationReadback
+    let verification: MutationReadback?
     let rows: [JSONValue]?
     let submitted: [String: JSONValue]
     let submittedSuccessFields: [String: JSONValue]
@@ -290,7 +292,7 @@ extension ForgeRuntime {
         message: String = ""
     ) async -> Bool {
         let key = mutationCommandKey(windowID: windowID, command: command)
-        guard acknowledgedMutationReadbacks[key] == nil, let state = await mutationCommandStates[key]?.peek(),
+        guard acknowledgedDialogMutations[key] == nil, let state = await mutationCommandStates[key]?.peek(),
               state.phase == .indeterminate || state.phase == .partialFailure else { return false }
         guardedMutationCommands.remove(key)
         mutationTransportOwners = mutationTransportOwners.filter { $0.value != key }
@@ -336,13 +338,16 @@ extension ForgeRuntime {
     ) async -> MutationCommandResult {
         let targetRef = command.dataSourceRef.trimmingCharacters(in: .whitespacesAndNewlines)
         let key = mutationCommandKey(windowID: windowID, command: command)
-        if let acknowledged = acknowledgedMutationReadbacks[key] {
+        if let acknowledged = acknowledgedDialogMutations[key] {
             let requestedPresentation = dialogID.flatMap { pendingDialogScope("\(windowID)Dialog\($0)").id }
             guard retryVerificationInvocationId.map({ $0 == acknowledged.operation.id }) ?? true,
                   sourceDataSourceRef == acknowledged.operation.source,
                   dialogID == acknowledged.dialogID,
                   requestedPresentation == acknowledged.operation.presentationID else {
                 return .init(accepted: false, status: "suppressed")
+            }
+            guard acknowledged.verification != nil else {
+                return .init(accepted: false, status: "suppressed", invocationId: acknowledged.operation.id)
             }
             return await retryMutationReadback(acknowledged)
         }
@@ -382,6 +387,14 @@ extension ForgeRuntime {
         }
         let admittedMetadata = await windowMetadata(id: windowID)
         let admitted = admittedMetadata?.authorizationSnapshot
+        if command.reviewedScope != nil,
+           await !reviewIsCurrent(command, windowID: windowID, source: sourceDataSourceRef,
+                                  dialogID: dialogID, presentationID: originalPresentation) {
+            let message = ReviewedScopeChanged().localizedDescription
+            guardedMutationCommands.remove(key)
+            await publishMutationState(key, .init(phase: .failed, error: message, message: message, writerStatus: .notInvoked))
+            return .init(accepted: false, status: "invalid_payload", error: message)
+        }
         let originalSelection = await dataSourceSelectionState(windowID: windowID, dataSourceRef: sourceDataSourceRef)
         var submitted: [String: JSONValue] = [:]
         var submittedSuccessFields: [String: JSONValue] = [:]
@@ -463,7 +476,7 @@ extension ForgeRuntime {
         let operation = MutationOperation(
             key: key, id: invocationId, windowID: windowID, source: sourceDataSourceRef,
             authorization: admitted, selection: originalSelection, root: command, transportRevision: dataSourceTransportRevision, footer: footer, dialogSignal: dialogSignal,
-            presentationID: originalPresentation, selectionFence: selectionFence, originalPendingFields: originalPendingFields, fileFields: fileFields, submittedFiles: submittedFiles)
+            presentationID: originalPresentation, dialogID: dialogID, selectionFence: selectionFence, originalPendingFields: originalPendingFields, fileFields: fileFields, submittedFiles: submittedFiles)
         if let members = command.group {
             return await executeMutationGroup(members, operation: operation, parameters: groupParameters, extras: extras, dialogID: dialogID)
         }
@@ -512,12 +525,12 @@ extension ForgeRuntime {
                 begin: !admittedWrites, child: false)
             defer {
                 mutationTransportOwners.removeValue(forKey: mutationTransportKey(windowID: windowID, dataSourceRef: targetRef))
-                if acknowledgedMutationReadbacks[key] == nil { guardedMutationCommands.remove(key) }
+                if acknowledgedDialogMutations[key] == nil { guardedMutationCommands.remove(key) }
             }
             if let verification = receipt.verification {
-                let acknowledged = AcknowledgedMutationReadback(operation: operation, verification: verification,
+                let acknowledged = AcknowledgedDialogMutation(operation: operation, verification: verification,
                     rows: receipt.rows, submitted: submitted, submittedSuccessFields: submittedSuccessFields, dialogID: dialogID)
-                acknowledgedMutationReadbacks[key] = acknowledged
+                acknowledgedDialogMutations[key] = acknowledged
                 return await verifyAcknowledgedMutation(acknowledged)
             }
             return await completeMutation(operation: operation, rows: receipt.rows, submitted: submitted,
@@ -563,19 +576,24 @@ extension ForgeRuntime {
                     }
                 }
             }
-            defer { if !unresolved { guardedMutationCommands.remove(key) } }
+            var heldReview = false
+            if !unresolved, !receipts.isEmpty, command.reviewedScope != nil, await !reviewIsCurrent(operation) {
+                heldReview = retainReviewedAcknowledgement(operation, dialogID: dialogID, rows: [.object(receipts)])
+            }
+            defer { if !unresolved && !heldReview { guardedMutationCommands.remove(key) } }
             if !failure.lostScope, await completionIsCurrent(operation) {
                 if !unresolved, admittedWrites || failure.invoked {
                     await clearSubmittedFields(windowID: windowID, source: sourceDataSourceRef, submitted: submitted, files: submittedFiles, presentation: operation.presentationID)
                 }
                 await applyMutationWindowState(windowID: windowID, patch: unresolved ? command.indeterminateState : command.errorState)
             }
+            if command.reviewedScope != nil { await finishReviewedPending(operation, stale: await !reviewIsCurrent(operation)) }
             let cleanupUnconfirmed = warnings.contains { $0.stage == "cleanup" }
             let message = cleanupUnconfirmed ? "\(failure.message) Cleanup could not be confirmed." : failure.message
             await publishMutationState(
                 key,
                 MutationCommandState(
-                    phase: unresolved ? .indeterminate : .failed, guarded: unresolved, retryAllowed: !unresolved,
+                    phase: unresolved ? .indeterminate : .failed, guarded: unresolved || heldReview, retryAllowed: !unresolved && !heldReview,
                     error: failure.unknown ? nil : failure.message,
                     message: message, invocationId: invocationId, failedStepId: currentStep, writerStatus: writerStatus,
                     warnings: warnings))
@@ -585,13 +603,13 @@ extension ForgeRuntime {
         }
     }
 
-    func releaseMutationReadbacks(windowID: String, presentationID: UUID) async {
-        let retired = acknowledgedMutationReadbacks.filter {
+    func releaseAcknowledgedDialogMutations(windowID: String, presentationID: UUID) async {
+        let retired = acknowledgedDialogMutations.filter {
             $0.value.operation.windowID == windowID && $0.value.operation.presentationID == presentationID
         }
         for (key, pending) in retired {
-            guard acknowledgedMutationReadbacks[key]?.operation.id == pending.operation.id else { continue }
-            acknowledgedMutationReadbacks.removeValue(forKey: key)
+            guard acknowledgedDialogMutations[key]?.operation.id == pending.operation.id else { continue }
+            acknowledgedDialogMutations.removeValue(forKey: key)
             await publishMutationState(key, .init())
             if !pending.verifying {
                 guardedMutationCommands.remove(key)
@@ -600,23 +618,23 @@ extension ForgeRuntime {
         }
     }
 
-    private func mutationReadbackPresentationIsCurrent(_ acknowledged: AcknowledgedMutationReadback) -> Bool {
+    private func mutationReadbackPresentationIsCurrent(_ acknowledged: AcknowledgedDialogMutation) -> Bool {
         guard let dialogID = acknowledged.dialogID else { return true }
         let windowID = acknowledged.operation.windowID
         return pendingDialogScope("\(windowID)Dialog\(dialogID)").id == acknowledged.operation.presentationID
     }
 
-    private func retryMutationReadback(_ acknowledged: AcknowledgedMutationReadback) async -> MutationCommandResult {
+    private func retryMutationReadback(_ acknowledged: AcknowledgedDialogMutation) async -> MutationCommandResult {
         let key = acknowledged.operation.key
-        guard let pending = acknowledgedMutationReadbacks[key], pending.operation.id == acknowledged.operation.id, !pending.verifying else {
+        guard let pending = acknowledgedDialogMutations[key], pending.operation.id == acknowledged.operation.id, !pending.verifying else {
             return .init(accepted: false, status: "suppressed")
         }
         guard pending.retryable else {
             return .init(accepted: true, status: "verification_failed", invocationId: pending.operation.id)
         }
-        acknowledgedMutationReadbacks[key]?.verifying = true
+        acknowledgedDialogMutations[key]?.verifying = true
         defer {
-            if acknowledgedMutationReadbacks[key] == nil {
+            if acknowledgedDialogMutations[key] == nil {
                 guardedMutationCommands.remove(key)
                 mutationSerializationOwners = mutationSerializationOwners.filter { $0.value != key }
             }
@@ -624,8 +642,9 @@ extension ForgeRuntime {
         return await verifyAcknowledgedMutation(pending)
     }
 
-    private func mutationReadbackScopeIsCurrent(_ acknowledged: AcknowledgedMutationReadback) async -> Bool {
+    private func mutationReadbackScopeIsCurrent(_ acknowledged: AcknowledgedDialogMutation) async -> Bool {
         let operation = acknowledged.operation
+        guard await reviewIsCurrent(operation) else { return false }
         if let fence = operation.selectionFence, await !dataSourceRuntime.dialogSelectionIsCurrent(fence) { return false }
         guard operation.transportRevision == dataSourceTransportRevision,
               mutationReadbackPresentationIsCurrent(acknowledged),
@@ -636,12 +655,13 @@ extension ForgeRuntime {
               (scope.snapshot(operation.source)?.selection ?? .init()) == operation.selection,
               operation.transportRevision == dataSourceTransportRevision,
               mutationReadbackPresentationIsCurrent(acknowledged) else { return false }
-        return Self.readbackScopeValues(acknowledged.verification.spec, reader: acknowledged.verification.reader, scope: scope)
-            == acknowledged.verification.scopeValues
+        guard let verification = acknowledged.verification else { return false }
+        return Self.readbackScopeValues(verification.spec, reader: verification.reader, scope: scope) == verification.scopeValues
     }
 
-    private func verifyAcknowledgedMutation(_ acknowledged: AcknowledgedMutationReadback) async -> MutationCommandResult {
-        let operation = acknowledged.operation, verification = acknowledged.verification
+    private func verifyAcknowledgedMutation(_ acknowledged: AcknowledgedDialogMutation) async -> MutationCommandResult {
+        guard let verification = acknowledged.verification else { return .init(accepted: false, status: "suppressed") }
+        let operation = acknowledged.operation
         let invocationId = operation.id
         let current: @Sendable () async -> Bool = {
             guard !Task.isCancelled else { return false }
@@ -656,7 +676,7 @@ extension ForgeRuntime {
                 guard let metadata = await windowMetadata(id: operation.windowID), await current() else { throw scopeFailure(invoked: true) }
                 let rows = try await readMutationVerification(operation, metadata: metadata, verification: verification, current: current)
                 if await current(), Self.mutationReadbackMatches(rows, verification: verification) {
-                    acknowledgedMutationReadbacks.removeValue(forKey: operation.key)
+                    acknowledgedDialogMutations.removeValue(forKey: operation.key)
                     return await completeMutation(operation: operation, rows: acknowledged.rows, submitted: acknowledged.submitted,
                         submittedSuccessFields: acknowledged.submittedSuccessFields, dialogID: acknowledged.dialogID, readbackRows: rows)
                 }
@@ -678,14 +698,17 @@ extension ForgeRuntime {
         }
 
         let canRetry = await mutationReadbackScopeIsCurrent(acknowledged)
+        if !canRetry, operation.root.reviewedScope != nil, await !reviewIsCurrent(operation) {
+            await finishReviewedPending(operation, stale: true)
+        }
         let message = canRetry ? "Saved. \(issue)" : "Saved. The original verification scope is no longer current."
         if windows.contains(where: { $0.id == operation.windowID }), mutationReadbackPresentationIsCurrent(acknowledged) {
             await publishMutationState(operation.key, .init(phase: .verificationFailed, guarded: true, retryAllowed: canRetry,
                 error: message, message: message, invocationId: invocationId, writerStatus: .succeeded, syncStatus: .verificationFailed))
-            acknowledgedMutationReadbacks[operation.key]?.retryable = canRetry
-            acknowledgedMutationReadbacks[operation.key]?.verifying = false
-        } else if acknowledgedMutationReadbacks[operation.key]?.operation.id == invocationId {
-            acknowledgedMutationReadbacks.removeValue(forKey: operation.key)
+            acknowledgedDialogMutations[operation.key]?.retryable = canRetry
+            acknowledgedDialogMutations[operation.key]?.verifying = false
+        } else if acknowledgedDialogMutations[operation.key]?.operation.id == invocationId {
+            acknowledgedDialogMutations.removeValue(forKey: operation.key)
             await publishMutationState(operation.key, .init())
         }
         return .init(accepted: true, status: "verification_failed", invocationId: invocationId, error: message,
@@ -838,6 +861,15 @@ extension ForgeRuntime {
             readerParameters: readerParameters)
     }
 
+    /// A receipt whose original presentation is still open must not be replayed if the scope switches back.
+    private func retainReviewedAcknowledgement(_ operation: MutationOperation, dialogID: String?, rows: [JSONValue]?) -> Bool {
+        guard operation.root.reviewedScope != nil, let id = operation.presentationID, let dialogID,
+              pendingDialogScope("\(operation.windowID)Dialog\(dialogID)").id == id else { return false }
+        acknowledgedDialogMutations[operation.key] = .init(operation: operation, verification: nil, rows: rows,
+            submitted: [:], submittedSuccessFields: [:], dialogID: dialogID, retryable: false, verifying: false)
+        return true
+    }
+
     private func completeMutation(operation: MutationOperation, rows: [JSONValue]?, submitted: [String: JSONValue],
                                   submittedSuccessFields: [String: JSONValue], dialogID: String?,
                                   readbackRows: [[String: JSONValue]]? = nil) async -> MutationCommandResult {
@@ -851,20 +883,23 @@ extension ForgeRuntime {
             warnings = await synchronizeMutationUI(
                 windowID: windowID, targetDataSourceRef: targetRef, command: command, authorization: admitted,
                 receipt: steps.isEmpty && command.receiptWhen == nil && command.receiptIdentity == nil ? nil : rows?.compactMap(\.objectValue),
-                presentation: operation.plainDialogFooter || command.receiptWhen != nil || command.receiptIdentity != nil ? operation : nil)
+                presentation: operation.root.reviewedScope != nil || operation.plainDialogFooter || command.receiptWhen != nil || command.receiptIdentity != nil ? operation : nil)
         }
         guard await completionIsCurrent(operation) else {
             if command.reconcile?.verify == nil, command.receiptWhen != nil || command.receiptIdentity != nil, await operationIsCurrent(operation), await !presentationIsCurrent(operation) {
                 await publishMutationState(key, .init(phase: .succeeded, message: "Completed", invocationId: invocationId, writerStatus: .succeeded, syncStatus: .succeeded))
                 return .init(accepted: true, status: "succeeded", invocationId: invocationId)
             }
+            let held = retainReviewedAcknowledgement(operation, dialogID: dialogID, rows: rows)
+            await finishReviewedPending(operation, stale: true)
             await publishMutationState(
                 key,
                 MutationCommandState(
-                    phase: .succeeded, message: "Authorization changed after the write.", invocationId: invocationId,
+                    phase: .succeeded, guarded: held, retryAllowed: !held, message: "Authorization changed after the write.", invocationId: invocationId,
                     writerStatus: .succeeded, syncStatus: .partialFailure))
             return MutationCommandResult(accepted: true, status: "superseded", invocationId: invocationId)
         }
+        await finishReviewedPending(operation, stale: false)
         var patch = command.successState
         let receipt = JSONValue.array(rows ?? [])
         for (field, selectors) in command.resultState {
@@ -956,7 +991,10 @@ extension ForgeRuntime {
                 return await preflightFailure("Another command is using a group writer.", status: "transport_busy")
             }
             for writer in writers { mutationTransportOwners[writer] = operation.key }
-            await applyMutationWindowState(windowID: windowID, patch: root.pendingState)
+            guard await applyPendingState(operation) else {
+                for writer in writers where mutationTransportOwners[writer] == operation.key { mutationTransportOwners.removeValue(forKey: writer) }
+                return await preflightFailure("The command scope changed.", status: "superseded")
+            }
             await publishMutationState(operation.key, .init(phase: .pending, guarded: true, pending: true, retryAllowed: false,
                 message: "Saving…", invocationId: operation.id, writerStatus: .pending, members: outcomes))
         }
@@ -998,27 +1036,30 @@ extension ForgeRuntime {
             }
             return "\(outcome.label): \(summary)"
         }.joined(separator: "\n")
-        defer { if !held { guardedMutationCommands.remove(operation.key) } }
         let current = await completionIsCurrent(operation)
         if current {
             let patch = if succeeded { root.successState } else if unknown { root.indeterminateState }
                 else if failed || partial { root.errorState } else { [:] as [String: JSONValue] }
             await applyMutationWindowState(windowID: windowID, patch: patch)
         }
-        let warnings = committed == 0 ? [] : await synchronizeMutationUI(
+        let warnings = committed == 0 || (root.reviewedScope != nil && !current) ? [] : await synchronizeMutationUI(
             windowID: windowID, targetDataSourceRef: operation.source, command: root,
             authorization: operation.authorization, receipt: nil, presentation: operation)
         // Clearing the owner's selection is an authorized refresh effect. It
         // cannot invalidate this presentation's terminal state or close.
         let currentPresentation = await operationOwnerIsCurrent(operation) ? await presentationIsCurrent(operation) : false
-        await publishMutationState(operation.key, .init(phase: phase, guarded: held, retryAllowed: !held,
+        if root.reviewedScope != nil { await finishReviewedPending(operation, stale: await !reviewIsCurrent(operation)) }
+        let staleReview = root.reviewedScope != nil && !currentPresentation && committed > 0 && !unknown
+        let heldReview = staleReview && retainReviewedAcknowledgement(operation, dialogID: dialogID, rows: nil)
+        defer { if !held && !heldReview { guardedMutationCommands.remove(operation.key) } }
+        await publishMutationState(operation.key, .init(phase: phase, guarded: held || heldReview, retryAllowed: !held && !heldReview,
             error: currentPresentation && failed && !held ? message : nil, message: currentPresentation ? message : "", invocationId: operation.id,
             writerStatus: unknown ? .indeterminate : succeeded ? .succeeded : attempted ? .failed : .notInvoked,
             syncStatus: committed == 0 ? .notStarted : warnings.isEmpty ? .succeeded : .partialFailure, warnings: warnings, members: outcomes))
         if succeeded, currentPresentation, operation.footer?.close == true, let dialogID, let presentationID = operation.presentationID {
             await closeDialog(windowID: windowID, dialogID: dialogID, presentationID: presentationID)
         }
-        return .init(accepted: attempted, status: status, invocationId: operation.id, error: failed && !held ? message : nil,
+        return .init(accepted: attempted, status: staleReview && succeeded ? "superseded" : status, invocationId: operation.id, error: failed && !held ? message : nil,
             warnings: warnings, members: outcomes)
     }
 
@@ -1071,6 +1112,7 @@ extension ForgeRuntime {
     // footer write. A replacement dialog owns its own form and selection.
     private func completionIsCurrent(_ operation: MutationOperation) async -> Bool {
         if operation.plainDialogFooter {
+            guard await reviewIsCurrent(operation) else { return false }
             return await windowMetadata(id: operation.windowID)?.authorizationSnapshot == operation.authorization
                 && windows.contains(where: { $0.id == operation.windowID })
         }
@@ -1078,14 +1120,34 @@ extension ForgeRuntime {
         return await presentationIsCurrent(operation)
     }
 
+    private func reviewIsCurrent(_ command: MutationCommandDef, windowID: String, source: String,
+                                 dialogID: String?, presentationID: UUID?) async -> Bool {
+        guard let dialogID, let presentationID, let scope = await mutationScope(windowID: windowID, source: source) else { return false }
+        return admitsDialogReview(key: "\(windowID)Dialog\(dialogID)", presentationID: presentationID, command: command, scope: scope)
+    }
+
+    private func reviewIsCurrent(_ operation: MutationOperation) async -> Bool {
+        guard operation.root.reviewedScope != nil else { return true }
+        return await reviewIsCurrent(operation.root, windowID: operation.windowID, source: operation.source,
+                                     dialogID: operation.dialogID, presentationID: operation.presentationID)
+    }
+
     private func operationOwnerIsCurrent(_ operation: MutationOperation) async -> Bool {
+        guard await reviewIsCurrent(operation) else { return false }
         guard windows.contains(where: { $0.id == operation.windowID }) else { return false }
         return await windowMetadata(id: operation.windowID)?.authorizationSnapshot == operation.authorization
     }
 
     private func operationIsCurrent(_ operation: MutationOperation) async -> Bool {
-        guard await operationOwnerIsCurrent(operation) else { return false }
         if let fence = operation.selectionFence, await !dataSourceRuntime.dialogSelectionIsCurrent(fence) { return false }
+        if operation.root.reviewedScope != nil {
+            guard let dialog = operation.dialogID, let presentation = operation.presentationID,
+                  let scope = await mutationScope(windowID: operation.windowID, source: operation.source),
+                  scope.metadata.authorizationSnapshot == operation.authorization,
+                  (scope.snapshot(operation.source)?.selection ?? .init()) == operation.selection else { return false }
+            return admitsDialogReview(key: "\(operation.windowID)Dialog\(dialog)", presentationID: presentation, command: operation.root, scope: scope)
+        }
+        guard await operationOwnerIsCurrent(operation) else { return false }
         return await dataSourceSelectionState(windowID: operation.windowID, dataSourceRef: operation.source) == operation.selection
     }
 
@@ -1156,14 +1218,24 @@ extension ForgeRuntime {
             }
         }
         if begin {
-            await applyMutationWindowState(windowID: windowID, patch: operation.root.pendingState)
+            guard await applyPendingState(operation) else { throw scopeFailure() }
             await publishMutationState(
                 operation.key,
                 .init(
                     phase: .pending, guarded: true, pending: true, retryAllowed: false, message: "Saving…",
                     invocationId: operation.id, writerStatus: child ? .notInvoked : .pending))
         }
-        await setDataSourceInputParameters(windowID: windowID, dataSourceRef: target, parameters: input.parameters, preservePendingFetch: false)
+        let submittedInput: InputState?
+        if operation.root.reviewedScope != nil {
+            let id = WindowIdentity(windowID: windowID).dataSourceID(ref: target)
+            let signal = await signals.input(dataSourceID: id)
+            let captured = await dataSourceRuntime.installInputParameters(dataSourceID: id, parameters: input.parameters, fetch: false, preservePendingFetch: false)
+            await signal.set(captured)
+            submittedInput = captured
+        } else {
+            await setDataSourceInputParameters(windowID: windowID, dataSourceRef: target, parameters: input.parameters, preservePendingFetch: false)
+            submittedInput = nil
+        }
         guard await operationIsCurrent(operation) else { throw scopeFailure() }
         if !child && !begin {
             await publishMutationState(
@@ -1185,10 +1257,13 @@ extension ForgeRuntime {
                   Self.readbackScopeValues(verification.spec, reader: verification.reader, scope: live) == verification.scopeValues else { throw scopeFailure() }
         }
         if grouped, Task.isCancelled { throw scopeFailure() }
+        let admitTransport: (@Sendable () async -> Bool)?
+        if operation.root.reviewedScope != nil { admitTransport = { await self.operationIsCurrent(operation) } }
+        else { admitTransport = nil }
         let outcome = await awaitMutationWriter(
             windowID: windowID, dataSourceRef: target, timeoutMs: max(1_000, command.timeoutMs ?? 30_000),
             requireRecords: child || !command.resultState.isEmpty || exactReceipt, ordered: exactReceipt,
-            guardTransportErrors: exactReceipt || !command.successFormState.isEmpty, groupInvocation: grouped ? invocation : nil)
+            guardTransportErrors: exactReceipt || !command.successFormState.isEmpty, groupInvocation: grouped ? invocation : nil, admitTransport: admitTransport, submittedInput: submittedInput)
         if case .indeterminate = outcome {
             retainLease = true
             throw MutationDispatchFailure(
@@ -1197,8 +1272,9 @@ extension ForgeRuntime {
                 unknown: true)
         }
         switch outcome {
+        case .notInvoked: throw scopeFailure()
         case .succeeded(let rows):
-            if child && !grouped, await !operationIsCurrent(operation) { throw scopeFailure(invoked: true) }
+            if child && !grouped && operation.root.reviewedScope == nil, await !operationIsCurrent(operation) { throw scopeFailure(invoked: true) }
             if !compensating, (command.receiptWhen != nil || command.rejectedWhen != nil),
                let failure = Self.classifyWriterReceipt(rows ?? [], accepted: command.receiptWhen, rejected: command.rejectedWhen) {
                 retainLease = failure.unknown
@@ -1224,7 +1300,10 @@ extension ForgeRuntime {
             retainLease = !child  // final synchronization still owns its writer's collection.
             return .init(rows: rows, verification: verification)
         case .failed(let error):
-            if !grouped, await !operationIsCurrent(operation) { throw scopeFailure(invoked: true) }
+            if !grouped, await !operationIsCurrent(operation) {
+                if operation.root.reviewedScope != nil { throw MutationDispatchFailure(status: "failed", message: error, invoked: true, lostScope: true) }
+                throw scopeFailure(invoked: true)
+            }
             throw MutationDispatchFailure(status: "failed", message: error, invoked: true)
         case .indeterminate: preconditionFailure("Handled above")
         }
@@ -1293,14 +1372,15 @@ extension ForgeRuntime {
     }
 
     private func awaitMutationWriter(
-        windowID: String, dataSourceRef: String, timeoutMs: Int, requireRecords: Bool, ordered: Bool, guardTransportErrors: Bool, groupInvocation: String?
+        windowID: String, dataSourceRef: String, timeoutMs: Int, requireRecords: Bool, ordered: Bool, guardTransportErrors: Bool, groupInvocation: String?, admitTransport: (@Sendable () async -> Bool)?, submittedInput: InputState?
     ) async -> MutationWriterOutcome {
         let race = MutationRace<MutationWriterOutcome>()
         let writer = Task {
             let receipt = await self.refreshDataSourceRows(windowID: windowID, dataSourceRef: dataSourceRef, requireInvocationRecords: ordered,
-                bypassCache: groupInvocation != nil, invocationId: groupInvocation)
+                bypassCache: groupInvocation != nil, invocationId: groupInvocation, admitTransport: admitTransport, submittedInput: submittedInput)
             switch receipt {
             case .success(let rows): await race.resolve(.succeeded(requireRecords ? rows : nil))
+            case .failure(let error) where error is ReviewedScopeChanged: await race.resolve(.notInvoked)
             case .failure(let error):
                 let transport = error as NSError
                 if (guardTransportErrors
@@ -1341,6 +1421,7 @@ extension ForgeRuntime {
         var warnings: [MutationCommandWarning] = []
         func originalDialog() async -> Bool {
             guard let presentation else { return true }
+            guard await reviewIsCurrent(presentation) else { return false }
             return await presentationIsCurrent(presentation)
         }
         if let reconcile = command.reconcile, reconcile.verify == nil, await originalDialog() {
@@ -1348,7 +1429,11 @@ extension ForgeRuntime {
                 let destinationRef = reconcile.dataSourceRef?.trimmingCharacters(in: .whitespacesAndNewlines)
                 let ref = destinationRef?.isEmpty == false ? destinationRef! : targetDataSourceRef
                 if reconcile.mode?.lowercased() == "refetch" {
-                    await refreshDataSourceCollection(windowID: windowID, dataSourceRef: ref)
+                    if let presentation, presentation.root.reviewedScope != nil {
+                        _ = await refreshDataSourceRows(windowID: windowID, dataSourceRef: ref, current: { await self.reviewIsCurrent(presentation) })
+                    } else {
+                        await refreshDataSourceCollection(windowID: windowID, dataSourceRef: ref)
+                    }
                     if let error = await dataSourceControl(windowID: windowID, dataSourceRef: ref).error {
                         throw MutationRuntimeError.message(error)
                     }
@@ -1365,6 +1450,7 @@ extension ForgeRuntime {
         }
         var clearedSource = false
         for refresh in command.refresh {
+            if let presentation, presentation.root.reviewedScope != nil, await !reviewIsCurrent(presentation) { break }
             if command.group != nil, let presentation {
                 let ref = refresh.dataSourceRef
                 guard await groupSynchronizationIsCurrent(presentation, afterClearingSource: clearedSource) else {
@@ -1395,7 +1481,12 @@ extension ForgeRuntime {
             if refresh.clearSelection && original {
                 await setDataSourceSelection(windowID: windowID, dataSourceRef: refresh.dataSourceRef, selected: nil)
             }
-            await refreshDataSourceCollection(windowID: windowID, dataSourceRef: refresh.dataSourceRef)
+            if let presentation, presentation.root.reviewedScope != nil {
+                _ = await refreshDataSourceRows(windowID: windowID, dataSourceRef: refresh.dataSourceRef,
+                    bypassCache: refresh.bypassCache, current: { await self.reviewIsCurrent(presentation) })
+            } else {
+                await refreshDataSourceCollection(windowID: windowID, dataSourceRef: refresh.dataSourceRef)
+            }
             if let error = await dataSourceControl(windowID: windowID, dataSourceRef: refresh.dataSourceRef).error, !error.isEmpty {
                 warnings.append(MutationCommandWarning(stage: "refresh", dataSourceRef: refresh.dataSourceRef, message: error))
             }
@@ -1405,9 +1496,11 @@ extension ForgeRuntime {
 
     func mutationScope(windowID: String, source: String) async -> MutationScope? {
         guard let metadata = await windowMetadata(id: windowID) else { return nil }
+        let read = await dataSourceRuntime.snapshotReader()
+        let identity = WindowIdentity(windowID: windowID)
         return MutationScope(windowKey: metadata.windowKey ?? windows.first(where: { $0.id == windowID })?.key ?? "",
-            identity: WindowIdentity(windowID: windowID), source: source, metadata: metadata,
-            windowForm: await windowFormJSONValue(windowID: windowID), read: await dataSourceRuntime.snapshotReader())
+            identity: identity, source: source, metadata: metadata,
+            windowForm: read(identity.windowFormID())?.form ?? [:], read: read)
     }
 
     public func mutationPredicateAllows(windowID: String, dataSourceRef: String, condition: DashboardConditionDef?) async -> Bool {
@@ -1420,6 +1513,34 @@ extension ForgeRuntime {
         return actions.map { action in
             let visible = scope.allows(action.visibleWhen)
             return (visible, !visible || (action.disabledWhen.map { scope.allows($0) } ?? false) || !scope.allows(action.mutationCommand?.validateWhen))
+        }
+    }
+
+    private func applyPendingState(_ operation: MutationOperation) async -> Bool {
+        let patch = operation.root.pendingState
+        guard !patch.isEmpty else { return true }
+        return await updateWindowFormValue(windowID: operation.windowID, values: patch,
+            pending: operation.root.reviewedScope == nil ? nil : operation)
+    }
+
+    func releaseReviewedPending(_ patch: ReviewedPendingPatch, actor: ReviewedActor, windowID: String, owner: String, presentation: UUID) async {
+        let ref = WindowIdentity(windowID: windowID).windowFormID()
+        let signal = await signals.form(dataSourceID: ref)
+        while pendingDialogScope(owner).id == presentation {
+            let current = await dataSourceRuntime.form(dataSourceID: ref)
+            let metadata = await windowMetadata(id: windowID)
+            let sameActor = metadata.flatMap { ReviewedActor($0.authorizationSnapshot) } == actor
+            let next = patch.releasing(from: current, restore: sameActor)
+            guard pendingDialogScope(owner).id == presentation else { return }
+            if current != next {
+                guard await dataSourceRuntime.restoreForm(dataSourceID: ref, ifCurrent: current, previous: next) else { continue }
+                guard pendingDialogScope(owner).id == presentation else {
+                    _ = await dataSourceRuntime.restoreForm(dataSourceID: ref, ifCurrent: next, previous: current)
+                    return
+                }
+            }
+            await signal.releasePending(patch, restore: sameActor)
+            return
         }
     }
 

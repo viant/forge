@@ -3,6 +3,7 @@ package com.viant.forgeandroid.runtime
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -129,6 +130,9 @@ class DataSourceRuntime(
                 val owned = window.metadata.peek()?.let { dataSourceRef in reportOwnedDataSourceRefs(it) } == true
                 !owned || authorizeReportRead?.invoke(registeredContexts[window.windowId]?.get(instanceRef) ?: error("The datasource is not registered."), proposed) != false
             },
+            enqueueReviewed = { source, request ->
+                scope.launch { withContext(Dispatchers.IO) { fetchCollection(source, requestedInput = request) } }
+            },
             preparedRegister = { id -> preparedCompletions[id] = PreparedCompletion(window.windowId, instanceRef, CompletableDeferred()) },
             preparedAwait = { id ->
                 val completion = checkNotNull(preparedCompletions[id]) { "The prepared report dispatch is unavailable." }
@@ -250,26 +254,49 @@ class DataSourceRuntime(
         if (reportOwned && reportRequestInspectionOnly) { failPrepared(ctx, "Debug report inspection is active."); return }
         val refreshOwner = requestedInput.refreshOwner
         val rawCommandReceipt = requestedInput.preparedDispatchId != null && requestedInput.rawCommandReceipt
-        fun canCommit() = (!reportOwned || commitGuard != null) && commitGuard?.invoke() != false &&
+        val reviewed = requestedInput.reviewedWriter.takeIf { requestedInput.preparedDispatchId != null }
+        var physicalRows: List<*>? = null
+        var receivedResponse = false
+        fun admissionCurrent() = (!reportOwned || commitGuard != null) && commitGuard?.invoke() != false &&
             refreshOwner?.invoke() != false &&
             ((commitGuard == null && refreshOwner == null) || live.input.peek().preparedDispatchId == requestedInput.preparedDispatchId) &&
             (!reportOwned || authorizeReportRead?.invoke(live, requestedInput) != false)
-        if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
+        fun canCommit() = admissionCurrent() && reviewed?.current?.invoke() != false
+        fun admitEffects(error: Throwable? = null): Boolean {
+            if (!admissionCurrent()) {
+                failPrepared(ctx, "The prepared report dispatch is stale or unauthorized.")
+                return false
+            }
+            if (reviewed == null || (error !is ReviewedWriterNotInvoked && reviewed.current())) return true
+            val cause = if (!reviewed.dispatched) ReviewedWriterNotInvoked() else error
+            // Preserve the original invocation's physical evidence without publishing to the replacement.
+            val dispatchId = requestedInput.preparedDispatchId
+            ctx.control.update { if (it.requestId == dispatchId) it.copy(loading = false, requestId = null) else it }
+            val rows = physicalRows
+            if (dispatchId != null) preparedCompletions[dispatchId]?.result?.complete(PreparedReportFetchResult(
+                JsonUtil.anyToElement(rows.orEmpty()).jsonArray, JsonObject(emptyMap()), cause?.message, cause,
+                recordsConfirmed = rows != null || (cause != null && !receivedResponse)))
+            return false
+        }
+        if (!admitEffects()) return
         val parentRead = admitParentRead(live, ctx)
         ctx.control.set(ctx.control.peek().copy(loading = true, error = null, resolved = false, requestId = requestedInput.preparedDispatchId))
 
-        var receivedResponse = false
         try {
-            val loaderResult = collectionLoader?.invoke(ctx, null, false)
+            val loaderResult = collectionLoader?.let { loader ->
+                reviewed?.begin()
+                loader(ctx, null, false)
+            }
             if (loaderResult != null) {
+                if (reviewed != null) physicalRows = loaderResult.rows
                 receivedResponse = true
                 currentCoroutineContext().ensureActive()
-                if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
+                if (!admitEffects()) return
                 val evidence = if (rawCommandReceipt) JsonUtil.anyToElement(loaderResult.rows).jsonArray else null
                 val modeled = applyResourceModel(ctx, loaderResult.rows)
                 val data = applyNamedFetchHooks(ctx, applyCollectionHook(ctx, modeled), currentPath)
                 currentCoroutineContext().ensureActive()
-                if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
+                if (!admitEffects()) return
                 ctx.collection.set(data)
                 if (loaderResult.form != null) {
                     ctx.form.set(loaderResult.form)
@@ -281,7 +308,7 @@ class DataSourceRuntime(
                         loaderResult.rowIndex ?: -1
                     )
                     currentCoroutineContext().ensureActive()
-                    if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
+                    if (!admitEffects()) return
                     ctx.selection.set(
                         SelectionState(
                             selected = preparedSelection,
@@ -295,11 +322,11 @@ class DataSourceRuntime(
                     ctx.toggleSelection(data.first(), 0, commitGuard = { canCommit() })
                 }
                 currentCoroutineContext().ensureActive()
-                if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
+                if (!admitEffects()) return
                 ctx.metrics.set(loaderResult.metrics)
                 trigger(ctx, "onFetch", mapOf("collection" to data), currentPath)
                 trigger(ctx, "onSuccess", mapOf("collection" to data), currentPath)
-                if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
+                if (!admitEffects()) return
                 finishFetch(ctx, rows = data, metrics = loaderResult.metrics, invocationEvidence = evidence)
                 if (parentRead != null && data == modeled) settleParentRead(live, parentRead, data, loaderResult.admittedParentInputs, fromLoader = true)
                 return
@@ -321,11 +348,16 @@ class DataSourceRuntime(
             }
 
             val requireRecords = requestedInput.requireCommandRecords && requestedInput.preparedDispatchId != null
+            reviewed?.begin()
             val response = executeRequest(endpoint, request, requireRecords)
             receivedResponse = true
             currentCoroutineContext().ensureActive()
-            if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
+            if (reviewed == null && !admitEffects()) return
             val rawRows = collectionValue(response, ctx.dataSource.selectors?.data, requireRecords)
+            if (reviewed != null) {
+                physicalRows = rawRows as? List<*>
+                if (!admitEffects()) return
+            }
             // The displayed collection may transform or filter records. A checked receipt belongs
             // to the selected physical response, before any resource model or onFetch hook.
             val evidence = if (rawCommandReceipt && rawRows is List<*>) JsonUtil.anyToElement(rawRows).jsonArray else null
@@ -333,13 +365,13 @@ class DataSourceRuntime(
             val data = applyNamedFetchHooks(ctx, applyCollectionHook(ctx, modeled), currentPath)
             currentCoroutineContext().ensureActive()
             val dataInfo = normalizeDataInfo(response, ctx.dataSource.selectors?.dataInfo)
-            if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
+            if (!admitEffects()) return
             ctx.collection.set(data)
             if (ctx.dataSource.autoSelect != false && data.isNotEmpty() && ctx.peekSelection().selected == null) {
                 ctx.toggleSelection(data.first(), 0, commitGuard = { canCommit() })
             }
             currentCoroutineContext().ensureActive()
-            if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
+            if (!admitEffects()) return
             if (dataInfo.isNotEmpty()) {
                 ctx.metrics.set(dataInfo)
             } else {
@@ -347,7 +379,7 @@ class DataSourceRuntime(
             }
             trigger(ctx, "onFetch", mapOf("collection" to data, "response" to response), currentPath)
             trigger(ctx, "onSuccess", mapOf("collection" to data, "response" to response), currentPath)
-            if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
+            if (!admitEffects()) return
             // The datasource still exposes object rows. A correlated command receipt may also contain JSON scalars.
             val invocationRows = if (requireRecords && rawRows is List<*> && rawRows.any { it !is Map<*, *> }) rawRows else data
             finishFetch(ctx, rows = invocationRows, metrics = if (dataInfo.isNotEmpty()) dataInfo else extractPagingMetrics(response, ctx.dataSource),
@@ -358,14 +390,14 @@ class DataSourceRuntime(
             failPrepared(ctx, "The prepared report query was cancelled.")
             throw e
         } catch (e: Exception) {
-            if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
+            if (!admitEffects(e)) return
             trigger(ctx, "onError", mapOf("error" to (e.message ?: "Unknown error")), currentPath)
-            if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
+            if (!admitEffects()) return
             finishFetch(ctx, error = e.message ?: e.javaClass.simpleName, cause = e, recordsConfirmed = !receivedResponse)
         } finally {
             if (requestedInput.fetch) {
                 live.input.update { current ->
-                    if (current === requestedInput) current.copy(fetch = false, refresh = false, requireCommandRecords = false, rawCommandReceipt = false) else current
+                    if (current === requestedInput) current.copy(fetch = false, refresh = false, requireCommandRecords = false, rawCommandReceipt = false, reviewedWriter = null) else current
                 }
             }
         }
@@ -746,9 +778,11 @@ class DataSourceRuntime(
         lifecyclePath: List<String> = listOf(ctx.dataSourceRef)
     ) {
         val metadata = ctx.window.metadata.peek()
+        val current = ctx.input.peek().reviewedWriter?.current
         ctx.dataSource.on
             .filter { it.event == event }
             .forEach { execution ->
+                if (current?.invoke() == false) return
                 val handler = execution.handler?.trim().orEmpty()
                 val code = metadata?.actions?.code?.trim().orEmpty()
                 if (event == "onFetch") {
@@ -849,7 +883,9 @@ class DataSourceRuntime(
         effects: List<DataSourceLifecycleEffect>,
         lifecyclePath: List<String>
     ) {
+        val current = source.input.peek().reviewedWriter?.current
         effects.forEach { effect ->
+                if (current?.invoke() == false) return
                 val target = source.window.contextOrNull(effect.ref) ?: return@forEach
                 when (effect.kind) {
                     "form" -> (JsonUtil.elementToAny(effect.value) as? Map<*, *>)?.let { value ->
@@ -946,7 +982,8 @@ class DataSourceContext(
     val instanceRef: String = dataSourceRef,
     private val preparedAuthorization: (InputState) -> Boolean = { true },
     private val preparedRegister: (String) -> Unit = {},
-    private val preparedAwait: suspend (String) -> PreparedReportFetchResult = { error("Prepared report completion is unavailable.") }
+    private val preparedAwait: suspend (String) -> PreparedReportFetchResult = { error("Prepared report completion is unavailable.") },
+    private val enqueueReviewed: ((DataSourceContext, InputState) -> Unit)? = null
 ) {
     fun peekForm(): Map<String, Any?> = form.peek()
     fun setForm(values: Map<String, Any?>) = form.set(values)
@@ -1130,9 +1167,9 @@ class DataSourceContext(
         parameters.mapValues { snapshotInputValue(it.value) }
 
     internal fun dispatchCommand(parameters: Map<String, Any?>, requireRecords: Boolean,
-        captured: Map<String, Any?>? = null, rawReceipt: Boolean = false): String =
+        captured: Map<String, Any?>? = null, rawReceipt: Boolean = false, reviewed: ReviewedWriterDispatch? = null): String =
         checkNotNull(setInputParametersValue(captured ?: parameters, fetch = true, captureResult = true,
-            requireRecords = requireRecords, captured = captured, rawReceipt = rawReceipt))
+            requireRecords = requireRecords, captured = captured, rawReceipt = rawReceipt, reviewed = reviewed))
 
     fun setPreparedInputParameters(parameters: Map<String, Any?>, permit: NativeReportReadPermit? = null, commitGuard: () -> Boolean): String? {
         if (!commitGuard()) return null
@@ -1186,16 +1223,7 @@ class DataSourceContext(
         setInputParametersValue(parameters, fetch = fetch, preservePendingFetch = false)
     }
 
-    // Detach mutable inputs while preserving the scalar types supplied by callers.
-    private fun snapshotInputValue(value: Any?): Any? = when (value) {
-        is JsonElement -> JsonUtil.elementToAny(value)
-        is Map<*, *> -> value.entries.associate { it.key.toString() to snapshotInputValue(it.value) }
-        is List<*> -> value.map(::snapshotInputValue)
-        is Number, is Boolean, is String, null -> value
-        else -> value.toString()
-    }
-
-    private fun setInputParametersValue(parameters: Map<String, Any?>, fetch: Boolean = false, commitGuard: (() -> Boolean)? = null, permit: NativeReportReadPermit? = null, captureResult: Boolean = false, requireRecords: Boolean = false, preservePendingFetch: Boolean = true, captured: Map<String, Any?>? = null, rawReceipt: Boolean = false): String? {
+    private fun setInputParametersValue(parameters: Map<String, Any?>, fetch: Boolean = false, commitGuard: (() -> Boolean)? = null, permit: NativeReportReadPermit? = null, captureResult: Boolean = false, requireRecords: Boolean = false, preservePendingFetch: Boolean = true, captured: Map<String, Any?>? = null, rawReceipt: Boolean = false, reviewed: ReviewedWriterDispatch? = null): String? {
         val current = input.peek()
         val inputPayload = JsonUtil.asStringMap(parameters["input"])
         val query = JsonUtil.asStringMap(inputPayload["query"])
@@ -1206,13 +1234,20 @@ class DataSourceContext(
         }
         val next = current.copy(parameters = captured ?: snapshotCommandParameters(parameters), filter = nextFilter, fetch = fetch || (preservePendingFetch && current.fetch),
             refresh = if (!preservePendingFetch && fetch && current.fetch) !current.refresh else current.refresh,
-            preparedGuard = commitGuard, requireCommandRecords = requireRecords, rawCommandReceipt = rawReceipt, refreshOwner = null, refreshBypassCache = false,
+            preparedGuard = commitGuard, requireCommandRecords = requireRecords, rawCommandReceipt = rawReceipt, reviewedWriter = reviewed, refreshOwner = null, refreshBypassCache = false,
             preparedWindowForm = if (commitGuard == null) null else window.peekWindowForm().mapValues { snapshotInputValue(it.value) },
             preparedMetadata = if (commitGuard == null) null else window.metadata.peek(),
             preparedDispatchId = if (commitGuard == null && !captureResult) null else java.util.UUID.randomUUID().toString(), preparedReadPermit = permit)
         if (commitGuard != null && !preparedAuthorization(next)) return null
         if (permit != null || captureResult) next.preparedDispatchId?.let(preparedRegister)
-        input.set(next)
+        if (reviewed == null) input.set(next) else {
+            // A later parameter edit must never inherit this write's fetch intent. Use the same
+            // fetch/receipt path with the immutable admitted input, independently of collectLatest.
+            val enqueue = checkNotNull(enqueueReviewed)
+            input.set(next.copy(fetch = false, refresh = false, preparedDispatchId = null, requireCommandRecords = false,
+                rawCommandReceipt = false, reviewedWriter = null))
+            enqueue(this, next)
+        }
         return next.preparedDispatchId
     }
 
@@ -1233,4 +1268,13 @@ class DataSourceContext(
                 eventDispatcher(execution, args)
             }
     }
+}
+
+// Detach mutable inputs while preserving the scalar types supplied by callers.
+internal fun snapshotInputValue(value: Any?): Any? = when (value) {
+    is JsonElement -> JsonUtil.elementToAny(value)
+    is Map<*, *> -> value.entries.associate { it.key.toString() to snapshotInputValue(it.value) }
+    is List<*> -> value.map(::snapshotInputValue)
+    is Number, is Boolean, is String, null -> value
+    else -> value.toString()
 }

@@ -306,7 +306,7 @@ export function createDataConnector(dataSource, runtime = {}) {
     /**
      * GET method
      */
-    async function get({filter = {}, page, cursor, pageSize, inputParameters = {}, cache = null, invocationId = null, signal = null, fresh = false, responseInfo = null, ifNoneMatch = '', bindingRetry = false} = {}) {
+    async function get({filter = {}, page, cursor, pageSize, inputParameters = {}, cache = null, invocationId = null, signal = null, fresh = false, responseInfo = null, ifNoneMatch = '', bindingRetry = false, admitWriter} = {}) {
         try {
             let {method, url, headers} = getUrlAndHeaders();
             let queryParams = new URLSearchParams();
@@ -375,13 +375,14 @@ export function createDataConnector(dataSource, runtime = {}) {
             }
             const log = getLogger('connector');
             try { log.debug('[request]', { method, url: finalUrl, request }); } catch(_) {}
-            const requestKey = requestMethod === 'GET' && !signal && fresh !== true
+            const requestKey = requestMethod === 'GET' && !admitWriter && !signal && fresh !== true
                 ? JSON.stringify({ url: finalUrl, headers: request.headers || {} })
                 : '';
             if (requestKey && inFlightGetRequests.has(requestKey)) {
                 return inFlightGetRequests.get(requestKey);
             }
             const performRequest = (async () => {
+                admitWriter?.();
                 if (dataSourceRef) recordWindowPerfPhase('datasource-fetch-start',windowId);
                 const resp = await fetch(finalUrl, request);
                 if (responseInfo && typeof responseInfo === 'object') {
@@ -412,7 +413,7 @@ export function createDataConnector(dataSource, runtime = {}) {
                         if (requestKey && inFlightGetRequests.get(requestKey)===completion)inFlightGetRequests.delete(requestKey);
                         await recoverWindowBinding({windowId,signal,sessionId:requestSession});
                         if (signal?.aborted) throw new DOMException('The operation was aborted.','AbortError');
-                        return get({filter,page,cursor,pageSize,inputParameters,cache,invocationId,signal,fresh,responseInfo,ifNoneMatch,bindingRetry:true});
+                        return get({filter,page,cursor,pageSize,inputParameters,cache,invocationId,signal,fresh,responseInfo,ifNoneMatch,admitWriter,bindingRetry:true});
                     }
                     throw error;
                 } finally {

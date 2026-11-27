@@ -335,3 +335,22 @@ it('awaits host request preparation before sending any datasource request',async
  const pending=connector.get();await Promise.resolve();expect(global.fetch).not.toHaveBeenCalled();
  ready();await pending;expect(global.fetch).toHaveBeenCalledOnce();expect(global.fetch.mock.calls[0][1].headers['Mcp-Session-Id']).toBe('negotiated');
 });
+
+it('rechecks a reviewed write after asynchronous request preparation, before fetch', async () => {
+    let finishPreparation;
+    const fetch = vi.spyOn(globalThis, 'fetch');
+    const connector = createDataConnector({service:{URL:'/writer', method:'POST'}}, {
+        prepareRequest: () => new Promise(resolve => {finishPreparation = resolve;}),
+    });
+    let current = true;
+    try {
+        const result = connector.get({inputParameters:{ownerId:7},admitWriter:()=>{
+            if (!current) throw Object.assign(new Error('Stale review'), {code:'reviewed_scope_changed'});
+        }});
+        await vi.waitFor(()=>expect(finishPreparation).toBeTypeOf('function'));
+        current = false;
+        finishPreparation({});
+        await expect(result).rejects.toMatchObject({code:'reviewed_scope_changed'});
+        expect(fetch).not.toHaveBeenCalled();
+    } finally { fetch.mockRestore(); }
+});

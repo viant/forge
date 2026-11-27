@@ -135,12 +135,14 @@ public actor ForgeRuntime {
     private var externalURLHandler: (@Sendable (URL) async -> Void)?
     var mutationCommandStates: [String: Signal<MutationCommandState>] = [:]
     var guardedMutationCommands: Set<String> = []
-    var acknowledgedMutationReadbacks: [String: AcknowledgedMutationReadback] = [:]
+    var acknowledgedDialogMutations: [String: AcknowledgedDialogMutation] = [:]
     var mutationSerializationOwners: [String: String] = [:]
     var mutationTransportOwners: [String: String] = [:]
 
     var handlers: [String: ForgeHandler] = [:]
     private struct DialogPresentation {
+        var review: ReviewedDialogPresentation?
+        var pendingRetirement: Task<Void,Never>?
         var id: UUID?
         var outbound: PendingDialog?
         var selectionFence: DialogSelectionFence?
@@ -295,8 +297,8 @@ public actor ForgeRuntime {
     }
 
     public func closeWindow(id: String) {
-        for (key, acknowledged) in acknowledgedMutationReadbacks where acknowledged.operation.windowID == id {
-            acknowledgedMutationReadbacks.removeValue(forKey: key)
+        for (key, acknowledged) in acknowledgedDialogMutations where acknowledged.operation.windowID == id {
+            acknowledgedDialogMutations.removeValue(forKey: key)
             guardedMutationCommands.remove(key)
             mutationSerializationOwners = mutationSerializationOwners.filter { $0.value != key }
         }
@@ -717,7 +719,9 @@ public actor ForgeRuntime {
         requireInvocationRecords: Bool = false,
         bypassCache: Bool = false,
         invocationId: String? = nil,
-        current: (@Sendable () async -> Bool)? = nil
+        current: (@Sendable () async -> Bool)? = nil,
+        admitTransport: (@Sendable () async -> Bool)? = nil,
+        submittedInput: InputState? = nil
     ) async -> DataSourceRowReceipt? {
         if let current, await !current() { return nil }
         let signal = await signals.metadata(windowID: windowID)
@@ -727,9 +731,9 @@ public actor ForgeRuntime {
             return nil
         }
         let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
-        let input = await dataSourceRuntime.input(dataSourceID: dataSourceID)
+        let input = if let submittedInput { submittedInput } else { await dataSourceRuntime.input(dataSourceID: dataSourceID) }
         let transportRevision = dataSourceTransportRevision
-        let originalControl = if current != nil { await dataSourceRuntime.control(dataSourceID: dataSourceID) } else { ControlState() }
+        let originalControl = if current != nil || admitTransport != nil { await dataSourceRuntime.control(dataSourceID: dataSourceID) } else { ControlState() }
         func parentRead(_ rows: [[String: JSONValue]], raw: [[String: JSONValue]], _ resolvedInputs: [String: JSONValue]) -> ParentCollectionRead? {
             guard rows.count == 1, let readers = metadata.parentReaders, readers.refs.contains(dataSourceRef), rows == raw else { return nil }
             return ParentCollectionRead(metadataRevision: readers.revision, transportRevision: transportRevision, effectiveParameters: input.parameters.merging(resolvedInputs) { _, resolved in resolved })
@@ -747,14 +751,17 @@ public actor ForgeRuntime {
         let fetchGeneration = (dataSourceFetchGenerations[dataSourceID] ?? 0) &+ 1
         dataSourceFetchGenerations[dataSourceID] = fetchGeneration
 
+        func restoreOriginalControl() async {
+            guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration else { return }
+            await dataSourceRuntime.setControl(dataSourceID: dataSourceID, control: originalControl)
+            let signal = await signals.control(dataSourceID: dataSourceID)
+            if dataSourceFetchGenerations[dataSourceID] == fetchGeneration { await signal.set(originalControl) }
+        }
+
         func stillCurrent() async -> Bool {
             guard let current else { return true }
             if await current() { return true }
-            if dataSourceFetchGenerations[dataSourceID] == fetchGeneration {
-                await dataSourceRuntime.setControl(dataSourceID: dataSourceID, control: originalControl)
-                let signal = await signals.control(dataSourceID: dataSourceID)
-                if dataSourceFetchGenerations[dataSourceID] == fetchGeneration { await signal.set(originalControl) }
-            }
+            await restoreOriginalControl()
             return false
         }
 
@@ -767,6 +774,10 @@ public actor ForgeRuntime {
                 guard await stillCurrent(), await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return nil }
                 let resolvedInputs = ParameterResolver.resolve(parameters: dataSource.parameters, context: await buildParameterResolutionContext(
                     windowID: windowID, metadata: metadata, identityDataSourceRef: dataSourceRef, preferredInput: input))
+                if let admitTransport, await !admitTransport() {
+                    await restoreOriginalControl()
+                    return .failure(ReviewedScopeChanged())
+                }
                 if let result = try await dataSourceLoader(
                     DataSourceFetchRequest(
                         windowID: windowID,
@@ -903,8 +914,12 @@ public actor ForgeRuntime {
             session: session,
             bypassCache: bypassCache,
             invocationId: invocationId,
-            current: current
+            current: current, admitTransport: admitTransport, submittedInput: submittedInput
         )
+        if case .failure(let error) = receipt, error is ReviewedScopeChanged {
+            await restoreOriginalControl()
+            return receipt
+        }
         guard await stillCurrent(), dataSourceFetchGenerations[dataSourceID] == fetchGeneration, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return nil }
         let fetchedRows: [[String: JSONValue]]
         if case let .success(rows) = receipt { fetchedRows = rows.compactMap(\.objectValue) }
@@ -1281,6 +1296,66 @@ public actor ForgeRuntime {
         pendingDialogs[key, default: DialogPresentation()].outbound = pending
     }
 
+    func ownReviewedPending(_ operation: MutationOperation, before: [String:JSONValue], after: [String:JSONValue]) -> Bool {
+        guard let dialogID = operation.dialogID, let id = operation.presentationID else { return false }
+        let key = "\(operation.windowID)Dialog\(dialogID)"
+        guard pendingDialogs[key]?.id == id, let sequence = pendingDialogs[key]?.review?.pendingSequence,
+              pendingDialogs[key]?.pendingRetirement == nil else { return false }
+        pendingDialogs[key]?.review?.pendingSequence = sequence &+ 1
+        pendingDialogs[key]?.review?.pending[operation.id] = ReviewedPendingPatch(sequence: sequence, keys: operation.root.pendingState.keys, before: before, after: after)
+        return true
+    }
+
+    func finishReviewedPending(_ operation: MutationOperation, stale: Bool) async {
+        guard operation.root.reviewedScope != nil, let dialog = operation.dialogID, let id = operation.presentationID else { return }
+        let key = "\(operation.windowID)Dialog\(dialog)"
+        guard let session = pendingDialogs[key], session.id == id else { return }
+        if let retirement = session.pendingRetirement { await retirement.value; return }
+        if stale {
+            await releasePendingPatch(windowID: operation.windowID, key: key, presentation: id, invocation: operation.id)?.value
+        } else if pendingDialogs[key]?.review?.pending[operation.id]?.release == nil {
+            pendingDialogs[key]?.review?.pending.removeValue(forKey: operation.id)
+        }
+    }
+
+    private func releasePendingPatch(windowID: String, key: String, presentation: UUID, invocation: String) -> Task<Void,Never>? {
+        guard let session = pendingDialogs[key], session.id == presentation, let review = session.review,
+              let patch = review.pending[invocation] else { return nil }
+        if let release = patch.release { return release }
+        let actor = review.actor
+        let release = Task {
+            await releaseReviewedPending(patch, actor: actor, windowID: windowID, owner: key, presentation: presentation)
+            if pendingDialogs[key]?.id == presentation { pendingDialogs[key]?.review?.pending.removeValue(forKey: invocation) }
+        }
+        pendingDialogs[key]?.review?.pending[invocation]?.release = release
+        return release
+    }
+
+    /// Keep the original presentation installed until its outstanding releases finish.
+    private func retirePendingFields(windowID: String, key: String, presentationID: UUID) async {
+        guard let session = pendingDialogs[key], session.id == presentationID else { return }
+        if let retirement = session.pendingRetirement { await retirement.value; return }
+        guard let pending = session.review?.pending, !pending.isEmpty else { return }
+        // Overlapping pending fields restore in reverse publication order.
+        let invocations = pending.sorted { $0.value.sequence > $1.value.sequence }.map(\.key)
+        let retirement = Task {
+            for invocation in invocations {
+                await releasePendingPatch(windowID: windowID, key: key, presentation: presentationID, invocation: invocation)?.value
+            }
+        }
+        pendingDialogs[key]?.pendingRetirement = retirement
+        await retirement.value
+    }
+
+    func admitsDialogReview(key: String, presentationID: UUID, command: MutationCommandDef, scope: MutationScope) -> Bool {
+        let name = command.commandId ?? command.dataSourceRef
+        guard let rules = command.reviewedScope, let session = pendingDialogs[key], session.id == presentationID, session.pendingRetirement == nil,
+              let review = session.review, review.plans[name] == rules, !review.invalidated.contains(name) else { return false }
+        if scope.admitsReviewed(rules, review: review) { return true }
+        pendingDialogs[key]?.review?.invalidated.insert(name)
+        return false
+    }
+
     func pendingDialogScope(_ key: String) -> (id: UUID?, outbound: PendingDialog?, selectionFence: DialogSelectionFence?) {
         let dialog = pendingDialogs[key]
         return (dialog?.id, dialog?.outbound, dialog?.selectionFence)
@@ -1317,7 +1392,9 @@ public actor ForgeRuntime {
     ) async -> UUID? {
         let key = "\(windowID)Dialog\(dialogID)"
         let sig = await signals.dialog(dialogID: key)
-        if !parameters.isEmpty, let dialog = await windowMetadata(id: windowID)?.dialogs.first(where: { $0.id == dialogID }),
+        let metadata = await windowMetadata(id: windowID)
+        let dialog = metadata?.dialogs.first { $0.id == dialogID }
+        if !parameters.isEmpty, let dialog,
            let ref = dialog.content?.dataSourceRef ?? dialog.dataSourceRef, !ref.isEmpty {
             let scoped = parameters[ref]?.objectValue
             await setDataSourceInputParameters(windowID: windowID, dataSourceRef: ref,
@@ -1325,6 +1402,16 @@ public actor ForgeRuntime {
         }
         if let selectionFence, await !dataSourceRuntime.dialogSelectionIsCurrent(selectionFence) { return nil }
         if let expected, await sig.peek() != expected || pendingDialogs[key]?.id != nil { return nil }
+        if let previous = pendingDialogs[key], let previousID = previous.id,
+           previous.pendingRetirement != nil || previous.review?.pending.isEmpty == false {
+            await retirePendingFields(windowID: windowID, key: key, presentationID: previousID)
+            if let live = pendingDialogs[key]?.id, live != previousID { waiter?.resume(returning: nil); return nil }
+            if let selectionFence, await !dataSourceRuntime.dialogSelectionIsCurrent(selectionFence) {
+                if pendingDialogs[key]?.id == previousID { pendingDialogs[key]?.pendingRetirement = nil }
+                waiter?.resume(returning: nil)
+                return nil
+            }
+        }
         var presentation = DialogState(open: true, selectionMode: selectionMode, props: parameters, args: parameters)
         let id = UUID()
         presentation.presentationID = id
@@ -1336,6 +1423,9 @@ public actor ForgeRuntime {
             session = DialogPresentation()
         }
         session.id = id
+        if let dialog, !dialog.reviewedPlans.isEmpty, let metadata {
+            session.review = ReviewedDialogPresentation(dialog.reviewedPlans, authorization: metadata.authorizationSnapshot, arguments: parameters)
+        }
         session.selectionFence = selectionFence
         if let waiter {
             session.waiter?.resume(returning: nil)
@@ -1345,7 +1435,7 @@ public actor ForgeRuntime {
         pendingDialogs[key] = session
         let previous = await sig.exchange(presentation)
         if let replacedSelectionFence { await dataSourceRuntime.releaseDialogSelection(replacedSelectionFence) }
-        if let replacedID { await releaseMutationReadbacks(windowID: windowID, presentationID: replacedID) }
+        if let replacedID { await releaseAcknowledgedDialogMutations(windowID: windowID, presentationID: replacedID) }
         if !previous.open, pendingDialogs[key]?.id == id {
             await dispatchDialogLifecycle("onOpen", windowID: windowID, dialogID: dialogID, parameters: parameters)
         }
@@ -1358,10 +1448,15 @@ public actor ForgeRuntime {
         if let presentationID, pendingDialogs[key]?.id != presentationID { return }
         // Detach the accepted presentation before yielding to its signal. A new
         // presentation at the same key owns its own caller and result waiter.
+        if let previous = pendingDialogs[key], let previousID = previous.id,
+           previous.pendingRetirement != nil || previous.review?.pending.isEmpty == false {
+            await retirePendingFields(windowID: windowID, key: key, presentationID: previousID)
+            guard pendingDialogs[key]?.id == previousID else { return }
+        }
         let session = pendingDialogs.removeValue(forKey: key)
         let previous = await sig.dismiss(presentationID: session?.id)
         if let selectionFence = session?.selectionFence { await dataSourceRuntime.releaseDialogSelection(selectionFence) }
-        if let id = session?.id { await releaseMutationReadbacks(windowID: windowID, presentationID: id) }
+        if let id = session?.id { await releaseAcknowledgedDialogMutations(windowID: windowID, presentationID: id) }
         session?.waiter?.resume(returning: payload)
         if let previous, previous.open, pendingDialogs[key]?.id == nil {
             await dispatchDialogLifecycle("onClose", windowID: windowID, dialogID: dialogID, parameters: previous.args)

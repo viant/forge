@@ -4030,6 +4030,13 @@
           "description": "ResultState maps window form fields to ordered selectors in this invocation's normalized writer rows.",
           "type": "object"
         },
+        "reviewedScope": {
+          "description": "ReviewedScope binds a dialog footer command to the original actor and named launch values.\nIts preparation steps, group members and cleanup inherit the same dispatch boundary.",
+          "items": {
+            "$ref": "#/$defs/ReviewedScopeMatch"
+          },
+          "type": "array"
+        },
         "serializationGroup": {
           "description": "SerializationGroup optionally serializes commands in the same context/window, across writers.",
           "type": "string"
@@ -5515,6 +5522,24 @@
           "type": "string"
         },
         "label": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ReviewedScopeMatch": {
+      "additionalProperties": true,
+      "properties": {
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        },
+        "parameter": {
+          "type": "string"
+        },
+        "source": {
           "type": "string"
         }
       },
@@ -7900,7 +7925,7 @@
   "$ref": "#/$defs/Window",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "x-forge-provenance": {
-    "baseCommit": "c8f8f93fe9e7b69669f1a17b6980db7a07618f3b",
+    "baseCommit": "50966e15734259abe12711feb35300995901637b",
     "generator": "scripts/window-schema/main.go",
     "sha256": {
       "choice_browser.go": "935cbeddb231dd329374114c5f38454dc7c44c2ab70a45ea3c0f37ce7f3aee26",
@@ -7946,7 +7971,7 @@
       "json_metadata_clone.go": "baa9bde7e567774737f28b87c45a2bb145d9c5b2fadc81da3024578b17c6c09c",
       "local_state_owner.go": "987402ce2487f4b7714a3991c405aab0dda74a573d8690f8f6561d4ce020ab8f",
       "model.go": "4ff4bccce7a6d47c345c2f16fd42e7c73b912960a88ebe8fc077dcd8bd5b4b5f",
-      "mutation_preparation.go": "ebf4df8a474c1d33ce70a656617986d2faa3a57ac737cc0afc5ca830734d9282",
+      "mutation_preparation.go": "11ed9267dc04208898ad5849c7dab9707c73cbc306f2780caed81206c64ccd41",
       "mutation_readback.go": "947e63e5bb42d63420a5dbe5d0309d0b88d2722b1149565ed95a409f4e68e0b0",
       "parameter_editor.go": "a176f3b63d74714d216daf57ba5c3c3ee8e12aaf8ccf2c0ee1b663c95a657bf6",
       "predicate_composition_editor.go": "881bcf68a5f5e16cae2f58ef7495ac14582398236cfd263cc8585e89f97cab4b",
@@ -7957,7 +7982,7 @@
       "resource_field_attributes.go": "fc2ef49fcc4e88a78849581a9ccbdf62d2968023a5c76282e8b42ec488653c70",
       "resource_invariant.go": "9dee76d65b3161d019c6b446c764b54603416fa7bc5927b87d06bc79ca3687d4",
       "resource_model.go": "f04bef9d5a9594a318c3f547ef502ec943287cc09ac9af32d01fd646f0e6a9b5",
-      "resource_model_validation.go": "b69645ed5cca07d2355529da7c0fc127a53341d103c69425a29d323a6d87fca8",
+      "resource_model_validation.go": "28ded2055bb011ee0924937920c4f805ea1f7429743ca514219ca6d6f450e89c",
       "resource_policy_editor.go": "6f3a00bf5ac0751a133fe121e727f5aa2671489dfb07b98a29314cc7a380b8c2",
       "result_preview.go": "bd913237174dc663cf40a5cd30bf5e835ec077930e7f0916f7ce906671f3dbff",
       "rule_editor.go": "3eda2833f57c5a64adec603e42213423907151451998fa4ba538fe258273f6e6",
@@ -7969,7 +7994,7 @@
       "window_reference_manifest.go": "e8245d783f99d3a59143fd1e37e364c040389fa409b457207da567d9112ddb5b",
       "window_resource.go": "a991b091b9b4b45a999cca138fa8f6c0fa90b9ed0dc63bfce2ace576700ca872",
       "window_target_proof.go": "53605c132aae2b8c8d6e377daaae416f347e0ff8c48a39fb2a0f15f95ad5faeb",
-      "workflow_primitives.go": "722c29729ed3660cb4e79787ff375abd26d45e9f9affc626e3a2102f9e2e83a3",
+      "workflow_primitives.go": "d33fb4cfe713459cd953186f11af48df47b4495e90a1e4309a2746aee36f8f39",
       "workspace_summary.go": "d9cf3867d3d3bfa3f65c9fdeccad91d21bd9d2602e066823bb36cbff079c86c1"
     },
     "sourceNote": "Generated from committed canonical Forge authored model and Forge-owned public contracts; SHA-256 identifies every parsed source file."

@@ -74,7 +74,7 @@ class ForgeRuntime(
 
     init {
         dataSourceRuntime.setExecutor { execution, context, args ->
-            execEngine.execute(execution, context, args)
+            execEngine.execute(execution, context, args, current = context.input.peek().reviewedWriter?.current)
         }
     }
 
@@ -621,8 +621,11 @@ class ForgeRuntime(
         val caller = callerDataSourceRef?.takeIf { it != sourceRef }?.let(window::contextOrNull)
         val verifiedSelection = if (caller != null && dialog?.actions?.any { it.mutationCommand?.reconcile?.verify != null } == true)
             VerifiedDialogSelection.capture(caller) else null
+        val reviewedScope = ReviewedDialogScope.capture(dialog, sourceRef, args, metadata?.authorizationSnapshot.orEmpty())
         val next = DialogState(open = true, selectionMode = selectionMode, props = args, args = args,
-            initializing = hooks.isNotEmpty(), sourceDataSourceRef = sourceRef, verifiedSelection = verifiedSelection)
+            initializing = hooks.isNotEmpty(), sourceDataSourceRef = sourceRef, verifiedSelection = verifiedSelection,
+            reviewedScope = reviewedScope)
+        previous.reviewedScope?.settleBeforeClose()
         previous.verifiedSelection?.dispose()
         val key = "${windowId}Dialog$dialogId"
         if (previous.open && pendingDialogResults[key]?.owned == true) {
@@ -664,8 +667,9 @@ class ForgeRuntime(
         val waiter = pendingDialogResults.remove(dialogKey)
         pendingDialogs.remove(dialogKey)
         // Publishing the closed state can synchronously reopen this key and register a new waiter.
+        current.reviewedScope?.settleBeforeClose()
         current.verifiedSelection?.dispose()
-        val closed = current.copy(open = false, verifiedSelection = null)
+        val closed = current.copy(open = false, verifiedSelection = null, reviewedScope = null)
         waiter?.closed = closed
         sig.set(closed)
         waiter?.result?.complete(result)
@@ -845,16 +849,17 @@ class ExecutionEngine(
     private val parameterResolver: ParameterResolver,
     private val scope: CoroutineScope
 ) {
-    fun execute(execution: ExecutionDef, context: DataSourceContext?, args: Map<String, Any?> = emptyMap()): Job? {
+    fun execute(execution: ExecutionDef, context: DataSourceContext?, args: Map<String, Any?> = emptyMap(),
+        current: (() -> Boolean)? = null): Job? {
         val handlerName = execution.handler ?: return null
         val handler = handlers.resolve(handlerName) ?: builtIn(handlerName)
         if (handler != null) {
             return scope.launch {
-                invokeHandler(execution, context, args, handler, applyState = true)
+                invokeHandler(execution, context, args, handler, applyState = true, current = current)
             }
         }
         if (context != null && runtime.canProjectMetadataExecution(execution, context)) {
-            return scope.launch { runtime.evaluateMetadataExecution(execution, context, args, applyEffects = true) }
+            return scope.launch { runtime.evaluateMetadataExecution(execution, context, args, applyEffects = true, current = current ?: { true }) }
         }
         return null
     }
@@ -882,8 +887,10 @@ class ExecutionEngine(
         context: DataSourceContext?,
         args: Map<String, Any?>,
         handler: Handler,
-        applyState: Boolean
+        applyState: Boolean,
+        current: (() -> Boolean)? = null
     ): Any? {
+        if (current?.invoke() == false) return false
         val params = if (context != null) {
             if (execution.handler == "dataSource.setFormData") parameterResolver.resolveOperation(execution.parameters, context)
             else parameterResolver.resolve(execution.parameters, context)
@@ -891,7 +898,7 @@ class ExecutionEngine(
             ParameterResolution(emptyMap(), emptyList())
         }
         val result = handler.invoke(ExecutionArgs(execution, context, params.inbound, args))
-        if (applyState && result != false && execution.state.isNotEmpty() && context != null) {
+        if (applyState && result != false && execution.state.isNotEmpty() && context != null && current?.invoke() != false) {
             runtime.setWindowFormValues(
                 context.window.windowId,
                 execution.state.mapValues { JsonUtil.elementToAny(it.value) }

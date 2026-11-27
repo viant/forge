@@ -29,8 +29,17 @@ export function createTransportConnector(dataSource, runtime) {
         const mapped = withMappedFilterInputs(dataSource, options);
         const paging = String(dataSource?.paginationMode || '').toLowerCase() === 'client'
             ? null : resolvePagingValues(mapped.page, withPagingSize(dataSource?.paging, mapped.pageSize), mapped.cursor);
+        const admitWriter = mapped.admitWriter;
+        if (admitWriter) {
+            if (runtime.transport.supportsReviewedDispatch !== true) throw new Error('The host transport does not support reviewed dispatch.');
+            delete mapped.admitWriter;
+        }
+        // A host may await credentials or a session and retry a rejected binding.
+        // Keep admission out of serializable connector options; the host calls it
+        // immediately before each physical writer request.
         const result = await runtime.transport({operation, dataSource, dataSourceRef: runtime.dataSourceRef || dataSource?.id || dataSource?.dataSourceRef,
             targetContext: runtime.targetContext || {},
+            ...(admitWriter ? {admitWriter} : {}),
             options: {...mapped, inputParameters: withPagingInputs(mapped.inputParameters || {}, paging)}});
         if (options.signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError');
         return result;

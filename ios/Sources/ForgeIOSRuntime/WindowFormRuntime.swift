@@ -15,23 +15,20 @@ extension ForgeRuntime {
         replace: Bool = false,
         bumpPrefillRevision: Bool = true
     ) async {
+        _ = await updateWindowFormValue(windowID: windowID, values: values, replace: replace, bumpPrefillRevision: bumpPrefillRevision)
+    }
+
+    func updateWindowFormValue(windowID: String, values: [String:JSONValue], replace: Bool = false,
+                               bumpPrefillRevision: Bool = false, pending: MutationOperation? = nil) async -> Bool {
         let dataSourceID = WindowIdentity(windowID: windowID).windowFormID()
         let signal = await signals.form(dataSourceID: dataSourceID)
         let current = await dataSourceRuntime.form(dataSourceID: dataSourceID)
-        let nextValues = bumpPrefillRevision
-            ? valuesWithPrefillRevision(values, current: current)
-            : values
-        if replace {
-            await dataSourceRuntime.setForm(dataSourceID: dataSourceID, values: nextValues)
-            await signal.set(nextValues)
-            return
-        }
-        let merged = mergeWindowFormValues(base: current, override: nextValues)
-        await dataSourceRuntime.setForm(
-            dataSourceID: dataSourceID,
-            values: merged
-        )
+        let next = bumpPrefillRevision ? valuesWithPrefillRevision(values, current: current) : values
+        let merged = replace ? next : mergeWindowFormValues(base: current, override: next)
+        if let pending, !ownReviewedPending(pending, before: current, after: merged) { return false }
+        await dataSourceRuntime.setForm(dataSourceID: dataSourceID, values: merged)
         await signal.set(merged)
+        return true
     }
 
     func reconcileWindowForm(

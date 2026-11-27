@@ -1301,7 +1301,10 @@ data class DialogDef(
     val targetOverrides: Map<String, JsonElement> = emptyMap(),
     val closeDisabledWhen: DashboardConditionDef? = null,
     val fetchOnOpen: Boolean? = null
-)
+) {
+    @kotlinx.serialization.Transient
+    internal val reviewedParameters = actions.flatMap { it.mutationCommand?.reviewedScope.orEmpty() }.distinctBy { it.parameter }
+}
 
 @Serializable
 data class ActionDef(
@@ -1590,6 +1593,7 @@ data class InputState(
     internal val preparedReadPermit: NativeReportReadPermit? = null,
     internal val requireCommandRecords: Boolean = false,
     internal val rawCommandReceipt: Boolean = false,
+    internal val reviewedWriter: ReviewedWriterDispatch? = null,
     internal val refreshOwner: (() -> Boolean)? = null,
     internal val refreshBypassCache: Boolean = false
 )
@@ -1614,5 +1618,6 @@ data class DialogState(
     val initializing: Boolean = false,
     val initializationError: String? = null,
     val sourceDataSourceRef: String? = null,
-    internal val verifiedSelection: VerifiedDialogSelection? = null
+    internal val verifiedSelection: VerifiedDialogSelection? = null,
+    internal val reviewedScope: ReviewedDialogScope? = null
 )

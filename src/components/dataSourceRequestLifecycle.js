@@ -2,7 +2,7 @@ const pending = new Map();
 
 const key = (dataSourceId, requestId) => `${String(dataSourceId || '')}\u001f${String(requestId || '')}`;
 
-export function beginDataSourceRequest(dataSourceId, requestId, windowId = '', result = 'payload') {
+export function beginDataSourceRequest(dataSourceId, requestId, windowId = '', result = 'payload', reviewedWrite) {
   if (!dataSourceId || !requestId) return null;
   const requestKey = key(dataSourceId, requestId);
   const existing = pending.get(requestKey);
@@ -13,8 +13,20 @@ export function beginDataSourceRequest(dataSourceId, requestId, windowId = '', r
   // A caller may be detached by an authorization context change before it
   // awaits the promise. Keep rejection observable without an unhandled event.
   promise.catch(() => {});
-  pending.set(requestKey, {promise, resolve, reject, result, windowId: String(windowId || '').trim()});
+  pending.set(requestKey, {promise, resolve, reject, result, reviewedWrite, windowId: String(windowId || '').trim()});
   return promise;
+}
+
+// A queued reviewed write may outlive its presentation or its invocation entry.
+// The connector consults this at dispatch, including after asynchronous HTTP preparation.
+export function admitReviewedWriter(dataSourceId, requestId) {
+  const admit = pending.get(key(dataSourceId, requestId))?.reviewedWrite?.admit;
+  if (!admit) throw Object.assign(new Error('The reviewed submission is no longer active.'), {code:'reviewed_scope_changed'});
+  admit();
+}
+
+export function reviewedWriterInput(dataSourceId, requestId) {
+  return pending.get(key(dataSourceId, requestId))?.reviewedWrite?.input;
 }
 
 // Only the invocation that owns this promise can retain its acknowledgement

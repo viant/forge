@@ -20,6 +20,7 @@ import {beginDataSourceRequest, settleDataSourceRequest} from '../components/dat
 import {pendingSharedRead, registerSharedRead, sharedReadRequestId, nextDataSourceReadId} from '../components/dataSourceSharedRead.js';
 import {dataSourceRequestId, isDependencyGeneration} from '../components/primitives/bindingGeneration.js';
 import {snapshotFilter} from '../components/dataSourceFetchState.js';
+import {snapshotResourceValue} from '../components/primitives/resourceModel.js';
 
 function isPlainObject(value) {
     return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -27,13 +28,14 @@ function isPlainObject(value) {
 
 export function buildFetchCollectionSignal(current = {}, props = {}) {
     const {filter = {}, replaceFilter = false, cache = null, invocationId = null, bindingGeneration = null, formSynchronization = null} = props || {};
-    const {formSynchronization: _previousSynchronization, appendPage: _appendPage, ...rest} = current || {};
+    const {formSynchronization: _previousSynchronization, appendPage: _appendPage, reviewedRequest: _previousReview, ...rest} = current || {};
     return {
         ...rest,
         filter: replaceFilter ? {...filter} : {...((current || {}).filter || {}), ...filter},
         fetch: true,
         cache,
         invocationId,
+        ...(typeof props?.admitWriter === 'function' ? {reviewedRequest:true, parameters:props.parameters} : {}),
         bindingGeneration: bindingGeneration ?? (isDependencyGeneration(current?.bindingGeneration) ? current.bindingGeneration : null),
         ...(formSynchronization ? {formSynchronization} : {}),
     };
@@ -1043,7 +1045,7 @@ const setWindowFormData = ({values = {}, parameters = {}, replace = false, bumpP
             const resolved = resolveParameters(windowParameters, {signals});
             newValue.parameters = windowParameters.some(parameter => parameter.name === '...')
                 ? resolved
-                : {...(previous.parameters || {}), ...resolved};
+                : {...(newValue.parameters || {}), ...resolved};
         }
         // Compare fully resolved read arguments within this datasource and actor
         // generation. A writer never opts into projection forwarding.
@@ -1064,7 +1066,9 @@ const setWindowFormData = ({values = {}, parameters = {}, replace = false, bumpP
             superseded.code = 'request_superseded';
             settleDataSourceRequest(identity?.dataSourceId, previousRequestId, superseded);
         }
-        const completion = requestId ? beginDataSourceRequest(identity?.dataSourceId, requestId, identity?.windowId, props?.result) : null;
+        const reviewedWrite = typeof props?.admitWriter === 'function'
+            ? {admit:props.admitWriter, input:snapshotResourceValue(newValue)} : undefined;
+        const completion = requestId ? beginDataSourceRequest(identity?.dataSourceId, requestId, identity?.windowId, props?.result, reviewedWrite) : null;
         try {
             const log = getLogger('ds');
             log.debug('[fetchCollection]', { ds: identity?.dataSourceRef, filter: newValue.filter });
@@ -1073,6 +1077,9 @@ const setWindowFormData = ({values = {}, parameters = {}, replace = false, bumpP
         input.value =newValue
         return completion;
     };
+
+    // A reviewed command cannot delegate to an adapter that ignores physical admission.
+    fetchCollection.supportsReviewedDispatch = true;
 
     const fetchRecords = async (props = {}) => {
         const {

@@ -33,7 +33,7 @@ internal class PreparedMutationReadback private constructor(
 
     fun scopeMatches(source: DataSourceContext, resolver: ParameterResolver): Boolean =
         resolveReadbackScope(spec, reader, source, resolver)?.let { values ->
-            values.zip(scopeValues).all { (actual, expected) -> sameReadbackValue(actual, expected) }
+            values.zip(scopeValues).all { (actual, expected) -> sameMutationValue(actual, expected) }
         } == true
 
     fun matches(rows: List<Map<String, Any?>>, acknowledged: JsonArray): Boolean {
@@ -126,7 +126,7 @@ private fun readbackValue(value: JsonElement, path: List<String>): JsonElement? 
     SelectorUtil.resolveParts(value, path, SelectorUtil.Missing, strictArrayIndex = true) as? JsonElement
 
 private data class ReadbackExpectedField(val path: List<String>, val expected: JsonElement) {
-    fun matches(row: JsonElement): Boolean = sameReadbackValue(readbackValue(row, path), expected)
+    fun matches(row: JsonElement): Boolean = sameMutationValue(readbackValue(row, path), expected)
 }
 
 private fun readbackScopeScalar(value: JsonElement): JsonPrimitive? {
@@ -154,13 +154,13 @@ private fun resolveReadbackScope(spec: ReconcileVerificationSpec, reader: String
     }
 }
 
-private fun sameReadbackValue(left: JsonElement?, right: JsonElement?): Boolean {
+internal fun sameMutationValue(left: JsonElement?, right: JsonElement?): Boolean {
     if (left == right) return true
     return when {
         left is JsonObject && right is JsonObject ->
-            left.keys == right.keys && left.all { (key, value) -> sameReadbackValue(value, right[key]) }
+            left.keys == right.keys && left.all { (key, value) -> sameMutationValue(value, right[key]) }
         left is JsonArray && right is JsonArray ->
-            left.size == right.size && left.indices.all { sameReadbackValue(left[it], right[it]) }
+            left.size == right.size && left.indices.all { sameMutationValue(left[it], right[it]) }
         left is JsonPrimitive && right is JsonPrimitive && !left.isString && !right.isString -> {
             val number = left.content.toBigDecimalOrNull()
             val other = right.content.toBigDecimalOrNull()
