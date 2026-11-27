@@ -90,6 +90,25 @@ type ReconcileSpec struct {
 	IdentityFields []string `json:"identityFields,omitempty" yaml:"identityFields,omitempty"`
 	ResultPath     string   `json:"resultPath,omitempty" yaml:"resultPath,omitempty"`
 	RowsPath       string   `json:"rowsPath,omitempty" yaml:"rowsPath,omitempty"`
+	// Verify checks an authoritative refetch before applying the submitting command's success effects.
+	Verify *ReadbackVerification `json:"verify,omitempty" yaml:"verify,omitempty"`
+}
+
+type ReadbackVerification struct {
+	// IDsParameter names the reader parameter that receives the acknowledged IDs.
+	IDsParameter string          `json:"idsParameter" yaml:"idsParameter"`
+	Scope        []ReadbackScope `json:"scope" yaml:"scope"`
+	// Fields maps submitted row selectors to reader row selectors. Omitted submitted fields are skipped.
+	Fields map[string]string `json:"fields,omitempty" yaml:"fields,omitempty"`
+	// SubmittedRows can locate the original row values when the writer returns a generated ID.
+	SubmittedRows string `json:"submittedRows,omitempty" yaml:"submittedRows,omitempty"`
+}
+
+type ReadbackScope struct {
+	Field     string     `json:"field" yaml:"field"`
+	Parameter *Parameter `json:"parameter" yaml:"parameter"`
+	// PassToReader includes this named scope parameter in the reader request.
+	PassToReader bool `json:"passToReader,omitempty" yaml:"passToReader,omitempty"`
 }
 
 type RefreshSpec struct {

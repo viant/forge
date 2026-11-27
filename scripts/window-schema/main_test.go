@@ -33,7 +33,7 @@ func TestSchemaPreservesNullableStringDictionaryValues(t *testing.T) {
 	}
 }
 
-func TestGroupedMutationAuthoringSchema(t *testing.T) {
+func TestMutationAuthoringSchema(t *testing.T) {
 	originalDefinitions, originalGenerated := defs, generated
 	originalLoaded, originalProvenance := loaded, provenance
 	t.Cleanup(func() {
@@ -45,6 +45,15 @@ func TestGroupedMutationAuthoringSchema(t *testing.T) {
 	ref("MutationCommand")
 
 	command := generated["MutationCommand"].(S)["properties"].(S)
+	reconcile := generated["ReconcileSpec"].(S)["properties"].(S)
+	verify := generated["ReadbackVerification"].(S)["properties"].(S)
+	scope := generated["ReadbackScope"].(S)["properties"].(S)
+	if reconcile["verify"].(S)["$ref"] != "#/$defs/ReadbackVerification" ||
+		verify["idsParameter"].(S)["type"] != "string" ||
+		!reflect.DeepEqual(verify["fields"].(S)["additionalProperties"], S{"type": "string"}) ||
+		!reflect.DeepEqual(scope["parameter"], S{"$ref": "#/$defs/Parameter"}) {
+		t.Fatalf("invalid verification schema: %#v, %#v", verify, scope)
+	}
 	group := command["group"].(S)
 	if group["type"] != "array" || !reflect.DeepEqual(group["items"], S{"$ref": "#/$defs/MutationGroupMember"}) {
 		t.Fatalf("group must be an array of authored members: %#v", group)

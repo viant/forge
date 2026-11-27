@@ -13,6 +13,11 @@ func validatePreparationSteps(window *Window, owner, fallbackID string, root *Mu
 	if err := validateWriterReceipt(root, owner); err != nil {
 		return err
 	}
+	if root.Reconcile != nil && root.Reconcile.Verify != nil {
+		if err := validateReadbackVerification(window, owner, root, checkSources); err != nil {
+			return err
+		}
+	}
 	for field := range root.SuccessFormState {
 		if !validResourceSelector(field) || strings.Contains(field, ".") {
 			return fmt.Errorf("%s.successFormState requires safe top-level field names", owner)
