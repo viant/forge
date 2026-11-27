@@ -266,7 +266,7 @@ type ResponsiveDataGridSpec struct {
 
 type ResponsiveDataGridState struct {
 	Columns         []string                          `json:"columns,omitempty" yaml:"columns,omitempty"`
-	StickyColumns   []string                          `json:"stickyColumns,omitempty" yaml:"stickyColumns,omitempty"`
+	StickyColumns   []string                          `json:"stickyColumns,omitzero" yaml:"stickyColumns,omitempty"` // nil inherits; an empty list clears authored stickiness.
 	ColumnOverrides map[string]map[string]interface{} `json:"columnOverrides,omitempty" yaml:"columnOverrides,omitempty"`
 	Density         string                            `json:"density,omitempty" yaml:"density,omitempty"`
 	RowLayout       string                            `json:"rowLayout,omitempty" yaml:"rowLayout,omitempty"`
