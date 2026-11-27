@@ -71,6 +71,9 @@ func validatePreparationSteps(window *Window, owner, fallbackID string, root *Mu
 			return fmt.Errorf("%s requires a distinct commandId usable as one selector segment", location)
 		}
 		ids[id] = true
+		if command.ReviewedScope != nil {
+			return fmt.Errorf("%s: reviewedScope belongs on the root dialog footer", owner)
+		}
 		if command.Group != nil || len(command.Before) > 0 || len(command.ClearFormFields) > 0 || command.Confirm != "" || command.ConfirmSelection != nil || command.SerializationGroup != "" ||
 			len(command.PendingState)+len(command.SuccessState)+len(command.SuccessFormState)+len(command.ResultState)+len(command.ErrorState)+len(command.IndeterminateState)+len(command.CleanupState) > 0 ||
 			len(command.Refresh) > 0 || command.Reconcile != nil {
@@ -281,4 +284,31 @@ func validateInvocationConditionOperand(key string, operand any, at string) (boo
 		return validateConditionOperand(key, operand, at)
 	}
 	return false, nil
+}
+
+func validateReviewedScope(window *Window, matches []ReviewedScopeMatch, checkSources bool) error {
+	if len(matches) == 0 {
+		return fmt.Errorf("reviewedScope requires at least one match")
+	}
+	for i, match := range matches {
+		if !validResourceSelector(match.Parameter) || !validResourceSelector(match.Field) {
+			return fmt.Errorf("reviewedScope[%d] requires safe parameter and field selectors", i)
+		}
+		switch match.Source {
+		case "windowForm":
+			if match.DataSourceRef != "" {
+				return fmt.Errorf("reviewedScope[%d]: windowForm cannot reference a datasource", i)
+			}
+		case "collection", "metrics", "selection":
+			if strings.TrimSpace(match.DataSourceRef) == "" {
+				return fmt.Errorf("reviewedScope[%d]: %s requires a datasource", i, match.Source)
+			}
+			if _, exists := window.DataSource[match.DataSourceRef]; checkSources && !exists {
+				return fmt.Errorf("reviewedScope[%d]: unknown datasource %s", i, match.DataSourceRef)
+			}
+		default:
+			return fmt.Errorf("reviewedScope[%d]: unsupported source %q", i, match.Source)
+		}
+	}
+	return nil
 }

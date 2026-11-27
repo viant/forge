@@ -23,10 +23,22 @@ type ReceiptIdentity struct {
 	Generated       bool   `json:"generated,omitempty" yaml:"generated,omitempty"`
 }
 
+// ReviewedScopeMatch compares a value from the original dialog launch arguments
+// with a live window or datasource value immediately before writer dispatch.
+type ReviewedScopeMatch struct {
+	Parameter     string `json:"parameter" yaml:"parameter"`
+	Source        string `json:"source" yaml:"source"`
+	Field         string `json:"field" yaml:"field"`
+	DataSourceRef string `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+}
+
 // MutationCommand describes the generic mutation lifecycle shared by workflow
 // primitives. Business validation and persistence remain owned by the target
 // datasource; Forge owns pending/success/error state and reconciliation.
 type MutationCommand struct {
+	// ReviewedScope binds a dialog footer command to the original actor and named launch values.
+	// Its preparation steps, group members and cleanup inherit the same dispatch boundary.
+	ReviewedScope []ReviewedScopeMatch `json:"reviewedScope,omitempty" yaml:"reviewedScope,omitempty"`
 	// Group replaces the terminal writer with independently acknowledged writers.
 	// An optional root prepare returns parameter maps keyed by member command ID.
 	Group           []MutationGroupMember `json:"group,omitempty" yaml:"group,omitempty"`

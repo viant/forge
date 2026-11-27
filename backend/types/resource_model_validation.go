@@ -131,6 +131,11 @@ func validateResourceModels(window *Window, validateDataSources bool) error {
 	}
 	for index := range window.Dialogs {
 		for _, action := range window.Dialogs[index].Actions {
+			if command := action.MutationCommand; command != nil && command.ReviewedScope != nil {
+				if err := validateReviewedScope(window, command.ReviewedScope, validateDataSources); err != nil {
+					return fmt.Errorf("dialog %s action %s: %w", window.Dialogs[index].Id, action.ID, err)
+				}
+			}
 			if err := validatePreparationSteps(window, "dialog "+window.Dialogs[index].Id+" action "+action.ID, action.ID, action.MutationCommand, validateDataSources); err != nil {
 				return err
 			}
@@ -486,6 +491,9 @@ func validateContainerResourceModels(window *Window, container *Container, valid
 		}
 		if err := validateCommandResultState(command); err != nil {
 			return fmt.Errorf("container %s: %w", container.ID, err)
+		}
+		if command.ReviewedScope != nil {
+			return fmt.Errorf("container %s: reviewedScope requires a dialog footer command", container.ID)
 		}
 		if len(command.SuccessFormState) > 0 {
 			return fmt.Errorf("container %s: successFormState requires a dialog footer command", container.ID)
