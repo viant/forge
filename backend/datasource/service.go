@@ -370,6 +370,10 @@ func (s *Service) executeDatasource(ctx context.Context, id string, inputs map[s
 	if err != nil {
 		return nil, fmt.Errorf("datasource %q: %w", ds.ID, err)
 	}
+	var resultLookups map[string]dsproto.ResultLookup
+	if ds.Backend.Kind == dsproto.BackendMCPFanout && ds.Backend.Fanout != nil {
+		resultLookups = ds.Backend.Fanout.ResultLookups
+	}
 	policy := dsproto.CachePolicyOrDefault(ds.Cache)
 	cacheEnabled := ds.Backend.Kind != dsproto.BackendAuthorization && ds.Backend.Kind != dsproto.BackendDatly && ds.Backend.Kind != dsproto.BackendMCPResource && !s.disableCache && (policy.Enabled == nil || *policy.Enabled)
 	scopeID := s.scopeID(ctx, policy.Scope)
@@ -442,7 +446,18 @@ func (s *Service) executeDatasource(ctx context.Context, id string, inputs map[s
 		cacheKey += "|method-variants-v1:" + hex.EncodeToString(digest[:])
 	}
 	if ds.Paging != nil && ds.Paging.Enabled && strings.EqualFold(strings.TrimSpace(ds.Paging.Mode), "cursor") {
-		raw, _ := json.Marshal(ds)
+		rawDefinition := ds
+		if len(resultLookups) != 0 {
+			// A lookup-only change can reuse the unadorned cursor page.
+			copy := *ds
+			backend := *ds.Backend
+			fanout := *backend.Fanout
+			fanout.ResultLookups = nil
+			backend.Fanout = &fanout
+			copy.Backend = &backend
+			rawDefinition = &copy
+		}
+		raw, _ := json.Marshal(rawDefinition)
 		sum := sha256.Sum256(raw)
 		cacheKey += "|cursor:" + hex.EncodeToString(sum[:])
 	}
@@ -461,7 +476,7 @@ func (s *Service) executeDatasource(ctx context.Context, id string, inputs map[s
 				if err := runtimerequestctx.BeginResourceReadRelease(ctx); err != nil {
 					return nil, err
 				}
-				res := cloneResult(entry.result)
+				res := cloneResult(entry.result, resultLookups)
 				if err := validatePagingDataInfo(&ds.DataSource, res.DataInfo, mergedArgs); err != nil {
 					return nil, err
 				}
@@ -503,7 +518,7 @@ func (s *Service) executeDatasource(ctx context.Context, id string, inputs map[s
 
 	if cacheEnabled {
 		s.cache.put(cacheKey, cacheEntry{
-			result:    cloneResult(result),
+			result:    cloneResult(result, nil),
 			fetchedAt: s.now(),
 		}, policy.MaxEntries)
 
@@ -513,6 +528,7 @@ func (s *Service) executeDatasource(ctx context.Context, id string, inputs map[s
 			TTLSeconds: int(policy.TTL.Seconds()),
 		}
 	}
+	result.Rows = projectResultLookups(result.Rows, resultLookups)
 	return result, nil
 }
 
@@ -989,7 +1005,7 @@ func defaultIdentity(ctx context.Context) Identity {
 	return id
 }
 
-func cloneResult(r *dsproto.FetchResult) *dsproto.FetchResult {
+func cloneResult(r *dsproto.FetchResult, lookups map[string]dsproto.ResultLookup) *dsproto.FetchResult {
 	if r == nil {
 		return nil
 	}
@@ -1001,7 +1017,7 @@ func cloneResult(r *dsproto.FetchResult) *dsproto.FetchResult {
 			for k, v := range row {
 				cp[k] = v
 			}
-			out.Rows[i] = cp
+			out.Rows[i] = resultLookupRow(row, cp, lookups)
 		}
 	}
 	if r.DataInfo != nil {

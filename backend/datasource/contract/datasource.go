@@ -49,6 +49,15 @@ type DataSource struct {
 	Cache *CachePolicy `json:"cache,omitempty" yaml:"cache,omitempty"`
 }
 
+// ResultLookup maps a string field to an authored display label. Missing keys
+// omit the result field. A dictionary entry may explicitly return null.
+type ResultLookup struct {
+	Field  string             `json:"field" yaml:"field"`
+	Values map[string]*string `json:"values" yaml:"values"`
+	// TrimSpace strips ECMAScript String.trim whitespace from the input field.
+	TrimSpace bool `json:"trimSpace,omitempty" yaml:"trimSpace,omitempty"`
+}
+
 // BackendKind enumerates the supported backend types. Adding a new kind is a
 // single Source implementation + registration — nothing else in the pipeline
 // changes.
@@ -184,6 +193,9 @@ type MCPFanout struct {
 	IncludeUnresolved    bool              `json:"includeUnresolved,omitempty" yaml:"includeUnresolved,omitempty"`
 	UnmappedAsUnresolved bool              `json:"unmappedAsUnresolved,omitempty" yaml:"unmappedAsUnresolved,omitempty"`
 	FieldMap             map[string]string `json:"fieldMap,omitempty" yaml:"fieldMap,omitempty"`
+	// ResultLookups adds display fields to returned rows after paging and cache access.
+	// Each lookup reads the original returned row by literal key.
+	ResultLookups map[string]ResultLookup `json:"resultLookups,omitempty" yaml:"resultLookups,omitempty"`
 }
 
 // CacheScope keys the cache to a user, a conversation, or shares globally.
