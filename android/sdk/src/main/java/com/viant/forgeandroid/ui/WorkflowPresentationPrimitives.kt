@@ -361,8 +361,9 @@ private fun DraftFormActions(
 /** Keep an admitted composed write alive if its pending metadata removes the composing control. */
 internal fun startControlMutation(runtime: ForgeRuntime, window: WindowContext, source: DataSourceContext,
     command: MutationCommandDef, extras: Map<String, Any?>, controlScope: CoroutineScope, dialogId: String?,
-    closeOnSuccess: Boolean = false, confirm: suspend (String) -> Boolean): kotlinx.coroutines.Deferred<MutationCommandResult> {
-    val composed = command.before.isNotEmpty() || command.group != null
+    closeOnSuccess: Boolean = false, retryVerificationInvocationId: String? = null,
+    confirm: suspend (String) -> Boolean): kotlinx.coroutines.Deferred<MutationCommandResult> {
+    val composed = command.before.isNotEmpty() || command.group != null || command.reconcile?.verify != null
     if (dialogId == null && !composed && command.clearFormFields.isEmpty() && !closeOnSuccess) return controlScope.async {
         runtime.mutationCommands.execute(runtime, window, source, command, extras, confirm)
     }
@@ -372,7 +373,8 @@ internal fun startControlMutation(runtime: ForgeRuntime, window: WindowContext, 
     val owner = if (!composed && !closeOnSuccess && !plainFooter) controlScope else runtime.scope
     return owner.async(controlScope.coroutineContext.minusKey(Job)) {
         runtime.mutationCommands.executePresented(runtime, window, source, command, extras, presented,
-            { dialog == null || (presented?.open == true && dialog.peek() === presented) }, confirm, dialogId.takeIf { closeOnSuccess })
+            { dialog == null || (presented?.open == true && dialog.peek() === presented) }, confirm, dialogId.takeIf { closeOnSuccess },
+            retryVerificationInvocationId)
     }
 }
 
@@ -399,7 +401,8 @@ internal fun MutationCommandButton(
 
     var activatedHere by remember(command.commandId, command.dataSourceRef) { mutableStateOf(false) }
     val plainFooter = dialogId != null && command.before.isEmpty() && command.clearFormFields.isEmpty() && !closeOnSuccess
-    val observeRuntime = command.before.isNotEmpty() || command.group != null || plainFooter
+    val verified = command.reconcile?.verify != null
+    val observeRuntime = command.before.isNotEmpty() || command.group != null || plainFooter || verified
     val observed = if (!observeRuntime) standaloneState
         else remember(runtime, window.windowId, command.commandId, command.dataSourceRef) {
             runtime.mutationCommands.stateUpdates(window.windowId, command)
@@ -407,10 +410,11 @@ internal fun MutationCommandButton(
     val samePresentation = dialogId != null && observed.presentation?.get() === window.dialogSignal(dialogId).peek()
     val sameAuthorization = observed.authorization == null || observed.authorization == window.metadata.peek()?.authorizationSnapshot.orEmpty()
     val state = when {
-        !sameAuthorization || (plainFooter && !samePresentation) -> if (observed.guarded) MutationCommandState(
+        !sameAuthorization || ((plainFooter || (verified && dialogId != null)) && !samePresentation) -> if (observed.guarded) MutationCommandState(
             phase = observed.phase, guarded = true, retryAllowed = false,
             message = when (observed.phase) {
                 MutationCommandPhase.Indeterminate -> "A previous submission needs verification before retrying."
+                MutationCommandPhase.VerificationFailed -> "The original saved submission needs verification."
                 MutationCommandPhase.PartialFailure -> "A previous submission partially completed. Review its outcome before proceeding."
                 else -> "Another submission is in progress."
             }
@@ -423,12 +427,13 @@ internal fun MutationCommandButton(
     }
 
     fun execute() {
+        val retry = state.invocationId.takeIf { state.phase == MutationCommandPhase.VerificationFailed }
         activatedHere = true
         val origin = dialogId?.let { window.dialogSignal(it).peek() }
         val actor = window.metadata.peek()?.authorizationSnapshot.orEmpty()
         scope.launch {
             val request = if (confirmationOverride == null) command else command.copy(confirm = confirmationOverride)
-            val execution = startControlMutation(runtime, window, source, request, extras, this, dialogId, closeOnSuccess) { text ->
+            val execution = startControlMutation(runtime, window, source, request, extras, this, dialogId, closeOnSuccess, retry) { text ->
                 if (scope.coroutineContext[Job]?.isActive != true) false else {
                     val decision = kotlinx.coroutines.CompletableDeferred<Boolean>()
                     confirmation = text to decision
@@ -441,27 +446,30 @@ internal fun MutationCommandButton(
             }
             val result = execution.await()
             if (!observeRuntime) standaloneState = runtime.mutationCommands.state(window.windowId, request)
-            val sameActor = command.group == null || actor == window.metadata.peek()?.authorizationSnapshot.orEmpty()
+            val sameActor = (command.group == null && !verified) || actor == window.metadata.peek()?.authorizationSnapshot.orEmpty()
             val originalDialog = dialogId == null || window.dialogSignal(dialogId).peek() === origin
-            if (sameActor && (originalDialog || (closeOnSuccess && command.group == null))) {
+            if (sameActor && (originalDialog || (closeOnSuccess && command.group == null && !verified))) {
                 onSettled?.invoke(result)
             }
         }
     }
 
+    val verificationFailed = state.phase == MutationCommandPhase.VerificationFailed
+    val retryVerification = verificationFailed && state.retryAllowed
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Button(
-            enabled = !state.guarded && !externallyDisabled,
+            enabled = if (verificationFailed) retryVerification else !state.guarded && !externallyDisabled,
             onClick = { execute() },
             colors = if (command.intent.isNullOrBlank()) androidx.compose.material3.ButtonDefaults.buttonColors()
                 else androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = notificationColor(command.intent)),
             modifier = Modifier.semantics {
-                contentDescription = accessibilityDescriptionOverride ?: command.label ?: "Save"
+                contentDescription = if (retryVerification) "Retry verification" else accessibilityDescriptionOverride ?: command.label ?: "Save"
             }
         ) {
             val icon = toolbarIcon(command.icon)
             if (icon != null) androidx.compose.material3.Icon(icon, contentDescription = null)
-            if (!command.hideLabel || icon == null) Text(if (state.pending) "Saving…" else labelOverride ?: command.label ?: "Save")
+            if (retryVerification) Text("Retry verification")
+            else if (!command.hideLabel || icon == null) Text(if (state.pending) state.message.takeIf { verified } ?: "Saving…" else labelOverride ?: command.label ?: "Save")
         }
         if (state.message.isNotBlank()) {
             Text(

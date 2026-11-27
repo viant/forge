@@ -4593,6 +4593,49 @@
       },
       "type": "object"
     },
+    "ReadbackScope": {
+      "additionalProperties": true,
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "parameter": {
+          "$ref": "#/$defs/Parameter"
+        },
+        "passToReader": {
+          "description": "PassToReader includes this named scope parameter in the reader request.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "ReadbackVerification": {
+      "additionalProperties": true,
+      "properties": {
+        "fields": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Fields maps submitted row selectors to reader row selectors. Omitted submitted fields are skipped.",
+          "type": "object"
+        },
+        "idsParameter": {
+          "description": "IDsParameter names the reader parameter that receives the acknowledged IDs.",
+          "type": "string"
+        },
+        "scope": {
+          "items": {
+            "$ref": "#/$defs/ReadbackScope"
+          },
+          "type": "array"
+        },
+        "submittedRows": {
+          "description": "SubmittedRows can locate the original row values when the writer returns a generated ID.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "ReaderWorkbenchSpec": {
       "additionalProperties": true,
       "properties": {
@@ -4689,6 +4732,10 @@
         },
         "rowsPath": {
           "type": "string"
+        },
+        "verify": {
+          "$ref": "#/$defs/ReadbackVerification",
+          "description": "Verify checks an authoritative refetch before applying the submitting command's success effects."
         }
       },
       "type": "object"
@@ -7853,7 +7900,7 @@
   "$ref": "#/$defs/Window",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "x-forge-provenance": {
-    "baseCommit": "9bc58ec0455d97380f40ac7e901b4b461d6c674b",
+    "baseCommit": "c8f8f93fe9e7b69669f1a17b6980db7a07618f3b",
     "generator": "scripts/window-schema/main.go",
     "sha256": {
       "choice_browser.go": "935cbeddb231dd329374114c5f38454dc7c44c2ab70a45ea3c0f37ce7f3aee26",
@@ -7899,7 +7946,8 @@
       "json_metadata_clone.go": "baa9bde7e567774737f28b87c45a2bb145d9c5b2fadc81da3024578b17c6c09c",
       "local_state_owner.go": "987402ce2487f4b7714a3991c405aab0dda74a573d8690f8f6561d4ce020ab8f",
       "model.go": "4ff4bccce7a6d47c345c2f16fd42e7c73b912960a88ebe8fc077dcd8bd5b4b5f",
-      "mutation_preparation.go": "f0c0007abdd9a524e39ed0476551f70514bdf73d769af376e69c7ae0a2b95057",
+      "mutation_preparation.go": "ebf4df8a474c1d33ce70a656617986d2faa3a57ac737cc0afc5ca830734d9282",
+      "mutation_readback.go": "947e63e5bb42d63420a5dbe5d0309d0b88d2722b1149565ed95a409f4e68e0b0",
       "parameter_editor.go": "a176f3b63d74714d216daf57ba5c3c3ee8e12aaf8ccf2c0ee1b663c95a657bf6",
       "predicate_composition_editor.go": "881bcf68a5f5e16cae2f58ef7495ac14582398236cfd263cc8585e89f97cab4b",
       "presentation_primitives.go": "4b2fdcf0fffb902dd8a8dee7c17d1075faa5d62ab74e1d2551f29935215905aa",
@@ -7921,7 +7969,7 @@
       "window_reference_manifest.go": "e8245d783f99d3a59143fd1e37e364c040389fa409b457207da567d9112ddb5b",
       "window_resource.go": "a991b091b9b4b45a999cca138fa8f6c0fa90b9ed0dc63bfce2ace576700ca872",
       "window_target_proof.go": "53605c132aae2b8c8d6e377daaae416f347e0ff8c48a39fb2a0f15f95ad5faeb",
-      "workflow_primitives.go": "d364eaebcca2b21b34b0f4962c1bac9789212fe2ae37ff70bb0bde68dab8d6eb",
+      "workflow_primitives.go": "722c29729ed3660cb4e79787ff375abd26d45e9f9affc626e3a2102f9e2e83a3",
       "workspace_summary.go": "d9cf3867d3d3bfa3f65c9fdeccad91d21bd9d2602e066823bb36cbff079c86c1"
     },
     "sourceNote": "Generated from committed canonical Forge authored model and Forge-owned public contracts; SHA-256 identifies every parsed source file."

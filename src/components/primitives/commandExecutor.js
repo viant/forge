@@ -1,12 +1,12 @@
 import {submittedFileRevision, fileRevisionMatches} from '../../runtime/formFileSelection.js';
 import equal from 'fast-deep-equal';
-import {isDeferredCacheHitEnvelope} from '../dataSourceExtract.js';
+import {extractData, isDeferredCacheHitEnvelope} from '../dataSourceExtract.js';
 import {withoutAuthorizationValidationHints} from '../../runtime/canonicalDelivery.js';
 import {resolveParameters} from '../../hooks/parameters.js';
 import {evaluateCondition} from '../../utils/evaluateCondition.js';
 import {resolveSelector, resolveSelectorParts} from '../../utils/selector.js';
 import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
-import {applyPrimitiveState, mutationCommandTargetParameters, reconcileEditableCollection} from './editableCollectionModel.js';
+import {applyPrimitiveState, editableCollectionRows, mutationCommandTargetParameters, reconcileEditableCollection} from './editableCollectionModel.js';
 import {prepareResourcePayload, snapshotResourceValue as parameterSnapshot} from './resourceModel.js';
 import {formatDataSourceError} from '../../utils/dataSourceError.js';
 import {retainMutationAcknowledgement} from '../dataSourceRequestLifecycle.js';
@@ -212,7 +212,7 @@ async function synchronizeUI(context, target, command, writerResponse = null, au
     ...(formSynchronization && context?.identity?.dataSourceId && destination?.identity?.dataSourceId === context.identity.dataSourceId
       ? {formSynchronization, invocationId: invocationID()} : {}),
   });
-  if (command.reconcile && presentationCurrent()) {
+  if (command.reconcile && !command.reconcile.verify && presentationCurrent()) {
     const spec = command.reconcile;
     try {
       const destination = context?.Context?.(spec.dataSourceRef) || context;
@@ -445,6 +445,7 @@ function validateWriterReceipt(command) {
     (spec.submittedField != null && (spec.submittedRows == null || !validIdentityPath(spec.submittedField))))) {
     throw new Error('receiptIdentity requires a safe field and either generated or a submitted row selector.');
   }
+  validateReadback(command);
   if (command.rejectedWhen != null && command.receiptWhen == null && command.receiptIdentity == null)
     throw new Error('rejectedWhen requires receiptWhen or receiptIdentity.');
   for (const rule of [command.receiptWhen, command.rejectedWhen]) {
@@ -480,16 +481,185 @@ function receiptCondition(rule, rows) {
   return evaluateCondition(rule, () => actual);
 }
 
+function validateReadback(command) {
+  const reconcile = command.reconcile;
+  const verify = reconcile?.verify;
+  if (verify == null) return;
+  const receipt = command.receiptIdentity;
+  if (reconcile.mode !== 'refetch' || !receipt || !reconcile.dataSourceRef ||
+      reconcile.dataSourceRef === command.dataSourceRef || command.group ||
+      reconcile.rowsPath || reconcile.identityFields?.length ||
+      (command.before || []).some(step => [step?.command?.dataSourceRef, step?.cleanup?.dataSourceRef].includes(reconcile.dataSourceRef)) ||
+      (command.refresh || []).some(({dataSourceRef}) => [command.dataSourceRef, reconcile.dataSourceRef].includes(dataSourceRef)) ||
+      !validIdentityPath(verify.idsParameter) || verify.idsParameter.includes('.') ||
+      (reconcile.identityField && !validIdentityPath(reconcile.identityField)) ||
+      (reconcile.resultPath !== undefined && !validIdentityPath(reconcile.resultPath)) ||
+      !Array.isArray(verify.scope) || !verify.scope.length) {
+    throw new Error('Verified readback requires a distinct reader, receipt identity, IDs parameter and bound scope.');
+  }
+  const names = new Set([verify.idsParameter]);
+  const scopeFields = new Set();
+  for (const {field, parameter, passToReader} of verify.scope) {
+    if (!validIdentityPath(field) || scopeFields.has(field) || !validIdentityPath(parameter?.name) ||
+        parameter.name.includes('.') || names.has(parameter.name) ||
+        parameter.output === true || parameter.direction === 'out' ||
+        (passToReader != null && typeof passToReader !== 'boolean')) {
+      throw new Error('Verified readback requires named scope parameters.');
+    }
+    names.add(parameter.name);
+    scopeFields.add(field);
+  }
+  if (verify.fields != null && (typeof verify.fields !== 'object' || Array.isArray(verify.fields) ||
+      Object.entries(verify.fields).some(([field, reader]) => !validIdentityPath(field) || !validIdentityPath(reader)) ||
+      (Object.keys(verify.fields).length && (receipt.submittedValues != null || !(verify.submittedRows || receipt.submittedRows))))) {
+    throw new Error('Verified readback field checks require submitted rows and safe reader field names.');
+  }
+  if (verify.submittedRows && (!validIdentityPath(verify.submittedRows) ||
+      (!receipt.generated && verify.submittedRows !== receipt.submittedRows))) {
+    throw new Error('Verified readback requires a safe submitted rows selector.');
+  }
+}
+
+function readbackScope(spec, context) {
+  return spec.verify.scope.map(({field, parameter, passToReader}) => {
+    const name = parameter.name;
+    const resolved = resolveParameters([parameter], context);
+    const [reference, store] = (parameter.to || parameter.kind || '').split(':');
+    const destination = reference || (store ? context.identity?.dataSourceRef : spec.dataSourceRef);
+    const target = (resolved?.inbound || resolved)?.[destination];
+    const parameters = store
+      ? target?.[store] || target?.[`input.${store}`]
+      : mutationCommandTargetParameters(resolved, destination);
+    const value = parameters && Object.hasOwn(parameters, name) ? parameters[name] : undefined;
+    const scalar = Array.isArray(value) && value.length === 1 ? value[0] : value;
+    if (!['boolean', 'string', 'number'].includes(typeof scalar) ||
+        (typeof scalar === 'string' && !scalar.trim()) || (typeof scalar === 'number' && !Number.isFinite(scalar))) {
+      throw new Error('Verified readback scope must resolve to a scalar or a singleton identity array.');
+    }
+    return {field: field.split('.'), name, value: parameterSnapshot(value), scalar, passToReader};
+  });
+}
+
+export function retryCommandVerification(context, command = {}, presentationToken) {
+  const entry = stateEntry(context, commandGuardKey(command));
+  const retry = entry?.verificationRetry;
+  if (!retry || retry.presentationToken !== presentationToken || entry.value.phase !== 'verification_failed') {
+    return Promise.resolve({accepted: false, status: 'suppressed'});
+  }
+  return retry.run();
+}
+
+export function discardCommandVerification(context, command, presentationToken) {
+  const retry = stateEntry(context, commandGuardKey(command))?.verificationRetry;
+  if (retry && retry.presentationToken === presentationToken) retry.invalidate();
+}
+
+const readbackParameterSignals = {
+  windowForm: ['windowForm'], windowform: ['windowForm'], form: ['form'], selection: ['selection'], metadata: ['metadata'],
+  input: ['input'],
+  metrics: ['metrics'], filter: ['filter', 'input'], collection: ['collection'],
+  dataSource: ['selection', 'form', 'filter', 'input'],
+};
+
+function watchReadbackScope(context, dialog, originSelection, scope, onChange) {
+  const base = context.signals || {};
+  const signals = new Set([dialog, base.authorization, base.selection, originSelection]);
+  for (const {parameter} of scope) {
+    const compact = parameter.from?.includes(':') && parameter.to?.includes(':');
+    const [ref, store] = compact ? parameter.from.split(':') : [parameter.location?.split?.('.')[0], parameter.in];
+    const resolved = ref && Object.hasOwn(context.metadata?.dataSource || {}, ref) ? context.Context?.(ref)?.signals : base;
+    for (const name of readbackParameterSignals[store] || []) signals.add(resolved?.[name]);
+  }
+  const subscriptions = [...signals].filter(signal => signal?.subscribe).map(signal => signal.subscribe(onChange));
+  return () => subscriptions.forEach(unsubscribe => unsubscribe());
+}
+
+// A failed verification can discard its proof without making the still-open
+// footer eligible to submit that acknowledged mutation again.
+function abandonVerification(context, key, id, dialog, props) {
+  const reset = {
+    phase: 'idle', guarded: false, pending: false, retryAllowed: true, writerStatus: 'succeeded',
+    syncStatus: 'verification_superseded', message: '', error: null, warnings: [],
+  };
+  const current = () => dialog?.peek()?.open === true && dialog.peek().props === props;
+  if (!current()) {
+    publish(context, key, reset);
+    return;
+  }
+  const unsubscribe = dialog.subscribe(() => {
+    if (current()) return;
+    unsubscribe();
+    if (stateEntry(context, key).value.invocationId === id) publish(context, key, reset);
+  });
+  publish(context, key, {...reset, phase: 'verification_abandoned', guarded: true, retryAllowed: false,
+    message: 'Saved. Reopen the form to continue.'});
+}
+
+function submittedReadbackRows(command, input) {
+  const verify = command.reconcile.verify;
+  const fields = Object.entries(verify.fields || {});
+  if (!fields.length) return null;
+  const receipt = command.receiptIdentity;
+  const rows = identityValue(input.parameters, (verify.submittedRows || receipt.submittedRows).split('.'));
+  if (!Array.isArray(rows) || (receipt.generated ? rows.length !== 1 || !rows[0] || typeof rows[0] !== 'object' || Array.isArray(rows[0]) : !receiptIdentitiesMatch(
+    {...receipt, field: receipt.submittedField || receipt.field}, rows, input.expected))) {
+    throw new Error('Verified readback checks must refer to exactly the submitted rows.');
+  }
+  return new Map(rows.map(row => [
+    receipt.generated ? null : identityValue(row, (receipt.submittedField || receipt.field).split('.')),
+    fields.flatMap(([submitted, reader]) => {
+      const value = identityValue(row, submitted.split('.'));
+      return value === undefined ? [] : [[reader.split('.'), parameterSnapshot(value)]];
+    }),
+  ]));
+}
+
+async function verifyReadback(readback, acknowledgements, command, id, signal) {
+  const {spec, reader, schema, scope, submitted} = readback;
+  const parameters = {[spec.verify.idsParameter]: [...acknowledgements]};
+  for (const {name, value, passToReader} of scope) {
+    if (passToReader) parameters[name] = parameterSnapshot(value);
+  }
+  const payload = await reader.handlers.dataSource.fetchRecords({
+    parameters, cache: {bypassCache: true}, invocationId: id,
+    signal,
+  });
+  if (signal.aborted) throw signal.reason;
+  if (isDeferredCacheHitEnvelope(payload)) throw new Error('Verified readback returned a deferred response.');
+  let records;
+  try { ({records} = extractData(schema?.selectors, undefined, payload, true)); }
+  catch (cause) { throw new Error('Verified readback did not contain a record array.', {cause}); }
+  const field = spec.identityField || command.receiptIdentity.field;
+  const identityKeys = field.split('.');
+  const ids = rowIdentitySet(records, field);
+  if (!ids || ids.size !== acknowledgements.length || acknowledgements.some(value => !ids.has(value))) {
+    throw new Error('Verified readback did not return exactly the acknowledged identities.');
+  }
+  for (const row of records) {
+    const id = identityValue(row, identityKeys);
+    const expected = submitted?.get(command.receiptIdentity.generated ? null : id) || [];
+    if (scope.some(({field, scalar}) => identityValue(row, field) !== scalar) ||
+        expected.some(([field, value]) => !equal(identityValue(row, field), value))) {
+      throw new Error('Verified readback did not match the submitted scope and values.');
+    }
+  }
+  return parameterSnapshot(records);
+}
+
 function classifyWriterReceipt(writer, command, expected) {
   if ((!command.receiptIdentity && !command.receiptWhen) || writer.status !== 'succeeded') return writer;
   const rows = writer.records;
+  const identityRows = command.reconcile?.verify && command.reconcile.resultPath !== undefined
+    ? identityValue(rows, command.reconcile.resultPath.split('.')) : rows;
   const rejected = command.rejectedWhen ? receiptCondition(command.rejectedWhen, rows) : false;
   if (rejected === true) {
     const message = rows[0]?.message;
     return {status: 'failed', error: new Error(typeof message === 'string' && message.trim() ? message : 'The producer rejected the write.')};
   }
   if (rejected === false && (!command.receiptWhen || receiptCondition(command.receiptWhen, rows) === true) &&
-    receiptIdentitiesMatch(command.receiptIdentity, rows, expected)) return writer;
+    receiptIdentitiesMatch(command.receiptIdentity, identityRows, expected)) {
+    return command.reconcile?.verify ? {...writer, acknowledgedIds: [...rowIdentitySet(identityRows, command.receiptIdentity.field)]} : writer;
+  }
   return {status: 'indeterminate', error: new Error('The producer did not confirm the write. Verify its outcome before retrying.')};
 }
 
@@ -945,15 +1115,43 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
   let originalScope;
   let dialogSignal;
   let dialogProps;
+  let origin;
   let validationContext = context;
+  let readback;
+  let disposeReadbackWatch;
+  let scopeInvalidated = false;
+  let scopeCaptured = false;
+  const entry = stateEntry(context, key);
   const peek = signal => signal?.peek?.() ?? signal?.value;
   const authority = () => JSON.stringify(peek(context?.signals?.authorization) ?? context?.authorization ?? null);
-  const selection = () => needsExactReceipt ? JSON.stringify(peek(context?.signals?.selection) ?? null) : null;
+  const selection = () => {
+    if (!needsExactReceipt) return null;
+    const local = context?.signals?.selection;
+    const current = peek(local) ?? null;
+    if (!origin?.signals?.selection) return JSON.stringify(current);
+    const source = origin.handlers?.dataSource;
+    const selected = peek(origin.signals.selection) ?? null;
+    const keys = source?.getUniqueKeyValue && editableCollectionRows(selected || {}).map(row => source.getUniqueKeyValue(row));
+    // Use the same datasource identities as selection itself. When a source
+    // cannot identify its rows, fall back to the exact selection snapshot.
+    const evidence = keys && (!keys.length || rowIdentitySet(keys)) ? keys.sort() : selected;
+    return JSON.stringify(origin.signals.selection === local ? evidence : [current, evidence]);
+  };
   const scopeSnapshot = () => ({authority: authority(), selection: selection()});
   const authorizationIsCurrent = () => (!protectedWindow || protectedWindowEpoch(windowId) === authorizationEpoch)
     && (!originalScope || (authority() === originalScope.authority && selection() === originalScope.selection));
   const presentationCurrent = () => !dialogSignal || (dialogSignal.peek()?.open === true && dialogSignal.peek().props === dialogProps);
   const uiIsCurrent = () => authorizationIsCurrent() && presentationCurrent();
+  const readbackScopeCurrent = () => {
+    if (scopeInvalidated || !uiIsCurrent() || lifecycle.isPresent?.() === false) return false;
+    try { return equal(readback.scope, readbackScope(readback.spec, context)); }
+    catch { return false; }
+  };
+  const finishReadbackScope = () => {
+    disposeReadbackWatch?.();
+    disposeReadbackWatch = null;
+    delete entry.verificationRetry;
+  };
   // Plain commands retain their declared window-wide state and owner refresh.
   // Dialog-local feedback belongs to the presentation that initiated the call.
   const windowEffectsCurrent = needsExactReceipt ? uiIsCurrent : authorizationIsCurrent;
@@ -970,15 +1168,45 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
   let writerSucceeded = false;
   let transportAcquired = false;
   let target = null;
+  const postWriteFailure = error => {
+    const warnings = [{stage: 'post_write', error}];
+    publish(context, key, {phase: 'succeeded', guarded: false, pending: false, retryAllowed: true, error: null, message: 'Saved. Some related data could not be refreshed.', writerStatus: 'succeeded', syncStatus: 'partial_failure', warnings});
+    if ((readback ? readbackScopeCurrent : uiIsCurrent)()) notifyLifecycle(lifecycle, 'onSettled', {status: 'succeeded', warnings, invocationId: id});
+    return {accepted: true, status: 'succeeded', warnings, invocationId: id};
+  };
   try {
     if (command.clearFormFields != null && !Array.isArray(command.clearFormFields)) throw new Error('Expected an array of clearFormFields.');
     validateWriterReceipt(command);
     if (grouped) validateCommandGroup(command);
     if (command.before != null && !Array.isArray(command.before)) throw new Error('Expected an array of preparation steps.');
-    if (needsExactReceipt || lifecycle.dialogId) originalScope = scopeSnapshot();
     if (lifecycle.dialogId) {
       dialogSignal = findDialogSignal(`${windowId}Dialog${lifecycle.dialogId}`);
       dialogProps = dialogSignal?.peek()?.props;
+      if (command.reconcile?.verify && dialogProps?.context?.identity?.windowId === windowId) {
+        origin = dialogProps?.context;
+      }
+    }
+    if (needsExactReceipt || lifecycle.dialogId) originalScope = scopeSnapshot();
+    if (command.reconcile?.verify) {
+      const spec = command.reconcile;
+      const reader = context.Context?.(spec.dataSourceRef);
+      const schema = context.metadata?.dataSource?.[spec.dataSourceRef];
+      if (!reader?.handlers?.dataSource?.fetchRecords || !schema || reader === context.Context?.(targetRef)) {
+        throw new Error('Verified readback reader datasource is unavailable or is the writer.');
+      }
+      const method = String(schema.service?.method || schema.method || 'GET').trim().toUpperCase();
+      if (method !== 'GET' && method !== 'POST') throw new Error('Verified readback requires a read transport.');
+      if (lifecycle.dialogId && (!dialogSignal || !presentationCurrent())) {
+        throw new Error('The verification dialog is no longer open.');
+      }
+      readback = {spec, reader, schema, scope: readbackScope(spec, context)};
+      disposeReadbackWatch = watchReadbackScope(context, dialogSignal, origin?.signals?.selection, spec.verify.scope, () => {
+        if (scopeCaptured && !readbackScopeCurrent()) {
+          scopeInvalidated = true;
+          entry.verificationRetry?.invalidate();
+        }
+      });
+      scopeCaptured = true;
     }
     formPatch = captureFormPatch(context, command.successFormState, command.clearFormFields, dialogSignal && presentationCurrent());
     if (ordered) {
@@ -1048,6 +1276,7 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
       if (needsExactReceipt) throw stepError('superseded', '', new Error('Command scope changed before the final write.'));
       return superseded(false);
     }
+    if (readback && !readbackScopeCurrent()) throw stepError('superseded', '', new Error('The verification scope changed before submission.'));
     if (needsExactReceipt && !rootEligible()) throw stepError('invalid', '', new Error(command.invalidMessage || 'Command eligibility changed before the final write.'));
     if (!submittedFileChoicesMatch(context, formPatch, submittedFields)) {
       throw stepError('invalid', '', new Error('The selected file changed before submission.'));
@@ -1065,6 +1294,10 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
     publish(context, key, {phase: 'pending', guarded: true, pending: true, retryAllowed: false, error: null, message: 'Saving…', invocationId: id, writerStatus: 'pending', syncStatus: 'not_started'});
     const mapsResult = Object.keys(command.resultState || {}).length > 0;
     const input = verifiedWriterInput(command, preparedSnapshot, id);
+    if (readback) {
+      if (!readbackScopeCurrent()) throw stepError('superseded', '', new Error('The verification scope changed before submission.'));
+      readback.submitted = submittedReadbackRows(command, input);
+    }
     const response = await dispatchCommandWriter(target,command,input,id,needsExactReceipt || mapsResult,()=>{writerInvoked=true;}, needsExactReceipt, dialogSignal ? presentationCurrent : undefined);
     const writer = classifyWriterReceipt(response, command, input.expected);
     if ((needsExactReceipt || dialogSignal) && writer.status === 'failed' && ambiguousWriterFailure(writer.error)) writer.status='indeterminate';
@@ -1094,47 +1327,118 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
       return {accepted: true, status: 'indeterminate', warnings, invocationId: id};
     }
     writerSucceeded = true;
-    let warnings = [];
-    if (uiIsCurrent()) clearSubmittedFields(context, submittedFields, warnings);
-    let formChanged = false;
-    if (formPatch && uiIsCurrent()) {
-      try { formChanged = !submittedFileChoicesMatch(context, formPatch, submittedFields) || !applyFormPatch(context, formPatch); }
-      catch (error) { warnings.push({stage: 'successFormState', error}); }
-    }
-    const successState = mapsResult ? Object.assign(Object.create(null), command.successState) : command.successState;
-    for (const [field, selectors] of Object.entries(command.resultState || {})) {
-      let value;
-      for (const selector of selectors) {
-        value = resolveSelector(writer.records, selector);
-        if (value !== undefined) break;
+    const completeSuccess = async (readbackRows) => {
+      const effectCurrent = readback ? readbackScopeCurrent : uiIsCurrent;
+      let warnings = [];
+      if (effectCurrent()) clearSubmittedFields(context, submittedFields, warnings);
+      let formChanged = false;
+      if (formPatch && effectCurrent()) {
+        try { formChanged = !submittedFileChoicesMatch(context, formPatch, submittedFields) || !applyFormPatch(context, formPatch); }
+        catch (error) { warnings.push({stage: 'successFormState', error}); }
       }
-      if (value === undefined) warnings.push({stage: 'resultState', error: new Error(`Writer receipt omitted the value for ${field}.`)});
-      successState[field] = value ?? null;
-    }
-    try { if (windowEffectsCurrent()) applyPrimitiveState(context, successState); } catch (error) { warnings.push({stage: 'successState', error}); }
-    const writerResponse = writer.records ?? parameterSnapshot(target?.signals?.collection?.peek?.() || target?.signals?.collection?.value || []);
-    // The writer transport is no longer in use once its terminal success is
-    // acknowledged. Release it before potentially slow UI reconciliation so a
-    // different command may use the same datasource. Keep this command's own
-    // guard until synchronization settles, and reconcile against the immutable
-    // writer response snapshot so a later writer cannot replace its result.
+      const successState = mapsResult ? Object.assign(Object.create(null), command.successState) : command.successState;
+      for (const [field, selectors] of Object.entries(command.resultState || {})) {
+        let value;
+        for (const selector of selectors) {
+          value = resolveSelector(writer.records, selector);
+          if (value !== undefined) break;
+        }
+        if (value === undefined) warnings.push({stage: 'resultState', error: new Error(`Writer receipt omitted the value for ${field}.`)});
+        successState[field] = value ?? null;
+      }
+      try { if ((readback ? effectCurrent : windowEffectsCurrent)()) applyPrimitiveState(context, successState); } catch (error) { warnings.push({stage: 'successState', error}); }
+      const writerResponse = writer.records ?? parameterSnapshot(target?.signals?.collection?.peek?.() || target?.signals?.collection?.value || []);
+      // The writer transport is no longer in use once its terminal success is
+      // acknowledged. Release it before potentially slow UI reconciliation so a
+      // different command may use the same datasource. Keep this command's own
+      // guard until synchronization settles, and reconcile against the immutable
+      // writer response snapshot so a later writer cannot replace its result.
+      if (transportAcquired) {
+        releaseTransport(target, key);
+        transportAcquired = false;
+      }
+      publish(context, key, {phase: 'synchronizing', guarded: true, pending: false, retryAllowed: false, error: null, message: 'Refreshing…', writerStatus: 'succeeded', syncStatus: 'pending'});
+      try { warnings.push(...await synchronizeUI(context, target, command, writerResponse, readback ? effectCurrent : windowEffectsCurrent, formSynchronization, presentationCurrent)); } catch (error) { warnings.push({stage: 'synchronize', error}); }
+      if (!needsExactReceipt && !authorizationIsCurrent()) return superseded(writerInvoked, id);
+      // Deliver verified evidence while the caller still owns the presentation.
+      // Its successful close may intentionally unmount that presentation.
+      const result = {status: 'succeeded', warnings, invocationId: id};
+      const evidence = readbackRows && effectCurrent()
+        ? {readbackRows, writerRecords: parameterSnapshot(writer.records)} : null;
+      if (evidence) notifyLifecycle(lifecycle, 'onSettled', {...result, ...evidence});
+      if (closesDialog && dialogSignal && effectCurrent()) {
+        // A close hook can await application work. Check the invocation's scope
+        // again inside the dialog immediately before dismissing its presentation.
+        try { await lifecycle.closeOnSuccess(effectCurrent); }
+        catch (error) { warnings.push({stage: 'close', error}); }
+      }
+      const syncStatus = warnings.length ? 'partial_failure' : 'succeeded';
+      const successMessage = formChanged ? 'Saved the submitted version. Your newer changes are still in the form.' : 'Completed';
+      const message = warnings.length ? 'Saved. Some related data could not be refreshed.' : successMessage;
+      publish(context, key, {phase: 'succeeded', guarded: false, pending: false, retryAllowed: true, error: null, message, writerStatus: 'succeeded', syncStatus, warnings});
+      if (!readback && effectCurrent()) notifyLifecycle(lifecycle, 'onSettled', result);
+      return {accepted: true, ...result, ...(evidence && authorizationIsCurrent() && (!dialogSignal?.peek()?.open || effectCurrent()) ? evidence : {})};
+    };
+    if (!readback) return await completeSuccess();
+
     releaseTransport(target, key);
     transportAcquired = false;
-    publish(context, key, {phase: 'synchronizing', guarded: true, pending: false, retryAllowed: false, error: null, message: 'Refreshing…', writerStatus: 'succeeded', syncStatus: 'pending'});
-    try { warnings.push(...await synchronizeUI(context, target, command, writerResponse, windowEffectsCurrent, formSynchronization, presentationCurrent)); } catch (error) { warnings.push({stage: 'synchronize', error}); }
-    if (!needsExactReceipt && !authorizationIsCurrent()) return superseded(writerInvoked, id);
-    if (closesDialog && dialogSignal && uiIsCurrent()) {
-      // A close hook can await application work. Check the invocation's scope
-      // again inside the dialog immediately before dismissing its presentation.
-      try { await lifecycle.closeOnSuccess(uiIsCurrent); }
-      catch (error) { warnings.push({stage: 'close', error}); }
-    }
-    const syncStatus = warnings.length ? 'partial_failure' : 'succeeded';
-    const successMessage = formChanged ? 'Saved the submitted version. Your newer changes are still in the form.' : 'Completed';
-    const message = warnings.length ? 'Saved. Some related data could not be refreshed.' : successMessage;
-    publish(context, key, {phase: 'succeeded', guarded: false, pending: false, retryAllowed: true, error: null, message, writerStatus: 'succeeded', syncStatus, warnings});
-    if (uiIsCurrent()) notifyLifecycle(lifecycle, 'onSettled', {status: 'succeeded', warnings, invocationId: id});
-    return {accepted: true, status: 'succeeded', warnings, invocationId: id};
+    const acknowledgedIds = writer.acknowledgedIds;
+    let verificationController;
+    const supersededVerification = () => {
+      finishReadbackScope();
+      abandonVerification(context, key, id, dialogSignal, dialogProps);
+      return {accepted: true, status: 'superseded', writerStatus: 'succeeded', invocationId: id};
+    };
+    const retry = {
+      presentationToken: lifecycle.presentationToken,
+      invalidate: () => {
+        scopeInvalidated = true;
+        verificationController?.abort();
+        if (entry.value.phase === 'verification_failed') supersededVerification();
+        else finishReadbackScope();
+      },
+      run: async () => {
+        if (!readbackScopeCurrent()) return supersededVerification();
+        const controller = verificationController = new AbortController();
+        publish(context, key, {phase: 'verifying', guarded: true, pending: true, retryAllowed: false,
+          error: null, message: 'Verifying saved changes…', writerStatus: 'succeeded', syncStatus: 'pending'});
+        let verifiedRows;
+        let cancel;
+        const timer = setTimeout(() => controller.abort(new DOMException('Verification timed out.', 'TimeoutError')),
+          Math.max(1000, Number(command.timeoutMs) || 30000));
+        try {
+          if (!readbackScopeCurrent()) return supersededVerification();
+          const completion = new Promise((_, reject) => {
+            cancel = () => reject(controller.signal.reason);
+            controller.signal.addEventListener('abort', cancel, {once: true});
+          });
+          verifiedRows = await Promise.race([
+            verifyReadback(readback, acknowledgedIds, command, invocationID(), controller.signal),
+            completion,
+          ]);
+        } catch (error) {
+          if (!readbackScopeCurrent()) return supersededVerification();
+          publish(context, key, {phase: 'verification_failed', guarded: true, pending: false, retryAllowed: false,
+            error, message: 'Saved. Verification did not complete. ' + commandErrorMessage(error), writerStatus: 'succeeded', syncStatus: 'verification_failed'});
+          const result = {status: 'verification_failed', writerStatus: 'succeeded', error, invocationId: id};
+          if (!readbackScopeCurrent()) return {accepted: true, ...result};
+          const writerRecords = parameterSnapshot(writer.records);
+          notifyLifecycle(lifecycle, 'onSettled', {...result, writerRecords});
+          return {accepted: true, ...result, ...(readbackScopeCurrent() ? {writerRecords} : {})};
+        } finally {
+          clearTimeout(timer);
+          if (cancel) controller.signal.removeEventListener('abort', cancel);
+          verificationController = null;
+        }
+        if (!readbackScopeCurrent()) return supersededVerification();
+        try { return await completeSuccess(verifiedRows); }
+        catch (error) { return postWriteFailure(error); }
+        finally { finishReadbackScope(); }
+      },
+    };
+    entry.verificationRetry = retry;
+    return await retry.run();
   } catch (error) {
     if (transportAcquired && target) releaseTransport(target, key);
     if (needsExactReceipt && !writerSucceeded) {
@@ -1162,12 +1466,7 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
     }
     if (!needsExactReceipt && !authorizationIsCurrent()) return superseded(writerInvoked, id);
     console.error(`Forge mutation command failed commandId=${key} dataSourceRef=${targetRef} writerInvoked=${writerInvoked}: ${error?.stack || error}`);
-    if (writerSucceeded) {
-      const warnings = [{stage: 'post_write', error}];
-      publish(context, key, {phase: 'succeeded', guarded: false, pending: false, retryAllowed: true, error: null, message: 'Saved. Some related data could not be refreshed.', writerStatus: 'succeeded', syncStatus: 'partial_failure', warnings});
-      if (uiIsCurrent()) notifyLifecycle(lifecycle, 'onSettled', {status: 'succeeded', warnings, invocationId: id});
-      return {accepted: true, status: 'succeeded', warnings, invocationId: id};
-    }
+    if (writerSucceeded) return postWriteFailure(error);
     if (!writerInvoked && !presentationCurrent()) return superseded(false, id);
     try { applyPrimitiveState(context, command.errorState); } catch (_) {}
     publish(context, key, {phase: 'failed', guarded: false, pending: false, retryAllowed: true, error, message: commandErrorMessage(error), writerStatus: writerInvoked ? 'failed' : 'not_invoked', syncStatus: 'not_started'});
@@ -1175,6 +1474,7 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
     return {accepted: writerInvoked, status: 'failed', error, invocationId: id};
   } finally {
     const current = getCommandState(context, command);
+    if (!entry.verificationRetry) finishReadbackScope();
     if (!(current.guarded && ['indeterminate', 'partial_failure'].includes(current.phase))) releaseSerialization(context, key);
   }
 }

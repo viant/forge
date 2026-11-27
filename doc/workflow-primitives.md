@@ -61,7 +61,7 @@ Eligible members use independent invocation receipts and distinct transports. Th
 
 Primitive predicates control UX. Command validation protects client dispatch. The writer remains authoritative for authorization, concurrency, business validation, persistence, and transaction commit.
 
-Writer and synchronization results are orthogonal: `writerStatus` is `succeeded|failed|indeterminate`, while `syncStatus` is `not_started|succeeded|partial_failure`. Reconciliation and refresh synchronize UI only after a committed writer result; they are not part of the business transaction. Every configured refresh is attempted even if local reconciliation fails. If the writer succeeds but reconciliation or refresh fails, the command remains `succeeded` with `syncStatus: partial_failure` and a stale-dependency warning. It MUST NOT report that the writer failed or encourage an unsafe retry. A client timeout is `indeterminate`, because the writer may still commit after the client stops waiting; it is not equivalent to failure. An indeterminate command remains guarded until an explicit authoritative recovery calls the executor resolution API. No result-based reconciliation occurs while outcome is unknown.
+The command reports the writer outcome and UI synchronization separately. With ordinary reconciliation, a confirmed writer and a failed UI refresh return `writerStatus: succeeded` and `syncStatus: partial_failure`. Each configured refresh is attempted while its scope is current. Opting into verified readback adds a verification step before success effects. A failure there produces `syncStatus: verification_failed` and a read-only retry. A timeout during the writer itself leaves its outcome indeterminate. The command stays guarded until the caller performs authoritative recovery.
 
 The runtime creates an invocation ID for correlation, carries it through the datasource request envelope/header, and exposes `invocationParameter` only for writers whose declared input contract accepts it. Correlation alone is not writer idempotency; future replay protection requires explicit writer support.
 
@@ -90,6 +90,34 @@ the existing indeterminate-outcome guard. Confirmation cancellation performs no
 preparation or write.
 
 Forge workflow primitives keep interaction mechanics in the runtime and business rules in datasource contracts. Metadata selects datasources, fields, permissions, transitions, reconciliation, and layout; it does not implement transactions. Mutation datasources should normally set `replayPendingFetchOnRestore: false`.
+
+### Verify persisted fields after a write
+
+A root command can opt into verified readback by adding `verify` to its refetch reconciliation. The writer and reader each keep their own authorization and data contracts. This example submits record changes and verifies the persisted caption for each row that included it.
+
+```yaml
+mutationCommand:
+  commandId: saveRecords
+  dataSourceRef: updateRecords
+  receiptIdentity: {field: id, submittedRows: changes}
+  reconcile:
+    mode: refetch
+    dataSourceRef: readRecords
+    resultPath: '0.data'
+    verify:
+      idsParameter: ids
+      scope:
+        - field: ownerId
+          parameter: {name: owner, in: windowForm, location: selectedOwner}
+          passToReader: true
+      fields: {caption: displayCaption}
+```
+
+Here the writer datasource returns one envelope row containing `data`. The explicit `resultPath` selects its receipt rows for identity checks. A writer that already returns individual rows can omit this path. The command uses the acknowledged IDs in one cache-bypassed read and indexes the returned records by identity. It checks the exact ID set and the bound scope of every row, then compares each submitted field named in `fields`. An explicitly submitted null requires a present null in the returned row. An omitted submitted field requires no comparison.
+
+For creation, declare `receiptIdentity: {field: id, generated: true}`. To compare fields on the new row, also set `verify.submittedRows` to the selector for the submitted single-row array. Leave `passToReader` unset when the reader accepts only IDs. The returned scope value is still checked against the bound value.
+
+If the write is acknowledged and verification fails, the command retains `writerStatus: succeeded` and exposes the read or comparison error with `syncStatus: verification_failed`. **Retry verification** reads the same IDs again in the original scope. A successful verification makes `readbackRows` available to the original caller and runs the declared success effects. The paged UI collection keeps its current rows. Declare a separate refresh if another view needs reloading. Native datasource fetch routes accept ID arrays in their POST body. A direct HTTP reader needs a supported encoding for the entire ID array.
 
 ### Dialog footer commands
 

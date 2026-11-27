@@ -554,12 +554,14 @@ struct MutationCommandButton: View {
                 if state.pending {
                     ProgressView().controlSize(.small)
                 }
-                if !(dialogFooter?.action.hideLabel ?? command.hideLabel) {
+                if state.phase == .verificationFailed && state.retryAllowed {
+                    Text("Retry verification")
+                } else if !(dialogFooter?.action.hideLabel ?? command.hideLabel) {
                     Text(labelOverride ?? command.label ?? "Save")
                 }
             }
             .buttonStyle(.borderedProminent)
-            .disabled(state.guarded || externallyDisabled)
+            .disabled(state.phase == .verificationFailed ? !state.retryAllowed : state.guarded || externallyDisabled)
             .accessibilityIdentifier("forge-mutation-\(command.commandId ?? command.dataSourceRef)")
             .alert(effectiveConfirmation ?? "Confirm", isPresented: $confirmationVisible) {
                 Button("Cancel", role: .cancel) { settleConfirmation(false) }
@@ -575,10 +577,10 @@ struct MutationCommandButton: View {
         .task(id: command.commandId ?? command.dataSourceRef) {
             for await next in await runtime.mutationCommandUpdates(windowID: window.windowID, command: command) {
                 if let dialogFooter,
-                   command.group != nil || (!dialogFooter.action.close && command.before?.isEmpty != false && command.clearFormFields.isEmpty),
+                   command.reconcile?.verify != nil || command.group != nil || (!dialogFooter.action.close && command.before?.isEmpty != false && command.clearFormFields.isEmpty),
                    await runtime.dialogState(windowID: window.windowID, dialogID: dialogFooter.id).presentationID != activatedPresentation {
                     state = next.guarded ? MutationCommandState(phase: next.phase, guarded: true, retryAllowed: false,
-                        message: next.phase == .indeterminate || next.phase == .partialFailure
+                        message: next.phase == .indeterminate || next.phase == .partialFailure || next.phase == .verificationFailed
                             ? "A previous submission needs verification before retrying." : "Another submission is in progress.") : MutationCommandState()
                 } else {
                     state = next
@@ -603,29 +605,30 @@ struct MutationCommandButton: View {
     }
 
     private func execute() {
+        let retryVerificationInvocationId = state.phase == .verificationFailed ? state.invocationId : nil
         Task {
             let origin = if let dialogFooter {
                 await runtime.dialogState(windowID: window.windowID, dialogID: dialogFooter.id).presentationID
             } else { nil as UUID? }
             activatedPresentation = origin
-            if effectiveConfirmation?.isEmpty == false && resolveMutationConfirmation(command: command, extras: extras).isEmpty {
+            if retryVerificationInvocationId == nil && effectiveConfirmation?.isEmpty == false && resolveMutationConfirmation(command: command, extras: extras).isEmpty {
                 guard await askConfirmation() else { return }
             }
             let confirmation: @Sendable (String) async -> Bool = { _ in await askConfirmation() }
-            let result = await dispatch(confirmation)
+            let result = await dispatch(confirmation, retryVerificationInvocationId: retryVerificationInvocationId)
             if let dialogFooter, command.group != nil || !dialogFooter.action.close,
                await runtime.dialogState(windowID: window.windowID, dialogID: dialogFooter.id).presentationID != origin { return }
             onSettled?(result)
         }
     }
 
-    private func dispatch(_ confirmation: (@Sendable (String) async -> Bool)?) async -> MutationCommandResult {
+    private func dispatch(_ confirmation: (@Sendable (String) async -> Bool)?, retryVerificationInvocationId: String?) async -> MutationCommandResult {
         if let footer = dialogFooter {
-            return await runtime.activateDialogFooter(windowID: window.windowID, dialogID: footer.id, sourceDataSourceRef: sourceDataSourceRef, action: footer.action, confirm: confirmation)
+            return await runtime.activateDialogFooter(windowID: window.windowID, dialogID: footer.id, sourceDataSourceRef: sourceDataSourceRef, action: footer.action, retryVerificationInvocationId: retryVerificationInvocationId, confirm: confirmation)
                 ?? MutationCommandResult(accepted: false, status: "invalid")
         }
         return await runtime.executeMutationCommand(windowID: window.windowID, sourceDataSourceRef: sourceDataSourceRef,
-            command: command, extras: extras, confirm: confirmation)
+            command: command, extras: extras, retryVerificationInvocationId: retryVerificationInvocationId, confirm: confirmation)
     }
 }
 

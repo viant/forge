@@ -5,28 +5,30 @@ private enum MutationReceiptID: Hashable, Sendable {
     case number(Double)
 }
 
+private func mutationIdentity(_ row: JSONValue, path: [String]?) -> MutationReceiptID? {
+    let value: JSONValue
+    if let path {
+        guard row.objectValue != nil, let nested = resourceResolveValue(row, components: path, strictIndices: true) else { return nil }
+        value = nested
+    } else {
+        value = row
+    }
+    switch value {
+    case .string(let value) where !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty:
+        return .string(Data(value.utf8))
+    case .number(let value) where value.isFinite && value.rounded(.towardZero) == value && abs(value) <= 9_007_199_254_740_991:
+        return .number(value)
+    default:
+        return nil
+    }
+}
+
 private func mutationIdentitySet(_ rows: [JSONValue], field: String?) -> Set<MutationReceiptID>? {
     guard !rows.isEmpty else { return nil }
     var ids = Set<MutationReceiptID>()
     let path = field?.components(separatedBy: ".")
     for row in rows {
-        let value: JSONValue
-        if let path {
-            guard row.objectValue != nil, let nested = resourceResolveValue(row, components: path, strictIndices: true) else { return nil }
-            value = nested
-        } else {
-            value = row
-        }
-        let id: MutationReceiptID
-        switch value {
-        case .string(let value) where !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty:
-            id = .string(Data(value.utf8))
-        case .number(let value) where value.isFinite && value.rounded(.towardZero) == value && abs(value) <= 9_007_199_254_740_991:
-            id = .number(value)
-        default:
-            return nil
-        }
-        guard ids.insert(id).inserted else { return nil }
+        guard let id = mutationIdentity(row, path: path), ids.insert(id).inserted else { return nil }
     }
     return ids
 }
@@ -40,6 +42,7 @@ public enum MutationCommandPhase: String, Codable, Sendable {
     case pending
     case succeeded
     case failed
+    case verificationFailed = "verification_failed"
     case partialFailure = "partial_failure"
     case indeterminate
 }
@@ -56,6 +59,7 @@ public enum MutationWriterStatus: String, Codable, Sendable {
 public enum MutationSyncStatus: String, Codable, Sendable {
     case notStarted = "not_started"
     case succeeded
+    case verificationFailed = "verification_failed"
     case partialFailure = "partial_failure"
 }
 
@@ -136,15 +140,19 @@ public struct MutationCommandResult: Sendable, Equatable {
     public let invocationId: String
     public let failedStepId: String?
     public let error: String?
+    public let writerRecords: [JSONValue]?
+    public let readbackRows: [[String: JSONValue]]?
     public let warnings: [MutationCommandWarning]
     public let members: [String: MutationGroupMemberOutcome]?
 
-    public init(accepted: Bool, status: String, invocationId: String = "", failedStepId: String? = nil, error: String? = nil, warnings: [MutationCommandWarning] = [], members: [String: MutationGroupMemberOutcome]? = nil) {
+    public init(accepted: Bool, status: String, invocationId: String = "", failedStepId: String? = nil, error: String? = nil, warnings: [MutationCommandWarning] = [], members: [String: MutationGroupMemberOutcome]? = nil, readbackRows: [[String: JSONValue]]? = nil, writerRecords: [JSONValue]? = nil) {
         self.accepted = accepted
         self.status = status
         self.failedStepId = failedStepId
         self.invocationId = invocationId
         self.error = error
+        self.writerRecords = writerRecords
+        self.readbackRows = readbackRows
         self.warnings = warnings
         self.members = members
     }
@@ -156,7 +164,7 @@ private enum MutationWriterOutcome: Sendable {
     case indeterminate
 }
 
-private struct MutationOperation: Sendable {
+struct MutationOperation: Sendable {
     let key: String
     let id: String
     let windowID: String
@@ -164,9 +172,11 @@ private struct MutationOperation: Sendable {
     let authorization: [String: JSONValue]?
     let selection: SelectionState
     let root: MutationCommandDef
+    let transportRevision: UUID
     let footer: ActionDef?
     let dialogSignal: Signal<DialogState>?
     let presentationID: UUID?
+    let selectionFence: DialogSelectionFence?
     let originalPendingFields: [String: JSONValue]
     let fileFields: Set<String>
     let submittedFiles: [String: FormFileSelection]
@@ -187,6 +197,49 @@ private struct MutationDispatchFailure: Error {
 private struct PreparedMutationWriter: Sendable {
     let parameters: [String: JSONValue]
     let identities: Set<MutationReceiptID>?
+    var verification: MutationReadback? = nil
+}
+
+fileprivate struct MutationReadbackField: Sendable {
+    let path: [String]
+    let expected: JSONValue
+
+    func matches(_ row: JSONValue) -> Bool {
+        resourceResolveValue(row, components: path, strictIndices: true) == expected
+    }
+}
+
+fileprivate struct MutationReadbackScopeValue: Equatable, Sendable {
+    let raw: JSONValue
+    let scalar: JSONValue
+}
+
+struct MutationReadback: Sendable {
+    let reader: String
+    let spec: ReconcileVerificationSpec
+    let readerIdentity: [String]
+    fileprivate let scopeValues: [MutationReadbackScopeValue]
+    fileprivate let scopeChecks: [MutationReadbackField]
+    fileprivate let submittedByID: [MutationReceiptID: [MutationReadbackField]]
+    fileprivate let generatedSubmission: [MutationReadbackField]?
+    fileprivate var acknowledgedIDs: Set<MutationReceiptID> = []
+    var readerParameters: [String: JSONValue]
+}
+
+private struct MutationWriterReceipt: Sendable {
+    let rows: [JSONValue]?
+    let verification: MutationReadback?
+}
+
+struct AcknowledgedMutationReadback: Sendable {
+    let operation: MutationOperation
+    let verification: MutationReadback
+    let rows: [JSONValue]?
+    let submitted: [String: JSONValue]
+    let submittedSuccessFields: [String: JSONValue]
+    let dialogID: String?
+    var retryable = true
+    var verifying = true
 }
 
 private struct PreparedMutationGroupMember: Sendable {
@@ -198,16 +251,16 @@ private struct PreparedMutationGroupMember: Sendable {
     let input: PreparedMutationWriter
 }
 
-private actor MutationWriterRace {
-    private var outcome: MutationWriterOutcome?
-    private var continuation: CheckedContinuation<MutationWriterOutcome, Never>?
+private actor MutationRace<Outcome: Sendable> {
+    private var outcome: Outcome?
+    private var continuation: CheckedContinuation<Outcome, Never>?
 
-    func wait() async -> MutationWriterOutcome {
+    func wait() async -> Outcome {
         if let outcome { return outcome }
         return await withCheckedContinuation { continuation = $0 }
     }
 
-    func resolve(_ next: MutationWriterOutcome) {
+    func resolve(_ next: Outcome) {
         guard outcome == nil else { return }
         outcome = next
         continuation?.resume(returning: next)
@@ -237,7 +290,7 @@ extension ForgeRuntime {
         message: String = ""
     ) async -> Bool {
         let key = mutationCommandKey(windowID: windowID, command: command)
-        guard let state = await mutationCommandStates[key]?.peek(),
+        guard acknowledgedMutationReadbacks[key] == nil, let state = await mutationCommandStates[key]?.peek(),
               state.phase == .indeterminate || state.phase == .partialFailure else { return false }
         guardedMutationCommands.remove(key)
         mutationTransportOwners = mutationTransportOwners.filter { $0.value != key }
@@ -247,11 +300,12 @@ extension ForgeRuntime {
     }
 
     public func activateDialogFooter(windowID: String, dialogID: String, sourceDataSourceRef: String, action: ActionDef,
-                                     confirm: (@Sendable (String) async -> Bool)? = nil) async -> MutationCommandResult? {
+                                     retryVerificationInvocationId: String? = nil, confirm: (@Sendable (String) async -> Bool)? = nil) async -> MutationCommandResult? {
         if let command = action.footerCommand {
-            return await executeMutationCommand(windowID: windowID, sourceDataSourceRef: sourceDataSourceRef, command: command, footer: action, dialogID: dialogID, confirm: confirm)
+            return await executeMutationCommand(windowID: windowID, sourceDataSourceRef: sourceDataSourceRef, command: command, footer: action, dialogID: dialogID,
+                retryVerificationInvocationId: retryVerificationInvocationId, confirm: confirm)
         }
-        guard await footerAllows(windowID: windowID, source: sourceDataSourceRef, action: action) else {
+        guard retryVerificationInvocationId == nil, await footerAllows(windowID: windowID, source: sourceDataSourceRef, action: action) else {
             return MutationCommandResult(accepted: false, status: "invalid")
         }
         let context = ExecutionContext(windowID: windowID, dataSourceRef: sourceDataSourceRef)
@@ -277,11 +331,22 @@ extension ForgeRuntime {
         extras: [String: JSONValue] = [:],
         footer: ActionDef? = nil,
         dialogID: String? = nil,
+        retryVerificationInvocationId: String? = nil,
         confirm: (@Sendable (String) async -> Bool)? = nil
     ) async -> MutationCommandResult {
         let targetRef = command.dataSourceRef.trimmingCharacters(in: .whitespacesAndNewlines)
         let key = mutationCommandKey(windowID: windowID, command: command)
-        guard command.group != nil || !targetRef.isEmpty, !guardedMutationCommands.contains(key) else {
+        if let acknowledged = acknowledgedMutationReadbacks[key] {
+            let requestedPresentation = dialogID.flatMap { pendingDialogScope("\(windowID)Dialog\($0)").id }
+            guard retryVerificationInvocationId.map({ $0 == acknowledged.operation.id }) ?? true,
+                  sourceDataSourceRef == acknowledged.operation.source,
+                  dialogID == acknowledged.dialogID,
+                  requestedPresentation == acknowledged.operation.presentationID else {
+                return .init(accepted: false, status: "suppressed")
+            }
+            return await retryMutationReadback(acknowledged)
+        }
+        guard retryVerificationInvocationId == nil, command.group != nil || !targetRef.isEmpty, !guardedMutationCommands.contains(key) else {
             return MutationCommandResult(accepted: false, status: "suppressed")
         }
         let group = command.serializationGroup?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -308,6 +373,13 @@ extension ForgeRuntime {
 
         let dialogSignal = if let dialogID { await signals.dialog(dialogID: "\(windowID)Dialog\(dialogID)") } else { nil as Signal<DialogState>? }
         let originalPresentation = await dialogSignal?.peek().presentationID
+        let selectionFence: DialogSelectionFence?
+        if command.reconcile?.verify != nil, let dialogID, let originalPresentation {
+            let presentation = pendingDialogScope("\(windowID)Dialog\(dialogID)")
+            selectionFence = presentation.id == originalPresentation ? presentation.selectionFence : nil
+        } else {
+            selectionFence = nil
+        }
         let admittedMetadata = await windowMetadata(id: windowID)
         let admitted = admittedMetadata?.authorizationSnapshot
         let originalSelection = await dataSourceSelectionState(windowID: windowID, dataSourceRef: sourceDataSourceRef)
@@ -390,8 +462,8 @@ extension ForgeRuntime {
         }
         let operation = MutationOperation(
             key: key, id: invocationId, windowID: windowID, source: sourceDataSourceRef,
-            authorization: admitted, selection: originalSelection, root: command, footer: footer, dialogSignal: dialogSignal,
-            presentationID: originalPresentation, originalPendingFields: originalPendingFields, fileFields: fileFields, submittedFiles: submittedFiles)
+            authorization: admitted, selection: originalSelection, root: command, transportRevision: dataSourceTransportRevision, footer: footer, dialogSignal: dialogSignal,
+            presentationID: originalPresentation, selectionFence: selectionFence, originalPendingFields: originalPendingFields, fileFields: fileFields, submittedFiles: submittedFiles)
         if let members = command.group {
             return await executeMutationGroup(members, operation: operation, parameters: groupParameters, extras: extras, dialogID: dialogID)
         }
@@ -424,7 +496,7 @@ extension ForgeRuntime {
                     child, invocation: childInvocation, operation: operation, extras: extras, receipts: receipts,
                     begin: !admittedWrites, child: true)
                 // Child calls require records, including a confirmed empty array.
-                guard let rows else {
+                guard let rows = rows.rows else {
                     throw MutationDispatchFailure(
                         status: "indeterminate", message: "The pre-save writer receipt is unavailable.", invoked: true, unknown: true)
                 }
@@ -435,61 +507,21 @@ extension ForgeRuntime {
 
             currentStep = nil
             attemptingFinalWriter = true
-            let rows = try await dispatchMutationWriter(
+            let receipt = try await dispatchMutationWriter(
                 command, invocation: invocationId, operation: operation, extras: extras, receipts: steps.isEmpty ? nil : receipts,
                 begin: !admittedWrites, child: false)
             defer {
                 mutationTransportOwners.removeValue(forKey: mutationTransportKey(windowID: windowID, dataSourceRef: targetRef))
-                guardedMutationCommands.remove(key)
+                if acknowledgedMutationReadbacks[key] == nil { guardedMutationCommands.remove(key) }
             }
-            var warnings: [MutationCommandWarning] = []
-            let formPatch = await applySuccessFormState(operation, dialogID: dialogID, submitted: submittedSuccessFields)
-            if await completionIsCurrent(operation) {
-                warnings = await synchronizeMutationUI(
-                    windowID: windowID, targetDataSourceRef: targetRef, command: command, authorization: admitted,
-                    receipt: steps.isEmpty && command.receiptWhen == nil && command.receiptIdentity == nil ? nil : rows?.compactMap(\.objectValue),
-                    presentation: operation.plainDialogFooter || command.receiptWhen != nil || command.receiptIdentity != nil ? operation : nil)
+            if let verification = receipt.verification {
+                let acknowledged = AcknowledgedMutationReadback(operation: operation, verification: verification,
+                    rows: receipt.rows, submitted: submitted, submittedSuccessFields: submittedSuccessFields, dialogID: dialogID)
+                acknowledgedMutationReadbacks[key] = acknowledged
+                return await verifyAcknowledgedMutation(acknowledged)
             }
-            guard await completionIsCurrent(operation) else {
-                if command.receiptWhen != nil || command.receiptIdentity != nil, await operationIsCurrent(operation), await !presentationIsCurrent(operation) {
-                    await publishMutationState(key, .init(phase: .succeeded, message: "Completed", invocationId: invocationId, writerStatus: .succeeded, syncStatus: .succeeded))
-                    return .init(accepted: true, status: "succeeded", invocationId: invocationId)
-                }
-                await publishMutationState(
-                    key,
-                    MutationCommandState(
-                        phase: .succeeded, message: "Authorization changed after the write.", invocationId: invocationId,
-                        writerStatus: .succeeded, syncStatus: .partialFailure))
-                return MutationCommandResult(accepted: true, status: "superseded", invocationId: invocationId)
-            }
-            var patch = command.successState
-            let receipt = JSONValue.array(rows ?? [])
-            for (field, selectors) in command.resultState {
-                let value = selectors.lazy.compactMap { resourceResolveValue(receipt, path: $0) }.first
-                if value == nil {
-                    warnings.append(
-                        .init(stage: "resultState", dataSourceRef: targetRef, message: "Writer receipt omitted the value for \(field)."))
-                }
-                patch[field] = value ?? .null
-            }
-            await clearSubmittedFields(windowID: windowID, source: sourceDataSourceRef, submitted: submitted, files: submittedFiles, presentation: operation.presentationID)
-            await applyMutationWindowState(windowID: windowID, patch: patch)
-            var message = "Completed"
-            if !warnings.isEmpty {
-                message = "Saved. Some related data could not be refreshed."
-            } else if formPatch == .conflict, await presentationIsCurrent(operation) {
-                message = "Saved the submitted version. Your newer changes are still in the form."
-            }
-            await publishMutationState(
-                key,
-                MutationCommandState(
-                    phase: .succeeded, message: message,
-                    invocationId: invocationId, writerStatus: .succeeded, syncStatus: warnings.isEmpty ? .succeeded : .partialFailure,
-                    warnings: warnings))
-            if footer?.close == true, let dialogID, let presentationID = operation.presentationID, await operationIsCurrent(operation) {
-                await closeDialog(windowID: windowID, dialogID: dialogID, presentationID: presentationID)
-            }
-            return MutationCommandResult(accepted: true, status: "succeeded", invocationId: invocationId, warnings: warnings)
+            return await completeMutation(operation: operation, rows: receipt.rows, submitted: submitted,
+                submittedSuccessFields: submittedSuccessFields, dialogID: dialogID)
         } catch {
             let failure = error as? MutationDispatchFailure ?? .init(status: "invalid_payload", message: error.localizedDescription)
             var warnings: [MutationCommandWarning] = []
@@ -513,7 +545,7 @@ extension ForgeRuntime {
                             entry.command, invocation: UUID().uuidString, operation: operation, extras: extras,
                             receipts: receipts, begin: false, child: true, compensating: true)
                         if let condition = entry.command.receiptWhen {
-                            let receipt = JSONValue.array(records ?? [])
+                            let receipt = JSONValue.array(records.rows ?? [])
                             let confirmed = DashboardRuntime.evaluateDashboardCondition(condition, valueForCondition: { node in
                                 guard node.source == "collection", let field = node.field else { return nil }
                                 return Self.receiptLeafValue(node, value: resourceResolveValue(receipt, path: field))
@@ -551,6 +583,317 @@ extension ForgeRuntime {
                 accepted: admittedWrites || failure.invoked, status: failure.status, invocationId: invocationId, failedStepId: currentStep,
                 error: failure.unknown ? nil : failure.message, warnings: warnings)
         }
+    }
+
+    func releaseMutationReadbacks(windowID: String, presentationID: UUID) async {
+        let retired = acknowledgedMutationReadbacks.filter {
+            $0.value.operation.windowID == windowID && $0.value.operation.presentationID == presentationID
+        }
+        for (key, pending) in retired {
+            guard acknowledgedMutationReadbacks[key]?.operation.id == pending.operation.id else { continue }
+            acknowledgedMutationReadbacks.removeValue(forKey: key)
+            await publishMutationState(key, .init())
+            if !pending.verifying {
+                guardedMutationCommands.remove(key)
+                mutationSerializationOwners = mutationSerializationOwners.filter { $0.value != key }
+            }
+        }
+    }
+
+    private func mutationReadbackPresentationIsCurrent(_ acknowledged: AcknowledgedMutationReadback) -> Bool {
+        guard let dialogID = acknowledged.dialogID else { return true }
+        let windowID = acknowledged.operation.windowID
+        return pendingDialogScope("\(windowID)Dialog\(dialogID)").id == acknowledged.operation.presentationID
+    }
+
+    private func retryMutationReadback(_ acknowledged: AcknowledgedMutationReadback) async -> MutationCommandResult {
+        let key = acknowledged.operation.key
+        guard let pending = acknowledgedMutationReadbacks[key], pending.operation.id == acknowledged.operation.id, !pending.verifying else {
+            return .init(accepted: false, status: "suppressed")
+        }
+        guard pending.retryable else {
+            return .init(accepted: true, status: "verification_failed", invocationId: pending.operation.id)
+        }
+        acknowledgedMutationReadbacks[key]?.verifying = true
+        defer {
+            if acknowledgedMutationReadbacks[key] == nil {
+                guardedMutationCommands.remove(key)
+                mutationSerializationOwners = mutationSerializationOwners.filter { $0.value != key }
+            }
+        }
+        return await verifyAcknowledgedMutation(pending)
+    }
+
+    private func mutationReadbackScopeIsCurrent(_ acknowledged: AcknowledgedMutationReadback) async -> Bool {
+        let operation = acknowledged.operation
+        if let fence = operation.selectionFence, await !dataSourceRuntime.dialogSelectionIsCurrent(fence) { return false }
+        guard operation.transportRevision == dataSourceTransportRevision,
+              mutationReadbackPresentationIsCurrent(acknowledged),
+              await presentationIsCurrent(operation),
+              let scope = await mutationScope(windowID: operation.windowID, source: operation.source),
+              windows.contains(where: { $0.id == operation.windowID }),
+              scope.metadata.authorizationSnapshot == operation.authorization,
+              (scope.snapshot(operation.source)?.selection ?? .init()) == operation.selection,
+              operation.transportRevision == dataSourceTransportRevision,
+              mutationReadbackPresentationIsCurrent(acknowledged) else { return false }
+        return Self.readbackScopeValues(acknowledged.verification.spec, reader: acknowledged.verification.reader, scope: scope)
+            == acknowledged.verification.scopeValues
+    }
+
+    private func verifyAcknowledgedMutation(_ acknowledged: AcknowledgedMutationReadback) async -> MutationCommandResult {
+        let operation = acknowledged.operation, verification = acknowledged.verification
+        let invocationId = operation.id
+        let current: @Sendable () async -> Bool = {
+            guard !Task.isCancelled else { return false }
+            return await self.mutationReadbackScopeIsCurrent(acknowledged)
+        }
+
+        var issue = "The reader did not confirm the submitted rows."
+        if await current() {
+            await publishMutationState(operation.key, .init(phase: .pending, guarded: true, pending: true, retryAllowed: false,
+                message: "Verifying saved data…", invocationId: invocationId, writerStatus: .succeeded))
+            do {
+                guard let metadata = await windowMetadata(id: operation.windowID), await current() else { throw scopeFailure(invoked: true) }
+                let rows = try await readMutationVerification(operation, metadata: metadata, verification: verification, current: current)
+                if await current(), Self.mutationReadbackMatches(rows, verification: verification) {
+                    acknowledgedMutationReadbacks.removeValue(forKey: operation.key)
+                    return await completeMutation(operation: operation, rows: acknowledged.rows, submitted: acknowledged.submitted,
+                        submittedSuccessFields: acknowledged.submittedSuccessFields, dialogID: acknowledged.dialogID, readbackRows: rows)
+                }
+            } catch {
+                if Task.isCancelled || isForgeCancellationError(error) {
+                    issue = "The verification read was cancelled."
+                } else if (error as? URLError)?.code == .timedOut {
+                    issue = "The verification read timed out."
+                } else if (error as NSError).domain == "Forge.DataSource.HTTP" {
+                    issue = "The verification reader returned HTTP \((error as NSError).code)."
+                } else if let failure = error as? SelectionPreparationError {
+                    issue = failure.message
+                } else {
+                    issue = "The verification reader could not return records."
+                }
+            }
+        } else if Task.isCancelled {
+            issue = "The verification read was cancelled."
+        }
+
+        let canRetry = await mutationReadbackScopeIsCurrent(acknowledged)
+        let message = canRetry ? "Saved. \(issue)" : "Saved. The original verification scope is no longer current."
+        if windows.contains(where: { $0.id == operation.windowID }), mutationReadbackPresentationIsCurrent(acknowledged) {
+            await publishMutationState(operation.key, .init(phase: .verificationFailed, guarded: true, retryAllowed: canRetry,
+                error: message, message: message, invocationId: invocationId, writerStatus: .succeeded, syncStatus: .verificationFailed))
+            acknowledgedMutationReadbacks[operation.key]?.retryable = canRetry
+            acknowledgedMutationReadbacks[operation.key]?.verifying = false
+        } else if acknowledgedMutationReadbacks[operation.key]?.operation.id == invocationId {
+            acknowledgedMutationReadbacks.removeValue(forKey: operation.key)
+            await publishMutationState(operation.key, .init())
+        }
+        return .init(accepted: true, status: "verification_failed", invocationId: invocationId, error: message,
+            writerRecords: canRetry ? acknowledged.rows : nil)
+    }
+
+    private static func readbackValue(_ value: JSONValue, path: String) -> JSONValue? {
+        resourceResolveValue(value, components: path.components(separatedBy: "."), strictIndices: true)
+    }
+
+    private func readMutationVerification(_ operation: MutationOperation, metadata: WindowMetadata,
+                                          verification: MutationReadback, current: @escaping @Sendable () async -> Bool) async throws -> [[String: JSONValue]] {
+        let race = MutationRace<Result<[[String: JSONValue]], Error>>()
+        let reader = Task {
+            do {
+                let rows = try await readPreparedSelection(windowID: operation.windowID, metadata: metadata, ref: verification.reader,
+                    parameters: verification.readerParameters, invocationId: UUID().uuidString, useExactParameters: true, current: current)
+                await race.resolve(.success(rows))
+            } catch {
+                await race.resolve(.failure(error))
+            }
+        }
+        let timeout = Task {
+            try await Task.sleep(for: .milliseconds(max(1_000, operation.root.timeoutMs ?? 30_000)))
+            await race.resolve(.failure(URLError(.timedOut)))
+        }
+        defer {
+            reader.cancel()
+            timeout.cancel()
+        }
+        return try await withTaskCancellationHandler {
+            try await race.wait().get()
+        } onCancel: {
+            Task { await race.resolve(.failure(CancellationError())) }
+        }
+    }
+
+    private static func readbackScopeScalar(_ value: JSONValue) -> JSONValue? {
+        let scalar: JSONValue
+        if case .array(let values) = value {
+            guard values.count == 1 else { return nil }
+            scalar = values[0]
+        } else {
+            scalar = value
+        }
+        switch scalar {
+        case .bool: return scalar
+        case .number(let number) where number.isFinite: return scalar
+        case .string(let text) where !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty: return scalar
+        default: return nil
+        }
+    }
+
+    private static func readbackScopeValues(_ verification: ReconcileVerificationSpec, reader: String, scope: MutationScope) -> [MutationReadbackScopeValue]? {
+        let context = scope.parameterContext(source: scope.source)
+        var values: [MutationReadbackScopeValue] = []
+        values.reserveCapacity(verification.scope.count)
+        for binding in verification.scope {
+            let resolved = ParameterResolver.resolve(parameters: [binding.parameter], context: context, operationBindings: true)
+            let inputs = MutationScope.targetParameters(resolved[reader]?.objectValue ?? resolved)
+            guard let value = inputs[binding.parameter.name], let scalar = readbackScopeScalar(value) else { return nil }
+            values.append(.init(raw: value, scalar: scalar))
+        }
+        return values
+    }
+
+    private static func mutationReadbackMatches(_ rows: [[String: JSONValue]], verification: MutationReadback) -> Bool {
+        guard rows.count == verification.acknowledgedIDs.count else { return false }
+        var remaining = verification.acknowledgedIDs
+        let comparesSubmittedFields = verification.spec.fields?.isEmpty == false
+        for record in rows {
+            let row = JSONValue.object(record)
+            guard let id = mutationIdentity(row, path: verification.readerIdentity), remaining.remove(id) != nil,
+                  verification.scopeChecks.allSatisfy({ $0.matches(row) }) else { return false }
+            if comparesSubmittedFields {
+                guard let submitted = verification.generatedSubmission ?? verification.submittedByID[id],
+                      submitted.allSatisfy({ $0.matches(row) }) else { return false }
+            }
+        }
+        return true
+    }
+
+    private func prepareMutationReadback(_ command: MutationCommandDef, parameters: [String: JSONValue], scope: MutationScope) throws -> MutationReadback? {
+        guard let reconcile = command.reconcile, let spec = reconcile.verify else { return nil }
+        let identifier = MutationCommandDef.isPlainID
+        func path(_ value: String) -> Bool { value.components(separatedBy: ".").allSatisfy(identifier) }
+
+        let invalid = MutationDispatchFailure(status: "invalid_payload", message: "Verification requires a distinct refetch reader, receipt identities, and valid named scope bindings.")
+        guard reconcile.mode == "refetch", let identity = command.receiptIdentity,
+              let reader = reconcile.dataSourceRef, reader != command.dataSourceRef, let readerSource = scope.metadata.dataSources[reader],
+              identifier(spec.idsParameter), !spec.scope.isEmpty,
+              reconcile.identityFields.isEmpty, reconcile.rowsPath == nil, reconcile.resultPath.map(path) ?? true,
+              command.refresh.allSatisfy({ $0.dataSourceRef != reader && $0.dataSourceRef != command.dataSourceRef }),
+              (command.before ?? []).allSatisfy({ $0.command.dataSourceRef != reader && $0.cleanup?.dataSourceRef != reader }),
+              identity.generated == true || spec.submittedRows == nil || spec.submittedRows == identity.submittedRows else { throw invalid }
+        let readerMethod = (readerSource.service?.method ?? readerSource.method ?? "GET").trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard ["GET", "POST"].contains(readerMethod) else { throw invalid }
+        let readerIdentity = reconcile.identityField ?? identity.field
+        guard path(readerIdentity) else { throw invalid }
+        var names: Set<String> = [spec.idsParameter]
+        var scopeFields: Set<String> = []
+        for binding in spec.scope {
+            guard path(binding.field), scopeFields.insert(binding.field).inserted,
+                  identifier(binding.parameter.name), names.insert(binding.parameter.name).inserted else { throw invalid }
+        }
+
+        let fields = (spec.fields ?? [:]).map {
+            (submitted: $0.key.components(separatedBy: "."), reader: $0.value.components(separatedBy: "."))
+        }
+        guard fields.allSatisfy({ $0.submitted.allSatisfy(identifier) && $0.reader.allSatisfy(identifier) }) else { throw invalid }
+        func submittedChecks(_ row: JSONValue) -> [MutationReadbackField] {
+            fields.compactMap { mapping in
+                resourceResolveValue(row, components: mapping.submitted, strictIndices: true).map {
+                    MutationReadbackField(path: mapping.reader, expected: $0)
+                }
+            }
+        }
+        let submittedPath = spec.submittedRows ?? identity.submittedRows
+        let submittedRows: [JSONValue]
+        if let submittedPath {
+            guard path(submittedPath), let rows = Self.readbackValue(.object(parameters), path: submittedPath)?.arrayValue,
+                  !rows.isEmpty, rows.allSatisfy({ $0.objectValue != nil }) else { throw invalid }
+            submittedRows = rows
+        } else {
+            submittedRows = []
+        }
+        var submittedByID: [MutationReceiptID: [MutationReadbackField]] = [:]
+        var generatedSubmission: [MutationReadbackField]?
+        if !fields.isEmpty {
+            if identity.generated == true {
+                guard submittedRows.count == 1 else { throw invalid }
+                generatedSubmission = submittedChecks(submittedRows[0])
+            } else {
+                guard identity.submittedRows != nil else { throw invalid }
+                let submittedField = (identity.submittedField ?? identity.field).components(separatedBy: ".")
+                for row in submittedRows {
+                    guard let id = mutationIdentity(row, path: submittedField),
+                          submittedByID.updateValue(submittedChecks(row), forKey: id) == nil else { throw invalid }
+                }
+            }
+        }
+        guard let scopeValues = Self.readbackScopeValues(spec, reader: reader, scope: scope) else { throw invalid }
+        var readerParameters: [String: JSONValue] = [:]
+        let scopeChecks = zip(spec.scope, scopeValues).map { binding, value in
+            if binding.passToReader == true { readerParameters[binding.parameter.name] = value.raw }
+            return MutationReadbackField(path: binding.field.components(separatedBy: "."), expected: value.scalar)
+        }
+        return MutationReadback(reader: reader, spec: spec, readerIdentity: readerIdentity.components(separatedBy: "."),
+            scopeValues: scopeValues, scopeChecks: scopeChecks, submittedByID: submittedByID, generatedSubmission: generatedSubmission,
+            readerParameters: readerParameters)
+    }
+
+    private func completeMutation(operation: MutationOperation, rows: [JSONValue]?, submitted: [String: JSONValue],
+                                  submittedSuccessFields: [String: JSONValue], dialogID: String?,
+                                  readbackRows: [[String: JSONValue]]? = nil) async -> MutationCommandResult {
+        let command = operation.root, windowID = operation.windowID, targetRef = command.dataSourceRef
+        let sourceDataSourceRef = operation.source, admitted = operation.authorization, footer = operation.footer
+        let key = operation.key, invocationId = operation.id, submittedFiles = operation.submittedFiles
+        let steps = command.before ?? []
+        var warnings: [MutationCommandWarning] = []
+        let formPatch = await applySuccessFormState(operation, dialogID: dialogID, submitted: submittedSuccessFields)
+        if await completionIsCurrent(operation) {
+            warnings = await synchronizeMutationUI(
+                windowID: windowID, targetDataSourceRef: targetRef, command: command, authorization: admitted,
+                receipt: steps.isEmpty && command.receiptWhen == nil && command.receiptIdentity == nil ? nil : rows?.compactMap(\.objectValue),
+                presentation: operation.plainDialogFooter || command.receiptWhen != nil || command.receiptIdentity != nil ? operation : nil)
+        }
+        guard await completionIsCurrent(operation) else {
+            if command.reconcile?.verify == nil, command.receiptWhen != nil || command.receiptIdentity != nil, await operationIsCurrent(operation), await !presentationIsCurrent(operation) {
+                await publishMutationState(key, .init(phase: .succeeded, message: "Completed", invocationId: invocationId, writerStatus: .succeeded, syncStatus: .succeeded))
+                return .init(accepted: true, status: "succeeded", invocationId: invocationId)
+            }
+            await publishMutationState(
+                key,
+                MutationCommandState(
+                    phase: .succeeded, message: "Authorization changed after the write.", invocationId: invocationId,
+                    writerStatus: .succeeded, syncStatus: .partialFailure))
+            return MutationCommandResult(accepted: true, status: "superseded", invocationId: invocationId)
+        }
+        var patch = command.successState
+        let receipt = JSONValue.array(rows ?? [])
+        for (field, selectors) in command.resultState {
+            let value = selectors.lazy.compactMap { resourceResolveValue(receipt, path: $0) }.first
+            if value == nil {
+                warnings.append(
+                    .init(stage: "resultState", dataSourceRef: targetRef, message: "Writer receipt omitted the value for \(field)."))
+            }
+            patch[field] = value ?? .null
+        }
+        await clearSubmittedFields(windowID: windowID, source: sourceDataSourceRef, submitted: submitted, files: submittedFiles, presentation: operation.presentationID)
+        await applyMutationWindowState(windowID: windowID, patch: patch)
+        var message = "Completed"
+        if !warnings.isEmpty {
+            message = "Saved. Some related data could not be refreshed."
+        } else if formPatch == .conflict, await presentationIsCurrent(operation) {
+            message = "Saved the submitted version. Your newer changes are still in the form."
+        }
+        await publishMutationState(
+            key,
+            MutationCommandState(
+                phase: .succeeded, message: message,
+                invocationId: invocationId, writerStatus: .succeeded, syncStatus: warnings.isEmpty ? .succeeded : .partialFailure,
+                warnings: warnings))
+        if footer?.close == true, let dialogID, let presentationID = operation.presentationID, await operationIsCurrent(operation) {
+            await closeDialog(windowID: windowID, dialogID: dialogID, presentationID: presentationID)
+        }
+        return MutationCommandResult(accepted: true, status: "succeeded", invocationId: invocationId, warnings: warnings,
+            readbackRows: readbackRows, writerRecords: readbackRows == nil ? nil : rows)
     }
 
     private func executeMutationGroup(
@@ -686,7 +1029,7 @@ extension ForgeRuntime {
             let rows = try await dispatchMutationWriter(
                 member.command, invocation: member.invocation, operation: operation, extras: [:], receipts: nil,
                 begin: false, child: true, memberWhen: member.condition, prepared: member.input)
-            return (member.id, .init(label: member.label, status: "succeeded", invocationId: member.invocation, rows: rows))
+            return (member.id, .init(label: member.label, status: "succeeded", invocationId: member.invocation, rows: rows.rows))
         } catch {
             let failure = error as? MutationDispatchFailure ?? .init(status: "invalid_payload", message: error.localizedDescription)
             let status = if failure.status == "skipped" { "skipped" } else if failure.lostScope && !failure.invoked { "not_invoked" }
@@ -742,6 +1085,7 @@ extension ForgeRuntime {
 
     private func operationIsCurrent(_ operation: MutationOperation) async -> Bool {
         guard await operationOwnerIsCurrent(operation) else { return false }
+        if let fence = operation.selectionFence, await !dataSourceRuntime.dialogSelectionIsCurrent(fence) { return false }
         return await dataSourceSelectionState(windowID: operation.windowID, dataSourceRef: operation.source) == operation.selection
     }
 
@@ -756,7 +1100,7 @@ extension ForgeRuntime {
     private func dispatchMutationWriter(
         _ command: MutationCommandDef, invocation: String, operation: MutationOperation, extras: [String: JSONValue],
         receipts: [String: JSONValue]?, begin: Bool, child: Bool, compensating: Bool = false, memberWhen: DashboardConditionDef? = nil, prepared: PreparedMutationWriter? = nil
-    ) async throws -> [JSONValue]? {
+    ) async throws -> MutationWriterReceipt {
         let windowID = operation.windowID, source = operation.source, target = command.dataSourceRef
         guard (!Task.isCancelled || operation.root.group == nil), await operationIsCurrent(operation) else { throw scopeFailure() }
         guard let scope = await mutationScope(windowID: windowID, source: source), scope.metadata.dataSources[target] != nil else {
@@ -835,6 +1179,11 @@ extension ForgeRuntime {
             }
         }
         let exactReceipt = ordered || (!compensating && (command.receiptWhen != nil || command.receiptIdentity != nil)) || (!child && operation.footer?.close == true)
+        if let verification = input.verification {
+            guard await presentationIsCurrent(operation), dataSourceTransportRevision == operation.transportRevision,
+                  let live = await mutationScope(windowID: windowID, source: source),
+                  Self.readbackScopeValues(verification.spec, reader: verification.reader, scope: live) == verification.scopeValues else { throw scopeFailure() }
+        }
         if grouped, Task.isCancelled { throw scopeFailure() }
         let outcome = await awaitMutationWriter(
             windowID: windowID, dataSourceRef: target, timeoutMs: max(1_000, command.timeoutMs ?? 30_000),
@@ -855,16 +1204,25 @@ extension ForgeRuntime {
                 retainLease = failure.unknown
                 throw failure
             }
+            var verification = input.verification
             if !compensating, let identity = command.receiptIdentity {
-                let actual = rows.flatMap { mutationIdentitySet($0, field: identity.field) }
-                let valid = identity.generated == true ? (rows?.count == 1 && actual?.count == 1) : actual != nil && actual == input.identities
+                let identityRows = if verification != nil, let path = command.reconcile?.resultPath {
+                    rows.flatMap { Self.readbackValue(.array($0), path: path)?.arrayValue }
+                } else { rows }
+                let actual = identityRows.flatMap { mutationIdentitySet($0, field: identity.field) }
+                let valid = identity.generated == true ? (identityRows?.count == 1 && actual?.count == 1) : actual != nil && actual == input.identities
                 guard valid else {
                     retainLease = true
                     throw MutationDispatchFailure(status: "indeterminate", message: "The producer did not confirm the requested identities. Verify the outcome before retrying.", invoked: true, unknown: true)
                 }
+                if var captured = verification, let actual, let identityRows {
+                    captured.acknowledgedIDs = actual
+                    captured.readerParameters[captured.spec.idsParameter] = .array(identityRows.compactMap { Self.readbackValue($0, path: identity.field) })
+                    verification = captured
+                }
             }
             retainLease = !child  // final synchronization still owns its writer's collection.
-            return rows
+            return .init(rows: rows, verification: verification)
         case .failed(let error):
             if !grouped, await !operationIsCurrent(operation) { throw scopeFailure(invoked: true) }
             throw MutationDispatchFailure(status: "failed", message: error, invoked: true)
@@ -880,15 +1238,16 @@ extension ForgeRuntime {
         if let field = command.invocationParameter?.trimmingCharacters(in: .whitespacesAndNewlines), !field.isEmpty {
             parameters[field] = .string(invocation)
         }
+        let verification = try compensating ? nil : prepareMutationReadback(command, parameters: parameters, scope: scope)
         guard !compensating, let identity = command.receiptIdentity, identity.generated != true else {
-            return .init(parameters: parameters, identities: nil)
+            return .init(parameters: parameters, identities: nil, verification: verification)
         }
         guard let path = identity.submittedRows ?? identity.submittedValues,
               let rows = resourceResolveValue(.object(parameters), components: path.components(separatedBy: "."), strictIndices: true)?.arrayValue,
               let ids = mutationIdentitySet(rows, field: identity.submittedValues == nil ? identity.submittedField ?? identity.field : nil) else {
             throw MutationDispatchFailure(status: "invalid_payload", message: "Submitted receipt identities are missing or invalid.")
         }
-        return .init(parameters: parameters, identities: ids)
+        return .init(parameters: parameters, identities: ids, verification: verification)
     }
 
     private static func classifyWriterReceipt(_ rows: [JSONValue], accepted: DashboardConditionDef?, rejected: DashboardConditionDef?) -> MutationDispatchFailure? {
@@ -936,7 +1295,7 @@ extension ForgeRuntime {
     private func awaitMutationWriter(
         windowID: String, dataSourceRef: String, timeoutMs: Int, requireRecords: Bool, ordered: Bool, guardTransportErrors: Bool, groupInvocation: String?
     ) async -> MutationWriterOutcome {
-        let race = MutationWriterRace()
+        let race = MutationRace<MutationWriterOutcome>()
         let writer = Task {
             let receipt = await self.refreshDataSourceRows(windowID: windowID, dataSourceRef: dataSourceRef, requireInvocationRecords: ordered,
                 bypassCache: groupInvocation != nil, invocationId: groupInvocation)
@@ -984,7 +1343,7 @@ extension ForgeRuntime {
             guard let presentation else { return true }
             return await presentationIsCurrent(presentation)
         }
-        if let reconcile = command.reconcile, await originalDialog() {
+        if let reconcile = command.reconcile, reconcile.verify == nil, await originalDialog() {
             do {
                 let destinationRef = reconcile.dataSourceRef?.trimmingCharacters(in: .whitespacesAndNewlines)
                 let ref = destinationRef?.isEmpty == false ? destinationRef! : targetDataSourceRef

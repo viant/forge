@@ -41,10 +41,11 @@ class RestClient(
     fun <T> delete(endpoint: String?, uri: String, parser: (String) -> T): T = request(endpoint, "DELETE", uri, null, parser)
 
     internal fun <T> request(endpoint: String?, method: String, uri: String, payload: String?, parser: (String) -> T,
-        singleAttempt: Boolean = false): T {
+        singleAttempt: Boolean = false, bypassCache: Boolean = false): T {
         val config = endpoints.resolve(endpoint) ?: error("Endpoint not found: $endpoint")
         val url = config.baseUrl.trimEnd('/') + "/" + uri.trimStart('/')
         val builder = Request.Builder().url(url).applyEndpoint(config)
+        if (bypassCache) builder.header("Cache-Control", "no-cache")
         val request = when (method) {
             "PATCH", "POST", "PUT" -> builder.method(method, requireNotNull(payload).toRequestBody("application/json".toMediaType()))
             "DELETE" -> builder.delete()

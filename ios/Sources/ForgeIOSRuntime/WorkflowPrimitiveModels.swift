@@ -135,7 +135,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         self.refresh = refresh
     }
 
-    private static func isPlainID(_ name: String) -> Bool {
+    static func isPlainID(_ name: String) -> Bool {
         !name.isEmpty && name == name.trimmingCharacters(in: .whitespacesAndNewlines)
             && name.rangeOfCharacter(from: CharacterSet(charactersIn: ".:/[]")) == nil
             && !["__proto__", "constructor", "prototype"].contains(name)
@@ -381,6 +381,32 @@ public struct SelectionConfirmationDef: Codable, Sendable {
     }
 }
 
+public struct ReconcileVerificationSpec: Codable, Sendable {
+    public struct Scope: Codable, Sendable {
+        public let field: String
+        public let parameter: ParameterDef
+        public let passToReader: Bool?
+
+        public init(field: String, parameter: ParameterDef, passToReader: Bool? = nil) {
+            self.field = field
+            self.parameter = parameter
+            self.passToReader = passToReader
+        }
+    }
+
+    public let idsParameter: String
+    public let scope: [Scope]
+    public let fields: [String: String]?
+    public let submittedRows: String?
+
+    public init(idsParameter: String, scope: [Scope], fields: [String: String]? = nil, submittedRows: String? = nil) {
+        self.idsParameter = idsParameter
+        self.scope = scope
+        self.fields = fields
+        self.submittedRows = submittedRows
+    }
+}
+
 public struct ReconcileSpec: Codable, Sendable {
     public let mode: String?
     public let dataSourceRef: String?
@@ -388,17 +414,19 @@ public struct ReconcileSpec: Codable, Sendable {
     public let identityFields: [String]
     public let resultPath: String?
     public let rowsPath: String?
+    public let verify: ReconcileVerificationSpec?
 
-    public init(mode: String? = nil, dataSourceRef: String? = nil, identityField: String? = nil, identityFields: [String] = [], resultPath: String? = nil, rowsPath: String? = nil) {
+    public init(mode: String? = nil, dataSourceRef: String? = nil, identityField: String? = nil, identityFields: [String] = [], resultPath: String? = nil, rowsPath: String? = nil, verify: ReconcileVerificationSpec? = nil) {
         self.mode = mode
         self.dataSourceRef = dataSourceRef
         self.identityField = identityField
         self.identityFields = identityFields
         self.resultPath = resultPath
         self.rowsPath = rowsPath
+        self.verify = verify
     }
 
-    private enum CodingKeys: String, CodingKey { case mode, dataSourceRef, identityField, identityFields, resultPath, rowsPath }
+    private enum CodingKeys: String, CodingKey { case mode, dataSourceRef, identityField, identityFields, resultPath, rowsPath, verify }
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         mode = try values.decodeIfPresent(String.self, forKey: .mode)
@@ -407,6 +435,7 @@ public struct ReconcileSpec: Codable, Sendable {
         identityFields = try values.decodeIfPresent([String].self, forKey: .identityFields) ?? []
         resultPath = try values.decodeIfPresent(String.self, forKey: .resultPath)
         rowsPath = try values.decodeIfPresent(String.self, forKey: .rowsPath)
+        verify = try values.decodeIfPresent(ReconcileVerificationSpec.self, forKey: .verify)
     }
 }
 

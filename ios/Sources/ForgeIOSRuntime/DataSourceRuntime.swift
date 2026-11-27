@@ -81,6 +81,11 @@ public actor DataSourceRuntime {
     private var collectionInfo: [String: [String: JSONValue]] = [:]
     private var collectionValues: [String: [[String: JSONValue]]] = [:]
     private var formValues: [String: [String: JSONValue]] = [:]
+    private struct DialogSelection {
+        let identityPath: [String]
+        let keys: [String]
+    }
+    private var dialogSelectionFences: [String: [UUID: DialogSelection]] = [:]
     private var selectionValues: [String: SelectionState] = [:]
     private var inputValues: [String: InputState] = [:]
     private var controlValues: [String: ControlState] = [:]
@@ -184,6 +189,31 @@ public actor DataSourceRuntime {
 
     public func setSelection(dataSourceID: String, selection: SelectionState) {
         selectionValues[dataSourceID] = selection
+        guard let active = dialogSelectionFences[dataSourceID] else { return }
+        let remaining = active.filter { _, guardState in
+            selection.preparedSelectionKeys(identityPath: guardState.identityPath) == guardState.keys
+        }
+        dialogSelectionFences[dataSourceID] = remaining.isEmpty ? nil : remaining
+    }
+
+    func guardDialogSelection(dataSourceID: String, identityField: String, keys: [String]) -> DialogSelectionFence? {
+        let path = identityField.components(separatedBy: ".")
+        guard selection(dataSourceID: dataSourceID).preparedSelectionKeys(identityPath: path) == keys else { return nil }
+        let fence = DialogSelectionFence(dataSourceID: dataSourceID)
+        dialogSelectionFences[dataSourceID, default: [:]][fence.token] = DialogSelection(identityPath: path, keys: keys)
+        return fence
+    }
+
+    func dialogSelectionIsCurrent(_ fence: DialogSelectionFence?) -> Bool {
+        guard let fence else { return true }
+        return dialogSelectionFences[fence.dataSourceID]?[fence.token] != nil
+    }
+
+    func releaseDialogSelection(_ fence: DialogSelectionFence) {
+        dialogSelectionFences[fence.dataSourceID]?.removeValue(forKey: fence.token)
+        if dialogSelectionFences[fence.dataSourceID]?.isEmpty == true {
+            dialogSelectionFences.removeValue(forKey: fence.dataSourceID)
+        }
     }
 
     public func input(dataSourceID: String) -> InputState {
@@ -249,6 +279,7 @@ public actor DataSourceRuntime {
         formValues.removeValue(forKey: dataSourceID)
         metricsValues.removeValue(forKey: dataSourceID)
         selectionValues.removeValue(forKey: dataSourceID)
+        dialogSelectionFences.removeValue(forKey: dataSourceID)
         controlValues[dataSourceID] = ControlState(inactive: true)
         return true
     }
@@ -592,6 +623,7 @@ public actor DataSourceRuntime {
             collectionInfo.removeValue(forKey: key)
             formValues.removeValue(forKey: key)
             selectionValues.removeValue(forKey: key)
+            dialogSelectionFences.removeValue(forKey: key)
             inputValues.removeValue(forKey: key)
             controlValues.removeValue(forKey: key)
             metricsValues.removeValue(forKey: key)

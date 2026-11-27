@@ -77,9 +77,9 @@ class ForgeRuntime(
     fun registerDataSourceLoader(
         loader: suspend (DataSourceFetchRequest) -> DataSourceFetchResult?
     ) {
-        dataSourceRuntime.setRequestLoader { context, detachedReadId ->
+        dataSourceRuntime.setRequestLoader { context, detachedReadId, exactInputs ->
             val input = context.input.peek()
-            val resolved = parameterResolver.resolveFlat(context.dataSource.parameters, context)
+            val resolved = if (exactInputs) input.parameters else parameterResolver.resolveFlat(context.dataSource.parameters, context)
             val parentInputs = if (detachedReadId == null && context.window.metadata.peek()?.preparedParentReaders?.contains(context.dataSourceRef) == true)
                 JsonUtil.anyToElement(resolved) else null
             loader(
@@ -238,6 +238,10 @@ class ForgeRuntime(
     internal suspend fun readSelectedRows(window: WindowContext, ref: String, parameters: Map<String, Any?>, invocationId: String) =
         dataSourceRuntime.readSelectionRows(window, ref, parameters, invocationId)
 
+    internal suspend fun readMutationVerificationRows(window: WindowContext, ref: String, parameters: Map<String, Any?>,
+        current: () -> Boolean) =
+        dataSourceRuntime.readSelectionRows(window, ref, parameters, java.util.UUID.randomUUID().toString(), exact = true, current = current)
+
     fun registeredWindowDataSources(windowId: String) = dataSourceRuntime.registeredWindowContexts(windowId)
 
     private data class ReportPrefillAcknowledgment(val key: String, val acknowledged: Boolean)
@@ -329,6 +333,9 @@ class ForgeRuntime(
     } == true
 
     fun closeWindow(windowId: String) {
+        metadataSignal(windowId).peek()?.dialogs?.forEach { dialog ->
+            signals.dialog("${windowId}Dialog${dialog.id}").peek().verifiedSelection?.dispose()
+        }
         completedDatasetProofs.closeWindow(windowId)
         frozenNativeReports.closeWindow(windowId)
         reportPrefills.remove(windowId)
@@ -337,6 +344,7 @@ class ForgeRuntime(
         visibleSourceLeases.entries.removeIf { it.value.first == windowId }
         clearPendingWindow(windowId)
         windowRuntime.closeWindow(windowId)
+        scope.launch { mutationCommands.retireReadbacks(windowId) }
     }
 
     fun metadataSignal(windowId: String): Signal<WindowMetadata?> = signals.metadata(windowId)
@@ -602,8 +610,14 @@ class ForgeRuntime(
                 previous.selectionMode == selectionMode && previous.sourceDataSourceRef == sourceRef))) return
         val source = sourceRef?.let(window::contextOrNull)
         val hooks = if (previous.open) emptyList() else dialog?.on.orEmpty().filter { it.event == "onOpen" }
-        val next = DialogState(open = true, selectionMode = selectionMode, props = args, args = args, initializing = hooks.isNotEmpty(), sourceDataSourceRef = sourceRef)
+        val caller = callerDataSourceRef?.takeIf { it != sourceRef }?.let(window::contextOrNull)
+        val verifiedSelection = if (caller != null && dialog?.actions?.any { it.mutationCommand?.reconcile?.verify != null } == true)
+            VerifiedDialogSelection.capture(caller) else null
+        val next = DialogState(open = true, selectionMode = selectionMode, props = args, args = args,
+            initializing = hooks.isNotEmpty(), sourceDataSourceRef = sourceRef, verifiedSelection = verifiedSelection)
+        previous.verifiedSelection?.dispose()
         signal.set(next)
+        if (previous.open) scope.launch { mutationCommands.retireReadbacks(windowId, previous) }
         val fetch = dialog?.fetchOnOpen ?: (dialog?.content?.fetchData != false)
         if (source != null) {
             if (args.isNotEmpty()) {
@@ -638,8 +652,10 @@ class ForgeRuntime(
         val waiter = pendingDialogResults.remove(dialogKey)
         pendingDialogs.remove(dialogKey)
         // Publishing the closed state can synchronously reopen this key and register a new waiter.
-        sig.set(current.copy(open = false))
+        current.verifiedSelection?.dispose()
+        sig.set(current.copy(open = false, verifiedSelection = null))
         waiter?.complete(result)
+        if (current.open) scope.launch { mutationCommands.retireReadbacks(windowId, current) }
     }
 
     fun closeDialogPublic(windowId: String, dialogId: String) {

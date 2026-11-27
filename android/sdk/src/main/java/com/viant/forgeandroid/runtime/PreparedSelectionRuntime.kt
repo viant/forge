@@ -280,7 +280,7 @@ internal class PreparedSelectionRuntime {
 private val decimalIdentity = Regex("[+-]?[0-9]+")
 private const val maxExactSelectionInteger = 9007199254740991L
 
-private fun selectionIdentity(value: Any?): String = when (value) {
+internal fun selectionIdentity(value: Any?): String = when (value) {
     is String -> {
         require(value.isNotBlank()) { "A nonblank selection or scope identity is required." }
         if (decimalIdentity.matches(value)) value.toBigInteger().toString() else value

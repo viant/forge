@@ -84,6 +84,18 @@ private func selectionKey(_ value: JSONValue?) throws -> String {
     }
 }
 
+struct DialogSelectionFence: Sendable {
+    let dataSourceID: String
+    let token = UUID()
+}
+
+extension SelectionState {
+    func preparedSelectionKeys(identityPath: [String]) -> [String]? {
+        let rows = selection.isEmpty ? selected.map { [$0] } ?? [] : selection
+        return try? rows.map { try selectionKey(resourceResolveValue(.object($0), components: identityPath, strictIndices: true)) }
+    }
+}
+
 private func rowsInSelectionOrder(_ records: [SelectionRecord], keys: [String], identity: String, scope: [String: String]) throws
     -> [SelectionRecord]
 {
@@ -275,11 +287,20 @@ extension ForgeRuntime {
             guard admittedKeys == nil || keys == admittedKeys, admittedInput == nil || parameters == admittedInput else { return nil }
             return (keys, ids, parameters, live)
         }
+        var selectionFence: DialogSelectionFence?
+        var transferredSelectionFence = false
         let result: MutationCommandResult
         do {
             guard let first = try await admission() else { return .init(accepted: false, status: "invalid") }
             admittedKeys = first.keys
             admittedInput = first.parameters
+            if spec.parentParameter == nil, dialog.actions.contains(where: { $0.footerCommand?.reconcile?.verify != nil }) {
+                let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: source)
+                guard let fence = await dataSourceRuntime.guardDialogSelection(
+                    dataSourceID: dataSourceID, identityField: spec.identityField, keys: first.keys
+                ) else { throw SupersededSelection() }
+                selectionFence = fence
+            }
             var parameters = first.parameters
             if spec.parentParameter == nil {
                 guard let name = spec.idsParameter, !name.isEmpty, parameters[name] == nil else {
@@ -328,13 +349,15 @@ extension ForgeRuntime {
             let previous = await dataSourceForm(windowID: windowID, dataSourceRef: draft)
             await setDataSourceForm(windowID: windowID, dataSourceRef: draft, values: values)
             guard (try? await admission()) != nil,
-                await openDialog(windowID: windowID, dialogID: dialogID, parameters: [:], expected: originalDialog) != nil
+                await openDialog(windowID: windowID, dialogID: dialogID, parameters: [:],
+                    selectionFence: selectionFence, expected: originalDialog) != nil
             else {
                 if await dialogSignal.peek() == originalDialog {
                     await restorePreparedForm(windowID: windowID, draft: draft, submitted: values, previous: previous)
                 }
                 throw SupersededSelection()
             }
+            transferredSelectionFence = true
             result = .init(accepted: true, status: "opened", invocationId: invocation.uuidString)
         } catch {
             let current: Bool
@@ -355,6 +378,9 @@ extension ForgeRuntime {
                 accepted: attempted, status: !current && attempted ? "superseded" : cancelled ? "cancelled" : "failed",
                 invocationId: invocation.uuidString,
                 error: current || !attempted ? error.localizedDescription : nil)
+        }
+        if let selectionFence, !transferredSelectionFence {
+            await dataSourceRuntime.releaseDialogSelection(selectionFence)
         }
         if pendingPublished, let field = spec.pendingField, windowState(id: windowID) != nil,
             await windowFormJSONValue(windowID: windowID)[field] == .bool(true)

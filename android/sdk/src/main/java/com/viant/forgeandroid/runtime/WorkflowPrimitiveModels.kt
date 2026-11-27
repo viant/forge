@@ -167,8 +167,20 @@ data class ReconcileSpec(
     val identityField: String? = null,
     val identityFields: List<String> = emptyList(),
     val resultPath: String? = null,
-    val rowsPath: String? = null
+    val rowsPath: String? = null,
+    val verify: ReconcileVerificationSpec? = null
 )
+
+@Serializable
+data class ReconcileVerificationSpec(
+    val idsParameter: String,
+    val scope: List<ReadbackScopeBinding>,
+    val fields: Map<String, String> = emptyMap(),
+    val submittedRows: String? = null
+)
+
+@Serializable
+data class ReadbackScopeBinding(val field: String, val parameter: ParameterDef, val passToReader: Boolean = false)
 
 @Serializable
 data class RefreshSpec(

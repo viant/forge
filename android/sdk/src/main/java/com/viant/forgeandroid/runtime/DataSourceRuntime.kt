@@ -50,17 +50,17 @@ class DataSourceRuntime(
     fun registeredWindowContexts(windowId: String): Map<String, DataSourceContext> = registeredContexts[windowId]?.toMap().orEmpty()
     private val parameterResolver = ParameterResolver()
     private var executor: ((ExecutionDef, DataSourceContext, Map<String, Any?>) -> Unit)? = null
-    @Volatile private var collectionLoader: (suspend (DataSourceContext, String?) -> LoaderResult?)? = null
+    @Volatile private var collectionLoader: (suspend (DataSourceContext, String?, Boolean) -> LoaderResult?)? = null
 
     fun setExecutor(executor: (ExecutionDef, DataSourceContext, Map<String, Any?>) -> Unit) {
         this.executor = executor
     }
 
     fun setCollectionLoader(loader: suspend (DataSourceContext) -> LoaderResult?) {
-        setRequestLoader { context, _ -> loader(context) }
+        setRequestLoader { context, _, _ -> loader(context) }
     }
 
-    internal fun setRequestLoader(loader: suspend (DataSourceContext, String?) -> LoaderResult?) {
+    internal fun setRequestLoader(loader: suspend (DataSourceContext, String?, Boolean) -> LoaderResult?) {
         synchronized(parentReads) {
             collectionLoader = loader
             parentReads.clear()
@@ -161,7 +161,9 @@ class DataSourceRuntime(
     }
 
     /** Invoke the configured reader without publishing input, rows, lifecycle events, or auto-selection. */
-    internal suspend fun readSelectionRows(window: WindowContext, ref: String, parameters: Map<String, Any?>, invocationId: String): List<Map<String, Any?>> {
+    internal suspend fun readSelectionRows(window: WindowContext, ref: String, parameters: Map<String, Any?>, invocationId: String,
+        exact: Boolean = false, current: (() -> Boolean)? = null): List<Map<String, Any?>> {
+        check(current?.invoke() != false) { "The scoped read is no longer authorized." }
         val metadata = window.metadata.peek() ?: error("Window metadata is unavailable.")
         val definition = metadata.dataSources[ref] ?: error("Selection reader is unavailable: $ref")
         require(ref !in reportOwnedDataSourceRefs(metadata)) { "This reader requires report admission." }
@@ -170,16 +172,20 @@ class DataSourceRuntime(
             Signal(ControlState()), Signal(emptyMap()), { _, _ -> })
         val reader = collectionLoader
         val rows = if (reader != null) {
-            val receipt = reader(request, invocationId) ?: error("The selection reader did not acknowledge the request: $ref")
+            val receipt = reader(request, invocationId, exact) ?: error("The selection reader did not acknowledge the request: $ref")
             receipt.rows
         } else {
-            val binding = buildRequest(request, suppliedInputs = parameters, detachedReadId = invocationId) ?: error("No physical selection reader is configured: $ref")
-            val response = executeRequest(definition.service?.endpoint, binding, requireRecords = true)
+            val binding = buildRequest(request, suppliedInputs = parameters, detachedReadId = invocationId, exactInputs = exact) ?:  error("No physical selection reader is configured: $ref")
+            val response = if (exact) kotlinx.coroutines.runInterruptible(Dispatchers.IO) {
+                check(current?.invoke() != false) { "The scoped read is no longer authorized." }
+                executeRequest(definition.service?.endpoint, binding, requireRecords = true, bypassCache = true)
+            } else executeRequest(definition.service?.endpoint, binding, requireRecords = true)
             val records = collectionValue(response, definition.selectors?.data, requireRecords = true)
             require(records is List<*> && records.all { it is Map<*, *> }) { "The selection reader did not return an array of records." }
             normalizeCollection(records)
         }
-        return applyResourceModel(request, rows)
+        check(current?.invoke() != false) { "The scoped read is no longer authorized." }
+        return if (exact) rows else applyResourceModel(request, rows)
     }
 
     // An ordinary successful read may qualify for parent preparation. The receipt
@@ -254,7 +260,7 @@ class DataSourceRuntime(
 
         var receivedResponse = false
         try {
-            val loaderResult = collectionLoader?.invoke(ctx, null)
+            val loaderResult = collectionLoader?.invoke(ctx, null, false)
             if (loaderResult != null) {
                 receivedResponse = true
                 currentCoroutineContext().ensureActive()
@@ -365,12 +371,12 @@ class DataSourceRuntime(
         }
     }
 
-    private fun executeRequest(endpoint: String?, request: DataSourceRequest, requireRecords: Boolean): Map<String, Any?> {
+    private fun executeRequest(endpoint: String?, request: DataSourceRequest, requireRecords: Boolean, bypassCache: Boolean = false): Map<String, Any?> {
         val parser: (String) -> Map<String, Any?> = { body ->
             val value = JsonUtil.elementToAny(JsonUtil.json.parseToJsonElement(body))
             if (requireRecords && value is List<*>) mapOf("data" to value) else JsonUtil.asStringMap(value)
         }
-        return restClient.request(endpoint, request.method, request.uri, request.body, parser, singleAttempt = requireRecords)
+        return restClient.request(endpoint, request.method, request.uri, request.body, parser, singleAttempt = requireRecords, bypassCache = bypassCache)
     }
 
     private fun failPrepared(ctx: DataSourceContext, message: String) {
@@ -448,19 +454,20 @@ class DataSourceRuntime(
     }
 
     private fun buildRequest(ctx: DataSourceContext, suppliedInputs: Map<String, Any?> = emptyMap(), detachedReadId: String? = null,
-        captureInputs: ((Map<String, Any?>) -> Unit)? = null): DataSourceRequest? {
+        captureInputs: ((Map<String, Any?>) -> Unit)? = null, exactInputs: Boolean = false): DataSourceRequest? {
         val baseUri = ctx.dataSource.service?.uri ?: ctx.dataSource.uri ?: return null
         val method = (ctx.dataSource.service?.method ?: ctx.dataSource.method ?: "GET")
             .trim()
             .uppercase()
             .ifBlank { "GET" }
+        require(!exactInputs || method == "POST") { "The HTTP verification reader must accept a request body for the exact ID array." }
         return if (method == "GET") {
             DataSourceRequest(method = "GET", uri = buildRequestUri(ctx, baseUri))
         } else {
             DataSourceRequest(
                 method = method,
                 uri = baseUri,
-                body = buildRequestBody(ctx, baseUri, suppliedInputs, detachedReadId, captureInputs)
+                body = buildRequestBody(ctx, baseUri, suppliedInputs, detachedReadId, captureInputs, exactInputs)
             )
         }
     }
@@ -519,10 +526,9 @@ class DataSourceRuntime(
     }
 
     private fun buildRequestBody(ctx: DataSourceContext, baseUri: String, suppliedInputs: Map<String, Any?>, detachedReadId: String?,
-        captureInputs: ((Map<String, Any?>) -> Unit)?): String {
+        captureInputs: ((Map<String, Any?>) -> Unit)?, exactInputs: Boolean = false): String {
         val payload = if (isDatasourceFetchRoute(baseUri)) {
-            val inputs = buildDatasourceFetchInputs(ctx)
-            val effective = if (suppliedInputs.isEmpty()) inputs else inputs + suppliedInputs
+            val effective = if (exactInputs) suppliedInputs else buildDatasourceFetchInputs(ctx) + suppliedInputs
             captureInputs?.invoke(effective)
             buildMap<String, Any?> {
                 put("inputs", effective)
@@ -532,7 +538,7 @@ class DataSourceRuntime(
                 }
             }
         } else {
-            buildBodyParameters(ctx)
+            if (exactInputs) suppliedInputs else buildBodyParameters(ctx)
         }
         return JsonUtil.json.encodeToString(
             kotlinx.serialization.json.JsonElement.serializer(),

@@ -1613,5 +1613,6 @@ data class DialogState(
     val args: Map<String, Any?> = emptyMap(),
     val initializing: Boolean = false,
     val initializationError: String? = null,
-    val sourceDataSourceRef: String? = null
+    val sourceDataSourceRef: String? = null,
+    internal val verifiedSelection: VerifiedDialogSelection? = null
 )

@@ -5,7 +5,7 @@ import {Alert, Button} from '@blueprintjs/core';
 import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
 import {executeCommand, getMutationCommandState, resetMutationCommandState, subscribeMutationCommand} from './primitiveMutation.js';
 import {usePredicateSignals} from './usePredicateSignals.js';
-import {commandGuardKey, stableContextOwner} from './commandExecutor.js';
+import {commandGuardKey, discardCommandVerification, retryCommandVerification, stableContextOwner} from './commandExecutor.js';
 import DisabledActionShell from '../DisabledActionShell.jsx';
 import {findDialogSignal, protectedWindowEpoch} from '../../core/store/signals.js';
 import {getLogger} from '../../utils/logger.js';
@@ -24,7 +24,8 @@ function useBoundMutationCommandState(context, command) {
   const key = commandGuardKey(command);
   const authority = context?.signals?.authorization?.value ?? context?.authorization;
   const epoch = context?.identity?.protectedWindow ? protectedWindowEpoch(context.identity.windowId) : undefined;
-  const binding = React.useMemo(() => ({context, command}), [owner, key, command?.dataSourceRef, authority, epoch]);
+  const verification = command?.reconcile?.verify ? command.reconcile : null;
+  const binding = React.useMemo(() => ({context, command}), [owner, key, command?.dataSourceRef, authority, epoch, verification]);
   React.useLayoutEffect(() => {
     resetMutationCommandState(binding.context, binding.command);
     return subscribeMutationCommand(binding.context, binding.command, setState);
@@ -50,18 +51,29 @@ export default function MutationCommand({command, context, extras = {}, disabled
     ? (!valid ? command?.invalidMessage || command?.tooltip : command?.tooltip)
     : '';
   const busy = state.guarded === true || ['validating', 'confirming', 'pending'].includes(state.phase);
-  const scopedFooter = dialogId && (command.group || (!closeOnSuccess && !command.before?.length && !command.clearFormFields?.length));
+  const scopedFooter = dialogId && (command.reconcile?.verify || command.group || (!closeOnSuccess && !command.before?.length && !command.clearFormFields?.length));
   const dialog = scopedFooter && findDialogSignal(`${context?.identity?.windowId}Dialog${dialogId}`);
   const presentation = dialog?.peek?.()?.props;
   const activatedPresentation = React.useRef(null);
   const belongsHere = !dialog || (activatedPresentation.current?.props === presentation && activatedPresentation.current?.binding === binding);
-  const statusMessage = !belongsHere ? (state.guarded ? (['indeterminate', 'partial_failure'].includes(state.phase)
+  const liveBinding = React.useRef(null);
+  React.useLayoutEffect(() => {
+    liveBinding.current = binding;
+    return () => {
+      liveBinding.current = null;
+      if (binding.command.reconcile?.verify) discardCommandVerification(binding.context, binding.command, binding);
+    };
+  }, [binding]);
+  const retry = belongsHere && state.phase === 'verification_failed';
+  const triggerDisabled = retry ? disabled : blocked || busy;
+  const statusMessage = !belongsHere ? (state.guarded ? (['indeterminate', 'partial_failure', 'verification_failed'].includes(state.phase)
     ? 'A previous submission needs verification before retrying.' : 'Another submission is in progress.') : '') : state.message || ({validating: 'Validating…', confirming: 'Awaiting confirmation…', preparing: 'Preparing…', pending: 'Saving…', indeterminate: 'Outcome unknown; refresh authoritative data before retrying.'}[state.phase]) || (state.guarded ? 'Working…' : '');
   const invoke = () => {
     mutationLog.debug('activate', {commandId: command?.commandId, dataSourceRef: command?.dataSourceRef, blocked, busy, phase: state.phase, guarded: getMutationCommandState(context, command).guarded});
-    if (blocked || busy) return;
+    if (triggerDisabled) return;
+    if (retry) return retryCommandVerification(context, command, binding);
     activatedPresentation.current = {props: presentation, binding};
-    commandPromise.current = executeCommand(context, command, extras, {onSettled, dialogId, closeOnSuccess, confirm: (message) => new Promise((resolve) => {
+    commandPromise.current = executeCommand(context, command, extras, {onSettled, dialogId, closeOnSuccess, presentationToken: binding, isPresent: () => liveBinding.current === binding, confirm: (message) => new Promise((resolve) => {
       confirmResolver.current = resolve;
       setConfirmMessage(message);
       setConfirmOpen(true);
@@ -77,13 +89,14 @@ export default function MutationCommand({command, context, extras = {}, disabled
   React.useEffect(() => () => confirmResolver.current?.(false), []);
   const operateInvoke=async()=>{const promise=invoke();await Promise.resolve();if(confirmResolver.current)return {status:'awaiting_confirmation',pendingConfirmation:true,accepted:false};return await promise;};
   const operationMeta={windowId:context?.identity?.windowId,dataSourceRef:context?.identity?.dataSourceRef,controlId:command?.commandId};
-  useRegisteredControlActions(operationMeta,()=>({visible:isLiveControlVisible(operationRoot.current),disabled:blocked||busy,readOnly:false,actions:{click:operateInvoke}}),`${blocked}:${busy}:${state.phase}`);
+  useRegisteredControlActions(operationMeta,()=>({visible:isLiveControlVisible(operationRoot.current),disabled:triggerDisabled,readOnly:false,actions:{click:operateInvoke}}),`${triggerDisabled}:${state.phase}`);
   useRegisteredControlActions({...operationMeta,controlId:command?.commandId?`${command.commandId}:confirm`:null},()=>({visible:confirmOpen&&isLiveControlVisible(operationRoot.current),disabled:!confirmOpen,readOnly:false,actions:{click:()=>{settleConfirmation(true);return commandPromise.current;}}}),`${confirmOpen}`);
   useRegisteredControlActions({...operationMeta,controlId:command?.commandId?`${command.commandId}:cancel`:null},()=>({visible:confirmOpen&&isLiveControlVisible(operationRoot.current),disabled:!confirmOpen,readOnly:false,actions:{click:()=>{settleConfirmation(false);return commandPromise.current;}}}),`${confirmOpen}`);
 
   return (
-    <div ref={operationRoot} style={{display:'contents'}}><DisabledActionShell reason={blockedExplanation} label={command?.label || 'Action'} className="forge-mutation-command">
-      {renderTrigger ? renderTrigger({invoke, disabled: blocked || busy, pending: state.phase === 'pending'}) :
+    <div ref={operationRoot} style={{display:'contents'}}><DisabledActionShell reason={retry ? '' : blockedExplanation} label={command?.label || 'Action'} className="forge-mutation-command">
+      {retry ? <Button className={command?.className} data-forge-part="button" intent={command?.intent || undefined}
+        disabled={triggerDisabled} onClick={invoke}>Retry verification</Button> : renderTrigger ? renderTrigger({invoke, disabled: blocked || busy, pending: state.phase === 'pending'}) :
         <Button className={command?.className} data-forge-part="button" icon={command?.icon || undefined} aria-label={command?.label || 'Save'} title={!valid ? command.invalidMessage || 'This action is not currently valid.' : command?.label || undefined} intent={command?.intent || undefined} loading={state.phase === 'pending'} disabled={blocked || busy} onClick={invoke}>{command?.hideLabel ? null : children || command?.label || 'Save'}</Button>}
       <span className="forge-mutation-command__status" data-command-phase={(belongsHere || state.guarded ? state.phase : 'idle') || 'idle'} aria-live="polite">{statusMessage}</span>
       <Alert isOpen={confirmOpen} intent={command?.intent === 'danger' ? 'danger' : 'primary'} confirmButtonText={children || command?.label || 'Confirm'} cancelButtonText="Cancel" onCancel={() => settleConfirmation(false)} onConfirm={() => settleConfirmation(true)}>{confirmMessage}</Alert>

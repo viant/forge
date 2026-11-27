@@ -57,7 +57,7 @@ data class MutationReceiptIdentityDef(
 
 internal class InvalidSubmittedIdentity(message: String) : IllegalArgumentException(message)
 
-private fun receiptId(value: Any?): Any? {
+internal fun receiptId(value: Any?): Any? {
     if (value is Int || value is Short || value is Byte) return (value as Number).toLong()
     if (value is Long) return value.takeIf { it in -9007199254740991L..9007199254740991L }
     val number = when (value) {
