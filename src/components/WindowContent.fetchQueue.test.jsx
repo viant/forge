@@ -33,7 +33,24 @@ it('does not mount command writers from inactive lazy panels',()=>{
     expect(resolveDeferredDataSourceRefs(metadata,'',{}, {tabs:{tabs:'edit'}})).toEqual(new Set(['writer']));
 });
 
-it('executes a primitive-only writer once after clicking, never while mounting the window',async()=>{
+it('defers table command writers and their dependencies until the panel is active', () => {
+    const table = {id:'details', dataSourceRef:'records', table:{columns:[{
+        id:'change', type:'button', mutationCommand:{dataSourceRef:'update'},
+        mutationCommands:[{when:{source:'row',field:'active',equals:true},command:{
+            dataSourceRef:'remove', before:[{command:{dataSourceRef:'stage'}}], refresh:[{dataSourceRef:'records'}],
+        }}],
+    }]}};
+    const metadata = {dataSource:{home:{},records:{},update:{},remove:{},stage:{}},view:{content:{
+        id:'sections',stableTabs:{defaultSelectedTabId:'home'},
+        containers:[{id:'home',dataSourceRef:'home'}, table],
+    }}};
+    expect(resolveRequiredDataSourceRefs(metadata)).toEqual(['home']);
+    const active = {tabs:{sections:'details'}};
+    expect(new Set(resolveRequiredDataSourceRefs(metadata, '', {}, active))).toEqual(new Set(['records','update','remove','stage']));
+    expect(resolveDeferredDataSourceRefs(metadata, '', {}, active)).toEqual(new Set(['update','remove','stage']));
+});
+
+it.each(['standalone', 'table'])('executes the %s writer once after clicking, never while mounting the window',async presentation=>{
     const previousAct=globalThis.IS_REACT_ACT_ENVIRONMENT;globalThis.IS_REACT_ACT_ENVIRONMENT=true;
     const React=await import('react');const {createRoot}=await import('react-dom/client');
     const {default:WindowContent}=await import('./WindowContent.jsx');
@@ -41,18 +58,26 @@ it('executes a primitive-only writer once after clicking, never while mounting t
     const {removeSignalsForKey}=await import('../core/store/signals.js');
     await import('../packs/blueprint/index.jsx');
     const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
-    const windowId='primitive-command-only-writer';const requests=[];
+    const windowId='primitive-command-only-writer-'+presentation;const requests=[];
     const transport=async request=>{requests.push(request.dataSourceRef);return {data:request.dataSourceRef==='rows'?[{id:1,name:'Example'}]:[{saved:true}]};};
     const metadata={dataSource:{rows:{id:'rows',cardinality:'collection',service:{uri:'mcp://fixture/rows'}},writer:{id:'writer',cardinality:'object',service:{uri:'mcp://fixture/write'}}},view:{content:{id:'root',containers:[
         {id:'records',dataSourceRef:'rows',table:{columns:[{id:'name',name:'Name'}]}},
         {id:'save',mutationCommand:{commandId:'save',label:'Apply',dataSourceRef:'writer',refresh:[{dataSourceRef:'rows',bypassCache:true}]}}
     ]}}};
+    if (presentation === 'table') {
+        const [records, save] = metadata.view.content.containers;
+        metadata.dataSource.rows.uniqueKey = [{field:'id'}];
+        records.table.columns.push({id:'change',name:'Change',type:'button',cellProperties:{'aria-label':'Apply'},mutationCommands:[
+            {when:{source:'row',field:'id',equals:1},command:save.mutationCommand},
+        ]});
+        metadata.view.content.containers = [records];
+    }
     const settle=async(action)=>React.act(async()=>{action?.();for(let i=0;i<40;i++)await Promise.resolve();});
     try {
         await settle(()=>root.render(<SettingProvider connectorConfig={{window:{service:{uri:'/window'}}}} services={{dataConnectorTransport:transport}}><WindowContent window={{windowId,windowKey:'commands'}} selectedMetadata={metadata}/></SettingProvider>));
         expect(requests.filter(ref=>ref==='writer')).toHaveLength(0);
         expect(requests.filter(ref=>ref==='rows')).toHaveLength(1);
-        const button=[...host.querySelectorAll('button')].find(item=>item.textContent.trim()==='Apply');
+        const button=[...host.querySelectorAll('button')].find(item=>item.textContent.trim()==='Apply' || item.getAttribute('aria-label')==='Apply');
         expect(button).toBeTruthy();
         await settle(()=>button.click());
         expect(requests.filter(ref=>ref==='writer')).toHaveLength(1);

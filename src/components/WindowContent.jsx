@@ -557,6 +557,12 @@ function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}, fetchU
         && resolveSectionProperties(node.section).collapseProps?.keepChildrenMounted === false
         && !resolveSectionOpenState({...node.section, stateKey: node.section.stateKey || node.id}, viewState)) return;
 
+    for (const column of Array.isArray(node.table?.columns) ? node.table.columns : []) {
+        if (column?.type !== 'button') continue;
+        addCommand(column.mutationCommand);
+        if (Array.isArray(column.mutationCommands)) column.mutationCommands.forEach(variant => addCommand(variant?.command));
+    }
+
     if (node.chart) {
         addRef(node.chart.dataSourceRef, node.fetchData === false || node.chart.fetchData === false);
         addRef(resolveMappedRef(node.chart), node.fetchData === false || node.chart.fetchData === false);
