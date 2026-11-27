@@ -31,6 +31,34 @@ primitive precondition
      `-> succeeded: attempt reconciliation and every configured refresh; publish writer/sync status
 ```
 
+### Independent writes under one confirmation
+
+A mutation command with a `group` and a `commandId` owns the confirmation, terminal state and reader refresh. Each member declares its own command ID, writer and acknowledgement contract. The group has no terminal writer of its own.
+
+```yaml
+mutationCommand:
+  commandId: applyReviewedChanges
+  confirm: Apply the reviewed changes?
+  prepare: Editor.prepareReviewedChanges
+  group:
+    - command:
+        commandId: items
+        label: Items
+        dataSourceRef: update_items
+        receiptIdentity: {field: id, submittedValues: change.ids}
+    - command:
+        commandId: folders
+        label: Folders
+        dataSourceRef: update_folders
+        receiptIdentity: {field: id, submittedValues: change.ids}
+  refresh:
+    - {dataSourceRef: inventory, bypassCache: true}
+```
+
+The optional root preparation runs once after confirmation. For the example, it can return `{items: {change: {ids: [7]}}, folders: {change: {ids: [7]}}}`. A missing member key skips that writer. Without a root preparation, member parameters and optional eligibility conditions use the ordinary command bindings. An enabled member with invalid input or an unavailable writer prevents the group from starting. With `submittedValues`, each submitted identity must be a distinct valid scalar and the returned objects must contain exactly those identities in the declared field.
+
+Eligible members use independent invocation receipts and distinct transports. They may finish in either order. Outcomes are available by command ID in `members`. A confirmed member and a definitively failed member produce `partial_failure`. Any unknown write makes the group `indeterminate`. In both cases the group stays guarded against replay until the caller verifies the authoritative state and explicitly resolves the guard. A wholly rejected group permits correction and retry. Any confirmed write triggers the declared refreshes once while the original scope is current. Successful writes remain acknowledged when a refresh fails.
+
 Primitive predicates control UX. Command validation protects client dispatch. The writer remains authoritative for authorization, concurrency, business validation, persistence, and transaction commit.
 
 Writer and synchronization results are orthogonal: `writerStatus` is `succeeded|failed|indeterminate`, while `syncStatus` is `not_started|succeeded|partial_failure`. Reconciliation and refresh synchronize UI only after a committed writer result; they are not part of the business transaction. Every configured refresh is attempted even if local reconciliation fails. If the writer succeeds but reconciliation or refresh fails, the command remains `succeeded` with `syncStatus: partial_failure` and a stale-dependency warning. It MUST NOT report that the writer failed or encourage an unsafe retry. A client timeout is `indeterminate`, because the writer may still commit after the client stops waiting; it is not equivalent to failure. An indeterminate command remains guarded until an explicit authoritative recovery calls the executor resolution API. No result-based reconciliation occurs while outcome is unknown.

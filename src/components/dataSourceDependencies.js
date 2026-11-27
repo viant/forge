@@ -83,6 +83,7 @@ export function visitCommandDataSourceRefs(command, visit) {
         visit(step?.command?.dataSourceRef);
         visit(step?.cleanup?.dataSourceRef);
     }
+    for (const member of Array.isArray(command.group) ? command.group : []) visit(member?.command?.dataSourceRef);
     for (const refresh of Array.isArray(command.refresh) ? command.refresh : []) visit(refresh?.dataSourceRef);
     visit(command.reconcile?.dataSourceRef);
 }

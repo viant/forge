@@ -19,7 +19,7 @@ data class MutationCommandDef(
     val invalidMessage: String? = null,
     val timeoutMs: Int? = null,
     val invocationParameter: String? = null,
-    val dataSourceRef: String,
+    val dataSourceRef: String = "",
     val parameters: List<ParameterDef> = emptyList(),
     val payload: ResourcePayloadPreparationDef? = null,
     val validateWhen: DashboardConditionDef? = null,
@@ -39,7 +39,8 @@ data class MutationCommandDef(
     val clearFormFields: List<String> = emptyList(),
     val successFormState: JsonObject = JsonObject(emptyMap()),
     val rejectedWhen: @Serializable(with = ReceiptConditionSerializer::class) DashboardConditionDef? = null,
-    val receiptIdentity: MutationReceiptIdentityDef? = null
+    val receiptIdentity: MutationReceiptIdentityDef? = null,
+    val group: List<MutationGroupMemberDef>? = null
 ) {
     @kotlinx.serialization.Transient
     internal val invalidClearFields: Boolean = clearFormFields.isNotEmpty() &&
@@ -58,7 +59,7 @@ data class MutationCommandDef(
     internal val checksReceipt get() = receiptWhen != null || receiptIdentity != null
     @kotlinx.serialization.Transient
     internal val receiptDefinitionError = when {
-        receiptIdentity?.valid == false -> "receiptIdentity requires safe identity fields and exactly one of generated or submittedRows."
+        receiptIdentity?.valid == false -> "receiptIdentity requires safe identity fields and exactly one of generated, submittedRows or submittedValues."
         rejectedWhen != null && !checksReceipt -> "rejectedWhen requires receiptWhen or receiptIdentity."
         receiptWhen != null && acceptedReceipt == null || rejectedWhen != null && rejectedReceipt == null ->
             "Receipt predicates must use indexed invocation collection rows."
@@ -66,7 +67,52 @@ data class MutationCommandDef(
     }
     @kotlinx.serialization.Transient
     internal val beforeDefinitionError: String? = if (before.isEmpty()) null else validateBefore()
+    @kotlinx.serialization.Transient
+    internal val groupDefinitionError: String? = group?.let { validateGroup(it) }
 }
+
+@Serializable
+data class MutationGroupMemberDef(
+    @SerialName("when") val condition: DashboardConditionDef? = null,
+    val command: MutationCommandDef
+)
+
+private fun MutationCommandDef.validateGroup(members: List<MutationGroupMemberDef>): String? {
+    val owner = commandId.orEmpty()
+    if (!safeFormField(owner) || members.isEmpty() || dataSourceRef.isNotBlank() ||
+        payload != null || before.isNotEmpty() ||
+        invocationParameter != null || resultState.isNotEmpty() || checksReceipt || rejectedWhen != null ||
+        reconcile != null || successFormState.isNotEmpty() || clearFormFields.isNotEmpty() || cleanupState.isNotEmpty()) {
+        return "A command group requires an explicit ID and members, and cannot declare a writer or writer-specific behavior."
+    }
+    val ids = mutableSetOf(owner)
+    val writers = mutableSetOf<String>()
+    for ((_, member) in members) {
+        val id = member.commandId.orEmpty()
+        val writer = member.dataSourceRef.trim()
+        if (!safeFormField(id) || !ids.add(id) || writer.isEmpty() || !writers.add(writer)) {
+            return "Group members require unique explicit command IDs and distinct writers."
+        }
+        member.receiptDefinitionError?.let { return it }
+        if (member.group != null || member.hasPrivateLifecycle() || member.before.isNotEmpty()) {
+            return "Group member $id cannot declare nested steps or command lifecycle metadata."
+        }
+    }
+    val readers = mutableSetOf<String>()
+    for (refresh in refresh) {
+        val ref = refresh.dataSourceRef.trim()
+        if (ref.isEmpty() || ref in writers || !readers.add(ref)) {
+            return "Group refresh requires distinct readers that are not member writers."
+        }
+    }
+    return null
+}
+
+private fun MutationCommandDef.hasPrivateLifecycle(): Boolean = !serializationGroup.isNullOrBlank() ||
+    !confirm.isNullOrBlank() || confirmSelection != null || reconcile != null || refresh.isNotEmpty() ||
+    resultState.isNotEmpty() || pendingState.isNotEmpty() || successState.isNotEmpty() ||
+    errorState.isNotEmpty() || indeterminateState.isNotEmpty() || cleanupState.isNotEmpty() ||
+    clearFormFields.isNotEmpty() || successFormState.isNotEmpty()
 
 @Serializable
 data class MutationBeforeStepDef(
@@ -87,11 +133,7 @@ private fun MutationCommandDef.validateBefore(): String? {
             if (command.receiptIdentity != null || command.rejectedWhen != null || command.receiptWhen?.usesOnlyReceiptRows() == false)
                 return "Cleanup supports only receiptWhen on indexed invocation collection rows."
         } else command.receiptDefinitionError?.let { return it }
-        if (command.dataSourceRef.isBlank() || command.before.isNotEmpty() || !command.serializationGroup.isNullOrBlank() ||
-            !command.confirm.isNullOrBlank() || command.confirmSelection != null || command.reconcile != null ||
-            command.refresh.isNotEmpty() || command.resultState.isNotEmpty() || command.pendingState.isNotEmpty() ||
-            command.successState.isNotEmpty() || command.errorState.isNotEmpty() || command.indeterminateState.isNotEmpty() ||
-            command.cleanupState.isNotEmpty() || command.clearFormFields.isNotEmpty() || command.successFormState.isNotEmpty()) {
+        if (command.dataSourceRef.isBlank() || command.before.isNotEmpty() || command.group != null || command.hasPrivateLifecycle()) {
             return "Ordered command $id must declare a writer without nested steps or command lifecycle metadata."
         }
     }
@@ -303,7 +345,7 @@ internal fun ActionDef.footerCommand(): MutationCommandDef? {
     val command = mutationCommand ?: return null
     val guards = listOfNotNull(command.validateWhen, visibleWhen, disabledWhen?.let { DashboardConditionDef(not = it) })
     return command.copy(
-        commandId = command.commandId?.takeIf(String::isNotBlank) ?: id,
+        commandId = if (command.group != null) command.commandId else command.commandId?.takeIf(String::isNotBlank) ?: id,
         label = label ?: id,
         icon = icon ?: command.icon,
         hideLabel = hideLabel,

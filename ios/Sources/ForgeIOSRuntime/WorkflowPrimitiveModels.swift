@@ -21,12 +21,14 @@ extension DashboardConditionDef {
 public struct MutationReceiptIdentityDef: Codable, Sendable {
     public let field: String
     public let submittedRows: String?
+    public let submittedValues: String?
     public let submittedField: String?
     public let generated: Bool?
 
-    public init(field: String, submittedRows: String? = nil, submittedField: String? = nil, generated: Bool? = nil) {
+    public init(field: String, submittedRows: String? = nil, submittedField: String? = nil, generated: Bool? = nil, submittedValues: String? = nil) {
         self.field = field
         self.submittedRows = submittedRows
+        self.submittedValues = submittedValues
         self.submittedField = submittedField
         self.generated = generated
     }
@@ -36,6 +38,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
     public let serializationGroup: String?
     let beforeValidationError: String?
     public let before: [MutationBeforeStepDef]?
+    public let group: [MutationGroupMemberDef]?
     public let commandId: String?
     public let label: String?
     public let icon: String?
@@ -68,6 +71,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
     public init(
         commandId: String? = nil,
         before: [MutationBeforeStepDef]? = nil,
+        group: [MutationGroupMemberDef]? = nil,
         serializationGroup: String? = nil,
         label: String? = nil,
         icon: String? = nil,
@@ -78,7 +82,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         invalidMessage: String? = nil,
         timeoutMs: Int? = nil,
         invocationParameter: String? = nil,
-        dataSourceRef: String,
+        dataSourceRef: String = "",
         parameters: [ParameterDef] = [],
         payload: ResourcePayloadPreparationDef? = nil,
         prepare: String? = nil,
@@ -99,6 +103,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
     ) {
         self.beforeValidationError = Self.validateBefore(before, root: commandId ?? dataSourceRef, fields: clearFormFields, successFormState: successFormState, receiptWhen: receiptWhen, rejectedWhen: rejectedWhen, receiptIdentity: receiptIdentity)
         self.before = before
+        self.group = group
         self.commandId = commandId
         self.serializationGroup = serializationGroup
         self.label = label
@@ -177,9 +182,15 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         func safe(_ path: String) -> Bool { !path.isEmpty && path.components(separatedBy: ".").allSatisfy(isPlainID) }
         guard safe(identity.field), identity.submittedField.map(safe) ?? true else { return "receiptIdentity requires safe field paths." }
         if identity.generated == true {
-            guard identity.submittedRows == nil, identity.submittedField == nil else { return "Generated receiptIdentity cannot specify submitted rows or field." }
+            guard identity.submittedRows == nil, identity.submittedValues == nil, identity.submittedField == nil else {
+                return "Generated receiptIdentity cannot specify submitted values, rows or field."
+            }
+        } else if let values = identity.submittedValues {
+            guard safe(values), identity.submittedRows == nil, identity.submittedField == nil else {
+                return "receiptIdentity submittedValues cannot be combined with submittedRows or submittedField."
+            }
         } else {
-            guard let rows = identity.submittedRows, safe(rows) else { return "receiptIdentity requires submittedRows or generated: true." }
+            guard let rows = identity.submittedRows, safe(rows) else { return "receiptIdentity requires submittedRows, submittedValues or generated: true." }
         }
         return nil
     }
@@ -208,7 +219,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
                       !child.dataSourceRef.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                     return "Pre-save and cleanup commands require distinct, plain command IDs and a writer reference."
                 }
-                guard child.before?.isEmpty != false, child.confirm?.isEmpty != false, child.confirmSelection == nil,
+                guard child.group == nil, child.before?.isEmpty != false, child.confirm?.isEmpty != false, child.confirmSelection == nil,
                       child.serializationGroup?.isEmpty != false, child.reconcile == nil, child.refresh.isEmpty,
                       child.pendingState.isEmpty, child.successState.isEmpty, child.successFormState.isEmpty, child.resultState.isEmpty, child.errorState.isEmpty,
                       child.clearFormFields.isEmpty, child.cleanupState.isEmpty, child.indeterminateState.isEmpty else {
@@ -219,8 +230,47 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         return nil
     }
 
+    func groupValidationError() -> String? {
+        guard let group else { return nil }
+        guard !group.isEmpty, let commandId, Self.isPlainID(commandId) else {
+            return "A command group requires a plain command ID and at least one member."
+        }
+        guard dataSourceRef.isEmpty, before == nil, payload == nil,
+              invocationParameter == nil, receiptWhen == nil, rejectedWhen == nil, receiptIdentity == nil,
+              resultState.isEmpty, reconcile == nil, cleanupState.isEmpty, clearFormFields.isEmpty, successFormState.isEmpty else {
+            return "A command group cannot own a writer, receipt, cleanup, result mapping or form synchronization."
+        }
+        var ids: Set<String> = [commandId]
+        var writers = Set<String>()
+        for member in group {
+            let child = member.command
+            let writer = child.dataSourceRef.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let id = child.commandId, Self.isPlainID(id), ids.insert(id).inserted,
+                  !writer.isEmpty, writer == child.dataSourceRef, writers.insert(writer).inserted else {
+                return "Command group members require distinct plain command IDs and writer references."
+            }
+            guard child.group == nil, child.before == nil, child.confirm == nil, child.confirmSelection == nil,
+                  child.serializationGroup == nil, child.reconcile == nil, child.refresh.isEmpty,
+                  child.pendingState.isEmpty, child.successState.isEmpty, child.successFormState.isEmpty,
+                  child.resultState.isEmpty, child.errorState.isEmpty, child.clearFormFields.isEmpty,
+                  child.cleanupState.isEmpty, child.indeterminateState.isEmpty else {
+                return "The command group owns confirmation and UI synchronization."
+            }
+            if let error = child.beforeValidationError { return error }
+        }
+        var refreshed = Set<String>()
+        for target in refresh {
+            let ref = target.dataSourceRef
+            guard !ref.isEmpty, ref == ref.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !writers.contains(ref), refreshed.insert(ref).inserted else {
+                return "A command group must refresh distinct reader datasources."
+            }
+        }
+        return nil
+    }
+
     private enum CodingKeys: String, CodingKey {
-        case before, commandId, serializationGroup, label, icon, hideLabel, intent, confirm, confirmSelection, invalidMessage, timeoutMs
+        case before, group, commandId, serializationGroup, label, icon, hideLabel, intent, confirm, confirmSelection, invalidMessage, timeoutMs
         case invocationParameter, dataSourceRef, parameters, payload, prepare, validateWhen, receiptWhen, rejectedWhen, receiptIdentity
         case clearFormFields, cleanupState, pendingState, resultState, successState, successFormState, errorState, indeterminateState, reconcile, refresh
     }
@@ -233,6 +283,7 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         serializationGroup = try values.decodeIfPresent(String.self, forKey: .serializationGroup)
         before = try values.decodeIfPresent([MutationBeforeStepDef].self, forKey: .before)
+        group = try values.decodeIfPresent([MutationGroupMemberDef].self, forKey: .group)
         commandId = try values.decodeIfPresent(String.self, forKey: .commandId)
         label = try values.decodeIfPresent(String.self, forKey: .label)
         icon = try values.decodeIfPresent(String.self, forKey: .icon)
@@ -243,7 +294,8 @@ public final class MutationCommandDef: Codable, @unchecked Sendable {
         invalidMessage = try values.decodeIfPresent(String.self, forKey: .invalidMessage)
         timeoutMs = try values.decodeIfPresent(Int.self, forKey: .timeoutMs)
         invocationParameter = try values.decodeIfPresent(String.self, forKey: .invocationParameter)
-        dataSourceRef = try values.decode(String.self, forKey: .dataSourceRef)
+        dataSourceRef = if group != nil { try values.decodeIfPresent(String.self, forKey: .dataSourceRef) ?? "" }
+            else { try values.decode(String.self, forKey: .dataSourceRef) }
         parameters = try values.decodeIfPresent([ParameterDef].self, forKey: .parameters) ?? []
         prepare = try values.decodeIfPresent(String.self, forKey: .prepare)
         payload = try values.decodeIfPresent(ResourcePayloadPreparationDef.self, forKey: .payload)
@@ -270,12 +322,22 @@ extension ActionDef {
     public var footerCommand: MutationCommandDef? {
         guard let command = mutationCommand else { return nil }
         guard command.commandId?.isEmpty != false, let id, !id.isEmpty else { return command }
-        return MutationCommandDef(commandId: id, before: command.before, serializationGroup: command.serializationGroup, label: command.label, icon: command.icon, hideLabel: command.hideLabel, intent: command.intent,
+        return MutationCommandDef(commandId: id, before: command.before, group: command.group, serializationGroup: command.serializationGroup, label: command.label, icon: command.icon, hideLabel: command.hideLabel, intent: command.intent,
             confirm: command.confirm, confirmSelection: command.confirmSelection, invalidMessage: command.invalidMessage,
             timeoutMs: command.timeoutMs, invocationParameter: command.invocationParameter, dataSourceRef: command.dataSourceRef,
             parameters: command.parameters, payload: command.payload, prepare: command.prepare, validateWhen: command.validateWhen, receiptWhen: command.receiptWhen, rejectedWhen: command.rejectedWhen, receiptIdentity: command.receiptIdentity,
             clearFormFields: command.clearFormFields, cleanupState: command.cleanupState, pendingState: command.pendingState, successState: command.successState, successFormState: command.successFormState, resultState: command.resultState,
             errorState: command.errorState, indeterminateState: command.indeterminateState, reconcile: command.reconcile, refresh: command.refresh)
+    }
+}
+
+public struct MutationGroupMemberDef: Codable, Sendable {
+    public let when: DashboardConditionDef?
+    public let command: MutationCommandDef
+
+    public init(when: DashboardConditionDef? = nil, command: MutationCommandDef) {
+        self.when = when
+        self.command = command
     }
 }
 

@@ -358,17 +358,18 @@ private fun DraftFormActions(
     }
 }
 
-/** Keep an admitted ordered write alive if its pending metadata removes the composing control. */
+/** Keep an admitted composed write alive if its pending metadata removes the composing control. */
 internal fun startControlMutation(runtime: ForgeRuntime, window: WindowContext, source: DataSourceContext,
     command: MutationCommandDef, extras: Map<String, Any?>, controlScope: CoroutineScope, dialogId: String?,
     closeOnSuccess: Boolean = false, confirm: suspend (String) -> Boolean): kotlinx.coroutines.Deferred<MutationCommandResult> {
-    if (dialogId == null && command.before.isEmpty() && command.clearFormFields.isEmpty() && !closeOnSuccess) return controlScope.async {
+    val composed = command.before.isNotEmpty() || command.group != null
+    if (dialogId == null && !composed && command.clearFormFields.isEmpty() && !closeOnSuccess) return controlScope.async {
         runtime.mutationCommands.execute(runtime, window, source, command, extras, confirm)
     }
     val dialog = dialogId?.let(window::dialogSignal)
     val presented = dialog?.peek()
     val plainFooter = dialogId != null && command.before.isEmpty() && command.clearFormFields.isEmpty() && !closeOnSuccess
-    val owner = if (command.before.isEmpty() && !closeOnSuccess && !plainFooter) controlScope else runtime.scope
+    val owner = if (!composed && !closeOnSuccess && !plainFooter) controlScope else runtime.scope
     return owner.async(controlScope.coroutineContext.minusKey(Job)) {
         runtime.mutationCommands.executePresented(runtime, window, source, command, extras, presented,
             { dialog == null || (presented?.open == true && dialog.peek() === presented) }, confirm, dialogId.takeIf { closeOnSuccess })
@@ -398,16 +399,21 @@ internal fun MutationCommandButton(
 
     var activatedHere by remember(command.commandId, command.dataSourceRef) { mutableStateOf(false) }
     val plainFooter = dialogId != null && command.before.isEmpty() && command.clearFormFields.isEmpty() && !closeOnSuccess
-    val observeRuntime = command.before.isNotEmpty() || plainFooter
+    val observeRuntime = command.before.isNotEmpty() || command.group != null || plainFooter
     val observed = if (!observeRuntime) standaloneState
         else remember(runtime, window.windowId, command.commandId, command.dataSourceRef) {
             runtime.mutationCommands.stateUpdates(window.windowId, command)
         }.collectAsState().value
     val samePresentation = dialogId != null && observed.presentation?.get() === window.dialogSignal(dialogId).peek()
+    val sameAuthorization = observed.authorization == null || observed.authorization == window.metadata.peek()?.authorizationSnapshot.orEmpty()
     val state = when {
-        plainFooter && !samePresentation -> if (observed.guarded) MutationCommandState(
+        !sameAuthorization || (plainFooter && !samePresentation) -> if (observed.guarded) MutationCommandState(
             phase = observed.phase, guarded = true, retryAllowed = false,
-            message = if (observed.phase == MutationCommandPhase.Indeterminate) "A previous submission needs verification before retrying." else "Another submission is in progress."
+            message = when (observed.phase) {
+                MutationCommandPhase.Indeterminate -> "A previous submission needs verification before retrying."
+                MutationCommandPhase.PartialFailure -> "A previous submission partially completed. Review its outcome before proceeding."
+                else -> "Another submission is in progress."
+            }
         ) else MutationCommandState()
         observed.guarded || activatedHere || samePresentation -> observed
         else -> MutationCommandState()
@@ -419,6 +425,7 @@ internal fun MutationCommandButton(
     fun execute() {
         activatedHere = true
         val origin = dialogId?.let { window.dialogSignal(it).peek() }
+        val actor = window.metadata.peek()?.authorizationSnapshot.orEmpty()
         scope.launch {
             val request = if (confirmationOverride == null) command else command.copy(confirm = confirmationOverride)
             val execution = startControlMutation(runtime, window, source, request, extras, this, dialogId, closeOnSuccess) { text ->
@@ -434,7 +441,11 @@ internal fun MutationCommandButton(
             }
             val result = execution.await()
             if (!observeRuntime) standaloneState = runtime.mutationCommands.state(window.windowId, request)
-            if (dialogId == null || closeOnSuccess || window.dialogSignal(dialogId).peek() === origin) onSettled?.invoke(result)
+            val sameActor = command.group == null || actor == window.metadata.peek()?.authorizationSnapshot.orEmpty()
+            val originalDialog = dialogId == null || window.dialogSignal(dialogId).peek() === origin
+            if (sameActor && (originalDialog || (closeOnSuccess && command.group == null))) {
+                onSettled?.invoke(result)
+            }
         }
     }
 
@@ -456,7 +467,7 @@ internal fun MutationCommandButton(
             Text(
                 state.message,
                 style = MaterialTheme.typography.bodySmall,
-                color = if (state.phase == MutationCommandPhase.Failed) Color(0xFFB42318) else MaterialTheme.colorScheme.onSurfaceVariant
+                color = if (state.phase == MutationCommandPhase.Failed || state.phase == MutationCommandPhase.PartialFailure) Color(0xFFB42318) else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

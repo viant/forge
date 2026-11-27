@@ -690,8 +690,12 @@ public actor ForgeRuntime {
         baseURL: String = "",
         additionalHeaders: [String: String] = [:],
         lifecyclePath: [String] = [],
-        requireInvocationRecords: Bool = false
+        requireInvocationRecords: Bool = false,
+        bypassCache: Bool = false,
+        invocationId: String? = nil,
+        current: (@Sendable () async -> Bool)? = nil
     ) async -> DataSourceRowReceipt? {
+        if let current, await !current() { return nil }
         let signal = await signals.metadata(windowID: windowID)
         guard let metadata = await signal.peek() else { return nil }
         guard let dataSource = metadata.dataSources[dataSourceRef] else {
@@ -701,6 +705,7 @@ public actor ForgeRuntime {
         let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
         let input = await dataSourceRuntime.input(dataSourceID: dataSourceID)
         let transportRevision = dataSourceTransportRevision
+        let originalControl = if current != nil { await dataSourceRuntime.control(dataSourceID: dataSourceID) } else { ControlState() }
         func parentRead(_ rows: [[String: JSONValue]], raw: [[String: JSONValue]], _ resolvedInputs: [String: JSONValue]) -> ParentCollectionRead? {
             guard rows.count == 1, let readers = metadata.parentReaders, readers.refs.contains(dataSourceRef), rows == raw else { return nil }
             return ParentCollectionRead(metadataRevision: readers.revision, transportRevision: transportRevision, effectiveParameters: input.parameters.merging(resolvedInputs) { _, resolved in resolved })
@@ -708,13 +713,26 @@ public actor ForgeRuntime {
         let preparationFence: PreparedReportFetchFence
         do { preparationFence = try await validatedReportFetchFence(windowID: windowID, dataSourceRef: dataSourceRef, parameters: input.parameters) }
         catch {
+            if let current, await !current() { return nil }
             let control = ControlState(loading: false, error: error.localizedDescription)
             await dataSourceRuntime.setControl(dataSourceID: dataSourceID, control: control)
             await (await signals.control(dataSourceID: dataSourceID)).set(control)
             return .failure(error)
         }
+        if let current, await !current() { return nil }
         let fetchGeneration = (dataSourceFetchGenerations[dataSourceID] ?? 0) &+ 1
         dataSourceFetchGenerations[dataSourceID] = fetchGeneration
+
+        func stillCurrent() async -> Bool {
+            guard let current else { return true }
+            if await current() { return true }
+            if dataSourceFetchGenerations[dataSourceID] == fetchGeneration {
+                await dataSourceRuntime.setControl(dataSourceID: dataSourceID, control: originalControl)
+                let signal = await signals.control(dataSourceID: dataSourceID)
+                if dataSourceFetchGenerations[dataSourceID] == fetchGeneration { await signal.set(originalControl) }
+            }
+            return false
+        }
 
         if let dataSourceLoader {
             let loadingControl = ControlState(loading: true)
@@ -722,7 +740,7 @@ public actor ForgeRuntime {
             let loadingSignal = await signals.control(dataSourceID: dataSourceID)
             await loadingSignal.set(loadingControl)
             do {
-                guard await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return nil }
+                guard await stillCurrent(), await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return nil }
                 let resolvedInputs = ParameterResolver.resolve(parameters: dataSource.parameters, context: await buildParameterResolutionContext(
                     windowID: windowID, metadata: metadata, identityDataSourceRef: dataSourceRef, preferredInput: input))
                 if let result = try await dataSourceLoader(
@@ -732,18 +750,20 @@ public actor ForgeRuntime {
                         dataSource: dataSource,
                         input: input,
                         resolvedInputs: resolvedInputs,
-                        conversationID: windows.first { $0.id == windowID }?.conversationID
+                        conversationID: windows.first { $0.id == windowID }?.conversationID,
+                        bypassCache: bypassCache,
+                        invocationId: invocationId
                     )
                 ) {
-                    guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else {
+                    guard await stillCurrent(), dataSourceFetchGenerations[dataSourceID] == fetchGeneration, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else {
                         return nil
                     }
                     let baseRows = applyCollectionHook(metadata: metadata, rows: try unmarshalResourceRows(result.rows, dataSource: dataSource, metadata: metadata))
                     let hookedRows = await applyDataSourceFetchHooks(
                         windowID: windowID, dataSourceRef: dataSourceRef, metadata: metadata,
-                        rows: baseRows, generation: fetchGeneration, path: lifecyclePath + [dataSourceRef]
+                        rows: baseRows, generation: fetchGeneration, path: lifecyclePath + [dataSourceRef], current: current
                     )
-                    guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return nil }
+                    guard await stillCurrent(), dataSourceFetchGenerations[dataSourceID] == fetchGeneration, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return nil }
                     await dataSourceRuntime.setCollection(dataSourceID: dataSourceID, rows: hookedRows, forInput: input,
                         parentRead: parentRead(hookedRows, raw: result.rows, resolvedInputs))
                     await dataSourceRuntime.setCollectionInfo(dataSourceID: dataSourceID, values: result.dataInfo)
@@ -781,11 +801,12 @@ public actor ForgeRuntime {
                     await applyDataSourceLifecycleHooks(
                         windowID: windowID, dataSourceRef: dataSourceRef, metadata: metadata,
                         event: "onSuccess", rows: hookedRows, generation: fetchGeneration,
-                        path: lifecyclePath + [dataSourceRef]
+                        path: lifecyclePath + [dataSourceRef], current: current
                     )
                     return .success(hookedRows.map(JSONValue.object))
                 }
             } catch {
+                guard await stillCurrent() else { return nil }
                 // SwiftUI restarts report tasks as restored filters and presets settle.
                 // URLSession reports the superseded request as cancelled; that is not
                 // a datasource failure and must not replace the next request's state
@@ -799,7 +820,7 @@ public actor ForgeRuntime {
                     }
                     return nil
                 }
-                guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else {
+                guard await stillCurrent(), dataSourceFetchGenerations[dataSourceID] == fetchGeneration, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else {
                     return nil
                 }
                 print("ForgeRuntime datasource load failed for \(dataSourceRef): \(error)")
@@ -812,7 +833,7 @@ public actor ForgeRuntime {
                 await applyDataSourceLifecycleHooks(
                     windowID: windowID, dataSourceRef: dataSourceRef, metadata: metadata,
                     event: "onError", rows: [], generation: fetchGeneration,
-                    path: lifecyclePath + [dataSourceRef]
+                    path: lifecyclePath + [dataSourceRef], current: current
                 )
                 return .failure(error)
             }
@@ -855,17 +876,20 @@ public actor ForgeRuntime {
             paging: dataSource.paging,
             requireInvocationRecords: requireInvocationRecords,
             additionalHeaders: additionalHeaders,
-            session: session
+            session: session,
+            bypassCache: bypassCache,
+            invocationId: invocationId,
+            current: current
         )
-        guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return nil }
+        guard await stillCurrent(), dataSourceFetchGenerations[dataSourceID] == fetchGeneration, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return nil }
         let fetchedRows: [[String: JSONValue]]
         if case let .success(rows) = receipt { fetchedRows = rows.compactMap(\.objectValue) }
         else { fetchedRows = await dataSourceRuntime.collection(dataSourceID: dataSourceID) }
         let hookedRows = await applyDataSourceFetchHooks(
             windowID: windowID, dataSourceRef: dataSourceRef, metadata: metadata,
-            rows: fetchedRows, generation: fetchGeneration, path: lifecyclePath + [dataSourceRef]
+            rows: fetchedRows, generation: fetchGeneration, path: lifecyclePath + [dataSourceRef], current: current
         )
-        guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return nil }
+        guard await stillCurrent(), dataSourceFetchGenerations[dataSourceID] == fetchGeneration, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return nil }
         if case .success = receipt, baseURL.isEmpty, additionalHeaders.isEmpty, let proof = parentRead(hookedRows, raw: fetchedRows, resolvedInputs) {
             await dataSourceRuntime.setCollection(dataSourceID: dataSourceID, rows: hookedRows, forInput: input, parentRead: proof)
         } else {
@@ -893,7 +917,7 @@ public actor ForgeRuntime {
         await applyDataSourceLifecycleHooks(
             windowID: windowID, dataSourceRef: dataSourceRef, metadata: metadata,
             event: control.error == nil ? "onSuccess" : "onError", rows: hookedRows,
-            generation: fetchGeneration, path: lifecyclePath + [dataSourceRef]
+            generation: fetchGeneration, path: lifecyclePath + [dataSourceRef], current: current
         )
         // Grid signals contain objects. A command may also receive a scalar
         // acknowledgement from its producer, which must keep its JSON type.
@@ -905,7 +929,7 @@ public actor ForgeRuntime {
     private func applyDataSourceLifecycleHooks(windowID: String, dataSourceRef: String,
                                                metadata: WindowMetadata, event: String,
                                                rows: [[String: JSONValue]], generation: UInt64,
-                                               path: [String]) async {
+                                               path: [String], current: (@Sendable () async -> Bool)? = nil) async {
         let hooks = metadata.dataSources[dataSourceRef]?.on.filter { $0.event == event } ?? []
         guard !hooks.isEmpty, let code = metadata.actions?.code else { return }
         let sourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
@@ -918,14 +942,14 @@ public actor ForgeRuntime {
                     "collection": .array(await dataSourceRuntime.collection(dataSourceID: id).map(JSONValue.object))
                 ])
             }
-            guard dataSourceFetchGenerations[sourceID] == generation, !Task.isCancelled else { return }
+            guard await current?() != false, dataSourceFetchGenerations[sourceID] == generation, !Task.isCancelled else { return }
             do {
                 let projection = try DataSourceHookProjection.invoke(code: code, function: hook.action,
                     namespace: metadata.actionNamespace(for: hook.action), source: dataSourceRef, snapshots: snapshots, collection: rows,
                     windowForm: await windowFormJSONValue(windowID: windowID))
                 await applyDataSourceLifecycleEffects(
                     projection.effects, windowID: windowID, metadata: metadata,
-                    sourceID: sourceID, generation: generation, path: path
+                    sourceID: sourceID, generation: generation, path: path, current: current
                 )
             } catch {
                 print("Forge datasource lifecycle hook failed [\(hook.action)]: \(error.localizedDescription)")
@@ -935,14 +959,14 @@ public actor ForgeRuntime {
 
     private func applyDataSourceFetchHooks(
         windowID: String, dataSourceRef: String, metadata: WindowMetadata,
-        rows: [[String: JSONValue]], generation: UInt64, path: [String]
+        rows: [[String: JSONValue]], generation: UInt64, path: [String], current: (@Sendable () async -> Bool)? = nil
     ) async -> [[String: JSONValue]] {
         let hooks = metadata.dataSources[dataSourceRef]?.on.filter { $0.event == "onFetch" } ?? []
         guard !hooks.isEmpty, let code = metadata.actions?.code else { return rows }
         let sourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
-        var current = rows
+        var transformedRows = rows
         for hook in hooks {
-            guard dataSourceFetchGenerations[sourceID] == generation, !Task.isCancelled else { return rows }
+            guard await current?() != false, dataSourceFetchGenerations[sourceID] == generation, !Task.isCancelled else { return rows }
             var snapshots: [String: JSONValue] = [:]
             for ref in metadata.dataSources.keys {
                 let id = WindowIdentity(windowID: windowID).dataSourceID(ref: ref)
@@ -954,30 +978,30 @@ public actor ForgeRuntime {
             do {
                 let projection = try DataSourceHookProjection.invoke(
                     code: code, function: hook.action, namespace: metadata.actionNamespace(for: hook.action),
-                    source: dataSourceRef, snapshots: snapshots, collection: current,
+                    source: dataSourceRef, snapshots: snapshots, collection: transformedRows,
                     windowForm: await windowFormJSONValue(windowID: windowID)
                 )
-                guard dataSourceFetchGenerations[sourceID] == generation, !Task.isCancelled else { return rows }
+                guard await current?() != false, dataSourceFetchGenerations[sourceID] == generation, !Task.isCancelled else { return rows }
                 await applyDataSourceLifecycleEffects(
                     projection.effects, windowID: windowID, metadata: metadata,
-                    sourceID: sourceID, generation: generation, path: path
+                    sourceID: sourceID, generation: generation, path: path, current: current
                 )
                 if let transformed = projection.result?.arrayValue {
-                    current = transformed.compactMap(\.objectValue)
+                    transformedRows = transformed.compactMap(\.objectValue)
                 }
             } catch {
                 print("Forge datasource onFetch hook failed [\(hook.action)]: \(error.localizedDescription)")
             }
         }
-        return current
+        return transformedRows
     }
 
     private func applyDataSourceLifecycleEffects(
         _ effects: [JSONValue], windowID: String, metadata: WindowMetadata,
-        sourceID: String, generation: UInt64, path: [String]
+        sourceID: String, generation: UInt64, path: [String], current: (@Sendable () async -> Bool)? = nil
     ) async {
         for effect in effects {
-            guard dataSourceFetchGenerations[sourceID] == generation, !Task.isCancelled else { return }
+            guard await current?() != false, dataSourceFetchGenerations[sourceID] == generation, !Task.isCancelled else { return }
             guard let object = effect.objectValue, let ref = object["ref"]?.stringValue,
                   metadata.dataSources[ref] != nil else { continue }
             switch object["kind"]?.stringValue {
@@ -994,7 +1018,7 @@ public actor ForgeRuntime {
                     print("Forge datasource hook cycle rejected: \(path) -> \(ref)")
                     continue
                 }
-                await refreshDataSourceCollection(windowID: windowID, dataSourceRef: ref, lifecyclePath: path)
+                _ = await refreshDataSourceRows(windowID: windowID, dataSourceRef: ref, lifecyclePath: path, current: current)
             default: break
             }
         }

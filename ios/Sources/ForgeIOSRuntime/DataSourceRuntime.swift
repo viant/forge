@@ -335,13 +335,19 @@ public actor DataSourceRuntime {
         paging: DataSourcePagingDef? = nil,
         requireInvocationRecords: Bool = false,
         additionalHeaders: [String: String] = [:],
-        session: URLSession = .shared
+        session: URLSession = .shared,
+        bypassCache: Bool = false,
+        invocationId: String? = nil,
+        current: (@Sendable () async -> Bool)? = nil
     ) async -> DataSourceRowReceipt? {
+        if let current, await !current() { return nil }
         setControl(dataSourceID: dataSourceID, control: ControlState(loading: true))
         do {
             let input = inputValues[dataSourceID] ?? InputState()
             let raw = try await requestCollection(input: input, baseURL: baseURL, path: path, method: method, staticParameters: staticParameters,
-                                                  inputParameters: inputParameters, paging: paging, additionalHeaders: additionalHeaders, session: session)
+                                                  inputParameters: inputParameters, paging: paging, additionalHeaders: additionalHeaders,
+                                                  session: session, bypassCache: bypassCache, invocationId: invocationId)
+            if let current, await !current() { return nil }
             var invocationRecords: [JSONValue]?
             if requireInvocationRecords {
                 guard let items = invocationRecordsFromResponse(raw, selector: selectors?.data) else {
@@ -365,6 +371,7 @@ public actor DataSourceRuntime {
             setControl(dataSourceID: dataSourceID, control: ControlState())
             return .success(invocationRecords ?? rows.map(JSONValue.object))
         } catch {
+            if let current, await !current() { return nil }
             if Task.isCancelled || (error as? URLError)?.code == .cancelled || error is CancellationError {
                 setControl(dataSourceID: dataSourceID, control: ControlState())
                 return nil

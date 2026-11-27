@@ -574,10 +574,12 @@ struct MutationCommandButton: View {
         }
         .task(id: command.commandId ?? command.dataSourceRef) {
             for await next in await runtime.mutationCommandUpdates(windowID: window.windowID, command: command) {
-                if let dialogFooter, !dialogFooter.action.close, command.before?.isEmpty != false, command.clearFormFields.isEmpty,
+                if let dialogFooter,
+                   command.group != nil || (!dialogFooter.action.close && command.before?.isEmpty != false && command.clearFormFields.isEmpty),
                    await runtime.dialogState(windowID: window.windowID, dialogID: dialogFooter.id).presentationID != activatedPresentation {
                     state = next.guarded ? MutationCommandState(phase: next.phase, guarded: true, retryAllowed: false,
-                        message: next.phase == .indeterminate ? "A previous submission needs verification before retrying." : "Another submission is in progress.") : MutationCommandState()
+                        message: next.phase == .indeterminate || next.phase == .partialFailure
+                            ? "A previous submission needs verification before retrying." : "Another submission is in progress.") : MutationCommandState()
                 } else {
                     state = next
                 }
@@ -611,7 +613,7 @@ struct MutationCommandButton: View {
             }
             let confirmation: @Sendable (String) async -> Bool = { _ in await askConfirmation() }
             let result = await dispatch(confirmation)
-            if let dialogFooter, !dialogFooter.action.close,
+            if let dialogFooter, command.group != nil || !dialogFooter.action.close,
                await runtime.dialogState(windowID: window.windowID, dialogID: dialogFooter.id).presentationID != origin { return }
             onSettled?(result)
         }

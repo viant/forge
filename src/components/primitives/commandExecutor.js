@@ -101,7 +101,7 @@ export function resetCommandState(context, command = {}) {
   const key = commandGuardKey(command);
   const current = getCommandState(context, command);
   if (!key || current.guarded || !['succeeded', 'failed'].includes(current.phase)) return false;
-  publish(context, key, {phase: 'idle', guarded: false, pending: false, retryAllowed: true, error: null, message: '', invocationId: '', writerStatus: 'idle', syncStatus: 'not_started', warnings: []});
+  publish(context, key, {phase: 'idle', guarded: false, pending: false, retryAllowed: true, error: null, message: '', invocationId: '', writerStatus: 'idle', syncStatus: 'not_started', warnings: [], ...(command.group && {members: {}})});
   return true;
 }
 
@@ -204,7 +204,7 @@ function awaitWriter(target, invoke, timeoutMs, requireRecords = false, presenta
   });
 }
 
-async function synchronizeUI(context, target, command, writerResponse = null, authorizationIsCurrent = () => true, formSynchronization = null, presentationCurrent = () => true) {
+async function synchronizeUI(context, target, command, writerResponse = null, authorizationIsCurrent = () => true, formSynchronization = null, presentationCurrent = () => true, selectionCleared) {
   const warnings = [];
   if (!authorizationIsCurrent()) return [{stage: 'authorization', error: new Error('Authorization context changed before UI synchronization.')}];
   const refreshOptions = (destination, bypassCache) => ({
@@ -234,7 +234,10 @@ async function synchronizeUI(context, target, command, writerResponse = null, au
     try {
       const dataContext = context?.Context?.(refresh.dataSourceRef);
       if (!presentationCurrent() && refresh.dataSourceRef === context?.identity?.dataSourceRef) continue;
-      if (refresh.clearSelection === true && presentationCurrent()) dataContext?.handlers?.dataSource?.resetSelection?.();
+      if (refresh.clearSelection === true && presentationCurrent() && dataContext?.handlers?.dataSource?.resetSelection) {
+        dataContext.handlers.dataSource.resetSelection();
+        selectionCleared?.(dataContext);
+      }
       const result = dataContext?.handlers?.dataSource?.fetchCollection?.(refreshOptions(dataContext, refresh.bypassCache));
       if (result?.then) await result;
       if (!authorizationIsCurrent()) return [...warnings, {stage: 'authorization', error: new Error('Authorization context changed before UI synchronization.')}];
@@ -286,11 +289,14 @@ export function resolveCommandConfirmation(command = {}, extras = {}) {
 export function resolveIndeterminateCommand(context, command = {}, message = '') {
   const key = commandGuardKey(command);
   const current = getCommandState(context, command);
-  if (current.phase !== 'indeterminate') return false;
+  if (!['indeterminate', 'partial_failure'].includes(current.phase)) return false;
   const entry = stateEntry(context, key);
+  if (entry.unknownGroupTransports?.some(target => transportStates.get(stableContextOwner(target))?.commandKey !== key)) return false;
   if (entry.unknownTransport && !releaseTransport(entry.unknownTransport, key)) return false;
   delete entry.unknownTransport;
-  publish(context, key, {phase: 'idle', guarded: false, pending: false, retryAllowed: true, message, writerStatus: 'idle', syncStatus: 'not_started'});
+  for (const target of entry.unknownGroupTransports || []) releaseTransport(target, key);
+  delete entry.unknownGroupTransports;
+  publish(context, key, {...(command.group && {members: {}, error: null, warnings: []}), phase: 'idle', guarded: false, pending: false, retryAllowed: true, message, writerStatus: 'idle', syncStatus: 'not_started'});
   releaseSerialization(context, key);
   return true;
 }
@@ -400,11 +406,11 @@ function identityValue(root, keys) {
 
 function rowIdentitySet(rows, field) {
   if (!Array.isArray(rows) || !rows.length) return null;
-  const keys = field.split('.');
+  const keys = field?.split('.');
   const ids = new Set();
   for (const row of rows) {
-    if (!row || typeof row !== 'object' || Array.isArray(row)) return null;
-    const id = identityValue(row, keys);
+    if (keys && (!row || typeof row !== 'object' || Array.isArray(row))) return null;
+    const id = keys ? identityValue(row, keys) : row;
     if (!(Number.isSafeInteger(id) || (typeof id === 'string' && id.trim())) || ids.has(id)) return null;
     ids.add(id);
   }
@@ -413,8 +419,8 @@ function rowIdentitySet(rows, field) {
 
 function submittedIdentities(spec, parameters) {
   if (!spec || spec.generated) return null;
-  const rows = identityValue(parameters, spec.submittedRows.split('.'));
-  const ids = rowIdentitySet(rows, spec.submittedField || spec.field);
+  const rows = identityValue(parameters, (spec.submittedValues ?? spec.submittedRows).split('.'));
+  const ids = rowIdentitySet(rows, spec.submittedValues == null ? spec.submittedField || spec.field : null);
   if (!ids) throw new Error('The submitted rows require distinct, valid identities.');
   return ids;
 }
@@ -433,9 +439,10 @@ function validateWriterReceipt(command) {
   const spec = command.receiptIdentity;
   if (spec != null && (!validIdentityPath(spec.field) ||
     (spec.generated != null && typeof spec.generated !== 'boolean') ||
-    (spec.generated === true) === (spec.submittedRows != null) ||
+    [spec.generated === true, spec.submittedRows != null, spec.submittedValues != null].filter(Boolean).length !== 1 ||
+    (spec.submittedValues != null && !validIdentityPath(spec.submittedValues)) ||
     (spec.submittedRows != null && !validIdentityPath(spec.submittedRows)) ||
-    (spec.submittedField != null && (spec.generated || !validIdentityPath(spec.submittedField))))) {
+    (spec.submittedField != null && (spec.submittedRows == null || !validIdentityPath(spec.submittedField))))) {
     throw new Error('receiptIdentity requires a safe field and either generated or a submitted row selector.');
   }
   if (command.rejectedWhen != null && command.receiptWhen == null && command.receiptIdentity == null)
@@ -486,6 +493,20 @@ function classifyWriterReceipt(writer, command, expected) {
   return {status: 'indeterminate', error: new Error('The producer did not confirm the write. Verify its outcome before retrying.')};
 }
 
+function childDefinitionError(part, ids) {
+  if (!part || !validFormField(part.commandId) || ids.has(part.commandId) ||
+      typeof part.dataSourceRef !== 'string' || !part.dataSourceRef.trim()) {
+    return 'Preparation and cleanup commands require distinct command IDs and writer references.';
+  }
+  ids.add(part.commandId);
+  if (part.clearFormFields?.length || part.group != null || part.before?.length || part.confirm || part.confirmSelection ||
+      part.serializationGroup || part.reconcile || part.refresh?.length ||
+      ['pendingState', 'cleanupState', 'successState', 'successFormState', 'errorState', 'indeterminateState', 'resultState']
+        .some(field => Object.keys(part[field] || {}).length)) {
+    return 'The root command owns confirmation, sequencing and UI synchronization.';
+  }
+}
+
 function sequenceDefinitionError(command) {
   const ids = new Set([commandGuardKey(command)]);
   for (const entry of command.before) {
@@ -495,37 +516,159 @@ function sequenceDefinitionError(command) {
     if (entry?.cleanup?.rejectedWhen != null) return 'A cleanup command cannot declare rejectedWhen.';
     if (!entry?.command) return 'A preparation step requires a command.';
     validateWriterReceipt(entry.command);
-    for (const part of [entry.command, entry.cleanup].filter(Boolean)) {
-      const id = part.commandId;
-      if (
-        typeof id !== 'string' ||
-        !id.trim() ||
-        id.trim() !== id ||
-        /[.:/\[\]]/.test(id) ||
-        ids.has(id) ||
-        ['constructor', 'prototype', '__proto__'].includes(id) ||
-        typeof part.dataSourceRef !== 'string' ||
-        !part.dataSourceRef.trim()
-      ) {
-        return 'Preparation and cleanup commands require distinct command IDs and writer references.';
+    const problem = childDefinitionError(entry.command, ids) || (entry.cleanup && childDefinitionError(entry.cleanup, ids));
+    if (problem) return problem;
+  }
+}
+
+function validateCommandGroup(command) {
+  if (!Array.isArray(command.group) || !command.group.length || !validFormField(command.commandId) ||
+      command.dataSourceRef || command.payload || command.reconcile || command.invocationParameter ||
+      command.before?.length || command.clearFormFields?.length || command.receiptWhen || command.rejectedWhen ||
+      command.receiptIdentity || [command.cleanupState, command.resultState, command.successFormState].some(map => Object.keys(map || {}).length)) {
+    throw new Error('A command group needs an ID and independent member writers.');
+  }
+  const ids = new Set([command.commandId]);
+  const refs = new Set();
+  for (const entry of command.group) {
+    const problem = childDefinitionError(entry?.command, ids);
+    if (problem) throw new Error(problem);
+    const child = entry.command;
+    validateWriterReceipt(child);
+    if (entry.cleanup || refs.has(child.dataSourceRef)) throw new Error('Group members require distinct writer references and cannot declare cleanup.');
+    refs.add(child.dataSourceRef);
+  }
+  for (const reader of command.refresh || []) {
+    if (!reader.dataSourceRef || refs.has(reader.dataSourceRef)) throw new Error('Group refresh requires a distinct reader datasource.');
+    refs.add(reader.dataSourceRef);
+  }
+}
+
+async function dispatchGroupMember(member, key, unknownTransports, eligible) {
+  const {command, target, input, id} = member;
+  let invoked = false;
+  let result;
+  try {
+    if (!eligible()) throw new Error('Command scope or eligibility changed before dispatch.');
+    const response = await dispatchCommandWriter(target, command, input, id, true, () => { invoked = true; }, true);
+    result = classifyWriterReceipt(response, command, input.expected);
+  } catch (error) {
+    result = {status: 'failed', error};
+  }
+  const unknown = invoked && (result.status === 'indeterminate' || ambiguousWriterFailure(result.error));
+  const status = unknown ? 'indeterminate' : result.status === 'succeeded' ? 'succeeded' : invoked ? 'failed' : 'not_invoked';
+  if (unknown) unknownTransports.push(target);
+  else releaseTransport(target, key);
+  return {label: command.label || command.commandId, status, ...(invoked && {invocationId: id}),
+    ...(result.records && {rows: result.records}), ...(result.error && {error: result.error, message: commandErrorMessage(result.error)})};
+}
+
+async function prepareCommandGroup(context, command, parameters, extras, members, checkScope) {
+  const plan = [];
+  const inputs = command.prepare ? await prepareCommandParameters(context, command, parameters, extras) : null;
+  if (inputs && Object.keys(inputs).some(name => !Object.hasOwn(members, name))) throw new Error('Group preparation returned an unknown member ID.');
+  for (const {when, command: child} of command.group) {
+    const name = child.commandId;
+    const ownInput = inputs && Object.hasOwn(inputs, name);
+    if (ownInput && (!inputs[name] || typeof inputs[name] !== 'object' || Array.isArray(inputs[name]))) {
+      throw new Error('Group preparation must return a parameter map for each included member.');
+    }
+    if ((inputs && !ownInput) || (when && !evaluatePlainVisibleWhen(when, context))) {
+      members[name].status = 'skipped';
+      continue;
+    }
+    checkScope();
+    if (!commandValidationPasses(context, child)) throw new Error(child.invalidMessage || 'A group member is not eligible.');
+    const childExtras = inputs ? inputs[name] : mergeCommandParameters(parameters, extras);
+    const base = mutationCommandTargetParameters(resolveParameters(child.parameters || [], context), child.dataSourceRef);
+    let params = preparedInputs(context, child, childExtras, childExtras, base);
+    if (child.prepare) params = await prepareCommandParameters(context, child, params, childExtras);
+    const target = context.Context?.(child.dataSourceRef);
+    if (!target?.handlers?.dataSource?.setInputParameters || !target?.handlers?.dataSource?.fetchCollection) {
+      throw new Error('Group writer is unavailable: ' + child.dataSourceRef);
+    }
+    const memberId = invocationID();
+    plan.push({command: child, target, when, id: memberId, input: verifiedWriterInput(child, params, memberId)});
+  }
+  return plan;
+}
+
+async function runCommandGroup(context, command, key, id, parameters, extras, current, lifecycle, selectionCleared) {
+  const members = Object.create(null);
+  let plan = [];
+  const acquired = [];
+  const unknownTransports = [];
+  let validationContext = context;
+  let pendingApplied = false;
+  let error;
+  for (const {command: child} of command.group) {
+    members[child.commandId] = {label: child.label || child.commandId, status: 'not_invoked'};
+  }
+  const checkScope = () => {
+    if (!current() || !commandValidationPasses(context, command)) throw new Error('Command scope or eligibility changed before group dispatch.');
+  };
+  try {
+    checkScope();
+    plan = await prepareCommandGroup(context, command, parameters, extras, members, checkScope);
+    checkScope();
+    if (!plan.length) {
+      publish(context, key, {phase: 'idle', guarded: false, pending: false, retryAllowed: true,
+        members, message: '', writerStatus: 'not_invoked', syncStatus: 'not_started'});
+      return {accepted: false, status: 'skipped', invocationId: id, members};
+    }
+    for (const member of plan) {
+      if (!commandValidationPasses(context, member.command) || (member.when && !evaluatePlainVisibleWhen(member.when, context))) {
+        throw new Error(member.command.invalidMessage || 'A group member is not eligible.');
       }
-      ids.add(id);
-      if (
-        part.clearFormFields?.length ||
-        part.before?.length ||
-        part.confirm ||
-        part.confirmSelection ||
-        part.serializationGroup ||
-        part.reconcile ||
-        part.refresh?.length ||
-        ['pendingState', 'cleanupState', 'successState', 'successFormState', 'errorState', 'indeterminateState', 'resultState'].some(
-          (k) => Object.keys(part[k] || {}).length
-        )
-      ) {
-        return 'The root command owns confirmation, sequencing and UI synchronization.';
-      }
+      if (!acquireTransport(member.target, key)) throw new Error('Another command is using a group writer.');
+      acquired.push(member.target);
+    }
+    const windowState = context.signals?.windowForm?.peek?.() ?? context.signals?.windowForm?.value ?? {};
+    validationContext = pendingValidationContext(context, command.pendingState, windowState);
+    applyPrimitiveState(context, command.pendingState);
+    pendingApplied = true;
+    publish(context, key, {phase: 'pending', guarded: true, pending: true, retryAllowed: false,
+      invocationId: id, writerStatus: 'pending', syncStatus: 'not_started', message: 'Saving…'});
+  } catch (cause) {
+    error = cause;
+    for (const target of acquired) releaseTransport(target, key);
+  }
+  if (!error) {
+    const outcomes = await Promise.all(plan.map(member => dispatchGroupMember(member, key, unknownTransports,
+      () => current() && commandValidationPasses(validationContext, command) && commandValidationPasses(validationContext, member.command)
+        && (!member.when || evaluatePlainVisibleWhen(member.when, validationContext)))));
+    for (const [index, member] of plan.entries()) members[member.command.commandId] = outcomes[index];
+  }
+  const results = command.group.map(({command: child}) => members[child.commandId]);
+  const succeeded = results.filter(member => member.status === 'succeeded').length;
+  const allSucceeded = !error && succeeded === plan.length;
+  const status = allSucceeded ? 'succeeded' : unknownTransports.length ? 'indeterminate' : succeeded ? 'partial_failure' : 'failed';
+  const guarded = status === 'partial_failure' || status === 'indeterminate';
+  stateEntry(context, key).unknownGroupTransports = unknownTransports;
+  const accepted = results.some(member => member.invocationId);
+  const warnings = [];
+  if (pendingApplied && current()) {
+    try {
+      applyPrimitiveState(context, allSucceeded ? command.successState : status === 'indeterminate' ? command.indeterminateState : command.errorState);
+      if (succeeded) warnings.push(...await synchronizeUI(context, null, command, null, current, null, current, selectionCleared));
+      if (allSucceeded && current() && lifecycle.closeOnSuccess) await lifecycle.closeOnSuccess(current);
+    } catch (cause) {
+      warnings.push({stage: 'synchronize', error: cause});
     }
   }
+  const labels = results.filter(member => member.status !== 'skipped').map(member =>
+    member.label + ': ' + (member.message || member.status.replaceAll('_', ' ')));
+  const primary = error || results.find(member => member.error)?.error;
+  const message = error ? commandErrorMessage(error) : labels.join(' · ');
+  const visible = current();
+  publish(context, key, {phase: status, guarded, pending: false, retryAllowed: !guarded, invocationId: id,
+    message: visible ? message : guarded ? 'A previous submission needs verification before retrying.' : '',
+    members: visible ? members : {}, error: visible ? primary || null : null, warnings: visible ? warnings : [],
+    writerStatus: allSucceeded ? 'succeeded' : status === 'indeterminate' ? 'indeterminate' : accepted ? 'failed' : 'not_invoked',
+    syncStatus: succeeded && visible ? warnings.length ? 'partial_failure' : 'succeeded' : 'not_started'});
+  const result = {accepted, status, invocationId: id, members, warnings, ...(primary && {error: primary})};
+  if (current()) notifyLifecycle(lifecycle, 'onSettled', result);
+  return result;
 }
 
 function ambiguousWriterFailure(error) {
@@ -783,7 +926,8 @@ function clearSubmittedFields(context, submitted, warnings) {
 export async function executeCommand(context, command = {}, extras = {}, lifecycle = {}) {
   const targetRef = String(command.dataSourceRef || '').trim();
   const key = commandGuardKey(command);
-  if (!targetRef || !key || getCommandState(context, command).guarded) return {accepted: false, status: 'suppressed'};
+  const grouped = command.group != null;
+  if ((!targetRef && !grouped) || !key || getCommandState(context, command).guarded) return {accepted: false, status: 'suppressed'};
   if (!acquireSerialization(context, command, key)) {
     publish(context, key, {phase: 'idle', guarded: false, pending: false, retryAllowed: true, error: null, message: 'Another command in this group is running.', writerStatus: 'not_invoked', syncStatus: 'not_started'});
     return {accepted: false, status: 'group_busy'};
@@ -794,7 +938,7 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
   const ordered = Array.isArray(command.before) && command.before.length > 0;
   const clearFields = Array.isArray(command.clearFormFields) && command.clearFormFields.length > 0;
   const closesDialog = Boolean(lifecycle.dialogId) && typeof lifecycle.closeOnSuccess === 'function';
-  const needsExactReceipt = ordered || clearFields || closesDialog || command.receiptWhen != null || command.receiptIdentity != null;
+  const needsExactReceipt = grouped || ordered || clearFields || closesDialog || command.receiptWhen != null || command.receiptIdentity != null;
   let submittedFields;
   let formPatch;
   let sequence = null;
@@ -803,8 +947,11 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
   let dialogProps;
   let validationContext = context;
   const peek = signal => signal?.peek?.() ?? signal?.value;
-  const scopeSnapshot = () => JSON.stringify([peek(context?.signals?.authorization) ?? context?.authorization, needsExactReceipt ? peek(context?.signals?.selection) : null]);
-  const authorizationIsCurrent = () => (!protectedWindow || protectedWindowEpoch(windowId) === authorizationEpoch) && (originalScope === undefined || scopeSnapshot() === originalScope);
+  const authority = () => JSON.stringify(peek(context?.signals?.authorization) ?? context?.authorization ?? null);
+  const selection = () => needsExactReceipt ? JSON.stringify(peek(context?.signals?.selection) ?? null) : null;
+  const scopeSnapshot = () => ({authority: authority(), selection: selection()});
+  const authorizationIsCurrent = () => (!protectedWindow || protectedWindowEpoch(windowId) === authorizationEpoch)
+    && (!originalScope || (authority() === originalScope.authority && selection() === originalScope.selection));
   const presentationCurrent = () => !dialogSignal || (dialogSignal.peek()?.open === true && dialogSignal.peek().props === dialogProps);
   const uiIsCurrent = () => authorizationIsCurrent() && presentationCurrent();
   // Plain commands retain their declared window-wide state and owner refresh.
@@ -817,8 +964,8 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
     publish(context, key, {phase: 'failed', guarded: false, pending: false, retryAllowed: true, error, message: 'Authorization context changed. Reopen this window.', writerStatus: accepted ? 'failed' : 'not_invoked', syncStatus: 'not_started'});
     return {accepted, status: 'failed', error, invocationId};
   };
-  publish(context, key, {phase: 'validating', guarded: true, pending: false, retryAllowed: false, error: null, message: 'Validating…', writerStatus: 'not_invoked', syncStatus: 'not_started'});
-  let id = ordered ? invocationID() : '';
+  publish(context, key, {phase: 'validating', guarded: true, pending: false, retryAllowed: false, error: null, message: 'Validating…', writerStatus: 'not_invoked', syncStatus: 'not_started', ...(grouped && {members: {}})});
+  let id = ordered || grouped ? invocationID() : '';
   let writerInvoked = false;
   let writerSucceeded = false;
   let transportAcquired = false;
@@ -826,6 +973,7 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
   try {
     if (command.clearFormFields != null && !Array.isArray(command.clearFormFields)) throw new Error('Expected an array of clearFormFields.');
     validateWriterReceipt(command);
+    if (grouped) validateCommandGroup(command);
     if (command.before != null && !Array.isArray(command.before)) throw new Error('Expected an array of preparation steps.');
     if (needsExactReceipt || lifecycle.dialogId) originalScope = scopeSnapshot();
     if (lifecycle.dialogId) {
@@ -849,8 +997,9 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
     const formSynchronization = command.synchronizeForm === true && context?.signals?.form
       ? {expectedForm: parameterSnapshot(context.signals.form.peek?.() ?? context.signals.form.value)} : null;
     const baseParameters = mutationCommandTargetParameters(resolved, targetRef);
-    let preparedSnapshot = sequence ? null : preparedInputs(context, command, extras, extras, baseParameters);
-    let preparationExtras = command.prepare && !sequence ? parameterSnapshot(extras) : null;
+    const groupExtras = grouped ? parameterSnapshot(extras) : null;
+    let preparedSnapshot = sequence || grouped ? null : preparedInputs(context, command, extras, extras, baseParameters);
+    let preparationExtras = command.prepare && !sequence && !grouped ? parameterSnapshot(extras) : null;
     const confirmation = resolveCommandConfirmation(command, extras);
     if (confirmation) {
       if (typeof lifecycle.confirm !== 'function') {
@@ -863,6 +1012,12 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
         publish(context, key, {phase: 'idle', guarded: false, pending: false, retryAllowed: true, error: null, message: '', writerStatus: 'not_invoked', syncStatus: 'not_started'});
         return {accepted: false, status: 'cancelled'};
       }
+    }
+    if (grouped) {
+      const selectionCleared = destination => {
+        if (destination?.signals?.selection && destination.signals.selection === context.signals?.selection) originalScope.selection = selection();
+      };
+      return await runCommandGroup(context, command, key, id, baseParameters, groupExtras, uiIsCurrent, lifecycle, selectionCleared);
     }
     if (sequence) {
       if (!uiIsCurrent() || (confirmation && !rootEligible())) throw stepError('superseded','',new Error('Command eligibility changed before preparation.'));
@@ -991,7 +1146,7 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
         await unwindPreparation(context, command, sequence, key, authorizationIsCurrent, presentationCurrent, warnings);
       const unknown = primaryUnknown || cleanupUnknown || (!current && accepted);
       const status = primaryUnknown ? 'indeterminate' : error.stepStatus || 'failed';
-      if (uiIsCurrent()) {
+      if (!grouped && uiIsCurrent()) {
         if (accepted && !unknown) clearSubmittedFields(context, submittedFields, warnings);
         try { applyPrimitiveState(context, unknown ? command.indeterminateState : command.errorState); }
         catch (secondary) { warnings.push({stage: 'errorState', error: secondary}); }
@@ -1020,7 +1175,7 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
     return {accepted: writerInvoked, status: 'failed', error, invocationId: id};
   } finally {
     const current = getCommandState(context, command);
-    if (!(current.guarded && current.phase === 'indeterminate')) releaseSerialization(context, key);
+    if (!(current.guarded && ['indeterminate', 'partial_failure'].includes(current.phase))) releaseSerialization(context, key);
   }
 }
 
@@ -1031,7 +1186,7 @@ export function commandValidationPasses(context, command = {}) {
 }
 
 export function dispatchMutationCommand(context, command = {}, extras = {}, lifecycle = {}) {
-  if (!command.dataSourceRef || getCommandState(context, command).guarded) return false;
+  if ((!command.dataSourceRef && !command.group) || getCommandState(context, command).guarded) return false;
   if ((command.confirm || command.confirmSelection) && typeof lifecycle.confirm !== 'function') {
     void executeCommand(context, command, extras, lifecycle);
     return false;

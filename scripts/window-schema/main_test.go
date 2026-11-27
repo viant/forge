@@ -32,3 +32,39 @@ func TestSchemaPreservesNullableStringDictionaryValues(t *testing.T) {
 		})
 	}
 }
+
+func TestGroupedMutationAuthoringSchema(t *testing.T) {
+	originalDefinitions, originalGenerated := defs, generated
+	originalLoaded, originalProvenance := loaded, provenance
+	t.Cleanup(func() {
+		defs, generated = originalDefinitions, originalGenerated
+		loaded, provenance = originalLoaded, originalProvenance
+	})
+	defs, generated, loaded, provenance = map[string]definition{}, S{}, map[string]bool{}, map[string]string{}
+	load("../../backend/types", "")
+	ref("MutationCommand")
+
+	command := generated["MutationCommand"].(S)["properties"].(S)
+	group := command["group"].(S)
+	if group["type"] != "array" || !reflect.DeepEqual(group["items"], S{"$ref": "#/$defs/MutationGroupMember"}) {
+		t.Fatalf("group must be an array of authored members: %#v", group)
+	}
+	member := generated["MutationGroupMember"].(S)["properties"].(S)
+	if len(member) != 2 || member["when"] == nil || !reflect.DeepEqual(member["command"], S{"$ref": "#/$defs/MutationCommand"}) {
+		t.Fatalf("group member contains unexpected authored keys: %#v", member)
+	}
+	receipt := generated["ReceiptIdentity"].(S)["properties"].(S)
+	for _, key := range []string{"field", "submittedValues", "submittedRows", "submittedField"} {
+		if receipt[key].(S)["type"] != "string" {
+			t.Errorf("receipt selector %s has incorrect type", key)
+		}
+	}
+	if receipt["generated"].(S)["type"] != "boolean" || command["dataSourceRef"] == nil || command["before"] == nil {
+		t.Fatal("existing receipt or single/ordered writer metadata changed")
+	}
+	for _, field := range []string{"members", "invocationId", "guarded", "writerStatus", "syncStatus", "phase"} {
+		if command[field] != nil || member[field] != nil || receipt[field] != nil {
+			t.Errorf("runtime state field %q leaked into the authoring schema", field)
+		}
+	}
+}

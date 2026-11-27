@@ -1,16 +1,22 @@
 import Foundation
 
-private enum MutationReceiptID: Hashable {
+private enum MutationReceiptID: Hashable, Sendable {
     case string(Data)
     case number(Double)
 }
 
-private func mutationIdentitySet(_ rows: [JSONValue], field: String) -> Set<MutationReceiptID>? {
+private func mutationIdentitySet(_ rows: [JSONValue], field: String?) -> Set<MutationReceiptID>? {
     guard !rows.isEmpty else { return nil }
     var ids = Set<MutationReceiptID>()
-    let path = field.components(separatedBy: ".")
+    let path = field?.components(separatedBy: ".")
     for row in rows {
-        guard row.objectValue != nil, let value = resourceResolveValue(row, components: path, strictIndices: true) else { return nil }
+        let value: JSONValue
+        if let path {
+            guard row.objectValue != nil, let nested = resourceResolveValue(row, components: path, strictIndices: true) else { return nil }
+            value = nested
+        } else {
+            value = row
+        }
         let id: MutationReceiptID
         switch value {
         case .string(let value) where !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty:
@@ -34,6 +40,7 @@ public enum MutationCommandPhase: String, Codable, Sendable {
     case pending
     case succeeded
     case failed
+    case partialFailure = "partial_failure"
     case indeterminate
 }
 
@@ -64,6 +71,22 @@ public struct MutationCommandWarning: Codable, Sendable, Equatable {
     }
 }
 
+public struct MutationGroupMemberOutcome: Codable, Sendable, Equatable {
+    public let label: String
+    public let status: String
+    public let invocationId: String?
+    public let rows: [JSONValue]?
+    public let error: String?
+
+    public init(label: String, status: String, invocationId: String? = nil, rows: [JSONValue]? = nil, error: String? = nil) {
+        self.label = label
+        self.status = status
+        self.invocationId = invocationId
+        self.rows = rows
+        self.error = error
+    }
+}
+
 public struct MutationCommandState: Codable, Sendable, Equatable {
     public let phase: MutationCommandPhase
     public let guarded: Bool
@@ -76,6 +99,7 @@ public struct MutationCommandState: Codable, Sendable, Equatable {
     public let writerStatus: MutationWriterStatus
     public let syncStatus: MutationSyncStatus
     public let warnings: [MutationCommandWarning]
+    public let members: [String: MutationGroupMemberOutcome]?
 
     public init(
         phase: MutationCommandPhase = .idle,
@@ -88,7 +112,8 @@ public struct MutationCommandState: Codable, Sendable, Equatable {
         failedStepId: String? = nil,
         writerStatus: MutationWriterStatus = .idle,
         syncStatus: MutationSyncStatus = .notStarted,
-        warnings: [MutationCommandWarning] = []
+        warnings: [MutationCommandWarning] = [],
+        members: [String: MutationGroupMemberOutcome]? = nil
     ) {
         self.phase = phase
         self.guarded = guarded
@@ -101,6 +126,7 @@ public struct MutationCommandState: Codable, Sendable, Equatable {
         self.writerStatus = writerStatus
         self.syncStatus = syncStatus
         self.warnings = warnings
+        self.members = members
     }
 }
 
@@ -111,14 +137,16 @@ public struct MutationCommandResult: Sendable, Equatable {
     public let failedStepId: String?
     public let error: String?
     public let warnings: [MutationCommandWarning]
+    public let members: [String: MutationGroupMemberOutcome]?
 
-    public init(accepted: Bool, status: String, invocationId: String = "", failedStepId: String? = nil, error: String? = nil, warnings: [MutationCommandWarning] = []) {
+    public init(accepted: Bool, status: String, invocationId: String = "", failedStepId: String? = nil, error: String? = nil, warnings: [MutationCommandWarning] = [], members: [String: MutationGroupMemberOutcome]? = nil) {
         self.accepted = accepted
         self.status = status
         self.failedStepId = failedStepId
         self.invocationId = invocationId
         self.error = error
         self.warnings = warnings
+        self.members = members
     }
 }
 
@@ -128,7 +156,7 @@ private enum MutationWriterOutcome: Sendable {
     case indeterminate
 }
 
-private struct MutationOperation {
+private struct MutationOperation: Sendable {
     let key: String
     let id: String
     let windowID: String
@@ -143,7 +171,7 @@ private struct MutationOperation {
     let fileFields: Set<String>
     let submittedFiles: [String: FormFileSelection]
     var plainDialogFooter: Bool {
-        presentationID != nil && footer?.close == false && root.before?.isEmpty != false && root.clearFormFields.isEmpty && root.receiptWhen == nil && root.receiptIdentity == nil
+        presentationID != nil && footer?.close == false && root.group == nil && root.before?.isEmpty != false && root.clearFormFields.isEmpty && root.receiptWhen == nil && root.receiptIdentity == nil
     }
 
 }
@@ -154,6 +182,20 @@ private struct MutationDispatchFailure: Error {
     var invoked = false
     var lostScope = false
     var unknown = false
+}
+
+private struct PreparedMutationWriter: Sendable {
+    let parameters: [String: JSONValue]
+    let identities: Set<MutationReceiptID>?
+}
+
+private struct PreparedMutationGroupMember: Sendable {
+    let id: String
+    let label: String
+    let invocation: String
+    let command: MutationCommandDef
+    let condition: DashboardConditionDef?
+    let input: PreparedMutationWriter
 }
 
 private actor MutationWriterRace {
@@ -195,7 +237,8 @@ extension ForgeRuntime {
         message: String = ""
     ) async -> Bool {
         let key = mutationCommandKey(windowID: windowID, command: command)
-        guard await mutationCommandStates[key]?.peek().phase == .indeterminate else { return false }
+        guard let state = await mutationCommandStates[key]?.peek(),
+              state.phase == .indeterminate || state.phase == .partialFailure else { return false }
         guardedMutationCommands.remove(key)
         mutationTransportOwners = mutationTransportOwners.filter { $0.value != key }
         mutationSerializationOwners = mutationSerializationOwners.filter { $0.value != key }
@@ -238,7 +281,7 @@ extension ForgeRuntime {
     ) async -> MutationCommandResult {
         let targetRef = command.dataSourceRef.trimmingCharacters(in: .whitespacesAndNewlines)
         let key = mutationCommandKey(windowID: windowID, command: command)
-        guard !targetRef.isEmpty, !guardedMutationCommands.contains(key) else {
+        guard command.group != nil || !targetRef.isEmpty, !guardedMutationCommands.contains(key) else {
             return MutationCommandResult(accepted: false, status: "suppressed")
         }
         let group = command.serializationGroup?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -253,6 +296,11 @@ extension ForgeRuntime {
             }
         }
         guardedMutationCommands.insert(key)
+        if let error = command.groupValidationError() {
+            guardedMutationCommands.remove(key)
+            await publishMutationState(key, .init(phase: .failed, error: error, message: error, writerStatus: .notInvoked))
+            return .init(accepted: false, status: "invalid_payload", error: error)
+        }
         await publishMutationState(key, MutationCommandState(
             phase: .validating, guarded: true, retryAllowed: false,
             message: "Validating…", writerStatus: .notInvoked
@@ -291,6 +339,15 @@ extension ForgeRuntime {
             return MutationCommandResult(accepted: false, status: "invalid", error: message)
         }
 
+        // JSONValue is recursively value-typed, so preparation sees two
+        // independent snapshots taken before yielding to confirmation.
+        let groupParameters: [String: JSONValue]
+        if command.group != nil, !command.parameters.isEmpty,
+           let scope = await mutationScope(windowID: windowID, source: sourceDataSourceRef) {
+            groupParameters = scope.resolvedParameters(command.parameters, target: command.dataSourceRef)
+        } else {
+            groupParameters = [:]
+        }
         let resolvedConfirmation = resolveMutationConfirmation(command: command, extras: extras)
         if !resolvedConfirmation.isEmpty {
             let confirmation = resolvedConfirmation
@@ -313,8 +370,10 @@ extension ForgeRuntime {
             }
         }
 
-        guard await mutationDataSourceExists(windowID: windowID, dataSourceRef: targetRef) else {
-            let message = "Command datasource is unavailable: \(targetRef)"
+        let requiredWriters = command.group?.map { $0.command.dataSourceRef } ?? [targetRef]
+        let freshMetadata = await windowMetadata(id: windowID)
+        if let missing = requiredWriters.first(where: { freshMetadata?.dataSources[$0] == nil }) {
+            let message = "Command datasource is unavailable: \(missing)"
             guardedMutationCommands.remove(key)
             await publishMutationState(key, MutationCommandState(
                 phase: .failed, error: message, message: message, writerStatus: .notInvoked
@@ -325,7 +384,7 @@ extension ForgeRuntime {
 
         let invocationId = UUID().uuidString
         var originalPendingFields: [String: JSONValue] = [:]
-        if command.before?.isEmpty == false, !command.pendingState.isEmpty {
+        if command.group != nil || command.before?.isEmpty == false, !command.pendingState.isEmpty {
             let original = await windowFormJSONValue(windowID: windowID)
             for field in command.pendingState.keys { originalPendingFields[field] = original[field] }
         }
@@ -333,6 +392,9 @@ extension ForgeRuntime {
             key: key, id: invocationId, windowID: windowID, source: sourceDataSourceRef,
             authorization: admitted, selection: originalSelection, root: command, footer: footer, dialogSignal: dialogSignal,
             presentationID: originalPresentation, originalPendingFields: originalPendingFields, fileFields: fileFields, submittedFiles: submittedFiles)
+        if let members = command.group {
+            return await executeMutationGroup(members, operation: operation, parameters: groupParameters, extras: extras, dialogID: dialogID)
+        }
         let steps = command.before ?? []
         var receipts: [String: JSONValue] = [:]
         var cleanups: [(id: String, command: MutationCommandDef)] = []
@@ -491,6 +553,149 @@ extension ForgeRuntime {
         }
     }
 
+    private func executeMutationGroup(
+        _ members: [MutationGroupMemberDef], operation: MutationOperation, parameters: [String: JSONValue],
+        extras: [String: JSONValue], dialogID: String?
+    ) async -> MutationCommandResult {
+        let root = operation.root
+        let windowID = operation.windowID
+        func preflightFailure(_ message: String, status: String = "invalid_payload") async -> MutationCommandResult {
+            await publishMutationState(operation.key, .init(phase: .failed, error: message, message: message,
+                invocationId: operation.id, writerStatus: .notInvoked))
+            guardedMutationCommands.remove(operation.key)
+            return .init(accepted: false, status: status, invocationId: operation.id, error: message)
+        }
+
+        guard !Task.isCancelled, await operationIsCurrent(operation), await presentationIsCurrent(operation),
+              let scope = await mutationScope(windowID: windowID, source: operation.source) else {
+            return await preflightFailure("The command scope changed.", status: "superseded")
+        }
+        var outcomes: [String: MutationGroupMemberOutcome] = [:]
+        var plans: [PreparedMutationGroupMember] = []
+        do {
+            let mapped: [String: JSONValue]?
+            if let prepare = root.prepare, !prepare.isEmpty {
+                let result = try scope.invoke(prepare, props: ["extras": .object(extras), "parameters": .object(parameters)])
+                guard let map = result?.objectValue,
+                      Set(map.keys).isSubset(of: Set(members.compactMap { $0.command.commandId })),
+                      map.values.allSatisfy({ $0.objectValue != nil }) else {
+                    return await preflightFailure("Group preparation must return input maps keyed by member command ID.")
+                }
+                mapped = map
+            } else { mapped = nil }
+
+            let base = mapped == nil ? deepMergeMutationValues(parameters, extras) : [:]
+            for member in members {
+                guard let id = member.command.commandId else { continue }
+                let command = member.command
+                let label = command.label ?? id
+                guard scope.allows(member.when), mapped == nil || mapped?[id] != nil else {
+                    outcomes[id] = .init(label: label, status: "skipped")
+                    continue
+                }
+                guard scope.allows(command.validateWhen) else {
+                    return await preflightFailure(command.invalidMessage ?? "\(label): This action is not currently valid.", status: "invalid")
+                }
+                let invocation = UUID().uuidString
+                let input = try prepareMutationWriter(
+                    command, invocation: invocation, scope: scope, extras: mapped?[id]?.objectValue ?? base, receipts: nil, compensating: false)
+                plans.append(.init(id: id, label: label, invocation: invocation, command: command, condition: member.when, input: input))
+            }
+        } catch {
+            return await preflightFailure((error as? MutationDispatchFailure)?.message ?? error.localizedDescription)
+        }
+        let writers = plans.map { mutationTransportKey(windowID: windowID, dataSourceRef: $0.command.dataSourceRef) }
+        if !plans.isEmpty {
+            guard !Task.isCancelled, await operationIsCurrent(operation), await presentationIsCurrent(operation) else {
+                return await preflightFailure("The command scope changed.", status: "superseded")
+            }
+            guard writers.allSatisfy({ mutationTransportOwners[$0] == nil }) else {
+                return await preflightFailure("Another command is using a group writer.", status: "transport_busy")
+            }
+            for writer in writers { mutationTransportOwners[writer] = operation.key }
+            await applyMutationWindowState(windowID: windowID, patch: root.pendingState)
+            await publishMutationState(operation.key, .init(phase: .pending, guarded: true, pending: true, retryAllowed: false,
+                message: "Saving…", invocationId: operation.id, writerStatus: .pending, members: outcomes))
+        }
+        await withTaskGroup(of: (String, MutationGroupMemberOutcome).self) { tasks in
+            for plan in plans {
+                tasks.addTask { await self.executeMutationGroupMember(plan, operation: operation) }
+            }
+            for await (id, result) in tasks {
+                outcomes[id] = result
+                await publishMutationState(operation.key, .init(phase: .pending, guarded: true, pending: true, retryAllowed: false,
+                    message: "Saving…", invocationId: operation.id, writerStatus: .pending, members: outcomes))
+            }
+        }
+        for (plan, writer) in zip(plans, writers)
+        where outcomes[plan.id]?.status != "indeterminate" && mutationTransportOwners[writer] == operation.key {
+            mutationTransportOwners.removeValue(forKey: writer)
+        }
+        let committed = outcomes.values.filter { $0.status == "succeeded" }.count
+        let failed = outcomes.values.contains { $0.status == "failed" }
+        let unknown = outcomes.values.contains { $0.status == "indeterminate" }
+        let attempted = outcomes.values.contains { $0.invocationId != nil }
+        let interrupted = outcomes.values.contains { $0.status == "not_invoked" }
+
+        let partial = committed > 0 && (failed || interrupted)
+        let held = partial || unknown
+        let succeeded = committed > 0 && !held && !failed && !interrupted
+        let status = if unknown { "indeterminate" } else if partial { "partial_failure" }
+            else if succeeded { "succeeded" } else if interrupted { "superseded" } else if failed { "failed" } else { "skipped" }
+        let phase: MutationCommandPhase = if unknown { .indeterminate } else if partial { .partialFailure }
+            else if succeeded { .succeeded } else if status == "skipped" { .idle } else { .failed }
+        let message = members.compactMap { member -> String? in
+            guard let id = member.command.commandId, let outcome = outcomes[id] else { return nil }
+            let summary = switch outcome.status {
+            case "succeeded": "completed"
+            case "failed": outcome.error ?? "failed"
+            case "indeterminate": "verify the outcome"
+            case "not_invoked": "not submitted"
+            default: "skipped"
+            }
+            return "\(outcome.label): \(summary)"
+        }.joined(separator: "\n")
+        defer { if !held { guardedMutationCommands.remove(operation.key) } }
+        let current = await completionIsCurrent(operation)
+        if current {
+            let patch = if succeeded { root.successState } else if unknown { root.indeterminateState }
+                else if failed || partial { root.errorState } else { [:] as [String: JSONValue] }
+            await applyMutationWindowState(windowID: windowID, patch: patch)
+        }
+        let warnings = committed == 0 ? [] : await synchronizeMutationUI(
+            windowID: windowID, targetDataSourceRef: operation.source, command: root,
+            authorization: operation.authorization, receipt: nil, presentation: operation)
+        // Clearing the owner's selection is an authorized refresh effect. It
+        // cannot invalidate this presentation's terminal state or close.
+        let currentPresentation = await operationOwnerIsCurrent(operation) ? await presentationIsCurrent(operation) : false
+        await publishMutationState(operation.key, .init(phase: phase, guarded: held, retryAllowed: !held,
+            error: currentPresentation && failed && !held ? message : nil, message: currentPresentation ? message : "", invocationId: operation.id,
+            writerStatus: unknown ? .indeterminate : succeeded ? .succeeded : attempted ? .failed : .notInvoked,
+            syncStatus: committed == 0 ? .notStarted : warnings.isEmpty ? .succeeded : .partialFailure, warnings: warnings, members: outcomes))
+        if succeeded, currentPresentation, operation.footer?.close == true, let dialogID, let presentationID = operation.presentationID {
+            await closeDialog(windowID: windowID, dialogID: dialogID, presentationID: presentationID)
+        }
+        return .init(accepted: attempted, status: status, invocationId: operation.id, error: failed && !held ? message : nil,
+            warnings: warnings, members: outcomes)
+    }
+
+    private func executeMutationGroupMember(
+        _ member: PreparedMutationGroupMember, operation: MutationOperation
+    ) async -> (String, MutationGroupMemberOutcome) {
+        do {
+            let rows = try await dispatchMutationWriter(
+                member.command, invocation: member.invocation, operation: operation, extras: [:], receipts: nil,
+                begin: false, child: true, memberWhen: member.condition, prepared: member.input)
+            return (member.id, .init(label: member.label, status: "succeeded", invocationId: member.invocation, rows: rows))
+        } catch {
+            let failure = error as? MutationDispatchFailure ?? .init(status: "invalid_payload", message: error.localizedDescription)
+            let status = if failure.status == "skipped" { "skipped" } else if failure.lostScope && !failure.invoked { "not_invoked" }
+                else if failure.unknown { "indeterminate" } else { "failed" }
+            return (member.id, .init(label: member.label, status: status, invocationId: failure.invoked ? member.invocation : nil,
+                error: status == "skipped" ? nil : failure.message))
+        }
+    }
+
     private func applySuccessFormState(_ operation: MutationOperation, dialogID: String?, submitted: [String: JSONValue]) async -> SubmittedFormPatchDisposition {
         let patch = operation.root.successFormState
         guard !patch.isEmpty, let dialogID, let presentation = operation.presentationID else { return .unchanged }
@@ -530,10 +735,13 @@ extension ForgeRuntime {
         return await presentationIsCurrent(operation)
     }
 
+    private func operationOwnerIsCurrent(_ operation: MutationOperation) async -> Bool {
+        guard windows.contains(where: { $0.id == operation.windowID }) else { return false }
+        return await windowMetadata(id: operation.windowID)?.authorizationSnapshot == operation.authorization
+    }
+
     private func operationIsCurrent(_ operation: MutationOperation) async -> Bool {
-        guard windows.contains(where: { $0.id == operation.windowID }),
-            await windowMetadata(id: operation.windowID)?.authorizationSnapshot == operation.authorization
-        else { return false }
+        guard await operationOwnerIsCurrent(operation) else { return false }
         return await dataSourceSelectionState(windowID: operation.windowID, dataSourceRef: operation.source) == operation.selection
     }
 
@@ -547,21 +755,26 @@ extension ForgeRuntime {
     /// preparation, transport lease and invocation-bound receipt path.
     private func dispatchMutationWriter(
         _ command: MutationCommandDef, invocation: String, operation: MutationOperation, extras: [String: JSONValue],
-        receipts: [String: JSONValue]?, begin: Bool, child: Bool, compensating: Bool = false
+        receipts: [String: JSONValue]?, begin: Bool, child: Bool, compensating: Bool = false, memberWhen: DashboardConditionDef? = nil, prepared: PreparedMutationWriter? = nil
     ) async throws -> [JSONValue]? {
         let windowID = operation.windowID, source = operation.source, target = command.dataSourceRef
-        guard await operationIsCurrent(operation) else { throw scopeFailure() }
+        guard (!Task.isCancelled || operation.root.group == nil), await operationIsCurrent(operation) else { throw scopeFailure() }
         guard let scope = await mutationScope(windowID: windowID, source: source), scope.metadata.dataSources[target] != nil else {
             throw MutationDispatchFailure(status: "failed", message: "Command datasource is unavailable: \(target)")
         }
-        let ordered = receipts != nil
-        func eligible(_ scope: MutationScope) -> Bool {
+        let grouped = operation.root.group != nil
+        let ordered = receipts != nil || grouped
+        func eligibilityScope(_ scope: MutationScope) -> MutationScope {
             var live = scope
             if ordered && !begin {
                 for (field, pending) in operation.root.pendingState where live.windowForm[field] == pending {
                     live.windowForm[field] = operation.originalPendingFields[field]
                 }
             }
+            return live
+        }
+        func eligible(_ scope: MutationScope) -> Bool {
+            let live = eligibilityScope(scope)
             guard live.allows(operation.root.validateWhen), live.allows(operation.footer?.visibleWhen) else { return false }
             return !(operation.footer?.disabledWhen.map { live.allows($0) } ?? false)
         }
@@ -571,41 +784,32 @@ extension ForgeRuntime {
                 throw MutationDispatchFailure(status:"invalid_payload", message:"The action is no longer eligible.")
             }
         }
-        if child && !scope.allows(command.validateWhen) {
+        let childScope = grouped ? eligibilityScope(scope) : scope
+        if grouped, !childScope.allows(memberWhen) { throw MutationDispatchFailure(status: "skipped", message: "") }
+        if child && !childScope.allows(command.validateWhen) {
             throw MutationDispatchFailure(status: "invalid", message: command.invalidMessage ?? "This action is not currently valid.")
         }
         let lease = mutationTransportKey(windowID: windowID, dataSourceRef: target)
-        guard mutationTransportOwners[lease] == nil else {
+        guard grouped ? mutationTransportOwners[lease] == operation.key : mutationTransportOwners[lease] == nil else {
             throw MutationDispatchFailure(status: "transport_busy", message: "Another command is using this datasource.")
         }
-        mutationTransportOwners[lease] = operation.key
+        if !grouped { mutationTransportOwners[lease] = operation.key }
         var retainLease = false
-        defer { if !retainLease { mutationTransportOwners.removeValue(forKey: lease) } }
+        defer { if !grouped && !retainLease { mutationTransportOwners.removeValue(forKey: lease) } }
         if begin && command.prepare?.isEmpty == false {
             await publishMutationState(
                 operation.key, .init(phase: .preparing, guarded: true, retryAllowed: false, message: "Preparing…", writerStatus: .notInvoked))
         }
-        var parameters = try scope.parameters(command: command, extras: extras, stepReceipts: receipts)
+        let input = try prepared ?? prepareMutationWriter(
+            command, invocation: invocation, scope: scope, extras: extras, receipts: receipts, compensating: compensating)
         guard await operationIsCurrent(operation) else { throw scopeFailure() }
         if ordered, !compensating, let fresh = await mutationScope(windowID: windowID, source: source) {
             guard await presentationIsCurrent(operation) else { throw scopeFailure() }
-            guard eligible(fresh), !child || fresh.allows(command.validateWhen) else {
+            let freshChild = grouped ? eligibilityScope(fresh) : fresh
+            if grouped, !freshChild.allows(memberWhen) { throw MutationDispatchFailure(status: "skipped", message: "") }
+            guard eligible(fresh), !child || freshChild.allows(command.validateWhen) else {
                 throw MutationDispatchFailure(status:"invalid", message: command.invalidMessage ?? "The action is no longer eligible.")
             }
-        }
-        if let field = command.invocationParameter?.trimmingCharacters(in: .whitespacesAndNewlines), !field.isEmpty {
-            parameters[field] = .string(invocation)
-        }
-        let submittedIdentity: Set<MutationReceiptID>?
-        if !compensating, let identity = command.receiptIdentity, identity.generated != true {
-            guard let path = identity.submittedRows,
-                  let rows = resourceResolveValue(.object(parameters), components: path.components(separatedBy: "."), strictIndices: true)?.arrayValue,
-                  let ids = mutationIdentitySet(rows, field: identity.submittedField ?? identity.field) else {
-                throw MutationDispatchFailure(status: "invalid_payload", message: "Submitted receipt identities are missing or invalid.")
-            }
-            submittedIdentity = ids
-        } else {
-            submittedIdentity = nil
         }
         if begin {
             await applyMutationWindowState(windowID: windowID, patch: operation.root.pendingState)
@@ -615,7 +819,7 @@ extension ForgeRuntime {
                     phase: .pending, guarded: true, pending: true, retryAllowed: false, message: "Saving…",
                     invocationId: operation.id, writerStatus: child ? .notInvoked : .pending))
         }
-        await setDataSourceInputParameters(windowID: windowID, dataSourceRef: target, parameters: parameters, preservePendingFetch: false)
+        await setDataSourceInputParameters(windowID: windowID, dataSourceRef: target, parameters: input.parameters, preservePendingFetch: false)
         guard await operationIsCurrent(operation) else { throw scopeFailure() }
         if !child && !begin {
             await publishMutationState(
@@ -630,11 +834,12 @@ extension ForgeRuntime {
                 throw MutationDispatchFailure(status: "invalid_payload", message: "The selected file changed. Review it before saving.")
             }
         }
-        let exactReceipt = receipts != nil || (!compensating && (command.receiptWhen != nil || command.receiptIdentity != nil)) || (!child && operation.footer?.close == true)
+        let exactReceipt = ordered || (!compensating && (command.receiptWhen != nil || command.receiptIdentity != nil)) || (!child && operation.footer?.close == true)
+        if grouped, Task.isCancelled { throw scopeFailure() }
         let outcome = await awaitMutationWriter(
             windowID: windowID, dataSourceRef: target, timeoutMs: max(1_000, command.timeoutMs ?? 30_000),
             requireRecords: child || !command.resultState.isEmpty || exactReceipt, ordered: exactReceipt,
-            guardTransportErrors: exactReceipt || !command.successFormState.isEmpty)
+            guardTransportErrors: exactReceipt || !command.successFormState.isEmpty, groupInvocation: grouped ? invocation : nil)
         if case .indeterminate = outcome {
             retainLease = true
             throw MutationDispatchFailure(
@@ -644,7 +849,7 @@ extension ForgeRuntime {
         }
         switch outcome {
         case .succeeded(let rows):
-            if child, await !operationIsCurrent(operation) { throw scopeFailure(invoked: true) }
+            if child && !grouped, await !operationIsCurrent(operation) { throw scopeFailure(invoked: true) }
             if !compensating, (command.receiptWhen != nil || command.rejectedWhen != nil),
                let failure = Self.classifyWriterReceipt(rows ?? [], accepted: command.receiptWhen, rejected: command.rejectedWhen) {
                 retainLease = failure.unknown
@@ -652,7 +857,7 @@ extension ForgeRuntime {
             }
             if !compensating, let identity = command.receiptIdentity {
                 let actual = rows.flatMap { mutationIdentitySet($0, field: identity.field) }
-                let valid = identity.generated == true ? (rows?.count == 1 && actual?.count == 1) : actual != nil && actual == submittedIdentity
+                let valid = identity.generated == true ? (rows?.count == 1 && actual?.count == 1) : actual != nil && actual == input.identities
                 guard valid else {
                     retainLease = true
                     throw MutationDispatchFailure(status: "indeterminate", message: "The producer did not confirm the requested identities. Verify the outcome before retrying.", invoked: true, unknown: true)
@@ -661,10 +866,29 @@ extension ForgeRuntime {
             retainLease = !child  // final synchronization still owns its writer's collection.
             return rows
         case .failed(let error):
-            guard await operationIsCurrent(operation) else { throw scopeFailure(invoked: true) }
+            if !grouped, await !operationIsCurrent(operation) { throw scopeFailure(invoked: true) }
             throw MutationDispatchFailure(status: "failed", message: error, invoked: true)
         case .indeterminate: preconditionFailure("Handled above")
         }
+    }
+
+    private func prepareMutationWriter(
+        _ command: MutationCommandDef, invocation: String, scope: MutationScope, extras: [String: JSONValue],
+        receipts: [String: JSONValue]?, compensating: Bool
+    ) throws -> PreparedMutationWriter {
+        var parameters = try scope.parameters(command: command, extras: extras, stepReceipts: receipts)
+        if let field = command.invocationParameter?.trimmingCharacters(in: .whitespacesAndNewlines), !field.isEmpty {
+            parameters[field] = .string(invocation)
+        }
+        guard !compensating, let identity = command.receiptIdentity, identity.generated != true else {
+            return .init(parameters: parameters, identities: nil)
+        }
+        guard let path = identity.submittedRows ?? identity.submittedValues,
+              let rows = resourceResolveValue(.object(parameters), components: path.components(separatedBy: "."), strictIndices: true)?.arrayValue,
+              let ids = mutationIdentitySet(rows, field: identity.submittedValues == nil ? identity.submittedField ?? identity.field : nil) else {
+            throw MutationDispatchFailure(status: "invalid_payload", message: "Submitted receipt identities are missing or invalid.")
+        }
+        return .init(parameters: parameters, identities: ids)
     }
 
     private static func classifyWriterReceipt(_ rows: [JSONValue], accepted: DashboardConditionDef?, rejected: DashboardConditionDef?) -> MutationDispatchFailure? {
@@ -710,11 +934,12 @@ extension ForgeRuntime {
     }
 
     private func awaitMutationWriter(
-        windowID: String, dataSourceRef: String, timeoutMs: Int, requireRecords: Bool, ordered: Bool, guardTransportErrors: Bool
+        windowID: String, dataSourceRef: String, timeoutMs: Int, requireRecords: Bool, ordered: Bool, guardTransportErrors: Bool, groupInvocation: String?
     ) async -> MutationWriterOutcome {
         let race = MutationWriterRace()
         let writer = Task {
-            let receipt = await self.refreshDataSourceRows(windowID: windowID, dataSourceRef: dataSourceRef, requireInvocationRecords: ordered)
+            let receipt = await self.refreshDataSourceRows(windowID: windowID, dataSourceRef: dataSourceRef, requireInvocationRecords: ordered,
+                bypassCache: groupInvocation != nil, invocationId: groupInvocation)
             switch receipt {
             case .success(let rows): await race.resolve(.succeeded(requireRecords ? rows : nil))
             case .failure(let error):
@@ -737,10 +962,20 @@ extension ForgeRuntime {
             try? await Task.sleep(for: .milliseconds(timeoutMs))
             if !Task.isCancelled { await race.resolve(.indeterminate) }
         }
-        let outcome = await race.wait()
+        let outcome = if groupInvocation != nil {
+            await withTaskCancellationHandler(operation: { await race.wait() }, onCancel: {
+                Task { await race.resolve(.indeterminate) }
+            })
+        } else { await race.wait() }
         writer.cancel()
         timeout.cancel()
         return outcome
+    }
+
+    private func groupSynchronizationIsCurrent(_ operation: MutationOperation, afterClearingSource: Bool) async -> Bool {
+        guard await operationOwnerIsCurrent(operation), await presentationIsCurrent(operation) else { return false }
+        let expected = afterClearingSource ? SelectionState() : operation.selection
+        return await dataSourceSelectionState(windowID: operation.windowID, dataSourceRef: operation.source) == expected
     }
 
     private func synchronizeMutationUI(windowID: String, targetDataSourceRef: String, command: MutationCommandDef, authorization: [String: JSONValue]?, receipt: [[String: JSONValue]]?, presentation: MutationOperation? = nil) async -> [MutationCommandWarning] {
@@ -769,7 +1004,31 @@ extension ForgeRuntime {
                 warnings.append(MutationCommandWarning(stage: "reconcile", dataSourceRef: reconcile.dataSourceRef, message: error.localizedDescription))
             }
         }
+        var clearedSource = false
         for refresh in command.refresh {
+            if command.group != nil, let presentation {
+                let ref = refresh.dataSourceRef
+                guard await groupSynchronizationIsCurrent(presentation, afterClearingSource: clearedSource) else {
+                    warnings.append(.init(stage: "refresh", dataSourceRef: ref, message: "The original command presentation is no longer current."))
+                    break
+                }
+                if refresh.clearSelection {
+                    await setDataSourceSelection(windowID: windowID, dataSourceRef: ref, selected: nil)
+                    if ref == presentation.source { clearedSource = true }
+                }
+                let afterClear = clearedSource
+                let receipt = await refreshDataSourceRows(windowID: windowID, dataSourceRef: ref, bypassCache: refresh.bypassCache, current: {
+                    await self.groupSynchronizationIsCurrent(presentation, afterClearingSource: afterClear)
+                })
+                guard await groupSynchronizationIsCurrent(presentation, afterClearingSource: clearedSource) else {
+                    warnings.append(.init(stage: "refresh", dataSourceRef: ref, message: "The original command presentation is no longer current."))
+                    break
+                }
+                if case .failure(let error) = receipt {
+                    warnings.append(.init(stage: "refresh", dataSourceRef: ref, message: error.localizedDescription))
+                }
+                continue
+            }
             guard await windowMetadata(id: windowID)?.authorizationSnapshot == authorization else { break }
             let original = await originalDialog()
             if !original && (command.receiptWhen != nil || command.receiptIdentity != nil) { break }
@@ -803,10 +1062,6 @@ extension ForgeRuntime {
             let visible = scope.allows(action.visibleWhen)
             return (visible, !visible || (action.disabledWhen.map { scope.allows($0) } ?? false) || !scope.allows(action.mutationCommand?.validateWhen))
         }
-    }
-
-    private func mutationDataSourceExists(windowID: String, dataSourceRef: String) async -> Bool {
-        await windowMetadata(id: windowID)?.dataSources[dataSourceRef] != nil
     }
 
     private func applyMutationWindowState(windowID: String, patch: [String: JSONValue]) async {

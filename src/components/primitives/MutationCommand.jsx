@@ -50,12 +50,12 @@ export default function MutationCommand({command, context, extras = {}, disabled
     ? (!valid ? command?.invalidMessage || command?.tooltip : command?.tooltip)
     : '';
   const busy = state.guarded === true || ['validating', 'confirming', 'pending'].includes(state.phase);
-  const plainFooter = dialogId && !closeOnSuccess && !command.before?.length && !command.clearFormFields?.length;
-  const dialog = plainFooter && findDialogSignal(`${context?.identity?.windowId}Dialog${dialogId}`);
+  const scopedFooter = dialogId && (command.group || (!closeOnSuccess && !command.before?.length && !command.clearFormFields?.length));
+  const dialog = scopedFooter && findDialogSignal(`${context?.identity?.windowId}Dialog${dialogId}`);
   const presentation = dialog?.peek?.()?.props;
   const activatedPresentation = React.useRef(null);
   const belongsHere = !dialog || (activatedPresentation.current?.props === presentation && activatedPresentation.current?.binding === binding);
-  const statusMessage = !belongsHere ? (state.guarded ? (state.phase === 'indeterminate'
+  const statusMessage = !belongsHere ? (state.guarded ? (['indeterminate', 'partial_failure'].includes(state.phase)
     ? 'A previous submission needs verification before retrying.' : 'Another submission is in progress.') : '') : state.message || ({validating: 'Validating…', confirming: 'Awaiting confirmation…', preparing: 'Preparing…', pending: 'Saving…', indeterminate: 'Outcome unknown; refresh authoritative data before retrying.'}[state.phase]) || (state.guarded ? 'Working…' : '');
   const invoke = () => {
     mutationLog.debug('activate', {commandId: command?.commandId, dataSourceRef: command?.dataSourceRef, blocked, busy, phase: state.phase, guarded: getMutationCommandState(context, command).guarded});

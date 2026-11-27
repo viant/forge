@@ -13,18 +13,23 @@ data class MutationReceiptIdentityDef(
     val field: String,
     val submittedRows: String? = null,
     val submittedField: String? = null,
-    val generated: Boolean? = null
+    val generated: Boolean? = null,
+    val submittedValues: String? = null
 ) {
     @Transient private val returnedPath = field.split('.')
-    @Transient private val rowsPath = submittedRows?.split('.')
+    @Transient private val rowsPath = (submittedRows ?: submittedValues)?.split('.')
     @Transient private val submittedPath = submittedField?.split('.') ?: returnedPath
     internal val valid get() = returnedPath.all(::safeFormField) && submittedPath.all(::safeFormField) &&
-        (if (generated == true) submittedRows == null && submittedField == null else rowsPath != null && rowsPath.all(::safeFormField))
+        when {
+            generated == true -> submittedRows == null && submittedField == null && submittedValues == null
+            submittedValues != null -> submittedRows == null && submittedField == null && rowsPath?.all(::safeFormField) == true
+            else -> rowsPath?.all(::safeFormField) == true
+        }
 
     internal fun capture(parameters: Map<String, Any?>): Set<Any>? {
         val path = rowsPath ?: return null
         val rows = SelectorUtil.resolveParts(parameters, path, null, strictArrayIndex = true)
-        return keys(rows, submittedPath)
+        return keys(rows, submittedPath.takeIf { submittedValues == null })
             ?: throw InvalidSubmittedIdentity("The submitted rows must contain distinct, nonblank string or safe integer identities.")
     }
 
@@ -34,13 +39,16 @@ data class MutationReceiptIdentityDef(
         return generated == true || actual == submitted
     }
 
-    private fun keys(value: Any?, path: List<String>): Set<Any>? {
+    private fun keys(value: Any?, path: List<String>?): Set<Any>? {
         val rows = value as? List<*> ?: return null
         if (rows.isEmpty()) return null
         val result = HashSet<Any>(rows.size)
         for (row in rows) {
-            if (row !is Map<*, *>) return null
-            val id = receiptId(SelectorUtil.resolveParts(row, path, null, strictArrayIndex = true)) ?: return null
+            val candidate = if (path == null) row else {
+                if (row !is Map<*, *>) return null
+                SelectorUtil.resolveParts(row, path, null, strictArrayIndex = true)
+            }
+            val id = receiptId(candidate) ?: return null
             if (!result.add(id)) return null
         }
         return result

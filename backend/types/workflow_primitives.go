@@ -8,19 +8,29 @@ type MutationPreparationStep struct {
 	Cleanup *MutationCommand       `json:"cleanup,omitempty" yaml:"cleanup,omitempty"`
 }
 
+// MutationGroupMember is an independent writer in a single confirmed operation.
+type MutationGroupMember struct {
+	When    map[string]interface{} `json:"when,omitempty" yaml:"when,omitempty"`
+	Command *MutationCommand       `json:"command" yaml:"command"`
+}
+
 // ReceiptIdentity requires returned row identities to match this invocation.
 type ReceiptIdentity struct {
-	Field          string `json:"field" yaml:"field"`
-	SubmittedRows  string `json:"submittedRows,omitempty" yaml:"submittedRows,omitempty"`
-	SubmittedField string `json:"submittedField,omitempty" yaml:"submittedField,omitempty"`
-	Generated      bool   `json:"generated,omitempty" yaml:"generated,omitempty"`
+	Field           string `json:"field" yaml:"field"`
+	SubmittedValues string `json:"submittedValues,omitempty" yaml:"submittedValues,omitempty"`
+	SubmittedRows   string `json:"submittedRows,omitempty" yaml:"submittedRows,omitempty"`
+	SubmittedField  string `json:"submittedField,omitempty" yaml:"submittedField,omitempty"`
+	Generated       bool   `json:"generated,omitempty" yaml:"generated,omitempty"`
 }
 
 // MutationCommand describes the generic mutation lifecycle shared by workflow
 // primitives. Business validation and persistence remain owned by the target
 // datasource; Forge owns pending/success/error state and reconciliation.
 type MutationCommand struct {
-	ReceiptIdentity *ReceiptIdentity `json:"receiptIdentity,omitempty" yaml:"receiptIdentity,omitempty"`
+	// Group replaces the terminal writer with independently acknowledged writers.
+	// An optional root prepare returns parameter maps keyed by member command ID.
+	Group           []MutationGroupMember `json:"group,omitempty" yaml:"group,omitempty"`
+	ReceiptIdentity *ReceiptIdentity      `json:"receiptIdentity,omitempty" yaml:"receiptIdentity,omitempty"`
 	// ClearFormFields clears the named draft fields after an acknowledged root write if their submitted values are still current.
 	ClearFormFields []string `json:"clearFormFields,omitempty" yaml:"clearFormFields,omitempty"`
 	// ReceiptWhen requires the invocation's normalized rows to confirm the requested operation.
@@ -43,7 +53,7 @@ type MutationCommand struct {
 	InvalidMessage      string                      `json:"invalidMessage,omitempty" yaml:"invalidMessage,omitempty"`
 	TimeoutMs           int                         `json:"timeoutMs,omitempty" yaml:"timeoutMs,omitempty"`
 	InvocationParameter string                      `json:"invocationParameter,omitempty" yaml:"invocationParameter,omitempty"`
-	DataSourceRef       string                      `json:"dataSourceRef" yaml:"dataSourceRef"`
+	DataSourceRef       string                      `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
 	Parameters          []*Parameter                `json:"parameters,omitempty" yaml:"parameters,omitempty"`
 	Payload             *ResourcePayloadPreparation `json:"payload,omitempty" yaml:"payload,omitempty"`
 	ValidateWhen        map[string]interface{}      `json:"validateWhen,omitempty" yaml:"validateWhen,omitempty"`

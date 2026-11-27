@@ -30,7 +30,7 @@ func validatePreparationSteps(window *Window, owner, fallbackID string, root *Mu
 			seen[field] = true
 		}
 	}
-	if len(root.Before) == 0 {
+	if len(root.Before) == 0 && root.Group == nil {
 		return nil
 	}
 	rootID := root.CommandID
@@ -41,7 +41,19 @@ func validatePreparationSteps(window *Window, owner, fallbackID string, root *Mu
 		rootID = root.DataSourceRef
 	}
 	rootID = strings.TrimSpace(rootID)
-	if err := validatePreparationWriter(window, owner, root, checkSources); err != nil {
+	if root.Group != nil {
+		if len(root.Group) == 0 || root.CommandID == "" || !validResourceSelector(root.CommandID) || strings.Contains(root.CommandID, ".") {
+			return fmt.Errorf("%s.group requires a commandId and at least one member", owner)
+		}
+		if root.DataSourceRef != "" || root.Payload != nil || root.Reconcile != nil || root.InvocationParameter != "" ||
+			len(root.Before)+len(root.CleanupState)+len(root.ResultState)+len(root.SuccessFormState)+len(root.ClearFormFields) != 0 ||
+			root.ReceiptIdentity != nil || root.ReceiptWhen != nil || root.RejectedWhen != nil {
+			return fmt.Errorf("%s.group: writer inputs, receipts and reconciliation belong to individual writes", owner)
+		}
+		if err := validateGroupCondition(window, root.ValidateWhen, owner+".validateWhen", checkSources); err != nil {
+			return err
+		}
+	} else if err := validatePreparationWriter(window, owner, root, checkSources); err != nil {
 		return err
 	}
 	ids := map[string]bool{rootID: true}
@@ -54,12 +66,47 @@ func validatePreparationSteps(window *Window, owner, fallbackID string, root *Mu
 			return fmt.Errorf("%s requires a distinct commandId usable as one selector segment", location)
 		}
 		ids[id] = true
-		if len(command.Before) > 0 || len(command.ClearFormFields) > 0 || command.Confirm != "" || command.ConfirmSelection != nil || command.SerializationGroup != "" ||
+		if command.Group != nil || len(command.Before) > 0 || len(command.ClearFormFields) > 0 || command.Confirm != "" || command.ConfirmSelection != nil || command.SerializationGroup != "" ||
 			len(command.PendingState)+len(command.SuccessState)+len(command.SuccessFormState)+len(command.ResultState)+len(command.ErrorState)+len(command.IndeterminateState)+len(command.CleanupState) > 0 ||
 			len(command.Refresh) > 0 || command.Reconcile != nil {
 			return fmt.Errorf("%s: confirmation, sequencing and result lifecycle belong to the root command", location)
 		}
 		return validatePreparationWriter(window, location, command, checkSources)
+	}
+	refs := map[string]bool{}
+	for i, member := range root.Group {
+		memberLocation := fmt.Sprintf("%s.group[%d]", owner, i)
+		location := memberLocation + ".command"
+		if err := validateGroupCondition(window, member.When, memberLocation+".when", checkSources); err != nil {
+			return err
+		}
+		if err := validate(member.Command, location); err != nil {
+			return err
+		}
+		if err := validateGroupCondition(window, member.Command.ValidateWhen, location+".validateWhen", checkSources); err != nil {
+			return err
+		}
+		if err := validateWriterReceipt(member.Command, location); err != nil {
+			return err
+		}
+		ref := member.Command.DataSourceRef
+		if refs[ref] {
+			return fmt.Errorf("%s requires a distinct writer datasource", location)
+		}
+		refs[ref] = true
+	}
+	if root.Group != nil {
+		readers := make(map[string]bool, len(root.Refresh))
+		for _, refresh := range root.Refresh {
+			ref := refresh.DataSourceRef
+			if strings.TrimSpace(ref) == "" || readers[ref] || refs[ref] {
+				return fmt.Errorf("%s.refresh requires distinct reader datasources outside the group writers: %q", owner, ref)
+			}
+			if _, found := window.DataSource[ref]; checkSources && !found {
+				return fmt.Errorf("%s.refresh references unknown datasource %s", owner, ref)
+			}
+			readers[ref] = true
+		}
 	}
 	for i, step := range root.Before {
 		location := fmt.Sprintf("%s.before[%d]", owner, i)
@@ -89,6 +136,56 @@ func validatePreparationSteps(window *Window, owner, fallbackID string, root *Mu
 	return nil
 }
 
+func validateGroupCondition(window *Window, condition map[string]any, owner string, checkSources bool) error {
+	if condition == nil {
+		return nil
+	}
+	return validateConditionTree(condition, owner, func(leaf map[string]any, at string) error {
+		selectors, operators, bounds := 0, 0, 0
+		for key, operand := range leaf {
+			switch key {
+			case "source":
+				source, _ := operand.(string)
+				switch strings.ToLower(source) {
+				case "authorization", "windowform", "filter", "filters", "selection", "input", "metrics", "collection", "control", "formstatus", "row", "form":
+				default:
+					return fmt.Errorf("%s.source requires a supported condition scope", at)
+				}
+				continue
+			case "dataSourceRef":
+				ref, _ := operand.(string)
+				if strings.TrimSpace(ref) == "" {
+					return fmt.Errorf("%s.dataSourceRef requires a datasource", at)
+				}
+				if _, found := window.DataSource[ref]; checkSources && !found {
+					return fmt.Errorf("%s references unknown datasource %s", at, ref)
+				}
+				continue
+			case "field", "selector", "key":
+				selector, _ := operand.(string)
+				if !validResourceSelector(selector) {
+					return fmt.Errorf("%s.%s requires a safe selector", at, key)
+				}
+				selectors++
+				continue
+			default:
+				bound, err := validateInvocationConditionOperand(key, operand, at)
+				if err != nil {
+					return err
+				}
+				if bound {
+					bounds++
+				}
+			}
+			operators++
+		}
+		if selectors != 1 || (operators > 1 && operators != bounds) {
+			return fmt.Errorf("%s requires one selector and either one predicate or numeric bounds", at)
+		}
+		return nil
+	})
+}
+
 // Ordered invocations require a bound writer even when their input is prepared by a hook.
 func validatePreparationWriter(window *Window, owner string, command *MutationCommand, checkSources bool) error {
 	if strings.TrimSpace(command.DataSourceRef) == "" {
@@ -107,10 +204,11 @@ func validatePreparationWriter(window *Window, owner string, command *MutationCo
 
 func validateWriterReceipt(command *MutationCommand, owner string) error {
 	if identity := command.ReceiptIdentity; identity != nil {
-		if !validResourceSelector(identity.Field) || identity.Generated == (identity.SubmittedRows != "") ||
-			(identity.SubmittedRows != "" && !validResourceSelector(identity.SubmittedRows)) ||
-			(identity.SubmittedField != "" && (identity.Generated || !validResourceSelector(identity.SubmittedField))) {
-			return fmt.Errorf("%s.receiptIdentity requires a safe field and either generated or a submitted row selector", owner)
+		rows, values := identity.SubmittedRows != "", identity.SubmittedValues != ""
+		if !validResourceSelector(identity.Field) || rows && values || identity.Generated == (rows || values) ||
+			(rows && !validResourceSelector(identity.SubmittedRows)) || (values && !validResourceSelector(identity.SubmittedValues)) ||
+			(identity.SubmittedField != "" && (!rows || !validResourceSelector(identity.SubmittedField))) {
+			return fmt.Errorf("%s.receiptIdentity requires a safe field and exactly one of generated, submittedRows or submittedValues", owner)
 		}
 	}
 	if command.ReceiptWhen != nil {
@@ -145,16 +243,8 @@ func validateReceiptLeaf(leaf map[string]any, at string) error {
 			}
 			selectors++
 			continue
-		case "contains":
-			if !invariantScalar(operand) {
-				return fmt.Errorf("%s.contains requires a scalar operand", at)
-			}
-		case "matches":
-			if _, ok := operand.(string); !ok {
-				return fmt.Errorf("%s.matches requires a string pattern", at)
-			}
 		default:
-			bound, err := validateConditionOperand(key, operand, at)
+			bound, err := validateInvocationConditionOperand(key, operand, at)
 			if err != nil {
 				return err
 			}
@@ -168,4 +258,22 @@ func validateReceiptLeaf(leaf map[string]any, at string) error {
 		return fmt.Errorf("%s requires one receipt selector and either one predicate or numeric bounds", at)
 	}
 	return nil
+}
+
+// Invocation conditions share the scalar rules used by authoring invariants
+// and also support the two string predicates used by the runtime evaluator.
+func validateInvocationConditionOperand(key string, operand any, at string) (bool, error) {
+	switch key {
+	case "contains":
+		if !invariantScalar(operand) {
+			return false, fmt.Errorf("%s.contains requires a scalar operand", at)
+		}
+	case "matches":
+		if _, ok := operand.(string); !ok {
+			return false, fmt.Errorf("%s.matches requires a string pattern", at)
+		}
+	default:
+		return validateConditionOperand(key, operand, at)
+	}
+	return false, nil
 }
